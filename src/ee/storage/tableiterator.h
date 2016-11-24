@@ -81,6 +81,7 @@ public:
      * @return true if succeeded. false if no more active tuple is there.
     */
     bool next(TableTuple &out);
+
     bool hasNext();
     int getLocation() const;
 
@@ -89,7 +90,7 @@ public:
     }
 
     bool operator ==(const TableIterator &other) const {
-        return m_location == other.getLocation();
+        return m_table == other.m_table && m_location == other.m_location;
     }
 
     bool operator !=(const TableIterator &other) const {

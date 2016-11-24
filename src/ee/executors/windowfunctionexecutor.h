@@ -197,7 +197,11 @@ public:
     void advanceAggs(const TableTuple& tuple,
                      bool newOrderByGroup);
 
-    void advanceAggsToOrderByEdge(TableWindow *window);
+    void lookaheadInOrderByGroupForAggs(TableWindow *window,
+                                        const TableTuple &tuple);
+
+    void lookaheadInPartitionByGroupForAggs(TableWindow *window,
+                                            const TableTuple &tuple);
 
     void insertOutputTuple(WindowAggregateRow* winFunRow);
 
@@ -327,7 +331,7 @@ private:
      */
     TableWindow  * m_tableWindow;
 
-    void processOneRow(TableWindow* window);
+    void processOneRow(TableWindow* window, bool newOrderByGroup);
 };
 
 } /* namespace voltdb */

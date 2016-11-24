@@ -20,9 +20,14 @@
 
 #include "executors/windowfunctionexecutor.h"
 
+#include <sstream>
+#include <memory>
+#include <limits.h>
+
 #include "plannodes/windowfunctionnode.h"
 #include "execution/ProgressMonitorProxy.h"
-#include <sstream>
+#include "common/ValueFactory.hpp"
+
 namespace voltdb {
 
 /**
@@ -36,10 +41,7 @@ struct TableWindow {
           m_orderByEdge(tbl->iterator()),
           m_leadingEdge(tbl->iterator()),
           m_partitionSize(0),
-          m_orderByGroupSize(0),
-          m_beforeFirstRow(true),
-          m_beforeFirstGroup(true),
-          m_afterLastRow(false) {}
+          m_orderByGroupSize(0) {}
     std::string debug() {
         std::stringstream stream;
         stream << "Table Window: [Trailing: "
@@ -67,33 +69,68 @@ struct TableWindow {
      * in findOrderByEdge();
      */
     size_t m_orderByGroupSize;
-    /**
-     * True only on the first row of a table.  We need
-     * this because the last partition by tuple is not
-     * primed on the first row, so we can't compare it
-     * to the inprogress tuple.
-     */
-    bool m_beforeFirstRow;
-    /**
-     * Set to true on the first row of the first group.
-     * We need this because we buffer rows, and because
-     * we look for partitions before order by rows.
-     */
-    bool m_beforeFirstGroup;
-    /**
-     * Set to true if we are looking at the last row
-     * of the table.  We need this because we are
-     * buffering one row always.
-     */
-    bool m_afterLastRow;
 };
 
 /**
  * A WindowAggregate is the base class of aggregate calculations.
- * Each aggregate function has some
+ * In the algorithm for calculating window function values we are
+ * sensitive to some requirements.
+ *   <ol>
+ *     <li>All aggregates look at each input row in each order by group to
+ *         calculate a value at each input row.</li>
+ *     <li>For each such input row, some aggregates can use only values
+ *         which can be computed before the input row, and some need to know
+ *         values after the input row.  For example, RANK and DENSE_RANK
+ *         only need to know how many rows precede the input row.  On the
+ *         other hand, COUNT(*) needs to know how many rows are in the
+ *         order by group of the input row, which includes rows after the
+ *         input row.<li>
+ *     <li>Some aggregates needs to inspect each row to compute values.
+ *         For example, COUNT(E) must evaluate E in each input row in
+ *         the order by group and only count those where the evaluation
+ *         of E is non-null.</li>
+ *   </ol>
+ * Since it's expensive to evaluate expressions when they are not used,
+ * we want to be able to turn off evaluation when it's not needed.
+ *
+ * The aggregate calculation algorithm is this.
+ *   <ol>
+ *     <li>Scan the rows looking for the partition by group.  If there
+ *         are no partition by expressions, there is one big partition.
+ *         <ul>
+ *           <li>At each row in the scan, we call lookaheadOneRowInPartitionByGroup
+ *               on each aggregate unless m_needsPartitionByLookahead is false.
+ *               By setting m_needsPartitionByLookahead to false we can avoid
+ *               argument evaluations for individual aggregates.</li>
+ *           <li>After the end of the scan we call lookaheadPartitionByGroup
+ *               unconditionally.</li>
+ *         </ul></li>
+ *     <li>Scan the partition again looking for order by boundaries.  If there
+ *         are no order by expressions, all rows in the partition are in the
+ *         order by group.
+ *         <ul>
+ *           <li>At each row in the scan we call lookaheadOneRowInOrderByGroup
+ *               on each aggregate unless m_needsOrderByLookahead is false.
+ *               By setting m_needsOrderByLookahead to false we can avoid
+ *               argument evaluation for aggregates which don't need them.</li>
+ *           <li>After the end of the order by group is determined, we call
+ *               lookaheadOrderByGroup on each aggregate unconditionally.</li>
+ *         </ul></li>
+ *     <li>For each row in the order by group we call advance on each
+ *         aggregate unless m_needsAdvance is set to false.  Since some
+ *         aggregates don't need advance, this lets us avoid unnecessary
+ *         argument evaluations.</li>
+ *     <li>Finally, we output the output row.</li>
+ *   </ol>
  */
 class WindowAggregate {
 public:
+    WindowAggregate()
+      : m_partitionSize(0),
+        m_orderByGroupSize(0),
+        m_needsOrderByLookahead(false),
+        m_needsPartitionByLookahead(false),
+        m_needsAdvance(false) {}
     virtual ~WindowAggregate() {
 
     }
@@ -101,28 +138,89 @@ public:
     void operator delete(void*, Pool& memoryPool) { /* NOOP -- on alloc error unroll nothing */ }
     void operator delete(void*) { /* NOOP -- deallocate wholesale with pool */ }
 
-    virtual void advance(const NValueArray &val,
-                         bool newOrderByGroup) = 0;
-
-    virtual void advanceToOrderByEdge(TableWindow *window) {
-        m_partitionSize = window->m_partitionSize;
-        m_orderByGroupSize = window->m_orderByGroupSize;
+    /**
+     * Return true if an aggregate needs to look ahead at
+     * each row when looking ahead through an order by group.
+     */
+    bool needsOrderByLookahead() {
+        return m_needsOrderByLookahead;
+    }
+    /**
+     * Return true if an aggregate needs to look ahead at
+     * each row when looking ahead through a partition by group.
+     */
+    bool needsPartitionByLookahead() {
+        return m_needsPartitionByLookahead;
+    }
+    /**
+     * Return true if an aggregate needs to
+     * each row when scanning an order by group.
+     */
+    bool needsAdvance() {
+        return m_needsAdvance;
     }
 
+    /**
+     * Advance an aggregate value for output.
+     */
+    virtual void advance(const NValueArray &val,
+                         bool newOrderByGroup) {}
+
+    /**
+     * Do calculations needed when scanning ahead for
+     * the end of an order by group.
+     */
+    virtual void lookaheadOneRowInOrderByGroup(TableWindow *window, NValueArray &argValues) {
+    }
+
+    /**
+     * Do calculations needed when scanning ahead for
+     * the end of a partition by group.
+     */
+    virtual void lookaheadOneRowInPartitionByGroup(TableWindow *window, NValueArray &argValues) {
+    }
+
+    /**
+     * Do calculations at the end of a scan of an order by
+     * group.
+     */
+    virtual void lookaheadOrderByGroup(TableWindow *window) {
+        m_orderByGroupSize = window->m_orderByGroupSize;
+    }
+    /**
+     * Do calculations at the end of a scan of a partition by
+     * group.
+     */
+    virtual void lookaheadPartitionGroup(TableWindow *window) {
+        m_partitionSize = window->m_partitionSize;
+    }
+
+    /**
+     * Calculate the final value for the output tuple.
+     */
     virtual NValue finalize(ValueType type)
     {
         m_value.castAs(type);
         return m_value;
     }
 
+    /**
+     * Initialize the aggregate.  This is called at the
+     * beginning of each partition by group.
+     */
     virtual void resetAgg()
     {
         m_value.setNull();
+        m_partitionSize = 0;
+        m_orderByGroupSize = 0;
     }
 protected:
     NValue m_value;
     size_t m_partitionSize;
     size_t m_orderByGroupSize;
+    bool   m_needsOrderByLookahead;
+    bool   m_needsPartitionByLookahead;
+    bool   m_needsAdvance;
 };
 
 /**
@@ -132,35 +230,32 @@ protected:
  */
 class DenseRankAgg : public WindowAggregate {
 public:
-    DenseRankAgg()
-      : m_rank(0) {
+    DenseRankAgg() {
+      m_value = ValueFactory::getBigIntValue(0);
     }
 
     virtual ~DenseRankAgg() {}
-    virtual void advance(const NValueArray &,
-                         bool newOrderByGroup) {
-    }
-    virtual void advanceToOrderByEdge(TableWindow *window) {
-        m_rank += orderByPeerIncrement();
-        WindowAggregate::advanceToOrderByEdge(window);
-    }
+
     virtual NValue finalize(ValueType type) {
-        return ValueFactory::getBigIntValue(m_rank);
+        size_t increment = orderByPeerIncrement();
+        NValue answer = m_value;
+        m_value = m_value.op_add(ValueFactory::getBigIntValue(increment));
+        return answer;
     }
+
     virtual void resetAgg() {
         WindowAggregate::resetAgg();
-        m_rank = 0;
+        m_value = ValueFactory::getBigIntValue(0);
     }
     virtual size_t orderByPeerIncrement() {
         return 1;
     }
-protected:
-    int m_rank;
 };
 
 /**
  * Rank is like dense rank, but we increment
  * the m_rank by the size of the order by group.
+ * This size is set in the base class in lookaheadOrderByGroup.
  */
 class RankAgg : public DenseRankAgg {
 public:
@@ -172,29 +267,121 @@ public:
     }
 };
 
+/**
+ * Count is a bit like rank, but we need to contrive
+ * to calculate when the argument expression is null,
+ * and add the count of non-null rows to the count output
+ * before we advance any rows in the order by group.
+ */
 class CountAgg : public WindowAggregate {
 public:
-    CountAgg()
-      : m_count(0) {}
+    CountAgg() {
+        m_needsOrderByLookahead = true;
+    }
 
     virtual ~CountAgg() {}
-    virtual void advance(const NValueArray &val,
-                         bool newOrderByGroup) {
-        assert(val.size() <= 1);
-        if ((val.size() == 0) || ( ! val[0].isNull())) {
+
+    virtual void lookaheadOneRowInOrderByGroup(TableWindow *window, NValueArray &argVals) {
+        /*
+         * COUNT(*) has no arguments.  If there are arguments,
+         * then don't count the row if the argument value is
+         * NULL.
+         */
+        if (argVals.size() == 0 || ! argVals[0].isNull()) {
+            m_value = m_value.op_add(argVals[0]);
+        }
+    }
+
+    virtual void resetAgg() {
+        WindowAggregate::resetAgg();
+        m_value = ValueFactory::getBigIntValue(0);
+    }
+};
+
+#if  0
+/*
+ * The following are examples of other aggregate definitions.
+ */
+class MinAgg : public WindowAggregate {
+public:
+    MinAgg() {
+        m_value = ValueFactory::getBigIntValue(LONG_MAX);
+        m_needsOrderByLookahead = true;
+    }
+    /**
+     * Calculate the min by looking ahead in the
+     * order by group.
+     */
+    virtual void lookaheadOneRowInOrderByGroup(TableWindow *window, NValueArray &argVals) {
+        assert(argVals.size() == 1);
+        if ( ! argVals[0].isNull()) {
+            if (argVals[0].op_lessThan(m_value)) {
+                m_value = argVals[0];
+            }
+        }
+    }
+};
+
+class MaxAgg : public WindowAggregate {
+public:
+    MaxAgg() {
+        m_value = ValueFactory::getBigIntValue(LONG_MIN);
+        m_needsOrderByLookahead = true;
+    }
+    /**
+     * Calculate the min by looking ahead in the
+     * order by group.
+     */
+    virtual void lookaheadOneRowInOrderByGroup(TableWindow *window, NValueArray &argVals) {
+        assert(argVals.size() == 1);
+        if ( ! argVals[0].isNull()) {
+            if (argVals[0].op_greaterThan(m_value)) {
+                m_value = argVals[0];
+            }
+        }
+    }
+};
+
+class SumAgg : public WindowAggregate {
+public:
+    SumAgg() {
+        m_needsOrderByLookahead = true;
+    }
+    /**
+     * Calculate the min by looking ahead in the
+     * order by group.
+     */
+    virtual void lookaheadOneRowInOrderByGroup(TableWindow *window, NValueArray &argVals) {
+        assert(argVals.size() == 1);
+        if ( ! argVals[0].isNull()) {
+            m_value = m_value.op_add(argVals[0]);
+        }
+    }
+};
+
+class AvgAgg : public WindowAggregate {
+public:
+    AvgAgg()
+      : m_count(0) {
+        m_needsOrderByLookahead = true;
+    }
+    virtual void lookaheadOneRowInOrderByGroup(TableWindow *window, NValueArray &argVals) {
+        assert(argVals.size() == 1);
+        if ( ! argVals[0].isNull() ) {
+            m_value = m_value.op_add(argVals[0]);
             m_count += 1;
         }
     }
     virtual NValue finalize(ValueType type) {
-        return ValueFactory::getBigIntValue(m_count);
-    }
-    virtual void resetAgg() {
-        WindowAggregate::resetAgg();
-        m_count = 0;
+        if (m_count == 0) {
+            throw SQLException("Division by zero");
+        }
+        return m_value.op_divide(ValueFactory::getDoubleValue(m_count));
     }
 private:
-    long m_count;
+    int64_t m_count;
 };
+#endif
 
 /**
  * This class is fancification of a C array of pointers to
@@ -336,10 +523,35 @@ inline void WindowFunctionExecutor::initAggInstances()
     }
 }
 
-inline void WindowFunctionExecutor::advanceAggsToOrderByEdge(TableWindow *window) {
+inline void WindowFunctionExecutor::lookaheadInOrderByGroupForAggs(TableWindow *window,
+                                                                   const TableTuple &tuple) {
     WindowAggregate** aggs = m_aggregateRow->getAggregates();
     for (int ii = 0; ii < m_aggTypes.size(); ii++) {
-        aggs[ii]->advanceToOrderByEdge(window);
+        if (aggs[ii]->needsOrderByLookahead()) {
+            const AbstractPlanNode::OwningExpressionVector &inputExprs
+                = getAggregateInputExpressions()[ii];
+            NValueArray vals(inputExprs.size());
+            for (int idx = 0; idx < inputExprs.size(); idx += 1) {
+                vals[idx] = inputExprs[idx]->eval(&tuple);
+            }
+            aggs[ii]->lookaheadOneRowInOrderByGroup(window, vals);
+        }
+    }
+}
+
+inline void WindowFunctionExecutor::lookaheadInPartitionByGroupForAggs(TableWindow *window,
+                                                                       const TableTuple &tuple) {
+    WindowAggregate** aggs = m_aggregateRow->getAggregates();
+    for (int ii = 0; ii < m_aggTypes.size(); ii++) {
+        if (aggs[ii]->needsOrderByLookahead()) {
+            const AbstractPlanNode::OwningExpressionVector &inputExprs
+                = getAggregateInputExpressions()[ii];
+            NValueArray vals(inputExprs.size());
+            for (int idx = 0; idx < inputExprs.size(); idx += 1) {
+                vals[idx] = inputExprs[idx]->eval(&tuple);
+            }
+            aggs[ii]->lookaheadOneRowInPartitionByGroup(window, vals);
+        }
     }
 }
 
@@ -349,13 +561,15 @@ inline void WindowFunctionExecutor::advanceAggs(const TableTuple& tuple,
     m_aggregateRow->recordPassThroughTuple(tuple);
     WindowAggregate **aggs = m_aggregateRow->getAggregates();
     for (int ii = 0; ii < m_aggTypes.size(); ii++) {
-        const AbstractPlanNode::OwningExpressionVector &inputExprs
-            = getAggregateInputExpressions()[ii];
-        NValueArray vals(inputExprs.size());
-        for (int idx = 0; idx < inputExprs.size(); idx += 1) {
-            vals[idx] = inputExprs[0]->eval(&tuple);
+        if (aggs[ii]->needsAdvance()) {
+            const AbstractPlanNode::OwningExpressionVector &inputExprs
+                = getAggregateInputExpressions()[ii];
+            NValueArray vals(inputExprs.size());
+            for (int idx = 0; idx < inputExprs.size(); idx += 1) {
+                vals[idx] = inputExprs[idx]->eval(&tuple);
+            }
+            aggs[ii]->advance(vals, newOrderByGroup);
         }
-        aggs[ii]->advance(vals, newOrderByGroup);
     }
 }
 
@@ -421,15 +635,8 @@ struct ScopedNullingPointer {
     ProgressMonitorProxy    * & m_ptr;
 };
 
-void WindowFunctionExecutor::processOneRow(TableWindow* window)
+void WindowFunctionExecutor::processOneRow(TableWindow* window, bool newOrderByGroup)
 {
-    VOLT_TRACE("middleEdge: Window = %s", window->debug().c_str());
-    TableTuple nextTuple(m_inputSchema);
-    window->m_middleEdge.next(nextTuple);
-    m_pmp->countdownProgress();
-    advanceAggs(nextTuple, window->m_beforeFirstGroup);
-    window->m_beforeFirstGroup = false;
-    insertOutputTuple(m_aggregateRow);
 }
 
 /*
@@ -451,7 +658,7 @@ bool WindowFunctionExecutor::p_execute(const NValueArray& params) {
     m_inputSchema = input_table->schema();
     assert(m_inputSchema);
 
-    boost::scoped_ptr<TableWindow>  scoped_window(new TableWindow(input_table));
+    boost::shared_ptr<TableWindow>  scoped_window(new TableWindow(input_table));
     TableWindow *window = scoped_window.get();
     ProgressMonitorProxy pmp(m_engine, this);
     /*
@@ -468,14 +675,19 @@ bool WindowFunctionExecutor::p_execute(const NValueArray& params) {
 
     initAggInstances();
 
+    TableTuple nextTuple(m_inputSchema);
     while (findLeadingEdge(window)) {
         VOLT_TRACE("LeadingEdge: %s", window->debug().c_str());
         m_aggregateRow->resetAggs();
         while (findOrderByEdge(window)) {
             VOLT_TRACE("OrderByEdge: %s", window->debug().c_str());
-            advanceAggsToOrderByEdge(window);
             for (int idx = 0; idx < window->m_orderByGroupSize; idx += 1) {
-                processOneRow(window);
+                VOLT_TRACE("middleEdge: Window = %s", window->debug().c_str());
+                TableTuple nextTuple(m_inputSchema);
+                window->m_middleEdge.next(nextTuple);
+                m_pmp->countdownProgress();
+                advanceAggs(nextTuple, idx == 0);
+                insertOutputTuple(m_aggregateRow);
             }
         }
     }
@@ -487,94 +699,113 @@ bool WindowFunctionExecutor::p_execute(const NValueArray& params) {
     return true;
 }
 
-bool WindowFunctionExecutor::findLeadingEdge(TableWindow *window) {
+bool WindowFunctionExecutor::findLeadingEdge(TableWindow *window)
+{
     TableTuple nextTuple(m_inputSchema);
-    window->m_partitionSize = 0;
-    if ( ! window->m_leadingEdge.hasNext()) {
-        if ( ! window->m_beforeFirstRow && ! window->m_afterLastRow ) {
-            /*
-             * If it's not before the first row we have one row
-             * in our buffer.  If in addition we can't
-             * read the next row, then the partition has
-             * size 1.
-             */
-            window->m_afterLastRow = true;
-            window->m_partitionSize += 1;
-            return true;
-        } else {
-            /*
-             * If we don't have a next leading edge row,
-             * and it is the first row or else we have
-             * processed the last row, then we are completely
-             * done.
-             */
-            window->m_trailingEdge = window->m_middleEdge = window->m_orderByEdge = window->m_leadingEdge;
-            window->m_partitionSize = 0;
-            return false;
-        }
-    }
+
+    assert(window->m_middleEdge == window->m_leadingEdge);
+    window->m_trailingEdge = window->m_leadingEdge;
+
     /*
-     * Now we know there is a next row for the leading edge.
+     * This is a theme.  We copy an iterator and increment the
+     * copy.  If like the result we copy the copy back into
+     * the iterator.  This lets us look ahead one row without
+     * completely committing to it.
      */
-    do {
-        VOLT_TRACE("findLeadingEdge: Window = %s", window->debug().c_str());
-        if ( ! window->m_leadingEdge.next(nextTuple)) {
-            /*
-             * If there is no next row, then the buffered row
-             * must be in the same partition as the last row.
-             * So, just push past it.
-             */
-            window->m_partitionSize += 1;
-            window->m_beforeFirstRow = false;
-            window->m_afterLastRow = true;
-            break;
-        } else {
-            /*
-             * If there is a next row, we may have just read
-             * the very first row, or we may have a buffered row
-             * already. If this is the very first row, just
-             * push past it.  Otherwise, compare this next row
-             * with the previous row.  If it's different, then
-             * we are done with this partition.  But we have
-             * a buffered row in the in progress partition.
-             */
-            initPartitionByKeyTuple(nextTuple);
-            if (!window->m_beforeFirstRow
-                    && compareTuples(getInProgressPartitionByKeyTuple(),
-                                     getLastPartitionByKeyTuple()) != 0) {
-                break;
-            }
-            window->m_beforeFirstRow = false;
-        }
-    } while (true);
-    VOLT_TRACE("findLeadingEdge(end): Window = %s", window->debug().c_str());
-    return true;
-}
-
-bool WindowFunctionExecutor::findOrderByEdge(TableWindow *window) {
-    TableTuple nextTuple(m_inputSchema);
-
-    window->m_orderByGroupSize = (window->m_beforeFirstGroup ? 0 : 1);
-    if (window->m_orderByEdge == window->m_leadingEdge) {
+    TableIterator nextEdge = window->m_leadingEdge;
+    /*
+     * The first row is slightly special.  We
+     * don't have any rows yet, so we need to
+     * prime the system.
+     */
+    // VOLT_TRACE("findLeadingEdge(start): %s", window->debug().c_str());
+    if (nextEdge.next(nextTuple)) {
+        initPartitionByKeyTuple(nextTuple);
+        lookaheadInPartitionByGroupForAggs(window, nextTuple);
+        /* First row.  Nothing to compare it with. */
+        window->m_partitionSize = 1;
+    } else {
+       /*
+        * If there is no first row, then just
+        * return false.  The leading edge iterator
+        * will never have a next row, so we can
+        * ask for its next again and will always get false.
+        */
+        window->m_partitionSize = 0;
         return false;
     }
     do {
-        VOLT_TRACE("findOrderByEdge: Window = %s", window->debug().c_str());
-        window->m_orderByGroupSize += 1;
-        if (window->m_orderByEdge != window->m_leadingEdge) {
-            window->m_orderByEdge.next(nextTuple);
-            initOrderByKeyTuple(nextTuple);
-            if (!window->m_beforeFirstGroup
-                    && compareTuples(getInProgressOrderByKeyTuple(),
-                                     getLastOrderByKeyTuple()) != 0) {
-                break;
+        // VOLT_TRACE("findLeadingEdge(loopStart): %s", window->debug().c_str());
+        window->m_leadingEdge = nextEdge;
+        if (nextEdge.next(nextTuple)) {
+            initPartitionByKeyTuple(nextTuple);
+            if (compareTuples(getInProgressPartitionByKeyTuple(),
+                              getLastPartitionByKeyTuple()) != 0) {
+                return true;
+            } else {
+                lookaheadInPartitionByGroupForAggs(window, nextTuple);
+                window->m_partitionSize += 1;
             }
-            window->m_beforeFirstGroup = false;
+            VOLT_TRACE("findLeadingEdge(loop): %s", window->debug().c_str());
         } else {
-            break;
+            return true;
         }
     } while (true);
-    VOLT_TRACE("findOrderByEdge(end): Window = %s", window->debug().c_str());
+    // VOLT_TRACE("findLeadingEdge(end): %s", window->debug().c_str());
+    return true;
+}
+
+bool WindowFunctionExecutor::findOrderByEdge(TableWindow *window)
+{
+    TableTuple nextTuple(m_inputSchema);
+
+    assert(window->m_middleEdge == window->m_orderByEdge);
+    TableIterator nextEdge = window->m_orderByEdge;
+    /*
+     * The first row is slightly special.  We
+     * don't have any rows yet, so we need to
+     * prime the system.
+     */
+    // VOLT_TRACE("findOrderByEdge(start): %s", window->debug().c_str());
+    if (nextEdge != window->m_leadingEdge) {
+        if ( ! nextEdge.next(nextTuple) ) {
+            // How can this be true?
+            window->m_orderByGroupSize = 0;
+            return false;
+        }
+        initOrderByKeyTuple(nextTuple);
+        /* First row.  Nothing to compare it with. */
+        window->m_orderByGroupSize = 1;
+        lookaheadInOrderByGroupForAggs(window, nextTuple);
+    } else {
+       /*
+        * If there is no first row, then just
+        * return false.  The leading edge iterator
+        * will never have a next row, so we can
+        * ask for its next again and will always get false.
+        */
+        window->m_orderByGroupSize = 0;
+        return false;
+    }
+    do {
+        window->m_orderByEdge = nextEdge;
+        // VOLT_TRACE("findOrderByEdge(loopStart): %s", window->debug().c_str());
+        if (nextEdge != window->m_leadingEdge) {
+            nextEdge.next(nextTuple);
+            initOrderByKeyTuple(nextTuple);
+            if (compareTuples(getInProgressOrderByKeyTuple(),
+                              getLastOrderByKeyTuple()) != 0) {
+                return true;
+            } else {
+                window->m_orderByGroupSize += 1;
+                lookaheadInOrderByGroupForAggs(window, nextTuple);
+            }
+            VOLT_TRACE("findOrderByEdge(loop): %s", window->debug().c_str());
+        } else {
+            return true;
+        }
+    } while (true);
+    // VOLT_TRACE("findOrderByEdge(end): %s", window->debug().c_str());
     return true;
 }
 
