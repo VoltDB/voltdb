@@ -551,12 +551,12 @@ class VoltNetwork implements Runnable, IOStatsIntf
     }
 
     public Set<Connection> getConnections() {
-        SettableFuture<Set<Connection>> connectionsFuture = SettableFuture.create();
+        final SettableFuture<Set<Connection>> connectionsFuture = SettableFuture.create();
         m_tasks.offer(new Runnable() {
             @Override
             public void run() {
                 // Make a copy of m_ports to avoid concurrent modification
-                connectionsFuture.set(new HashSet<>(m_ports));
+                connectionsFuture.set(new HashSet<Connection>(m_ports));
             }
         });
         try {
