@@ -18,8 +18,8 @@ cp src/frontend/org/voltdb/dbmonitor/js/sha256.js src/frontend/org/voltdb/dbmoni
 
 cp src/frontend/org/voltdb/dbmonitor/js/split.min.js src/frontend/org/voltdb/dbmonitor/js-min/
 
-cp src/frontend/org/voltdb/dbmonitor/js/jquery-ui.min.js src/frontend/org/voltdb/dbmonitor/js-min/
 
+java -jar lib/yuicompressor-2.4.8.jar src/frontend/org/voltdb/dbmonitor/js/jquery-ui.js -o src/frontend/org/voltdb/dbmonitor/js-min/jquery-ui.min.js
 
 java -jar lib/yuicompressor-2.4.8.jar src/frontend/org/voltdb/dbmonitor/js/voltdb.config.js -o src/frontend/org/voltdb/dbmonitor/js-min/voltdb.config.min.js
 
