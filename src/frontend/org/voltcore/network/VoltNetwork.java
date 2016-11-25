@@ -61,6 +61,7 @@
 
 package org.voltcore.network;
 
+import com.google_voltpatches.common.util.concurrent.SettableFuture;
 import io.netty_voltpatches.NinjaKeySet;
 
 import java.io.IOException;
@@ -79,6 +80,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -549,8 +551,18 @@ class VoltNetwork implements Runnable, IOStatsIntf
     }
 
     public Set<Connection> getConnections() {
-        Set<Connection> conns = new HashSet<>();
-        conns.addAll(m_ports);
-        return conns;
+        SettableFuture<Set<Connection>> connectionsFuture = SettableFuture.create();
+        m_tasks.offer(new Runnable() {
+            @Override
+            public void run() {
+                // Make a copy of m_ports to avoid concurrent modification
+                connectionsFuture.set(new HashSet<>(m_ports));
+            }
+        });
+        try {
+            return connectionsFuture.get();
+        } catch (InterruptedException | ExecutionException e) {
+            return new HashSet<>();
+        }
     }
 }
