@@ -559,6 +559,7 @@ class VoltNetwork implements Runnable, IOStatsIntf
                 connectionsFuture.set(new HashSet<Connection>(m_ports));
             }
         });
+        m_selector.wakeup();
         try {
             return connectionsFuture.get();
         } catch (InterruptedException | ExecutionException e) {
