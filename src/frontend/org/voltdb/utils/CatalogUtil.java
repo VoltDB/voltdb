@@ -143,6 +143,7 @@ import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
 import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.collect.Sets;
+import com.google_voltpatches.common.net.HostAndPort;
 import org.voltdb.compiler.deploymentfile.SnmpType;
 
 /**
@@ -1612,7 +1613,18 @@ public abstract class CatalogUtil {
         }
         //Validate Snmp Configuration.
         if (snmpType.getTarget() == null || snmpType.getTarget().trim().length() == 0) {
-            throw new RuntimeException("Target must be specified for SNMP configuration.");
+            throw new IllegalArgumentException("Target must be specified for SNMP configuration.");
+        }
+        //Must be a good host and port
+        HostAndPort hap = HostAndPort.fromString(snmpType.getTarget());
+        if (hap == null || !hap.hasPort()) {
+            throw new IllegalArgumentException("Target must be specified as host:port");
+        }
+        if (snmpType.getAuthkey() != null && snmpType.getAuthkey().length() < 8) {
+            throw new IllegalArgumentException("SNMP Authkey must be > 8 characters.");
+        }
+        if (snmpType.getPrivacykey() != null && snmpType.getPrivacykey().length() < 8) {
+            throw new IllegalArgumentException("SNMP Privacy Key must be > 8 characters.");
         }
     }
 

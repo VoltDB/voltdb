@@ -93,9 +93,9 @@
     <xs:attribute name="community" type="xs:string" default="public"/>
     <xs:attribute name="username" type="xs:string" />
     <xs:attribute name="authprotocol" type="xs:string" default="SHA"/>
-    <xs:attribute name="authkey" type="xs:string" default="authkey" />
+    <xs:attribute name="authkey" type="xs:string" />
     <xs:attribute name="privacyprotocol" type="xs:string" default="AES" />
-    <xs:attribute name="privacykey" type="xs:string" default="privacykey" />
+    <xs:attribute name="privacykey" type="xs:string" />
   </xs:complexType>
 
   <!-- <consistency> -->
