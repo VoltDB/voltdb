@@ -156,7 +156,13 @@ public class VoltNetworkPool {
     public Set<Connection> getConnections() {
         Set<Connection> conns = new HashSet<>();
         for (VoltNetwork vn : m_networks) {
-            conns.addAll(vn.getConnections());
+            Set<Connection> connsForNetwork;
+            try {
+                connsForNetwork = vn.getConnections().get();
+            } catch (InterruptedException | ExecutionException e) {
+                connsForNetwork = new HashSet<>();
+            }
+            conns.addAll(connsForNetwork);
         }
         return conns;
     }
