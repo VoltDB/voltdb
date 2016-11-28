@@ -170,6 +170,42 @@ public class MiscUtils {
                 public boolean isCommandLoggingAllowed() {
                     return false;
                 }
+
+                @Override
+                public boolean isAWSMarketplace() {
+                    return false;
+                }
+
+                @Override
+                public boolean isEnterprise() {
+                    return false;
+                }
+
+                @Override
+                public boolean isPro() {
+                    return false;
+                }
+
+                @Override
+                public String licensee() {
+                    return "VoltDB Community Edition User";
+                }
+
+                @Override
+                public Calendar issued() {
+                    Calendar result = Calendar.getInstance();
+                    return result;
+                }
+
+                @Override
+                public String note() {
+                    return "";
+                }
+
+                @Override
+                public boolean hardExpiration() {
+                    return false;
+                }
             };
         }
 
@@ -274,14 +310,25 @@ public class MiscUtils {
             return false;
         }
 
+        // for now, bail on AWS licenses entirely - will enable this in another commit
+        if (licenseApi.isAWSMarketplace()) {
+            hostLog.fatal("VoltDB AWS Marketplace licenses not yet supported.");
+            return false;
+        }
+
         Calendar now = GregorianCalendar.getInstance();
         SimpleDateFormat sdf = new SimpleDateFormat("MMM d, yyyy");
         String expiresStr = sdf.format(licenseApi.expires().getTime());
         boolean valid = true;
 
         if (now.after(licenseApi.expires())) {
-            if (licenseApi.isTrial()) {
-                hostLog.fatal("VoltDB trial license expired on " + expiresStr + ".");
+            if (licenseApi.hardExpiration()) {
+                if (licenseApi.isTrial()) {
+                    hostLog.fatal("VoltDB trial license expired on " + expiresStr + ".");
+                }
+                else {
+                    hostLog.fatal("VoltDB license expired on " + expiresStr + ".");
+                }
                 hostLog.fatal("Please contact sales@voltdb.com to request a new license.");
                 return false;
             }
@@ -300,27 +347,29 @@ public class MiscUtils {
             }
         }
 
+        // check node count
+        if (licenseApi.maxHostcount() < numberOfNodes) {
+            // Enterprise gets a pass on this one for now
+            if (licenseApi.isEnterprise()) {
+                hostLog.error("Warning, VoltDB commercial license for " + licenseApi.maxHostcount() +
+                        " nodes, starting cluster with " + numberOfNodes + " nodes.");
+                valid = false;
+            }
+            // Trial, Pro & AWS licenses have a hard enforced limit
+            else {
+                hostLog.fatal("Warning, VoltDB license for a " + licenseApi.maxHostcount() + " node " +
+                        "attempted for use with a " + numberOfNodes + " node cluster.");
+                return false;
+            }
+        }
+
         // print out trial success message
         if (licenseApi.isTrial()) {
             consoleLog.info("Starting VoltDB with trial license. License expires on " + expiresStr + ".");
             return true;
         }
 
-        // ASSUME CUSTOMER LICENSE HERE
-
-        // single node product strictly enforces the single node detail...
-        if (licenseApi.maxHostcount() == 1 && numberOfNodes > 1) {
-            hostLog.fatal("Warning, VoltDB commercial license for a 1 node " +
-                    "attempted for use with a " + numberOfNodes + " node cluster." +
-                    " A single node subscription is only valid with a single node cluster.");
-            return false;
-        }
-        // multi-node commercial licenses only warn
-        else if (numberOfNodes > licenseApi.maxHostcount()) {
-            hostLog.error("Warning, VoltDB commercial license for " + licenseApi.maxHostcount() +
-                          " nodes, starting cluster with " + numberOfNodes + " nodes.");
-            valid = false;
-        }
+        // ASSUME NON-TRIAL LICENSE HERE
 
         // this gets printed even if there are non-fatal problems, so it
         // injects the word "invalid" to make it clear this is the case
@@ -337,14 +386,13 @@ public class MiscUtils {
         // The original license is only a whole data (no minutes/millis).
         // There should thus be no issue with daylight savings time,
         // but just in case, if the diff is a negative number, round up to zero.
-        if (diff < 0)
-        {
+        if (diff < 0) {
             diff = 0;
         }
         long diffDays = diff / (24 * 60 * 60 * 1000);
         if ((diff > 0) && (diff <= 30))
         {
-            msg = "Warning, VoltDB commercial license expires in " + diffDays + " day(s).";
+            msg = "Warning: VoltDB license expires in " + diffDays + " day(s).";
             consoleLog.info(msg);
         }
 
