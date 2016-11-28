@@ -284,10 +284,9 @@ public:
     virtual void lookaheadOneRowInOrderByGroup(TableWindow *window, NValueArray &argVals) {
         /*
          * COUNT(*) has no arguments.  If there are arguments,
-         * then don't count the row if the argument value is
-         * NULL.
+         * and the argument value is null, then don't count the row.
          */
-        if (argVals.size() == 0 || ! argVals[0].isNull()) {
+        if (argVals.size() > 0 && ! argVals[0].isNull()) {
             m_value = m_value.op_add(argVals[0]);
         }
     }
