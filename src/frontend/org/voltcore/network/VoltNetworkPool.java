@@ -154,11 +154,15 @@ public class VoltNetworkPool {
     }
 
     public Set<Connection> getConnections() {
-        Set<Connection> conns = new HashSet<>();
+        List<Future<Set<Connection>>> futures = new ArrayList<>(m_networks.length);
         for (VoltNetwork vn : m_networks) {
+            futures.add(vn.getConnections());
+        }
+        Set<Connection> conns = new HashSet<>();
+        for (Future<Set<Connection>> fut : futures) {
             Set<Connection> connsForNetwork;
             try {
-                connsForNetwork = vn.getConnections().get();
+                connsForNetwork = fut.get();
             } catch (InterruptedException | ExecutionException e) {
                 connsForNetwork = new HashSet<>();
             }
