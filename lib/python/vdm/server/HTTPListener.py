@@ -1435,9 +1435,13 @@ class StartLocalServerAPI(MethodView):
             sid = -1
             if 'pause' in request.args:
                 pause = request.args.get('pause')
+            else:
+                pause = "false"
 
             if 'force' in request.args:
                 force = request.args.get('force')
+            else:
+                force = "false"
 
             if 'id' in request.args:
                 sid = int(request.args.get('id'))
