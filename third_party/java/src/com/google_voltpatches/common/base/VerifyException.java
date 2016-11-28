@@ -16,7 +16,6 @@ package com.google_voltpatches.common.base;
 
 import com.google_voltpatches.common.annotations.Beta;
 import com.google_voltpatches.common.annotations.GwtCompatible;
-
 import javax.annotation_voltpatches.Nullable;
 
 /**

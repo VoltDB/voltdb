@@ -19,7 +19,6 @@ package com.google_voltpatches.common.collect;
 import static com.google_voltpatches.common.base.Preconditions.checkNotNull;
 
 import com.google_voltpatches.common.annotations.GwtCompatible;
-
 import java.io.Serializable;
 
 /** An ordering that uses the natural order of the values. */
@@ -28,11 +27,32 @@ import java.io.Serializable;
 final class NaturalOrdering extends Ordering<Comparable> implements Serializable {
   static final NaturalOrdering INSTANCE = new NaturalOrdering();
 
+  private transient Ordering<Comparable> nullsFirst;
+  private transient Ordering<Comparable> nullsLast;
+
   @Override
   public int compare(Comparable left, Comparable right) {
     checkNotNull(left); // for GWT
     checkNotNull(right);
     return left.compareTo(right);
+  }
+
+  @Override
+  public <S extends Comparable> Ordering<S> nullsFirst() {
+    Ordering<Comparable> result = nullsFirst;
+    if (result == null) {
+      result = nullsFirst = super.nullsFirst();
+    }
+    return (Ordering<S>) result;
+  }
+
+  @Override
+  public <S extends Comparable> Ordering<S> nullsLast() {
+    Ordering<Comparable> result = nullsLast;
+    if (result == null) {
+      result = nullsLast = super.nullsLast();
+    }
+    return (Ordering<S>) result;
   }
 
   @Override

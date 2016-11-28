@@ -22,8 +22,9 @@ import static com.google_voltpatches.common.base.Preconditions.checkNotNull;
 import com.google_voltpatches.common.annotations.Beta;
 import com.google_voltpatches.common.annotations.GwtCompatible;
 import com.google_voltpatches.common.annotations.VisibleForTesting;
-
+import com.google_voltpatches.errorprone.annotations.CanIgnoreReturnValue;
 import java.io.Serializable;
+import java.util.ArrayDeque;
 import java.util.Collection;
 import java.util.Queue;
 
@@ -51,7 +52,7 @@ public final class EvictingQueue<E> extends ForwardingQueue<E> implements Serial
 
   private EvictingQueue(int maxSize) {
     checkArgument(maxSize >= 0, "maxSize (%s) must >= 0", maxSize);
-    this.delegate = Platform.newFastestQueue(maxSize);
+    this.delegate = new ArrayDeque<E>(maxSize);
     this.maxSize = maxSize;
   }
 
@@ -87,6 +88,7 @@ public final class EvictingQueue<E> extends ForwardingQueue<E> implements Serial
    * @return {@code true} always
    */
   @Override
+  @CanIgnoreReturnValue
   public boolean offer(E e) {
     return add(e);
   }
@@ -98,6 +100,7 @@ public final class EvictingQueue<E> extends ForwardingQueue<E> implements Serial
    * @return {@code true} always
    */
   @Override
+  @CanIgnoreReturnValue
   public boolean add(E e) {
     checkNotNull(e); // check before removing
     if (maxSize == 0) {
@@ -111,7 +114,13 @@ public final class EvictingQueue<E> extends ForwardingQueue<E> implements Serial
   }
 
   @Override
+  @CanIgnoreReturnValue
   public boolean addAll(Collection<? extends E> collection) {
+    int size = collection.size();
+    if (size >= maxSize) {
+      clear();
+      return Iterables.addAll(this, Iterables.skip(collection, size - maxSize));
+    }
     return standardAddAll(collection);
   }
 
@@ -121,6 +130,7 @@ public final class EvictingQueue<E> extends ForwardingQueue<E> implements Serial
   }
 
   @Override
+  @CanIgnoreReturnValue
   public boolean remove(Object object) {
     return delegate().remove(checkNotNull(object));
   }

@@ -132,6 +132,16 @@ public interface OpTypes {
             return "PERCENT_RANK";
         case WINDOWED_CUME_DIST:
             return "CUME_DIST";
+        case AVG:
+        	return "AVG";
+        case MIN:
+        	return "MIN";
+        case MAX:
+        	return "MAX";
+        case COUNT:
+        	return "COUNT";
+        case SUM:
+        	return "SUM";
         default:
             return "UnsupportedOp(" + opType + ")";
         }

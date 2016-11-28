@@ -1016,7 +1016,7 @@ public abstract class SubPlanAssembler {
             // we don't want to consider the order by at all.
             // Note that this is the content of ENG-10474.
             ParsedSelectStmt pss = (ParsedSelectStmt)m_parsedStmt;
-            if (pss.hasWindowedExpression()) {
+            if (pss.hasWindowFunctionExpression()) {
                 return 0;
             }
         }

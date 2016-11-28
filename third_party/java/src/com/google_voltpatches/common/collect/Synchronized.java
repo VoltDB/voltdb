@@ -21,7 +21,7 @@ import static com.google_voltpatches.common.base.Preconditions.checkNotNull;
 import com.google_voltpatches.common.annotations.GwtCompatible;
 import com.google_voltpatches.common.annotations.GwtIncompatible;
 import com.google_voltpatches.common.annotations.VisibleForTesting;
-
+import com.google_voltpatches.j2objc.annotations.RetainedWith;
 import java.io.IOException;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
@@ -40,7 +40,6 @@ import java.util.RandomAccess;
 import java.util.Set;
 import java.util.SortedMap;
 import java.util.SortedSet;
-
 import javax.annotation_voltpatches.Nullable;
 
 /**
@@ -87,14 +86,14 @@ final class Synchronized {
     // they don't contain any non-transient member variables, while the
     // following writeObject() handles the SynchronizedObject members.
 
-    @GwtIncompatible("java.io.ObjectOutputStream")
+    @GwtIncompatible // java.io.ObjectOutputStream
     private void writeObject(ObjectOutputStream stream) throws IOException {
       synchronized (mutex) {
         stream.defaultWriteObject();
       }
     }
 
-    @GwtIncompatible("not needed in emulated source")
+    @GwtIncompatible // not needed in emulated source
     private static final long serialVersionUID = 0;
   }
 
@@ -1160,6 +1159,7 @@ final class Synchronized {
   static class SynchronizedBiMap<K, V> extends SynchronizedMap<K, V>
       implements BiMap<K, V>, Serializable {
     private transient Set<V> valueSet;
+    @RetainedWith
     private transient BiMap<V, K> inverse;
 
     private SynchronizedBiMap(
@@ -1267,7 +1267,7 @@ final class Synchronized {
     private static final long serialVersionUID = 0;
   }
 
-  @GwtIncompatible("NavigableSet")
+  @GwtIncompatible // NavigableSet
   @VisibleForTesting
   static class SynchronizedNavigableSet<E> extends SynchronizedSortedSet<E>
       implements NavigableSet<E> {
@@ -1382,28 +1382,28 @@ final class Synchronized {
     private static final long serialVersionUID = 0;
   }
 
-  @GwtIncompatible("NavigableSet")
+  @GwtIncompatible // NavigableSet
   static <E> NavigableSet<E> navigableSet(NavigableSet<E> navigableSet, @Nullable Object mutex) {
     return new SynchronizedNavigableSet<E>(navigableSet, mutex);
   }
 
-  @GwtIncompatible("NavigableSet")
+  @GwtIncompatible // NavigableSet
   static <E> NavigableSet<E> navigableSet(NavigableSet<E> navigableSet) {
     return navigableSet(navigableSet, null);
   }
 
-  @GwtIncompatible("NavigableMap")
+  @GwtIncompatible // NavigableMap
   static <K, V> NavigableMap<K, V> navigableMap(NavigableMap<K, V> navigableMap) {
     return navigableMap(navigableMap, null);
   }
 
-  @GwtIncompatible("NavigableMap")
+  @GwtIncompatible // NavigableMap
   static <K, V> NavigableMap<K, V> navigableMap(
       NavigableMap<K, V> navigableMap, @Nullable Object mutex) {
     return new SynchronizedNavigableMap<K, V>(navigableMap, mutex);
   }
 
-  @GwtIncompatible("NavigableMap")
+  @GwtIncompatible // NavigableMap
   @VisibleForTesting
   static class SynchronizedNavigableMap<K, V> extends SynchronizedSortedMap<K, V>
       implements NavigableMap<K, V> {
@@ -1582,7 +1582,7 @@ final class Synchronized {
     private static final long serialVersionUID = 0;
   }
 
-  @GwtIncompatible("works but is needed only for NavigableMap")
+  @GwtIncompatible // works but is needed only for NavigableMap
   private static <K, V> Entry<K, V> nullableSynchronizedEntry(
       @Nullable Entry<K, V> entry, @Nullable Object mutex) {
     if (entry == null) {
@@ -1591,7 +1591,7 @@ final class Synchronized {
     return new SynchronizedEntry<K, V>(entry, mutex);
   }
 
-  @GwtIncompatible("works but is needed only for NavigableMap")
+  @GwtIncompatible // works but is needed only for NavigableMap
   private static class SynchronizedEntry<K, V> extends SynchronizedObject implements Entry<K, V> {
 
     SynchronizedEntry(Entry<K, V> delegate, @Nullable Object mutex) {
@@ -1695,12 +1695,10 @@ final class Synchronized {
     private static final long serialVersionUID = 0;
   }
 
-  @GwtIncompatible("Deque")
   static <E> Deque<E> deque(Deque<E> deque, @Nullable Object mutex) {
     return new SynchronizedDeque<E>(deque, mutex);
   }
 
-  @GwtIncompatible("Deque")
   private static final class SynchronizedDeque<E> extends SynchronizedQueue<E> implements Deque<E> {
 
     SynchronizedDeque(Deque<E> delegate, @Nullable Object mutex) {

@@ -456,8 +456,6 @@ public class AggregatePlanNode extends AbstractPlanNode {
             return "Serial";
         case PARTIALAGGREGATE:
             return "Partial";
-        case PARTITIONBY:
-            return "Windowed";
         default:
             assert(nodeType == PlanNodeType.HASHAGGREGATE);
             return "Hash";

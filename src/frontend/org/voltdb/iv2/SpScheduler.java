@@ -1152,19 +1152,19 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     {
         String who = CoreUtils.hsIdToString(m_mailbox.getHSId());
         hostLog.warn("State dump for site: " + who);
-        hostLog.warn("" + who + ": partition: " + m_partitionId + ", isLeader: " + m_isLeader);
+        hostLog.warn(who + ": partition: " + m_partitionId + ", isLeader: " + m_isLeader);
         if (m_isLeader) {
-            hostLog.warn("" + who + ": replicas: " + CoreUtils.hsIdCollectionToString(m_replicaHSIds));
+            hostLog.warn(who + ": replicas: " + CoreUtils.hsIdCollectionToString(m_replicaHSIds));
             if (m_sendToHSIds.length > 0) {
                 m_mailbox.send(m_sendToHSIds, new DumpMessage());
             }
         }
-        hostLog.warn("" + who + ": most recent SP handle: " + TxnEgo.txnIdToString(getCurrentTxnId()));
-        hostLog.warn("" + who + ": outstanding txns: " + m_outstandingTxns.keySet() + " " +
+        hostLog.warn(who + ": most recent SP handle: " + TxnEgo.txnIdToString(getCurrentTxnId()));
+        hostLog.warn(who + ": outstanding txns: " + m_outstandingTxns.keySet() + " " +
                 TxnEgo.txnIdCollectionToString(m_outstandingTxns.keySet()));
-        hostLog.warn("" + who + ": TransactionTaskQueue: " + m_pendingTasks.toString());
+        hostLog.warn(who + ": TransactionTaskQueue: " + m_pendingTasks.toString());
         if (m_duplicateCounters.size() > 0) {
-            hostLog.warn("" + who + ": duplicate counters: ");
+            hostLog.warn(who + ": duplicate counters: ");
             for (Entry<DuplicateCounterKey, DuplicateCounter> e : m_duplicateCounters.entrySet()) {
                 hostLog.warn("\t" + who + ": " + e.getKey().toString() + ": " + e.getValue().toString());
             }

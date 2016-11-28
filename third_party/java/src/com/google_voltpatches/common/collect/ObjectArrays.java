@@ -20,10 +20,9 @@ import static com.google_voltpatches.common.base.Preconditions.checkPositionInde
 
 import com.google_voltpatches.common.annotations.GwtCompatible;
 import com.google_voltpatches.common.annotations.GwtIncompatible;
-
+import com.google_voltpatches.errorprone.annotations.CanIgnoreReturnValue;
 import java.lang.reflect.Array;
 import java.util.Collection;
-
 import javax.annotation_voltpatches.Nullable;
 
 /**
@@ -44,7 +43,7 @@ public final class ObjectArrays {
    * @param type the component type
    * @param length the length of the new array
    */
-  @GwtIncompatible("Array.newInstance(Class, int)")
+  @GwtIncompatible // Array.newInstance(Class, int)
   @SuppressWarnings("unchecked")
   public static <T> T[] newArray(Class<T> type, int length) {
     return (T[]) Array.newInstance(type, length);
@@ -68,7 +67,7 @@ public final class ObjectArrays {
    * @param second the second array of elements to concatenate
    * @param type the component type of the returned array
    */
-  @GwtIncompatible("Array.newInstance(Class, int)")
+  @GwtIncompatible // Array.newInstance(Class, int)
   public static <T> T[] concat(T[] first, T[] second, Class<T> type) {
     T[] result = newArray(type, first.length + second.length);
     System.arraycopy(first, 0, result, 0, first.length);
@@ -204,6 +203,7 @@ public final class ObjectArrays {
     return result;
   }
 
+  @CanIgnoreReturnValue
   private static Object[] fillArray(Iterable<?> elements, Object[] array) {
     int i = 0;
     for (Object element : elements) {
@@ -221,10 +221,12 @@ public final class ObjectArrays {
     array[j] = temp;
   }
 
+  @CanIgnoreReturnValue
   static Object[] checkElementsNotNull(Object... array) {
     return checkElementsNotNull(array, array.length);
   }
   
+  @CanIgnoreReturnValue
   static Object[] checkElementsNotNull(Object[] array, int length) {
     for (int i = 0; i < length; i++) {
       checkElementNotNull(array[i], i);
@@ -234,6 +236,7 @@ public final class ObjectArrays {
 
   // We do this instead of Preconditions.checkNotNull to save boxing and array
   // creation cost.
+  @CanIgnoreReturnValue
   static Object checkElementNotNull(Object element, int index) {
     if (element == null) {
       throw new NullPointerException("at index " + index);
