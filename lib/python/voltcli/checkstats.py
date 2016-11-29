@@ -13,11 +13,11 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
-
+import sys
 import time
 import voltdbclient
 
-def check_exporter(runner):
+def check_exporter(runner, timeout=-1):
     runner.info('Completing outstanding exporter transactions...')
     last_table_stat_time = 0
     export_tables_with_data = dict()
@@ -29,6 +29,8 @@ def check_exporter(runner):
     # after 10 seconds notify admin of what transactions have not drained
     notifyInterval = 10
     # have to get two samples of table stats because the cached value could be from before Quiesce
+    last_export_tables_with_data = dict()
+    lastUpdatedTime = time.time()
     while True:
         time.sleep(1)
         if last_table_stat_time > 1:
@@ -43,13 +45,16 @@ def check_exporter(runner):
                 notifyInterval = 10
                 if last_table_stat_time > 1 and export_tables_with_data:
                     print_export_pending(runner, export_tables_with_data)
+        lastUpdatedTime = checkStatisticsTimeout(last_export_tables_with_data, export_tables_with_data, lastUpdatedTime, timeout, 'Exporter')
 
-
-def check_dr_producer(runner):
+def check_dr_producer(runner, timeout=-1):
     runner.info('Completing outstanding DR producer transactions...')
     partition_min_host = dict()
     partition_min = dict()
     partition_max = dict()
+    last_partition_min= dict()
+    last_partition_max= dict()
+    lastUpdatedTime = time.time()
     dr_producer_stats(runner, partition_min_host, partition_min, partition_max)
     if not partition_min:
         # there are no outstanding export or dr transactions
@@ -70,23 +75,50 @@ def check_dr_producer(runner):
                 notifyInterval = 10
                 if partition_min:
                     print_dr_pending(runner, partition_min_host, partition_min, partition_max)
+        lastUpdatedTime = verifyDrProducerTimeout(last_partition_min, last_partition_max, partition_min, partition_max, lastUpdatedTime, timeout)
+
+def verifyDrProducerTimeout(LastPartitionMin, currentPartitionMin,
+                            LastPartitionMax, currentPartitionMax, lastUpdatedTime, timeout):
+    currentTime = time.time()
+    #not timeout check
+    if timeout == -1:
+        return currentTime
+    #are stats moved?
+    updated = (comp(LastPartitionMin,currentPartitionMin) <> 0)
+    if updated:
+        updated = (comp(LastPartitionMax,currentPartitionMax) <> 0)
+
+    LastPartitionMin = currentPartitionMin.copy()
+    LastPartitionMax = currentPartitionMax.copy()
+
+    #stats moved
+    if updated == False:
+        return currentTime
+
+    timeSinceLastUpdate = currentTime - lastUpdatedTime
+    #stats timeout
+    if timeSinceLastUpdate > timeout:
+         raise TimeException("Outstanding transactions in DRPRODUCER have not been completely drained.")
+    #stats has not been moved but not timeout yet
+
+    return lastUpdatedTime
 
 def get_stats(runner, component):
     retry = 5
-    while True:
-        response = runner.call_proc('@Statistics', [voltdbclient.FastSerializer.VOLTTYPE_STRING,
-                                    voltdbclient.FastSerializer.VOLTTYPE_INTEGER], [component, 0])
-        status = response.status()
-        if status <> 1 and "timeout" in response.statusString:
-            if retry == 0:
-                runner.error("Unable to collect %s statistics from the cluster" % component)
-            else:
-                time.sleep(1)
-                retry -= 1
-                continue
-        if status <> 1:
-            runner.error("Unexpected response to @Statistics %s: %s" % (component, resp))
-        return response
+    while retry > 0:
+        retry -= 1
+        resp = runner.call_proc('@Statistics', [voltdbclient.FastSerializer.VOLTTYPE_STRING,
+                                    voltdbclient.FastSerializer.VOLTTYPE_INTEGER], [component, 0], False)
+        status = resp.status()
+        if status == 1:
+            return resp
+        #procedure timeout, retry
+        if status == -6:
+           time.sleep(1)
+        else:
+           raise StatisticsProcedureException("Unexpected errors to collect statistics for %s: %s." % (component, resp))
+        if retry == 0:
+            raise StatisticsProcedureException("Unable to collect statistics for %s after 5 attempts." % component)
 
 def dr_producer_stats(runner, partition_min_host, partition_min, partition_max):
     resp = get_stats(runner, 'DRPRODUCER')
@@ -203,8 +235,10 @@ def print_export_pending(runner, export_tables_with_data):
         partlist = reduce(lambda a,x: a+","+str(x), list(pidlist), "")[1:]
         runner.info(summaryline % (table, ', '.join(hostlist), partlist))
 
-def check_clients(runner):
+def check_clients(runner, timeout=-1):
      runner.info('Completing outstanding client transactions...')
+     lastUpdatedTime = time.time()
+     lastValidationParamms = [0, 0, 0]
      while True:
         resp = get_stats(runner, 'LIVECLIENTS')
         trans = 0
@@ -217,10 +251,14 @@ def check_clients(runner):
         runner.info('\tOutstanding transactions=%d, Outstanding request bytes=%d, Outstanding response messages=%d' %(trans, bytes,msgs))
         if trans == 0 and bytes == 0 and msgs == 0:
             return
+        currentValidationParams = [r[6], r[7], r[8]]
+        lastUpdatedTime = checkStatisticsTimeout(lastValidationParamms, currentValidationParams, lastUpdatedTime, timeout, 'LIVECLIENTS')
         time.sleep(1)
 
-def check_importer(runner):
+def check_importer(runner, timeout=-1):
      runner.info('Completing outstanding importer requests...')
+     lastUpdatedTime = time.time()
+     lastValidationParamms = [0]
      while True:
         resp = get_stats(runner, 'IMPORTER')
         outstanding = 0
@@ -231,10 +269,14 @@ def check_importer(runner):
         runner.info('\tOutstanding importer requests=%d' %(outstanding))
         if outstanding == 0:
             return
+        currentValidationParams = [r[8]]
+        lastUpdatedTime = checkStatisticsTimeout(lastValidationParamms, currentValidationParams, lastUpdatedTime, timeout, 'IMPORTER')
         time.sleep(1)
 
-def check_dr_consumer(runner):
+def check_dr_consumer(runner, timeout=-1):
      runner.info('Completing outstanding DR consumer transactions...')
+     lastUpdatedTime = time.time()
+     lastValidationParamms = ['0', '0']
      while True:
         resp = get_stats(runner, 'DRCONSUMER')
         outstanding = 0
@@ -250,10 +292,14 @@ def check_dr_consumer(runner):
                 runner.info('\tPartition %d on host %d has outstanding DR consumer transactions. last received: %s, last applied:%s' %(r[4], r[1], r[7], r[8]))
         if outstanding == 0:
             return
+        currentValidationParams = [r[7],r[8]]
+        lastUpdatedTime = checkStatisticsTimeout(lastValidationParamms, currentValidationParams, lastUpdatedTime, timeout, 'DRCONSUMER')
         time.sleep(1)
 
-def check_command_log(runner):
+def check_command_log(runner, timeout=-1):
     runner.info('Completing outstanding Command Log transactions...')
+    lastUpdatedTime = time.time()
+    lastValidationParamms = [0, 0]
     while True:
         resp = get_stats(runner, 'COMMANDLOG')
         outstandingByte = 0
@@ -272,4 +318,38 @@ def check_command_log(runner):
             runner.info('\tOutstanding command log bytes = %d and transactions = %d.' %(outstandingByte, outstandingTxn))
             return
         runner.info('\tOutstanding command log bytes = %d and transactions = %d.' %(outstandingByte, outstandingTxn))
+        currentValidationParams = [r[3], r[4]]
+        lastUpdatedTime = checkStatisticsTimeout(lastValidationParamms, currentValidationParams, lastUpdatedTime, timeout, 'COMMANDLOG')
         time.sleep(1)
+
+def checkStatisticsTimeout(lastUpdatedParams, currentParams, lastUpdatedTime, timeout, component):
+    currentTime = time.time()
+    #not timeout check
+    if timeout == -1:
+        return currentTime
+    #are stats moved?
+    updated = True
+    if isinstance(lastUpdatedParams, dict):
+        updated = (comp(lastUpdatedParams,currentParams) <> 0)
+        lastUpdatedParams = currentParams.copy()
+    else :
+        updated = (lastUpdatedParams == currentParams)
+        lastUpdatedParams = currentParams
+    #stats moved
+    if updated == False:
+        return currentTime
+
+    timeSinceLastUpdate = currentTime - lastUpdatedTime
+    #stats timeout
+    if timeSinceLastUpdate > timeout:
+         raise TimeException("Outstanding transactions in %s have not been completely drained." % component)
+    #stats has not been moved but not timeout yet
+    return lastUpdatedTime
+
+class StatisticsTimeoutException(Exception):
+    def __init__(self, message):
+        self.message = message
+
+class StatisticsProcedureException(Exception):
+    def __init__(self, message):
+       self.message = message

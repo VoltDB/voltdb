@@ -16,6 +16,8 @@
 import time
 import signal
 from voltcli import checkstats
+from voltcli.checkstats import StatisticsProcedureException
+from voltcli.checkstats import StatisticsTimeoutException
 
 @VOLT.Command(
     bundles = VOLT.AdminBundle(),
@@ -23,6 +25,7 @@ from voltcli import checkstats
     options = (
         VOLT.BooleanOption('-f', '--force', 'forcing', 'immediate shutdown', default = False),
         VOLT.BooleanOption('-s', '--save', 'save', 'snapshot database contents', default = False),
+        VOLT.IntegerOption('-t', '--timeout', 'timeout', 'The timeout value in minute if @Statistics is not progressing.', default = 2),
     )
 )
 def shutdown(runner):
@@ -32,6 +35,10 @@ def shutdown(runner):
     columns = []
     zk_pause_txnid = 0
     runner.info('Cluster shutdown in progress.')
+    timeout = -1;
+    if runner.opts.timeout:
+        timeout = (runner.opts.timeout) * 60 * 1000
+
     if not runner.opts.forcing:
         try:
             runner.info('Preparing for shutdown...')
@@ -44,21 +51,27 @@ def shutdown(runner):
             status = runner.call_proc('@Quiesce', [], []).table(0).tuple(0).column_integer(0)
             if status <> 0:
                 runner.abort('The cluster has failed to be quiesce with status: %d' % status)
-            checkstats.check_clients(runner)
-            checkstats.check_importer(runner)
-            checkstats.check_command_log(runner)
+            checkstats.check_clients(runner, timeout)
+            checkstats.check_importer(runner, timeout)
+            checkstats.check_command_log(runner, timeout)
             runner.info('All transactions have been made durable.')
             if runner.opts.save:
                columns = [VOLT.FastSerializer.VOLTTYPE_BIGINT]
                shutdown_params =  [zk_pause_txnid]
                #save option, check more stats
-               checkstats.check_dr_consumer(runner)
+               checkstats.check_dr_consumer(runner, timeout)
                runner.info('Starting resolution of external commitments...')
-               checkstats.check_exporter(runner)
-               checkstats.check_dr_producer(runner)
+               checkstats.check_exporter(runner, timeout)
+               checkstats.check_dr_producer(runner, timeout)
                runner.info('Saving a final snapshot, The cluster will shutdown after the snapshot is finished...')
             else:
                 runner.info('Shutting down the cluster...')
+        except StatisticsProcedureException as proex:
+             runner.info('The cluster shutdown process has stopped. The cluster is still in a paused state.')
+             runner.abort(proex.message)
+        except StatisticsTimeoutException as toex:
+             runner.info('The cluster shutdown process has stopped. The cluster is still in a paused state.')
+             runner.abort(toex.message)
         except (KeyboardInterrupt, SystemExit):
             runner.info('The cluster shutdown process has stopped. The cluster is still in a paused state.')
             runner.abort('You may shutdown the cluster with the "voltadmin shutdown --force" command, or continue to wait with "voltadmin shutdown".')
