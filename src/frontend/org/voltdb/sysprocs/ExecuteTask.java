@@ -148,7 +148,6 @@ public class ExecuteTask extends VoltSystemProcedure {
                     Map<Integer, Map<Integer, DRConsumerDrIdTracker>> clusterToPartitionMap = (Map<Integer, Map<Integer, DRConsumerDrIdTracker>>)ois.readObject();
                     context.recoverWithDrAppliedTrackers(clusterToPartitionMap);
                     result.addRow(STATUS_OK);
-
                 } catch (Exception e) {
                     e.printStackTrace();
                     result.addRow("FAILURE");
