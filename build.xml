@@ -544,8 +544,8 @@ PRIMARY ENTRY POINTS
 -->
 
 <target name="default"
-    depends="compile, ee, voltdb.jar, voltdbclient.jar, importbundles"
-    description="Compile Java classes and C++ JNI library."
+    depends="minifyjs, compile, ee, voltdb.jar, voltdbclient.jar, importbundles"
+    description="Compile Java classes and C++ JNI library and minify the javascript artifacts."
 />
 <target name="check"
     depends="licensecheck, default, voltdbipc"
@@ -2836,8 +2836,12 @@ RPM PACKAGE CREATION
     </exec>
 </target>
 <!--Modifies the javascript artifact files to min version -->
-<exec executable="/bin/bash">
-    <arg value="minify.sh"/>
-</exec>
+<target name="minifyjs"
+      depends=""
+      description="Minify all the javascript artifacts.">
+    <exec executable="/bin/bash">
+        <arg value="minify.sh"/>
+    </exec>
+</target>
 <!-- END PROJECT -->
 </project>
