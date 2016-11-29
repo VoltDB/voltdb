@@ -20,12 +20,12 @@ import static com.google_voltpatches.common.base.Preconditions.checkNotNull;
 
 import com.google_voltpatches.common.annotations.GwtCompatible;
 import com.google_voltpatches.common.base.MoreObjects;
-
+import com.google_voltpatches.errorprone.annotations.CanIgnoreReturnValue;
+import java.io.Serializable;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-
 import javax.annotation_voltpatches.Nullable;
 
 /**
@@ -40,18 +40,12 @@ import javax.annotation_voltpatches.Nullable;
  * @since 11.0
  */
 @GwtCompatible
-// TODO(gak): make serializable
-public abstract class ImmutableTable<R, C, V> extends AbstractTable<R, C, V> {
-  private static final ImmutableTable<Object, Object, Object> EMPTY =
-      new SparseImmutableTable<Object, Object, Object>(
-          ImmutableList.<Cell<Object, Object, Object>>of(),
-          ImmutableSet.of(),
-          ImmutableSet.of());
-  
+public abstract class ImmutableTable<R, C, V> extends AbstractTable<R, C, V>
+    implements Serializable {
   /** Returns an empty immutable table. */
   @SuppressWarnings("unchecked")
   public static <R, C, V> ImmutableTable<R, C, V> of() {
-    return (ImmutableTable<R, C, V>) EMPTY;
+    return (ImmutableTable<R, C, V>) SparseImmutableTable.EMPTY;
   }
 
   /** Returns an immutable table containing a single cell. */
@@ -161,6 +155,7 @@ public abstract class ImmutableTable<R, C, V> extends AbstractTable<R, C, V> {
     /**
      * Specifies the ordering of the generated table's rows.
      */
+    @CanIgnoreReturnValue
     public Builder<R, C, V> orderRowsBy(Comparator<? super R> rowComparator) {
       this.rowComparator = checkNotNull(rowComparator);
       return this;
@@ -169,6 +164,7 @@ public abstract class ImmutableTable<R, C, V> extends AbstractTable<R, C, V> {
     /**
      * Specifies the ordering of the generated table's columns.
      */
+    @CanIgnoreReturnValue
     public Builder<R, C, V> orderColumnsBy(Comparator<? super C> columnComparator) {
       this.columnComparator = checkNotNull(columnComparator);
       return this;
@@ -179,6 +175,7 @@ public abstract class ImmutableTable<R, C, V> extends AbstractTable<R, C, V> {
      * value} in the built table. Duplicate key pairs are not allowed and will
      * cause {@link #build} to fail.
      */
+    @CanIgnoreReturnValue
     public Builder<R, C, V> put(R rowKey, C columnKey, V value) {
       cells.add(cellOf(rowKey, columnKey, value));
       return this;
@@ -189,6 +186,7 @@ public abstract class ImmutableTable<R, C, V> extends AbstractTable<R, C, V> {
      * necessary. Duplicate key pairs are not allowed and will cause {@link
      * #build} to fail.
      */
+    @CanIgnoreReturnValue
     public Builder<R, C, V> put(Cell<? extends R, ? extends C, ? extends V> cell) {
       if (cell instanceof Tables.ImmutableCell) {
         checkNotNull(cell.getRowKey());
@@ -210,6 +208,7 @@ public abstract class ImmutableTable<R, C, V> extends AbstractTable<R, C, V> {
      *
      * @throws NullPointerException if any key or value in {@code table} is null
      */
+    @CanIgnoreReturnValue
     public Builder<R, C, V> putAll(Table<? extends R, ? extends C, ? extends V> table) {
       for (Cell<? extends R, ? extends C, ? extends V> cell : table.cellSet()) {
         put(cell);
@@ -272,8 +271,7 @@ public abstract class ImmutableTable<R, C, V> extends AbstractTable<R, C, V> {
   public ImmutableMap<R, V> column(C columnKey) {
     checkNotNull(columnKey);
     return MoreObjects.firstNonNull(
-        (ImmutableMap<R, V>) columnMap().get(columnKey),
-        ImmutableMap.<R, V>of());
+        (ImmutableMap<R, V>) columnMap().get(columnKey), ImmutableMap.<R, V>of());
   }
 
   @Override
@@ -299,8 +297,7 @@ public abstract class ImmutableTable<R, C, V> extends AbstractTable<R, C, V> {
   public ImmutableMap<C, V> row(R rowKey) {
     checkNotNull(rowKey);
     return MoreObjects.firstNonNull(
-        (ImmutableMap<C, V>) rowMap().get(rowKey),
-        ImmutableMap.<C, V>of());
+        (ImmutableMap<C, V>) rowMap().get(rowKey), ImmutableMap.<C, V>of());
   }
 
   @Override
@@ -345,6 +342,7 @@ public abstract class ImmutableTable<R, C, V> extends AbstractTable<R, C, V> {
    * @throws UnsupportedOperationException always
    * @deprecated Unsupported operation.
    */
+  @CanIgnoreReturnValue
   @Deprecated
   @Override
   public final V put(R rowKey, C columnKey, V value) {
@@ -369,9 +367,72 @@ public abstract class ImmutableTable<R, C, V> extends AbstractTable<R, C, V> {
    * @throws UnsupportedOperationException always
    * @deprecated Unsupported operation.
    */
+  @CanIgnoreReturnValue
   @Deprecated
   @Override
   public final V remove(Object rowKey, Object columnKey) {
     throw new UnsupportedOperationException();
+  }
+
+  /** Creates the common serialized form for this table. */
+  abstract SerializedForm createSerializedForm();
+
+  /**
+   * Serialized type for all ImmutableTable instances. It captures the logical contents and
+   * preserves iteration order of all views.
+   */
+  static final class SerializedForm implements Serializable {
+    private final Object[] rowKeys;
+    private final Object[] columnKeys;
+
+    private final Object[] cellValues;
+    private final int[] cellRowIndices;
+    private final int[] cellColumnIndices;
+
+    private SerializedForm(
+        Object[] rowKeys,
+        Object[] columnKeys,
+        Object[] cellValues,
+        int[] cellRowIndices,
+        int[] cellColumnIndices) {
+      this.rowKeys = rowKeys;
+      this.columnKeys = columnKeys;
+      this.cellValues = cellValues;
+      this.cellRowIndices = cellRowIndices;
+      this.cellColumnIndices = cellColumnIndices;
+    }
+
+    static SerializedForm create(
+        ImmutableTable<?, ?, ?> table, int[] cellRowIndices, int[] cellColumnIndices) {
+      return new SerializedForm(
+          table.rowKeySet().toArray(),
+          table.columnKeySet().toArray(),
+          table.values().toArray(),
+          cellRowIndices,
+          cellColumnIndices);
+    }
+
+    Object readResolve() {
+      if (cellValues.length == 0) {
+        return of();
+      }
+      if (cellValues.length == 1) {
+        return of(rowKeys[0], columnKeys[0], cellValues[0]);
+      }
+      ImmutableList.Builder<Cell<Object, Object, Object>> cellListBuilder =
+          new ImmutableList.Builder<Cell<Object, Object, Object>>(cellValues.length);
+      for (int i = 0; i < cellValues.length; i++) {
+        cellListBuilder.add(
+            cellOf(rowKeys[cellRowIndices[i]], columnKeys[cellColumnIndices[i]], cellValues[i]));
+      }
+      return RegularImmutableTable.forOrderedComponents(
+          cellListBuilder.build(), ImmutableSet.copyOf(rowKeys), ImmutableSet.copyOf(columnKeys));
+    }
+
+    private static final long serialVersionUID = 0;
+  }
+
+  final Object writeReplace() {
+    return createSerializedForm();
   }
 }

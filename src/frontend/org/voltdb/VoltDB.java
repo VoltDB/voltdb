@@ -45,6 +45,7 @@ import org.voltcore.utils.EstTimeUpdater;
 import org.voltcore.utils.OnDemandBinaryLogger;
 import org.voltcore.utils.PortGenerator;
 import org.voltcore.utils.ShutdownHooks;
+import org.voltcore.utils.ssl.SSLEncryptionService;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.common.Constants;
 import org.voltdb.probe.MeshProber;
@@ -177,6 +178,9 @@ public class VoltDB {
 
         /** ssl context factory */
         public SslContextFactory m_sslContextFactory = null;
+
+        /** executor service for ssl ecncryption/decryption */
+        public SSLEncryptionService m_sslEncryptionService = null;
 
         /** ssl context for client and admin ports */
         public SSLContext m_sslContext = null;

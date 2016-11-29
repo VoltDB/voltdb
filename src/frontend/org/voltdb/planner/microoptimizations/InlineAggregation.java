@@ -24,7 +24,7 @@ import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AggregatePlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.LimitPlanNode;
-import org.voltdb.plannodes.PartitionByPlanNode;
+import org.voltdb.plannodes.WindowFunctionPlanNode;
 import org.voltdb.types.PlanNodeType;
 
 public class InlineAggregation extends MicroOptimization {
@@ -64,7 +64,7 @@ public class InlineAggregation extends MicroOptimization {
     AbstractPlanNode inlineAggregationApply(AbstractPlanNode plan) {
         // check for an aggregation of the right form
         if ((plan instanceof AggregatePlanNode) == false
-                || (plan instanceof PartitionByPlanNode)) {
+                || (plan instanceof WindowFunctionPlanNode)) {
             return plan;
         }
         assert(plan.getChildCount() == 1);

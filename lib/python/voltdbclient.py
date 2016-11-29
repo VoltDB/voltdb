@@ -320,6 +320,9 @@ class FastSerializer:
             if use_ca_cert:
                 self.ssl_config['ca_certs'] = cafile.name
                 self.ssl_config['cert_reqs'] = ssl.CERT_REQUIRED
+        elif 'cacerts' in jks_config and jks_config['cacerts']:
+            self.ssl_config['ca_certs'] = jks_config['cacerts']
+            self.ssl_config['cert_reqs'] = ssl.CERT_REQUIRED
 
         return ssl.wrap_socket(ss, self.ssl_config['keyfile'],
                                self.ssl_config['certfile'], False,

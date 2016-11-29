@@ -624,7 +624,8 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
             JSONStringer stringer,
             List<AbstractExpression> sortExpressions,
             List<SortDirectionType> sortDirections) throws JSONException {
-        stringer.key(SortMembers.SORT_COLUMNS).array();
+        stringer.key(SortMembers.SORT_COLUMNS);
+        stringer.array();
         int listSize = sortExpressions.size();
         for (int ii = 0; ii < listSize; ii++) {
             stringer.object();
@@ -783,24 +784,32 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
      * @param tableScan
      * @throws JSONException
      */
-    public static void loadFromJSONArrayChild(List<AbstractExpression> starter,
-            JSONObject parent, String label, StmtTableScan tableScan)
-            throws JSONException {
+    public static List<AbstractExpression> loadFromJSONArrayChild(
+            List<AbstractExpression> starter,
+            JSONObject parent,
+            String label,
+            StmtTableScan tableScan) throws JSONException {
         if (parent.isNull(label)) {
-            return;
+            return null;
         }
 
         JSONArray jarray = parent.getJSONArray(label);
-        loadFromJSONArray(starter, jarray, tableScan);
+        return loadFromJSONArray(starter, jarray, tableScan);
     }
 
-    private static void loadFromJSONArray(List<AbstractExpression> starter,
-            JSONArray jarray,  StmtTableScan tableScan) throws JSONException {
+    private static List<AbstractExpression> loadFromJSONArray(
+            List<AbstractExpression> starter,
+            JSONArray jarray,
+            StmtTableScan tableScan) throws JSONException {
+        if (starter == null) {
+            starter = new ArrayList<>();
+        }
         int size = jarray.length();
         for (int i = 0 ; i < size; ++i) {
             JSONObject tempjobj = jarray.getJSONObject(i);
             starter.add(fromJSONObject(tempjobj, tableScan));
         }
+        return starter;
     }
 
     /**
@@ -1448,5 +1457,18 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
                 arg.findNonemptyMVSafeOperations(ops);
             }
         }
+    }
+
+    public static void toJSONArray(JSONStringer stringer, String keyString, List<AbstractExpression> exprs) throws JSONException {
+        stringer.key(keyString)
+                .array();
+        if (exprs != null) {
+            for (AbstractExpression ae : exprs) {
+                stringer.object();
+                ae.toJSONString(stringer);
+                stringer.endObject();
+            }
+        }
+        stringer.endArray();
     }
 }

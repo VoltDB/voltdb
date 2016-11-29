@@ -19,7 +19,8 @@ package com.google_voltpatches.common.collect;
 import static com.google_voltpatches.common.collect.CollectPreconditions.checkEntryNotNull;
 
 import com.google_voltpatches.common.annotations.GwtCompatible;
-
+import com.google_voltpatches.errorprone.annotations.concurrent.LazyInit;
+import com.google_voltpatches.j2objc.annotations.RetainedWith;
 import javax.annotation_voltpatches.Nullable;
 
 /**
@@ -82,6 +83,8 @@ final class SingletonImmutableBiMap<K, V> extends ImmutableBiMap<K, V> {
     return ImmutableSet.of(singleKey);
   }
 
+  @LazyInit
+  @RetainedWith
   transient ImmutableBiMap<V, K> inverse;
 
   @Override

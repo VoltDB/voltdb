@@ -75,7 +75,7 @@ public class TestNIOWriteStream extends TestCase {
         }
 
         public MockPort() throws UnknownHostException {
-            super(null, null, new InetSocketAddress(InetAddress.getByName("127.0.0.1"), 21212), pool, null);
+            super(null, null, new InetSocketAddress(InetAddress.getByName("127.0.0.1"), 21212), pool);
         }
 
         @Override
@@ -335,7 +335,7 @@ public class TestNIOWriteStream extends TestCase {
         MockChannel channel = new MockChannel(MockChannel.SINK, 1);
         MockPort port = new MockPort();
         AdmissionControlGroup acg = new AdmissionControlGroup(2, 1024);
-        NIOWriteStream wstream = new NIOWriteStream(port, null, null, acg, null);
+        NIOWriteStream wstream = new NIOWriteStream(port, null, null, acg);
 
         ByteBuffer tmp = ByteBuffer.allocate(6);
         tmp.put((byte)1);
@@ -439,7 +439,7 @@ public class TestNIOWriteStream extends TestCase {
                 queue.addAndGet(bytes);
                 return false;
             }
-        }, null);
+        });
         wstream.enqueue(ByteBuffer.allocate(32));
         wstream.swapAndSerializeQueuedWrites(pool);
         assertEquals(32, queue.get());

@@ -538,7 +538,7 @@ public class TestWindowedAggregateSuite extends RegressionSuite {
      *
      * @throws Exception
      */
-    public void testSubqueryWindowedExpressions() throws Exception {
+    public void testSubqueryWindowFunctionExpressions() throws Exception {
         Client client = getClient();
 
         client.callProcedure("P2.insert", 0, 2, null, -67);

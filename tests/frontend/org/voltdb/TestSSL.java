@@ -94,13 +94,11 @@ public class TestSSL extends TestCase {
         VoltProjectBuilder builder = getBuilderForTest();
 
         if (keyStorePath != null) {
-            String keystore = getResourcePath(keyStorePath);
-            builder.setKeyStoreInfo(keystore, keyStorePasswd);
+            builder.setKeyStoreInfo(keyStorePath, keyStorePasswd);
         }
 
         if (certStorePath != null) {
-            String certstore = getResourcePath(certStorePath);
-            builder.setCertStoreInfo(certstore, certStorePasswd);
+            builder.setCertStoreInfo(certStorePath, certStorePasswd);
         }
 
         m_cluster = new LocalCluster("ssl.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI,

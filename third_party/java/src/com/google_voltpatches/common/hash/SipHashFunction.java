@@ -23,7 +23,6 @@ import static com.google_voltpatches.common.base.Preconditions.checkArgument;
 
 import java.io.Serializable;
 import java.nio.ByteBuffer;
-
 import javax.annotation_voltpatches.Nullable;
 
 /**

@@ -167,7 +167,7 @@ public abstract class NIOWriteStreamBase {
      * Validate that serialization is accurately reporting the amount of data necessary
      * to serialize the message
      */
-    private void checkSloppySerialization(ByteBuffer buf, DeferredSerialization ds) {
+    public void checkSloppySerialization(ByteBuffer buf, DeferredSerialization ds) {
         if (buf.limit() != buf.capacity()) {
             if (ASSERT_ON) {
                 networkLog.fatal("Sloppy serialization size for message class " + ds);

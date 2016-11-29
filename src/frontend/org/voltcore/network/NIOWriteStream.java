@@ -65,7 +65,7 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
     private final ArrayDeque<DeferredSerialization> m_queuedWrites2 =
         new ArrayDeque<DeferredSerialization>();
 
-    private ArrayDeque<DeferredSerialization> m_queuedWrites = m_queuedWrites1;
+    protected ArrayDeque<DeferredSerialization> m_queuedWrites = m_queuedWrites1;
 
     private final int m_maxQueuedWritesBeforeBackpressure = 100;
 
@@ -80,31 +80,22 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
      */
     private long m_lastPendingWriteTime = -1;
 
-    private final SSLBufferEncrypter m_sslBufferEncrypter;
-    private ByteBuffer m_encryptedWriteBuffer;
     private int m_writeSize;
 
     NIOWriteStream(VoltPort port) {
-        this(port, null, null, null, null);
+        this(port, null, null, null);
     }
 
     NIOWriteStream (
             VoltPort port,
             Runnable offBackPressureCallback,
             Runnable onBackPressureCallback,
-            QueueMonitor monitor,
-            SSLEngine sslEngine)
+            QueueMonitor monitor)
     {
         m_port = port;
         m_offBackPressureCallback = offBackPressureCallback;
         m_onBackPressureCallback = onBackPressureCallback;
         m_monitor = monitor;
-        if (sslEngine != null) {
-            m_sslBufferEncrypter = new SSLBufferEncrypter(sslEngine);
-        } else {
-            m_sslBufferEncrypter = null;
-        }
-        m_encryptedWriteBuffer = null;
         m_writeSize = 0;
     }
 
@@ -120,7 +111,7 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
     @Override
     synchronized public boolean isEmpty()
     {
-        return super.isEmpty() && m_encryptedWriteBuffer == null && m_queuedWrites.isEmpty();
+        return super.isEmpty() && m_queuedWrites.isEmpty();
     }
 
     /**
@@ -314,7 +305,7 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
     }
 
     @Override
-    protected void updateQueued(int queued, boolean noBackpressureSignal) {
+    public void updateQueued(int queued, boolean noBackpressureSignal) {
         if (m_monitor != null) {
             boolean shouldSignalBackpressure = m_monitor.queue(queued);
             if (!noBackpressureSignal && shouldSignalBackpressure) {
@@ -365,9 +356,7 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
         } finally {
             //We might fail after writing few bytes. make sure the ones that are written accounted for.
             //Not sure if we need to do any backpressure magic as client is dead and so no backpressure on this may be needed.
-            if (m_queuedBuffers.isEmpty() && m_hadBackPressure && m_queuedWrites.size() <= m_maxQueuedWritesBeforeBackpressure) {
-                backpressureEnded();
-            }
+            checkBackpressureEnded();
             //Same here I dont know if we do need to do this housekeeping??
             if (!isEmpty()) {
                 if (bytesWritten > 0) {
@@ -383,14 +372,25 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
         return bytesWritten;
     }
 
-    private ByteBuffer getBufferToWrite() throws IOException {
-        if (m_sslBufferEncrypter == null) {
-            return getClearBuffer();
+    /**
+     * Ends backpressure if appropriate.
+     */
+    public void checkBackpressureEnded() {
+        if (m_queuedBuffers.isEmpty() && m_hadBackPressure && m_queuedWrites.size() <= m_maxQueuedWritesBeforeBackpressure) {
+            backpressureEnded();
         }
-        return getEncryptedBuffer();
     }
 
-    private ByteBuffer getClearBuffer() {
+    /**
+     * Starts backpressure if appropriate.
+     */
+    public void checkBackpressureStarted() {
+        if (!m_hadBackPressure) {
+            backpressureStarted();
+        }
+    }
+
+    protected ByteBuffer getBufferToWrite() throws IOException {
         if (m_currentWriteBuffer == null && m_queuedBuffers.isEmpty()) {
             return null;
         }
@@ -405,47 +405,10 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
         }
     }
 
-    private ByteBuffer getEncryptedBuffer() throws IOException {
-        if (m_encryptedWriteBuffer != null) {
-            return m_encryptedWriteBuffer;
-        }
-        ByteBuffer writeBuffer;
-        if ((writeBuffer = getClearBuffer()) == null) {
-            return null;
-        }
-        ByteBuffer buffToEncrypt;
-        if (writeBuffer.remaining() <= Constants.SSL_CHUNK_SIZE) {
-            buffToEncrypt = writeBuffer.slice();
-            writeBuffer.position(writeBuffer.limit());
-        } else {
-            int oldLimit = writeBuffer.limit();
-            writeBuffer.limit(writeBuffer.position() + Constants.SSL_CHUNK_SIZE);
-            buffToEncrypt = writeBuffer.slice();
-            writeBuffer.position(writeBuffer.limit());
-            writeBuffer.limit(oldLimit);
-        }
-        m_encryptedWriteBuffer = m_sslBufferEncrypter.encryptBuffer(buffToEncrypt);
-        return m_encryptedWriteBuffer;
-    }
-
-    private int discardBuffer() {
-        if (m_sslBufferEncrypter == null) {
-            return discardClearBuffer();
-        }
-        return discardEncryptedBuffer();
-    }
-
-    private int discardClearBuffer() {
+    protected int discardBuffer() {
         m_currentWriteBuffer.discard();
         m_currentWriteBuffer = null;
         return m_writeSize;
     }
 
-    private int discardEncryptedBuffer() {
-        m_encryptedWriteBuffer = null;
-        if (!m_currentWriteBuffer.b().hasRemaining()) {
-            return discardClearBuffer();
-        }
-        return 0;
-    }
 }

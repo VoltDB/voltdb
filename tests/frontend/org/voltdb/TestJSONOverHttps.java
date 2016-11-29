@@ -170,7 +170,7 @@ public class TestJSONOverHttps extends TestCase {
             builder.addStmtProcedure("foocount", "select count(*) from foo;");
             builder.setHTTPDPort(port);
             builder.setSslEnabled(true);
-            builder.setSslExternal(false);
+            builder.setSslExternal(true);
             if (keyStorePath != null) {
                 String keystore = getResourcePath(keyStorePath);
                 builder.setKeyStoreInfo(keystore, keyStorePasswd);
@@ -209,7 +209,7 @@ public class TestJSONOverHttps extends TestCase {
             System.setProperty(KEYSTORE_PASSWD_SYSPROP, "");
             System.setProperty(TRUSTSTORE_SYSPROP, "");
             System.setProperty(TRUSTSTORE_PASSWD_SYSPROP, "");
-            startServer(KEYSTORE_RESOURCE, KEYSTORE_PASSWD_OBFUSCATED, null, null);
+            startServer(KEYSTORE_RESOURCE, KEYSTORE_PASSWD_OBFUSCATED, KEYSTORE_RESOURCE, KEYSTORE_PASSWD_OBFUSCATED);
 
             String varString = "Procedure=foocount";
             TestJSONInterface.Response response =
@@ -232,7 +232,7 @@ public class TestJSONOverHttps extends TestCase {
             System.setProperty(KEYSTORE_PASSWD_SYSPROP, "");
             System.setProperty(TRUSTSTORE_SYSPROP, "");
             System.setProperty(TRUSTSTORE_PASSWD_SYSPROP, "");
-            startServer(KEYSTORE_RESOURCE, KEYSTORE_PASSWD, null, null);
+            startServer(KEYSTORE_RESOURCE, KEYSTORE_PASSWD, KEYSTORE_RESOURCE, KEYSTORE_PASSWD);
 
             String varString = "Procedure=foocount";
             TestJSONInterface.Response response =
@@ -256,7 +256,7 @@ public class TestJSONOverHttps extends TestCase {
             System.setProperty(TRUSTSTORE_SYSPROP, "");
             System.setProperty(TRUSTSTORE_PASSWD_SYSPROP, "");
             m_port = VoltDB.DEFAULT_HTTPS_PORT;
-            startServer(KEYSTORE_RESOURCE, KEYSTORE_PASSWD, null, null, 0);
+            startServer(KEYSTORE_RESOURCE, KEYSTORE_PASSWD, KEYSTORE_RESOURCE, KEYSTORE_PASSWD, 0);
 
             String varString = "Procedure=foocount";
             TestJSONInterface.Response response =

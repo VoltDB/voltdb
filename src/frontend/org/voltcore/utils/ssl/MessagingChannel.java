@@ -17,12 +17,12 @@
 
 package org.voltcore.utils.ssl;
 
-import javax.net.ssl.SSLEngine;
-import javax.net.ssl.SSLEngineResult;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
-import java.util.List;
+
+import javax.net.ssl.SSLEngine;
+import javax.net.ssl.SSLEngineResult;
 
 /**
  * Wraps a SocketChannel, knows how to read and write VoltDB
@@ -35,6 +35,8 @@ public class MessagingChannel {
     private final SSLEngine m_sslEngine;
     private ByteBuffer m_encBuffer;
     private final SSLBufferDecrypter m_sslBufferDescrypter;
+    private ByteBuffer m_dstBuffer;
+    private final SSLMessageParser m_sslMessageParser;
 
     public MessagingChannel(SocketChannel m_socketChannel, SSLEngine sslEngine) {
         this.m_socketChannel = m_socketChannel;
@@ -43,9 +45,12 @@ public class MessagingChannel {
             int packetBufferSize = m_sslEngine.getSession().getPacketBufferSize();
             // wrapMessage will overflow until the encryption buffer is this size.
             this.m_encBuffer = ByteBuffer.allocate(packetBufferSize);
+            this.m_dstBuffer = ByteBuffer.allocateDirect(1024);
             this.m_sslBufferDescrypter = new SSLBufferDecrypter(sslEngine);
+            this.m_sslMessageParser = new SSLMessageParser();
         } else {
             this.m_sslBufferDescrypter = null;
+            this.m_sslMessageParser = null;
         }
     }
 
@@ -82,9 +87,13 @@ public class MessagingChannel {
         if (read == -1) {
             throw new IOException("Failed to read message");
         }
+        m_encBuffer.flip();
         // there will always be a length, need to have more than four bytes to have a message
-        if (read > 4 && m_sslBufferDescrypter.decrypt(m_encBuffer) > 0) {
-            return m_sslBufferDescrypter.message();
+        if (read > 4) {
+            m_dstBuffer = m_sslBufferDescrypter.unwrap(m_encBuffer, m_dstBuffer);
+            if (m_dstBuffer.hasRemaining()) {
+                return m_sslMessageParser.message(m_dstBuffer);
+            }
         }
         return null;
     }

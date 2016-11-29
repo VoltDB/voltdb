@@ -22,7 +22,8 @@ import static com.google_voltpatches.common.collect.ObjectArrays.checkElementNot
 import com.google_voltpatches.common.annotations.GwtCompatible;
 import com.google_voltpatches.common.annotations.VisibleForTesting;
 import com.google_voltpatches.common.primitives.Ints;
-
+import com.google_voltpatches.errorprone.annotations.CanIgnoreReturnValue;
+import com.google_voltpatches.errorprone.annotations.concurrent.LazyInit;
 import java.io.Serializable;
 import java.util.Arrays;
 import java.util.Collection;
@@ -30,7 +31,6 @@ import java.util.Collections;
 import java.util.EnumSet;
 import java.util.Iterator;
 import java.util.Set;
-
 import javax.annotation_voltpatches.Nullable;
 
 /**
@@ -103,6 +103,7 @@ public abstract class ImmutableSet<E> extends ImmutableCollection<E> implements 
    *
    * @since 3.0 (source-compatible since 2.0)
    */
+  @SafeVarargs // For Eclipse. For internal javac we have disabled this pointless type of warning.
   public static <E> ImmutableSet<E> of(E e1, E e2, E e3, E e4, E e5, E e6, E... others) {
     final int paramCount = 6;
     Object[] elements = new Object[paramCount + others.length];
@@ -176,9 +177,7 @@ public abstract class ImmutableSet<E> extends ImmutableCollection<E> implements 
       return construct(uniques, elements);
     } else {
       Object[] uniqueElements =
-          (uniques < elements.length)
-              ? ObjectArrays.arraysCopyOf(elements, uniques)
-              : elements;
+          (uniques < elements.length) ? ObjectArrays.arraysCopyOf(elements, uniques) : elements;
       return new RegularImmutableSet<E>(uniqueElements, hashCode, table, mask);
     }
   }
@@ -224,7 +223,7 @@ public abstract class ImmutableSet<E> extends ImmutableCollection<E> implements 
    * <p><b>Performance note:</b> This method will sometimes recognize that the actual copy operation
    * is unnecessary; for example, {@code copyOf(copyOf(anArrayList))} will copy the data only once.
    * This reduces the expense of habitually making defensive copies at API boundaries. However, the
-   * the precise conditions for skipping the copy operation are undefined.
+   * precise conditions for skipping the copy operation are undefined.
    *
    * @throws NullPointerException if any of {@code elements} is null
    * @since 7.0 (source-compatible since 2.0)
@@ -280,10 +279,7 @@ public abstract class ImmutableSet<E> extends ImmutableCollection<E> implements 
     if (!elements.hasNext()) {
       return of(first);
     } else {
-      return new ImmutableSet.Builder<E>()
-          .add(first)
-          .addAll(elements)
-          .build();
+      return new ImmutableSet.Builder<E>().add(first).addAll(elements).build();
     }
   }
 
@@ -339,6 +335,19 @@ public abstract class ImmutableSet<E> extends ImmutableCollection<E> implements 
   // ImmutableCollection.iterator() consistent.
   @Override
   public abstract UnmodifiableIterator<E> iterator();
+
+  @LazyInit
+  private transient ImmutableList<E> asList;
+
+  @Override
+  public ImmutableList<E> asList() {
+    ImmutableList<E> result = asList;
+    return (result == null) ? asList = createAsList() : result;
+  }
+
+  ImmutableList<E> createAsList() {
+    return new RegularImmutableAsList<E>(this, toArray());
+  }
 
   abstract static class Indexed<E> extends ImmutableSet<E> {
     abstract E get(int index);
@@ -435,6 +444,7 @@ public abstract class ImmutableSet<E> extends ImmutableCollection<E> implements 
      * @return this {@code Builder} object
      * @throws NullPointerException if {@code element} is null
      */
+    @CanIgnoreReturnValue
     @Override
     public Builder<E> add(E element) {
       super.add(element);
@@ -450,6 +460,7 @@ public abstract class ImmutableSet<E> extends ImmutableCollection<E> implements 
      * @throws NullPointerException if {@code elements} is null or contains a
      *     null element
      */
+    @CanIgnoreReturnValue
     @Override
     public Builder<E> add(E... elements) {
       super.add(elements);
@@ -465,6 +476,7 @@ public abstract class ImmutableSet<E> extends ImmutableCollection<E> implements 
      * @throws NullPointerException if {@code elements} is null or contains a
      *     null element
      */
+    @CanIgnoreReturnValue
     @Override
     public Builder<E> addAll(Iterable<? extends E> elements) {
       super.addAll(elements);
@@ -480,6 +492,7 @@ public abstract class ImmutableSet<E> extends ImmutableCollection<E> implements 
      * @throws NullPointerException if {@code elements} is null or contains a
      *     null element
      */
+    @CanIgnoreReturnValue
     @Override
     public Builder<E> addAll(Iterator<? extends E> elements) {
       super.addAll(elements);

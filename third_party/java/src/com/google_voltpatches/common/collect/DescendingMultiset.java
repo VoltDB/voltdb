@@ -18,7 +18,6 @@ package com.google_voltpatches.common.collect;
 
 import com.google_voltpatches.common.annotations.GwtCompatible;
 import com.google_voltpatches.j2objc.annotations.WeakOuter;
-
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.NavigableSet;

@@ -43,7 +43,7 @@ public class TestVoltNetwork extends TestCase {
 
     private static class MockVoltPort extends VoltPort {
         MockVoltPort(VoltNetwork vn, InputHandler handler) throws UnknownHostException {
-            super (vn, handler, new InetSocketAddress(InetAddress.getByName("127.0.0.1"), 21212), vn.m_pool, null);
+            super (vn, handler, new InetSocketAddress(InetAddress.getByName("127.0.0.1"), 21212), vn.m_pool);
         }
 
         @Override
@@ -67,15 +67,33 @@ public class TestVoltNetwork extends TestCase {
         }
 
         @Override
-        public ByteBuffer retrieveNextMessage(NIOReadStream c) {
-            // TODO Auto-generated method stub
+        public ByteBuffer retrieveNextMessage(NIOReadStream inputStream) throws IOException {
             return null;
         }
 
         @Override
-        public boolean retrieveNextSSLMessage(NIOReadStream inputStream, ByteBuffer buffer) {
-            // TODO Auto-generated method stub
-            return false;
+        public boolean retrieveNextMessageHeader(NIOReadStream inputStream, ByteBuffer header) {
+            return true;
+        }
+
+        @Override
+        public int fillBuffer(NIOReadStream inputStream, ByteBuffer buffer) {
+            return 0;
+        }
+
+        @Override
+        public void checkMessageLength(int messageLength) throws BadMessageLength {
+
+        }
+
+        @Override
+        public void setNextMessageLength(int nextMessageLength) {
+
+        }
+
+        @Override
+        public int getNextMessageLength() {
+            return 0;
         }
 
         @Override
