@@ -41,6 +41,9 @@ import org.voltdb.ReplicationRole;
 import org.voltdb.ServerThread;
 import org.voltdb.StartAction;
 import org.voltdb.VoltDB;
+import org.voltdb.client.Client;
+import org.voltdb.client.ClientConfig;
+import org.voltdb.client.ClientFactory;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.CommandLine;
 import org.voltdb.utils.MiscUtils;
@@ -1915,5 +1918,13 @@ public class LocalCluster extends VoltServerConfig {
                     i, lc.internalPort(i), lc.adminPort(i), lc.port(i), lc.drAgentStartPort(i));
         }
         return lc;
+    }
+
+    public Client createClient(ClientConfig config) throws IOException {
+        Client client = ClientFactory.createClient(config);
+        for (String address : getListenerAddresses()) {
+            client.createConnection(address);
+        }
+        return client;
     }
 }
