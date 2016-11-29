@@ -46,6 +46,7 @@ def check_exporter(runner, timeout=-1):
                 if last_table_stat_time > 1 and export_tables_with_data:
                     print_export_pending(runner, export_tables_with_data)
         lastUpdatedTime = checkStatisticsTimeout(last_export_tables_with_data, export_tables_with_data, lastUpdatedTime, timeout, 'Exporter')
+        last_export_tables_with_data = export_tables_with_data.copy()
 
 def check_dr_producer(runner, timeout=-1):
     runner.info('Completing outstanding DR producer transactions...')
@@ -76,20 +77,20 @@ def check_dr_producer(runner, timeout=-1):
                 if partition_min:
                     print_dr_pending(runner, partition_min_host, partition_min, partition_max)
         lastUpdatedTime = verifyDrProducerTimeout(last_partition_min, last_partition_max, partition_min, partition_max, lastUpdatedTime, timeout)
+        LastPartitionMin = partition_min.copy()
+        lastPartitionMax = partition_max.copy()
 
-def verifyDrProducerTimeout(LastPartitionMin, currentPartitionMin,
-                            LastPartitionMax, currentPartitionMax, lastUpdatedTime, timeout):
+
+def verifyDrProducerTimeout(lastPartitionMin, currentPartitionMin,
+                            lastPartitionMax, currentPartitionMax, lastUpdatedTime, timeout):
     currentTime = time.time()
     #not timeout check
     if timeout == -1:
         return currentTime
     #are stats moved?
-    updated = (comp(LastPartitionMin,currentPartitionMin) <> 0)
+    updated = (comp(lastPartitionMin,currentPartitionMin) <> 0)
     if updated:
-        updated = (comp(LastPartitionMax,currentPartitionMax) <> 0)
-
-    LastPartitionMin = currentPartitionMin.copy()
-    LastPartitionMax = currentPartitionMax.copy()
+        updated = (comp(lastPartitionMax,currentPartitionMax) <> 0)
 
     #stats moved
     if updated == False:
@@ -251,8 +252,9 @@ def check_clients(runner, timeout=-1):
         runner.info('\tOutstanding transactions=%d, Outstanding request bytes=%d, Outstanding response messages=%d' %(trans, bytes,msgs))
         if trans == 0 and bytes == 0 and msgs == 0:
             return
-        currentValidationParams = [r[6], r[7], r[8]]
+        currentValidationParams = [trans, bytes, msgs]
         lastUpdatedTime = checkStatisticsTimeout(lastValidationParamms, currentValidationParams, lastUpdatedTime, timeout, 'LIVECLIENTS')
+        lastValidationParamms = [trans, bytes, msgs]
         time.sleep(1)
 
 def check_importer(runner, timeout=-1):
@@ -269,14 +271,15 @@ def check_importer(runner, timeout=-1):
         runner.info('\tOutstanding importer requests=%d' %(outstanding))
         if outstanding == 0:
             return
-        currentValidationParams = [r[8]]
+        currentValidationParams = [outstanding]
         lastUpdatedTime = checkStatisticsTimeout(lastValidationParamms, currentValidationParams, lastUpdatedTime, timeout, 'IMPORTER')
+        lastValidationParamms = [outstanding]
         time.sleep(1)
 
 def check_dr_consumer(runner, timeout=-1):
      runner.info('Completing outstanding DR consumer transactions...')
      lastUpdatedTime = time.time()
-     lastValidationParamms = ['0', '0']
+     lastValidationParamms = [0]
      while True:
         resp = get_stats(runner, 'DRCONSUMER')
         outstanding = 0
@@ -292,8 +295,9 @@ def check_dr_consumer(runner, timeout=-1):
                 runner.info('\tPartition %d on host %d has outstanding DR consumer transactions. last received: %s, last applied:%s' %(r[4], r[1], r[7], r[8]))
         if outstanding == 0:
             return
-        currentValidationParams = [r[7],r[8]]
+        currentValidationParams = [outstanding]
         lastUpdatedTime = checkStatisticsTimeout(lastValidationParamms, currentValidationParams, lastUpdatedTime, timeout, 'DRCONSUMER')
+        lastValidationParamms = [outstanding]
         time.sleep(1)
 
 def check_command_log(runner, timeout=-1):
@@ -315,11 +319,11 @@ def check_command_log(runner, timeout=-1):
             outstandingTxn += r[4]
 
         if outstandingByte == 0 and outstandingTxn == 0:
-            runner.info('\tOutstanding command log bytes = %d and transactions = %d.' %(outstandingByte, outstandingTxn))
             return
         runner.info('\tOutstanding command log bytes = %d and transactions = %d.' %(outstandingByte, outstandingTxn))
-        currentValidationParams = [r[3], r[4]]
+        currentValidationParams = [outstandingByte, outstandingTxn]
         lastUpdatedTime = checkStatisticsTimeout(lastValidationParamms, currentValidationParams, lastUpdatedTime, timeout, 'COMMANDLOG')
+        lastValidationParamms = [outstandingByte, outstandingTxn]
         time.sleep(1)
 
 def checkStatisticsTimeout(lastUpdatedParams, currentParams, lastUpdatedTime, timeout, component):
@@ -331,10 +335,9 @@ def checkStatisticsTimeout(lastUpdatedParams, currentParams, lastUpdatedTime, ti
     updated = True
     if isinstance(lastUpdatedParams, dict):
         updated = (comp(lastUpdatedParams,currentParams) <> 0)
-        lastUpdatedParams = currentParams.copy()
     else :
         updated = (lastUpdatedParams == currentParams)
-        lastUpdatedParams = currentParams
+
     #stats moved
     if updated == False:
         return currentTime
@@ -342,7 +345,7 @@ def checkStatisticsTimeout(lastUpdatedParams, currentParams, lastUpdatedTime, ti
     timeSinceLastUpdate = currentTime - lastUpdatedTime
     #stats timeout
     if timeSinceLastUpdate > timeout:
-         raise TimeException("Outstanding transactions in %s have not been completely drained." % component)
+         raise StatisticsTimeoutException("Outstanding transactions in %s have not been completely drained." % component)
     #stats has not been moved but not timeout yet
     return lastUpdatedTime
 

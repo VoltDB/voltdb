@@ -37,7 +37,7 @@ def shutdown(runner):
     runner.info('Cluster shutdown in progress.')
     timeout = -1;
     if runner.opts.timeout:
-        timeout = (runner.opts.timeout) * 60 * 1000
+        timeout = (runner.opts.timeout) * 60
 
     if not runner.opts.forcing:
         try:
