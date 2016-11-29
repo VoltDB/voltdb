@@ -61,6 +61,7 @@
 
 package org.voltcore.network;
 
+import com.google_voltpatches.common.util.concurrent.SettableFuture;
 import io.netty_voltpatches.NinjaKeySet;
 
 import java.io.IOException;
@@ -548,9 +549,15 @@ class VoltNetwork implements Runnable, IOStatsIntf
         return m_numPorts.get();
     }
 
-    public Set<Connection> getConnections() {
-        Set<Connection> conns = new HashSet<>();
-        conns.addAll(m_ports);
-        return conns;
+    public Future<Set<Connection>> getConnections() {
+        final SettableFuture<Set<Connection>> connectionsFuture = SettableFuture.create();
+        queueTask(new Runnable() {
+            @Override
+            public void run() {
+                // Make a copy of m_ports to avoid concurrent modification
+                connectionsFuture.set(new HashSet<Connection>(m_ports));
+            }
+        });
+        return connectionsFuture;
     }
 }
