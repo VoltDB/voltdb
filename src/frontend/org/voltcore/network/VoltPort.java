@@ -38,7 +38,7 @@ public class VoltPort implements Connection
 
     private static final int MAX_MESSAGE_LENGTH = 52428800;
 
-    private final NetworkDBBPool m_pool;
+    protected final NetworkDBBPool m_pool;
 
     /** The currently selected operations on this port. */
     private int m_readyOps = 0;

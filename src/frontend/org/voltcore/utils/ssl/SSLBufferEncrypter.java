@@ -17,6 +17,8 @@
 
 package org.voltcore.utils.ssl;
 
+import org.voltcore.network.NetworkDBBPool;
+import org.voltcore.utils.DBBPool;
 import org.voltdb.common.Constants;
 
 import javax.net.ssl.SSLEngine;
@@ -29,26 +31,25 @@ import java.util.List;
 public class SSLBufferEncrypter {
 
     private final SSLEngine m_sslEngine;
-    private ByteBuffer m_encBuffer;
+    int m_packetBufferSize;
 
     public SSLBufferEncrypter(SSLEngine sslEngine) {
         this.m_sslEngine = sslEngine;
-        int packetBufferSize = m_sslEngine.getSession().getPacketBufferSize();
-        // wrap will overflow until the encryption buffer is this size.
-        this.m_encBuffer = ByteBuffer.allocateDirect(packetBufferSize);
+        this.m_packetBufferSize = m_sslEngine.getSession().getPacketBufferSize();
     }
 
 
-    public ByteBuffer encryptBuffer(ByteBuffer src) throws IOException {
-        m_encBuffer.clear();
+    public DBBPool.BBContainer encryptBuffer(ByteBuffer src) throws IOException {
+        DBBPool.BBContainer dstCont = DBBPool.allocateDirectAndPool(m_packetBufferSize);
+        ByteBuffer dst = dstCont.b();
+        dst.clear();
         while (true) {
-            SSLEngineResult result = m_sslEngine.wrap(src, m_encBuffer);
+            SSLEngineResult result = m_sslEngine.wrap(src, dst);
             switch (result.getStatus()) {
                 case OK:
-                    m_encBuffer.flip();
-                    return m_encBuffer;
+                    dst.flip();
+                    return dstCont;
                 case BUFFER_OVERFLOW:
-                    m_encBuffer = ByteBuffer.allocate(m_encBuffer.capacity() << 1);
                     break;
                 case BUFFER_UNDERFLOW:
                     throw new IOException("Underflow on ssl wrap of buffer.");
