@@ -433,12 +433,18 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         try {
                             handshakeStatus = handshaker.handshake();
                         } catch (IOException e) {
-                            socket.close();
+                            try {
+                                socket.close();
+                            } catch (IOException e1) {
+                            }
                             networkLog.warn("Rejected accepting new connection, SSL handshake failed: " + e.getMessage());
                             continue;
                         }
                         if (!handshakeStatus) {
-                            socket.close();
+                            try {
+                                socket.close();
+                            } catch (IOException e) {
+                            }
                             networkLog.warn("Rejected accepting new connection, SSL handshake failed.");
                             continue;
                         }
