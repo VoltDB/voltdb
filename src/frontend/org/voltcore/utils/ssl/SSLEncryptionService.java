@@ -31,7 +31,7 @@ import java.util.concurrent.TimeUnit;
 public class SSLEncryptionService {
 
     private static SSLEncryptionService m_self;
-    private final ExecutorService m_executorService;
+    private final ExecutorService m_es;
 
 
     public static SSLEncryptionService initialize(int nThreads) {
@@ -44,22 +44,17 @@ public class SSLEncryptionService {
     }
 
     public SSLEncryptionService(int nThreads) {
-        this.m_executorService = Executors.newFixedThreadPool(nThreads);
+        this.m_es = Executors.newFixedThreadPool(nThreads);
     }
 
-    public boolean awaitTermination(long timeout, TimeUnit unit) throws InterruptedException {
-        return m_executorService.awaitTermination(timeout, unit);
-    }
-
-    public void shutdown() {
-        m_executorService.shutdown();
-    }
-
-    public List<Runnable> shutdownNow() {
-        return m_executorService.shutdownNow();
+    public void shutdown() throws InterruptedException {
+        if (m_es != null) {
+            m_es.shutdown();
+            m_es.awaitTermination(120, TimeUnit.SECONDS);
+        }
     }
 
     public <T> Future<T> submit(Callable<T> task) {
-        return m_executorService.submit(task);
+        return m_es.submit(task);
     }
 }
