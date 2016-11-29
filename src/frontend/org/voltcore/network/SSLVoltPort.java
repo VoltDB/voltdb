@@ -45,6 +45,7 @@ public class SSLVoltPort extends VoltPort {
     private final SSLEngine m_sslEngine;
     private final SSLBufferDecrypter m_sslBufferDecrypter;
     private final SSLBufferEncrypter m_sslBufferEncrypter;
+    private final DBBPool.BBContainer m_dstBufferCont;
     private ByteBuffer m_dstBuffer;
     private final SSLMessageParser m_sslMessageParser;
 
@@ -61,13 +62,14 @@ public class SSLVoltPort extends VoltPort {
     public SSLVoltPort(VoltNetwork network, InputHandler handler, InetSocketAddress remoteAddress, NetworkDBBPool pool, SSLEngine sslEngine) {
         super(network, handler, remoteAddress, pool);
         this.m_sslEngine = sslEngine;
-        m_sslBufferDecrypter = new SSLBufferDecrypter(sslEngine);
+        this.m_sslBufferDecrypter = new SSLBufferDecrypter(sslEngine);
         this.m_sslBufferEncrypter = new SSLBufferEncrypter(sslEngine);
-        m_sslMessageParser = new SSLMessageParser();
-        m_frameHeader = ByteBuffer.allocate(5);
-
-        // should be accessed only by the callable, not thread safe otherwise.
-        this.m_dstBuffer = ByteBuffer.allocateDirect(1024 * 1024);
+        this.m_sslMessageParser = new SSLMessageParser();
+        this.m_frameHeader = ByteBuffer.allocate(5);
+        int packetBufferSize = m_sslEngine.getSession().getPacketBufferSize();
+        this.m_dstBufferCont = DBBPool.allocateDirectAndPool(packetBufferSize);
+        this.m_dstBuffer = m_dstBufferCont.b();
+        m_dstBuffer.clear();
     }
 
     public void run() throws IOException {
@@ -258,7 +260,7 @@ public class SSLVoltPort extends VoltPort {
                     messages.add(message);
                 }
             }
-
+            m_dstBuffer.clear();j
             return messages;
         }
     }
@@ -374,5 +376,11 @@ public class SSLVoltPort extends VoltPort {
             this.m_encBuffers = encBuffers;
             this.m_nBytesClear = nClearBytes;
         }
+    }
+
+    @Override
+    void unregistered() {
+        super.unregistered();
+        m_dstBufferCont.discard();
     }
 }

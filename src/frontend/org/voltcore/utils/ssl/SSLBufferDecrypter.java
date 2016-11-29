@@ -36,7 +36,7 @@ public class SSLBufferDecrypter {
         // save initial state of dst buffer in case of underflow.
         int initialDstPos = dstBuffer.position();
         while (true) {
-            SSLEngineResult result = m_sslEngine.unwrap(srcBuffer, dstBuffer.slice());
+            SSLEngineResult result = m_sslEngine.unwrap(srcBuffer.slice(), dstBuffer.slice());
             switch (result.getStatus()) {
                 case OK:
                     // in m_dstBuffer, newly decrtyped data is between pos and lim
@@ -48,14 +48,7 @@ public class SSLBufferDecrypter {
                         continue;
                     }
                 case BUFFER_OVERFLOW:
-                    // the dst buffer holds partial volt messages, so its state needs to
-                    // be retained on overflow.
-                    ByteBuffer tmp = ByteBuffer.allocateDirect(dstBuffer.capacity() << 1);
-                    dstBuffer.position(0);
-                    tmp.put(dstBuffer);
-                    tmp.position(initialDstPos);
-                    dstBuffer = tmp;
-                    break;
+                    throw new SSLException("SSL engine unexpectedly overflowed when decrypting");
                 case BUFFER_UNDERFLOW:
                     // on underflow, want to read again.  There are unprocessed bytes up to limit.
                     // reset the buffers to their state prior to the underflow.

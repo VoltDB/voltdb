@@ -27,13 +27,10 @@ import java.nio.ByteBuffer;
 public class SSLMessageParser {
 
     private final ByteBuffer m_partialMessageLength;
-    private int m_currentMessageLength;
-    private int m_currentMessageStart;
+    private ByteBuffer m_currentMessage;
 
     public SSLMessageParser() {
         this.m_partialMessageLength = ByteBuffer.allocate(4);
-        this.m_currentMessageLength = -1;
-        this.m_currentMessageStart = -1;
     }
 
     public ByteBuffer message(ByteBuffer messagesBuf) {
@@ -43,34 +40,24 @@ public class SSLMessageParser {
             return null;
         }
 
-        if (m_partialMessageLength.position() != 0) {
-            if (!startMessage(messagesBuf)) {
-                return null;
-            }
-        } else if (m_currentMessageLength == -1) {
+        // all the newly descrypted data has been processeed.
+        if (m_partialMessageLength.position() != 0 || m_currentMessage == null) {
             if (!startMessage(messagesBuf)) {
                 return null;
             }
         }
 
-        int remainingInMessage = m_currentMessageLength - (messagesBuf.position() - m_currentMessageStart);
-        if (messagesBuf.remaining() >= remainingInMessage) {
+        if (messagesBuf.remaining() >= m_currentMessage.remaining()) {
             int oldLimit = messagesBuf.limit();
-            messagesBuf.position(m_currentMessageStart);
-            messagesBuf.limit(messagesBuf.position() + m_currentMessageLength);
-
-            ByteBuffer message = ByteBuffer.allocate(m_currentMessageLength);
-            message.put(messagesBuf);
-            message.flip();
+            messagesBuf.limit(messagesBuf.position() + m_currentMessage.remaining());
+            m_currentMessage.put(messagesBuf);
+            m_currentMessage.flip();
             messagesBuf.limit(oldLimit);
-            int remainingMessageLength = messagesBuf.remaining();
-            messagesBuf.compact();
-            messagesBuf.flip();
-            m_currentMessageLength = -1;
+            ByteBuffer message = m_currentMessage;
+            m_currentMessage = null;
             return message;
         } else {
-            // newly decrypted bytes are part of the existing message
-            messagesBuf.position(messagesBuf.limit());
+            m_currentMessage.put(messagesBuf);
             return null;
         }
     }
@@ -82,9 +69,9 @@ public class SSLMessageParser {
             m_partialMessageLength.put(messagesBuf);
             messagesBuf.limit(oldLimit);
             m_partialMessageLength.flip();
-            m_currentMessageLength = m_partialMessageLength.getInt();
+            int messageLength = m_partialMessageLength.getInt();
             m_partialMessageLength.clear();
-            m_currentMessageStart = messagesBuf.position();
+            m_currentMessage = ByteBuffer.allocate(messageLength);
             return true;
         } else {
             m_partialMessageLength.put(messagesBuf);
