@@ -253,7 +253,7 @@ public class ConnectionUtil {
             try {
                 loginResponse = messagingChannel.readMessage();
             } catch (IOException e) {
-                throw new IOException("Authentication rejected");
+                throw new IOException("Authentication rejected", e);
             }
 
             byte version = loginResponse.get();

@@ -496,7 +496,7 @@ public class ClientConfig {
             FileInputStream configFis = new FileInputStream(configFile);
             configIsr = new InputStreamReader(configFis);
         } catch (FileNotFoundException e) {
-            throw new IllegalArgumentException("Can't read ssl config file " + m_sslPropsFile);
+            throw new IllegalArgumentException("Can't read ssl config file " + m_sslPropsFile, e);
         }
 
         String keyStorePath = null;

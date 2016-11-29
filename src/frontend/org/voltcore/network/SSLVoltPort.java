@@ -90,13 +90,11 @@ public class SSLVoltPort extends VoltPort {
                 m_remainingWrites = writeBuffers(m_remainingWrites);
                 if (m_remainingWrites == null) {
                     m_writeStream.updateQueued(-m_remainingWritesByteCount, false);
-                    // m_writeStream.backpressureEnded();
                 }
             }
 
             // if the leftover bytes were written, add any new tasks to the the queue.
             if (m_remainingWrites == null) {
-                    // m_writeStream.backpressureEnded();
                 buildWriteTasks();
             }
 
