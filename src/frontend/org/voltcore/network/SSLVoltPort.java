@@ -260,7 +260,7 @@ public class SSLVoltPort extends VoltPort {
                     messages.add(message);
                 }
             }
-            m_dstBuffer.clear();j
+            m_dstBuffer.clear();
             return messages;
         }
     }
