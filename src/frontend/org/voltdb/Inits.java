@@ -501,18 +501,15 @@ public class Inits {
             String keyStorePath = getKeyTrustStoreAttribute("javax.net.ssl.keyStore", sslType.getKeystore(), "path");
             if (keyStorePath == null || keyStorePath.trim().isEmpty()) {
                 hostLog.fatal("A path for the SSL keystore file was not specified.");
-                System.exit(-1);
             }
             if (! new File(keyStorePath).exists()) {
                 hostLog.fatal("The specified SSL keystore file was not found.");
-                System.exit(-1);
             }
             sslContextFactory.setKeyStorePath(keyStorePath);
 
             String keyStorePassword = getKeyTrustStoreAttribute("javax.net.ssl.keyStorePassword", sslType.getKeystore(), "password");
             if (keyStorePassword == null) {
                 hostLog.fatal("An SSL keystore password was not specified.");
-                System.exit(-1);
             }
             sslContextFactory.setKeyStorePassword(keyStorePassword);
 
@@ -520,18 +517,15 @@ public class Inits {
                 String trustStorePath = getKeyTrustStoreAttribute("javax.net.ssl.trustStore", sslType.getTruststore(), "path");
                 if (trustStorePath == null || trustStorePath.trim().isEmpty()) {
                     hostLog.fatal("A path for the SSL truststore file was not specified.");
-                    System.exit(-1);
                 }
                 if (! new File(trustStorePath).exists()) {
                     hostLog.fatal("The specified SSL truststore file was not found.");
-                    System.exit(-1);
                 }
                 sslContextFactory.setTrustStorePath(trustStorePath);
 
                 String trustStorePassword = getKeyTrustStoreAttribute("javax.net.ssl.trustStorePassword", sslType.getTruststore(), "password");
                 if (trustStorePassword == null) {
                     hostLog.fatal("An SSL truststore password was not specified.");
-                    System.exit(-1);
                 }
                 sslContextFactory.setTrustStorePassword(trustStorePassword);
             }
@@ -592,7 +586,6 @@ public class Inits {
                         } else {
                             hostLog.fatal("HTTP service unable to bind to port " + httpPort + ". Exiting.", e1);
                         }
-                        System.exit(-1);
                     }
                 }
                 if (!findAny) {
