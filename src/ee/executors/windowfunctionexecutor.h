@@ -23,9 +23,8 @@
 namespace voltdb {
 
 class ProgressMonitorProxy;
-class WindowAggregate;
-class WindowAggregateRow;
-class TableWindow;
+struct WindowAggregateRow;
+struct TableWindow;
 /**
  * This is the executor for a WindowFunctionPlanNode.
  */
@@ -51,13 +50,25 @@ public:
         }
     virtual ~WindowFunctionExecutor();
 
+    /**
+     * This is the type of kinds of edges between groups.
+     */
+    enum EdgeType {
+        InvalidEdgeType,  /** No Type. */
+        StartOfInput,     /** Start of input. */
+        StartOfPartitionByGroup, /** Start of a new partition group. */
+        StartOfOrderByGroup,     /** Start of an order by group. */
+        EndOfInput               /** End of all input rows */
+    };
 
+private:
     /**
      * How many aggregate functions are there?
      */
     int getAggregateCount() const {
         return m_aggregateInputExpressions.size();
     }
+
     /**
      * Returns the input expressions for each aggregate in the
      * list.  Only one input expression per aggregate is used
@@ -122,6 +133,10 @@ public:
      * sophisticated windowing support.
      */
     virtual void p_execute_finish(TableWindow *window);
+
+    TableTuple & getBufferedInputTuple() {
+        return m_bufferedInputStorage;
+    }
 
     /**
      * This tuple is the set of partition by keys for the
@@ -197,13 +212,31 @@ public:
     void advanceAggs(const TableTuple& tuple,
                      bool newOrderByGroup);
 
-    void lookaheadInOrderByGroupForAggs(TableWindow *window,
-                                        const TableTuple &tuple);
+    /**
+     * Call lookaheadOneRow for each aggregate.  This
+     * will happen for each row, and can be disabled
+     * by setting m_needsLookahead to false.
+     */
+    void lookaheadOneRowForAggs(TableWindow *window,
+                                const TableTuple &tuple);
 
-    void lookaheadInPartitionByGroupForAggs(TableWindow *window,
-                                            const TableTuple &tuple);
+    /**
+     * Call lookaheadNextGroup for each aggregate
+     * before the calls to advance.
+     * This will happen for each group and cannot be
+     * disabled.
+     */
+    void lookaheadNextGroupForAggs(TableWindow *window);
 
-    void insertOutputTuple(WindowAggregateRow* winFunRow);
+    /**
+     * Call endGroup for each aggregate.  This will happen
+     * for each group and cannot be disabled.
+     */
+    void endGroupForAggs(TableWindow *window, EdgeType edgeType);
+    /**
+     * Insert the output tuple.
+     */
+    void insertOutputTuple();
 
     TupleSchema* constructSchemaFromExpressionVector(const AbstractPlanNode::OwningExpressionVector &exprs);
 
@@ -212,12 +245,16 @@ public:
 
     void initWorkingTupleStorage();
 
-    bool findLeadingEdge(TableWindow *window);
+    /**
+     * Find the next edge, given that the current group's
+     * leading edge is the given edge type.  Return the edge type
+     * of the next group, not this group.  Note that
+     * the edge type is the type of the group after the current
+     * group.
+     */
+    EdgeType findNextEdge(TableWindow *window, EdgeType edgeType);
 
-    bool findOrderByEdge(TableWindow *window);
-
-private:
-     Pool m_memoryPool;
+    Pool m_memoryPool;
     /**
      * The operation type of the aggregates.
      */
@@ -270,6 +307,12 @@ private:
      * order.
      */
     TupleSchema* m_partitionByKeySchema;
+    /**
+     * This holds tuples read while looking ahead in the
+     * input table.  Saving them here lets us avoid reading them
+     * multiple times.
+     */
+    PoolBackedTupleStorage m_bufferedInputStorage;
     /**
      * This holds the evaluations for the current partition.
      * Note that this is essentially a TableTuple, but that it
@@ -330,8 +373,6 @@ private:
      * of all the iterators.
      */
     TableWindow  * m_tableWindow;
-
-    void processOneRow(TableWindow* window, bool newOrderByGroup);
 };
 
 } /* namespace voltdb */
