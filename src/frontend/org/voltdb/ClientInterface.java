@@ -442,6 +442,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             networkLog.warn("Rejected accepting new connection, SSL handshake failed.");
                             continue;
                         }
+                        networkLog.info("SSL enabled on connection " + socket.socket().getRemoteSocketAddress() +
+                                " with cipher " + sslEngine.getSession().getCipherSuite());
                     }
                     /*
                      * Enforce a limit on the maximum number of connections
