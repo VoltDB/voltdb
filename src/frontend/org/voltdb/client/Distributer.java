@@ -1237,7 +1237,7 @@ class Distributer {
         m_ex.awaitTermination(365, TimeUnit.DAYS);
         if (m_sslEncryptionService != null) {
             m_sslEncryptionService.shutdown();
-            m_sslEncryptionService.awaitTermination(365, TimeUnit.DAYS);
+            m_sslEncryptionService = null;
         }
         m_network.shutdown();
     }
