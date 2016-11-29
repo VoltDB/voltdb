@@ -17,6 +17,11 @@
 
 package org.voltcore.utils.ssl;
 
+import com.google_voltpatches.common.util.concurrent.ListenableFuture;
+import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
+import com.google_voltpatches.common.util.concurrent.MoreExecutors;
+import org.voltcore.utils.CoreUtils;
+
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
@@ -31,8 +36,11 @@ import java.util.concurrent.TimeUnit;
 public class SSLEncryptionService {
 
     private static SSLEncryptionService m_self;
-    private final ExecutorService m_es;
 
+    private static final ListeningExecutorService m_es = MoreExecutors.listeningDecorator(
+            Executors.newFixedThreadPool(Math.max(2, CoreUtils.availableProcessors()),
+                    CoreUtils.getThreadFactory("Compression service thread"))
+    );
 
     public static SSLEncryptionService initialize(int nThreads) {
         m_self = new SSLEncryptionService(nThreads);
@@ -44,7 +52,6 @@ public class SSLEncryptionService {
     }
 
     public SSLEncryptionService(int nThreads) {
-        this.m_es = Executors.newFixedThreadPool(nThreads);
     }
 
     public void shutdown() throws InterruptedException {
@@ -54,7 +61,7 @@ public class SSLEncryptionService {
         }
     }
 
-    public <T> Future<T> submit(Callable<T> task) {
+    public <T> ListenableFuture<T> submit(Callable<T> task) {
         return m_es.submit(task);
     }
 }
