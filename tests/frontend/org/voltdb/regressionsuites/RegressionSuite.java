@@ -39,11 +39,6 @@ import java.util.Properties;
 import java.util.Random;
 import java.util.regex.Pattern;
 
-import javax.net.ssl.SSLContext;
-import javax.net.ssl.SSLEngine;
-
-import junit.framework.TestCase;
-
 import org.apache.commons.lang3.StringUtils;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
@@ -63,6 +58,8 @@ import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.Encoder;
 
 import com.google_voltpatches.common.net.HostAndPort;
+
+import junit.framework.TestCase;
 
 /**
  * Base class for a set of JUnit tests that perform regression tests
@@ -339,6 +336,7 @@ public class RegressionSuite extends TestCase {
      *
      * @return A SocketChannel that is already authenticated with the server
      */
+
     public SocketChannel getClientChannel() throws IOException {
         return getClientChannel(false);
     }
@@ -353,18 +351,10 @@ public class RegressionSuite extends TestCase {
             port = hNp.getPort();
         }
 
-        SSLEngine sslEngine = null;
-        if (Boolean.valueOf(System.getenv("Enable_SSL") == null ? "false" : System.getenv("Enable_SSL")) && sslEngine == null) {
-            SSLContext sslContext = new ClientConfig().getSslContext();
-            sslEngine = sslContext.createSSLEngine("client", port);
-            sslEngine.setUseClientMode(true);
-        }
-
-
         final SocketChannel channel = (SocketChannel)
             ConnectionUtil.getAuthenticatedConnection(
                     hNp.getHostText(), m_username, hashedPassword, port, null,
-                    ClientAuthScheme.getByUnencodedLength(hashedPassword.length), sslEngine)[0];
+                    ClientAuthScheme.getByUnencodedLength(hashedPassword.length))[0];
         channel.configureBlocking(true);
         if (!noTearDown) {
             synchronized (m_clientChannels) {
@@ -373,7 +363,6 @@ public class RegressionSuite extends TestCase {
         }
         return channel;
     }
-
     /**
      * Protected method used by MultiConfigSuiteBuilder to set the VoltServerConfig
      * instance a particular test will run with.

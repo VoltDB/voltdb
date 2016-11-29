@@ -46,7 +46,7 @@ public class ClientConfig {
     static final long DEFAULT_MAX_CONNECTION_RETRY_INTERVAL_MS = 8000; // default max connection retry interval is 8 seconds
     private static final String DEFAULT_SSL_PROPS_FILE = "ssl-config";
 
-    private boolean isSslEnable = Boolean.valueOf(System.getenv("Enable_SSL") == null ? "false" : System.getenv("Enable_SSL"));
+    private boolean isEnableSSL = Boolean.valueOf(System.getenv("ENABLE_SSL") == null ? "false" : System.getenv("ENABLE_SSL"));
     private String m_sslPropsFile;
     final ClientAuthScheme m_hashScheme;
     final String m_username;
@@ -483,7 +483,7 @@ public class ClientConfig {
      * Configure ssl from the provided properties file.
      */
     public void enableSSL() throws Exception {
-        if (isSslEnable && m_sslPropsFile == null) {
+        if (isEnableSSL && m_sslPropsFile == null) {
             m_sslPropsFile = this.getClass().getResource(DEFAULT_SSL_PROPS_FILE).getFile();
         }
         if (m_sslPropsFile == null) {

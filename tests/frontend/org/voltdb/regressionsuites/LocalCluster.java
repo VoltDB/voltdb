@@ -96,7 +96,7 @@ public class LocalCluster extends VoltServerConfig {
     private final boolean m_debug;
     FailureState m_failureState;
     int m_nextIPCPort = 10000;
-    ArrayList<Process> m_cluster = new ArrayList<Process>();
+    ArrayList<Process> m_cluster = new ArrayList<>();
     int perLocalClusterExtProcessIndex = 0;
     VoltProjectBuilder m_builder;
     private boolean m_expectedToCrash = false;
@@ -105,7 +105,7 @@ public class LocalCluster extends VoltServerConfig {
 
     Map<String, String> m_hostRoots = new HashMap<>();
     // Dedicated paths in the filesystem to be used as a root for each process
-    ArrayList<File> m_subRoots = new ArrayList<File>();
+    ArrayList<File> m_subRoots = new ArrayList<>();
     public ArrayList<File> getSubRoots() {
         return m_subRoots;
     }
@@ -119,7 +119,7 @@ public class LocalCluster extends VoltServerConfig {
     ArrayList<CommandLine> m_cmdLines = null;
     ServerThread m_localServer = null;
     ProcessBuilder m_procBuilder;
-    private final ArrayList<EEProcess> m_eeProcs = new ArrayList<EEProcess>();
+    private final ArrayList<EEProcess> m_eeProcs = new ArrayList<>();
     //This is additional process invironment variables that can be passed.
     // This is used to pass JMX port. Any additional use cases can use this too.
     private Map<String, String> m_additionalProcessEnv = null;
@@ -152,6 +152,14 @@ public class LocalCluster extends VoltServerConfig {
         isNewCli = flag;
         templateCmdLine.setNewCli(flag);
         templateCmdLine.startCommand("create");
+    };
+
+    private boolean isEnableSSL = Boolean.valueOf(System.getenv("ENABLE_SSL") == null ? "false" : System.getenv("ENABLE_SSL"));
+    public boolean isEnableSSL() { return isEnableSSL; };
+    public void setEnableSSL(boolean flag) {
+        isEnableSSL = flag;
+        templateCmdLine.m_sslEnable = flag;
+        templateCmdLine.m_sslExternal = flag;
     };
 
     private String m_prefix = null;
@@ -244,7 +252,7 @@ public class LocalCluster extends VoltServerConfig {
         numberOfCoordinators = hostCount <= 2 ? hostCount : hostCount <= 4 ? 2 : 3;
         internalPortGenerator = new InternalPortGeneratorForTest(portGenerator, numberOfCoordinators);
 
-        m_additionalProcessEnv = env==null ? new HashMap<String, String>() : env;
+        m_additionalProcessEnv = env==null ? new HashMap<>() : env;
         if (Boolean.getBoolean(EELibraryLoader.USE_JAVA_LIBRARY_PATH)) {
             // set use.javalib for LocalCluster so that Eclipse runs will be OK.
             m_additionalProcessEnv.put(EELibraryLoader.USE_JAVA_LIBRARY_PATH, "true");
@@ -278,6 +286,7 @@ public class LocalCluster extends VoltServerConfig {
         }
         templateCmdLine.hostCount(hostCount);
         templateCmdLine.setNewCli(isNewCli);
+        setEnableSSL(isEnableSSL);
         if (kfactor > 0 && !MiscUtils.isPro()) {
             m_kfactor = 0;
         }
@@ -288,8 +297,8 @@ public class LocalCluster extends VoltServerConfig {
         m_debug = debug;
         m_jarFileName = jarFileName;
         m_failureState = m_kfactor < 1 ? FailureState.ALL_RUNNING : failureState;
-        m_pipes = new ArrayList<PipeToFile>();
-        m_cmdLines = new ArrayList<CommandLine>();
+        m_pipes = new ArrayList<>();
+        m_cmdLines = new ArrayList<>();
 
         // if the user wants valgrind and it makes sense, give it to 'em
         // For now only one host works.
@@ -635,7 +644,7 @@ public class LocalCluster extends VoltServerConfig {
                     continue;
                 }
                 synchronized(pipeToFile) {
-                    // if process is dead, no point in waiting around
+                    // if prtests/frontend/org/voltdb/regressionsuites/LocalCluster.javaocess is dead, no point in waiting around
                     if (isProcessDead(pipeToFile.getProcess())) {
                         // dead process means the other pipes won't start,
                         // so bail here
@@ -939,6 +948,8 @@ public class LocalCluster extends VoltServerConfig {
             cmdln.setForceVoltdbCreate(false);
         }
 
+
+
         if (this.m_additionalProcessEnv != null) {
             for (String name : this.m_additionalProcessEnv.keySet()) {
                 cmdln.setJavaProperty(name, this.m_additionalProcessEnv.get(name));
@@ -1027,7 +1038,6 @@ public class LocalCluster extends VoltServerConfig {
                 assert(m_sitesperhostOverrides.containsKey(hostId));
                 cmdln.m_sitesperhost = m_sitesperhostOverrides.get(hostId);
             }
-
 
             m_cmdLines.add(cmdln);
             m_procBuilder.command().clear();
@@ -1536,7 +1546,7 @@ public class LocalCluster extends VoltServerConfig {
         if (!m_running) {
             return null;
         }
-        ArrayList<String> listeners = new ArrayList<String>();
+        ArrayList<String> listeners = new ArrayList<>();
         for (int i = 0; i < m_cmdLines.size(); i++) {
             CommandLine cl = m_cmdLines.get(i);
             Process p = m_cluster.get(i);
@@ -1794,7 +1804,7 @@ public class LocalCluster extends VoltServerConfig {
 
     @Override
     public ArrayList<File> listFiles(File path) throws IOException {
-        ArrayList<File> files = new ArrayList<File>();
+        ArrayList<File> files = new ArrayList<>();
         for (File root : m_subRoots) {
             File actualPath = new File(root, path.getPath());
             for (File f : actualPath.listFiles()) {
