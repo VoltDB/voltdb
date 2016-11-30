@@ -13,9 +13,10 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
-
+import sys
 import time
 from voltcli import checkstats
+from voltcli.checkstats import StatisticsProcedureException
 
 @VOLT.Command(
     bundles = VOLT.AdminBundle(),
@@ -23,7 +24,8 @@ from voltcli import checkstats
     options = (
         VOLT.BooleanOption('-w', '--wait', 'waiting',
                            'wait for all DR and Export transactions to be externally processed',
-                           default = False)
+                           default = False),
+        VOLT.IntegerOption('-t', '--timeout', 'timeout', 'The timeout value in minute if @Statistics is not progressing.', default = 2),
     )
 )
 def pause(runner):
@@ -34,14 +36,22 @@ def pause(runner):
         return
     runner.info('The cluster is paused.')
     if runner.opts.waiting:
+        timeout = -1;
+        if runner.opts.timeout:
+            timeout = (runner.opts.timeout) * 60
         status = runner.call_proc('@Quiesce', [], []).table(0).tuple(0).column_integer(0)
         if status <> 0:
             runner.error('The cluster has failed to quiesce with status: %d' % status)
             return
         runner.info('The cluster is quiesced.')
         try:
-            checkstats.check_exporter(runner)
-            checkstats.check_dr_producer(runner)
+            checkstats.check_exporter(runner, timeout)
+            checkstats.check_dr_producer(runner, timeout)
+        except StatisticsProcedureException as proex:
+            runner.info('The pause process has stopped. The cluster is in a paused state.')
+            runner.error(proex.message)
+            runner.info('Transactions may not be completely drained. You may continue monitoring the outstanding transactions with @Statistics')
+            sys.exit(1)
         except (KeyboardInterrupt, SystemExit):
             runner.info('The pause process has stopped. The cluster is in a paused state.')
             runner.abort('Transactions may not be completely drained. You may continue monitoring the outstanding transactions with @Statistics')
