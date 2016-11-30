@@ -593,16 +593,19 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 System.exit(-1);
             }
 
+            // print the ascii art!
+            consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_StartupString.name(), null);
+
             // load license API
-            if (m_config.m_pathToLicense == null) {
+            if (config.m_pathToLicense == null) {
                 m_licenseApi = MiscUtils.licenseApiFactory();
                 if (m_licenseApi == null) {
                     hostLog.fatal("Unable to open license file in default directories");
                 }
             } else {
-                m_licenseApi = MiscUtils.licenseApiFactory(m_config.m_pathToLicense);
+                m_licenseApi = MiscUtils.licenseApiFactory(config.m_pathToLicense);
                 if (m_licenseApi == null) {
-                    hostLog.fatal("Unable to open license file in provided path: " + m_config.m_pathToLicense);
+                    hostLog.fatal("Unable to open license file in provided path: " + config.m_pathToLicense);
                 }
             }
 
@@ -614,7 +617,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             }
 
             // determine the edition
-            m_isRunningWithOldVerb = config.m_startAction.isLegacy();
             String edition = "Community Edition";
             if (config.m_isEnterprise) {
                 if (m_licenseApi.isEnterprise()) edition = "Enterprise Edition";
@@ -653,8 +655,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             // config UUID is part of the status tracker that is slated to be an
             // Information source for an http admun endpoint
             m_statusTracker = new NodeStateTracker();
-
-            consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_StartupString.name(), null);
 
             if (config.m_startAction == StartAction.INITIALIZE) {
                 if (config.m_forceVoltdbCreate) {
