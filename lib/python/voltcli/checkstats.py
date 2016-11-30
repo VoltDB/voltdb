@@ -137,10 +137,10 @@ def dr_producer_stats(runner, partition_min_host, partition_min, partition_max):
             last_acked = -1
         else:
             last_acked = r[9]
-        
+
         if last_queued == -1 and last_acked == -1:
             continue
-        
+
         # check TOTALBYTES
         if r[5] > 0:
             # track the highest seen drId for each partition. use last queued to get the upper bound
