@@ -747,6 +747,11 @@ public class MockVoltDB implements VoltDBInterface
             public boolean hardExpiration() {
                 return false;
             }
+
+            @Override
+            public boolean secondaryInitialization() {
+                return true;
+            }
         };
     }
 
