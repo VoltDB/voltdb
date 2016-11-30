@@ -35,10 +35,6 @@ def shutdown(runner):
     columns = []
     zk_pause_txnid = 0
     runner.info('Cluster shutdown in progress.')
-    timeout = -1;
-    if runner.opts.timeout:
-        timeout = (runner.opts.timeout) * 60
-
     if not runner.opts.forcing:
         try:
             runner.info('Preparing for shutdown...')
@@ -51,18 +47,18 @@ def shutdown(runner):
             status = runner.call_proc('@Quiesce', [], []).table(0).tuple(0).column_integer(0)
             if status <> 0:
                 runner.abort('The cluster has failed to be quiesce with status: %d' % status)
-            checkstats.check_clients(runner, timeout)
-            checkstats.check_importer(runner, timeout)
-            checkstats.check_command_log(runner, timeout)
+            checkstats.check_clients(runner)
+            checkstats.check_importer(runner)
+            checkstats.check_command_log(runner)
             runner.info('All transactions have been made durable.')
             if runner.opts.save:
                columns = [VOLT.FastSerializer.VOLTTYPE_BIGINT]
                shutdown_params =  [zk_pause_txnid]
                #save option, check more stats
-               checkstats.check_dr_consumer(runner, timeout)
+               checkstats.check_dr_consumer(runner)
                runner.info('Starting resolution of external commitments...')
-               checkstats.check_exporter(runner, timeout)
-               checkstats.check_dr_producer(runner, timeout)
+               checkstats.check_exporter(runner)
+               checkstats.check_dr_producer(runner)
                runner.info('Saving a final snapshot, The cluster will shutdown after the snapshot is finished...')
             else:
                 runner.info('Shutting down the cluster...')

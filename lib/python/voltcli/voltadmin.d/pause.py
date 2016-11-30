@@ -36,17 +36,14 @@ def pause(runner):
         return
     runner.info('The cluster is paused.')
     if runner.opts.waiting:
-        timeout = -1;
-        if runner.opts.timeout:
-            timeout = (runner.opts.timeout) * 60
         status = runner.call_proc('@Quiesce', [], []).table(0).tuple(0).column_integer(0)
         if status <> 0:
             runner.error('The cluster has failed to quiesce with status: %d' % status)
             return
         runner.info('The cluster is quiesced.')
         try:
-            checkstats.check_exporter(runner, timeout)
-            checkstats.check_dr_producer(runner, timeout)
+            checkstats.check_exporter(runner)
+            checkstats.check_dr_producer(runner)
         except StatisticsProcedureException as proex:
             runner.info('The pause process has stopped. The cluster is in a paused state.')
             runner.error(proex.message)

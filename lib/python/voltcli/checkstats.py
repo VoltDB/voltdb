@@ -17,7 +17,7 @@ import sys
 import time
 import voltdbclient
 
-def check_exporter(runner, timeout=-1):
+def check_exporter(runner):
     runner.info('Completing outstanding exporter transactions...')
     last_table_stat_time = 0
     export_tables_with_data = dict()
@@ -45,10 +45,10 @@ def check_exporter(runner, timeout=-1):
                 notifyInterval = 10
                 if last_table_stat_time > 1 and export_tables_with_data:
                     print_export_pending(runner, export_tables_with_data)
-        lastUpdatedTime = monitorStatisticsProgress(last_export_tables_with_data, export_tables_with_data, lastUpdatedTime, timeout, 'Exporter')
+        lastUpdatedTime = monitorStatisticsProgress(last_export_tables_with_data, export_tables_with_data, lastUpdatedTime, runner, 'Exporter')
         last_export_tables_with_data = export_tables_with_data.copy()
 
-def check_dr_producer(runner, timeout=-1):
+def check_dr_producer(runner):
     runner.info('Completing outstanding DR producer transactions...')
     partition_min_host = dict()
     partition_min = dict()
@@ -76,14 +76,18 @@ def check_dr_producer(runner, timeout=-1):
                 notifyInterval = 10
                 if partition_min:
                     print_dr_pending(runner, partition_min_host, partition_min, partition_max)
-        lastUpdatedTime = monitorDRProducerStatisticsProgress(last_partition_min, last_partition_max, partition_min, partition_max, lastUpdatedTime, timeout)
+        lastUpdatedTime = monitorDRProducerStatisticsProgress(last_partition_min, last_partition_max, partition_min, partition_max, lastUpdatedTime, runner)
         last_partition_min = partition_min.copy()
         last_partition_max = partition_max.copy()
 
 def monitorDRProducerStatisticsProgress(lastPartitionMin, lastPartitionMax, currentPartitionMin,
-                             currentPartitionMax, lastUpdatedTime, timeout):
+                             currentPartitionMax, lastUpdatedTime, runner):
     currentTime = time.time()
     #no timeout check
+    timeout = -1;
+    if runner.opts.timeout:
+        timeout = (runner.opts.timeout) * 60
+
     if timeout == -1:
         return currentTime
     #any stats progress?
@@ -236,7 +240,7 @@ def print_export_pending(runner, export_tables_with_data):
         partlist = reduce(lambda a,x: a+","+str(x), list(pidlist), "")[1:]
         runner.info(summaryline % (table, ', '.join(hostlist), partlist))
 
-def check_clients(runner, timeout=-1):
+def check_clients(runner):
      runner.info('Completing outstanding client transactions...')
      lastUpdatedTime = time.time()
      lastValidationParamms = [0, 0, 0]
@@ -257,11 +261,11 @@ def check_clients(runner, timeout=-1):
         if trans == 0 and bytes == 0 and msgs == 0:
             return
         currentValidationParams = [trans, bytes, msgs]
-        lastUpdatedTime = monitorStatisticsProgress(lastValidationParamms, currentValidationParams, lastUpdatedTime, timeout, 'LIVECLIENTS')
+        lastUpdatedTime = monitorStatisticsProgress(lastValidationParamms, currentValidationParams, lastUpdatedTime, runner, 'LIVECLIENTS')
         lastValidationParamms = [trans, bytes, msgs]
         time.sleep(1)
 
-def check_importer(runner, timeout=-1):
+def check_importer(runner):
      runner.info('Completing outstanding importer requests...')
      lastUpdatedTime = time.time()
      lastValidationParamms = [0]
@@ -281,11 +285,11 @@ def check_importer(runner, timeout=-1):
         if outstanding == 0:
             return
         currentValidationParams = [outstanding]
-        lastUpdatedTime = monitorStatisticsProgress(lastValidationParamms, currentValidationParams, lastUpdatedTime, timeout, 'IMPORTER')
+        lastUpdatedTime = monitorStatisticsProgress(lastValidationParamms, currentValidationParams, lastUpdatedTime, runner, 'IMPORTER')
         lastValidationParamms = [outstanding]
         time.sleep(1)
 
-def check_dr_consumer(runner, timeout=-1):
+def check_dr_consumer(runner):
      runner.info('Completing outstanding DR consumer transactions...')
      lastUpdatedTime = time.time()
      lastValidationParamms = dict()
@@ -311,11 +315,11 @@ def check_dr_consumer(runner, timeout=-1):
             return
         if notifyInterval == 0:
             notifyInterval = 10
-        lastUpdatedTime = monitorStatisticsProgress(lastValidationParamms, currentValidationParams, lastUpdatedTime, timeout, 'DRCONSUMER')
+        lastUpdatedTime = monitorStatisticsProgress(lastValidationParamms, currentValidationParams, lastUpdatedTime, runner, 'DRCONSUMER')
         lastValidationParamms = currentValidationParams.copy()
         time.sleep(1)
 
-def check_command_log(runner, timeout=-1):
+def check_command_log(runner):
     runner.info('Completing outstanding Command Log transactions...')
     lastUpdatedTime = time.time()
     lastValidationParamms = [0, 0]
@@ -340,12 +344,17 @@ def check_command_log(runner, timeout=-1):
             notifyInterval = 10
             runner.info('\tOutstanding command log bytes = %d and transactions = %d.' %(outstandingByte, outstandingTxn))
         currentValidationParams = [outstandingByte, outstandingTxn]
-        lastUpdatedTime = monitorStatisticsProgress(lastValidationParamms, currentValidationParams, lastUpdatedTime, timeout, 'COMMANDLOG')
+        lastUpdatedTime = monitorStatisticsProgress(lastValidationParamms, currentValidationParams, lastUpdatedTime, runner, 'COMMANDLOG')
         lastValidationParamms = [outstandingByte, outstandingTxn]
         time.sleep(1)
 
-def monitorStatisticsProgress(lastUpdatedParams, currentParams, lastUpdatedTime, timeout, component):
+def monitorStatisticsProgress(lastUpdatedParams, currentParams, lastUpdatedTime, runner, component):
     currentTime = time.time()
+
+    timeout = -1;
+    if runner.opts.timeout:
+        timeout = (runner.opts.timeout) * 60
+
     #no timeout check
     if timeout == -1:
         return currentTime
