@@ -36,7 +36,7 @@ public class SSLBufferDecrypter {
         // save initial state of dst buffer in case of underflow.
         int initialDstPos = dstBuffer.position();
         while (true) {
-            SSLEngineResult result = m_sslEngine.unwrap(srcBuffer.slice(), dstBuffer.slice());
+            SSLEngineResult result = m_sslEngine.unwrap(srcBuffer, dstBuffer.slice());
             switch (result.getStatus()) {
                 case OK:
                     // in m_dstBuffer, newly decrtyped data is between pos and lim
