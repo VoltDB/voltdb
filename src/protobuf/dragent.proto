@@ -49,6 +49,17 @@ message Query {
     optional bool includeMesh = 1 [default = false];
 }
 
+message ConversationInfo {
+    optional int32 clusterId = 1;
+    optional fixed64 clusterCreationId = 2;
+    optional int32 clusterProtocolVersion = 3;
+    repeated NodeInfo nodeInfo = 4;
+}
+
+message StartCursor {
+    repeated ConversationInfo conversationInfo = 1;
+}
+
 message Response {
     enum ReplicationMode {
         IDLE = 1;
@@ -143,6 +154,7 @@ message CtrlEnvelope {
         STOP_SYNC = 8;
         CONNECT = 9;
         SUBSCRIBE = 10;
+        START_CURSOR = 11;
     }
     required Type type = 1;
     required UUID id = 2;
@@ -155,4 +167,5 @@ message CtrlEnvelope {
     // Intentionally skip field 9 -- deprecated message type
     optional Connect connect = 10;
     optional Query query = 11;
+    optional StartCursor startCursor = 12;
 }
