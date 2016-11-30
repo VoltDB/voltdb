@@ -18,11 +18,11 @@ package com.google_voltpatches.common.collect;
 
 import static com.google_voltpatches.common.base.Preconditions.checkNotNull;
 
+import com.google_voltpatches.common.annotations.GwtIncompatible;
 import com.google_voltpatches.common.primitives.Primitives;
-
+import com.google_voltpatches.errorprone.annotations.CanIgnoreReturnValue;
 import java.io.Serializable;
 import java.util.Map;
-
 import javax.annotation_voltpatches.Nullable;
 
 /**
@@ -32,6 +32,7 @@ import javax.annotation_voltpatches.Nullable;
  * @author Kevin Bourrillion
  * @since 2.0
  */
+@GwtIncompatible
 public final class ImmutableClassToInstanceMap<B> extends ForwardingMap<Class<? extends B>, B>
     implements ClassToInstanceMap<B>, Serializable {
   
@@ -90,6 +91,7 @@ public final class ImmutableClassToInstanceMap<B> extends ForwardingMap<Class<? 
      * Associates {@code key} with {@code value} in the built map. Duplicate
      * keys are not allowed, and will cause {@link #build} to fail.
      */
+    @CanIgnoreReturnValue
     public <T extends B> Builder<B> put(Class<T> key, T value) {
       mapBuilder.put(key, value);
       return this;
@@ -103,6 +105,7 @@ public final class ImmutableClassToInstanceMap<B> extends ForwardingMap<Class<? 
      * @throws ClassCastException if any value is not an instance of the type
      *     specified by its key
      */
+    @CanIgnoreReturnValue
     public <T extends B> Builder<B> putAll(Map<? extends Class<? extends T>, ? extends T> map) {
       for (Entry<? extends Class<? extends T>, ? extends T> entry : map.entrySet()) {
         Class<? extends T> type = entry.getKey();
@@ -180,6 +183,7 @@ public final class ImmutableClassToInstanceMap<B> extends ForwardingMap<Class<? 
    * @throws UnsupportedOperationException always
    * @deprecated Unsupported operation.
    */
+  @CanIgnoreReturnValue
   @Deprecated
   @Override
   public <T extends B> T putInstance(Class<T> type, T value) {

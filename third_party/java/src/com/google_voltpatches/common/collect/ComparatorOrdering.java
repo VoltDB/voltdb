@@ -19,10 +19,8 @@ package com.google_voltpatches.common.collect;
 import static com.google_voltpatches.common.base.Preconditions.checkNotNull;
 
 import com.google_voltpatches.common.annotations.GwtCompatible;
-
 import java.io.Serializable;
 import java.util.Comparator;
-
 import javax.annotation_voltpatches.Nullable;
 
 /** An ordering for a pre-existing comparator. */

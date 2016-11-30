@@ -19,10 +19,8 @@ package com.google_voltpatches.common.collect;
 import static com.google_voltpatches.common.base.Preconditions.checkNotNull;
 
 import com.google_voltpatches.common.annotations.GwtCompatible;
-
 import java.io.Serializable;
 import java.util.Iterator;
-
 import javax.annotation_voltpatches.Nullable;
 
 /** An ordering that uses the reverse of a given order. */

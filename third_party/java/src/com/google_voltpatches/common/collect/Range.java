@@ -22,13 +22,11 @@ import com.google_voltpatches.common.annotations.GwtCompatible;
 import com.google_voltpatches.common.base.Equivalence;
 import com.google_voltpatches.common.base.Function;
 import com.google_voltpatches.common.base.Predicate;
-
 import java.io.Serializable;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.SortedSet;
-
 import javax.annotation_voltpatches.Nullable;
 
 /**
@@ -47,8 +45,9 @@ import javax.annotation_voltpatches.Nullable;
  * it is either open or unbounded. The construct {@code {x | statement}} is read "the set of all
  * <i>x</i> such that <i>statement</i>.")
  *
- * <blockquote><table>
- * <tr><td><b>Notation</b> <td><b>Definition</b>        <td><b>Factory method</b>
+ * <blockquote>
+ * <table>
+ * <tr><th>Notation        <th>Definition               <th>Factory method
  * <tr><td>{@code (a..b)}  <td>{@code {x | a < x < b}}  <td>{@link Range#open open}
  * <tr><td>{@code [a..b]}  <td>{@code {x | a <= x <= b}}<td>{@link Range#closed closed}
  * <tr><td>{@code (a..b]}  <td>{@code {x | a < x <= b}} <td>{@link Range#openClosed openClosed}
@@ -58,7 +57,8 @@ import javax.annotation_voltpatches.Nullable;
  * <tr><td>{@code (-∞..b)} <td>{@code {x | x < b}}      <td>{@link Range#lessThan lessThan}
  * <tr><td>{@code (-∞..b]} <td>{@code {x | x <= b}}     <td>{@link Range#atMost atMost}
  * <tr><td>{@code (-∞..+∞)}<td>{@code {x}}              <td>{@link Range#all all}
- * </table></blockquote>
+ * </table>
+ * </blockquote>
  *
  * <p>When both endpoints exist, the upper endpoint may not be less than the lower. The endpoints
  * may be equal only if at least one of the bounds is closed:
@@ -647,7 +647,7 @@ public final class Range<C extends Comparable> implements Predicate<C>, Serializ
   private static String toString(Cut<?> lowerBound, Cut<?> upperBound) {
     StringBuilder sb = new StringBuilder(16);
     lowerBound.describeAsLowerBound(sb);
-    sb.append('\u2025');
+    sb.append("..");
     upperBound.describeAsUpperBound(sb);
     return sb.toString();
   }

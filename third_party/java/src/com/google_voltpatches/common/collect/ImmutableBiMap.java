@@ -18,7 +18,7 @@ package com.google_voltpatches.common.collect;
 
 import com.google_voltpatches.common.annotations.Beta;
 import com.google_voltpatches.common.annotations.GwtCompatible;
-
+import com.google_voltpatches.errorprone.annotations.CanIgnoreReturnValue;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Map;
@@ -134,6 +134,7 @@ public abstract class ImmutableBiMap<K, V> extends ImmutableMap<K, V> implements
      * Associates {@code key} with {@code value} in the built bimap. Duplicate
      * keys or values are not allowed, and will cause {@link #build} to fail.
      */
+    @CanIgnoreReturnValue
     @Override
     public Builder<K, V> put(K key, V value) {
       super.put(key, value);
@@ -146,6 +147,7 @@ public abstract class ImmutableBiMap<K, V> extends ImmutableMap<K, V> implements
      *
      * @since 19.0
      */
+    @CanIgnoreReturnValue
     @Override
     public Builder<K, V> put(Entry<? extends K, ? extends V> entry) {
       super.put(entry);
@@ -159,6 +161,7 @@ public abstract class ImmutableBiMap<K, V> extends ImmutableMap<K, V> implements
      *
      * @throws NullPointerException if any key or value in {@code map} is null
      */
+    @CanIgnoreReturnValue
     @Override
     public Builder<K, V> putAll(Map<? extends K, ? extends V> map) {
       super.putAll(map);
@@ -172,6 +175,7 @@ public abstract class ImmutableBiMap<K, V> extends ImmutableMap<K, V> implements
      * @throws NullPointerException if any key, value, or entry is null
      * @since 19.0
      */
+    @CanIgnoreReturnValue
     @Beta
     @Override
     public Builder<K, V> putAll(Iterable<? extends Entry<? extends K, ? extends V>> entries) {
@@ -190,6 +194,7 @@ public abstract class ImmutableBiMap<K, V> extends ImmutableMap<K, V> implements
      * @throws IllegalStateException if this method was already called
      * @since 19.0
      */
+    @CanIgnoreReturnValue
     @Beta
     @Override
     public Builder<K, V> orderEntriesByValue(Comparator<? super V> valueComparator) {
@@ -313,6 +318,7 @@ public abstract class ImmutableBiMap<K, V> extends ImmutableMap<K, V> implements
    * @throws UnsupportedOperationException always
    * @deprecated Unsupported operation.
    */
+  @CanIgnoreReturnValue
   @Deprecated
   @Override
   public V forcePut(K key, V value) {

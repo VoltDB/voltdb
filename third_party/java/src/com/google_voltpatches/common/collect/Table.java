@@ -18,11 +18,10 @@ package com.google_voltpatches.common.collect;
 
 import com.google_voltpatches.common.annotations.GwtCompatible;
 import com.google_voltpatches.common.base.Objects;
-
+import com.google_voltpatches.errorprone.annotations.CanIgnoreReturnValue;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Set;
-
 import javax.annotation_voltpatches.Nullable;
 
 /**
@@ -140,6 +139,7 @@ public interface Table<R, C, V> {
    * @return the value previously associated with the keys, or {@code null} if
    *     no mapping existed for the keys
    */
+  @CanIgnoreReturnValue
   @Nullable
   V put(R rowKey, C columnKey, V value);
 
@@ -160,6 +160,7 @@ public interface Table<R, C, V> {
    * @return the value previously associated with the keys, or {@code null} if
    *     no such value existed
    */
+  @CanIgnoreReturnValue
   @Nullable
   V remove(@Nullable Object rowKey, @Nullable Object columnKey);
 

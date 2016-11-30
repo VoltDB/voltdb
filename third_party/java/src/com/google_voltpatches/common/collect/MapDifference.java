@@ -17,9 +17,7 @@
 package com.google_voltpatches.common.collect;
 
 import com.google_voltpatches.common.annotations.GwtCompatible;
-
 import java.util.Map;
-
 import javax.annotation_voltpatches.Nullable;
 
 /**

@@ -19,15 +19,14 @@ package com.google_voltpatches.common.collect;
 import static com.google_voltpatches.common.base.Preconditions.checkNotNull;
 
 import com.google_voltpatches.common.annotations.GwtCompatible;
+import com.google_voltpatches.errorprone.annotations.CanIgnoreReturnValue;
 import com.google_voltpatches.j2objc.annotations.WeakOuter;
-
 import java.util.AbstractCollection;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
-
 import javax.annotation_voltpatches.Nullable;
 
 /**
@@ -59,17 +58,20 @@ abstract class AbstractMultimap<K, V> implements Multimap<K, V> {
     return collection != null && collection.contains(value);
   }
   
+  @CanIgnoreReturnValue
   @Override
   public boolean remove(@Nullable Object key, @Nullable Object value) {
     Collection<V> collection = asMap().get(key);
     return collection != null && collection.remove(value);
   }
 
+  @CanIgnoreReturnValue
   @Override
   public boolean put(@Nullable K key, @Nullable V value) {
     return get(key).add(value);
   }
 
+  @CanIgnoreReturnValue
   @Override
   public boolean putAll(@Nullable K key, Iterable<? extends V> values) {
     checkNotNull(values);
@@ -84,6 +86,7 @@ abstract class AbstractMultimap<K, V> implements Multimap<K, V> {
     }
   }
 
+  @CanIgnoreReturnValue
   @Override
   public boolean putAll(Multimap<? extends K, ? extends V> multimap) {
     boolean changed = false;
@@ -93,6 +96,7 @@ abstract class AbstractMultimap<K, V> implements Multimap<K, V> {
     return changed;
   }
 
+  @CanIgnoreReturnValue
   @Override
   public Collection<V> replaceValues(@Nullable K key, Iterable<? extends V> values) {
     checkNotNull(values);

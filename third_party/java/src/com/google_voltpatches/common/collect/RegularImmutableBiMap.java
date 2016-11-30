@@ -23,10 +23,10 @@ import static com.google_voltpatches.common.collect.RegularImmutableMap.checkNoC
 
 import com.google_voltpatches.common.annotations.GwtCompatible;
 import com.google_voltpatches.common.collect.ImmutableMapEntry.NonTerminalImmutableBiMapEntry;
+import com.google_voltpatches.errorprone.annotations.concurrent.LazyInit;
+import com.google_voltpatches.j2objc.annotations.RetainedWith;
 import com.google_voltpatches.j2objc.annotations.WeakOuter;
-
 import java.io.Serializable;
-
 import javax.annotation_voltpatches.Nullable;
 
 /**
@@ -92,12 +92,12 @@ class RegularImmutableBiMap<K, V> extends ImmutableBiMap<K, V> {
          */
         boolean reusable =
             entry instanceof ImmutableMapEntry && ((ImmutableMapEntry<K, V>) entry).isReusable();
-        newEntry = reusable
-            ? (ImmutableMapEntry<K, V>) entry
-            : new ImmutableMapEntry<K, V>(key, value);
+        newEntry =
+            reusable ? (ImmutableMapEntry<K, V>) entry : new ImmutableMapEntry<K, V>(key, value);
       } else {
-        newEntry = new NonTerminalImmutableBiMapEntry<K, V>(
-            key, value, nextInKeyBucket, nextInValueBucket);
+        newEntry =
+            new NonTerminalImmutableBiMapEntry<K, V>(
+                key, value, nextInKeyBucket, nextInValueBucket);
       }
       keyTable[keyBucket] = newEntry;
       valueTable[valueBucket] = newEntry;
@@ -162,6 +162,8 @@ class RegularImmutableBiMap<K, V> extends ImmutableBiMap<K, V> {
     return entries.length;
   }
   
+  @LazyInit
+  @RetainedWith
   private transient ImmutableBiMap<V, K> inverse;
 
   @Override
