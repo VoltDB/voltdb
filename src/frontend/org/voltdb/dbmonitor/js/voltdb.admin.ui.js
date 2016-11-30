@@ -4574,7 +4574,7 @@ function loadAdminPage() {
 
 
             if (adminConfigValues.heartBeatTimeout != null) {
-                adminDOMObjects.heartBeatTimeoutLabel.text("ms");
+                adminDOMObjects.heartBeatTimeoutLabel.text("s");
 
                 if (adminEditObjects.editStateHeartbeatTimeout == editStates.ShowEdit)
                     adminEditObjects.LinkHeartbeatEdit.show();
