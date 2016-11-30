@@ -177,17 +177,24 @@ public class AsyncBenchmark {
     public AsyncBenchmark(VoterConfig config) {
         this.config = config;
 
-        ClientConfig clientConfig = new ClientConfig(config.user, config.password, new StatusListener(), config.ssl);
-        clientConfig.setMaxTransactionsPerSecond(config.ratelimit);
+        // following arranglement works around problem with empty sslfile
+        // when not using SSL.
+        //
+        // when that's fixed, we can go back.
+        ClientConfig clientConfig = null;
 
         if (config.ssl != null && !config.ssl.isEmpty()) {
             try {
+                clientConfig = new ClientConfig(config.user, config.password, new StatusListener(), config.ssl);
                 clientConfig.enableSSL();
             } catch (Exception e) {
                 System.err.println("Failed to configure ssl, exiting");
                 System.exit(-1);
             }
+        } else {
+            clientConfig = new ClientConfig(config.user, config.password, new StatusListener());
         }
+        clientConfig.setMaxTransactionsPerSecond(config.ratelimit);
 
         if (config.topologyaware) {
             clientConfig.setTopologyChangeAware(true);

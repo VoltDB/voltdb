@@ -99,6 +99,7 @@ public class SyncBenchmark {
     final AtomicLong failedGets = new AtomicLong(0);
     final AtomicLong rawGetData = new AtomicLong(0);
     final AtomicLong networkGetData = new AtomicLong(0);
+    final AtomicLong allOps = new AtomicLong(0);
 
     final AtomicLong successfulPuts = new AtomicLong(0);
     final AtomicLong failedPuts = new AtomicLong(0);
@@ -163,6 +164,9 @@ public class SyncBenchmark {
 
         @Option(desc = "File with SSL properties")
         String sslfile = "";
+
+        @Option(desc = "Number of get/puts to perform")
+        long maxops = -1L;
 
         @Override
         public void validate() {
@@ -288,14 +292,14 @@ public class SyncBenchmark {
         ClientConfig clientConfig = null;
         if (config.sslfile.length() > 0) {
             try {
-                clientConfig = new ClientConfig("", "", config.sslfile);
+				clientConfig = new ClientConfig("", "", config.sslfile);
                 clientConfig.enableSSL();
             } catch (Exception e) {
                 System.err.println("Failed to configure ssl, exiting");
+                e.printStackTrace();
                 System.exit(-1);
             }
-        }
-        else
+        } else
             clientConfig = new ClientConfig("", "");
 
         clientConfig.setReconnectOnConnectionLoss(true);
@@ -493,6 +497,11 @@ public class SyncBenchmark {
      */
     class KVThread implements Runnable {
 
+        private boolean keepRunning(boolean countops) {
+            if (countops) return allOps.incrementAndGet() <= config.maxops;
+            else return !benchmarkComplete.get();
+        }
+
         @Override
         public void run() {
             while (warmupComplete.get() == false) {
@@ -514,7 +523,9 @@ public class SyncBenchmark {
                 }
             }
 
-            while (benchmarkComplete.get() == false) {
+            final boolean countops = config.maxops > 0;
+            while (keepRunning(countops)) {
+
                 // Decide whether to perform a GET or PUT operation
                 if (rand.nextDouble() < config.getputratio) {
                     // Get a key/value pair, synchronously
@@ -613,7 +624,14 @@ public class SyncBenchmark {
 
         // Run the benchmark loop for the requested warmup time
         System.out.println("\nRunning benchmark...");
-        Thread.sleep(1000l * config.duration);
+
+        if (config.maxops > 0) {
+           while(allOps.get() < config.maxops) {
+               Thread.sleep(5_000);
+           }
+        } else {
+            Thread.sleep(1000l * config.duration);
+        }
 
         // stop the threads
         benchmarkComplete.set(true);
