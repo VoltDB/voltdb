@@ -37,8 +37,6 @@ public class DummySnmpTrapSender implements SnmpTrapSender {
     }
 
     @Override
-    public boolean sendTrap(int faultCode, int threshold, int actual, String unit) {
-        return true;
+    public void sendTrap(int faultCode, int threshold, int actual, String unit) {
     }
-
 }
