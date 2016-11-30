@@ -80,20 +80,18 @@ def check_dr_producer(runner, timeout=-1):
         LastPartitionMin = partition_min.copy()
         lastPartitionMax = partition_max.copy()
 
-
 def verifyDrProducerTimeout(lastPartitionMin, currentPartitionMin,
                             lastPartitionMax, currentPartitionMax, lastUpdatedTime, timeout):
     currentTime = time.time()
-    #not timeout check
+    #no timeout check
     if timeout == -1:
         return currentTime
-    #are stats moved?
-    updated = (comp(lastPartitionMin,currentPartitionMin) <> 0)
-    if updated:
-        updated = (comp(lastPartitionMax,currentPartitionMax) <> 0)
+    #any stats progress?
+    partitionMinProgressed = comp(lastPartitionMin,currentPartitionMin)
+    partitionMaxprogressed = comp(lastPartitionMax,currentPartitionMax)
 
     #stats moved
-    if updated == False:
+    if partitionMinProgressed <> 0 or partitionMaxprogressed <> 0:
         return currentTime
 
     timeSinceLastUpdate = currentTime - lastUpdatedTime
@@ -101,7 +99,6 @@ def verifyDrProducerTimeout(lastPartitionMin, currentPartitionMin,
     if timeSinceLastUpdate > timeout:
          raise TimeException("Outstanding transactions in DRPRODUCER have not been completely drained.")
     #stats has not been moved but not timeout yet
-
     return lastUpdatedTime
 
 def get_stats(runner, component):
@@ -240,6 +237,7 @@ def check_clients(runner, timeout=-1):
      runner.info('Completing outstanding client transactions...')
      lastUpdatedTime = time.time()
      lastValidationParamms = [0, 0, 0]
+     notifyInterval = 10
      while True:
         resp = get_stats(runner, 'LIVECLIENTS')
         trans = 0
@@ -249,7 +247,10 @@ def check_clients(runner, timeout=-1):
             bytes += r[6]
             msgs += r[7]
             trans += r[8]
-        runner.info('\tOutstanding transactions=%d, Outstanding request bytes=%d, Outstanding response messages=%d' %(trans, bytes,msgs))
+            notifyInterval -= 1
+            if notifyInterval == 0:
+                notifyInterval = 10
+                runner.info('\tOutstanding transactions=%d, Outstanding request bytes=%d, Outstanding response messages=%d' %(trans, bytes,msgs))
         if trans == 0 and bytes == 0 and msgs == 0:
             return
         currentValidationParams = [trans, bytes, msgs]
@@ -261,6 +262,7 @@ def check_importer(runner, timeout=-1):
      runner.info('Completing outstanding importer requests...')
      lastUpdatedTime = time.time()
      lastValidationParamms = [0]
+     notifyInterval = 10
      while True:
         resp = get_stats(runner, 'IMPORTER')
         outstanding = 0
@@ -268,7 +270,11 @@ def check_importer(runner, timeout=-1):
             return
         for r in resp.table(0).tuples():
             outstanding += r[8]
-        runner.info('\tOutstanding importer requests=%d' %(outstanding))
+
+        notifyInterval -= 1
+        if notifyInterval == 0:
+            notifyInterval = 10
+            runner.info('\tOutstanding importer requests=%d' %(outstanding))
         if outstanding == 0:
             return
         currentValidationParams = [outstanding]
@@ -280,6 +286,7 @@ def check_dr_consumer(runner, timeout=-1):
      runner.info('Completing outstanding DR consumer transactions...')
      lastUpdatedTime = time.time()
      lastValidationParamms = [0]
+     notifyInterval = 10
      while True:
         resp = get_stats(runner, 'DRCONSUMER')
         outstanding = 0
@@ -289,12 +296,16 @@ def check_dr_consumer(runner, timeout=-1):
         # column 7: The timestamp of the last transaction received from the producer for the partition
         # column 8: The timestamp of the last transaction successfully applied to this partition on the consumer
         # If the two timestamps are the same, all the transactions have been applied for the partition.
+        notifyInterval -= 1
         for r in resp.table(1).tuples():
             if r[7] <> r[8]:
                 outstanding += 1
-                runner.info('\tPartition %d on host %d has outstanding DR consumer transactions. last received: %s, last applied:%s' %(r[4], r[1], r[7], r[8]))
+                if notifyInterval == 0:
+                    runner.info('\tPartition %d on host %d has outstanding DR consumer transactions. last received: %s, last applied:%s' %(r[4], r[1], r[7], r[8]))
         if outstanding == 0:
             return
+        if notifyInterval == 0:
+            notifyInterval = 10
         currentValidationParams = [outstanding]
         lastUpdatedTime = checkStatisticsTimeout(lastValidationParamms, currentValidationParams, lastUpdatedTime, timeout, 'DRCONSUMER')
         lastValidationParamms = [outstanding]
@@ -304,6 +315,7 @@ def check_command_log(runner, timeout=-1):
     runner.info('Completing outstanding Command Log transactions...')
     lastUpdatedTime = time.time()
     lastValidationParamms = [0, 0]
+    notifyInterval = 10
     while True:
         resp = get_stats(runner, 'COMMANDLOG')
         outstandingByte = 0
@@ -320,7 +332,9 @@ def check_command_log(runner, timeout=-1):
 
         if outstandingByte == 0 and outstandingTxn == 0:
             return
-        runner.info('\tOutstanding command log bytes = %d and transactions = %d.' %(outstandingByte, outstandingTxn))
+        if notifyInterval == 0:
+            notifyInterval = 10
+            runner.info('\tOutstanding command log bytes = %d and transactions = %d.' %(outstandingByte, outstandingTxn))
         currentValidationParams = [outstandingByte, outstandingTxn]
         lastUpdatedTime = checkStatisticsTimeout(lastValidationParamms, currentValidationParams, lastUpdatedTime, timeout, 'COMMANDLOG')
         lastValidationParamms = [outstandingByte, outstandingTxn]
@@ -332,26 +346,22 @@ def checkStatisticsTimeout(lastUpdatedParams, currentParams, lastUpdatedTime, ti
     if timeout == -1:
         return currentTime
     #are stats moved?
-    updated = True
+    statsProgressed = True
     if isinstance(lastUpdatedParams, dict):
-        updated = (comp(lastUpdatedParams,currentParams) <> 0)
+        statsProgressed = (comp(lastUpdatedParams,currentParams) <> 0)
     else :
-        updated = (lastUpdatedParams == currentParams)
+        statsProgressed = (lastUpdatedParams <> currentParams)
 
     #stats moved
-    if updated == False:
+    if statsProgressed:
         return currentTime
 
     timeSinceLastUpdate = currentTime - lastUpdatedTime
     #stats timeout
     if timeSinceLastUpdate > timeout:
-         raise StatisticsTimeoutException("Outstanding transactions in %s have not been completely drained." % component)
+         raise StatisticsProcedureException("Outstanding transactions in %s have not been completely drained." % component)
     #stats has not been moved but not timeout yet
     return lastUpdatedTime
-
-class StatisticsTimeoutException(Exception):
-    def __init__(self, message):
-        self.message = message
 
 class StatisticsProcedureException(Exception):
     def __init__(self, message):

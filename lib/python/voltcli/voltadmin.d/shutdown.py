@@ -17,7 +17,6 @@ import time
 import signal
 from voltcli import checkstats
 from voltcli.checkstats import StatisticsProcedureException
-from voltcli.checkstats import StatisticsTimeoutException
 
 @VOLT.Command(
     bundles = VOLT.AdminBundle(),
@@ -68,10 +67,8 @@ def shutdown(runner):
                 runner.info('Shutting down the cluster...')
         except StatisticsProcedureException as proex:
              runner.info('The cluster shutdown process has stopped. The cluster is still in a paused state.')
-             runner.abort(proex.message)
-        except StatisticsTimeoutException as toex:
-             runner.info('The cluster shutdown process has stopped. The cluster is still in a paused state.')
-             runner.abort(toex.message)
+             runner.info(proex.message)
+             runner.abort('You may shutdown the cluster with the "voltadmin shutdown --force" command, or continue to wait with "voltadmin shutdown".')
         except (KeyboardInterrupt, SystemExit):
             runner.info('The cluster shutdown process has stopped. The cluster is still in a paused state.')
             runner.abort('You may shutdown the cluster with the "voltadmin shutdown --force" command, or continue to wait with "voltadmin shutdown".')
