@@ -16,7 +16,7 @@
 */
 
  
-var stIsIE = false;
+var stIsIE = /*@cc_on!@*/false;
 
 sorttable = {
   init: function() {

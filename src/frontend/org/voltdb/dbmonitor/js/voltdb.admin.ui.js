@@ -2515,7 +2515,7 @@ function loadAdminPage() {
             if (editId != "-1") {
 
                 var existingAdminConfig = VoltDbAdminConfig.getLatestRawAdminConfigurations();
-                var config = existingAdminConfig['export'].configuration[editId * 1];
+                var config = existingAdminConfig.export.configuration[editId * 1];
                 $("#txtType").val(config.type);
                 addExportProperties();
                 VoltDbAdminConfig.orgTypeValue = config.type;
@@ -2616,7 +2616,7 @@ function loadAdminPage() {
             $("#btnSaveConfigOk").on("click", function () {
                 var adminConfigurations = VoltDbAdminConfig.getLatestRawAdminConfigurations();
                 if ($("#expotSaveConfigText").data("status") == "delete") {
-                    adminConfigurations['export'].configuration.splice(editId * 1, 1);
+                    adminConfigurations.export.configuration.splice(editId * 1, 1);
                 }
                 else {
                     var newConfig = {};
@@ -2636,16 +2636,16 @@ function loadAdminPage() {
                         newConfig["exportconnectorclass"] = $("#txtExportConnectorClass").val();
                     }
 
-                    if (!adminConfigurations['export']) {
-                        adminConfigurations['export'] = {};
-                        adminConfigurations['export']["configuration"] = [];
+                    if (!adminConfigurations.export) {
+                        adminConfigurations.export = {};
+                        adminConfigurations.export["configuration"] = [];
                     }
 
                     //For editing an existing configuration
                     if (editId == "-1") {
-                        adminConfigurations['export'].configuration.push(newConfig);
+                        adminConfigurations.export.configuration.push(newConfig);
                     } else {
-                        var updatedConfig = adminConfigurations['export'].configuration[editId * 1];
+                        var updatedConfig = adminConfigurations.export.configuration[editId * 1];
                         updatedConfig.stream = newConfig.stream;
                         updatedConfig.type = newConfig.type;
                         updatedConfig.enabled = newConfig.enabled;
@@ -2874,7 +2874,7 @@ function loadAdminPage() {
             //For editing an existing configuration
             if (editId != "-1") {
                 var existingAdminConfig = VoltDbAdminConfig.getLatestRawAdminConfigurations();
-                var config = existingAdminConfig['import'].configuration[editId * 1];
+                var config = existingAdminConfig.import.configuration[editId * 1];
                 $("#txtImportType").val(config.type);
                 addImportProperties();
                 VoltDbAdminConfig.orgTypeValue = config.type;
@@ -2972,7 +2972,7 @@ function loadAdminPage() {
             $("#btnSaveImportConfigOk").on("click", function () {
                 var adminConfigurations = VoltDbAdminConfig.getLatestRawAdminConfigurations();
                 if ($("#importSaveConfigText").data("status") == "delete") {
-                    adminConfigurations['import'].configuration.splice(editId * 1, 1);
+                    adminConfigurations.import.configuration.splice(editId * 1, 1);
                 }
                 else {
                     var newConfig = {};
@@ -2994,16 +2994,16 @@ function loadAdminPage() {
                         newConfig["module"] = null
                     }
 
-                    if (!adminConfigurations['import']) {
-                        adminConfigurations['import'] = {};
-                        adminConfigurations['import']["configuration"] = [];
+                    if (!adminConfigurations.import) {
+                        adminConfigurations.import = {};
+                        adminConfigurations.import["configuration"] = [];
                     }
 
                     //For editing an existing configuration
                     if (editId == "-1") {
-                        adminConfigurations['import'].configuration.push(newConfig);
+                        adminConfigurations.import.configuration.push(newConfig);
                     } else {
-                        var updatedConfig = adminConfigurations['import'].configuration[editId * 1];
+                        var updatedConfig = adminConfigurations.import.configuration[editId * 1];
                         updatedConfig.format = newConfig.format;
                         updatedConfig.type = newConfig.type;
                         updatedConfig.enabled = newConfig.enabled;

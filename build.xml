@@ -2835,9 +2835,6 @@ RPM PACKAGE CREATION
         <arg line="-c 'rm -rfv ${rpm.package.dir}'" />
     </exec>
 </target>
-<!--Modifies the javascript artifact files to min version -->
-<exec executable="/bin/bash">
-    <arg value="minify.sh"/>
-</exec>
+
 <!-- END PROJECT -->
 </project>
