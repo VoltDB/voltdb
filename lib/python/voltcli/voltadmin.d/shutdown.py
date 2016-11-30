@@ -13,6 +13,7 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
+import sys
 import time
 import signal
 from voltcli import checkstats
@@ -67,8 +68,9 @@ def shutdown(runner):
                 runner.info('Shutting down the cluster...')
         except StatisticsProcedureException as proex:
              runner.info('The cluster shutdown process has stopped. The cluster is still in a paused state.')
-             runner.info(proex.message)
-             runner.abort('You may shutdown the cluster with the "voltadmin shutdown --force" command, or continue to wait with "voltadmin shutdown".')
+             runner.error(proex.message)
+             runner.info('You may shutdown the cluster with the "voltadmin shutdown --force" command, or continue to wait with "voltadmin shutdown".')
+             sys.exit(1)
         except (KeyboardInterrupt, SystemExit):
             runner.info('The cluster shutdown process has stopped. The cluster is still in a paused state.')
             runner.abort('You may shutdown the cluster with the "voltadmin shutdown --force" command, or continue to wait with "voltadmin shutdown".')

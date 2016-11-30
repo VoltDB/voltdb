@@ -45,7 +45,7 @@ def check_exporter(runner, timeout=-1):
                 notifyInterval = 10
                 if last_table_stat_time > 1 and export_tables_with_data:
                     print_export_pending(runner, export_tables_with_data)
-        lastUpdatedTime = checkStatisticsTimeout(last_export_tables_with_data, export_tables_with_data, lastUpdatedTime, timeout, 'Exporter')
+        lastUpdatedTime = monitorStatisticsProgress(last_export_tables_with_data, export_tables_with_data, lastUpdatedTime, timeout, 'Exporter')
         last_export_tables_with_data = export_tables_with_data.copy()
 
 def check_dr_producer(runner, timeout=-1):
@@ -76,20 +76,19 @@ def check_dr_producer(runner, timeout=-1):
                 notifyInterval = 10
                 if partition_min:
                     print_dr_pending(runner, partition_min_host, partition_min, partition_max)
-        lastUpdatedTime = verifyDrProducerTimeout(last_partition_min, last_partition_max, partition_min, partition_max, lastUpdatedTime, timeout)
-        LastPartitionMin = partition_min.copy()
-        lastPartitionMax = partition_max.copy()
+        lastUpdatedTime = monitorDRProducerStatisticsProgress(last_partition_min, last_partition_max, partition_min, partition_max, lastUpdatedTime, timeout)
+        last_partition_min = partition_min.copy()
+        last_partition_max = partition_max.copy()
 
-def verifyDrProducerTimeout(lastPartitionMin, currentPartitionMin,
-                            lastPartitionMax, currentPartitionMax, lastUpdatedTime, timeout):
+def monitorDRProducerStatisticsProgress(lastPartitionMin, lastPartitionMax, currentPartitionMin,
+                             currentPartitionMax, lastUpdatedTime, timeout):
     currentTime = time.time()
     #no timeout check
     if timeout == -1:
         return currentTime
     #any stats progress?
-    partitionMinProgressed = comp(lastPartitionMin,currentPartitionMin)
-    partitionMaxprogressed = comp(lastPartitionMax,currentPartitionMax)
-
+    partitionMinProgressed = cmp(lastPartitionMin, currentPartitionMin)
+    partitionMaxprogressed = cmp(lastPartitionMax, currentPartitionMax)
     #stats moved
     if partitionMinProgressed <> 0 or partitionMaxprogressed <> 0:
         return currentTime
@@ -97,7 +96,7 @@ def verifyDrProducerTimeout(lastPartitionMin, currentPartitionMin,
     timeSinceLastUpdate = currentTime - lastUpdatedTime
     #stats timeout
     if timeSinceLastUpdate > timeout:
-         raise TimeException("Outstanding transactions in DRPRODUCER have not been completely drained.")
+         raise StatisticsProcedureException("The cluster has not drained any transactions for DRPRODUCER in %d seconds. There are outstanding transactions." % (timeout))
     #stats has not been moved but not timeout yet
     return lastUpdatedTime
 
@@ -112,9 +111,9 @@ def get_stats(runner, component):
             return resp
         #procedure timeout, retry
         if status == -6:
-           time.sleep(1)
+            time.sleep(1)
         else:
-           raise StatisticsProcedureException("Unexpected errors to collect statistics for %s: %s." % (component, resp))
+            raise StatisticsProcedureException("Unexpected errors to collect statistics for %s: %s." % (component, resp))
         if retry == 0:
             raise StatisticsProcedureException("Unable to collect statistics for %s after 5 attempts." % component)
 
@@ -254,7 +253,7 @@ def check_clients(runner, timeout=-1):
         if trans == 0 and bytes == 0 and msgs == 0:
             return
         currentValidationParams = [trans, bytes, msgs]
-        lastUpdatedTime = checkStatisticsTimeout(lastValidationParamms, currentValidationParams, lastUpdatedTime, timeout, 'LIVECLIENTS')
+        lastUpdatedTime = monitorStatisticsProgress(lastValidationParamms, currentValidationParams, lastUpdatedTime, timeout, 'LIVECLIENTS')
         lastValidationParamms = [trans, bytes, msgs]
         time.sleep(1)
 
@@ -278,14 +277,14 @@ def check_importer(runner, timeout=-1):
         if outstanding == 0:
             return
         currentValidationParams = [outstanding]
-        lastUpdatedTime = checkStatisticsTimeout(lastValidationParamms, currentValidationParams, lastUpdatedTime, timeout, 'IMPORTER')
+        lastUpdatedTime = monitorStatisticsProgress(lastValidationParamms, currentValidationParams, lastUpdatedTime, timeout, 'IMPORTER')
         lastValidationParamms = [outstanding]
         time.sleep(1)
 
 def check_dr_consumer(runner, timeout=-1):
      runner.info('Completing outstanding DR consumer transactions...')
      lastUpdatedTime = time.time()
-     lastValidationParamms = [0]
+     lastValidationParamms = dict()
      notifyInterval = 10
      while True:
         resp = get_stats(runner, 'DRCONSUMER')
@@ -297,18 +296,19 @@ def check_dr_consumer(runner, timeout=-1):
         # column 8: The timestamp of the last transaction successfully applied to this partition on the consumer
         # If the two timestamps are the same, all the transactions have been applied for the partition.
         notifyInterval -= 1
+        currentValidationParams = dict()
         for r in resp.table(1).tuples():
             if r[7] <> r[8]:
                 outstanding += 1
+                currentValidationParams[str(r[1]) + '-' +  str(r[4])] = "%s-%s" %(r[7], r[8])
                 if notifyInterval == 0:
                     runner.info('\tPartition %d on host %d has outstanding DR consumer transactions. last received: %s, last applied:%s' %(r[4], r[1], r[7], r[8]))
         if outstanding == 0:
             return
         if notifyInterval == 0:
             notifyInterval = 10
-        currentValidationParams = [outstanding]
-        lastUpdatedTime = checkStatisticsTimeout(lastValidationParamms, currentValidationParams, lastUpdatedTime, timeout, 'DRCONSUMER')
-        lastValidationParamms = [outstanding]
+        lastUpdatedTime = monitorStatisticsProgress(lastValidationParamms, currentValidationParams, lastUpdatedTime, timeout, 'DRCONSUMER')
+        lastValidationParamms = currentValidationParams.copy()
         time.sleep(1)
 
 def check_command_log(runner, timeout=-1):
@@ -336,31 +336,34 @@ def check_command_log(runner, timeout=-1):
             notifyInterval = 10
             runner.info('\tOutstanding command log bytes = %d and transactions = %d.' %(outstandingByte, outstandingTxn))
         currentValidationParams = [outstandingByte, outstandingTxn]
-        lastUpdatedTime = checkStatisticsTimeout(lastValidationParamms, currentValidationParams, lastUpdatedTime, timeout, 'COMMANDLOG')
+        lastUpdatedTime = monitorStatisticsProgress(lastValidationParamms, currentValidationParams, lastUpdatedTime, timeout, 'COMMANDLOG')
         lastValidationParamms = [outstandingByte, outstandingTxn]
         time.sleep(1)
 
-def checkStatisticsTimeout(lastUpdatedParams, currentParams, lastUpdatedTime, timeout, component):
+def monitorStatisticsProgress(lastUpdatedParams, currentParams, lastUpdatedTime, timeout, component):
     currentTime = time.time()
-    #not timeout check
+    #no timeout check
     if timeout == -1:
         return currentTime
-    #are stats moved?
+
     statsProgressed = True
     if isinstance(lastUpdatedParams, dict):
-        statsProgressed = (comp(lastUpdatedParams,currentParams) <> 0)
+        statsProgressed = (cmp(lastUpdatedParams,currentParams) <> 0)
     else :
         statsProgressed = (lastUpdatedParams <> currentParams)
 
-    #stats moved
+    #stats progressed, update lastUpdatedTime
     if statsProgressed:
         return currentTime
 
+    #stats has not made any progress since last check
     timeSinceLastUpdate = currentTime - lastUpdatedTime
+
     #stats timeout
     if timeSinceLastUpdate > timeout:
-         raise StatisticsProcedureException("Outstanding transactions in %s have not been completely drained." % component)
-    #stats has not been moved but not timeout yet
+         raise StatisticsProcedureException("The cluster has not drained any transactions for %s in %d seconds. There are outstanding transactions." % (component, timeout))
+
+    #not timeout yet
     return lastUpdatedTime
 
 class StatisticsProcedureException(Exception):
