@@ -56,6 +56,7 @@ public class ExpressionWindowed extends Expression {
         super(ParserBase.getWindowedExpressionType(tokenT));
 
         nodes = aggExprs;
+        m_isDistinctAggregate = isDistinct;
         m_partitionByList = partitionByList;
         m_sortAndSlice = sortAndSlice;
         validateWindowedSyntax();
@@ -249,4 +250,8 @@ public class ExpressionWindowed extends Expression {
         }
         return exp;
     }
+
+	public boolean isDistinct() {
+		return m_isDistinctAggregate;
+	}
 }

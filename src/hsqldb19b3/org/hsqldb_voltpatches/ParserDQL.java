@@ -1496,12 +1496,18 @@ public class ParserDQL extends ParserBase {
         if (token.tokenType == Tokens.OVER) {
             read();
             aggExpr = readWindowSpecification(tokenT, aggExpr);
+            if (aggExpr instanceof ExpressionWindowed) {
+            	ExpressionWindowed aggWinExpr = (ExpressionWindowed)aggExpr;
+            	if (aggWinExpr.isDistinct()) {
+            		throw Error.error("DISTINCT is not allowed in window functions.", "", -1);
+            	}
+            }
         }
 
         return aggExpr;
     }
 
-    private Expression readAggregateExpression(int tokenT) {
+    private ExpressionAggregate readAggregateExpression(int tokenT) {
 
         int     type     = ParserDQL.getExpressionType(tokenT);
         boolean distinct = false;
@@ -1569,7 +1575,7 @@ public class ParserDQL extends ParserBase {
                 }
         }
 
-        Expression aggregateExp = new ExpressionAggregate(type, distinct, e);
+        ExpressionAggregate aggregateExp = new ExpressionAggregate(type, distinct, e);
 
         return aggregateExp;
     }

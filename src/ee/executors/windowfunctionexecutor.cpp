@@ -420,12 +420,11 @@ bool WindowFunctionExecutor::p_init(AbstractPlanNode *init_node, TempTableLimits
 }
 
 /**
- * Create an instance of a window aggregator for the specified aggregate type
- * and "distinct" flag.  The object is allocated from the provided memory pool.
+ * Create an instance of a window aggregator for the specified aggregate type.
+ * The object is allocated from the provided memory pool.
  */
 inline WindowAggregate* getWindowedAggInstance(Pool& memoryPool,
-                                               ExpressionType agg_type,
-                                               bool isDistinct)
+                                               ExpressionType agg_type)
 {
     switch (agg_type) {
     case EXPRESSION_TYPE_AGGREGATE_WINDOWED_RANK:
@@ -452,8 +451,7 @@ inline void WindowFunctionExecutor::initAggInstances()
     WindowAggregate** aggs = m_aggregateRow->getAggregates();
     for (int ii = 0; ii < m_aggTypes.size(); ii++) {
         aggs[ii] = getWindowedAggInstance(m_memoryPool,
-                                          m_aggTypes[ii],
-                                          m_distinctAggs[ii]);
+                                          m_aggTypes[ii]);
     }
 }
 

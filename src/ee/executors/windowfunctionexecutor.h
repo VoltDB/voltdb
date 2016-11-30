@@ -34,7 +34,6 @@ public:
     WindowFunctionExecutor(VoltDBEngine* engine, AbstractPlanNode* abstract_node)
       : AbstractExecutor(engine, abstract_node),
         m_aggTypes(dynamic_cast<const WindowFunctionPlanNode*>(abstract_node)->getAggregates()),
-        m_distinctAggs(dynamic_cast<const WindowFunctionPlanNode*>(abstract_node)->getDistinctAggregates()),
         m_partitionByExpressions(dynamic_cast<const WindowFunctionPlanNode*>(abstract_node)->getPartitionByExpressions()),
         m_orderByExpressions(dynamic_cast<const WindowFunctionPlanNode*>(abstract_node)->getOrderByExpressions()),
         m_aggregateInputExpressions(dynamic_cast<const WindowFunctionPlanNode*>(abstract_node)->getAggregateInputExpressions()),
@@ -76,48 +75,6 @@ private:
      */
     const WindowFunctionPlanNode::AggregateExpressionList &getAggregateInputExpressions() const {
         return m_aggregateInputExpressions;
-    }
-
-    /**
-     * Returns the list of partition by expressions.  There is
-     * one, shared among all aggregates.  We will need these to partition the input.
-     */
-    const AbstractPlanNode::OwningExpressionVector& getPartitionByExpressions() const {
-        return m_partitionByExpressions;
-    }
-
-    /**
-     * Returns the order by expressions.  Like the partition by expressions,
-     * these are shared among all the aggregates.
-     */
-    const AbstractPlanNode::OwningExpressionVector &getOrderByExpressions() const {
-        return m_orderByExpressions;
-    }
-
-    /**
-     * Returns the aggregate types for each expression.  The
-     * aggregate types are the operation type and not the
-     * value's type. So, they are things like "MIN", "MAX",
-     * "RANK" and so forth.  They are not "TINYINT" or "FLOAT".
-     */
-    const std::vector<ExpressionType>& getAggregateTypes() const {
-        return m_aggTypes;
-    }
-
-    /**
-     * Returns true in index j if the aggregate expression
-     * for j is distinct.
-     */
-    const std::vector<bool>& getDistinctAggs() const {
-        return m_distinctAggs;
-    }
-
-    /**
-     * Returns the output column expressions.  These are
-     * used to calculate the pass through columns.
-     */
-    const std::vector<AbstractExpression*>& getOutputColumnExpressions() const {
-        return m_outputColumnExpressions;
     }
 
     /**
@@ -259,10 +216,6 @@ private:
      * The operation type of the aggregates.
      */
     const std::vector<ExpressionType> &m_aggTypes;
-    /**
-     * Element j is true iff aggregate j is distinct.
-     */
-    const std::vector<bool> &m_distinctAggs;
     /**
      * This is the list of all partition by expressions.
      * It resides in the plan node.

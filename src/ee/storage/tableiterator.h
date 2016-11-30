@@ -96,10 +96,6 @@ public:
     bool operator !=(const TableIterator &other) const {
         return ! ((*this) == other);
     }
-
-    bool isEnd() {
-        return ! hasNext();
-    }
 protected:
     // Get an iterator via table->iterator()
     TableIterator(Table *, TBMapI);

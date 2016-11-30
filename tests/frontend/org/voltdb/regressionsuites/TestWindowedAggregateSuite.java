@@ -830,6 +830,35 @@ public class TestWindowedAggregateSuite extends RegressionSuite {
                                    {2, 203, 3},
                                    {2, 204, 1},
                                    {2, 205, 3}});
+
+        // Try some things on an empty table.
+        // We expect to get no answers anywhere.
+        client.callProcedure("@AdHoc", "TRUNCATE TABLE T;");
+        validateCount(client,
+                      "select a, c, count(b) over (partition by a order by b desc) from t order by a, c",
+                      new long[][]{});
+        validateCount(client,
+                      "select a, c, count(b) over (partition by a) from t order by a, c",
+                      new long[][]{});
+        validateCount(client,
+                      "select a, c, count(b) over (order by b desc) from t order by a, c",
+                      new long[][]{});
+        validateCount(client,
+                      "select a, c, count(b) over () from t order by a, c",
+                      new long[][]{});
+        validateCount(client,
+                      "select a, c, count(*) over (partition by a order by b desc) from t order by a, c",
+                      new long[][]{});
+        validateCount(client,
+                      "select a, c, count(*) over (partition by a) from t order by a, c",
+                      new long[][]{});
+        validateCount(client,
+                      "select a, c, count(*) over (order by b desc) from t order by a, c",
+                      new long[][]{});
+        validateCount(client,
+                      "select a, c, count(*) over () from t order by a, c",
+                      new long[][]{});
+
     }
 
     static public junit.framework.Test suite() {

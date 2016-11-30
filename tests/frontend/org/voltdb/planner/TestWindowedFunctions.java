@@ -393,9 +393,6 @@ public class TestWindowedFunctions extends PlannerTestCase {
                       "       RANK() OVER (PARTITION BY B ORDER BY A ) AS R2  " +
                       "FROM AAA;",
                       "Only one windowed function call may appear in a selection list.");
-        failToCompile("SELECT RANK() OVER (PARTITION BY A ORDER BY A, B) FROM AAA;",
-                      "Windowed function call expressions can have only one ORDER BY expression in their window.");
-
         failToCompile("SELECT RANK() OVER (PARTITION BY A ORDER BY CAST(A AS FLOAT)) FROM AAA;",
                       "Windowed function call expressions can have only integer or TIMESTAMP value types in the ORDER BY expression of their window.");
         // Windowed expressions can only appear in the selection list.
@@ -419,6 +416,11 @@ public class TestWindowedFunctions extends PlannerTestCase {
                       "Expected a right parenthesis (')') here.");
         failToCompile("SELECT DENSE_RANK(ALL) over (PARTITION BY A ORDER BY B) AS ARANK FROM AAA",
                       "Expected a right parenthesis (')') here.");
+        failToCompile("SELECT COUNT(DISTINCT *) OVER (PARTITION BY A ORDER BY B) AS ARANK FROM AAA",
+                      "DISTINCT is not allowed in window functions.");
+        failToCompile("SELECT COUNT(DISTINCT A+B) OVER (PARTITION BY A ORDER BY B) AS ARANK FROM AAA",
+                      "DISTINCT is not allowed in window functions.");
+
     }
 
     public void testExplainPlanText() {

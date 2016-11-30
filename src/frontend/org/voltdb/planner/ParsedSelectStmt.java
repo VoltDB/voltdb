@@ -958,11 +958,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                             " function call expressions require an ORDER BY specification.");
                 }
 
-                if (orderByExpressions.size() > 1) {
-                    // This is perhaps slightly misleading.
-                    throw new PlanningErrorException(
-                            "Windowed function call expressions can have only one ORDER BY expression in their window.");
-                }
                 VoltType valType = orderByExpressions.get(0).getValueType();
                 if (!valType.isAnyIntegerType() && (valType != VoltType.TIMESTAMP)) {
                     throw new PlanningErrorException(
