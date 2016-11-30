@@ -43,9 +43,17 @@ public class StatisticsTestSuiteBase extends SaveRestoreBase {
     protected final static int HOSTS = 3;
     protected final static int KFACTOR = MiscUtils.isPro() ? 1 : 0;
     protected final static int PARTITIONS = (SITES * HOSTS) / (KFACTOR + 1);
+    protected final static String jarName = "statistics-cluster.jar";
     protected final static boolean hasLocalServer = false;
     protected static StringBuilder m_recentAnalysis = null;
     protected final static int FSYNC_INTERVAL_GOLD = 50;
+
+    protected final static String drSchema =
+            "CREATE TABLE EMPLOYEE (\n"
+                    +   "E_ID INTEGER NOT NULL,\n"
+                    +   "E_AGE INTEGER NOT NULL"
+                    +   ");\n"
+                    +   "DR TABLE EMPLOYEE;\n";
 
     protected static final Class<?>[] PROCEDURES
             = {
@@ -130,6 +138,7 @@ public class StatisticsTestSuiteBase extends SaveRestoreBase {
     // node has seen a procedure invocation for 'foo'
     protected void validateRowSeenAtAllHosts(VoltTable result, Map<String, String> columnTargets,
             boolean enforceUnique) {
+        result.resetRowPosition();
         int hostCount = countHostsProvidingRows(result, columnTargets, enforceUnique);
         assertEquals(claimRecentAnalysis(), HOSTS, hostCount);
     }
@@ -177,12 +186,16 @@ public class StatisticsTestSuiteBase extends SaveRestoreBase {
         assertEquals(PARTITIONS, partsSeen.size());
     }
 
+    static public Test suite(Class classzz, boolean isCommandLogTest) throws IOException {
+        return suite(classzz, isCommandLogTest, -1);
+    }
+
     //
     // Build a list of the tests to be run. Use the regression suite
     // helpers to allow multiple backends.
     // JUnit magic that uses the regression suite helper classes.
     //
-    static public Test suite(Class classzz, boolean isCommandLogTest) throws IOException {
+    static public Test suite(Class classzz, boolean isCommandLogTest, int replicationPort) throws IOException {
         VoltServerConfig config = null;
 
         MultiConfigSuiteBuilder builder
@@ -232,7 +245,7 @@ public class StatisticsTestSuiteBase extends SaveRestoreBase {
          * simulated through LocalCluster -- all the hosts have the same HOSTNAME, just different host ids.
          * So, these tests shouldn't rely on the usual uniqueness of host names in a cluster.
          */
-        config = new LocalCluster("statistics-cluster.jar", StatisticsTestSuiteBase.SITES,
+        config = new LocalCluster(jarName, StatisticsTestSuiteBase.SITES,
                 StatisticsTestSuiteBase.HOSTS, StatisticsTestSuiteBase.KFACTOR,
                 BackendTarget.NATIVE_EE_JNI);
         ((LocalCluster) config).setHasLocalServer(hasLocalServer);
@@ -240,6 +253,14 @@ public class StatisticsTestSuiteBase extends SaveRestoreBase {
         if (MiscUtils.isPro() && isCommandLogTest) {
             ((LocalCluster) config).setJavaProperty("LOG_SEGMENT_SIZE", "1");
             ((LocalCluster) config).setJavaProperty("LOG_SEGMENTS", "1");
+        }
+
+        if (replicationPort > 0) {
+            // cluster id is default to 0
+            project.addLiteralSchema(drSchema);
+            project.setDrProducerEnabled();
+            ((LocalCluster) config).setReplicationPort(replicationPort);
+            ((LocalCluster) config).overrideAnyRequestForValgrind();
         }
 
         boolean success = config.compile(project);
