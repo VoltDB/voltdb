@@ -50,11 +50,18 @@ public:
     virtual ~WindowFunctionExecutor();
 
     /**
-     * This is the type of kinds of edges between groups.
+     * When calculating an window function, the value at a row may
+     * depend on the order by peers of the row.  So, we need to
+     * scan the input forward to the next edge between order by
+     * groups.  Edges between partition by groups are a kind of
+     * edge between order by groups as well.
+     *
+     * This enum type gives the type of kinds of edges between groups
+     * of rows.
      */
     enum EdgeType {
-        InvalidEdgeType,  /** No Type. */
-        StartOfInput,     /** Start of input. */
+        InvalidEdgeType,         /** No Type. */
+        StartOfInput,            /** Start of input. */
         StartOfPartitionByGroup, /** Start of a new partition group. */
         StartOfOrderByGroup,     /** Start of an order by group. */
         EndOfInput               /** End of all input rows */

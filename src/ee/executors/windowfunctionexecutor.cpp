@@ -32,7 +32,12 @@ namespace voltdb {
 
 /**
  * This class holds all the iterators used when iterating
- * through an input table.
+ * through an input table.  There is one of these each time
+ * the executor runs.  Since it contains table iterators
+ * which have no default constructor, it really needs to
+ * know its input table at construction time.  This is not
+ * available when the executor object is constructed, so
+ * this needs to be heap allocated.
  */
 struct TableWindow {
     TableWindow(Table *tbl)
