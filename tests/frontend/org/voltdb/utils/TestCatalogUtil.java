@@ -658,6 +658,11 @@ public class TestCatalogUtil extends TestCase {
             public boolean hardExpiration() {
                 return false;
             }
+
+            @Override
+            public boolean secondaryInitialization() {
+                return true;
+            }
         };
         assertNull("Setting DR Active-Active should succeed with qualified license",
                    CatalogUtil.checkLicenseConstraint(catalog, lapi));
@@ -736,6 +741,11 @@ public class TestCatalogUtil extends TestCase {
             @Override
             public boolean hardExpiration() {
                 return false;
+            }
+
+            @Override
+            public boolean secondaryInitialization() {
+                return true;
             }
         };
         assertNotNull("Setting DR Active-Active should fail with unqualified license",

@@ -26,6 +26,7 @@ import java.util.Calendar;
  */
 public interface LicenseApi {
     public boolean initializeFromFile(File license);
+    public boolean secondaryInitialization();
     public boolean isTrial();
     public boolean isAWSMarketplace();
     public boolean isEnterprise();

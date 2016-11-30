@@ -206,6 +206,11 @@ public class MiscUtils {
                 public boolean hardExpiration() {
                     return false;
                 }
+
+                @Override
+                public boolean secondaryInitialization() {
+                    return true;
+                }
             };
         }
 
@@ -310,9 +315,8 @@ public class MiscUtils {
             return false;
         }
 
-        // for now, bail on AWS licenses entirely - will enable this in another commit
-        if (licenseApi.isAWSMarketplace()) {
-            hostLog.fatal("VoltDB AWS Marketplace licenses not yet supported.");
+        // do some extra initialization here
+        if (!licenseApi.secondaryInitialization()) {
             return false;
         }
 
