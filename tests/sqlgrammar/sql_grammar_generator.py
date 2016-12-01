@@ -486,7 +486,7 @@ if __name__ == "__main__":
         for sql_statement_type in options.initial_type.split(','):
             generate_sql_statements(sql_statement_type, int(options.initial_number))
     for sql_statement_type in options.type.split(','):
-        generate_sql_statements(sql_statement_type, int(options.number), int(options.max_save), 
+        generate_sql_statements(sql_statement_type, int(options.number), int(options.max_save),
                                 options.delete_type, options.delete_number)
 
     if debug > 3:
