@@ -103,34 +103,28 @@ public class SSLVoltPort extends VoltPort {
                 buildWriteTasks();
             }
 
-            while (!m_readTasks.isEmpty() || !m_writeTasks.isEmpty()) {
-                if (!m_readTasks.isEmpty()) {
-                    ListenableFuture<List<ByteBuffer>> readFuture = m_readTasks.poll();
-                    List<ByteBuffer> messages = null;
-                    try {
-                        messages = readFuture.get();
-                        handleRead(messages);
-                    } catch (InterruptedException e) {
-                        return;
-                    } catch (ExecutionException e) {
-                        throw new IOException("decryption task failed in voltport " + m_channel.socket().getRemoteSocketAddress(), e);
-                    }
+            ListenableFuture<List<ByteBuffer>> readFuture = null;
+            ListenableFuture<EncryptionResult> writeFuture = null;
+            while (readFuture != null || writeFuture != null || !m_readTasks.isEmpty() || (!m_writeTasks.isEmpty() && m_remainingWrites == null)) {
+                if (readFuture == null && !m_readTasks.isEmpty()) {
+                    readFuture = m_readTasks.poll();
+                }
+                if (writeFuture == null && !m_writeTasks.isEmpty() && m_remainingWrites == null) {
+                    writeFuture = m_writeTasks.poll();
                 }
 
-                if (!m_writeTasks.isEmpty()) {
-                    ListenableFuture<EncryptionResult> writeFuture = m_writeTasks.poll();
-                    EncryptionResult er = null;
-                    try {
-                        er = writeFuture.get();
-                    } catch (InterruptedException e) {
-                        return;
-                    } catch (ExecutionException e) {
-                        throw new IOException("encryption task failed in voltport " + m_channel.socket().getRemoteSocketAddress(), e);
-                    }
-                    boolean writeCompleted = handleWrite(er);
-                    if ((!writeCompleted)) {
-                        break;
-                    }
+                if (readFuture != null && readFuture.isDone()) {
+                    handleReadFuture(readFuture);
+                    readFuture = null;
+                } else if (writeFuture != null && writeFuture.isDone()) {
+                    handleWriteFuture(writeFuture);
+                    writeFuture = null;
+                } else if (readFuture != null) {
+                    handleReadFuture(readFuture);
+                    readFuture = null;
+                } else {
+                    handleWriteFuture(writeFuture);
+                    writeFuture = null;
                 }
             }
         } finally {
@@ -143,6 +137,26 @@ public class SSLVoltPort extends VoltPort {
                 m_running = false;
             }
         }
+    }
+
+    private void handleReadFuture(ListenableFuture<List<ByteBuffer>> readFuture) throws IOException {
+        List<ByteBuffer> messages = null;
+        try {
+            messages = readFuture.get();
+            handleRead(messages);
+        } catch (Exception e) {
+            throw new IOException("decryption task failed in voltport " + m_channel.socket().getRemoteSocketAddress(), e);
+        }
+    }
+
+    private void handleWriteFuture(ListenableFuture<EncryptionResult> writeFuture) throws IOException {
+        EncryptionResult er = null;
+        try {
+            er = writeFuture.get();
+        } catch (Exception e) {
+            throw new IOException("encryption task failed in voltport " + m_channel.socket().getRemoteSocketAddress(), e);
+        }
+        handleWrite(er);
     }
 
     private void handleRead(List<ByteBuffer> messages) throws IOException {
