@@ -71,7 +71,7 @@ public class SSLVoltPort extends VoltPort {
         this.m_sslMessageParser = new SSLMessageParser();
         this.m_frameHeader = ByteBuffer.allocate(5);
         int packetBufferSize = m_sslEngine.getSession().getPacketBufferSize();
-        this.m_dstBufferCont = DBBPool.allocateDirectAndPool(packetBufferSize);
+        this.m_dstBufferCont = DBBPool.allocateDirect(packetBufferSize);
         this.m_dstBuffer = m_dstBufferCont.b();
         m_dstBuffer.clear();
         this.m_decryptionGateway = new DecryptionGateway(m_sslBufferDecrypter, m_sslMessageParser, m_dstBuffer);
