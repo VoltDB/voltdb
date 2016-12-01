@@ -444,7 +444,7 @@ point-value             ::= {point-non-null-value} 3| NULL
 # TODO: flesh this part out ...
 
 # About a quarter of these simple polygons will be defined clockwise, hence invalid
-polygon-non-null-value  ::= polygonFromText('POLYGON((0 0, {longitude} 0, 0 {latitude}, 0 0)') | \
+polygon-non-null-value  ::= polygonFromText('POLYGON((0 0, {longitude} 0, 0 {latitude}, 0 0))') | \
                             polygonFromText('POLYGON((-2 -2, 10 -2, -2 10, -2 -2),(-1 -1, -1 {digit}, {digit} -1, -1 -1))')
 
 # The "3" before the "|" makes the "polygon-non-null-value" option 3 times as

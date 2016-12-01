@@ -194,6 +194,13 @@ def print_summary():
         seconds = time() - start_time
         summary_message = '\n\nSUMMARY: in ' + re.sub('^0:', '', str(timedelta(0, round(seconds))), 1) \
                         + ' ({0:.3f} seconds)'.format(seconds) + ', SQL statements by type:'
+
+        # Check for a special case: TRUNCATE statements were all valid,
+        # none invalid, as sometimes happens
+        if count_sql_statements.get('TRUNCA') and \
+                count_sql_statements.get('TRUNCA').get('invalid') is None:
+            count_sql_statements['TRUNCA']['invalid'] = 0
+
         total_count = -1
         if count_sql_statements.get('total') and count_sql_statements.get('total').get('total'):
             total_count = count_sql_statements['total']['total']
@@ -206,9 +213,9 @@ def print_summary():
                 if validity != 'total':  # save total for last
                     count = count_sql_statements[sql_type][validity]
                     percent = int(round(100.0 * count / sql_type_count))
-                    summary_message += '{0:7d} '.format(count) + validity + ' ({0:2d}%),'.format(percent)
+                    summary_message += '{0:7d} '.format(count) + validity + ' ({0:3d}%),'.format(percent)
             percent = int(round(100.0 * sql_type_count / total_count))
-            summary_message += '{0:7d} '.format(sql_type_count) + 'total ({0:2d}%)'.format(percent)
+            summary_message += '{0:7d} '.format(sql_type_count) + 'total ({0:3d}%)'.format(percent)
         summary_message += '\n\n'
     except Exception as e:
         print '\n\nCaught exception attempting to print SUMMARY message:'
@@ -264,39 +271,60 @@ def print_sql_statement(sql, num_chars_in_sql_type=6):
     """
     global sql_output_file, sqlcmd_output_file, sqlcmd_proc, debug
 
+    # Print the specified SQL statement to the specified output file
     print >> sql_output_file, sql
 
-    # Pass the SQL statement to sqlcmd, if a sqlcmd sub-process has been defined
+    # If a sqlcmd sub-process has been defined, use it
     if sqlcmd_proc:
-        if debug > 4:
-            print >> sqlcmd_output_file, 'DEBUG: SQL statement:', sql
-        sqlcmd_proc.stdin.write(sql + '\n')
-        while True:
-            output = sqlcmd_proc.stdout.readline()
-            print >> sqlcmd_output_file, output.rstrip('\n')
 
-            # TODO: might want to use regex's here:
-            if output and '(Returned ' in output and ' rows in ' in output and 's)' in output:
-                increment_sql_statement_type(sql[0:num_chars_in_sql_type], 'valid')
-                if debug > 4:
-                    print >> sqlcmd_output_file, 'DEBUG: FOUND: (Returned ... rows in ...s)'
-                break
-            elif output and 'ERROR' in output.upper():
-                increment_sql_statement_type(sql[0:num_chars_in_sql_type], 'invalid')
-                if debug > 4:
-                    print >> sqlcmd_output_file, 'DEBUG: FOUND ERROR'
-                break
-            elif (not output or 'Unable to connect' in output or 'No connections' in output
-                   or 'Connection refused' in output
-                   or ('Connection to database host' in output and 'was lost' in output) ):
-                error_message = '\n\nFATAL ERROR: sqlcmd responded:\n    "' + output.rstrip('\n') + '"\npossibly due to ' + \
-                                'a VoltDB server crash (or it was never started), after SQL statement:\n    "' + sql + '"'
-                print >> sqlcmd_output_file, error_message
-                if sqlcmd_output_file is not sys.stdout:
-                    print error_message
-                print_summary()
-                sqlcmd_proc.communicate('exit')
-                exit(99)
+        # Pass the SQL statement to the sqlcmd sub-process
+        sqlcmd_proc.stdin.write(sql + '\n')
+        sql_was_echoed_as_output = False
+
+        while True:
+            # Retrieve (& print) the next line of output from the sqlcmd sub-process
+            output = sqlcmd_proc.stdout.readline().rstrip('\n')
+            print >> sqlcmd_output_file, output
+
+            if output:
+                # Wait until the SQL statement has been echoed by sqlcmd,
+                # before checking whether it was considered valid or invalid
+                if output == sql:
+                    sql_was_echoed_as_output = True
+
+                # Check if sqlcmd considered the SQL statement to be valid
+                elif (('(Returned ' in output and ' rows in ' in output and 's)' in output) or
+                        'Command succeeded.' in output):
+                    if sql_was_echoed_as_output:
+                        increment_sql_statement_type(sql[0:num_chars_in_sql_type], 'valid')
+                        break
+                    else:  # this should never happen
+                        print "\nWARNING: Unexpected condition (should never happen?!): found ", \
+                              "'(Returned N rows in X.XXs)' or 'Command succeeded' before SQL echoed, ", \
+                              "with:\n  sql   :", sql, '\n  output:', output
+
+                # Check if sqlcmd considered the SQL statement to be invalid
+                elif 'ERROR' in output.upper():
+                    if sql_was_echoed_as_output:
+                        increment_sql_statement_type(sql[0:num_chars_in_sql_type], 'invalid')
+                        break
+                    elif debug > 2:  # this can happen, though it's uncommon
+                        print 'DEBUG: Found ERROR before SQL echoed, ', \
+                              'with:\n  sql   :', sql, '\n  output:', output
+
+                # Check if sqlcmd cannot, or can no longer, reach the VoltDB server
+                elif ('Unable to connect' in output or 'No connections' in output
+                       or 'Connection refused' in output
+                       or ('Connection to database host' in output and 'was lost' in output) ):
+                    error_message = '\n\nFATAL ERROR: sqlcmd responded:\n    "' + output + \
+                                    '"\npossibly due to a VoltDB server crash (or it was ' + \
+                                    'never started), after SQL statement:\n    "' + sql + '"'
+                    print >> sqlcmd_output_file, error_message
+                    if sqlcmd_output_file is not sys.stdout:
+                        print error_message
+                    print_summary()
+                    sqlcmd_proc.communicate('exit')
+                    exit(99)
     else:
         increment_sql_statement_type(sql[0:num_chars_in_sql_type])
 
@@ -317,7 +345,7 @@ def generate_sql_statements(sql_statement_type, num_sql_statements=0, max_save_s
 
     for i in xrange(num_sql_statements):
         if max_time and time() > max_time:
-            if debug:
+            if debug > 1:
                 print 'DEBUG: exceeded max_time, at:', time()
             break
         print_sql_statement(get_one_sql_statement(grammar, sql_statement_type))
@@ -329,8 +357,6 @@ def generate_sql_statements(sql_statement_type, num_sql_statements=0, max_save_s
         if (count_sql_statements and count_sql_statements.get('total')
                 and count_sql_statements['total'].get('total') and max_save_statements
                 and not count_sql_statements['total']['total'] % max_save_statements):
-            for i in range(delete_statement_number):
-                print_sql_statement(get_one_sql_statement(grammar, delete_statement_type))
             if sql_output_file and sql_output_file != sys.stdout:
                 filename = sql_output_file.name
                 sql_output_file.close()
@@ -339,6 +365,8 @@ def generate_sql_statements(sql_statement_type, num_sql_statements=0, max_save_s
                 filename = sqlcmd_output_file.name
                 sqlcmd_output_file.close()
                 sqlcmd_output_file = open(filename, 'w')
+            for i in range(delete_statement_number):
+                print_sql_statement(get_one_sql_statement(grammar, delete_statement_type))
 
 
 if __name__ == "__main__":
@@ -381,7 +409,7 @@ if __name__ == "__main__":
                       help="an output file name, to which sqlcmd output is sent, or STDOUT to send the output there; the "
                          + "generated SQL statements are only passed to sqlcmd if this value is specified [default: None]")
     parser.add_option("-D", "--debug", dest="debug", default=0,
-                      help="print debug info: 0 for none, increasing values for more [default: 0]")
+                      help="print debug info: 0 for none, increasing values (1-5) for more [default: 0]")
     (options, args) = parser.parse_args()
 
     # If 'minutes' is specified, change the default for 'number'
@@ -391,19 +419,19 @@ if __name__ == "__main__":
     debug = int(options.debug)
     if debug > 1:
         print "DEBUG: all arguments:", " ".join(sys.argv)
-        print "DEBUG: options.path            :", options.path
-        print "DEBUG: options.grammar_files   :", options.grammar_files
-        print "DEBUG: options.initial_type    :", options.initial_type
-        print "DEBUG: options.initial_number  :", options.initial_number
-        print "DEBUG: options.type            :", options.type
-        print "DEBUG: options.number          :", options.number
-        print "DEBUG: options.minutes         :", options.minutes
-        print "DEBUG: options.delete_type     :", options.delete_type
-        print "DEBUG: options.delete_number   :", options.delete_number
-        print "DEBUG: options.max_save        :", options.max_save
-        print "DEBUG: options.sql_output      :", options.sql_output
-        print "DEBUG: options.sqlcmd_output   :", options.sqlcmd_output
-        print "DEBUG: options.debug           :", options.debug
+        print "DEBUG: options.path          :", options.path
+        print "DEBUG: options.grammar_files :", options.grammar_files
+        print "DEBUG: options.initial_type  :", options.initial_type
+        print "DEBUG: options.initial_number:", options.initial_number
+        print "DEBUG: options.type          :", options.type
+        print "DEBUG: options.number        :", options.number
+        print "DEBUG: options.minutes       :", options.minutes
+        print "DEBUG: options.delete_type   :", options.delete_type
+        print "DEBUG: options.delete_number :", options.delete_number
+        print "DEBUG: options.max_save      :", options.max_save
+        print "DEBUG: options.sql_output    :", options.sql_output
+        print "DEBUG: options.sqlcmd_output :", options.sqlcmd_output
+        print "DEBUG: options.debug         :", options.debug
         print "DEBUG: options (all):\n", options
         print "DEBUG: args (all):", args
 
@@ -413,9 +441,10 @@ if __name__ == "__main__":
     max_time = 0
     if options.minutes:
         max_time = start_time + 60*int(options.minutes)
-    if debug:
+    if debug > 1:
         print 'DEBUG: start time:', start_time
         print 'DEBUG: max_time  :', max_time
+        sys.stdout.flush()
 
     # Define the grammar to be used to generate SQL statements, based upon
     # the input grammar file(s)
@@ -423,7 +452,7 @@ if __name__ == "__main__":
     for grammar_file in options.grammar_files.split(','):
         grammar = get_grammar(grammar, grammar_file, options.path)
 
-    if debug > 5:
+    if debug > 4:
         print 'DEBUG: grammar:'
         for key in grammar.keys():
             print '   ', key + ':', grammar[key]
@@ -468,7 +497,7 @@ if __name__ == "__main__":
         print_sql_statement('select count(ID), count(TINY), count(SMALL), count(INT), count(BIG), count(NUM), count(DEC), count(VCHAR), count(VCHAR_INLINE_MAX), count(VCHAR_INLINE), count(TIME), count(VARBIN), count(POINT), count(POLYGON) from P1;')
         print_sql_statement('select count(ID), count(TINY), count(SMALL), count(INT), count(BIG), count(NUM), count(DEC), count(VCHAR), count(VCHAR_INLINE_MAX), count(VCHAR_INLINE), count(TIME), count(VARBIN), count(POINT), count(POLYGON) from R1;')
 
-    if debug:
+    if debug > 1:
         print 'DEBUG: end time  :', time()
 
     print_summary()
