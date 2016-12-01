@@ -38,6 +38,18 @@ public class DummySnmpTrapSender implements SnmpTrapSender {
     }
 
     @Override
-    public void sendTrap(int faultCode, int threshold, int actual, String unit) {
+    public void crash(String msg) {
+    }
+
+    @Override
+    public void hostDown(int hostId, String msg) {
+    }
+
+    @Override
+    public void hostUp(int hostId, String msg) {
+    }
+
+    @Override
+    public void statistics(FaultFacility facility, String msg) {
     }
 }

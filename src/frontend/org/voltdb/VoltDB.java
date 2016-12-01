@@ -50,6 +50,7 @@ import org.voltdb.probe.MeshProber;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.settings.NodeSettings;
 import org.voltdb.settings.Settings;
+import org.voltdb.snmp.SnmpTrapSender;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.MiscUtils;
@@ -1035,6 +1036,29 @@ public class VoltDB {
     }
 
     /**
+     * send a SNMP trap crash notification
+     * @param msg
+     */
+    private static void sendCrashSNMPTrap(String msg) {
+        if (msg == null || msg.trim().isEmpty()) {
+            return;
+        }
+        VoltDBInterface vdbInstance = instance();
+        if (vdbInstance == null) {
+            return;
+        }
+        SnmpTrapSender snmp = vdbInstance.getSnmpTrapSender();
+        if (snmp == null) {
+            return;
+        }
+        try {
+            snmp.crash(msg);
+        } catch (Throwable t) {
+            VoltLogger log = new VoltLogger("HOST");
+            log.warn("failed to issue a crash SNMP trap", t);
+        }
+    }
+    /**
      * Exit the process with an error message, optionally with a stack trace.
      */
     public static void crashLocalVoltDB(String errMsg, boolean stackTrace, Throwable thrown) {
@@ -1061,7 +1085,8 @@ public class VoltDB {
             log.warn("Declining to drop a crash file during a junit test.");
         }
         // end test code
-
+        // send a snmp trap crash notification
+        sendCrashSNMPTrap(errMsg);
         // try/finally block does its best to ensure death, no matter what context this
         // is called in
         try {
@@ -1187,6 +1212,8 @@ public class VoltDB {
         }
         // end test code
 
+        // send a snmp trap crash notification
+        sendCrashSNMPTrap(errMsg);
         try {
             // turn off client interface as fast as possible
             // we don't expect this to ever fail, but if it does, skip to dying immediately

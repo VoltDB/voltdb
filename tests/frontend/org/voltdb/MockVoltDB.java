@@ -64,6 +64,8 @@ import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.settings.DbSettings;
 import org.voltdb.settings.NodeSettings;
+import org.voltdb.snmp.DummySnmpTrapSender;
+import org.voltdb.snmp.SnmpTrapSender;
 
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
@@ -772,5 +774,10 @@ public class MockVoltDB implements VoltDBInterface
 
     @Override
     public void setShuttingdown(boolean shuttingdown) {
+    }
+
+    @Override
+    public SnmpTrapSender getSnmpTrapSender() {
+        return new DummySnmpTrapSender();
     }
 }
