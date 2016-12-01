@@ -29,8 +29,6 @@ import static org.mockito.Mockito.verify;
 
 import java.util.Arrays;
 
-import junit.framework.TestCase;
-
 import org.mockito.Mockito;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.LegacyHashinator;
@@ -50,6 +48,8 @@ import org.voltdb.catalog.Statement;
 import org.voltdb.planner.ActivePlanRepository;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
+
+import junit.framework.TestCase;
 
 public class TestFragmentProgressUpdate extends TestCase {
 
@@ -493,7 +493,7 @@ public class TestFragmentProgressUpdate extends TestCase {
             break;
         case STATEMENT_LIST:
             expectedSqlTextMsg = "Unable to report specific SQL statement text "
-                    + "for fragment task message index " + (numFragsToExecute - 1) + ".  "
+                    + "for fragment task message index " + (numFragsToExecute - 1) + ". "
                     + "It MAY be one of these " + (numFragsToExecute - 1) + " items: "
                     + "\"SELECT W_ID FROM WAREHOUSE LIMIT 1;\", ";
             break;
