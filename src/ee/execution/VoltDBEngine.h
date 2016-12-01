@@ -143,6 +143,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
             m_drReplicatedConflictStreamedTable = replicatedConflictTable;
         }
 
+        ExecutorContext* getExecutorContext() { return m_executorContext; }
+
         // -------------------------------------------------
         // Execution Functions
         // -------------------------------------------------
@@ -178,8 +180,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          */
         UniqueTempTableResult executePlanFragment(ExecutorVector* executorVector,
                                                   int64_t* tuplesModified = NULL);
-
-        int getUsedParamcnt() const { return m_usedParamcnt; }
 
         // Created to transition existing unit tests to context abstraction.
         // If using this somewhere new, consider if you're being lazy.
@@ -579,8 +579,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         /** reused parameter container. */
         NValueArray m_staticParams;
-        /** TODO : should be passed as execute() parameter..*/
-        int m_usedParamcnt;
 
         /** buffer object for result tables. set when the result table is sent out to localsite. */
         FallbackSerializeOutput m_resultOutput;

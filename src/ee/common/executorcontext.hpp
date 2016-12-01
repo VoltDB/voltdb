@@ -294,6 +294,9 @@ class ExecutorContext {
 
     void checkTransactionForDR();
 
+    void setUsedParameterCount(int usedParamcnt) { m_usedParamcnt = usedParamcnt; }
+    int getUsedParameterCount() const { return m_usedParamcnt; }
+
   private:
     Topend *m_topEnd;
     Pool *m_tempStringPool;
@@ -301,6 +304,9 @@ class ExecutorContext {
 
     // Pointer to the static parameters
     NValueArray* m_staticParams;
+    /** TODO : should be passed as execute() parameter..*/
+    int m_usedParamcnt;
+
     // Executor stack map. The key is the statement id (0 means the main/parent statement)
     // The value is the pointer to the executor stack for that statement
     std::map<int, std::vector<AbstractExecutor*>* >* m_executorsMap;

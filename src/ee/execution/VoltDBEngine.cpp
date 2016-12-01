@@ -392,13 +392,14 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
 
     for (m_currentIndexInBatch = 0; m_currentIndexInBatch < numFragments; ++m_currentIndexInBatch) {
 
-        m_usedParamcnt = serialize_in.readShort();
-        if (m_usedParamcnt < 0) {
-            throwFatalException("parameter count is negative: %d", m_usedParamcnt);
+        int usedParamcnt = serialize_in.readShort();
+        m_executorContext->setUsedParameterCount(usedParamcnt);
+        if (usedParamcnt < 0) {
+            throwFatalException("parameter count is negative: %d", usedParamcnt);
         }
-        assert (m_usedParamcnt < MAX_PARAM_COUNT);
+        assert (usedParamcnt < MAX_PARAM_COUNT);
 
-        for (int j = 0; j < m_usedParamcnt; ++j) {
+        for (int j = 0; j < usedParamcnt; ++j) {
             m_staticParams[j].deserializeFromAllocateForStorage(serialize_in, &m_stringPool);
         }
 
