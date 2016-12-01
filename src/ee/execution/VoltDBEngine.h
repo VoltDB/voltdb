@@ -281,8 +281,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         /** Returns the size of buffer for receiving result tables from EE. */
         int getReusedResultBufferCapacity() const { return m_reusedResultCapacity; }
 
-        NValueArray& getParameterContainer() { return m_staticParams; }
-        const NValueArray& getParameterContainer() const { return m_staticParams; }
         int64_t* getBatchFragmentIdsContainer() { return m_batchFragmentIdsContainer; }
         int64_t* getBatchDepIdsContainer() { return m_batchDepIdsContainer; }
 
@@ -576,9 +574,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         boost::scoped_ptr<catalog::Catalog> m_catalog;
         catalog::Database *m_database;
         bool m_isActiveActiveDREnabled;
-
-        /** reused parameter container. */
-        NValueArray m_staticParams;
 
         /** buffer object for result tables. set when the result table is sent out to localsite. */
         FallbackSerializeOutput m_resultOutput;

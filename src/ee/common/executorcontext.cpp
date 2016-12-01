@@ -77,7 +77,6 @@ ExecutorContext::ExecutorContext(int64_t siteId,
                 UndoQuantum *undoQuantum,
                 Topend* topend,
                 Pool* tempStringPool,
-                NValueArray* params,
                 VoltDBEngine* engine,
                 std::string hostname,
                 CatalogId hostId,
@@ -87,7 +86,7 @@ ExecutorContext::ExecutorContext(int64_t siteId,
     m_topEnd(topend),
     m_tempStringPool(tempStringPool),
     m_undoQuantum(undoQuantum),
-    m_staticParams(params),
+    m_staticParams(MAX_PARAM_COUNT),
     m_executorsMap(),
     m_drStream(drStream),
     m_drReplicatedStream(drReplicatedStream),
@@ -147,7 +146,7 @@ UniqueTempTableResult ExecutorContext::executeExecutors(const std::vector<Abstra
             assert(executor);
             // Call the execute method to actually perform whatever action
             // it is that the node is supposed to do...
-            if (!executor->execute(*m_staticParams)) {
+            if (!executor->execute(m_staticParams)) {
                 throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                     "Unspecified execution error detected");
             }

@@ -149,7 +149,6 @@ VoltDBEngine::VoltDBEngine(Topend *topend, LogProxy *logProxy)
       m_partitionId(-1),
       m_hashinator(NULL),
       m_isActiveActiveDREnabled(false),
-      m_staticParams(MAX_PARAM_COUNT),
       m_currentInputDepId(-1),
       m_stringPool(16777216, 2),
       m_numResultDependencies(0),
@@ -234,7 +233,6 @@ VoltDBEngine::initialize(int32_t clusterIndex,
                                             m_currentUndoQuantum,
                                             getTopend(),
                                             &m_stringPool,
-                                            &m_staticParams,
                                             this,
                                             hostname,
                                             hostId,
@@ -389,6 +387,7 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
     m_tuplesProcessedInBatch = 0;
     m_tuplesProcessedInFragment = 0;
     m_tuplesProcessedSinceReport = 0;
+    NValueArray &params = m_executorContext->getParameterContainer();
 
     for (m_currentIndexInBatch = 0; m_currentIndexInBatch < numFragments; ++m_currentIndexInBatch) {
 
@@ -400,7 +399,7 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
         assert (usedParamcnt < MAX_PARAM_COUNT);
 
         for (int j = 0; j < usedParamcnt; ++j) {
-            m_staticParams[j].deserializeFromAllocateForStorage(serialize_in, &m_stringPool);
+            params[j].deserializeFromAllocateForStorage(serialize_in, &m_stringPool);
         }
 
         // success is 0 and error is 1.

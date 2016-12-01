@@ -64,7 +64,6 @@ class ExecutorContext {
                     UndoQuantum *undoQuantum,
                     Topend* topend,
                     Pool* tempStringPool,
-                    NValueArray* params,
                     VoltDBEngine* engine,
                     std::string hostname,
                     CatalogId hostId,
@@ -142,10 +141,6 @@ class ExecutorContext {
 
     UndoQuantum *getCurrentUndoQuantum() {
         return m_undoQuantum;
-    }
-
-    NValueArray* getParameterContainer() {
-        return m_staticParams;
     }
 
     static VoltDBEngine* getEngine() {
@@ -296,14 +291,16 @@ class ExecutorContext {
 
     void setUsedParameterCount(int usedParamcnt) { m_usedParamcnt = usedParamcnt; }
     int getUsedParameterCount() const { return m_usedParamcnt; }
+    NValueArray& getParameterContainer() { return m_staticParams; }
+    const NValueArray& getParameterContainer() const { return m_staticParams; }
 
   private:
     Topend *m_topEnd;
     Pool *m_tempStringPool;
     UndoQuantum *m_undoQuantum;
 
-    // Pointer to the static parameters
-    NValueArray* m_staticParams;
+    /** reused parameter container. */
+    NValueArray m_staticParams;
     /** TODO : should be passed as execute() parameter..*/
     int m_usedParamcnt;
 
