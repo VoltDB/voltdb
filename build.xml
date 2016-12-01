@@ -546,7 +546,7 @@ PRIMARY ENTRY POINTS
 -->
 
 <target name="default"
-    depends="minifyjs, compile, ee, voltdb.jar, voltdbclient.jar, importbundles"
+    depends="compile, ee, voltdb.jar, voltdbclient.jar, importbundles"
     description="Compile Java classes and C++ JNI library and minify the javascript artifacts."
 />
 <target name="check"
@@ -1326,7 +1326,7 @@ JAVA COMPILATION
 ***************************************
 -->
 
-<target name="compile" depends="catalog, dbbpool_gen, project_gen, deployment_gen, compile_core, compile_pro"
+<target name="compile" depends="catalog, dbbpool_gen, project_gen, deployment_gen, compile_core, minifyjs, compile_pro"
         description="Compile all Java source and test classes"/>
 
 <target name="compile_client">
@@ -1366,6 +1366,7 @@ JAVA COMPILATION
 
     <copy todir='${build.prod.dir}/org/voltdb/dbmonitor'>
         <fileset dir="${src.gpl.dir}/org/voltdb/dbmonitor">
+            <exclude name="**/js/"/>
             <include name="**"/>
         </fileset>
     </copy>
@@ -2841,9 +2842,25 @@ RPM PACKAGE CREATION
 <target name="minifyjs"
       depends="uptodate_js.check"
       description="Minify all the javascript artifacts." unless='${uptodate_js}'>
-    <exec executable="/bin/bash">
-        <arg value="minify.sh"/>
-    </exec>
+
+    <copy todir="temp/js" overwrite="yes">
+        <fileset dir="src/frontend/org/voltdb/dbmonitor/js"/>
+    </copy>
+    <apply executable="java" parallel="false" dest="temp/js">
+        <fileset dir="temp/js" includes="**/*.js" />
+          <arg line="-jar"/>
+          <arg path="lib/yuicompressor-2.4.8.jar" />
+          <srcfile/>
+        <arg line="-v"/>
+          <arg line="-o"/>
+          <mapper type="glob" from="*.js" to="*-abc.js"/>
+          <targetfile/>
+    </apply>
+    <move todir="${build.prod.dir}/org/voltdb/dbmonitor/js" overwrite="true">
+        <fileset dir="temp/js" />
+        <mapper type="glob" from="*-abc.js" to="*.js"/>
+    </move>
+    <delete dir="temp" failonerror="false" />
 </target>
 
 <target name='uptodate_js.check'>
