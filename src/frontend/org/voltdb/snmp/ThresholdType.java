@@ -14,25 +14,25 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
+
 package org.voltdb.snmp;
 
-import org.voltcore.messaging.HostMessenger;
-import org.voltdb.compiler.deploymentfile.SnmpType;
+import static com.google_voltpatches.common.base.Preconditions.checkArgument;
 
-/**
- *
- * @author akhanzode
- */
-public interface SnmpTrapSender {
+import java.util.List;
 
-    //From deployment build the Snmp sender.
-    public void initialize(SnmpType snmpType, HostMessenger hm, int clusterId);
-    public void shutdown();
-    //Update Snmp properties.
-    public void notifyOfCatalogUpdate(SnmpType snmpType);
-    public void crash(String msg);
-    public void hostDown(int hostId, String msg);
-    public void hostUp(int hostId, String msg);
-    public void statistics(FaultFacility facility, String msg);
-    public void resource(ThresholdType criteria, FaultFacility facility, long threshold, long actual, String msg);
+import com.google_voltpatches.common.collect.ImmutableList;
+
+public enum ThresholdType {
+
+    __unsmnp__, // ordinal 0 doesn't map to SNMP enumerations
+    PERCENT,
+    LIMIT;
+
+    public final static List<ThresholdType> values = ImmutableList.copyOf(values());
+
+    public final static ThresholdType valueOf(int ordinal) {
+        checkArgument(ordinal > __unsmnp__.ordinal() && ordinal < values.size());
+        return values.get(ordinal);
+    }
 }

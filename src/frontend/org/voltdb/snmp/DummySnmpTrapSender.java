@@ -52,4 +52,9 @@ public class DummySnmpTrapSender implements SnmpTrapSender {
     @Override
     public void statistics(FaultFacility facility, String msg) {
     }
+
+    @Override
+    public void resource(ThresholdType criteria, FaultFacility facility,
+            long threshold, long actual, String msg) {
+    }
 }
