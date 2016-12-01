@@ -499,10 +499,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          */
         int executePlanFragment(int64_t planfragmentId,
                                 int64_t inputDependencyId,
-                                int64_t txnId,
-                                int64_t spHandle,
-                                int64_t lastCommittedSpHandle,
-                                int64_t uniqueId,
                                 bool first,
                                 bool last);
 

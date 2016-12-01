@@ -405,10 +405,6 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
         // success is 0 and error is 1.
         if (executePlanFragment(planfragmentIds[m_currentIndexInBatch],
                                 inputDependencyIds ? inputDependencyIds[m_currentIndexInBatch] : -1,
-                                txnId,
-                                spHandle,
-                                lastCommittedSpHandle,
-                                uniqueId,
                                 m_currentIndexInBatch == 0,
                                 m_currentIndexInBatch == (numFragments - 1))) {
             ++failures;
@@ -430,10 +426,6 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
 
 int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
                                       int64_t inputDependencyId,
-                                      int64_t txnId,
-                                      int64_t spHandle,
-                                      int64_t lastCommittedSpHandle,
-                                      int64_t uniqueId,
                                       bool first,
                                       bool last)
 {
