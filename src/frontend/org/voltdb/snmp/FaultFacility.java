@@ -16,20 +16,25 @@
  */
 package org.voltdb.snmp;
 
-import org.voltcore.messaging.HostMessenger;
-import org.voltdb.compiler.deploymentfile.SnmpType;
+import static com.google_voltpatches.common.base.Preconditions.checkArgument;
 
-/**
- *
- * @author akhanzode
- */
-public interface SnmpTrapSender {
+import java.util.List;
 
-    //From deployment build the Snmp sender.
-    public void initialize(SnmpType snmpType, HostMessenger hm, int clusterId);
-    public void shutdown();
-    //Update Snmp properties.
-    public void notifyOfCatalogUpdate(SnmpType snmpType);
-    public void sendTrap(int faultCode, int threshold, int actual, String unit);
+import com.google_voltpatches.common.collect.ImmutableList;
 
+public enum FaultFacility {
+    __unsmnp__, // ordinal 0 doesn't map to SNMP enumerations
+    HOST,
+    MEMORY,
+    DISK,
+    INITIATOR,
+    CLUSTER,
+    DR;
+
+    static final List<FaultFacility> values = ImmutableList.copyOf(values());
+
+    public final static FaultFacility valueOf(int ordinal) {
+        checkArgument(ordinal > __unsmnp__.ordinal() && ordinal < values.size());
+        return values.get(ordinal);
+    }
 }

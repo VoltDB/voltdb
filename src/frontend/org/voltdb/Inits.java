@@ -485,7 +485,10 @@ public class Inits {
                     if (loggerClass != null) {
                         final Constructor<?> constructor = loggerClass.getConstructor();
                         m_rvdb.m_snmp = (SnmpTrapSender) constructor.newInstance();
-                        m_rvdb.m_snmp.initialize(m_deployment.getSnmp());
+                        m_rvdb.m_snmp.initialize(
+                                m_deployment.getSnmp(),
+                                m_rvdb.getHostMessenger(),
+                                m_rvdb.getCatalogContext().cluster.getDrclusterid());
                     }
                 } catch (Exception e) {
                     VoltDB.crashLocalVoltDB("Unable to instantiate SNMP", true, e);

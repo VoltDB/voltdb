@@ -16,6 +16,7 @@
  */
 package org.voltdb.snmp;
 
+import org.voltcore.messaging.HostMessenger;
 import org.voltdb.compiler.deploymentfile.SnmpType;
 
 /**
@@ -25,7 +26,7 @@ import org.voltdb.compiler.deploymentfile.SnmpType;
 public class DummySnmpTrapSender implements SnmpTrapSender {
 
     @Override
-    public void initialize(SnmpType snmpType) {
+    public void initialize(SnmpType snmpType, HostMessenger hm, int clusterId) {
     }
 
     @Override
