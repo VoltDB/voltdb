@@ -486,7 +486,7 @@ public class ClientConfig {
         if (isEnableSSL && m_sslPropsFile == null) {
             m_sslPropsFile = this.getClass().getResource(DEFAULT_SSL_PROPS_FILE).getFile();
         }
-        if (m_sslPropsFile == null) {
+        if (m_sslPropsFile == null || m_sslPropsFile.isEmpty()) {
             m_sslContext = null;
             return;
         }
