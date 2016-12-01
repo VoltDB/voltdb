@@ -476,12 +476,15 @@ public class Inits {
     }
 
     class SetupSSL extends InitWork {
+        private static final String DEFAULT_KEYSTORE_RESOURCE = "keystore";
+        private static final String DEFAULT_KEYSTORE_PASSWD = "password";
 
         @Override
         public void run() {
             SslType sslType = m_deployment.getSsl();
-            if (sslType != null && sslType.isEnabled()) {
-                if (sslType.isExternal()) {
+            if ((sslType != null && sslType.isEnabled())
+                    || (m_config.m_sslEnable)) {
+                if (sslType.isExternal() || m_config.m_sslExternal) {
                     try {
                         m_config.m_sslContextFactory = getSSLContextFactory(sslType);
                         m_config.m_sslContextFactory.start();
@@ -496,18 +499,29 @@ public class Inits {
             }
         }
 
+        private String getResourcePath(String resource) {
+            URL res = this.getClass().getResource(resource);
+            return res == null ? null : res.getPath();
+        }
+
         private SslContextFactory getSSLContextFactory(SslType sslType) {
             SslContextFactory sslContextFactory = new SslContextFactory();
             String keyStorePath = getKeyTrustStoreAttribute("javax.net.ssl.keyStore", sslType.getKeystore(), "path");
+            if (m_config.m_sslEnable) {
+                keyStorePath = null == keyStorePath  ? getResourcePath(DEFAULT_KEYSTORE_RESOURCE):getResourcePath(keyStorePath);
+            }
             if (keyStorePath == null || keyStorePath.trim().isEmpty()) {
                 hostLog.fatal("A path for the SSL keystore file was not specified.");
             }
             if (! new File(keyStorePath).exists()) {
-                hostLog.fatal("The specified SSL keystore file was not found.");
+                hostLog.fatal("The specified SSL keystore file " + keyStorePath + " was not found.");
             }
             sslContextFactory.setKeyStorePath(keyStorePath);
 
             String keyStorePassword = getKeyTrustStoreAttribute("javax.net.ssl.keyStorePassword", sslType.getKeystore(), "password");
+            if (m_config.m_sslEnable && null == keyStorePassword) {
+                keyStorePassword = DEFAULT_KEYSTORE_PASSWD;
+            }
             if (keyStorePassword == null) {
                 hostLog.fatal("An SSL keystore password was not specified.");
             }
@@ -515,15 +529,21 @@ public class Inits {
 
             if (sslType.isExternal()) {
                 String trustStorePath = getKeyTrustStoreAttribute("javax.net.ssl.trustStore", sslType.getTruststore(), "path");
+                if (m_config.m_sslEnable) {
+                    trustStorePath = null == trustStorePath  ? getResourcePath(DEFAULT_KEYSTORE_RESOURCE):getResourcePath(trustStorePath);
+                }
                 if (trustStorePath == null || trustStorePath.trim().isEmpty()) {
                     hostLog.fatal("A path for the SSL truststore file was not specified.");
                 }
                 if (! new File(trustStorePath).exists()) {
-                    hostLog.fatal("The specified SSL truststore file was not found.");
+                    hostLog.fatal("The specified SSL truststore file " + trustStorePath + " was not found.");
                 }
                 sslContextFactory.setTrustStorePath(trustStorePath);
 
                 String trustStorePassword = getKeyTrustStoreAttribute("javax.net.ssl.trustStorePassword", sslType.getTruststore(), "password");
+                if (m_config.m_sslEnable && null == trustStorePassword) {
+                    trustStorePassword = DEFAULT_KEYSTORE_PASSWD;
+                }
                 if (trustStorePassword == null) {
                     hostLog.fatal("An SSL truststore password was not specified.");
                 }

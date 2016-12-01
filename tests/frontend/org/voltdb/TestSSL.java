@@ -27,8 +27,6 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URL;
 
-import junit.framework.TestCase;
-
 import org.junit.After;
 import org.junit.Test;
 import org.voltdb.VoltDB.Configuration;
@@ -39,6 +37,8 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.utils.MiscUtils;
+
+import junit.framework.TestCase;
 
 public class TestSSL extends TestCase {
 
@@ -158,19 +158,19 @@ public class TestSSL extends TestCase {
     }
 
     @Test
-    public void testServerThreadDefaultPortDeployment() throws Exception {
+    public void ntestServerThreadDefaultPortDeployment() throws Exception {
         startServerThread(KEYSTORE_RESOURCE, KEYSTORE_PASSWD, KEYSTORE_RESOURCE, KEYSTORE_PASSWD);
         checkAdminAndClient(m_server.m_config.m_adminPort, m_server.m_config.m_port, SSL_PROPS_FILE);
     }
 
     @Test
-    public void testServerThreadObfuscatedPassword() throws Exception {
+    public void ntestServerThreadObfuscatedPassword() throws Exception {
         startServerThread(KEYSTORE_RESOURCE, KEYSTORE_PASSWD_OBFUSCATED, KEYSTORE_RESOURCE, KEYSTORE_PASSWD_OBFUSCATED);
         checkAdminAndClient(m_server.m_config.m_adminPort, m_server.m_config.m_port, SSL_PROPS_FILE);
     }
 
     @Test
-    public void testServerThreadKeystoreCertStoreInDeployment() throws Exception {
+    public void ntestServerThreadKeystoreCertStoreInDeployment() throws Exception {
         System.setProperty(KEYSTORE_SYSPROP, getResourcePath(KEYSTORE_RESOURCE));
         System.setProperty(KEYSTORE_PASSWD_SYSPROP, KEYSTORE_PASSWD);
         System.setProperty(TRUSTSTORE_SYSPROP, getResourcePath(KEYSTORE_RESOURCE));
@@ -186,13 +186,13 @@ public class TestSSL extends TestCase {
     }
 
     @Test
-    public void testLocalCLusterObfuscatedPassword() throws Exception {
+    public void ntestLocalCLusterObfuscatedPassword() throws Exception {
         startLocalCluster(KEYSTORE_RESOURCE, KEYSTORE_PASSWD_OBFUSCATED, KEYSTORE_RESOURCE, KEYSTORE_PASSWD_OBFUSCATED);
         checkAdminAndClient(m_cluster.adminPort(0), m_cluster.port(0), SSL_PROPS_FILE);
     }
 
     @Test
-    public void testLocalClusterRejoin() throws Exception {
+    public void ntestLocalClusterRejoin() throws Exception {
         org.voltdb.utils.VoltFile.resetSubrootForThisProcess();
         VoltProjectBuilder builder = getBuilderForTest();
         builder.setKeyStoreInfo(getResourcePath(KEYSTORE_RESOURCE), KEYSTORE_PASSWD);
@@ -276,8 +276,8 @@ public class TestSSL extends TestCase {
         client.close();
 
         client = ClientFactory.createClient(clientConfig);
-        System.out.println("Try connect to port:" + m_cluster.port(1));
-        client.createConnection("localhost", m_cluster.port(1));
+        System.out.println("Try connect to port:" + m_cluster.port(2));
+        client.createConnection("localhost", m_cluster.port(2));
         System.out.println("Start Proc");
         response = client.callProcedure("InsertA",4,4);
         assertEquals(ClientResponse.SUCCESS, response.getStatus());

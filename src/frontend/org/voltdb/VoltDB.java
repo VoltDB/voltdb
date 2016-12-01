@@ -36,6 +36,8 @@ import java.util.Queue;
 import java.util.TimeZone;
 import java.util.UUID;
 
+import javax.net.ssl.SSLContext;
+
 import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.voltcore.logging.VoltLog4jLogger;
 import org.voltcore.logging.VoltLogger;
@@ -62,8 +64,6 @@ import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
 import com.google_voltpatches.common.net.HostAndPort;
-
-import javax.net.ssl.SSLContext;
 
 /**
  * VoltDB provides main() for the VoltDB server
@@ -185,6 +185,12 @@ public class VoltDB {
         /** ssl context for client and admin ports */
         public SSLContext m_sslContext = null;
 
+        /** enable ssl */
+        public boolean m_sslEnable = false;
+
+        /** enable ssl for external (https, client and admin port*/
+        public boolean m_sslExternal = false;
+
         /** consistency level for reads */
         public Consistency.ReadLevel m_consistencyReadLevel = Consistency.ReadLevel.SAFE;
 
@@ -249,9 +255,9 @@ public class VoltDB {
         /** true if we're running the rejoin tests. Not used in production. */
         public boolean m_isRejoinTest = false;
 
-        public final Queue<String> m_networkCoreBindings = new ArrayDeque<String>();
-        public final Queue<String> m_computationCoreBindings = new ArrayDeque<String>();
-        public final Queue<String> m_executionCoreBindings = new ArrayDeque<String>();
+        public final Queue<String> m_networkCoreBindings = new ArrayDeque<>();
+        public final Queue<String> m_computationCoreBindings = new ArrayDeque<>();
+        public final Queue<String> m_executionCoreBindings = new ArrayDeque<>();
         public String m_commandLogBinding = null;
 
         /**
@@ -626,6 +632,10 @@ public class VoltDB {
                         System.err.println("FATAL: " + e.getMessage());
                         referToDocAndExit();
                     }
+                } else if (arg.equalsIgnoreCase("enableSSL")) {
+                    m_sslEnable = true;
+                } else if (arg.equalsIgnoreCase("externalSSL")) {
+                    m_sslExternal = true;
                 }
                 else {
                     System.err.println("FATAL: Unrecognized option to VoltDB: " + arg);
@@ -998,7 +1008,7 @@ public class VoltDB {
      */
     public static void printStackTraces(PrintWriter writer, List<String> currentStacktrace) {
         if (currentStacktrace == null) {
-            currentStacktrace = new ArrayList<String>();
+            currentStacktrace = new ArrayList<>();
         }
 
         Map<Thread, StackTraceElement[]> traces = Thread.getAllStackTraces();
@@ -1089,7 +1099,7 @@ public class VoltDB {
 
                 // Even if the logger is null, don't stop.  We want to log the stack trace and
                 // any other pertinent information to a .dmp file for crash diagnosis
-                List<String> currentStacktrace = new ArrayList<String>();
+                List<String> currentStacktrace = new ArrayList<>();
                 currentStacktrace.add("Stack trace from crashLocalVoltDB() method:");
 
                 // Create a special dump file to hold the stack trace
