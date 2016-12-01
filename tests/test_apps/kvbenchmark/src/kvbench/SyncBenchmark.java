@@ -292,7 +292,7 @@ public class SyncBenchmark {
         ClientConfig clientConfig = null;
         if (config.sslfile.length() > 0) {
             try {
-				clientConfig = new ClientConfig("", "", config.sslfile);
+                clientConfig = new ClientConfig("", "", config.sslfile);
                 clientConfig.enableSSL();
             } catch (Exception e) {
                 System.err.println("Failed to configure ssl, exiting");
