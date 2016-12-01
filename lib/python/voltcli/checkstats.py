@@ -100,7 +100,8 @@ def monitorDRProducerStatisticsProgress(lastPartitionMin, lastPartitionMax, curr
     timeSinceLastUpdate = currentTime - lastUpdatedTime
     #stats timeout
     if timeSinceLastUpdate > timeout:
-         raise StatisticsProcedureException("The cluster has not drained any transactions for DRPRODUCER in %d seconds. There are outstanding transactions." % (timeout))
+         msg = "The cluster has not drained any transactions for DRPRODUCER in last %d minutes. There are outstanding transactions."
+         raise StatisticsProcedureException( msg % (runner.opts.timeout), 1)
     #stats has not been moved but not timeout yet
     return lastUpdatedTime
 
@@ -117,9 +118,9 @@ def get_stats(runner, component):
         if status == -6:
             time.sleep(1)
         else:
-            raise StatisticsProcedureException("Unexpected errors to collect statistics for %s: %s." % (component, resp))
+            raise StatisticsProcedureException("Unexpected errors to collect statistics for %s: %s." % (component, resp.response.statusString), 1, False)
         if retry == 0:
-            raise StatisticsProcedureException("Unable to collect statistics for %s after 5 attempts." % component)
+            raise StatisticsProcedureException("Unable to collect statistics for %s after 5 attempts." % component, 1, False)
 
 def dr_producer_stats(runner, partition_min_host, partition_min, partition_max):
     resp = get_stats(runner, 'DRPRODUCER')
@@ -374,11 +375,14 @@ def monitorStatisticsProgress(lastUpdatedParams, currentParams, lastUpdatedTime,
 
     #stats timeout
     if timeSinceLastUpdate > timeout:
-         raise StatisticsProcedureException("The cluster has not drained any transactions for %s in %d seconds. There are outstanding transactions." % (component, timeout))
+         msg = "The cluster has not drained any transactions for %s in last %d minutes. There are outstanding transactions."
+         raise StatisticsProcedureException( msg % (component, runner.opts.timeout), 1)
 
     #not timeout yet
     return lastUpdatedTime
 
 class StatisticsProcedureException(Exception):
-    def __init__(self, message):
+    def __init__(self, message, exitCode, isTimeout = True):
        self.message = message
+       self.exitCode = exitCode
+       self.isTimeout = isTimeout

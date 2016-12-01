@@ -41,14 +41,16 @@ def pause(runner):
             runner.error('The cluster has failed to quiesce with status: %d' % status)
             return
         runner.info('The cluster is quiesced.')
+        actionMessage = 'Transactions may not be completely drained. You may continue monitoring the outstanding transactions with @Statistics'
         try:
             checkstats.check_exporter(runner)
             checkstats.check_dr_producer(runner)
         except StatisticsProcedureException as proex:
-            runner.info('The pause process has stopped. The cluster is in a paused state.')
+            runner.info('The previous command has timed out and stopped waiting... The cluster is in a paused state.')
             runner.error(proex.message)
-            runner.info('Transactions may not be completely drained. You may continue monitoring the outstanding transactions with @Statistics')
-            sys.exit(1)
+            if proex.isTimeout:
+                runner.info(actionMessage)
+            sys.exit(proex.exitCode)
         except (KeyboardInterrupt, SystemExit):
-            runner.info('The pause process has stopped. The cluster is in a paused state.')
-            runner.abort('Transactions may not be completely drained. You may continue monitoring the outstanding transactions with @Statistics')
+            runner.info('The previous command has stopped waiting... The cluster is in a paused state.')
+            runner.abort(actionMessage)

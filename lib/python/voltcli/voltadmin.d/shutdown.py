@@ -36,6 +36,8 @@ def shutdown(runner):
     zk_pause_txnid = 0
     runner.info('Cluster shutdown in progress.')
     if not runner.opts.forcing:
+        stateMessage = 'The cluster shutdown process has stopped. The cluster is still in a paused state.'
+        actionMessage = 'You may shutdown the cluster with the "voltadmin shutdown --force" command, or continue to wait with "voltadmin shutdown".'
         try:
             runner.info('Preparing for shutdown...')
             resp = runner.call_proc('@PrepareShutdown', [], [])
@@ -52,6 +54,7 @@ def shutdown(runner):
             checkstats.check_command_log(runner)
             runner.info('All transactions have been made durable.')
             if runner.opts.save:
+               actionMessage = 'You may shutdown the cluster with the "voltadmin shutdown --force" command, or continue to wait with "voltadmin shutdown --save".'
                columns = [VOLT.FastSerializer.VOLTTYPE_BIGINT]
                shutdown_params =  [zk_pause_txnid]
                #save option, check more stats
@@ -63,12 +66,13 @@ def shutdown(runner):
             else:
                 runner.info('Shutting down the cluster...')
         except StatisticsProcedureException as proex:
-             runner.info('The cluster shutdown process has stopped. The cluster is still in a paused state.')
+             runner.info(stateMessage)
              runner.error(proex.message)
-             runner.info('You may shutdown the cluster with the "voltadmin shutdown --force" command, or continue to wait with "voltadmin shutdown".')
-             sys.exit(1)
+             if proex.isTimeout:
+                 runner.info(actionMessage)
+             sys.exit(proex.exitCode)
         except (KeyboardInterrupt, SystemExit):
-            runner.info('The cluster shutdown process has stopped. The cluster is still in a paused state.')
-            runner.abort('You may shutdown the cluster with the "voltadmin shutdown --force" command, or continue to wait with "voltadmin shutdown".')
+            runner.info(stateMessage)
+            runner.abort(actionMessage)
     response = runner.call_proc('@Shutdown', columns, shutdown_params, check_status = False)
     print response
