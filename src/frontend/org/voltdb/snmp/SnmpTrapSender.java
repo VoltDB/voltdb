@@ -30,6 +30,8 @@ public interface SnmpTrapSender {
     public void shutdown();
     //Update Snmp properties.
     public void notifyOfCatalogUpdate(SnmpType snmpType);
-    public void sendTrap(int faultCode, int threshold, int actual, String unit);
-
+    public void crash(String msg);
+    public void hostDown(int hostId, String msg);
+    public void hostUp(int hostId, String msg);
+    public void statistics(FaultFacility facility, String msg);
 }

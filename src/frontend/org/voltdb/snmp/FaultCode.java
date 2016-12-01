@@ -26,13 +26,11 @@ import com.google_voltpatches.common.collect.ImmutableList;
 public enum FaultCode {
 
     __unsmnp__, // ordinal 0 doesn't map to SNMP enumerations
-    LING_DOWN,
-    LINK_UP,
+    HOST_DOWN,
+    HOST_UP,
     RESOURCE,
-    STORAGE,
     CRASH,
-    DR,
-    KSAFETY;
+    STATISTICS;
 
     public final static List<FaultCode> values = ImmutableList.copyOf(values());
 
