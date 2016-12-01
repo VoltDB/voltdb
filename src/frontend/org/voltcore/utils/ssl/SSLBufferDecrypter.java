@@ -32,7 +32,7 @@ public class SSLBufferDecrypter {
         this.m_sslEngine = sslEngine;
     }
 
-    public ByteBuffer unwrap(ByteBuffer srcBuffer, ByteBuffer dstBuffer) throws IOException {
+    public void unwrap(ByteBuffer srcBuffer, ByteBuffer dstBuffer) throws IOException {
         // save initial state of dst buffer in case of underflow.
         int initialDstPos = dstBuffer.position();
         while (true) {
@@ -42,7 +42,7 @@ public class SSLBufferDecrypter {
                     // in m_dstBuffer, newly decrtyped data is between pos and lim
                     if (result.bytesProduced() > 0) {
                         dstBuffer.limit(dstBuffer.position() + result.bytesProduced());
-                        return dstBuffer;
+                        return;
                         }
                     else {
                         continue;
@@ -56,7 +56,7 @@ public class SSLBufferDecrypter {
                     srcBuffer.limit(srcBuffer.capacity());
                     dstBuffer.position(initialDstPos);
                     dstBuffer.limit(initialDstPos);
-                    return dstBuffer;
+                    return;
                 case CLOSED:
                     throw new SSLException("SSL engine is closed on ssl unwrap of buffer.");
             }

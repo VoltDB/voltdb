@@ -352,7 +352,7 @@ public class SSLVoltPort extends VoltPort {
                                 }
                                 m_dstBuffer.limit(m_dstBuffer.capacity());
                                 try {
-                                    ByteBuffer dstBuffer = m_sslBufferDecrypter.unwrap(srcBuffer, m_dstBuffer);
+                                    m_sslBufferDecrypter.unwrap(srcBuffer, m_dstBuffer);
                                 } catch (IOException e) {
                                     f.setException(e);
                                     return;
