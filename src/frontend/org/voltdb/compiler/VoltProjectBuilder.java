@@ -82,6 +82,7 @@ import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.utils.NotImplementedException;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
+import org.voltdb.compiler.deploymentfile.SnmpType;
 
 /**
  * Alternate (programmatic) interface to VoltCompiler. Give the class all of
@@ -296,6 +297,9 @@ public class VoltProjectBuilder {
     private Integer m_commandLogFsyncInterval;
     private Integer m_commandLogMaxTxnsBeforeFsync;
 
+    private Boolean m_snmpEnabled = false;
+    private String m_snmpTarget = null;
+
     private Integer m_snapshotPriority;
 
     private Integer m_maxTempTableMemory = 100;
@@ -355,6 +359,11 @@ public class VoltProjectBuilder {
 
     public void setUseDDLSchema(boolean useIt) {
         m_useDDLSchema = useIt;
+    }
+
+    public void configureSnmp(String target) {
+        m_snmpTarget = target;
+        m_snmpEnabled = true;
     }
 
     public void configureLogging(String internalSnapshotPath, String commandLogPath, Boolean commandLogSync,
@@ -1152,6 +1161,14 @@ public class VoltProjectBuilder {
                 httpsType.setTruststore(store);
             }
             httpd.setHttps(httpsType);
+        }
+
+        //SNMP
+        SnmpType snmpType = factory.createSnmpType();
+        if (m_snmpEnabled) {
+            snmpType.setEnabled(true);
+            snmpType.setTarget(m_snmpTarget);
+            deployment.setSnmp(snmpType);
         }
 
         // <export>
