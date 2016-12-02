@@ -42,7 +42,7 @@ public class DummySnmpTrapSender implements SnmpTrapSender {
     }
 
     @Override
-    public void hostDown(int hostId, String msg) {
+    public void hostDown(FaultLevel level, int hostId, String msg) {
     }
 
     @Override

@@ -146,6 +146,7 @@ import org.voltdb.settings.NodeSettings;
 import org.voltdb.settings.Settings;
 import org.voltdb.settings.SettingsException;
 import org.voltdb.snmp.DummySnmpTrapSender;
+import org.voltdb.snmp.FaultLevel;
 import org.voltdb.snmp.SnmpTrapSender;
 import org.voltdb.sysprocs.saverestore.SnapshotPathType;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
@@ -1356,7 +1357,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     }
                     // Send hostDown traps
                     for (int hostId : failedHosts) {
-                        m_snmp.hostDown(hostId, "host left cluster mesh due to connection loss");
+                        m_snmp.hostDown(FaultLevel.ERROR, hostId, "host left cluster mesh due to connection loss");
                     }
                     // Cleanup the rejoin blocker in case the rejoining node failed.
                     // This has to run on a separate thread because the callback is
@@ -2774,6 +2775,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     m_clientInterface.shutdown();
                     m_clientInterface = null;
                 }
+                // send hostDown trap as client interface is
+                // no longer available
+                m_snmp.hostDown(FaultLevel.INFO, m_messenger.getHostId(), "Host is shutting down");
 
                 // tell the iv2 sites to stop their runloop
                 if (m_iv2Initiators != null) {
