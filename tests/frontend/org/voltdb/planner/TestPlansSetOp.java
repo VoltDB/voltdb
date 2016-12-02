@@ -40,7 +40,7 @@ import org.voltdb.types.ExpressionType;
 import org.voltdb.types.PlanNodeType;
 import org.voltdb.types.SetOpType;
 
-public class TestUnion extends PlannerTestCase {
+public class TestPlansSetOp extends PlannerTestCase {
 
     public void testUnion() {
         AbstractPlanNode pn = compile("select A from T1 UNION select B from T2 UNION select C from T3");
@@ -156,12 +156,6 @@ public class TestUnion extends PlannerTestCase {
 
     public void testNonSupportedUnions()
     {
-        // If both sides are multi-partitioned, there is no facility for pushing down the
-        // union processing below the send/receive, so each child of the union requires
-        // its own send/receive so the plan ends up as an unsupported 3-fragment plan.
-        failToCompile("select DESC from T1 UNION select TEXT from T5");
-//        failToCompile("select A from T1 UNION select D from T4");
-
         // Query hangs from SQL coverage
         failToCompile("select A from T1 UNION select A from T1 INTERSECT select B from T2");
 
@@ -178,11 +172,6 @@ public class TestUnion extends PlannerTestCase {
         // execute on one of the designated single partitions.
         // At this point, coordinator designation is only supported for single-fragment plans.
         failToCompile("select DESC from T1 WHERE A = 1 UNION select TEXT from T5 WHERE E = 2");
-
-        // If both sides are multi-partitioned, there is no facility for pushing down the
-        // union processing below the send/receive, so each child of the union requires
-        // its own send/receive so the plan ends up as an unsupported 3-fragment plan.
-        failToCompile("select DESC from T1 UNION select TEXT from T5");
 
         // If ONE side is single-partitioned, it would theoretically be possible to satisfy
         // the query with a 2-fragment plan IFF the coordinator fragment could be forced to
@@ -241,11 +230,6 @@ public class TestUnion extends PlannerTestCase {
         // execute on one of the designated single partitions.
         // At this point, coordinator designation is only supported for single-fragment plans.
         failToCompile("select DESC from T1 WHERE A = 1 UNION select DESC from T1 WHERE A = 2");
-
-        // If both sides are multi-partitioned, there is no facility for pushing down the
-        // union processing below the send/receive, so each child of the union requires
-        // its own send/receive so the plan ends up as an unsupported 3-fragment plan.
-        failToCompile("select DESC from T1 UNION select DESC from T1");
     }
 
     public void testSubqueryUnionWithParamENG7783() {
@@ -669,31 +653,53 @@ public class TestUnion extends PlannerTestCase {
       // FROM subquery - non-trivial coordinator fragment - SEQSCAN
       failToCompile("select A, B from (select T9.A, T10.B from T9, T10 where T9.A = T10.A limit 10) T union select A, B from T9",
               "Statements are too complex in set operation using multiple partitioned tables.");
-      // No partioning columns in the output
-      failToCompile("select T1.DESC from T1 union select T5.TEXT from T5",
-              "Statements are too complex in set operation using multiple partitioned tables.");
-      failToCompile("SELECT F, COUNT(*) FROM T1 GROUP BY F UNION SELECT D, COUNT(*) FROM T4 GROUP BY D",
-              "Statements are too complex in set operation using multiple partitioned tables.");
       failToCompile("SELECT COUNT(*) FROM T1 UNION SELECT D FROM T4",
-              "Statements are too complex in set operation using multiple partitioned tables.");
-      // Partitioning columns position mismatch
-      failToCompile("SELECT CNT, V_A FROM VT1 UNION SELECT D, COUNT(*) FROM T4 GROUP BY D",
               "Statements are too complex in set operation using multiple partitioned tables.");
       // Select from distributed T1 does not require a MP plan
       failToCompile("select T1.A from T1 where T1.A = 3 union select T5.E from T5",
               "Statements are too complex in set operation using multiple partitioned tables.");
-      // Partitioning columns (T9.A and T10.A) position mismatch
-      failToCompile("select T9.A, T9.B from T9 union select T10.B, T10.A from T10",
+      // Union of distributed select and distributed set op. The latter has non-trivial coordinator
+      failToCompile("select A from T9 union (select A from T10 except select A1 from T1)",
               "Statements are too complex in set operation using multiple partitioned tables.");
-      // Union of three distributed selects. The output fo the last select doesn't have the partitioning column
-      failToCompile("select A from T9 union select A from T10 union select F from T1",
-              "Statements are too complex in set operation using multiple partitioned tables.");
-      // Not all of the selects (T10) have partitioning column in the output
-      failToCompile("select T9.A from T9 union select T10.B from T10",
-              "Statements are too complex in set operation using multiple partitioned tables.");
-      // Union of two distributed selects. One of them has a column expression that involved a partitioning column
-      failToCompile("select AT9.A + 1 AA from T9 AT9 union select AT10.A A2 from T10 AT10",
-              "Statements are too complex in set operation using multiple partitioned tables.");
+    }
+
+    public void testMultiPartitionedSetOpsTwoLevel() {
+// need a test with two partitioned and one distributed tables
+// need a test with two partitioned and one part whis PK = 3
+        List<AbstractPlanNode> pns;
+        PlanNodeType[] coordinatorTypes;
+        PlanNodeType[] setOpChildren;
+
+        // No partitioning columns in the output
+        pns = compileToFragments("select T1.DESC from T1 union select T5.TEXT from T5");
+        coordinatorTypes = new PlanNodeType[] {PlanNodeType.SETOPRECEIVE};
+        setOpChildren = new PlanNodeType[] {PlanNodeType.SEQSCAN, PlanNodeType.SEQSCAN};
+        checkPushedDownSetOp(pns, coordinatorTypes, SetOpType.UNION, setOpChildren);
+
+        // Partitioning columns VT1.V_A and T4.D position mismatch
+        pns = compileToFragments("SELECT MAXA, V_A FROM VT1 UNION SELECT D, MAX(D) FROM T4 GROUP BY D");
+        coordinatorTypes = new PlanNodeType[] {PlanNodeType.SETOPRECEIVE};
+        setOpChildren = new PlanNodeType[] {PlanNodeType.INDEXSCAN, PlanNodeType.SEQSCAN};
+        checkPushedDownSetOp(pns, coordinatorTypes, SetOpType.UNION, setOpChildren);
+
+        // Partitioning columns (T9.A and T10.A) position mismatch
+        pns = compileToFragments("select T9.A, T9.B from T9 union select T10.B, T10.A from T10");
+        coordinatorTypes = new PlanNodeType[] {PlanNodeType.SETOPRECEIVE};
+        setOpChildren = new PlanNodeType[] {PlanNodeType.INDEXSCAN, PlanNodeType.INDEXSCAN};
+        checkPushedDownSetOp(pns, coordinatorTypes, SetOpType.UNION, setOpChildren);
+
+        // Union of three distributed selects. The last select doesn't have the partitioning column
+        pns = compileToFragments("select A from T9 union select A from T10 union select A1 from T1");
+        coordinatorTypes = new PlanNodeType[] {PlanNodeType.SETOPRECEIVE};
+        setOpChildren = new PlanNodeType[] {PlanNodeType.INDEXSCAN, PlanNodeType.INDEXSCAN, PlanNodeType.SEQSCAN};
+        checkPushedDownSetOp(pns, coordinatorTypes, SetOpType.UNION, setOpChildren);
+
+        // Union of two distributed selects with column expressions that involved a partitioning column
+        pns = compileToFragments("select AT9.A + 1 AA from T9 AT9 union select AT10.A + 1 A2 from T10 AT10");
+        coordinatorTypes = new PlanNodeType[] {PlanNodeType.SETOPRECEIVE};
+        setOpChildren = new PlanNodeType[] {PlanNodeType.INDEXSCAN, PlanNodeType.INDEXSCAN};
+        checkPushedDownSetOp(pns, coordinatorTypes, SetOpType.UNION, setOpChildren);
+
     }
 
     private void checkPushedDownSetOp(List<AbstractPlanNode> pns, PlanNodeType[] coordinatorTypes, SetOpType setOpType, PlanNodeType[] setOpChildren) {
@@ -743,6 +749,6 @@ public class TestUnion extends PlannerTestCase {
 
     @Override
     protected void setUp() throws Exception {
-        setupSchema(TestUnion.class.getResource("testplans-union-ddl.sql"), "testunion", false);
+        setupSchema(TestPlansSetOp.class.getResource("testplans-union-ddl.sql"), "testunion", false);
     }
 }

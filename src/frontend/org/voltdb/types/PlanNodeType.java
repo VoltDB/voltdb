@@ -41,6 +41,7 @@ import org.voltdb.plannodes.ProjectionPlanNode;
 import org.voltdb.plannodes.ReceivePlanNode;
 import org.voltdb.plannodes.SendPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
+import org.voltdb.plannodes.SetOpReceivePlanNode;
 import org.voltdb.plannodes.TableCountPlanNode;
 import org.voltdb.plannodes.TupleScanPlanNode;
 import org.voltdb.plannodes.SetOpPlanNode;
@@ -81,6 +82,7 @@ public enum PlanNodeType {
     SEND            (40, SendPlanNode.class),
     RECEIVE         (41, ReceivePlanNode.class),
     MERGERECEIVE    (42, MergeReceivePlanNode.class),
+    SETOPRECEIVE    (43, SetOpReceivePlanNode.class),
 
     //
     // Misc Nodes

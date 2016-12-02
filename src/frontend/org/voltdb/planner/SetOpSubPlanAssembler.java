@@ -34,8 +34,11 @@ import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.plannodes.ProjectionPlanNode;
 import org.voltdb.plannodes.ReceivePlanNode;
 import org.voltdb.plannodes.SchemaColumn;
+import org.voltdb.plannodes.SendPlanNode;
 import org.voltdb.plannodes.SetOpPlanNode;
+import org.voltdb.plannodes.SetOpReceivePlanNode;
 import org.voltdb.types.PlanNodeType;
+import org.voltdb.types.SetOpType;
 
 /**
  * For a Set Op plan, this class builds the plans for the children queries
@@ -71,13 +74,16 @@ class SetOpSubPlanAssembler extends SubPlanAssembler {
     AbstractPlanNode nextPlan() {
         assert(m_parsedStmt instanceof ParsedSetOpStmt);
         ParsedSetOpStmt parsedSetOpStmt = (ParsedSetOpStmt) m_parsedStmt;
-        AbstractPlanNode setOpPlanNode = new SetOpPlanNode(parsedSetOpStmt.m_unionType);
+        SetOpPlanNode setOpPlanNode = new SetOpPlanNode(parsedSetOpStmt.m_unionType);
         m_recentErrorMsg = null;
 
         ArrayList<CompiledPlan> childrenPlans = new ArrayList<>();
 
         Set<Integer> commonPartitionColumns = null;
+        // Indicator that the SetOp node can be pushed down to the partition fragment
         boolean canPushSetOpDown = true;
+        // Indicator that there are two SetOp nodes are required (one for each fragment)
+        boolean canMPSetOp = true;
 
         // Build best plans for the children first
         int planId = 0;
@@ -120,9 +126,14 @@ class SetOpSubPlanAssembler extends SubPlanAssembler {
             //    in their respective output schemas
             // The above requirements guarantee that the given set op can be run disjointly on each
             // individual partition and the results can be simply aggregated at the coordinator
-            if (canPushSetOpDown) {
+            // If the statements fail to find a consensus on the partitioning column position but do have
+            // trivial coordinator fragments the plan must have two Set Op nodes for each fragment.
+            if (canMPSetOp) {
                 // Is statement MP and has a trivial  coordinator?
-                canPushSetOpDown = partitioning.requiresTwoFragments() && hasTrivialCoordinator(bestChildPlan.rootPlanGraph);
+                canMPSetOp = partitioning.requiresTwoFragments() && hasTrivialCoordinator(bestChildPlan.rootPlanGraph);
+            }
+            if (canPushSetOpDown) {
+                canPushSetOpDown = canMPSetOp;
                 if (canPushSetOpDown) {
                     // Extract partition column(s) from the child
                     Set<Integer> partitionColumns = extractPrationColumn(bestChildPlan.rootPlanGraph);
@@ -148,7 +159,7 @@ class SetOpSubPlanAssembler extends SubPlanAssembler {
 
             AbstractExpression statementPartitionExpression = partitioning.singlePartitioningExpression();
             if (m_setOpPrtitioning.requiresTwoFragments()) {
-                if ((partitioning.requiresTwoFragments() && !canPushSetOpDown)
+                if ((partitioning.requiresTwoFragments() && !(canPushSetOpDown || canMPSetOp))
                         || statementPartitionExpression != null) {
                     // If two child statements need to use a second fragment,
                     // the set op node must be pushed down to the partition fragments.
@@ -173,7 +184,7 @@ class SetOpSubPlanAssembler extends SubPlanAssembler {
                 // Again, currently the coordinator of a two-fragment plan is not allowed to
                 // target a particular partition, so neither can the union of the coordinator
                 // and a statement that wants to run single-partition.
-                assert(!canPushSetOpDown);
+                assert(!(canPushSetOpDown || canMPSetOp));
                 throw new PlanningErrorException(
                         "Statements are too complex in set operation using multiple partitioned tables.");
             }
@@ -191,7 +202,9 @@ class SetOpSubPlanAssembler extends SubPlanAssembler {
         m_planSelector.m_planId = planId;
 
         // Add and link children plans. Push down the SetOP if needed
-        return buildSetOpPlan(setOpPlanNode, childrenPlans, m_setOpPrtitioning.requiresTwoFragments() && canPushSetOpDown);
+        return buildSetOpPlan(setOpPlanNode, childrenPlans,
+ // do we the  m_setOpPrtitioning.requiresTwoFragments() && here? It's part of the defintiton any way
+                m_setOpPrtitioning.requiresTwoFragments() && canPushSetOpDown, m_setOpPrtitioning.requiresTwoFragments() && canMPSetOp);
     }
 
     /**
@@ -281,33 +294,33 @@ class SetOpSubPlanAssembler extends SubPlanAssembler {
      * @param setOpPlanNode Set Op Plan Node
      * @param childrenPlans individual children plans
      * @param needPushSetOpDown TRUE if the Set Op plan node needs to be pushed down
+     * @param needTwoSetOps TRUE if two Set Op plan nodes are required
+     *  
      * @return The final combined plan
      */
-    private AbstractPlanNode buildSetOpPlan(AbstractPlanNode setOpPlanNode, List<CompiledPlan> childrenPlans, boolean needPushSetOpDown) {
+    private AbstractPlanNode buildSetOpPlan(SetOpPlanNode setOpPlanNode, List<CompiledPlan> childrenPlans, boolean needPushSetOpDown, boolean needTwoSetOps) {
         AbstractPlanNode rootNode = setOpPlanNode;
         if (needPushSetOpDown) {
             // Add a Send/Receive pair on top of the current root node
             rootNode = SubPlanAssembler.addSendReceivePair(rootNode);
-            for (CompiledPlan selectPlan : childrenPlans) {
-                AbstractPlanNode childPlan = selectPlan.rootPlanGraph;
-                AbstractPlanNode childParent = setOpPlanNode;
-                if (selectPlan.rootPlanGraph instanceof ProjectionPlanNode) {
-                    // Keep the child projection by adding it directly under the Set Op node
-                    setOpPlanNode.addAndLinkChild(selectPlan.rootPlanGraph);
-                    // Detach the rest of the child plan
-                    assert(selectPlan.rootPlanGraph.getChildCount() == 1);
-                    childPlan = selectPlan.rootPlanGraph.getChild(0);
-                    selectPlan.rootPlanGraph.clearChildren();
-                    // Reset child parent to be its own projection node
-                    childParent = selectPlan.rootPlanGraph;
-                }
-                // Remove child Send/Receive nodes
-                assert(childPlan instanceof MergeReceivePlanNode || childPlan instanceof ReceivePlanNode);
-                childPlan = childPlan.getChild(0).getChild(0);
-                childPlan.clearParents();
-                // Add simplified child plan to its parent
-                childParent.addAndLinkChild(childPlan);
+            setOpPlanNode = connectSetOpChildren(setOpPlanNode, childrenPlans);
+        } else if (needTwoSetOps) {
+            // Prepare partition fragment
+            setOpPlanNode = connectSetOpChildren(setOpPlanNode, childrenPlans);
+
+            // Add inlihe Send node in case of the EXCEPT (ALL) /INTERCEPT (ALL) Set ops to be
+            // propagate children results to the coordinator to do a cross partition set op.
+            // The UNION (ALL) only need the partition set op result.
+            if (SetOpType.EXCEPT == setOpPlanNode.getSetOpType() || SetOpType.EXCEPT_ALL == setOpPlanNode.getSetOpType() ||
+                    SetOpType.INTERSECT == setOpPlanNode.getSetOpType() || SetOpType.INTERSECT_ALL == setOpPlanNode.getSetOpType()) {
+                setOpPlanNode.addInlinePlanNode(new SendPlanNode());
             }
+ 
+            AbstractPlanNode sendNode = new SendPlanNode();
+            sendNode.addAndLinkChild(setOpPlanNode);
+
+            rootNode = new SetOpReceivePlanNode(setOpPlanNode.getSetOpType(), childrenPlans.size());
+            rootNode.addAndLinkChild(sendNode);
         } else {
             // Single partition plan or Multi partition plan with a single distributed table
             // that does not require the Set Op node to be pushed down
@@ -324,5 +337,35 @@ class SetOpSubPlanAssembler extends SubPlanAssembler {
 
     String getIsContentDeterministic() {
         return m_isContentDeterministic;
+    }
+
+    /**
+     * Connect the SetOP node with its children
+     * @param setOpPlanNode
+     * @param childrenPlans
+     * @return 
+     */
+    private SetOpPlanNode connectSetOpChildren(SetOpPlanNode setOpPlanNode, List<CompiledPlan> childrenPlans) {
+        for (CompiledPlan selectPlan : childrenPlans) {
+            AbstractPlanNode childPlan = selectPlan.rootPlanGraph;
+            AbstractPlanNode childParent = setOpPlanNode;
+            if (selectPlan.rootPlanGraph instanceof ProjectionPlanNode) {
+                // Keep the child projection by adding it directly under the Set Op node
+                setOpPlanNode.addAndLinkChild(selectPlan.rootPlanGraph);
+                // Detach the rest of the child plan
+                assert(selectPlan.rootPlanGraph.getChildCount() == 1);
+                childPlan = selectPlan.rootPlanGraph.getChild(0);
+                selectPlan.rootPlanGraph.clearChildren();
+                // Reset child parent to be its own projection node
+                childParent = selectPlan.rootPlanGraph;
+            }
+            // Remove child Send/Receive nodes
+            assert(childPlan instanceof MergeReceivePlanNode || childPlan instanceof ReceivePlanNode);
+            childPlan = childPlan.getChild(0).getChild(0);
+            childPlan.clearParents();
+            // Add simplified child plan to its parent
+            childParent.addAndLinkChild(childPlan);
+        }
+        return setOpPlanNode;
     }
 }

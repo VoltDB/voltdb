@@ -77,6 +77,17 @@ public abstract class AbstractReceivePlanNode extends AbstractPlanNode {
         return true;
     }
 
+    /**
+     * Return a number of the input dependencies that this fragment depends upon.
+     * For example, a coordinator fragment for a MP SetOP plan depends on the output
+     * from all of its children
+     * 
+     * @return
+     */
+    public int getInputDependencyCount() {
+        return 1;
+    }
+
     protected void resolveColumnIndexes(NodeSchema outputSchema) {
         // Need to order and resolve indexes of output columns
         assert(m_children.size() == 1);

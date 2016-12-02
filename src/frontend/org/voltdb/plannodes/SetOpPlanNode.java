@@ -36,7 +36,7 @@ public class SetOpPlanNode extends AbstractPlanNode {
         static final String SETOP_TYPE = "SETOP_TYPE";
     }
 
-    // Union Type
+    // SetOp Type
     private SetOpType m_setOpType;
 
     public SetOpPlanNode() {
