@@ -206,13 +206,13 @@ public class ConnectionUtil {
 
         final long retvals[] = new long[4];
         returnArray[1] = retvals;
+        MessagingChannel messagingChannel = MessagingChannel.get(aChannel, sslEngine);
         try {
             /*
              * Send login info
              */
             aChannel.configureBlocking(true);
             aChannel.socket().setTcpNoDelay(true);
-            MessagingChannel messagingChannel = new MessagingChannel(aChannel, sslEngine);
 
             // encode strings
             byte[] serviceBytes = service == null ? null : service.getBytes(Constants.UTF8ENCODING);
@@ -305,6 +305,7 @@ public class ConnectionUtil {
             aChannel.socket().setKeepAlive(true);
             success = true;
         } finally {
+            messagingChannel.shutdown();
             if (!success) {
                 aChannel.close();
             }

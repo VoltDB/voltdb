@@ -339,8 +339,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     boolean success = false;
                     //Populated on timeout
                     AtomicReference<String> timeoutRef = new AtomicReference<String>();
+                    MessagingChannel messagingChannel = MessagingChannel.get(m_socket, m_sslEngine);
                     try {
-                        final InputHandler handler = authenticate(m_socket, m_sslEngine, timeoutRef);
+                        final InputHandler handler = authenticate(m_socket, messagingChannel, timeoutRef);
                         if (handler != null) {
                             m_socket.configureBlocking(false);
                             if (handler instanceof ClientInputHandler) {
@@ -384,6 +385,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             }
                         }
                     } finally {
+                        messagingChannel.shutdown();
                         if (!success) {
                             m_numConnections.decrementAndGet();
                         }
@@ -524,7 +526,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
          * @throws IOException
          */
         private InputHandler
-        authenticate(final SocketChannel socket, SSLEngine sslEngine, final AtomicReference<String> timeoutRef) throws IOException
+        authenticate(final SocketChannel socket, MessagingChannel messagingChannel, final AtomicReference<String> timeoutRef) throws IOException
         {
             ByteBuffer responseBuffer = ByteBuffer.allocate(6);
             byte version = (byte)0;
@@ -537,7 +539,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
              */
             socket.configureBlocking(true);
             socket.socket().setTcpNoDelay(true);//Greatly speeds up requests hitting the wire
-            MessagingChannel messagingChannel = new MessagingChannel(socket, sslEngine);
 
             /*
              * Schedule a timeout to close the socket in case there is no response for the timeout
