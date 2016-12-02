@@ -28,9 +28,11 @@ public enum FaultCode {
     __unsmnp__, // ordinal 0 doesn't map to SNMP enumerations
     HOST_DOWN,
     HOST_UP,
-    RESOURCE,
+    RESOURCE_TRIGGER,
+    RESOURCE_CLEAR,
     CRASH,
-    STATISTICS;
+    STATISTICS_TRIGGER,
+    STATISTICS_CLEAR;
 
     public final static List<FaultCode> values = ImmutableList.copyOf(values());
 
