@@ -27,5 +27,5 @@ SELECT DISTINCT LHS77._variable[@columntype],  LHS77._variable[@columntype]     
 SELECT DISTINCT @onefun(LHS78._variable[@columntype]),    LHS78._variable[@columntype]     FROM @fromtables LHS78 ,   @fromtables RHS WHERE LHS78._variable[@columntype] = RHS._variable[@comparabletype]
 
 --- DISTINCT with GROUP BY (81-82)
-SELECT DISTINCT  LHS81._variable[#GB2 @columntype],   @agg(LHS81._variable[@columntype])   FROM @fromtables LHS81  @jointype JOIN   @fromtables RHS ON LHS81._variable[@columntype] = RHS._variable[@comparabletype] GROUP BY LHS81.__[#GB1], LHS81.__[#GB2]
-SELECT DISTINCT  LHS82._variable[#GB2 @columntype],   @agg(LHS82._variable[@columntype])   FROM @fromtables LHS82  @jointype JOIN   @fromtables RHS ON LHS82._variable[@columntype] = RHS._variable[@comparabletype] GROUP BY LHS82.__[#GB1], LHS82.__[#GB2] ORDER BY 1, 2 LIMIT 5
+SELECT DISTINCT  LHS81._variable[#GB1 @columntype], LHS81._variable[#GB2 @columntype],   @agg(LHS81._variable[@columntype])   FROM @fromtables LHS81 @jointype JOIN @fromtables RHS ON LHS81._variable[#join @columntype] = RHS.__[#join] GROUP BY LHS81.__[#GB1], LHS81.__[#GB2]
+SELECT DISTINCT  LHS82._variable[#GB1 @columntype], LHS82._variable[#GB2 @columntype],   @agg(LHS82._variable[@columntype])   FROM @fromtables LHS82 @jointype JOIN @fromtables RHS ON LHS82._variable[#join @columntype] = RHS.__[#join] GROUP BY LHS82.__[#GB1], LHS82.__[#GB2] ORDER BY 1, 2 LIMIT 5
