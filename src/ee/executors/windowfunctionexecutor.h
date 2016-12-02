@@ -29,7 +29,12 @@ struct TableWindow;
  * This is the executor for a WindowFunctionPlanNode.
  */
 class WindowFunctionExecutor: public AbstractExecutor {
-
+	/*
+	 * EnsureCleanupOnExit is really part of WindowFunctionExecutor.
+	 * It needs access to private members that need to be finalized.
+	 * So this is not a dubious use of friendship.
+	 */
+	friend class EnsureCleanupOnExit;
 public:
     WindowFunctionExecutor(VoltDBEngine* engine, AbstractPlanNode* abstract_node)
       : AbstractExecutor(engine, abstract_node),
@@ -96,7 +101,7 @@ private:
      * also need to output some last rows, when we have more
      * sophisticated windowing support.
      */
-    virtual void p_execute_finish(TableWindow *window);
+    virtual void p_execute_finish();
 
     TableTuple & getBufferedInputTuple() {
         return m_bufferedInputStorage;
@@ -181,8 +186,7 @@ private:
      * will happen for each row, and can be disabled
      * by setting m_needsLookahead to false.
      */
-    void lookaheadOneRowForAggs(TableWindow *window,
-                                const TableTuple &tuple);
+    void lookaheadOneRowForAggs(const TableTuple &tuple);
 
     /**
      * Call lookaheadNextGroup for each aggregate
@@ -190,13 +194,13 @@ private:
      * This will happen for each group and cannot be
      * disabled.
      */
-    void lookaheadNextGroupForAggs(TableWindow *window);
+    void lookaheadNextGroupForAggs();
 
     /**
      * Call endGroup for each aggregate.  This will happen
      * for each group and cannot be disabled.
      */
-    void endGroupForAggs(TableWindow *window, EdgeType edgeType);
+    void endGroupForAggs(EdgeType edgeType);
     /**
      * Insert the output tuple.
      */
@@ -216,7 +220,7 @@ private:
      * the edge type is the type of the group after the current
      * group.
      */
-    EdgeType findNextEdge(TableWindow *window, EdgeType edgeType);
+    EdgeType findNextEdge(EdgeType edgeType);
 
     Pool m_memoryPool;
     /**
