@@ -325,7 +325,11 @@ public class MiscUtils {
         String expiresStr = sdf.format(licenseApi.expires().getTime());
         boolean valid = true;
 
-        if (now.after(licenseApi.expires())) {
+        // make it really expire tomorrow to deal with timezone whiners
+        Calendar tomorrow = GregorianCalendar.getInstance();
+        tomorrow.add(Calendar.DATE, 1);
+
+        if (tomorrow.after(licenseApi.expires())) {
             if (licenseApi.hardExpiration()) {
                 if (licenseApi.isTrial()) {
                     hostLog.fatal("VoltDB trial license expired on " + expiresStr + ".");
@@ -367,23 +371,6 @@ public class MiscUtils {
             }
         }
 
-        // print out trial success message
-        if (licenseApi.isTrial()) {
-            consoleLog.info("Starting VoltDB with trial license. License expires on " + expiresStr + ".");
-            return true;
-        }
-
-        // ASSUME NON-TRIAL LICENSE HERE
-
-        // this gets printed even if there are non-fatal problems, so it
-        // injects the word "invalid" to make it clear this is the case
-        String msg = String.format("Starting VoltDB with %scommercial license. " +
-                                   "License for %d nodes expires on %s.",
-                                   (valid ? "" : "invalid "),
-                                   licenseApi.maxHostcount(),
-                                   expiresStr);
-        consoleLog.info(msg);
-
         // If this is a commercial license, and there is less than or equal to 30 days until expiration,
         // issue a "days remaining" warning message.
         long diff = licenseApi.expires().getTimeInMillis() - now.getTimeInMillis();
@@ -394,9 +381,27 @@ public class MiscUtils {
             diff = 0;
         }
         long diffDays = diff / (24 * 60 * 60 * 1000);
-        if ((diff > 0) && (diff <= 30))
+
+        // print out trial success message
+        if (licenseApi.isTrial()) {
+            consoleLog.info("Starting VoltDB with trial license. License expires on " + expiresStr + " (" + diffDays + " days remaining).");
+            return true;
+        }
+        // print out a warning within a month for other licenses
+        else if ((diff > 0) && (diff <= 30))
         {
-            msg = "Warning: VoltDB license expires in " + diffDays + " day(s).";
+            String msg = "Warning: VoltDB license expires in " + diffDays + " day(s).";
+            consoleLog.info(msg);
+        }
+
+        if (!licenseApi.isTrial()) {
+            // this gets printed even if there are non-fatal problems, so it
+            // injects the word "invalid" to make it clear this is the case
+            String msg = String.format("Starting VoltDB with %scommercial license. " +
+                                       "License for %d nodes expires on %s.",
+                                       (valid ? "" : "invalid "),
+                                       licenseApi.maxHostcount(),
+                                       expiresStr);
             consoleLog.info(msg);
         }
 
