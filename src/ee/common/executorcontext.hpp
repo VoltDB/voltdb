@@ -24,8 +24,10 @@
 #include "common/subquerycontext.h"
 #include "common/ValuePeeker.hpp"
 #include "common/UniqueId.hpp"
+#include "execution/ExecutorVector.h"
 
 #include <vector>
+#include <stack>
 #include <map>
 #include <memory>
 
@@ -265,6 +267,8 @@ class ExecutorContext {
      */
     void cleanupExecutorsForSubquery(int subqueryId) const;
 
+    void resetExecutionMetadata(ExecutorVector* executorVector);
+
     void setDrStream(AbstractDRTupleStream *drStream);
     void setDrReplicatedStream(AbstractDRTupleStream *drReplicatedStream);
 
@@ -294,6 +298,20 @@ class ExecutorContext {
     NValueArray& getParameterContainer() { return m_staticParams; }
     const NValueArray& getParameterContainer() const { return m_staticParams; }
 
+    void pushNewModifiedTupleCounter() { m_tuplesModifiedStack.push(0); }
+    void popModifiedTupleCounter() { m_tuplesModifiedStack.pop(); }
+    int getModifiedTupleCount() {
+        assert(m_tuplesModifiedStack.size() > 0);
+        return m_tuplesModifiedStack.top();
+    }
+
+    /** DML executors call this to indicate how many tuples
+         * have been modified */
+    void addToTuplesModified(int64_t amount) {
+        assert(m_tuplesModifiedStack.size() > 0);
+        m_tuplesModifiedStack.top() += amount;
+    }
+
   private:
     Topend *m_topEnd;
     Pool *m_tempStringPool;
@@ -303,6 +321,11 @@ class ExecutorContext {
     NValueArray m_staticParams;
     /** TODO : should be passed as execute() parameter..*/
     int m_usedParamcnt;
+
+    /** Counts tuples modified by a plan fragments.  Top of stack is the
+     * most deeply nested executing plan fragment.
+     */
+    std::stack<int64_t> m_tuplesModifiedStack;
 
     // Executor stack map. The key is the statement id (0 means the main/parent statement)
     // The value is the pointer to the executor stack for that statement

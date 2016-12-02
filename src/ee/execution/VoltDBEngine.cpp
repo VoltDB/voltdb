@@ -162,8 +162,7 @@ VoltDBEngine::VoltDBEngine(Topend *topend, LogProxy *logProxy)
       m_drReplicatedStream(NULL),
       m_compatibleDRStream(NULL),
       m_compatibleDRReplicatedStream(NULL),
-      m_currExecutorVec(NULL),
-      m_tuplesModifiedStack()
+      m_currExecutorVec(NULL)
 {
 }
 
@@ -519,7 +518,7 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
 UniqueTempTableResult VoltDBEngine::executePlanFragment(ExecutorVector* executorVector, int64_t* tuplesModified) {
     UniqueTempTableResult result;
     // set this to zero for dml operations
-    m_tuplesModifiedStack.push(0);
+    m_executorContext->pushNewModifiedTupleCounter();
 
     // execution lists for planfragments are cached by planfragment id
     try {
@@ -528,28 +527,18 @@ UniqueTempTableResult VoltDBEngine::executePlanFragment(ExecutorVector* executor
         result = m_executorContext->executeExecutors(0);
     }
     catch (const SerializableEEException &e) {
-        resetExecutionMetadata(executorVector);
+        m_executorContext->resetExecutionMetadata(executorVector);
         throw;
     }
 
     if (tuplesModified != NULL) {
-        *tuplesModified = m_tuplesModifiedStack.top();
+        *tuplesModified = m_executorContext->getModifiedTupleCount();
     }
 
-    resetExecutionMetadata(executorVector);
+    m_executorContext->resetExecutionMetadata(executorVector);
 
     VOLT_DEBUG("Finished executing successfully.");
     return result;
-}
-
-void VoltDBEngine::resetExecutionMetadata(ExecutorVector* executorVector) {
-
-    if (m_tuplesModifiedStack.size() != 0) {
-        m_tuplesModifiedStack.pop();
-    }
-    assert (m_tuplesModifiedStack.size() == 0);
-
-    executorVector->resetLimitStats();
 }
 
 void VoltDBEngine::serializeException(const SerializableEEException& e) {
@@ -2037,7 +2026,7 @@ void VoltDBEngine::executePurgeFragment(PersistentTable* table) {
     // to report its tuples modified.  We don't want to actually
     // send this count back to the client---too confusing.  Just
     // throw it away.
-    m_tuplesModifiedStack.push(0);
+    m_executorContext->pushNewModifiedTupleCounter();
     pev->setupContext(m_executorContext);
 
     try {
@@ -2046,13 +2035,13 @@ void VoltDBEngine::executePurgeFragment(PersistentTable* table) {
     catch (const SerializableEEException &e) {
         // restore original DML statement state.
         m_currExecutorVec->setupContext(m_executorContext);
-        m_tuplesModifiedStack.pop();
+        m_executorContext->popModifiedTupleCounter();
         throw;
     }
 
     // restore original DML statement state.
     m_currExecutorVec->setupContext(m_executorContext);
-    m_tuplesModifiedStack.pop();
+    m_executorContext->popModifiedTupleCounter();
 }
 
 static std::string dummy_last_accessed_plan_node_name("no plan node in progress");
@@ -2084,8 +2073,7 @@ void VoltDBEngine::reportProgressToTopend(const TempTableLimits *limits) {
 }
 
 void VoltDBEngine::addToTuplesModified(int64_t amount) {
-    assert(m_tuplesModifiedStack.size() > 0);
-    m_tuplesModifiedStack.top() += amount;
+    m_executorContext->addToTuplesModified(amount);
 }
 
 } // namespace voltdb

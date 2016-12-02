@@ -87,6 +87,7 @@ ExecutorContext::ExecutorContext(int64_t siteId,
     m_tempStringPool(tempStringPool),
     m_undoQuantum(undoQuantum),
     m_staticParams(MAX_PARAM_COUNT),
+    m_tuplesModifiedStack(),
     m_executorsMap(),
     m_drStream(drStream),
     m_drReplicatedStream(drReplicatedStream),
@@ -118,7 +119,6 @@ void ExecutorContext::bindToThread()
     pthread_setspecific(static_key, this);
     VOLT_DEBUG("Installing EC(%ld)", (long)this);
 }
-
 
 ExecutorContext* ExecutorContext::getExecutorContext() {
     (void)pthread_once(&static_keyOnce, globalInitOrCreateOncePerProcess);
@@ -225,6 +225,16 @@ void ExecutorContext::cleanupExecutorsForSubquery(int subqueryId) const
 {
     const std::vector<AbstractExecutor*>& executorList = getExecutors(subqueryId);
     cleanupExecutorsForSubquery(executorList);
+}
+
+void ExecutorContext::resetExecutionMetadata(ExecutorVector* executorVector) {
+
+    if (m_tuplesModifiedStack.size() != 0) {
+        m_tuplesModifiedStack.pop();
+    }
+    assert (m_tuplesModifiedStack.size() == 0);
+
+    executorVector->resetLimitStats();
 }
 
 bool ExecutorContext::allOutputTempTablesAreEmpty() const {

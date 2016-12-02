@@ -63,7 +63,6 @@
 
 #include <cassert>
 #include <map>
-#include <stack>
 #include <string>
 #include <vector>
 
@@ -509,7 +508,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         void setExecutorVectorForFragmentId(int64_t fragId);
 
         bool checkTempTableCleanup(ExecutorVector * execsForFrag);
-        void resetExecutionMetadata(ExecutorVector* executorVector);
 
         // -------------------------------------------------
         // Data Members
@@ -667,11 +665,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // This stateless member acts as a counted reference to keep the ThreadLocalPool alive
         // just while this VoltDBEngine is alive. That simplifies valgrind-compliant process shutdown.
         ThreadLocalPool m_tlPool;
-
-        /** Counts tuples modified by a plan fragments.  Top of stack is the
-         * most deeply nested executing plan fragment.
-         */
-        std::stack<int64_t> m_tuplesModifiedStack;
 };
 
 inline void VoltDBEngine::resetReusedResultOutputBuffer(const size_t headerSize)
