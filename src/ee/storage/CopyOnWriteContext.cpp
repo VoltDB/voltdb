@@ -20,9 +20,6 @@
 #include "storage/CopyOnWriteIterator.h"
 #include "storage/tableiterator.h"
 #include "common/TupleOutputStream.h"
-#include "common/FatalException.hpp"
-#include "common/StreamPredicateList.h"
-#include "logging/LogManager.h"
 #include <algorithm>
 #include <cassert>
 #include <iostream>
