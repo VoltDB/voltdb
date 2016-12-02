@@ -25,6 +25,7 @@
 #include "common/ValuePeeker.hpp"
 #include "common/UniqueId.hpp"
 #include "execution/ExecutorVector.h"
+#include "execution/VoltDBEngine.h"
 
 #include <vector>
 #include <stack>
@@ -44,12 +45,7 @@ class AbstractDRTupleStream;
 class VoltDBEngine;
 
 class TempTable;
-class TempTableTupleDeleter;
 
-// UniqueTempTableResult is a smart pointer wrapper around a temp
-// table.  It doesn't delete the temp table, but it will delete the
-// contents of the table when it goes out of scope.
-typedef std::unique_ptr<TempTable, TempTableTupleDeleter> UniqueTempTableResult;
 struct ProgressStats {
     int64_t TuplesProcessedInBatch;
     int64_t TuplesProcessedInFragment;
@@ -419,11 +415,6 @@ class ExecutorContext {
     CatalogId m_hostId;
     CatalogId m_drClusterId;
     ProgressStats m_progressStats;
-};
-
-class TempTableTupleDeleter {
-public:
-    void operator()(TempTable* tbl) const;
 };
 
 }

@@ -332,10 +332,4 @@ void ExecutorContext::checkTransactionForDR() {
     }
 }
 
-void TempTableTupleDeleter::operator()(TempTable* tbl) const {
-    if (tbl != NULL) {
-        tbl->deleteAllTempTuples();
-    }
-}
-
 } // end namespace voltdb

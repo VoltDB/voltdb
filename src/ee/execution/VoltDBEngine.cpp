@@ -74,6 +74,7 @@
 #include "indexes/tableindexfactory.h"
 #include "plannodes/abstractplannode.h"
 #include "plannodes/plannodefragment.h"
+#include "storage/AbstractDRTupleStream.h"
 #include "storage/tablefactory.h"
 #include "storage/persistenttable.h"
 #include "storage/streamedtable.h"
@@ -2060,6 +2061,12 @@ static std::string dummy_last_accessed_plan_node_name("no plan node in progress"
 
 void VoltDBEngine::addToTuplesModified(int64_t amount) {
     m_executorContext->addToTuplesModified(amount);
+}
+
+void TempTableTupleDeleter::operator()(TempTable* tbl) const {
+    if (tbl != NULL) {
+        tbl->deleteAllTempTuples();
+    }
 }
 
 } // namespace voltdb

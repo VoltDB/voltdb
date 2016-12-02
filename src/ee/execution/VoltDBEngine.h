@@ -55,7 +55,6 @@
 #include "logging/LogProxy.h"
 #include "logging/StdoutLogProxy.h"
 #include "stats/StatsAgent.h"
-#include "storage/AbstractDRTupleStream.h"
 #include "storage/BinaryLogSinkWrapper.h"
 
 #include "boost/scoped_ptr.hpp"
@@ -81,6 +80,7 @@ class Table;
 
 namespace voltdb {
 
+class AbstractDRTupleStream;
 class AbstractExecutor;
 class AbstractPlanNode;
 class EnginePlanSet;  // Locally defined in VoltDBEngine.cpp
@@ -94,6 +94,16 @@ class TableCatalogDelegate;
 class TempTableLimits;
 class Topend;
 class TheHashinator;
+
+class TempTableTupleDeleter {
+public:
+    void operator()(TempTable* tbl) const;
+};
+
+// UniqueTempTableResult is a smart pointer wrapper around a temp
+// table.  It doesn't delete the temp table, but it will delete the
+// contents of the table when it goes out of scope.
+typedef std::unique_ptr<TempTable, TempTableTupleDeleter> UniqueTempTableResult;
 
 const int64_t DEFAULT_TEMP_TABLE_MEMORY = 1024 * 1024 * 100;
 
