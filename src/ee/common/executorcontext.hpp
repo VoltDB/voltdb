@@ -36,6 +36,9 @@ namespace voltdb {
 extern const int64_t VOLT_EPOCH;
 extern const int64_t VOLT_EPOCH_IN_MILLIS;
 
+// how many initial tuples to scan before calling into java
+const int64_t LONG_OP_THRESHOLD = 10000;
+
 class AbstractExecutor;
 class AbstractDRTupleStream;
 class VoltDBEngine;
@@ -47,6 +50,29 @@ class TempTableTupleDeleter;
 // table.  It doesn't delete the temp table, but it will delete the
 // contents of the table when it goes out of scope.
 typedef std::unique_ptr<TempTable, TempTableTupleDeleter> UniqueTempTableResult;
+struct ProgressStats {
+    int64_t TuplesProcessedInBatch;
+    int64_t TuplesProcessedInFragment;
+    int64_t TuplesProcessedSinceReport;
+    int64_t TupleReportThreshold;
+    PlanNodeType LastAccessedPlanNodeType;
+
+    ProgressStats() {
+        TuplesProcessedInBatch = TuplesProcessedInFragment = TuplesProcessedSinceReport = 0;
+        TupleReportThreshold = LONG_OP_THRESHOLD;
+        LastAccessedPlanNodeType = PLAN_NODE_TYPE_INVALID;
+    }
+
+    inline void resetForNewBatch() {
+        TuplesProcessedInBatch = TuplesProcessedInFragment = TuplesProcessedSinceReport = 0;
+    }
+
+    inline void rollUpForPlanFragment() {
+        TuplesProcessedInBatch += TuplesProcessedInFragment;
+        TuplesProcessedInFragment = 0;
+        TuplesProcessedSinceReport = 0;
+    }
+};
 
 /*
  * EE site global data required by executors at runtime.
@@ -154,7 +180,7 @@ class ExecutorContext {
     }
 
     Topend* getTopend() {
-        return m_topEnd;
+        return m_topend;
     }
 
     /** Current or most recent sp handle */
@@ -312,8 +338,53 @@ class ExecutorContext {
         m_tuplesModifiedStack.top() += amount;
     }
 
+    /**
+     * Called just before a potentially long-running operation
+     * begins execution.
+     *
+     * Track total tuples accessed for this query.  Set up
+     * statistics for long running operations thru m_engine if
+     * total tuples accessed passes the threshold.
+     */
+    inline int64_t pullTuplesRemainingUntilProgressReport(PlanNodeType planNodeType) {
+        m_progressStats.LastAccessedPlanNodeType = planNodeType;
+        return m_progressStats.TupleReportThreshold - m_progressStats.TuplesProcessedSinceReport;
+    }
+
+    /**
+     * Called periodically during a long-running operation to see
+     * if we need to report a long-running fragment.
+     */
+    inline int64_t pushTuplesProcessedForProgressMonitoring(const TempTableLimits* limits,
+                                                            int64_t tuplesProcessed) {
+        m_progressStats.TuplesProcessedSinceReport += tuplesProcessed;
+        if (m_progressStats.TuplesProcessedSinceReport >= m_progressStats.TupleReportThreshold) {
+            reportProgressToTopend(limits);
+        }
+        return m_progressStats.TupleReportThreshold; // size of next batch
+    }
+
+    /**
+     * Called when a long-running operation completes.
+     */
+    inline void pushFinalTuplesProcessedForProgressMonitoring(const TempTableLimits* limits,
+                                                              int64_t tuplesProcessed) {
+        try {
+            pushTuplesProcessedForProgressMonitoring(limits, tuplesProcessed);
+        } catch(const SerializableEEException &e) {
+            e.serialize(m_engine->getExceptionOutputSerializer());
+        }
+
+        m_progressStats.LastAccessedPlanNodeType = PLAN_NODE_TYPE_INVALID;
+    }
+
+    /**
+     * Call into the topend with information about how executing a plan fragment is going.
+     */
+    void reportProgressToTopend(const TempTableLimits* limits);
+
   private:
-    Topend *m_topEnd;
+    Topend *m_topend;
     Pool *m_tempStringPool;
     UndoQuantum *m_undoQuantum;
 
@@ -347,6 +418,7 @@ class ExecutorContext {
     std::string m_hostname;
     CatalogId m_hostId;
     CatalogId m_drClusterId;
+    ProgressStats m_progressStats;
 };
 
 class TempTableTupleDeleter {

@@ -83,7 +83,7 @@ ExecutorContext::ExecutorContext(int64_t siteId,
                 AbstractDRTupleStream *drStream,
                 AbstractDRTupleStream *drReplicatedStream,
                 CatalogId drClusterId) :
-    m_topEnd(topend),
+    m_topend(topend),
     m_tempStringPool(tempStringPool),
     m_undoQuantum(undoQuantum),
     m_staticParams(MAX_PARAM_COUNT),
@@ -99,7 +99,8 @@ ExecutorContext::ExecutorContext(int64_t siteId,
     m_partitionId(partitionId),
     m_hostname(hostname),
     m_hostId(hostId),
-    m_drClusterId(drClusterId)
+    m_drClusterId(drClusterId),
+    m_progressStats()
 {
     (void)pthread_once(&static_keyOnce, globalInitOrCreateOncePerProcess);
     bindToThread();
@@ -235,6 +236,32 @@ void ExecutorContext::resetExecutionMetadata(ExecutorVector* executorVector) {
     assert (m_tuplesModifiedStack.size() == 0);
 
     executorVector->resetLimitStats();
+}
+
+void ExecutorContext::reportProgressToTopend(const TempTableLimits *limits) {
+
+    int64_t allocated = limits != NULL ? limits->getAllocated() : -1;
+    int64_t peak = limits != NULL ? limits->getPeakMemoryInBytes() : -1;
+
+    //Update stats in java and let java determine if we should cancel this query.
+    m_progressStats.TuplesProcessedInFragment += m_progressStats.TuplesProcessedSinceReport;
+    int64_t tupleReportThreshold = m_topend->fragmentProgressUpdate(m_engine->getCurrentIndexInBatch(),
+                                        m_progressStats.LastAccessedPlanNodeType,
+                                        m_progressStats.TuplesProcessedInBatch + m_progressStats.TuplesProcessedInFragment,
+                                        allocated,
+                                        peak);
+    m_progressStats.TuplesProcessedSinceReport = 0;
+
+    if (tupleReportThreshold < 0) {
+        VOLT_DEBUG("Interrupt query.");
+        char buff[100];
+        snprintf(buff, 100,
+                "A SQL query was terminated after %.03f seconds because it exceeded the",
+                static_cast<double>(tupleReportThreshold) / -1000.0);
+
+        throw InterruptException(std::string(buff));
+    }
+    m_progressStats.TupleReportThreshold = tupleReportThreshold;
 }
 
 bool ExecutorContext::allOutputTempTablesAreEmpty() const {

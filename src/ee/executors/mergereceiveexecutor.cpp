@@ -236,7 +236,7 @@ bool MergeReceiveExecutor::p_execute(const NValueArray &params) {
     std::vector<TableTuple> xs;
     xs.reserve(m_tmpInputTable->activeTupleCount());
 
-    ProgressMonitorProxy pmp(m_engine, this);
+    ProgressMonitorProxy pmp(m_engine->getExecutorContext(), this);
 
     //
     // OPTIMIZATION: NESTED LIMIT

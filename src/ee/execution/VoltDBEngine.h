@@ -143,6 +143,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         }
 
         ExecutorContext* getExecutorContext() { return m_executorContext; }
+        int getCurrentIndexInBatch() const { return m_currentIndexInBatch; }
 
         // -------------------------------------------------
         // Execution Functions
@@ -183,46 +184,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // Created to transition existing unit tests to context abstraction.
         // If using this somewhere new, consider if you're being lazy.
         void updateExecutorContextUndoQuantumForTest();
-
-        /**
-         * Called just before a potentially long-running operation
-         * begins execution.
-         *
-         * Track total tuples accessed for this query.  Set up
-         * statistics for long running operations thru m_engine if
-         * total tuples accessed passes the threshold.
-         */
-        inline int64_t pullTuplesRemainingUntilProgressReport(PlanNodeType planNodeType) {
-            m_lastAccessedPlanNodeType = planNodeType;
-            return m_tupleReportThreshold - m_tuplesProcessedSinceReport;
-        }
-
-        /**
-         * Called periodically during a long-running operation to see
-         * if we need to report a long-running fragment.
-         */
-        inline int64_t pushTuplesProcessedForProgressMonitoring(const TempTableLimits* limits,
-                                                                int64_t tuplesProcessed) {
-            m_tuplesProcessedSinceReport += tuplesProcessed;
-            if (m_tuplesProcessedSinceReport >= m_tupleReportThreshold) {
-                reportProgressToTopend(limits);
-            }
-            return m_tupleReportThreshold; // size of next batch
-        }
-
-        /**
-         * Called when a long-running operation completes.
-         */
-        inline void pushFinalTuplesProcessedForProgressMonitoring(const TempTableLimits* limits,
-                                                                  int64_t tuplesProcessed) {
-            try {
-                pushTuplesProcessedForProgressMonitoring(limits, tuplesProcessed);
-            } catch(const SerializableEEException &e) {
-                e.serialize(getExceptionOutputSerializer());
-            }
-
-            m_lastAccessedPlanNodeType = PLAN_NODE_TYPE_INVALID;
-        }
 
         // If an insert will fail due to row limit constraint and user
         // has defined a delete action to make space, this method
@@ -354,28 +315,9 @@ class __attribute__((visibility("default"))) VoltDBEngine {
             setCurrentUndoQuantum(m_undoLog.generateUndoQuantum(nextUndoToken));
         }
 
-        void releaseUndoToken(int64_t undoToken)
-        {
-            if (m_currentUndoQuantum != NULL && m_currentUndoQuantum->getUndoToken() == undoToken) {
-                m_currentUndoQuantum = NULL;
-                m_executorContext->setupForPlanFragments(NULL);
-            }
-            m_undoLog.release(undoToken);
+        void releaseUndoToken(int64_t undoToken);
 
-            if (m_executorContext->drStream()) {
-                m_executorContext->drStream()->endTransaction(m_executorContext->currentUniqueId());
-            }
-            if (m_executorContext->drReplicatedStream()) {
-                m_executorContext->drReplicatedStream()->endTransaction(m_executorContext->currentUniqueId());
-            }
-        }
-
-        void undoUndoToken(int64_t undoToken)
-        {
-            m_currentUndoQuantum = NULL;
-            m_executorContext->setupForPlanFragments(NULL);
-            m_undoLog.undo(undoToken);
-        }
+        void undoUndoToken(int64_t undoToken);
 
         voltdb::UndoQuantum* getCurrentUndoQuantum() { return m_currentUndoQuantum; }
 
@@ -486,10 +428,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
                                                                   TABLE *table);
         bool updateCatalogDatabaseReference();
         void resetDRConflictStreamedTables();
-        /**
-         * Call into the topend with information about how executing a plan fragment is going.
-         */
-        void reportProgressToTopend(const TempTableLimits* limits);
 
         /**
          * Execute a single plan fragment.
@@ -515,11 +453,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         /** True if any fragments in a batch have modified any tuples */
         bool m_dirtyFragmentBatch;
         int m_currentIndexInBatch;
-        int64_t m_tuplesProcessedInBatch;
-        int64_t m_tuplesProcessedInFragment;
-        int64_t m_tuplesProcessedSinceReport;
-        int64_t m_tupleReportThreshold;
-        PlanNodeType m_lastAccessedPlanNodeType;
 
         boost::scoped_ptr<EnginePlanSet> m_plans;
         voltdb::UndoLog m_undoLog;

@@ -106,8 +106,6 @@ ENABLE_BOOST_FOREACH_ON_CONST_MAP(MaterializedViewInfo);
 ENABLE_BOOST_FOREACH_ON_CONST_MAP(Table);
 
 static const size_t PLAN_CACHE_SIZE = 1000;
-// how many initial tuples to scan before calling into java
-const int64_t LONG_OP_THRESHOLD = 10000;
 // table name prefix of DR conflict table
 const std::string DR_REPLICATED_CONFLICT_TABLE_NAME = "VOLTDB_AUTOGEN_XDCR_CONFLICTS_REPLICATED";
 const std::string DR_PARTITIONED_CONFLICT_TABLE_NAME = "VOLTDB_AUTOGEN_XDCR_CONFLICTS_PARTITIONED";
@@ -140,11 +138,6 @@ class EnginePlanSet : public PlanSet { };
 
 VoltDBEngine::VoltDBEngine(Topend *topend, LogProxy *logProxy)
     : m_currentIndexInBatch(-1),
-      m_tuplesProcessedInBatch(0),
-      m_tuplesProcessedInFragment(0),
-      m_tuplesProcessedSinceReport(0),
-      m_tupleReportThreshold(LONG_OP_THRESHOLD),
-      m_lastAccessedPlanNodeType(PLAN_NODE_TYPE_INVALID),
       m_currentUndoQuantum(NULL),
       m_partitionId(-1),
       m_hashinator(NULL),
@@ -383,9 +376,7 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
     m_executorContext->checkTransactionForDR();
 
     // reset these at the start of each batch
-    m_tuplesProcessedInBatch = 0;
-    m_tuplesProcessedInFragment = 0;
-    m_tuplesProcessedSinceReport = 0;
+    m_executorContext->m_progressStats.resetForNewBatch();
     NValueArray &params = m_executorContext->getParameterContainer();
 
     for (m_currentIndexInBatch = 0; m_currentIndexInBatch < numFragments; ++m_currentIndexInBatch) {
@@ -411,9 +402,7 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
         }
 
         // at the end of each frag, rollup and reset counters
-        m_tuplesProcessedInBatch += m_tuplesProcessedInFragment;
-        m_tuplesProcessedInFragment = 0;
-        m_tuplesProcessedSinceReport = 0;
+        m_executorContext->m_progressStats.rollUpForPlanFragment();
 
         m_stringPool.purge();
     }
@@ -539,6 +528,29 @@ UniqueTempTableResult VoltDBEngine::executePlanFragment(ExecutorVector* executor
 
     VOLT_DEBUG("Finished executing successfully.");
     return result;
+}
+
+void VoltDBEngine::releaseUndoToken(int64_t undoToken)
+{
+    if (m_currentUndoQuantum != NULL && m_currentUndoQuantum->getUndoToken() == undoToken) {
+        m_currentUndoQuantum = NULL;
+        m_executorContext->setupForPlanFragments(NULL);
+    }
+    m_undoLog.release(undoToken);
+
+    if (m_executorContext->drStream()) {
+        m_executorContext->drStream()->endTransaction(m_executorContext->currentUniqueId());
+    }
+    if (m_executorContext->drReplicatedStream()) {
+        m_executorContext->drReplicatedStream()->endTransaction(m_executorContext->currentUniqueId());
+    }
+}
+
+void VoltDBEngine::undoUndoToken(int64_t undoToken)
+{
+    m_currentUndoQuantum = NULL;
+    m_executorContext->setupForPlanFragments(NULL);
+    m_undoLog.undo(undoToken);
 }
 
 void VoltDBEngine::serializeException(const SerializableEEException& e) {
@@ -2045,32 +2057,6 @@ void VoltDBEngine::executePurgeFragment(PersistentTable* table) {
 }
 
 static std::string dummy_last_accessed_plan_node_name("no plan node in progress");
-
-void VoltDBEngine::reportProgressToTopend(const TempTableLimits *limits) {
-
-    int64_t allocated = limits != NULL ? limits->getAllocated() : -1;
-    int64_t peak = limits != NULL ? limits->getPeakMemoryInBytes() : -1;
-
-    //Update stats in java and let java determine if we should cancel this query.
-    m_tuplesProcessedInFragment += m_tuplesProcessedSinceReport;
-    int64_t tupleReportThreshold = m_topend->fragmentProgressUpdate(m_currentIndexInBatch,
-                                        m_lastAccessedPlanNodeType,
-                                        m_tuplesProcessedInBatch + m_tuplesProcessedInFragment,
-                                        allocated,
-                                        peak);
-    m_tuplesProcessedSinceReport = 0;
-
-    if (tupleReportThreshold < 0) {
-        VOLT_DEBUG("Interrupt query.");
-        char buff[100];
-        snprintf(buff, 100,
-                "A SQL query was terminated after %.03f seconds because it exceeded the",
-                static_cast<double>(tupleReportThreshold) / -1000.0);
-
-        throw InterruptException(std::string(buff));
-    }
-    m_tupleReportThreshold = tupleReportThreshold;
-}
 
 void VoltDBEngine::addToTuplesModified(int64_t amount) {
     m_executorContext->addToTuplesModified(amount);
