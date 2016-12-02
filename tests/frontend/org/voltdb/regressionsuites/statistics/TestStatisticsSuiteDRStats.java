@@ -160,7 +160,7 @@ public class TestStatisticsSuiteDRStats extends StatisticsTestSuiteBase {
                 consumerClusters.add(consumerCluster);
                 consumerClients.add(consumerClient);
                 boolean hasSnapshotData = false;
-                for (int i = 0; i < 20; i++) {
+                for (int i = 0; i < 60; i++) {
                     cr = consumerClient.callProcedure("@AdHoc", "select count(e_id) from employee;");
                     assertEquals(ClientResponse.SUCCESS, cr.getStatus());
                     VoltTable result = cr.getResults()[0];
