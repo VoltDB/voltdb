@@ -18,7 +18,6 @@
 #ifndef MATERIALIZEDVIEWTRIGGERFORINSERT_H_
 #define MATERIALIZEDVIEWTRIGGERFORINSERT_H_
 
-#include "catalog/catalogmap.h"
 #include "catalog/materializedviewinfo.h"
 #include "common/tabletuple.h"
 #include "expressions/abstractexpression.h"
@@ -29,18 +28,12 @@
 #include <string>
 #include <vector>
 
-namespace catalog {
-class IndexRef;
-class Statement;
-}
-
 namespace voltdb {
 
 class AbstractExpression;
 class ExecutorVector;
 class PersistentTable;
 class StreamedTable;
-class Table;
 class TableIndex;
 
 /**

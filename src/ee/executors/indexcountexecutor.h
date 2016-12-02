@@ -33,10 +33,8 @@
 namespace voltdb {
 
 class TempTable;
-class PersistentTable;
 class AbstractExpression;
 class IndexCountPlanNode;
-struct IndexCursor;
 
 class IndexCountExecutor : public AbstractExecutor
 {

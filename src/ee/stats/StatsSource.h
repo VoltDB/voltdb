@@ -29,8 +29,6 @@
 
 namespace voltdb {
 class Table;
-class TableFactory;
-class TupleSchema;
 class TableTuple;
 
 /**

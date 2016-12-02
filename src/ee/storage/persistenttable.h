@@ -54,29 +54,22 @@
 #include <boost/shared_ptr.hpp>
 #include "common/types.h"
 #include "common/ids.h"
-#include "common/valuevector.h"
 #include "common/tabletuple.h"
 #include "execution/VoltDBEngine.h"
 #include "storage/CopyOnWriteIterator.h"
 #include "storage/ElasticIndex.h"
-#include "storage/table.h"
 #include "storage/ExportTupleStream.h"
+#include "storage/table.h"
 #include "storage/TableStats.h"
-#include "storage/PersistentTableStats.h"
 #include "storage/TableStreamerInterface.h"
+#include "storage/PersistentTableStats.h"
 #include "storage/RecoveryContext.h"
-#include "storage/ElasticIndex.h"
-#include "storage/CopyOnWriteIterator.h"
 #include "common/UndoQuantumReleaseInterest.h"
 #include "common/ThreadLocalPool.h"
 
 class CompactionTest_BasicCompaction;
 class CompactionTest_CompactionWithCopyOnWrite;
 class CopyOnWriteTest;
-
-namespace catalog {
-class MaterializedViewInfo;
-}
 
 namespace voltdb {
 class CoveringCellIndexTest_TableCompaction;
