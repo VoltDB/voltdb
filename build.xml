@@ -1326,7 +1326,7 @@ JAVA COMPILATION
 ***************************************
 -->
 
-<target name="compile" depends="catalog, dbbpool_gen, project_gen, deployment_gen, compile_core, minifyjs, compile_pro"
+<target name="compile" depends="catalog, dbbpool_gen, project_gen, deployment_gen, compile_core, compile_pro"
         description="Compile all Java source and test classes"/>
 
 <target name="compile_client">
@@ -1370,6 +1370,25 @@ JAVA COMPILATION
             <include name="**"/>
         </fileset>
     </copy>
+
+    <delete dir="temp" failonerror="false" />
+    <copy todir="temp/js" overwrite="yes">
+        <fileset dir="src/frontend/org/voltdb/dbmonitor/js"/>
+    </copy>
+    <apply executable="java" parallel="false" dest="temp/js">
+        <fileset dir="temp/js" includes="**/*.js" />
+          <arg line="-jar"/>
+          <arg path="lib/yuicompressor-2.4.8.jar" />
+          <srcfile/>
+          <arg line="-o"/>
+          <mapper type="glob" from="*.js" to="*-abc.js"/>
+          <targetfile/>
+    </apply>
+    <move todir="${build.prod.dir}/org/voltdb/dbmonitor/js" overwrite="true">
+        <fileset dir="temp/js" />
+        <mapper type="glob" from="*-abc.js" to="*.js"/>
+    </move>
+    <delete dir="temp" failonerror="false" />
 
     <!-- README files we want to include in the jar -->
     <copy flatten='false' todir='${build.prod.dir}'>
@@ -2837,185 +2856,6 @@ RPM PACKAGE CREATION
     <exec dir='.' executable='/bin/sh' failonerror='false'>
         <arg line="-c 'rm -rfv ${rpm.package.dir}'" />
     </exec>
-</target>
-<!--Modifies the javascript artifact files to min version -->
-<target name="minifyjs"
-      depends="uptodate_js.check"
-      description="Minify all the javascript artifacts." unless='${uptodate_js}'>
-
-    <copy todir="temp/js" overwrite="yes">
-        <fileset dir="src/frontend/org/voltdb/dbmonitor/js"/>
-    </copy>
-    <apply executable="java" parallel="false" dest="temp/js">
-        <fileset dir="temp/js" includes="**/*.js" />
-          <arg line="-jar"/>
-          <arg path="lib/yuicompressor-2.4.8.jar" />
-          <srcfile/>
-        <arg line="-v"/>
-          <arg line="-o"/>
-          <mapper type="glob" from="*.js" to="*-abc.js"/>
-          <targetfile/>
-    </apply>
-    <move todir="${build.prod.dir}/org/voltdb/dbmonitor/js" overwrite="true">
-        <fileset dir="temp/js" />
-        <mapper type="glob" from="*-abc.js" to="*.js"/>
-    </move>
-    <delete dir="temp" failonerror="false" />
-</target>
-
-<target name='uptodate_js.check'>
-    <condition property='uptodate_js'>
-        <and>
-            <filesmatch
-                file1="${build.prod.dbmonitor.dir.js}/bignumber.js"
-                file2="${src.dbmonitor.dir.js}/bignumber.js"
-            />
-            <filesmatch
-                file1="${build.prod.dbmonitor.dir.js}/bootstrap.js"
-                file2="${src.dbmonitor.dir.js}/bootstrap.js"
-            />
-            <filesmatch
-                file1="${build.prod.dbmonitor.dir.js}/FileSaver.min.js"
-                file2="${src.dbmonitor.dir.js}/FileSaver.min.js"
-            />
-            <filesmatch
-                file1="${build.prod.dbmonitor.dir.js}/icheck.js"
-                file2="${src.dbmonitor.dir.js}/icheck.js"
-            />
-            <filesmatch
-                file1="${build.prod.dbmonitor.dir.js}/jquery.contextMenu.js"
-                file2="${src.dbmonitor.dir.js}/jquery.contextMenu.js"
-            />
-            <filesmatch
-                file1="${build.prod.dbmonitor.dir.js}/jquery.cookie.js"
-                file2="${src.dbmonitor.dir.js}/jquery.cookie.js"
-            />
-            <filesmatch
-                file1="${build.prod.dbmonitor.dir.js}/jquery.dataTables.js"
-                file2="${src.dbmonitor.dir.js}/jquery.dataTables.js"
-            />
-            <filesmatch
-                file1="${build.prod.dbmonitor.dir.js}/jquery.dataTables.min.js"
-                file2="${src.dbmonitor.dir.js}/jquery.dataTables.min.js"
-            />
-            <filesmatch
-                file1="${build.prod.dbmonitor.dir.js}/jquery.getSelectedText.min.js"
-                file2="${src.dbmonitor.dir.js}/jquery.getSelectedText.min.js"
-            />
-            <filesmatch
-                file1="${build.prod.dbmonitor.dir.js}/jquery.popup.js"
-                file2="${src.dbmonitor.dir.js}/jquery.popup.js"
-            />
-            <filesmatch
-                file1="${build.prod.dbmonitor.dir.js}/jquery.slimscroll.min.js"
-                file2="${src.dbmonitor.dir.js}/jquery.slimscroll.min.js"
-            />
-            <filesmatch
-                file1="${build.prod.dbmonitor.dir.js}/jquery.tablesorter.js"
-                file2="${src.dbmonitor.dir.js}/jquery.tablesorter.js"
-            />
-            <filesmatch
-                file1="${build.prod.dbmonitor.dir.js}/jquery.tablesorter.widgets.js"
-                file2="${src.dbmonitor.dir.js}/jquery.tablesorter.widgets.js"
-            />
-            <filesmatch
-                file1="${build.prod.dbmonitor.dir.js}/jquery.tooltipster.js"
-                file2="${src.dbmonitor.dir.js}/jquery.tooltipster.js"
-            />
-            <filesmatch
-                file1="${build.prod.dbmonitor.dir.js}/jquery.validate.min.js"
-                file2="${src.dbmonitor.dir.js}/jquery.validate.min.js"
-            />
-            <filesmatch
-                file1="${build.prod.dbmonitor.dir.js}/jquery-1.11.1.min.js"
-                file2="${src.dbmonitor.dir.js}/jquery-1.11.1.min.js"
-            />
-            <filesmatch
-                file1="${build.prod.dbmonitor.dir.js}/jqueryDatatablePlugins.js"
-                file2="${src.dbmonitor.dir.js}/jqueryDatatablePlugins.js"
-            />
-            <filesmatch
-                file1="${build.prod.dbmonitor.dir.js}/jquery-ui.js"
-                file2="${src.dbmonitor.dir.js}/jquery-ui.js"
-            />
-            <filesmatch
-                file1="${build.prod.dbmonitor.dir.js}/jquery-ui.min.js"
-                file2="${src.dbmonitor.dir.js}/jquery-ui.min.js"
-            />
-            <filesmatch
-                file1="${build.prod.dbmonitor.dir.js}/jsonParse.js"
-                file2="${src.dbmonitor.dir.js}/jsonParse.js"
-            />
-            <filesmatch
-                file1="${build.prod.dbmonitor.dir.js}/long.js"
-                file2="${src.dbmonitor.dir.js}/long.js"
-            />
-            <filesmatch
-                file1="${build.prod.dbmonitor.dir.js}/sha256.js"
-                file2="${src.dbmonitor.dir.js}/sha256.js"
-            />
-            <filesmatch
-                file1="${build.prod.dbmonitor.dir.js}/shortcut.js"
-                file2="${src.dbmonitor.dir.js}/shortcut.js"
-            />
-            <filesmatch
-                file1="${build.prod.dbmonitor.dir.js}/sorttable.js"
-                file2="${src.dbmonitor.dir.js}/sorttable.js"
-            />
-            <filesmatch
-                file1="${build.prod.dbmonitor.dir.js}/split.min.js"
-                file2="${src.dbmonitor.dir.js}/split.min.js"
-            />
-            <filesmatch
-                file1="${build.prod.dbmonitor.dir.js}/template.js"
-                file2="${src.dbmonitor.dir.js}/template.js"
-            />
-            <filesmatch
-                file1="${build.prod.dbmonitor.dir.js}/voltdb.admin.ui.js"
-                file2="${src.dbmonitor.dir.js}/voltdb.admin.ui.js"
-            />
-            <filesmatch
-                file1="${build.prod.dbmonitor.dir.js}/voltdb.config.js"
-                file2="${src.dbmonitor.dir.js}/voltdb.config.js"
-            />
-            <filesmatch
-                file1="${build.prod.dbmonitor.dir.js}/voltdb.core.js"
-                file2="${src.dbmonitor.dir.js}/voltdb.core.js"
-            />
-            <filesmatch
-                file1="${build.prod.dbmonitor.dir.js}/voltdb.graph.js"
-                file2="${src.dbmonitor.dir.js}/voltdb.graph.js"
-            />
-            <filesmatch
-                file1="${build.prod.dbmonitor.dir.js}/voltdb.queryrender.js"
-                file2="${src.dbmonitor.dir.js}/voltdb.queryrender.js"
-            />
-            <filesmatch
-                file1="${build.prod.dbmonitor.dir.js}/voltdb.render.js"
-                file2="${src.dbmonitor.dir.js}/voltdb.render.js"
-            />
-            <filesmatch
-                file1="${build.prod.dbmonitor.dir.js}/voltdb.service.js"
-                file2="${src.dbmonitor.dir.js}/voltdb.service.js"
-            />
-            <filesmatch
-                file1="${build.prod.dbmonitor.dir.js}/voltdb.sqlquery.ui.js"
-                file2="${src.dbmonitor.dir.js}/voltdb.sqlquery.ui.js"
-            />
-            <filesmatch
-                file1="${build.prod.dbmonitor.dir.js}/voltdb.ui.js"
-                file2="${src.dbmonitor.dir.js}/voltdb.ui.js"
-            />
-            <filesmatch
-                file1="${build.prod.dbmonitor.dir.js}/d3/d3.v3.min.js"
-                file2="${src.dbmonitor.dir.js}/d3/d3.v3.min.js"
-            />
-            <filesmatch
-                file1="${build.prod.dbmonitor.dir.js}/d3/nv.d3.min(modified).js"
-                file2="${src.dbmonitor.dir.js}/d3/nv.d3.min(modified).js"
-            />
-        </and>
-    </condition>
 </target>
 <!-- END PROJECT -->
 </project>
