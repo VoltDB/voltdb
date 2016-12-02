@@ -48,13 +48,9 @@
 
 #include <sstream>
 #include "abstractplannode.h"
-#include "common/debuglog.h"
 #include "common/valuevector.h"
 
 namespace voltdb {
-
-class Table;
-
 /**
  *
  */

@@ -54,7 +54,6 @@
 #include <boost/shared_ptr.hpp>
 #include "common/types.h"
 #include "common/ids.h"
-#include "common/valuevector.h"
 #include "common/tabletuple.h"
 #include "execution/VoltDBEngine.h"
 #include "storage/CopyOnWriteIterator.h"

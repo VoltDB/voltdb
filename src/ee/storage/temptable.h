@@ -48,14 +48,12 @@
 
 #include "table.h"
 #include "common/tabletuple.h"
-#include "common/ThreadLocalPool.h"
 #include "storage/tableiterator.h"
 #include "storage/TempTableLimits.h"
 #include "storage/TupleBlock.h"
 
 namespace voltdb {
 
-class TableColumn;
 class TableFactory;
 class TableStats;
 
