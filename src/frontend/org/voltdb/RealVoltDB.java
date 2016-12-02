@@ -1352,6 +1352,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     if (!m_leaderAppointer.isClusterKSafe(hostsOnRing)) {
                         VoltDB.crashLocalVoltDB("Some partitions have no replicas.  Cluster has become unviable.",
                                 false, null);
+                        return;
+                    }
+                    // Send hostDown traps
+                    for (int hostId : failedHosts) {
+                        m_snmp.hostDown(hostId, "host left cluster mesh due to connection loss");
                     }
                     // Cleanup the rejoin blocker in case the rejoining node failed.
                     // This has to run on a separate thread because the callback is
@@ -3259,6 +3264,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                         e);
                 VoltDB.crashLocalVoltDB("Error starting client interface.", true, e);
             }
+            // send hostUp trap
+            m_snmp.hostUp("host is now a cluster member");
+
             if (m_producerDRGateway != null && !m_producerDRGateway.isStarted()) {
                 // Start listening on the DR ports
                 prepareReplication();
@@ -3472,6 +3480,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                                    e);
                     VoltDB.crashLocalVoltDB("Error starting client interface.", true, e);
                 }
+                // send hostUp trap
+                m_snmp.hostUp("host is now a cluster member");
             }
 
             // Start listening on the DR ports

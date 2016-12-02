@@ -46,7 +46,7 @@ public class DummySnmpTrapSender implements SnmpTrapSender {
     }
 
     @Override
-    public void hostUp(int hostId, String msg) {
+    public void hostUp(String msg) {
     }
 
     @Override

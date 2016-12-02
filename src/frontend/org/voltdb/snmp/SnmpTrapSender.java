@@ -32,7 +32,7 @@ public interface SnmpTrapSender {
     public void notifyOfCatalogUpdate(SnmpType snmpType);
     public void crash(String msg);
     public void hostDown(int hostId, String msg);
-    public void hostUp(int hostId, String msg);
+    public void hostUp(String msg);
     public void statistics(FaultFacility facility, String msg);
     public void resource(ThresholdType criteria, FaultFacility facility, long threshold, long actual, String msg);
 }
