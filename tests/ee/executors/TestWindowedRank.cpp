@@ -43,7 +43,7 @@
 /******************************************************************************************
  *
  * NOTA BENE: This file is automagically generated from the source class named
- *                org.voltdb.planner.EECountPlanTestGenerator.
+ *                org.voltdb.planner.EERankPlanTestGenerator.
  *            Please do not edit it unless you abandon all hope of regenerating it.
  *
  ******************************************************************************************/
@@ -64,27 +64,27 @@ namespace {
 extern TestConfig allTests[];
 };
 
-class TestCount : public PlanTestingBaseClass<EngineTestTopend> {
+class TestWindowedRank : public PlanTestingBaseClass<EngineTestTopend> {
 public:
     /*
      * This constructor lets us set the global random seed for the
      * random number generator.  It would be better to have a seed
      * just for this test.  But that is not easily done.
      */
-    TestCount(uint32_t randomSeed = (unsigned int)time(NULL)) {
+    TestWindowedRank(uint32_t randomSeed = (unsigned int)time(NULL)) {
         initialize(m_PartitionByExecutorDB, randomSeed);
     }
 
-    ~TestCount() { }
+    ~TestWindowedRank() { }
 protected:
     static DBConfig         m_PartitionByExecutorDB;
 };
 
-TEST_F(TestCount, test_count_star) {
+TEST_F(TestWindowedRank, test_rank) {
     static int testIndex = 0;
     executeTest(allTests[testIndex]);
 }
-TEST_F(TestCount, test_count) {
+TEST_F(TestWindowedRank, test_dense_rank) {
     static int testIndex = 1;
     executeTest(allTests[testIndex]);
 }
@@ -134,44 +134,44 @@ const TableConfig *allTables[] = {
 
 };
 
-const int NUM_OUTPUT_ROWS_TEST_COUNT_STAR = 15;
-const int NUM_OUTPUT_COLS_TEST_COUNT_STAR = 4;
-const int outputTable_test_count_star[NUM_OUTPUT_ROWS_TEST_COUNT_STAR * NUM_OUTPUT_COLS_TEST_COUNT_STAR] = {
-      1,  1,101,  2,
-      1,  1,102,  2,
-      1,  2,201,  4,
-      1,  2,202,  4,
+const int NUM_OUTPUT_ROWS_TEST_RANK = 15;
+const int NUM_OUTPUT_COLS_TEST_RANK = 4;
+const int outputTable_test_rank[NUM_OUTPUT_ROWS_TEST_RANK * NUM_OUTPUT_COLS_TEST_RANK] = {
+      1,  1,101,  1,
+      1,  1,102,  1,
+      1,  2,201,  3,
+      1,  2,202,  3,
       1,  3,203,  5,
-      2,  1,1101,  2,
-      2,  1,1102,  2,
-      2,  2,1201,  4,
-      2,  2,1202,  4,
+      2,  1,1101,  1,
+      2,  1,1102,  1,
+      2,  2,1201,  3,
+      2,  2,1202,  3,
       2,  3,1203,  5,
-     20,  1,2101,  2,
-     20,  1,2102,  2,
-     20,  2,2201,  4,
-     20,  2,2202,  4,
+     20,  1,2101,  1,
+     20,  1,2102,  1,
+     20,  2,2201,  3,
+     20,  2,2202,  3,
      20,  3,2203,  5,
 };
 
-const int NUM_OUTPUT_ROWS_TEST_COUNT = 15;
-const int NUM_OUTPUT_COLS_TEST_COUNT = 4;
-const int outputTable_test_count[NUM_OUTPUT_ROWS_TEST_COUNT * NUM_OUTPUT_COLS_TEST_COUNT] = {
-      1,  1,101,  2,
-      1,  1,102,  2,
-      1,  2,201,  4,
-      1,  2,202,  4,
-      1,  3,203,  5,
-      2,  1,1101,  2,
-      2,  1,1102,  2,
-      2,  2,1201,  4,
-      2,  2,1202,  4,
-      2,  3,1203,  5,
-     20,  1,2101,  2,
-     20,  1,2102,  2,
-     20,  2,2201,  4,
-     20,  2,2202,  4,
-     20,  3,2203,  5,
+const int NUM_OUTPUT_ROWS_TEST_DENSE_RANK = 15;
+const int NUM_OUTPUT_COLS_TEST_DENSE_RANK = 4;
+const int outputTable_test_dense_rank[NUM_OUTPUT_ROWS_TEST_DENSE_RANK * NUM_OUTPUT_COLS_TEST_DENSE_RANK] = {
+      1,  1,101,  1,
+      1,  1,102,  1,
+      1,  2,201,  2,
+      1,  2,202,  2,
+      1,  3,203,  3,
+      2,  1,1101,  1,
+      2,  1,1102,  1,
+      2,  2,1201,  2,
+      2,  2,1202,  2,
+      2,  3,1203,  3,
+     20,  1,2101,  1,
+     20,  1,2102,  1,
+     20,  2,2201,  2,
+     20,  2,2202,  2,
+     20,  3,2203,  3,
 };
 
 
@@ -179,7 +179,7 @@ const int outputTable_test_count[NUM_OUTPUT_ROWS_TEST_COUNT * NUM_OUTPUT_COLS_TE
 TestConfig allTests[2] = {
     {
         // SQL Statement
-        "select A, B, C, count(*) over (partition by A order by B) as R from T ORDER BY A, B, C, R;",
+        "select A, B, C, rank() over (partition by A order by B) as R from T ORDER BY A, B, C, R;",
         // Plan String
         "{\n"
         "    \"EXECUTE_LIST\": [\n"
@@ -276,10 +276,9 @@ TestConfig allTests[2] = {
         "        },\n"
         "        {\n"
         "            \"AGGREGATE_COLUMNS\": [{\n"
-        "                \"AGGREGATE_DISTINCT\": 0,\n"
         "                \"AGGREGATE_EXPRESSIONS\": [],\n"
         "                \"AGGREGATE_OUTPUT_COLUMN\": 0,\n"
-        "                \"AGGREGATE_TYPE\": \"AGGREGATE_WINDOWED_COUNT\"\n"
+        "                \"AGGREGATE_TYPE\": \"AGGREGATE_WINDOWED_RANK\"\n"
         "            }],\n"
         "            \"CHILDREN_IDS\": [5],\n"
         "            \"ID\": 4,\n"
@@ -390,13 +389,13 @@ TestConfig allTests[2] = {
         "        }\n"
         "    ]\n"
         "}",
-        NUM_OUTPUT_ROWS_TEST_COUNT_STAR,
-        NUM_OUTPUT_COLS_TEST_COUNT_STAR,
-        outputTable_test_count_star
+        NUM_OUTPUT_ROWS_TEST_RANK,
+        NUM_OUTPUT_COLS_TEST_RANK,
+        outputTable_test_rank
     },
     {
         // SQL Statement
-        "select A, B, C, count(A+B) over (partition by A order by B) as R from T ORDER BY A, B, C, R;",
+        "select A, B, C, dense_rank() over (partition by A order by B) as R from T ORDER BY A, B, C, R;",
         // Plan String
         "{\n"
         "    \"EXECUTE_LIST\": [\n"
@@ -493,24 +492,9 @@ TestConfig allTests[2] = {
         "        },\n"
         "        {\n"
         "            \"AGGREGATE_COLUMNS\": [{\n"
-        "                \"AGGREGATE_DISTINCT\": 0,\n"
-        "                \"AGGREGATE_EXPRESSIONS\": [{\n"
-        "                    \"LEFT\": {\n"
-        "                        \"COLUMN_IDX\": 0,\n"
-        "                        \"TYPE\": 32,\n"
-        "                        \"VALUE_TYPE\": 5\n"
-        "                    },\n"
-        "                    \"RIGHT\": {\n"
-        "                        \"COLUMN_IDX\": 1,\n"
-        "                        \"TYPE\": 32,\n"
-        "                        \"VALUE_TYPE\": 5\n"
-        "                    },\n"
-        "                    \"TYPE\": 1,\n"
-        "                    \"VALUE_SIZE\": 0,\n"
-        "                    \"VALUE_TYPE\": 1\n"
-        "                }],\n"
+        "                \"AGGREGATE_EXPRESSIONS\": [],\n"
         "                \"AGGREGATE_OUTPUT_COLUMN\": 0,\n"
-        "                \"AGGREGATE_TYPE\": \"AGGREGATE_WINDOWED_COUNT\"\n"
+        "                \"AGGREGATE_TYPE\": \"AGGREGATE_WINDOWED_DENSE_RANK\"\n"
         "            }],\n"
         "            \"CHILDREN_IDS\": [5],\n"
         "            \"ID\": 4,\n"
@@ -621,15 +605,15 @@ TestConfig allTests[2] = {
         "        }\n"
         "    ]\n"
         "}",
-        NUM_OUTPUT_ROWS_TEST_COUNT,
-        NUM_OUTPUT_COLS_TEST_COUNT,
-        outputTable_test_count
+        NUM_OUTPUT_ROWS_TEST_DENSE_RANK,
+        NUM_OUTPUT_COLS_TEST_DENSE_RANK,
+        outputTable_test_dense_rank
     },
 };
 
 }
 
-DBConfig TestCount::m_PartitionByExecutorDB =
+DBConfig TestWindowedRank::m_PartitionByExecutorDB =
 
 {
     //
@@ -791,8 +775,8 @@ DBConfig TestCount::m_PartitionByExecutorDB =
     "set $PREV matviewsource null\n"
     "set $PREV matview null\n"
     "set $PREV inbytes false\n"
-    "add /clusters#cluster/databases#database procedures testcountplan\n"
-    "set /clusters#cluster/databases#database/procedures#testcountplan classname \"\"\n"
+    "add /clusters#cluster/databases#database procedures testrankplan\n"
+    "set /clusters#cluster/databases#database/procedures#testrankplan classname \"\"\n"
     "set $PREV readonly false\n"
     "set $PREV singlepartition false\n"
     "set $PREV everysite false\n"

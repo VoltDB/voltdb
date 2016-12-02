@@ -152,7 +152,7 @@ public class EERankPlanTestGenerator extends PlannerTestCase {
                                   { 20,  3, 2203, 3},
                                   //--------------------------------------
         }));;
-        generateTests("executors", "TestRank", db);
+        generateTests("executors", "TestWindowedRank", db);
     }
 
     @Override

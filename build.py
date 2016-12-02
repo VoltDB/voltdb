@@ -496,8 +496,8 @@ if whichtests in ("${eetestsuite}", "executors"):
     OptimizedProjectorTest
     MergeReceiveExecutorTest
     TestGeneratedPlans
-    TestRank
-    TestCount
+    TestWindowedRank
+    TestWindowedCount
     """
 
 if whichtests in ("${eetestsuite}", "expressions"):
