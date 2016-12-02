@@ -25,7 +25,6 @@
 #include <map>
 #include <string>
 #include <stdint.h>
-#include "catalogmap.h"
 
 namespace catalog {
 
