@@ -313,8 +313,9 @@ def run_config(suite_name, config, basedir, output_dir, random_seed,
 
     min_statements_per_pattern = generator.min_statements_per_pattern()
     max_statements_per_pattern = generator.max_statements_per_pattern()
-    num_inserts  = generator.num_insert_statements()
-    num_patterns = generator.num_patterns()
+    num_inserts    = generator.num_insert_statements()
+    num_patterns   = generator.num_patterns()
+    num_unresolved = generator.num_unresolved_statements()
 
     if generate_only or submit_verbosely:
         print "Generated %d statements." % counter
@@ -377,6 +378,7 @@ def run_config(suite_name, config, basedir, output_dir, random_seed,
                  get_numerical_html_table_element(max_statements_per_pattern, strong_warn_below=1, warn_above=100000) +
                  get_numerical_html_table_element(num_inserts,  warn_below=4, strong_warn_below=1, warn_above=1000) +
                  get_numerical_html_table_element(num_patterns, warn_below=4, strong_warn_below=1, warn_above=10000) +
+                 get_numerical_html_table_element(num_unresolved,             strong_warn_above=0) +
                  get_time_html_table_element(gensql_time) +
                  get_time_html_table_element(voltdb_time) +
                  get_time_html_table_element(cmpdb_time) )
@@ -444,6 +446,7 @@ def run_config(suite_name, config, basedir, output_dir, random_seed,
     global total_num_crashes
     global total_num_inserts
     global total_num_patterns
+    global total_num_unresolved
     global min_all_statements_per_pattern
     global max_all_statements_per_pattern
     keyStats_start_index = 0
@@ -459,6 +462,7 @@ def run_config(suite_name, config, basedir, output_dir, random_seed,
     total_num_crashes     += num_crashes
     total_num_inserts     += num_inserts
     total_num_patterns    += num_patterns
+    total_num_unresolved  += num_unresolved
     min_all_statements_per_pattern = min(min_all_statements_per_pattern, min_statements_per_pattern)
     max_all_statements_per_pattern = max(max_all_statements_per_pattern, max_statements_per_pattern)
 
@@ -668,6 +672,7 @@ if __name__ == "__main__":
     total_num_crashes  = 0
     total_num_inserts  = 0
     total_num_patterns = 0
+    total_num_unresolved = 0
     max_all_statements_per_pattern = 0
     min_all_statements_per_pattern = sys.maxint
 
@@ -809,6 +814,7 @@ if __name__ == "__main__":
                            "\n<td align=right>" + str(max_all_statements_per_pattern) + "</td>" + \
                            "\n<td align=right>" + str(total_num_inserts) + "</td>" + \
                            "\n<td align=right>" + str(total_num_patterns) + "</td>" + \
+                           "\n<td align=right>" + str(total_num_unresolved) + "</td>" + \
                            "\n<td align=right>" + minutes_colon_seconds(total_gensql_time) + "</td>" + \
                            "\n<td align=right>" + minutes_colon_seconds(total_voltdb_time) + "</td>" + \
                            "\n<td align=right>" + minutes_colon_seconds(total_cmpdb_time) + "</td>" + \
