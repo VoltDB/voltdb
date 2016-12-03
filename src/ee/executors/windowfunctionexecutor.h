@@ -29,12 +29,12 @@ struct TableWindow;
  * This is the executor for a WindowFunctionPlanNode.
  */
 class WindowFunctionExecutor: public AbstractExecutor {
-	/*
-	 * EnsureCleanupOnExit is really part of WindowFunctionExecutor.
-	 * It needs access to private members that need to be finalized.
-	 * So this is not a dubious use of friendship.
-	 */
-	friend class EnsureCleanupOnExit;
+    /*
+     * EnsureCleanupOnExit is really part of WindowFunctionExecutor.
+     * It needs access to private members that need to be finalized.
+     * So this is not a dubious use of friendship.
+     */
+    friend class EnsureCleanupOnExit;
 public:
     WindowFunctionExecutor(VoltDBEngine* engine, AbstractPlanNode* abstract_node)
       : AbstractExecutor(engine, abstract_node),
@@ -65,11 +65,11 @@ public:
      * of rows.
      */
     enum EdgeType {
-        InvalidEdgeType,         /** No Type. */
-        StartOfInput,            /** Start of input. */
-        StartOfPartitionByGroup, /** Start of a new partition group. */
-        StartOfOrderByGroup,     /** Start of an order by group. */
-        EndOfInput               /** End of all input rows */
+        INVALID_EDGE_TYPE,           /** No Type. */
+        START_OF_INPUT,              /** Start of input. */
+        START_OF_PARTITION_GROUP,    /** Start of a new partition group. */
+        START_OF_PARTITION_BY_GROUP, /** Start of an order by group. */
+        END_OF_INPUT                 /** End of all input rows */
     };
 
 private:
@@ -205,8 +205,6 @@ private:
      * Insert the output tuple.
      */
     void insertOutputTuple();
-
-    TupleSchema* constructSchemaFromExpressionVector(const AbstractPlanNode::OwningExpressionVector &exprs);
 
     int compareTuples(const TableTuple &tuple1,
                       const TableTuple &tuple2) const;

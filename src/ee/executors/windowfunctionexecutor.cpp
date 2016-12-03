@@ -143,7 +143,7 @@ struct WindowAggregate {
     }
     NValue m_value;
     bool   m_needsLookahead;
-    
+
     static NValue m_one;
 };
 
@@ -361,25 +361,6 @@ WindowFunctionExecutor::~WindowFunctionExecutor() {
     TupleSchema::freeTupleSchema(m_orderByKeySchema);
 }
 
-TupleSchema* WindowFunctionExecutor::constructSchemaFromExpressionVector
-        (const AbstractPlanNode::OwningExpressionVector &exprs) {
-    std::vector<ValueType> columnTypes;
-    std::vector<int32_t> columnSizes;
-    std::vector<bool> columnAllowNull;
-    std::vector<bool> columnInBytes;
-
-    BOOST_FOREACH (AbstractExpression* expr, exprs) {
-            columnTypes.push_back(expr->getValueType());
-            columnSizes.push_back(expr->getValueSize());
-            columnAllowNull.push_back(true);
-            columnInBytes.push_back(expr->getInBytes());
-    }
-    return TupleSchema::createTupleSchema(columnTypes,
-                                          columnSizes,
-                                          columnAllowNull,
-                                          columnInBytes);
-}
-
 /**
  * When this function is called, the AbstractExecutor's init function
  * will have set the input tables in the plan node, but nothing else.
@@ -403,8 +384,8 @@ bool WindowFunctionExecutor::p_init(AbstractPlanNode *init_node, TempTableLimits
     assert( getLastPartitionByKeyTuple().isNullTuple());
     assert( getLastOrderByKeyTuple().isNullTuple());
 
-    m_partitionByKeySchema = constructSchemaFromExpressionVector(m_partitionByExpressions);
-    m_orderByKeySchema = constructSchemaFromExpressionVector(m_orderByExpressions);
+    m_partitionByKeySchema = TupleSchema::createTupleSchema(m_partitionByExpressions);
+    m_orderByKeySchema = TupleSchema::createTupleSchema(m_orderByExpressions);
 
     /*
      * Initialize all the data for partition by and
@@ -535,7 +516,7 @@ struct EnsureCleanupOnExit {
     ~EnsureCleanupOnExit() {
         m_executor->p_execute_finish();
     }
-    
+
     WindowFunctionExecutor *m_executor;
 };
 /*
@@ -566,7 +547,7 @@ bool WindowFunctionExecutor::p_execute(const NValueArray& params) {
     * in p_execute_finish.  The member variable p_pmp
     * is set to NULL there also.  We force a call to
     * p_execute_finish when p_execute exits, so this
-    * call is not explicit in this function. 
+    * call is not explicit in this function.
     */
     m_tableWindow = new TableWindow(input_table);
     ProgressMonitorProxy pmp(m_engine, this);
@@ -581,19 +562,19 @@ bool WindowFunctionExecutor::p_execute(const NValueArray& params) {
     VOLT_TRACE("Beginning: %s", window->debug().c_str());
 
     TableTuple nextTuple(m_inputSchema);
-    
+
     /*
      * Call p_execute_finish when this is all over.
      */
     EnsureCleanupOnExit finishCleanup(this);
-    for (EdgeType etype = StartOfInput,
-                  nextEtype = InvalidEdgeType;
-         etype != EndOfInput;
+    for (EdgeType etype = START_OF_INPUT,
+                  nextEtype = INVALID_EDGE_TYPE;
+         etype != END_OF_INPUT;
          etype = nextEtype) {
         // Reset the aggregates if this is the
         // start of a partition group.  The start of
         // input is a special form of this.
-        if (etype == StartOfInput || etype == StartOfPartitionByGroup) {
+        if (etype == START_OF_INPUT || etype == START_OF_PARTITION_GROUP) {
             m_aggregateRow->resetAggs();
         }
         // Find the next edge.  This will
@@ -630,7 +611,7 @@ WindowFunctionExecutor::EdgeType WindowFunctionExecutor::findNextEdge(EdgeType  
      * At the start of the input we need to prime the
      * tuple pairs.
      */
-    if (edgeType == StartOfInput) {
+    if (edgeType == START_OF_INPUT) {
         if (m_tableWindow->m_leadingEdge.next(nextTuple)) {
             initPartitionByKeyTuple(nextTuple);
             initOrderByKeyTuple(nextTuple);
@@ -646,7 +627,7 @@ WindowFunctionExecutor::EdgeType WindowFunctionExecutor::findNextEdge(EdgeType  
              * We return a zero length group here.
              */
             m_tableWindow->m_groupSize = 0;
-            return EndOfInput;
+            return END_OF_INPUT;
         }
     } else {
         /*
@@ -664,19 +645,19 @@ WindowFunctionExecutor::EdgeType WindowFunctionExecutor::findNextEdge(EdgeType  
             if (compareTuples(getInProgressPartitionByKeyTuple(),
                               getLastPartitionByKeyTuple()) != 0) {
                 VOLT_TRACE("findNextEdge(Partition): %s", m_tableWindow->debug().c_str());
-                return StartOfPartitionByGroup;
+                return START_OF_PARTITION_GROUP;
             }
             if (compareTuples(getInProgressOrderByKeyTuple(),
                               getLastOrderByKeyTuple()) != 0) {
                 VOLT_TRACE("findNextEdge(Group): %s", m_tableWindow->debug().c_str());
-                return StartOfOrderByGroup;
+                return START_OF_PARTITION_BY_GROUP;
             }
             m_tableWindow->m_groupSize += 1;
             lookaheadOneRowForAggs(nextTuple);
             VOLT_TRACE("findNextEdge(loop): %s", m_tableWindow->debug().c_str());
         } else {
             VOLT_TRACE("findNextEdge(EOI): %s", m_tableWindow->debug().c_str());
-            return EndOfInput;
+            return END_OF_INPUT;
         }
     } while (true);
 }
