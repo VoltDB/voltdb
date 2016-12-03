@@ -25,12 +25,14 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.compiler.deploymentfile.DiskLimitType;
 import org.voltdb.compiler.deploymentfile.FeatureNameType;
-import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.licensetool.LicenseApi;
+import org.voltdb.snmp.FaultFacility;
+import org.voltdb.snmp.SnmpTrapSender;
+import org.voltdb.snmp.ThresholdType;
 import org.voltdb.utils.MiscUtils;
+import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
-import org.voltdb.utils.VoltFile;
 
 /**
  * Disk space monitoring related functionality of resource monitoring.
@@ -41,10 +43,18 @@ public class DiskResourceChecker
 
     static FileCheckForTest s_testFileCheck; // used only for testing
     private ImmutableMap<FeatureNameType, FeatureDiskLimitConfig> m_configuredLimits;
+    private SnmpTrapSender m_snmpTrapSender;
+    private boolean m_snmpEnable = false;
 
-    public DiskResourceChecker(SystemSettingsType systemSettings)
+    public DiskResourceChecker(DiskLimitType diskLimit, SnmpTrapSender snmpTrapSender) {
+        findDiskLimitConfiguration(diskLimit);
+        m_snmpTrapSender = snmpTrapSender;
+        m_snmpEnable = (null != m_snmpTrapSender);
+    }
+
+    public DiskResourceChecker(DiskLimitType diskLimit)
     {
-        findDiskLimitConfiguration(systemSettings);
+        this(diskLimit, null);
     }
 
     public boolean hasLimitsConfigured()
@@ -90,7 +100,9 @@ public class DiskResourceChecker
                 continue;
             }
             if (!isDiskAvailable(config.m_path, config.m_diskSizeLimitPerc, config.m_diskSizeLimit, config.m_featureName)) {
-                m_logger.error("Disk is over configured limits for feature " + config.m_featureName);
+                if (!m_snmpEnable) {
+                    m_logger.error("Disk is over configured limits for feature " + config.m_featureName);
+                }
                 return true;
             }
         }
@@ -98,10 +110,10 @@ public class DiskResourceChecker
         return false;
     }
 
-    private void findDiskLimitConfiguration(SystemSettingsType systemSettings)
+    private void findDiskLimitConfiguration(DiskLimitType diskLimit)
     {
         // By now we know that resource monitor is not null
-        DiskLimitType diskLimitConfig = systemSettings.getResourcemonitor().getDisklimit();
+        DiskLimitType diskLimitConfig = diskLimit;
         if (diskLimitConfig==null) {
             return;
         }
@@ -158,10 +170,18 @@ public class DiskResourceChecker
     private boolean isDiskAvailable(File filePath, int percThreshold, double sizeThreshold, FeatureNameType featureName)
     {
         boolean canWrite = (s_testFileCheck==null) ? filePath.canWrite() : s_testFileCheck.canWrite(filePath);
+        ThresholdType snmpCriteria = percThreshold > 0? ThresholdType.PERCENT:ThresholdType.LIMIT;
         if (!canWrite) {
-            m_logger.error(String.format("Invalid or readonly file path %s (%s). Setting database to read-only. " +
-                    "Use \"voltadmin resume\" command once resource constraint is corrected.",
-                    filePath, featureName.value()));
+            if (m_snmpEnable) {
+                try {
+                    m_snmpTrapSender.crash(String.format("Invalid or readonly file path %s (%s)",
+                        filePath, featureName.value()));
+                } catch (Throwable t) {
+                    m_logger.warn("failed to issue a crash SNMP trap", t);
+                }
+            }
+            org.voltdb.VoltDB.crashLocalVoltDB(
+                    String.format("Invalid or readonly file path %s (%s).",filePath, featureName.value()));
             return false;
         }
 
@@ -179,14 +199,31 @@ public class DiskResourceChecker
         }
 
         if (usedSpace >= calculatedThreshold) {
-            m_logger.error(String.format(
+            if (m_snmpEnable) {
+                try {
+                    m_snmpTrapSender.resource(snmpCriteria,
+                        FaultFacility.DISK,
+                        calculatedThreshold,
+                        usedSpace,
+                        String.format(
+                                "Resource limit exceeded. Disk for path %s (%s) limit %s on %s. Current disk usage is %s.",
+                                filePath, featureName.value(),
+                                (percThreshold > 0 ? percThreshold+"%" : sizeThreshold+" GB"),
+                                CoreUtils.getHostnameOrAddress(),
+                                ResourceUsageMonitor.getValueWithUnit(usedSpace)));
+                } catch (Throwable t) {
+                    m_logger.warn("failed to issue a resouce SNMP trap", t);
+                }
+            } else {
+                m_logger.error(String.format(
                     "Resource limit exceeded. Disk for path %s (%s) limit %s on %s. Setting database to read-only. " +
                     "Use \"voltadmin resume\" command once resource constraint is corrected.",
                     filePath, featureName.value(),
                     (percThreshold > 0 ? percThreshold+"%" : sizeThreshold+" GB"),
                     CoreUtils.getHostnameOrAddress()));
-            m_logger.error(String.format("Resource limit exceeded. Current disk usage for path %s (%s) is %s.",
+                m_logger.error(String.format("Resource limit exceeded. Current disk usage for path %s (%s) is %s.",
                     filePath, featureName.value(), ResourceUsageMonitor.getValueWithUnit(usedSpace)));
+            }
             return false;
         } else {
             return true;

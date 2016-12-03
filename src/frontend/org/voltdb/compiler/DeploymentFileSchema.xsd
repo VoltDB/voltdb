@@ -195,8 +195,15 @@
                 <xs:attribute name="size" type="xs:string" default="80%"/>
             </xs:complexType>
         </xs:element>
+        <xs:element name="snmpmemorylimit" minOccurs="0" maxOccurs="1">
+            <xs:complexType>
+                <xs:attribute name="size" type="xs:string" default="60%"/>
+            </xs:complexType>
+        </xs:element>
         <xs:element name="disklimit" type="diskLimitType"
                     minOccurs="0" maxOccurs="1"/>
+        <xs:element name="snmpdisklimit" type="diskLimitType"
+                  minOccurs="0" maxOccurs="1"/>
       </xs:all>
       <xs:attribute name="frequency" type="xs:int" default="60"/>
   </xs:complexType>
