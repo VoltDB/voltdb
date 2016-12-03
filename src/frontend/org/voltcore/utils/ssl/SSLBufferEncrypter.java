@@ -31,26 +31,35 @@ import java.util.List;
 public class SSLBufferEncrypter {
 
     private final SSLEngine m_sslEngine;
-    int m_packetBufferSize;
+    private final int m_applicationBufferSize;
+    private final int m_packetBufferSize;
 
-    public SSLBufferEncrypter(SSLEngine sslEngine) {
+    public SSLBufferEncrypter(SSLEngine sslEngine, int applicationBufferSize, int packetBufferSize) {
         this.m_sslEngine = sslEngine;
-        this.m_packetBufferSize = m_sslEngine.getSession().getPacketBufferSize();
+        this.m_applicationBufferSize = applicationBufferSize;
+        this.m_packetBufferSize = packetBufferSize;
     }
 
-
     public DBBPool.BBContainer encryptBuffer(ByteBuffer src) throws IOException {
-        DBBPool.BBContainer dstCont = DBBPool.allocateDirectAndPool(m_packetBufferSize);
-        ByteBuffer dst = dstCont.b();
-        dst.clear();
-        while (true) {
-            SSLEngineResult result = m_sslEngine.wrap(src, dst);
+        // may need to encrypt in more than one step.  Need to have packe buffer size
+        // remaining in the dest buffer whenever wrap is called, will overflow otherwise.
+        DBBPool.BBContainer dst = DBBPool.allocateDirectAndPool(src.remaining() + m_packetBufferSize);
+        dst.b().clear();
+        int initialSrcLimit = src.limit();
+        int i = 0;
+        while (src.hasRemaining()) {
+            if (src.remaining() > m_applicationBufferSize) {
+                src.limit(src.position() + m_applicationBufferSize);
+            }
+            SSLEngineResult result = m_sslEngine.wrap(src.slice(), dst.b().slice());
             switch (result.getStatus()) {
                 case OK:
-                    dst.flip();
-                    return dstCont;
-                case BUFFER_OVERFLOW:
+                    src.position(src.position() + result.bytesConsumed());
+                    src.limit(initialSrcLimit);
+                    dst.b().position(dst.b().position() + result.bytesProduced());
                     break;
+                case BUFFER_OVERFLOW:
+                    throw new IOException("Overflow on ssl wrap of buffer");
                 case BUFFER_UNDERFLOW:
                     throw new IOException("Underflow on ssl wrap of buffer.");
                 case CLOSED:
@@ -59,5 +68,7 @@ public class SSLBufferEncrypter {
                     throw new IOException("Unexpected SSLEngineResult.Status");
             }
         }
+        dst.b().flip();
+        return dst;
     }
 }

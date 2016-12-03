@@ -26,7 +26,6 @@ import org.voltcore.utils.ssl.SSLBufferDecrypter;
 import org.voltcore.utils.ssl.SSLBufferEncrypter;
 import org.voltcore.utils.ssl.SSLEncryptionService;
 import org.voltcore.utils.ssl.SSLMessageParser;
-import org.voltdb.common.Constants;
 
 import javax.net.ssl.SSLEngine;
 import java.io.IOException;
@@ -36,8 +35,6 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Queue;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class SSLVoltPort extends VoltPort {
@@ -59,18 +56,22 @@ public class SSLVoltPort extends VoltPort {
     private final DecryptionGateway m_decryptionGateway;
     private final EncryptionGateway m_encryptionGateway;
 
-    private List<DBBPool.BBContainer> m_remainingWrites;
+    private DBBPool.BBContainer m_remainingBytesToWrite;
     private int m_remainingWritesByteCount;
 
     public SSLVoltPort(VoltNetwork network, InputHandler handler, InetSocketAddress remoteAddress, NetworkDBBPool pool, SSLEngine sslEngine) {
         super(network, handler, remoteAddress, pool);
         this.m_sslEngine = sslEngine;
         this.m_sslBufferDecrypter = new SSLBufferDecrypter(sslEngine);
-        this.m_sslBufferEncrypter = new SSLBufferEncrypter(sslEngine);
+        int appBufferSize = m_sslEngine.getSession().getApplicationBufferSize();
+        // the app buffer size will sometimes be greater than 16k, but the ssl engine won't
+        // encrypt more than 16k bytes at a time.  So it's simpler to not go over 16k.
+        appBufferSize = Math.min(appBufferSize, 16 * 1024);
+        int packetBufferSize = m_sslEngine.getSession().getPacketBufferSize();
+        this.m_sslBufferEncrypter = new SSLBufferEncrypter(sslEngine, appBufferSize, packetBufferSize);
         this.m_encryptionGateway = new EncryptionGateway(m_sslBufferEncrypter);
         this.m_sslMessageParser = new SSLMessageParser();
         this.m_frameHeader = ByteBuffer.allocate(5);
-        int packetBufferSize = m_sslEngine.getSession().getPacketBufferSize();
         this.m_dstBufferCont = DBBPool.allocateDirect(packetBufferSize);
         this.m_dstBuffer = m_dstBufferCont.b();
         m_dstBuffer.clear();
@@ -91,25 +92,25 @@ public class SSLVoltPort extends VoltPort {
 
             // if the write stream didn't fully drain last time, there might be
             // leftover write buffers.
-            if (m_remainingWrites != null) {
-                m_remainingWrites = writeBuffers(m_remainingWrites);
-                if (m_remainingWrites == null) {
+            if (m_remainingBytesToWrite != null) {
+                m_remainingBytesToWrite = writeBuffer(m_remainingBytesToWrite);
+                if (m_remainingBytesToWrite == null) {
                     m_writeStream.updateQueued(-m_remainingWritesByteCount, false);
                 }
             }
 
             // if the leftover bytes were written, add any new tasks to the the queue.
-            if (m_remainingWrites == null) {
+            if (m_remainingBytesToWrite == null) {
                 buildWriteTasks();
             }
 
             ListenableFuture<List<ByteBuffer>> readFuture = null;
             ListenableFuture<EncryptionResult> writeFuture = null;
-            while (readFuture != null || writeFuture != null || !m_readTasks.isEmpty() || (!m_writeTasks.isEmpty() && m_remainingWrites == null)) {
+            while (readFuture != null || writeFuture != null || !m_readTasks.isEmpty() || (!m_writeTasks.isEmpty() && m_remainingBytesToWrite == null)) {
                 if (readFuture == null && !m_readTasks.isEmpty()) {
                     readFuture = m_readTasks.poll();
                 }
-                if (writeFuture == null && !m_writeTasks.isEmpty() && m_remainingWrites == null) {
+                if (writeFuture == null && !m_writeTasks.isEmpty() && m_remainingBytesToWrite == null) {
                     writeFuture = m_writeTasks.poll();
                 }
 
@@ -167,9 +168,9 @@ public class SSLVoltPort extends VoltPort {
     }
 
     private boolean handleWrite(EncryptionResult er) throws IOException {
-        List<DBBPool.BBContainer> remainingWrites = writeBuffers(er.m_encBuffers);
-        if (remainingWrites != null) {
-            m_remainingWrites = remainingWrites;
+        DBBPool.BBContainer remainingBytesToWrite = writeBuffer(er.m_encCont);
+        if (remainingBytesToWrite != null) {
+            m_remainingBytesToWrite = remainingBytesToWrite;
             m_remainingWritesByteCount = er.m_nBytesClear;
             return false;
         } else {
@@ -178,22 +179,15 @@ public class SSLVoltPort extends VoltPort {
         }
     }
 
-    private List<DBBPool.BBContainer> writeBuffers(List<DBBPool.BBContainer> buffersConts) throws IOException {
-        int nWrote;
-        while (true) {
-            if (buffersConts.isEmpty()) {
-                return null;
-            }
-            DBBPool.BBContainer bufCont = buffersConts.get(0);
-            ByteBuffer buf = bufCont.b();
-            nWrote = m_channel.write(buf);
-            if (buf.hasRemaining()) {
-                m_writeStream.checkBackpressureStarted();
-                return buffersConts;
-            } else {
-                buffersConts.remove(0);
-                bufCont.discard();
-            }
+    private DBBPool.BBContainer writeBuffer(DBBPool.BBContainer bufCont) throws IOException {
+        ByteBuffer buf = bufCont.b();
+        int bytesWritten = m_channel.write(buf);
+        if (buf.hasRemaining()) {
+            m_writeStream.checkBackpressureStarted();
+            return bufCont;
+        } else {
+            bufCont.discard();
+            return null;
         }
     }
 
@@ -297,10 +291,10 @@ public class SSLVoltPort extends VoltPort {
     }
 
     public static class EncryptionResult {
-        public final List<DBBPool.BBContainer> m_encBuffers;
+        public final DBBPool.BBContainer m_encCont;
         public final int m_nBytesClear;
-        public EncryptionResult(List<DBBPool.BBContainer> encBuffers, int nClearBytes) {
-            this.m_encBuffers = encBuffers;
+        public EncryptionResult(DBBPool.BBContainer encCont, int nClearBytes) {
+            this.m_encCont = encCont;
             this.m_nBytesClear = nClearBytes;
         }
     }
@@ -418,24 +412,9 @@ public class SSLVoltPort extends VoltPort {
                                 SettableFuture<EncryptionResult> f = p.getSecond();
                                 try {
                                     ByteBuffer fragment = fragCont.b();
-                                    // division with rounding up
                                     int nBytes = fragment.remaining();
-                                    int nChunks = (fragment.remaining() + Constants.SSL_CHUNK_SIZE - 1) / Constants.SSL_CHUNK_SIZE;
-                                    List<DBBPool.BBContainer> encChunks = new ArrayList<>(nChunks);
-                                    while (fragment.hasRemaining()) {
-                                        if (fragment.remaining() <= Constants.SSL_CHUNK_SIZE) {
-                                            encChunks.add(m_sslBufferEncrypter.encryptBuffer(fragment.slice()));
-                                            fragment.position(fragment.limit());
-                                        } else {
-                                            int oldLimit = fragment.limit();
-                                            fragment.limit(fragment.position() + Constants.SSL_CHUNK_SIZE);
-                                            encChunks.add(m_sslBufferEncrypter.encryptBuffer(fragment.slice()));
-                                            fragment.position(fragment.limit());
-                                            fragment.limit(oldLimit);
-                                        }
-                                    }
-                                    EncryptionResult er = new EncryptionResult(encChunks, nBytes);
-                                    f.set(er);
+                                    DBBPool.BBContainer encCont = m_sslBufferEncrypter.encryptBuffer(fragment.slice());
+                                    f.set(new EncryptionResult(encCont, nBytes));
                                 } catch (IOException e) {
                                     f.setException(e);
                                 } finally {
