@@ -1378,7 +1378,7 @@ JAVA COMPILATION
     <apply executable="java" parallel="false" dest="temp/js">
         <fileset dir="temp/js" includes="**/*.js" />
           <arg line="-jar"/>
-          <arg path="lib/yuicompressor-2.4.8.jar" />
+          <arg path="third_party/java/jars/yuicompressor-2.4.8.jar" />
           <srcfile/>
           <arg line="-o"/>
           <mapper type="glob" from="*.js" to="*-abc.js"/>
