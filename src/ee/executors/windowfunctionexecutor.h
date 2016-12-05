@@ -34,7 +34,7 @@ class WindowFunctionExecutor: public AbstractExecutor {
      * It needs access to private members that need to be finalized.
      * So this is not a dubious use of friendship.
      */
-    friend class EnsureCleanupOnExit;
+    friend struct EnsureCleanupOnExit;
 public:
     WindowFunctionExecutor(VoltDBEngine* engine, AbstractPlanNode* abstract_node)
       : AbstractExecutor(engine, abstract_node),
