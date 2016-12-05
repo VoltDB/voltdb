@@ -322,11 +322,11 @@ class ExecutorContext {
 
     void pushNewModifiedTupleCounter() { m_tuplesModifiedStack.push(0); }
     void popModifiedTupleCounter() { m_tuplesModifiedStack.pop(); }
-    int getModifiedTupleCount() {
+    const int64_t getModifiedTupleCount() const {
         assert(m_tuplesModifiedStack.size() > 0);
         return m_tuplesModifiedStack.top();
     }
-    size_t getModifiedTupleStackSize() { return m_tuplesModifiedStack.size(); }
+    const size_t getModifiedTupleStackSize() const { return m_tuplesModifiedStack.size(); }
 
     /** DML executors call this to indicate how many tuples
          * have been modified */
