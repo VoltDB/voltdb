@@ -20,18 +20,8 @@ package org.voltcore.utils.ssl;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.MoreExecutors;
-import com.google_voltpatches.common.util.concurrent.SettableFuture;
 import org.voltcore.utils.CoreUtils;
-import org.voltcore.utils.Pair;
-
-import java.nio.ByteBuffer;
-import java.util.ArrayDeque;
-import java.util.List;
-import java.util.Queue;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -44,7 +34,7 @@ public class SSLEncryptionService {
 
     private static final ListeningExecutorService m_es = MoreExecutors.listeningDecorator(
             Executors.newFixedThreadPool(Math.max(2, CoreUtils.availableProcessors()),
-                    CoreUtils.getThreadFactory("SSL encryption service thread"))
+                    CoreUtils.getThreadFactory("SSL service thread"))
     );
 
     public static SSLEncryptionService initialize(int nThreads) {
@@ -62,7 +52,7 @@ public class SSLEncryptionService {
     public void shutdown() throws InterruptedException {
         if (m_es != null) {
             m_es.shutdown();
-            m_es.awaitTermination(120, TimeUnit.SECONDS);
+            m_es.awaitTermination(365, TimeUnit.DAYS);
         }
     }
 
