@@ -49,15 +49,8 @@ message Query {
     optional bool includeMesh = 1 [default = false];
 }
 
-message ConversationInfo {
-    optional int32 clusterId = 1;
-    optional fixed64 clusterCreationId = 2;
-    optional int32 clusterProtocolVersion = 3;
-    repeated NodeInfo nodeInfo = 4;
-}
-
 message StartCursor {
-    repeated ConversationInfo conversationInfo = 1;
+    repeated ClusterInfo clusterInfo = 1;
 }
 
 message Response {
@@ -120,11 +113,13 @@ message ClusterInfo {
     required int32 clusterId = 1;
     required fixed64 creationId = 2;
 
-    optional fixed64 recoverTime = 3;
+    optional fixed64 recoveryId = 3;
     optional int32 globalPartitionCount = 4;
 
     repeated NodeInfo nodeInfo = 5;
     repeated PartitionInfo partitionInfo = 6;
+
+    optional int32 protocolVersion = 7;
 }
 
 message NodeInfo {
