@@ -25,10 +25,13 @@ from voltcli.checkstats import StatisticsProcedureException
         VOLT.BooleanOption('-w', '--wait', 'waiting',
                            'wait for all DR and Export transactions to be externally processed',
                            default = False),
-        VOLT.IntegerOption('-t', '--timeout', 'timeout', 'The timeout value in minute if @Statistics is not progressing.', default = 2),
+        VOLT.IntegerOption('-t', '--timeout', 'timeout', 'The timeout value in minutes if @Statistics is not progressing.', default = 2),
     )
 )
 def pause(runner):
+    if runner.opts.timeout and runner.opts.timeout < 0:
+        runner.abort_with_help('You cannot specify timeout less than zero minutes.')
+
     #Check the STATUS column. runner.call_proc() detects and aborts on errors.
     status = runner.call_proc('@Pause', [], []).table(0).tuple(0).column_integer(0)
     if status <> 0:
