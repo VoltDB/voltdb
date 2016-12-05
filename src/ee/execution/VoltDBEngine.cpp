@@ -446,7 +446,7 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
     // In version 5.0, fragments may trigger execution of other fragments.
     // (I.e., DELETE triggered by an insert to enforce ROW LIMIT)
     // This method only executes top-level fragments.
-    assert(m_tuplesModifiedStack.size() == 0);
+    assert(m_executorContext->getModifiedTupleStackSize() == 0);
 
     int64_t tuplesModified = 0;
     try {

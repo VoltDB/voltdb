@@ -326,6 +326,7 @@ class ExecutorContext {
         assert(m_tuplesModifiedStack.size() > 0);
         return m_tuplesModifiedStack.top();
     }
+    size_t getModifiedTupleStackSize() { return m_tuplesModifiedStack.size(); }
 
     /** DML executors call this to indicate how many tuples
          * have been modified */
