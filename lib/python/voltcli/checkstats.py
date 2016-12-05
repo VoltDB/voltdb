@@ -137,6 +137,8 @@ def dr_producer_stats(runner, partition_min_host, partition_min, partition_max):
         else:
             last_acked = r[9]
 
+        #The partition is in the initial state. no stats updated yet-no transactions are queued and acknowledged 
+        #thus no need to track. 
         if last_queued == -1 and last_acked == -1:
             continue
 
