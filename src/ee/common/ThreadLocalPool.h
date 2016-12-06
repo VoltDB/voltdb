@@ -34,23 +34,6 @@ public:
     ThreadLocalPool();
     ~ThreadLocalPool();
 
-    /**
-     * Put relocatable allocations (non-inlined table data) into
-     * "deferred release mode" which means that calls to free will
-     * mark allocations for release, but will not release them until a
-     * call is mode to enableImmediateReleaseMode().
-     *
-     * The advantage of doing this is that we can release many items
-     * at once, and avoid some of the overhead of compacting.
-     */
-    static void enableDeferredReleaseMode();
-
-    /**
-     * Releases all allocations that are pending release, and returns
-     * to normal, "immediate release" mode.
-     */
-    static void enableImmediateReleaseMode();
-
     /// The layout of an allocation segregated by size,
     /// including overhead to help identify the size-specific
     /// pool from which the allocation must be freed.
@@ -129,20 +112,33 @@ public:
      * Deallocate the object returned by allocateRelocatable.
      * This implements continuous compaction which can have the side effect of
      * relocating some other allocation.
+     *
+     * Note that in deferred release mode (described below in the
+     * header comment for ScopedPoolDeferredReleaseMode), we may not
+     * immediately free the object, but mark it for deletion at a
+     * later point in time.
      */
     static void freeRelocatable(Sized* string);
 };
 
-// A helper class to switch to deferred release mode within a specific scope,
-// switching back to immediate release mode in an exception-safe way.
-struct ScopedDeferredReleaseMode {
-    ScopedDeferredReleaseMode() {
-        ThreadLocalPool::enableDeferredReleaseMode();
-    }
-
-    ~ScopedDeferredReleaseMode() {
-        ThreadLocalPool::enableImmediateReleaseMode();
-    }
+/**
+ * A helper class to switch to deferred release mode within the
+ * current scope, switching back to immediate release mode in an
+ * exception-safe way.
+ *
+ * Deferred release mode means that objects allocated via
+ * ThreadLocalPool::allocateRelocatable won't be freed immediately
+ * when freeRelocatable is called.  Instead, they will be freed when
+ * this object goes out of scope.
+ *
+ * This is desirable because the hole-filling algorithm CompactingPool
+ * uses to keep memory contiguous can incur needless memcpying.
+ * Freeing many objects at once can allows us to avoid copying objects
+ * that are soon to be deleted anyway.
+ */
+struct ScopedPoolDeferredReleaseMode {
+    ScopedPoolDeferredReleaseMode();
+    ~ScopedPoolDeferredReleaseMode();
 };
 
 }

@@ -359,7 +359,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         void releaseUndoToken(int64_t undoToken)
         {
-            ScopedDeferredReleaseMode sdrm;
+            ScopedPoolDeferredReleaseMode spdrm;
 
             if (m_currentUndoQuantum != NULL && m_currentUndoQuantum->getUndoToken() == undoToken) {
                 m_currentUndoQuantum = NULL;
@@ -377,7 +377,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         void undoUndoToken(int64_t undoToken)
         {
-            ScopedDeferredReleaseMode sdrm;
+            ScopedPoolDeferredReleaseMode spdrm;
 
             m_currentUndoQuantum = NULL;
             m_executorContext->setupForPlanFragments(NULL);

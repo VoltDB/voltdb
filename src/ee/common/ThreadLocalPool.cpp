@@ -116,18 +116,6 @@ static CompactingStringStorage& getStringPoolMap()
     return *static_cast<CompactingStringStorage*>(pthread_getspecific(m_stringKey));
 }
 
-void ThreadLocalPool::enableDeferredReleaseMode() {
-    pthread_setspecific(m_releaseModeKey, &DEFERRED_RELEASE);
-}
-
-void ThreadLocalPool::enableImmediateReleaseMode() {
-    auto& poolMap = getStringPoolMap();
-    BOOST_FOREACH(auto entry, poolMap) {
-        entry.second->freePendingAllocations();
-    }
-    pthread_setspecific(m_releaseModeKey, &IMMEDIATE_RELEASE);
-}
-
 static bool isDeferredReleaseMode() {
     bool* v = static_cast<bool*>(pthread_getspecific(m_releaseModeKey));
     return *v == DEFERRED_RELEASE;
@@ -263,12 +251,12 @@ void ThreadLocalPool::freeRelocatable(Sized* sized)
                             alloc_size);
     }
 
-    if (! isDeferredReleaseMode()) {
-        // Free the raw allocation from the found pool.
-        iter->second->free(sized);
+    if (isDeferredReleaseMode()) {
+        iter->second->markAllocationAsPendingRelease(sized);
     }
     else {
-        iter->second->markAllocationAsPendingRelease(sized);
+        // Free the raw allocation from the found pool.
+        iter->second->free(sized);
     }
 }
 
@@ -363,4 +351,17 @@ void voltdb_pool_allocator_new_delete::free(char * const block) {
     (*static_cast< std::size_t* >(pthread_getspecific(m_keyAllocated))) -= *reinterpret_cast<std::size_t*>(block - sizeof(std::size_t));
     delete [](block - sizeof(std::size_t));
 }
+
+ScopedPoolDeferredReleaseMode::ScopedPoolDeferredReleaseMode() {
+    pthread_setspecific(m_releaseModeKey, &DEFERRED_RELEASE);
+}
+
+ScopedPoolDeferredReleaseMode::~ScopedPoolDeferredReleaseMode() {
+    auto& poolMap = getStringPoolMap();
+    BOOST_FOREACH(auto entry, poolMap) {
+        entry.second->freePendingAllocations();
+    }
+    pthread_setspecific(m_releaseModeKey, &IMMEDIATE_RELEASE);
+}
+
 }
