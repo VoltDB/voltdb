@@ -32,9 +32,14 @@ public class SSLEncryptionService {
 
     private static SSLEncryptionService m_self;
 
-    private static final ListeningExecutorService m_es = MoreExecutors.listeningDecorator(
-            Executors.newFixedThreadPool(Math.max(2, CoreUtils.availableProcessors()),
-                    CoreUtils.getThreadFactory("SSL service thread"))
+    private static final ListeningExecutorService m_EncEs = MoreExecutors.listeningDecorator(
+            Executors.newFixedThreadPool(Math.max(2, CoreUtils.availableProcessors()/2),
+                    CoreUtils.getThreadFactory("SSL encryption thread"))
+    );
+
+    private static final ListeningExecutorService m_DecEs = MoreExecutors.listeningDecorator(
+            Executors.newFixedThreadPool(Math.max(2, CoreUtils.availableProcessors()/2),
+                    CoreUtils.getThreadFactory("SSL decryption thread"))
     );
 
     public static SSLEncryptionService initialize(int nThreads) {
@@ -50,13 +55,21 @@ public class SSLEncryptionService {
     }
 
     public void shutdown() throws InterruptedException {
-        if (m_es != null) {
-            m_es.shutdown();
-            m_es.awaitTermination(365, TimeUnit.DAYS);
+        if (m_EncEs != null) {
+            m_EncEs.shutdown();
+            m_EncEs.awaitTermination(365, TimeUnit.DAYS);
+        }
+        if (m_DecEs != null) {
+            m_DecEs.shutdown();
+            m_DecEs.awaitTermination(365, TimeUnit.DAYS);
         }
     }
 
-    public ListenableFuture<?> submit(Runnable task) {
-        return m_es.submit(task);
+    public ListenableFuture<?> submitForEncryption(Runnable task) {
+        return m_EncEs.submit(task);
+    }
+
+    public ListenableFuture<?> submitForDecryption(Runnable task) {
+        return m_DecEs.submit(task);
     }
 }
