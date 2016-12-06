@@ -99,10 +99,12 @@ public class SSLVoltPort extends VoltPort {
 
             buildEncryptionTasks();
 
-            drainDecryptionTasks();
-            drainReadTasks();
-            drainEncryptionTasks();
-            drainWriteTasks();
+            while (hasTasks()) {
+                processDoneDecryptionTask();
+                processDoneReadTask();
+                processDoneEncryptionTask();
+                processDoneWriteTask();
+            }
         } finally {
             if (m_encryptionTasks.isEmpty() && m_writeTasks.isEmpty()) {
                 m_writeStream.checkBackpressureEnded();
@@ -115,8 +117,12 @@ public class SSLVoltPort extends VoltPort {
         }
     }
 
-    private void drainDecryptionTasks() throws IOException {
-        while (!m_decryptionTasks.isEmpty()) {
+    private boolean hasTasks() {
+        return !m_decryptionTasks.isEmpty() || !m_readTasks.isEmpty() || !m_encryptionTasks.isEmpty() || !m_writeTasks.isEmpty();
+    }
+
+    private void processDoneDecryptionTask() throws IOException {
+        if (!m_decryptionTasks.isEmpty()) {
             try {
                 m_readTasks.add(m_readGateway.enque(m_decryptionTasks.poll().get()));
             } catch (InterruptedException | ExecutionException e) {
@@ -125,8 +131,8 @@ public class SSLVoltPort extends VoltPort {
         }
     }
 
-    private void drainReadTasks() throws IOException {
-        while (!m_readTasks.isEmpty()) {
+    private void processDoneReadTask() throws IOException {
+        if (!m_readTasks.isEmpty()) {
             try {
                 m_messagesRead += m_readTasks.poll().get();
             } catch (Exception e) {
@@ -135,8 +141,8 @@ public class SSLVoltPort extends VoltPort {
         }
     }
 
-    private void drainEncryptionTasks() throws IOException {
-        while (!m_encryptionTasks.isEmpty()) {
+    private void processDoneEncryptionTask() throws IOException {
+        if (!m_encryptionTasks.isEmpty()) {
             try {
                 EncryptionResult er = m_encryptionTasks.poll().get();
                 writeStream().updateQueued(er.m_nBytesEncrypted, false);
@@ -147,14 +153,13 @@ public class SSLVoltPort extends VoltPort {
         }
     }
 
-    private void drainWriteTasks() throws IOException {
-        while (!m_writeTasks.isEmpty()) {
+    private void processDoneWriteTask() throws IOException {
+        if (!m_writeTasks.isEmpty()) {
             try {
                 WriteResult wr = m_writeTasks.poll().get();
                 writeStream().updateQueued(-wr.m_bytesWritten, false);
                 if (wr.m_bytesWritten < wr.m_bytesQueued) {
                     m_writeStream.checkBackpressureStarted();
-                    break;
                 }
             } catch (Exception e) {
                 throw new IOException("write task failed in voltport " + m_channel.socket().getRemoteSocketAddress(), e);
