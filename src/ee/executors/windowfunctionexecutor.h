@@ -47,8 +47,7 @@ public:
         m_partitionByKeySchema(NULL),
         m_inputTable(NULL),
         m_inputSchema(NULL),
-        m_aggregateRow(NULL),
-        m_tableWindow(NULL)
+        m_aggregateRow(NULL)
         {
             dynamic_cast<WindowFunctionPlanNode *>(abstract_node)->collectOutputExpressions(m_outputColumnExpressions);
         }
@@ -186,7 +185,7 @@ private:
      * will happen for each row, and can be disabled
      * by setting m_needsLookahead to false.
      */
-    void lookaheadOneRowForAggs(const TableTuple &tuple);
+    void lookaheadOneRowForAggs(const TableTuple &tuple, TableWindow &tableWindow);
 
     /**
      * Call lookaheadNextGroup for each aggregate
@@ -194,13 +193,13 @@ private:
      * This will happen for each group and cannot be
      * disabled.
      */
-    void lookaheadNextGroupForAggs();
+    void lookaheadNextGroupForAggs(TableWindow &tableWindow);
 
     /**
      * Call endGroup for each aggregate.  This will happen
      * for each group and cannot be disabled.
      */
-    void endGroupForAggs(EdgeType edgeType);
+    void endGroupForAggs(TableWindow &tableWindow, EdgeType edgeType);
     /**
      * Insert the output tuple.
      */
@@ -218,7 +217,7 @@ private:
      * the edge type is the type of the group after the current
      * group.
      */
-    EdgeType findNextEdge(EdgeType edgeType);
+    EdgeType findNextEdge(EdgeType edgeType, TableWindow &);
 
     Pool m_memoryPool;
     /**
@@ -327,14 +326,6 @@ private:
      * a tuple for the values passed through from the input.
      */
     WindowAggregateRow * m_aggregateRow;
-
-    /**
-     * As we iterate through the input table, we iterate
-     * through partitions, and each partition may be
-     * grouped in order by groups.  A TableWindow keeps track
-     * of all the iterators.
-     */
-    TableWindow  * m_tableWindow;
 };
 
 } /* namespace voltdb */

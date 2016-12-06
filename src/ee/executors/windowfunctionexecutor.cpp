@@ -43,19 +43,19 @@ struct TableWindow {
     TableWindow(Table *tbl)
         : m_middleEdge(tbl->iterator()),
           m_leadingEdge(tbl->iterator()),
-          m_groupSize(0) {}
+          m_orderByGroupSize(0) {}
     std::string debug() {
         std::stringstream stream;
         stream << "Table Window: [Middle: "
                 << m_middleEdge.getLocation() << ", Leading: "
                 << m_leadingEdge.getLocation() << "], "
-                << "ssize = " << m_groupSize
+                << "ssize = " << m_orderByGroupSize
                 << "\n";
         return stream.str();
     }
 
     void resetCounts() {
-        m_groupSize = 0;
+        m_orderByGroupSize = 0;
     }
     TableIterator m_middleEdge;
     TableIterator m_leadingEdge;
@@ -63,7 +63,7 @@ struct TableWindow {
      * This is handy for the aggregators.  It's maintained
      * in findOrderByEdge();
      */
-    size_t m_groupSize;
+    size_t m_orderByGroupSize;
 };
 
 /**
@@ -103,7 +103,7 @@ struct WindowAggregate {
      * Do calculations needed when scanning each row ahead for
      * the end of an order by or partition by group.
      */
-    virtual void lookaheadOneRow(TableWindow *window, NValueArray &argValues) {
+    virtual void lookaheadOneRow(TableWindow &window, NValueArray &argValues) {
         ;
     }
 
@@ -111,7 +111,7 @@ struct WindowAggregate {
      * Do calculations at the end of a scan of an order by
      * group.
      */
-    virtual void lookaheadNextGroup(TableWindow *window) {
+    virtual void lookaheadNextGroup(TableWindow &window) {
         ;
     }
 
@@ -119,7 +119,7 @@ struct WindowAggregate {
      * Do calculations to end the group and start the
      * next group.
      */
-    virtual void endGroup(TableWindow *window,
+    virtual void endGroup(TableWindow &window,
                           WindowFunctionExecutor::EdgeType edgeType) {
         ;
     }
@@ -144,10 +144,10 @@ struct WindowAggregate {
     NValue m_value;
     bool   m_needsLookahead;
 
-    static NValue m_one;
+    const static NValue m_one;
 };
 
-NValue WindowAggregate::m_one = ValueFactory::getBigIntValue(1);
+const NValue WindowAggregate::m_one = ValueFactory::getBigIntValue(1);
 
 /**
  * Dense rank is the easiest.  We just count
@@ -164,7 +164,7 @@ public:
 
     virtual ~DenseRankAgg() {}
 
-    virtual void endGroup(TableWindow *window, WindowFunctionExecutor::EdgeType etype) {
+    virtual void endGroup(TableWindow &window, WindowFunctionExecutor::EdgeType etype) {
         m_value = m_value.op_add(orderByPeerIncrement());
     }
 
@@ -189,8 +189,8 @@ public:
     RankAgg()
     : DenseRankAgg() {
     }
-    void lookaheadNextGroup(TableWindow *window) {
-        m_orderByPeerIncrement = ValueFactory::getBigIntValue(window->m_groupSize);
+    void lookaheadNextGroup(TableWindow &window) {
+        m_orderByPeerIncrement = ValueFactory::getBigIntValue(window.m_orderByGroupSize);
     }
     ~RankAgg() {}
 };
@@ -203,13 +203,11 @@ public:
  */
 class CountAgg : public WindowAggregate {
 public:
-    CountAgg() {
-        m_one = ValueFactory::getBigIntValue(1);
-    }
+    CountAgg() { }
 
     virtual ~CountAgg() {}
 
-    virtual void lookaheadOneRow(TableWindow *window, NValueArray &argVals) {
+    virtual void lookaheadOneRow(TableWindow &window, NValueArray &argVals) {
         /*
          * COUNT(*) has no arguments.  If there are arguments,
          * and the argument value is null, then don't count the row.
@@ -223,8 +221,6 @@ public:
         WindowAggregate::resetAgg();
         m_value = ValueFactory::getBigIntValue(0);
     }
-
-    NValue m_one;
 };
 
 #if  0
@@ -240,7 +236,7 @@ public:
      * Calculate the min by looking ahead in the
      * order by group.
      */
-    virtual void lookaheadOneRow(TableWindow *window, NValueArray &argVals) {
+    virtual void lookaheadOneRow(TableWindow &window, NValueArray &argVals) {
         assert(argVals.size() == 1);
         if ( ! argVals[0].isNull()) {
             if (argVals[0].op_lessThan(m_value)) {
@@ -259,7 +255,7 @@ public:
      * Calculate the min by looking ahead in the
      * order by group.
      */
-    virtual void lookaheadOneRow(TableWindow *window, NValueArray &argVals) {
+    virtual void lookaheadOneRow(TableWindow &window, NValueArray &argVals) {
         assert(argVals.size() == 1);
         if ( ! argVals[0].isNull()) {
             if (argVals[0].op_greaterThan(m_value)) {
@@ -277,7 +273,7 @@ public:
      * Calculate the min by looking ahead in the
      * order by group.
      */
-    virtual void lookaheadOneRow(TableWindow *window, NValueArray &argVals) {
+    virtual void lookaheadOneRow(TableWindow &window, NValueArray &argVals) {
         assert(argVals.size() == 1);
         if ( ! argVals[0].isNull()) {
             m_value = m_value.op_add(argVals[0]);
@@ -288,10 +284,8 @@ public:
 class AvgAgg : public WindowAggregate {
 public:
     AvgAgg()
-      : m_count(ValueFactory::getBigIntValue(0)),
-        m_one(ValueFactory::getBigIntValue(1)) {
-    }
-    virtual void lookaheadOneRow(TableWindow *window, NValueArray &argVals) {
+      : m_count(ValueFactory::getBigIntValue(0)) { }
+    virtual void lookaheadOneRow(TableWindow &window, NValueArray &argVals) {
         assert(argVals.size() == 1);
         if ( ! argVals[0].isNull() ) {
             m_value = m_value.op_add(argVals[0]);
@@ -308,7 +302,6 @@ public:
     }
 private:
     NValue m_count;
-    NValue m_one;
     size_t m_ct;
 };
 #endif
@@ -431,7 +424,7 @@ inline void WindowFunctionExecutor::initAggInstances()
     }
 }
 
-inline void WindowFunctionExecutor::lookaheadOneRowForAggs(const TableTuple &tuple) {
+inline void WindowFunctionExecutor::lookaheadOneRowForAggs(const TableTuple &tuple, TableWindow &tableWindow) {
     WindowAggregate** aggs = m_aggregateRow->getAggregates();
     for (int ii = 0; ii < m_aggTypes.size(); ii++) {
         if (aggs[ii]->m_needsLookahead) {
@@ -441,22 +434,22 @@ inline void WindowFunctionExecutor::lookaheadOneRowForAggs(const TableTuple &tup
             for (int idx = 0; idx < inputExprs.size(); idx += 1) {
                 vals[idx] = inputExprs[idx]->eval(&tuple);
             }
-            aggs[ii]->lookaheadOneRow(m_tableWindow, vals);
+            aggs[ii]->lookaheadOneRow(tableWindow, vals);
         }
     }
 }
 
-inline void WindowFunctionExecutor::lookaheadNextGroupForAggs() {
+inline void WindowFunctionExecutor::lookaheadNextGroupForAggs(TableWindow &tableWindow) {
     WindowAggregate** aggs = m_aggregateRow->getAggregates();
     for (int ii = 0; ii < m_aggTypes.size(); ii++) {
-        aggs[ii]->lookaheadNextGroup(m_tableWindow);
+        aggs[ii]->lookaheadNextGroup(tableWindow);
     }
 }
 
-inline void WindowFunctionExecutor::endGroupForAggs(EdgeType edgeType) {
+inline void WindowFunctionExecutor::endGroupForAggs(TableWindow &tableWindow, EdgeType edgeType) {
     WindowAggregate** aggs = m_aggregateRow->getAggregates();
     for (int ii = 0; ii < m_aggTypes.size(); ii++) {
-        aggs[ii]->endGroup(m_tableWindow, edgeType);
+        aggs[ii]->endGroup(tableWindow, edgeType);
     }
 }
 
@@ -542,14 +535,7 @@ bool WindowFunctionExecutor::p_execute(const NValueArray& params) {
      */
     initWorkingTupleStorage();
 
-   /*
-    * The member variable m_tableWindow is deleted and nulled
-    * in p_execute_finish.  The member variable p_pmp
-    * is set to NULL there also.  We force a call to
-    * p_execute_finish when p_execute exits, so this
-    * call is not explicit in this function.
-    */
-    m_tableWindow = new TableWindow(input_table);
+    TableWindow tableWindow(input_table);
     ProgressMonitorProxy pmp(m_engine, this);
     m_pmp = &pmp;
 
@@ -564,7 +550,8 @@ bool WindowFunctionExecutor::p_execute(const NValueArray& params) {
     TableTuple nextTuple(m_inputSchema);
 
     /*
-     * Call p_execute_finish when this is all over.
+     * Force a call p_execute_finish when this is all over.
+     * This cleans thing up and nulls out p_pmp.
      */
     EnsureCleanupOnExit finishCleanup(this);
     for (EdgeType etype = START_OF_INPUT,
@@ -580,19 +567,19 @@ bool WindowFunctionExecutor::p_execute(const NValueArray& params) {
         // Find the next edge.  This will
         // give the aggs a crack at each row
         // if they want it.
-        nextEtype = findNextEdge(etype);
+        nextEtype = findNextEdge(etype, tableWindow);
         // Let the aggs know the results
         // of the lookahead.
-        lookaheadNextGroupForAggs();
+        lookaheadNextGroupForAggs(tableWindow);
         // Advance to the end of the current group.
-        for (int idx = 0; idx < m_tableWindow->m_groupSize; idx += 1) {
+        for (int idx = 0; idx < tableWindow.m_orderByGroupSize; idx += 1) {
             VOLT_TRACE("MiddleEdge: Window = %s", m_tableWindow->debug().c_str());
-            m_tableWindow->m_middleEdge.next(nextTuple);
+            tableWindow.m_middleEdge.next(nextTuple);
             m_pmp->countdownProgress();
             m_aggregateRow->recordPassThroughTuple(nextTuple);
             insertOutputTuple();
         }
-        endGroupForAggs(etype);
+        endGroupForAggs(tableWindow, etype);
         VOLT_TRACE("FirstEdge: %s", m_tableWindow->debug().c_str());
     }
     VOLT_TRACE("WindowFunctionExecutor: finalizing..");
@@ -602,22 +589,22 @@ bool WindowFunctionExecutor::p_execute(const NValueArray& params) {
     return true;
 }
 
-WindowFunctionExecutor::EdgeType WindowFunctionExecutor::findNextEdge(EdgeType     edgeType)
+WindowFunctionExecutor::EdgeType WindowFunctionExecutor::findNextEdge(EdgeType     edgeType, TableWindow &tableWindow)
 {
     // This is just an alias for the buffered input tuple.
     TableTuple &nextTuple = getBufferedInputTuple();
-    VOLT_TRACE("findNextEdge(start): %s", m_tableWindow->debug().c_str());
+    VOLT_TRACE("findNextEdge(start): %s", tableWindow.debug().c_str());
     /*
      * At the start of the input we need to prime the
      * tuple pairs.
      */
     if (edgeType == START_OF_INPUT) {
-        if (m_tableWindow->m_leadingEdge.next(nextTuple)) {
+        if (tableWindow.m_leadingEdge.next(nextTuple)) {
             initPartitionByKeyTuple(nextTuple);
             initOrderByKeyTuple(nextTuple);
             /* First row.  Nothing to compare it with. */
-            m_tableWindow->m_groupSize = 1;
-            lookaheadOneRowForAggs(nextTuple);
+            tableWindow.m_orderByGroupSize = 1;
+            lookaheadOneRowForAggs(nextTuple, tableWindow);
         } else {
             /*
              * If there is no first row, then just
@@ -626,7 +613,7 @@ WindowFunctionExecutor::EdgeType WindowFunctionExecutor::findNextEdge(EdgeType  
              * ask for its next again and will always get false.
              * We return a zero length group here.
              */
-            m_tableWindow->m_groupSize = 0;
+            tableWindow.m_orderByGroupSize = 0;
             return END_OF_INPUT;
         }
     } else {
@@ -634,12 +621,12 @@ WindowFunctionExecutor::EdgeType WindowFunctionExecutor::findNextEdge(EdgeType  
          * We've already got a row, so
          * count it.
          */
-        m_tableWindow->m_groupSize = 1;
-        lookaheadOneRowForAggs(nextTuple);
+        tableWindow.m_orderByGroupSize = 1;
+        lookaheadOneRowForAggs(nextTuple, tableWindow);
     }
     do {
         VOLT_TRACE("findNextEdge(loopStart): %s", m_tableWindow->debug().c_str());
-        if (m_tableWindow->m_leadingEdge.next(nextTuple)) {
+        if (tableWindow.m_leadingEdge.next(nextTuple)) {
             initPartitionByKeyTuple(nextTuple);
             initOrderByKeyTuple(nextTuple);
             if (compareTuples(getInProgressPartitionByKeyTuple(),
@@ -652,11 +639,11 @@ WindowFunctionExecutor::EdgeType WindowFunctionExecutor::findNextEdge(EdgeType  
                 VOLT_TRACE("findNextEdge(Group): %s", m_tableWindow->debug().c_str());
                 return START_OF_PARTITION_BY_GROUP;
             }
-            m_tableWindow->m_groupSize += 1;
-            lookaheadOneRowForAggs(nextTuple);
-            VOLT_TRACE("findNextEdge(loop): %s", m_tableWindow->debug().c_str());
+            tableWindow.m_orderByGroupSize += 1;
+            lookaheadOneRowForAggs(nextTuple, tableWindow);
+            VOLT_TRACE("findNextEdge(loop): %s", tableWindow.debug().c_str());
         } else {
-            VOLT_TRACE("findNextEdge(EOI): %s", m_tableWindow->debug().c_str());
+            VOLT_TRACE("findNextEdge(EOI): %s", tableWindow.debug().c_str());
             return END_OF_INPUT;
         }
     } while (true);
@@ -749,8 +736,6 @@ void WindowFunctionExecutor::swapOrderByKeyTupleData() {
 
 void WindowFunctionExecutor::p_execute_finish() {
     m_pmp = NULL;
-    delete m_tableWindow;
-    m_tableWindow = NULL;
     /*
      * The working tuples should not be null.
      */
