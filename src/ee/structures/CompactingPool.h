@@ -18,6 +18,7 @@
 #ifndef _EE_STRUCTURES_COMPACTINGPOOL_H_
 #define _EE_STRUCTURES_COMPACTINGPOOL_H_
 
+#include "CompactingSet.h"
 #include "ContiguousAllocator.h"
 
 #include <cassert>
@@ -102,7 +103,14 @@ class CompactingPool
      */
     void markAllocationAsPendingRelease(void* element)
     {
-        m_allocationsPendingRelease.insert(element);
+        if (isLast(element)) {
+            // Is marking last element for release, just release it now, to
+            // avoid growing the pending release map.
+            m_allocator.trim();
+        }
+        else {
+            m_allocationsPendingRelease.insert(element);
+        }
     }
 
     /**
@@ -115,25 +123,15 @@ class CompactingPool
      */
     void freePendingAllocations()
     {
-        auto end = m_allocationsPendingRelease.end();
-        decltype(end) it;
-        do {
-            if (trimAllocationsPendingRelease()) {
-                // This function returns true if there are no
-                // allocations pending release.
-                break;
-            }
+        // While there are still deferred allocations...
+        while (trimAllocationsPendingRelease() != true) {
+            auto it = m_allocationsPendingRelease.begin();
+            assert (!it.isEnd());
 
-            it = m_allocationsPendingRelease.begin();
-            assert (it != end);
-
-            auto toBeReleased = it;
-            ++it;
-
-            free(*toBeReleased);
+            void* toBeReleased = it.key();
             m_allocationsPendingRelease.erase(toBeReleased);
+            free(toBeReleased);
         }
-        while (it != end);
 
         assert (m_allocationsPendingRelease.size() == 0);
     }
@@ -146,6 +144,12 @@ class CompactingPool
 
   private:
 
+    bool isLast(void *element) {
+        Relocatable* vacated = Relocatable::backtrackFromCallerData(element);
+        Relocatable* last = reinterpret_cast<Relocatable*>(m_allocator.last());
+        return vacated == last;
+    }
+
     /**
      * If the last() references an item that is pending release, then
      * trim it.  Do this until last() references an item that is not
@@ -154,31 +158,25 @@ class CompactingPool
      * Returns true if all allocations pending release have been freed.
      */
     bool trimAllocationsPendingRelease() {
-        if (m_allocator.count() == 0)
-            return true;
-
-        Relocatable* last = reinterpret_cast<Relocatable*>(m_allocator.last());
-        auto trimIt = m_allocationsPendingRelease.find(last->m_data);
-        auto end = m_allocationsPendingRelease.end();
-        while (trimIt != end) {
-            m_allocator.trim();
-            m_allocationsPendingRelease.erase(trimIt);
-
+        while (true) {
             if (m_allocator.count() == 0) {
                 assert (m_allocationsPendingRelease.empty());
                 return true;
             }
 
-            last = reinterpret_cast<Relocatable*>(m_allocator.last());
-            trimIt = m_allocationsPendingRelease.find(last->m_data);
+            Relocatable* last = reinterpret_cast<Relocatable*>(m_allocator.last());
+            auto trimIt = m_allocationsPendingRelease.find(last->m_data);
+            if (trimIt.isEnd()) {
+                return m_allocationsPendingRelease.empty();
+            }
+            m_allocator.trim();
+            m_allocationsPendingRelease.erase(trimIt.key());
         }
-
-        return m_allocationsPendingRelease.empty();
     }
 
     ContiguousAllocator m_allocator;
 
-    boost::unordered_set<void*> m_allocationsPendingRelease;
+    CompactingSet<void*, PointerComparator> m_allocationsPendingRelease;
 
     /// The layout of a relocatable allocation,
     /// including overhead for managing the relocation process.

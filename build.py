@@ -538,11 +538,12 @@ if whichtests in ("${eetestsuite}", "storage"):
 
 if whichtests in ("${eetestsuite}", "structures"):
     CTX.TESTS['structures'] = """
-     CompactingMapTest
-     CompactingMapIndexCountTest
      CompactingHashTest
-     CompactingPoolTest
      CompactingMapBenchmark
+     CompactingMapIndexCountTest
+     CompactingMapTest
+     CompactingPoolTest
+     CompactingSetTest
     """
 
 if whichtests in ("${eetestsuite}", "plannodes"):

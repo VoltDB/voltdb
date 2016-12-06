@@ -20,7 +20,7 @@
 
 #include "ContiguousAllocator.h"
 
-#include <cstdlib>
+#include <cstdio>
 #include <stdint.h>
 #include <utility>
 #include <limits>

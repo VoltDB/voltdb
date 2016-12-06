@@ -117,6 +117,9 @@ TEST_F(CompactingPoolTest, bytes_allocated_test)
     dut.freePendingAllocations();
 }
 
+TEST_F(CompactingPoolTest, deferred_release) {
+}
+
 int main() {
     return TestSuite::globalInstance()->runAll();
 }

@@ -21,59 +21,57 @@
 #include "CompactingMap.h"
 
 namespace voltdb {
-template<typename Key, typename Compare = comp<Key> >
+
+/**
+ * A class that implements a tree-based set on top of CompactingMap,
+ * which uses our homegrown pools and allocators to avoid fragmenting
+ * memory or bottlenecking on calls to malloc/free.
+ */
+template<typename Key, typename Compare >
 class CompactingSet {
-protected:
+private:
     // To be used as the value type for the map
     struct EmptyStruct {};
     typedef struct EmptyStruct Data;
 
-    typedef CompactingMap<NormalKeyValuePair<Key, Data>, Compare, false, Key> tree_type;
+    typedef CompactingMap<NormalKeyValuePair<Key, Data>, Compare, false> tree_type;
 
-    tree_type m_map;
-
-public:
+ public:
     typedef typename tree_type::iterator iterator;
-    typedef typename tree_type::const_iterator const_iterator;
-
-    // The following are required by the STL API.
-    typedef Compare key_compare;
-    typedef typename tree_type::value_type value_type;
-    typedef typename tree_type::value_compare value_compare;
 
 public:
-    inline CompactingSet(Compare comper = Compare()) : m_map(true, comper) {}
-    inline CompactingSet(const CompactingSet<Key, Compare> &other) : m_map(other.m_map) {}
+    inline CompactingSet() : m_map(true, Compare()) {}
 
     inline bool exists(const Key &key) const { return !m_map.find(key).isEnd(); }
+    inline iterator find(const Key &key) const { return m_map.find(key); }
+
+    // Returns true if an element was inserted, false if the value is already in the set.
     inline bool insert(const Key &key) { return (m_map.insert(key, Data()) == NULL); }
+
+    // Returns true if an element was erased.
     bool erase(const Key &key) { return m_map.erase(key); }
 
-    inline bool empty() const { return m_map.empty(); }
     inline size_t size() const { return m_map.size(); }
-    inline void clear() { m_map.clear(); }
+    inline bool empty() const { return m_map.size() == 0; }
 
     inline iterator begin() { return m_map.begin(); }
-    inline const_iterator begin() const { return m_map.begin(); }
-    inline iterator end() { return m_map.end(); }
-    inline const_iterator end() const { return m_map.end(); }
-    inline iterator lower_bound(const Key &key) { return m_map.lowerBound(key); }
-    inline const_iterator lower_bound(const Key &key) const { return m_map.lowerBound(key); }
-    inline iterator upper_bound(const Key &key) { return m_map.upperBound(key); }
-    inline const_iterator upper_bound(const Key &key) const { return m_map.upperBound(key); }
 
-    // Required by the STL API.
-    inline key_compare key_comp() const { return m_map.key_comp(); }
-    inline value_compare value_comp() const { return m_map.value_comp(); }
+private:
+    // unimplemented copy ctor and assignment operator
+    CompactingSet(const CompactingSet<Key, Compare> &);
+    CompactingSet<Key, Compare>& operator=(const CompactingSet<Key, Compare>&);
 
-    inline bool operator==(const CompactingSet<Key, Compare> &other) const
-    {
-        return m_map == other.m_map;
-    }
+    tree_type m_map;
+};
 
-    inline bool operator!=(const CompactingSet<Key, Compare> &other) const
-    {
-        return m_map != other.m_map;
+/**
+ * A simple comparator that works for any kind of pointer.
+ */
+struct PointerComparator {
+    int operator()(const void* v1, const void* v2) const {
+        // C++ does not like it if you try to subtract void pointers,
+        // because the size of void is ambiguous
+        return static_cast<const char*>(v1) - static_cast<const char*>(v2);
     }
 };
 
