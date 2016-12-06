@@ -68,7 +68,6 @@ def get_grammar(grammar={}, grammar_filename='sql-grammar.txt', grammar_dir='.')
         symbol_name = grammar_defn.group('symbolname').strip()
         definition  = grammar_defn.group('definition').strip()
 
-        weighted_xor = re.search(__WEIGHTED_XOR, definition)
         weights = []
         for wxor in __WEIGHTED_XOR.finditer(definition):
             weight = wxor.group('weight')
@@ -129,10 +128,7 @@ def get_one_sql_statement(grammar, sql_statement_type='sql-statement', max_depth
             print "ERROR: Could not find symbol_name '" + str(symbol_name) + "' in grammar dictionary!!!"
             break
         # Check how deep into a recursive definition we're going
-        if depth.get(symbol_name):
-            depth[symbol_name] += 1
-        else:
-            depth[symbol_name] = 1
+        depth[symbol_name] = depth.get(symbol_name, 0) + 1
         if isinstance(definition, list):
             random_index = randrange(0, len(definition))
             #print 'DEBUG: len(definition):', str(len(definition))
