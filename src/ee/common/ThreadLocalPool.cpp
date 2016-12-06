@@ -46,79 +46,109 @@ const int ThreadLocalPool::POOLED_MAX_VALUE_LENGTH = 1024 * 1024;
 /**
  * Thread local key for storing thread specific memory pools
  */
-static pthread_key_t m_key;
-static pthread_key_t m_stringKey;
-static pthread_key_t m_releaseModeKey;
-/**
- * Thread local key for storing integer value of amount of memory allocated
- */
-static pthread_key_t m_keyAllocated;
+static pthread_key_t m_perThreadPoolsKey;
 static pthread_once_t m_keyOnce = PTHREAD_ONCE_INIT;
 
 typedef boost::pool<voltdb_pool_allocator_new_delete> PoolForObjectSize;
 typedef boost::shared_ptr<PoolForObjectSize> PoolForObjectSizePtr;
 typedef boost::unordered_map<std::size_t, PoolForObjectSizePtr> PoolsByObjectSize;
-
-typedef std::pair<int, PoolsByObjectSize* > PairType;
-typedef PairType* PairTypePtr;
-
 typedef boost::unordered_map<int32_t, boost::shared_ptr<CompactingPool> > CompactingStringStorage;
 
 static const bool IMMEDIATE_RELEASE = false;
 static const bool DEFERRED_RELEASE = true;
 
+namespace {
+struct PerThreadPools {
+    PerThreadPools()
+        : m_refCount(1)
+        , m_bytesAllocated(0)
+        , m_exactSizePools()
+        , m_relocatablePools()
+        , m_relocatablePoolReleaseMode(IMMEDIATE_RELEASE)
+    {
+    }
+
+    void incrementRefCount() {
+        ++m_refCount;
+    }
+
+    void decrementRefCount() {
+        --m_refCount;
+        assert(m_refCount >= 0);
+    }
+
+    int getRefCount() const {
+        return m_refCount;
+    }
+
+    CompactingStringStorage& getStringPoolMap() {
+        return m_relocatablePools;
+    }
+
+    bool getRelocatablePoolReleaseMode() const {
+        return m_relocatablePoolReleaseMode;
+    }
+
+    void setRelocatablePoolReleaseMode(bool mode) {
+        m_relocatablePoolReleaseMode = mode;
+    }
+
+    PoolsByObjectSize& getExactSizePools() {
+        return m_exactSizePools;
+    }
+
+    size_t& getBytesAllocated() {
+        return m_bytesAllocated;
+    }
+
+private:
+    int m_refCount;
+    size_t m_bytesAllocated;
+    PoolsByObjectSize m_exactSizePools;
+    CompactingStringStorage m_relocatablePools;
+    bool m_relocatablePoolReleaseMode;
+};
+}
+
 static void createThreadLocalKey() {
-    (void)pthread_key_create( &m_key, NULL);
-    (void)pthread_key_create( &m_stringKey, NULL);
-    (void)pthread_key_create( &m_keyAllocated, NULL);
-    (void)pthread_key_create( &m_releaseModeKey, NULL);
+    (void)pthread_key_create( &m_perThreadPoolsKey, NULL);
+}
+
+static PerThreadPools* getPerThreadPools() {
+    return static_cast<PerThreadPools*>(pthread_getspecific(m_perThreadPoolsKey));
 }
 
 ThreadLocalPool::ThreadLocalPool() {
     (void)pthread_once(&m_keyOnce, createThreadLocalKey);
-    if (pthread_getspecific(m_key) == NULL) {
-        pthread_setspecific( m_keyAllocated, static_cast<const void *>(new std::size_t(0)));
-        pthread_setspecific( m_key, static_cast<const void *>(
-                new PairType(
-                        1, new PoolsByObjectSize())));
-        pthread_setspecific(m_stringKey, static_cast<const void*>(new CompactingStringStorage()));
-        pthread_setspecific(m_releaseModeKey, static_cast<const void*>(&IMMEDIATE_RELEASE));
+    if (pthread_getspecific(m_perThreadPoolsKey) == NULL) {
+        pthread_setspecific(m_perThreadPoolsKey, new PerThreadPools());
     } else {
-        PairTypePtr p =
-                static_cast<PairTypePtr>(pthread_getspecific(m_key));
-        pthread_setspecific( m_key, new PairType( p->first + 1, p->second));
-        delete p;
+        PerThreadPools* ptp = getPerThreadPools();
+        ptp->incrementRefCount();
     }
 }
 
 ThreadLocalPool::~ThreadLocalPool() {
-    PairTypePtr p =
-            static_cast<PairTypePtr>(pthread_getspecific(m_key));
-    assert(p != NULL);
-    if (p != NULL) {
-        if (p->first == 1) {
-            delete p->second;
-            pthread_setspecific( m_key, NULL);
-            delete static_cast<CompactingStringStorage*>(pthread_getspecific(m_stringKey));
-            pthread_setspecific(m_stringKey, NULL);
-            delete static_cast<std::size_t*>(pthread_getspecific(m_keyAllocated));
-            pthread_setspecific( m_keyAllocated, NULL);
-            pthread_setspecific( m_releaseModeKey, NULL);
-        } else {
-            pthread_setspecific( m_key, new PairType( p->first - 1, p->second));
+    PerThreadPools* ptp = getPerThreadPools();
+    assert(ptp != NULL);
+    if (ptp != NULL) {
+        ptp->decrementRefCount();
+        if (ptp->getRefCount() == 0) {
+            delete ptp;
+            pthread_setspecific(m_perThreadPoolsKey, NULL);
         }
-        delete p;
     }
 }
 
 static CompactingStringStorage& getStringPoolMap()
 {
-    return *static_cast<CompactingStringStorage*>(pthread_getspecific(m_stringKey));
+    PerThreadPools* ptp = getPerThreadPools();
+    return ptp->getStringPoolMap();
 }
 
 static bool isDeferredReleaseMode() {
-    bool* v = static_cast<bool*>(pthread_getspecific(m_releaseModeKey));
-    return *v == DEFERRED_RELEASE;
+    PerThreadPools* ptp = getPerThreadPools();
+    return ptp->getRelocatablePoolReleaseMode() == DEFERRED_RELEASE;
 }
 static int32_t getAllocationSizeForObject(int length)
 {
@@ -264,8 +294,8 @@ void ThreadLocalPool::freeRelocatable(Sized* sized)
 
 void* ThreadLocalPool::allocateExactSizedObject(std::size_t sz)
 {
-    PoolsByObjectSize& pools =
-            *(static_cast< PairTypePtr >(pthread_getspecific(m_key))->second);
+    PerThreadPools* ptp = getPerThreadPools();
+    PoolsByObjectSize& pools = ptp->getExactSizePools();
     PoolsByObjectSize::iterator iter = pools.find(sz);
     PoolForObjectSize* pool;
     if (iter == pools.end()) {
@@ -311,8 +341,7 @@ void* ThreadLocalPool::allocateExactSizedObject(std::size_t sz)
 
 void ThreadLocalPool::freeExactSizedObject(std::size_t sz, void* object)
 {
-    PoolsByObjectSize& pools =
-            *(static_cast< PairTypePtr >(pthread_getspecific(m_key))->second);
+    PoolsByObjectSize& pools = getPerThreadPools()->getExactSizePools();
     PoolsByObjectSize::iterator iter = pools.find(sz);
     if (iter == pools.end()) {
         throwFatalException(
@@ -323,14 +352,17 @@ void ThreadLocalPool::freeExactSizedObject(std::size_t sz, void* object)
     pool->free(object);
 }
 
+static size_t& getBytesAllocated() {
+    return getPerThreadPools()->getBytesAllocated();
+}
+
 std::size_t ThreadLocalPool::getPoolAllocationSize() {
-    size_t bytes_allocated =
-        *static_cast< std::size_t* >(pthread_getspecific(m_keyAllocated));
+    size_t bytes_allocated = getBytesAllocated();
+
     // For relocatable objects, each object-size-specific pool
     // -- or actually, its ContiguousAllocator -- tracks its own memory
     // allocation, so sum them, here.
-    CompactingStringStorage* poolMap =
-        static_cast<CompactingStringStorage*>(pthread_getspecific(m_stringKey));
+    CompactingStringStorage* poolMap = &(getStringPoolMap());
     for (CompactingStringStorage::iterator iter = poolMap->begin();
          iter != poolMap->end();
          ++iter) {
@@ -340,20 +372,19 @@ std::size_t ThreadLocalPool::getPoolAllocationSize() {
 }
 
 char * voltdb_pool_allocator_new_delete::malloc(const size_type bytes) {
-    (*static_cast< std::size_t* >(pthread_getspecific(m_keyAllocated))) += bytes + sizeof(std::size_t);
-    //std::cout << "Pooled memory is " << ((*static_cast< std::size_t* >(pthread_getspecific(m_keyAllocated))) / (1024 * 1024)) << " after requested allocation " << (bytes / (1024 * 1024)) <<  std::endl;
+    getBytesAllocated() += bytes + sizeof(std::size_t);
     char *retval = new (std::nothrow) char[bytes + sizeof(std::size_t)];
     *reinterpret_cast<std::size_t*>(retval) = bytes + sizeof(std::size_t);
     return &retval[sizeof(std::size_t)];
 }
 
 void voltdb_pool_allocator_new_delete::free(char * const block) {
-    (*static_cast< std::size_t* >(pthread_getspecific(m_keyAllocated))) -= *reinterpret_cast<std::size_t*>(block - sizeof(std::size_t));
+    getBytesAllocated() -= *reinterpret_cast<std::size_t*>(block - sizeof(std::size_t));
     delete [](block - sizeof(std::size_t));
 }
 
 ScopedPoolDeferredReleaseMode::ScopedPoolDeferredReleaseMode() {
-    pthread_setspecific(m_releaseModeKey, &DEFERRED_RELEASE);
+    getPerThreadPools()->setRelocatablePoolReleaseMode(DEFERRED_RELEASE);
 }
 
 ScopedPoolDeferredReleaseMode::~ScopedPoolDeferredReleaseMode() {
@@ -361,7 +392,7 @@ ScopedPoolDeferredReleaseMode::~ScopedPoolDeferredReleaseMode() {
     BOOST_FOREACH(auto entry, poolMap) {
         entry.second->freePendingAllocations();
     }
-    pthread_setspecific(m_releaseModeKey, &IMMEDIATE_RELEASE);
+    getPerThreadPools()->setRelocatablePoolReleaseMode(DEFERRED_RELEASE);
 }
 
 }
