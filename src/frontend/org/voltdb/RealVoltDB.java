@@ -593,8 +593,48 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 System.exit(-1);
             }
 
-            m_isRunningWithOldVerb = config.m_startAction.isLegacy();
-            readBuildInfo(config.m_isEnterprise ? "Enterprise Edition" : "Community Edition");
+            // print the ascii art!
+            consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_StartupString.name(), null);
+
+            // load license API
+            if (config.m_pathToLicense == null) {
+                m_licenseApi = MiscUtils.licenseApiFactory();
+                if (m_licenseApi == null) {
+                    hostLog.fatal("Unable to open license file in default directories");
+                }
+            } else {
+                m_licenseApi = MiscUtils.licenseApiFactory(config.m_pathToLicense);
+                if (m_licenseApi == null) {
+                    hostLog.fatal("Unable to open license file in provided path: " + config.m_pathToLicense);
+                }
+            }
+
+            if (m_licenseApi == null) {
+                hostLog.fatal("Please contact sales@voltdb.com to request a license.");
+                VoltDB.crashLocalVoltDB(
+                        "Failed to initialize license verifier. " + "See previous log message for details.", false,
+                        null);
+            }
+
+            // determine the edition
+            String edition = "Community Edition";
+            if (config.m_isEnterprise) {
+                if (m_licenseApi.isEnterprise()) edition = "Enterprise Edition";
+                if (m_licenseApi.isPro()) edition = "Pro Edition";
+                if (m_licenseApi.isTrial()) edition = "Enterprise Edition";
+                if (m_licenseApi.isAWSMarketplace()) edition = "AWS Marketplace Pro Edition";
+            }
+
+            // this also prints out the license type on the console
+            readBuildInfo(edition);
+
+            // print out the licensee on the license
+            if (config.m_isEnterprise) {
+                String licensee = m_licenseApi.licensee();
+                if ((licensee != null) && (licensee.length() > 0)) {
+                    consoleLog.info(String.format("Licensed to: %s", licensee));
+                }
+            }
 
             // Replay command line args that we can see
             StringBuilder sb = new StringBuilder(2048).append("Command line arguments: ");
@@ -615,8 +655,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             // config UUID is part of the status tracker that is slated to be an
             // Information source for an http admun endpoint
             m_statusTracker = new NodeStateTracker();
-
-            consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_StartupString.name(), null);
 
             if (config.m_startAction == StartAction.INITIALIZE) {
                 if (config.m_forceVoltdbCreate) {
@@ -844,30 +882,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 }
             }
 
-            if (m_config.m_pathToLicense == null) {
-                m_licenseApi = MiscUtils.licenseApiFactory();
-                if (m_licenseApi == null) {
-                    hostLog.fatal("Unable to open license file in default directories");
-                }
-            }
-            else {
-                m_licenseApi = MiscUtils.licenseApiFactory(m_config.m_pathToLicense);
-                if (m_licenseApi == null) {
-                    hostLog.fatal("Unable to open license file in provided path: " + m_config.m_pathToLicense);
-                }
-            }
-
-            if (m_licenseApi == null) {
-                hostLog.fatal("Please contact sales@voltdb.com to request a license.");
-                VoltDB.crashLocalVoltDB("Failed to initialize license verifier. " +
-                        "See previous log message for details.", false, null);
-            }
             m_asyncCompilerAgent = new AsyncCompilerAgent(m_licenseApi);
 
             try {
                 SimpleDateFormat sdf = new SimpleDateFormat("EEE MMM d, yyyy");
                 JSONObject jo = new JSONObject();
-                jo.put("trial",m_licenseApi.isTrial());
+                jo.put("trial", m_licenseApi.isTrial());
                 jo.put("hostcount",m_licenseApi.maxHostcount());
                 jo.put("commandlogging", m_licenseApi.isCommandLoggingAllowed());
                 jo.put("wanreplication", m_licenseApi.isDrReplicationAllowed());

@@ -135,7 +135,7 @@ OrderByExecutor::p_execute(const NValueArray &params)
     // is if limit == 0.
     if (limit != 0) {
         vector<TableTuple> xs;
-        ProgressMonitorProxy pmp(m_engine, this);
+        ProgressMonitorProxy pmp(m_engine->getExecutorContext(), this);
         while (iterator.next(tuple))
         {
             pmp.countdownProgress();
