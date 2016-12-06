@@ -114,12 +114,11 @@ message ClusterInfo {
     required fixed64 creationId = 2;
 
     optional fixed64 recoveryId = 3;
-    optional int32 globalPartitionCount = 4;
+    optional int32 protocolVersion = 4;
+    optional int32 globalPartitionCount = 5;
 
-    repeated NodeInfo nodeInfo = 5;
-    repeated PartitionInfo partitionInfo = 6;
-
-    optional int32 protocolVersion = 7;
+    repeated NodeInfo nodeInfo = 6;
+    repeated PartitionInfo partitionInfo = 7;
 }
 
 message NodeInfo {

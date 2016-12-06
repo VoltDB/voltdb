@@ -11610,75 +11610,75 @@ public final class DRAgent {
      */
     long getRecoveryId();
 
-    // optional int32 globalPartitionCount = 4;
+    // optional int32 protocolVersion = 4;
     /**
-     * <code>optional int32 globalPartitionCount = 4;</code>
+     * <code>optional int32 protocolVersion = 4;</code>
+     */
+    boolean hasProtocolVersion();
+    /**
+     * <code>optional int32 protocolVersion = 4;</code>
+     */
+    int getProtocolVersion();
+
+    // optional int32 globalPartitionCount = 5;
+    /**
+     * <code>optional int32 globalPartitionCount = 5;</code>
      */
     boolean hasGlobalPartitionCount();
     /**
-     * <code>optional int32 globalPartitionCount = 4;</code>
+     * <code>optional int32 globalPartitionCount = 5;</code>
      */
     int getGlobalPartitionCount();
 
-    // repeated .pmsg.NodeInfo nodeInfo = 5;
+    // repeated .pmsg.NodeInfo nodeInfo = 6;
     /**
-     * <code>repeated .pmsg.NodeInfo nodeInfo = 5;</code>
+     * <code>repeated .pmsg.NodeInfo nodeInfo = 6;</code>
      */
     java.util.List<org.voltdb.pmsg.DRAgent.NodeInfo> 
         getNodeInfoList();
     /**
-     * <code>repeated .pmsg.NodeInfo nodeInfo = 5;</code>
+     * <code>repeated .pmsg.NodeInfo nodeInfo = 6;</code>
      */
     org.voltdb.pmsg.DRAgent.NodeInfo getNodeInfo(int index);
     /**
-     * <code>repeated .pmsg.NodeInfo nodeInfo = 5;</code>
+     * <code>repeated .pmsg.NodeInfo nodeInfo = 6;</code>
      */
     int getNodeInfoCount();
     /**
-     * <code>repeated .pmsg.NodeInfo nodeInfo = 5;</code>
+     * <code>repeated .pmsg.NodeInfo nodeInfo = 6;</code>
      */
     java.util.List<? extends org.voltdb.pmsg.DRAgent.NodeInfoOrBuilder> 
         getNodeInfoOrBuilderList();
     /**
-     * <code>repeated .pmsg.NodeInfo nodeInfo = 5;</code>
+     * <code>repeated .pmsg.NodeInfo nodeInfo = 6;</code>
      */
     org.voltdb.pmsg.DRAgent.NodeInfoOrBuilder getNodeInfoOrBuilder(
         int index);
 
-    // repeated .pmsg.PartitionInfo partitionInfo = 6;
+    // repeated .pmsg.PartitionInfo partitionInfo = 7;
     /**
-     * <code>repeated .pmsg.PartitionInfo partitionInfo = 6;</code>
+     * <code>repeated .pmsg.PartitionInfo partitionInfo = 7;</code>
      */
     java.util.List<org.voltdb.pmsg.DRAgent.PartitionInfo> 
         getPartitionInfoList();
     /**
-     * <code>repeated .pmsg.PartitionInfo partitionInfo = 6;</code>
+     * <code>repeated .pmsg.PartitionInfo partitionInfo = 7;</code>
      */
     org.voltdb.pmsg.DRAgent.PartitionInfo getPartitionInfo(int index);
     /**
-     * <code>repeated .pmsg.PartitionInfo partitionInfo = 6;</code>
+     * <code>repeated .pmsg.PartitionInfo partitionInfo = 7;</code>
      */
     int getPartitionInfoCount();
     /**
-     * <code>repeated .pmsg.PartitionInfo partitionInfo = 6;</code>
+     * <code>repeated .pmsg.PartitionInfo partitionInfo = 7;</code>
      */
     java.util.List<? extends org.voltdb.pmsg.DRAgent.PartitionInfoOrBuilder> 
         getPartitionInfoOrBuilderList();
     /**
-     * <code>repeated .pmsg.PartitionInfo partitionInfo = 6;</code>
+     * <code>repeated .pmsg.PartitionInfo partitionInfo = 7;</code>
      */
     org.voltdb.pmsg.DRAgent.PartitionInfoOrBuilder getPartitionInfoOrBuilder(
         int index);
-
-    // optional int32 protocolVersion = 7;
-    /**
-     * <code>optional int32 protocolVersion = 7;</code>
-     */
-    boolean hasProtocolVersion();
-    /**
-     * <code>optional int32 protocolVersion = 7;</code>
-     */
-    int getProtocolVersion();
   }
   /**
    * Protobuf type {@code pmsg.ClusterInfo}
@@ -11748,28 +11748,28 @@ public final class DRAgent {
             }
             case 32: {
               bitField0_ |= 0x00000008;
-              globalPartitionCount_ = input.readInt32();
+              protocolVersion_ = input.readInt32();
               break;
             }
-            case 42: {
-              if (!((mutable_bitField0_ & 0x00000010) == 0x00000010)) {
-                nodeInfo_ = new java.util.ArrayList<org.voltdb.pmsg.DRAgent.NodeInfo>();
-                mutable_bitField0_ |= 0x00000010;
-              }
-              nodeInfo_.add(input.readMessage(org.voltdb.pmsg.DRAgent.NodeInfo.PARSER, extensionRegistry));
+            case 40: {
+              bitField0_ |= 0x00000010;
+              globalPartitionCount_ = input.readInt32();
               break;
             }
             case 50: {
               if (!((mutable_bitField0_ & 0x00000020) == 0x00000020)) {
-                partitionInfo_ = new java.util.ArrayList<org.voltdb.pmsg.DRAgent.PartitionInfo>();
+                nodeInfo_ = new java.util.ArrayList<org.voltdb.pmsg.DRAgent.NodeInfo>();
                 mutable_bitField0_ |= 0x00000020;
               }
-              partitionInfo_.add(input.readMessage(org.voltdb.pmsg.DRAgent.PartitionInfo.PARSER, extensionRegistry));
+              nodeInfo_.add(input.readMessage(org.voltdb.pmsg.DRAgent.NodeInfo.PARSER, extensionRegistry));
               break;
             }
-            case 56: {
-              bitField0_ |= 0x00000010;
-              protocolVersion_ = input.readInt32();
+            case 58: {
+              if (!((mutable_bitField0_ & 0x00000040) == 0x00000040)) {
+                partitionInfo_ = new java.util.ArrayList<org.voltdb.pmsg.DRAgent.PartitionInfo>();
+                mutable_bitField0_ |= 0x00000040;
+              }
+              partitionInfo_.add(input.readMessage(org.voltdb.pmsg.DRAgent.PartitionInfo.PARSER, extensionRegistry));
               break;
             }
           }
@@ -11780,10 +11780,10 @@ public final class DRAgent {
         throw new com.google.protobuf.InvalidProtocolBufferException(
             e.getMessage()).setUnfinishedMessage(this);
       } finally {
-        if (((mutable_bitField0_ & 0x00000010) == 0x00000010)) {
+        if (((mutable_bitField0_ & 0x00000020) == 0x00000020)) {
           nodeInfo_ = java.util.Collections.unmodifiableList(nodeInfo_);
         }
-        if (((mutable_bitField0_ & 0x00000020) == 0x00000020)) {
+        if (((mutable_bitField0_ & 0x00000040) == 0x00000040)) {
           partitionInfo_ = java.util.Collections.unmodifiableList(partitionInfo_);
         }
         this.unknownFields = unknownFields.build();
@@ -11866,118 +11866,118 @@ public final class DRAgent {
       return recoveryId_;
     }
 
-    // optional int32 globalPartitionCount = 4;
-    public static final int GLOBALPARTITIONCOUNT_FIELD_NUMBER = 4;
-    private int globalPartitionCount_;
+    // optional int32 protocolVersion = 4;
+    public static final int PROTOCOLVERSION_FIELD_NUMBER = 4;
+    private int protocolVersion_;
     /**
-     * <code>optional int32 globalPartitionCount = 4;</code>
+     * <code>optional int32 protocolVersion = 4;</code>
      */
-    public boolean hasGlobalPartitionCount() {
+    public boolean hasProtocolVersion() {
       return ((bitField0_ & 0x00000008) == 0x00000008);
     }
     /**
-     * <code>optional int32 globalPartitionCount = 4;</code>
+     * <code>optional int32 protocolVersion = 4;</code>
+     */
+    public int getProtocolVersion() {
+      return protocolVersion_;
+    }
+
+    // optional int32 globalPartitionCount = 5;
+    public static final int GLOBALPARTITIONCOUNT_FIELD_NUMBER = 5;
+    private int globalPartitionCount_;
+    /**
+     * <code>optional int32 globalPartitionCount = 5;</code>
+     */
+    public boolean hasGlobalPartitionCount() {
+      return ((bitField0_ & 0x00000010) == 0x00000010);
+    }
+    /**
+     * <code>optional int32 globalPartitionCount = 5;</code>
      */
     public int getGlobalPartitionCount() {
       return globalPartitionCount_;
     }
 
-    // repeated .pmsg.NodeInfo nodeInfo = 5;
-    public static final int NODEINFO_FIELD_NUMBER = 5;
+    // repeated .pmsg.NodeInfo nodeInfo = 6;
+    public static final int NODEINFO_FIELD_NUMBER = 6;
     private java.util.List<org.voltdb.pmsg.DRAgent.NodeInfo> nodeInfo_;
     /**
-     * <code>repeated .pmsg.NodeInfo nodeInfo = 5;</code>
+     * <code>repeated .pmsg.NodeInfo nodeInfo = 6;</code>
      */
     public java.util.List<org.voltdb.pmsg.DRAgent.NodeInfo> getNodeInfoList() {
       return nodeInfo_;
     }
     /**
-     * <code>repeated .pmsg.NodeInfo nodeInfo = 5;</code>
+     * <code>repeated .pmsg.NodeInfo nodeInfo = 6;</code>
      */
     public java.util.List<? extends org.voltdb.pmsg.DRAgent.NodeInfoOrBuilder> 
         getNodeInfoOrBuilderList() {
       return nodeInfo_;
     }
     /**
-     * <code>repeated .pmsg.NodeInfo nodeInfo = 5;</code>
+     * <code>repeated .pmsg.NodeInfo nodeInfo = 6;</code>
      */
     public int getNodeInfoCount() {
       return nodeInfo_.size();
     }
     /**
-     * <code>repeated .pmsg.NodeInfo nodeInfo = 5;</code>
+     * <code>repeated .pmsg.NodeInfo nodeInfo = 6;</code>
      */
     public org.voltdb.pmsg.DRAgent.NodeInfo getNodeInfo(int index) {
       return nodeInfo_.get(index);
     }
     /**
-     * <code>repeated .pmsg.NodeInfo nodeInfo = 5;</code>
+     * <code>repeated .pmsg.NodeInfo nodeInfo = 6;</code>
      */
     public org.voltdb.pmsg.DRAgent.NodeInfoOrBuilder getNodeInfoOrBuilder(
         int index) {
       return nodeInfo_.get(index);
     }
 
-    // repeated .pmsg.PartitionInfo partitionInfo = 6;
-    public static final int PARTITIONINFO_FIELD_NUMBER = 6;
+    // repeated .pmsg.PartitionInfo partitionInfo = 7;
+    public static final int PARTITIONINFO_FIELD_NUMBER = 7;
     private java.util.List<org.voltdb.pmsg.DRAgent.PartitionInfo> partitionInfo_;
     /**
-     * <code>repeated .pmsg.PartitionInfo partitionInfo = 6;</code>
+     * <code>repeated .pmsg.PartitionInfo partitionInfo = 7;</code>
      */
     public java.util.List<org.voltdb.pmsg.DRAgent.PartitionInfo> getPartitionInfoList() {
       return partitionInfo_;
     }
     /**
-     * <code>repeated .pmsg.PartitionInfo partitionInfo = 6;</code>
+     * <code>repeated .pmsg.PartitionInfo partitionInfo = 7;</code>
      */
     public java.util.List<? extends org.voltdb.pmsg.DRAgent.PartitionInfoOrBuilder> 
         getPartitionInfoOrBuilderList() {
       return partitionInfo_;
     }
     /**
-     * <code>repeated .pmsg.PartitionInfo partitionInfo = 6;</code>
+     * <code>repeated .pmsg.PartitionInfo partitionInfo = 7;</code>
      */
     public int getPartitionInfoCount() {
       return partitionInfo_.size();
     }
     /**
-     * <code>repeated .pmsg.PartitionInfo partitionInfo = 6;</code>
+     * <code>repeated .pmsg.PartitionInfo partitionInfo = 7;</code>
      */
     public org.voltdb.pmsg.DRAgent.PartitionInfo getPartitionInfo(int index) {
       return partitionInfo_.get(index);
     }
     /**
-     * <code>repeated .pmsg.PartitionInfo partitionInfo = 6;</code>
+     * <code>repeated .pmsg.PartitionInfo partitionInfo = 7;</code>
      */
     public org.voltdb.pmsg.DRAgent.PartitionInfoOrBuilder getPartitionInfoOrBuilder(
         int index) {
       return partitionInfo_.get(index);
     }
 
-    // optional int32 protocolVersion = 7;
-    public static final int PROTOCOLVERSION_FIELD_NUMBER = 7;
-    private int protocolVersion_;
-    /**
-     * <code>optional int32 protocolVersion = 7;</code>
-     */
-    public boolean hasProtocolVersion() {
-      return ((bitField0_ & 0x00000010) == 0x00000010);
-    }
-    /**
-     * <code>optional int32 protocolVersion = 7;</code>
-     */
-    public int getProtocolVersion() {
-      return protocolVersion_;
-    }
-
     private void initFields() {
       clusterId_ = 0;
       creationId_ = 0L;
       recoveryId_ = 0L;
+      protocolVersion_ = 0;
       globalPartitionCount_ = 0;
       nodeInfo_ = java.util.Collections.emptyList();
       partitionInfo_ = java.util.Collections.emptyList();
-      protocolVersion_ = 0;
     }
     private byte memoizedIsInitialized = -1;
     public final boolean isInitialized() {
@@ -12009,16 +12009,16 @@ public final class DRAgent {
         output.writeFixed64(3, recoveryId_);
       }
       if (((bitField0_ & 0x00000008) == 0x00000008)) {
-        output.writeInt32(4, globalPartitionCount_);
-      }
-      for (int i = 0; i < nodeInfo_.size(); i++) {
-        output.writeMessage(5, nodeInfo_.get(i));
-      }
-      for (int i = 0; i < partitionInfo_.size(); i++) {
-        output.writeMessage(6, partitionInfo_.get(i));
+        output.writeInt32(4, protocolVersion_);
       }
       if (((bitField0_ & 0x00000010) == 0x00000010)) {
-        output.writeInt32(7, protocolVersion_);
+        output.writeInt32(5, globalPartitionCount_);
+      }
+      for (int i = 0; i < nodeInfo_.size(); i++) {
+        output.writeMessage(6, nodeInfo_.get(i));
+      }
+      for (int i = 0; i < partitionInfo_.size(); i++) {
+        output.writeMessage(7, partitionInfo_.get(i));
       }
       getUnknownFields().writeTo(output);
     }
@@ -12043,19 +12043,19 @@ public final class DRAgent {
       }
       if (((bitField0_ & 0x00000008) == 0x00000008)) {
         size += com.google.protobuf.CodedOutputStream
-          .computeInt32Size(4, globalPartitionCount_);
-      }
-      for (int i = 0; i < nodeInfo_.size(); i++) {
-        size += com.google.protobuf.CodedOutputStream
-          .computeMessageSize(5, nodeInfo_.get(i));
-      }
-      for (int i = 0; i < partitionInfo_.size(); i++) {
-        size += com.google.protobuf.CodedOutputStream
-          .computeMessageSize(6, partitionInfo_.get(i));
+          .computeInt32Size(4, protocolVersion_);
       }
       if (((bitField0_ & 0x00000010) == 0x00000010)) {
         size += com.google.protobuf.CodedOutputStream
-          .computeInt32Size(7, protocolVersion_);
+          .computeInt32Size(5, globalPartitionCount_);
+      }
+      for (int i = 0; i < nodeInfo_.size(); i++) {
+        size += com.google.protobuf.CodedOutputStream
+          .computeMessageSize(6, nodeInfo_.get(i));
+      }
+      for (int i = 0; i < partitionInfo_.size(); i++) {
+        size += com.google.protobuf.CodedOutputStream
+          .computeMessageSize(7, partitionInfo_.get(i));
       }
       size += getUnknownFields().getSerializedSize();
       memoizedSerializedSize = size;
@@ -12181,22 +12181,22 @@ public final class DRAgent {
         bitField0_ = (bitField0_ & ~0x00000002);
         recoveryId_ = 0L;
         bitField0_ = (bitField0_ & ~0x00000004);
-        globalPartitionCount_ = 0;
+        protocolVersion_ = 0;
         bitField0_ = (bitField0_ & ~0x00000008);
+        globalPartitionCount_ = 0;
+        bitField0_ = (bitField0_ & ~0x00000010);
         if (nodeInfoBuilder_ == null) {
           nodeInfo_ = java.util.Collections.emptyList();
-          bitField0_ = (bitField0_ & ~0x00000010);
+          bitField0_ = (bitField0_ & ~0x00000020);
         } else {
           nodeInfoBuilder_.clear();
         }
         if (partitionInfoBuilder_ == null) {
           partitionInfo_ = java.util.Collections.emptyList();
-          bitField0_ = (bitField0_ & ~0x00000020);
+          bitField0_ = (bitField0_ & ~0x00000040);
         } else {
           partitionInfoBuilder_.clear();
         }
-        protocolVersion_ = 0;
-        bitField0_ = (bitField0_ & ~0x00000040);
         return this;
       }
 
@@ -12240,29 +12240,29 @@ public final class DRAgent {
         if (((from_bitField0_ & 0x00000008) == 0x00000008)) {
           to_bitField0_ |= 0x00000008;
         }
+        result.protocolVersion_ = protocolVersion_;
+        if (((from_bitField0_ & 0x00000010) == 0x00000010)) {
+          to_bitField0_ |= 0x00000010;
+        }
         result.globalPartitionCount_ = globalPartitionCount_;
         if (nodeInfoBuilder_ == null) {
-          if (((bitField0_ & 0x00000010) == 0x00000010)) {
+          if (((bitField0_ & 0x00000020) == 0x00000020)) {
             nodeInfo_ = java.util.Collections.unmodifiableList(nodeInfo_);
-            bitField0_ = (bitField0_ & ~0x00000010);
+            bitField0_ = (bitField0_ & ~0x00000020);
           }
           result.nodeInfo_ = nodeInfo_;
         } else {
           result.nodeInfo_ = nodeInfoBuilder_.build();
         }
         if (partitionInfoBuilder_ == null) {
-          if (((bitField0_ & 0x00000020) == 0x00000020)) {
+          if (((bitField0_ & 0x00000040) == 0x00000040)) {
             partitionInfo_ = java.util.Collections.unmodifiableList(partitionInfo_);
-            bitField0_ = (bitField0_ & ~0x00000020);
+            bitField0_ = (bitField0_ & ~0x00000040);
           }
           result.partitionInfo_ = partitionInfo_;
         } else {
           result.partitionInfo_ = partitionInfoBuilder_.build();
         }
-        if (((from_bitField0_ & 0x00000040) == 0x00000040)) {
-          to_bitField0_ |= 0x00000010;
-        }
-        result.protocolVersion_ = protocolVersion_;
         result.bitField0_ = to_bitField0_;
         onBuilt();
         return result;
@@ -12288,6 +12288,9 @@ public final class DRAgent {
         if (other.hasRecoveryId()) {
           setRecoveryId(other.getRecoveryId());
         }
+        if (other.hasProtocolVersion()) {
+          setProtocolVersion(other.getProtocolVersion());
+        }
         if (other.hasGlobalPartitionCount()) {
           setGlobalPartitionCount(other.getGlobalPartitionCount());
         }
@@ -12295,7 +12298,7 @@ public final class DRAgent {
           if (!other.nodeInfo_.isEmpty()) {
             if (nodeInfo_.isEmpty()) {
               nodeInfo_ = other.nodeInfo_;
-              bitField0_ = (bitField0_ & ~0x00000010);
+              bitField0_ = (bitField0_ & ~0x00000020);
             } else {
               ensureNodeInfoIsMutable();
               nodeInfo_.addAll(other.nodeInfo_);
@@ -12308,7 +12311,7 @@ public final class DRAgent {
               nodeInfoBuilder_.dispose();
               nodeInfoBuilder_ = null;
               nodeInfo_ = other.nodeInfo_;
-              bitField0_ = (bitField0_ & ~0x00000010);
+              bitField0_ = (bitField0_ & ~0x00000020);
               nodeInfoBuilder_ = 
                 com.google.protobuf.GeneratedMessage.alwaysUseFieldBuilders ?
                    getNodeInfoFieldBuilder() : null;
@@ -12321,7 +12324,7 @@ public final class DRAgent {
           if (!other.partitionInfo_.isEmpty()) {
             if (partitionInfo_.isEmpty()) {
               partitionInfo_ = other.partitionInfo_;
-              bitField0_ = (bitField0_ & ~0x00000020);
+              bitField0_ = (bitField0_ & ~0x00000040);
             } else {
               ensurePartitionInfoIsMutable();
               partitionInfo_.addAll(other.partitionInfo_);
@@ -12334,7 +12337,7 @@ public final class DRAgent {
               partitionInfoBuilder_.dispose();
               partitionInfoBuilder_ = null;
               partitionInfo_ = other.partitionInfo_;
-              bitField0_ = (bitField0_ & ~0x00000020);
+              bitField0_ = (bitField0_ & ~0x00000040);
               partitionInfoBuilder_ = 
                 com.google.protobuf.GeneratedMessage.alwaysUseFieldBuilders ?
                    getPartitionInfoFieldBuilder() : null;
@@ -12342,9 +12345,6 @@ public final class DRAgent {
               partitionInfoBuilder_.addAllMessages(other.partitionInfo_);
             }
           }
-        }
-        if (other.hasProtocolVersion()) {
-          setProtocolVersion(other.getProtocolVersion());
         }
         this.mergeUnknownFields(other.getUnknownFields());
         return this;
@@ -12480,46 +12480,79 @@ public final class DRAgent {
         return this;
       }
 
-      // optional int32 globalPartitionCount = 4;
-      private int globalPartitionCount_ ;
+      // optional int32 protocolVersion = 4;
+      private int protocolVersion_ ;
       /**
-       * <code>optional int32 globalPartitionCount = 4;</code>
+       * <code>optional int32 protocolVersion = 4;</code>
        */
-      public boolean hasGlobalPartitionCount() {
+      public boolean hasProtocolVersion() {
         return ((bitField0_ & 0x00000008) == 0x00000008);
       }
       /**
-       * <code>optional int32 globalPartitionCount = 4;</code>
+       * <code>optional int32 protocolVersion = 4;</code>
+       */
+      public int getProtocolVersion() {
+        return protocolVersion_;
+      }
+      /**
+       * <code>optional int32 protocolVersion = 4;</code>
+       */
+      public Builder setProtocolVersion(int value) {
+        bitField0_ |= 0x00000008;
+        protocolVersion_ = value;
+        onChanged();
+        return this;
+      }
+      /**
+       * <code>optional int32 protocolVersion = 4;</code>
+       */
+      public Builder clearProtocolVersion() {
+        bitField0_ = (bitField0_ & ~0x00000008);
+        protocolVersion_ = 0;
+        onChanged();
+        return this;
+      }
+
+      // optional int32 globalPartitionCount = 5;
+      private int globalPartitionCount_ ;
+      /**
+       * <code>optional int32 globalPartitionCount = 5;</code>
+       */
+      public boolean hasGlobalPartitionCount() {
+        return ((bitField0_ & 0x00000010) == 0x00000010);
+      }
+      /**
+       * <code>optional int32 globalPartitionCount = 5;</code>
        */
       public int getGlobalPartitionCount() {
         return globalPartitionCount_;
       }
       /**
-       * <code>optional int32 globalPartitionCount = 4;</code>
+       * <code>optional int32 globalPartitionCount = 5;</code>
        */
       public Builder setGlobalPartitionCount(int value) {
-        bitField0_ |= 0x00000008;
+        bitField0_ |= 0x00000010;
         globalPartitionCount_ = value;
         onChanged();
         return this;
       }
       /**
-       * <code>optional int32 globalPartitionCount = 4;</code>
+       * <code>optional int32 globalPartitionCount = 5;</code>
        */
       public Builder clearGlobalPartitionCount() {
-        bitField0_ = (bitField0_ & ~0x00000008);
+        bitField0_ = (bitField0_ & ~0x00000010);
         globalPartitionCount_ = 0;
         onChanged();
         return this;
       }
 
-      // repeated .pmsg.NodeInfo nodeInfo = 5;
+      // repeated .pmsg.NodeInfo nodeInfo = 6;
       private java.util.List<org.voltdb.pmsg.DRAgent.NodeInfo> nodeInfo_ =
         java.util.Collections.emptyList();
       private void ensureNodeInfoIsMutable() {
-        if (!((bitField0_ & 0x00000010) == 0x00000010)) {
+        if (!((bitField0_ & 0x00000020) == 0x00000020)) {
           nodeInfo_ = new java.util.ArrayList<org.voltdb.pmsg.DRAgent.NodeInfo>(nodeInfo_);
-          bitField0_ |= 0x00000010;
+          bitField0_ |= 0x00000020;
          }
       }
 
@@ -12527,7 +12560,7 @@ public final class DRAgent {
           org.voltdb.pmsg.DRAgent.NodeInfo, org.voltdb.pmsg.DRAgent.NodeInfo.Builder, org.voltdb.pmsg.DRAgent.NodeInfoOrBuilder> nodeInfoBuilder_;
 
       /**
-       * <code>repeated .pmsg.NodeInfo nodeInfo = 5;</code>
+       * <code>repeated .pmsg.NodeInfo nodeInfo = 6;</code>
        */
       public java.util.List<org.voltdb.pmsg.DRAgent.NodeInfo> getNodeInfoList() {
         if (nodeInfoBuilder_ == null) {
@@ -12537,7 +12570,7 @@ public final class DRAgent {
         }
       }
       /**
-       * <code>repeated .pmsg.NodeInfo nodeInfo = 5;</code>
+       * <code>repeated .pmsg.NodeInfo nodeInfo = 6;</code>
        */
       public int getNodeInfoCount() {
         if (nodeInfoBuilder_ == null) {
@@ -12547,7 +12580,7 @@ public final class DRAgent {
         }
       }
       /**
-       * <code>repeated .pmsg.NodeInfo nodeInfo = 5;</code>
+       * <code>repeated .pmsg.NodeInfo nodeInfo = 6;</code>
        */
       public org.voltdb.pmsg.DRAgent.NodeInfo getNodeInfo(int index) {
         if (nodeInfoBuilder_ == null) {
@@ -12557,7 +12590,7 @@ public final class DRAgent {
         }
       }
       /**
-       * <code>repeated .pmsg.NodeInfo nodeInfo = 5;</code>
+       * <code>repeated .pmsg.NodeInfo nodeInfo = 6;</code>
        */
       public Builder setNodeInfo(
           int index, org.voltdb.pmsg.DRAgent.NodeInfo value) {
@@ -12574,7 +12607,7 @@ public final class DRAgent {
         return this;
       }
       /**
-       * <code>repeated .pmsg.NodeInfo nodeInfo = 5;</code>
+       * <code>repeated .pmsg.NodeInfo nodeInfo = 6;</code>
        */
       public Builder setNodeInfo(
           int index, org.voltdb.pmsg.DRAgent.NodeInfo.Builder builderForValue) {
@@ -12588,7 +12621,7 @@ public final class DRAgent {
         return this;
       }
       /**
-       * <code>repeated .pmsg.NodeInfo nodeInfo = 5;</code>
+       * <code>repeated .pmsg.NodeInfo nodeInfo = 6;</code>
        */
       public Builder addNodeInfo(org.voltdb.pmsg.DRAgent.NodeInfo value) {
         if (nodeInfoBuilder_ == null) {
@@ -12604,7 +12637,7 @@ public final class DRAgent {
         return this;
       }
       /**
-       * <code>repeated .pmsg.NodeInfo nodeInfo = 5;</code>
+       * <code>repeated .pmsg.NodeInfo nodeInfo = 6;</code>
        */
       public Builder addNodeInfo(
           int index, org.voltdb.pmsg.DRAgent.NodeInfo value) {
@@ -12621,7 +12654,7 @@ public final class DRAgent {
         return this;
       }
       /**
-       * <code>repeated .pmsg.NodeInfo nodeInfo = 5;</code>
+       * <code>repeated .pmsg.NodeInfo nodeInfo = 6;</code>
        */
       public Builder addNodeInfo(
           org.voltdb.pmsg.DRAgent.NodeInfo.Builder builderForValue) {
@@ -12635,7 +12668,7 @@ public final class DRAgent {
         return this;
       }
       /**
-       * <code>repeated .pmsg.NodeInfo nodeInfo = 5;</code>
+       * <code>repeated .pmsg.NodeInfo nodeInfo = 6;</code>
        */
       public Builder addNodeInfo(
           int index, org.voltdb.pmsg.DRAgent.NodeInfo.Builder builderForValue) {
@@ -12649,7 +12682,7 @@ public final class DRAgent {
         return this;
       }
       /**
-       * <code>repeated .pmsg.NodeInfo nodeInfo = 5;</code>
+       * <code>repeated .pmsg.NodeInfo nodeInfo = 6;</code>
        */
       public Builder addAllNodeInfo(
           java.lang.Iterable<? extends org.voltdb.pmsg.DRAgent.NodeInfo> values) {
@@ -12663,12 +12696,12 @@ public final class DRAgent {
         return this;
       }
       /**
-       * <code>repeated .pmsg.NodeInfo nodeInfo = 5;</code>
+       * <code>repeated .pmsg.NodeInfo nodeInfo = 6;</code>
        */
       public Builder clearNodeInfo() {
         if (nodeInfoBuilder_ == null) {
           nodeInfo_ = java.util.Collections.emptyList();
-          bitField0_ = (bitField0_ & ~0x00000010);
+          bitField0_ = (bitField0_ & ~0x00000020);
           onChanged();
         } else {
           nodeInfoBuilder_.clear();
@@ -12676,7 +12709,7 @@ public final class DRAgent {
         return this;
       }
       /**
-       * <code>repeated .pmsg.NodeInfo nodeInfo = 5;</code>
+       * <code>repeated .pmsg.NodeInfo nodeInfo = 6;</code>
        */
       public Builder removeNodeInfo(int index) {
         if (nodeInfoBuilder_ == null) {
@@ -12689,14 +12722,14 @@ public final class DRAgent {
         return this;
       }
       /**
-       * <code>repeated .pmsg.NodeInfo nodeInfo = 5;</code>
+       * <code>repeated .pmsg.NodeInfo nodeInfo = 6;</code>
        */
       public org.voltdb.pmsg.DRAgent.NodeInfo.Builder getNodeInfoBuilder(
           int index) {
         return getNodeInfoFieldBuilder().getBuilder(index);
       }
       /**
-       * <code>repeated .pmsg.NodeInfo nodeInfo = 5;</code>
+       * <code>repeated .pmsg.NodeInfo nodeInfo = 6;</code>
        */
       public org.voltdb.pmsg.DRAgent.NodeInfoOrBuilder getNodeInfoOrBuilder(
           int index) {
@@ -12706,7 +12739,7 @@ public final class DRAgent {
         }
       }
       /**
-       * <code>repeated .pmsg.NodeInfo nodeInfo = 5;</code>
+       * <code>repeated .pmsg.NodeInfo nodeInfo = 6;</code>
        */
       public java.util.List<? extends org.voltdb.pmsg.DRAgent.NodeInfoOrBuilder> 
            getNodeInfoOrBuilderList() {
@@ -12717,14 +12750,14 @@ public final class DRAgent {
         }
       }
       /**
-       * <code>repeated .pmsg.NodeInfo nodeInfo = 5;</code>
+       * <code>repeated .pmsg.NodeInfo nodeInfo = 6;</code>
        */
       public org.voltdb.pmsg.DRAgent.NodeInfo.Builder addNodeInfoBuilder() {
         return getNodeInfoFieldBuilder().addBuilder(
             org.voltdb.pmsg.DRAgent.NodeInfo.getDefaultInstance());
       }
       /**
-       * <code>repeated .pmsg.NodeInfo nodeInfo = 5;</code>
+       * <code>repeated .pmsg.NodeInfo nodeInfo = 6;</code>
        */
       public org.voltdb.pmsg.DRAgent.NodeInfo.Builder addNodeInfoBuilder(
           int index) {
@@ -12732,7 +12765,7 @@ public final class DRAgent {
             index, org.voltdb.pmsg.DRAgent.NodeInfo.getDefaultInstance());
       }
       /**
-       * <code>repeated .pmsg.NodeInfo nodeInfo = 5;</code>
+       * <code>repeated .pmsg.NodeInfo nodeInfo = 6;</code>
        */
       public java.util.List<org.voltdb.pmsg.DRAgent.NodeInfo.Builder> 
            getNodeInfoBuilderList() {
@@ -12745,7 +12778,7 @@ public final class DRAgent {
           nodeInfoBuilder_ = new com.google.protobuf.RepeatedFieldBuilder<
               org.voltdb.pmsg.DRAgent.NodeInfo, org.voltdb.pmsg.DRAgent.NodeInfo.Builder, org.voltdb.pmsg.DRAgent.NodeInfoOrBuilder>(
                   nodeInfo_,
-                  ((bitField0_ & 0x00000010) == 0x00000010),
+                  ((bitField0_ & 0x00000020) == 0x00000020),
                   getParentForChildren(),
                   isClean());
           nodeInfo_ = null;
@@ -12753,13 +12786,13 @@ public final class DRAgent {
         return nodeInfoBuilder_;
       }
 
-      // repeated .pmsg.PartitionInfo partitionInfo = 6;
+      // repeated .pmsg.PartitionInfo partitionInfo = 7;
       private java.util.List<org.voltdb.pmsg.DRAgent.PartitionInfo> partitionInfo_ =
         java.util.Collections.emptyList();
       private void ensurePartitionInfoIsMutable() {
-        if (!((bitField0_ & 0x00000020) == 0x00000020)) {
+        if (!((bitField0_ & 0x00000040) == 0x00000040)) {
           partitionInfo_ = new java.util.ArrayList<org.voltdb.pmsg.DRAgent.PartitionInfo>(partitionInfo_);
-          bitField0_ |= 0x00000020;
+          bitField0_ |= 0x00000040;
          }
       }
 
@@ -12767,7 +12800,7 @@ public final class DRAgent {
           org.voltdb.pmsg.DRAgent.PartitionInfo, org.voltdb.pmsg.DRAgent.PartitionInfo.Builder, org.voltdb.pmsg.DRAgent.PartitionInfoOrBuilder> partitionInfoBuilder_;
 
       /**
-       * <code>repeated .pmsg.PartitionInfo partitionInfo = 6;</code>
+       * <code>repeated .pmsg.PartitionInfo partitionInfo = 7;</code>
        */
       public java.util.List<org.voltdb.pmsg.DRAgent.PartitionInfo> getPartitionInfoList() {
         if (partitionInfoBuilder_ == null) {
@@ -12777,7 +12810,7 @@ public final class DRAgent {
         }
       }
       /**
-       * <code>repeated .pmsg.PartitionInfo partitionInfo = 6;</code>
+       * <code>repeated .pmsg.PartitionInfo partitionInfo = 7;</code>
        */
       public int getPartitionInfoCount() {
         if (partitionInfoBuilder_ == null) {
@@ -12787,7 +12820,7 @@ public final class DRAgent {
         }
       }
       /**
-       * <code>repeated .pmsg.PartitionInfo partitionInfo = 6;</code>
+       * <code>repeated .pmsg.PartitionInfo partitionInfo = 7;</code>
        */
       public org.voltdb.pmsg.DRAgent.PartitionInfo getPartitionInfo(int index) {
         if (partitionInfoBuilder_ == null) {
@@ -12797,7 +12830,7 @@ public final class DRAgent {
         }
       }
       /**
-       * <code>repeated .pmsg.PartitionInfo partitionInfo = 6;</code>
+       * <code>repeated .pmsg.PartitionInfo partitionInfo = 7;</code>
        */
       public Builder setPartitionInfo(
           int index, org.voltdb.pmsg.DRAgent.PartitionInfo value) {
@@ -12814,7 +12847,7 @@ public final class DRAgent {
         return this;
       }
       /**
-       * <code>repeated .pmsg.PartitionInfo partitionInfo = 6;</code>
+       * <code>repeated .pmsg.PartitionInfo partitionInfo = 7;</code>
        */
       public Builder setPartitionInfo(
           int index, org.voltdb.pmsg.DRAgent.PartitionInfo.Builder builderForValue) {
@@ -12828,7 +12861,7 @@ public final class DRAgent {
         return this;
       }
       /**
-       * <code>repeated .pmsg.PartitionInfo partitionInfo = 6;</code>
+       * <code>repeated .pmsg.PartitionInfo partitionInfo = 7;</code>
        */
       public Builder addPartitionInfo(org.voltdb.pmsg.DRAgent.PartitionInfo value) {
         if (partitionInfoBuilder_ == null) {
@@ -12844,7 +12877,7 @@ public final class DRAgent {
         return this;
       }
       /**
-       * <code>repeated .pmsg.PartitionInfo partitionInfo = 6;</code>
+       * <code>repeated .pmsg.PartitionInfo partitionInfo = 7;</code>
        */
       public Builder addPartitionInfo(
           int index, org.voltdb.pmsg.DRAgent.PartitionInfo value) {
@@ -12861,7 +12894,7 @@ public final class DRAgent {
         return this;
       }
       /**
-       * <code>repeated .pmsg.PartitionInfo partitionInfo = 6;</code>
+       * <code>repeated .pmsg.PartitionInfo partitionInfo = 7;</code>
        */
       public Builder addPartitionInfo(
           org.voltdb.pmsg.DRAgent.PartitionInfo.Builder builderForValue) {
@@ -12875,7 +12908,7 @@ public final class DRAgent {
         return this;
       }
       /**
-       * <code>repeated .pmsg.PartitionInfo partitionInfo = 6;</code>
+       * <code>repeated .pmsg.PartitionInfo partitionInfo = 7;</code>
        */
       public Builder addPartitionInfo(
           int index, org.voltdb.pmsg.DRAgent.PartitionInfo.Builder builderForValue) {
@@ -12889,7 +12922,7 @@ public final class DRAgent {
         return this;
       }
       /**
-       * <code>repeated .pmsg.PartitionInfo partitionInfo = 6;</code>
+       * <code>repeated .pmsg.PartitionInfo partitionInfo = 7;</code>
        */
       public Builder addAllPartitionInfo(
           java.lang.Iterable<? extends org.voltdb.pmsg.DRAgent.PartitionInfo> values) {
@@ -12903,12 +12936,12 @@ public final class DRAgent {
         return this;
       }
       /**
-       * <code>repeated .pmsg.PartitionInfo partitionInfo = 6;</code>
+       * <code>repeated .pmsg.PartitionInfo partitionInfo = 7;</code>
        */
       public Builder clearPartitionInfo() {
         if (partitionInfoBuilder_ == null) {
           partitionInfo_ = java.util.Collections.emptyList();
-          bitField0_ = (bitField0_ & ~0x00000020);
+          bitField0_ = (bitField0_ & ~0x00000040);
           onChanged();
         } else {
           partitionInfoBuilder_.clear();
@@ -12916,7 +12949,7 @@ public final class DRAgent {
         return this;
       }
       /**
-       * <code>repeated .pmsg.PartitionInfo partitionInfo = 6;</code>
+       * <code>repeated .pmsg.PartitionInfo partitionInfo = 7;</code>
        */
       public Builder removePartitionInfo(int index) {
         if (partitionInfoBuilder_ == null) {
@@ -12929,14 +12962,14 @@ public final class DRAgent {
         return this;
       }
       /**
-       * <code>repeated .pmsg.PartitionInfo partitionInfo = 6;</code>
+       * <code>repeated .pmsg.PartitionInfo partitionInfo = 7;</code>
        */
       public org.voltdb.pmsg.DRAgent.PartitionInfo.Builder getPartitionInfoBuilder(
           int index) {
         return getPartitionInfoFieldBuilder().getBuilder(index);
       }
       /**
-       * <code>repeated .pmsg.PartitionInfo partitionInfo = 6;</code>
+       * <code>repeated .pmsg.PartitionInfo partitionInfo = 7;</code>
        */
       public org.voltdb.pmsg.DRAgent.PartitionInfoOrBuilder getPartitionInfoOrBuilder(
           int index) {
@@ -12946,7 +12979,7 @@ public final class DRAgent {
         }
       }
       /**
-       * <code>repeated .pmsg.PartitionInfo partitionInfo = 6;</code>
+       * <code>repeated .pmsg.PartitionInfo partitionInfo = 7;</code>
        */
       public java.util.List<? extends org.voltdb.pmsg.DRAgent.PartitionInfoOrBuilder> 
            getPartitionInfoOrBuilderList() {
@@ -12957,14 +12990,14 @@ public final class DRAgent {
         }
       }
       /**
-       * <code>repeated .pmsg.PartitionInfo partitionInfo = 6;</code>
+       * <code>repeated .pmsg.PartitionInfo partitionInfo = 7;</code>
        */
       public org.voltdb.pmsg.DRAgent.PartitionInfo.Builder addPartitionInfoBuilder() {
         return getPartitionInfoFieldBuilder().addBuilder(
             org.voltdb.pmsg.DRAgent.PartitionInfo.getDefaultInstance());
       }
       /**
-       * <code>repeated .pmsg.PartitionInfo partitionInfo = 6;</code>
+       * <code>repeated .pmsg.PartitionInfo partitionInfo = 7;</code>
        */
       public org.voltdb.pmsg.DRAgent.PartitionInfo.Builder addPartitionInfoBuilder(
           int index) {
@@ -12972,7 +13005,7 @@ public final class DRAgent {
             index, org.voltdb.pmsg.DRAgent.PartitionInfo.getDefaultInstance());
       }
       /**
-       * <code>repeated .pmsg.PartitionInfo partitionInfo = 6;</code>
+       * <code>repeated .pmsg.PartitionInfo partitionInfo = 7;</code>
        */
       public java.util.List<org.voltdb.pmsg.DRAgent.PartitionInfo.Builder> 
            getPartitionInfoBuilderList() {
@@ -12985,45 +13018,12 @@ public final class DRAgent {
           partitionInfoBuilder_ = new com.google.protobuf.RepeatedFieldBuilder<
               org.voltdb.pmsg.DRAgent.PartitionInfo, org.voltdb.pmsg.DRAgent.PartitionInfo.Builder, org.voltdb.pmsg.DRAgent.PartitionInfoOrBuilder>(
                   partitionInfo_,
-                  ((bitField0_ & 0x00000020) == 0x00000020),
+                  ((bitField0_ & 0x00000040) == 0x00000040),
                   getParentForChildren(),
                   isClean());
           partitionInfo_ = null;
         }
         return partitionInfoBuilder_;
-      }
-
-      // optional int32 protocolVersion = 7;
-      private int protocolVersion_ ;
-      /**
-       * <code>optional int32 protocolVersion = 7;</code>
-       */
-      public boolean hasProtocolVersion() {
-        return ((bitField0_ & 0x00000040) == 0x00000040);
-      }
-      /**
-       * <code>optional int32 protocolVersion = 7;</code>
-       */
-      public int getProtocolVersion() {
-        return protocolVersion_;
-      }
-      /**
-       * <code>optional int32 protocolVersion = 7;</code>
-       */
-      public Builder setProtocolVersion(int value) {
-        bitField0_ |= 0x00000040;
-        protocolVersion_ = value;
-        onChanged();
-        return this;
-      }
-      /**
-       * <code>optional int32 protocolVersion = 7;</code>
-       */
-      public Builder clearProtocolVersion() {
-        bitField0_ = (bitField0_ & ~0x00000040);
-        protocolVersion_ = 0;
-        onChanged();
-        return this;
       }
 
       // @@protoc_insertion_point(builder_scope:pmsg.ClusterInfo)
@@ -16980,10 +16980,10 @@ public final class DRAgent {
       "lusterInfo\"4\n\rQueryResponse\022#\n\010clusters\030",
       "\001 \003(\0132\021.pmsg.ClusterInfo\"\315\001\n\013ClusterInfo" +
       "\022\021\n\tclusterId\030\001 \002(\005\022\022\n\ncreationId\030\002 \002(\006\022" +
-      "\022\n\nrecoveryId\030\003 \001(\006\022\034\n\024globalPartitionCo" +
-      "unt\030\004 \001(\005\022 \n\010nodeInfo\030\005 \003(\0132\016.pmsg.NodeI" +
-      "nfo\022*\n\rpartitionInfo\030\006 \003(\0132\023.pmsg.Partit" +
-      "ionInfo\022\027\n\017protocolVersion\030\007 \001(\005\":\n\010Node" +
+      "\022\n\nrecoveryId\030\003 \001(\006\022\027\n\017protocolVersion\030\004" +
+      " \001(\005\022\034\n\024globalPartitionCount\030\005 \001(\005\022 \n\010no" +
+      "deInfo\030\006 \003(\0132\016.pmsg.NodeInfo\022*\n\rpartitio" +
+      "nInfo\030\007 \003(\0132\023.pmsg.PartitionInfo\":\n\010Node" +
       "Info\022\020\n\010hostname\030\001 \001(\t\022\016\n\006drport\030\002 \001(\005\022\014" +
       "\n\004isUp\030\003 \001(\010\":\n\rPartitionInfo\022\023\n\013partiti" +
       "onId\030\001 \001(\005\022\024\n\014nextUniqueId\030\n \001(\003\"\222\004\n\014Ctr" +
@@ -17096,7 +17096,7 @@ public final class DRAgent {
           internal_static_pmsg_ClusterInfo_fieldAccessorTable = new
             com.google.protobuf.GeneratedMessage.FieldAccessorTable(
               internal_static_pmsg_ClusterInfo_descriptor,
-              new java.lang.String[] { "ClusterId", "CreationId", "RecoveryId", "GlobalPartitionCount", "NodeInfo", "PartitionInfo", "ProtocolVersion", });
+              new java.lang.String[] { "ClusterId", "CreationId", "RecoveryId", "ProtocolVersion", "GlobalPartitionCount", "NodeInfo", "PartitionInfo", });
           internal_static_pmsg_NodeInfo_descriptor =
             getDescriptor().getMessageTypes().get(15);
           internal_static_pmsg_NodeInfo_fieldAccessorTable = new
