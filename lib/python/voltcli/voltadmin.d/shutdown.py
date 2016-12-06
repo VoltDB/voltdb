@@ -25,14 +25,14 @@ from voltcli.checkstats import StatisticsProcedureException
     options = (
         VOLT.BooleanOption('-f', '--force', 'forcing', 'immediate shutdown', default = False),
         VOLT.BooleanOption('-s', '--save', 'save', 'snapshot database contents', default = False),
-        VOLT.IntegerOption('-t', '--timeout', 'timeout', 'The timeout value in minutes if @Statistics is not progressing.', default = 2),
+        VOLT.IntegerOption('-t', '--timeout', 'timeout', 'The timeout value in seconds if @Statistics is not progressing.', default = 120),
     )
 )
 def shutdown(runner):
     if runner.opts.forcing and runner.opts.save:
        runner.abort_with_help('You cannot specify both --force and --save options.')
-    if runner.opts.timeout and runner.opts.timeout < 0:
-        runner.abort_with_help('You cannot specify timeout less than zero minutes.')
+    if runner.opts.timeout <= 0:
+        runner.abort_with_help('The timeout value must be more than zero seconds.')
     shutdown_params = []
     columns = []
     zk_pause_txnid = 0
