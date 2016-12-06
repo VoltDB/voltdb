@@ -32,6 +32,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBElement;
@@ -1307,16 +1308,15 @@ public class VoltProjectBuilder {
             query.setTimeout(m_queryTimeout);
             systemSettingType.setQuery(query);
         }
-        if (m_rssLimit != null) {
+        if (m_rssLimit != null || m_snmpRssLimit != null) {
             ResourceMonitorType monitorType = initializeResourceMonitorType(systemSettingType, factory);
             Memorylimit memoryLimit = factory.createResourceMonitorTypeMemorylimit();
-            memoryLimit.setSize(m_rssLimit);
-            monitorType.setMemorylimit(memoryLimit);
-        }
-        if (m_snmpRssLimit != null) {
-            ResourceMonitorType monitorType = initializeResourceMonitorType(systemSettingType, factory);
-            Memorylimit memoryLimit = factory.createResourceMonitorTypeMemorylimit();
-            memoryLimit.setSize(m_snmpRssLimit);
+            if (m_rssLimit != null) {
+                memoryLimit.setSize(m_rssLimit);
+            }
+            if (m_snmpRssLimit != null) {
+                memoryLimit.setSnmpalert(m_snmpRssLimit);
+            }
             monitorType.setMemorylimit(memoryLimit);
         }
 
@@ -1326,7 +1326,6 @@ public class VoltProjectBuilder {
         }
 
         setupDiskLimitType(systemSettingType, factory);
-        setupSnmpDiskLimitType(systemSettingType, factory);
 
         return systemSettingType;
     }
@@ -1339,34 +1338,23 @@ public class VoltProjectBuilder {
         }
 
         DiskLimitType diskLimit = factory.createDiskLimitType();
-        for (FeatureNameType featureName : m_featureDiskLimits.keySet()) {
+        Set<FeatureNameType> featureNames = new HashSet<> ();
+        featureNames.addAll(m_featureDiskLimits.keySet());
+        featureNames.addAll(m_snmpFeatureDiskLimits.keySet());
+        for (FeatureNameType featureName : featureNames) {
                 DiskLimitType.Feature feature = factory.createDiskLimitTypeFeature();
                 feature.setName(featureName);
-                feature.setSize(m_featureDiskLimits.get(featureName));
+                if (m_featureDiskLimits.containsKey(featureName)) {
+                    feature.setSize(m_featureDiskLimits.get(featureName));
+                }
+                if (m_snmpFeatureDiskLimits.containsKey(featureName)) {
+                    feature.setSnmpalert(m_snmpFeatureDiskLimits.get(featureName));
+                }
                 diskLimit.getFeature().add(feature);
         }
 
         ResourceMonitorType monitorType = initializeResourceMonitorType(systemSettingsType, factory);
         monitorType.setDisklimit(diskLimit);
-    }
-
-    private void setupSnmpDiskLimitType(SystemSettingsType systemSettingsType,
-            org.voltdb.compiler.deploymentfile.ObjectFactory factory) {
-
-        if (m_snmpFeatureDiskLimits==null || m_snmpFeatureDiskLimits.isEmpty()) {
-            return;
-        }
-
-        DiskLimitType diskLimit = factory.createDiskLimitType();
-        for (FeatureNameType featureName : m_snmpFeatureDiskLimits.keySet()) {
-                DiskLimitType.Feature feature = factory.createDiskLimitTypeFeature();
-                feature.setName(featureName);
-                feature.setSize(m_snmpFeatureDiskLimits.get(featureName));
-                diskLimit.getFeature().add(feature);
-        }
-
-        ResourceMonitorType monitorType = initializeResourceMonitorType(systemSettingsType, factory);
-        monitorType.setSnmpdisklimit(diskLimit);
     }
 
     private ResourceMonitorType initializeResourceMonitorType(SystemSettingsType systemSettingType,

@@ -49,7 +49,6 @@ public class ResourceUsageMonitor implements Runnable
     private String m_snmpRssLimitStr;
     private long m_snmpRssLimit;
     private ThresholdType m_snmpRssCriteria;
-    private DiskResourceChecker m_snmpDiskLimitConfig;
 
     public ResourceUsageMonitor(SystemSettingsType systemSettings) {
         this(systemSettings, null);
@@ -70,26 +69,25 @@ public class ResourceUsageMonitor implements Runnable
             m_rssLimit = Double.valueOf(dblLimit).longValue();
         }
 
-        m_diskLimitConfig = new DiskResourceChecker(systemSettings.getResourcemonitor().getDisklimit());
+        m_diskLimitConfig = new DiskResourceChecker(systemSettings.getResourcemonitor().getDisklimit(), snmpTrapSender);
 
         // for snmp trap
         m_snmpTrapSender = snmpTrapSender;
         if (null != m_snmpTrapSender) {
             m_snmpEnable = true;
-            if (config.getSnmpmemorylimit() != null) {
-                m_snmpRssLimitStr = config.getSnmpmemorylimit().getSize().trim();
+            if (config.getMemorylimit() != null) {
+                m_snmpRssLimitStr = config.getMemorylimit().getSnmpalert().trim();
                 // configured value is in GB. Convert it to bytes
                 double dblLimit = getMemoryLimitSize(m_snmpRssLimitStr);
                 m_snmpRssLimit = Double.valueOf(dblLimit).longValue();
                 m_snmpRssCriteria = m_snmpRssLimitStr.endsWith("%") ? ThresholdType.PERCENT:ThresholdType.LIMIT;
             }
-            m_snmpDiskLimitConfig = new DiskResourceChecker(systemSettings.getResourcemonitor().getSnmpdisklimit(), m_snmpTrapSender);
         }
     }
 
     public boolean hasResourceLimitsConfigured()
     {
-        return ((m_rssLimit > 0 || (m_diskLimitConfig!=null && m_diskLimitConfig.hasLimitsConfigured()))
+        return ((m_rssLimit > 0 || m_snmpRssLimit > 0 || (m_diskLimitConfig!=null && m_diskLimitConfig.hasLimitsConfigured()))
                 && m_resourceCheckInterval > 0);
     }
 
@@ -104,6 +102,9 @@ public class ResourceUsageMonitor implements Runnable
             m_logger.info("Resource limit monitoring configured to run every " + m_resourceCheckInterval + " seconds");
             if (m_rssLimit > 0) {
                 m_logger.info("RSS limit: "  + getRssLimitLogString(m_rssLimit, m_rssLimitStr));
+            }
+            if (m_snmpRssLimit > 0) {
+                m_logger.info("RSS SNMP notification limit: "  + getRssLimitLogString(m_snmpRssLimit, m_snmpRssLimitStr));
             }
             if (m_diskLimitConfig!=null) {
                 m_diskLimitConfig.logConfiguredLimits();
@@ -126,8 +127,6 @@ public class ResourceUsageMonitor implements Runnable
         if (getClusterOperationMode() != OperationMode.RUNNING) {
             return;
         }
-
-        m_snmpDiskLimitConfig.isOverLimitConfiguration();
 
         if (isOverMemoryLimit() || m_diskLimitConfig.isOverLimitConfiguration()) {
             SyncCallback cb = new SyncCallback();

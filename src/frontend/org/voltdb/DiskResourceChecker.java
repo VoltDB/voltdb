@@ -65,7 +65,8 @@ public class DiskResourceChecker
 
         for (FeatureDiskLimitConfig config : m_configuredLimits.values())
         {
-            if (config.m_diskSizeLimit > 0 || config.m_diskSizeLimitPerc > 0) {
+            if (config.m_diskSizeLimit > 0 || config.m_diskSizeLimitPerc > 0 ||
+                    config.m_diskSizeLimitSnmp > 0 || config.m_diskSizeLimitPercSnmp > 0) {
                 return true;
             }
         }
@@ -85,28 +86,34 @@ public class DiskResourceChecker
                 m_logger.info(config.m_featureName.value() + " on " + config.m_path + " configured with size limit: " +
                         (config.m_diskSizeLimit > 0 ? config.m_diskSizeLimit + "GB" : config.m_diskSizeLimitPerc + "%"));
             }
+            if (config.m_diskSizeLimitSnmp > 0 || config.m_diskSizeLimitPercSnmp > 0) {
+                m_logger.info(config.m_featureName.value() + " on " + config.m_path + " configured with SNMP notification limit: " +
+                        (config.m_diskSizeLimitSnmp > 0 ? config.m_diskSizeLimitSnmp + "GB" : config.m_diskSizeLimitPercSnmp + "%"));
+            }
         }
     }
 
-    public boolean isOverLimitConfiguration()
-    {
-        if (m_configuredLimits==null) {
+    public boolean isOverLimitConfiguration() {
+        if (m_configuredLimits == null) {
             return false;
         }
 
-        for (FeatureDiskLimitConfig config : m_configuredLimits.values())
-        {
+        for (FeatureDiskLimitConfig config : m_configuredLimits.values()) {
+            if (config.m_diskSizeLimitSnmp > 0 || config.m_diskSizeLimitPercSnmp > 0) {
+                isDiskAvailable(config.m_path, config.m_diskSizeLimitPercSnmp,
+                        config.m_diskSizeLimitSnmp,
+                        config.m_featureName, true);
+            }
+
             if (config.m_diskSizeLimit <= 0 && config.m_diskSizeLimitPerc <= 0) {
                 continue;
             }
-            if (!isDiskAvailable(config.m_path, config.m_diskSizeLimitPerc, config.m_diskSizeLimit, config.m_featureName)) {
-                if (!m_snmpEnable) {
-                    m_logger.error("Disk is over configured limits for feature " + config.m_featureName);
-                }
+            if (!isDiskAvailable(config.m_path, config.m_diskSizeLimitPerc, config.m_diskSizeLimit,
+                    config.m_featureName)) {
+                m_logger.error("Disk is over configured limits for feature " + config.m_featureName);
                 return true;
             }
         }
-
         return false;
     }
 
@@ -129,16 +136,19 @@ public class DiskResourceChecker
         {
             for (DiskLimitType.Feature feature : features) {
                 configuredFeatures.add(feature.getName());
-                FeatureDiskLimitConfig aConfig =
-                        new FeatureDiskLimitConfig(feature.getName(), feature.getSize());
                 if (!isSupportedFeature(feature.getName())) {
                     m_logger.warn("Ignoring unsupported feature " + feature.getName());
                     continue;
                 }
                 String size = feature.getSize();
+                String snmpSize = feature.getSnmpalert();
+                FeatureDiskLimitConfig aConfig =
+                        new FeatureDiskLimitConfig(feature.getName(), size, snmpSize);
                 builder.put(feature.getName(), aConfig);
                 if (m_logger.isDebugEnabled()) {
-                    m_logger.debug("Added disk usage limit configuration " + size + " for feature " + feature.getName());
+                    m_logger.debug("Added disk usage limit configuration " + (size == null? "no limit ": size) +
+                            "snmp alert configuration " + (snmpSize == null? "no limit ": snmpSize) +
+                            " for feature " + feature.getName());
                 }
             }
         }
@@ -167,19 +177,15 @@ public class DiskResourceChecker
         }
     }
 
-    private boolean isDiskAvailable(File filePath, int percThreshold, double sizeThreshold, FeatureNameType featureName)
+    private boolean isDiskAvailable(File filePath, int percThreshold, double sizeThreshold, FeatureNameType featureName) {
+        return isDiskAvailable(filePath, percThreshold, sizeThreshold, featureName, false);
+    }
+
+    private boolean isDiskAvailable(File filePath, int percThreshold, double sizeThreshold, FeatureNameType featureName, boolean forSnmp)
     {
         boolean canWrite = (s_testFileCheck==null) ? filePath.canWrite() : s_testFileCheck.canWrite(filePath);
         ThresholdType snmpCriteria = percThreshold > 0? ThresholdType.PERCENT:ThresholdType.LIMIT;
         if (!canWrite) {
-            if (m_snmpEnable) {
-                try {
-                    m_snmpTrapSender.crash(String.format("Invalid or readonly file path %s (%s)",
-                        filePath, featureName.value()));
-                } catch (Throwable t) {
-                    m_logger.warn("failed to issue a crash SNMP trap", t);
-                }
-            }
             org.voltdb.VoltDB.crashLocalVoltDB(
                     String.format("Invalid or readonly file path %s (%s).",filePath, featureName.value()));
             return false;
@@ -199,31 +205,26 @@ public class DiskResourceChecker
         }
 
         if (usedSpace >= calculatedThreshold) {
-            if (m_snmpEnable) {
+            if (m_snmpEnable && forSnmp) {
                 try {
-                    m_snmpTrapSender.resource(snmpCriteria,
-                        FaultFacility.DISK,
-                        calculatedThreshold,
-                        usedSpace,
-                        String.format(
-                                "Resource limit exceeded. Disk for path %s (%s) limit %s on %s. Current disk usage is %s.",
-                                filePath, featureName.value(),
-                                (percThreshold > 0 ? percThreshold+"%" : sizeThreshold+" GB"),
-                                CoreUtils.getHostnameOrAddress(),
-                                ResourceUsageMonitor.getValueWithUnit(usedSpace)));
+                    m_snmpTrapSender.resource(snmpCriteria, FaultFacility.DISK, calculatedThreshold, usedSpace,
+                            String.format(
+                                    "Resource limit exceeded. Disk for path %s (%s) limit %s on %s. Current disk usage is %s.",
+                                    filePath, featureName.value(),
+                                    (percThreshold > 0 ? percThreshold + "%" : sizeThreshold + " GB"),
+                                    CoreUtils.getHostnameOrAddress(),
+                                    ResourceUsageMonitor.getValueWithUnit(usedSpace)));
                 } catch (Throwable t) {
                     m_logger.warn("failed to issue a resouce SNMP trap", t);
                 }
-            } else {
-                m_logger.error(String.format(
-                    "Resource limit exceeded. Disk for path %s (%s) limit %s on %s. Setting database to read-only. " +
-                    "Use \"voltadmin resume\" command once resource constraint is corrected.",
-                    filePath, featureName.value(),
-                    (percThreshold > 0 ? percThreshold+"%" : sizeThreshold+" GB"),
-                    CoreUtils.getHostnameOrAddress()));
-                m_logger.error(String.format("Resource limit exceeded. Current disk usage for path %s (%s) is %s.",
-                    filePath, featureName.value(), ResourceUsageMonitor.getValueWithUnit(usedSpace)));
             }
+            m_logger.error(String.format(
+                    "Resource limit exceeded. Disk for path %s (%s) limit %s on %s. Setting database to read-only. "
+                            + "Use \"voltadmin resume\" command once resource constraint is corrected.",
+                    filePath, featureName.value(), (percThreshold > 0 ? percThreshold + "%" : sizeThreshold + " GB"),
+                    CoreUtils.getHostnameOrAddress()));
+            m_logger.error(String.format("Resource limit exceeded. Current disk usage for path %s (%s) is %s.",
+                    filePath, featureName.value(), ResourceUsageMonitor.getValueWithUnit(usedSpace)));
             return false;
         } else {
             return true;
@@ -256,8 +257,10 @@ public class DiskResourceChecker
         final VoltFile m_path;
         final double m_diskSizeLimit;
         final int m_diskSizeLimitPerc;
+        final double m_diskSizeLimitSnmp;
+        final int m_diskSizeLimitPercSnmp;
 
-        FeatureDiskLimitConfig(FeatureNameType featureName, String sizeConfig)
+        FeatureDiskLimitConfig(FeatureNameType featureName, String sizeConfig, String sizeConfigSnmp)
         {
             m_featureName = featureName;
             m_path = getPathForFeature(featureName);
@@ -286,6 +289,29 @@ public class DiskResourceChecker
                 } catch(NumberFormatException e) {
                     throw new IllegalArgumentException(
                             "Invalid value " + sizeConfig + " configured for disk limit size for feature " + featureName);
+                }
+            }
+
+            if (sizeConfigSnmp==null || sizeConfigSnmp.trim().isEmpty()) {
+                m_diskSizeLimitSnmp = 0;
+                m_diskSizeLimitPercSnmp = 0;
+            } else {
+                String str = sizeConfigSnmp.trim();
+                try {
+                    if (str.charAt(str.length()-1) == '%') {
+                        m_diskSizeLimitSnmp = 0;
+                        m_diskSizeLimitPercSnmp = Integer.parseInt(str.substring(0, str.length()-1));
+                        if (m_diskSizeLimitPerc > 99 || m_diskSizeLimitPerc < 0) {
+                            throw new IllegalArgumentException(
+                                    "Invalid percentage value " + sizeConfig + " configured for disk limit size for feature " + featureName);
+                        }
+                    } else {
+                        m_diskSizeLimitSnmp = Double.parseDouble(str);
+                        m_diskSizeLimitPercSnmp = 0;
+                    }
+                } catch(NumberFormatException e) {
+                    throw new IllegalArgumentException(
+                            "Invalid value " + sizeConfigSnmp + " configured for disk snmp alert limit size for feature " + featureName);
                 }
             }
         }
