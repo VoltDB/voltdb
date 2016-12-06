@@ -766,10 +766,10 @@ function alertNodeClicked(obj) {
                 }
 
                 //Export
-                if (data['export'] != null) {
-                    adminConfigValues['export'] = data['export'].enabled;
-                    adminConfigValues['targets'] = data['export'].target;
-                    adminConfigValues['configuration'] = data['export'].configuration;
+                if (data.export != null) {
+                    adminConfigValues['export'] = data.export.enabled;
+                    adminConfigValues['targets'] = data.export.target;
+                    adminConfigValues['configuration'] = data.export.configuration;
                 }
 
                 //Advanced 
@@ -832,8 +832,8 @@ function alertNodeClicked(obj) {
 
                 //import
 
-                if (data['import'] != null) {
-                    adminConfigValues['importConfiguration'] = data['import'].configuration;
+                if (data.import != null) {
+                    adminConfigValues['importConfiguration'] = data.import.configuration;
                 }
             }
 
