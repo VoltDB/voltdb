@@ -31,7 +31,6 @@ import javax.net.ssl.SSLEngine;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
-import java.nio.channels.SocketChannel;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
@@ -317,14 +316,14 @@ public class SSLVoltPort extends VoltPort {
                                 srcC.discard();
                             }
                             if (!m_q.isEmpty()) {
-                                SSLEncryptionService.instance().submit(this);
+                                SSLEncryptionService.instance().submitForDecryption(this);
                             } else {
                                 m_hasOutstandingTask.set(false);
                             }
                         }
                     }
                 };
-                SSLEncryptionService.instance().submit(task);
+                SSLEncryptionService.instance().submitForDecryption(task);
             }
             return fut;
         }
@@ -366,13 +365,13 @@ public class SSLVoltPort extends VoltPort {
                             }
                         }
                         if (!m_q.isEmpty()) {
-                            SSLEncryptionService.instance().submit(this);
+                            SSLEncryptionService.instance().submitForEncryption(this);
                         } else {
                             m_hasOutstandingTask.set(false);
                         }
                     }
                 };
-                SSLEncryptionService.instance().submit(task);
+                SSLEncryptionService.instance().submitForEncryption(task);
             }
             return fut;
         }
@@ -421,14 +420,14 @@ public class SSLVoltPort extends VoltPort {
                         }
                         synchronized (m_q) {
                             if (!m_q.isEmpty()) {
-                                SSLEncryptionService.instance().submit(this);
+                                SSLEncryptionService.instance().submitForDecryption(this);
                             } else {
                                 m_hasOutstandingTask.set(false);
                             }
                         }
                     }
                 };
-                SSLEncryptionService.instance().submit(task);
+                SSLEncryptionService.instance().submitForDecryption(task);
             }
             return fut;
         }
@@ -480,14 +479,14 @@ public class SSLVoltPort extends VoltPort {
                         }
                         synchronized (m_q) {
                             if (!m_q.isEmpty()) {
-                                SSLEncryptionService.instance().submit(this);
+                                SSLEncryptionService.instance().submitForEncryption(this);
                             } else {
                                 m_hasOutstandingTask.set(false);
                             }
                         }
                     }
                 };
-                SSLEncryptionService.instance().submit(task);
+                SSLEncryptionService.instance().submitForEncryption(task);
             }
             return fut;
         }
