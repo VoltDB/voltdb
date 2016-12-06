@@ -94,8 +94,8 @@ def monitorDRProducerStatisticsProgress(lastPartitionMin, lastPartitionMax, curr
     timeSinceLastUpdate = currentTime - lastUpdatedTime
     #stats timeout
     if timeSinceLastUpdate > timeout:
-         msg = "The cluster has not drained any transactions for DRPRODUCER in last %d minutes. There are outstanding transactions."
-         raise StatisticsProcedureException( msg % (runner.opts.timeout), 1)
+         msg = "The cluster has not drained any transactions for DRPRODUCER in last %d seconds. There are outstanding transactions."
+         raise StatisticsProcedureException( msg % (timeout), 1)
     #stats has not been moved but not timeout yet
     return lastUpdatedTime
 
@@ -362,8 +362,8 @@ def monitorStatisticsProgress(lastUpdatedParams, currentParams, lastUpdatedTime,
 
     #stats timeout
     if timeSinceLastUpdate > timeout:
-         msg = "The cluster has not drained any transactions for %s in last %d minutes. There are outstanding transactions."
-         raise StatisticsProcedureException( msg % (component, runner.opts.timeout), 1)
+         msg = "The cluster has not drained any transactions for %s in last %d seconds. There are outstanding transactions."
+         raise StatisticsProcedureException( msg % (component, timeout), 1)
 
     #not timeout yet
     return lastUpdatedTime
