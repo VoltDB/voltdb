@@ -377,12 +377,14 @@ public class MiscUtils {
 
         // this gets printed even if there are non-fatal problems, so it
         // injects the word "invalid" to make it clear this is the case
-        String msg = String.format("Starting VoltDB with %scommercial license. " +
-                                   "License for %d nodes expires on %s.",
-                                   (valid ? "" : "invalid "),
-                                   licenseApi.maxHostcount(),
-                                   expiresStr);
-        consoleLog.info(msg);
+        if (!licenseApi.isAWSMarketplace()) {
+            String msg = String.format("Starting VoltDB with %scommercial license. " +
+                                       "License for %d nodes expires on %s.",
+                                       (valid ? "" : "invalid "),
+                                       licenseApi.maxHostcount(),
+                                       expiresStr);
+            consoleLog.info(msg);
+        }
 
         // If this is a commercial license, and there is less than or equal to 30 days until expiration,
         // issue a "days remaining" warning message.
@@ -396,7 +398,7 @@ public class MiscUtils {
         long diffDays = diff / (24 * 60 * 60 * 1000);
         if ((diff > 0) && (diff <= 30))
         {
-            msg = "Warning: VoltDB license expires in " + diffDays + " day(s).";
+            String msg = "Warning: VoltDB license expires in " + diffDays + " day(s).";
             consoleLog.info(msg);
         }
 
