@@ -25,6 +25,10 @@
 #include "storage/StreamedTableStats.h"
 #include "storage/TableStats.h"
 
+namespace catalog {
+class MaterializedViewInfo;
+}
+
 namespace voltdb {
 class ExecutorContext;
 class ExportTupleStream;

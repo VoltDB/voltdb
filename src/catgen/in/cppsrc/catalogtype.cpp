@@ -22,6 +22,7 @@
 #include <cctype>
 #include <cstdlib>
 #include "catalogtype.h"
+#include "catalogmap.h"
 #include "catalog.h"
 #include "common/SerializableEEException.h"
 

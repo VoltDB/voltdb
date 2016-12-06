@@ -32,8 +32,10 @@ class Table;
 class PersistentTable;
 class StreamedTable;
 class Pool;
+class ExecutorContext;
 class TupleSchema;
 struct TableIndexScheme;
+class DRTupleStream;
 
 // There might be a better place for this, but current callers happen to have this header in common.
 template<typename K, typename V> V findInMapOrNull(const K& key, std::map<K, V> const &the_map)

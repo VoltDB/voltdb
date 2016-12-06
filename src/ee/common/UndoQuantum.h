@@ -29,6 +29,7 @@
 #include "boost/unordered_set.hpp"
 
 class StreamedTableTest;
+class TableAndIndexTest;
 
 namespace voltdb {
 class UndoLog;

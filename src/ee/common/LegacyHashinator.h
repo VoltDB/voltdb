@@ -18,6 +18,10 @@
 #ifndef LEGACYHASHINATOR_H_
 #define LEGACYHASHINATOR_H_
 
+#include "common/FatalException.hpp"
+#include "common/NValue.hpp"
+#include "common/ValueFactory.hpp"
+#include "common/ValuePeeker.hpp"
 #include "common/serializeio.h"
 
 #include <cstring>

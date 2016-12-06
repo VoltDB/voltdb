@@ -26,6 +26,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "catalog.h"
+#include "catalogtype.h"
 #include "cluster.h"
 #include "common/SerializableEEException.h"
 #include "common/MiscUtil.h"

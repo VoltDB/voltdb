@@ -49,6 +49,9 @@
 #include "abstractplannode.h"
 
 namespace voltdb {
+
+class Table;
+
 /**
  *
  */
