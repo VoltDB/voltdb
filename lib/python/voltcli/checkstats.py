@@ -83,7 +83,7 @@ def check_dr_producer(runner):
 def monitorDRProducerStatisticsProgress(lastPartitionMin, lastPartitionMax, currentPartitionMin,
                              currentPartitionMax, lastUpdatedTime, runner):
     currentTime = time.time()
-    timeout = (runner.opts.timeout) * 60
+    timeout = runner.opts.timeout
     #any stats progress?
     partitionMinProgressed = cmp(lastPartitionMin, currentPartitionMin)
     partitionMaxprogressed = cmp(lastPartitionMax, currentPartitionMax)
@@ -346,7 +346,7 @@ def check_command_log(runner):
 
 def monitorStatisticsProgress(lastUpdatedParams, currentParams, lastUpdatedTime, runner, component):
     currentTime = time.time()
-    timeout = (runner.opts.timeout) * 60
+    timeout = runner.opts.timeout
     statsProgressed = True
     if isinstance(lastUpdatedParams, dict):
         statsProgressed = (cmp(lastUpdatedParams,currentParams) <> 0)
