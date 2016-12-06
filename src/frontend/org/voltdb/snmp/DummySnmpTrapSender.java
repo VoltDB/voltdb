@@ -57,4 +57,9 @@ public class DummySnmpTrapSender implements SnmpTrapSender {
     public void resource(ThresholdType criteria, FaultFacility facility,
             long threshold, long actual, String msg) {
     }
+
+    @Override
+    public void resourceClear(ThresholdType criteria, FaultFacility facility,
+            long threshold, long actual, String msg) {
+    }
 }

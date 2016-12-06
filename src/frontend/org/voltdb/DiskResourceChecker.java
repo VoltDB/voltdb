@@ -45,11 +45,13 @@ public class DiskResourceChecker
     private ImmutableMap<FeatureNameType, FeatureDiskLimitConfig> m_configuredLimits;
     private SnmpTrapSender m_snmpTrapSender;
     private boolean m_snmpEnable = false;
+    private boolean m_snmpDiskTrapSent = false;
 
     public DiskResourceChecker(DiskLimitType diskLimit, SnmpTrapSender snmpTrapSender) {
         findDiskLimitConfiguration(diskLimit);
         m_snmpTrapSender = snmpTrapSender;
         m_snmpEnable = (null != m_snmpTrapSender);
+        m_snmpDiskTrapSent = false;
     }
 
     public DiskResourceChecker(DiskLimitType diskLimit)
@@ -205,7 +207,7 @@ public class DiskResourceChecker
         }
 
         if (usedSpace >= calculatedThreshold) {
-            if (m_snmpEnable && forSnmp) {
+            if (m_snmpEnable && forSnmp && !m_snmpDiskTrapSent) {
                 try {
                     m_snmpTrapSender.resource(snmpCriteria, FaultFacility.DISK, calculatedThreshold, usedSpace,
                             String.format(
@@ -214,6 +216,7 @@ public class DiskResourceChecker
                                     (percThreshold > 0 ? percThreshold + "%" : sizeThreshold + " GB"),
                                     CoreUtils.getHostnameOrAddress(),
                                     ResourceUsageMonitor.getValueWithUnit(usedSpace)));
+                    m_snmpDiskTrapSent = true;
                 } catch (Throwable t) {
                     m_logger.warn("failed to issue a resouce SNMP trap", t);
                 }
@@ -227,6 +230,20 @@ public class DiskResourceChecker
                     filePath, featureName.value(), ResourceUsageMonitor.getValueWithUnit(usedSpace)));
             return false;
         } else {
+            if (forSnmp && m_snmpDiskTrapSent) {
+                try {
+                    m_snmpTrapSender.resourceClear(snmpCriteria, FaultFacility.DISK, calculatedThreshold, usedSpace,
+                            String.format(
+                                    "Resource limit cleared. Disk for path %s (%s) limit %s on %s. Current disk usage is %s.",
+                                    filePath, featureName.value(),
+                                    (percThreshold > 0 ? percThreshold + "%" : sizeThreshold + " GB"),
+                                    CoreUtils.getHostnameOrAddress(),
+                                    ResourceUsageMonitor.getValueWithUnit(usedSpace)));
+                    m_snmpDiskTrapSent = false;
+                } catch (Throwable t) {
+                    m_logger.warn("failed to issue a resouce SNMP trap", t);
+                }
+            }
             return true;
         }
     }
