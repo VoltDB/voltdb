@@ -88,7 +88,6 @@ struct FunctionTest : public Test {
                                   (UndoQuantum *)0,
                                   (Topend *)0,
                                   &m_pool,
-                                  NULL,
                                   (VoltDBEngine *)0,
                                   "localhost",
                                   0,

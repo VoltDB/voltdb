@@ -796,7 +796,7 @@ bool AggregateHashExecutor::p_execute(const NValueArray& params)
     const TupleSchema * inputSchema = input_table->schema();
     assert(inputSchema);
     TableIterator it = input_table->iteratorDeletingAsWeGo();
-    ProgressMonitorProxy pmp(m_engine, this);
+    ProgressMonitorProxy pmp(m_engine->getExecutorContext(), this);
 
     TableTuple nextTuple = AggregateHashExecutor::p_execute_init(params, &pmp, inputSchema, NULL);
 
@@ -898,7 +898,7 @@ bool AggregateSerialExecutor::p_execute(const NValueArray& params)
     TableIterator it = input_table->iteratorDeletingAsWeGo();
     TableTuple nextTuple(input_table->schema());
 
-    ProgressMonitorProxy pmp(m_engine, this);
+    ProgressMonitorProxy pmp(m_engine->getExecutorContext(), this);
     AggregateSerialExecutor::p_execute_init(params, &pmp, input_table->schema(), NULL);
 
     while (m_postfilter.isUnderLimit() && it.next(nextTuple)) {
@@ -1012,7 +1012,7 @@ bool AggregatePartialExecutor::p_execute(const NValueArray& params)
     TableIterator it = input_table->iteratorDeletingAsWeGo();
     TableTuple nextTuple(input_table->schema());
 
-    ProgressMonitorProxy pmp(m_engine, this);
+    ProgressMonitorProxy pmp(m_engine->getExecutorContext(), this);
     AggregatePartialExecutor::p_execute_init(params, &pmp, input_table->schema(), NULL);
 
     while (m_postfilter.isUnderLimit() && it.next(nextTuple)) {
