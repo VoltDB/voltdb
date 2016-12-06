@@ -102,6 +102,9 @@ public class TestWindowedFunctions extends PlannerTestCase {
 
     public void testCount() {
         String windowedQuery;
+        windowedQuery = "SELECT COUNT(A+B) OVER (PARTITION BY A, C ORDER BY B DESC) AS ARANK FROM AAA;";
+        validateWindowedFunctionPlan(windowedQuery, 3, 2, 2);
+
         windowedQuery = "SELECT A+B, MOD(A, B), B, COUNT(*) OVER (PARTITION BY A, C ORDER BY B DESC) AS ARANK FROM AAA;";
         validateWindowedFunctionPlan(windowedQuery, 3, 2, 2);
 
@@ -420,7 +423,8 @@ public class TestWindowedFunctions extends PlannerTestCase {
                       "DISTINCT is not allowed in window functions.");
         failToCompile("SELECT COUNT(DISTINCT A+B) OVER (PARTITION BY A ORDER BY B) AS ARANK FROM AAA",
                       "DISTINCT is not allowed in window functions.");
-
+        failToCompile("SELECT COUNT(A) OVER (PARTITION BY A ORDER BY B) AS ARANK FROM AAA_STRING_PA",
+                      "Windowed Count arguments must have either integer or timestamp type.");
     }
 
     public void testExplainPlanText() {

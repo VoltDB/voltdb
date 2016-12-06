@@ -959,12 +959,27 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 }
 
                 VoltType valType = orderByExpressions.get(0).getValueType();
+                assert(valType != null);
                 if (!valType.isAnyIntegerType() && (valType != VoltType.TIMESTAMP)) {
                     throw new PlanningErrorException(
                             "Windowed function call expressions can have only integer or TIMESTAMP value types in the ORDER BY expression of their window.");
                 }
                 break;
             case AGGREGATE_WINDOWED_COUNT:
+                if (windowFunctionExpression.getAggregateArguments().size() > 0) {
+                    if (windowFunctionExpression.getAggregateArguments().size() > 1) {
+                        throw new PlanningErrorException(
+                                "Windowed COUNT can only have one expression argument");
+                    }
+                    AbstractExpression ctArg = windowFunctionExpression.getAggregateArguments().get(0);
+                    assert(ctArg != null);
+                    VoltType vt = ctArg.getValueType();
+                    assert(vt != null);
+                    if (! (vt.isAnyIntegerType() || vt == VoltType.TIMESTAMP) ) {
+                        throw new PlanningErrorException(
+                                "Windowed Count arguments must have either integer or timestamp type.");
+                    }
+                }
                 break;
             default:
                 {

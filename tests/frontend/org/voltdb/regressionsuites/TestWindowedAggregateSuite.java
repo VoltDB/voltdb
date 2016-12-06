@@ -831,6 +831,15 @@ public class TestWindowedAggregateSuite extends RegressionSuite {
                                    {2, 204, 1},
                                    {2, 205, 3}});
 
+        // Test that COUNT(E) works if E is a timestamp.
+        long baseTime = TimestampType.millisFromJDBCformat("1953-06-10 00:00:00");
+        TimestampType baseTimestamp = new TimestampType(baseTime);
+        client.callProcedure("T_TIMESTAMP.insert", 100, 100, baseTimestamp);
+        client.callProcedure("T_TIMESTAMP.insert", 100, 100, null);
+        client.callProcedure("T_TIMESTAMP.insert", 100, 100, baseTimestamp);
+        validateCount(client,
+                      "select count(c) over() from T_TIMESTAMP",
+                      new long[][]{{2}, {2}, {2}});
         // Try some things on an empty table.
         // We expect to get no answers anywhere.
         client.callProcedure("@AdHoc", "TRUNCATE TABLE T;");
