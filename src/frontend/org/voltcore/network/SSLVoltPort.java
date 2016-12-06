@@ -118,7 +118,7 @@ public class SSLVoltPort extends VoltPort {
     }
 
     private boolean hasTasks() {
-        return !m_decryptionTasks.isEmpty() || !m_readTasks.isEmpty() || !m_encryptionTasks.isEmpty() || !m_writeTasks.isEmpty();
+        return !m_decryptionTasks.isEmpty() || !m_readTasks.isEmpty() || !m_encryptionTasks.isEmpty() || ((!m_writeTasks.isEmpty() && !writeStream().hadBackPressure()));
     }
 
     private void processDecryptionTasks() throws IOException {
