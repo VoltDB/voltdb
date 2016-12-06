@@ -100,10 +100,10 @@ public class SSLVoltPort extends VoltPort {
             buildEncryptionTasks();
 
             while (hasTasks()) {
-                processDoneDecryptionTask();
-                processDoneReadTask();
-                processDoneEncryptionTask();
-                processDoneWriteTask();
+                processDecryptionTasks();
+                processDoneReadTasks();
+                processDoneEncryptionTasks();
+                processDoneWriteTasks();
             }
         } finally {
             if (m_encryptionTasks.isEmpty() && m_writeTasks.isEmpty()) {
@@ -121,50 +121,74 @@ public class SSLVoltPort extends VoltPort {
         return !m_decryptionTasks.isEmpty() || !m_readTasks.isEmpty() || !m_encryptionTasks.isEmpty() || !m_writeTasks.isEmpty();
     }
 
-    private void processDoneDecryptionTask() throws IOException {
-        if (!m_decryptionTasks.isEmpty()) {
-            try {
+    private void processDecryptionTasks() throws IOException {
+        try {
+            if (!m_decryptionTasks.isEmpty()) {
                 m_readTasks.add(m_readGateway.enque(m_decryptionTasks.poll().get()));
-            } catch (InterruptedException | ExecutionException e) {
-                throw new IOException("read task failed in voltport " + m_channel.socket().getRemoteSocketAddress(), e);
             }
+            while (!m_decryptionTasks.isEmpty() && m_decryptionTasks.peek().isDone()) {
+                m_readTasks.add(m_readGateway.enque(m_decryptionTasks.poll().get()));
+            }
+        } catch (InterruptedException | ExecutionException e) {
+            throw new IOException("read task failed in voltport " + m_channel.socket().getRemoteSocketAddress(), e);
         }
     }
 
-    private void processDoneReadTask() throws IOException {
-        if (!m_readTasks.isEmpty()) {
-            try {
+    private void processDoneReadTasks() throws IOException {
+        try {
+            if (!m_readTasks.isEmpty()) {
                 m_messagesRead += m_readTasks.poll().get();
-            } catch (Exception e) {
-                throw new IOException("read task failed in voltport " + m_channel.socket().getRemoteSocketAddress(), e);
             }
+            while (!m_readTasks.isEmpty() && m_readTasks.peek().isDone()) {
+                m_messagesRead += m_readTasks.poll().get();
+            }
+        } catch (Exception e) {
+            throw new IOException("read task failed in voltport " + m_channel.socket().getRemoteSocketAddress(), e);
         }
     }
 
-    private void processDoneEncryptionTask() throws IOException {
-        if (!m_encryptionTasks.isEmpty()) {
-            try {
-                EncryptionResult er = m_encryptionTasks.poll().get();
-                writeStream().updateQueued(er.m_nBytesEncrypted, false);
-                m_writeTasks.add(m_writeGateway.enque(er));
-            } catch (InterruptedException | ExecutionException e) {
-                throw new IOException("read task failed in voltport " + m_channel.socket().getRemoteSocketAddress(), e);
+    private void processDoneEncryptionTasks() throws IOException {
+        try {
+            if (!m_encryptionTasks.isEmpty()) {
+                handleEncryptionTask(m_encryptionTasks.poll().get());
             }
+            while (!m_encryptionTasks.isEmpty() && m_encryptionTasks.peek().isDone()) {
+                handleEncryptionTask(m_encryptionTasks.poll().get());
+            }
+        } catch (InterruptedException | ExecutionException e) {
+            throw new IOException("read task failed in voltport " + m_channel.socket().getRemoteSocketAddress(), e);
         }
     }
 
-    private void processDoneWriteTask() throws IOException {
-        if (!m_writeTasks.isEmpty()) {
-            try {
-                WriteResult wr = m_writeTasks.poll().get();
-                writeStream().updateQueued(-wr.m_bytesWritten, false);
-                if (wr.m_bytesWritten < wr.m_bytesQueued) {
-                    m_writeStream.checkBackpressureStarted();
+    private void handleEncryptionTask(EncryptionResult er) {
+        writeStream().updateQueued(er.m_nBytesEncrypted, false);
+        m_writeTasks.add(m_writeGateway.enque(er));
+    }
+
+    private void processDoneWriteTasks() throws IOException {
+        try {
+            if (!m_writeTasks.isEmpty()) {
+                if (! handleWriteTask(m_writeTasks.poll().get())) {
+                    return;
                 }
-            } catch (Exception e) {
-                throw new IOException("write task failed in voltport " + m_channel.socket().getRemoteSocketAddress(), e);
             }
+            while (!m_writeTasks.isEmpty() && m_writeTasks.peek().isDone()) {
+                if (! handleWriteTask(m_writeTasks.poll().get())) {
+                    return;
+                }
+            }
+        } catch (Exception e) {
+            throw new IOException("write task failed in voltport " + m_channel.socket().getRemoteSocketAddress(), e);
         }
+    }
+
+    private boolean handleWriteTask(WriteResult wr) {
+        writeStream().updateQueued(-wr.m_bytesWritten, false);
+        if (wr.m_bytesWritten < wr.m_bytesQueued) {
+            m_writeStream.checkBackpressureStarted();
+            return false;
+        }
+        return true;
     }
 
     private void buildDecryptionTasks() {
