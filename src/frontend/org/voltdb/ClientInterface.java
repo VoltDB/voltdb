@@ -451,7 +451,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             continue;
                         }
                         networkLog.info("SSL enabled on connection " + socket.socket().getRemoteSocketAddress() +
-                                " with cipher " + sslEngine.getSession().getCipherSuite());
+                                " with protocol " + sslEngine.getSession().getProtocol() + " and with cipher " + sslEngine.getSession().getCipherSuite());
                     }
                     /*
                      * Enforce a limit on the maximum number of connections
