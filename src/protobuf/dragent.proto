@@ -49,6 +49,10 @@ message Query {
     optional bool includeMesh = 1 [default = false];
 }
 
+message StartCursor {
+    repeated ClusterInfo clusterInfo = 1;
+}
+
 message Response {
     enum ReplicationMode {
         IDLE = 1;
@@ -109,11 +113,12 @@ message ClusterInfo {
     required int32 clusterId = 1;
     required fixed64 creationId = 2;
 
-    optional fixed64 recoverTime = 3;
-    optional int32 globalPartitionCount = 4;
+    optional fixed64 recoveryId = 3;
+    optional int32 protocolVersion = 4;
+    optional int32 globalPartitionCount = 5;
 
-    repeated NodeInfo nodeInfo = 5;
-    repeated PartitionInfo partitionInfo = 6;
+    repeated NodeInfo nodeInfo = 6;
+    repeated PartitionInfo partitionInfo = 7;
 }
 
 message NodeInfo {
@@ -143,6 +148,7 @@ message CtrlEnvelope {
         STOP_SYNC = 8;
         CONNECT = 9;
         SUBSCRIBE = 10;
+        START_CURSOR = 11;
     }
     required Type type = 1;
     required UUID id = 2;
@@ -155,4 +161,5 @@ message CtrlEnvelope {
     // Intentionally skip field 9 -- deprecated message type
     optional Connect connect = 10;
     optional Query query = 11;
+    optional StartCursor startCursor = 12;
 }
