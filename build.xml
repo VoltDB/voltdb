@@ -58,6 +58,7 @@
 <property name='base.dir'                    location='.' />
 <property name='build.dir'                   location='obj/${build}' />
 <property name='build.prod.dir'              location='${build.dir}/prod' />
+<property name='build.prod.dbmonitor.dir.js' location='${build.prod.dir}/org/voltdb/dbmonitor/js' />
 <property name='build.test.dir'              location='${build.dir}/test' />
 <property name='build.testproc.dir'          location='${build.dir}/testprocs' />
 <property name='build.client.dir'            location='${build.dir}/clientobj' />
@@ -73,6 +74,7 @@
 <property name='src.hsqldb.test.dir'         location='tests/hsqldb' />
 <property name='src.ee.test.dir'             location='tests/ee' />
 <property name='src.dbmonitor.dir'           location='src/frontend/org/voltdb/dbmonitor' />
+<property name='src.dbmonitor.dir.js'        location='src/frontend/org/voltdb/dbmonitor/js' />
 <property name='build.testoutput.dir'        location='${build.dir}/testoutput' />
 <property name='build.testobjects.dir'       location='${build.dir}/testobjects' />
 <property name='lib.dir'                     location='lib' />
@@ -545,7 +547,7 @@ PRIMARY ENTRY POINTS
 
 <target name="default"
     depends="compile, ee, voltdb.jar, voltdbclient.jar, importbundles"
-    description="Compile Java classes and C++ JNI library."
+    description="Compile Java classes and C++ JNI library and minify the javascript artifacts."
 />
 <target name="check"
     depends="licensecheck, default, voltdbipc"
@@ -1364,9 +1366,29 @@ JAVA COMPILATION
 
     <copy todir='${build.prod.dir}/org/voltdb/dbmonitor'>
         <fileset dir="${src.gpl.dir}/org/voltdb/dbmonitor">
+            <exclude name="**/js/"/>
             <include name="**"/>
         </fileset>
     </copy>
+
+    <delete dir="temp" failonerror="false" />
+    <copy todir="temp/js" overwrite="yes">
+        <fileset dir="src/frontend/org/voltdb/dbmonitor/js"/>
+    </copy>
+    <apply executable="java" parallel="false" dest="temp/js">
+        <fileset dir="temp/js" includes="**/*.js" />
+          <arg line="-jar"/>
+          <arg path="third_party/java/jars/yuicompressor-2.4.8.jar" />
+          <srcfile/>
+          <arg line="-o"/>
+          <mapper type="glob" from="*.js" to="*-abc.js"/>
+          <targetfile/>
+    </apply>
+    <move todir="${build.prod.dir}/org/voltdb/dbmonitor/js" overwrite="true">
+        <fileset dir="temp/js" />
+        <mapper type="glob" from="*-abc.js" to="*.js"/>
+    </move>
+    <delete dir="temp" failonerror="false" />
 
     <!-- README files we want to include in the jar -->
     <copy flatten='false' todir='${build.prod.dir}'>
@@ -2835,6 +2857,5 @@ RPM PACKAGE CREATION
         <arg line="-c 'rm -rfv ${rpm.package.dir}'" />
     </exec>
 </target>
-
 <!-- END PROJECT -->
 </project>
