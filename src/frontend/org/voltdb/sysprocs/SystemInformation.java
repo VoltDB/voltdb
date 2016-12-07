@@ -20,6 +20,7 @@ package org.voltdb.sysprocs;
 import java.io.File;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -27,12 +28,14 @@ import java.util.Map.Entry;
 
 import org.apache.log4j.Logger;
 import org.apache.log4j.net.SocketHubAppender;
+import org.apache.zookeeper_voltpatches.data.Stat;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.common.Constants;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.zk.CoreZK;
 import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
@@ -446,8 +449,18 @@ public class SystemInformation extends VoltSystemProcedure
         if (MiscUtils.isPro()) {
             vt.addRow(hostId, "LICENSE", VoltDB.instance().getLicenseInformation());
         }
-
+        getPlacementGroup(hostId, vt);
         return vt;
+    }
+
+    private static void getPlacementGroup(Integer hostId, VoltTable vt) {
+        try {
+            String hostInfo = new String(VoltDB.instance().getHostMessenger().getZK().getData(CoreZK.hosts_host + hostId, false, new Stat()), StandardCharsets.UTF_8);
+            final JSONObject obj = new JSONObject(hostInfo);
+            vt.addRow(hostId, "PLACEMENTGROUP",obj.getString("group"));
+        } catch (Exception e) {
+            org.voltdb.VoltDB.crashLocalVoltDB("Error getting host info", false, e);
+        }
     }
 
     static public VoltTable populateDeploymentProperties(
