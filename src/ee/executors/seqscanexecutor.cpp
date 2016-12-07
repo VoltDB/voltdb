@@ -184,7 +184,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
         // Initialize the postfilter
         CountingPostfilter postfilter(m_tmpOutputTable, predicate, limit, offset);
 
-        ProgressMonitorProxy pmp(m_engine, this);
+        ProgressMonitorProxy pmp(m_engine->getExecutorContext(), this);
         TableTuple temp_tuple;
         assert(m_tmpOutputTable);
         if (m_aggExec != NULL) {

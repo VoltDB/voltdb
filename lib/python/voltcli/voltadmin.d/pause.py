@@ -13,9 +13,10 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
-
+import sys
 import time
 from voltcli import checkstats
+from voltcli.checkstats import StatisticsProcedureException
 
 @VOLT.Command(
     bundles = VOLT.AdminBundle(),
@@ -23,10 +24,14 @@ from voltcli import checkstats
     options = (
         VOLT.BooleanOption('-w', '--wait', 'waiting',
                            'wait for all DR and Export transactions to be externally processed',
-                           default = False)
+                           default = False),
+        VOLT.IntegerOption('-t', '--timeout', 'timeout', 'The timeout value in seconds if @Statistics is not progressing.', default = 120),
     )
 )
 def pause(runner):
+    if runner.opts.timeout <= 0:
+        runner.abort_with_help('The timeout value must be more than zero seconds.')
+
     #Check the STATUS column. runner.call_proc() detects and aborts on errors.
     status = runner.call_proc('@Pause', [], []).table(0).tuple(0).column_integer(0)
     if status <> 0:
@@ -39,9 +44,16 @@ def pause(runner):
             runner.error('The cluster has failed to quiesce with status: %d' % status)
             return
         runner.info('The cluster is quiesced.')
+        actionMessage = 'Transactions may not be completely drained. You may continue monitoring the outstanding transactions with @Statistics'
         try:
             checkstats.check_exporter(runner)
             checkstats.check_dr_producer(runner)
+        except StatisticsProcedureException as proex:
+            runner.info('The previous command has timed out and stopped waiting... The cluster is in a paused state.')
+            runner.error(proex.message)
+            if proex.isTimeout:
+                runner.info(actionMessage)
+            sys.exit(proex.exitCode)
         except (KeyboardInterrupt, SystemExit):
-            runner.info('The pause process has stopped. The cluster is in a paused state.')
-            runner.abort('Transactions may not be completely drained. You may continue monitoring the outstanding transactions with @Statistics')
+            runner.info('The previous command has stopped waiting... The cluster is in a paused state.')
+            runner.abort(actionMessage)

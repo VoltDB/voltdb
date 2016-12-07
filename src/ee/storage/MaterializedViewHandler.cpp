@@ -353,7 +353,7 @@ namespace voltdb {
     NValue MaterializedViewHandler::fallbackMinMaxColumn(int columnIndex, int minMaxColumnIndex) {
         NValue newValue = NValue::getNullValue(m_destTable->schema()->columnType(columnIndex));
         ExecutorContext* ec = ExecutorContext::getExecutorContext();
-        NValueArray &params = *ec->getParameterContainer();
+        NValueArray &params = ec->getParameterContainer();
         // We first backup the params array and fill it with our parameters.
         // Is it really necessary???
         vector<NValue> backups(m_groupByColumnCount+1);

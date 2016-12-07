@@ -93,7 +93,6 @@ struct WindowAggregate {
       : m_needsLookahead(true) {
     }
     virtual ~WindowAggregate() {
-
     }
     void* operator new(size_t size, Pool& memoryPool) { return memoryPool.allocate(size); }
     void operator delete(void*, Pool& memoryPool) { /* NOOP -- on alloc error unroll nothing */ }
@@ -536,7 +535,7 @@ bool WindowFunctionExecutor::p_execute(const NValueArray& params) {
     initWorkingTupleStorage();
 
     TableWindow tableWindow(input_table);
-    ProgressMonitorProxy pmp(m_engine, this);
+    ProgressMonitorProxy pmp(m_engine->getExecutorContext(), this);
     m_pmp = &pmp;
 
     m_aggregateRow

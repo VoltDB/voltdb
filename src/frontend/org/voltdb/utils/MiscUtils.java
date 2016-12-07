@@ -387,23 +387,26 @@ public class MiscUtils {
             consoleLog.info("Starting VoltDB with trial license. License expires on " + expiresStr + " (" + diffDays + " days remaining).");
             return true;
         }
+
+        if (licenseApi.isAWSMarketplace()) {
+            return true;
+        }
+
         // print out a warning within a month for other licenses
-        else if ((diff > 0) && (diff <= 30))
+        if ((diff > 0) && (diff <= 30))
         {
             String msg = "Warning: VoltDB license expires in " + diffDays + " day(s).";
             consoleLog.info(msg);
         }
 
-        if (!licenseApi.isTrial()) {
-            // this gets printed even if there are non-fatal problems, so it
-            // injects the word "invalid" to make it clear this is the case
-            String msg = String.format("Starting VoltDB with %scommercial license. " +
-                                       "License for %d nodes expires on %s.",
-                                       (valid ? "" : "invalid "),
-                                       licenseApi.maxHostcount(),
-                                       expiresStr);
-            consoleLog.info(msg);
-        }
+        // this gets printed even if there are non-fatal problems, so it
+        // injects the word "invalid" to make it clear this is the case
+        String msg = String.format("Starting VoltDB with %scommercial license. " +
+                                   "License for %d nodes expires on %s.",
+                                   (valid ? "" : "invalid "),
+                                   licenseApi.maxHostcount(),
+                                   expiresStr);
+        consoleLog.info(msg);
 
         return true;
     }
