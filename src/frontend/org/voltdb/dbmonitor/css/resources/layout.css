@@ -48,7 +48,7 @@ h1 {
     color: #FFFFFF;
     font: 14px Arial, Helvetica, sans-serif;
     text-shadow: none;
-    text-decoration: none;
+    text-decoration: none !important;
     border-radius: 0;
     border: none;
 }
@@ -1940,6 +1940,9 @@ ul.topRightList li a {
         float: left;
     }
 
+#Ul1 {
+    float: right !important;
+}
 .blockWrapper h1.theHeading {
     margin: 0 0 10px 0 !important;
     padding: 17px 20px 9px 0;
@@ -2793,7 +2796,7 @@ ul.adminClusterList li a.shutdown {
 }
 
 input.exitableTxtBx {
-    width: 35px; /*position:relative; top:6px;*/
+    width: 55px; /*position:relative; top:6px;*/
     padding: 2px 3px;
 }
 
@@ -2803,7 +2806,7 @@ input.exitableFilePrefix {
 }
 
 input.exitableMemoryLimit {
-    width: 90px; /*position:relative; top:6px;*/
+    width: 60px; /*position:relative; top:6px;*/
     padding: 2px 3px;
 }
 
@@ -3061,7 +3064,7 @@ td.heartbeattd span.unit, td.queryTimeOut span.unit {
 }
 
     .overviewTbl table td {
-       /*white-space: nowrap !important;*/
+       white-space: nowrap !important;
     }
 
 .confirmationHeight {
