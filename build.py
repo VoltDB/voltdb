@@ -498,6 +498,9 @@ if whichtests in ("${eetestsuite}", "executors"):
     TestGeneratedPlans
     TestWindowedRank
     TestWindowedCount
+    TestWindowedMin
+    TestWindowedMax
+    TestWindowedSum
     """
 
 if whichtests in ("${eetestsuite}", "expressions"):
