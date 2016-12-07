@@ -411,7 +411,7 @@ bool WindowFunctionExecutor::p_execute(const NValueArray& params) {
     m_inputSchema = input_table->schema();
     TableTuple nextTuple(m_inputSchema);
 
-    ProgressMonitorProxy pmp(m_engine, this);
+    ProgressMonitorProxy pmp(m_engine->getExecutorContext(), this);
     /*
      * This will set m_pmp to NULL on return, which avoids
      * a reference to the dangling pointer pmp.  Note that

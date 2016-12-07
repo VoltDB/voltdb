@@ -162,7 +162,7 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
     const TableTuple& null_inner_tuple = m_null_inner_tuple.tuple();
 
     TableIterator iterator0 = outer_table->iteratorDeletingAsWeGo();
-    ProgressMonitorProxy pmp(m_engine, this);
+    ProgressMonitorProxy pmp(m_engine->getExecutorContext(), this);
     // Init the postfilter
     CountingPostfilter postfilter(m_tmpOutputTable, wherePredicate, limit, offset);
 
