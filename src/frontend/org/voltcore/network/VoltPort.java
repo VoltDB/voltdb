@@ -32,7 +32,7 @@ import org.voltcore.logging.VoltLogger;
 public class VoltPort implements Connection
 {
     /** The network this port participates in */
-    private final VoltNetwork m_network;
+    protected final VoltNetwork m_network;
 
     protected static final VoltLogger networkLog = new VoltLogger("NETWORK");
 
@@ -263,7 +263,7 @@ public class VoltPort implements Connection
         setInterests(SelectionKey.OP_WRITE, 0);
     }
 
-    private void disableWriteSelection() {
+    protected void disableWriteSelection() {
         setInterests(0, SelectionKey.OP_WRITE);
     }
 
