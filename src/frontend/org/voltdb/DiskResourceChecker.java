@@ -218,7 +218,7 @@ public class DiskResourceChecker
                                     ResourceUsageMonitor.getValueWithUnit(usedSpace)));
                     m_snmpDiskTrapSent = true;
                 } catch (Throwable t) {
-                    m_logger.warn("failed to issue a resouce SNMP trap", t);
+                    m_logger.warn("failed to issue a resouceTrigger SNMP trap", t);
                 }
             }
             m_logger.error(String.format(
@@ -241,7 +241,7 @@ public class DiskResourceChecker
                                     ResourceUsageMonitor.getValueWithUnit(usedSpace)));
                     m_snmpDiskTrapSent = false;
                 } catch (Throwable t) {
-                    m_logger.warn("failed to issue a resouce SNMP trap", t);
+                    m_logger.warn("failed to issue a resouceClear SNMP trap", t);
                 }
             }
             return true;

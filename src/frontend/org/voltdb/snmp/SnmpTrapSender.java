@@ -36,4 +36,6 @@ public interface SnmpTrapSender {
     public void statistics(FaultFacility facility, String msg);
     public void resource(ThresholdType criteria, FaultFacility facility, long threshold, long actual, String msg);
     public void resourceClear(ThresholdType criteria, FaultFacility facility, long threshold, long actual, String msg);
+    public void pause(String msg);
+    public void resume(String msg);
 }
