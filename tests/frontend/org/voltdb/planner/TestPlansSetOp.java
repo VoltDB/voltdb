@@ -676,6 +676,31 @@ public class TestPlansSetOp extends PlannerTestCase {
         setOpChildren = new PlanNodeType[] {PlanNodeType.SEQSCAN, PlanNodeType.SEQSCAN};
         checkPushedDownSetOp(pns, coordinatorTypes, SetOpType.UNION, setOpChildren);
 
+        pns = compileToFragments("select T1.DESC from T1 union all select T5.TEXT from T5");
+        coordinatorTypes = new PlanNodeType[] {PlanNodeType.RECEIVE};
+        setOpChildren = new PlanNodeType[] {PlanNodeType.SEQSCAN, PlanNodeType.SEQSCAN};
+        checkPushedDownSetOp(pns, coordinatorTypes, SetOpType.UNION_ALL, setOpChildren);
+
+        pns = compileToFragments("select T1.DESC from T1 except select T5.TEXT from T5");
+        coordinatorTypes = new PlanNodeType[] {PlanNodeType.PROJECTION, PlanNodeType.SETOPRECEIVE};
+        setOpChildren = new PlanNodeType[] {PlanNodeType.SEQSCAN, PlanNodeType.SEQSCAN};
+        checkPushedDownSetOp(pns, coordinatorTypes, SetOpType.EXCEPT, setOpChildren);
+
+        pns = compileToFragments("select T1.DESC from T1 except all select T5.TEXT from T5");
+        coordinatorTypes = new PlanNodeType[] {PlanNodeType.PROJECTION, PlanNodeType.SETOPRECEIVE};
+        setOpChildren = new PlanNodeType[] {PlanNodeType.SEQSCAN, PlanNodeType.SEQSCAN};
+        checkPushedDownSetOp(pns, coordinatorTypes, SetOpType.EXCEPT_ALL, setOpChildren);
+
+        pns = compileToFragments("select T1.DESC from T1 intersect select T5.TEXT from T5");
+        coordinatorTypes = new PlanNodeType[] {PlanNodeType.PROJECTION, PlanNodeType.SETOPRECEIVE};
+        setOpChildren = new PlanNodeType[] {PlanNodeType.SEQSCAN, PlanNodeType.SEQSCAN};
+        checkPushedDownSetOp(pns, coordinatorTypes, SetOpType.INTERSECT, setOpChildren);
+
+        pns = compileToFragments("select T1.DESC from T1 intersect all select T5.TEXT from T5");
+        coordinatorTypes = new PlanNodeType[] {PlanNodeType.PROJECTION, PlanNodeType.SETOPRECEIVE};
+        setOpChildren = new PlanNodeType[] {PlanNodeType.SEQSCAN, PlanNodeType.SEQSCAN};
+        checkPushedDownSetOp(pns, coordinatorTypes, SetOpType.INTERSECT_ALL, setOpChildren);
+
         // Partitioning columns VT1.V_A and T4.D position mismatch
         pns = compileToFragments("SELECT MAXA, V_A FROM VT1 UNION SELECT D, MAX(D) FROM T4 GROUP BY D");
         coordinatorTypes = new PlanNodeType[] {PlanNodeType.SETOPRECEIVE};

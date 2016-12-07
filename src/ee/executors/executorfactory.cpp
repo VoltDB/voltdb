@@ -67,6 +67,7 @@
 #include "executors/sendexecutor.h"
 #include "executors/seqscanexecutor.h"
 #include "executors/setopexecutor.h"
+#include "executors/setopreceiveexecutor.h"
 #include "executors/tuplescanexecutor.h"
 #include "executors/updateexecutor.h"
 #include "executors/partitionbyexecutor.h"
@@ -104,6 +105,7 @@ AbstractExecutor* getNewExecutor(VoltDBEngine *engine,
     case PLAN_NODE_TYPE_SEND: return new SendExecutor(engine, abstract_node);
     case PLAN_NODE_TYPE_SEQSCAN: return new SeqScanExecutor(engine, abstract_node);
     case PLAN_NODE_TYPE_SETOP: return new SetOpExecutor(engine, abstract_node);
+    case PLAN_NODE_TYPE_SETOPRECEIVE: return new SetOpReceiveExecutor(engine, abstract_node);
     case PLAN_NODE_TYPE_TABLECOUNT: return new TableCountExecutor(engine, abstract_node);
     case PLAN_NODE_TYPE_TUPLESCAN: return new TupleScanExecutor(engine, abstract_node);
     case PLAN_NODE_TYPE_UPDATE: return new UpdateExecutor(engine, abstract_node);

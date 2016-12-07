@@ -32,8 +32,8 @@ import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 
-public class TestUnionSuite extends RegressionSuite {
-    public TestUnionSuite(String name) {
+public class TestSetOpSuite extends RegressionSuite {
+    public TestSetOpSuite(String name) {
         super(name);
     }
 
@@ -905,10 +905,10 @@ public class TestUnionSuite extends RegressionSuite {
     static public junit.framework.Test suite() {
         VoltServerConfig config = null;
         MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(
-                TestUnionSuite.class);
+                TestSetOpSuite.class);
         VoltProjectBuilder project = new VoltProjectBuilder();
 
-        project.addSchema(TestUnionSuite.class.getResource("testunion-ddl.sql"));
+        project.addSchema(TestSetOpSuite.class.getResource("testunion-ddl.sql"));
         project.addStmtProcedure("InsertA", "INSERT INTO A VALUES(?, ?);");
         project.addStmtProcedure("InsertB", "INSERT INTO B VALUES(?, ?);");
         project.addStmtProcedure("InsertC", "INSERT INTO C VALUES(?, ?);");

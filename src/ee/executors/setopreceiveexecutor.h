@@ -42,55 +42,37 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-#include "setopnode.h"
 
-#include "common/SerializableEEException.h"
+#ifndef HSTORESETOPMERGEEXECUTOR_H
+#define HSTORESETOPMERGEEXECUTOR_H
 
-#include <sstream>
+#include "common/common.h"
+#include "common/tabletuple.h"
+#include "common/valuevector.h"
+#include "executors/abstractexecutor.h"
+
+#include <boost/scoped_ptr.hpp>
 
 namespace voltdb {
 
-SetOpPlanNode::~SetOpPlanNode() { }
+struct SetOperator;
 
-PlanNodeType SetOpPlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_SETOP; }
+class SetOpReceiveExecutor : public AbstractExecutor {
+    public:
+        SetOpReceiveExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node);
 
-std::string SetOpPlanNode::debugInfo(const std::string &spacer) const
-{
-    std::ostringstream buffer;
-    buffer << spacer << "SetOpType[" << m_setopType << "]\n";
-    return buffer.str();
+    protected:
+        bool p_init(AbstractPlanNode* abstract_node,
+                    TempTableLimits* limits);
+        bool p_execute(const NValueArray &params);
+
+    private:
+        boost::scoped_ptr<SetOperator> m_setOperator;
+
+        boost::scoped_ptr<TempTable> m_tmpInputTable;
+
+};
+
 }
 
-void SetOpPlanNode::loadFromJSONObject(PlannerDomValue obj)
-{
-    m_setopType = SetOpPlanNode::parseSetOpType(obj.valueForKey("SETOP_TYPE").asStr());
-    if (obj.hasKey("NEED_CHILDREN_RESULTS")) {
-        m_needChildrenRows = obj.valueForKey("NEED_CHILDREN_RESULTS").asBool();
-    }
-}
-
-SetOpType SetOpPlanNode::parseSetOpType(const std::string& setopTypeStr)
-{
-    if (setopTypeStr == "UNION") {
-        return SETOP_TYPE_UNION;
-    } else if (setopTypeStr == "UNION_ALL") {
-        return SETOP_TYPE_UNION_ALL;
-    } else if (setopTypeStr == "INTERSECT") {
-        return SETOP_TYPE_INTERSECT;
-    } else if (setopTypeStr == "INTERSECT_ALL") {
-        return SETOP_TYPE_INTERSECT_ALL;
-    } else if (setopTypeStr == "EXCEPT") {
-        return SETOP_TYPE_EXCEPT;
-    } else if (setopTypeStr == "EXCEPT_ALL") {
-        return SETOP_TYPE_EXCEPT_ALL;
-    } else if (setopTypeStr == "NONE") {
-        return SETOP_TYPE_NONE;
-    } else {
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "SetopPlanNode::loadFromJSONObject:"
-                                      " Unsupported SETOP_TYPE value " +
-                                      setopTypeStr);
-    }
-}
-
-} // namespace voltdb
+#endif

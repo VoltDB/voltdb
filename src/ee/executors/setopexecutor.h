@@ -46,17 +46,16 @@
 #ifndef HSTOREUNIONEXECUTOR_H
 #define HSTOREUNIONEXECUTOR_H
 
-#include "boost/shared_ptr.hpp"
-
 #include "common/common.h"
 #include "common/valuevector.h"
 #include "executors/abstractexecutor.h"
 
+#include "boost/shared_ptr.hpp"
+
+
 namespace voltdb {
 
-namespace detail {
-    struct SetOperator;
-}
+struct SetOperator;
 
 /**
  *
@@ -71,7 +70,8 @@ class SetOpExecutor : public AbstractExecutor {
         bool p_execute(const NValueArray &params);
 
     private:
-        boost::shared_ptr<detail::SetOperator> m_setOperator;
+        boost::shared_ptr<SetOperator> m_setOperator;
+        bool m_needChildrenRows;
 };
 
 }

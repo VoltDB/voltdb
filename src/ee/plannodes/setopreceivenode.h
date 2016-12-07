@@ -42,55 +42,35 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-#include "setopnode.h"
 
-#include "common/SerializableEEException.h"
+#ifndef HSTORESETOPRECEIVENODE_H
+#define HSTORESETOPRECEIVENODE_H
 
-#include <sstream>
+#include "abstractreceivenode.h"
+
 
 namespace voltdb {
 
-SetOpPlanNode::~SetOpPlanNode() { }
-
-PlanNodeType SetOpPlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_SETOP; }
-
-std::string SetOpPlanNode::debugInfo(const std::string &spacer) const
+class SetOpReceivePlanNode : public AbstractReceivePlanNode
 {
-    std::ostringstream buffer;
-    buffer << spacer << "SetOpType[" << m_setopType << "]\n";
-    return buffer.str();
-}
+public:
+    SetOpReceivePlanNode();
+    ~SetOpReceivePlanNode();
+    PlanNodeType getPlanNodeType() const;
+    std::string debugInfo(const std::string& spacer) const;
 
-void SetOpPlanNode::loadFromJSONObject(PlannerDomValue obj)
-{
-    m_setopType = SetOpPlanNode::parseSetOpType(obj.valueForKey("SETOP_TYPE").asStr());
-    if (obj.hasKey("NEED_CHILDREN_RESULTS")) {
-        m_needChildrenRows = obj.valueForKey("NEED_CHILDREN_RESULTS").asBool();
-    }
-}
+    SetOpType getSetOpType() const { return m_setopType; }
 
-SetOpType SetOpPlanNode::parseSetOpType(const std::string& setopTypeStr)
-{
-    if (setopTypeStr == "UNION") {
-        return SETOP_TYPE_UNION;
-    } else if (setopTypeStr == "UNION_ALL") {
-        return SETOP_TYPE_UNION_ALL;
-    } else if (setopTypeStr == "INTERSECT") {
-        return SETOP_TYPE_INTERSECT;
-    } else if (setopTypeStr == "INTERSECT_ALL") {
-        return SETOP_TYPE_INTERSECT_ALL;
-    } else if (setopTypeStr == "EXCEPT") {
-        return SETOP_TYPE_EXCEPT;
-    } else if (setopTypeStr == "EXCEPT_ALL") {
-        return SETOP_TYPE_EXCEPT_ALL;
-    } else if (setopTypeStr == "NONE") {
-        return SETOP_TYPE_NONE;
-    } else {
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "SetopPlanNode::loadFromJSONObject:"
-                                      " Unsupported SETOP_TYPE value " +
-                                      setopTypeStr);
-    }
-}
+    int getChildrenCount() const { return m_childrenCnt; }
+
+protected:
+    void loadFromJSONObject(PlannerDomValue obj);
+
+private:
+   SetOpType m_setopType;
+   int m_childrenCnt;
+};
 
 } // namespace voltdb
+
+#endif

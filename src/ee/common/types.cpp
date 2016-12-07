@@ -424,6 +424,9 @@ string planNodeToString(PlanNodeType type)
     case PLAN_NODE_TYPE_MERGERECEIVE: {
         return "MERGERECEIVE";
     }
+    case PLAN_NODE_TYPE_SETOPRECEIVE: {
+        return "SETOPRECEIVE";
+    }
     case PLAN_NODE_TYPE_AGGREGATE: {
         return "AGGREGATE";
     }
@@ -489,6 +492,8 @@ PlanNodeType stringToPlanNode(string str )
         return PLAN_NODE_TYPE_RECEIVE;
     } else if (str == "MERGERECEIVE") {
         return PLAN_NODE_TYPE_MERGERECEIVE;
+    }  else if (str == "SETOPRECEIVE") {
+        return PLAN_NODE_TYPE_SETOPRECEIVE;
     } else if (str == "AGGREGATE") {
         return PLAN_NODE_TYPE_AGGREGATE;
     } else if (str == "HASHAGGREGATE") {

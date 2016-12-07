@@ -55,18 +55,22 @@ namespace voltdb {
  */
 class SetOpPlanNode : public AbstractPlanNode {
 public:
-    SetOpPlanNode() : m_setopType(SETOP_TYPE_NONE) { }
+    SetOpPlanNode() : m_setopType(SETOP_TYPE_NONE), m_needChildrenRows(false) { }
     ~SetOpPlanNode();
     PlanNodeType getPlanNodeType() const;
     std::string debugInfo(const std::string &spacer) const;
 
     SetOpType getSetOpType() const { return m_setopType; }
 
+    bool needChildrenRows() const { return m_needChildrenRows; }
+    static SetOpType parseSetOpType(const std::string& setopTypeStr);
+
 protected:
     void loadFromJSONObject(PlannerDomValue obj);
 
 private:
    SetOpType m_setopType;
+   bool m_needChildrenRows;
 };
 
 } // namespace voltdb

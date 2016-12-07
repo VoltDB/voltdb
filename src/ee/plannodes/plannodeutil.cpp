@@ -65,6 +65,7 @@
 #include "plannodes/sendnode.h"
 #include "plannodes/seqscannode.h"
 #include "plannodes/setopnode.h"
+#include "plannodes/setopreceivenode.h"
 #include "plannodes/tuplescannode.h"
 #include "plannodes/updatenode.h"
 #include "plannodes/partitionbynode.h"
@@ -202,6 +203,12 @@ voltdb::AbstractPlanNode* getEmptyPlanNode(voltdb::PlanNodeType type) {
         // ------------------------------------------------------------------
         case (voltdb::PLAN_NODE_TYPE_MERGERECEIVE):
             ret = new voltdb::MergeReceivePlanNode();
+            break;
+        // ------------------------------------------------------------------
+        // SetOp Receive
+        // ------------------------------------------------------------------
+        case (voltdb::PLAN_NODE_TYPE_SETOPRECEIVE):
+            ret = new voltdb::SetOpReceivePlanNode();
             break;
         // ------------------------------------------------------------------
         // PartitionBy

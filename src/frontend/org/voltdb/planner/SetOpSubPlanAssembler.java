@@ -295,7 +295,7 @@ class SetOpSubPlanAssembler extends SubPlanAssembler {
      * @param childrenPlans individual children plans
      * @param needPushSetOpDown TRUE if the Set Op plan node needs to be pushed down
      * @param needTwoSetOps TRUE if two Set Op plan nodes are required
-     *  
+     *
      * @return The final combined plan
      */
     private AbstractPlanNode buildSetOpPlan(SetOpPlanNode setOpPlanNode, List<CompiledPlan> childrenPlans, boolean needPushSetOpDown, boolean needTwoSetOps) {
@@ -308,19 +308,34 @@ class SetOpSubPlanAssembler extends SubPlanAssembler {
             // Prepare partition fragment
             setOpPlanNode = connectSetOpChildren(setOpPlanNode, childrenPlans);
 
-            // Add inlihe Send node in case of the EXCEPT (ALL) /INTERCEPT (ALL) Set ops to be
-            // propagate children results to the coordinator to do a cross partition set op.
-            // The UNION (ALL) only need the partition set op result.
-            if (SetOpType.EXCEPT == setOpPlanNode.getSetOpType() || SetOpType.EXCEPT_ALL == setOpPlanNode.getSetOpType() ||
-                    SetOpType.INTERSECT == setOpPlanNode.getSetOpType() || SetOpType.INTERSECT_ALL == setOpPlanNode.getSetOpType()) {
-                setOpPlanNode.addInlinePlanNode(new SendPlanNode());
-            }
- 
-            AbstractPlanNode sendNode = new SendPlanNode();
-            sendNode.addAndLinkChild(setOpPlanNode);
+            if (SetOpType.UNION_ALL == setOpPlanNode.getSetOpType()) {
+                // UNION ALL doesn't require any additional cros partition post processing
+                // Simply add send/receive pair on top
+                rootNode = SubPlanAssembler.addSendReceivePair(setOpPlanNode);
+            } else {
+                AbstractPlanNode sendNode = new SendPlanNode();
+                sendNode.addAndLinkChild(setOpPlanNode);
 
-            rootNode = new SetOpReceivePlanNode(setOpPlanNode.getSetOpType(), childrenPlans.size());
-            rootNode.addAndLinkChild(sendNode);
+                rootNode = new SetOpReceivePlanNode(setOpPlanNode.getSetOpType(), childrenPlans.size());
+                rootNode.addAndLinkChild(sendNode);
+                // EXCEPT (ALL) /INTERCEPT (ALL) Set ops require children results to be propagated
+                // to the coordinator to do a cross partition set op. Since all children have a
+                // compatible schema the same output table can be used to hold all the rows but
+                // we need to add a tag column to be able to differentiate between original sources.
+                //
+                // The UNION at the coordinator level only needs the partition set op result.
+                if (SetOpType.UNION != setOpPlanNode.getSetOpType()) {
+                    // Need to add an extra temp column to keep number of row per children
+                    setOpPlanNode.setNeedTagColumn(true);
+
+                    // Find a projection from a first child
+                    AbstractPlanNode projection = findTopProjection(childrenPlans.get(0).rootPlanGraph);
+                    assert(projection != null);
+                    ProjectionPlanNode coordinatorProjection = new ProjectionPlanNode(projection.getOutputSchema());
+                    coordinatorProjection.addAndLinkChild(rootNode);
+                    rootNode = coordinatorProjection;
+                }
+            }
         } else {
             // Single partition plan or Multi partition plan with a single distributed table
             // that does not require the Set Op node to be pushed down
@@ -343,7 +358,7 @@ class SetOpSubPlanAssembler extends SubPlanAssembler {
      * Connect the SetOP node with its children
      * @param setOpPlanNode
      * @param childrenPlans
-     * @return 
+     * @return
      */
     private SetOpPlanNode connectSetOpChildren(SetOpPlanNode setOpPlanNode, List<CompiledPlan> childrenPlans) {
         for (CompiledPlan selectPlan : childrenPlans) {
@@ -367,5 +382,22 @@ class SetOpSubPlanAssembler extends SubPlanAssembler {
             childParent.addAndLinkChild(childPlan);
         }
         return setOpPlanNode;
+    }
+
+    private AbstractPlanNode findTopProjection(AbstractPlanNode node) {
+        if (node instanceof ProjectionPlanNode) {
+            return node;
+        }
+        AbstractPlanNode inlineProjection = node.getInlinePlanNode(PlanNodeType.PROJECTION);
+        if (inlineProjection != null) {
+            return inlineProjection;
+        }
+        for (int i = 0; i < node.getChildCount(); i++) {
+            AbstractPlanNode childProjection = findTopProjection(node.getChild(i));
+            if (childProjection != null) {
+                return childProjection;
+            }
+        }
+        return null;
     }
 }

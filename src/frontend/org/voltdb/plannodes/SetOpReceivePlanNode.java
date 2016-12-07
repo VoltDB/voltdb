@@ -28,22 +28,23 @@ public class SetOpReceivePlanNode extends AbstractReceivePlanNode {
 
     private static class Members {
         static final String SETOP_TYPE = "SETOP_TYPE";
+        static final String CHILDREN_CNT = "CHILDREN_CNT";
     }
 
     // SetOp Type
     private SetOpType m_setOpType;
 
-    // Cildren count
-    private int m_chidlrednCnt;
+    // Children count
+    private int m_childrenCnt;
 
     public SetOpReceivePlanNode() {
         super();
         m_setOpType = SetOpType.NONE;
     }
-    public SetOpReceivePlanNode(SetOpType setOpType, int chidlrednCnt) {
+    public SetOpReceivePlanNode(SetOpType setOpType, int childrenCnt) {
         super();
         m_setOpType = setOpType;
-        m_chidlrednCnt = chidlrednCnt;
+        m_childrenCnt = childrenCnt;
     }
 
     @Override
@@ -52,8 +53,7 @@ public class SetOpReceivePlanNode extends AbstractReceivePlanNode {
     }
 
     @Override
-    public void resolveColumnIndexes()
-    {
+    public void resolveColumnIndexes() {
         resolveColumnIndexes(m_outputSchema);
     }
 
@@ -61,12 +61,14 @@ public class SetOpReceivePlanNode extends AbstractReceivePlanNode {
     public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
         helpLoadFromJSONObject(jobj, db);
         m_setOpType = SetOpType.valueOf(jobj.getString(Members.SETOP_TYPE));
+        m_childrenCnt = jobj.getInt(Members.CHILDREN_CNT);
     }
 
     @Override
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
         stringer.keySymbolValuePair(Members.SETOP_TYPE, m_setOpType.name());
+        stringer.keySymbolValuePair(Members.CHILDREN_CNT, m_childrenCnt);
     }
 
     @Override
@@ -74,22 +76,8 @@ public class SetOpReceivePlanNode extends AbstractReceivePlanNode {
         return "RECEIVE SET OP " + m_setOpType.name();
     }
 
-    @Override
-    public int getInputDependencyCount() {
-        if (m_setOpType == SetOpType.EXCEPT || m_setOpType == SetOpType.EXCEPT_ALL) {
-            // Partiton Set op result plus its children
-            return m_chidlrednCnt + 1;
-        } else if (m_setOpType == SetOpType.INTERSECT || m_setOpType == SetOpType.INTERSECT_ALL) {
-            //
-            return m_chidlrednCnt;
-        } else {
-            return 1;
-        }
-    }
-
     public SetOpType getSetOpType() {
         return m_setOpType;
     }
-
 
 }

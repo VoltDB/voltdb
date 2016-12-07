@@ -1138,7 +1138,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
             pnt.loadPlanNodesFromJSONArrays(jarray, db);
             List<AbstractPlanNode> list = pnt.getNodeList();
             for( AbstractPlanNode pn : list ) {
-                m_inlineNodes.put( pn.getPlanNodeType(), pn);
+                addInlinePlanNode(pn);
             }
         }
         //children and parents list loading implemented in planNodeTree.loadFromJsonArray
