@@ -720,9 +720,9 @@ public class ParserBase {
         windowedExpressionTypeMap.put(Tokens.RANK, OpTypes.WINDOWED_RANK);
         windowedExpressionTypeMap.put(Tokens.DENSE_RANK, OpTypes.WINDOWED_DENSE_RANK);
         windowedExpressionTypeMap.put(Tokens.COUNT, OpTypes.WINDOWED_COUNT);
-        // No support for these yet.
-        // windowedExpressionTypeMap.put(Tokens.PERCENT_RANK, OpTypes.WINDOWED_PERCENT_RANK);
-        // windowedExpressionTypeMap.put(Tokens.CUME_DIST, OpTypes.WINDOWED_CUME_DIST);
+        windowedExpressionTypeMap.put(Tokens.MIN, OpTypes.WINDOWED_MIN);
+        windowedExpressionTypeMap.put(Tokens.MAX, OpTypes.WINDOWED_MAX);
+        windowedExpressionTypeMap.put(Tokens.SUM, OpTypes.WINDOWED_SUM);
     }
 
     HsqlException unexpectedToken(String tokenS) {

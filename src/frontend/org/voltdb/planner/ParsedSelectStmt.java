@@ -948,11 +948,11 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             List<AbstractExpression> orderByExpressions =
                     windowFunctionExpression.getOrderByExpressions();
             ExpressionType exprType = windowFunctionExpression.getExpressionType();
+            String aggName = exprType.symbol().toUpperCase();
             switch (exprType) {
             case AGGREGATE_WINDOWED_RANK:
             case AGGREGATE_WINDOWED_DENSE_RANK:
                 if (orderByExpressions.size() == 0) {
-                    String aggName = exprType.symbol().toUpperCase();
                     throw new PlanningErrorException(
                             "Windowed " + aggName +
                             " function call expressions require an ORDER BY specification.");
@@ -977,8 +977,29 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                     assert(vt != null);
                     if (! (vt.isAnyIntegerType() || vt == VoltType.TIMESTAMP) ) {
                         throw new PlanningErrorException(
-                                "Windowed Count arguments must have either integer or timestamp type.");
+                                "Windowed COUNT arguments must have exactly one integer or timestamp type");
                     }
+                }
+                break;
+            case AGGREGATE_WINDOWED_MAX:
+            case AGGREGATE_WINDOWED_MIN:
+                if (windowFunctionExpression.getAggregateArguments().size() != 1) {
+                    throw new PlanningErrorException(
+                            String.format("Windowed %s must have exactly one argument", aggName));
+                }
+                // Any type is ok, so we won't inspect the type.
+                break;
+            case AGGREGATE_WINDOWED_SUM:
+                if (windowFunctionExpression.getAggregateArguments().size() != 1) {
+                    throw new PlanningErrorException(
+                            String.format("Windowed %s must have exactly one integer argument", aggName));
+                }
+                AbstractExpression arg = windowFunctionExpression.getAggregateArguments().get(0);
+                VoltType vt = arg.getValueType();
+                assert(vt != null);
+                if (! vt.isAnyIntegerType() || vt == VoltType.TIMESTAMP) {
+                    throw new PlanningErrorException(
+                                "Windowed SUM must have exactly one integer or timestamp argument");
                 }
                 break;
             default:

@@ -85,6 +85,8 @@ public class AggregateExpression extends AbstractExpression {
         case AGGREGATE_AVG:
         case AGGREGATE_MAX:
         case AGGREGATE_MIN:
+        case AGGREGATE_WINDOWED_MAX:
+        case AGGREGATE_WINDOWED_MIN:
             //
             // It's always whatever the base type is
             //
@@ -97,6 +99,7 @@ public class AggregateExpression extends AbstractExpression {
             }
             break;
         case AGGREGATE_SUM:
+        case AGGREGATE_WINDOWED_SUM:
             if (m_left.getValueType() == VoltType.TINYINT ||
                 m_left.getValueType() == VoltType.SMALLINT ||
                 m_left.getValueType() == VoltType.INTEGER) {
