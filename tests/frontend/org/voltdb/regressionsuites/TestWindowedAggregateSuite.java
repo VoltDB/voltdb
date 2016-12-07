@@ -693,6 +693,183 @@ public class TestWindowedAggregateSuite extends RegressionSuite {
         }, vt);
     }
 
+    private void validateCount(Client client, String sql, long expected[][]) throws Exception {
+        ClientResponse cr = client.callProcedure("@AdHoc", sql);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        VoltTable vt = cr.getResults()[0];
+        validateTableOfLongs(vt, expected);
+    }
+
+    public void testCount() throws Exception {
+        Client client = getClient();
+        initUniqueTable(client);
+
+        // Try some simple cases with partition by and order by.
+        validateCount(client,
+                      "select a, count(*) over (partition by a) from tu order by a",
+                      new long[][]{{10, 1}, {20, 1}, {30, 1}, {40, 1}, {50, 1}});
+        validateCount(client,
+                      "select a, count(*) over (order by a) from tu order by a",
+                      new long[][]{{10, 1}, {20, 2}, {30, 3}, {40, 4}, {50, 5}});
+        validateCount(client,
+                      "select a, count(*) over () from tu order by a",
+                      new long[][]{{10, 5}, {20, 5}, {30, 5}, {40, 5}, {50, 5}});
+
+        // Try some simple cases with partition by and order by
+        // on tables that have duplicate order keys.
+        client.callProcedure("tm.insert", 10, 1);
+        client.callProcedure("tm.insert", 10, 1);
+        client.callProcedure("tm.insert", 10, 2);
+        client.callProcedure("tm.insert", 20, 1);
+        client.callProcedure("tm.insert", 30, 3);
+        client.callProcedure("tm.insert", 30, 1);
+        client.callProcedure("tm.insert", 40, 2);
+        client.callProcedure("tm.insert", 40, 3);
+        client.callProcedure("tm.insert", 50, 2);
+        validateCount(client,
+                      "select a, count(*) over (partition by a) from tm order by a",
+                      new long[][]{{10, 3}, {10, 3}, {10, 3},
+                                   {20, 1},
+                                   {30, 2}, {30, 2},
+                                   {40, 2}, {40, 2},
+                                   {50, 1}});
+
+        validateCount(client,
+                      "select a, count(*) over (partition by a order by b) from tm order by a",
+                      new long[][]{{10, 2}, {10, 2}, {10, 3},
+                                   {20, 1},
+                                   {30, 1}, {30, 2},
+                                   {40, 1}, {40, 2},
+                                   {50, 1}});
+        validateCount(client,
+                      "select a, count(*) over (order by a) from tm order by a",
+                      new long[][]{{10, 3}, {10, 3}, {10, 3},
+                                   {20, 4},
+                                   {30, 6}, {30, 6},
+                                   {40, 8}, {40, 8},
+                                   {50, 9}});
+        validateCount(client,
+                      "select a, count(*) over () from tm order by a",
+                      new long[][]{{10, 9}, {10, 9}, {10, 9},
+                                   {20, 9},
+                                   {30, 9}, {30, 9},
+                                   {40, 9}, {40, 9},
+                                   {50, 9}});
+
+        client.callProcedure("@AdHoc", "truncate table tm");
+        client.callProcedure("@AdHoc", "truncate table tu");
+
+        // Try some cases with nulls.  These answers are not
+        // the same as the answers we would see with postsgresql,
+        // since we sort nulls first and PG sorts them last.
+        client.callProcedure("t.insert", 1,    1, 100);
+        client.callProcedure("t.insert", 1,    2, 101);
+        client.callProcedure("t.insert", 1,    3, 102);
+        client.callProcedure("t.insert", 1, null, 103);
+        client.callProcedure("t.insert", 1, null, 104);
+        client.callProcedure("t.insert", 1, null, 105);
+        client.callProcedure("t.insert", 2,    1, 200);
+        client.callProcedure("t.insert", 2,    2, 201);
+        client.callProcedure("t.insert", 2,    3, 202);
+        client.callProcedure("t.insert", 2,    4, 203);
+        client.callProcedure("t.insert", 2,    5, 204);
+        client.callProcedure("t.insert", 2,    4, 205);
+
+        validateCount(client,
+                      "select a, c, count(*) over (partition by a order by b) from t order by a, c",
+                      // Note: The nulls sort first.  So, since this is
+                      //       order by b, the rows with b sort together,
+                      //       making their count all 3.  The rest count
+                      //       up from there.  This is not the same as
+                      //       postgresql, where the nulls sort after.
+                      new long[][]{{1, 100, 4},
+                                   {1, 101, 5},
+                                   {1, 102, 6},
+                                   {1, 103, 3},
+                                   {1, 104, 3},
+                                   {1, 105, 3},
+                                   {2, 200, 1},
+                                   {2, 201, 2},
+                                   {2, 202, 3},
+                                   {2, 203, 5},
+                                   {2, 204, 6},
+                                   {2, 205, 5}});
+        validateCount(client,
+                      "select a, c, count(b) over (partition by a order by b) from t order by a, c",
+                      // Note: Here the argument expression b in count(b) is
+                      //       null for c == 103, 104, 105.  Since these sort
+                      //       rows sort first, but the rows don't count,
+                      //       we get counts of 0.
+                      new long[][]{{1, 100, 1},
+                                   {1, 101, 2},
+                                   {1, 102, 3},
+                                   {1, 103, 0},
+                                   {1, 104, 0},
+                                   {1, 105, 0},
+                                   {2, 200, 1},
+                                   {2, 201, 2},
+                                   {2, 202, 3},
+                                   {2, 203, 5},
+                                   {2, 204, 6},
+                                   {2, 205, 5}});
+        validateCount(client,
+                      "select a, c, count(b) over (partition by a order by b desc) from t order by a, c",
+                      // Note: Here the argument expression b in count(b) is
+                      //       null for c == 103, 104, 105.  Since these sort
+                      //       rows sort last in descending order, but the rows
+                      //       don't count, we get counts of 0.
+                      new long[][]{{1, 100, 3},
+                                   {1, 101, 2},
+                                   {1, 102, 1},
+                                   {1, 103, 3},
+                                   {1, 104, 3},
+                                   {1, 105, 3},
+                                   {2, 200, 6},
+                                   {2, 201, 5},
+                                   {2, 202, 4},
+                                   {2, 203, 3},
+                                   {2, 204, 1},
+                                   {2, 205, 3}});
+
+        // Test that COUNT(E) works if E is a timestamp.
+        long baseTime = TimestampType.millisFromJDBCformat("1953-06-10 00:00:00");
+        TimestampType baseTimestamp = new TimestampType(baseTime);
+        client.callProcedure("T_TIMESTAMP.insert", 100, 100, baseTimestamp);
+        client.callProcedure("T_TIMESTAMP.insert", 100, 100, null);
+        client.callProcedure("T_TIMESTAMP.insert", 100, 100, baseTimestamp);
+        validateCount(client,
+                      "select count(c) over() from T_TIMESTAMP",
+                      new long[][]{{2}, {2}, {2}});
+        // Try some things on an empty table.
+        // We expect to get no answers anywhere.
+        client.callProcedure("@AdHoc", "TRUNCATE TABLE T;");
+        validateCount(client,
+                      "select a, c, count(b) over (partition by a order by b desc) from t order by a, c",
+                      new long[][]{});
+        validateCount(client,
+                      "select a, c, count(b) over (partition by a) from t order by a, c",
+                      new long[][]{});
+        validateCount(client,
+                      "select a, c, count(b) over (order by b desc) from t order by a, c",
+                      new long[][]{});
+        validateCount(client,
+                      "select a, c, count(b) over () from t order by a, c",
+                      new long[][]{});
+        validateCount(client,
+                      "select a, c, count(*) over (partition by a order by b desc) from t order by a, c",
+                      new long[][]{});
+        validateCount(client,
+                      "select a, c, count(*) over (partition by a) from t order by a, c",
+                      new long[][]{});
+        validateCount(client,
+                      "select a, c, count(*) over (order by b desc) from t order by a, c",
+                      new long[][]{});
+        validateCount(client,
+                      "select a, c, count(*) over () from t order by a, c",
+                      new long[][]{});
+
+    }
+
     static public junit.framework.Test suite() {
         VoltServerConfig config = null;
         MultiConfigSuiteBuilder builder =
