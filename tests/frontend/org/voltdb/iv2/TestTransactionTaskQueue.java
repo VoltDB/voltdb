@@ -63,7 +63,7 @@ public class TestTransactionTaskQueue extends TestCase
         when(mbox.getHSId()).thenReturn(1337l);
 
         SpProcedureTask task =
-            new SpProcedureTask(mbox, "TestProc", queue, init, null);
+            new SpProcedureTask(mbox, "TestProc", queue, init);
         return task;
     }
 
@@ -108,7 +108,7 @@ public class TestTransactionTaskQueue extends TestCase
         CompleteTransactionMessage msg = mock(CompleteTransactionMessage.class);
         when(msg.getTxnId()).thenReturn(mpTxnId);
         CompleteTransactionTask task =
-            new CompleteTransactionTask(mock(InitiatorMailbox.class), txn, queue, msg, null);
+            new CompleteTransactionTask(mock(InitiatorMailbox.class), txn, queue, msg);
         return task;
     }
 

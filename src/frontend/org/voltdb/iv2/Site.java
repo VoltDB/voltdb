@@ -173,8 +173,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
     // Cache the DR gateway here so that we can pass it to tasks as they are reconstructed from
     // the task log
-    private final PartitionDRGateway m_drGateway;
-    private final PartitionDRGateway m_mpDrGateway;
+    private PartitionDRGateway m_drGateway;
+    private PartitionDRGateway m_mpDrGateway;
+    private final boolean m_hasMPDRGateway; // true if this site has the MP gateway
 
     /*
      * Track the last producer-cluster unique IDs and drIds associated with an
@@ -431,7 +432,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         @Override
         public void forceAllDRNodeBuffersToDisk(final boolean nofsync)
         {
-            m_drGateway.forceAllDRNodeBuffersToDisk(nofsync);
+            if (m_drGateway != null) {
+                m_drGateway.forceAllDRNodeBuffersToDisk(nofsync);
+            }
             if (m_mpDrGateway != null) {
                 m_mpDrGateway.forceAllDRNodeBuffersToDisk(nofsync);
             }
@@ -583,8 +586,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             MemoryStats memStats,
             String coreBindIds,
             TaskLog rejoinTaskLog,
-            PartitionDRGateway drGateway,
-            PartitionDRGateway mpDrGateway)
+            boolean hasMPDRGateway)
     {
         m_siteId = siteId;
         m_context = context;
@@ -602,8 +604,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         m_initiatorMailbox = initiatorMailbox;
         m_coreBindIds = coreBindIds;
         m_rejoinTaskLog = rejoinTaskLog;
-        m_drGateway = drGateway;
-        m_mpDrGateway = mpDrGateway;
+        m_hasMPDRGateway = hasMPDRGateway;
         m_hashinator = TheHashinator.getCurrentHashinator();
 
         if (agent != null) {
@@ -621,6 +622,18 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             m_tableStats = null;
             m_indexStats = null;
             m_memStats = null;
+        }
+    }
+
+    public void setDRGateway(PartitionDRGateway drGateway,
+                             PartitionDRGateway mpDrGateway)
+    {
+        m_drGateway = drGateway;
+        m_mpDrGateway = mpDrGateway;
+        if (m_hasMPDRGateway && m_mpDrGateway == null) {
+            throw new IllegalArgumentException("This site should contain the MP DR gateway but was not given");
+        } else if (!m_hasMPDRGateway && m_mpDrGateway != null) {
+            throw new IllegalArgumentException("This site should not contain the MP DR gateway but was given");
         }
     }
 
@@ -685,7 +698,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                         defaultDrBufferSize,
                         deploy.getSystemsettings().get("systemsettings").getTemptablemaxsize(),
                         hashinatorConfig,
-                        m_mpDrGateway != null);
+                        m_hasMPDRGateway);
             }
             else if (m_backend == BackendTarget.NATIVE_EE_SPY_JNI){
                 Class<?> spyClass = Class.forName("org.mockito.Mockito");
@@ -701,7 +714,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                         m_context.cluster.getDeployment().get("deployment").
                         getSystemsettings().get("systemsettings").getTemptablemaxsize(),
                         hashinatorConfig,
-                        m_mpDrGateway != null);
+                        m_hasMPDRGateway);
                 eeTemp = (ExecutionEngine) spyMethod.invoke(null, internalEE);
             }
             else {
@@ -719,7 +732,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                             m_backend,
                             VoltDB.instance().getConfig().m_ipcPort,
                             hashinatorConfig,
-                            m_mpDrGateway != null);
+                            m_hasMPDRGateway);
             }
             eeTemp.loadCatalog(m_startupConfig.m_timestamp, m_startupConfig.m_serializedCatalog);
             eeTemp.setBatchTimeout(m_context.cluster.getDeployment().get("deployment").
@@ -831,7 +844,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 Iv2InitiateTaskMessage m = (Iv2InitiateTaskMessage)tibm;
                 SpProcedureTask t = new SpProcedureTask(
                         m_initiatorMailbox, m.getStoredProcedureName(),
-                        null, m, m_drGateway);
+                        null, m);
                 if (!filter(tibm)) {
                     m_currentTxnId = t.getTxnId();
                     m_lastTxnTime = EstTime.currentTimeMillis();
@@ -867,7 +880,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 if (global_replay_mpTxn != null) {
                     CompleteTransactionMessage m = (CompleteTransactionMessage)tibm;
                     CompleteTransactionTask t = new CompleteTransactionTask(m_initiatorMailbox, global_replay_mpTxn,
-                            null, m, m_drGateway);
+                            null, m);
                     if (!m.isRestart()) {
                         global_replay_mpTxn = null;
                     }
@@ -994,6 +1007,12 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     public int getCorrespondingClusterId()
     {
         return m_context.cluster.getDrclusterid();
+    }
+
+    @Override
+    public PartitionDRGateway getDRGateway()
+    {
+        return m_drGateway;
     }
 
     @Override

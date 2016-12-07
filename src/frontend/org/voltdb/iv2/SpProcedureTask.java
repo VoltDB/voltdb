@@ -40,8 +40,6 @@ import org.voltdb.utils.LogKeys;
  */
 public class SpProcedureTask extends ProcedureTask
 {
-    final private PartitionDRGateway m_drGateway;
-
     private static final boolean EXEC_TRACE_ENABLED;
     private static final boolean HOST_DEBUG_ENABLED;
     private static final boolean HOST_TRACE_ENABLED;
@@ -52,11 +50,9 @@ public class SpProcedureTask extends ProcedureTask
     }
 
     public SpProcedureTask(Mailbox initiator, String procName, TransactionTaskQueue queue,
-                  Iv2InitiateTaskMessage msg,
-                  PartitionDRGateway drGateway)
+                  Iv2InitiateTaskMessage msg)
     {
        super(initiator, procName, new SpTransactionState(msg), queue);
-       m_drGateway = drGateway;
     }
 
     /** Run is invoked by a run-loop to execute this transaction. */
@@ -105,7 +101,7 @@ public class SpProcedureTask extends ProcedureTask
             hostLog.debug("COMPLETE: " + this);
         }
 
-        logToDR(txnState, response);
+        logToDR(siteConnection.getDRGateway(), txnState, response);
     }
 
     @Override
@@ -179,14 +175,14 @@ public class SpProcedureTask extends ProcedureTask
             hostLog.trace("COMPLETE replaying txn: " + this);
         }
 
-        logToDR(txnState, response);
+        logToDR(siteConnection.getDRGateway(), txnState, response);
     }
 
-    private void logToDR(SpTransactionState txnState, InitiateResponseMessage response)
+    private void logToDR(PartitionDRGateway drGateway, SpTransactionState txnState, InitiateResponseMessage response)
     {
         // Log invocation to DR
-        if (m_drGateway != null && !txnState.isReadOnly() && !txnState.needsRollback()) {
-            m_drGateway.onSuccessfulProcedureCall(txnState.txnId, txnState.uniqueId, txnState.getHash(),
+        if (drGateway != null && !txnState.isReadOnly() && !txnState.needsRollback()) {
+            drGateway.onSuccessfulProcedureCall(txnState.txnId, txnState.uniqueId, txnState.getHash(),
                     txnState.getInvocation(), response.getClientResponseData());
         }
     }
