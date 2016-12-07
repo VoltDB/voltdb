@@ -29,6 +29,7 @@ import org.voltdb.jni.ExecutionEngine.EventType;
 import org.voltdb.licensetool.LicenseApi;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
+import org.voltdb.utils.MiscUtils;
 
 /**
  * Stub class that provides a gateway to the DRProducer when
@@ -70,6 +71,20 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
     }
 
     public static ImmutableMap<Integer, PartitionDRGateway> m_partitionDRGateways = ImmutableMap.of();
+    public static final DRConflictManager m_conflictManager;
+    static {
+        if (MiscUtils.isPro()) {
+            DRConflictManager tmpObj = null;
+            try {
+                Class<?> klass = Class.forName("org.voltdb.dr2.DRConflictManagerImpl");
+                Constructor<?> constructor = klass.getConstructor();
+                tmpObj = (DRConflictManager) constructor.newInstance();
+            } catch (Exception e) {}
+            m_conflictManager = tmpObj;
+        } else {
+            m_conflictManager = null;
+        }
+    }
 
     // all partial MP txns go into SP streams
     public static final byte DR_NO_MP_START_PROTOCOL_VERSION = 3;
@@ -156,14 +171,6 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
     @Override
     public void lastUniqueIdsMadeDurable(long spUniqueId, long mpUniqueId) {}
 
-    public int processDRConflict(int partitionId, int remoteClusterId, long remoteTimestamp, String tableName, DRRecordType action,
-                                 DRConflictType deleteConflict, ByteBuffer existingMetaTableForDelete, ByteBuffer existingTupleTableForDelete,
-                                 ByteBuffer expectedMetaTableForDelete, ByteBuffer expectedTupleTableForDelete,
-                                 DRConflictType insertConflict, ByteBuffer existingMetaTableForInsert, ByteBuffer existingTupleTableForInsert,
-                                 ByteBuffer newMetaTableForInsert, ByteBuffer newTupleTableForInsert) {
-        return 0;
-    }
-
     public static long pushDRBuffer(
             int partitionId,
             long startSequenceNumber,
@@ -174,7 +181,7 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
             ByteBuffer buf) {
         final PartitionDRGateway pdrg = m_partitionDRGateways.get(partitionId);
         if (pdrg == null) {
-            VoltDB.crashLocalVoltDB("No PRDG when there should be", true, null);
+            return -1;
         }
         return pdrg.onBinaryDR(partitionId, startSequenceNumber, lastSequenceNumber,
                 lastSpUniqueId, lastMpUniqueId, EventType.values()[eventType], buf);
@@ -187,15 +194,17 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
                                        ByteBuffer expectedMetaTableForDelete, ByteBuffer expectedTupleTableForDelete,
                                        int insertConflict, ByteBuffer existingMetaTableForInsert, ByteBuffer existingTupleTableForInsert,
                                        ByteBuffer newMetaTableForInsert, ByteBuffer newTupleTableForInsert) {
-        final PartitionDRGateway pdrg = m_partitionDRGateways.get(partitionId);
-        if (pdrg == null) {
-            VoltDB.crashLocalVoltDB("No PRDG when there should be", true, null);
-        }
-
-        return pdrg.processDRConflict(partitionId, remoteClusterId, remoteTimestamp, tableName, DRRecordType.values()[action],
-                DRConflictType.values()[deleteConflict], existingMetaTableForDelete, existingTupleTableForDelete,
-                expectedMetaTableForDelete, expectedTupleTableForDelete,
-                DRConflictType.values()[insertConflict], existingMetaTableForInsert, existingTupleTableForInsert,
-                newMetaTableForInsert, newTupleTableForInsert);
+        assert m_conflictManager != null : "Community edition should not have any conflicts";
+        return m_conflictManager.resolveConflict(partitionId,
+                                                 remoteClusterId,
+                                                 remoteTimestamp,
+                                                 tableName,
+                                                 DRRecordType.values()[action],
+                                                 DRConflictType.values()[deleteConflict],
+                                                 existingMetaTableForDelete, existingTupleTableForDelete,
+                                                 expectedMetaTableForDelete, expectedTupleTableForDelete,
+                                                 DRConflictType.values()[insertConflict],
+                                                 existingMetaTableForInsert, existingTupleTableForInsert,
+                                                 newMetaTableForInsert, newTupleTableForInsert);
     }
 }

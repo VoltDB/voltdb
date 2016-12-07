@@ -41,7 +41,6 @@ import org.voltdb.CommandLog;
 import org.voltdb.CommandLog.DurabilityListener;
 import org.voltdb.Consistency;
 import org.voltdb.Consistency.ReadLevel;
-import org.voltdb.PartitionDRGateway;
 import org.voltdb.SnapshotCompletionInterest;
 import org.voltdb.SnapshotCompletionMonitor;
 import org.voltdb.SystemProcedureCatalog;
@@ -142,7 +141,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     private final Map<Long, Queue<TransactionTask>> m_mpsPendingDurability =
         new HashMap<Long, Queue<TransactionTask>>();
     private CommandLog m_cl;
-    private PartitionDRGateway m_drGateway = new PartitionDRGateway();
     private final SnapshotCompletionMonitor m_snapMonitor;
     // used to decide if we should shortcut reads
     private final Consistency.ReadLevel m_defaultConsistencyReadLevel;
@@ -195,12 +193,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 m_durabilityListener.setUniqueIdListener(listener);
             }
         });
-    }
-
-    public void setDRGateway(PartitionDRGateway gateway)
-    {
-        m_drGateway = gateway;
-        setDurableUniqueIdListener(gateway);
     }
 
     @Override
@@ -572,7 +564,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         final boolean shortcutRead = msg.isReadOnly() && (m_defaultConsistencyReadLevel == ReadLevel.FAST);
         final String procedureName = msg.getStoredProcedureName();
         final SpProcedureTask task =
-            new SpProcedureTask(m_mailbox, procedureName, m_pendingTasks, msg, m_drGateway);
+            new SpProcedureTask(m_mailbox, procedureName, m_pendingTasks, msg);
         if (!shortcutRead) {
             ListenableFuture<Object> durabilityBackpressureFuture =
                     m_cl.log(msg, msg.getSpHandle(), null, m_durabilityListener, task);
@@ -1013,7 +1005,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         {
             Iv2Trace.logCompleteTransactionMessage(msg, m_mailbox.getHSId());
             final CompleteTransactionTask task =
-                new CompleteTransactionTask(txn, m_pendingTasks, msg, m_drGateway);
+                new CompleteTransactionTask(txn, m_pendingTasks, msg);
             queueOrOfferMPTask(task);
             // If this is a restart, then we need to leave the transaction state around
             if (!msg.isRestart()) {
