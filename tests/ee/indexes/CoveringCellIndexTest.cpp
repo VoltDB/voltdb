@@ -69,7 +69,6 @@ public:
                                                             wantNoQuantum,    // undoQuantum
                                                             topless,          // topend
                                                             m_testPool.get(), // tempStringPool
-                                                            NULL,             // params
                                                             NULL,             // engine
                                                             "",               // hostname
                                                             0,                // hostId
