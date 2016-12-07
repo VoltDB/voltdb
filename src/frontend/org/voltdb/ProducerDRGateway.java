@@ -17,19 +17,29 @@
 
 package org.voltdb;
 
+import java.io.IOException;
 import java.util.Map;
 
 public interface ProducerDRGateway {
 
-    /*
-     * Ensure that all enabled DR Producer Hosts have agreed on the PBD file name
+    /**
+     * Start the main thread and the state machine, wait until all nodes converge on the initial state.
+     * @throws IOException
      */
-    public abstract void blockOnDRStateConvergence();
+    public void startAndWaitForGlobalAgreement() throws IOException;
+
+    /**
+     * Truncate the DR log using the snapshot restore truncation point cached
+     * earlier. This is called on recover before the command log replay starts
+     * to drop all binary logs generated after the snapshot. Command log replay
+     * will recreate those binary logs.
+     */
+    public void truncateDRLog();
 
     /**
      * Start listening on the ports
      */
-    public abstract void initialize(boolean drProducerEnabled, int listenPort, String portInterface);
+    public abstract void startListening(boolean drProducerEnabled, int listenPort, String portInterface) throws IOException;
 
     /**
      * @return true if bindPorts has been called.
@@ -53,7 +63,7 @@ public interface ProducerDRGateway {
 
     public abstract int getDRClusterId();
 
-    public void truncateDRLogsForRestore(Map<Integer, Long> sequenceNumbers);
+    public void cacheSnapshotRestoreTruncationPoint(Map<Integer, Long> sequenceNumbers);
 
     /**
      * Clear all queued DR buffers for a master, useful when the replica goes away
