@@ -382,7 +382,7 @@ def run_config(suite_name, config, basedir, output_dir, random_seed,
                  get_numerical_html_table_element(max_statements_per_pattern, strong_warn_below=1, warn_above=100000) +
                  get_numerical_html_table_element(num_inserts,  warn_below=4, strong_warn_below=1, warn_above=1000) +
                  get_numerical_html_table_element(num_patterns, warn_below=4, strong_warn_below=1, warn_above=10000) +
-                 get_numerical_html_table_element(num_unresolved,             strong_warn_above=0) +
+                 get_numerical_html_table_element(num_unresolved, error_above=0) +
                  get_time_html_table_element(gensql_time) +
                  get_time_html_table_element(voltdb_time) +
                  get_time_html_table_element(cmpdb_time) )
@@ -833,6 +833,9 @@ if __name__ == "__main__":
     print_seconds(total_compar_time, "for comparing ALL DB results")
     print_elapsed_seconds("for generating the output report", time1, "Total   time: ")
     print_elapsed_seconds("for the entire run", time0, "Total   time: ")
+    if total_num_unresolved > 0:
+        success = False
+        print "Total number of invalid statements with unresolved symbols: %d" % total_num_unresolved
     if total_cmp_npes > 0:
         print "Total number of " + comparison_database + " NullPointerExceptions (NPEs): %d" % total_cmp_npes
     if total_volt_npes > 0:
