@@ -74,7 +74,6 @@ import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.base.Predicate;
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;
-import com.google_voltpatches.common.collect.ImmutableSet;
 import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.collect.Sets;
 import com.google_voltpatches.common.net.HostAndPort;
@@ -323,7 +322,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      * All failed hosts that have ever been seen.
      * Used to dedupe failures so that they are only processed once.
      */
-    private volatile ImmutableSet<Integer> m_knownFailedHosts = ImmutableSet.of();
+    private volatile ImmutableMap<Integer,String> m_knownFailedHosts = ImmutableMap.of();
 
     private AgreementSite m_agreementSite;
     private ZooKeeper m_zk;
@@ -517,19 +516,26 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
 
     private final void addFailedHosts(Set<Integer> rip) {
         synchronized (m_mapLock) {
-            m_knownFailedHosts = ImmutableSet.<Integer>builder()
-                    .addAll(Sets.filter(m_knownFailedHosts, not(in(rip))))
-                    .addAll(rip)
-                    .build();
+            ImmutableMap.Builder<Integer, String> bldr = ImmutableMap.<Integer,String>builder()
+                    .putAll(Maps.filterKeys(m_knownFailedHosts, not(in(rip))));
+            for (int hostId: rip) {
+                ForeignHost fh = m_foreignHosts.get(hostId);
+                String hostname = fh != null ? fh.hostnameAndIPAndPort() : "UNKNOWN";
+                bldr.put(hostId, hostname);
+            }
+            m_knownFailedHosts = bldr.build();
         }
     }
 
     private final void addFailedHost(int hostId) {
-        if (!m_knownFailedHosts.contains(hostId)) {
+        if (!m_knownFailedHosts.containsKey(hostId)) {
             synchronized (m_mapLock) {
-                m_knownFailedHosts = ImmutableSet.<Integer>builder()
-                        .addAll(Sets.filter(m_knownFailedHosts, not(equalTo(hostId))))
-                        .build();
+                ImmutableMap.Builder<Integer, String> bldr = ImmutableMap.<Integer,String>builder()
+                        .putAll(Maps.filterKeys(m_knownFailedHosts, not(equalTo(hostId))));
+                ForeignHost fh = m_foreignHosts.get(hostId);
+                String hostname = fh != null ? fh.hostnameAndIPAndPort() : "UNKNOWN";
+                bldr.put(hostId, hostname);
+                m_knownFailedHosts = bldr.build();
             }
         }
     }
@@ -1136,7 +1142,9 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             return CoreUtils.getHostnameOrAddress();
         }
         ForeignHost fh = m_foreignHosts.get(hostId);
-        return fh == null ? "UNKNOWN" : fh.hostname();
+        return fh != null ? fh.hostname() :
+            m_knownFailedHosts.get(hostId) != null ? m_knownFailedHosts.get(hostId) :
+                "UNKNOWN";
     }
 
     /**
@@ -1168,7 +1176,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
 
         if (fhost == null)
         {
-            if (!m_knownFailedHosts.contains(hostId)) {
+            if (!m_knownFailedHosts.containsKey(hostId)) {
                 m_networkLog.warn(
                         "Attempted to send a message to foreign host with id " +
                         hostId + " but there is no such host.");
@@ -1464,7 +1472,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     }
 
     public boolean validateForeignHostId(Integer hostId) {
-        return !m_knownFailedHosts.contains(hostId);
+        return !m_knownFailedHosts.containsKey(hostId);
     }
 
     public void setDeadHostTimeout(int timeout) {

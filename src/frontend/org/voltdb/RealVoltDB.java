@@ -146,6 +146,7 @@ import org.voltdb.settings.NodeSettings;
 import org.voltdb.settings.Settings;
 import org.voltdb.settings.SettingsException;
 import org.voltdb.snmp.DummySnmpTrapSender;
+import org.voltdb.snmp.FaultFacility;
 import org.voltdb.snmp.FaultLevel;
 import org.voltdb.snmp.SnmpTrapSender;
 import org.voltdb.sysprocs.saverestore.SnapshotPathType;
@@ -243,6 +244,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     // IV2 things
     TreeMap<Integer, Initiator> m_iv2Initiators = new TreeMap<>();
     Cartographer m_cartographer = null;
+    Supplier<Boolean> m_partitionZeroLeader = null;
     LeaderAppointer m_leaderAppointer = null;
     GlobalServiceElector m_globalServiceElector = null;
     MpInitiator m_MPI = null;
@@ -934,6 +936,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 m_configuredReplicationFactor = clusterConfig.getReplicationFactor();
                 m_cartographer = new Cartographer(m_messenger, m_configuredReplicationFactor,
                         m_catalogContext.cluster.getNetworkpartition());
+                m_partitionZeroLeader = new Supplier<Boolean>() {
+                    @Override
+                    public Boolean get() {
+                        return m_cartographer.isPartitionZeroLeader();
+                    }
+                };
                 List<Integer> partitions = null;
                 if (isRejoin) {
                     m_configuredNumberOfPartitions = m_cartographer.getPartitionCount();
@@ -1355,9 +1363,21 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                                 false, null);
                         return;
                     }
-                    // Send hostDown traps
-                    for (int hostId : failedHosts) {
-                        m_snmp.hostDown(FaultLevel.ERROR, hostId, "host left cluster mesh due to connection loss");
+                    // Send KSafety trap - BTW the side effect of
+                    // calling m_leaderAppointer.isClusterKSafe(..) is that leader appointer
+                    // creates the ksafety stats set
+                    if (m_cartographer.isPartitionZeroLeader() || isFirstZeroPartitionReplica(failedHosts)) {
+                        // Send hostDown traps
+                        for (int hostId : failedHosts) {
+                            m_snmp.hostDown(FaultLevel.ERROR, hostId, "Host left cluster mesh due to connection loss");
+                        }
+                        final int missing = m_leaderAppointer.getKSafetyStatsSet().stream()
+                                .max((s1,s2) -> s1.getMissingCount() - s2.getMissingCount())
+                                .map(s->s.getMissingCount()).orElse(failedHosts.size());
+                        final int expected = m_clusterSettings.getReference().hostcount();
+                        m_snmp.statistics(FaultFacility.CLUSTER,
+                                "Node lost. Cluster is down to " + (expected - missing)
+                              + " members out of original "+ expected + ".");
                     }
                     // Cleanup the rejoin blocker in case the rejoining node failed.
                     // This has to run on a separate thread because the callback is
@@ -1385,6 +1405,21 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 }
             });
         }
+    }
+
+    private boolean isFirstZeroPartitionReplica(Set<Integer> failedHosts) {
+        int partitionZeroMaster = CoreUtils.getHostIdFromHSId(m_cartographer.getHSIdForMaster(0));
+        if (!failedHosts.contains(partitionZeroMaster)) {
+            return false;
+        }
+        int firstReplica = m_cartographer
+                .getReplicasForPartition(0)
+                .stream()
+                .map(l->CoreUtils.getHostIdFromHSId(l))
+                .filter(i-> !failedHosts.contains(i))
+                .min((i1,i2) -> i1 - i2)
+                .orElse(m_messenger.getHostId() + 1);
+        return firstReplica == m_messenger.getHostId();
     }
 
     class DailyLogTask implements Runnable {
@@ -3279,7 +3314,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 VoltDB.crashLocalVoltDB("Error starting client interface.", true, e);
             }
             // send hostUp trap
-            m_snmp.hostUp("host is now a cluster member");
+            m_snmp.hostUp("Host is now a cluster member");
 
             if (m_producerDRGateway != null && !m_producerDRGateway.isStarted()) {
                 // Start listening on the DR ports
