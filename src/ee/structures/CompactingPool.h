@@ -52,7 +52,6 @@ class CompactingPool
     // allocate buffers of size elementSize * elementsPerBuffer bytes.
     CompactingPool(int32_t elementSize, int32_t elementsPerBuffer)
       : m_allocator(elementSize + FIXED_OVERHEAD_PER_ENTRY(), elementsPerBuffer)
-      , m_allocationsPendingRelease()
     { }
 
     void* malloc(char** referrer)
@@ -97,20 +96,13 @@ class CompactingPool
         m_allocator.trim();
     }
 
-    /**
-     * Put this pointer to allocated data in a set of items
-     * that will be freed when client calls freePendingAllocations().
-     */
-    void markAllocationAsPendingRelease(void* element)
-    {
+    bool freeIfLast(void* element) {
         if (isLast(element)) {
-            // Is marking last element for release, just release it now, to
-            // avoid growing the pending release map.
             m_allocator.trim();
+            return true;
         }
-        else {
-            m_allocationsPendingRelease.insert(element);
-        }
+
+        return false;
     }
 
     /**
@@ -121,19 +113,18 @@ class CompactingPool
      * memove'ing we need to do---we can avoid moving allocations that
      * are about to be freed anyway.
      */
-    void freePendingAllocations()
+    void freePendingAllocations(SizePtrPairSet& pendingReleaseSet)
     {
         // While there are still deferred allocations...
-        while (trimAllocationsPendingRelease() != true) {
-            auto it = m_allocationsPendingRelease.begin();
-            assert (!it.isEnd());
+        /* while (true) { */
+             trimAllocationsPendingRelease(pendingReleaseSet);
+        /*     auto it = pendingReleaseSet.begin(); */
+        /*     assert (!it.isEnd()); */
 
-            void* toBeReleased = it.key();
-            m_allocationsPendingRelease.erase(toBeReleased);
-            free(toBeReleased);
-        }
-
-        assert (m_allocationsPendingRelease.size() == 0);
+        /*     void* toBeReleased = it.key(); */
+        /*     pendingReleaseSet.erase(toBeReleased); */
+        /*     free(toBeReleased); */
+        /* } */
     }
 
     std::size_t getBytesAllocated() const
@@ -157,26 +148,28 @@ class CompactingPool
      *
      * Returns true if all allocations pending release have been freed.
      */
-    bool trimAllocationsPendingRelease() {
-        while (true) {
-            if (m_allocator.count() == 0) {
-                assert (m_allocationsPendingRelease.empty());
-                return true;
-            }
+    void trimAllocationsPendingRelease(SizePtrPairSet& pendingReleaseSet) {
 
-            Relocatable* last = reinterpret_cast<Relocatable*>(m_allocator.last());
-            auto trimIt = m_allocationsPendingRelease.find(last->m_data);
-            if (trimIt.isEnd()) {
-                return m_allocationsPendingRelease.empty();
-            }
-            m_allocator.trim();
-            m_allocationsPendingRelease.erase(trimIt.key());
-        }
+        // FIXME
+
+        /* const int elemSize = 1; */
+        /* while (true) { */
+        /*     if (m_allocator.count() == 0) { */
+        /*         return true; */
+        /*     } */
+
+        /*     Relocatable* last = reinterpret_cast<Relocatable*>(m_allocator.last()); */
+        /*     auto trimIt = pendingReleaseSet.find(SizePtrPair(last->m_data, elemSize)); */
+        /*     if (trimIt.isEnd()) { */
+        /*         // Last ietem in allocator is not pending delete */
+        /*         return pendingReleaseSet.empty(); */
+        /*     } */
+        /*     m_allocator.trim(); */
+        /*     m_allocationsPendingRelease.erase(trimIt.key()); */
+        /* } */
     }
 
     ContiguousAllocator m_allocator;
-
-    CompactingSet<void*, PointerComparator> m_allocationsPendingRelease;
 
     /// The layout of a relocatable allocation,
     /// including overhead for managing the relocation process.

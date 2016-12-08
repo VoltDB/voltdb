@@ -20,12 +20,14 @@
 #include "common/SQLException.h"
 
 #include "structures/CompactingPool.h"
+#include "structures/CompactingSet.h"
 
 #include <boost/shared_ptr.hpp>
 #include <boost/unordered_map.hpp>
 
 #include <iostream>
 #include <pthread.h>
+#include <utility>
 
 namespace voltdb {
 
@@ -64,6 +66,7 @@ struct PerThreadPools {
         , m_bytesAllocated(0)
         , m_exactSizePools()
         , m_relocatablePools()
+        , m_relocatableObjectsPendingRelease()
         , m_relocatablePoolReleaseMode(IMMEDIATE_RELEASE)
     {
     }
@@ -83,6 +86,10 @@ struct PerThreadPools {
 
     CompactingStringStorage& getStringPoolMap() {
         return m_relocatablePools;
+    }
+
+    SizePtrPairSet& getPendingReleaseSet() {
+        return m_relocatableObjectsPendingRelease;
     }
 
     bool getRelocatablePoolReleaseMode() const {
@@ -106,6 +113,7 @@ private:
     size_t m_bytesAllocated;
     PoolsByObjectSize m_exactSizePools;
     CompactingStringStorage m_relocatablePools;
+    SizePtrPairSet m_relocatableObjectsPendingRelease;
     bool m_relocatablePoolReleaseMode;
 };
 }
@@ -281,12 +289,17 @@ void ThreadLocalPool::freeRelocatable(Sized* sized)
                             alloc_size);
     }
 
+    auto pool = iter->second;
     if (isDeferredReleaseMode()) {
-        iter->second->markAllocationAsPendingRelease(sized);
+        // If we can just free it now cheaply, do it.
+        // Otherwise put it in the set of things to free later.
+        if (! pool->freeIfLast(sized)) {
+            getPerThreadPools()->getPendingReleaseSet().insert(SizePtrPair(alloc_size, sized));
+        }
     }
     else {
         // Free the raw allocation from the found pool.
-        iter->second->free(sized);
+        pool->free(sized);
     }
 }
 
@@ -388,10 +401,13 @@ ScopedPoolDeferredReleaseMode::ScopedPoolDeferredReleaseMode() {
 }
 
 ScopedPoolDeferredReleaseMode::~ScopedPoolDeferredReleaseMode() {
+    auto& pendingReleaseSet = getPerThreadPools()->getPendingReleaseSet();
+
     auto& poolMap = getStringPoolMap();
     BOOST_FOREACH(auto entry, poolMap) {
-        entry.second->freePendingAllocations();
+        entry.second->freePendingAllocations(pendingReleaseSet);
     }
+    assert (pendingReleaseSet.empty());
     getPerThreadPools()->setRelocatablePoolReleaseMode(DEFERRED_RELEASE);
 }
 

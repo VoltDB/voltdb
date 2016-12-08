@@ -27,8 +27,12 @@
 #include "boost/foreach.hpp"
 #include "harness.h"
 #include "structures/CompactingSet.h"
+#include "common/ThreadLocalPool.h"
 
 using voltdb::CompactingSet;
+using voltdb::PointerComparator;
+using voltdb::SizePtrPair;
+using voltdb::SizePtrPairComparator;
 
 class CompactingSetTest : public Test {
 public:
@@ -40,7 +44,7 @@ public:
 };
 
 TEST_F(CompactingSetTest, Simple) {
-    CompactingSet<int*> mySet;
+    CompactingSet<int*, PointerComparator> mySet;
     std::set<int*> stdSet;
 
     ASSERT_TRUE(mySet.empty());
@@ -88,6 +92,55 @@ TEST_F(CompactingSetTest, Simple) {
     ASSERT_EQ(0, mySet.size());
 }
 
+TEST_F(CompactingSetTest, RangeScan) {
+    CompactingSet<SizePtrPair, SizePtrPairComparator> mySet;
+    std::set<SizePtrPair> stdSet;
+
+    std::vector<SizePtrPair> pairs = {
+        {2, new int32_t(72)},
+        {2, new int32_t(73)},
+        {2, new int32_t(74)},
+        {4, new int32_t(75)},
+        {4, new int32_t(76)},
+        {4, new int32_t(77)},
+        {8, new int32_t(78)},
+        {8, new int32_t(79)},
+        {8, new int32_t(80)}
+    };
+
+    for (int i = 0; i < pairs.size(); ++i) {
+        mySet.insert(pairs[i]);
+        stdSet.insert(pairs[i]);
+    }
+
+    BOOST_FOREACH(int32_t size, std::vector<int32_t>({2, 4, 8})) {
+        SizePtrPair lowerKey(size, 0);
+        SizePtrPair upperKey(size + 1, 0);
+
+        auto myIt = mySet.lowerBound(lowerKey);
+        auto stdIt = stdSet.lower_bound(lowerKey);
+
+        auto myUpperIt = mySet.upperBound(upperKey);
+        auto stdUpperIt = stdSet.upper_bound(upperKey);
+
+        while (stdIt != stdUpperIt) {
+            SizePtrPair expected = *stdIt;
+            SizePtrPair actual = myIt.key();
+            ASSERT_EQ(expected, actual);
+            ++stdIt;
+            myIt.moveNext();
+        }
+
+        ASSERT_TRUE(myIt.equals(myUpperIt));
+    }
+
+    auto it = mySet.begin();
+    while (! it.isEnd()) {
+        delete static_cast<int32_t*>(it.key().second);
+        mySet.erase(it.key());
+        it = mySet.begin();
+    }
+}
 
 int main() {
     ::srand(777);

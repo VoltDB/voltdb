@@ -56,6 +56,9 @@ public:
 
     inline iterator begin() { return m_map.begin(); }
 
+    inline iterator lowerBound(const Key& key) { return m_map.lowerBound(key); }
+    inline iterator upperBound(const Key& key) { return m_map.upperBound(key); }
+
 private:
     // unimplemented copy ctor and assignment operator
     CompactingSet(const CompactingSet<Key, Compare> &);
