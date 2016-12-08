@@ -85,18 +85,15 @@ public class SSLVoltPort extends VoltPort {
     public void run() throws IOException {
         int nRead = 0;
         try {
-
             if (!processingReads && !processingWrites) {
+                disableWriteSelection();
                 final int maxRead = m_handler.getMaxRead();
                 nRead = fillReadStream(maxRead);
-                disableWriteSelection();
                 if (nRead > 0) {
                     queueDecryptionTasks();
                     processingReads = true;
-                }
-                if (m_isShuttingDown) {
-                    unregistered();
-                    return;
+                } else {
+                    enableWriteSelection();
                 }
             }
 
@@ -106,13 +103,12 @@ public class SSLVoltPort extends VoltPort {
                     return;
                 } else {
                     processingReads = false;
+                    enableWriteSelection();
                 }
             }
 
             if (!processingReads && !processingWrites) {
-                enableWriteSelection();
                 boolean responsesReceived = buildEncryptionTasks();
-                disableWriteSelection();
                 if (responsesReceived) {
                     processingWrites = true;
                 }
@@ -131,7 +127,7 @@ public class SSLVoltPort extends VoltPort {
             }
         } catch (IOException ioe) {
             while (!gatewaysEmpty()) {
-                System.out.println("Waiting for ssl tasks to finish.");
+                System.out.println("Waiting for ssl task to finish.");
             }
             throw ioe;
         } finally {
