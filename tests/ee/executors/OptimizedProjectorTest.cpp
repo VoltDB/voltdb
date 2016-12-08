@@ -527,7 +527,6 @@ int main(int argc, char* argv[]) {
                                                     wantNoQuantum,  // undoQuantum
                                                     topless,        // topend
                                                     testPool.get(), // tempStringPool
-                                                    NULL,           // params
                                                     NULL,           // engine
                                                     "",             // hostname
                                                     0,              // hostId

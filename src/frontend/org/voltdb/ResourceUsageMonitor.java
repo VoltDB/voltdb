@@ -190,7 +190,7 @@ public class ResourceUsageMonitor implements Runnable
                                         CoreUtils.getHostnameOrAddress(), getValueWithUnit(datum.rss)));
                         m_snmpMemoryTrapSent = true;
                     } catch (Throwable t) {
-                        m_logger.warn("failed to issue a resouce SNMP trap", t);
+                        m_logger.warn("failed to issue a resouceTrigger SNMP trap", t);
                     }
                 }
             } else {
@@ -202,7 +202,7 @@ public class ResourceUsageMonitor implements Runnable
                                         CoreUtils.getHostnameOrAddress(), getValueWithUnit(datum.rss)));
                         m_snmpMemoryTrapSent = false;
                     } catch (Throwable t) {
-                        m_logger.warn("failed to issue a resouce SNMP trap", t);
+                        m_logger.warn("failed to issue a resouceClear SNMP trap", t);
                     }
                 }
             }

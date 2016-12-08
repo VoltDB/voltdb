@@ -191,7 +191,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     CountingPostfilter postfilter(m_outputTable, post_expression, limit, offset);
 
     TableTuple temp_tuple;
-    ProgressMonitorProxy pmp(m_engine, this);
+    ProgressMonitorProxy pmp(m_engine->getExecutorContext(), this);
     if (m_aggExec != NULL) {
         const TupleSchema * inputSchema = tableIndex->getTupleSchema();
         if (m_projectionNode != NULL) {

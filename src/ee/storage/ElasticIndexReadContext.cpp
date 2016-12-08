@@ -19,6 +19,7 @@
 #include "common/MiscUtil.h"
 #include "common/TupleOutputStream.h"
 #include "common/TupleOutputStreamProcessor.h"
+#include "storage/AbstractDRTupleStream.h"
 #include "storage/ElasticIndexReadContext.h"
 #include "storage/persistenttable.h"
 #include "logging/LogManager.h"

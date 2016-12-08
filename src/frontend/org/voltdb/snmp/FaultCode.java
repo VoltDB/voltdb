@@ -32,7 +32,9 @@ public enum FaultCode {
     RESOURCE_CLEAR,
     CRASH,
     STATISTICS_TRIGGER,
-    STATISTICS_CLEAR;
+    STATISTICS_CLEAR,
+    PAUSE,
+    RESUME;
 
     public final static List<FaultCode> values = ImmutableList.copyOf(values());
 

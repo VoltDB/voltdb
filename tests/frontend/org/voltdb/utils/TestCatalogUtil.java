@@ -33,6 +33,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.SortedSet;
 
+
 import org.voltcore.utils.Pair;
 import org.voltdb.VoltDB;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
@@ -617,6 +618,47 @@ public class TestCatalogUtil extends TestCase {
             public boolean isCommandLoggingAllowed() {
                 return false;
             }
+
+            @Override
+            public boolean isAWSMarketplace() {
+                return false;
+            }
+
+            @Override
+            public boolean isEnterprise() {
+                return false;
+            }
+
+            @Override
+            public boolean isPro() {
+                return false;
+            }
+
+            @Override
+            public String licensee() {
+                return null;
+            }
+
+            @Override
+            public Calendar issued() {
+                // TODO Auto-generated method stub
+                return null;
+            }
+
+            @Override
+            public String note() {
+                return null;
+            }
+
+            @Override
+            public boolean hardExpiration() {
+                return false;
+            }
+
+            @Override
+            public boolean secondaryInitialization() {
+                return true;
+            }
         };
         assertNull("Setting DR Active-Active should succeed with qualified license",
                    CatalogUtil.checkLicenseConstraint(catalog, lapi));
@@ -660,6 +702,46 @@ public class TestCatalogUtil extends TestCase {
             @Override
             public boolean isCommandLoggingAllowed() {
                 return false;
+            }
+
+            @Override
+            public boolean isAWSMarketplace() {
+                return false;
+            }
+
+            @Override
+            public boolean isEnterprise() {
+                return false;
+            }
+
+            @Override
+            public boolean isPro() {
+                return false;
+            }
+
+            @Override
+            public String licensee() {
+                return null;
+            }
+
+            @Override
+            public Calendar issued() {
+                return null;
+            }
+
+            @Override
+            public String note() {
+                return null;
+            }
+
+            @Override
+            public boolean hardExpiration() {
+                return false;
+            }
+
+            @Override
+            public boolean secondaryInitialization() {
+                return true;
             }
         };
         assertNotNull("Setting DR Active-Active should fail with unqualified license",

@@ -349,7 +349,7 @@ NValue MaterializedViewTriggerForWrite::findFallbackValueUsingPlan(const TableTu
     // build parameters.
     // the parameters are the groupby columns and the aggregation column.
     ExecutorContext* context = ExecutorContext::getExecutorContext();
-    NValueArray &params = *context->getParameterContainer();
+    NValueArray &params = context->getParameterContainer();
     vector<NValue> backups(m_groupByColumnCount+1);
     NValue newVal = initialNull;
     NValue oldValue = getAggInputFromSrcTuple(aggIndex, oldTuple);

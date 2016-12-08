@@ -33,6 +33,7 @@
 #include "expressions/functionexpression.h"
 #include "indexes/tableindex.h"
 #include "indexes/tableindexfactory.h"
+#include "storage/AbstractDRTupleStream.h"
 #include "storage/constraintutil.h"
 #include "storage/MaterializedViewTriggerForWrite.h"
 #include "storage/persistenttable.h"

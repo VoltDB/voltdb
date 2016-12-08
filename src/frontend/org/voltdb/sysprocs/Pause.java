@@ -35,6 +35,7 @@ import org.voltdb.VoltDBInterface;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltZK;
+import org.voltdb.snmp.SnmpTrapSender;
 
 @ProcInfo(singlePartition = false)
 
@@ -109,6 +110,17 @@ public class Pause extends VoltSystemProcedure {
                 m_stat = stat;
                 voltdb.getHostMessenger().pause();
                 voltdb.setMode(PAUSED);
+
+             // for snmp
+                SnmpTrapSender snmp = voltdb.getSnmpTrapSender();
+                if (snmp != null) {
+                    try {
+                        snmp.pause("Cluster paused.");
+                    } catch (Throwable t) {
+                        VoltLogger log = new VoltLogger("HOST");
+                        log.warn("failed to issue a resume pause trap", t);
+                    }
+                }
 
             } catch (Exception e) {
                 throw new RuntimeException(e);

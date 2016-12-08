@@ -1180,7 +1180,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeHashi
     assert(engine);
     try {
         updateJNILogProxy(engine); //JNIEnv pointer can change between calls, must be updated
-        NValueArray& params = engine->getParameterContainer();
+        NValueArray& params = engine->getExecutorContext()->getParameterContainer();
         Pool *stringPool = engine->getStringPool();
         deserializeParameterSet(engine->getParameterBuffer(), engine->getParameterBufferCapacity(), params, engine->getStringPool());
         HashinatorType hashinatorType = static_cast<HashinatorType>(voltdb::ValuePeeker::peekAsInteger(params[1]));
@@ -1226,7 +1226,7 @@ SHAREDLIB_JNIEXPORT void JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeUpdat
             return;
         }
         updateJNILogProxy(engine); //JNIEnv pointer can change between calls, must be updated
-        NValueArray& params = engine->getParameterContainer();
+        NValueArray& params = engine->getExecutorContext()->getParameterContainer();
         Pool *stringPool = engine->getStringPool();
         deserializeParameterSet(engine->getParameterBuffer(), engine->getParameterBufferCapacity(), params, engine->getStringPool());
         const char *configValue = voltdb::ValuePeeker::peekObjectValue(params[0]);
