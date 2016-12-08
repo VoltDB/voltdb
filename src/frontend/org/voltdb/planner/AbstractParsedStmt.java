@@ -546,7 +546,7 @@ public abstract class AbstractParsedStmt {
         return m_windowFunctionExpressions;
     }
     /**
-     * Parse the rank expression.  This actually just returns a TVE.  The
+     * Parse the a windowed expression.  This actually just returns a TVE.  The
      * WindowFunctionExpression is squirreled away in the m_windowFunctionExpressions
      * object, though, because we will need it later.
      *

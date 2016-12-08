@@ -216,7 +216,7 @@ public class EEPlanTestGenerator extends PlannerTestCase {
                                    getCatalogString(),
                                    TConfig);
         countDB.addTest(new TestConfig("test_max_last_row",
-                                  "select A, B, (-1 * (max(abs(5-C)) over (partition by A order by B))) as R from T ORDER BY A, B, R;",
+                                  "select A, B, max(-1 * abs(5-C)) over (partition by A order by B) as R from T ORDER BY A, B, R;",
                                   new int[][] {{  1,  1,    0},
                                                {  1,  1,    0},
                                                {  1,  1,    0},
@@ -255,7 +255,7 @@ public class EEPlanTestGenerator extends PlannerTestCase {
         }));
 
         countDB.addTest(new TestConfig("test_max_middle_row",
-                                  "select A, B, (-1 * (max(abs(3-C)) over (partition by A order by B))) as R from T ORDER BY A, B, R;",
+                                  "select A, B, max(-1 * abs(3-C)) over (partition by A order by B) as R from T ORDER BY A, B, R;",
                                   new int[][] {{  1,  1,    0},
                                                {  1,  1,    0},
                                                {  1,  1,    0},
@@ -294,7 +294,7 @@ public class EEPlanTestGenerator extends PlannerTestCase {
         }));
 
         countDB.addTest(new TestConfig("test_max_first_row",
-                                  "select A, B, (-1 * (max(abs(1-C)) over (partition by A order by B))) as R from T ORDER BY A, B, R;",
+                                  "select A, B, max(-1 * abs(1-C)) over (partition by A order by B) as R from T ORDER BY A, B, R;",
                                   new int[][] {{  1,  1,    0},
                                                {  1,  1,    0},
                                                {  1,  1,    0},

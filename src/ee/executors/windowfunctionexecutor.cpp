@@ -27,6 +27,8 @@
 #include "plannodes/windowfunctionnode.h"
 #include "execution/ProgressMonitorProxy.h"
 #include "common/ValueFactory.hpp"
+#include "common/ValuePeeker.hpp"
+#include "expressions/dateconstants.h"
 
 namespace voltdb {
 
@@ -89,8 +91,9 @@ struct TableWindow {
  * we want to be able to turn off evaluation when it's not needed.
  */
 struct WindowAggregate {
-    WindowAggregate()
-      : m_needsLookahead(true) {
+    WindowAggregate(ValueType valType)
+      : m_needsLookahead(true),
+        m_valType(valType) {
     }
     virtual ~WindowAggregate() {
 
@@ -141,8 +144,10 @@ struct WindowAggregate {
     {
         m_value.setNull();
     }
+
     NValue m_value;
     bool   m_needsLookahead;
+    ValueType m_valType;
 
     const static NValue m_one;
 };
@@ -156,7 +161,8 @@ const NValue WindowAggregate::m_one = ValueFactory::getBigIntValue(1);
  */
 class DenseRankAgg : public WindowAggregate {
 public:
-    DenseRankAgg() {
+    DenseRankAgg(ValueType valType)
+        : WindowAggregate(valType) {
         m_value = ValueFactory::getBigIntValue(1);
         m_orderByPeerIncrement = m_value;
         m_needsLookahead = false;
@@ -177,6 +183,7 @@ public:
     virtual NValue orderByPeerIncrement() {
         return m_orderByPeerIncrement;
     }
+
     NValue m_orderByPeerIncrement;
 };
 
@@ -186,8 +193,8 @@ public:
  */
 class RankAgg : public DenseRankAgg {
 public:
-    RankAgg()
-    : DenseRankAgg() {
+    RankAgg(ValueType valType)
+    : DenseRankAgg(valType) {
     }
     void lookaheadNextGroup(TableWindow &window) {
         m_orderByPeerIncrement = ValueFactory::getBigIntValue(window.m_orderByGroupSize);
@@ -203,7 +210,8 @@ public:
  */
 class CountAgg : public WindowAggregate {
 public:
-    CountAgg() { }
+    CountAgg(ValueType valType)
+        : WindowAggregate(valType) { }
 
     virtual ~CountAgg() {}
 
@@ -223,14 +231,35 @@ public:
     }
 };
 
-#if  0
 /*
  * The following are examples of other aggregate definitions.
  */
 class MinAgg : public WindowAggregate {
 public:
-    MinAgg() {
-        m_value = ValueFactory::getBigIntValue(LONG_MAX);
+    MinAgg(ValueType valType)
+        : WindowAggregate(valType) {
+    }
+    virtual void resetAgg() {
+        WindowAggregate::resetAgg();
+        switch (m_valType) {
+        case VALUE_TYPE_BIGINT:
+            m_value = ValueFactory::getBigIntValue(LONG_MAX);
+            break;
+        case VALUE_TYPE_INTEGER:
+            m_value = ValueFactory::getIntegerValue(INT_MAX);
+            break;
+        case VALUE_TYPE_SMALLINT:
+            m_value = ValueFactory::getSmallIntValue(SHRT_MAX);
+            break;
+        case VALUE_TYPE_TINYINT:
+            m_value = ValueFactory::getTinyIntValue(CHAR_MAX);
+            break;
+        case VALUE_TYPE_TIMESTAMP:
+            m_value = ValueFactory::getTimestampValue(NYE9999);
+        default:
+            throw SerializableEEException(
+                    "Value type unknown in aggregate constructor");
+        }
     }
     /**
      * Calculate the min by looking ahead in the
@@ -239,7 +268,7 @@ public:
     virtual void lookaheadOneRow(TableWindow &window, NValueArray &argVals) {
         assert(argVals.size() == 1);
         if ( ! argVals[0].isNull()) {
-            if (argVals[0].op_lessThan(m_value)) {
+            if (argVals[0].op_lessThan(m_value).isTrue()) {
                 m_value = argVals[0];
             }
         }
@@ -248,8 +277,31 @@ public:
 
 class MaxAgg : public WindowAggregate {
 public:
-    MaxAgg() {
-        m_value = ValueFactory::getBigIntValue(LONG_MIN);
+    MaxAgg(ValueType valType)
+        : WindowAggregate(valType) {
+    }
+    virtual void resetAgg() {
+        WindowAggregate::resetAgg();
+        switch (m_valType) {
+        case VALUE_TYPE_BIGINT:
+            // Start at LONG_MIN+1, because LONG_MIN stands for NULL.
+            m_value = ValueFactory::getBigIntValue(LONG_MIN+1);
+            break;
+        case VALUE_TYPE_INTEGER:
+            m_value = ValueFactory::getIntegerValue(INT_MIN);
+            break;
+        case VALUE_TYPE_SMALLINT:
+            m_value = ValueFactory::getSmallIntValue(SHRT_MIN);
+            break;
+        case VALUE_TYPE_TINYINT:
+            m_value = ValueFactory::getTinyIntValue(CHAR_MAX);
+            break;
+        case VALUE_TYPE_TIMESTAMP:
+            m_value = ValueFactory::getTimestampValue(GREGORIAN_EPOCH);
+        default:
+            throw SerializableEEException(
+                    "Value type unknown in aggregate constructor");
+        }
     }
     /**
      * Calculate the min by looking ahead in the
@@ -258,7 +310,7 @@ public:
     virtual void lookaheadOneRow(TableWindow &window, NValueArray &argVals) {
         assert(argVals.size() == 1);
         if ( ! argVals[0].isNull()) {
-            if (argVals[0].op_greaterThan(m_value)) {
+            if (argVals[0].op_greaterThan(m_value).isTrue()) {
                 m_value = argVals[0];
             }
         }
@@ -267,7 +319,13 @@ public:
 
 class SumAgg : public WindowAggregate {
 public:
-    SumAgg() : m_ct(0) {
+    SumAgg(ValueType valType)
+        : WindowAggregate(valType) {
+        m_value = ValueFactory::getBigIntValue(0);
+    }
+    virtual void resetAgg() {
+        WindowAggregate::resetAgg();
+        m_value = ValueFactory::getBigIntValue(0);
     }
     /**
      * Calculate the min by looking ahead in the
@@ -281,6 +339,7 @@ public:
     }
 };
 
+#if  0
 class AvgAgg : public WindowAggregate {
 public:
     AvgAgg()
@@ -393,15 +452,22 @@ bool WindowFunctionExecutor::p_init(AbstractPlanNode *init_node, TempTableLimits
  * The object is allocated from the provided memory pool.
  */
 inline WindowAggregate* getWindowedAggInstance(Pool& memoryPool,
-                                               ExpressionType agg_type)
+                                               ExpressionType agg_type,
+                                               ValueType valType)
 {
     switch (agg_type) {
     case EXPRESSION_TYPE_AGGREGATE_WINDOWED_RANK:
-        return new (memoryPool) RankAgg();
+        return new (memoryPool) RankAgg(valType);
     case EXPRESSION_TYPE_AGGREGATE_WINDOWED_DENSE_RANK:
-        return new (memoryPool) DenseRankAgg();
+        return new (memoryPool) DenseRankAgg(valType);
     case EXPRESSION_TYPE_AGGREGATE_WINDOWED_COUNT:
-        return new (memoryPool) CountAgg();
+        return new (memoryPool) CountAgg(valType);
+    case EXPRESSION_TYPE_AGGREGATE_WINDOWED_MAX:
+        return new (memoryPool) MaxAgg(valType);
+    case EXPRESSION_TYPE_AGGREGATE_WINDOWED_MIN:
+        return new (memoryPool) MinAgg(valType);
+    case EXPRESSION_TYPE_AGGREGATE_WINDOWED_SUM:
+        return new (memoryPool) SumAgg(valType);
     default:
         {
             char message[128];
@@ -417,10 +483,14 @@ inline WindowAggregate* getWindowedAggInstance(Pool& memoryPool,
  */
 inline void WindowFunctionExecutor::initAggInstances()
 {
+    TableTuple& tempTuple = m_tmpOutputTable->tempTuple();
+
     WindowAggregate** aggs = m_aggregateRow->getAggregates();
     for (int ii = 0; ii < m_aggTypes.size(); ii++) {
+        ValueType valType = tempTuple.getSchema()->columnType(ii);
         aggs[ii] = getWindowedAggInstance(m_memoryPool,
-                                          m_aggTypes[ii]);
+                                          m_aggTypes[ii],
+                                          valType);
     }
 }
 
@@ -428,11 +498,12 @@ inline void WindowFunctionExecutor::lookaheadOneRowForAggs(const TableTuple &tup
     WindowAggregate **aggs = m_aggregateRow->getAggregates();
     for (int ii = 0; ii < m_aggTypes.size(); ii++) {
         if (aggs[ii]->m_needsLookahead) {
-        const AbstractPlanNode::OwningExpressionVector &inputExprs
-            = getAggregateInputExpressions()[ii];
+            const AbstractPlanNode::OwningExpressionVector &inputExprs
+                = getAggregateInputExpressions()[ii];
             NValueArray vals(inputExprs.size());
             for (int idx = 0; idx < inputExprs.size(); idx += 1) {
-                vals[idx] = inputExprs[idx]->eval(&tuple);
+                auto ie = inputExprs[idx];
+                vals[idx] = ie->eval(&tuple);
             }
             aggs[ii]->lookaheadOneRow(tableWindow, vals);
         }
@@ -545,7 +616,7 @@ bool WindowFunctionExecutor::p_execute(const NValueArray& params) {
 
     initAggInstances();
 
-    VOLT_TRACE("Beginning: %s", window->debug().c_str());
+    VOLT_TRACE("Beginning: %s", tableWindow.debug().c_str());
 
     TableTuple nextTuple(m_inputSchema);
 
@@ -573,14 +644,14 @@ bool WindowFunctionExecutor::p_execute(const NValueArray& params) {
         lookaheadNextGroupForAggs(tableWindow);
         // Advance to the end of the current group.
         for (int idx = 0; idx < tableWindow.m_orderByGroupSize; idx += 1) {
-            VOLT_TRACE("MiddleEdge: Window = %s", m_tableWindow->debug().c_str());
+            VOLT_TRACE("MiddleEdge: Window = %s", tableWindow.debug().c_str());
             tableWindow.m_middleEdge.next(nextTuple);
         m_pmp->countdownProgress();
             m_aggregateRow->recordPassThroughTuple(nextTuple);
             insertOutputTuple();
         }
         endGroupForAggs(tableWindow, etype);
-        VOLT_TRACE("FirstEdge: %s", m_tableWindow->debug().c_str());
+        VOLT_TRACE("FirstEdge: %s", tableWindow.debug().c_str());
     }
     VOLT_TRACE("WindowFunctionExecutor: finalizing..");
 
@@ -625,18 +696,18 @@ WindowFunctionExecutor::EdgeType WindowFunctionExecutor::findNextEdge(EdgeType  
         lookaheadOneRowForAggs(nextTuple, tableWindow);
     }
     do {
-        VOLT_TRACE("findNextEdge(loopStart): %s", m_tableWindow->debug().c_str());
+        VOLT_TRACE("findNextEdge(loopStart): %s", tableWindow.debug().c_str());
         if (tableWindow.m_leadingEdge.next(nextTuple)) {
             initPartitionByKeyTuple(nextTuple);
             initOrderByKeyTuple(nextTuple);
             if (compareTuples(getInProgressPartitionByKeyTuple(),
                               getLastPartitionByKeyTuple()) != 0) {
-                VOLT_TRACE("findNextEdge(Partition): %s", m_tableWindow->debug().c_str());
+                VOLT_TRACE("findNextEdge(Partition): %s", tableWindow.debug().c_str());
                 return START_OF_PARTITION_GROUP;
             }
             if (compareTuples(getInProgressOrderByKeyTuple(),
                               getLastOrderByKeyTuple()) != 0) {
-                VOLT_TRACE("findNextEdge(Group): %s", m_tableWindow->debug().c_str());
+                VOLT_TRACE("findNextEdge(Group): %s", tableWindow.debug().c_str());
                 return START_OF_PARTITION_BY_GROUP;
             }
             tableWindow.m_orderByGroupSize += 1;

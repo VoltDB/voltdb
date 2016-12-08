@@ -319,6 +319,9 @@ enum ExpressionType {
     EXPRESSION_TYPE_AGGREGATE_WINDOWED_RANK                   = 70,
     EXPRESSION_TYPE_AGGREGATE_WINDOWED_DENSE_RANK             = 71,
     EXPRESSION_TYPE_AGGREGATE_WINDOWED_COUNT                  = 72,
+    EXPRESSION_TYPE_AGGREGATE_WINDOWED_MAX                    = 73,
+    EXPRESSION_TYPE_AGGREGATE_WINDOWED_MIN                    = 74,
+    EXPRESSION_TYPE_AGGREGATE_WINDOWED_SUM                    = 75,
     // -----------------------------
     // Functions
     // -----------------------------
