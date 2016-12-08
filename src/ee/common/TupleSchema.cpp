@@ -19,6 +19,8 @@
 #include <cstdio>
 #include "common/TupleSchema.h"
 #include "common/NValue.hpp"
+#include "expressions/abstractexpression.h"
+#include "plannodes/abstractplannode.h"
 
 namespace voltdb {
 
@@ -227,6 +229,26 @@ TupleSchema::createTupleSchema(const TupleSchema *first,
     }
 
     return schema;
+}
+
+TupleSchema* TupleSchema::createTupleSchema(
+        const std::vector<AbstractExpression *> &exprs) {
+    std::vector<ValueType> columnTypes;
+    std::vector<int32_t> columnSizes;
+    std::vector<bool> columnAllowNull;
+    std::vector<bool> columnInBytes;
+
+    for (auto b = exprs.begin(), e = exprs.end(); b != e; b++) {
+        const AbstractExpression *expr = *b;
+        columnTypes.push_back(expr->getValueType());
+        columnSizes.push_back(expr->getValueSize());
+        columnAllowNull.push_back(true);
+        columnInBytes.push_back(expr->getInBytes());
+    }
+    return TupleSchema::createTupleSchema(columnTypes,
+                                          columnSizes,
+                                          columnAllowNull,
+                                          columnInBytes);
 }
 
 void TupleSchema::freeTupleSchema(TupleSchema *schema) {

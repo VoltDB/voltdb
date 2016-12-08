@@ -34,7 +34,7 @@ public abstract class TopologyZKUtils {
         // (In the end, there can be only one)
         try
         {
-            byte[] payload = topology.topologyToJSON().getBytes(Charsets.UTF_8);
+            byte[] payload = topology.topologyToJSON().toString().getBytes(Charsets.UTF_8);
             zk.create(VoltZK.topology, payload, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
         }
         catch (KeeperException.NodeExistsException nee)

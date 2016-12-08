@@ -628,19 +628,6 @@ public class TestVoltCompiler extends TestCase {
         assertTrue(compiler.m_catalog.getClusters().get("cluster").getDatabases().get("database") != null);
     }
 
-    public void testBadClusterConfig() throws IOException {
-        // check no hosts
-        Map<Integer, Integer> emptySphMap = Maps.newHashMap();
-        ClusterConfig cluster_config = new ClusterConfig(0, emptySphMap, 0);
-        assertFalse(cluster_config.validate());
-
-        // check no sites-per-hosts
-        Map<Integer, Integer> zeroSphMap = Maps.newHashMap();
-        zeroSphMap.put(0, 0);
-        cluster_config = new ClusterConfig(1, zeroSphMap, 0);
-        assertFalse(cluster_config.validate());
-    }
-
     public void testXMLFileWithDDL() throws IOException {
         String schema1 =
             "create table books (cash integer default 23 NOT NULL, title varchar(3) default 'foo', PRIMARY KEY(cash)); " +

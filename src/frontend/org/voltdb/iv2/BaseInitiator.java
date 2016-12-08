@@ -29,7 +29,6 @@ import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.CommandLog;
 import org.voltdb.LoadedProcedureSet;
 import org.voltdb.MemoryStats;
-import org.voltdb.PartitionDRGateway;
 import org.voltdb.ProcedureRunnerFactory;
 import org.voltdb.StartAction;
 import org.voltdb.StarvationTracker;
@@ -129,8 +128,7 @@ public abstract class BaseInitiator implements Initiator
                           MemoryStats memStats,
                           CommandLog cl,
                           String coreBindIds,
-                          PartitionDRGateway drGateway,
-                          PartitionDRGateway mpDrGateway)
+                          boolean hasMPDRGateway)
         throws KeeperException, ExecutionException, InterruptedException
     {
             int snapshotPriority = 6;
@@ -162,8 +160,7 @@ public abstract class BaseInitiator implements Initiator
                                        memStats,
                                        coreBindIds,
                                        taskLog,
-                                       drGateway,
-                                       mpDrGateway);
+                                       hasMPDRGateway);
             ProcedureRunnerFactory prf = new ProcedureRunnerFactory();
             prf.configure(m_executionSite, m_executionSite.m_sysprocContext);
 
