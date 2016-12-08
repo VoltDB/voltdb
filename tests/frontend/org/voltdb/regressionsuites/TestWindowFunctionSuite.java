@@ -52,9 +52,9 @@ import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.types.TimestampType;
 
-public class TestWindowedAggregateSuite extends RegressionSuite {
+public class TestWindowFunctionSuite extends RegressionSuite {
 
-    public TestWindowedAggregateSuite(String name) {
+    public TestWindowFunctionSuite(String name) {
         super(name);
         // TODO Auto-generated constructor stub
     }
@@ -873,7 +873,7 @@ public class TestWindowedAggregateSuite extends RegressionSuite {
     static public junit.framework.Test suite() {
         VoltServerConfig config = null;
         MultiConfigSuiteBuilder builder =
-            new MultiConfigSuiteBuilder(TestWindowedAggregateSuite.class);
+            new MultiConfigSuiteBuilder(TestWindowFunctionSuite.class);
         boolean success = false;
 
         VoltProjectBuilder project;
