@@ -169,7 +169,7 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
             ByteBuffer buf) {
         final PartitionDRGateway pdrg = m_partitionDRGateways.get(partitionId);
         if (pdrg == null) {
-            VoltDB.crashLocalVoltDB("No PRDG when there should be", true, null);
+            return -1;
         }
         return pdrg.onBinaryDR(partitionId, startSequenceNumber, lastSequenceNumber,
                 lastSpUniqueId, lastMpUniqueId, EventType.values()[eventType], buf);

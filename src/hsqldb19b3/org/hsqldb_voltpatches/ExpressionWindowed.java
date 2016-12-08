@@ -53,8 +53,10 @@ public class ExpressionWindowed extends Expression {
                        boolean isDistinct,
                        SortAndSlice sortAndSlice,
                        List<Expression> partitionByList) {
-        super(ParserBase.getExpressionType(tokenT));
+        super(ParserBase.getWindowedExpressionType(tokenT));
+
         nodes = aggExprs;
+        m_isDistinctAggregate = isDistinct;
         m_partitionByList = partitionByList;
         m_sortAndSlice = sortAndSlice;
         validateWindowedSyntax();
@@ -73,6 +75,8 @@ public class ExpressionWindowed extends Expression {
                 throw Error.error("Windowed Aggregate " + OpTypes.aggregateName(opType) + " expects no arguments.", "", 0);
             }
             break;
+        case OpTypes.WINDOWED_COUNT:
+        	break;
         default:
             throw Error.error("Unsupported window function " + OpTypes.aggregateName(opType), "", 0);
         }
@@ -90,6 +94,7 @@ public class ExpressionWindowed extends Expression {
         switch (opType) {
         case OpTypes.WINDOWED_RANK:
         case OpTypes.WINDOWED_DENSE_RANK:
+        case OpTypes.WINDOWED_COUNT:
             return Type.SQL_BIGINT;
         default:
             throw Error.error("Unsupported windowed function " + OpTypes.aggregateName(opType), "", 0);
@@ -207,7 +212,7 @@ public class ExpressionWindowed extends Expression {
      *             for the order by list, &lt;E3, ASC&gt;.</li>
      *       </ul>
      *    </li>
-     *   <li>A child named "winargs" whose children are the arguments to the aggregate.  This
+     *   <li>All other children are the arguments to the aggregate.  This
      *       would be <code>A+B</code> in the expression above.  Note that there are no
      *       arguments to the rank functions, so this will be empty for the rank functions.
      * </ul>
@@ -220,15 +225,7 @@ public class ExpressionWindowed extends Expression {
     public VoltXMLElement voltAnnotateWindowedAggregateXML(VoltXMLElement exp, SimpleColumnContext context)
             throws HSQLParseException {
         VoltXMLElement winspec = new VoltXMLElement("winspec");
-        VoltXMLElement winargs = new VoltXMLElement("winargs");
         exp.children.add(winspec);
-        exp.children.add(winargs);
-        if (nodes.length > 0) {
-            for (Expression expr : nodes) {
-                winargs.children.add(expr.voltGetXML(context, null));
-            }
-        }
-
         if (m_partitionByList.size() > 0) {
             VoltXMLElement pxe = new VoltXMLElement("partitionbyList");
             winspec.children.add(pxe);
@@ -251,7 +248,10 @@ public class ExpressionWindowed extends Expression {
                 rxe.children.add(orderby);
             }
         }
-
         return exp;
     }
+
+	public boolean isDistinct() {
+		return m_isDistinctAggregate;
+	}
 }

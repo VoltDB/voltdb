@@ -97,13 +97,18 @@ public class NIOReadStream {
             }
             if (first.remaining() == 0) {
                 // read an entire block: move it to the empty buffers list
-                m_readBuffers.poll();
+                m_readBBContainers.poll();
                 firstC.discard();
             }
         }
         return totalBytesCopied;
     }
 
+    /**
+     * Move all bytes in current read buffers to output array, free read buffers
+     * back to thread local memory pool.
+     * @param output
+     */
     void getBytes(byte[] output) {
         if (m_totalAvailable < output.length) {
             throw new IllegalStateException("Requested " + output.length + " bytes; only have "
@@ -112,7 +117,14 @@ public class NIOReadStream {
 
         int bytesCopied = 0;
         while (bytesCopied < output.length) {
-            BBContainer firstC = getFirstC();
+            BBContainer firstC = m_readBBContainers.peekFirst();
+            if (firstC == null) {
+                // Steal the write buffer
+                m_poolBBContainer.b().flip();
+                m_readBBContainers.add(m_poolBBContainer);
+                firstC = m_poolBBContainer;
+                m_poolBBContainer = null;
+            }
             ByteBuffer first = firstC.b();
             assert first.remaining() > 0;
 
@@ -126,20 +138,20 @@ public class NIOReadStream {
 
             if (first.remaining() == 0) {
                 // read an entire block: move it to the empty buffers list
-                m_readBuffers.poll();
+                m_readBBContainers.poll();
                 firstC.discard();
             }
         }
     }
 
     private BBContainer getFirstC() {
-        BBContainer firstC = m_readBuffers.peekFirst();
+        BBContainer firstC = m_readBBContainers.peekFirst();
         if (firstC == null) {
             // Steal the write buffer
-            m_writeBuffer.b().flip();
-            m_readBuffers.add(m_writeBuffer);
-            firstC = m_writeBuffer;
-            m_writeBuffer = null;
+            m_poolBBContainer.b().flip();
+            m_readBBContainers.add(m_poolBBContainer);
+            firstC = m_poolBBContainer;
+            m_poolBBContainer = null;
         }
         return firstC;
     }
@@ -156,22 +168,22 @@ public class NIOReadStream {
         int lastRead = 1;
         try {
             while (bytesRead < maxBytes && lastRead > 0) {
-                ByteBuffer writeBuffer = null;
-                if (m_writeBuffer == null) {
-                    m_writeBuffer = pool.acquire();
-                    writeBuffer = m_writeBuffer.b();
-                    writeBuffer.clear();
+                ByteBuffer poolBuffer = null;
+                if (m_poolBBContainer == null) {
+                    m_poolBBContainer = pool.acquire();
+                    poolBuffer = m_poolBBContainer.b();
+                    poolBuffer.clear();
                 } else {
-                    writeBuffer = m_writeBuffer.b();
+                    poolBuffer = m_poolBBContainer.b();
                 }
 
-                lastRead = channel.read(writeBuffer);
+                lastRead = channel.read(poolBuffer);
 
                 // EOF, no data read
                 if (lastRead < 0 && bytesRead == 0) {
-                    if (writeBuffer.position() == 0) {
-                        m_writeBuffer.discard();
-                        m_writeBuffer = null;
+                    if (poolBuffer.position() == 0) {
+                        m_poolBBContainer.discard();
+                        m_poolBBContainer = null;
                     }
                     return -1;
                 }
@@ -179,16 +191,16 @@ public class NIOReadStream {
                 //Data read
                 if (lastRead > 0) {
                     bytesRead += lastRead;
-                    if (!writeBuffer.hasRemaining()) {
-                        writeBuffer.flip();
-                        m_readBuffers.add(m_writeBuffer);
-                        m_writeBuffer = null;
+                    if (!poolBuffer.hasRemaining()) {
+                        poolBuffer.flip();
+                        m_readBBContainers.add(m_poolBBContainer);
+                        m_poolBBContainer = null;
                     } else {
                         break;
                     }
-                } else if (writeBuffer.position() == 0) {
-                    m_writeBuffer.discard();
-                    m_writeBuffer = null;
+                } else if (poolBuffer.position() == 0) {
+                    m_poolBBContainer.discard();
+                    m_poolBBContainer = null;
                 }
             }
         } finally {
@@ -202,18 +214,18 @@ public class NIOReadStream {
     }
 
     void shutdown() {
-        for (BBContainer c : m_readBuffers) {
+        for (BBContainer c : m_readBBContainers) {
             c.discard();
         }
-        if (m_writeBuffer != null) {
-            m_writeBuffer.discard();
+        if (m_poolBBContainer != null) {
+            m_poolBBContainer.discard();
         }
-        m_readBuffers.clear();
-        m_writeBuffer = null;
+        m_readBBContainers.clear();
+        m_poolBBContainer = null;
     }
 
-    private final ArrayDeque<BBContainer> m_readBuffers = new ArrayDeque<BBContainer>();
-    private BBContainer m_writeBuffer = null;
+    private final ArrayDeque<BBContainer> m_readBBContainers = new ArrayDeque<BBContainer>();
+    private BBContainer m_poolBBContainer = null;
     private int m_totalAvailable = 0;
     private long m_bytesRead = 0;
     private long m_lastBytesRead = 0;

@@ -23,24 +23,29 @@
 namespace voltdb {
 
 class ProgressMonitorProxy;
-class WindowAggregate;
-class WindowAggregateRow;
+struct WindowAggregateRow;
+struct TableWindow;
 /**
  * This is the executor for a WindowFunctionPlanNode.
  */
 class WindowFunctionExecutor: public AbstractExecutor {
-
+    /*
+     * EnsureCleanupOnExit is really part of WindowFunctionExecutor.
+     * It needs access to private members that need to be finalized.
+     * So this is not a dubious use of friendship.
+     */
+    friend struct EnsureCleanupOnExit;
 public:
     WindowFunctionExecutor(VoltDBEngine* engine, AbstractPlanNode* abstract_node)
       : AbstractExecutor(engine, abstract_node),
         m_aggTypes(dynamic_cast<const WindowFunctionPlanNode*>(abstract_node)->getAggregates()),
-        m_distinctAggs(dynamic_cast<const WindowFunctionPlanNode*>(abstract_node)->getDistinctAggregates()),
         m_partitionByExpressions(dynamic_cast<const WindowFunctionPlanNode*>(abstract_node)->getPartitionByExpressions()),
         m_orderByExpressions(dynamic_cast<const WindowFunctionPlanNode*>(abstract_node)->getOrderByExpressions()),
         m_aggregateInputExpressions(dynamic_cast<const WindowFunctionPlanNode*>(abstract_node)->getAggregateInputExpressions()),
         m_pmp(NULL),
         m_orderByKeySchema(NULL),
         m_partitionByKeySchema(NULL),
+        m_inputTable(NULL),
         m_inputSchema(NULL),
         m_aggregateRow(NULL)
         {
@@ -48,13 +53,32 @@ public:
         }
     virtual ~WindowFunctionExecutor();
 
+    /**
+     * When calculating an window function, the value at a row may
+     * depend on the order by peers of the row.  So, we need to
+     * scan the input forward to the next edge between order by
+     * groups.  Edges between partition by groups are a kind of
+     * edge between order by groups as well.
+     *
+     * This enum type gives the type of kinds of edges between groups
+     * of rows.
+     */
+    enum EdgeType {
+        INVALID_EDGE_TYPE,           /** No Type. */
+        START_OF_INPUT,              /** Start of input. */
+        START_OF_PARTITION_GROUP,    /** Start of a new partition group. */
+        START_OF_PARTITION_BY_GROUP, /** Start of an order by group. */
+        END_OF_INPUT                 /** End of all input rows */
+    };
 
+private:
     /**
      * How many aggregate functions are there?
      */
     int getAggregateCount() const {
         return m_aggregateInputExpressions.size();
     }
+
     /**
      * Returns the input expressions for each aggregate in the
      * list.  Only one input expression per aggregate is used
@@ -65,58 +89,11 @@ public:
     }
 
     /**
-     * Returns the list of partition by expressions.  There is
-     * one, shared among all aggregates.  We will need these to partition the input.
-     */
-    const AbstractPlanNode::OwningExpressionVector& getPartitionByExpressions() const {
-        return m_partitionByExpressions;
-    }
-
-    /**
-     * Returns the order by expressions.  Like the partition by expressions,
-     * these are shared among all the aggregates.
-     */
-    const AbstractPlanNode::OwningExpressionVector &getOrderByExpressions() const {
-        return m_orderByExpressions;
-    }
-
-    /**
-     * Returns the aggregate types for each expression.  The
-     * aggregate types are the operation type and not the
-     * value's type. So, they are things like "MIN", "MAX",
-     * "RANK" and so forth.  They are not "TINYINT" or "FLOAT".
-     */
-    const std::vector<ExpressionType>& getAggregateTypes() const {
-        return m_aggTypes;
-    }
-
-    /**
-     * Returns true in index j if the aggregate expression
-     * for j is distinct.
-     */
-    const std::vector<bool>& getDistinctAggs() const {
-        return m_distinctAggs;
-    }
-
-    /**
-     * Returns the output column expressions.  These are
-     * used to calculate the pass through columns.
-     */
-    const std::vector<AbstractExpression*>& getOutputColumnExpressions() const {
-        return m_outputColumnExpressions;
-    }
-
-    /**
      * Initiate the member variables for execute the window function.
      */
     TableTuple p_execute_init(const NValueArray& params,
                               const TupleSchema * schema,
                               TempTable* newTempTable = NULL);
-
-    /**
-     * Execute a single tuple.
-     */
-    void p_execute_tuple(const TableTuple& nextTuple, bool firstTuple);
 
     /**
      * Last method to clean up memory or variables.  We may
@@ -125,11 +102,52 @@ public:
      */
     virtual void p_execute_finish();
 
-private:
-    virtual bool p_init(AbstractPlanNode*, TempTableLimits*);
+    TableTuple & getBufferedInputTuple() {
+        return m_bufferedInputStorage;
+    }
 
-    /** Concrete executor classes implement execution in p_execute() */
-    virtual bool p_execute(const NValueArray& params);
+    /**
+     * This tuple is the set of partition by keys for the
+     * current row.
+     */
+    TableTuple  & getInProgressPartitionByKeyTuple() {
+        return m_inProgressPartitionByKeyStorage;
+    }
+
+    /**
+     * This tuple is the set of partition by keys for the last
+     * row.
+     */
+    TableTuple & getLastPartitionByKeyTuple() {
+        return m_lastPartitionByKeyStorage;
+    }
+
+    /**
+     * This tuple is the set of order by keys for the
+     * current row.
+     */
+    TableTuple & getInProgressOrderByKeyTuple() {
+        return m_inProgressOrderByKeyStorage;
+    }
+
+    /**
+     * This tuple is the set of order by keys for the last row.
+     */
+    TableTuple & getLastOrderByKeyTuple() {
+        return m_lastOrderByKeyStorage;
+    }
+
+    /**
+     * Swap the current group by key tuple with the in-progress partition by key tuple.
+     * Return the new partition by key tuple associated with in-progress tuple address.
+     */
+    void swapPartitionByKeyTupleData();
+
+    /**
+     * Swap the current group by key tuple with the in-progress order by key tuple.
+     * Return the new order by key tuple associated with in-progress tuple address.
+     */
+    void swapOrderByKeyTupleData();
 
     /**
      * Evaluate the partition by expressions in
@@ -148,45 +166,64 @@ private:
      * Create all the WindowAggregate objects in aggregateRow.
      * These hold the state of a window function computation.
      */
-    void initAggInstances(WindowAggregateRow *aggregateRow);
+    void initAggInstances();
+
+    virtual bool p_init(AbstractPlanNode*, TempTableLimits*);
+
+    /** Concrete executor classes implement execution in p_execute() */
+    virtual bool p_execute(const NValueArray& params);
 
     /**
      * Apply the tuple, which is the next input row table,
      * to each of the aggs in aggregateRow.
      */
-    void advanceAggs(const TableTuple& tuple, bool newOrderByGroup);
+    void advanceAggs(const TableTuple& tuple,
+                     bool newOrderByGroup);
 
     /**
-     * Swap the current group by key tuple with the in-progress partition by key tuple.
-     * Return the new partition by key tuple associated with in-progress tuple address.
+     * Call lookaheadOneRow for each aggregate.  This
+     * will happen for each row, and can be disabled
+     * by setting m_needsLookahead to false.
      */
-    void swapPartitionByKeyTupleData();
+    void lookaheadOneRowForAggs(const TableTuple &tuple, TableWindow &tableWindow);
 
     /**
-     * Swap the current group by key tuple with the in-progress order by key tuple.
-     * Return the new order by key tuple associated with in-progress tuple address.
+     * Call lookaheadNextGroup for each aggregate
+     * before the calls to advance.
+     * This will happen for each group and cannot be
+     * disabled.
      */
-    void swapOrderByKeyTupleData();
+    void lookaheadNextGroupForAggs(TableWindow &tableWindow);
 
-    void insertOutputTuple(WindowAggregateRow* winFunRow);
-
-    TupleSchema* constructSchemaFromExpressionVector(const AbstractPlanNode::OwningExpressionVector &exprs);
+    /**
+     * Call endGroup for each aggregate.  This will happen
+     * for each group and cannot be disabled.
+     */
+    void endGroupForAggs(TableWindow &tableWindow, EdgeType edgeType);
+    /**
+     * Insert the output tuple.
+     */
+    void insertOutputTuple();
 
     int compareTuples(const TableTuple &tuple1,
                       const TableTuple &tuple2) const;
 
     void initWorkingTupleStorage();
 
-private:
-     Pool m_memoryPool;
+    /**
+     * Find the next edge, given that the current group's
+     * leading edge is the given edge type.  Return the edge type
+     * of the next group, not this group.  Note that
+     * the edge type is the type of the group after the current
+     * group.
+     */
+    EdgeType findNextEdge(EdgeType edgeType, TableWindow &);
+
+    Pool m_memoryPool;
     /**
      * The operation type of the aggregates.
      */
     const std::vector<ExpressionType> &m_aggTypes;
-    /**
-     * Element j is true iff aggregate j is distinct.
-     */
-    const std::vector<bool> &m_distinctAggs;
     /**
      * This is the list of all partition by expressions.
      * It resides in the plan node.
@@ -232,15 +269,18 @@ private:
      */
     TupleSchema* m_partitionByKeySchema;
     /**
+     * This holds tuples read while looking ahead in the
+     * input table.  Saving them here lets us avoid reading them
+     * multiple times.
+     */
+    PoolBackedTupleStorage m_bufferedInputStorage;
+    /**
      * This holds the evaluations for the current partition.
      * Note that this is essentially a TableTuple, but that it
      * uses the pool associated with this executor to allocate
      * its memory.
      */
     PoolBackedTupleStorage  m_inProgressPartitionByKeyStorage;
-    TableTuple  & getInProgressPartitionByKeyTuple() {
-        return m_inProgressPartitionByKeyStorage;
-    }
     /**
      * This holds the evaluations for the next row.
      * Before we evaluate the expressions, on the next tuple,
@@ -257,9 +297,7 @@ private:
      * associated with this executor.
      */
     PoolBackedTupleStorage  m_lastPartitionByKeyStorage;
-    TableTuple & getLastPartitionByKeyTuple() {
-        return m_lastPartitionByKeyStorage;
-    }
+
     /**
      * This holds the evaluations for the current order by expressions.
      * Note that this is essentially a TableTuple, but that it
@@ -267,17 +305,16 @@ private:
      * its memory.
      */
     PoolBackedTupleStorage  m_inProgressOrderByKeyStorage;
-    TableTuple & getInProgressOrderByKeyTuple() {
-        return m_inProgressOrderByKeyStorage;
-    }
+
     /**
      * This holds the result of evaluating the order by
      * expressions.
      */
     PoolBackedTupleStorage  m_lastOrderByKeyStorage;
-    TableTuple & getLastOrderByKeyTuple() {
-        return m_lastOrderByKeyStorage;
-    }
+    /**
+     * This is the input table.
+     */
+    const Table * m_inputTable;
     /**
      * This is the schema of the input table.
      */
@@ -288,7 +325,7 @@ private:
      * each aggregate has an element in the array.  There is also
      * a tuple for the values passed through from the input.
      */
-    WindowAggregateRow *m_aggregateRow;
+    WindowAggregateRow * m_aggregateRow;
 };
 
 } /* namespace voltdb */

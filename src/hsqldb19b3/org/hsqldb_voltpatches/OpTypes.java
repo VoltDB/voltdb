@@ -109,8 +109,9 @@ public interface OpTypes {
         // OpType enumerals to distinguish.
         , WINDOWED_RANK         = 99
         , WINDOWED_DENSE_RANK   = 100
-        , WINDOWED_PERCENT_RANK = 101 // reserved but not used
-        , WINDOWED_CUME_DIST    = 102 // reserved but not used
+        , WINDOWED_COUNT        = 101
+        , WINDOWED_PERCENT_RANK = 102 // reserved but not used
+        , WINDOWED_CUME_DIST    = 103 // reserved but not used
         // End VoltDB extension
     ;
 
@@ -128,10 +129,8 @@ public interface OpTypes {
             return "RANK";
         case WINDOWED_DENSE_RANK:
             return "DENSE_RANK";
-        case WINDOWED_PERCENT_RANK:
-            return "PERCENT_RANK";
-        case WINDOWED_CUME_DIST:
-            return "CUME_DIST";
+        case WINDOWED_COUNT:
+            return "COUNT";
         case AVG:
         	return "AVG";
         case MIN:

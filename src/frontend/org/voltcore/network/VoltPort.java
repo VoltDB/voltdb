@@ -201,6 +201,7 @@ public class VoltPort implements Connection
         if ( maxBytes == 0 || m_isShuttingDown)
             return 0;
 
+        // read from network, copy data into read buffers, which from thread local memory pool
         final int read = m_readStream.read(m_channel, maxBytes, m_pool);
 
         if (read == -1) {
@@ -227,7 +228,7 @@ public class VoltPort implements Connection
 
     protected final void drainWriteStream() throws IOException {
         //Safe to do this with a separate embedded synchronization because no interest ops are modded
-        m_writeStream.swapAndSerializeQueuedWrites(m_pool);
+        m_writeStream.serializeQueuedWrites(m_pool);
 
         /*
          * All interactions with write stream must be protected

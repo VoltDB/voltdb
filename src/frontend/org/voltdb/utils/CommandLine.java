@@ -128,6 +128,7 @@ public class CommandLine extends VoltDB.Configuration
         cl.m_newCli = m_newCli;
         cl.m_sslEnable = m_sslEnable;
         cl.m_sslExternal = m_sslExternal;
+        cl.m_placementGroup = m_placementGroup;
         // deep copy the property map if it exists
         if (javaProperties != null) {
             cl.javaProperties = new TreeMap<>();
@@ -795,7 +796,9 @@ public class CommandLine extends VoltDB.Configuration
         if (!m_startAction.isLegacy()) {
             cmdline.add("voltdbroot"); cmdline.add(m_voltdbRoot.getPath());
         }
-
+        if (m_placementGroup != null) {
+            cmdline.add("placementgroup"); cmdline.add(m_placementGroup);
+        }
         return cmdline;
     }
 
@@ -1061,4 +1064,9 @@ public class CommandLine extends VoltDB.Configuration
         return m_newCli;
     }
     public void setNewCli(boolean flag) { m_newCli = flag; };
+
+    String m_placementGroup = "";
+    public void setPlacementGroup(String placementGroup) {
+        m_placementGroup = placementGroup;
+    }
 }

@@ -101,7 +101,7 @@ TempTable *loadTableFrom(const char *buffer,
     /*
      * Read the schema information.
      */
-    std::vector<string> columnNames;
+    std::vector<std::string> columnNames;
     voltdb::TupleSchemaBuilder builder(column_count);
     for (int idx = 0; idx < column_count; idx += 1) {
         ValueType colType = static_cast<ValueType>(result.readByte());
