@@ -1364,6 +1364,7 @@ void PersistentTable::processLoadedTuple(TableTuple &tuple,
                                          size_t &tupleCountPosition,
                                          bool shouldDRStreamRows) {
     try {
+        insertTupleIntoDeltaTable(tuple, true);
         insertTupleCommon(tuple, tuple, true, shouldDRStreamRows);
     }
     catch (ConstraintFailureException &e) {
