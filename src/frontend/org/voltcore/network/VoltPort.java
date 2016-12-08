@@ -51,7 +51,7 @@ public class VoltPort implements Connection
 
     private volatile boolean m_isDead = false;
 
-    private boolean m_isShuttingDown = false;
+    protected boolean m_isShuttingDown = false;
 
     /** Used internally to make operation changes atomic.
      *  External writers (like a foreign host, for example),
@@ -259,7 +259,7 @@ public class VoltPort implements Connection
         }
     }
 
-    private void enableWriteSelection() {
+    protected void enableWriteSelection() {
         setInterests(SelectionKey.OP_WRITE, 0);
     }
 
