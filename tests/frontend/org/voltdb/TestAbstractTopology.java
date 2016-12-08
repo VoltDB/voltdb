@@ -26,16 +26,16 @@ package org.voltdb;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
-
-import junit.framework.TestCase;
 
 import org.json_voltpatches.JSONException;
 import org.voltdb.AbstractTopology.HAGroup;
@@ -44,6 +44,8 @@ import org.voltdb.AbstractTopology.HostDescription;
 import org.voltdb.AbstractTopology.KSafetyViolationException;
 import org.voltdb.AbstractTopology.Partition;
 import org.voltdb.AbstractTopology.PartitionDescription;
+
+import junit.framework.TestCase;
 
 public class TestAbstractTopology extends TestCase {
 
@@ -636,6 +638,79 @@ public class TestAbstractTopology extends TestCase {
             topo = AbstractTopology.mutateAddHosts(topo, td2.hosts);
             topo = AbstractTopology.mutateAddPartitionsToEmptyHosts(topo, td2.partitions);
             validate(topo);
+        }
+    }
+
+    /**
+     * generate topology multiple times and validate the same topology
+     * @throws InterruptedException
+     */
+    public void testTopologyStatibility() throws InterruptedException {
+        Map<Integer, String> hostGroups = new HashMap<>();
+        hostGroups.put(0, "g0");
+        hostGroups.put(1, "g0");
+        hostGroups.put(2, "g0");
+        hostGroups.put(3, "g0");
+        Map<Integer, Integer> sitesPerHostMap = new HashMap<>();
+        sitesPerHostMap.put(0, 6);
+        sitesPerHostMap.put(1, 6);
+        sitesPerHostMap.put(2, 6);
+        sitesPerHostMap.put(3, 6);
+        //test 1
+        doStabilityTest(hostGroups, sitesPerHostMap, 2);
+
+        hostGroups.put(4, "g1");
+        hostGroups.put(5, "g1");
+        hostGroups.put(6, "g1");
+        hostGroups.put(7, "g1");
+
+        sitesPerHostMap.put(4, 6);
+        sitesPerHostMap.put(5, 6);
+        sitesPerHostMap.put(6, 6);
+        sitesPerHostMap.put(7, 6);
+        //test 2
+        doStabilityTest(hostGroups, sitesPerHostMap, 3);
+    }
+
+    private void doStabilityTest( Map<Integer, String> hostGroups,
+            Map<Integer, Integer> sitesPerHostMap, int kfactor) throws InterruptedException {
+        int count = 200;
+        CountDownLatch latch = new CountDownLatch(count);
+        Set<String> topos = new HashSet<>();
+        List<StabilityTestTask> tasks = new ArrayList<> ();
+        while (count > 0) {
+            tasks.add(new StabilityTestTask(latch, topos,sitesPerHostMap, hostGroups, kfactor));
+            count--;
+        }
+        for (StabilityTestTask task :tasks) {
+            task.run();
+        }
+        latch.await();
+        assertEquals(1, topos.size());
+    }
+    class StabilityTestTask implements Runnable {
+        final CountDownLatch latch;
+        Set<String> topos;
+        final Map<Integer, Integer>  sitesPerHostMap;
+        final Map<Integer, String> hostGroups;
+        final int kfactor;
+        public StabilityTestTask (CountDownLatch latch, Set<String> topos,
+                Map<Integer, Integer>  sitesPerHostMap, Map<Integer, String> hostGroups, int kfactor) {
+            this.latch = latch;
+            this.topos = topos;
+            this.hostGroups = hostGroups;
+            this.kfactor = kfactor;
+            this.sitesPerHostMap = sitesPerHostMap;
+        }
+        @Override
+        public void run() {
+            AbstractTopology topology = AbstractTopology.getTopology(sitesPerHostMap, hostGroups, kfactor);
+            try {
+                topos.add(topology.topologyToJSON().toString());
+            } catch (JSONException e) {
+                e.printStackTrace();
+            }
+            latch.countDown();
         }
     }
 }
