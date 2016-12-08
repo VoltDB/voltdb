@@ -1400,6 +1400,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             logSystemSettingFromCatalogContext();
 
             scheduleDailyLoggingWorkInNextCheckTime();
+
+            // daily maintenance
+            EnterpriseMaintenance em = EnterpriseMaintenance.get();
+            if (em != null) { em.dailyMaintenaceTask(); }
         }
     }
 
@@ -1741,6 +1745,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 SystemStatsCollector.asyncSampleSystemNow(true, true);
             }
         }, 0, 6, TimeUnit.MINUTES));
+
+        // other enterprise setup
+        EnterpriseMaintenance em = EnterpriseMaintenance.get();
+        if (em != null) { em.setupMaintenaceTasks(); }
 
         GCInspector.instance.start(m_periodicPriorityWorkThread);
     }
