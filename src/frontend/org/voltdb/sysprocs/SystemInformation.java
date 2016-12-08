@@ -25,6 +25,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 
 import org.apache.log4j.Logger;
 import org.apache.log4j.net.SocketHubAppender;
@@ -449,15 +450,18 @@ public class SystemInformation extends VoltSystemProcedure
         if (MiscUtils.isPro()) {
             vt.addRow(hostId, "LICENSE", VoltDB.instance().getLicenseInformation());
         }
-        getPlacementGroup(hostId, vt);
+        populatePartitionGroups(hostId, vt);
         return vt;
     }
 
-    private static void getPlacementGroup(Integer hostId, VoltTable vt) {
+    private static void populatePartitionGroups(Integer hostId, VoltTable vt) {
         try {
-            String hostInfo = new String(VoltDB.instance().getHostMessenger().getZK().getData(CoreZK.hosts_host + hostId, false, new Stat()), StandardCharsets.UTF_8);
+            byte[] bytes = VoltDB.instance().getHostMessenger().getZK().getData(CoreZK.hosts_host + hostId, false, new Stat());
+            String hostInfo = new String(bytes, StandardCharsets.UTF_8);
             final JSONObject obj = new JSONObject(hostInfo);
             vt.addRow(hostId, "PLACEMENTGROUP",obj.getString("group"));
+            Set<Integer> buddies = VoltDB.instance().getCartograhper().getHostIdsWithinPartitionGroup(hostId);
+            vt.addRow(hostId, "PARTITIONGROUP",buddies.toString());
         } catch (Exception e) {
             org.voltdb.VoltDB.crashLocalVoltDB("Error getting host info", false, e);
         }

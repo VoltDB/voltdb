@@ -4005,4 +4005,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     private String getTerminusNonce() {
         return terminusNonceSupplier.get();
     }
+
+    @Override
+    public Cartographer getCartograhper() {
+        return m_cartographer;
+    }
 }
