@@ -81,6 +81,7 @@ public:
      * @return true if succeeded. false if no more active tuple is there.
     */
     bool next(TableTuple &out);
+
     bool hasNext();
     int getLocation() const;
 
@@ -88,6 +89,13 @@ public:
         m_tempTableDeleteAsGo = flag;
     }
 
+    bool operator ==(const TableIterator &other) const {
+        return m_table == other.m_table && m_location == other.m_location;
+    }
+
+    bool operator !=(const TableIterator &other) const {
+        return ! ((*this) == other);
+    }
 protected:
     // Get an iterator via table->iterator()
     TableIterator(Table *, TBMapI);

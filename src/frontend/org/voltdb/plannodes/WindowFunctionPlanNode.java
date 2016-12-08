@@ -40,7 +40,6 @@ public class WindowFunctionPlanNode extends AbstractPlanNode {
     public enum Members {
         AGGREGATE_COLUMNS,
         AGGREGATE_TYPE,
-        AGGREGATE_DISTINCT,
         AGGREGATE_OUTPUT_COLUMN,
         AGGREGATE_EXPRESSIONS,
         PARTITIONBY_EXPRESSIONS
@@ -50,8 +49,6 @@ public class WindowFunctionPlanNode extends AbstractPlanNode {
     // types.  They are more like expression operator types, like
     // MIN, MAX etc.
     protected List<ExpressionType> m_aggregateTypes = new ArrayList<>();
-    // a list of whether the aggregate is over distinct elements
-    protected List<Boolean> m_aggregateDistinct = new ArrayList<>();
     // a list of column offsets/indexes not plan column guids.
     protected List<Integer> m_aggregateOutputColumns = new ArrayList<>();
     // List of the input TVEs into the aggregates.  Maybe should become
@@ -109,7 +106,6 @@ public class WindowFunctionPlanNode extends AbstractPlanNode {
         assert(getAggregateFunctionCount() == 0);
         m_aggregateOutputColumns.add(getAggregateFunctionCount());
         m_aggregateTypes.add(winExpr.getExpressionType());
-        m_aggregateDistinct.add(winExpr.getIsDistinct());
         if (winExpr.getAggregateArguments().size() > 0) {
             m_aggregateExpressions.add(winExpr.getAggregateArguments());
         }
@@ -134,8 +130,6 @@ public class WindowFunctionPlanNode extends AbstractPlanNode {
         for (int ii = 0; ii < m_aggregateTypes.size(); ii++) {
             stringer.object();
             stringer.keySymbolValuePair(Members.AGGREGATE_TYPE.name(), m_aggregateTypes.get(ii).name());
-            boolean isDistinct = m_aggregateDistinct.get(ii);
-            stringer.keySymbolValuePair(Members.AGGREGATE_DISTINCT.name(), isDistinct ? 1 : 0);
             stringer.keySymbolValuePair(Members.AGGREGATE_OUTPUT_COLUMN.name(), m_aggregateOutputColumns.get(ii));
             AbstractExpression.toJSONArray(stringer,
                                            Members.AGGREGATE_EXPRESSIONS.name(),
@@ -167,7 +161,6 @@ public class WindowFunctionPlanNode extends AbstractPlanNode {
             assert(i == 0);
             JSONObject tempObj = jarray.getJSONObject( i );
             m_aggregateTypes.add( ExpressionType.get( tempObj.getString( Members.AGGREGATE_TYPE.name() )));
-            m_aggregateDistinct.add( tempObj.getInt( Members.AGGREGATE_DISTINCT.name() )  == 1 );
             m_aggregateOutputColumns.add( tempObj.getInt( Members.AGGREGATE_OUTPUT_COLUMN.name() ));
             m_aggregateExpressions.add(
                     AbstractExpression.loadFromJSONArrayChild(null,

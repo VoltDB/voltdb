@@ -34,6 +34,7 @@
 
 namespace voltdb {
 
+class AbstractExpression;
 /**
  * Represents the schema of a tuple or table row. Used to define table rows, as
  * well as index keys. Note: due to arbitrary size embedded array data, this class
@@ -85,6 +86,8 @@ public:
     static TupleSchema* createTupleSchemaForTest(const std::vector<ValueType> columnTypes,
                                                  const std::vector<int32_t> columnSizes,
                                                  const std::vector<bool> allowNull);
+
+    static TupleSchema* createTupleSchema(const std::vector<AbstractExpression *> &exprs);
 
     /** Static factory method fakes a copy constructor (will also
      *  duplicate hidden columns) */

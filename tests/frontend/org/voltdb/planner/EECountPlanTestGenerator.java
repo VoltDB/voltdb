@@ -41,13 +41,13 @@
  * the License.
  */package org.voltdb.planner;
 
-public class EERankPlanTestGenerator extends PlannerTestCase {
+public class EECountPlanTestGenerator extends PlannerTestCase {
     private static final String DDL_FILENAME = "testrankplan-eegenerator.sql";
     @Override
     protected void setUp() throws Exception {
 
-        setupSchema(EERankPlanTestGenerator.class.getResource(DDL_FILENAME),
-                    "testrankplan",
+        setupSchema(EECountPlanTestGenerator.class.getResource(DDL_FILENAME),
+                    "testcountplan",
                     false);
     }
 
@@ -88,71 +88,71 @@ public class EERankPlanTestGenerator extends PlannerTestCase {
                                    getCatalogString(),
                                    TConfig);
         String sqlStmt;
-        sqlStmt = "select A, B, C, rank() over (partition by A order by B) as R from T ORDER BY A, B, C, R;";
+        sqlStmt = "select A, B, C, count(*) over (partition by A order by B) as R from T ORDER BY A, B, C, R;";
 
-        db.addTest(new TestConfig("test_rank",
+        db.addTest(new TestConfig("test_count_star",
                                   sqlStmt,
                                   new int[][] {
-                                  // A   B    C    rank
+                                  // A   B    C    count
                                   //--------------------------------------
-                                  {  1,  1,  101, 1},
-                                  {  1,  1,  102, 1},
+                                  {  1,  1,  101, 2},
+                                  {  1,  1,  102, 2},
                                   //======================================
-                                  {  1,  2,  201, 3},
-                                  {  1,  2,  202, 3},
+                                  {  1,  2,  201, 4},
+                                  {  1,  2,  202, 4},
                                   //======================================
                                   {  1,  3,  203, 5},
                                   //--------------------------------------
-                                  {  2,  1, 1101, 1},
-                                  {  2,  1, 1102, 1},
+                                  {  2,  1, 1101, 2},
+                                  {  2,  1, 1102, 2},
                                   //======================================
-                                  {  2,  2, 1201, 3},
-                                  {  2,  2, 1202, 3},
+                                  {  2,  2, 1201, 4},
+                                  {  2,  2, 1202, 4},
                                   //======================================
                                   {  2,  3, 1203, 5},
                                   //--------------------------------------
-                                  { 20,  1, 2101, 1},
-                                  { 20,  1, 2102, 1},
+                                  { 20,  1, 2101, 2},
+                                  { 20,  1, 2102, 2},
                                   //======================================
-                                  { 20,  2, 2201, 3},
-                                  { 20,  2, 2202, 3},
+                                  { 20,  2, 2201, 4},
+                                  { 20,  2, 2202, 4},
                                   //======================================
                                   { 20,  3, 2203, 5},
                                   //--------------------------------------
         }));;
-        sqlStmt = "select A, B, C, dense_rank() over (partition by A order by B) as R from T ORDER BY A, B, C, R;";
+        sqlStmt = "select A, B, C, count(A+B) over (partition by A order by B) as R from T ORDER BY A, B, C, R;";
 
-        db.addTest(new TestConfig("test_dense_rank",
+        db.addTest(new TestConfig("test_count",
                                   sqlStmt,
                                   new int[][] {
-                                  // A   B    C    rank
+                                  // A   B    C    count
                                   //--------------------------------------
-                                  {  1,  1,  101, 1},
-                                  {  1,  1,  102, 1},
+                                  {  1,  1,  101, 2},
+                                  {  1,  1,  102, 2},
                                   //======================================
-                                  {  1,  2,  201, 2},
-                                  {  1,  2,  202, 2},
+                                  {  1,  2,  201, 4},
+                                  {  1,  2,  202, 4},
                                   //======================================
-                                  {  1,  3,  203, 3},
+                                  {  1,  3,  203, 5},
                                   //--------------------------------------
-                                  {  2,  1, 1101, 1},
-                                  {  2,  1, 1102, 1},
+                                  {  2,  1, 1101, 2},
+                                  {  2,  1, 1102, 2},
+                                  //=====================================
+                                  {  2,  2, 1201, 4},
+                                  {  2,  2, 1202, 4},
                                   //======================================
-                                  {  2,  2, 1201, 2},
-                                  {  2,  2, 1202, 2},
-                                  //======================================
-                                  {  2,  3, 1203, 3},
+                                  {  2,  3, 1203, 5},
                                   //--------------------------------------
-                                  { 20,  1, 2101, 1},
-                                  { 20,  1, 2102, 1},
+                                  { 20,  1, 2101, 2},
+                                  { 20,  1, 2102, 2},
                                   //======================================
-                                  { 20,  2, 2201, 2},
-                                  { 20,  2, 2202, 2},
+                                  { 20,  2, 2201, 4},
+                                  { 20,  2, 2202, 4},
                                   //======================================
-                                  { 20,  3, 2203, 3},
+                                  { 20,  3, 2203, 5},
                                   //--------------------------------------
         }));;
-        generateTests("executors", "TestWindowedRank", db);
+        generateTests("executors", "TestWindowedCount", db);
     }
 
     @Override
