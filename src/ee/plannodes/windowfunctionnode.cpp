@@ -57,8 +57,6 @@ std::string WindowFunctionPlanNode::debugInfo(const std::string &spacer) const
     for (int ctr = 0, cnt = (int) m_aggregates.size(); ctr < cnt; ctr++) {
         buffer << nspacer << "type="
                << expressionToString(m_aggregates[ctr]) << "\n";
-        buffer << nspacer << "distinct="
-               << m_distinctAggregates[ctr] << "\n";
         buffer << nspacer << "outcol="
                << m_aggregateOutputColumns[ctr] << "\n";
         debugWriteAggregateExpressionList(buffer, nspacer, "arguments", m_aggregateInputExpressions[ctr]);
@@ -72,7 +70,6 @@ std::string WindowFunctionPlanNode::debugInfo(const std::string &spacer) const
 void WindowFunctionPlanNode::loadFromJSONObject(PlannerDomValue obj) {
     PlannerDomValue aggregateColumnsArray = obj.valueForKey("AGGREGATE_COLUMNS");
     bool containsType = false;
-    bool containsDistinct = false;
     bool containsOutputColumn = false;
     bool containsExpressions = false;
     bool containsPartitionExpressions = false;
@@ -83,11 +80,6 @@ void WindowFunctionPlanNode::loadFromJSONObject(PlannerDomValue obj) {
             containsType = true;
             std::string aggregateColumnTypeString = aggregateColumnValue.valueForKey("AGGREGATE_TYPE").asStr();
             m_aggregates.push_back(stringToExpression(aggregateColumnTypeString));
-        }
-        if (aggregateColumnValue.hasNonNullKey("AGGREGATE_DISTINCT")) {
-            containsDistinct = true;
-            bool distinct = aggregateColumnValue.valueForKey("AGGREGATE_DISTINCT").asInt() == 1;
-            m_distinctAggregates.push_back(distinct);
         }
         if (aggregateColumnValue.hasNonNullKey("AGGREGATE_OUTPUT_COLUMN")) {
             containsOutputColumn = true;
@@ -101,15 +93,11 @@ void WindowFunctionPlanNode::loadFromJSONObject(PlannerDomValue obj) {
             OwningExpressionVector &exprVec = m_aggregateInputExpressions[nExprs];
             exprVec.loadExpressionArrayFromJSONObject("AGGREGATE_EXPRESSIONS", aggregateColumnValue);
         }
-        if(!(containsType && containsDistinct && containsOutputColumn && containsExpressions)) {
+        if(!(containsType && containsOutputColumn && containsExpressions)) {
             std::ostringstream buffer;
             std::string sep = "";
             if (!containsType) {
                 buffer << "Aggregate Type";
-                sep = ", ";
-            }
-            if (!containsDistinct) {
-                buffer << sep << "Distinct";
                 sep = ", ";
             }
             if (!containsOutputColumn) {
