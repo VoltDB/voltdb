@@ -455,7 +455,7 @@ def getTopSummaryLines(cmpdb, includeAll=True):
     topLines += """
 <td colspan=5 align=center>SQL Statements</td>
 <td colspan=5 align=center>Test Failures</td>
-<td colspan=4 align=center>SQL Statements per Pattern</td>
+<td colspan=5 align=center>SQL Statements per Pattern</td>
 <td colspan=5 align=center>Time (min:sec)</td>
 </tr><tr>
 <td>Valid</td><td>Valid %%</td>
@@ -463,7 +463,7 @@ def getTopSummaryLines(cmpdb, includeAll=True):
 <td>Total</td>
 <td>Mismatched</td><td>Mismatched %%</td>
 <td>NPE's(V)</td><td>NPE's(%s)</td><td>Crashes</td>
-<td>Minimum</td><td>Maximum</td><td># Inserts</td><td># Patterns</td>
+<td>Minimum</td><td>Maximum</td><td># Inserts</td><td># Patterns</td><td># Unresolved</td>
 <td>Generating SQL</td><td>VoltDB</td><td>%s</td>
 """ % (cmpdb[:1], cmpdb)
     if includeAll:
