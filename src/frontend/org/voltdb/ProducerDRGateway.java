@@ -17,19 +17,21 @@
 
 package org.voltdb;
 
+import java.io.IOException;
 import java.util.Map;
 
 public interface ProducerDRGateway {
 
-    /*
-     * Ensure that all enabled DR Producer Hosts have agreed on the PBD file name
+    /**
+     * Start the main thread and the state machine, wait until all nodes converge on the initial state.
+     * @throws IOException
      */
-    public abstract void blockOnDRStateConvergence();
+    public void startAndWaitForGlobalAgreement() throws IOException;
 
     /**
      * Start listening on the ports
      */
-    public abstract void initialize(boolean drProducerEnabled, int listenPort, String portInterface);
+    public abstract void startListening(boolean drProducerEnabled, int listenPort, String portInterface) throws IOException;
 
     /**
      * @return true if bindPorts has been called.
