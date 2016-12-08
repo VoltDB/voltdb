@@ -52,6 +52,7 @@
 #include "execution/VoltDBEngine.h"
 #include "execution/ProgressMonitorProxy.h"
 #include "executors/setoperator.h"
+#include "storage/table.h"
 
 // #include "executors/aggregateexecutor.h"
 // #include "executors/executorutil.h"
@@ -67,8 +68,16 @@
 namespace voltdb {
 
 SetOpReceiveExecutor::SetOpReceiveExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
-    : AbstractExecutor(engine, abstract_node)
+    : AbstractExecutor(engine, abstract_node), m_setOperator(), m_chldrenTables()
 { }
+
+SetOpReceiveExecutor::~SetOpReceiveExecutor()
+{
+    for(std::vector<Table*>::iterator tableIt = m_chldrenTables.begin(); tableIt!= m_chldrenTables.end(); ++tableIt) {
+        Table* childTable = *tableIt;
+        delete childTable;
+    }
+}
 
 bool SetOpReceiveExecutor::p_init(AbstractPlanNode* abstract_node,
                              TempTableLimits* limits)
@@ -85,12 +94,26 @@ bool SetOpReceiveExecutor::p_init(AbstractPlanNode* abstract_node,
     TupleSchema* schema = m_abstractNode->generateTupleSchema();
     std::vector<std::string> column_names(schema->columnCount());
     m_tmpInputTable.reset(TableFactory::getTempTable(m_abstractNode->databaseId(),
-                                                         "tempInput",
-                                                         schema,
-                                                         column_names,
-                                                         limits));
+                                                     "tempInput",
+                                                     schema,
+                                                     column_names,
+                                                     limits));
 
-    m_setOperator.reset(SetOperator::getSetOperator(/*node->getSetOpType()*/SetOpTyp.UNION, node->getInputTableRefs(), node->getTempOutputTable(), false));
+    if (SETOP_TYPE_UNION == node->getSetOpType()) {
+        std::vector<Table*> input_tables(1, m_tmpInputTable.get());
+        m_setOperator.reset(SetOperator::getSetOperator(node->getSetOpType(), input_tables, node->getTempOutputTable(), false));
+    } else {
+        m_chldrenTables.reserve(node->getChildrenCount());
+        for (int i = 0; i < node->getChildrenCount(); ++i) {
+            Table* childTable = TableFactory::getTempTable(m_abstractNode->databaseId(),
+                                                     "tempChildInput",
+                                                     schema,
+                                                     column_names,
+                                                     limits);
+            m_chldrenTables.push_back(childTable);
+        }
+        m_setOperator.reset(SetOperator::getSetOperator(node->getSetOpType(), m_chldrenTables, node->getTempOutputTable(), false));
+    }
     return true;
 }
 
@@ -105,11 +128,18 @@ bool SetOpReceiveExecutor::p_execute(const NValueArray &params) {
     ProgressMonitorProxy pmp(m_engine, this);
 
 
+
     VOLT_TRACE("Result of SetOpReceive:\n '%s'", m_tmpOutputTable->debug().c_str());
 
-    cleanupInputTempTable(m_tmpInputTable.get());
+    bool result = m_setOperator->processTuples();
 
-    return true;
+    cleanupInputTempTable(m_tmpInputTable.get());
+    for(std::vector<Table*>::iterator tableIt = m_chldrenTables.begin(); tableIt!= m_chldrenTables.end(); ++tableIt) {
+        cleanupInputTempTable(*tableIt);
+    }
+
+
+    return result;
 }
 
 }

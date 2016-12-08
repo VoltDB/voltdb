@@ -53,6 +53,17 @@ public class SetOpReceivePlanNode extends AbstractReceivePlanNode {
     }
 
     @Override
+    public void generateOutputSchema(Database db)
+    {
+        super.generateOutputSchema(db);
+
+        // except, while technically the resulting output schema is just a pass-through,
+        // when the plan gets fragmented, this receive node will be at the bottom of the
+        // fragment and will need its own serialized copy of its (former) child's output schema.
+        m_hasSignificantOutputSchema = true;
+    }
+
+    @Override
     public void resolveColumnIndexes() {
         resolveColumnIndexes(m_outputSchema);
     }

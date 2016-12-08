@@ -53,13 +53,17 @@
 
 #include <boost/scoped_ptr.hpp>
 
+#include <vector>
+
 namespace voltdb {
 
 struct SetOperator;
+class Table;
 
 class SetOpReceiveExecutor : public AbstractExecutor {
     public:
         SetOpReceiveExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node);
+        ~SetOpReceiveExecutor();
 
     protected:
         bool p_init(AbstractPlanNode* abstract_node,
@@ -70,7 +74,7 @@ class SetOpReceiveExecutor : public AbstractExecutor {
         boost::scoped_ptr<SetOperator> m_setOperator;
 
         boost::scoped_ptr<TempTable> m_tmpInputTable;
-
+        std::vector<Table*> m_chldrenTables;
 };
 
 }

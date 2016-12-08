@@ -45,6 +45,8 @@
 
 #include "setoperator.h"
 
+#include "common/ValueFactory.hpp"
+
 namespace voltdb {
 
 struct TableSizeLess {
@@ -54,58 +56,15 @@ struct TableSizeLess {
     }
 };
 
-
-SetOperator::SetOperator(const std::vector<TableReference>& input_tablerefs,
+SetOperator::SetOperator(const std::vector<Table*>& input_tables,
                 TempTable* output_table,
-                bool is_all,
-                bool need_children_result)
-    : m_input_tablerefs(input_tablerefs),
+                bool is_all)
+    : m_input_tables(input_tables),
       m_output_table(output_table),
-      m_is_all(is_all),
-      m_need_children_result(need_children_result)
+      m_is_all(is_all)
 { }
+
 SetOperator::~SetOperator() {}
-
-
-UnionSetOperator::UnionSetOperator(const std::vector<TableReference>& input_tablerefs,
-                TempTable* output_table,
-                 bool is_all)
-    : SetOperator(input_tablerefs, output_table, is_all, false)
-{ }
-
-bool UnionSetOperator::processTuples()
-{
-    // Set to keep candidate tuples.
-    TupleSet tuples;
-
-    //
-    // For each input table, grab their TableIterator and then append all of its tuples
-    // to our ouput table. Only distinct tuples are retained.
-    //
-    for (size_t ctr = 0, cnt = m_input_tablerefs.size(); ctr < cnt; ctr++) {
-        Table* input_table = m_input_tablerefs[ctr].getTable();
-        assert(input_table);
-        TableIterator iterator = input_table->iterator();
-        TableTuple tuple(input_table->schema());
-        while (iterator.next(tuple)) {
-            if (m_is_all || needToInsert(tuple, tuples)) {
-                // we got tuple to insert
-                m_output_table->insertTempTuple(tuple);
-            }
-        }
-    }
-    return true;
-}
-
-ExceptIntersectSetOperator::ExceptIntersectSetOperator(const std::vector<TableReference>& input_tablerefs,
-                               TempTable* output_table,
-                               bool is_all,
-                               bool is_except,
-                               bool need_children_result)
-    : SetOperator(input_tablerefs, output_table, is_all, need_children_result),
-      m_is_except(is_except),
-      m_input_tables(input_tablerefs.size())
-{ }
 
 // for debugging - may be unused
 void SetOperator::printTupleMap(const char* nonce, TupleMap &tuples)
@@ -130,6 +89,96 @@ void SetOperator::printTupleSet(const char* nonce, TupleSet &tuples)
     fflush(stdout);
 }
 
+SetOperator* SetOperator::getSetOperator(SetOpType setopType,
+                const std::vector<TableReference>& input_tablerefs,
+                TempTable* output_table,
+                bool need_children_result)
+{
+    std::vector<Table*> input_vectors;
+    input_vectors.reserve(input_tablerefs.size());
+    for (int i = 0; i < input_tablerefs.size(); ++i)
+    {
+        input_vectors.push_back(input_tablerefs[i].getTable());
+    }
+    return SetOperator::getSetOperator(setopType, input_vectors, output_table, need_children_result);
+}
+
+SetOperator* SetOperator::getSetOperator(SetOpType setopType,
+                const std::vector<Table*>& input_tables,
+                TempTable* output_table,
+                bool need_children_result)
+{
+    switch (setopType) {
+        case SETOP_TYPE_UNION_ALL:
+            return new UnionSetOperator(input_tables, output_table, true);
+        case SETOP_TYPE_UNION:
+            return new UnionSetOperator(input_tables, output_table, false);
+        case SETOP_TYPE_EXCEPT_ALL:
+            return new ExceptIntersectSetOperator(input_tables, output_table,
+                true, true, need_children_result);
+        case SETOP_TYPE_EXCEPT:
+            return new ExceptIntersectSetOperator(input_tables, output_table,
+                false, true, need_children_result);
+        case SETOP_TYPE_INTERSECT_ALL:
+            if (need_children_result) {
+                return new PassThroughSetOperator(input_tables, output_table);
+            } else {
+                return new ExceptIntersectSetOperator(input_tables, output_table,
+                    true, false, false);
+            }
+        case SETOP_TYPE_INTERSECT:
+            if (need_children_result) {
+                return new PassThroughSetOperator(input_tables, output_table);
+            } else {
+                return new ExceptIntersectSetOperator(input_tables, output_table,
+                    false, false, false);
+            }
+        default:
+            VOLT_ERROR("Unsupported tuple set operation '%d'.", setopType);
+            return NULL;
+    }
+}
+
+UnionSetOperator::UnionSetOperator(const std::vector<Table*>& input_tables,
+                TempTable* output_table,
+                 bool is_all)
+    : SetOperator(input_tables, output_table, is_all)
+{ }
+
+bool UnionSetOperator::processTuples()
+{
+    // Set to keep candidate tuples.
+    TupleSet tuples;
+
+    //
+    // For each input table, grab their TableIterator and then append all of its tuples
+    // to our ouput table. Only distinct tuples are retained.
+    //
+    for (size_t ctr = 0, cnt = m_input_tables.size(); ctr < cnt; ctr++) {
+        Table* input_table = m_input_tables[ctr];
+        assert(input_table);
+        TableIterator iterator = input_table->iterator();
+        TableTuple tuple(input_table->schema());
+        while (iterator.next(tuple)) {
+            if (m_is_all || needToInsert(tuple, tuples)) {
+                // we got tuple to insert
+                m_output_table->insertTempTuple(tuple);
+            }
+        }
+    }
+    return true;
+}
+
+ExceptIntersectSetOperator::ExceptIntersectSetOperator(const std::vector<Table*>& input_tables,
+                               TempTable* output_table,
+                               bool is_all,
+                               bool is_except,
+                               bool need_children_result)
+    : SetOperator(input_tables, output_table, is_all),
+      m_is_except(is_except),
+      m_need_children_result(need_children_result)
+{ }
+
 bool ExceptIntersectSetOperator::processTuples()
 {
     // Map to keep candidate tuples. The key is the tuple itself
@@ -137,11 +186,6 @@ bool ExceptIntersectSetOperator::processTuples()
     TupleMap tuples;
 
     assert( ! m_input_tables.empty());
-
-    size_t ii = m_input_tablerefs.size();
-    while (ii--) {
-        m_input_tables[ii] = m_input_tablerefs[ii].getTable();
-    }
 
     if ( ! m_is_except) {
         // For intersect we want to start with the smallest table
@@ -165,6 +209,9 @@ bool ExceptIntersectSetOperator::processTuples()
         collectTuples(*input_table, next_tuples);
         if (m_is_except) {
             exceptTupleMaps(tuples, next_tuples);
+            if (m_need_children_result) {
+                send_child_rows_up(next_tuples, ctr);
+            }
         } else {
             intersectTupleMaps(tuples, next_tuples);
         }
@@ -202,13 +249,42 @@ void ExceptIntersectSetOperator::exceptTupleMaps(TupleMap& map_a, TupleMap& map_
         if (it_b != map_b.end()) {
             if (it_a->second > it_b->second) {
                 it_a->second -= it_b->second;
+                // Remove rows that already was accounted for from the child
+                if (m_need_children_result) {
+                    map_b.erase(it_b);
+                }
             }
             else {
+                if (m_need_children_result) {
+                    if (it_a->second == it_b->second) {
+                        map_b.erase(it_b);
+                    } else {
+                        it_b->second -= it_a->second;
+                    }
+                }
                 it_a = map_a.erase(it_a);
                 continue;
             }
         }
         ++it_a;
+    }
+}
+
+void ExceptIntersectSetOperator::send_child_rows_up(TupleMap& child_tuples, int child_id) {
+    TableTuple out_tuple = m_output_table->tempTuple();
+    TupleMap::iterator child_it = child_tuples.begin();
+    while(child_it != child_tuples.end()) {
+        TableTuple tuple = child_it->first;
+        int count = child_it->second;
+        int child_column_cnt = tuple.sizeInValues();
+        // Output current tuple multiple times according to a tuple count
+        for (int i = 0; i < count; ++i) {
+            out_tuple.setNValues(0, tuple, 0, child_column_cnt);
+            out_tuple.setNValue(child_column_cnt, ValueFactory::getBigIntValue(child_id));
+            m_output_table->insertTempTuple(out_tuple);
+        }
+        // Move to the next tuple;
+        ++child_it;
     }
 }
 
@@ -226,32 +302,30 @@ void ExceptIntersectSetOperator::intersectTupleMaps(TupleMap& map_a, TupleMap& m
     }
 }
 
-SetOperator* SetOperator::getSetOperator(SetOpType setopType,
-                const std::vector<TableReference>& input_tablerefs,
-                TempTable* output_table,
-                bool need_children_result)
+PassThroughSetOperator::PassThroughSetOperator(const std::vector<Table*>& input_tables,
+                TempTable* output_table)
+    : SetOperator(input_tables, output_table, true)
+{ }
+
+bool PassThroughSetOperator::processTuples()
 {
-    switch (setopType) {
-        case SETOP_TYPE_UNION_ALL:
-            return new UnionSetOperator(input_tablerefs, output_table, true);
-        case SETOP_TYPE_UNION:
-            return new UnionSetOperator(input_tablerefs, output_table, false);
-        case SETOP_TYPE_EXCEPT_ALL:
-            return new ExceptIntersectSetOperator(input_tablerefs, output_table,
-                true, true, need_children_result);
-        case SETOP_TYPE_EXCEPT:
-            return new ExceptIntersectSetOperator(input_tablerefs, output_table,
-                false, true, need_children_result);
-        case SETOP_TYPE_INTERSECT_ALL:
-            return new ExceptIntersectSetOperator(input_tablerefs, output_table,
-                true, false, need_children_result);
-        case SETOP_TYPE_INTERSECT:
-            return new ExceptIntersectSetOperator(input_tablerefs, output_table,
-                false, false, need_children_result);
-        default:
-            VOLT_ERROR("Unsupported tuple set operation '%d'.", setopType);
-            return NULL;
+    assert(m_output_table);
+
+    TableTuple out_tuple = m_output_table->tempTuple();
+    for (size_t ctr = 0, cnt = m_input_tables.size(); ctr < cnt; ctr++) {
+        Table* input_table = m_input_tables[ctr];
+        assert(input_table);
+        assert(m_output_table->schema()->columnCount() == input_table->schema()->columnCount() + 1);
+        int input_columns = input_table->schema()->columnCount();
+        TableIterator iterator = input_table->iterator();
+        TableTuple tuple(input_table->schema());
+        while (iterator.next(tuple)) {
+            out_tuple.setNValues(0, tuple, 0, input_columns);
+            out_tuple.setNValue(input_columns, ValueFactory::getBigIntValue(ctr));
+            m_output_table->insertTempTuple(out_tuple);
+        }
     }
+    return true;
 }
 
 }

@@ -53,6 +53,7 @@
 #include "storage/tableiterator.h"
 #include "storage/tablefactory.h"
 
+#include "boost/optional.hpp"
 #include "boost/unordered_set.hpp"
 #include "boost/unordered_map.hpp"
 
@@ -67,10 +68,9 @@ struct SetOperator {
         TupleMap;
     typedef AbstractPlanNode::TableReference TableReference;
 
-    SetOperator(const std::vector<TableReference>& input_tablerefs,
+    SetOperator(const std::vector<Table*>& input_tables,
                 TempTable* output_table,
-                bool is_all,
-                bool need_children_result);
+                bool is_all);
     virtual ~SetOperator();
 
     virtual bool processTuples() = 0;
@@ -79,20 +79,23 @@ struct SetOperator {
                 const std::vector<TableReference>& input_tablerefs,
                 TempTable* output_table,
                 bool need_children_result);
+    static SetOperator* getSetOperator(SetOpType setopType,
+                const std::vector<Table*>& input_tables,
+                TempTable* output_table,
+                bool need_children_result);
 
     // for debugging - may be unused
     static void printTupleMap(const char* nonce, TupleMap &tuples);
     static void printTupleSet(const char* nonce, TupleSet &tuples);
 
 protected:
-    const std::vector<TableReference>& m_input_tablerefs;
+    std::vector<Table*> m_input_tables;
     TempTable* const m_output_table;
     bool const m_is_all;
-    bool const m_need_children_result;
 };
 
 struct UnionSetOperator : public SetOperator {
-    UnionSetOperator(const std::vector<TableReference>& input_tablerefs,
+    UnionSetOperator(const std::vector<Table*>& input_tables,
                      TempTable* output_table,
                      bool is_all);
 private:
@@ -109,7 +112,8 @@ private:
 };
 
 struct ExceptIntersectSetOperator : public SetOperator {
-    ExceptIntersectSetOperator(const std::vector<TableReference>& input_tablerefs,
+
+    ExceptIntersectSetOperator(const std::vector<Table*>& input_tables,
                                TempTable* output_table,
                                bool is_all,
                                bool is_except,
@@ -120,9 +124,18 @@ private:
     void collectTuples(Table& input_table, TupleMap& tuple_map);
     void exceptTupleMaps(TupleMap& tuple_a, TupleMap& tuple_b);
     void intersectTupleMaps(TupleMap& tuple_a, TupleMap& tuple_b);
+    void send_child_rows_up(TupleMap& child_tuples, int child_id);
 
     bool const m_is_except;
-    std::vector<Table*> m_input_tables;
+    bool const m_need_children_result;
+
+};
+
+struct PassThroughSetOperator : public SetOperator {
+    PassThroughSetOperator(const std::vector<Table*>& input_tables,
+                     TempTable* output_table);
+private:
+    bool processTuples();
 };
 
 }
