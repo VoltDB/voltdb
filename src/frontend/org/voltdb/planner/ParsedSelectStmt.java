@@ -999,7 +999,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 assert(vt != null);
                 if (! vt.isAnyIntegerType() || vt == VoltType.TIMESTAMP) {
                     throw new PlanningErrorException(
-                                "Windowed SUM must have exactly one integer or timestamp argument");
+                                "Windowed SUM must have exactly one integer argument");
                 }
                 break;
             default:

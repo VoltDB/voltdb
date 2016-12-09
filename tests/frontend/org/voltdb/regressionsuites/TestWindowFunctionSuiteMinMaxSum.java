@@ -234,7 +234,7 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
     }
 
-    private void initTableWithNulls(Client client) throws NoConnectionsException, IOException, ProcCallException {
+    private void initTableWithSomeNulls(Client client) throws NoConnectionsException, IOException, ProcCallException {
         ClientResponse cr;
         cr = client.callProcedure("@AdHoc", "truncate table t");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
@@ -305,6 +305,77 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
     }
 
+    private void initTableWithAllNulls(Client client) throws NoConnectionsException, IOException, ProcCallException {
+        ClientResponse cr;
+        cr = client.callProcedure("@AdHoc", "truncate table t");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t.insert",  1,  1, null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t.insert",  1,  1, null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t.insert",  1,  1, null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t.insert",  1,  1, null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t.insert",  1,  1, null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        //======================================
+        cr = client.callProcedure("t.insert",  1,  2, null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t.insert",  1,  2, null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t.insert",  1,  2, null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t.insert",  1,  2, null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t.insert",  1,  2, null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        //======================================
+        cr = client.callProcedure("t.insert",  1,  3, null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t.insert",  1,  3, null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t.insert",  1,  3, null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t.insert",  1,  3, null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t.insert",  1,  3, null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        //--------------------------------------
+        cr = client.callProcedure("t.insert",  2,  1, null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t.insert",  2,  1, null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t.insert",  2,  1, null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t.insert",  2,  1, null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t.insert",  2,  1, null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        //======================================
+        cr = client.callProcedure("t.insert",  2,  2, null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t.insert",  2,  2, null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t.insert",  2,  2, null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t.insert",  2,  2, null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t.insert",  2,  2, null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        //======================================
+        cr = client.callProcedure("t.insert",  2,  3, null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t.insert",  2,  3, null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t.insert",  2,  3, null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t.insert",  2,  3, null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t.insert",  2,  3, null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+    }
+
     public void testMin() throws Exception {
         Client client = getClient();
         long expected[] [] = new long[][] {
@@ -364,14 +435,7 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         validateTableOfLongs(cr.getResults()[0], expected);
 
-        initTableWithNulls(client);
-        // Find the min at the end of the peer group.
-        cr = client.callProcedure("@AdHoc",
-                                  "select A, B, min(C) over (partition by A order by B) as R from T ORDER BY A, B, R;");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        validateTableOfLongs(cr.getResults()[0], expected);
-
-        long expectedWithNulls[] [] = new long[][] {
+        long expectedWithSomeNulls[] [] = new long[][] {
             {  1L,  1L,    1L},
             {  1L,  1L,    1L},
             {  1L,  1L,    1L},
@@ -402,12 +466,347 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
             {  2L,  2L,    1L},
             {  2L,  2L,    1L},
             //======================================
-            {  2L,  3L,    5L},
-            {  2L,  3L,    5L},
-            {  2L,  3L,    5L},
-            {  2L,  3L,    5L},
-            {  2L,  3L,    5L}
+            {  2L,  3L,    1L},
+            {  2L,  3L,    1L},
+            {  2L,  3L,    1L},
+            {  2L,  3L,    1L},
+            {  2L,  3L,    1L}
         };
+        initTableWithSomeNulls(client);
+        // Find the min at the end of the peer group.
+        cr = client.callProcedure("@AdHoc",
+                                  "select A, B, min(C) over (partition by A order by B) as R from T ORDER BY A, B, R;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        validateTableOfLongs(cr.getResults()[0], expectedWithSomeNulls);
+
+        long expectedWithAllNulls[] [] = new long[][] {
+            {  1L,  1L,    Long.MIN_VALUE},
+            {  1L,  1L,    Long.MIN_VALUE},
+            {  1L,  1L,    Long.MIN_VALUE},
+            {  1L,  1L,    Long.MIN_VALUE},
+            {  1L,  1L,    Long.MIN_VALUE},
+            //======================================
+            {  1L,  2L,    Long.MIN_VALUE},
+            {  1L,  2L,    Long.MIN_VALUE},
+            {  1L,  2L,    Long.MIN_VALUE},
+            {  1L,  2L,    Long.MIN_VALUE},
+            {  1L,  2L,    Long.MIN_VALUE},
+            //======================================
+            {  1L,  3L,    Long.MIN_VALUE},
+            {  1L,  3L,    Long.MIN_VALUE},
+            {  1L,  3L,    Long.MIN_VALUE},
+            {  1L,  3L,    Long.MIN_VALUE},
+            {  1L,  3L,    Long.MIN_VALUE},
+            //--------------------------------------
+            {  2L,  1L,    Long.MIN_VALUE},
+            {  2L,  1L,    Long.MIN_VALUE},
+            {  2L,  1L,    Long.MIN_VALUE},
+            {  2L,  1L,    Long.MIN_VALUE},
+            {  2L,  1L,    Long.MIN_VALUE},
+            //======================================
+            {  2L,  2L,    Long.MIN_VALUE},
+            {  2L,  2L,    Long.MIN_VALUE},
+            {  2L,  2L,    Long.MIN_VALUE},
+            {  2L,  2L,    Long.MIN_VALUE},
+            {  2L,  2L,    Long.MIN_VALUE},
+            //======================================
+            {  2L,  3L,    Long.MIN_VALUE},
+            {  2L,  3L,    Long.MIN_VALUE},
+            {  2L,  3L,    Long.MIN_VALUE},
+            {  2L,  3L,    Long.MIN_VALUE},
+            {  2L,  3L,    Long.MIN_VALUE}
+        };
+        initTableWithAllNulls(client);
+        // Find the min at the end of the peer group.
+        cr = client.callProcedure("@AdHoc",
+                                  "select A, B, min(C) over (partition by A order by B) as R from T ORDER BY A, B, R;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        validateTableOfLongs(cr.getResults()[0], expectedWithAllNulls);
+    }
+
+    public void testMax() throws Exception {
+        Client client = getClient();
+        long expected[] [] = new long[][] {
+            {  1L,  1L,    0L},
+            {  1L,  1L,    0L},
+            {  1L,  1L,    0L},
+            {  1L,  1L,    0L},
+            {  1L,  1L,    0L},
+            //======================================
+            {  1L,  2L,    0L},
+            {  1L,  2L,    0L},
+            {  1L,  2L,    0L},
+            {  1L,  2L,    0L},
+            {  1L,  2L,    0L},
+            //======================================
+            {  1L,  3L,    0L},
+            {  1L,  3L,    0L},
+            {  1L,  3L,    0L},
+            {  1L,  3L,    0L},
+            {  1L,  3L,    0L},
+            //--------------------------------------
+            {  2L,  1L,    0L},
+            {  2L,  1L,    0L},
+            {  2L,  1L,    0L},
+            {  2L,  1L,    0L},
+            {  2L,  1L,    0L},
+            //======================================
+            {  2L,  2L,    0L},
+            {  2L,  2L,    0L},
+            {  2L,  2L,    0L},
+            {  2L,  2L,    0L},
+            {  2L,  2L,    0L},
+            //======================================
+            {  2L,  3L,    0L},
+            {  2L,  3L,    0L},
+            {  2L,  3L,    0L},
+            {  2L,  3L,    0L},
+            {  2L,  3L,    0L}
+        };
+        initTable(client);
+        ClientResponse cr;
+        // Find the min at the end of the peer group.
+        cr = client.callProcedure("@AdHoc",
+                                  "select A, B, max(-1*abs(5-C)) over (partition by A order by B) as R from T ORDER BY A, B, R;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        validateTableOfLongs(cr.getResults()[0], expected);
+
+        // Find the min at the middle of the peer group.
+        cr = client.callProcedure("@AdHoc",
+                                  "select A, B, max(-1*abs(3-C)) over (partition by A order by B) as R from T ORDER BY A, B, R;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        validateTableOfLongs(cr.getResults()[0], expected);
+
+        // Find the min at the beginning of the peer group.
+        cr = client.callProcedure("@AdHoc",
+                                  "select A, B, max(-1*abs(1-C)) over (partition by A order by B) as R from T ORDER BY A, B, R;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        validateTableOfLongs(cr.getResults()[0], expected);
+
+        long expectedWithSomeNulls[] [] = new long[][] {
+            {  1L,  1L,    1L},
+            {  1L,  1L,    1L},
+            {  1L,  1L,    1L},
+            {  1L,  1L,    1L},
+            {  1L,  1L,    1L},
+            //======================================
+            {  1L,  2L,    1L},
+            {  1L,  2L,    1L},
+            {  1L,  2L,    1L},
+            {  1L,  2L,    1L},
+            {  1L,  2L,    1L},
+            //======================================
+            {  1L,  3L,    1L},
+            {  1L,  3L,    1L},
+            {  1L,  3L,    1L},
+            {  1L,  3L,    1L},
+            {  1L,  3L,    1L},
+            //--------------------------------------
+            {  2L,  1L,    1L},
+            {  2L,  1L,    1L},
+            {  2L,  1L,    1L},
+            {  2L,  1L,    1L},
+            {  2L,  1L,    1L},
+            //======================================
+            {  2L,  2L,    1L},
+            {  2L,  2L,    1L},
+            {  2L,  2L,    1L},
+            {  2L,  2L,    1L},
+            {  2L,  2L,    1L},
+            //======================================
+            {  2L,  3L,    1L},
+            {  2L,  3L,    1L},
+            {  2L,  3L,    1L},
+            {  2L,  3L,    1L},
+            {  2L,  3L,    1L}
+        };
+        initTableWithSomeNulls(client);
+        // Find the min at the end of the peer group.
+        cr = client.callProcedure("@AdHoc",
+                                  "select A, B, min(C) over (partition by A order by B) as R from T ORDER BY A, B, R;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        validateTableOfLongs(cr.getResults()[0], expectedWithSomeNulls);
+
+        long expectedWithAllNulls[] [] = new long[][] {
+            {  1L,  1L,    Long.MIN_VALUE},
+            {  1L,  1L,    Long.MIN_VALUE},
+            {  1L,  1L,    Long.MIN_VALUE},
+            {  1L,  1L,    Long.MIN_VALUE},
+            {  1L,  1L,    Long.MIN_VALUE},
+            //======================================
+            {  1L,  2L,    Long.MIN_VALUE},
+            {  1L,  2L,    Long.MIN_VALUE},
+            {  1L,  2L,    Long.MIN_VALUE},
+            {  1L,  2L,    Long.MIN_VALUE},
+            {  1L,  2L,    Long.MIN_VALUE},
+            //======================================
+            {  1L,  3L,    Long.MIN_VALUE},
+            {  1L,  3L,    Long.MIN_VALUE},
+            {  1L,  3L,    Long.MIN_VALUE},
+            {  1L,  3L,    Long.MIN_VALUE},
+            {  1L,  3L,    Long.MIN_VALUE},
+            //--------------------------------------
+            {  2L,  1L,    Long.MIN_VALUE},
+            {  2L,  1L,    Long.MIN_VALUE},
+            {  2L,  1L,    Long.MIN_VALUE},
+            {  2L,  1L,    Long.MIN_VALUE},
+            {  2L,  1L,    Long.MIN_VALUE},
+            //======================================
+            {  2L,  2L,    Long.MIN_VALUE},
+            {  2L,  2L,    Long.MIN_VALUE},
+            {  2L,  2L,    Long.MIN_VALUE},
+            {  2L,  2L,    Long.MIN_VALUE},
+            {  2L,  2L,    Long.MIN_VALUE},
+            //======================================
+            {  2L,  3L,    Long.MIN_VALUE},
+            {  2L,  3L,    Long.MIN_VALUE},
+            {  2L,  3L,    Long.MIN_VALUE},
+            {  2L,  3L,    Long.MIN_VALUE},
+            {  2L,  3L,    Long.MIN_VALUE}
+        };
+        initTableWithAllNulls(client);
+        // Find the min at the end of the peer group.
+        cr = client.callProcedure("@AdHoc",
+                                  "select A, B, min(C) over (partition by A order by B) as R from T ORDER BY A, B, R;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        validateTableOfLongs(cr.getResults()[0], expectedWithAllNulls);
+    }
+
+    public void testSum() throws Exception {
+        Client client = getClient();
+        long expected[] [] = new long[][] {
+            {  1L,  1L,   20L},
+            {  1L,  1L,   20L},
+            {  1L,  1L,   20L},
+            {  1L,  1L,   20L},
+            {  1L,  1L,   20L},
+            //======================================
+            {  1L,  2L,   45L},
+            {  1L,  2L,   45L},
+            {  1L,  2L,   45L},
+            {  1L,  2L,   45L},
+            {  1L,  2L,   45L},
+            //======================================
+            {  1L,  3L,   75L},
+            {  1L,  3L,   75L},
+            {  1L,  3L,   75L},
+            {  1L,  3L,   75L},
+            {  1L,  3L,   75L},
+            //--------------------------------------
+            {  2L,  1L,   20L},
+            {  2L,  1L,   20L},
+            {  2L,  1L,   20L},
+            {  2L,  1L,   20L},
+            {  2L,  1L,   20L},
+            //======================================
+            {  2L,  2L,   45L},
+            {  2L,  2L,   45L},
+            {  2L,  2L,   45L},
+            {  2L,  2L,   45L},
+            {  2L,  2L,   45L},
+            //======================================
+            {  2L,  3L,   75L},
+            {  2L,  3L,   75L},
+            {  2L,  3L,   75L},
+            {  2L,  3L,   75L},
+            {  2L,  3L,   75L}
+        };
+        initTable(client);
+        ClientResponse cr;
+        // Find the sum.
+        cr = client.callProcedure("@AdHoc",
+                                  "select A, B, sum(B+C) over (partition by A order by B) as R from T ORDER BY A, B, R;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        validateTableOfLongs(cr.getResults()[0], expected);
+
+        long expectedWithSomeNulls[] [] = new long[][] {
+            {  1L,  1L,   20L},
+            {  1L,  1L,   20L},
+            {  1L,  1L,   20L},
+            {  1L,  1L,   20L},
+            {  1L,  1L,   20L},
+            //======================================
+            {  1L,  2L,   23L},
+            {  1L,  2L,   23L},
+            {  1L,  2L,   23L},
+            {  1L,  2L,   23L},
+            {  1L,  2L,   23L},
+            //======================================
+            {  1L,  3L,   53L},
+            {  1L,  3L,   53L},
+            {  1L,  3L,   53L},
+            {  1L,  3L,   53L},
+            {  1L,  3L,   53L},
+            //--------------------------------------
+            {  2L,  1L,   20L},
+            {  2L,  1L,   20L},
+            {  2L,  1L,   20L},
+            {  2L,  1L,   20L},
+            {  2L,  1L,   20L},
+            //======================================
+            {  2L,  2L,   45L},
+            {  2L,  2L,   45L},
+            {  2L,  2L,   45L},
+            {  2L,  2L,   45L},
+            {  2L,  2L,   45L},
+            //======================================
+            {  2L,  3L,   53L},
+            {  2L,  3L,   53L},
+            {  2L,  3L,   53L},
+            {  2L,  3L,   53L},
+            {  2L,  3L,   53L}
+        };
+
+        initTableWithSomeNulls(client);
+        // Find the sum.
+        cr = client.callProcedure("@AdHoc",
+                                  "select A, B, sum(B+C) over (partition by A order by B) as R from T ORDER BY A, B, R;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        validateTableOfLongs(cr.getResults()[0], expectedWithSomeNulls);
+
+        long expectedWithAllNulls[] [] = new long[][] {
+            {  1L,  1L, 0},
+            {  1L,  1L, 0},
+            {  1L,  1L, 0},
+            {  1L,  1L, 0},
+            {  1L,  1L, 0},
+            //======================================
+            {  1L,  2L, 0},
+            {  1L,  2L, 0},
+            {  1L,  2L, 0},
+            {  1L,  2L, 0},
+            {  1L,  2L, 0},
+            //======================================
+            {  1L,  3L, 0},
+            {  1L,  3L, 0},
+            {  1L,  3L, 0},
+            {  1L,  3L, 0},
+            {  1L,  3L, 0},
+            //--------------------------------------
+            {  2L,  1L, 0},
+            {  2L,  1L, 0},
+            {  2L,  1L, 0},
+            {  2L,  1L, 0},
+            {  2L,  1L, 0},
+            //======================================
+            {  2L,  2L, 0},
+            {  2L,  2L, 0},
+            {  2L,  2L, 0},
+            {  2L,  2L, 0},
+            {  2L,  2L, 0},
+            //======================================
+            {  2L,  3L, 0},
+            {  2L,  3L, 0},
+            {  2L,  3L, 0},
+            {  2L,  3L, 0},
+            {  2L,  3L, 0}
+        };
+        initTableWithAllNulls(client);
+        // Find the sum.
+        cr = client.callProcedure("@AdHoc",
+                                  "select A, B, sum(B+C) over (partition by A order by B) as R from T ORDER BY A, B, R;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        validateTableOfLongs(cr.getResults()[0], expectedWithAllNulls);
     }
     static public junit.framework.Test suite() {
         VoltServerConfig config = null;

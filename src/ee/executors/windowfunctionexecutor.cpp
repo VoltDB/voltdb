@@ -49,10 +49,10 @@ struct TableWindow {
     std::string debug() {
         std::stringstream stream;
         stream << "Table Window: [Middle: "
-                << m_middleEdge.getLocation() << ", Leading: "
-                << m_leadingEdge.getLocation() << "], "
-                << "ssize = " << m_orderByGroupSize
-                << "\n";
+               << m_middleEdge.getLocation() << ", Leading: "
+               << m_leadingEdge.getLocation() << "], "
+               << "ssize = " << m_orderByGroupSize
+               << "\n";
         return stream.str();
     }
 
@@ -91,17 +91,28 @@ struct TableWindow {
  * we want to be able to turn off evaluation when it's not needed.
  */
 struct WindowAggregate {
-    WindowAggregate(ValueType valType)
-      : m_needsLookahead(true),
-        m_valType(valType) {
+    WindowAggregate()
+        : m_needsLookahead(true),
+          m_inlineCopiedToOutline(false) {
+        VOLT_TRACE("WindowAggregate::WindowAggregate() @ %p\n", this);
+        PRINT_STACK_TRACE();
     }
-    virtual ~WindowAggregate() {
 
+    virtual ~WindowAggregate() {
+        VOLT_TRACE("~WindowAggregate()\n");
     }
-    void* operator new(size_t size, Pool& memoryPool) { return memoryPool.allocate(size); }
+    void* operator new(size_t size, Pool& memoryPool) {
+        void *answer = memoryPool.allocate(size);
+        VOLT_TRACE("WindowAggregate::new(%ld, %p) -> %p\n",
+                   size,
+                   &memoryPool,
+                   answer);
+        return answer;
+    }
     void operator delete(void*, Pool& memoryPool) { /* NOOP -- on alloc error unroll nothing */ }
     void operator delete(void*) { /* NOOP -- deallocate wholesale with pool */ }
 
+    virtual const char *getAggName() const = 0;
     /**
      * Do calculations needed when scanning each row ahead for
      * the end of an order by or partition by group.
@@ -132,7 +143,11 @@ struct WindowAggregate {
      */
     virtual NValue finalize(ValueType type)
     {
+        VOLT_TRACE("WindowAggregate::finalize: type = %d\n", (int)type);
         m_value.castAs(type);
+        if (m_inlineCopiedToOutline) {
+            m_value.allocateObjectFromOutlinedValue();
+        }
         return m_value;
     }
 
@@ -147,29 +162,35 @@ struct WindowAggregate {
 
     NValue m_value;
     bool   m_needsLookahead;
-    ValueType m_valType;
+    bool   m_inlineCopiedToOutline;
 
     const static NValue m_one;
+    const static NValue m_zero;
 };
 
-const NValue WindowAggregate::m_one = ValueFactory::getBigIntValue(1);
+const NValue WindowAggregate::m_one  = ValueFactory::getBigIntValue(1);
+const NValue WindowAggregate::m_zero = ValueFactory::getBigIntValue(0);
 
 /**
  * Dense rank is the easiest.  We just count
  * the number of times the order by expression values
  * change.
  */
-class DenseRankAgg : public WindowAggregate {
+class WindowedDenseRankAgg : public WindowAggregate {
 public:
-    DenseRankAgg(ValueType valType)
-        : WindowAggregate(valType) {
+    WindowedDenseRankAgg() {
         m_value = ValueFactory::getBigIntValue(1);
         m_orderByPeerIncrement = m_value;
         m_needsLookahead = false;
     }
 
-    virtual ~DenseRankAgg() {}
+    virtual ~WindowedDenseRankAgg() {
+        VOLT_TRACE("~DenseRankAgg()\n");
+    }
 
+    virtual const char *getAggName() const {
+        return "DENSE_RANK";
+    }
     virtual void endGroup(TableWindow &window, WindowFunctionExecutor::EdgeType etype) {
         m_value = m_value.op_add(orderByPeerIncrement());
     }
@@ -191,15 +212,17 @@ public:
  * Rank is like dense rank, but we increment
  * the m_rank by the size of the order by group.
  */
-class RankAgg : public DenseRankAgg {
+class WindowedRankAgg : public WindowedDenseRankAgg {
 public:
-    RankAgg(ValueType valType)
-    : DenseRankAgg(valType) {
+    virtual const char *getAggName() const {
+        return "RANK";
     }
     void lookaheadNextGroup(TableWindow &window) {
         m_orderByPeerIncrement = ValueFactory::getBigIntValue(window.m_orderByGroupSize);
     }
-    ~RankAgg() {}
+    ~WindowedRankAgg() {
+        VOLT_TRACE("~RankAgg()\n");
+    }
 };
 
 /**
@@ -208,13 +231,15 @@ public:
  * and add the count of non-null rows to the count output
  * before we output the rows.
  */
-class CountAgg : public WindowAggregate {
+class WindowedCountAgg : public WindowAggregate {
 public:
-    CountAgg(ValueType valType)
-        : WindowAggregate(valType) { }
+    virtual ~WindowedCountAgg() {
+        VOLT_TRACE("~CountAgg()\n");
+    }
 
-    virtual ~CountAgg() {}
-
+    virtual const char *getAggName() const {
+        return "COUNT";
+    }
     virtual void lookaheadOneRow(TableWindow &window, NValueArray &argVals) {
         /*
          * COUNT(*) has no arguments.  If there are arguments,
@@ -227,39 +252,47 @@ public:
 
     virtual void resetAgg() {
         WindowAggregate::resetAgg();
-        m_value = ValueFactory::getBigIntValue(0);
+        m_value = m_zero;
     }
 };
 
 /*
- * The following are examples of other aggregate definitions.
+ * Calculate MIN.
  */
-class MinAgg : public WindowAggregate {
+class WindowedMinAgg : public WindowAggregate {
 public:
-    MinAgg(ValueType valType)
-        : WindowAggregate(valType) {
+    /*
+     * Since min can operate on strings, we need to
+     * be careful that the memory is allocated in
+     * our pool.
+     */
+    WindowedMinAgg(Pool &pool)
+        : WindowAggregate(),
+          m_isEmpty(true),
+          m_pool(pool) {
+        VOLT_TRACE("WindowedMinAgg::WindowedMinAgg(%s, %p)\n", getAggName(), this);
+    }
+
+    ~WindowedMinAgg() {
+        VOLT_TRACE("~WindowedMinAgg()\n");
+    }
+    virtual const char *getAggName() const {
+        return "MIN";
     }
     virtual void resetAgg() {
         WindowAggregate::resetAgg();
-        switch (m_valType) {
-        case VALUE_TYPE_BIGINT:
-            m_value = ValueFactory::getBigIntValue(LONG_MAX);
-            break;
-        case VALUE_TYPE_INTEGER:
-            m_value = ValueFactory::getIntegerValue(INT_MAX);
-            break;
-        case VALUE_TYPE_SMALLINT:
-            m_value = ValueFactory::getSmallIntValue(SHRT_MAX);
-            break;
-        case VALUE_TYPE_TINYINT:
-            m_value = ValueFactory::getTinyIntValue(CHAR_MAX);
-            break;
-        case VALUE_TYPE_TIMESTAMP:
-            m_value = ValueFactory::getTimestampValue(NYE9999);
-        default:
-            throw SerializableEEException(
-                    "Value type unknown in aggregate constructor");
+        m_isEmpty = true;
+    }
+    virtual NValue finalize(ValueType type)
+    {
+        /*
+         * If we looked at no values, this is null.
+         */
+        if (! m_isEmpty) {
+            return WindowAggregate::finalize(type);
         }
+        m_value = NValue::getNullValue(type);
+        return m_value;
     }
     /**
      * Calculate the min by looking ahead in the
@@ -268,40 +301,45 @@ public:
     virtual void lookaheadOneRow(TableWindow &window, NValueArray &argVals) {
         assert(argVals.size() == 1);
         if ( ! argVals[0].isNull()) {
-            if (argVals[0].op_lessThan(m_value).isTrue()) {
+            if (m_isEmpty || argVals[0].op_lessThan(m_value).isTrue()) {
                 m_value = argVals[0];
+                if (m_value.getSourceInlined()) {
+                    m_value.allocateObjectFromInlinedValue(&m_pool);
+                    m_inlineCopiedToOutline = true;
+                }
+                m_isEmpty = false;
             }
         }
     }
+    bool m_isEmpty;
+    Pool &m_pool;
 };
 
-class MaxAgg : public WindowAggregate {
+class WindowedMaxAgg : public WindowAggregate {
 public:
-    MaxAgg(ValueType valType)
-        : WindowAggregate(valType) {
+    WindowedMaxAgg(Pool &pool) : WindowAggregate(), m_isEmpty(true), m_pool(pool) {
+        VOLT_TRACE("WindowedMaxAgg::WindowedMaxAgg(%s, %p)\n", getAggName(), this);
+    }
+    ~WindowedMaxAgg() {
+        VOLT_TRACE("~WindowedMaxAgg()\n");
+    }
+    virtual const char *getAggName() const {
+        return "MAX";
     }
     virtual void resetAgg() {
         WindowAggregate::resetAgg();
-        switch (m_valType) {
-        case VALUE_TYPE_BIGINT:
-            // Start at LONG_MIN+1, because LONG_MIN stands for NULL.
-            m_value = ValueFactory::getBigIntValue(LONG_MIN+1);
-            break;
-        case VALUE_TYPE_INTEGER:
-            m_value = ValueFactory::getIntegerValue(INT_MIN);
-            break;
-        case VALUE_TYPE_SMALLINT:
-            m_value = ValueFactory::getSmallIntValue(SHRT_MIN);
-            break;
-        case VALUE_TYPE_TINYINT:
-            m_value = ValueFactory::getTinyIntValue(CHAR_MAX);
-            break;
-        case VALUE_TYPE_TIMESTAMP:
-            m_value = ValueFactory::getTimestampValue(GREGORIAN_EPOCH);
-        default:
-            throw SerializableEEException(
-                    "Value type unknown in aggregate constructor");
+        m_isEmpty = true;
+    }
+    virtual NValue finalize(ValueType type)
+    {
+        /*
+         * If we looked at no values, this is null.
+         */
+        if (! m_isEmpty) {
+            return WindowAggregate::finalize(type);
         }
+        m_value = NValue::getNullValue(type);
+        return m_value;
     }
     /**
      * Calculate the min by looking ahead in the
@@ -310,22 +348,35 @@ public:
     virtual void lookaheadOneRow(TableWindow &window, NValueArray &argVals) {
         assert(argVals.size() == 1);
         if ( ! argVals[0].isNull()) {
-            if (argVals[0].op_greaterThan(m_value).isTrue()) {
+            if (m_isEmpty || argVals[0].op_greaterThan(m_value).isTrue()) {
                 m_value = argVals[0];
+                if (m_value.getSourceInlined()) {
+                    m_value.allocateObjectFromInlinedValue(&m_pool);
+                    m_inlineCopiedToOutline = true;
+                }
+                m_isEmpty = false;
             }
         }
     }
+    bool m_isEmpty;
+    Pool &m_pool;
 };
 
-class SumAgg : public WindowAggregate {
+class WindowedSumAgg : public WindowAggregate {
 public:
-    SumAgg(ValueType valType)
-        : WindowAggregate(valType) {
-        m_value = ValueFactory::getBigIntValue(0);
+    WindowedSumAgg() {
+        m_value = m_zero;
+        VOLT_TRACE("WindowedSumAgg::WindowedSumAgg() @ %p\n", this);
+    }
+    ~WindowedSumAgg() {
+        VOLT_TRACE("~WindowedSumAgg()\n");
+    }
+    virtual const char *getAggName() const {
+        return "SUM";
     }
     virtual void resetAgg() {
         WindowAggregate::resetAgg();
-        m_value = ValueFactory::getBigIntValue(0);
+        m_value = m_zero;
     }
     /**
      * Calculate the min by looking ahead in the
@@ -340,28 +391,32 @@ public:
 };
 
 #if  0
+// This doesn't actually work for
+// distributed calculations.  We need to
+// calculate a value per partition, and the
+// aggregate it on teh coordinator.
+//
+// I think the same is true of stddev.
 class AvgAgg : public WindowAggregate {
 public:
     AvgAgg()
-      : m_count(ValueFactory::getBigIntValue(0)) { }
+        : m_count(m_zero) { }
     virtual void lookaheadOneRow(TableWindow &window, NValueArray &argVals) {
         assert(argVals.size() == 1);
         if ( ! argVals[0].isNull() ) {
             m_value = m_value.op_add(argVals[0]);
             m_count = m_count.op_add(m_one);
-            m_ct += 1;
         }
     }
     virtual NValue finalize(ValueType type) {
-        if (m_ct == 0) {
-            // Not sure how to do this really.
-            return NValue::getNullValue(VALUE_TYPE_BIGINT);
+        if (m_count.op_equals(m_zero).isTrue()) {
+            m_value = NValue::getNullValue(type);
+            return m_value;
         }
         return m_value.op_divide(m_count);
     }
 private:
     NValue m_count;
-    size_t m_ct;
 };
 #endif
 
@@ -370,8 +425,6 @@ private:
  * WindowAgg.  It has a pass through tuple and at the end has a
  * bunch of pointers to WindowAggregate objects.  These latter
  * calculate the actual aggregate values.
- *
- * Don't define anything which needs virtuality here, or awful things will happen.
  */
 struct WindowAggregateRow {
     WindowAggregateRow(const TupleSchema *inputSchema, Pool &pool) {
@@ -380,15 +433,17 @@ struct WindowAggregateRow {
     }
     void* operator new(size_t size, Pool& memoryPool, size_t nAggs)
     {
-      return memoryPool.allocateZeroes(size + (sizeof(void*) * (nAggs + 1)));
+        return memoryPool.allocateZeroes(size + (sizeof(void*) * (nAggs + 1)));
     }
     void operator delete(void*, Pool& memoryPool, size_t nAggs) { /* NOOP -- on alloc error unroll */ }
     void operator delete(void*) { /* NOOP -- deallocate wholesale with pool */ }
 
     void resetAggs()
     {
+        VOLT_TRACE("WindowFunctionExecutor::Resetting All Aggregates\n");
         // Stop at the terminating null agg pointer that has been allocated as an extra and ignored since.
         for (int ii = 0; m_aggregates[ii] != NULL; ++ii) {
+            VOLT_TRACE("WindowFunctionExecutor::resetAggs(%d) == %s\n", ii, m_aggregates[ii]->getAggName());
             m_aggregates[ii]->resetAgg();
         }
     }
@@ -452,22 +507,34 @@ bool WindowFunctionExecutor::p_init(AbstractPlanNode *init_node, TempTableLimits
  * The object is allocated from the provided memory pool.
  */
 inline WindowAggregate* getWindowedAggInstance(Pool& memoryPool,
-                                               ExpressionType agg_type,
-                                               ValueType valType)
+                                               ExpressionType agg_type)
 {
+    WindowAggregate *answer = NULL;
+    VOLT_TRACE("getWindowedAggInstance(start): type is %d (%s)\n",
+               agg_type,
+               expressionToString(agg_type).c_str());
+    
     switch (agg_type) {
     case EXPRESSION_TYPE_AGGREGATE_WINDOWED_RANK:
-        return new (memoryPool) RankAgg(valType);
+        answer = new (memoryPool) WindowedRankAgg();
+        break;
     case EXPRESSION_TYPE_AGGREGATE_WINDOWED_DENSE_RANK:
-        return new (memoryPool) DenseRankAgg(valType);
+        answer = new (memoryPool) WindowedDenseRankAgg();
+        break;
     case EXPRESSION_TYPE_AGGREGATE_WINDOWED_COUNT:
-        return new (memoryPool) CountAgg(valType);
+        answer = new (memoryPool) WindowedCountAgg();
+        break;
     case EXPRESSION_TYPE_AGGREGATE_WINDOWED_MAX:
-        return new (memoryPool) MaxAgg(valType);
+        VOLT_TRACE("getWindowedAggInstance: MAX\n");
+        answer = new (memoryPool) WindowedMaxAgg(memoryPool);
+        break;
     case EXPRESSION_TYPE_AGGREGATE_WINDOWED_MIN:
-        return new (memoryPool) MinAgg(valType);
+        answer = new (memoryPool) WindowedMinAgg(memoryPool);
+        break;
     case EXPRESSION_TYPE_AGGREGATE_WINDOWED_SUM:
-        return new (memoryPool) SumAgg(valType);
+        VOLT_TRACE("getWindowedAggInstance: Sum\n");
+        answer = new (memoryPool) WindowedSumAgg();
+        break;
     default:
         {
             char message[128];
@@ -475,6 +542,8 @@ inline WindowAggregate* getWindowedAggInstance(Pool& memoryPool,
             throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
         }
     }
+    VOLT_TRACE("getWindowedAggInstance: agg is %s\n", answer->getAggName());
+    return answer;
 }
 
 /*
@@ -483,19 +552,32 @@ inline WindowAggregate* getWindowedAggInstance(Pool& memoryPool,
  */
 inline void WindowFunctionExecutor::initAggInstances()
 {
-    TableTuple& tempTuple = m_tmpOutputTable->tempTuple();
-
     WindowAggregate** aggs = m_aggregateRow->getAggregates();
+    VOLT_TRACE("WindowFunctionExecutor::initAggInstances(begin)\n");
     for (int ii = 0; ii < m_aggTypes.size(); ii++) {
-        ValueType valType = tempTuple.getSchema()->columnType(ii);
         aggs[ii] = getWindowedAggInstance(m_memoryPool,
-                                          m_aggTypes[ii],
-                                          valType);
+                                          m_aggTypes[ii]);
+        VOLT_TRACE("initAggInstances: after allocate\n");
+        assert(aggs[ii] != NULL);
+        VOLT_TRACE("WindowFunctionExecutor::initAggInstances(agg %d, %s)\n",
+                   ii, aggs[ii]->getAggName());
     }
+#if defined(VOLT_TRACE_ENABLED)
+    for (int ii = 0; ii < m_aggTypes.size(); ii++) {
+        VOLT_TRACE("  Agg %d: %s\n", ii, aggs[ii]->getAggName());
+    }
+#endif /* defined(VOLT_TRACE_ENABLED) */
+    VOLT_TRACE("WindowFunctionExecutor::initAggInstances(end)\n");
 }
 
 inline void WindowFunctionExecutor::lookaheadOneRowForAggs(const TableTuple &tuple, TableWindow &tableWindow) {
     WindowAggregate **aggs = m_aggregateRow->getAggregates();
+#if defined(VOLT_TRACE_ENABLED)
+    VOLT_TRACE("WindowFunctionExecutor::lookaheadOneRowForAggs\n");
+    for (int ii = 0; ii < m_aggTypes.size(); ii++) {
+        VOLT_TRACE("  Agg %d: %s\n", ii, aggs[ii]->getAggName());
+    }
+#endif /* defined(VOLT_TRACE_ENABLED) */
     for (int ii = 0; ii < m_aggTypes.size(); ii++) {
         if (aggs[ii]->m_needsLookahead) {
             const AbstractPlanNode::OwningExpressionVector &inputExprs
@@ -508,6 +590,7 @@ inline void WindowFunctionExecutor::lookaheadOneRowForAggs(const TableTuple &tup
             aggs[ii]->lookaheadOneRow(tableWindow, vals);
         }
     }
+    VOLT_TRACE("WindowFunctionExecutor::lookaheadOneRowForAggs(end)\n");
 }
 
 inline void WindowFunctionExecutor::lookaheadNextGroupForAggs(TableWindow &tableWindow) {
@@ -560,7 +643,7 @@ int WindowFunctionExecutor::compareTuples(const TableTuple &tuple1,
 
     for (int ii = schema->columnCount() - 1; ii >= 0; --ii) {
         int cmp = tuple2.getNValue(ii)
-                        .compare(tuple1.getNValue(ii));
+            .compare(tuple1.getNValue(ii));
         if (cmp != 0) {
             return cmp;
         }
@@ -578,8 +661,9 @@ struct EnsureCleanupOnExit {
         : m_executor(executor) {
     }
     ~EnsureCleanupOnExit() {
+        VOLT_DEBUG("EnsureCleanupOnExit: begin\n");
         m_executor->p_execute_finish();
-        }
+    }
 
     WindowFunctionExecutor *m_executor;
 };
@@ -605,16 +689,18 @@ bool WindowFunctionExecutor::p_execute(const NValueArray& params) {
      * Do this after setting the m_inputSchema.
      */
     initWorkingTupleStorage();
-
+    VOLT_TRACE("windowFunctionExecutor::initWorkingTupleStorage\n");
     TableWindow tableWindow(input_table);
     ProgressMonitorProxy pmp(m_engine->getExecutorContext(), this);
     m_pmp = &pmp;
 
     m_aggregateRow
         = new (m_memoryPool, m_aggTypes.size())
-             WindowAggregateRow(m_inputSchema, m_memoryPool);
+        WindowAggregateRow(m_inputSchema, m_memoryPool);
 
+    VOLT_TRACE("WindowAggregateExecutor::p_execute(before initAggInstances)\n");
     initAggInstances();
+    VOLT_TRACE("WindowAggregateExecutor::p_execute(after initAggInstances)\n");
 
     VOLT_TRACE("Beginning: %s", tableWindow.debug().c_str());
 
@@ -622,11 +708,10 @@ bool WindowFunctionExecutor::p_execute(const NValueArray& params) {
 
     /*
      * Force a call p_execute_finish when this is all over.
-     * This cleans thing up and nulls out p_pmp.
      */
     EnsureCleanupOnExit finishCleanup(this);
     for (EdgeType etype = START_OF_INPUT,
-                  nextEtype = INVALID_EDGE_TYPE;
+             nextEtype = INVALID_EDGE_TYPE;
          etype != END_OF_INPUT;
          etype = nextEtype) {
         // Reset the aggregates if this is the
@@ -646,7 +731,7 @@ bool WindowFunctionExecutor::p_execute(const NValueArray& params) {
         for (int idx = 0; idx < tableWindow.m_orderByGroupSize; idx += 1) {
             VOLT_TRACE("MiddleEdge: Window = %s", tableWindow.debug().c_str());
             tableWindow.m_middleEdge.next(nextTuple);
-        m_pmp->countdownProgress();
+            m_pmp->countdownProgress();
             m_aggregateRow->recordPassThroughTuple(nextTuple);
             insertOutputTuple();
         }
@@ -806,6 +891,7 @@ void WindowFunctionExecutor::swapOrderByKeyTupleData() {
 
 
 void WindowFunctionExecutor::p_execute_finish() {
+    VOLT_DEBUG("WindowFunctionExecutor::p_execute_finish() start\n");
     m_pmp = NULL;
     /*
      * The working tuples should not be null.
@@ -829,6 +915,7 @@ void WindowFunctionExecutor::p_execute_finish() {
     assert( getLastOrderByKeyTuple().isNullTuple());
     assert( getBufferedInputTuple().isNullTuple());
     m_memoryPool.purge();
+    VOLT_DEBUG("WindowFunctionExecutor::p_execute_finish() end\n");
 }
 
 void WindowFunctionExecutor::initWorkingTupleStorage() {
