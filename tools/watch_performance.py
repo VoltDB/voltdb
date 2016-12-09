@@ -68,30 +68,19 @@ def check_response(response):
 proc_stats = VoltProcedure( client, "@Statistics", [FastSerializer.VOLTTYPE_STRING,FastSerializer.VOLTTYPE_INTEGER] )
 proc_catalog = VoltProcedure( client, "@SystemCatalog", [FastSerializer.VOLTTYPE_STRING] )
 
-# Statistics gathering functions
-def get_cpu():
-    response = proc_stats.call(["CPU",0])
-    check_response(response)
-    table = response.tables[0]
-    cpu_perc = table.tuples[0][3]
-    return cpu_perc
+# function to get short name of procedure
+def get_proc_name(procname):
+    if '.' in procname:
+        shortname = procname[procname.rindex('.')+1:] # everything after the right-most '.'
+        if shortname not in ['delete','insert','select','update','upsert']:
+            procname = shortname
+    return procname
 
-def get_pp():
-    response = proc_stats.call(["PROCEDUREPROFILE",1])
+def get_partition_count():
+    response = proc_stats.call(["PARTITIONCOUNT",0])
     check_response(response)
     table = response.tables[0]
-    return table.tuples
-
-def get_latencies():
-    response = proc_stats.call(["INITIATOR",1])
-    check_response(response)
-    table = response.tables[0]
-    latencies = dict()
-    for row in table.tuples:
-        procname = row[6]
-        avg_millis = row[8]
-        latencies[procname] = avg_millis
-    return latencies
+    return table.tuples[0][3]
 
 def get_proc_labels():
     response = proc_catalog.call(["PROCEDURES"])
@@ -99,7 +88,7 @@ def get_proc_labels():
     table = response.tables[0]
     labels = dict()
     for row in table.tuples:
-        procname = row[2]
+        procname = row[2] # uses short name, so no need to call get_proc_name()
         remarks = row[6]
         remarks_json = json.loads(remarks)
         if remarks_json.get("singlePartition") == True:
@@ -114,58 +103,189 @@ def get_proc_labels():
         labels[procname] = label
     return labels
 
-# before monitoring
-proc_labels = get_proc_labels()
-lasttime = dict()
 
-# print headers
-print "    time cpu                                procedure label pct  invocations   avgnanos     tps lat_millis     c"
-print "-------- --- ---------------------------------------- ----- --- ------------ ---------- ------- ---------- -----"
+
+
+# Statistics gathering functions
+def get_proc_stats():
+    response = proc_stats.call(["PROCEDURE",0])
+    check_response(response)
+    table = response.tables[0]
+    return table.tuples
+
+def get_cpu():
+    response = proc_stats.call(["CPU",0])
+    check_response(response)
+    table = response.tables[0]
+    cpu_perc = table.tuples[0][3]
+    return cpu_perc
+
+def get_latencies():
+    response = proc_stats.call(["INITIATOR",1])
+    check_response(response)
+    table = response.tables[0]
+    latencies = dict()
+    for row in table.tuples:
+        procname = row[6]
+        avg_millis = row[8]
+        latencies[procname] = avg_millis
+    return latencies
+
+
+# Statistics calculation functions (for Python 2.7)
+def mean(data):
+    """Return the sample arithmetic mean of data."""
+    n = len(data)
+    if n < 1:
+        raise ValueError('mean requires at least one data point')
+    return sum(data)/n # in Python 2 use sum(data)/float(n)
+
+def _ss(data):
+    """Return sum of square deviations of sequence data."""
+    c = mean(data)
+    ss = sum((x-c)**2 for x in data)
+    return ss
+
+def pstdev(data):
+    """Calculates the population standard deviation."""
+    n = len(data)
+    if n < 2:
+        raise ValueError('variance requires at least two data points')
+    ss = _ss(data)
+    pvar = ss/n # the population variance
+    return pvar**0.5
+
+def _min(data):
+    min_value = None
+    for value in data:
+        if not min_value:
+            min_value = value
+        elif value < min_value:
+            min_value = value
+    return min_value
+
+def _max(data):
+    max_value = None
+    for value in data:
+        if not max_value:
+            max_value = value
+        elif value > max_value:
+            max_value = value
+    return max_value
+
+# before monitoring
+last_stats = dict()
+partition_proc_stats = dict()
+partition_stats = dict()
+procedure_stats = dict()
+partition_count = get_partition_count()
+
+print "    time                                procedure label exec_pct invocations txn/sec    exec_ms  svr_ms     c cpu partitions   skew   inMB/s  outMB/s"
+print "-------- ---------------------------------------- ----- -------- ----------- ------- ---------- ------- ----- --- ---------- ------ -------- --------"
 
 # begin monitoring every (frequency) seconds for (duration) minutes
 start_time = time.time()
 end_time = start_time + args.duration * 60
 while end_time > time.time():
 
+    partition_proc_stats.clear()
+    partition_stats.clear()
+    procedure_stats.clear()
     now = time.strftime('%X')
 
     # gather cpu and latency metrics
     cpu = get_cpu()
     latencies = get_latencies()
+    proc_labels = get_proc_labels()
+
+    total_exec_millis = 0.0
 
     # gather and iterate through procedureprofile statistics, calculating and printing output for each procedure executed
-    for row in get_pp():
+    for row in get_proc_stats():
 
         # get columns as variables
         epochmillis = row[0]
-        procname = row[1]
-        perc = row[2]
-        invs = row[3]
-        avgnanos = row[4]
+        host_id = row[1]
+        partition_id = row[4]
+        procname = get_proc_name(row[5]) # convert long names to short names
+        invs = row[6]
+        avgnanos = row[10]
+        avgbytesout = row[13]
+        avgbytesin = row[16]
 
-        # fix procname
-        if '.' in procname:
-            # get short name
-            shortname = procname[procname.rindex('.')+1:] # everything after the right-most '.'
-            if shortname not in ['delete','insert','select','update','upsert']:
-                procname = shortname
+        # compute incremental stats
+        incr_millis = 0
+        incr_invs = 0
+        if (host_id, partition_id, procname) in last_stats:
+            prev_stats = last_stats[(host_id, partition_id, procname)]
+            incr_millis = epochmillis - prev_stats[0]
+            incr_invs = invs - prev_stats[1]
+        last_stats[(host_id, partition_id, procname)] = (epochmillis, invs)
 
-        # get label
-        label = proc_labels.get(procname)
-
-        # compute timestamp difference
-        elapsedmillis = 0
-        if procname in lasttime:
-            elapsedmillis = epochmillis - lasttime[procname]
-        lasttime[procname] = epochmillis
 
         # compute tps, c_svrs
         tps = 0
+        exec_millis = 0
         c_svrs = 0.0
-        if (elapsedmillis > 0):
-            tps = invs *1000 / elapsedmillis
-            c_svrs = float(avgnanos) * invs / (1000000 * elapsedmillis)
+        mbin = 0.0
+        mbout = 0.0
+        if (incr_millis > 0):
+            tps = incr_invs *1000 / incr_millis
+            exec_millis = float(avgnanos) * incr_invs / 1000000
+            c_svrs = exec_millis / incr_millis
+            mbin = float(avgbytesin*incr_invs)/(incr_millis*1000)
+            mbout = float(avgbytesout*incr_invs)/(incr_millis*1000)
 
-        print '%8s %3d %40s %5s %3d %12d %10d %7d %10d %5.1f' % (now, cpu, procname, label, perc, invs, avgnanos, tps, latencies.get(procname,0), c_svrs)
+
+        new_values = (incr_invs, tps, exec_millis, c_svrs, mbin, mbout)
+
+        if incr_invs > 0:
+            if (procname, partition_id) in partition_proc_stats:
+                pass # do nothing
+            else:
+                total_exec_millis += exec_millis
+                partition_proc_stats[(procname, partition_id)] = new_values
+                if procname in procedure_stats:
+                    procedure_stats[procname] = tuple(sum(x) for x in zip(procedure_stats[procname],new_values))
+                else:
+                    procedure_stats[procname] = new_values
+                if partition_id in partition_stats:
+                    partition_stats[partition_id] = tuple(sum(x) for x in zip(partition_stats[partition_id],new_values))
+                else:
+                    partition_stats[partition_id] = new_values
+
+    procs_sort = procedure_stats.items()
+    procs_sort.sort(key=lambda x:x[1][3], reverse=True) # sort procedures by exec_millis (highest first)
+    for row in procs_sort:
+        procname = row[0]
+        invs, tps, exec_millis, c_svrs, mbin, mbout = row[1]
+        avgms = exec_millis/invs
+        exec_pct = 100 * exec_millis / total_exec_millis
+        label = proc_labels.get(procname)
+        latency = latencies.get(procname,0)
+
+        # calculate skew
+        tps_list = []
+        min_tps = None
+        max_tps = None
+        partitions_used = 0
+        for p in range(partition_count):
+            if (procname, p) in partition_proc_stats:
+                tps_list.append(partition_proc_stats[(procname,p)][1])
+                partitions_used += 1
+            else:
+                tps_list.append(0)
+        tps_stdev = pstdev(tps_list)
+        tps_mean = mean(tps_list)
+        tps_coeff_var = 0 # skew of distribution across partitions
+        if tps_mean > 0:
+            tps_coeff_var = tps_stdev / tps_mean
+
+        partitions_used_string = str(partitions_used) + "/" + str(partition_count)
+
+        print '%8s %40s %5s %8.1f %11d %7d %10.3f %7d %5.2f %3d %10s %6.3f %8.3f %8.3f' % (now, procname, label, exec_pct, invs, tps, avgms, latency, c_svrs, cpu, partitions_used_string, tps_coeff_var, mbin, mbout)
+
+
+
 
     time.sleep(args.frequency)
