@@ -468,6 +468,7 @@ class BaseGenerator:
     # For labeled tokens, like "_X[#Y...]", attributes are only processed on the first occurrence of each unique
     # token/label combination in a statement and ignored on other occurrences.
     #
+    INDF = r"IS\s+(NOT\s+)?DISTINCT\s+FROM"
     #                   token (starting with '_')
     #                   |       optional attribute section between []s
     #                   |       |
@@ -475,11 +476,11 @@ class BaseGenerator:
     #                   |       |             |
     TYPE_PATTERN_GROUP  =                                           "type" # optional type for columns, values
     #                   |       |             |                      |
-    MIN_VALUE_PATTERN_GROUP =                                                                          "min" # optional min (only for numeric values)
-    #                   |       |             |                      |                                  |
-    MAX_VALUE_PATTERN_GROUP =                                                                                                 "max" # optional max (only for numeric values)
-    #                   |       |             |                      |                                  |                      |
-    __EXPR_TEMPLATE = r"%s" r"(\[\s*" r"(#(?P<label>\w+)\s*)?" r"(?P<type>\w+|[=<>!]{1,2})?\s*" r"(:(?P<min>(-?\d*\.?\d*)),(?P<max>(-?\d*\.?\d*))" \
+    MIN_VALUE_PATTERN_GROUP =                                                                                    "min" # optional min (only for numeric values)
+    #                   |       |             |                      |                                            |
+    MAX_VALUE_PATTERN_GROUP =                                                                                                          "max" # optional max (only for numeric values)
+    #                   |       |             |                      |                                            |                      |
+    __EXPR_TEMPLATE = r"%s" r"(\[\s*" r"(#(?P<label>\w+)\s*)?" r"(?P<type>\w+|"+INDF+r"|[=<>!]{1,2})?\s*" r"(:(?P<min>(-?\d*\.?\d*)),(?P<max>(-?\d*\.?\d*))" \
                       r"(,(?P<latmin>(-?\d*\.?\d*))(,(?P<latmax>(-?\d*\.?\d*)))?)?)?(;(?P<numholes>(-?\d+)))?\s*" r"(null(?P<nullpct>(\d*)))?" r"\])?"
     #                         |                          |                                |                                  |                    |
     #                         |                          |                                |                                  |                    end of [] attribute section
@@ -787,6 +788,9 @@ class SymbolGenerator(BaseGenerator):
         BaseGenerator.__init__(self, "_symbol")
 
     def prepare_params(self, attribute_groups):
+        # The "TYPE_PATTERN_GROUP", which in ColumnGenerator describes the column type,
+        # here actually refers to a symbol, which is typically a function name or a
+        # comparison operator (including the "IS [NOT] DISTINCT FROM" operator).
         self.__symbol = attribute_groups[BaseGenerator.TYPE_PATTERN_GROUP]
         if not self.__symbol:
             self.__symbol = ""
@@ -1191,6 +1195,7 @@ class SQLGenerator:
         self.__min_statements_per_pattern = sys.maxint
         self.__max_statements_per_pattern = -1
         self.__num_insert_statements      = 0
+        self.__num_unresolved_statements  = 0
 
     GENERATOR_TYPES = (TableGenerator, ColumnGenerator, SymbolGenerator, ConstantGenerator, IdGenerator)
 
@@ -1217,6 +1222,7 @@ class SQLGenerator:
                 print ('WARNING: final statement contains suspicious unresolved symbol(s): "' +
                        statement + '"')
                 print ('with schema "' + self.__schema.debug_schema_to_string() + '"')
+                self.__num_unresolved_statements += 1
             for generated_stmt in BaseGenerator.generate_statements_from_list(statement,
                                                                               generators,
                                                                               field_map):
@@ -1260,6 +1266,9 @@ class SQLGenerator:
 
     def num_patterns(self):
         return len(self.__statements)
+
+    def num_unresolved_statements(self):
+        return self.__num_unresolved_statements
 
 if __name__ == "__main__":
     # run the SQLGenerator in a test mode that simply prints its results

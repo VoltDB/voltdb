@@ -19,6 +19,7 @@
 -- scaling down the random values until overflow detection works in VoltDB AND HSQL
 --{@insertvals = "_id, _value[byte], _value[int16], _value[int64]"}
 {@insertvals = "_id, _value[int:-10,10], _value[byte null30], _value[byte]"}
+{@numcol = "SMALL"}
 {@onefun = "ABS"}
 {@optionalfn = "_numfun"}
 {@plus10 = " + 10"}
