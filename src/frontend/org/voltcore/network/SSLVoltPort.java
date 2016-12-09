@@ -111,6 +111,7 @@ public class SSLVoltPort extends VoltPort {
                 m_network.nudgeChannel(this);
             }
             if (processingWrites && isWriteStreamProcessed()) {
+                writeStream().checkBackpressureEnded();
                 processingWrites = false;
                 disableWriteSelection();
                 m_network.nudgeChannel(this);
