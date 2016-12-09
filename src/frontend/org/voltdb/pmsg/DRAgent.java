@@ -10894,29 +10894,29 @@ public final class DRAgent {
   public interface QueryResponseOrBuilder
       extends com.google.protobuf.MessageOrBuilder {
 
-    // repeated .pmsg.ClusterInfo clusters = 1;
+    // repeated .pmsg.ClusterInfo clusterInfo = 1;
     /**
-     * <code>repeated .pmsg.ClusterInfo clusters = 1;</code>
+     * <code>repeated .pmsg.ClusterInfo clusterInfo = 1;</code>
      */
     java.util.List<org.voltdb.pmsg.DRAgent.ClusterInfo> 
-        getClustersList();
+        getClusterInfoList();
     /**
-     * <code>repeated .pmsg.ClusterInfo clusters = 1;</code>
+     * <code>repeated .pmsg.ClusterInfo clusterInfo = 1;</code>
      */
-    org.voltdb.pmsg.DRAgent.ClusterInfo getClusters(int index);
+    org.voltdb.pmsg.DRAgent.ClusterInfo getClusterInfo(int index);
     /**
-     * <code>repeated .pmsg.ClusterInfo clusters = 1;</code>
+     * <code>repeated .pmsg.ClusterInfo clusterInfo = 1;</code>
      */
-    int getClustersCount();
+    int getClusterInfoCount();
     /**
-     * <code>repeated .pmsg.ClusterInfo clusters = 1;</code>
+     * <code>repeated .pmsg.ClusterInfo clusterInfo = 1;</code>
      */
     java.util.List<? extends org.voltdb.pmsg.DRAgent.ClusterInfoOrBuilder> 
-        getClustersOrBuilderList();
+        getClusterInfoOrBuilderList();
     /**
-     * <code>repeated .pmsg.ClusterInfo clusters = 1;</code>
+     * <code>repeated .pmsg.ClusterInfo clusterInfo = 1;</code>
      */
-    org.voltdb.pmsg.DRAgent.ClusterInfoOrBuilder getClustersOrBuilder(
+    org.voltdb.pmsg.DRAgent.ClusterInfoOrBuilder getClusterInfoOrBuilder(
         int index);
   }
   /**
@@ -10972,10 +10972,10 @@ public final class DRAgent {
             }
             case 10: {
               if (!((mutable_bitField0_ & 0x00000001) == 0x00000001)) {
-                clusters_ = new java.util.ArrayList<org.voltdb.pmsg.DRAgent.ClusterInfo>();
+                clusterInfo_ = new java.util.ArrayList<org.voltdb.pmsg.DRAgent.ClusterInfo>();
                 mutable_bitField0_ |= 0x00000001;
               }
-              clusters_.add(input.readMessage(org.voltdb.pmsg.DRAgent.ClusterInfo.PARSER, extensionRegistry));
+              clusterInfo_.add(input.readMessage(org.voltdb.pmsg.DRAgent.ClusterInfo.PARSER, extensionRegistry));
               break;
             }
           }
@@ -10987,7 +10987,7 @@ public final class DRAgent {
             e.getMessage()).setUnfinishedMessage(this);
       } finally {
         if (((mutable_bitField0_ & 0x00000001) == 0x00000001)) {
-          clusters_ = java.util.Collections.unmodifiableList(clusters_);
+          clusterInfo_ = java.util.Collections.unmodifiableList(clusterInfo_);
         }
         this.unknownFields = unknownFields.build();
         makeExtensionsImmutable();
@@ -11020,52 +11020,52 @@ public final class DRAgent {
       return PARSER;
     }
 
-    // repeated .pmsg.ClusterInfo clusters = 1;
-    public static final int CLUSTERS_FIELD_NUMBER = 1;
-    private java.util.List<org.voltdb.pmsg.DRAgent.ClusterInfo> clusters_;
+    // repeated .pmsg.ClusterInfo clusterInfo = 1;
+    public static final int CLUSTERINFO_FIELD_NUMBER = 1;
+    private java.util.List<org.voltdb.pmsg.DRAgent.ClusterInfo> clusterInfo_;
     /**
-     * <code>repeated .pmsg.ClusterInfo clusters = 1;</code>
+     * <code>repeated .pmsg.ClusterInfo clusterInfo = 1;</code>
      */
-    public java.util.List<org.voltdb.pmsg.DRAgent.ClusterInfo> getClustersList() {
-      return clusters_;
+    public java.util.List<org.voltdb.pmsg.DRAgent.ClusterInfo> getClusterInfoList() {
+      return clusterInfo_;
     }
     /**
-     * <code>repeated .pmsg.ClusterInfo clusters = 1;</code>
+     * <code>repeated .pmsg.ClusterInfo clusterInfo = 1;</code>
      */
     public java.util.List<? extends org.voltdb.pmsg.DRAgent.ClusterInfoOrBuilder> 
-        getClustersOrBuilderList() {
-      return clusters_;
+        getClusterInfoOrBuilderList() {
+      return clusterInfo_;
     }
     /**
-     * <code>repeated .pmsg.ClusterInfo clusters = 1;</code>
+     * <code>repeated .pmsg.ClusterInfo clusterInfo = 1;</code>
      */
-    public int getClustersCount() {
-      return clusters_.size();
+    public int getClusterInfoCount() {
+      return clusterInfo_.size();
     }
     /**
-     * <code>repeated .pmsg.ClusterInfo clusters = 1;</code>
+     * <code>repeated .pmsg.ClusterInfo clusterInfo = 1;</code>
      */
-    public org.voltdb.pmsg.DRAgent.ClusterInfo getClusters(int index) {
-      return clusters_.get(index);
+    public org.voltdb.pmsg.DRAgent.ClusterInfo getClusterInfo(int index) {
+      return clusterInfo_.get(index);
     }
     /**
-     * <code>repeated .pmsg.ClusterInfo clusters = 1;</code>
+     * <code>repeated .pmsg.ClusterInfo clusterInfo = 1;</code>
      */
-    public org.voltdb.pmsg.DRAgent.ClusterInfoOrBuilder getClustersOrBuilder(
+    public org.voltdb.pmsg.DRAgent.ClusterInfoOrBuilder getClusterInfoOrBuilder(
         int index) {
-      return clusters_.get(index);
+      return clusterInfo_.get(index);
     }
 
     private void initFields() {
-      clusters_ = java.util.Collections.emptyList();
+      clusterInfo_ = java.util.Collections.emptyList();
     }
     private byte memoizedIsInitialized = -1;
     public final boolean isInitialized() {
       byte isInitialized = memoizedIsInitialized;
       if (isInitialized != -1) return isInitialized == 1;
 
-      for (int i = 0; i < getClustersCount(); i++) {
-        if (!getClusters(i).isInitialized()) {
+      for (int i = 0; i < getClusterInfoCount(); i++) {
+        if (!getClusterInfo(i).isInitialized()) {
           memoizedIsInitialized = 0;
           return false;
         }
@@ -11077,8 +11077,8 @@ public final class DRAgent {
     public void writeTo(com.google.protobuf.CodedOutputStream output)
                         throws java.io.IOException {
       getSerializedSize();
-      for (int i = 0; i < clusters_.size(); i++) {
-        output.writeMessage(1, clusters_.get(i));
+      for (int i = 0; i < clusterInfo_.size(); i++) {
+        output.writeMessage(1, clusterInfo_.get(i));
       }
       getUnknownFields().writeTo(output);
     }
@@ -11089,9 +11089,9 @@ public final class DRAgent {
       if (size != -1) return size;
 
       size = 0;
-      for (int i = 0; i < clusters_.size(); i++) {
+      for (int i = 0; i < clusterInfo_.size(); i++) {
         size += com.google.protobuf.CodedOutputStream
-          .computeMessageSize(1, clusters_.get(i));
+          .computeMessageSize(1, clusterInfo_.get(i));
       }
       size += getUnknownFields().getSerializedSize();
       memoizedSerializedSize = size;
@@ -11201,7 +11201,7 @@ public final class DRAgent {
       }
       private void maybeForceBuilderInitialization() {
         if (com.google.protobuf.GeneratedMessage.alwaysUseFieldBuilders) {
-          getClustersFieldBuilder();
+          getClusterInfoFieldBuilder();
         }
       }
       private static Builder create() {
@@ -11210,11 +11210,11 @@ public final class DRAgent {
 
       public Builder clear() {
         super.clear();
-        if (clustersBuilder_ == null) {
-          clusters_ = java.util.Collections.emptyList();
+        if (clusterInfoBuilder_ == null) {
+          clusterInfo_ = java.util.Collections.emptyList();
           bitField0_ = (bitField0_ & ~0x00000001);
         } else {
-          clustersBuilder_.clear();
+          clusterInfoBuilder_.clear();
         }
         return this;
       }
@@ -11243,14 +11243,14 @@ public final class DRAgent {
       public org.voltdb.pmsg.DRAgent.QueryResponse buildPartial() {
         org.voltdb.pmsg.DRAgent.QueryResponse result = new org.voltdb.pmsg.DRAgent.QueryResponse(this);
         int from_bitField0_ = bitField0_;
-        if (clustersBuilder_ == null) {
+        if (clusterInfoBuilder_ == null) {
           if (((bitField0_ & 0x00000001) == 0x00000001)) {
-            clusters_ = java.util.Collections.unmodifiableList(clusters_);
+            clusterInfo_ = java.util.Collections.unmodifiableList(clusterInfo_);
             bitField0_ = (bitField0_ & ~0x00000001);
           }
-          result.clusters_ = clusters_;
+          result.clusterInfo_ = clusterInfo_;
         } else {
-          result.clusters_ = clustersBuilder_.build();
+          result.clusterInfo_ = clusterInfoBuilder_.build();
         }
         onBuilt();
         return result;
@@ -11267,29 +11267,29 @@ public final class DRAgent {
 
       public Builder mergeFrom(org.voltdb.pmsg.DRAgent.QueryResponse other) {
         if (other == org.voltdb.pmsg.DRAgent.QueryResponse.getDefaultInstance()) return this;
-        if (clustersBuilder_ == null) {
-          if (!other.clusters_.isEmpty()) {
-            if (clusters_.isEmpty()) {
-              clusters_ = other.clusters_;
+        if (clusterInfoBuilder_ == null) {
+          if (!other.clusterInfo_.isEmpty()) {
+            if (clusterInfo_.isEmpty()) {
+              clusterInfo_ = other.clusterInfo_;
               bitField0_ = (bitField0_ & ~0x00000001);
             } else {
-              ensureClustersIsMutable();
-              clusters_.addAll(other.clusters_);
+              ensureClusterInfoIsMutable();
+              clusterInfo_.addAll(other.clusterInfo_);
             }
             onChanged();
           }
         } else {
-          if (!other.clusters_.isEmpty()) {
-            if (clustersBuilder_.isEmpty()) {
-              clustersBuilder_.dispose();
-              clustersBuilder_ = null;
-              clusters_ = other.clusters_;
+          if (!other.clusterInfo_.isEmpty()) {
+            if (clusterInfoBuilder_.isEmpty()) {
+              clusterInfoBuilder_.dispose();
+              clusterInfoBuilder_ = null;
+              clusterInfo_ = other.clusterInfo_;
               bitField0_ = (bitField0_ & ~0x00000001);
-              clustersBuilder_ = 
+              clusterInfoBuilder_ = 
                 com.google.protobuf.GeneratedMessage.alwaysUseFieldBuilders ?
-                   getClustersFieldBuilder() : null;
+                   getClusterInfoFieldBuilder() : null;
             } else {
-              clustersBuilder_.addAllMessages(other.clusters_);
+              clusterInfoBuilder_.addAllMessages(other.clusterInfo_);
             }
           }
         }
@@ -11298,8 +11298,8 @@ public final class DRAgent {
       }
 
       public final boolean isInitialized() {
-        for (int i = 0; i < getClustersCount(); i++) {
-          if (!getClusters(i).isInitialized()) {
+        for (int i = 0; i < getClusterInfoCount(); i++) {
+          if (!getClusterInfo(i).isInitialized()) {
             
             return false;
           }
@@ -11326,244 +11326,244 @@ public final class DRAgent {
       }
       private int bitField0_;
 
-      // repeated .pmsg.ClusterInfo clusters = 1;
-      private java.util.List<org.voltdb.pmsg.DRAgent.ClusterInfo> clusters_ =
+      // repeated .pmsg.ClusterInfo clusterInfo = 1;
+      private java.util.List<org.voltdb.pmsg.DRAgent.ClusterInfo> clusterInfo_ =
         java.util.Collections.emptyList();
-      private void ensureClustersIsMutable() {
+      private void ensureClusterInfoIsMutable() {
         if (!((bitField0_ & 0x00000001) == 0x00000001)) {
-          clusters_ = new java.util.ArrayList<org.voltdb.pmsg.DRAgent.ClusterInfo>(clusters_);
+          clusterInfo_ = new java.util.ArrayList<org.voltdb.pmsg.DRAgent.ClusterInfo>(clusterInfo_);
           bitField0_ |= 0x00000001;
          }
       }
 
       private com.google.protobuf.RepeatedFieldBuilder<
-          org.voltdb.pmsg.DRAgent.ClusterInfo, org.voltdb.pmsg.DRAgent.ClusterInfo.Builder, org.voltdb.pmsg.DRAgent.ClusterInfoOrBuilder> clustersBuilder_;
+          org.voltdb.pmsg.DRAgent.ClusterInfo, org.voltdb.pmsg.DRAgent.ClusterInfo.Builder, org.voltdb.pmsg.DRAgent.ClusterInfoOrBuilder> clusterInfoBuilder_;
 
       /**
-       * <code>repeated .pmsg.ClusterInfo clusters = 1;</code>
+       * <code>repeated .pmsg.ClusterInfo clusterInfo = 1;</code>
        */
-      public java.util.List<org.voltdb.pmsg.DRAgent.ClusterInfo> getClustersList() {
-        if (clustersBuilder_ == null) {
-          return java.util.Collections.unmodifiableList(clusters_);
+      public java.util.List<org.voltdb.pmsg.DRAgent.ClusterInfo> getClusterInfoList() {
+        if (clusterInfoBuilder_ == null) {
+          return java.util.Collections.unmodifiableList(clusterInfo_);
         } else {
-          return clustersBuilder_.getMessageList();
+          return clusterInfoBuilder_.getMessageList();
         }
       }
       /**
-       * <code>repeated .pmsg.ClusterInfo clusters = 1;</code>
+       * <code>repeated .pmsg.ClusterInfo clusterInfo = 1;</code>
        */
-      public int getClustersCount() {
-        if (clustersBuilder_ == null) {
-          return clusters_.size();
+      public int getClusterInfoCount() {
+        if (clusterInfoBuilder_ == null) {
+          return clusterInfo_.size();
         } else {
-          return clustersBuilder_.getCount();
+          return clusterInfoBuilder_.getCount();
         }
       }
       /**
-       * <code>repeated .pmsg.ClusterInfo clusters = 1;</code>
+       * <code>repeated .pmsg.ClusterInfo clusterInfo = 1;</code>
        */
-      public org.voltdb.pmsg.DRAgent.ClusterInfo getClusters(int index) {
-        if (clustersBuilder_ == null) {
-          return clusters_.get(index);
+      public org.voltdb.pmsg.DRAgent.ClusterInfo getClusterInfo(int index) {
+        if (clusterInfoBuilder_ == null) {
+          return clusterInfo_.get(index);
         } else {
-          return clustersBuilder_.getMessage(index);
+          return clusterInfoBuilder_.getMessage(index);
         }
       }
       /**
-       * <code>repeated .pmsg.ClusterInfo clusters = 1;</code>
+       * <code>repeated .pmsg.ClusterInfo clusterInfo = 1;</code>
        */
-      public Builder setClusters(
+      public Builder setClusterInfo(
           int index, org.voltdb.pmsg.DRAgent.ClusterInfo value) {
-        if (clustersBuilder_ == null) {
+        if (clusterInfoBuilder_ == null) {
           if (value == null) {
             throw new NullPointerException();
           }
-          ensureClustersIsMutable();
-          clusters_.set(index, value);
+          ensureClusterInfoIsMutable();
+          clusterInfo_.set(index, value);
           onChanged();
         } else {
-          clustersBuilder_.setMessage(index, value);
+          clusterInfoBuilder_.setMessage(index, value);
         }
         return this;
       }
       /**
-       * <code>repeated .pmsg.ClusterInfo clusters = 1;</code>
+       * <code>repeated .pmsg.ClusterInfo clusterInfo = 1;</code>
        */
-      public Builder setClusters(
+      public Builder setClusterInfo(
           int index, org.voltdb.pmsg.DRAgent.ClusterInfo.Builder builderForValue) {
-        if (clustersBuilder_ == null) {
-          ensureClustersIsMutable();
-          clusters_.set(index, builderForValue.build());
+        if (clusterInfoBuilder_ == null) {
+          ensureClusterInfoIsMutable();
+          clusterInfo_.set(index, builderForValue.build());
           onChanged();
         } else {
-          clustersBuilder_.setMessage(index, builderForValue.build());
+          clusterInfoBuilder_.setMessage(index, builderForValue.build());
         }
         return this;
       }
       /**
-       * <code>repeated .pmsg.ClusterInfo clusters = 1;</code>
+       * <code>repeated .pmsg.ClusterInfo clusterInfo = 1;</code>
        */
-      public Builder addClusters(org.voltdb.pmsg.DRAgent.ClusterInfo value) {
-        if (clustersBuilder_ == null) {
+      public Builder addClusterInfo(org.voltdb.pmsg.DRAgent.ClusterInfo value) {
+        if (clusterInfoBuilder_ == null) {
           if (value == null) {
             throw new NullPointerException();
           }
-          ensureClustersIsMutable();
-          clusters_.add(value);
+          ensureClusterInfoIsMutable();
+          clusterInfo_.add(value);
           onChanged();
         } else {
-          clustersBuilder_.addMessage(value);
+          clusterInfoBuilder_.addMessage(value);
         }
         return this;
       }
       /**
-       * <code>repeated .pmsg.ClusterInfo clusters = 1;</code>
+       * <code>repeated .pmsg.ClusterInfo clusterInfo = 1;</code>
        */
-      public Builder addClusters(
+      public Builder addClusterInfo(
           int index, org.voltdb.pmsg.DRAgent.ClusterInfo value) {
-        if (clustersBuilder_ == null) {
+        if (clusterInfoBuilder_ == null) {
           if (value == null) {
             throw new NullPointerException();
           }
-          ensureClustersIsMutable();
-          clusters_.add(index, value);
+          ensureClusterInfoIsMutable();
+          clusterInfo_.add(index, value);
           onChanged();
         } else {
-          clustersBuilder_.addMessage(index, value);
+          clusterInfoBuilder_.addMessage(index, value);
         }
         return this;
       }
       /**
-       * <code>repeated .pmsg.ClusterInfo clusters = 1;</code>
+       * <code>repeated .pmsg.ClusterInfo clusterInfo = 1;</code>
        */
-      public Builder addClusters(
+      public Builder addClusterInfo(
           org.voltdb.pmsg.DRAgent.ClusterInfo.Builder builderForValue) {
-        if (clustersBuilder_ == null) {
-          ensureClustersIsMutable();
-          clusters_.add(builderForValue.build());
+        if (clusterInfoBuilder_ == null) {
+          ensureClusterInfoIsMutable();
+          clusterInfo_.add(builderForValue.build());
           onChanged();
         } else {
-          clustersBuilder_.addMessage(builderForValue.build());
+          clusterInfoBuilder_.addMessage(builderForValue.build());
         }
         return this;
       }
       /**
-       * <code>repeated .pmsg.ClusterInfo clusters = 1;</code>
+       * <code>repeated .pmsg.ClusterInfo clusterInfo = 1;</code>
        */
-      public Builder addClusters(
+      public Builder addClusterInfo(
           int index, org.voltdb.pmsg.DRAgent.ClusterInfo.Builder builderForValue) {
-        if (clustersBuilder_ == null) {
-          ensureClustersIsMutable();
-          clusters_.add(index, builderForValue.build());
+        if (clusterInfoBuilder_ == null) {
+          ensureClusterInfoIsMutable();
+          clusterInfo_.add(index, builderForValue.build());
           onChanged();
         } else {
-          clustersBuilder_.addMessage(index, builderForValue.build());
+          clusterInfoBuilder_.addMessage(index, builderForValue.build());
         }
         return this;
       }
       /**
-       * <code>repeated .pmsg.ClusterInfo clusters = 1;</code>
+       * <code>repeated .pmsg.ClusterInfo clusterInfo = 1;</code>
        */
-      public Builder addAllClusters(
+      public Builder addAllClusterInfo(
           java.lang.Iterable<? extends org.voltdb.pmsg.DRAgent.ClusterInfo> values) {
-        if (clustersBuilder_ == null) {
-          ensureClustersIsMutable();
-          super.addAll(values, clusters_);
+        if (clusterInfoBuilder_ == null) {
+          ensureClusterInfoIsMutable();
+          super.addAll(values, clusterInfo_);
           onChanged();
         } else {
-          clustersBuilder_.addAllMessages(values);
+          clusterInfoBuilder_.addAllMessages(values);
         }
         return this;
       }
       /**
-       * <code>repeated .pmsg.ClusterInfo clusters = 1;</code>
+       * <code>repeated .pmsg.ClusterInfo clusterInfo = 1;</code>
        */
-      public Builder clearClusters() {
-        if (clustersBuilder_ == null) {
-          clusters_ = java.util.Collections.emptyList();
+      public Builder clearClusterInfo() {
+        if (clusterInfoBuilder_ == null) {
+          clusterInfo_ = java.util.Collections.emptyList();
           bitField0_ = (bitField0_ & ~0x00000001);
           onChanged();
         } else {
-          clustersBuilder_.clear();
+          clusterInfoBuilder_.clear();
         }
         return this;
       }
       /**
-       * <code>repeated .pmsg.ClusterInfo clusters = 1;</code>
+       * <code>repeated .pmsg.ClusterInfo clusterInfo = 1;</code>
        */
-      public Builder removeClusters(int index) {
-        if (clustersBuilder_ == null) {
-          ensureClustersIsMutable();
-          clusters_.remove(index);
+      public Builder removeClusterInfo(int index) {
+        if (clusterInfoBuilder_ == null) {
+          ensureClusterInfoIsMutable();
+          clusterInfo_.remove(index);
           onChanged();
         } else {
-          clustersBuilder_.remove(index);
+          clusterInfoBuilder_.remove(index);
         }
         return this;
       }
       /**
-       * <code>repeated .pmsg.ClusterInfo clusters = 1;</code>
+       * <code>repeated .pmsg.ClusterInfo clusterInfo = 1;</code>
        */
-      public org.voltdb.pmsg.DRAgent.ClusterInfo.Builder getClustersBuilder(
+      public org.voltdb.pmsg.DRAgent.ClusterInfo.Builder getClusterInfoBuilder(
           int index) {
-        return getClustersFieldBuilder().getBuilder(index);
+        return getClusterInfoFieldBuilder().getBuilder(index);
       }
       /**
-       * <code>repeated .pmsg.ClusterInfo clusters = 1;</code>
+       * <code>repeated .pmsg.ClusterInfo clusterInfo = 1;</code>
        */
-      public org.voltdb.pmsg.DRAgent.ClusterInfoOrBuilder getClustersOrBuilder(
+      public org.voltdb.pmsg.DRAgent.ClusterInfoOrBuilder getClusterInfoOrBuilder(
           int index) {
-        if (clustersBuilder_ == null) {
-          return clusters_.get(index);  } else {
-          return clustersBuilder_.getMessageOrBuilder(index);
+        if (clusterInfoBuilder_ == null) {
+          return clusterInfo_.get(index);  } else {
+          return clusterInfoBuilder_.getMessageOrBuilder(index);
         }
       }
       /**
-       * <code>repeated .pmsg.ClusterInfo clusters = 1;</code>
+       * <code>repeated .pmsg.ClusterInfo clusterInfo = 1;</code>
        */
       public java.util.List<? extends org.voltdb.pmsg.DRAgent.ClusterInfoOrBuilder> 
-           getClustersOrBuilderList() {
-        if (clustersBuilder_ != null) {
-          return clustersBuilder_.getMessageOrBuilderList();
+           getClusterInfoOrBuilderList() {
+        if (clusterInfoBuilder_ != null) {
+          return clusterInfoBuilder_.getMessageOrBuilderList();
         } else {
-          return java.util.Collections.unmodifiableList(clusters_);
+          return java.util.Collections.unmodifiableList(clusterInfo_);
         }
       }
       /**
-       * <code>repeated .pmsg.ClusterInfo clusters = 1;</code>
+       * <code>repeated .pmsg.ClusterInfo clusterInfo = 1;</code>
        */
-      public org.voltdb.pmsg.DRAgent.ClusterInfo.Builder addClustersBuilder() {
-        return getClustersFieldBuilder().addBuilder(
+      public org.voltdb.pmsg.DRAgent.ClusterInfo.Builder addClusterInfoBuilder() {
+        return getClusterInfoFieldBuilder().addBuilder(
             org.voltdb.pmsg.DRAgent.ClusterInfo.getDefaultInstance());
       }
       /**
-       * <code>repeated .pmsg.ClusterInfo clusters = 1;</code>
+       * <code>repeated .pmsg.ClusterInfo clusterInfo = 1;</code>
        */
-      public org.voltdb.pmsg.DRAgent.ClusterInfo.Builder addClustersBuilder(
+      public org.voltdb.pmsg.DRAgent.ClusterInfo.Builder addClusterInfoBuilder(
           int index) {
-        return getClustersFieldBuilder().addBuilder(
+        return getClusterInfoFieldBuilder().addBuilder(
             index, org.voltdb.pmsg.DRAgent.ClusterInfo.getDefaultInstance());
       }
       /**
-       * <code>repeated .pmsg.ClusterInfo clusters = 1;</code>
+       * <code>repeated .pmsg.ClusterInfo clusterInfo = 1;</code>
        */
       public java.util.List<org.voltdb.pmsg.DRAgent.ClusterInfo.Builder> 
-           getClustersBuilderList() {
-        return getClustersFieldBuilder().getBuilderList();
+           getClusterInfoBuilderList() {
+        return getClusterInfoFieldBuilder().getBuilderList();
       }
       private com.google.protobuf.RepeatedFieldBuilder<
           org.voltdb.pmsg.DRAgent.ClusterInfo, org.voltdb.pmsg.DRAgent.ClusterInfo.Builder, org.voltdb.pmsg.DRAgent.ClusterInfoOrBuilder> 
-          getClustersFieldBuilder() {
-        if (clustersBuilder_ == null) {
-          clustersBuilder_ = new com.google.protobuf.RepeatedFieldBuilder<
+          getClusterInfoFieldBuilder() {
+        if (clusterInfoBuilder_ == null) {
+          clusterInfoBuilder_ = new com.google.protobuf.RepeatedFieldBuilder<
               org.voltdb.pmsg.DRAgent.ClusterInfo, org.voltdb.pmsg.DRAgent.ClusterInfo.Builder, org.voltdb.pmsg.DRAgent.ClusterInfoOrBuilder>(
-                  clusters_,
+                  clusterInfo_,
                   ((bitField0_ & 0x00000001) == 0x00000001),
                   getParentForChildren(),
                   isClean());
-          clusters_ = null;
+          clusterInfo_ = null;
         }
-        return clustersBuilder_;
+        return clusterInfoBuilder_;
       }
 
       // @@protoc_insertion_point(builder_scope:pmsg.QueryResponse)
@@ -16977,30 +16977,30 @@ public final class DRAgent {
       "\200\001\n\017ConnectResponse\022\022\n\ncatalogCRC\030\001 \001(\006\022" +
       "\030\n\020catalogSignature\030\002 \001(\t\022\027\n\017protocolVer" +
       "sion\030\003 \001(\005\022&\n\013clusterInfo\030\004 \003(\0132\021.pmsg.C" +
-      "lusterInfo\"4\n\rQueryResponse\022#\n\010clusters\030",
-      "\001 \003(\0132\021.pmsg.ClusterInfo\"\315\001\n\013ClusterInfo" +
-      "\022\021\n\tclusterId\030\001 \002(\005\022\022\n\ncreationId\030\002 \002(\006\022" +
-      "\022\n\nrecoveryId\030\003 \001(\006\022\027\n\017protocolVersion\030\004" +
-      " \001(\005\022\034\n\024globalPartitionCount\030\005 \001(\005\022 \n\010no" +
-      "deInfo\030\006 \003(\0132\016.pmsg.NodeInfo\022*\n\rpartitio" +
-      "nInfo\030\007 \003(\0132\023.pmsg.PartitionInfo\":\n\010Node" +
-      "Info\022\020\n\010hostname\030\001 \001(\t\022\016\n\006drport\030\002 \001(\005\022\014" +
-      "\n\004isUp\030\003 \001(\010\":\n\rPartitionInfo\022\023\n\013partiti" +
-      "onId\030\001 \001(\005\022\024\n\014nextUniqueId\030\n \001(\003\"\222\004\n\014Ctr" +
-      "lEnvelope\022%\n\004type\030\001 \002(\0162\027.pmsg.CtrlEnvel",
-      "ope.Type\022\026\n\002id\030\002 \002(\0132\n.pmsg.UUID\022\026\n\003ack\030" +
-      "\003 \001(\0132\t.pmsg.Ack\022\032\n\005reset\030\004 \001(\0132\013.pmsg.R" +
-      "eset\022\032\n\005pause\030\005 \001(\0132\013.pmsg.Pause\022 \n\010resp" +
-      "onse\030\006 \001(\0132\016.pmsg.Response\022&\n\013snapshotRe" +
-      "q\030\007 \001(\0132\021.pmsg.SnapshotReq\022\"\n\tsubscribe\030" +
-      "\010 \001(\0132\017.pmsg.Subscribe\022\036\n\007connect\030\n \001(\0132" +
-      "\r.pmsg.Connect\022\032\n\005query\030\013 \001(\0132\013.pmsg.Que" +
-      "ry\022&\n\013startCursor\030\014 \001(\0132\021.pmsg.StartCurs" +
-      "or\"\240\001\n\004Type\022\007\n\003ACK\020\001\022\t\n\005RESET\020\002\022\t\n\005PAUSE" +
-      "\020\003\022\t\n\005QUERY\020\004\022\014\n\010RESPONSE\020\005\022\020\n\014SNAPSHOT_",
-      "REQ\020\006\022\021\n\rSNAPSHOT_TERM\020\007\022\r\n\tSTOP_SYNC\020\010\022" +
-      "\013\n\007CONNECT\020\t\022\r\n\tSUBSCRIBE\020\n\022\020\n\014START_CUR" +
-      "SOR\020\013B\032\n\017org.voltdb.pmsgB\007DRAgent"
+      "lusterInfo\"7\n\rQueryResponse\022&\n\013clusterIn",
+      "fo\030\001 \003(\0132\021.pmsg.ClusterInfo\"\315\001\n\013ClusterI" +
+      "nfo\022\021\n\tclusterId\030\001 \002(\005\022\022\n\ncreationId\030\002 \002" +
+      "(\006\022\022\n\nrecoveryId\030\003 \001(\006\022\027\n\017protocolVersio" +
+      "n\030\004 \001(\005\022\034\n\024globalPartitionCount\030\005 \001(\005\022 \n" +
+      "\010nodeInfo\030\006 \003(\0132\016.pmsg.NodeInfo\022*\n\rparti" +
+      "tionInfo\030\007 \003(\0132\023.pmsg.PartitionInfo\":\n\010N" +
+      "odeInfo\022\020\n\010hostname\030\001 \001(\t\022\016\n\006drport\030\002 \001(" +
+      "\005\022\014\n\004isUp\030\003 \001(\010\":\n\rPartitionInfo\022\023\n\013part" +
+      "itionId\030\001 \001(\005\022\024\n\014nextUniqueId\030\n \001(\003\"\222\004\n\014" +
+      "CtrlEnvelope\022%\n\004type\030\001 \002(\0162\027.pmsg.CtrlEn",
+      "velope.Type\022\026\n\002id\030\002 \002(\0132\n.pmsg.UUID\022\026\n\003a" +
+      "ck\030\003 \001(\0132\t.pmsg.Ack\022\032\n\005reset\030\004 \001(\0132\013.pms" +
+      "g.Reset\022\032\n\005pause\030\005 \001(\0132\013.pmsg.Pause\022 \n\010r" +
+      "esponse\030\006 \001(\0132\016.pmsg.Response\022&\n\013snapsho" +
+      "tReq\030\007 \001(\0132\021.pmsg.SnapshotReq\022\"\n\tsubscri" +
+      "be\030\010 \001(\0132\017.pmsg.Subscribe\022\036\n\007connect\030\n \001" +
+      "(\0132\r.pmsg.Connect\022\032\n\005query\030\013 \001(\0132\013.pmsg." +
+      "Query\022&\n\013startCursor\030\014 \001(\0132\021.pmsg.StartC" +
+      "ursor\"\240\001\n\004Type\022\007\n\003ACK\020\001\022\t\n\005RESET\020\002\022\t\n\005PA" +
+      "USE\020\003\022\t\n\005QUERY\020\004\022\014\n\010RESPONSE\020\005\022\020\n\014SNAPSH",
+      "OT_REQ\020\006\022\021\n\rSNAPSHOT_TERM\020\007\022\r\n\tSTOP_SYNC" +
+      "\020\010\022\013\n\007CONNECT\020\t\022\r\n\tSUBSCRIBE\020\n\022\020\n\014START_" +
+      "CURSOR\020\013B\032\n\017org.voltdb.pmsgB\007DRAgent"
     };
     com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner assigner =
       new com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner() {
@@ -17090,7 +17090,7 @@ public final class DRAgent {
           internal_static_pmsg_QueryResponse_fieldAccessorTable = new
             com.google.protobuf.GeneratedMessage.FieldAccessorTable(
               internal_static_pmsg_QueryResponse_descriptor,
-              new java.lang.String[] { "Clusters", });
+              new java.lang.String[] { "ClusterInfo", });
           internal_static_pmsg_ClusterInfo_descriptor =
             getDescriptor().getMessageTypes().get(14);
           internal_static_pmsg_ClusterInfo_fieldAccessorTable = new
