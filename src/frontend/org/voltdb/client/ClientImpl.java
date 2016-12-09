@@ -117,7 +117,7 @@ public final class ClientImpl implements Client {
      * most outgoing procedure invocations. This helps size initial allocations
      * for serializing network writes
      */
-    ClientImpl(ClientConfig config) {
+    ClientImpl(ClientConfig config, SSLContext sslContext) {
 
         if (config.m_topologyChangeAware && !config.m_useClientAffinity) {
             throw new IllegalArgumentException("The client affinity must be enabled to enable topology awareness.");
@@ -170,7 +170,7 @@ public final class ClientImpl implements Client {
             m_distributer.m_rateLimiter.setLimits(
                     config.m_maxTransactionsPerSecond, config.m_maxOutstandingTxns);
         }
-        m_sslContext = config.m_sslContext;
+        m_sslContext = sslContext;
     }
 
     private boolean verifyCredentialsAreAlwaysTheSame(String username, byte[] hashedPassword) {

@@ -44,7 +44,7 @@ public abstract class ClientFactory {
             EstTimeUpdater.start();
             ReverseDNSCache.start();
         }
-        return new ClientImpl(new ClientConfig());
+        return new ClientImpl(new ClientConfig(), null);
     }
 
     /**
@@ -62,7 +62,9 @@ public abstract class ClientFactory {
             EstTimeUpdater.start();
             ReverseDNSCache.start();
         }
-        return new ClientImpl(config);
+        //Enable SSL if configured and do this once.
+        config.enableSSL();
+        return new ClientImpl(config, config.getSslContext());
     }
 
     public static void decreaseClientNum() throws InterruptedException {

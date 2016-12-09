@@ -296,6 +296,9 @@ public class CSVLoader implements BulkLoaderErrorHandler {
                 hasArg = false)
         boolean noquotechar = false;
 
+        @Option(desc = "Enable SSL, Optionally provide configuration file.")
+        String ssl = "";
+
         /**
          * Batch size for processing batched operations.
          */
@@ -431,7 +434,7 @@ public class CSVLoader implements BulkLoaderErrorHandler {
         config.password = cfg.readPasswordIfNeeded(config.user, config.password, "Enter password: ");
 
         // Create connection
-        final ClientConfig c_config = new ClientConfig(config.user, config.password);
+        final ClientConfig c_config = new ClientConfig(config.user, config.password, null, (config.ssl != null && config.ssl.length() > 0), config.ssl);
         c_config.setProcedureCallTimeout(0); // Set procedure all to infinite
         Client csvClient = null;
         try {

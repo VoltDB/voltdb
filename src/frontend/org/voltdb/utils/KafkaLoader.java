@@ -98,7 +98,7 @@ public class KafkaLoader {
         m_config.password = m_config.readPasswordIfNeeded(m_config.user, m_config.password, "Enter password: ");
 
         // Create connection
-        final ClientConfig c_config = new ClientConfig(m_config.user, m_config.password);
+        final ClientConfig c_config = new ClientConfig(m_config.user, m_config.password, null, (m_config.ssl != null && m_config.ssl.length() > 0), m_config.ssl);
         c_config.setProcedureCallTimeout(0); // Set procedure all to infinite
 
         m_client = getClient(c_config, serverlist, m_config.port);
@@ -178,6 +178,9 @@ public class KafkaLoader {
 
         @Option(desc = "Use upsert instead of insert", hasArg = false)
         boolean update = false;
+
+        @Option(desc = "Enable SSL, Optionally provide configuration file.")
+        String ssl = "";
 
         /**
          * Validate command line options.

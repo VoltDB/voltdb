@@ -123,8 +123,11 @@ public class SyncBenchmark {
         @Option(desc = "Number of concurrent threads synchronously calling procedures.")
         int threads = 40;
 
-        @Option(desc = "SSL configuration file.")
-        String ssl = "";
+        @Option(desc = "Enable SSL")
+        boolean ssl = false;
+
+        @Option(desc = "SSL Configuration file")
+        String ssl_config = null;
 
         @Override
         public void validate() {
@@ -161,16 +164,7 @@ public class SyncBenchmark {
     public SyncBenchmark(VoterConfig config) {
         this.config = config;
 
-        ClientConfig clientConfig = new ClientConfig("", "", new StatusListener());
-
-        if (config.ssl != null && !config.ssl.isEmpty()) {
-            try {
-                clientConfig.enableSSL();
-            } catch (Exception e) {
-                System.err.println("Failed to configure ssl, exiting");
-                System.exit(-1);
-            }
-        }
+        ClientConfig clientConfig = new ClientConfig("", "", new StatusListener(), config.ssl, config.ssl_config);
 
         client = ClientFactory.createClient(clientConfig);
 

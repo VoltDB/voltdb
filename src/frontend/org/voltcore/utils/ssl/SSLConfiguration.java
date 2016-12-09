@@ -18,9 +18,16 @@
 package org.voltcore.utils.ssl;
 
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.io.InputStream;
+import java.security.KeyManagementException;
 import java.security.KeyStore;
+import java.security.KeyStoreException;
+import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
+import java.security.UnrecoverableKeyException;
+import java.security.cert.CertificateException;
 
 import javax.net.ssl.KeyManager;
 import javax.net.ssl.KeyManagerFactory;
@@ -60,15 +67,17 @@ public class SSLConfiguration {
     }
 
     public static SSLContext initializeSslContext(SslConfig sslConfig)
-            throws Exception {
+            throws NoSuchAlgorithmException, KeyStoreException, IOException, FileNotFoundException, CertificateException, UnrecoverableKeyException, KeyManagementException {
         SSLContext sslContext = SSLContext.getInstance("TLS");
         KeyManager[] keyManagers = null;
         TrustManager[] trustManagers = null;
-        if (sslConfig.keyStorePath != null && sslConfig.keyStorePassword != null) {
-            keyManagers = createKeyManagers(sslConfig.keyStorePath, sslConfig.keyStorePassword, sslConfig.keyStorePassword);
-        }
-        if (sslConfig.trustStorePath != null && sslConfig.trustStorePath != null) {
-            trustManagers = createTrustManagers(sslConfig.trustStorePath, sslConfig.trustStorePassword);
+        if (sslConfig != null) {
+            if (sslConfig.keyStorePath != null && sslConfig.keyStorePassword != null) {
+                keyManagers = createKeyManagers(sslConfig.keyStorePath, sslConfig.keyStorePassword, sslConfig.keyStorePassword);
+            }
+            if (sslConfig.trustStorePath != null && sslConfig.trustStorePassword != null) {
+                trustManagers = createTrustManagers(sslConfig.trustStorePath, sslConfig.trustStorePassword);
+            }
         }
 
         sslContext.init(keyManagers,trustManagers, new SecureRandom());
@@ -84,15 +93,11 @@ public class SSLConfiguration {
      * @return {@link KeyManager} array that will be used to initiate the {@link SSLContext}.
      * @throws Exception
      */
-    private static KeyManager[] createKeyManagers(String filepath, String keystorePassword, String keyPassword) throws Exception {
+    private static KeyManager[] createKeyManagers(String filepath, String keystorePassword, String keyPassword)
+            throws FileNotFoundException, KeyStoreException, IOException, NoSuchAlgorithmException, CertificateException, UnrecoverableKeyException {
         KeyStore keyStore = KeyStore.getInstance("JKS");
-        InputStream keyStoreIS = new FileInputStream(filepath);
-        try {
+        try (InputStream keyStoreIS = new FileInputStream(filepath)) {
             keyStore.load(keyStoreIS, keystorePassword.toCharArray());
-        } finally {
-            if (keyStoreIS != null) {
-                keyStoreIS.close();
-            }
         }
         KeyManagerFactory kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
         kmf.init(keyStore, keyPassword.toCharArray());
@@ -107,35 +112,16 @@ public class SSLConfiguration {
      * @return {@link TrustManager} array, that will be used to initiate the {@link SSLContext}.
      * @throws Exception
      */
-    private static TrustManager[] createTrustManagers(String filepath, String keystorePassword) throws Exception {
+    private static TrustManager[] createTrustManagers(String filepath, String keystorePassword)
+            throws KeyStoreException, FileNotFoundException,
+            IOException, NoSuchAlgorithmException, CertificateException {
         KeyStore trustStore = KeyStore.getInstance("JKS");
-        InputStream trustStoreIS = new FileInputStream(filepath);
-        try {
+        try (InputStream trustStoreIS = new FileInputStream(filepath)) {
             trustStore.load(trustStoreIS, keystorePassword.toCharArray());
-        } finally {
-            if (trustStoreIS != null) {
-                trustStoreIS.close();
-            }
         }
         TrustManagerFactory trustFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
         trustFactory.init(trustStore);
         return trustFactory.getTrustManagers();
-    }
-
-    public static String parseValue(String property, String key) {
-        // strip off the key
-        String restOfProperty = property.substring(key.length());
-        restOfProperty.trim();
-        if (! restOfProperty.startsWith("=")) {
-            throw new IllegalArgumentException("Badly formed property in ssl config file, expecting '=' " + property);
-        }
-        // strip off the equals sign
-        String value = restOfProperty.substring(1);
-        value.trim();
-        if (value.isEmpty()) {
-            throw new IllegalArgumentException("No value specified for property in ssl config file " + property);
-        }
-        return value;
     }
 
     public static class SslConfig {
@@ -151,25 +137,5 @@ public class SSLConfiguration {
             this.trustStorePassword = trustStorePassword;
         }
 
-        public boolean isValid() {
-            // verify that either all the properties are null or all are set
-            if (keyStorePath == null && keyStorePassword == null && trustStorePath == null && trustStorePassword == null) {
-                // none of the properties are set, this is a valid config.
-                return true;
-            } else {
-                if (isConfigured()) {
-                    // all of the properties are set, this is a valid config.
-                    return true;
-                } else {
-                    // not valid
-                    return false;
-                }
-            }
-        }
-
-        public boolean isConfigured() {
-            return (keyStorePath != null && keyStorePassword != null && trustStorePath != null && trustStorePassword != null) ||
-                   (keyStorePath == null && keyStorePassword == null && trustStorePath != null && trustStorePassword != null);
-        }
     }
 }

@@ -137,7 +137,7 @@ public class AsyncBenchmark {
         @Option(desc = "Password for connection.")
         String password = "";
 
-        @Option(desc = "SSL configuration file.")
+        @Option(desc = "Enable SSL, Optionally provide configuration file.")
         String ssl = "";
 
         @Option(desc = "Enable topology awareness")
@@ -177,23 +177,8 @@ public class AsyncBenchmark {
     public AsyncBenchmark(VoterConfig config) {
         this.config = config;
 
-        // following arranglement works around problem with empty sslfile
-        // when not using SSL.
-        //
-        // when that's fixed, we can go back.
-        ClientConfig clientConfig = null;
-
-        if (config.ssl != null && !config.ssl.isEmpty()) {
-            try {
-                clientConfig = new ClientConfig(config.user, config.password, new StatusListener(), config.ssl);
-                clientConfig.enableSSL();
-            } catch (Exception e) {
-                System.err.println("Failed to configure ssl, exiting");
-                System.exit(-1);
-            }
-        } else {
-            clientConfig = new ClientConfig(config.user, config.password, new StatusListener());
-        }
+        ClientConfig clientConfig = new ClientConfig(config.user, config.password, new StatusListener(),
+                (config.ssl != null && config.ssl.length() > 0), config.ssl);
         clientConfig.setMaxTransactionsPerSecond(config.ratelimit);
 
         if (config.topologyaware) {
