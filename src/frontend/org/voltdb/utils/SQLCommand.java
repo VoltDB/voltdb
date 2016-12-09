@@ -53,7 +53,6 @@ import jline.console.KeyMap;
 import jline.console.history.FileHistory;
 
 import org.voltdb.CLIConfig;
-import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.BatchTimeoutOverrideType;
@@ -1029,6 +1028,7 @@ public class SQLCommand
         + "              [--user=user]\n"
         + "              [--password=password]\n"
         + "              [--kerberos=jaas_login_configuration_entry_key]\n"
+        + "              [--ssl or --ssl=ssl-configuration-file]\n"
         + "              [--query=query]\n"
         + "              [--output-format=(fixed|csv|tab)]\n"
         + "              [--output-skip-metadata]\n"
@@ -1268,6 +1268,7 @@ public class SQLCommand
         List<String> queries = null;
         String ddlFile = "";
         String sslConfigFile = null;
+        boolean enableSSL = false;
 
         // Parse out parameters
         for (int i = 0; i < args.length; i++) {
@@ -1345,10 +1346,13 @@ public class SQLCommand
             else if (arg.equals("--output-skip-metadata")) {
                 m_outputShowMetadata = false;
             }
-
-            // arg to enable ssl from a properties file
-            else if (arg.startsWith("--ssl")) {
+            else if (arg.startsWith("--ssl=")) {
+                enableSSL = true;
                 sslConfigFile = extractArgInput(arg);
+            }
+            else if (arg.startsWith("--ssl")) {
+                enableSSL = true;
+                sslConfigFile = null;
             }
             else if (arg.equals("--debug")) {
                 m_debug = true;
@@ -1388,16 +1392,8 @@ public class SQLCommand
         }
 
         // Create connection
-        ClientConfig config = new ClientConfig(user, password, sslConfigFile);
+        ClientConfig config = new ClientConfig(user, password, null, enableSSL, sslConfigFile);
         config.setProcedureCallTimeout(0);  // Set procedure all to infinite timeout, see ENG-2670
-        if (sslConfigFile != null) {
-            try {
-                config.enableSSL();
-            } catch (Exception e) {
-                VoltDB.crashLocalVoltDB("Failed to enable SSL on Client: " + e.getMessage(), false, null);
-                return;
-            }
-        }
         try {
             // if specified enable kerberos
             if (!kerberos.isEmpty()) {

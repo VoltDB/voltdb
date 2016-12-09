@@ -136,7 +136,7 @@ public class TestSSL extends TestCase {
     }
 
     private void checkAdminAndClient(int adminPort, int clientPort, String sslPropsFile) throws Exception {
-        ClientConfig clientConfig = new ClientConfig("", "", getResourcePath(sslPropsFile));
+        ClientConfig clientConfig = new ClientConfig("", "", null, true, getResourcePath(sslPropsFile));
         clientConfig.enableSSL();
 
         m_admin = ClientFactory.createClient(clientConfig);
@@ -212,7 +212,7 @@ public class TestSSL extends TestCase {
 
         m_cluster.startUp();
 
-        ClientConfig clientConfig = new ClientConfig("", "", getResourcePath(SSL_PROPS_FILE));
+        ClientConfig clientConfig = new ClientConfig("", "", null, true, getResourcePath(SSL_PROPS_FILE));
         clientConfig.enableSSL();
 
         ClientResponse response;

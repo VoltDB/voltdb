@@ -17,15 +17,20 @@
 
 package org.voltdb.client;
 
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.InputStreamReader;
+import java.io.IOException;
 import java.math.RoundingMode;
+import java.security.KeyManagementException;
+import java.security.KeyStoreException;
+import java.security.NoSuchAlgorithmException;
 import java.security.Principal;
+import java.security.UnrecoverableKeyException;
+import java.security.cert.CertificateException;
 import java.util.Iterator;
+import java.util.Properties;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 import javax.net.ssl.SSLContext;
 import javax.security.auth.Subject;
@@ -33,6 +38,7 @@ import javax.security.auth.login.LoginContext;
 import javax.security.auth.login.LoginException;
 
 import org.voltcore.utils.ssl.SSLConfiguration;
+import org.voltcore.utils.ssl.SSLConfiguration.SslConfig;
 import org.voltdb.types.VoltDecimalHelper;
 
 /**
@@ -44,10 +50,7 @@ public class ClientConfig {
     static final long DEFAULT_CONNECTION_TIMOUT_MS = 2 * 60 * 1000; // default timeout is 2 minutes;
     static final long DEFAULT_INITIAL_CONNECTION_RETRY_INTERVAL_MS = 1000; // default initial connection retry interval is 1 second
     static final long DEFAULT_MAX_CONNECTION_RETRY_INTERVAL_MS = 8000; // default max connection retry interval is 8 seconds
-    private static final String DEFAULT_SSL_PROPS_FILE = "ssl-config";
 
-    private boolean isEnableSSL = Boolean.valueOf(System.getenv("ENABLE_SSL") == null ? "false" : System.getenv("ENABLE_SSL"));
-    private String m_sslPropsFile;
     final ClientAuthScheme m_hashScheme;
     final String m_username;
     final String m_password;
@@ -66,8 +69,15 @@ public class ClientConfig {
     long m_initialConnectionRetryIntervalMS = DEFAULT_INITIAL_CONNECTION_RETRY_INTERVAL_MS;
     long m_maxConnectionRetryIntervalMS = DEFAULT_MAX_CONNECTION_RETRY_INTERVAL_MS;
     boolean m_sendReadsToReplicasBytDefaultIfCAEnabled = false;
-    SSLContext m_sslContext;
+    final AtomicReference<SSLContext> m_sslContextRef = new AtomicReference<>();
+    final SslConfig m_sslConfig;
     boolean m_topologyChangeAware = false;
+    boolean m_enableSSL = false;
+    String m_sslPropsFile = null;
+
+    //For unit testing.
+    private static final boolean ENABLE_SSL_FOR_TEST = Boolean.valueOf(System.getenv("ENABLE_SSL") == null ? "false" : System.getenv("ENABLE_SSL"));
+    private static final String DEFAULT_SSL_PROPS_FILE = "ssl-config";
 
     final static String getUserNameFromSubject(Subject subject) {
         if (subject == null || subject.getPrincipals() == null || subject.getPrincipals().isEmpty()) {
@@ -96,12 +106,7 @@ public class ClientConfig {
         m_listener = null;
         m_cleartext = true;
         m_hashScheme = ClientAuthScheme.HASH_SHA256;
-        try {
-            enableSSL();
-        } catch (Exception exc) {
-            System.err.println(exc.getMessage());
-            System.exit(-1);
-        }
+        m_sslConfig = null;
     }
 
 
@@ -113,7 +118,7 @@ public class ClientConfig {
      * @param password Cleartext password.
      */
     public ClientConfig(String username, String password) {
-        this(username, password, true, (ClientStatusListenerExt) null, ClientAuthScheme.HASH_SHA256, null);
+        this(username, password, true, (ClientStatusListenerExt) null, ClientAuthScheme.HASH_SHA256, false, null);
     }
 
     /**
@@ -122,10 +127,10 @@ public class ClientConfig {
      *
      * @param username Cleartext username.
      * @param password Cleartext password.
-     * @param sslPropsFile Properties file for ssl configuration.
+     * @param enableSSL enable SSL connection to server
      */
-    public ClientConfig(String username, String password, String sslPropsFile) {
-        this(username, password, true, (ClientStatusListenerExt) null, ClientAuthScheme.HASH_SHA256, sslPropsFile);
+    public ClientConfig(String username, String password, boolean enableSSL) {
+        this(username, password, true, (ClientStatusListenerExt) null, ClientAuthScheme.HASH_SHA256, enableSSL, null);
     }
 
     /**
@@ -141,7 +146,7 @@ public class ClientConfig {
      */
     @Deprecated
     public ClientConfig(String username, String password, ClientStatusListener listener, ClientAuthScheme scheme) {
-        this(username, password, true, new ClientStatusListenerWrapper(listener), scheme, null);
+        this(username, password, true, new ClientStatusListenerWrapper(listener), scheme, false, null);
     }
 
     /**
@@ -153,7 +158,7 @@ public class ClientConfig {
      * @param listener {@link ClientStatusListenerExt} implementation to receive callbacks.
      */
     public ClientConfig(String username, String password, ClientStatusListenerExt listener) {
-        this(username,password,true,listener, ClientAuthScheme.HASH_SHA256, null);
+        this(username,password,true,listener, ClientAuthScheme.HASH_SHA256, false, null);
     }
 
     /**
@@ -163,10 +168,24 @@ public class ClientConfig {
      * @param username Cleartext username.
      * @param password Cleartext password.
      * @param listener {@link ClientStatusListenerExt} implementation to receive callbacks.
-     * @param sslPropsFile Properties file for ssl configuration.
+     * @param enableSSL enable SSL connection to server
      */
-    public ClientConfig(String username, String password, ClientStatusListenerExt listener, String sslPropsFile) {
-        this(username,password,true,listener, ClientAuthScheme.HASH_SHA256, sslPropsFile);
+    public ClientConfig(String username, String password, ClientStatusListenerExt listener, boolean enableSSL) {
+        this(username,password,true,listener, ClientAuthScheme.HASH_SHA256, enableSSL, null);
+    }
+
+    /**
+     * <p>Configuration for a client that specifies authentication credentials. The username and
+     * password can be null or the empty string. Also specifies a status listener.</p>
+     *
+     * @param username Cleartext username.
+     * @param password Cleartext password.
+     * @param listener {@link ClientStatusListenerExt} implementation to receive callbacks.
+     * @param enableSSL enable SSL connection to server
+     * @param sslPropsFile SSL Properties file
+     */
+    public ClientConfig(String username, String password, ClientStatusListenerExt listener, boolean enableSSL, String sslPropsFile) {
+        this(username,password,true,listener, ClientAuthScheme.HASH_SHA256, enableSSL, sslPropsFile);
     }
 
     /**
@@ -179,7 +198,7 @@ public class ClientConfig {
      * @param scheme Client password hash scheme
      */
     public ClientConfig(String username, String password, ClientStatusListenerExt listener, ClientAuthScheme scheme) {
-        this(username,password,true,listener, scheme, null);
+        this(username,password,true,listener, scheme, false, null);
     }
 
     /**
@@ -192,7 +211,7 @@ public class ClientConfig {
      * @param cleartext Whether the password is hashed.
      */
     public ClientConfig(String username, String password, boolean cleartext, ClientStatusListenerExt listener) {
-        this(username, password, cleartext, listener, ClientAuthScheme.HASH_SHA256, null);
+        this(username, password, cleartext, listener, ClientAuthScheme.HASH_SHA256, false, null);
     }
 
     /**
@@ -203,9 +222,10 @@ public class ClientConfig {
      * @param listener {@link ClientStatusListenerExt} implementation to receive callbacks.
      */
     public ClientConfig(Subject subject, ClientStatusListenerExt listener) {
-        this(getUserNameFromSubject(subject), "", true, listener, ClientAuthScheme.HASH_SHA256, null);
+        this(getUserNameFromSubject(subject), "", true, listener, ClientAuthScheme.HASH_SHA256, false, null);
         m_subject = subject;
     }
+
     /**
      * <p>Configuration for a client that specifies authentication credentials. The username and
      * password can be null or the empty string. Also specifies a status listener.</p>
@@ -216,7 +236,38 @@ public class ClientConfig {
      * @param cleartext Whether the password is hashed.
      * @param scheme Client password hash scheme
      */
-    public ClientConfig(String username, String password, boolean cleartext, ClientStatusListenerExt listener, ClientAuthScheme scheme, String sslPropsFile) {
+    public ClientConfig(String username, String password, boolean cleartext, ClientStatusListenerExt listener, ClientAuthScheme scheme) {
+        this(username, password, true, listener, ClientAuthScheme.HASH_SHA256, false, null);
+    }
+
+    /**
+     * <p>Configuration for a client that specifies authentication credentials. The username and
+     * password can be null or the empty string. Also specifies a status listener.</p>
+     *
+     * @param username Cleartext username.
+     * @param password A cleartext or hashed passowrd.
+     * @param listener {@link ClientStatusListenerExt} implementation to receive callbacks.
+     * @param cleartext Whether the password is hashed.
+     * @param scheme Client password hash scheme
+     * @param enableSSL enable SSL connection to server
+     */
+    public ClientConfig(String username, String password, boolean cleartext, ClientStatusListenerExt listener, ClientAuthScheme scheme, boolean enableSSL) {
+        this(username, password, true, listener, ClientAuthScheme.HASH_SHA256, enableSSL, null);
+    }
+
+    /**
+     * <p>Configuration for a client that specifies authentication credentials. The username and
+     * password can be null or the empty string. Also specifies a status listener.</p>
+     *
+     * @param username Cleartext username.
+     * @param password A cleartext or hashed passowrd.
+     * @param listener {@link ClientStatusListenerExt} implementation to receive callbacks.
+     * @param cleartext Whether the password is hashed.
+     * @param scheme Client password hash scheme
+     * @param enableSSL enable SSL connection to server
+     * @param sslPropsFile ssl configuration properties file.
+     */
+    public ClientConfig(String username, String password, boolean cleartext, ClientStatusListenerExt listener, ClientAuthScheme scheme, boolean enableSSL, String sslPropsFile) {
         if (username == null) {
             m_username = "";
         } else {
@@ -231,11 +282,34 @@ public class ClientConfig {
         m_cleartext = cleartext;
         m_hashScheme = scheme;
         m_sslPropsFile = sslPropsFile;
-        try {
-            enableSSL();
-        } catch (Exception exc) {
-            System.err.println(exc.getMessage());
-            System.exit(-1);
+        m_enableSSL = enableSSL;
+        if (m_sslPropsFile != null && m_sslPropsFile.trim().length() > 0) m_enableSSL = true;
+        //For testing
+        if (ENABLE_SSL_FOR_TEST) {
+            m_enableSSL = true;
+            m_sslPropsFile = this.getClass().getResource(DEFAULT_SSL_PROPS_FILE).getFile();
+        }
+        if (m_enableSSL) {
+            if (m_enableSSL && (m_sslPropsFile == null || m_sslPropsFile.trim().length() == 0) ) {
+                m_sslConfig = new SSLConfiguration.SslConfig(null, null, null, null);
+                SSLConfiguration.applySystemProperties(m_sslConfig);
+            } else {
+                File configFile = new File(m_sslPropsFile);
+                Properties sslProperties = new Properties();
+                try ( FileInputStream configFis = new FileInputStream(configFile) ) {
+                    sslProperties.load(configFis);
+                    m_sslConfig = new SSLConfiguration.SslConfig(
+                            sslProperties.getProperty(SSLConfiguration.KEYSTORE_CONFIG_PROP),
+                            sslProperties.getProperty(SSLConfiguration.KEYSTORE_PASSWORD_CONFIG_PROP),
+                            sslProperties.getProperty(SSLConfiguration.TRUSTSTORE_CONFIG_PROP),
+                            sslProperties.getProperty(SSLConfiguration.TRUSTSTORE_PASSWORD_CONFIG_PROP));
+                    SSLConfiguration.applySystemProperties(m_sslConfig);
+                } catch (IOException ioe) {
+                    throw new IllegalArgumentException("Unable to access SSL configuration.", ioe);
+                }
+            }
+        } else {
+           m_sslConfig = null;
         }
     }
 
@@ -461,9 +535,7 @@ public class ClientConfig {
            LoginContext lc = new LoginContext(loginContextEntryKey);
            lc.login();
            m_subject = lc.getSubject();
-       } catch (SecurityException ex) {
-           throw new IllegalArgumentException("Cannot determine client consumer's credentials", ex);
-       } catch (LoginException ex) {
+       } catch (SecurityException | LoginException ex) {
            throw new IllegalArgumentException("Cannot determine client consumer's credentials", ex);
        }
     }
@@ -480,64 +552,20 @@ public class ClientConfig {
     }
 
     /**
-     * Configure ssl from the provided properties file.
+     * Configure ssl from the provided properties file. if file is not provided we configure without keystore and truststore manager.
      */
-    public void enableSSL() throws Exception {
-        if (isEnableSSL && m_sslPropsFile == null) {
-            m_sslPropsFile = this.getClass().getResource(DEFAULT_SSL_PROPS_FILE).getFile();
-        }
-        if (m_sslPropsFile == null || m_sslPropsFile.isEmpty()) {
-            m_sslContext = null;
-            return;
-        }
-        File configFile = new File(m_sslPropsFile);
-        InputStreamReader configIsr;
-        try {
-            FileInputStream configFis = new FileInputStream(configFile);
-            configIsr = new InputStreamReader(configFis);
-        } catch (FileNotFoundException e) {
-            throw new IllegalArgumentException("Can't read ssl config file " + m_sslPropsFile, e);
-        }
-
-        String keyStorePath = null;
-        String keyStorePassword = null;
-        String trustStorePath = null;
-        String trustStorePassword = null;
-        try (BufferedReader br = new BufferedReader(configIsr)) {
-            String configLine;
-            while ((configLine = br.readLine()) != null) {
-                configLine.trim();
-                // look for the password lines first as the password lines
-                // also match the path lines.
-                if (configLine.startsWith(SSLConfiguration.KEYSTORE_PASSWORD_CONFIG_PROP)) {
-                    keyStorePassword = SSLConfiguration.parseValue(configLine, SSLConfiguration.KEYSTORE_PASSWORD_CONFIG_PROP);
-                } else if (configLine.startsWith(SSLConfiguration.KEYSTORE_CONFIG_PROP)) {
-                    keyStorePath = SSLConfiguration.parseValue(configLine, SSLConfiguration.KEYSTORE_CONFIG_PROP);
-                } else if (configLine.startsWith(SSLConfiguration.TRUSTSTORE_PASSWORD_CONFIG_PROP)) {
-                    trustStorePassword = SSLConfiguration.parseValue(configLine, SSLConfiguration.TRUSTSTORE_PASSWORD_CONFIG_PROP);
-                } else if (configLine.startsWith(SSLConfiguration.TRUSTSTORE_CONFIG_PROP)) {
-                    trustStorePath = SSLConfiguration.parseValue(configLine, SSLConfiguration.TRUSTSTORE_CONFIG_PROP);
-                } else {
-                    throw new IllegalArgumentException("Unexpected entry in ssl config file " + configLine);
-                }
+    public void enableSSL() {
+        if (!m_enableSSL || m_sslContextRef.get() != null) return;
+        synchronized (m_sslContextRef) {
+            try {
+                m_sslContextRef.set(SSLConfiguration.initializeSslContext(m_sslConfig));
+            } catch (IOException | NoSuchAlgorithmException | KeyStoreException | CertificateException | UnrecoverableKeyException | KeyManagementException ex) {
+                throw new IllegalArgumentException("Failed to initialize SSL from config file: " + m_sslPropsFile, ex);
             }
-        }
-
-        SSLConfiguration.SslConfig sslConfig = new SSLConfiguration.SslConfig(keyStorePath, keyStorePassword, trustStorePath, trustStorePassword);
-        SSLConfiguration.applySystemProperties(sslConfig);
-        if (!sslConfig.isValid()) {
-            throw new IllegalArgumentException("Some ssl configuration is missing.  keyStore, keyStorePassword, " +
-                    "trustStore and trustStorePassword need to be specified");
-        }
-
-        if (sslConfig.isConfigured()) {
-            m_sslContext = SSLConfiguration.initializeSslContext(sslConfig);
-        } else {
-            m_sslContext = null;
         }
     }
 
     public SSLContext getSslContext() {
-        return m_sslContext;
+        return m_sslContextRef.get();
     }
 }
