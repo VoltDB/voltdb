@@ -459,7 +459,7 @@ public class SystemInformation extends VoltSystemProcedure
         try {
             byte[]  bytes = VoltDB.instance().getHostMessenger().getZK().getData(CoreZK.hosts_host + hostId, false, new Stat());
             String hostInfo = new String(bytes, StandardCharsets.UTF_8);
-            JSONObject obj  = new JSONObject(hostInfo);
+            JSONObject obj = new JSONObject(hostInfo);
             vt.addRow(hostId, "PLACEMENTGROUP",obj.getString("group"));
         } catch (KeeperException | InterruptedException | JSONException e) {
             vt.addRow(hostId, "PLACEMENTGROUP","NULL");
