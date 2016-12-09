@@ -461,7 +461,8 @@ public class SystemInformation extends VoltSystemProcedure
             final JSONObject obj = new JSONObject(hostInfo);
             vt.addRow(hostId, "PLACEMENTGROUP",obj.getString("group"));
             Set<Integer> buddies = VoltDB.instance().getCartograhper().getHostIdsWithinPartitionGroup(hostId);
-            vt.addRow(hostId, "PARTITIONGROUP",buddies.toString());
+            String[] strIds = buddies.stream().map(i -> String.valueOf(i)).toArray(String[]::new);
+            vt.addRow(hostId, "PARTITIONGROUP",String.join(",", strIds));
         } catch (Exception e) {
             org.voltdb.VoltDB.crashLocalVoltDB("Error getting host info", false, e);
         }
