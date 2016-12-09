@@ -860,13 +860,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             validateStartAction();
 
             readDeploymentAndCreateStarterCatalogContext(config);
-            final int numberOfNodes = m_messenger.getLiveHostIds().size();
             if (config.m_isEnterprise && m_config.m_startAction.doesRequireEmptyDirectories()
                     && !config.m_forceVoltdbCreate) {
                     managedPathsEmptyCheck(config);
             }
 
-            Map<Integer, String> hostGroups = m_messenger.waitForGroupJoin(numberOfNodes);
             if (m_messenger.isPaused() || m_config.m_isPaused) {
                 setStartMode(OperationMode.PAUSED);
             }
@@ -947,11 +945,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
              * Ning: topology may not reflect the true partitions in the cluster during join. So if another node
              * is trying to rejoin, it should rely on the cartographer's view to pick the partitions to replace.
              */
-            AbstractTopology topo = getTopology(config.m_startAction, hostGroups, m_joinCoordinator);
+            AbstractTopology topo = getTopology(config.m_startAction, m_joinCoordinator);
             m_partitionsToSitesAtStartupForExportInit = new ArrayList<>();
             try {
                 // IV2 mailbox stuff
-                m_configuredReplicationFactor = m_catalogContext.getDeployment().getCluster().getKfactor();
+                m_configuredReplicationFactor = topo.getReplicationFactor();
                 m_cartographer = new Cartographer(m_messenger, m_configuredReplicationFactor,
                         m_catalogContext.cluster.getNetworkpartition());
                 m_partitionZeroLeader = new Supplier<Boolean>() {
@@ -1652,34 +1650,34 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     // Get topology information.  If rejoining, get it directly from
     // ZK.  Otherwise, try to do the write/read race to ZK on startup.
-    private AbstractTopology getTopology(StartAction startAction, Map<Integer, String> hostGroups,
-                                   JoinCoordinator joinCoordinator)
+    private AbstractTopology getTopology(StartAction startAction, JoinCoordinator joinCoordinator)
     {
         AbstractTopology topology = null;
-        Map<Integer, Integer> sitesPerHostMap = m_messenger.getSitesPerHostMapFromZK();
-        if (startAction == StartAction.JOIN) {
-            assert(joinCoordinator != null);
-            JSONObject topoJson = joinCoordinator.getTopology();
-            try {
+        try {
+            Map<Integer, String> hostGroups = m_messenger.getHostGroupsFromZK();
+            if (startAction == StartAction.JOIN) {
+                assert(joinCoordinator != null);
+                JSONObject topoJson = joinCoordinator.getTopology();
                 topology = AbstractTopology.topologyFromJSON(topoJson);
-            } catch (JSONException e) {
-                VoltDB.crashLocalVoltDB("Unable to get topology from Json object", true, e);
+            } else if (startAction.doesRejoin()) {
+                topology = TopologyZKUtils.readTopologyFromZK(m_messenger.getZK());
+            } else {
+                // initial start or recover
+                int hostcount = m_clusterSettings.get().hostcount();
+                Preconditions.checkArgument(hostGroups.size() == hostcount);
+                int kfactor = m_catalogContext.getDeployment().getCluster().getKfactor();
+                Map<Integer, Integer> sitesPerHostMap = m_messenger.getSitesPerHostMapFromZK();
+                String errMsg = AbstractTopology.validateLegacyClusterConfig(hostcount, sitesPerHostMap, kfactor);
+                if (errMsg != null) {
+                    VoltDB.crashLocalVoltDB(errMsg, false, null);
+                }
+                topology = AbstractTopology.getTopology(sitesPerHostMap, hostGroups, kfactor);
+                TopologyZKUtils.registerTopologyToZK(m_messenger.getZK(), topology);
             }
-        } else if (startAction.doesRejoin()) {
-            topology = TopologyZKUtils.readTopologyFromZK(m_messenger.getZK());
-        } else {
-            // initial start or recover
-            final Set<Integer> liveHostIds = m_messenger.getLiveHostIds();
-            Preconditions.checkArgument(hostGroups.keySet().equals(liveHostIds));
-            int hostcount = liveHostIds.size();
-            int kfactor = m_catalogContext.getDeployment().getCluster().getKfactor();
-            String errMsg = AbstractTopology.validateLegacyClusterConfig(hostcount, sitesPerHostMap, kfactor);
-            if (errMsg != null) {
-                VoltDB.crashLocalVoltDB(errMsg, false, null);
-            }
-            topology = AbstractTopology.getTopology(sitesPerHostMap, hostGroups, kfactor);
-            TopologyZKUtils.registerTopologyToZK(m_messenger.getZK(), topology);
+        } catch (KeeperException | InterruptedException | JSONException e) {
+            VoltDB.crashLocalVoltDB("Unable to get topology from Json object", true, e);
         }
+
         return topology;
     }
 

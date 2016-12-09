@@ -25,6 +25,8 @@ import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.UUID;
 
+import org.apache.zookeeper_voltpatches.KeeperException;
+import org.json_voltpatches.JSONException;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogMap;
@@ -315,26 +317,39 @@ public class CatalogContext {
         // topology
         Deployment deployment = cluster.getDeployment().iterator().next();
         int hostCount = m_dbSettings.getCluster().hostcount();
-        Map<Integer, Integer> sphMap = VoltDB.instance().getHostMessenger().getSitesPerHostMapFromZK();
-        int totalSitesCount = 0;
-        for (Map.Entry<Integer, Integer> e : sphMap.entrySet()) {
-            totalSitesCount += e.getValue();
+        Map<Integer, Integer> sphMap;
+        try {
+            sphMap = VoltDB.instance().getHostMessenger().getSitesPerHostMapFromZK();
+        } catch (KeeperException | InterruptedException | JSONException e) {
+            hostLog.warn("Failed to get sitesperhost information from Zookeeper", e);
+            sphMap = null;
         }
-        int localSitesCount = sphMap.get(VoltDB.instance().getHostMessenger().getHostId());
-        int kFactor = deployment.getKfactor();
-        logLines.put("deployment1",
-                String.format("Cluster has %d hosts with leader hostname: \"%s\". %d local sites count. K = %d.",
-                hostCount, VoltDB.instance().getConfig().m_leader, localSitesCount, kFactor));
+        if (sphMap != null) {
+            int localSitesCount = sphMap.get(VoltDB.instance().getHostMessenger().getHostId());
+            int kFactor = deployment.getKfactor();
+            logLines.put("deployment1",
+                    String.format("Cluster has %d hosts with leader hostname: \"%s\". %d local sites count. K = %d.",
+                    hostCount, VoltDB.instance().getConfig().m_leader, localSitesCount, kFactor));
 
-        int replicas = kFactor + 1;
-        int partitionCount = totalSitesCount / replicas;
-        logLines.put("deployment2",
-                String.format("The entire cluster has %d %s of%s %d logical partition%s.",
-                replicas,
-                replicas > 1 ? "copies" : "copy",
-                partitionCount > 1 ? " each of the" : "",
-                partitionCount,
-                partitionCount > 1 ? "s" : ""));
+            int totalSitesCount = 0;
+            for (Map.Entry<Integer, Integer> e : sphMap.entrySet()) {
+                totalSitesCount += e.getValue();
+            }
+            int replicas = kFactor + 1;
+            int partitionCount = totalSitesCount / replicas;
+            logLines.put("deployment2",
+                    String.format("The entire cluster has %d %s of%s %d logical partition%s.",
+                    replicas,
+                    replicas > 1 ? "copies" : "copy",
+                    partitionCount > 1 ? " each of the" : "",
+                    partitionCount,
+                    partitionCount > 1 ? "s" : ""));
+        } else {
+            logLines.put("deployment1",
+                    String.format("Cluster has %d hosts with leader hostname: \"%s\". [unknown] local sites count. K = [unknown].",
+                    hostCount, VoltDB.instance().getConfig().m_leader));
+            logLines.put("deployment2", "Unable to retrieve partition information from the cluster.");
+        }
 
         // voltdb root
         logLines.put("voltdbroot", "Using \"" + VoltDB.instance().getVoltDBRootPath() + "\" for voltdbroot directory.");

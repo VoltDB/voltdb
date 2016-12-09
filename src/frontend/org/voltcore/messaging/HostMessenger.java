@@ -21,6 +21,7 @@ import static com.google_voltpatches.common.base.Preconditions.checkArgument;
 import static com.google_voltpatches.common.base.Predicates.equalTo;
 import static com.google_voltpatches.common.base.Predicates.not;
 
+import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.SocketException;
 import java.nio.ByteBuffer;
@@ -47,6 +48,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.zookeeper_voltpatches.CreateMode;
+import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.data.Stat;
@@ -68,7 +70,6 @@ import org.voltcore.utils.PortGenerator;
 import org.voltcore.utils.ShutdownHooks;
 import org.voltcore.zk.CoreZK;
 import org.voltcore.zk.ZKUtil;
-import org.voltdb.VoltDB;
 import org.voltdb.probe.MeshProber;
 
 import com.google_voltpatches.common.base.Preconditions;
@@ -782,6 +783,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         };
     }
 
+
     /*
      * Convenience method for doing the verbose COW remove from the map
      */
@@ -791,14 +793,16 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             m_foreignHosts = ImmutableMultimap.<Integer, ForeignHost>builder()
                     .putAll(Multimaps.filterKeys(m_foreignHosts, not(equalTo(hostId))))
                     .build();
-            Predicate<Long> predicates = new Predicate<Long>() {
+
+            Predicate<Long> hostIdNotEqual = new Predicate<Long>() {
                 @Override
                 public boolean apply(Long intput) {
                     return CoreUtils.getHostIdFromHSId(intput) != hostId;
                 }
             };
+
             m_fhMapping = ImmutableMap.<Long, ForeignHost>builder()
-                    .putAll(Maps.filterKeys(m_fhMapping, predicates))
+                    .putAll(Maps.filterKeys(m_fhMapping, hostIdNotEqual))
                     .build();
         }
         for (ForeignHost fh : fhs) {
@@ -1131,32 +1135,26 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         return hostGroups;
     }
 
-    public Map<Integer, String> getHostGroupsFromZK() {
+    public Map<Integer, String> getHostGroupsFromZK()
+            throws KeeperException, InterruptedException, JSONException {
         Map<Integer, String> hostGroups = Maps.newHashMap();
-        try {
             List<String> children = m_zk.getChildren(CoreZK.hosts, false);
             for (String child : children) {
                 byte[] payload = m_zk.getData( ZKUtil.joinZKPath(CoreZK.hosts, child), false, new Stat());
                 final HostInfo info = HostInfo.fromBytes(payload);
                 hostGroups.put(parseHostId(child), info.m_group);
             }
-        } catch (Exception e) {
-            VoltDB.crashGlobalVoltDB("Unable to get placement groups from Zookeeper", false, e);
-        }
         return hostGroups;
     }
 
-    public Map<Integer, Integer> getSitesPerHostMapFromZK() {
+    public Map<Integer, Integer> getSitesPerHostMapFromZK()
+            throws KeeperException, InterruptedException, JSONException {
         Map<Integer, Integer> sphMap = new HashMap<>();
-        try {
-            List<String> children = m_zk.getChildren(CoreZK.hosts, false);
-            for (String child : children) {
-                byte[] payload = m_zk.getData( ZKUtil.joinZKPath(CoreZK.hosts, child), false, new Stat());
-                final HostInfo info = HostInfo.fromBytes(payload);
-                sphMap.put(parseHostId(child), info.m_localSitesCount);
-            }
-        } catch (Exception e) {
-            VoltDB.crashGlobalVoltDB("Unable to get sitesperhost from Zookeeper", false, e);
+        List<String> children = m_zk.getChildren(CoreZK.hosts, false);
+        for (String child : children) {
+            byte[] payload = m_zk.getData( ZKUtil.joinZKPath(CoreZK.hosts, child), false, new Stat());
+            final HostInfo info = HostInfo.fromBytes(payload);
+            sphMap.put(parseHostId(child), info.m_localSitesCount);
         }
         return sphMap;
     }
@@ -1661,7 +1659,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                                 fh.m_listeningAddress, new PicoNetwork(socket));
                         putForeignHost(hostId, fhost);
                         fhost.enableRead(VERBOTEN_THREADS);
-                    } catch (Exception e) {
+                    } catch (IOException | JSONException e) {
                         m_hostLog.error("Failed to connect to peer nodes.", e);
                         throw new RuntimeException("Failed to establish socket connection with " +
                                 fh.m_listeningAddress.getAddress().getHostAddress(), e);
