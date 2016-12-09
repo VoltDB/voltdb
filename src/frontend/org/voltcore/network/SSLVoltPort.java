@@ -83,47 +83,37 @@ public class SSLVoltPort extends VoltPort {
 
     @Override
     public void run() throws IOException {
+
+        if (m_isShuttingDown) {
+            System.err.println("shutting down");
+            unregistered();
+            return;
+        }
+
         int nRead = 0;
         try {
-            if (!processingReads && !processingWrites) {
-                disableWriteSelection();
-                final int maxRead = m_handler.getMaxRead();
-                nRead = fillReadStream(maxRead);
-                if (nRead > 0) {
-                    queueDecryptionTasks();
+            final int maxRead = m_handler.getMaxRead();
+            nRead = fillReadStream(maxRead);
+            if (nRead > 0) {
+                int queued = queueDecryptionTasks();
+                if (queued > 0) {
                     processingReads = true;
-                } else {
-                    enableWriteSelection();
                 }
             }
 
-            if (processingReads) {
-                if (!isReadStreamProcessed()) {
-                    m_network.nudgeChannel(this);
-                    return;
-                } else {
-                    processingReads = false;
-                    enableWriteSelection();
-                }
+            boolean responsesReceived = buildEncryptionTasks();
+            if (responsesReceived) {
+                processingWrites = true;
             }
 
-            if (!processingReads && !processingWrites) {
-                boolean responsesReceived = buildEncryptionTasks();
-                if (responsesReceived) {
-                    processingWrites = true;
-                }
-            }
-
-            if (processingWrites && !isWriteStreamProcessed()) {
+            if (processingReads && isReadStreamProcessed()) {
+                processingReads = false;
                 m_network.nudgeChannel(this);
-                return;
-            } else {
-                processingWrites = false;
             }
-
-            if (m_isShuttingDown) {
-                unregistered();
-                return;
+            if (processingWrites && isWriteStreamProcessed()) {
+                processingWrites = false;
+                disableWriteSelection();
+                m_network.nudgeChannel(this);
             }
         } catch (IOException ioe) {
             while (!gatewaysEmpty()) {
@@ -150,11 +140,11 @@ public class SSLVoltPort extends VoltPort {
         return m_decryptionGateway.isEmpty() && m_readGateway.isEmpty();
     }
 
-    private void queueDecryptionTasks() {
-        int read;
+    private int queueDecryptionTasks() {
+        int read = 0;
         while (true) {
             if (m_nextFrameLength == 0) {
-                read = readStream().getBytes(m_frameHeader);
+                read += readStream().getBytes(m_frameHeader);
                 if (m_frameHeader.hasRemaining()) {
                     break;
                 } else {
@@ -170,7 +160,7 @@ public class SSLVoltPort extends VoltPort {
                 }
             }
 
-            readStream().getBytes(m_frameCont.b());
+            read += readStream().getBytes(m_frameCont.b());
             if (m_frameCont.b().hasRemaining()) {
                 break;
             } else {
@@ -179,6 +169,8 @@ public class SSLVoltPort extends VoltPort {
                 m_nextFrameLength = 0;
             }
         }
+
+        return read;
     }
 
     /**
@@ -256,7 +248,7 @@ public class SSLVoltPort extends VoltPort {
         m_encryptionGateway.shutdown();
         m_decryptionGateway.shutdown();
         while (!gatewaysEmpty()) {
-            System.out.println("Waiting for decryption task to finish.");
+            System.out.println("Waiting for ssl task to finish.");
         }
         super.unregistering();
         super.unregistered();
