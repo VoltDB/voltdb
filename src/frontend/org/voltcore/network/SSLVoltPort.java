@@ -118,10 +118,10 @@ public class SSLVoltPort extends VoltPort {
             }
         } catch (IOException ioe) {
             while (!gatewaysEmpty()) {
-                System.out.println("Waiting for ssl task to finish.");
             }
             throw ioe;
         } finally {
+            m_writeStream.checkBackpressureEnded();
             synchronized (m_lock) {
                 assert (m_running == true);
                 m_running = false;
