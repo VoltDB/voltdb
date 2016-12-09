@@ -463,8 +463,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                         m_gapTracker.submit(messageAndOffset.nextOffset());
                         Invocation invocation = new Invocation(m_config.getProcedure(), formatter.transform(line));
                         TopicPartitionInvocationCallback cb = new TopicPartitionInvocationCallback(
-                                messageAndOffset.nextOffset(), cbcnt, m_gapTracker, m_dead,
-                                invocation);
+                                messageAndOffset.nextOffset(), cbcnt, m_gapTracker, m_dead);
                          if (!noTransaction && !callProcedure(invocation, cb)) {
                               if (isDebugEnabled()) {
                                  debug(null, "Failed to process Invocation possibly bad data: " + line);
@@ -679,19 +678,16 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
         private final AtomicLong m_cbcnt;
         private final Gap m_tracker;
         private final AtomicBoolean m_dontCommit;
-        private final Invocation m_invocation;
 
         public TopicPartitionInvocationCallback(
                 final long offset,
                 final AtomicLong cbcnt,
                 final Gap tracker,
-                final AtomicBoolean dontCommit,
-                final Invocation invocation) {
+                final AtomicBoolean dontCommit) {
             m_offset = offset;
             m_cbcnt = cbcnt;
             m_tracker = tracker;
             m_dontCommit = dontCommit;
-            m_invocation = invocation;
         }
 
         @Override
@@ -701,11 +697,6 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
             if (!m_dontCommit.get() && response.getStatus() != ClientResponse.SERVER_UNAVAILABLE) {
                 m_tracker.commit(m_offset);
             }
-        }
-
-        @SuppressWarnings("unused")
-        public Invocation getInvocation() {
-            return m_invocation;
         }
     }
 }
