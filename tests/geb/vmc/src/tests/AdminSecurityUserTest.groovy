@@ -252,7 +252,7 @@ class AdminSecurityUserTest extends TestBase {
         }
     }
 
-    def editTheUserUsernameoneAndChangeItToUsernametwo"EDIT THE USER usernameOne AND CHANGE IT TO usernameTwo"(){
+    def editTheUserUsernameoneAndChangeItToUsernametwo(){
 
         String usernameTwo  = page.overview.getUsernameTwoForSecurity()
         String passwordTwo  = page.overview.getPasswordTwoForSecurity()
