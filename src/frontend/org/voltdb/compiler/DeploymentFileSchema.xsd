@@ -183,7 +183,7 @@
              <xs:complexType>
                 <xs:attribute name="name" type="featureNameType"/>
                 <xs:attribute name="size" type="xs:string"/>
-                <xs:attribute name="snmpalert" type="xs:string"/>
+                <xs:attribute name="alert" type="xs:string"/>
              </xs:complexType>
           </xs:element>
       </xs:sequence>
@@ -194,7 +194,7 @@
         <xs:element name="memorylimit" minOccurs="0" maxOccurs="1">
             <xs:complexType>
                 <xs:attribute name="size" type="xs:string" default="80%"/>
-                <xs:attribute name="snmpalert" type="xs:string" default="70%"/>
+                <xs:attribute name="alert" type="xs:string" default="70%"/>
             </xs:complexType>
         </xs:element>
         <xs:element name="disklimit" type="diskLimitType"

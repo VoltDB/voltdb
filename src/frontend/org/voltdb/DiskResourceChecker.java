@@ -89,7 +89,7 @@ public class DiskResourceChecker
                         (config.m_diskSizeLimit > 0 ? config.m_diskSizeLimit + "GB" : config.m_diskSizeLimitPerc + "%"));
             }
             if (config.m_diskSizeLimitSnmp > 0 || config.m_diskSizeLimitPercSnmp > 0) {
-                m_logger.info(config.m_featureName.value() + " on " + config.m_path + " configured with SNMP notification limit: " +
+                m_logger.warn(config.m_featureName.value() + " on " + config.m_path + " configured with SNMP notification limit: " +
                         (config.m_diskSizeLimitSnmp > 0 ? config.m_diskSizeLimitSnmp + "GB" : config.m_diskSizeLimitPercSnmp + "%"));
             }
         }
@@ -143,7 +143,7 @@ public class DiskResourceChecker
                     continue;
                 }
                 String size = feature.getSize();
-                String snmpSize = feature.getSnmpalert();
+                String snmpSize = feature.getAlert();
                 FeatureDiskLimitConfig aConfig =
                         new FeatureDiskLimitConfig(feature.getName(), size, snmpSize);
                 builder.put(feature.getName(), aConfig);

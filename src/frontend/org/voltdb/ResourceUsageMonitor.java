@@ -77,7 +77,7 @@ public class ResourceUsageMonitor implements Runnable
         if (null != m_snmpTrapSender) {
             m_snmpEnable = true;
             if (config.getMemorylimit() != null) {
-                m_snmpRssLimitStr = config.getMemorylimit().getSnmpalert().trim();
+                m_snmpRssLimitStr = config.getMemorylimit().getAlert().trim();
                 // configured value is in GB. Convert it to bytes
                 double dblLimit = getMemoryLimitSize(m_snmpRssLimitStr);
                 m_snmpRssLimit = Double.valueOf(dblLimit).longValue();
@@ -106,7 +106,7 @@ public class ResourceUsageMonitor implements Runnable
                 m_logger.info("RSS limit: "  + getRssLimitLogString(m_rssLimit, m_rssLimitStr));
             }
             if (m_snmpRssLimit > 0) {
-                m_logger.info("RSS SNMP notification limit: "  + getRssLimitLogString(m_snmpRssLimit, m_snmpRssLimitStr));
+                m_logger.warn("RSS SNMP notification limit: "  + getRssLimitLogString(m_snmpRssLimit, m_snmpRssLimitStr));
             }
             if (m_diskLimitConfig!=null) {
                 m_diskLimitConfig.logConfiguredLimits();

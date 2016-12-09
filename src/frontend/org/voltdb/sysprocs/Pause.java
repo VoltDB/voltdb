@@ -118,7 +118,7 @@ public class Pause extends VoltSystemProcedure {
                         snmp.pause("Cluster paused.");
                     } catch (Throwable t) {
                         VoltLogger log = new VoltLogger("HOST");
-                        log.warn("failed to issue a resume pause trap", t);
+                        log.warn("failed to issue a pause SNMP trap", t);
                     }
                 }
 

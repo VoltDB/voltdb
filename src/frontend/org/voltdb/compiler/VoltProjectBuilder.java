@@ -1315,7 +1315,7 @@ public class VoltProjectBuilder {
                 memoryLimit.setSize(m_rssLimit);
             }
             if (m_snmpRssLimit != null) {
-                memoryLimit.setSnmpalert(m_snmpRssLimit);
+                memoryLimit.setAlert(m_snmpRssLimit);
             }
             monitorType.setMemorylimit(memoryLimit);
         }
@@ -1348,7 +1348,7 @@ public class VoltProjectBuilder {
                     feature.setSize(m_featureDiskLimits.get(featureName));
                 }
                 if (m_snmpFeatureDiskLimits.containsKey(featureName)) {
-                    feature.setSnmpalert(m_snmpFeatureDiskLimits.get(featureName));
+                    feature.setAlert(m_snmpFeatureDiskLimits.get(featureName));
                 }
                 diskLimit.getFeature().add(feature);
         }
