@@ -106,7 +106,7 @@ message ConnectResponse {
 }
 
 message QueryResponse {
-    repeated ClusterInfo clusters = 1;
+    repeated ClusterInfo clusterInfo = 1;
 }
 
 message ClusterInfo {
