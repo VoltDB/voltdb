@@ -29,6 +29,7 @@ import java.util.Set;
 
 import org.apache.log4j.Logger;
 import org.apache.log4j.net.SocketHubAppender;
+import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.data.Stat;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
@@ -456,16 +457,16 @@ public class SystemInformation extends VoltSystemProcedure
 
     private static void populatePartitionGroups(Integer hostId, VoltTable vt) {
         try {
-            byte[] bytes = VoltDB.instance().getHostMessenger().getZK().getData(CoreZK.hosts_host + hostId, false, new Stat());
+            byte[]  bytes = VoltDB.instance().getHostMessenger().getZK().getData(CoreZK.hosts_host + hostId, false, new Stat());
             String hostInfo = new String(bytes, StandardCharsets.UTF_8);
-            final JSONObject obj = new JSONObject(hostInfo);
+            JSONObject obj  = new JSONObject(hostInfo);
             vt.addRow(hostId, "PLACEMENTGROUP",obj.getString("group"));
-            Set<Integer> buddies = VoltDB.instance().getCartograhper().getHostIdsWithinPartitionGroup(hostId);
-            String[] strIds = buddies.stream().map(i -> String.valueOf(i)).toArray(String[]::new);
-            vt.addRow(hostId, "PARTITIONGROUP",String.join(",", strIds));
-        } catch (Exception e) {
-            org.voltdb.VoltDB.crashLocalVoltDB("Error getting host info", false, e);
+        } catch (KeeperException | InterruptedException | JSONException e) {
+            vt.addRow(hostId, "PLACEMENTGROUP","NULL");
         }
+        Set<Integer> buddies = VoltDB.instance().getCartograhper().getHostIdsWithinPartitionGroup(hostId);
+        String[] strIds = buddies.stream().sorted().map(i -> String.valueOf(i)).toArray(String[]::new);
+        vt.addRow(hostId, "PARTITIONGROUP",String.join(",", strIds));
     }
 
     static public VoltTable populateDeploymentProperties(
