@@ -143,36 +143,6 @@ struct ScopedPoolDeferredReleaseMode {
     ~ScopedPoolDeferredReleaseMode();
 };
 
-
-typedef std::pair<int32_t, void*> SizePtrPair;
-
-struct SizePtrPairComparator {
-    int operator() (const SizePtrPair& v1, const SizePtrPair& v2) const {
-
-        if (v1.first < v2.first) {
-            return -1;
-        }
-
-        if (v1.first > v2.first) {
-            return 1;
-        }
-
-        const char* cv1 = static_cast<const char*>(v1.second);
-        const char* cv2 = static_cast<const char*>(v2.second);
-        if (cv1 < cv2) {
-            return -1;
-        }
-
-        if (cv1 > cv2) {
-            return 1;
-        }
-
-        return 0;
-    }
-};
-
-typedef CompactingSet<SizePtrPair, SizePtrPairComparator> SizePtrPairSet;
-
 }
 
 

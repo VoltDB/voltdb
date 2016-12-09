@@ -26,6 +26,7 @@
 
 #include "boost/foreach.hpp"
 #include "harness.h"
+#include "structures/CompactingPool.h"
 #include "structures/CompactingSet.h"
 #include "common/ThreadLocalPool.h"
 

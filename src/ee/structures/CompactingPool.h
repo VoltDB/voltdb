@@ -27,6 +27,36 @@
 #include <boost/unordered_set.hpp>
 
 namespace voltdb {
+
+typedef std::pair<int32_t, void*> SizePtrPair;
+
+struct SizePtrPairComparator {
+    int operator() (const SizePtrPair& v1, const SizePtrPair& v2) const {
+
+        if (v1.first < v2.first) {
+            return -1;
+        }
+
+        if (v1.first > v2.first) {
+            return 1;
+        }
+
+        const char* cv1 = static_cast<const char*>(v1.second);
+        const char* cv2 = static_cast<const char*>(v2.second);
+        if (cv1 < cv2) {
+            return -1;
+        }
+
+        if (cv1 > cv2) {
+            return 1;
+        }
+
+        return 0;
+    }
+};
+
+typedef CompactingSet<SizePtrPair, SizePtrPairComparator> SizePtrPairSet;
+
 // Provide a compacting pool of objects of fixed size. Each object is assumed
 // to have a single char* pointer referencing it in the caller for the lifetime
 // of the allocation.
@@ -96,6 +126,13 @@ class CompactingPool
         m_allocator.trim();
     }
 
+    /**
+     * Free the referenced allocation if it's the last chunk in a
+     * block (and therefore is cheap because no memcpy is required to
+     * fill the hole).
+     *
+     * Returns true if chunk was freed, and false otherwise.
+     */
     bool freeIfLast(void* element) {
         if (isLast(element)) {
             m_allocator.trim();
@@ -115,16 +152,20 @@ class CompactingPool
      */
     void freePendingAllocations(SizePtrPairSet& pendingReleaseSet)
     {
-        // While there are still deferred allocations...
-        /* while (true) { */
-             trimAllocationsPendingRelease(pendingReleaseSet);
-        /*     auto it = pendingReleaseSet.begin(); */
-        /*     assert (!it.isEnd()); */
+        const int32_t elemSize = elementSize();
+        SizePtrPair lowerKey = SizePtrPair(elemSize, 0);
+        while (true) {
+            trimAllocationsPendingRelease(elemSize, pendingReleaseSet);
 
-        /*     void* toBeReleased = it.key(); */
-        /*     pendingReleaseSet.erase(toBeReleased); */
-        /*     free(toBeReleased); */
-        /* } */
+            auto it = pendingReleaseSet.lowerBound(lowerKey);
+            if (it.isEnd() || it.key().first != elemSize) {
+                break;
+            }
+
+            SizePtrPair toBeReleased = it.key();
+            pendingReleaseSet.erase(toBeReleased);
+            free(toBeReleased.second);
+        }
     }
 
     std::size_t getBytesAllocated() const
@@ -135,10 +176,14 @@ class CompactingPool
 
   private:
 
-    bool isLast(void *element) {
+    bool isLast(void *element) const {
         Relocatable* vacated = Relocatable::backtrackFromCallerData(element);
         Relocatable* last = reinterpret_cast<Relocatable*>(m_allocator.last());
         return vacated == last;
+    }
+
+    int32_t elementSize() const {
+        return m_allocator.allocationSize() - FIXED_OVERHEAD_PER_ENTRY();
     }
 
     /**
@@ -148,25 +193,22 @@ class CompactingPool
      *
      * Returns true if all allocations pending release have been freed.
      */
-    void trimAllocationsPendingRelease(SizePtrPairSet& pendingReleaseSet) {
+    void trimAllocationsPendingRelease(int32_t elemSize,
+                                       SizePtrPairSet& pendingReleaseSet) {
+        while (true) {
+            if (m_allocator.count() == 0) {
+                return;
+            }
 
-        // FIXME
+            Relocatable* last = reinterpret_cast<Relocatable*>(m_allocator.last());
+            auto trimIt = pendingReleaseSet.find(SizePtrPair(elemSize, last->m_data));
+            if (trimIt.isEnd()) {
+                return;
+            }
 
-        /* const int elemSize = 1; */
-        /* while (true) { */
-        /*     if (m_allocator.count() == 0) { */
-        /*         return true; */
-        /*     } */
-
-        /*     Relocatable* last = reinterpret_cast<Relocatable*>(m_allocator.last()); */
-        /*     auto trimIt = pendingReleaseSet.find(SizePtrPair(last->m_data, elemSize)); */
-        /*     if (trimIt.isEnd()) { */
-        /*         // Last ietem in allocator is not pending delete */
-        /*         return pendingReleaseSet.empty(); */
-        /*     } */
-        /*     m_allocator.trim(); */
-        /*     m_allocationsPendingRelease.erase(trimIt.key()); */
-        /* } */
+            m_allocator.trim();
+            pendingReleaseSet.erase(trimIt.key());
+        }
     }
 
     ContiguousAllocator m_allocator;
