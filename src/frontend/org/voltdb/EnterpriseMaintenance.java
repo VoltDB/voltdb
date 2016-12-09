@@ -43,7 +43,7 @@ public abstract class EnterpriseMaintenance {
             return null;
         }
 
-        // try to instatiate the pro class and leave as null if no luck
+        // try to instantiate the pro class and leave as null if no luck
         try {
             m_globalEM = (EnterpriseMaintenance) clz.newInstance();
         }
