@@ -114,12 +114,7 @@ public class Pause extends VoltSystemProcedure {
              // for snmp
                 SnmpTrapSender snmp = voltdb.getSnmpTrapSender();
                 if (snmp != null) {
-                    try {
-                        snmp.pause("Cluster paused.");
-                    } catch (Throwable t) {
-                        VoltLogger log = new VoltLogger("HOST");
-                        log.warn("failed to issue a pause SNMP trap", t);
-                    }
+                    snmp.pause("Cluster paused.");
                 }
 
             } catch (Exception e) {

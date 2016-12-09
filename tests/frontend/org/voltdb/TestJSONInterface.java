@@ -1672,7 +1672,7 @@ public class TestJSONInterface extends TestCase {
             ResourceMonitorType resourceMonitor = new ResourceMonitorType();
             Memorylimit memLimit = new Memorylimit();
             memLimit.setSize("10");
-            //memLimit.setAlert("5");
+            memLimit.setAlert("5");
             resourceMonitor.setMemorylimit(memLimit);
             ss.setResourcemonitor(resourceMonitor);
             String ndeptype = mapper.writeValueAsString(deptype);

@@ -24,7 +24,6 @@ import org.apache.zookeeper_voltpatches.KeeperException.BadVersionException;
 import org.apache.zookeeper_voltpatches.KeeperException.Code;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.data.Stat;
-import org.voltcore.logging.VoltLogger;
 import org.voltdb.DependencyPair;
 import org.voltdb.OperationMode;
 import org.voltdb.ParameterSet;
@@ -93,12 +92,7 @@ public class Resume extends VoltSystemProcedure {
                 // for snmp
                 SnmpTrapSender snmp = voltdb.getSnmpTrapSender();
                 if (snmp != null) {
-                    try {
-                        snmp.resume("Cluster resumed.");
-                    } catch (Throwable t) {
-                        VoltLogger log = new VoltLogger("HOST");
-                        log.warn("failed to issue a resume SNMP trap", t);
-                    }
+                    snmp.resume("Cluster resumed.");
                 }
             } catch (Exception e) {
                 throw new RuntimeException(e);
