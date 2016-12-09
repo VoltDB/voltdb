@@ -251,10 +251,9 @@ public class SSLVoltPort extends VoltPort {
         while (!gatewaysEmpty()) {
             System.out.println("Waiting for ssl task to finish.");
         }
-        super.unregistering();
-        super.unregistered();
         m_dstBufferCont.discard();
         m_dstBufferCont = null;
+        super.unregistered();
     }
 
     private class DecryptionGateway {
@@ -596,7 +595,10 @@ public class SSLVoltPort extends VoltPort {
         public void shutdown() {
             synchronized (m_q) {
                 m_isShuttingDown = true;
-                m_q.clear();
+                EncryptionResult er;
+                while ((er = m_q.poll()) != null) {
+                    er.m_encCont.discard();
+                }
             }
         }
     }
