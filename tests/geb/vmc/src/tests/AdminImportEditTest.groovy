@@ -56,7 +56,7 @@ class AdminImportEditTest extends TestBase {
      *  This test creates a new import configuration, adds a property to it and deletes it
      */
 
-    def VerifyAddEditAndDeleteConfigurationProperty() {
+    def verifyAddEditAndDeleteConfigurationProperty() {
         when: 'Open Add Import Configuration Popup'
         page.overview.openAddImportConfigurationPopup()
         page.overview.textImportType.value("KAFKA")
@@ -105,7 +105,6 @@ class AdminImportEditTest extends TestBase {
         waitFor(waitTime) { page.overview.importConfig.isDisplayed() }
         page.overview.importConfig.click()
         waitFor(waitTime) { page.overview.importExpanded.isDisplayed() }
-
         then: 'Display the created KAFKA'
         waitFor(waitTime) { page.overview.KafkaImportName.isDisplayed() }
         println("Import configuration created")
@@ -201,7 +200,7 @@ class AdminImportEditTest extends TestBase {
      *  This test creates a new import configuration, edit its type,
      *  provide values of new properties(related to new type) and deletes it
      */
-    def VerifyAddEditAndDeleteConfigurations() {
+    def verifyAddEditAndDeleteConfigurations() {
         when: 'Open Add Import Configuration Popup'
         page.overview.openAddImportConfigurationPopup()
         page.overview.textImportType.value("KAFKA")
