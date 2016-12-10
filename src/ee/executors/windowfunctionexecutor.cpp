@@ -94,19 +94,12 @@ struct WindowAggregate {
     WindowAggregate()
         : m_needsLookahead(true),
           m_inlineCopiedToOutline(false) {
-        VOLT_TRACE("WindowAggregate::WindowAggregate() @ %p\n", this);
-        PRINT_STACK_TRACE();
     }
 
     virtual ~WindowAggregate() {
-        VOLT_TRACE("~WindowAggregate()\n");
     }
     void* operator new(size_t size, Pool& memoryPool) {
         void *answer = memoryPool.allocate(size);
-        VOLT_TRACE("WindowAggregate::new(%ld, %p) -> %p\n",
-                   size,
-                   &memoryPool,
-                   answer);
         return answer;
     }
     void operator delete(void*, Pool& memoryPool) { /* NOOP -- on alloc error unroll nothing */ }
@@ -143,7 +136,6 @@ struct WindowAggregate {
      */
     virtual NValue finalize(ValueType type)
     {
-        VOLT_TRACE("WindowAggregate::finalize: type = %d\n", (int)type);
         m_value.castAs(type);
         if (m_inlineCopiedToOutline) {
             m_value.allocateObjectFromOutlinedValue();
@@ -185,7 +177,6 @@ public:
     }
 
     virtual ~WindowedDenseRankAgg() {
-        VOLT_TRACE("~DenseRankAgg()\n");
     }
 
     virtual const char *getAggName() const {
@@ -221,7 +212,6 @@ public:
         m_orderByPeerIncrement = ValueFactory::getBigIntValue(window.m_orderByGroupSize);
     }
     ~WindowedRankAgg() {
-        VOLT_TRACE("~RankAgg()\n");
     }
 };
 
@@ -234,7 +224,6 @@ public:
 class WindowedCountAgg : public WindowAggregate {
 public:
     virtual ~WindowedCountAgg() {
-        VOLT_TRACE("~CountAgg()\n");
     }
 
     virtual const char *getAggName() const {
@@ -270,11 +259,9 @@ public:
         : WindowAggregate(),
           m_isEmpty(true),
           m_pool(pool) {
-        VOLT_TRACE("WindowedMinAgg::WindowedMinAgg(%s, %p)\n", getAggName(), this);
     }
 
     ~WindowedMinAgg() {
-        VOLT_TRACE("~WindowedMinAgg()\n");
     }
     virtual const char *getAggName() const {
         return "MIN";
@@ -318,10 +305,8 @@ public:
 class WindowedMaxAgg : public WindowAggregate {
 public:
     WindowedMaxAgg(Pool &pool) : WindowAggregate(), m_isEmpty(true), m_pool(pool) {
-        VOLT_TRACE("WindowedMaxAgg::WindowedMaxAgg(%s, %p)\n", getAggName(), this);
     }
     ~WindowedMaxAgg() {
-        VOLT_TRACE("~WindowedMaxAgg()\n");
     }
     virtual const char *getAggName() const {
         return "MAX";
@@ -366,10 +351,8 @@ class WindowedSumAgg : public WindowAggregate {
 public:
     WindowedSumAgg() {
         m_value = m_zero;
-        VOLT_TRACE("WindowedSumAgg::WindowedSumAgg() @ %p\n", this);
     }
     ~WindowedSumAgg() {
-        VOLT_TRACE("~WindowedSumAgg()\n");
     }
     virtual const char *getAggName() const {
         return "SUM";
@@ -440,10 +423,8 @@ struct WindowAggregateRow {
 
     void resetAggs()
     {
-        VOLT_TRACE("WindowFunctionExecutor::Resetting All Aggregates\n");
         // Stop at the terminating null agg pointer that has been allocated as an extra and ignored since.
         for (int ii = 0; m_aggregates[ii] != NULL; ++ii) {
-            VOLT_TRACE("WindowFunctionExecutor::resetAggs(%d) == %s\n", ii, m_aggregates[ii]->getAggName());
             m_aggregates[ii]->resetAgg();
         }
     }
@@ -510,10 +491,7 @@ inline WindowAggregate* getWindowedAggInstance(Pool& memoryPool,
                                                ExpressionType agg_type)
 {
     WindowAggregate *answer = NULL;
-    VOLT_TRACE("getWindowedAggInstance(start): type is %d (%s)\n",
-               agg_type,
-               expressionToString(agg_type).c_str());
-    
+
     switch (agg_type) {
     case EXPRESSION_TYPE_AGGREGATE_WINDOWED_RANK:
         answer = new (memoryPool) WindowedRankAgg();
@@ -525,14 +503,12 @@ inline WindowAggregate* getWindowedAggInstance(Pool& memoryPool,
         answer = new (memoryPool) WindowedCountAgg();
         break;
     case EXPRESSION_TYPE_AGGREGATE_WINDOWED_MAX:
-        VOLT_TRACE("getWindowedAggInstance: MAX\n");
         answer = new (memoryPool) WindowedMaxAgg(memoryPool);
         break;
     case EXPRESSION_TYPE_AGGREGATE_WINDOWED_MIN:
         answer = new (memoryPool) WindowedMinAgg(memoryPool);
         break;
     case EXPRESSION_TYPE_AGGREGATE_WINDOWED_SUM:
-        VOLT_TRACE("getWindowedAggInstance: Sum\n");
         answer = new (memoryPool) WindowedSumAgg();
         break;
     default:
@@ -542,7 +518,6 @@ inline WindowAggregate* getWindowedAggInstance(Pool& memoryPool,
             throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
         }
     }
-    VOLT_TRACE("getWindowedAggInstance: agg is %s\n", answer->getAggName());
     return answer;
 }
 
@@ -553,31 +528,15 @@ inline WindowAggregate* getWindowedAggInstance(Pool& memoryPool,
 inline void WindowFunctionExecutor::initAggInstances()
 {
     WindowAggregate** aggs = m_aggregateRow->getAggregates();
-    VOLT_TRACE("WindowFunctionExecutor::initAggInstances(begin)\n");
     for (int ii = 0; ii < m_aggTypes.size(); ii++) {
         aggs[ii] = getWindowedAggInstance(m_memoryPool,
                                           m_aggTypes[ii]);
-        VOLT_TRACE("initAggInstances: after allocate\n");
         assert(aggs[ii] != NULL);
-        VOLT_TRACE("WindowFunctionExecutor::initAggInstances(agg %d, %s)\n",
-                   ii, aggs[ii]->getAggName());
     }
-#if defined(VOLT_TRACE_ENABLED)
-    for (int ii = 0; ii < m_aggTypes.size(); ii++) {
-        VOLT_TRACE("  Agg %d: %s\n", ii, aggs[ii]->getAggName());
-    }
-#endif /* defined(VOLT_TRACE_ENABLED) */
-    VOLT_TRACE("WindowFunctionExecutor::initAggInstances(end)\n");
 }
 
 inline void WindowFunctionExecutor::lookaheadOneRowForAggs(const TableTuple &tuple, TableWindow &tableWindow) {
     WindowAggregate **aggs = m_aggregateRow->getAggregates();
-#if defined(VOLT_TRACE_ENABLED)
-    VOLT_TRACE("WindowFunctionExecutor::lookaheadOneRowForAggs\n");
-    for (int ii = 0; ii < m_aggTypes.size(); ii++) {
-        VOLT_TRACE("  Agg %d: %s\n", ii, aggs[ii]->getAggName());
-    }
-#endif /* defined(VOLT_TRACE_ENABLED) */
     for (int ii = 0; ii < m_aggTypes.size(); ii++) {
         if (aggs[ii]->m_needsLookahead) {
             const AbstractPlanNode::OwningExpressionVector &inputExprs
@@ -590,7 +549,6 @@ inline void WindowFunctionExecutor::lookaheadOneRowForAggs(const TableTuple &tup
             aggs[ii]->lookaheadOneRow(tableWindow, vals);
         }
     }
-    VOLT_TRACE("WindowFunctionExecutor::lookaheadOneRowForAggs(end)\n");
 }
 
 inline void WindowFunctionExecutor::lookaheadNextGroupForAggs(TableWindow &tableWindow) {
@@ -698,9 +656,7 @@ bool WindowFunctionExecutor::p_execute(const NValueArray& params) {
         = new (m_memoryPool, m_aggTypes.size())
         WindowAggregateRow(m_inputSchema, m_memoryPool);
 
-    VOLT_TRACE("WindowAggregateExecutor::p_execute(before initAggInstances)\n");
     initAggInstances();
-    VOLT_TRACE("WindowAggregateExecutor::p_execute(after initAggInstances)\n");
 
     VOLT_TRACE("Beginning: %s", tableWindow.debug().c_str());
 

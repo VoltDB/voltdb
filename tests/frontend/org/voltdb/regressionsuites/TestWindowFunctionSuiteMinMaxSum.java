@@ -44,6 +44,7 @@
 import java.io.IOException;
 
 import org.voltdb.BackendTarget;
+import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
@@ -68,6 +69,12 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
                 + "  A INTEGER NOT NULL,"
                 + "  B INTEGER NOT NULL,"
                 + "  C VARCHAR NOT NULL"
+                + ");"
+
+                +"CREATE TABLE T_STRING_NULL ("
+                + "  A INTEGER NOT NULL,"
+                + "  B INTEGER NOT NULL,"
+                + "  C VARCHAR "
                 + ");"
 
                 +"CREATE TABLE T_STRING_A ("
@@ -161,6 +168,18 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
                 ;
         project.addLiteralSchema(literalSchema);
         project.setUseDDLSchema(true);
+    }
+
+    /*
+     * Make a string whose length is size * 8.  This is
+     * a constant.
+     */
+    private String makeLongString(int size) {
+        StringBuffer sb = new StringBuffer();
+        for (int idx = 0; idx < size; idx += 1) {
+            sb.append("abcdefgh");
+        }
+        return sb.toString();
     }
 
     private void initTable(Client client) throws NoConnectionsException, IOException, ProcCallException {
@@ -271,15 +290,15 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
         cr = client.callProcedure("t.insert",  1,  3,    5);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         //--------------------------------------
-        cr = client.callProcedure("t.insert",  2,  1,    1);
+        cr = client.callProcedure("t.insert",  2,  1,    null);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  2,  1,    2);
+        cr = client.callProcedure("t.insert",  2,  1,    null);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  2,  1,    3);
+        cr = client.callProcedure("t.insert",  2,  1,    null);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  2,  1,    4);
+        cr = client.callProcedure("t.insert",  2,  1,    null);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  2,  1,    5);
+        cr = client.callProcedure("t.insert",  2,  1,    null);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         //======================================
         cr = client.callProcedure("t.insert",  2,  2,    1);
@@ -293,13 +312,13 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
         cr = client.callProcedure("t.insert",  2,  2,    5);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         //======================================
-        cr = client.callProcedure("t.insert",  2,  3,    null);
+        cr = client.callProcedure("t.insert",  2,  3,    1);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  2,  3,    null);
+        cr = client.callProcedure("t.insert",  2,  3,    2);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  2,  3,    null);
+        cr = client.callProcedure("t.insert",  2,  3,    3);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  2,  3,    null);
+        cr = client.callProcedure("t.insert",  2,  3,    4);;
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         cr = client.callProcedure("t.insert",  2,  3,    5);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
@@ -376,8 +395,248 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
     }
 
+    private void initStringTable(Client client) throws NoConnectionsException, IOException, ProcCallException {
+        ClientResponse cr;
+        cr = client.callProcedure("@AdHoc", "truncate table t_string_null");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t_string_null.insert",  1,  1,    makeLongString(5));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t_string_null.insert",  1,  1,    makeLongString(4));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t_string_null.insert",  1,  1,    makeLongString(3));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t_string_null.insert",  1,  1,    makeLongString(2));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t_string_null.insert",  1,  1,    makeLongString(1));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        //======================================
+        cr = client.callProcedure("t_string_null.insert",  1,  2,    makeLongString(1));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t_string_null.insert",  1,  2,    makeLongString(2));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t_string_null.insert",  1,  2,    makeLongString(3));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t_string_null.insert",  1,  2,    makeLongString(4));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t_string_null.insert",  1,  2,    makeLongString(5));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        //======================================
+        cr = client.callProcedure("t_string_null.insert",  1,  3,    makeLongString(5));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t_string_null.insert",  1,  3,    makeLongString(4));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t_string_null.insert",  1,  3,    makeLongString(3));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t_string_null.insert",  1,  3,    makeLongString(2));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t_string_null.insert",  1,  3,    makeLongString(1));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        //--------------------------------------
+        cr = client.callProcedure("t_string_null.insert",  2,  1,    makeLongString(1));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t_string_null.insert",  2,  1,    makeLongString(2));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t_string_null.insert",  2,  1,    makeLongString(3));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t_string_null.insert",  2,  1,    makeLongString(4));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t_string_null.insert",  2,  1,    makeLongString(5));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        //======================================
+        cr = client.callProcedure("t_string_null.insert",  2,  2,    makeLongString(5));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t_string_null.insert",  2,  2,    makeLongString(4));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t_string_null.insert",  2,  2,    makeLongString(3));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t_string_null.insert",  2,  2,    makeLongString(2));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t_string_null.insert",  2,  2,    makeLongString(1));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        //======================================
+        cr = client.callProcedure("t_string_null.insert",  2,  3,    makeLongString(1));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t_string_null.insert",  2,  3,    makeLongString(2));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t_string_null.insert",  2,  3,    makeLongString(3));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t_string_null.insert",  2,  3,    makeLongString(4));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t_string_null.insert",  2,  3,    makeLongString(5));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+    }
+
+    private void initStringTableSomeNulls(Client client) throws NoConnectionsException, IOException, ProcCallException {
+        ClientResponse cr;
+        cr = client.callProcedure("@AdHoc", "truncate table t_string_null");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t_string_null.insert",  1,  1,    makeLongString(1));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t_string_null.insert",  1,  1,    makeLongString(2));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t_string_null.insert",  1,  1,    makeLongString(3));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t_string_null.insert",  1,  1,    makeLongString(4));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t_string_null.insert",  1,  1,    makeLongString(5));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        //======================================
+        cr = client.callProcedure("t_string_null.insert",  1,  2,    null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t_string_null.insert",  1,  2,    null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t_string_null.insert",  1,  2,    null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t_string_null.insert",  1,  2,    null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t_string_null.insert",  1,  2,    null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        //======================================
+        cr = client.callProcedure("t_string_null.insert",  1,  3,    makeLongString(1));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t_string_null.insert",  1,  3,    makeLongString(2));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t_string_null.insert",  1,  3,    makeLongString(3));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t_string_null.insert",  1,  3,    makeLongString(4));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t_string_null.insert",  1,  3,    makeLongString(5));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        //--------------------------------------
+        cr = client.callProcedure("t_string_null.insert",  2,  1,    null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t_string_null.insert",  2,  1,    null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t_string_null.insert",  2,  1,    null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t_string_null.insert",  2,  1,    null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t_string_null.insert",  2,  1,    null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        //======================================
+        cr = client.callProcedure("t_string_null.insert",  2,  2,    makeLongString(5));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t_string_null.insert",  2,  2,    makeLongString(4));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t_string_null.insert",  2,  2,    makeLongString(3));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t_string_null.insert",  2,  2,    makeLongString(2));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t_string_null.insert",  2,  2,    makeLongString(1));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        //======================================
+        cr = client.callProcedure("t_string_null.insert",  2,  3,    makeLongString(5));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t_string_null.insert",  2,  3,    makeLongString(4));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t_string_null.insert",  2,  3,    makeLongString(3));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t_string_null.insert",  2,  3,    makeLongString(2));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t_string_null.insert",  2,  3,    makeLongString(1));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+    }
+    private void initStringTableAllNulls(Client client) throws NoConnectionsException, IOException, ProcCallException {
+        ClientResponse cr;
+        cr = client.callProcedure("@AdHoc", "truncate table t_string_null");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t_string_null.insert",  1,  1,    null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t_string_null.insert",  1,  1,    null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t_string_null.insert",  1,  1,    null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t_string_null.insert",  1,  1,    null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t_string_null.insert",  1,  1,    null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        //======================================
+        cr = client.callProcedure("t_string_null.insert",  1,  2,    null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t_string_null.insert",  1,  2,    null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t_string_null.insert",  1,  2,    null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t_string_null.insert",  1,  2,    null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t_string_null.insert",  1,  2,    null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        //======================================
+        cr = client.callProcedure("t_string_null.insert",  1,  3,    null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t_string_null.insert",  1,  3,    null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t_string_null.insert",  1,  3,    null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t_string_null.insert",  1,  3,    null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t_string_null.insert",  1,  3,    null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        //--------------------------------------
+        cr = client.callProcedure("t_string_null.insert",  2,  1,    null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t_string_null.insert",  2,  1,    null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t_string_null.insert",  2,  1,    null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t_string_null.insert",  2,  1,    null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t_string_null.insert",  2,  1,    null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        //======================================
+        cr = client.callProcedure("t_string_null.insert",  2,  2,    null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t_string_null.insert",  2,  2,    null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t_string_null.insert",  2,  2,    null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t_string_null.insert",  2,  2,    null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t_string_null.insert",  2,  2,    null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        //======================================
+        cr = client.callProcedure("t_string_null.insert",  2,  3,    null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t_string_null.insert",  2,  3,    null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t_string_null.insert",  2,  3,    null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t_string_null.insert",  2,  3,    null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("t_string_null.insert",  2,  3,    null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+    }
+
+    private void validateStringTable(VoltTable voltTable, Object[][] expect) {
+        assertEquals(expect.length, voltTable.getRowCount());
+        for (int rowIdx = 0; rowIdx < expect.length; rowIdx += 1) {
+            Object expectRow[] = expect[rowIdx];
+            assertEquals(expectRow.length, voltTable.getColumnCount());
+            assertTrue(voltTable.advanceRow());
+            for (int colIdx = 0; colIdx < expectRow.length; colIdx += 1) {
+                Object expVal = expectRow[colIdx];
+                Object actVal;
+                if (colIdx == 2) {
+                    actVal = voltTable.getString(colIdx);
+                } else {
+                    actVal = voltTable.getLong(colIdx);
+                }
+                if (voltTable.wasNull()) {
+                    assertNull(expVal);
+                } else {
+                    assertEquals(expVal, actVal);
+                }
+            }
+        }
+    }
+
     public void testMin() throws Exception {
         Client client = getClient();
+        //
+        // First, test with no nulls.  Look for the min at the
+        // beginning of the order by peer group, the middle and the
+        // end.
+        //
         long expected[] [] = new long[][] {
             {  1L,  1L,    0L},
             {  1L,  1L,    0L},
@@ -435,6 +694,9 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         validateTableOfLongs(cr.getResults()[0], expected);
 
+        //
+        // Now test with some nulls.
+        //
         long expectedWithSomeNulls[] [] = new long[][] {
             {  1L,  1L,    1L},
             {  1L,  1L,    1L},
@@ -454,11 +716,11 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
             {  1L,  3L,    1L},
             {  1L,  3L,    1L},
             //--------------------------------------
-            {  2L,  1L,    1L},
-            {  2L,  1L,    1L},
-            {  2L,  1L,    1L},
-            {  2L,  1L,    1L},
-            {  2L,  1L,    1L},
+            {  2L,  1L,    Long.MIN_VALUE},
+            {  2L,  1L,    Long.MIN_VALUE},
+            {  2L,  1L,    Long.MIN_VALUE},
+            {  2L,  1L,    Long.MIN_VALUE},
+            {  2L,  1L,    Long.MIN_VALUE},
             //======================================
             {  2L,  2L,    1L},
             {  2L,  2L,    1L},
@@ -473,11 +735,15 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
             {  2L,  3L,    1L}
         };
         initTableWithSomeNulls(client);
-        // Find the min at the end of the peer group.
         cr = client.callProcedure("@AdHoc",
                                   "select A, B, min(C) over (partition by A order by B) as R from T ORDER BY A, B, R;");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         validateTableOfLongs(cr.getResults()[0], expectedWithSomeNulls);
+
+        //
+        // Now test with all nulls.
+        //
+        initTableWithAllNulls(client);
 
         long expectedWithAllNulls[] [] = new long[][] {
             {  1L,  1L,    Long.MIN_VALUE},
@@ -516,16 +782,153 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
             {  2L,  3L,    Long.MIN_VALUE},
             {  2L,  3L,    Long.MIN_VALUE}
         };
-        initTableWithAllNulls(client);
-        // Find the min at the end of the peer group.
         cr = client.callProcedure("@AdHoc",
                                   "select A, B, min(C) over (partition by A order by B) as R from T ORDER BY A, B, R;");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         validateTableOfLongs(cr.getResults()[0], expectedWithAllNulls);
+
+        Object expectStringTable[][] = new Object[][] {
+            {  1L,  1L,    makeLongString(1)},
+            {  1L,  1L,    makeLongString(1)},
+            {  1L,  1L,    makeLongString(1)},
+            {  1L,  1L,    makeLongString(1)},
+            {  1L,  1L,    makeLongString(1)},
+            //======================================
+            {  1L,  2L,    makeLongString(1)},
+            {  1L,  2L,    makeLongString(1)},
+            {  1L,  2L,    makeLongString(1)},
+            {  1L,  2L,    makeLongString(1)},
+            {  1L,  2L,    makeLongString(1)},
+            //======================================
+            {  1L,  3L,    makeLongString(1)},
+            {  1L,  3L,    makeLongString(1)},
+            {  1L,  3L,    makeLongString(1)},
+            {  1L,  3L,    makeLongString(1)},
+            {  1L,  3L,    makeLongString(1)},
+            //--------------------------------------
+            {  2L,  1L,    makeLongString(1)},
+            {  2L,  1L,    makeLongString(1)},
+            {  2L,  1L,    makeLongString(1)},
+            {  2L,  1L,    makeLongString(1)},
+            {  2L,  1L,    makeLongString(1)},
+            //======================================
+            {  2L,  2L,    makeLongString(1)},
+            {  2L,  2L,    makeLongString(1)},
+            {  2L,  2L,    makeLongString(1)},
+            {  2L,  2L,    makeLongString(1)},
+            {  2L,  2L,    makeLongString(1)},
+            //======================================
+            {  2L,  3L,    makeLongString(1)},
+            {  2L,  3L,    makeLongString(1)},
+            {  2L,  3L,    makeLongString(1)},
+            {  2L,  3L,    makeLongString(1)},
+            {  2L,  3L,    makeLongString(1)}
+        };
+        initStringTable(client);
+        cr = client.callProcedure("@AdHoc",
+                                  "select A, B, min(C) over (partition by A order by B) as R from T_STRING_NULL ORDER BY A, B, R;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        validateStringTable(cr.getResults()[0], expectStringTable);
+
+
+        Object expectStringTableSomeNull[][] = new Object[][] {
+            {  1L,  1L,    makeLongString(1)},
+            {  1L,  1L,    makeLongString(1)},
+            {  1L,  1L,    makeLongString(1)},
+            {  1L,  1L,    makeLongString(1)},
+            {  1L,  1L,    makeLongString(1)},
+            //======================================
+            {  1L,  2L,    makeLongString(1)},
+            {  1L,  2L,    makeLongString(1)},
+            {  1L,  2L,    makeLongString(1)},
+            {  1L,  2L,    makeLongString(1)},
+            {  1L,  2L,    makeLongString(1)},
+            //======================================
+            {  1L,  3L,    makeLongString(1)},
+            {  1L,  3L,    makeLongString(1)},
+            {  1L,  3L,    makeLongString(1)},
+            {  1L,  3L,    makeLongString(1)},
+            {  1L,  3L,    makeLongString(1)},
+            //--------------------------------------
+            {  2L,  1L,    null},
+            {  2L,  1L,    null},
+            {  2L,  1L,    null},
+            {  2L,  1L,    null},
+            {  2L,  1L,    null},
+            //======================================
+            {  2L,  2L,    makeLongString(1)},
+            {  2L,  2L,    makeLongString(1)},
+            {  2L,  2L,    makeLongString(1)},
+            {  2L,  2L,    makeLongString(1)},
+            {  2L,  2L,    makeLongString(1)},
+            //======================================
+            {  2L,  3L,    makeLongString(1)},
+            {  2L,  3L,    makeLongString(1)},
+            {  2L,  3L,    makeLongString(1)},
+            {  2L,  3L,    makeLongString(1)},
+            {  2L,  3L,    makeLongString(1)}
+        };
+        initStringTableSomeNulls(client);
+        cr = client.callProcedure("@AdHoc",
+                                  "select A, B, min(C) over (partition by A order by B) as R from T_STRING_NULL ORDER BY A, B, R;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        validateStringTable(cr.getResults()[0], expectStringTableSomeNull);
+
+        Object expectStringTableAllNull[][] = new Object[][] {
+            {  1L,  1L,    null},
+            {  1L,  1L,    null},
+            {  1L,  1L,    null},
+            {  1L,  1L,    null},
+            {  1L,  1L,    null},
+            //======================================
+            {  1L,  2L,    null},
+            {  1L,  2L,    null},
+            {  1L,  2L,    null},
+            {  1L,  2L,    null},
+            {  1L,  2L,    null},
+            //======================================
+            {  1L,  3L,    null},
+            {  1L,  3L,    null},
+            {  1L,  3L,    null},
+            {  1L,  3L,    null},
+            {  1L,  3L,    null},
+            //--------------------------------------
+            {  2L,  1L,    null},
+            {  2L,  1L,    null},
+            {  2L,  1L,    null},
+            {  2L,  1L,    null},
+            {  2L,  1L,    null},
+            //======================================
+            {  2L,  2L,    null},
+            {  2L,  2L,    null},
+            {  2L,  2L,    null},
+            {  2L,  2L,    null},
+            {  2L,  2L,    null},
+            //======================================
+            {  2L,  3L,    null},
+            {  2L,  3L,    null},
+            {  2L,  3L,    null},
+            {  2L,  3L,    null},
+            {  2L,  3L,    null},
+        };
+
+        initStringTableAllNulls(client);
+        cr = client.callProcedure("@AdHoc",
+                                  "select A, B, min(C) over (partition by A order by B) as R from T_STRING_NULL ORDER BY A, B, R;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        validateStringTable(cr.getResults()[0], expectStringTableAllNull);
     }
 
     public void testMax() throws Exception {
         Client client = getClient();
+        ClientResponse cr;
+
+        //
+        // Test with no nulls.  Look for the max at the
+        // beginning, end and middle of the order by peer
+        // group.
+        //
         long expected[] [] = new long[][] {
             {  1L,  1L,    0L},
             {  1L,  1L,    0L},
@@ -564,7 +967,6 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
             {  2L,  3L,    0L}
         };
         initTable(client);
-        ClientResponse cr;
         // Find the min at the end of the peer group.
         cr = client.callProcedure("@AdHoc",
                                   "select A, B, max(-1*abs(5-C)) over (partition by A order by B) as R from T ORDER BY A, B, R;");
@@ -583,50 +985,57 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         validateTableOfLongs(cr.getResults()[0], expected);
 
+        //
+        // Test with some nulls.
+        //
         long expectedWithSomeNulls[] [] = new long[][] {
-            {  1L,  1L,    1L},
-            {  1L,  1L,    1L},
-            {  1L,  1L,    1L},
-            {  1L,  1L,    1L},
-            {  1L,  1L,    1L},
+            {  1L,  1L,    5L},
+            {  1L,  1L,    5L},
+            {  1L,  1L,    5L},
+            {  1L,  1L,    5L},
+            {  1L,  1L,    5L},
             //======================================
-            {  1L,  2L,    1L},
-            {  1L,  2L,    1L},
-            {  1L,  2L,    1L},
-            {  1L,  2L,    1L},
-            {  1L,  2L,    1L},
+            {  1L,  2L,    5L},
+            {  1L,  2L,    5L},
+            {  1L,  2L,    5L},
+            {  1L,  2L,    5L},
+            {  1L,  2L,    5L},
             //======================================
-            {  1L,  3L,    1L},
-            {  1L,  3L,    1L},
-            {  1L,  3L,    1L},
-            {  1L,  3L,    1L},
-            {  1L,  3L,    1L},
+            {  1L,  3L,    5L},
+            {  1L,  3L,    5L},
+            {  1L,  3L,    5L},
+            {  1L,  3L,    5L},
+            {  1L,  3L,    5L},
             //--------------------------------------
-            {  2L,  1L,    1L},
-            {  2L,  1L,    1L},
-            {  2L,  1L,    1L},
-            {  2L,  1L,    1L},
-            {  2L,  1L,    1L},
+            {  2L,  1L,    Long.MIN_VALUE},
+            {  2L,  1L,    Long.MIN_VALUE},
+            {  2L,  1L,    Long.MIN_VALUE},
+            {  2L,  1L,    Long.MIN_VALUE},
+            {  2L,  1L,    Long.MIN_VALUE},
             //======================================
-            {  2L,  2L,    1L},
-            {  2L,  2L,    1L},
-            {  2L,  2L,    1L},
-            {  2L,  2L,    1L},
-            {  2L,  2L,    1L},
+            {  2L,  2L,    5L},
+            {  2L,  2L,    5L},
+            {  2L,  2L,    5L},
+            {  2L,  2L,    5L},
+            {  2L,  2L,    5L},
             //======================================
-            {  2L,  3L,    1L},
-            {  2L,  3L,    1L},
-            {  2L,  3L,    1L},
-            {  2L,  3L,    1L},
-            {  2L,  3L,    1L}
+            {  2L,  3L,    5L},
+            {  2L,  3L,    5L},
+            {  2L,  3L,    5L},
+            {  2L,  3L,    5L},
+            {  2L,  3L,    5L}
         };
+
         initTableWithSomeNulls(client);
         // Find the min at the end of the peer group.
         cr = client.callProcedure("@AdHoc",
-                                  "select A, B, min(C) over (partition by A order by B) as R from T ORDER BY A, B, R;");
+                                  "select A, B, max(C) over (partition by A order by B) as R from T ORDER BY A, B, R;");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         validateTableOfLongs(cr.getResults()[0], expectedWithSomeNulls);
 
+        //
+        // Test with all nulls.
+        //
         long expectedWithAllNulls[] [] = new long[][] {
             {  1L,  1L,    Long.MIN_VALUE},
             {  1L,  1L,    Long.MIN_VALUE},
@@ -667,9 +1076,147 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
         initTableWithAllNulls(client);
         // Find the min at the end of the peer group.
         cr = client.callProcedure("@AdHoc",
-                                  "select A, B, min(C) over (partition by A order by B) as R from T ORDER BY A, B, R;");
+                                  "select A, B, max(C) over (partition by A order by B) as R from T ORDER BY A, B, R;");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         validateTableOfLongs(cr.getResults()[0], expectedWithAllNulls);
+
+        //
+        // Test strings with no nulls.
+        //
+        Object expectStringTable[][] = new Object[][] {
+            {  1L,  1L,    makeLongString(5)},
+            {  1L,  1L,    makeLongString(5)},
+            {  1L,  1L,    makeLongString(5)},
+            {  1L,  1L,    makeLongString(5)},
+            {  1L,  1L,    makeLongString(5)},
+            //======================================
+            {  1L,  2L,    makeLongString(5)},
+            {  1L,  2L,    makeLongString(5)},
+            {  1L,  2L,    makeLongString(5)},
+            {  1L,  2L,    makeLongString(5)},
+            {  1L,  2L,    makeLongString(5)},
+            //======================================
+            {  1L,  3L,    makeLongString(5)},
+            {  1L,  3L,    makeLongString(5)},
+            {  1L,  3L,    makeLongString(5)},
+            {  1L,  3L,    makeLongString(5)},
+            {  1L,  3L,    makeLongString(5)},
+            //--------------------------------------
+            {  2L,  1L,    makeLongString(5)},
+            {  2L,  1L,    makeLongString(5)},
+            {  2L,  1L,    makeLongString(5)},
+            {  2L,  1L,    makeLongString(5)},
+            {  2L,  1L,    makeLongString(5)},
+            //======================================
+            {  2L,  2L,    makeLongString(5)},
+            {  2L,  2L,    makeLongString(5)},
+            {  2L,  2L,    makeLongString(5)},
+            {  2L,  2L,    makeLongString(5)},
+            {  2L,  2L,    makeLongString(5)},
+            //======================================
+            {  2L,  3L,    makeLongString(5)},
+            {  2L,  3L,    makeLongString(5)},
+            {  2L,  3L,    makeLongString(5)},
+            {  2L,  3L,    makeLongString(5)},
+            {  2L,  3L,    makeLongString(5)}
+        };
+        initStringTable(client);
+        cr = client.callProcedure("@AdHoc",
+                                  "select A, B, max(C) over (partition by A order by B) as R from T_STRING_NULL ORDER BY A, B, R;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        validateStringTable(cr.getResults()[0], expectStringTable);
+
+        //
+        // Test strings with some nulls.
+        //
+        Object expectStringTableSomeNull[][] = new Object[][] {
+            {  1L,  1L,    makeLongString(5)},
+            {  1L,  1L,    makeLongString(5)},
+            {  1L,  1L,    makeLongString(5)},
+            {  1L,  1L,    makeLongString(5)},
+            {  1L,  1L,    makeLongString(5)},
+            //======================================
+            {  1L,  2L,    makeLongString(5)},
+            {  1L,  2L,    makeLongString(5)},
+            {  1L,  2L,    makeLongString(5)},
+            {  1L,  2L,    makeLongString(5)},
+            {  1L,  2L,    makeLongString(5)},
+            //======================================
+            {  1L,  3L,    makeLongString(5)},
+            {  1L,  3L,    makeLongString(5)},
+            {  1L,  3L,    makeLongString(5)},
+            {  1L,  3L,    makeLongString(5)},
+            {  1L,  3L,    makeLongString(5)},
+            //--------------------------------------
+            {  2L,  1L,    null},
+            {  2L,  1L,    null},
+            {  2L,  1L,    null},
+            {  2L,  1L,    null},
+            {  2L,  1L,    null},
+            //======================================
+            {  2L,  2L,    makeLongString(5)},
+            {  2L,  2L,    makeLongString(5)},
+            {  2L,  2L,    makeLongString(5)},
+            {  2L,  2L,    makeLongString(5)},
+            {  2L,  2L,    makeLongString(5)},
+            //======================================
+            {  2L,  3L,    makeLongString(5)},
+            {  2L,  3L,    makeLongString(5)},
+            {  2L,  3L,    makeLongString(5)},
+            {  2L,  3L,    makeLongString(5)},
+            {  2L,  3L,    makeLongString(5)}
+        };
+        initStringTableSomeNulls(client);
+        cr = client.callProcedure("@AdHoc",
+                                  "select A, B, max(C) over (partition by A order by B) as R from T_STRING_NULL ORDER BY A, B, R;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        validateStringTable(cr.getResults()[0], expectStringTableSomeNull);
+
+        //
+        // Test strings with all nulls.
+        //
+        Object expectStringTableAllNull[][] = new Object[][] {
+            {  1L,  1L,    null},
+            {  1L,  1L,    null},
+            {  1L,  1L,    null},
+            {  1L,  1L,    null},
+            {  1L,  1L,    null},
+            //======================================
+            {  1L,  2L,    null},
+            {  1L,  2L,    null},
+            {  1L,  2L,    null},
+            {  1L,  2L,    null},
+            {  1L,  2L,    null},
+            //======================================
+            {  1L,  3L,    null},
+            {  1L,  3L,    null},
+            {  1L,  3L,    null},
+            {  1L,  3L,    null},
+            {  1L,  3L,    null},
+            //--------------------------------------
+            {  2L,  1L,    null},
+            {  2L,  1L,    null},
+            {  2L,  1L,    null},
+            {  2L,  1L,    null},
+            {  2L,  1L,    null},
+            //======================================
+            {  2L,  2L,    null},
+            {  2L,  2L,    null},
+            {  2L,  2L,    null},
+            {  2L,  2L,    null},
+            {  2L,  2L,    null},
+            //======================================
+            {  2L,  3L,    null},
+            {  2L,  3L,    null},
+            {  2L,  3L,    null},
+            {  2L,  3L,    null},
+            {  2L,  3L,    null}
+        };
+        initStringTableAllNulls(client);
+        cr = client.callProcedure("@AdHoc",
+                                  "select A, B, max(C) over (partition by A order by B) as R from T_STRING_NULL ORDER BY A, B, R;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        validateStringTable(cr.getResults()[0], expectStringTableAllNull);
     }
 
     public void testSum() throws Exception {
@@ -738,23 +1285,23 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
             {  1L,  3L,   53L},
             {  1L,  3L,   53L},
             //--------------------------------------
-            {  2L,  1L,   20L},
-            {  2L,  1L,   20L},
-            {  2L,  1L,   20L},
-            {  2L,  1L,   20L},
-            {  2L,  1L,   20L},
+            {  2L,  1L,    0L},
+            {  2L,  1L,    0L},
+            {  2L,  1L,    0L},
+            {  2L,  1L,    0L},
+            {  2L,  1L,    0L},
             //======================================
-            {  2L,  2L,   45L},
-            {  2L,  2L,   45L},
-            {  2L,  2L,   45L},
-            {  2L,  2L,   45L},
-            {  2L,  2L,   45L},
+            {  2L,  2L,   25L},
+            {  2L,  2L,   25L},
+            {  2L,  2L,   25L},
+            {  2L,  2L,   25L},
+            {  2L,  2L,   25L},
             //======================================
-            {  2L,  3L,   53L},
-            {  2L,  3L,   53L},
-            {  2L,  3L,   53L},
-            {  2L,  3L,   53L},
-            {  2L,  3L,   53L}
+            {  2L,  3L,   55L},
+            {  2L,  3L,   55L},
+            {  2L,  3L,   55L},
+            {  2L,  3L,   55L},
+            {  2L,  3L,   55L}
         };
 
         initTableWithSomeNulls(client);
@@ -808,6 +1355,7 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         validateTableOfLongs(cr.getResults()[0], expectedWithAllNulls);
     }
+
     static public junit.framework.Test suite() {
         VoltServerConfig config = null;
         MultiConfigSuiteBuilder builder =
@@ -822,14 +1370,13 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
             success = config.compile(project);
             assertTrue(success);
             builder.addServerConfig(config);
-            /*
+
             project = new VoltProjectBuilder();
             config = new LocalCluster("test-windowed-rank.jar", 3, 1, 0, BackendTarget.NATIVE_EE_JNI);
             setupSchema(project);
             success = config.compile(project);
             assertTrue(success);
             builder.addServerConfig(config);
-            */
         }
         catch (IOException excp) {
             fail();
