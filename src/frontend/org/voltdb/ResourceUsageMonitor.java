@@ -165,7 +165,7 @@ public class ResourceUsageMonitor implements Runnable
 
     private boolean isOverMemoryLimit()
     {
-        if (m_rssLimit<=0) {
+        if (m_rssLimit<=0 && m_snmpRssLimit<=0) {
             return false;
         }
 
@@ -183,27 +183,19 @@ public class ResourceUsageMonitor implements Runnable
         if (m_snmpEnable) {
             if (m_snmpRssLimit > 0 && datum.rss >= m_snmpRssLimit) {
                 if (!m_snmpMemoryTrapSent) {
-                    try {
-                        m_snmpTrapSender.resource(m_snmpRssCriteria, FaultFacility.MEMORY, m_snmpRssLimit, datum.rss,
-                                String.format("Resource limit exceeded. RSS limit %s on %s. Current RSS size %s.",
-                                        getRssLimitLogString(m_snmpRssLimit, m_snmpRssLimitStr),
-                                        CoreUtils.getHostnameOrAddress(), getValueWithUnit(datum.rss)));
-                        m_snmpMemoryTrapSent = true;
-                    } catch (Throwable t) {
-                        m_logger.warn("failed to issue a resouceTrigger SNMP trap", t);
-                    }
+                    m_snmpTrapSender.resource(m_snmpRssCriteria, FaultFacility.MEMORY, m_snmpRssLimit, datum.rss,
+                            String.format("Resource limit exceeded. RSS limit %s on %s. Current RSS size %s.",
+                                    getRssLimitLogString(m_snmpRssLimit, m_snmpRssLimitStr),
+                                    CoreUtils.getHostnameOrAddress(), getValueWithUnit(datum.rss)));
+                    m_snmpMemoryTrapSent = true;
                 }
             } else {
-                if (m_snmpMemoryTrapSent) {
-                    try {
-                        m_snmpTrapSender.resourceClear(m_snmpRssCriteria, FaultFacility.MEMORY, m_snmpRssLimit, datum.rss,
-                                String.format("Resource limit cleared. RSS limit %s on %s. Current RSS size %s.",
-                                        getRssLimitLogString(m_snmpRssLimit, m_snmpRssLimitStr),
-                                        CoreUtils.getHostnameOrAddress(), getValueWithUnit(datum.rss)));
-                        m_snmpMemoryTrapSent = false;
-                    } catch (Throwable t) {
-                        m_logger.warn("failed to issue a resouceClear SNMP trap", t);
-                    }
+                if (m_snmpRssLimit > 0 && m_snmpMemoryTrapSent) {
+                    m_snmpTrapSender.resourceClear(m_snmpRssCriteria, FaultFacility.MEMORY, m_snmpRssLimit, datum.rss,
+                            String.format("Resource limit cleared. RSS limit %s on %s. Current RSS size %s.",
+                                    getRssLimitLogString(m_snmpRssLimit, m_snmpRssLimitStr),
+                                    CoreUtils.getHostnameOrAddress(), getValueWithUnit(datum.rss)));
+                    m_snmpMemoryTrapSent = false;
                 }
             }
         }

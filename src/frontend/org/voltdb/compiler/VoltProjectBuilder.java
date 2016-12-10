@@ -1333,21 +1333,27 @@ public class VoltProjectBuilder {
     private void setupDiskLimitType(SystemSettingsType systemSettingsType,
             org.voltdb.compiler.deploymentfile.ObjectFactory factory) {
 
-        if (m_featureDiskLimits==null || m_featureDiskLimits.isEmpty()) {
+        Set<FeatureNameType> featureNames = new HashSet<> ();
+
+        if (m_featureDiskLimits!= null && !m_featureDiskLimits.isEmpty()) {
+            featureNames.addAll(m_featureDiskLimits.keySet());
+        }
+        if (m_snmpFeatureDiskLimits!= null && !m_snmpFeatureDiskLimits.isEmpty()) {
+            featureNames.addAll(m_snmpFeatureDiskLimits.keySet());
+        }
+
+        if (featureNames.isEmpty()) {
             return;
         }
 
         DiskLimitType diskLimit = factory.createDiskLimitType();
-        Set<FeatureNameType> featureNames = new HashSet<> ();
-        featureNames.addAll(m_featureDiskLimits.keySet());
-        featureNames.addAll(m_snmpFeatureDiskLimits.keySet());
         for (FeatureNameType featureName : featureNames) {
                 DiskLimitType.Feature feature = factory.createDiskLimitTypeFeature();
                 feature.setName(featureName);
-                if (m_featureDiskLimits.containsKey(featureName)) {
+                if (m_featureDiskLimits !=null && m_featureDiskLimits.containsKey(featureName)) {
                     feature.setSize(m_featureDiskLimits.get(featureName));
                 }
-                if (m_snmpFeatureDiskLimits.containsKey(featureName)) {
+                if (m_snmpFeatureDiskLimits !=null && m_snmpFeatureDiskLimits.containsKey(featureName)) {
                     feature.setAlert(m_snmpFeatureDiskLimits.get(featureName));
                 }
                 diskLimit.getFeature().add(feature);

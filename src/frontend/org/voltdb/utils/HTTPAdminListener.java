@@ -104,7 +104,7 @@ public class HTTPAdminListener {
     HTTPClientInterface httpClientInterface = new HTTPClientInterface();
     final boolean m_jsonEnabled;
 
-    Map<String, String> m_htmlTemplates = new HashMap<String, String>();
+    Map<String, String> m_htmlTemplates = new HashMap<>();
     final boolean m_mustListen;
     final DeploymentRequestHandler m_deploymentHandler;
 
@@ -540,6 +540,7 @@ public class HTTPAdminListener {
                         handleUpdateDeployment(jsonp, target, baseRequest, request, response, authResult);
                     } else {
                         //non POST
+                        response.setCharacterEncoding("UTF-8");
                         if (jsonp != null) {
                             response.getWriter().write(jsonp + "(");
                         }
@@ -801,7 +802,7 @@ public class HTTPAdminListener {
                     response.getWriter().write(jsonp + "(");
                 }
                 if (getDeployment().getUsers() != null) {
-                    List<IdUser> id = new ArrayList<IdUser>();
+                    List<IdUser> id = new ArrayList<>();
                     for(UsersType.User u : getDeployment().getUsers().getUser()) {
                         id.add(new IdUser(u, getHostHeader()));
                     }
@@ -837,7 +838,7 @@ public class HTTPAdminListener {
                 response.getWriter().write(jsonp + "(");
             }
             JSONObject exportTypes = new JSONObject();
-            HashSet<String> exportList = new HashSet<String>();
+            HashSet<String> exportList = new HashSet<>();
             for (ServerExportEnum type : ServerExportEnum.values()) {
                 exportList.add(type.value().toUpperCase());
             }

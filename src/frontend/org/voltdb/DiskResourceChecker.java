@@ -208,18 +208,13 @@ public class DiskResourceChecker
 
         if (usedSpace >= calculatedThreshold) {
             if (m_snmpEnable && forSnmp && !m_snmpDiskTrapSent) {
-                try {
-                    m_snmpTrapSender.resource(snmpCriteria, FaultFacility.DISK, calculatedThreshold, usedSpace,
-                            String.format(
-                                    "Resource limit exceeded. Disk for path %s (%s) limit %s on %s. Current disk usage is %s.",
-                                    filePath, featureName.value(),
-                                    (percThreshold > 0 ? percThreshold + "%" : sizeThreshold + " GB"),
-                                    CoreUtils.getHostnameOrAddress(),
-                                    ResourceUsageMonitor.getValueWithUnit(usedSpace)));
-                    m_snmpDiskTrapSent = true;
-                } catch (Throwable t) {
-                    m_logger.warn("failed to issue a resouceTrigger SNMP trap", t);
-                }
+                m_snmpTrapSender.resource(snmpCriteria, FaultFacility.DISK, calculatedThreshold, usedSpace,
+                        String.format(
+                                "Resource limit exceeded. Disk for path %s (%s) limit %s on %s. Current disk usage is %s.",
+                                filePath, featureName.value(),
+                                (percThreshold > 0 ? percThreshold + "%" : sizeThreshold + " GB"),
+                                CoreUtils.getHostnameOrAddress(), ResourceUsageMonitor.getValueWithUnit(usedSpace)));
+                m_snmpDiskTrapSent = true;
             }
             m_logger.error(String.format(
                     "Resource limit exceeded. Disk for path %s (%s) limit %s on %s. Setting database to read-only. "
@@ -231,18 +226,13 @@ public class DiskResourceChecker
             return false;
         } else {
             if (forSnmp && m_snmpDiskTrapSent) {
-                try {
-                    m_snmpTrapSender.resourceClear(snmpCriteria, FaultFacility.DISK, calculatedThreshold, usedSpace,
-                            String.format(
-                                    "Resource limit cleared. Disk for path %s (%s) limit %s on %s. Current disk usage is %s.",
-                                    filePath, featureName.value(),
-                                    (percThreshold > 0 ? percThreshold + "%" : sizeThreshold + " GB"),
-                                    CoreUtils.getHostnameOrAddress(),
-                                    ResourceUsageMonitor.getValueWithUnit(usedSpace)));
-                    m_snmpDiskTrapSent = false;
-                } catch (Throwable t) {
-                    m_logger.warn("failed to issue a resouceClear SNMP trap", t);
-                }
+                m_snmpTrapSender.resourceClear(snmpCriteria, FaultFacility.DISK, calculatedThreshold, usedSpace,
+                        String.format(
+                                "Resource limit cleared. Disk for path %s (%s) limit %s on %s. Current disk usage is %s.",
+                                filePath, featureName.value(),
+                                (percThreshold > 0 ? percThreshold + "%" : sizeThreshold + " GB"),
+                                CoreUtils.getHostnameOrAddress(), ResourceUsageMonitor.getValueWithUnit(usedSpace)));
+                m_snmpDiskTrapSent = false;
             }
             return true;
         }
