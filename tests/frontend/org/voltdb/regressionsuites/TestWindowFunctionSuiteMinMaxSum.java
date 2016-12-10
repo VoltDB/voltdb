@@ -182,428 +182,438 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
         return sb.toString();
     }
 
-    private void initTable(Client client) throws NoConnectionsException, IOException, ProcCallException {
+    private void initTable(Client client, String tableName) throws NoConnectionsException, IOException, ProcCallException {
         ClientResponse cr;
-        cr = client.callProcedure("@AdHoc", "truncate table t");
+        String insertProcName = tableName + ".insert";
+        cr = client.callProcedure("@AdHoc", "truncate table " + tableName);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         cr = client.callProcedure("t.insert",  1,  1,    1);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  1,  1,    2);
+        cr = client.callProcedure(insertProcName,  1,  1,    2);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  1,  1,    3);
+        cr = client.callProcedure(insertProcName,  1,  1,    3);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  1,  1,    4);
+        cr = client.callProcedure(insertProcName,  1,  1,    4);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  1,  1,    5);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        //======================================
-        cr = client.callProcedure("t.insert",  1,  2,    1);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  1,  2,    2);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  1,  2,    3);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  1,  2,    4);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  1,  2,    5);
+        cr = client.callProcedure(insertProcName,  1,  1,    5);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         //======================================
-        cr = client.callProcedure("t.insert",  1,  3,    1);
+        cr = client.callProcedure(insertProcName,  1,  2,    1);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  1,  3,    2);
+        cr = client.callProcedure(insertProcName,  1,  2,    2);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  1,  3,    3);
+        cr = client.callProcedure(insertProcName,  1,  2,    3);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  1,  3,    4);
+        cr = client.callProcedure(insertProcName,  1,  2,    4);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  1,  3,    5);
+        cr = client.callProcedure(insertProcName,  1,  2,    5);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        //======================================
+        cr = client.callProcedure(insertProcName,  1,  3,    1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure(insertProcName,  1,  3,    2);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure(insertProcName,  1,  3,    3);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure(insertProcName,  1,  3,    4);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure(insertProcName,  1,  3,    5);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         //--------------------------------------
-        cr = client.callProcedure("t.insert",  2,  1,    1);
+        cr = client.callProcedure(insertProcName,  2,  1,    1);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  2,  1,    2);
+        cr = client.callProcedure(insertProcName,  2,  1,    2);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  2,  1,    3);
+        cr = client.callProcedure(insertProcName,  2,  1,    3);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  2,  1,    4);
+        cr = client.callProcedure(insertProcName,  2,  1,    4);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  2,  1,    5);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        //======================================
-        cr = client.callProcedure("t.insert",  2,  2,    1);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  2,  2,    2);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  2,  2,    3);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  2,  2,    4);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  2,  2,    5);
+        cr = client.callProcedure(insertProcName,  2,  1,    5);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         //======================================
-        cr = client.callProcedure("t.insert",  2,  3,    1);
+        cr = client.callProcedure(insertProcName,  2,  2,    1);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  2,  3,    2);
+        cr = client.callProcedure(insertProcName,  2,  2,    2);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  2,  3,    3);
+        cr = client.callProcedure(insertProcName,  2,  2,    3);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  2,  3,    4);
+        cr = client.callProcedure(insertProcName,  2,  2,    4);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  2,  3,    5);
+        cr = client.callProcedure(insertProcName,  2,  2,    5);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        //======================================
+        cr = client.callProcedure(insertProcName,  2,  3,    1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure(insertProcName,  2,  3,    2);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure(insertProcName,  2,  3,    3);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure(insertProcName,  2,  3,    4);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure(insertProcName,  2,  3,    5);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
     }
 
-    private void initTableWithSomeNulls(Client client) throws NoConnectionsException, IOException, ProcCallException {
+    private void initTableWithSomeNulls(Client client, String tableName) throws NoConnectionsException, IOException, ProcCallException {
         ClientResponse cr;
-        cr = client.callProcedure("@AdHoc", "truncate table t");
+        String insertProcName = tableName + ".insert";
+        cr = client.callProcedure("@AdHoc", "truncate table " + tableName);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  1,  1,    1);
+        cr = client.callProcedure(insertProcName,  1,  1,    1);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  1,  1,    2);
+        cr = client.callProcedure(insertProcName,  1,  1,    2);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  1,  1,    3);
+        cr = client.callProcedure(insertProcName,  1,  1,    3);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  1,  1,    4);
+        cr = client.callProcedure(insertProcName,  1,  1,    4);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  1,  1,    5);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        //======================================
-        cr = client.callProcedure("t.insert",  1,  2,    1);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  1,  2,    null);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  1,  2,    null);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  1,  2,    null);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  1,  2,    null);
+        cr = client.callProcedure(insertProcName,  1,  1,    5);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         //======================================
-        cr = client.callProcedure("t.insert",  1,  3,    1);
+        cr = client.callProcedure(insertProcName,  1,  2,    1);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  1,  3,    2);
+        cr = client.callProcedure(insertProcName,  1,  2,    null);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  1,  3,    3);
+        cr = client.callProcedure(insertProcName,  1,  2,    null);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  1,  3,    4);
+        cr = client.callProcedure(insertProcName,  1,  2,    null);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  1,  3,    5);
+        cr = client.callProcedure(insertProcName,  1,  2,    null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        //======================================
+        cr = client.callProcedure(insertProcName,  1,  3,    1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure(insertProcName,  1,  3,    2);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure(insertProcName,  1,  3,    3);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure(insertProcName,  1,  3,    4);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure(insertProcName,  1,  3,    5);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         //--------------------------------------
-        cr = client.callProcedure("t.insert",  2,  1,    null);
+        cr = client.callProcedure(insertProcName,  2,  1,    null);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  2,  1,    null);
+        cr = client.callProcedure(insertProcName,  2,  1,    null);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  2,  1,    null);
+        cr = client.callProcedure(insertProcName,  2,  1,    null);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  2,  1,    null);
+        cr = client.callProcedure(insertProcName,  2,  1,    null);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  2,  1,    null);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        //======================================
-        cr = client.callProcedure("t.insert",  2,  2,    1);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  2,  2,    2);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  2,  2,    3);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  2,  2,    4);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  2,  2,    5);
+        cr = client.callProcedure(insertProcName,  2,  1,    null);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         //======================================
-        cr = client.callProcedure("t.insert",  2,  3,    1);
+        cr = client.callProcedure(insertProcName,  2,  2,    1);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  2,  3,    2);
+        cr = client.callProcedure(insertProcName,  2,  2,    2);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  2,  3,    3);
+        cr = client.callProcedure(insertProcName,  2,  2,    3);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  2,  3,    4);;
+        cr = client.callProcedure(insertProcName,  2,  2,    4);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  2,  3,    5);
+        cr = client.callProcedure(insertProcName,  2,  2,    5);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        //======================================
+        cr = client.callProcedure(insertProcName,  2,  3,    1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure(insertProcName,  2,  3,    2);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure(insertProcName,  2,  3,    3);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure(insertProcName,  2,  3,    4);;
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure(insertProcName,  2,  3,    5);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
     }
 
-    private void initTableWithAllNulls(Client client) throws NoConnectionsException, IOException, ProcCallException {
+    private void initTableWithAllNulls(Client client, String tableName) throws NoConnectionsException, IOException, ProcCallException {
         ClientResponse cr;
-        cr = client.callProcedure("@AdHoc", "truncate table t");
+
+        String insertProcName = tableName + ".insert";
+        cr = client.callProcedure("@AdHoc", "truncate table " + tableName);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  1,  1, null);
+        cr = client.callProcedure(insertProcName,  1,  1, null);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  1,  1, null);
+        cr = client.callProcedure(insertProcName,  1,  1, null);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  1,  1, null);
+        cr = client.callProcedure(insertProcName,  1,  1, null);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  1,  1, null);
+        cr = client.callProcedure(insertProcName,  1,  1, null);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  1,  1, null);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        //======================================
-        cr = client.callProcedure("t.insert",  1,  2, null);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  1,  2, null);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  1,  2, null);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  1,  2, null);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  1,  2, null);
+        cr = client.callProcedure(insertProcName,  1,  1, null);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         //======================================
-        cr = client.callProcedure("t.insert",  1,  3, null);
+        cr = client.callProcedure(insertProcName,  1,  2, null);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  1,  3, null);
+        cr = client.callProcedure(insertProcName,  1,  2, null);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  1,  3, null);
+        cr = client.callProcedure(insertProcName,  1,  2, null);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  1,  3, null);
+        cr = client.callProcedure(insertProcName,  1,  2, null);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  1,  3, null);
+        cr = client.callProcedure(insertProcName,  1,  2, null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        //======================================
+        cr = client.callProcedure(insertProcName,  1,  3, null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure(insertProcName,  1,  3, null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure(insertProcName,  1,  3, null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure(insertProcName,  1,  3, null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure(insertProcName,  1,  3, null);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         //--------------------------------------
-        cr = client.callProcedure("t.insert",  2,  1, null);
+        cr = client.callProcedure(insertProcName,  2,  1, null);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  2,  1, null);
+        cr = client.callProcedure(insertProcName,  2,  1, null);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  2,  1, null);
+        cr = client.callProcedure(insertProcName,  2,  1, null);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  2,  1, null);
+        cr = client.callProcedure(insertProcName,  2,  1, null);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  2,  1, null);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        //======================================
-        cr = client.callProcedure("t.insert",  2,  2, null);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  2,  2, null);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  2,  2, null);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  2,  2, null);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  2,  2, null);
+        cr = client.callProcedure(insertProcName,  2,  1, null);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         //======================================
-        cr = client.callProcedure("t.insert",  2,  3, null);
+        cr = client.callProcedure(insertProcName,  2,  2, null);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  2,  3, null);
+        cr = client.callProcedure(insertProcName,  2,  2, null);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  2,  3, null);
+        cr = client.callProcedure(insertProcName,  2,  2, null);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  2,  3, null);
+        cr = client.callProcedure(insertProcName,  2,  2, null);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  2,  3, null);
+        cr = client.callProcedure(insertProcName,  2,  2, null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        //======================================
+        cr = client.callProcedure(insertProcName,  2,  3, null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure(insertProcName,  2,  3, null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure(insertProcName,  2,  3, null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure(insertProcName,  2,  3, null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure(insertProcName,  2,  3, null);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
     }
 
-    private void initStringTable(Client client) throws NoConnectionsException, IOException, ProcCallException {
+    private void initStringTable(Client client, String tableName) throws NoConnectionsException, IOException, ProcCallException {
         ClientResponse cr;
+
+        String insertProcName = tableName + ".insert";
         cr = client.callProcedure("@AdHoc", "truncate table t_string_null");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t_string_null.insert",  1,  1,    makeLongString(5));
+        cr = client.callProcedure(insertProcName,  1,  1,    makeLongString(5));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t_string_null.insert",  1,  1,    makeLongString(4));
+        cr = client.callProcedure(insertProcName,  1,  1,    makeLongString(4));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t_string_null.insert",  1,  1,    makeLongString(3));
+        cr = client.callProcedure(insertProcName,  1,  1,    makeLongString(3));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t_string_null.insert",  1,  1,    makeLongString(2));
+        cr = client.callProcedure(insertProcName,  1,  1,    makeLongString(2));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t_string_null.insert",  1,  1,    makeLongString(1));
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        //======================================
-        cr = client.callProcedure("t_string_null.insert",  1,  2,    makeLongString(1));
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t_string_null.insert",  1,  2,    makeLongString(2));
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t_string_null.insert",  1,  2,    makeLongString(3));
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t_string_null.insert",  1,  2,    makeLongString(4));
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t_string_null.insert",  1,  2,    makeLongString(5));
+        cr = client.callProcedure(insertProcName,  1,  1,    makeLongString(1));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         //======================================
-        cr = client.callProcedure("t_string_null.insert",  1,  3,    makeLongString(5));
+        cr = client.callProcedure(insertProcName,  1,  2,    makeLongString(1));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t_string_null.insert",  1,  3,    makeLongString(4));
+        cr = client.callProcedure(insertProcName,  1,  2,    makeLongString(2));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t_string_null.insert",  1,  3,    makeLongString(3));
+        cr = client.callProcedure(insertProcName,  1,  2,    makeLongString(3));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t_string_null.insert",  1,  3,    makeLongString(2));
+        cr = client.callProcedure(insertProcName,  1,  2,    makeLongString(4));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t_string_null.insert",  1,  3,    makeLongString(1));
+        cr = client.callProcedure(insertProcName,  1,  2,    makeLongString(5));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        //======================================
+        cr = client.callProcedure(insertProcName,  1,  3,    makeLongString(5));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure(insertProcName,  1,  3,    makeLongString(4));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure(insertProcName,  1,  3,    makeLongString(3));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure(insertProcName,  1,  3,    makeLongString(2));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure(insertProcName,  1,  3,    makeLongString(1));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         //--------------------------------------
-        cr = client.callProcedure("t_string_null.insert",  2,  1,    makeLongString(1));
+        cr = client.callProcedure(insertProcName,  2,  1,    makeLongString(1));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t_string_null.insert",  2,  1,    makeLongString(2));
+        cr = client.callProcedure(insertProcName,  2,  1,    makeLongString(2));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t_string_null.insert",  2,  1,    makeLongString(3));
+        cr = client.callProcedure(insertProcName,  2,  1,    makeLongString(3));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t_string_null.insert",  2,  1,    makeLongString(4));
+        cr = client.callProcedure(insertProcName,  2,  1,    makeLongString(4));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t_string_null.insert",  2,  1,    makeLongString(5));
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        //======================================
-        cr = client.callProcedure("t_string_null.insert",  2,  2,    makeLongString(5));
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t_string_null.insert",  2,  2,    makeLongString(4));
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t_string_null.insert",  2,  2,    makeLongString(3));
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t_string_null.insert",  2,  2,    makeLongString(2));
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t_string_null.insert",  2,  2,    makeLongString(1));
+        cr = client.callProcedure(insertProcName,  2,  1,    makeLongString(5));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         //======================================
-        cr = client.callProcedure("t_string_null.insert",  2,  3,    makeLongString(1));
+        cr = client.callProcedure(insertProcName,  2,  2,    makeLongString(5));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t_string_null.insert",  2,  3,    makeLongString(2));
+        cr = client.callProcedure(insertProcName,  2,  2,    makeLongString(4));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t_string_null.insert",  2,  3,    makeLongString(3));
+        cr = client.callProcedure(insertProcName,  2,  2,    makeLongString(3));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t_string_null.insert",  2,  3,    makeLongString(4));
+        cr = client.callProcedure(insertProcName,  2,  2,    makeLongString(2));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t_string_null.insert",  2,  3,    makeLongString(5));
+        cr = client.callProcedure(insertProcName,  2,  2,    makeLongString(1));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        //======================================
+        cr = client.callProcedure(insertProcName,  2,  3,    makeLongString(1));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure(insertProcName,  2,  3,    makeLongString(2));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure(insertProcName,  2,  3,    makeLongString(3));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure(insertProcName,  2,  3,    makeLongString(4));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure(insertProcName,  2,  3,    makeLongString(5));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
     }
 
-    private void initStringTableSomeNulls(Client client) throws NoConnectionsException, IOException, ProcCallException {
+    private void initStringTableSomeNulls(Client client, String tableName) throws NoConnectionsException, IOException, ProcCallException {
         ClientResponse cr;
+
+        String insertProcName = tableName + ".insert";
         cr = client.callProcedure("@AdHoc", "truncate table t_string_null");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t_string_null.insert",  1,  1,    makeLongString(1));
+        cr = client.callProcedure(insertProcName,  1,  1,    makeLongString(1));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t_string_null.insert",  1,  1,    makeLongString(2));
+        cr = client.callProcedure(insertProcName,  1,  1,    makeLongString(2));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t_string_null.insert",  1,  1,    makeLongString(3));
+        cr = client.callProcedure(insertProcName,  1,  1,    makeLongString(3));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t_string_null.insert",  1,  1,    makeLongString(4));
+        cr = client.callProcedure(insertProcName,  1,  1,    makeLongString(4));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t_string_null.insert",  1,  1,    makeLongString(5));
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        //======================================
-        cr = client.callProcedure("t_string_null.insert",  1,  2,    null);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t_string_null.insert",  1,  2,    null);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t_string_null.insert",  1,  2,    null);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t_string_null.insert",  1,  2,    null);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t_string_null.insert",  1,  2,    null);
+        cr = client.callProcedure(insertProcName,  1,  1,    makeLongString(5));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         //======================================
-        cr = client.callProcedure("t_string_null.insert",  1,  3,    makeLongString(1));
+        cr = client.callProcedure(insertProcName,  1,  2,    null);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t_string_null.insert",  1,  3,    makeLongString(2));
+        cr = client.callProcedure(insertProcName,  1,  2,    null);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t_string_null.insert",  1,  3,    makeLongString(3));
+        cr = client.callProcedure(insertProcName,  1,  2,    null);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t_string_null.insert",  1,  3,    makeLongString(4));
+        cr = client.callProcedure(insertProcName,  1,  2,    null);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t_string_null.insert",  1,  3,    makeLongString(5));
+        cr = client.callProcedure(insertProcName,  1,  2,    null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        //======================================
+        cr = client.callProcedure(insertProcName,  1,  3,    makeLongString(1));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure(insertProcName,  1,  3,    makeLongString(2));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure(insertProcName,  1,  3,    makeLongString(3));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure(insertProcName,  1,  3,    makeLongString(4));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure(insertProcName,  1,  3,    makeLongString(5));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         //--------------------------------------
-        cr = client.callProcedure("t_string_null.insert",  2,  1,    null);
+        cr = client.callProcedure(insertProcName,  2,  1,    null);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t_string_null.insert",  2,  1,    null);
+        cr = client.callProcedure(insertProcName,  2,  1,    null);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t_string_null.insert",  2,  1,    null);
+        cr = client.callProcedure(insertProcName,  2,  1,    null);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t_string_null.insert",  2,  1,    null);
+        cr = client.callProcedure(insertProcName,  2,  1,    null);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t_string_null.insert",  2,  1,    null);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        //======================================
-        cr = client.callProcedure("t_string_null.insert",  2,  2,    makeLongString(5));
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t_string_null.insert",  2,  2,    makeLongString(4));
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t_string_null.insert",  2,  2,    makeLongString(3));
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t_string_null.insert",  2,  2,    makeLongString(2));
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t_string_null.insert",  2,  2,    makeLongString(1));
+        cr = client.callProcedure(insertProcName,  2,  1,    null);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         //======================================
-        cr = client.callProcedure("t_string_null.insert",  2,  3,    makeLongString(5));
+        cr = client.callProcedure(insertProcName,  2,  2,    makeLongString(5));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t_string_null.insert",  2,  3,    makeLongString(4));
+        cr = client.callProcedure(insertProcName,  2,  2,    makeLongString(4));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t_string_null.insert",  2,  3,    makeLongString(3));
+        cr = client.callProcedure(insertProcName,  2,  2,    makeLongString(3));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t_string_null.insert",  2,  3,    makeLongString(2));
+        cr = client.callProcedure(insertProcName,  2,  2,    makeLongString(2));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t_string_null.insert",  2,  3,    makeLongString(1));
+        cr = client.callProcedure(insertProcName,  2,  2,    makeLongString(1));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        //======================================
+        cr = client.callProcedure(insertProcName,  2,  3,    makeLongString(5));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure(insertProcName,  2,  3,    makeLongString(4));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure(insertProcName,  2,  3,    makeLongString(3));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure(insertProcName,  2,  3,    makeLongString(2));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure(insertProcName,  2,  3,    makeLongString(1));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
     }
-    private void initStringTableAllNulls(Client client) throws NoConnectionsException, IOException, ProcCallException {
+    private void initStringTableAllNulls(Client client, String tableName) throws NoConnectionsException, IOException, ProcCallException {
         ClientResponse cr;
+
+        String insertProcName = tableName + ".insert";
         cr = client.callProcedure("@AdHoc", "truncate table t_string_null");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t_string_null.insert",  1,  1,    null);
+        cr = client.callProcedure(insertProcName,  1,  1,    null);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t_string_null.insert",  1,  1,    null);
+        cr = client.callProcedure(insertProcName,  1,  1,    null);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t_string_null.insert",  1,  1,    null);
+        cr = client.callProcedure(insertProcName,  1,  1,    null);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t_string_null.insert",  1,  1,    null);
+        cr = client.callProcedure(insertProcName,  1,  1,    null);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t_string_null.insert",  1,  1,    null);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        //======================================
-        cr = client.callProcedure("t_string_null.insert",  1,  2,    null);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t_string_null.insert",  1,  2,    null);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t_string_null.insert",  1,  2,    null);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t_string_null.insert",  1,  2,    null);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t_string_null.insert",  1,  2,    null);
+        cr = client.callProcedure(insertProcName,  1,  1,    null);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         //======================================
-        cr = client.callProcedure("t_string_null.insert",  1,  3,    null);
+        cr = client.callProcedure(insertProcName,  1,  2,    null);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t_string_null.insert",  1,  3,    null);
+        cr = client.callProcedure(insertProcName,  1,  2,    null);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t_string_null.insert",  1,  3,    null);
+        cr = client.callProcedure(insertProcName,  1,  2,    null);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t_string_null.insert",  1,  3,    null);
+        cr = client.callProcedure(insertProcName,  1,  2,    null);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t_string_null.insert",  1,  3,    null);
+        cr = client.callProcedure(insertProcName,  1,  2,    null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        //======================================
+        cr = client.callProcedure(insertProcName,  1,  3,    null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure(insertProcName,  1,  3,    null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure(insertProcName,  1,  3,    null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure(insertProcName,  1,  3,    null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure(insertProcName,  1,  3,    null);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         //--------------------------------------
-        cr = client.callProcedure("t_string_null.insert",  2,  1,    null);
+        cr = client.callProcedure(insertProcName,  2,  1,    null);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t_string_null.insert",  2,  1,    null);
+        cr = client.callProcedure(insertProcName,  2,  1,    null);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t_string_null.insert",  2,  1,    null);
+        cr = client.callProcedure(insertProcName,  2,  1,    null);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t_string_null.insert",  2,  1,    null);
+        cr = client.callProcedure(insertProcName,  2,  1,    null);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t_string_null.insert",  2,  1,    null);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        //======================================
-        cr = client.callProcedure("t_string_null.insert",  2,  2,    null);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t_string_null.insert",  2,  2,    null);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t_string_null.insert",  2,  2,    null);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t_string_null.insert",  2,  2,    null);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t_string_null.insert",  2,  2,    null);
+        cr = client.callProcedure(insertProcName,  2,  1,    null);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         //======================================
-        cr = client.callProcedure("t_string_null.insert",  2,  3,    null);
+        cr = client.callProcedure(insertProcName,  2,  2,    null);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t_string_null.insert",  2,  3,    null);
+        cr = client.callProcedure(insertProcName,  2,  2,    null);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t_string_null.insert",  2,  3,    null);
+        cr = client.callProcedure(insertProcName,  2,  2,    null);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t_string_null.insert",  2,  3,    null);
+        cr = client.callProcedure(insertProcName,  2,  2,    null);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t_string_null.insert",  2,  3,    null);
+        cr = client.callProcedure(insertProcName,  2,  2,    null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        //======================================
+        cr = client.callProcedure(insertProcName,  2,  3,    null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure(insertProcName,  2,  3,    null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure(insertProcName,  2,  3,    null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure(insertProcName,  2,  3,    null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure(insertProcName,  2,  3,    null);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
     }
 
@@ -632,6 +642,8 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
 
     public void testMin() throws Exception {
         Client client = getClient();
+        ClientResponse cr;
+
         //
         // First, test with no nulls.  Look for the min at the
         // beginning of the order by peer group, the middle and the
@@ -674,8 +686,10 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
             {  2L,  3L,    0L},
             {  2L,  3L,    0L}
         };
-        initTable(client);
-        ClientResponse cr;
+        initTable(client, "t");
+        //
+        // Test the replicated table, t.
+        //
         // Find the min at the end of the peer group.
         cr = client.callProcedure("@AdHoc",
                                   "select A, B, min(abs(5-C)) over (partition by A order by B) as R from T ORDER BY A, B, R;");
@@ -694,6 +708,27 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         validateTableOfLongs(cr.getResults()[0], expected);
 
+        //
+        // Test the partitioned table t_pc.
+        //
+        initTable(client, "t_pc");
+        // Find the min at the end of the peer group.
+        cr = client.callProcedure("@AdHoc",
+                                  "select A, B, min(abs(5-C)) over (partition by A order by B) as R from T_PC ORDER BY A, B, R;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        validateTableOfLongs(cr.getResults()[0], expected);
+
+        // Find the min at the middle of the peer group.
+        cr = client.callProcedure("@AdHoc",
+                                  "select A, B, min(abs(3-C)) over (partition by A order by B) as R from T_PC ORDER BY A, B, R;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        validateTableOfLongs(cr.getResults()[0], expected);
+
+        // Find the min at the beginning of the peer group.
+        cr = client.callProcedure("@AdHoc",
+                                  "select A, B, min(abs(1-C)) over (partition by A order by B) as R from T_PC ORDER BY A, B, R;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        validateTableOfLongs(cr.getResults()[0], expected);
         //
         // Now test with some nulls.
         //
@@ -734,16 +769,28 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
             {  2L,  3L,    1L},
             {  2L,  3L,    1L}
         };
-        initTableWithSomeNulls(client);
+
+        //
+        // Test the replicated table, T.
+        //
+        initTableWithSomeNulls(client, "t");
         cr = client.callProcedure("@AdHoc",
                                   "select A, B, min(C) over (partition by A order by B) as R from T ORDER BY A, B, R;");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         validateTableOfLongs(cr.getResults()[0], expectedWithSomeNulls);
 
         //
-        // Now test with all nulls.
+        // Test with a partitioned table.
         //
-        initTableWithAllNulls(client);
+        initTableWithSomeNulls(client, "t_pc");
+        cr = client.callProcedure("@AdHoc",
+                                  "select A, B, min(C) over (partition by A order by B) as R from T_PC ORDER BY A, B, R;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        validateTableOfLongs(cr.getResults()[0], expectedWithSomeNulls);
+        //
+        // Now test with all nulls.  First, the replicated table.
+        //
+        initTableWithAllNulls(client, "t");
 
         long expectedWithAllNulls[] [] = new long[][] {
             {  1L,  1L,    Long.MIN_VALUE},
@@ -787,6 +834,19 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         validateTableOfLongs(cr.getResults()[0], expectedWithAllNulls);
 
+        //
+        // Now test the partitioned table.
+        //
+        initTableWithAllNulls(client, "t_pc");
+        cr = client.callProcedure("@AdHoc",
+                                  "select A, B, min(C) over (partition by A order by B) as R from T_PC ORDER BY A, B, R;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        validateTableOfLongs(cr.getResults()[0], expectedWithAllNulls);
+
+        //
+        // Strings are not partitionable, so we don't test
+        // partitioned tables below here.
+        //
         Object expectStringTable[][] = new Object[][] {
             {  1L,  1L,    makeLongString(1)},
             {  1L,  1L,    makeLongString(1)},
@@ -824,7 +884,7 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
             {  2L,  3L,    makeLongString(1)},
             {  2L,  3L,    makeLongString(1)}
         };
-        initStringTable(client);
+        initStringTable(client, "t");
         cr = client.callProcedure("@AdHoc",
                                   "select A, B, min(C) over (partition by A order by B) as R from T_STRING_NULL ORDER BY A, B, R;");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
@@ -868,7 +928,7 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
             {  2L,  3L,    makeLongString(1)},
             {  2L,  3L,    makeLongString(1)}
         };
-        initStringTableSomeNulls(client);
+        initStringTableSomeNulls(client, "t_string_null");
         cr = client.callProcedure("@AdHoc",
                                   "select A, B, min(C) over (partition by A order by B) as R from T_STRING_NULL ORDER BY A, B, R;");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
@@ -913,13 +973,13 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
             {  2L,  3L,    null},
         };
 
-        initStringTableAllNulls(client);
+        initStringTableAllNulls(client, "t_string_null");
         cr = client.callProcedure("@AdHoc",
                                   "select A, B, min(C) over (partition by A order by B) as R from T_STRING_NULL ORDER BY A, B, R;");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         validateStringTable(cr.getResults()[0], expectStringTableAllNull);
-    }
 
+    }
     public void testMax() throws Exception {
         Client client = getClient();
         ClientResponse cr;
@@ -966,7 +1026,10 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
             {  2L,  3L,    0L},
             {  2L,  3L,    0L}
         };
-        initTable(client);
+        //
+        // Test the replicated table.
+        //
+        initTable(client, "t");
         // Find the min at the end of the peer group.
         cr = client.callProcedure("@AdHoc",
                                   "select A, B, max(-1*abs(5-C)) over (partition by A order by B) as R from T ORDER BY A, B, R;");
@@ -985,6 +1048,27 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         validateTableOfLongs(cr.getResults()[0], expected);
 
+        //
+        // Test the partitioned table.
+        //
+        initTable(client, "t_pc");
+        // Find the min at the end of the peer group.
+        cr = client.callProcedure("@AdHoc",
+                                  "select A, B, max(-1*abs(5-C)) over (partition by A order by B) as R from T_PC ORDER BY A, B, R;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        validateTableOfLongs(cr.getResults()[0], expected);
+
+        // Find the min at the middle of the peer group.
+        cr = client.callProcedure("@AdHoc",
+                                  "select A, B, max(-1*abs(3-C)) over (partition by A order by B) as R from T_PC ORDER BY A, B, R;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        validateTableOfLongs(cr.getResults()[0], expected);
+
+        // Find the min at the beginning of the peer group.
+        cr = client.callProcedure("@AdHoc",
+                                  "select A, B, max(-1*abs(1-C)) over (partition by A order by B) as R from T_PC ORDER BY A, B, R;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        validateTableOfLongs(cr.getResults()[0], expected);
         //
         // Test with some nulls.
         //
@@ -1026,10 +1110,23 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
             {  2L,  3L,    5L}
         };
 
-        initTableWithSomeNulls(client);
+        //
+        // Test the replicated table.
+        //
+        initTableWithSomeNulls(client, "t");
         // Find the min at the end of the peer group.
         cr = client.callProcedure("@AdHoc",
                                   "select A, B, max(C) over (partition by A order by B) as R from T ORDER BY A, B, R;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        validateTableOfLongs(cr.getResults()[0], expectedWithSomeNulls);
+
+        //
+        // Test a partitioned table.
+        //
+        initTableWithSomeNulls(client, "t_pc");
+        // Find the min at the end of the peer group.
+        cr = client.callProcedure("@AdHoc",
+                                  "select A, B, max(C) over (partition by A order by B) as R from T_PC ORDER BY A, B, R;");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         validateTableOfLongs(cr.getResults()[0], expectedWithSomeNulls);
 
@@ -1073,12 +1170,28 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
             {  2L,  3L,    Long.MIN_VALUE},
             {  2L,  3L,    Long.MIN_VALUE}
         };
-        initTableWithAllNulls(client);
+        //
+        // Test a replicated table.
+        //
+        initTableWithAllNulls(client, "t");
         // Find the min at the end of the peer group.
         cr = client.callProcedure("@AdHoc",
                                   "select A, B, max(C) over (partition by A order by B) as R from T ORDER BY A, B, R;");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         validateTableOfLongs(cr.getResults()[0], expectedWithAllNulls);
+
+        //
+        // Test a partitioned table.
+        //
+        initTableWithAllNulls(client, "t_pc");
+        // Find the min at the end of the peer group.
+        cr = client.callProcedure("@AdHoc",
+                                  "select A, B, max(C) over (partition by A order by B) as R from T_pc ORDER BY A, B, R;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        validateTableOfLongs(cr.getResults()[0], expectedWithAllNulls);
+
+        // Since strings are not a partitionable type,
+        // we don't test partition tables below.
 
         //
         // Test strings with no nulls.
@@ -1120,7 +1233,7 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
             {  2L,  3L,    makeLongString(5)},
             {  2L,  3L,    makeLongString(5)}
         };
-        initStringTable(client);
+        initStringTable(client, "t_string_null");
         cr = client.callProcedure("@AdHoc",
                                   "select A, B, max(C) over (partition by A order by B) as R from T_STRING_NULL ORDER BY A, B, R;");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
@@ -1166,7 +1279,7 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
             {  2L,  3L,    makeLongString(5)},
             {  2L,  3L,    makeLongString(5)}
         };
-        initStringTableSomeNulls(client);
+        initStringTableSomeNulls(client, "t_string_null");
         cr = client.callProcedure("@AdHoc",
                                   "select A, B, max(C) over (partition by A order by B) as R from T_STRING_NULL ORDER BY A, B, R;");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
@@ -1212,7 +1325,7 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
             {  2L,  3L,    null},
             {  2L,  3L,    null}
         };
-        initStringTableAllNulls(client);
+        initStringTableAllNulls(client, "t_string_null");
         cr = client.callProcedure("@AdHoc",
                                   "select A, B, max(C) over (partition by A order by B) as R from T_STRING_NULL ORDER BY A, B, R;");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
@@ -1221,6 +1334,8 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
 
     public void testSum() throws Exception {
         Client client = getClient();
+        ClientResponse cr;
+
         long expected[] [] = new long[][] {
             {  1L,  1L,   20L},
             {  1L,  1L,   20L},
@@ -1258,14 +1373,20 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
             {  2L,  3L,   75L},
             {  2L,  3L,   75L}
         };
-        initTable(client);
-        ClientResponse cr;
+
+        initTable(client, "t");
         // Find the sum.
         cr = client.callProcedure("@AdHoc",
                                   "select A, B, sum(B+C) over (partition by A order by B) as R from T ORDER BY A, B, R;");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         validateTableOfLongs(cr.getResults()[0], expected);
 
+        initTable(client, "t_pc");
+        // Find the sum.
+        cr = client.callProcedure("@AdHoc",
+                                  "select A, B, sum(B+C) over (partition by A order by B) as R from T_PC ORDER BY A, B, R;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        validateTableOfLongs(cr.getResults()[0], expected);
         long expectedWithSomeNulls[] [] = new long[][] {
             {  1L,  1L,   20L},
             {  1L,  1L,   20L},
@@ -1304,10 +1425,16 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
             {  2L,  3L,   55L}
         };
 
-        initTableWithSomeNulls(client);
+        initTableWithSomeNulls(client, "t");
         // Find the sum.
         cr = client.callProcedure("@AdHoc",
                                   "select A, B, sum(B+C) over (partition by A order by B) as R from T ORDER BY A, B, R;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        validateTableOfLongs(cr.getResults()[0], expectedWithSomeNulls);
+
+        initTableWithSomeNulls(client, "t_pc");
+        cr = client.callProcedure("@AdHoc",
+                                  "select A, B, sum(B+C) over (partition by A order by B) as R from T_PC ORDER BY A, B, R;");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         validateTableOfLongs(cr.getResults()[0], expectedWithSomeNulls);
 
@@ -1348,10 +1475,17 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
             {  2L,  3L, 0},
             {  2L,  3L, 0}
         };
-        initTableWithAllNulls(client);
+        initTableWithAllNulls(client, "t");
         // Find the sum.
         cr = client.callProcedure("@AdHoc",
                                   "select A, B, sum(B+C) over (partition by A order by B) as R from T ORDER BY A, B, R;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        validateTableOfLongs(cr.getResults()[0], expectedWithAllNulls);
+
+        initTableWithAllNulls(client, "t_pc");
+        // Find the sum.
+        cr = client.callProcedure("@AdHoc",
+                                  "select A, B, sum(B+C) over (partition by A order by B) as R from T_PC ORDER BY A, B, R;");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         validateTableOfLongs(cr.getResults()[0], expectedWithAllNulls);
     }
