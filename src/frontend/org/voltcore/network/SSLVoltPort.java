@@ -550,7 +550,7 @@ public class SSLVoltPort extends VoltPort {
                             DBBPool.BBContainer writesCont = er.m_encCont;
                             try {
                                 int bytesWritten = m_channel.write(writesCont.b());
-                                m_network.updateQueued(bytesWritten, false, m_port);
+                                m_network.updateQueued(-bytesWritten, false, m_port);
                                 hasRemaining = writesCont.b().hasRemaining();
                                 if (writesCont.b().hasRemaining()) {
                                     m_writeStream.checkBackpressureStarted();
