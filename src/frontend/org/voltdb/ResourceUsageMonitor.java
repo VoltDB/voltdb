@@ -105,7 +105,7 @@ public class ResourceUsageMonitor implements Runnable
             if (m_rssLimit > 0) {
                 m_logger.info("RSS limit: "  + getRssLimitLogString(m_rssLimit, m_rssLimitStr));
             }
-            if (m_snmpRssLimit > 0) {
+            if (m_snmpEnable && m_snmpRssLimit > 0) {
                 m_logger.warn("RSS SNMP notification limit: "  + getRssLimitLogString(m_snmpRssLimit, m_snmpRssLimitStr));
             }
             if (m_diskLimitConfig!=null) {
@@ -200,7 +200,7 @@ public class ResourceUsageMonitor implements Runnable
             }
         }
 
-        if (datum.rss >= m_rssLimit) {
+        if (m_rssLimit > 0 && datum.rss >= m_rssLimit) {
             m_logger.error(String.format(
                     "Resource limit exceeded. RSS limit %s on %s. Setting database to read-only. " +
                     "Use \"voltadmin resume\" command once resource constraint is corrected.",
