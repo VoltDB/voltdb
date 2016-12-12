@@ -1104,7 +1104,6 @@
                 console.log(e.message);
             }
 
-
         };
 
         this.SaveSnapShot = function (snapshotDir, snapshotFileName, onConnectionAdded) {
@@ -1463,8 +1462,6 @@
             }
         };
     });
-
-
 
     window.VoltDBService = VoltDBService = new iVoltDbService();
 

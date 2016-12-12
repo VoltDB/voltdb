@@ -1,47 +1,46 @@
 
-    function QueryUI(queryTab) {
-    "use strict";
+function QueryUI(queryTab) {
     var CommandParser,
         queryToRun = '';
     this.QueryTab = queryTab;
 
 
     function getSelectedTextWithin(el) {
-    var selectedText = "";
-    if (typeof window.getSelection != "undefined") {
-        var sel = window.getSelection(), rangeCount;
-        if ( (rangeCount = sel.rangeCount) > 0 ) {
-            var range = document.createRange();
-            for (var i = 0, selRange; i < rangeCount; ++i) {
-                range.selectNodeContents(el);
-                selRange = sel.getRangeAt(i);
-                if (selRange.compareBoundaryPoints(range.START_TO_END, range) == 1 && selRange.compareBoundaryPoints(range.END_TO_START, range) == -1) {
-                    if (selRange.compareBoundaryPoints(range.START_TO_START, range) == 1) {
-                        range.setStart(selRange.startContainer, selRange.startOffset);
+        var selectedText = "";
+        if (typeof window.getSelection != "undefined") {
+            var sel = window.getSelection(), rangeCount;
+            if ( (rangeCount = sel.rangeCount) > 0 ) {
+                var range = document.createRange();
+                for (var i = 0, selRange; i < rangeCount; ++i) {
+                    range.selectNodeContents(el);
+                    selRange = sel.getRangeAt(i);
+                    if (selRange.compareBoundaryPoints(range.START_TO_END, range) == 1 && selRange.compareBoundaryPoints(range.END_TO_START, range) == -1) {
+                        if (selRange.compareBoundaryPoints(range.START_TO_START, range) == 1) {
+                            range.setStart(selRange.startContainer, selRange.startOffset);
+                        }
+                        if (selRange.compareBoundaryPoints(range.END_TO_END, range) == -1) {
+                            range.setEnd(selRange.endContainer, selRange.endOffset);
+                        }
+                        selectedText += range.toString();
                     }
-                    if (selRange.compareBoundaryPoints(range.END_TO_END, range) == -1) {
-                        range.setEnd(selRange.endContainer, selRange.endOffset);
-                    }
-                    selectedText += range.toString();
                 }
             }
-        }
-    } else if (typeof document.selection != "undefined" && document.selection.type == "Text") {
-        var selTextRange = document.selection.createRange();
-        var textRange = selTextRange.duplicate();
-        textRange.moveToElementText(el);
-        if (selTextRange.compareEndPoints("EndToStart", textRange) == 1 && selTextRange.compareEndPoints("StartToEnd", textRange) == -1) {
-            if (selTextRange.compareEndPoints("StartToStart", textRange) == 1) {
-                textRange.setEndPoint("StartToStart", selTextRange);
+        } else if (typeof document.selection != "undefined" && document.selection.type == "Text") {
+            var selTextRange = document.selection.createRange();
+            var textRange = selTextRange.duplicate();
+            textRange.moveToElementText(el);
+            if (selTextRange.compareEndPoints("EndToStart", textRange) == 1 && selTextRange.compareEndPoints("StartToEnd", textRange) == -1) {
+                if (selTextRange.compareEndPoints("StartToStart", textRange) == 1) {
+                    textRange.setEndPoint("StartToStart", selTextRange);
+                }
+                if (selTextRange.compareEndPoints("EndToEnd", textRange) == -1) {
+                    textRange.setEndPoint("EndToEnd", selTextRange);
+                }
+                selectedText = textRange.text;
             }
-            if (selTextRange.compareEndPoints("EndToEnd", textRange) == -1) {
-                textRange.setEndPoint("EndToEnd", selTextRange);
-            }
-            selectedText = textRange.text;
         }
+        return selectedText;
     }
-    return selectedText;
-}
 
     function ICommandParser() {
         var MatchEndOfLineComments = /^\s*(?:\/\/|--).*$/gm,
@@ -199,7 +198,6 @@
             if (response.status == -5 && VoltDbAdminConfig.isAdmin && !SQLQueryRender.useAdminPortCancelled) {
 
                 if (!VoltDbAdminConfig.isDbPaused) {
-
                     //Refresh cluster state to display latest status.
                     var loadAdminTabPortAndOverviewDetails = function (portAndOverviewValues) {
                         VoltDbAdminConfig.displayPortAndRefreshClusterState(portAndOverviewValues);
@@ -236,8 +234,7 @@
             source = source.replace(/^\s+|\s+$/g,'');
             if (source == '')
                 source = $('#querybox-' + query_id).text();
-        }
-        else
+        } else
             source = $('#querybox-' + query_id).text();
 
         source = source.replace(/^\s+|\s+$/g,'');
@@ -278,8 +275,7 @@
                 else
                     if (/^explainproc /i.test(statements[i])) {
                         connectionQueue.BeginExecute('@ExplainProc', statements[i].substr(12).replace(/[\r\n]+/g, " ").replace(/'/g, "''"), callback.Callback, null, true, SQLQueryRender.getCookie("timeoutTime"));
-                    }
-                    else {
+                    } else {
                         connectionQueue.BeginExecute('@AdHoc', statements[i].replace(/[\r\n]+/g, " ").replace(/'/g, "''"), callback.Callback, null, true, SQLQueryRender.getCookie("timeoutTime"));
                     }
         }
@@ -381,8 +377,7 @@
                         + lPadZero(dt.getUTCSeconds(), 2) + "."
                         + lPadZero((dt.getUTCMilliseconds()) * 1000 + us, 6);
                     typ = 9;  //code for varchar
-                }
-                else if(typ == 22){
+                } else if(typ == 22){
                     if(val!= null){
                         val = parseFloat(val).toFixed(12)
                     }
