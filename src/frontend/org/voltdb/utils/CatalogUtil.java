@@ -701,7 +701,7 @@ public abstract class CatalogUtil {
 
     private static void validateResourceMonitorInfo(DeploymentType deployment) {
         // call resource monitor ctor so that it does all validations.
-        new ResourceUsageMonitor(deployment.getSystemsettings());
+        new ResourceUsageMonitor(deployment.getSystemsettings(), VoltDB.instance().getSnmpTrapSender());
     }
 
 

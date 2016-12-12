@@ -27,20 +27,21 @@ import java.io.File;
 import java.util.HashMap;
 import java.util.Map;
 
-import junit.framework.Assert;
-import junit.framework.TestCase;
-
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientUtils;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.snmp.DummySnmpTrapSender;
 import org.voltdb.utils.FakeStatsProducer;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.PlatformProperties;
 import org.voltdb.utils.SystemStatsCollector;
 import org.voltdb.utils.SystemStatsCollector.Datum;
+
+import junit.framework.Assert;
+import junit.framework.TestCase;
 
 public class TestMemoryResourceMonitor extends TestCase
 {
@@ -99,7 +100,7 @@ public class TestMemoryResourceMonitor extends TestCase
                 "-20",
                 "abc"
         };
-        ResourceUsageMonitor monitor = new ResourceUsageMonitor(null);
+        ResourceUsageMonitor monitor = new ResourceUsageMonitor(null, new DummySnmpTrapSender());
         for (int i=0; i<badValues.length; i++) {
             try {
                 monitor.getMemoryLimitSize(badValues[i]);
@@ -118,7 +119,7 @@ public class TestMemoryResourceMonitor extends TestCase
         configToExpectedRss.put("15%", totalSize*15/100.0);
         configToExpectedRss.put("40", 40.0*1073741824L);
         configToExpectedRss.put("1.5", 1.5*1073741824L);
-        ResourceUsageMonitor monitor = new ResourceUsageMonitor(null);
+        ResourceUsageMonitor monitor = new ResourceUsageMonitor(null, new DummySnmpTrapSender());
         for (String str : configToExpectedRss.keySet()) {
             Assert.assertEquals(configToExpectedRss.get(str), monitor.getMemoryLimitSize(str));
         }

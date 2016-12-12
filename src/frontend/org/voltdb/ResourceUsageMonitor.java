@@ -28,6 +28,7 @@ import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.snmp.FaultFacility;
 import org.voltdb.snmp.SnmpTrapSender;
 import org.voltdb.snmp.ThresholdType;
+import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.PlatformProperties;
 import org.voltdb.utils.SystemStatsCollector;
 import org.voltdb.utils.SystemStatsCollector.Datum;
@@ -44,16 +45,12 @@ public class ResourceUsageMonitor implements Runnable
     private long m_rssLimit;
     private int m_resourceCheckInterval;
     private DiskResourceChecker m_diskLimitConfig;
-    private boolean m_snmpEnable = false;
     private boolean m_snmpMemoryTrapSent = false;
     private SnmpTrapSender m_snmpTrapSender;
     private String m_snmpRssLimitStr;
     private long m_snmpRssLimit;
     private ThresholdType m_snmpRssCriteria;
 
-    public ResourceUsageMonitor(SystemSettingsType systemSettings) {
-        this(systemSettings, null);
-    }
     public ResourceUsageMonitor(SystemSettingsType systemSettings, SnmpTrapSender snmpTrapSender)
     {
         if (systemSettings == null || systemSettings.getResourcemonitor() == null) {
@@ -74,17 +71,13 @@ public class ResourceUsageMonitor implements Runnable
 
         // for snmp trap
         m_snmpTrapSender = snmpTrapSender;
-        if (null != m_snmpTrapSender) {
-            m_snmpEnable = true;
-            if (config.getMemorylimit() != null) {
-                m_snmpRssLimitStr = config.getMemorylimit().getAlert().trim();
-                // configured value is in GB. Convert it to bytes
-                double dblLimit = getMemoryLimitSize(m_snmpRssLimitStr);
-                m_snmpRssLimit = Double.valueOf(dblLimit).longValue();
-                m_snmpRssCriteria = m_snmpRssLimitStr.endsWith("%") ? ThresholdType.PERCENT:ThresholdType.LIMIT;
-            }
+        if (config.getMemorylimit() != null) {
+            m_snmpRssLimitStr = config.getMemorylimit().getAlert().trim();
+            // configured value is in GB. Convert it to bytes
+            double dblLimit = getMemoryLimitSize(m_snmpRssLimitStr);
+            m_snmpRssLimit = Double.valueOf(dblLimit).longValue();
+            m_snmpRssCriteria = m_snmpRssLimitStr.endsWith("%") ? ThresholdType.PERCENT : ThresholdType.LIMIT;
         }
-        m_snmpMemoryTrapSent = false;
     }
 
     public boolean hasResourceLimitsConfigured()
@@ -105,7 +98,7 @@ public class ResourceUsageMonitor implements Runnable
             if (m_rssLimit > 0) {
                 m_logger.info("RSS limit: "  + getRssLimitLogString(m_rssLimit, m_rssLimitStr));
             }
-            if (m_snmpEnable && m_snmpRssLimit > 0) {
+            if (MiscUtils.isPro() && m_snmpRssLimit > 0) {
                 m_logger.warn("RSS SNMP notification limit: "  + getRssLimitLogString(m_snmpRssLimit, m_snmpRssLimitStr));
             }
             if (m_diskLimitConfig!=null) {
@@ -180,7 +173,7 @@ public class ResourceUsageMonitor implements Runnable
                     " Configured SNMP rss limit=" + m_snmpRssLimit);
         }
 
-        if (m_snmpEnable) {
+        if (MiscUtils.isPro()) {
             if (m_snmpRssLimit > 0 && datum.rss >= m_snmpRssLimit) {
                 if (!m_snmpMemoryTrapSent) {
                     m_snmpTrapSender.resource(m_snmpRssCriteria, FaultFacility.MEMORY, m_snmpRssLimit, datum.rss,

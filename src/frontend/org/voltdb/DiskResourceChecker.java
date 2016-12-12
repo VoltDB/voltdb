@@ -44,13 +44,11 @@ public class DiskResourceChecker
     static FileCheckForTest s_testFileCheck; // used only for testing
     private ImmutableMap<FeatureNameType, FeatureDiskLimitConfig> m_configuredLimits;
     private SnmpTrapSender m_snmpTrapSender;
-    private boolean m_snmpEnable = false;
     private boolean m_snmpDiskTrapSent = false;
 
     public DiskResourceChecker(DiskLimitType diskLimit, SnmpTrapSender snmpTrapSender) {
         findDiskLimitConfiguration(diskLimit);
         m_snmpTrapSender = snmpTrapSender;
-        m_snmpEnable = (null != m_snmpTrapSender);
         m_snmpDiskTrapSent = false;
     }
 
@@ -88,7 +86,7 @@ public class DiskResourceChecker
                 m_logger.info(config.m_featureName.value() + " on " + config.m_path + " configured with size limit: " +
                         (config.m_diskSizeLimit > 0 ? config.m_diskSizeLimit + "GB" : config.m_diskSizeLimitPerc + "%"));
             }
-            if ((m_snmpEnable) && (config.m_diskSizeLimitSnmp > 0 || config.m_diskSizeLimitPercSnmp > 0)) {
+            if ((MiscUtils.isPro()) && (config.m_diskSizeLimitSnmp > 0 || config.m_diskSizeLimitPercSnmp > 0)) {
                 m_logger.warn(config.m_featureName.value() + " on " + config.m_path + " configured with SNMP notification limit: " +
                         (config.m_diskSizeLimitSnmp > 0 ? config.m_diskSizeLimitSnmp + "GB" : config.m_diskSizeLimitPercSnmp + "%"));
             }
@@ -207,7 +205,7 @@ public class DiskResourceChecker
         }
 
         if (usedSpace >= calculatedThreshold) {
-            if (m_snmpEnable && forSnmp && !m_snmpDiskTrapSent) {
+            if (MiscUtils.isPro() && forSnmp && !m_snmpDiskTrapSent) {
                 m_snmpTrapSender.resource(snmpCriteria, FaultFacility.DISK, calculatedThreshold, usedSpace,
                         String.format(
                                 "Resource limit exceeded. Disk for path %s (%s) limit %s on %s. Current disk usage is %s.",
