@@ -136,6 +136,7 @@ import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.settings.DbSettings;
 import org.voltdb.settings.NodeSettings;
+import org.voltdb.snmp.DummySnmpTrapSender;
 import org.voltdb.types.ConstraintType;
 import org.xml.sax.SAXException;
 
@@ -701,7 +702,7 @@ public abstract class CatalogUtil {
 
     private static void validateResourceMonitorInfo(DeploymentType deployment) {
         // call resource monitor ctor so that it does all validations.
-        new ResourceUsageMonitor(deployment.getSystemsettings(), VoltDB.instance().getSnmpTrapSender());
+        new ResourceUsageMonitor(deployment.getSystemsettings(), new DummySnmpTrapSender());
     }
 
 
