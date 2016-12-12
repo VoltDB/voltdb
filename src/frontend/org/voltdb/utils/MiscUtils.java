@@ -241,6 +241,8 @@ public class MiscUtils {
             return null;
         }
 
+        hostLog.info("Found VoltDB license file at path: " + pathToLicense);
+
         // Initialize the API. This parses the file but does NOT verify signatures.
         if (licenseApi.initializeFromFile(licenseFile) == false) {
             hostLog.fatal("Unable to load license file: could not parse license.");

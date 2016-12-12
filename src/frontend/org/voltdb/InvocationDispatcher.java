@@ -1841,7 +1841,8 @@ public final class InvocationDispatcher {
         assert(!isSinglePartition || (partition >= 0));
         final ClientInterfaceHandleManager cihm = m_cihm.get(connectionId);
         if (cihm == null) {
-            hostLog.warn("InvocationDispatcher.createTransaction request rejected. "
+            hostLog.rateLimitedLog(60, Level.WARN, null,
+                    "InvocationDispatcher.createTransaction request rejected. "
                     + "This is likely due to VoltDB ceasing client communication as it "
                     + "shuts down.");
             return false;
