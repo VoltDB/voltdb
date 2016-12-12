@@ -58,9 +58,11 @@ public class SSLVoltPort extends VoltPort {
 
     private boolean processingReads = false;
     private boolean processingWrites = false;
+    private final NetworkDBBPool m_writePool;
 
-    public SSLVoltPort(VoltNetwork network, InputHandler handler, InetSocketAddress remoteAddress, NetworkDBBPool pool, SSLEngine sslEngine) {
-        super(network, handler, remoteAddress, pool);
+    public SSLVoltPort(VoltNetwork network, InputHandler handler, InetSocketAddress remoteAddress, NetworkDBBPool readPool, NetworkDBBPool writePool, SSLEngine sslEngine) {
+        super(network, handler, remoteAddress, readPool);
+        this.m_writePool = writePool;
         this.m_sslEngine = sslEngine;
         this.m_sslBufferDecrypter = new SSLBufferDecrypter(sslEngine);
         int appBufferSize = m_sslEngine.getSession().getApplicationBufferSize();
@@ -192,7 +194,7 @@ public class SSLVoltPort extends VoltPort {
             if (serializedSize == DeferredSerialization.EMPTY_MESSAGE_LENGTH) continue;
             //Fastpath, serialize to direct buffer creating no garbage
             if (outCont == null) {
-                outCont = m_pool.acquire();
+                outCont = m_writePool.acquire();
                 outCont.b().clear();
             }
             if (outCont.b().remaining() >= serializedSize) {
@@ -385,32 +387,36 @@ public class SSLVoltPort extends VoltPort {
                             }
                             fragCont = m_q.peek();
                         }
-                        if (fragCont != null) {
-                            DBBPool.BBContainer encCont = null;
-                            try {
-                                ByteBuffer fragment = fragCont.b();
-                                encCont = m_sslBufferEncrypter.encryptBuffer(fragment.slice());
-                                EncryptionResult er = new EncryptionResult(encCont, encCont.b().remaining());
-                                m_network.updateQueued(er.m_nBytesEncrypted, false, m_port);
-                                m_writeGateway.enque(er);
-                            } catch (IOException e) {
-                                System.err.println("EncryptionGateway: " + e.getMessage());
-                                if (encCont != null) {
-                                    encCont.discard();
+                        try {
+                            if (fragCont != null) {
+                                DBBPool.BBContainer encCont = null;
+                                try {
+                                    ByteBuffer fragment = fragCont.b();
+                                    encCont = m_sslBufferEncrypter.encryptBuffer(fragment.slice());
+                                    EncryptionResult er = new EncryptionResult(encCont, encCont.b().remaining());
+                                    m_network.updateQueued(er.m_nBytesEncrypted, false, m_port);
+                                    m_writeGateway.enque(er);
+                                } catch (IOException e) {
+                                    if (encCont != null) {
+                                        encCont.discard();
+                                    }
                                 }
                             }
-                        }
-                        synchronized (m_q) {
-                            if (m_isShuttingDown) {
-                                m_hasOutstandingTask.set(false);
-                                return;
-                            }
-                            fragCont = m_q.poll();
-                            fragCont.discard();
-                            if (!m_q.isEmpty()) {
-                                SSLEncryptionService.instance().submitForEncryption(this);
-                            } else {
-                                m_hasOutstandingTask.set(false);
+                        } finally {
+                            synchronized (m_q) {
+                                if (m_isShuttingDown) {
+                                    m_hasOutstandingTask.set(false);
+                                    return;
+                                }
+                                fragCont = m_q.poll();
+                                if (fragCont != null) {
+                                    fragCont.discard();
+                                }
+                                if (!m_q.isEmpty()) {
+                                    SSLEncryptionService.instance().submitForEncryption(this);
+                                } else {
+                                    m_hasOutstandingTask.set(false);
+                                }
                             }
                         }
                     }

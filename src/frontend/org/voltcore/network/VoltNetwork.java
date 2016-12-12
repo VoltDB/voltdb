@@ -105,6 +105,7 @@ class VoltNetwork implements Runnable, IOStatsIntf
     private final HashSet<VoltPort> m_ports = new HashSet<VoltPort>();
     private final AtomicInteger m_numPorts = new AtomicInteger();
     final NetworkDBBPool m_pool = new NetworkDBBPool();
+    final NetworkDBBPool m_writePool = new NetworkDBBPool();
     private final String m_coreBindId;
     final String networkThreadName;
 
@@ -262,6 +263,7 @@ class VoltNetwork implements Runnable, IOStatsIntf
                     handler,
                     (InetSocketAddress) channel.socket().getRemoteSocketAddress(),
                     m_pool,
+                    m_writePool,
                     sslEngine);
         }
     }
@@ -405,6 +407,7 @@ class VoltNetwork implements Runnable, IOStatsIntf
         }
 
         m_pool.clear();
+        m_writePool.clear();
 
         try {
             m_selector.close();
