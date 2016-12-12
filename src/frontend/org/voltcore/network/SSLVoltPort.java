@@ -92,30 +92,29 @@ public class SSLVoltPort extends VoltPort {
             return;
         }
 
-        int nRead = 0;
         try {
-            final int maxRead = m_handler.getMaxRead();
-            nRead = fillReadStream(maxRead);
-            if (nRead > 0) {
-                int queued = queueDecryptionTasks();
-                if (queued > 0) {
-                    processingReads = true;
+            if (!processingReads) {
+                processingReads = processReads();
+            }
+
+            if (!processingReads && !processingWrites) {
+                processingWrites = buildEncryptionTasks();
+            }
+
+            if (processingReads) {
+                if (isReadStreamProcessed()) {
+                    processingReads = false;
+                    processingWrites = buildEncryptionTasks();
                 }
-            }
-
-            boolean responsesReceived = buildEncryptionTasks();
-            if (responsesReceived) {
-                processingWrites = true;
-            }
-
-            if (processingReads && isReadStreamProcessed()) {
-                processingReads = false;
                 m_network.nudgeChannel(this);
             }
-            if (processingWrites && isWriteStreamProcessed()) {
-                writeStream().checkBackpressureEnded();
-                processingWrites = false;
-                disableWriteSelection();
+
+            if (processingWrites) {
+                if (isWriteStreamProcessed()) {
+                    writeStream().checkBackpressureEnded();
+                    processingWrites = false;
+                    disableWriteSelection();
+                }
                 m_network.nudgeChannel(this);
             }
         } catch (IOException ioe) {
@@ -129,6 +128,18 @@ public class SSLVoltPort extends VoltPort {
                 m_running = false;
             }
         }
+    }
+
+    private boolean processReads() throws IOException {
+        final int maxRead = m_handler.getMaxRead();
+        int nRead = fillReadStream(maxRead);
+        if (nRead > 0) {
+            int queued = queueDecryptionTasks();
+            if (queued > 0) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private boolean gatewaysEmpty() {
