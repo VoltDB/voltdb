@@ -17,9 +17,16 @@
 
 package org.voltdb;
 
+import org.voltdb.pmsg.DRAgent.ClusterInfo;
+
+import java.util.List;
 import java.util.Map;
 
 public interface ProducerDRGateway {
+
+    public interface DRProducerResponseHandler {
+        public void notifyOfResponse(boolean success, boolean shouldRetry, String failureCause);
+    }
 
     /*
      * Ensure that all enabled DR Producer Hosts have agreed on the PBD file name
@@ -62,4 +69,6 @@ public interface ProducerDRGateway {
     public void activateDRProducer();
 
     public void blockOnSyncSnapshotGeneration();
+
+    public void startCursor(final List<ClusterInfo> requestedCursors, final DRProducerResponseHandler handler);
 }
