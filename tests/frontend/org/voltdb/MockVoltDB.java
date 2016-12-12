@@ -59,6 +59,7 @@ import org.voltdb.catalog.Table;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.dtxn.SiteTracker;
+import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.settings.ClusterSettings;
@@ -812,5 +813,10 @@ public class MockVoltDB implements VoltDBInterface
 
     @Override
     public void setShuttingdown(boolean shuttingdown) {
+    }
+
+    @Override
+    public Cartographer getCartograhper() {
+        return null;
     }
 }
