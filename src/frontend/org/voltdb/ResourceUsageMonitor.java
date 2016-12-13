@@ -177,7 +177,7 @@ public class ResourceUsageMonitor implements Runnable
             if (m_snmpRssLimit > 0 && datum.rss >= m_snmpRssLimit) {
                 if (!m_snmpMemoryTrapSent) {
                     m_snmpTrapSender.resource(m_snmpRssCriteria, FaultFacility.MEMORY, m_snmpRssLimit, datum.rss,
-                            String.format("Resource limit exceeded. RSS limit %s on %s. Current RSS size %s.",
+                            String.format("SNMP resource limit exceeded. RSS limit %s on %s. Current RSS size %s.",
                                     getRssLimitLogString(m_snmpRssLimit, m_snmpRssLimitStr),
                                     CoreUtils.getHostnameOrAddress(), getValueWithUnit(datum.rss)));
                     m_snmpMemoryTrapSent = true;
@@ -185,7 +185,7 @@ public class ResourceUsageMonitor implements Runnable
             } else {
                 if (m_snmpRssLimit > 0 && m_snmpMemoryTrapSent) {
                     m_snmpTrapSender.resourceClear(m_snmpRssCriteria, FaultFacility.MEMORY, m_snmpRssLimit, datum.rss,
-                            String.format("Resource limit cleared. RSS limit %s on %s. Current RSS size %s.",
+                            String.format("SNMP resource limit cleared. RSS limit %s on %s. Current RSS size %s.",
                                     getRssLimitLogString(m_snmpRssLimit, m_snmpRssLimitStr),
                                     CoreUtils.getHostnameOrAddress(), getValueWithUnit(datum.rss)));
                     m_snmpMemoryTrapSent = false;
