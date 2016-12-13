@@ -57,6 +57,8 @@ public class AbstractTopology {
     public final static String TOPO_HOSTS = "hosts";
     public final static String TOPO_HOST = "host";
     public final static String TOPO_SPH = "targetSiteCount";
+    public final static String TOPO_HOST_LIVE = "live";
+
     public final long version;
     public final ImmutableMap<Integer, Host> hostsById;
     public final ImmutableMap<Integer, Partition> partitionsById;
@@ -169,7 +171,7 @@ public class AbstractTopology {
         public final int targetSiteCount;
         public final HAGroup haGroup;
         public final ImmutableSortedSet<Partition> partitions;
-
+        public boolean isLive = true;
         private Host(int id, int targetSiteCount, HAGroup haGroup, Collection<Partition> partitions) {
             assert(id >= 0);
             assert(targetSiteCount >= 0);
@@ -190,6 +192,10 @@ public class AbstractTopology {
                     .collect(Collectors.toList());
         }
 
+        public void markHostInactive() {
+            this.isLive = false;
+        }
+
         @Override
         public String toString() {
             String[] partitionIdStrings = partitions.stream().map(p -> String.valueOf(p.id)).toArray(String[]::new);
@@ -202,6 +208,7 @@ public class AbstractTopology {
             stringer.key(TOPO_HOST_ID).value(id);
             stringer.key(TOPO_SPH).value(targetSiteCount);
             stringer.key(TOPO_HAGROUP).value(haGroup.token);
+            stringer.key(TOPO_HOST_LIVE).value(isLive);
             stringer.key(TOPO_PARTITIONS).array();
             for (Partition partition : partitions) {
                 stringer.value(partition.id);
@@ -226,7 +233,12 @@ public class AbstractTopology {
                 int partitionId = jsonPartitions.getInt(i);
                 partitions.add(partitionsById.get(partitionId));
             }
-            return new Host(id, targetSiteCount, haGroup, partitions);
+            boolean isLive = json.getBoolean(TOPO_HOST_LIVE);
+            Host host =  new Host(id, targetSiteCount, haGroup, partitions);
+            if (!isLive) {
+                host.markHostInactive();
+            }
+            return host;
         }
 
         @Override
@@ -281,6 +293,7 @@ public class AbstractTopology {
     private static class MutableHost implements Comparable<MutableHost> {
         final int id;
         int targetSiteCount;
+        boolean isLive = true;
         HAGroup haGroup;
         Set<MutablePartition> partitions = new TreeSet<MutablePartition>();
 
@@ -297,6 +310,10 @@ public class AbstractTopology {
         /** Count the number of partitions that consider this host a leader */
         int leaderCount() {
             return (int) partitions.stream().filter(p -> p.leader == this).count();
+        }
+
+        public void markHostInactive() {
+            this.isLive = false;
         }
 
         @Override
@@ -950,6 +967,9 @@ public class AbstractTopology {
                     .map(mp -> partitionsById.get(mp.id))
                     .collect(Collectors.toList());
             Host newHost = new Host(mutableHost.id, mutableHost.targetSiteCount, mutableHost.haGroup, hostPartitions);
+            if (!mutableHost.isLive) {
+                newHost.markHostInactive();
+            }
             fullHostSet.add(newHost);
         }
 
@@ -1384,6 +1404,9 @@ public class AbstractTopology {
         // create mutable hosts without partitions
         for (Host host : topology.hostsById.values()) {
             final MutableHost mutableHost = new MutableHost(host.id, host.targetSiteCount, host.haGroup);
+            if (hosts.contains(host.id)) {
+                mutableHost.markHostInactive();
+            }
             mutableHostMap.put(host.id, mutableHost);
         }
 
