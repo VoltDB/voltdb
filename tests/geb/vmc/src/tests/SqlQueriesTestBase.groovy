@@ -131,5 +131,4 @@ class SqlQueriesTestBase extends TestBase {
 
         return qResult
     }
-
 }

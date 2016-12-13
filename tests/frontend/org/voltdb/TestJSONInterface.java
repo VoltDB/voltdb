@@ -322,7 +322,7 @@ public class TestJSONInterface extends TestCase {
         // Call insert
         String paramsInJSON = pset.toJSONString();
         //System.out.println(paramsInJSON);
-        HashMap<String, String> params = new HashMap<String, String>();
+        HashMap<String, String> params = new HashMap<>();
         params.put("Procedure", procName);
         params.put("Parameters", paramsInJSON);
         if (procCallTimeout > 0) {
@@ -1046,7 +1046,7 @@ public class TestJSONInterface extends TestCase {
             // test malformed auth (too short hash)
             pset = ParameterSet.fromArrayNoCopy(u.name + "-X2", u.password + "-X2", u.name + "-X2");
             String paramsInJSON = pset.toJSONString();
-            HashMap<String, String> params = new HashMap<String, String>();
+            HashMap<String, String> params = new HashMap<>();
             params.put("Procedure", "Insert");
             params.put("Parameters", paramsInJSON);
             params.put("User", u.name);
@@ -1059,7 +1059,7 @@ public class TestJSONInterface extends TestCase {
             // test malformed auth (gibberish password, but good length)
             pset = ParameterSet.fromArrayNoCopy(u.name + "-X3", u.password + "-X3", u.name + "-X3");
             paramsInJSON = pset.toJSONString();
-            params = new HashMap<String, String>();
+            params = new HashMap<>();
             params.put("Procedure", "Insert");
             params.put("Parameters", paramsInJSON);
             params.put("User", u.name);
@@ -1672,6 +1672,7 @@ public class TestJSONInterface extends TestCase {
             ResourceMonitorType resourceMonitor = new ResourceMonitorType();
             Memorylimit memLimit = new Memorylimit();
             memLimit.setSize("10");
+            memLimit.setAlert("5");
             resourceMonitor.setMemorylimit(memLimit);
             ss.setResourcemonitor(resourceMonitor);
             String ndeptype = mapper.writeValueAsString(deptype);

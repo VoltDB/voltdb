@@ -6,7 +6,6 @@
         this.hostIP = "";
         this.shortApiCredentials = "";
         this.isLoginVerified = false;
-
         this.authorization = null;
         DbConnection = function (aServer, aPort, aAdmin, aUser, aPassword, aIsHashPassword, aProcess) {
             this.server = aServer == null ? 'localhost' : $.trim(aServer);
@@ -322,8 +321,8 @@
                         this.EndExecute();
                     }
                 };
-
             };
+
             this.procedures = {
                 '@AdHoc': { '1': ['varchar'] },
                 '@Explain': { '1': ['varchar'] },
@@ -498,7 +497,7 @@
                         checkConnection(false);
                     }
                 },
-                 statusCode:{
+                statusCode:{
                     401: function(response){
                         alert('Failed to authenticate to the server via Kerberos. Please check the configuration of your client/browser')
                     }
@@ -680,9 +679,7 @@ jQuery.extend({
                     }
                 });
             }
-        }
-
-        else {
+        } else {
             jQuery.ajax({
                 type: 'POST',
                 url: url,
@@ -702,7 +699,6 @@ jQuery.extend({
             });
         }
     }
-
 });
 
 jQuery.extend({
@@ -731,7 +727,6 @@ jQuery.extend({
                     }
                 }
             });
-
         } else if(formData.indexOf('PrepareShutdown') > -1){
             jQuery.ajax({
                 type: 'GET',
@@ -781,9 +776,7 @@ jQuery.extend({
                 }
             });
         }
-
     }
-
 });
 
 jQuery.extend({

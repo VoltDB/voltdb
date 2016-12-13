@@ -34,6 +34,7 @@ import org.voltdb.VoltDBInterface;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltZK;
+import org.voltdb.snmp.SnmpTrapSender;
 
 @ProcInfo(singlePartition = false)
 
@@ -88,7 +89,11 @@ public class Resume extends VoltSystemProcedure {
 
                 voltdb.getHostMessenger().unpause();
                 voltdb.setMode(RUNNING);
-
+                // for snmp
+                SnmpTrapSender snmp = voltdb.getSnmpTrapSender();
+                if (snmp != null) {
+                    snmp.resume("Cluster resumed.");
+                }
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
