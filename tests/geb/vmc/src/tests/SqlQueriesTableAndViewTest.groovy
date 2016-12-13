@@ -43,7 +43,7 @@ class SqlQueriesTableAndViewTest extends SqlQueriesTestBase {
         at SqlQueryPage
     }
 
-    def "Check created table by refreshing in SQL QUERY tab and Schema tab"() {
+    def checkCreatedTableByRefreshingInSqlQueryTabAndSchemaTab() {
         when: 'click the SQL Query link (if needed)'
         openSqlQueryPage()
         then: 'should be on SQL Query page'
@@ -157,7 +157,7 @@ class SqlQueriesTableAndViewTest extends SqlQueriesTestBase {
         println("refresh button clicked and created table deleted in schema page of Size and worksheet tab")
     }
 
-    def "Check created views by refreshing in SQL QUERY tab and Schema tab"() {
+    def checkCreatedViewsByRefreshingInSqlQueryTabAndSchemaTab() {
         when: 'click the SQL Query link (if needed)'
         openSqlQueryPage()
         then: 'should be on SQL Query page'
@@ -277,6 +277,5 @@ class SqlQueriesTableAndViewTest extends SqlQueriesTestBase {
         waitFor(waitTime){page.refreshtableworksheet.isDisplayed()}
         page.refreshtableworksheet.click()
         println("refresh button clicked and created views deleted in schema page of Size and worksheet tab")
-
     }
 }

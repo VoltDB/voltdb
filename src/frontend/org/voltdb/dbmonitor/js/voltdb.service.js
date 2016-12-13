@@ -702,6 +702,15 @@
                             updatedData.systemsettings.resourcemonitor.memorylimit.size = encodeURIComponent(parseInt(updatedData.systemsettings.resourcemonitor.memorylimit.size));
                         }
                     }
+                    if ('alert' in updatedData.systemsettings.resourcemonitor.memorylimit) {
+                        var memoryAlert = "";
+                        if (updatedData.systemsettings.resourcemonitor.memorylimit.alert.indexOf("%")>-1) {
+                            memoryAlert = parseInt(updatedData.systemsettings.resourcemonitor.memorylimit.alert.replace("%", ""));
+                            updatedData.systemsettings.resourcemonitor.memorylimit.alert = memoryAlert + encodeURIComponent("%");
+                        } else {
+                            updatedData.systemsettings.resourcemonitor.memorylimit.alert = encodeURIComponent(parseInt(updatedData.systemsettings.resourcemonitor.memorylimit.alert));
+                        }
+                    }
                 }
 
                 var features = [];
@@ -721,6 +730,19 @@
                                 name: updatedData.systemsettings.resourcemonitor.disklimit.feature[i].name,
                                 size: updatedData.systemsettings.resourcemonitor.disklimit.feature[i].size
                             });
+
+                            if ('alert' in updatedData.systemsettings.resourcemonitor.disklimit.feature[i]) {
+                              var diskAlert = "";
+                              if (updatedData.systemsettings.resourcemonitor.disklimit.feature[i].alert.indexOf("%")>-1) {
+                                diskAlert = parseInt(updatedData.systemsettings.resourcemonitor.disklimit.feature[i].alert.replace("%", ""));
+                                updatedData.systemsettings.resourcemonitor.disklimit.feature[i].alert = diskAlert + encodeURIComponent("%");
+                              } else {
+                                updatedData.systemsettings.resourcemonitor.disklimit.feature[i].alert = encodeURIComponent(parseInt(updatedData.systemsettings.resourcemonitor.disklimit.feature[i].alert));
+                              }
+                              features.push({
+                                alert: updatedData.systemsettings.resourcemonitor.disklimit.feature[i].alert});
+                            }
+
                         }
                         updatedData.systemsettings.resourcemonitor.disklimit.feature = features;
                     }
@@ -1104,7 +1126,6 @@
                 console.log(e.message);
             }
 
-
         };
 
         this.SaveSnapShot = function (snapshotDir, snapshotFileName, onConnectionAdded) {
@@ -1463,8 +1484,6 @@
             }
         };
     });
-
-
 
     window.VoltDBService = VoltDBService = new iVoltDbService();
 

@@ -31,6 +31,7 @@ import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.settings.ClusterSettings;
+import org.voltdb.snmp.SnmpTrapSender;
 
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
@@ -295,10 +296,12 @@ public interface VoltDBInterface
      * Return the license api. This may be null in community editions!
      * @return License API based on edition.
      */
-     public LicenseApi getLicenseApi();
-     //Return JSON string represenation of license information.
-     public String getLicenseInformation();
-
+    public LicenseApi getLicenseApi();
+    //Return JSON string represenation of license information.
+    public String getLicenseInformation();
 
     public <T> ListenableFuture<T> submitSnapshotIOWork(Callable<T> work);
+
+    public SnmpTrapSender getSnmpTrapSender();
+
 }
