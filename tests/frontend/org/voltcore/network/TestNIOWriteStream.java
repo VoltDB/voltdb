@@ -439,6 +439,8 @@ public class TestNIOWriteStream extends TestCase {
                 queue.addAndGet(bytes);
                 return false;
             }
+            @Override
+            public boolean checkQueued() { return false; }
         });
         wstream.enqueue(ByteBuffer.allocate(32));
         wstream.serializeQueuedWrites(pool);

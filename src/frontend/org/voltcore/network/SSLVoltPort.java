@@ -33,6 +33,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class SSLVoltPort extends VoltPort {
 
@@ -59,6 +60,7 @@ public class SSLVoltPort extends VoltPort {
     private boolean processingReads = false;
     private boolean processingWrites = false;
     private final NetworkDBBPool m_writePool;
+    private final AtomicInteger m_bytesWritten = new AtomicInteger(0);
 
     public SSLVoltPort(VoltNetwork network, InputHandler handler, InetSocketAddress remoteAddress, NetworkDBBPool readPool, NetworkDBBPool writePool, SSLEngine sslEngine) {
         super(network, handler, remoteAddress, readPool);
@@ -111,23 +113,31 @@ public class SSLVoltPort extends VoltPort {
 
             if (processingWrites) {
                 if (isWriteStreamProcessed()) {
-                    writeStream().checkBackpressureEnded();
                     processingWrites = false;
                     disableWriteSelection();
                 }
                 m_network.addToChangeList(this, true);
             }
+
+            checkBackPressure();
         } catch (IOException ioe) {
             while (!gatewaysEmpty()) {
             }
             throw ioe;
         } finally {
-            m_writeStream.checkBackpressureEnded();
             synchronized (m_lock) {
                 assert (m_running == true);
                 m_running = false;
             }
         }
+    }
+
+    private void checkBackPressure() {
+        int bytesQueued = m_bytesWritten.getAndSet(0);
+        if (bytesQueued != 0) {
+            writeStream().updateQueued(bytesQueued, false);
+        }
+        writeStream().checkBackpressureEnded();
     }
 
     private boolean processReads() throws IOException {
@@ -200,6 +210,7 @@ public class SSLVoltPort extends VoltPort {
         if (oldlist.isEmpty()) return false;
         DeferredSerialization ds = null;
         DBBPool.BBContainer outCont = null;
+        int bytesQueued = 0;
         while ((ds = oldlist.poll()) != null) {
             final int serializedSize = ds.getSerializedSize();
             if (serializedSize == DeferredSerialization.EMPTY_MESSAGE_LENGTH) continue;
@@ -214,6 +225,7 @@ public class SSLVoltPort extends VoltPort {
                 final ByteBuffer slice =  outCont.b().slice();
                 ds.serialize(slice);
                 slice.position(0);
+                bytesQueued += slice.remaining();
                 outCont.b().position(outCont.b().limit());
                 outCont.b().limit(oldLimit);
             } else {
@@ -229,6 +241,7 @@ public class SSLVoltPort extends VoltPort {
                 ByteBuffer buf = ByteBuffer.allocate(serializedSize);
                 ds.serialize(buf);
                 buf.position(0);
+                bytesQueued += buf.remaining();
                 while (buf.hasRemaining()) {
                     if (buf.remaining() > m_appBufferSize) {
                         int oldLimit = buf.limit();
@@ -252,6 +265,7 @@ public class SSLVoltPort extends VoltPort {
                 outCont = null;
             }
         }
+        m_bytesWritten.getAndAdd(bytesQueued);
         return true;
     }
 
@@ -403,9 +417,9 @@ public class SSLVoltPort extends VoltPort {
                                 DBBPool.BBContainer encCont = null;
                                 try {
                                     ByteBuffer fragment = fragCont.b();
+                                    int nBytesClear = fragment.remaining();
                                     encCont = m_sslBufferEncrypter.encryptBuffer(fragment.slice());
-                                    EncryptionResult er = new EncryptionResult(encCont, encCont.b().remaining());
-                                    m_network.updateQueued(er.m_nBytesEncrypted, false, m_port);
+                                    EncryptionResult er = new EncryptionResult(encCont, nBytesClear);
                                     m_writeGateway.enque(er);
                                 } catch (IOException e) {
                                     if (encCont != null) {
@@ -567,11 +581,11 @@ public class SSLVoltPort extends VoltPort {
                             DBBPool.BBContainer writesCont = er.m_encCont;
                             try {
                                 int bytesWritten = m_channel.write(writesCont.b());
-                                m_network.updateQueued(-bytesWritten, false, m_port);
                                 hasRemaining = writesCont.b().hasRemaining();
                                 if (writesCont.b().hasRemaining()) {
                                     m_writeStream.checkBackpressureStarted();
                                 } else {
+                                    m_bytesWritten.getAndAdd(-er.m_nBytesClear);
                                     synchronized (m_q) {
                                         if (m_isShuttingDown) {
                                             m_hasOutstandingTask.set(false);
@@ -594,7 +608,6 @@ public class SSLVoltPort extends VoltPort {
                             if (!m_q.isEmpty()) {
                                 SSLEncryptionService.instance().submitForEncryption(this);
                             } else {
-                                m_writeStream.checkBackpressureEnded();
                                 m_hasOutstandingTask.set(false);
                             }
                         }
@@ -622,10 +635,10 @@ public class SSLVoltPort extends VoltPort {
 
     public class EncryptionResult {
         public final DBBPool.BBContainer m_encCont;
-        public final int m_nBytesEncrypted;
-        public EncryptionResult(DBBPool.BBContainer encCont, int nBytesEncrypted) {
+        public final int m_nBytesClear;
+        public EncryptionResult(DBBPool.BBContainer encCont, int nBytesClear) {
             this.m_encCont = encCont;
-            this.m_nBytesEncrypted = nBytesEncrypted;
+            this.m_nBytesClear = nBytesClear;
         }
     }
 

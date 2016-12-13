@@ -825,6 +825,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 public boolean queue(int bytes) {
                     return m_acg.get().queue(bytes);
                 }
+                @Override
+                public boolean checkQueued() { return false; }
             };
         }
 
