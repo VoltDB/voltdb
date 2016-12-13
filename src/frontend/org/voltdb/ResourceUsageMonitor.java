@@ -99,7 +99,7 @@ public class ResourceUsageMonitor implements Runnable
                 m_logger.info("RSS limit: "  + getRssLimitLogString(m_rssLimit, m_rssLimitStr));
             }
             if (MiscUtils.isPro() && m_snmpRssLimit > 0) {
-                m_logger.warn("RSS SNMP notification limit: "  + getRssLimitLogString(m_snmpRssLimit, m_snmpRssLimitStr));
+                m_logger.info("RSS SNMP notification limit: "  + getRssLimitLogString(m_snmpRssLimit, m_snmpRssLimitStr));
             }
             if (m_diskLimitConfig!=null) {
                 m_diskLimitConfig.logConfiguredLimits();
