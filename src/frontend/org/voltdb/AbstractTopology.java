@@ -1370,4 +1370,46 @@ public class AbstractTopology {
         Partition partition =  partitionsById.values().iterator().next();
         return partition.k;
     }
+
+    /**
+     * reassign partition leaders from the hosts to other hosts.
+     * @param topology current topology
+     * @param hosts The hosts on which partition leaders will be reassigned.
+     * @return new AbstractTopology
+     */
+    public static AbstractTopology shiftPartitionLeaders(AbstractTopology topology, Set<Integer> hosts) {
+        Map<Integer, MutableHost> mutableHostMap = new TreeMap<>();
+        Map<Integer, MutablePartition> mutablePartitionMap = new TreeMap<>();
+
+        // create mutable hosts without partitions
+        for (Host host : topology.hostsById.values()) {
+            final MutableHost mutableHost = new MutableHost(host.id, host.targetSiteCount, host.haGroup);
+            mutableHostMap.put(host.id, mutableHost);
+        }
+
+        for (Partition partition : topology.partitionsById.values()) {
+            MutablePartition mp = new MutablePartition(partition.id, partition.k);
+            mutablePartitionMap.put(mp.id, mp);
+            for (Integer hId : partition.hostIds) {
+                final MutableHost mutableHost = mutableHostMap.get(hId);
+                mp.hosts.add(mutableHost);
+                mutableHost.partitions.add(mp);
+            }
+            int leaderId = partition.leaderHostId;
+            if (hosts.contains(partition.leaderHostId)) {
+                //find the first host other than hosts with the partition
+                for (Host host : topology.hostsById.values()) {
+                    if (!hosts.contains(host.id)) {
+                        List<Integer> list = topology.getPartitionIdList(host.id);
+                        if (list.contains(partition.id)) {
+                            leaderId = host.id;
+                            break;
+                        }
+                    }
+                }
+            }
+            mp.leader = mutableHostMap.get(leaderId);
+        }
+        return convertMutablesToTopology(topology.version, mutableHostMap, mutablePartitionMap);
+    }
 }

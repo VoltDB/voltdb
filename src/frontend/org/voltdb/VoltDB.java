@@ -296,6 +296,9 @@ public class VoltDB {
         /** number of hosts that participate in a VoltDB cluster */
         public int m_hostCount = UNDEFINED;
 
+        /** number of hosts that will be added late in a VoltDB cluster */
+        public int m_inactiveCount = 0;
+
         /** not sites per host actually, number of local sites in this node */
         public int m_sitesperhost = UNDEFINED;
 
@@ -446,7 +449,9 @@ public class VoltDB {
                     m_meshBrokers = sbld.toString();
                 } else if (arg.equals("hostcount")) {
                     m_hostCount = Integer.parseInt(args[++i].trim());
-                } else if (arg.equals("sitesperhost")){
+                } else if (arg.equals("inactivecount")) {
+                    m_inactiveCount = Integer.parseInt(args[++i].trim());
+                }else if (arg.equals("sitesperhost")){
                     m_sitesperhost = Integer.parseInt(args[++i].trim());
                 } else if (arg.equals("publicinterface")) {
                     m_publicInterface = args[++i].trim();

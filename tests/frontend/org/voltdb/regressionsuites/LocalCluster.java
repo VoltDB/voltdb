@@ -89,6 +89,7 @@ public class LocalCluster extends VoltServerConfig {
     boolean m_compiled = false;
     protected int m_siteCount;
     int m_hostCount;
+    int m_inactiveCount = 0;
     int m_kfactor = 0;
     int m_clusterId;
     protected String m_jarFileName;
@@ -165,6 +166,17 @@ public class LocalCluster extends VoltServerConfig {
     {
         this(jarFileName, siteCount, hostCount, kfactor, target, null);
     }
+
+    public LocalCluster(String jarFileName,
+            int siteCount,
+            int hostCount,
+            int kfactor,
+            BackendTarget target,
+            int inactiveCount)
+{
+       this(jarFileName, siteCount, hostCount, kfactor, target, null);
+       this.m_inactiveCount = inactiveCount;
+}
 
     public LocalCluster(String jarFileName,
                         int siteCount,
@@ -277,6 +289,7 @@ public class LocalCluster extends VoltServerConfig {
             m_sitesperhostOverrides.put(hostId, m_siteCount);
         }
         templateCmdLine.hostCount(hostCount);
+        templateCmdLine.setInactiveCount(m_inactiveCount);
         templateCmdLine.setNewCli(isNewCli);
         if (kfactor > 0 && !MiscUtils.isPro()) {
             m_kfactor = 0;
@@ -712,7 +725,8 @@ public class LocalCluster extends VoltServerConfig {
         templateCmdLine.coordinators(internalPortGenerator.getCoordinators());
 
         m_eeProcs.clear();
-        for (int ii = 0; ii < m_hostCount; ii++) {
+        int hostCount = m_hostCount - m_inactiveCount;
+        for (int ii = 0; ii < hostCount; ii++) {
             String logfile = "LocalCluster_host_" + ii + ".log";
             m_eeProcs.add(new EEProcess(templateCmdLine.target(), m_siteCount, logfile));
         }
@@ -738,7 +752,7 @@ public class LocalCluster extends VoltServerConfig {
         }
 
         // create all the out-of-process servers
-        for (int i = oopStartIndex; i < m_hostCount; i++) {
+        for (int i = oopStartIndex; i < hostCount; i++) {
             try {
                 if (isNewCli && !skipInit) {
                     initOne(i, clearLocalDataDirectories);
@@ -1034,7 +1048,7 @@ public class LocalCluster extends VoltServerConfig {
                 cmdln.m_sitesperhost = m_sitesperhostOverrides.get(hostId);
             }
 
-
+            cmdln.setInactiveCount(m_inactiveCount);
             m_cmdLines.add(cmdln);
             m_procBuilder.command().clear();
             List<String> cmdlnList = cmdln.createCommandLine();

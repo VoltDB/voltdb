@@ -134,6 +134,7 @@ public class CommandLine extends VoltDB.Configuration
                 cl.javaProperties.put(e.getKey(), e.getValue());
             }
         }
+        cl.m_inactiveCount = m_inactiveCount;
 
         return cl;
     }
@@ -777,6 +778,10 @@ public class CommandLine extends VoltDB.Configuration
         if (m_placementGroup != null) {
             cmdline.add("placementgroup"); cmdline.add(m_placementGroup);
         }
+
+        if ( m_inactiveCount > 0) {
+            cmdline.add("inactivecount"); cmdline.add(Integer.toString(m_inactiveCount));
+        }
         return cmdline;
     }
 
@@ -1046,5 +1051,10 @@ public class CommandLine extends VoltDB.Configuration
     String m_placementGroup = "";
     public void setPlacementGroup(String placementGroup) {
         m_placementGroup = placementGroup;
+    }
+
+    int m_inactiveCount = 0;
+    public void setInactiveCount(int inactiveCount) {
+        this.m_inactiveCount = inactiveCount;
     }
 }

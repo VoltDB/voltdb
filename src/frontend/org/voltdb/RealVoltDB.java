@@ -727,6 +727,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 config.m_hostCount = readDepl.deployment.getCluster().getHostcount();
             }
 
+            config.m_hostCount -= config.m_inactiveCount;
+
             // set the mode first thing
             m_mode = OperationMode.INITIALIZING;
             m_config = config;
@@ -940,7 +942,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
              * Ning: topology may not reflect the true partitions in the cluster during join. So if another node
              * is trying to rejoin, it should rely on the cartographer's view to pick the partitions to replace.
              */
-            AbstractTopology topo = getTopology(config.m_startAction, hostGroups, m_joinCoordinator);
+            Set<Integer> inactiveHosts = Sets.newHashSet();
+            int inactiveHostId = Integer.MAX_VALUE;
+            for (int i = 0; i < m_config.m_inactiveCount; i++) {
+                inactiveHosts.add(inactiveHostId--);
+            }
+            AbstractTopology topo = getTopology(config.m_startAction, hostGroups, m_joinCoordinator, inactiveHosts);
             m_partitionsToSitesAtStartupForExportInit = new ArrayList<>();
             try {
                 // IV2 mailbox stuff
@@ -1608,7 +1615,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     // Get topology information.  If rejoining, get it directly from
     // ZK.  Otherwise, try to do the write/read race to ZK on startup.
     private AbstractTopology getTopology(StartAction startAction, Map<Integer, String> hostGroups,
-                                   JoinCoordinator joinCoordinator)
+                                   JoinCoordinator joinCoordinator, Set<Integer> inactiveHosts )
     {
         AbstractTopology topology = null;
         Map<Integer, Integer> sitesPerHostMap = m_messenger.getSitesPerHostMapFromZK();
@@ -1626,15 +1633,25 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             // initial start or recover
             final Set<Integer> liveHostIds = m_messenger.getLiveHostIds();
             Preconditions.checkArgument(hostGroups.keySet().equals(liveHostIds));
-            int hostcount = liveHostIds.size();
+            int sph = sitesPerHostMap.values().iterator().next();
+            for (int inactiveHostId : inactiveHosts) {
+                sitesPerHostMap.put(inactiveHostId, sph);
+                hostGroups.put(inactiveHostId, "inactiveGroup");
+            }
             int kfactor = m_catalogContext.getDeployment().getCluster().getKfactor();
+            int hostcount = liveHostIds.size() + inactiveHosts.size();
             String errMsg = AbstractTopology.validateLegacyClusterConfig(hostcount, sitesPerHostMap, kfactor);
             if (errMsg != null) {
                 VoltDB.crashLocalVoltDB(errMsg, false, null);
             }
             topology = AbstractTopology.getTopology(sitesPerHostMap, hostGroups, kfactor);
+            //reassign leaders from inactive hosts to active hosts
+            if (!inactiveHosts.isEmpty()) {
+                topology = AbstractTopology.shiftPartitionLeaders(topology, inactiveHosts);
+            }
             TopologyZKUtils.registerTopologyToZK(m_messenger.getZK(), topology);
         }
+
         return topology;
     }
 
