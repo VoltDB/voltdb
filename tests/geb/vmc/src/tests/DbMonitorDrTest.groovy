@@ -55,8 +55,7 @@ class DbMonitorDrTest extends TestBase {
         }
     }
 
-    def "Verify Show and Hide Database Replication (DR) table (MASTER)" (){
-
+    def verifyShowAndHideDatabaseReplicationTableMASTER() {
 //        when:"Check showHideDiv is displayed"
 //        if(waitFor(30){!page.isDrSectionOpen()})
 //        {
@@ -68,16 +67,13 @@ class DbMonitorDrTest extends TestBase {
          page.dbDrMode.isDisplayed()
         then: "Dr Mode must be Master or Both"
         println("DR Mode" + page.dbDrMode.text())
-        if(page.dbDrMode.text().equals("") || page.dbDrMode.text().equals("Replica"))
-        {
+        if(page.dbDrMode.text().equals("") || page.dbDrMode.text().equals("Replica")) {
             println("No Master mode")
         }
-        else
-        {
+        else {
             println("Master mode")
             when: "ensure the DR section is open"
-            if(!page.isDrSectionOpen())
-            {
+            if(!page.isDrSectionOpen()) {
                waitFor(30){ page.openDrArea()}
             }
             then: 'DR area is open (initially)'
@@ -85,13 +81,11 @@ class DbMonitorDrTest extends TestBase {
 
             when: 'click Show/Hide Graph (to close)'
             page.closeDrArea()
-
             then:'Dr area is closed'
             !page.isDrAreaOpen()
 
             when:'click Show/Hide Graph (to open)'
             page.openDrArea()
-
             then:'Dr area is open (again)'
             page.isDrAreaOpen()
 
@@ -100,19 +94,14 @@ class DbMonitorDrTest extends TestBase {
             then: 'Graph area is closed (again)'
             !page.isDrAreaOpen()
         }
-
-
     }
 
-    def "Verify the Ascending and Descending in the Partition ID column of Database Replication (DR) table (MASTER)"(){
+    def verifyTheAscendingAndDescendingInThePartitionIdColumnOfDatabaseReplicationTableMASTER() {
             String before = ""
             String after  = ""
             when:"Check if Dr Master is Displayed"
-
-            if(page.dbDrMode.text().equals("") || !waitFor(40){page.isDrMasterSectionOpen()})
-            {
+            if(page.dbDrMode.text().equals("") || !waitFor(40){page.isDrMasterSectionOpen()}) {
                 println("Master section is not visible")
-
             }
             else {
                 when: 'click Partition ID'
@@ -132,7 +121,6 @@ class DbMonitorDrTest extends TestBase {
                 else
                     before = "descending"
 
-
                 if (before.equals("ascending") && after.equals("descending"))
                     assert true
                 else
@@ -142,20 +130,14 @@ class DbMonitorDrTest extends TestBase {
             assert true
         }
 
-        def "Verify the Ascending and Descending in the Status column of Database Replication (DR) table (MASTER)"(){
+        def verifyTheAscendingAndDescendingInStatusColumnOfDatabaseReplicationTableMASTER() {
             String before = ""
             String after  = ""
             when:"Check if Dr Master is Displayed"
-
-            if(page.dbDrMode.text().equals("") || !waitFor(40){page.isDrMasterSectionOpen()})
-            {
+            if(page.dbDrMode.text().equals("") || !waitFor(40){page.isDrMasterSectionOpen()}) {
                 println("Master section is not visible")
-
             }
             else {
-
-
-
                 when: 'click Status'
                 waitFor(10){ page.clickStatus()}
                 then: 'check if row count is in ascending'
@@ -180,20 +162,14 @@ class DbMonitorDrTest extends TestBase {
             assert true
         }
 
-        def "Verify the Ascending and Descending in the MB On disk column of Database Replication (DR) table (MASTER)"(){
+        def verifyTheAscendingAndDescendingInMbOnDiskColumnOfDatabaseReplicationTableMASTER() {
             String before = ""
             String after  = ""
             when:"Check if Dr Master is Displayed"
-
-            if(page.dbDrMode.text().equals("") ||!waitFor(40){page.isDrMasterSectionOpen()})
-            {
+            if(page.dbDrMode.text().equals("") ||!waitFor(40){page.isDrMasterSectionOpen()}) {
                 println("Master section is not visible")
-
             }
             else {
-
-
-
                 when: 'click MB On disk'
                 waitFor(10){ page.clickMbOnDisk()}
                 then: 'check if row count is in ascending'
@@ -210,7 +186,6 @@ class DbMonitorDrTest extends TestBase {
                 else
                     after = "ascending"
 
-
                 if (before.equals("ascending") && after.equals("descending"))
                     assert true
                 else
@@ -220,20 +195,14 @@ class DbMonitorDrTest extends TestBase {
             assert true
         }
 
-        def "Verify the Ascending and Descending in the Replica Latency(ms) column of Database Replication (DR) table (MASTER)"(){
+        def verifyTheAscendingAndDescendingInTheReplicaLatencyColumnOfDatabaseReplicationTableMASTER() {
             String before = ""
             String after  = ""
             when:"Check if Dr Master is Displayed"
-
-            if(page.dbDrMode.text().equals("") ||!waitFor(40){page.isDrMasterSectionOpen()})
-            {
+            if(page.dbDrMode.text().equals("") ||!waitFor(40){page.isDrMasterSectionOpen()}) {
                 println("Master section is not visible")
-
             }
             else {
-
-
-
                 when: 'click Replica Latency(ms)'
                 waitFor(10){ page.clickReplicaLatencyMs()}
                 then: 'check if row count is in ascending'
@@ -250,7 +219,6 @@ class DbMonitorDrTest extends TestBase {
                 else
                     after = "ascending"
 
-
                 if (before.equals("ascending") && after.equals("descending"))
                     assert true
                 else
@@ -260,20 +228,14 @@ class DbMonitorDrTest extends TestBase {
             assert true
         }
 
-        def "Verify the Ascending and Descending in the replicaLatency (Transaction) column of Database Replication (DR) table (MASTER)"(){
+        def verifyTheAscendingAndDescendingInReplicaLatencyColumnOfDatabaseReplicationTableMASTER() {
             String before = ""
             String after  = ""
             when:"Check if Dr Master is Displayed"
-
-            if(page.dbDrMode.text().equals("") ||!waitFor(40){page.isDrMasterSectionOpen()})
-            {
+            if(page.dbDrMode.text().equals("") ||!waitFor(40){page.isDrMasterSectionOpen()}) {
                 println("Master section is not visible")
-
             }
             else {
-
-
-
                 when: 'click Replica Latency(Trans)'
                 waitFor(10){ page.clickReplicaLatencyTrans()}
                 then: 'check if row count is in ascending'
@@ -298,8 +260,7 @@ class DbMonitorDrTest extends TestBase {
             assert true
     }
 
-    def "Verify Show and Hide Database Replication (DR) table (REPLICA)" (){
-
+    def verifyShowAndHideDatabaseReplicationTableREPLICA() {
 //        when:"Check showHideDiv is displayed"
 //        if(waitFor(30){!page.isDrSectionOpen()})
 //        {
@@ -311,16 +272,13 @@ class DbMonitorDrTest extends TestBase {
         page.dbDrMode.isDisplayed()
         then: "Dr Mode must be Master or Both"
         println("DR Mode" + page.dbDrMode.text())
-        if(page.dbDrMode.text().equals("") || page.dbDrMode.text().equals("Master"))
-        {
+        if(page.dbDrMode.text().equals("") || page.dbDrMode.text().equals("Master")) {
             println("No Replica mode")
         }
-        else
-        {
+        else {
             println("Replica mode")
             when: "ensure the DR section is open"
-            if(!page.isDrSectionOpen())
-            {
+            if(!page.isDrSectionOpen()) {
                 waitFor(30){ page.openDrArea()}
             }
             then: 'DR area is open (initially)'
@@ -328,13 +286,11 @@ class DbMonitorDrTest extends TestBase {
 
             when: 'click Show/Hide Graph (to close)'
             page.closeDrArea()
-
             then:'Dr area is closed'
             !page.isDrAreaOpen()
 
             when:'click Show/Hide Graph (to open)'
             page.openDrArea()
-
             then:'Dr area is open (again)'
             page.isDrAreaOpen()
 
@@ -343,19 +299,14 @@ class DbMonitorDrTest extends TestBase {
             then: 'Graph area is closed (again)'
             !page.isDrAreaOpen()
         }
-
-
     }
 
-    def "Verify the Ascending and Descending in the Server column of Database Replication (DR) table (REPLICA)"(){
+    def verifyTheAscendingAndDescendingInServerColumnOfDatabaseReplicationTableREPLICA() {
         String before = ""
         String after  = ""
         when:"Check if Dr Master is Displayed"
-
-        if(page.dbDrMode.text().equals("") ||!waitFor(40){page.isDrReplicaSectionOpen()})
-        {
+        if(page.dbDrMode.text().equals("") ||!waitFor(40){page.isDrReplicaSectionOpen()}) {
             println("Replica section is not visible")
-
         }
         else {
             when: 'click Replica Server'
@@ -382,15 +333,12 @@ class DbMonitorDrTest extends TestBase {
         assert true
     }
 
-    def "Verify the Ascending and Descending in the Status column of Database Replication (DR) table (REPLICA)"(){
+    def verifyTheAscendingAndDescendingInStatusColumnOfDatabaseReplicationTableREPLICA() {
         String before = ""
         String after  = ""
         when:"Check if Dr Master is Displayed"
-
-        if(page.dbDrMode.text().equals("") ||!waitFor(40){page.isDrReplicaSectionOpen()})
-        {
+        if(page.dbDrMode.text().equals("") ||!waitFor(40){page.isDrReplicaSectionOpen()}) {
             println("Replica section is not visible")
-
         }
         else {
             when: 'click Replica Status'
@@ -417,15 +365,12 @@ class DbMonitorDrTest extends TestBase {
         assert true
     }
 
-    def "Verify the Ascending and Descending in the Replication Rate(1 min) column of Database Replication (DR) table (REPLICA)"(){
+    def verifyTheAscendingAndDescendingInReplicationRate1MinColumnOfDatabaseReplicationTableREPLICA() {
         String before = ""
         String after  = ""
         when:"Check if Dr Master is Displayed"
-
-        if(page.dbDrMode.text().equals("") ||!waitFor(40){page.isDrReplicaSectionOpen()})
-        {
+        if(page.dbDrMode.text().equals("") ||!waitFor(40){page.isDrReplicaSectionOpen()}) {
             println("Replica section is not visible")
-
         }
         else {
             when: 'click Replication Rate (1 min)'
@@ -452,15 +397,14 @@ class DbMonitorDrTest extends TestBase {
         assert true
     }
 
-    def "Verify the Ascending and Descending in the Replication Rate(5 min) column of Database Replication (DR) table (REPLICA)"() {
+    def verifyTheAscendingAndDescendingInTheReplicationRate5MinColumnOfDatabaseReplicationTableREPLICA() {
         String before = ""
         String after = ""
         when: "Check if Dr Master is Displayed"
-
         if (page.dbDrMode.text().equals("") || !waitFor(40) { page.isDrReplicaSectionOpen() }) {
             println("Replica section is not visible")
-
-        } else {
+        }
+        else {
             when: 'click Replication Rate (5 min)'
             waitFor(10) { page.clickReplicationRate5() }
             then: 'check if row count is in ascending'
@@ -485,10 +429,9 @@ class DbMonitorDrTest extends TestBase {
         assert true
     }
 
-    def "Verify the text in the Title in Database Replication Table (MASTER) "(){
+    def verifyTheTextInTheTitleInDatabaseReplicationTableMASTER() {
         when: "Check Master Title is displayed or not"
-        if(page.drMasterTitleDisplayed())
-        {
+        if(page.drMasterTitleDisplayed()) {
             assert true
         }
         then:
@@ -496,16 +439,14 @@ class DbMonitorDrTest extends TestBase {
             println(waitFor(20) { page.drMasterTitle.text() })
             page.drMasterTitle.text().equals("Master")
         }
-        else
-        {
+        else {
             println("Master Section is not visible")
         }
     }
 
-    def "Verify the text in the Title in Database Replication Table (REPLICA) "(){
+    def verifyTheTextInTheTitleInDatabaseReplicationTableREPLICA() {
         when: "Check Replica Title is displayed or not"
-        if(page.drReplicaTitleDisplayed())
-        {
+        if(page.drReplicaTitleDisplayed()) {
             assert true
         }
         then:
@@ -513,28 +454,23 @@ class DbMonitorDrTest extends TestBase {
             println(waitFor(20) { page.drReplicaTitle.text() })
             page.drReplicaTitle.text().equals("Replica")
         }
-        else
-        {
+        else {
             println("Replica Section is not visible")
         }
     }
 
-
-    def "Verify search in Database Replication table (MASTER)"(){
+    def verifySearchInDatabaseReplicationTableMASTER() {
         boolean isValid=false
         String searchText = ""
         boolean isDROpen = false
 
-       when: "Check if DR section is present"
-        if(!page.isDrSectionOpen())
-        {
+        when: "Check if DR section is present"
+        if(!page.isDrSectionOpen()) {
             isDROpen = false
             println("Dr Replication is not present")
         }
-        else
-        {
-            if(!page.isDrMasterSectionOpen())
-            {
+        else {
+            if(!page.isDrMasterSectionOpen()) {
                 println("Dr MAster section is not present")
                 isDROpen = false
             }
@@ -544,6 +480,7 @@ class DbMonitorDrTest extends TestBase {
         }
         then:
         println("proceed")
+
         when: "Set the value of Master filter"
         if(isDROpen==true) {
             if (page.partitionIdRows.size() > 1) {
@@ -562,11 +499,9 @@ class DbMonitorDrTest extends TestBase {
                 } else {
                     isValid = true
                 }
-
             }
         }
-        else
-        {
+        else {
             isValid=true
         }
         then:
@@ -576,24 +511,20 @@ class DbMonitorDrTest extends TestBase {
             } else {
                 assert false;
             }
-
     }
 
-    def "Verify search in Database Replication table (REPLICA)"(){
+    def verifySearchInDatabaseReplicationTableREPLICA() {
         boolean isValid=false
         String searchText = ""
         boolean isDROpen = false
 
         when: "Check if DR section is present"
-        if(!page.isDrSectionOpen())
-        {
+        if(!page.isDrSectionOpen()) {
             isDROpen = false
             println("Dr Replication is not present")
         }
-        else
-        {
-            if(!page.isDrReplicaSectionOpen())
-            {
+        else {
+            if(!page.isDrReplicaSectionOpen()) {
                 println("Dr Replica section is not present")
                 isDROpen = false
             }
@@ -603,6 +534,7 @@ class DbMonitorDrTest extends TestBase {
         }
         then:
         println("proceed")
+
         when: "Set the value of Master filter"
         if(isDROpen==true) {
             if (page.filterReplicaServerRows.size() > 1) {
@@ -621,11 +553,9 @@ class DbMonitorDrTest extends TestBase {
                 } else {
                     isValid = true
                 }
-
             }
         }
-        else
-        {
+        else {
             isValid=true
         }
         then:
@@ -635,6 +565,5 @@ class DbMonitorDrTest extends TestBase {
         } else {
             assert false;
         }
-
     }
 }

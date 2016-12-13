@@ -8,7 +8,6 @@
         var cpuMinCount = 0;
         var cmdLogSecCount = 0;
         var cmdLogMinCount = 0;
-
         var tpsSecCount = 0;
         var tpsMinCount = 0;
         var memSecCount = 0;
@@ -27,7 +26,8 @@
         var latencyChart;
         var transactionChart;
         var partitionChart;
-        var drReplicationChart;        var cmdLogChart;
+        var drReplicationChart;
+        var cmdLogChart;
         var cmdLogOverlay = [];
         var cmdLogOverlayMin = [];
         var cmdLogOverlayDay = [];
@@ -38,7 +38,9 @@
         var ChartLatency = nv.models.lineChart();
         var ChartTransactions = nv.models.lineChart();
         var ChartPartitionIdleTime = nv.models.lineChart();
-        var ChartDrReplicationRate = nv.models.lineChart();        var ChartCommandlog = nv.models.lineChart();        var dataMapperSec = {};
+        var ChartDrReplicationRate = nv.models.lineChart();
+        var ChartCommandlog = nv.models.lineChart();
+        var dataMapperSec = {};
         var dataMapperMin = {};
         var dataMapperDay = {};
         this.enumPartitionColor = {
@@ -247,7 +249,7 @@
 
                 ChartCpu.xAxis.rotateLabels(-20);
 
-               ChartCpu.yAxis
+                ChartCpu.yAxis
                     .tickFormat(d3.format(',.2f'));
 
                 ChartCpu.yAxis
@@ -276,9 +278,9 @@
         nv.addGraph({
             generate: function() {
                 ChartRam.xAxis
-              .tickFormat(function (d) {
-                  return d3.time.format('%X')(new Date(d));
-              });
+                    .tickFormat(function (d) {
+                      return d3.time.format('%X')(new Date(d));
+                    });
 
                 ChartRam.xAxis.rotateLabels(-20);
 
@@ -308,9 +310,9 @@
         nv.addGraph({
             generate: function() {
                 ChartLatency.xAxis
-              .tickFormat(function (d) {
-                  return d3.time.format('%X')(new Date(d));
-              });
+                    .tickFormat(function (d) {
+                      return d3.time.format('%X')(new Date(d));
+                    });
 
                 ChartLatency.xAxis.rotateLabels(-20);
 
@@ -338,31 +340,30 @@
         });
 
         nv.addGraph({
-           generate: function() {
-               ChartTransactions.xAxis
-              .tickFormat(function (d) {
-                  return d3.time.format('%X')(new Date(d));
-              });
+            generate: function() {
+                ChartTransactions.xAxis
+                    .tickFormat(function (d) {
+                      return d3.time.format('%X')(new Date(d));
+                    });
 
+                ChartTransactions.xAxis.rotateLabels(-20);
 
-               ChartTransactions.xAxis.rotateLabels(-20);
-
-               ChartTransactions.yAxis
+                ChartTransactions.yAxis
                    .tickFormat(d3.format(',.2f'));
 
-               ChartTransactions.yAxis
+                ChartTransactions.yAxis
                    .axisLabel('(Transactions/s)')
                    .axisLabelDistance(10);
 
-               ChartTransactions.margin({ left: 100 });
-               ChartTransactions.lines.forceY([0, 1]);
+                ChartTransactions.margin({ left: 100 });
+                ChartTransactions.lines.forceY([0, 1]);
 
-               d3.select('#visualisationTransaction')
+                d3.select('#visualisationTransaction')
                    .datum(dataTransactions)
                    .transition().duration(500)
                    .call(ChartTransactions);
 
-               nv.utils.windowResize(ChartTransactions.update);
+                nv.utils.windowResize(ChartTransactions.update);
            },
            callback: function(p) {
                ChartTransactions.useInteractiveGuideline(true);
@@ -373,9 +374,9 @@
         nv.addGraph({
             generate:function() {
                 ChartPartitionIdleTime.xAxis
-                .tickFormat(function (d) {
-                    return d3.time.format('%X')(new Date(d));
-                });
+                    .tickFormat(function (d) {
+                        return d3.time.format('%X')(new Date(d));
+                    });
 
                 ChartPartitionIdleTime.showLegend(false);
                 ChartPartitionIdleTime.xAxis.rotateLabels(-20);
@@ -407,9 +408,9 @@
         nv.addGraph({
             generate:function() {
                 ChartDrReplicationRate.xAxis
-               .tickFormat(function (d) {
-                   return d3.time.format('%X')(new Date(d));
-               });
+                    .tickFormat(function (d) {
+                       return d3.time.format('%X')(new Date(d));
+                    });
 
                 ChartDrReplicationRate.xAxis.rotateLabels(-20);
 
@@ -439,6 +440,7 @@
         nv.addGraph({
             generate: function () {
                 ChartCommandlog.showLegend(false);
+
                 ChartCommandlog.xAxis
                     .tickFormat(function (d) {
                         return d3.time.format('%X')(new Date(d));
@@ -463,7 +465,7 @@
 
                 nv.utils.windowResize(ChartCommandlog.update);
            },
-            callback:function() {
+           callback:function() {
                ChartCommandlog.useInteractiveGuideline(true);
                return ChartCommandlog;
            }
@@ -480,7 +482,6 @@
             n -= x >>> 31;
             return n;
         };
-
 
         function Histogram(lowestTrackableValue, highestTrackableValue, nSVD, totalCount) {
             this.lowestTrackableValue = lowestTrackableValue;
@@ -509,7 +510,6 @@
                 bucketsNeeded++;
             }
             this.bucketCount = bucketsNeeded;
-
             this.countsArrayLength = (this.bucketCount + 1) * (this.subBucketCount / 2);
         };
 
@@ -772,7 +772,6 @@
         };
 
         this.UpdateCharts = function () {
-
             if (ramChart.is(":visible"))
                 ChartRam.update();
 
@@ -836,15 +835,13 @@
         };
 
         function sliceFirstData(dataArray, view) {
-
             var total = totalEmptyData;
             var refEmptyData = emptyData;
 
             if (view == dataView.Minutes) {
                 total = totalEmptyDataForMinutes;
                 refEmptyData = emptyDataForMinutes;
-            }
-            else if (view == dataView.Days) {
+            } else if (view == dataView.Days) {
                 total = totalEmptyDataForDays;
                 refEmptyData = emptyDataForDays;
             }
@@ -876,7 +873,7 @@
 
             if(localStorage.latencyMin != undefined){
                 latencyArrMin = getFormattedDataFromLocalStorage(JSON.parse(localStorage.latencyMin))
-            } else{
+            } else {
                 latencyArrMin = JSON.stringify(convertDataFormat(dataLatMin, 'timestamp', 'latency'))
                 latencyArrMin = JSON.parse(latencyArrMin)
             }
@@ -1308,8 +1305,7 @@
                     if(localStorage.transDetails == undefined){
                         datatrans.push({ "x": new Date(transacDetail["TimeStamp"]), "y": 0 });
                         Monitors.tpsData = datatrans;
-                    }
-                    else{
+                    } else {
                         var calculatedValue = parseFloat(delta * 1000.0 / (currentTimerTick - monitor.lastTimerTick)).toFixed(1) * 1;
                         if (delta != 0 || (currentTimedTransactionCount == 0 && monitor.lastTimedTransactionCount == 0)) {
                             datatrans.push({ "x": new Date(transacDetail["TimeStamp"]), "y": calculatedValue });
@@ -1368,7 +1364,7 @@
 
             if(localStorage.cpuDetailsMin != undefined)
                 cpuDetailsArrMin = getFormattedDataFromLocalStorage(JSON.parse(localStorage.cpuDetailsMin))
-            else{
+            else {
                 cpuDetailsArrMin = JSON.stringify(convertDataFormat(cpuDataMin, 'timestamp', 'percentUsed'))
                 cpuDetailsArrMin = JSON.parse(cpuDetailsArrMin)
             }
@@ -1382,7 +1378,7 @@
 
             if(localStorage.cpuDetails != undefined){
                 cpuDetailsArr = getFormattedDataFromLocalStorage(JSON.parse(localStorage.cpuDetails))
-            } else{
+            } else {
                 cpuDetailsArr =  JSON.stringify(convertDataFormat(cpuData, 'timestamp', 'percentUsed'))
                 cpuDetailsArr =  JSON.parse(cpuDetailsArr)
             }
@@ -1466,8 +1462,7 @@
                     localStorage.cpuDetails = JSON.stringify(cpuDetailsArr)
                     localStorage.cpuDetailsMin = JSON.stringify(cpuDetailsArrMin)
                     localStorage.cpuDetailsDay = JSON.stringify(cpuDetailsArrDay)
-                }
-                catch(e){
+                } catch(e) {
                     $(".errorMsgLocalStorageFull").show();
                 }
                 Monitors.cpuData = cpuData;
@@ -1699,7 +1694,6 @@
                         } else {
                             partitionData[keyIndexSec].values.push({ 'x': new Date(timeStamp), 'y': percentValue });
                             partitionDetailsArr = savePartitionDataToLocalStorage(partitionDetailsArr, { 'x': new Date(timeStamp), 'y': percentValue }, keyIndexSec  )
-
                         }
                         Monitors.partitionData = partitionData;
                     });
@@ -1855,7 +1849,6 @@
                     dataDrReplicationRate[0]["values"] = drDataDay;
                 else {
                     dataDrReplicationRate[0]["values"] = drData;
-
                 }
 
                 if (currentTab == NavigationTabs.DBMonitor && currentView == graphView && drReplicationChart.is(":visible")) {
@@ -1890,6 +1883,7 @@
                 cmdLogArrMin =  JSON.stringify(convertDataFormat(cmdLogDataMin))
                 cmdLogArrMin = JSON.parse(cmdLogArrMin)
             }
+
             if(localStorage.cmdLogDay != undefined)
                 cmdLogArrDay = getFormattedDataFromLocalStorage(JSON.parse(localStorage.cmdLogDay))
             else {
@@ -2003,6 +1997,7 @@
                     overlayDataArrMin = []
                     cmdLogSecCount = 0;
                 }
+
                 if (cmdLogMinCount >= 60 || monitor.cmdLogFirstData) {
                     cmdLogDataDay = sliceFirstData(cmdLogDataDay, dataView.Days);
                     if (timeStamp == monitor.cmdLogMaxTimeStamp) {
@@ -2112,10 +2107,8 @@
                             .attr('y', 0)
                             .attr('class', 'overlayGraph')
                             .attr('height', ChartCommandlog.yAxis.range()[0]);
-
                     }
                 }
-
             }
             if (timeStamp > monitor.cmdLogMaxTimeStamp) {
                 monitor.cmdLogMaxTimeStamp = timeStamp;
@@ -2170,8 +2163,6 @@
                 ChartDrReplicationRate.update();
         };
     });
-
-
 
     window.MonitorGraphUI = new IMonitorGraphUI();
 })(window);
