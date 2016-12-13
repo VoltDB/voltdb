@@ -25,6 +25,10 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.SyncCallback;
 import org.voltdb.compiler.deploymentfile.ResourceMonitorType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
+import org.voltdb.snmp.FaultFacility;
+import org.voltdb.snmp.SnmpTrapSender;
+import org.voltdb.snmp.ThresholdType;
+import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.PlatformProperties;
 import org.voltdb.utils.SystemStatsCollector;
 import org.voltdb.utils.SystemStatsCollector.Datum;
@@ -41,8 +45,13 @@ public class ResourceUsageMonitor implements Runnable
     private long m_rssLimit;
     private int m_resourceCheckInterval;
     private DiskResourceChecker m_diskLimitConfig;
+    private boolean m_snmpMemoryTrapSent = false;
+    private SnmpTrapSender m_snmpTrapSender;
+    private String m_snmpRssLimitStr;
+    private long m_snmpRssLimit;
+    private ThresholdType m_snmpRssCriteria;
 
-    public ResourceUsageMonitor(SystemSettingsType systemSettings)
+    public ResourceUsageMonitor(SystemSettingsType systemSettings, SnmpTrapSender snmpTrapSender)
     {
         if (systemSettings == null || systemSettings.getResourcemonitor() == null) {
             return;
@@ -58,12 +67,22 @@ public class ResourceUsageMonitor implements Runnable
             m_rssLimit = Double.valueOf(dblLimit).longValue();
         }
 
-        m_diskLimitConfig = new DiskResourceChecker(systemSettings);
+        m_diskLimitConfig = new DiskResourceChecker(systemSettings.getResourcemonitor().getDisklimit(), snmpTrapSender);
+
+        // for snmp trap
+        m_snmpTrapSender = snmpTrapSender;
+        if (config.getMemorylimit() != null) {
+            m_snmpRssLimitStr = config.getMemorylimit().getAlert().trim();
+            // configured value is in GB. Convert it to bytes
+            double dblLimit = getMemoryLimitSize(m_snmpRssLimitStr);
+            m_snmpRssLimit = Double.valueOf(dblLimit).longValue();
+            m_snmpRssCriteria = m_snmpRssLimitStr.endsWith("%") ? ThresholdType.PERCENT : ThresholdType.LIMIT;
+        }
     }
 
     public boolean hasResourceLimitsConfigured()
     {
-        return ((m_rssLimit > 0 || (m_diskLimitConfig!=null && m_diskLimitConfig.hasLimitsConfigured()))
+        return ((m_rssLimit > 0 || m_snmpRssLimit > 0 || (m_diskLimitConfig!=null && m_diskLimitConfig.hasLimitsConfigured()))
                 && m_resourceCheckInterval > 0);
     }
 
@@ -77,7 +96,10 @@ public class ResourceUsageMonitor implements Runnable
         if (hasResourceLimitsConfigured()) {
             m_logger.info("Resource limit monitoring configured to run every " + m_resourceCheckInterval + " seconds");
             if (m_rssLimit > 0) {
-                m_logger.info("RSS limit: "  + getRssLimitLogString());
+                m_logger.info("RSS limit: "  + getRssLimitLogString(m_rssLimit, m_rssLimitStr));
+            }
+            if (MiscUtils.isPro() && m_snmpRssLimit > 0) {
+                m_logger.warn("RSS SNMP notification limit: "  + getRssLimitLogString(m_snmpRssLimit, m_snmpRssLimitStr));
             }
             if (m_diskLimitConfig!=null) {
                 m_diskLimitConfig.logConfiguredLimits();
@@ -87,11 +109,11 @@ public class ResourceUsageMonitor implements Runnable
         }
     }
 
-    private String getRssLimitLogString()
+    private String getRssLimitLogString(long rssLimit, String rssLimitStr)
     {
-        String rssWithUnit = getValueWithUnit(m_rssLimit);
-        return (m_rssLimitStr.endsWith("%") ?
-                m_rssLimitStr + " (" +  rssWithUnit + ")" : rssWithUnit);
+        String rssWithUnit = getValueWithUnit(rssLimit);
+        return (rssLimitStr.endsWith("%") ?
+                rssLimitStr + " (" +  rssWithUnit + ")" : rssWithUnit);
     }
 
     @Override
@@ -136,7 +158,7 @@ public class ResourceUsageMonitor implements Runnable
 
     private boolean isOverMemoryLimit()
     {
-        if (m_rssLimit<=0) {
+        if (m_rssLimit<=0 && m_snmpRssLimit<=0) {
             return false;
         }
 
@@ -147,13 +169,35 @@ public class ResourceUsageMonitor implements Runnable
         }
 
         if (m_logger.isDebugEnabled()) {
-            m_logger.debug("RSS=" + datum.rss + " Configured rss limit=" + m_rssLimit);
+            m_logger.debug("RSS=" + datum.rss + " Configured rss limit=" + m_rssLimit +
+                    " Configured SNMP rss limit=" + m_snmpRssLimit);
         }
-        if (datum.rss >= m_rssLimit) {
+
+        if (MiscUtils.isPro()) {
+            if (m_snmpRssLimit > 0 && datum.rss >= m_snmpRssLimit) {
+                if (!m_snmpMemoryTrapSent) {
+                    m_snmpTrapSender.resource(m_snmpRssCriteria, FaultFacility.MEMORY, m_snmpRssLimit, datum.rss,
+                            String.format("Resource limit exceeded. RSS limit %s on %s. Current RSS size %s.",
+                                    getRssLimitLogString(m_snmpRssLimit, m_snmpRssLimitStr),
+                                    CoreUtils.getHostnameOrAddress(), getValueWithUnit(datum.rss)));
+                    m_snmpMemoryTrapSent = true;
+                }
+            } else {
+                if (m_snmpRssLimit > 0 && m_snmpMemoryTrapSent) {
+                    m_snmpTrapSender.resourceClear(m_snmpRssCriteria, FaultFacility.MEMORY, m_snmpRssLimit, datum.rss,
+                            String.format("Resource limit cleared. RSS limit %s on %s. Current RSS size %s.",
+                                    getRssLimitLogString(m_snmpRssLimit, m_snmpRssLimitStr),
+                                    CoreUtils.getHostnameOrAddress(), getValueWithUnit(datum.rss)));
+                    m_snmpMemoryTrapSent = false;
+                }
+            }
+        }
+
+        if (m_rssLimit > 0 && datum.rss >= m_rssLimit) {
             m_logger.error(String.format(
                     "Resource limit exceeded. RSS limit %s on %s. Setting database to read-only. " +
                     "Use \"voltadmin resume\" command once resource constraint is corrected.",
-                    getRssLimitLogString(), CoreUtils.getHostnameOrAddress()));
+                    getRssLimitLogString(m_rssLimit,m_rssLimitStr), CoreUtils.getHostnameOrAddress()));
             m_logger.error(String.format("Resource limit exceeded. Current RSS size %s.", getValueWithUnit(datum.rss)));
             return true;
         } else {
