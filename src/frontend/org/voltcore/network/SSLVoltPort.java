@@ -106,7 +106,7 @@ public class SSLVoltPort extends VoltPort {
                     processingReads = false;
                     processingWrites = buildEncryptionTasks();
                 }
-                m_network.nudgeChannel(this);
+                m_network.addToChangeList(this, true);
             }
 
             if (processingWrites) {
@@ -115,7 +115,7 @@ public class SSLVoltPort extends VoltPort {
                     processingWrites = false;
                     disableWriteSelection();
                 }
-                m_network.nudgeChannel(this);
+                m_network.addToChangeList(this, true);
             }
         } catch (IOException ioe) {
             while (!gatewaysEmpty()) {

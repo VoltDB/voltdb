@@ -222,18 +222,6 @@ class VoltNetwork implements Runnable, IOStatsIntf
         }
     }
 
-    public Runnable nudgeChannel(final Connection c) {
-        Runnable nudge = new Runnable() {
-            @Override
-            public void run() {
-                VoltPort port = (VoltPort)c;
-                callPort(port);
-            }
-        };
-        m_tasks.offer(nudge);
-        return nudge;
-    }
-
     public Runnable updateQueued(final int bytes, final boolean flag, final VoltPort port) {
         Runnable uq = new Runnable() {
             @Override
