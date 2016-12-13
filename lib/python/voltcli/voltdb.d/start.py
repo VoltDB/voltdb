@@ -38,6 +38,7 @@ server_list_help = ('{hostname-or-ip[,...]}, '
         VOLT.BooleanOption('-r', '--replica', 'replica', 'start replica cluster', default = False),
         VOLT.BooleanOption('-A', '--add', 'enableadd', 'allows the server to elastically expand the cluster if the cluster is already complete', default = False),
         VOLT.IntegerOption('-s', '--sitesperhost', 'sitesperhost', None),
+        VOLT.IntegerOption('-i', '--inactivecount', 'inactivecount', None),
     ),
     description = 'Starts a database, which has been initialized.'
 )
@@ -51,6 +52,8 @@ def start(runner):
         runner.args.extend(['hostcount', runner.opts.hostcount])
     if runner.opts.sitesperhost:
         runner.args.extend(['sitesperhost', runner.opts.sitesperhost])
+    if runner.opts.inactivecount:
+        runner.args.extend(['inactivecount', runner.opts.inactivecount])
     if runner.opts.enableadd:
         runner.args.extend(['enableadd'])
     runner.go()
