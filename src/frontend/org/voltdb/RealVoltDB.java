@@ -2762,7 +2762,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             m_restoreAgent.restore();
         }
         else {
-            onRestoreCompletion(Long.MIN_VALUE, m_iv2InitiatorStartingTxnIds);
+            onSnapshotRestoreCompletion();
+            onReplayCompletion(Long.MIN_VALUE, m_iv2InitiatorStartingTxnIds);
         }
 
         // Start the rejoin coordinator
@@ -3345,7 +3346,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             m_snmp.hostUp("Host is now a cluster member");
 
             if (m_producerDRGateway != null && !m_producerDRGateway.isStarted()) {
-                // Start listening on the DR ports
+                // Initialize DR producer and start listening on the DR ports
+                initializeDRProducer();
                 prepareReplication();
             }
         }
@@ -3499,7 +3501,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     @Override
-    public void onRestoreCompletion(long txnId, Map<Integer, Long> perPartitionTxnIds) {
+    public void onSnapshotRestoreCompletion() {
+        if (!m_rejoining && !m_joining) {
+            initializeDRProducer();
+        }
+    }
+
+    @Override
+    public void onReplayCompletion(long txnId, Map<Integer, Long> perPartitionTxnIds) {
         /*
          * Remove the terminus file if it is there, which is written on shutdown --save
          */
@@ -3656,7 +3665,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         return m_computationService;
     }
 
-    private void prepareReplication() {
+    /**
+     * Initialize the DR producer so that any binary log generated on recover
+     * will be queued. This does NOT open the DR port. That will happen after
+     * command log replay finishes.
+     */
+    private void initializeDRProducer() {
         try {
             if (m_producerDRGateway != null) {
                 m_producerDRGateway.startAndWaitForGlobalAgreement();
@@ -3667,6 +3681,17 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                                           shouldInitiatorCreateMPDRGateway(iv2init));
                 }
 
+                m_producerDRGateway.truncateDRLog();
+            }
+        } catch (Exception ex) {
+            CoreUtils.printPortsInUse(hostLog);
+            VoltDB.crashLocalVoltDB("Failed to initialize DR producer", false, ex);
+        }
+    }
+
+    private void prepareReplication() {
+        try {
+            if (m_producerDRGateway != null) {
                 m_producerDRGateway.startListening(m_catalogContext.cluster.getDrproducerenabled(),
                                                    VoltDB.getReplicationPort(m_catalogContext.cluster.getDrproducerport()),
                                                    VoltDB.getDefaultReplicationInterface());
