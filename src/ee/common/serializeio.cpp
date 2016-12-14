@@ -23,16 +23,20 @@ void FallbackSerializeOutput::expand(size_t minimum_desired) {
     /*
      * Leave some space for message headers and such, almost 50 megabytes
      */
-    size_t maxAllocationSize = ((1024 * 1024 *50) - (1024 * 32));
+    size_t maxAllocationSize = ((1024 * 1024 * m_networkBufferSize) - (1024 * 32));
     if (fallbackBuffer_ != NULL || minimum_desired > maxAllocationSize) {
         if (fallbackBuffer_ != NULL) {
             char *temp = fallbackBuffer_;
             fallbackBuffer_ = NULL;
             delete []temp;
         }
-        throw SQLException(SQLException::volt_output_buffer_overflow,
-            "Output from SQL stmt overflowed output/network buffer of 50mb (-32k for message headers). "
-            "Try a \"limit\" clause or a stronger predicate.");
+
+        char msg[1024];
+        snprintf(msg, 1024, "Output from SQL stmt overflowed output/network buffer of %lldmb (-32k for message headers). "
+            "Try a \"limit\" clause or a stronger predicate.", (long long int)m_networkBufferSize);
+
+        throw SQLException(SQLException::volt_output_buffer_overflow, msg);
+
     }
     fallbackBuffer_ = new char[maxAllocationSize];
     ::memcpy(fallbackBuffer_, data(), position_);

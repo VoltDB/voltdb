@@ -166,6 +166,7 @@ public class TestExecutionEngine extends TestCase {
                                 0,
                                 64*1024,
                                 100,
+                                50,
                                 new HashinatorConfig(HashinatorType.LEGACY, configBytes, 0, 0), false));
             }
         };
@@ -281,6 +282,7 @@ public class TestExecutionEngine extends TestCase {
                                 0,
                                 64*1024,
                                 100,
+                                50,
                                 new HashinatorConfig(HashinatorType.LEGACY, configBytes, 0, 0), false));
             }
         };
@@ -343,6 +345,7 @@ public class TestExecutionEngine extends TestCase {
                         0,
                         64*1024,
                         100,
+                        50,
                         new HashinatorConfig(HashinatorType.LEGACY, LegacyHashinator.getConfigureBytes(1), 0, 0), false);
         m_project = new TPCCProjectBuilder();
         m_catalog = m_project.createTPCCSchemaCatalog();

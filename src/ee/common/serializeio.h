@@ -536,6 +536,10 @@ public:
         ReferenceSerializeOutput(), fallbackBuffer_(NULL) {
     }
 
+    void setNetworkBufferSize(int64_t size) {
+      m_networkBufferSize = size;
+    }
+
     /** Set the buffer to buffer with capacity and sets the position. */
     void initializeWithPosition(void* buffer, size_t capacity, size_t position) {
         if (fallbackBuffer_ != NULL) {
@@ -555,6 +559,7 @@ public:
     /** Expand once to a fallback size, and if that doesn't work abort */
     void expand(size_t minimum_desired);
 private:
+    int64_t m_networkBufferSize;
     char *fallbackBuffer_;
 };
 

@@ -47,6 +47,7 @@ import org.voltdb.compiler.deploymentfile.SecurityType;
 import org.voltdb.compiler.deploymentfile.SnapshotType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType.Temptables;
+import org.voltdb.compiler.deploymentfile.SystemSettingsType.Networkbuffer;
 import org.voltdb.compiler.deploymentfile.UsersType;
 import org.voltdb.compiler.deploymentfile.UsersType.User;
 
@@ -114,6 +115,7 @@ public class DeploymentBuilder {
     private Integer m_snapshotPriority;
 
     private Integer m_maxTempTableMemory = 100;
+    private Integer m_networkBufferSize = 50;
 
     private boolean m_elenabled;      // true if enabled; false if disabled
 
@@ -263,6 +265,12 @@ public class DeploymentBuilder {
     {
         m_maxTempTableMemory = max;
     }
+
+    public void setNetworkBufferSize(int max)
+    {
+        m_networkBufferSize = max;
+    }
+
 
     public void writeXML(String path) {
         File file;
