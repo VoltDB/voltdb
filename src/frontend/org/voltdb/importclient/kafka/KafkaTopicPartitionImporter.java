@@ -667,7 +667,10 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
     @Override
     protected void stop()
     {
-        // Nothing to stop. shouldRun() should take care of exiting the work loop.
+        //Cleanup kafka metrics threads
+        synchronized (this) {
+            com.yammer.metrics.Metrics.shutdown();
+        }
     }
 
     //Per topic per partition that we are responsible for.
