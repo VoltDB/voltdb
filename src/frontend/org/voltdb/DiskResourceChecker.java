@@ -215,7 +215,7 @@ public class DiskResourceChecker
                 m_snmpDiskTrapSent = true;
             }
             m_logger.error(String.format(
-                    "SNMP resource limit exceeded. Disk for path %s (%s) limit %s on %s. Setting database to read-only. "
+                    "Resource limit exceeded. Disk for path %s (%s) limit %s on %s. Setting database to read-only. "
                             + "Use \"voltadmin resume\" command once resource constraint is corrected.",
                     filePath, featureName.value(), (percThreshold > 0 ? percThreshold + "%" : sizeThreshold + " GB"),
                     CoreUtils.getHostnameOrAddress()));
@@ -226,7 +226,7 @@ public class DiskResourceChecker
             if (forSnmp && m_snmpDiskTrapSent) {
                 m_snmpTrapSender.resourceClear(snmpCriteria, FaultFacility.DISK, calculatedThreshold, usedSpace,
                         String.format(
-                                "Resource limit cleared. Disk for path %s (%s) limit %s on %s. Current disk usage is %s.",
+                                "SNMP resource limit cleared. Disk for path %s (%s) limit %s on %s. Current disk usage is %s.",
                                 filePath, featureName.value(),
                                 (percThreshold > 0 ? percThreshold + "%" : sizeThreshold + " GB"),
                                 CoreUtils.getHostnameOrAddress(), ResourceUsageMonitor.getValueWithUnit(usedSpace)));
