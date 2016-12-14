@@ -48,6 +48,7 @@
 #include "common/debuglog.h"
 #include "common/common.h"
 #include "common/tabletuple.h"
+#include "common/ValuePeeker.hpp"
 #include "plannodes/setopreceivenode.h"
 #include "execution/VoltDBEngine.h"
 #include "execution/ProgressMonitorProxy.h"
@@ -68,16 +69,11 @@
 namespace voltdb {
 
 SetOpReceiveExecutor::SetOpReceiveExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
-    : AbstractExecutor(engine, abstract_node), m_setOperator(), m_chldrenTables()
+    : AbstractExecutor(engine, abstract_node), m_setOperator(), m_childrenTables()
 { }
 
 SetOpReceiveExecutor::~SetOpReceiveExecutor()
-{
-    for(std::vector<Table*>::iterator tableIt = m_chldrenTables.begin(); tableIt!= m_chldrenTables.end(); ++tableIt) {
-        Table* childTable = *tableIt;
-        delete childTable;
-    }
-}
+{ }
 
 bool SetOpReceiveExecutor::p_init(AbstractPlanNode* abstract_node,
                              TempTableLimits* limits)
@@ -93,27 +89,33 @@ bool SetOpReceiveExecutor::p_init(AbstractPlanNode* abstract_node,
     //Create a temp table to collect tuples from multiple partitions
     TupleSchema* schema = m_abstractNode->generateTupleSchema();
     std::vector<std::string> column_names(schema->columnCount());
-    m_tmpInputTable.reset(TableFactory::getTempTable(m_abstractNode->databaseId(),
-                                                     "tempInput",
+    m_tmpInputTable.reset(TableFactory::buildTempTable("tempInput",
                                                      schema,
                                                      column_names,
                                                      limits));
 
+    std::vector<Table*> input_tables;
+
+    // UNION_ALL should not be there at all
+    assert(SETOP_TYPE_UNION_ALL != node->getSetOpType());
     if (SETOP_TYPE_UNION == node->getSetOpType()) {
-        std::vector<Table*> input_tables(1, m_tmpInputTable.get());
-        m_setOperator.reset(SetOperator::getSetOperator(node->getSetOpType(), input_tables, node->getTempOutputTable(), false));
+        // UNION does not require by child contribution.
+        input_tables.reserve(1);
+        input_tables.push_back(m_tmpInputTable.get());
     } else {
-        m_chldrenTables.reserve(node->getChildrenCount());
+        m_childrenTables.reserve(node->getChildrenCount());
+        input_tables.reserve(node->getChildrenCount());
         for (int i = 0; i < node->getChildrenCount(); ++i) {
-            Table* childTable = TableFactory::getTempTable(m_abstractNode->databaseId(),
-                                                     "tempChildInput",
-                                                     schema,
+            TupleSchema* childSchema = m_abstractNode->generateTupleSchema();
+            boost::shared_ptr<TempTable> childTable(TableFactory::buildTempTable("tempChildInput",
+                                                     childSchema,
                                                      column_names,
-                                                     limits);
-            m_chldrenTables.push_back(childTable);
+                                                     limits));
+            m_childrenTables.push_back(childTable);
+            input_tables.push_back(childTable.get());
         }
-        m_setOperator.reset(SetOperator::getSetOperator(node->getSetOpType(), m_chldrenTables, node->getTempOutputTable(), false));
     }
+    m_setOperator.reset(SetOperator::getReceiveSetOperator(node->getSetOpType(), input_tables, node->getTempOutputTable()));
     return true;
 }
 
@@ -125,21 +127,34 @@ bool SetOpReceiveExecutor::p_execute(const NValueArray &params) {
         loadedDeps = m_engine->loadNextDependency(m_tmpInputTable.get());
     } while (loadedDeps > 0);
 
-    ProgressMonitorProxy pmp(m_engine, this);
-
-
-
-    VOLT_TRACE("Result of SetOpReceive:\n '%s'", m_tmpOutputTable->debug().c_str());
+    if (SETOP_TYPE_UNION != m_setOperator->getSetOpType()) {
+        distribute_input();
+    }
 
     bool result = m_setOperator->processTuples();
 
+    VOLT_TRACE("Result of SetOpReceive:\n '%s'", m_tmpOutputTable->debug().c_str());
+
     cleanupInputTempTable(m_tmpInputTable.get());
-    for(std::vector<Table*>::iterator tableIt = m_chldrenTables.begin(); tableIt!= m_chldrenTables.end(); ++tableIt) {
-        cleanupInputTempTable(*tableIt);
+    for(std::vector<boost::shared_ptr<TempTable> >::iterator tableIt = m_childrenTables.begin(); tableIt!= m_childrenTables.end(); ++tableIt) {
+        cleanupInputTempTable(tableIt->get());
     }
 
-
     return result;
+}
+
+void SetOpReceiveExecutor::distribute_input() {
+
+    TableIterator iterator = m_tmpInputTable->iterator();
+    TableTuple tuple(m_tmpInputTable->schema());
+    int tuple_size = tuple.sizeInValues();
+
+    while (iterator.next(tuple)) {
+        int child_idx = ValuePeeker::peekAsInteger(tuple.getNValue(tuple_size - 1));
+        assert(child_idx < m_childrenTables.size());
+        m_childrenTables[child_idx]->insertTuple(tuple);
+    }
+
 }
 
 }

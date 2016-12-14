@@ -610,6 +610,268 @@ public class TestSetOpSuite extends RegressionSuite {
     }
 
     /**
+     * MP A union all E union all F. No partitioning columns in the output
+     * @throws NoConnectionsException
+     * @throws IOException
+     * @throws ProcCallException
+     */
+    public void testMP2LevelSetOperations1() throws NoConnectionsException, IOException, ProcCallException {
+        Client client = this.getClient();
+        VoltTable vt;
+
+        String sql = "(SELECT I FROM A UNION ALL "
+                + "SELECT I FROM E UNION ALL SELECT I FROM F) ORDER BY I;";
+        // Empty tables
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        assertEquals(0, vt.getRowCount());
+
+        vt = client.callProcedure("@Explain", sql).getResults()[0];
+        String explainPlan = vt.toString();
+        System.out.println(explainPlan);
+        // SET OP nodes are below the Receive one
+        assertTrue(explainPlan.indexOf("RECEIVE FROM ALL PARTITIONS") < explainPlan.indexOf("SET OP UNION_ALL"));
+
+        client.callProcedure("InsertA", 0, 0); // in
+        client.callProcedure("InsertA", 1, 0); // in
+        client.callProcedure("InsertA", 2, 0); // in
+        client.callProcedure("InsertE", 0, 0); // in
+        client.callProcedure("InsertE", 1, 2); // in
+        client.callProcedure("InsertE", 2, 2); // in
+        client.callProcedure("InsertF", 1, 2); // in
+        client.callProcedure("InsertF", 2, 3); // in
+
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        assertEquals(8, vt.getRowCount());
+        validateTableOfScalarLongs(vt, new long[]{0, 0, 0, 0, 2, 2, 2, 3});
+
+    }
+
+    /**
+     * MP A union E union F. No partitioning columns in the output
+     * @throws NoConnectionsException
+     * @throws IOException
+     * @throws ProcCallException
+     */
+    public void testMP2LevelSetOperations2() throws NoConnectionsException, IOException, ProcCallException {
+        Client client = this.getClient();
+        VoltTable vt;
+
+        String sql = "(SELECT I FROM A UNION "
+                + "SELECT I FROM E UNION SELECT I FROM F) ORDER BY I;";
+        // Empty tables
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        assertEquals(0, vt.getRowCount());
+
+        vt = client.callProcedure("@Explain", sql).getResults()[0];
+        String explainPlan = vt.toString();
+        System.out.println(explainPlan);
+        // SET OP nodes are below the Receive one
+        assertTrue(explainPlan.indexOf("RECEIVE SET OP UNION") < explainPlan.indexOf("SEND PARTITION RESULTS"));
+        assertTrue(explainPlan.indexOf("SEND PARTITION RESULTS") < explainPlan.lastIndexOf("SET OP UNION"));
+
+        client.callProcedure("InsertA", 0, 0); // in
+        client.callProcedure("InsertA", 1, 0); // out duplicate
+        client.callProcedure("InsertA", 2, 0); // out duplicate
+        client.callProcedure("InsertE", 0, 0); // out duplicate
+        client.callProcedure("InsertE", 1, 2); // in
+        client.callProcedure("InsertE", 2, 2); // out duplicate
+        client.callProcedure("InsertF", 1, 2); // out duplicate
+        client.callProcedure("InsertF", 2, 3); // in
+
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        assertEquals(3, vt.getRowCount());
+        validateTableOfScalarLongs(vt, new long[]{0, 2, 3});
+
+    }
+
+    /**
+     * MP A except all E except all F. No partitioning columns in the output
+     * @throws NoConnectionsException
+     * @throws IOException
+     * @throws ProcCallException
+     */
+    public void testMP2LevelSetOperations3() throws NoConnectionsException, IOException, ProcCallException {
+        Client client = this.getClient();
+        VoltTable vt;
+
+        String sql = "(SELECT I FROM A EXCEPT ALL "
+                + "SELECT I FROM E EXCEPT ALL SELECT I FROM F) ORDER BY I;";
+        // Empty tables
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        assertEquals(0, vt.getRowCount());
+
+        vt = client.callProcedure("@Explain", sql).getResults()[0];
+        String explainPlan = vt.toString();
+        System.out.println(explainPlan);
+        // SET OP nodes are below the Receive one
+        assertTrue(explainPlan.indexOf("RECEIVE SET OP EXCEPT_ALL") < explainPlan.indexOf("SEND PARTITION RESULTS"));
+        assertTrue(explainPlan.indexOf("SEND PARTITION RESULTS") < explainPlan.lastIndexOf("SET OP EXCEPT_ALL"));
+
+        // 0 x 3, 3 x 4, 4 x 2 - 0 x 1, 2 x 2, 3 x 2 - 0 x 2, 4 x 1 = 3 x 2, 4 x 1
+        client.callProcedure("InsertA", 0, 0); // out eliminated by E (1,0)
+        client.callProcedure("InsertA", 1, 0); // out eliminated by F (1,0)
+        client.callProcedure("InsertA", 2, 0); // out eliminated by F (3,0)
+        client.callProcedure("InsertA", 3, 3); // in
+        client.callProcedure("InsertA", 4, 3); // in
+        client.callProcedure("InsertA", 5, 3); // out eliminated by E (4,3)
+        client.callProcedure("InsertA", 9, 3); // out eliminated by E (6,3)
+        client.callProcedure("InsertA", 7, 4); // int
+        client.callProcedure("InsertA", 8, 4); // out eliminated by F (2,4)
+        client.callProcedure("InsertE", 0, 2);
+        client.callProcedure("InsertE", 1, 0);
+        client.callProcedure("InsertE", 2, 2);
+        client.callProcedure("InsertE", 4, 3);
+        client.callProcedure("InsertE", 6, 3);
+        client.callProcedure("InsertF", 1, 0);
+        client.callProcedure("InsertF", 2, 4);
+        client.callProcedure("InsertF", 3, 0);
+
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        assertEquals(3, vt.getRowCount());
+        validateTableOfScalarLongs(vt, new long[]{3, 3, 4});
+
+    }
+
+    /**
+     * MP A except E except F. No partitioning columns in the output
+     * @throws NoConnectionsException
+     * @throws IOException
+     * @throws ProcCallException
+     */
+    public void testMP2LevelSetOperations4() throws NoConnectionsException, IOException, ProcCallException {
+        Client client = this.getClient();
+        VoltTable vt;
+
+        String sql = "(SELECT I FROM A EXCEPT "
+                + "SELECT I FROM E EXCEPT SELECT I FROM F) ORDER BY I;";
+        // Empty tables
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        assertEquals(0, vt.getRowCount());
+
+        vt = client.callProcedure("@Explain", sql).getResults()[0];
+        String explainPlan = vt.toString();
+        System.out.println(explainPlan);
+        // SET OP nodes are below the Receive one
+        assertTrue(explainPlan.indexOf("RECEIVE SET OP EXCEPT") < explainPlan.indexOf("SEND PARTITION RESULTS"));
+        assertTrue(explainPlan.indexOf("SEND PARTITION RESULTS") < explainPlan.lastIndexOf("SET OP EXCEPT"));
+
+        // 0 x 3, 3 x 1, 4 x 2, 5 x 2 - 0 x 1, 2 x 2, 3 x 2 - 4 x 1 = 5
+        client.callProcedure("InsertA", 0, 0); // out eliminated by E (1,0)
+        client.callProcedure("InsertA", 1, 0); // out eliminated by E (1,0)
+        client.callProcedure("InsertA", 2, 0); // out eliminated by E (1,0)
+        client.callProcedure("InsertA", 3, 3); // in 
+        client.callProcedure("InsertA", 4, 5); // out duplicate
+        client.callProcedure("InsertA", 5, 5); // out duplicate
+        client.callProcedure("InsertA", 7, 4); // out  eliminated by F (2,4)
+        client.callProcedure("InsertA", 8, 4); // out  eliminated by F (2,4)
+        client.callProcedure("InsertE", 0, 2);
+        client.callProcedure("InsertE", 1, 0);
+        client.callProcedure("InsertE", 2, 2);
+        client.callProcedure("InsertE", 4, 3);
+        client.callProcedure("InsertE", 6, 3);
+        client.callProcedure("InsertF", 2, 4);
+
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        assertEquals(1, vt.getRowCount());
+        validateTableOfScalarLongs(vt, new long[]{5});
+
+    }
+
+    /**
+     * MP A intersect all E intersect all F. No partitioning columns in the output
+     * @throws NoConnectionsException
+     * @throws IOException
+     * @throws ProcCallException
+     */
+    public void testMP2LevelSetOperations5() throws NoConnectionsException, IOException, ProcCallException {
+        Client client = this.getClient();
+        VoltTable vt;
+
+        String sql = "(SELECT I FROM A INTERSECT ALL "
+                + "SELECT I FROM E INTERSECT ALL SELECT I FROM F) ORDER BY I;";
+        // Empty tables
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        assertEquals(0, vt.getRowCount());
+
+        vt = client.callProcedure("@Explain", sql).getResults()[0];
+        String explainPlan = vt.toString();
+        System.out.println(explainPlan);
+        // SET OP nodes are below the Receive one
+        assertTrue(explainPlan.indexOf("RECEIVE SET OP INTERSECT_ALL") < explainPlan.indexOf("SEND PARTITION RESULTS"));
+        assertTrue(explainPlan.indexOf("SEND PARTITION RESULTS") < explainPlan.lastIndexOf("SET OP INTERSECT_ALL"));
+
+        // 0 x 2, 2 x 1, 3 x 3   0 x 1, 2 x 1, 3 x 2 - 0 x 2, 9 x 1 = 0 x 1, 3 x 2
+
+        client.callProcedure("InsertA", 0, 0); // in A (0, 0) and E (1, 0) and F (1, 0)
+        client.callProcedure("InsertA", 1, 0); // out A(1, 0) and E (0, 2)
+        client.callProcedure("InsertA", 2, 2); // out A(2, 2) and F (3, 0)
+        client.callProcedure("InsertA", 3, 3); // in A (3, 3) and E (2, 3) and F (2, 3)
+        client.callProcedure("InsertA", 4, 3); // in A (4, 3) and E (4, 3) and F (5, 3)
+        client.callProcedure("InsertA", 5, 3); // out A(5, 3) only
+        client.callProcedure("InsertE", 0, 2); // out A(1, 0) and E (0, 2)
+        client.callProcedure("InsertE", 1, 0); // in A (0, 0) and E (1, 0) and F (1, 0)
+        client.callProcedure("InsertE", 2, 3); // in A (3, 3) and E (2, 3) and F (2, 3)
+        client.callProcedure("InsertE", 4, 3); // in A (4, 3) and E (4, 3) and F (5, 3)
+        client.callProcedure("InsertF", 0, 9); // out F(0, 9)
+        client.callProcedure("InsertF", 1, 0); // in A (0, 0) and E (1, 0) and F (1, 0)
+        client.callProcedure("InsertF", 3, 0); // out A(1, 0) and F (3, 0)
+        client.callProcedure("InsertF", 2, 3); // in A (3, 3) and E (2, 3) and F (2, 3)
+        client.callProcedure("InsertF", 5, 3); // in A (4, 3) and E (4, 3) and F (5, 3)
+
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        assertEquals(3, vt.getRowCount());
+        validateTableOfScalarLongs(vt, new long[]{0, 3, 3});
+
+    }
+
+    /**
+     * MP A intersect E intersect F. No partitioning columns in the output
+     * @throws NoConnectionsException
+     * @throws IOException
+     * @throws ProcCallException
+     */
+    public void testMP2LevelSetOperations6() throws NoConnectionsException, IOException, ProcCallException {
+        Client client = this.getClient();
+        VoltTable vt;
+
+        String sql = "(SELECT I FROM A INTERSECT "
+                + "SELECT I FROM E INTERSECT SELECT I FROM F) ORDER BY I;";
+        // Empty tables
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        assertEquals(0, vt.getRowCount());
+
+        vt = client.callProcedure("@Explain", sql).getResults()[0];
+        String explainPlan = vt.toString();
+        System.out.println(explainPlan);
+        // SET OP nodes are below the Receive one
+        assertTrue(explainPlan.indexOf("RECEIVE SET OP INTERSECT") < explainPlan.indexOf("SEND PARTITION RESULTS"));
+        assertTrue(explainPlan.indexOf("SEND PARTITION RESULTS") < explainPlan.lastIndexOf("SET OP INTERSECT"));
+
+        // 0 x 2, 2 x 1, 3 x 3   0 x 1, 2 x 1, 3 x 2 - 0 x 2, 9 x 1 = 0 x 1, 3 x 1
+
+        client.callProcedure("InsertA", 0, 0); // in A(0, 0) and E(1, 0) and F(1,0)
+        client.callProcedure("InsertA", 1, 0); // out duplicate
+        client.callProcedure("InsertA", 2, 2); // out A(2, 2)
+        client.callProcedure("InsertA", 3, 3); // in A(3, 3) and E(2, 3) and F(2, 3)
+        client.callProcedure("InsertA", 4, 3); // out duplicate
+        client.callProcedure("InsertA", 5, 3); // out duplicate
+        client.callProcedure("InsertE", 0, 2); // out duplicate
+        client.callProcedure("InsertE", 1, 0); // in A(0, 0) and E(1, 0) and F(1,0)
+        client.callProcedure("InsertE", 2, 3); // in A(3, 3) and E(2, 3) and F(2, 3)
+        client.callProcedure("InsertE", 4, 3); // out duplicate
+        client.callProcedure("InsertF", 0, 9); // out F(0, 9)
+        client.callProcedure("InsertF", 1, 0); // in A(0, 0) and E(1, 0) and F(1,0)
+        client.callProcedure("InsertF", 3, 0); // out duplicate
+        client.callProcedure("InsertF", 2, 3); // in A(3, 3) and E(2, 3) and F(2, 3)
+        client.callProcedure("InsertF", 5, 3); // out duplicate
+
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        assertEquals(2, vt.getRowCount());
+        validateTableOfScalarLongs(vt, new long[]{0, 3});
+
+    }
+
+    /**
      * (E.PC, C.PKEY WHERE E.PC = C.PKEY) union (F.PC)
      * PC is a partitioning column for E, and F tables. C is repliacte
      * @throws NoConnectionsException

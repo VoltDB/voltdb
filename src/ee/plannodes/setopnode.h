@@ -55,14 +55,14 @@ namespace voltdb {
  */
 class SetOpPlanNode : public AbstractPlanNode {
 public:
-    SetOpPlanNode() : m_setopType(SETOP_TYPE_NONE), m_needChildrenRows(false) { }
+    SetOpPlanNode() : m_setopType(SETOP_TYPE_NONE), m_needSendChildrenRows(false) { }
     ~SetOpPlanNode();
     PlanNodeType getPlanNodeType() const;
     std::string debugInfo(const std::string &spacer) const;
 
     SetOpType getSetOpType() const { return m_setopType; }
 
-    bool needChildrenRows() const { return m_needChildrenRows; }
+    bool needSendChildrenRows() const { return m_needSendChildrenRows; }
     static SetOpType parseSetOpType(const std::string& setopTypeStr);
 
 protected:
@@ -70,7 +70,7 @@ protected:
 
 private:
    SetOpType m_setopType;
-   bool m_needChildrenRows;
+   bool m_needSendChildrenRows;
 };
 
 } // namespace voltdb

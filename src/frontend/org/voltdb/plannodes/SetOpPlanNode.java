@@ -34,11 +34,11 @@ import org.voltdb.types.SortDirectionType;
 
 public class SetOpPlanNode extends AbstractPlanNode {
 
-    public static final String TMP_COLUMN_NAME = "VOLT_TMP_ROW_COUNT";
+    public static final String TMP_COLUMN_NAME = "VOLT_TMP_TAG_COLUMN";
 
     private static class Members {
         static final String SETOP_TYPE = "SETOP_TYPE";
-        static final String NEED_CHILDREN_RESULTS = "NEED_CHILDREN_RESULTS";
+        static final String SEND_CHILDREN_RESULTS_UP = "SEND_CHILDREN_RESULTS_UP";
     }
 
     // SetOp Type
@@ -109,11 +109,11 @@ public class SetOpPlanNode extends AbstractPlanNode {
 
         assert(! hasInlineVarcharOrVarbinary());
 
-        m_hasSignificantOutputSchema = false; // It's just the first child's
-
         // Add an extra tag column if needed
         if (m_needTagColumn) {
+            assert(m_children.get(0).getOutputSchema() != null);
             m_outputSchema = m_children.get(0).getOutputSchema().clone();
+            assert(!outputColumns.isEmpty());
             SchemaColumn firstColumn = outputColumns.get(0);
             ConstantValueExpression expr = new ConstantValueExpression();
             expr.setValueType(VoltType.BIGINT);
@@ -124,6 +124,8 @@ public class SetOpPlanNode extends AbstractPlanNode {
                                                   expr);
             m_outputSchema.addColumn(extra);
             m_hasSignificantOutputSchema = true;
+        } else {
+            m_hasSignificantOutputSchema = false; // It's just the first child's
         }
    }
 
@@ -145,7 +147,7 @@ public class SetOpPlanNode extends AbstractPlanNode {
         super.toJSONString(stringer);
         stringer.keySymbolValuePair(Members.SETOP_TYPE, m_setOpType.name());
         if (m_needTagColumn == true) {
-            stringer.keySymbolValuePair(Members.NEED_CHILDREN_RESULTS, true);
+            stringer.keySymbolValuePair(Members.SEND_CHILDREN_RESULTS_UP, true);
         }
     }
 
@@ -158,8 +160,8 @@ public class SetOpPlanNode extends AbstractPlanNode {
     public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
         helpLoadFromJSONObject(jobj, db);
         m_setOpType = SetOpType.valueOf(jobj.getString(Members.SETOP_TYPE));
-        if (jobj.has(Members.NEED_CHILDREN_RESULTS)) {
-            m_needTagColumn = jobj.getBoolean(Members.NEED_CHILDREN_RESULTS);
+        if (jobj.has(Members.SEND_CHILDREN_RESULTS_UP)) {
+            m_needTagColumn = jobj.getBoolean(Members.SEND_CHILDREN_RESULTS_UP);
         }
     }
 

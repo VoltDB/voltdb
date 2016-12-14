@@ -336,7 +336,13 @@ public:
     inline const NValue getNValue(const int idx) const {
         assert(m_schema);
         assert(m_data);
-        assert(idx < m_schema->columnCount());
+        int a = 0;
+        if (idx >= m_schema->columnCount()) {
+            a = idx;
+        } else {
+            a = idx;
+        }
+        assert(a < m_schema->columnCount());
 
         const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(idx);
         const voltdb::ValueType columnType = columnInfo->getVoltType();
@@ -409,6 +415,9 @@ public:
 
     bool equals(const TableTuple &other) const;
     bool equalsNoSchemaCheck(const TableTuple &other, bool includeHiddenColumns = false) const;
+    /** Compare tuples using only a subset of columns specified by the iterator's range*/
+    template<typename Iter>
+    bool equalsNoSchemaCheck(const TableTuple &other, Iter begin, Iter end) const;
 
     int compare(const TableTuple &other) const;
 
@@ -423,6 +432,9 @@ public:
     void freeObjectColumns() const;
     size_t hashCode(size_t seed) const;
     size_t hashCode() const;
+    /** Calculate hash using only a subset of columns specified by the iterator's range*/
+    template<typename Iter>
+    size_t hashCode(Iter begin, Iter end) const;
 
 private:
     inline void setActiveTrue() {
@@ -1014,6 +1026,20 @@ inline bool TableTuple::equalsNoSchemaCheck(const TableTuple &other, bool includ
     return true;
 }
 
+template<typename Iter>
+inline bool TableTuple::equalsNoSchemaCheck(const TableTuple &other, Iter begin, Iter end) const {
+    while (begin != end) {
+        assert(*begin < m_schema->columnCount());
+        const NValue lhs = getNValue(*begin);
+        const NValue rhs = other.getNValue(*begin);
+        if (lhs.op_notEquals(rhs).isTrue()) {
+            return false;
+        }
+        ++begin;
+    }
+    return true;
+}
+
 inline void TableTuple::setAllNulls() const {
     assert(m_schema);
     assert(m_data);
@@ -1057,6 +1083,18 @@ inline size_t TableTuple::hashCode(size_t seed) const {
 inline size_t TableTuple::hashCode() const {
     size_t seed = 0;
     return hashCode(seed);
+}
+
+template<typename Iter>
+inline size_t TableTuple::hashCode(Iter begin, Iter end) const {
+    size_t seed = 0;
+    while (begin != end) {
+        assert(*begin < m_schema->columnCount());
+        const NValue value = getNValue(*begin);
+        value.hashCombine(seed);
+        ++begin;
+    }
+    return seed;
 }
 
 /**

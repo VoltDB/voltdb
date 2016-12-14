@@ -82,7 +82,7 @@ class SetOpSubPlanAssembler extends SubPlanAssembler {
         Set<Integer> commonPartitionColumns = null;
         // Indicator that the SetOp node can be pushed down to the partition fragment
         boolean canPushSetOpDown = true;
-        // Indicator that there are two SetOp nodes are required (one for each fragment)
+        // Indicator that there must be two SetOp nodes - at the coordinator and partition fragments
         boolean canMPSetOp = true;
 
         // Build best plans for the children first
@@ -132,23 +132,23 @@ class SetOpSubPlanAssembler extends SubPlanAssembler {
                 // Is statement MP and has a trivial  coordinator?
                 canMPSetOp = partitioning.requiresTwoFragments() && hasTrivialCoordinator(bestChildPlan.rootPlanGraph);
             }
-            if (canPushSetOpDown) {
-                canPushSetOpDown = canMPSetOp;
-                if (canPushSetOpDown) {
-                    // Extract partition column(s) from the child
-                    Set<Integer> partitionColumns = extractPrationColumn(bestChildPlan.rootPlanGraph);
-                    if (commonPartitionColumns == null) {
-                        commonPartitionColumns = partitionColumns;
-                    } else {
-                        // Compare child and the common sets. Only retain entries that are present in both sets
-                        commonPartitionColumns.retainAll(partitionColumns);
-                    }
-                    if (commonPartitionColumns.isEmpty()) {
-                        // Partitions couldn't agree on a common position of their partitioning columns
-                        // in the output schema
-                        canPushSetOpDown = false;
-                    }
+            // Can we push down the SetOp?
+            if (canPushSetOpDown && canMPSetOp) {
+                // Extract partition column(s) from the child
+                Set<Integer> partitionColumns = extractPrationColumn(bestChildPlan.rootPlanGraph);
+                if (commonPartitionColumns == null) {
+                    commonPartitionColumns = partitionColumns;
+                } else {
+                    // Compare child and the common sets. Only retain entries that are present in both sets
+                    commonPartitionColumns.retainAll(partitionColumns);
                 }
+                if (commonPartitionColumns.isEmpty()) {
+                    // Partitions couldn't agree on a common position of their partitioning columns
+                    // in the output schema
+                    canPushSetOpDown = false;
+                }
+            } else {
+                canPushSetOpDown = false;
             }
 
             // Decide whether child statements' partitioning is compatible.
@@ -202,9 +202,7 @@ class SetOpSubPlanAssembler extends SubPlanAssembler {
         m_planSelector.m_planId = planId;
 
         // Add and link children plans. Push down the SetOP if needed
-        return buildSetOpPlan(setOpPlanNode, childrenPlans,
- // do we the  m_setOpPrtitioning.requiresTwoFragments() && here? It's part of the defintiton any way
-                m_setOpPrtitioning.requiresTwoFragments() && canPushSetOpDown, m_setOpPrtitioning.requiresTwoFragments() && canMPSetOp);
+        return buildSetOpPlan(setOpPlanNode, childrenPlans,  canPushSetOpDown, canMPSetOp);
     }
 
     /**
@@ -309,7 +307,7 @@ class SetOpSubPlanAssembler extends SubPlanAssembler {
             setOpPlanNode = connectSetOpChildren(setOpPlanNode, childrenPlans);
 
             if (SetOpType.UNION_ALL == setOpPlanNode.getSetOpType()) {
-                // UNION ALL doesn't require any additional cros partition post processing
+                // UNION ALL doesn't require any additional cross partition post processing
                 // Simply add send/receive pair on top
                 rootNode = SubPlanAssembler.addSendReceivePair(setOpPlanNode);
             } else {
@@ -325,10 +323,14 @@ class SetOpSubPlanAssembler extends SubPlanAssembler {
                 //
                 // The UNION at the coordinator level only needs the partition set op result.
                 if (SetOpType.UNION != setOpPlanNode.getSetOpType()) {
-                    // Need to add an extra temp column to keep number of row per children
+                    // Set a flag to the partition SetOp node that it needs an additional tag column
+                    // to track the origin of each row contributing to the final result se
                     setOpPlanNode.setNeedTagColumn(true);
 
-                    // Find a projection from a first child
+                    // Need to add a projection node on top of the coordinator SetOp node to weed out the tag column.
+                    // The children's output schemas are not generated yet at this point so we need to find
+                    // the first projection node going top down to get a child schema
+                    assert(!childrenPlans.isEmpty());
                     AbstractPlanNode projection = findTopProjection(childrenPlans.get(0).rootPlanGraph);
                     assert(projection != null);
                     ProjectionPlanNode coordinatorProjection = new ProjectionPlanNode(projection.getOutputSchema());

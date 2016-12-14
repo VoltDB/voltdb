@@ -49,16 +49,9 @@
 
 namespace voltdb {
 
-struct TableSizeLess {
-    bool operator()(const Table* t1, const Table* t2) const
-    {
-        return t1->activeTupleCount() < t2->activeTupleCount();
-    }
-};
-
 SetOperator::SetOperator(const std::vector<Table*>& input_tables,
-                TempTable* output_table,
-                bool is_all)
+    TempTable* output_table,
+    bool is_all)
     : m_input_tables(input_tables),
       m_output_table(output_table),
       m_is_all(is_all)
@@ -66,72 +59,46 @@ SetOperator::SetOperator(const std::vector<Table*>& input_tables,
 
 SetOperator::~SetOperator() {}
 
-// for debugging - may be unused
-void SetOperator::printTupleMap(const char* nonce, TupleMap &tuples)
-{
-    printf("Printing TupleMap (%s): ", nonce);
-    for (TupleMap::const_iterator mapIt = tuples.begin(); mapIt != tuples.end(); ++mapIt) {
-        TableTuple tuple = mapIt->first;
-        printf("%s, ", tuple.debugNoHeader().c_str());
-    }
-    printf("\n");
-    fflush(stdout);
-}
-
-// for debugging - may be unused
-void SetOperator::printTupleSet(const char* nonce, TupleSet &tuples)
-{
-    printf("Printing TupleSet (%s): ", nonce);
-    for (TupleSet::const_iterator setIt = tuples.begin(); setIt != tuples.end(); ++setIt) {
-        printf("%s, ", setIt->debugNoHeader().c_str());
-    }
-    printf("\n");
-    fflush(stdout);
-}
-
 SetOperator* SetOperator::getSetOperator(SetOpType setopType,
-                const std::vector<TableReference>& input_tablerefs,
-                TempTable* output_table,
-                bool need_children_result)
+    const std::vector<TableReference>& input_tablerefs,
+    TempTable* output_table,
+    bool need_send_children_result)
 {
-    std::vector<Table*> input_vectors;
-    input_vectors.reserve(input_tablerefs.size());
+    std::vector<Table*> input_tables;
+    input_tables.reserve(input_tablerefs.size());
     for (int i = 0; i < input_tablerefs.size(); ++i)
     {
-        input_vectors.push_back(input_tablerefs[i].getTable());
+        input_tables.push_back(input_tablerefs[i].getTable());
     }
-    return SetOperator::getSetOperator(setopType, input_vectors, output_table, need_children_result);
-}
 
-SetOperator* SetOperator::getSetOperator(SetOpType setopType,
-                const std::vector<Table*>& input_tables,
-                TempTable* output_table,
-                bool need_children_result)
-{
     switch (setopType) {
         case SETOP_TYPE_UNION_ALL:
+            // UNION_ALL and UNION don't need to send individual children results up to coordinator at all.
             return new UnionSetOperator(input_tables, output_table, true);
         case SETOP_TYPE_UNION:
             return new UnionSetOperator(input_tables, output_table, false);
         case SETOP_TYPE_EXCEPT_ALL:
-            return new ExceptIntersectSetOperator(input_tables, output_table,
-                true, true, need_children_result);
+            return new ExceptIntersectSetOperator<TableTupleHasher, TableTupleEqualityChecker>(
+                input_tables, output_table, true, true, need_send_children_result);
         case SETOP_TYPE_EXCEPT:
-            return new ExceptIntersectSetOperator(input_tables, output_table,
-                false, true, need_children_result);
+            return new ExceptIntersectSetOperator<TableTupleHasher, TableTupleEqualityChecker>(
+                input_tables, output_table, false, true, need_send_children_result);
         case SETOP_TYPE_INTERSECT_ALL:
-            if (need_children_result) {
+            // It doesn't make much sense to perform the INTERSECT_ALL and INTERSECT at the partition and the coordinator
+            // levels for a MP query. It needs to be done in one place at the coordinator. The partition just need
+            // to channel the children results through as is.
+            if (need_send_children_result) {
                 return new PassThroughSetOperator(input_tables, output_table);
             } else {
-                return new ExceptIntersectSetOperator(input_tables, output_table,
-                    true, false, false);
+                return new ExceptIntersectSetOperator<TableTupleHasher, TableTupleEqualityChecker>(
+                    input_tables, output_table, true, false);
             }
         case SETOP_TYPE_INTERSECT:
-            if (need_children_result) {
+            if (need_send_children_result) {
                 return new PassThroughSetOperator(input_tables, output_table);
             } else {
-                return new ExceptIntersectSetOperator(input_tables, output_table,
-                    false, false, false);
+                return new ExceptIntersectSetOperator<TableTupleHasher, TableTupleEqualityChecker>(
+                    input_tables, output_table, false, false);
             }
         default:
             VOLT_ERROR("Unsupported tuple set operation '%d'.", setopType);
@@ -139,171 +106,65 @@ SetOperator* SetOperator::getSetOperator(SetOpType setopType,
     }
 }
 
+SetOperator* SetOperator::getReceiveSetOperator(SetOpType setopType,
+    const std::vector<Table*>& input_tables,
+    TempTable* output_table)
+{
+    switch (setopType) {
+        case SETOP_TYPE_UNION:
+            // UNION_ALL does not require the coordinator SetOp node at all.
+            return new UnionSetOperator(
+                input_tables, output_table, false);
+        case SETOP_TYPE_EXCEPT_ALL:
+            return new ExceptIntersectSetOperator<TableTuplePartialHasher, TableTuplePartialEqualityChecker>(
+                input_tables, output_table, true, true);
+        case SETOP_TYPE_EXCEPT:
+            return new ExceptIntersectSetOperator<TableTuplePartialHasher, TableTuplePartialEqualityChecker>(
+                input_tables, output_table, false, true);
+        case SETOP_TYPE_INTERSECT_ALL:
+            return new ExceptIntersectSetOperator<TableTuplePartialHasher, TableTuplePartialEqualityChecker>(
+                    input_tables, output_table, true, false);
+        case SETOP_TYPE_INTERSECT:
+            return new ExceptIntersectSetOperator<TableTuplePartialHasher, TableTuplePartialEqualityChecker>(
+                    input_tables, output_table, false, false);
+        default:
+            VOLT_ERROR("Unsupported tuple receive set operation '%d'.", setopType);
+            return NULL;
+    }
+}
+
 UnionSetOperator::UnionSetOperator(const std::vector<Table*>& input_tables,
-                TempTable* output_table,
-                 bool is_all)
-    : SetOperator(input_tables, output_table, is_all)
+    TempTable* output_table,
+    bool is_all)
+    : SetOperatorImpl<TableTupleHasher, TableTupleEqualityChecker>(input_tables, output_table, is_all)
 { }
 
 bool UnionSetOperator::processTuples()
 {
     // Set to keep candidate tuples.
-    TupleSet tuples;
+    TupleSet tuples(0, getHasher(), getEqualityChecker());
 
     //
     // For each input table, grab their TableIterator and then append all of its tuples
     // to our ouput table. Only distinct tuples are retained.
     //
-    for (size_t ctr = 0, cnt = m_input_tables.size(); ctr < cnt; ctr++) {
-        Table* input_table = m_input_tables[ctr];
+    for (size_t ctr = 0, cnt = this->m_input_tables.size(); ctr < cnt; ctr++) {
+        Table* input_table = this->m_input_tables[ctr];
         assert(input_table);
         TableIterator iterator = input_table->iterator();
         TableTuple tuple(input_table->schema());
         while (iterator.next(tuple)) {
-            if (m_is_all || needToInsert(tuple, tuples)) {
+            if (this->m_is_all || needToInsert(tuple, tuples)) {
                 // we got tuple to insert
-                m_output_table->insertTempTuple(tuple);
+                this->m_output_table->insertTempTuple(tuple);
             }
         }
     }
     return true;
-}
-
-ExceptIntersectSetOperator::ExceptIntersectSetOperator(const std::vector<Table*>& input_tables,
-                               TempTable* output_table,
-                               bool is_all,
-                               bool is_except,
-                               bool need_children_result)
-    : SetOperator(input_tables, output_table, is_all),
-      m_is_except(is_except),
-      m_need_children_result(need_children_result)
-{ }
-
-bool ExceptIntersectSetOperator::processTuples()
-{
-    // Map to keep candidate tuples. The key is the tuple itself
-    // The value - tuple's repeat count in the final table.
-    TupleMap tuples;
-
-    assert( ! m_input_tables.empty());
-
-    if ( ! m_is_except) {
-        // For intersect we want to start with the smallest table
-        std::vector<Table*>::iterator minTableIt =
-            std::min_element(m_input_tables.begin(), m_input_tables.end(), TableSizeLess());
-        std::swap(m_input_tables[0], *minTableIt);
-    }
-    // Collect all tuples from the first set
-    Table* input_table = m_input_tables[0];
-    collectTuples(*input_table, tuples);
-
-    //
-    // For each remaining input table, collect its tuple into a separate map
-    // and substract/intersect it from/with the first one
-    //
-    TupleMap next_tuples;
-    for (size_t ctr = 1, cnt = m_input_tables.size(); ctr < cnt; ctr++) {
-        next_tuples.clear();
-        input_table = m_input_tables[ctr];
-        assert(input_table);
-        collectTuples(*input_table, next_tuples);
-        if (m_is_except) {
-            exceptTupleMaps(tuples, next_tuples);
-            if (m_need_children_result) {
-                send_child_rows_up(next_tuples, ctr);
-            }
-        } else {
-            intersectTupleMaps(tuples, next_tuples);
-        }
-    }
-
-    // Insert remaining tuples to the output table
-    for (TupleMap::const_iterator mapIt = tuples.begin(); mapIt != tuples.end(); ++mapIt) {
-        TableTuple tuple = mapIt->first;
-        for (size_t i = 0; i < mapIt->second; ++i) {
-            m_output_table->insertTempTuple(tuple);
-        }
-    }
-    return true;
-}
-
-void ExceptIntersectSetOperator::collectTuples(Table& input_table, TupleMap& tuple_map)
-{
-    TableIterator iterator = input_table.iterator();
-    TableTuple tuple(input_table.schema());
-    while (iterator.next(tuple)) {
-        TupleMap::iterator mapIt = tuple_map.find(tuple);
-        if (mapIt == tuple_map.end()) {
-            tuple_map.insert(std::make_pair(tuple, 1));
-        } else if (m_is_all) {
-            ++(mapIt->second);
-        }
-    }
-}
-
-void ExceptIntersectSetOperator::exceptTupleMaps(TupleMap& map_a, TupleMap& map_b)
-{
-    TupleMap::iterator it_a = map_a.begin();
-    while(it_a != map_a.end()) {
-        TupleMap::iterator it_b = map_b.find(it_a->first);
-        if (it_b != map_b.end()) {
-            if (it_a->second > it_b->second) {
-                it_a->second -= it_b->second;
-                // Remove rows that already was accounted for from the child
-                if (m_need_children_result) {
-                    map_b.erase(it_b);
-                }
-            }
-            else {
-                if (m_need_children_result) {
-                    if (it_a->second == it_b->second) {
-                        map_b.erase(it_b);
-                    } else {
-                        it_b->second -= it_a->second;
-                    }
-                }
-                it_a = map_a.erase(it_a);
-                continue;
-            }
-        }
-        ++it_a;
-    }
-}
-
-void ExceptIntersectSetOperator::send_child_rows_up(TupleMap& child_tuples, int child_id) {
-    TableTuple out_tuple = m_output_table->tempTuple();
-    TupleMap::iterator child_it = child_tuples.begin();
-    while(child_it != child_tuples.end()) {
-        TableTuple tuple = child_it->first;
-        int count = child_it->second;
-        int child_column_cnt = tuple.sizeInValues();
-        // Output current tuple multiple times according to a tuple count
-        for (int i = 0; i < count; ++i) {
-            out_tuple.setNValues(0, tuple, 0, child_column_cnt);
-            out_tuple.setNValue(child_column_cnt, ValueFactory::getBigIntValue(child_id));
-            m_output_table->insertTempTuple(out_tuple);
-        }
-        // Move to the next tuple;
-        ++child_it;
-    }
-}
-
-void ExceptIntersectSetOperator::intersectTupleMaps(TupleMap& map_a, TupleMap& map_b)
-{
-    TupleMap::iterator it_a = map_a.begin();
-    while(it_a != map_a.end()) {
-        TupleMap::iterator it_b = map_b.find(it_a->first);
-        if (it_b == map_b.end()) {
-            it_a = map_a.erase(it_a);
-        } else {
-            it_a->second = std::min(it_a->second, it_b->second);
-            ++it_a;
-        }
-    }
 }
 
 PassThroughSetOperator::PassThroughSetOperator(const std::vector<Table*>& input_tables,
-                TempTable* output_table)
+    TempTable* output_table)
     : SetOperator(input_tables, output_table, true)
 { }
 
@@ -311,6 +172,8 @@ bool PassThroughSetOperator::processTuples()
 {
     assert(m_output_table);
 
+    // Simply iterate over the children's output, tag each row by adding an extra column,
+    // and write the updated tuple to the output
     TableTuple out_tuple = m_output_table->tempTuple();
     for (size_t ctr = 0, cnt = m_input_tables.size(); ctr < cnt; ctr++) {
         Table* input_table = m_input_tables[ctr];

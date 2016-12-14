@@ -664,11 +664,12 @@ public class TestPlansSetOp extends PlannerTestCase {
     }
 
     public void testMultiPartitionedSetOpsTwoLevel() {
-// need a test with two partitioned and one distributed tables
-// need a test with two partitioned and one part whis PK = 3
         List<AbstractPlanNode> pns;
         PlanNodeType[] coordinatorTypes;
         PlanNodeType[] setOpChildren;
+
+        pns = compileToFragments("SELECT ABS(F) as tag FROM T1 INTERSECT  SELECT F FROM T1 ORDER BY tag;");
+        assert(false);
 
         // No partitioning columns in the output
         pns = compileToFragments("select T1.DESC from T1 union select T5.TEXT from T5");
@@ -700,6 +701,16 @@ public class TestPlansSetOp extends PlannerTestCase {
         coordinatorTypes = new PlanNodeType[] {PlanNodeType.PROJECTION, PlanNodeType.SETOPRECEIVE};
         setOpChildren = new PlanNodeType[] {PlanNodeType.SEQSCAN, PlanNodeType.SEQSCAN};
         checkPushedDownSetOp(pns, coordinatorTypes, SetOpType.INTERSECT_ALL, setOpChildren);
+
+        pns = compileToFragments("select T1.A1 from T1 where T1.A1 < 100 except select T1.A1 from T1 where T1.A1 < 100");
+        coordinatorTypes = new PlanNodeType[] {PlanNodeType.PROJECTION, PlanNodeType.SETOPRECEIVE};
+        setOpChildren = new PlanNodeType[] {PlanNodeType.SEQSCAN, PlanNodeType.SEQSCAN};
+        checkPushedDownSetOp(pns, coordinatorTypes, SetOpType.EXCEPT, setOpChildren);
+
+        pns = compileToFragments("select T1.A1 from T1 where T1.A1 < 100 union select T1.A1 from T1 where T1.A1 < 100");
+        coordinatorTypes = new PlanNodeType[] {PlanNodeType.SETOPRECEIVE};
+        setOpChildren = new PlanNodeType[] {PlanNodeType.SEQSCAN, PlanNodeType.SEQSCAN};
+        checkPushedDownSetOp(pns, coordinatorTypes, SetOpType.UNION, setOpChildren);
 
         // Partitioning columns VT1.V_A and T4.D position mismatch
         pns = compileToFragments("SELECT MAXA, V_A FROM VT1 UNION SELECT D, MAX(D) FROM T4 GROUP BY D");

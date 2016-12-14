@@ -499,6 +499,7 @@ if whichtests in ("${eetestsuite}", "executors"):
     OptimizedProjectorTest
     MergeReceiveExecutorTest
     PartitionByExecutorTest
+    SetOpExecutorTest
     TestGeneratedPlans
     """
 

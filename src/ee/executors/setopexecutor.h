@@ -71,7 +71,6 @@ class SetOpExecutor : public AbstractExecutor {
 
     private:
         boost::shared_ptr<SetOperator> m_setOperator;
-        bool m_needChildrenRows;
 };
 
 }

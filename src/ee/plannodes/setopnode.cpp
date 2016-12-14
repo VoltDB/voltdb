@@ -64,8 +64,8 @@ std::string SetOpPlanNode::debugInfo(const std::string &spacer) const
 void SetOpPlanNode::loadFromJSONObject(PlannerDomValue obj)
 {
     m_setopType = SetOpPlanNode::parseSetOpType(obj.valueForKey("SETOP_TYPE").asStr());
-    if (obj.hasKey("NEED_CHILDREN_RESULTS")) {
-        m_needChildrenRows = obj.valueForKey("NEED_CHILDREN_RESULTS").asBool();
+    if (obj.hasKey("SEND_CHILDREN_RESULTS_UP")) {
+        m_needSendChildrenRows = obj.valueForKey("SEND_CHILDREN_RESULTS_UP").asBool();
     }
 }
 

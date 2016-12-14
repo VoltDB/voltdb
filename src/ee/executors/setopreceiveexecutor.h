@@ -52,6 +52,7 @@
 #include "executors/abstractexecutor.h"
 
 #include <boost/scoped_ptr.hpp>
+#include <boost/shared_ptr.hpp>
 
 #include <vector>
 
@@ -71,10 +72,15 @@ class SetOpReceiveExecutor : public AbstractExecutor {
         bool p_execute(const NValueArray &params);
 
     private:
+
+        void distribute_input();
+
         boost::scoped_ptr<SetOperator> m_setOperator;
 
+        // A Temp Table to collect partitions output
         boost::scoped_ptr<TempTable> m_tmpInputTable;
-        std::vector<Table*> m_chldrenTables;
+        // Temp Tables to sort out the input by individual child stream.
+        std::vector<boost::shared_ptr<TempTable> > m_childrenTables;
 };
 
 }

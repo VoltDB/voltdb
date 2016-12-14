@@ -56,7 +56,7 @@
 namespace voltdb {
 
 SetOpExecutor::SetOpExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
-    : AbstractExecutor(engine, abstract_node), m_setOperator(), m_needChildrenRows(false)
+    : AbstractExecutor(engine, abstract_node), m_setOperator()
 { }
 
 bool SetOpExecutor::p_init(AbstractPlanNode* abstract_node,
@@ -67,7 +67,6 @@ bool SetOpExecutor::p_init(AbstractPlanNode* abstract_node,
     SetOpPlanNode* node = dynamic_cast<SetOpPlanNode*>(abstract_node);
     assert(node);
 
-    m_needChildrenRows = node->needChildrenRows();
     //
     // First check to make sure they have the same number of columns
     //
@@ -119,15 +118,20 @@ bool SetOpExecutor::p_init(AbstractPlanNode* abstract_node,
     // of columns with the same format.
     // Otherwise we need to use the output schema that have one extra column to tag each output row
     // to help the coordinator to sort out input rows into individual temp tables.
-    if (m_needChildrenRows) {
+    bool needSendChildrenRows = node->needSendChildrenRows();
+    TempTable* outputTable;
+    if (needSendChildrenRows) {
         setTempOutputTable(limits, node->getInputTable(0)->name());
+        outputTable = m_tmpOutputTable;
     } else {
         node->setOutputTable(TableFactory::buildCopiedTempTable(node->getInputTable(0)->name(),
                                                                 node->getInputTable(0),
                                                                 limits));
+        outputTable = node->getTempOutputTable();
     }
+    m_setOperator.reset(SetOperator::getSetOperator(
+        node->getSetOpType(), node->getInputTableRefs(), outputTable, needSendChildrenRows));
 
-    m_setOperator.reset(SetOperator::getSetOperator(node->getSetOpType(), node->getInputTableRefs(), node->getTempOutputTable(), m_needChildrenRows));
     return true;
 }
 
