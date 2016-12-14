@@ -52,6 +52,7 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 import org.voltdb.catalog.SnapshotSchedule;
 
+import com.google.common.collect.Sets;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
@@ -138,14 +139,14 @@ public class LeaderAppointer implements Promotable
             // compute previously unseen HSId set in the callback list
             Set<Long> newHSIds = new HashSet<Long>(updatedHSIds);
             newHSIds.removeAll(m_replicas);
-            tmLog.debug("Newly seen replicas: " + CoreUtils.hsIdCollectionToString(newHSIds));
             // compute previously seen but now vanished from the callback list HSId set
             Set<Long> missingHSIds = new HashSet<Long>(m_replicas);
             missingHSIds.removeAll(updatedHSIds);
-            tmLog.debug("Newly dead replicas: " + CoreUtils.hsIdCollectionToString(missingHSIds));
-
-            tmLog.debug("Handling babysitter callback for partition " + m_partitionId + ": children: " +
-                    CoreUtils.hsIdCollectionToString(updatedHSIds));
+            if (tmLog.isDebugEnabled()) {
+                tmLog.debug("Handling babysitter callback for partition " + m_partitionId + ": children: " + CoreUtils.hsIdCollectionToString(updatedHSIds));
+                tmLog.debug(String.format("Newly seen replicas:%s,Newly dead replicas:%s", CoreUtils.hsIdCollectionToString(newHSIds),
+                        CoreUtils.hsIdCollectionToString(missingHSIds)));
+            }
             if (m_state.get() == AppointerState.CLUSTER_START) {
                 // We can't yet tolerate a host failure during startup.  Crash it all
                 if (missingHSIds.size() > 0) {
@@ -156,13 +157,29 @@ public class LeaderAppointer implements Promotable
                 // and gate leader assignment on that many copies showing up.
                 int replicaCount = m_kfactor + 1;
                 JSONArray parts;
+                Set<Integer> inactiveHosts = Sets.newHashSet();
                 try {
+                    //find all inactive hosts
+                    JSONArray hosts = m_topo.getJSONArray("hosts");
+                    for (int h = 0; h < hosts.length(); h++) {
+                        JSONObject host = hosts.getJSONObject(h);
+                        boolean isLive = host.getBoolean("live");
+                        if (!isLive) {
+                            inactiveHosts.add(host.getInt("host_id"));
+                        }
+                    }
                     parts = m_topo.getJSONArray("partitions");
                     for (int p = 0; p < parts.length(); p++) {
                         JSONObject aPartition = parts.getJSONObject(p);
-                        int pid = aPartition.getInt("partition_id");
-                        if (pid == m_partitionId) {
-                            replicaCount = aPartition.getJSONArray("replicas").length();
+                        if (m_partitionId == aPartition.getInt("partition_id")) {
+                            JSONArray replicas = aPartition.getJSONArray("replicas");
+                            replicaCount = replicas.length();
+                            //replica may be placed on an inactive nodes. do not wait for the replica on inactive hosts
+                            for (int r = 0; r < replicas.length(); r++) {
+                                if (inactiveHosts.contains(replicas.getInt(r))) {
+                                    replicaCount--;
+                                }
+                            }
                             break;
                         }
                     }
@@ -171,13 +188,11 @@ public class LeaderAppointer implements Promotable
                 }
                 if (children.size() == replicaCount) {
                     m_currentLeader = assignLeader(m_partitionId, updatedHSIds);
-                }
-                else {
+                } else {
                     tmLog.info("Waiting on " + ((m_kfactor + 1) - children.size()) + " more nodes " +
                             "for k-safety before startup");
                 }
-            }
-            else {
+            } else {
                 Set<Integer> hostsOnRing = new HashSet<Integer>();
                 // Check for k-safety
                 if (!isClusterKSafe(hostsOnRing)) {
