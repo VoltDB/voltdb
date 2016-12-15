@@ -3658,8 +3658,8 @@ LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 =========================================================================================
-Google error-prone
-Site : https://github.com/google/error-prone/blob/master/COPYING
+snmp4j
+Site : http://www.snmp4j.org
 License : Apache 2.0 (http://www.apache.org/licenses/LICENSE-2.0)
 snmp4j (Open Source License only.)
 
@@ -3675,4 +3675,8 @@ snmp4j (Open Source License only.)
    See the License for the specific language governing permissions and
    limitations under the License.
 
+=========================================================================================
+FileSaver.min.js
+License: MIT
+Site: https://github.com/eligrey/FileSaver.js/blob/master/LICENSE.md
 =========================================================================================

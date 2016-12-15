@@ -87,7 +87,7 @@ public class DiskResourceChecker
                         (config.m_diskSizeLimit > 0 ? config.m_diskSizeLimit + "GB" : config.m_diskSizeLimitPerc + "%"));
             }
             if ((MiscUtils.isPro()) && (config.m_diskSizeLimitSnmp > 0 || config.m_diskSizeLimitPercSnmp > 0)) {
-                m_logger.warn(config.m_featureName.value() + " on " + config.m_path + " configured with SNMP notification limit: " +
+                m_logger.info(config.m_featureName.value() + " on " + config.m_path + " configured with SNMP notification limit: " +
                         (config.m_diskSizeLimitSnmp > 0 ? config.m_diskSizeLimitSnmp + "GB" : config.m_diskSizeLimitPercSnmp + "%"));
             }
         }
@@ -208,7 +208,7 @@ public class DiskResourceChecker
             if (MiscUtils.isPro() && forSnmp && !m_snmpDiskTrapSent) {
                 m_snmpTrapSender.resource(snmpCriteria, FaultFacility.DISK, calculatedThreshold, usedSpace,
                         String.format(
-                                "Resource limit exceeded. Disk for path %s (%s) limit %s on %s. Current disk usage is %s.",
+                                "SNMP resource limit exceeded. Disk for path %s (%s) limit %s on %s. Current disk usage is %s.",
                                 filePath, featureName.value(),
                                 (percThreshold > 0 ? percThreshold + "%" : sizeThreshold + " GB"),
                                 CoreUtils.getHostnameOrAddress(), ResourceUsageMonitor.getValueWithUnit(usedSpace)));
@@ -226,7 +226,7 @@ public class DiskResourceChecker
             if (forSnmp && m_snmpDiskTrapSent) {
                 m_snmpTrapSender.resourceClear(snmpCriteria, FaultFacility.DISK, calculatedThreshold, usedSpace,
                         String.format(
-                                "Resource limit cleared. Disk for path %s (%s) limit %s on %s. Current disk usage is %s.",
+                                "SNMP resource limit cleared. Disk for path %s (%s) limit %s on %s. Current disk usage is %s.",
                                 filePath, featureName.value(),
                                 (percThreshold > 0 ? percThreshold + "%" : sizeThreshold + " GB"),
                                 CoreUtils.getHostnameOrAddress(), ResourceUsageMonitor.getValueWithUnit(usedSpace)));
