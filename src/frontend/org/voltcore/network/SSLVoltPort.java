@@ -563,7 +563,9 @@ public class SSLVoltPort extends VoltPort {
                                 m_hasOutstandingTask.set(false);
                                 return;
                             } finally {
-                                writesCont.discard();
+                                if (!writesCont.b().hasRemaining() && m_leftoverWrites == null) {
+                                    writesCont.discard();
+                                }
                             }
                         }
                     };
