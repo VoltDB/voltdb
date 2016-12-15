@@ -138,6 +138,10 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
         return oldlist;
     }
 
+    protected synchronized boolean hasQueuedWrites() {
+        return !m_queuedWrites.isEmpty();
+    }
+
     /**
      * Called when not all queued data could be flushed to the channel
      */
