@@ -250,6 +250,8 @@ public class KafkaStreamImporterConfig implements ImporterConfig
                     attempts.add(new FailedMetaDataAttempt(
                             "Failed to get topic metadata for topic " + topic + " from host " + hp.getHost(), null
                             ));
+                    closeConsumer(consumer);
+                    consumer = null;
                     continue;
                 }
                 int partitionCount = 0;
@@ -278,21 +280,21 @@ public class KafkaStreamImporterConfig implements ImporterConfig
                 }
                 if (configs.size() != partitionCount) {
                     configs.clear();
-                    continue;
+                    closeConsumer(consumer);
+                    consumer = null;
                 }
             } catch (Exception e) {
                 attempts.add(new FailedMetaDataAttempt(
                         "Failed to send topic metadata request for topic " + topic + " from host " + hp.getHost(), e
                         ));
-                continue;
             } finally {
                 closeConsumer(consumer);
             }
         }
         if (!attempts.isEmpty()) {
-            for (FailedMetaDataAttempt attempt: attempts) {
+            attempts.forEach((attempt) -> {
                 attempt.log();
-            }
+            });
             attempts.clear();
             if (configs.isEmpty()) {
                 throw new KafkaConfigurationException("Failed to get topic metadata for %s", topic);
