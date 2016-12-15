@@ -96,12 +96,8 @@ public class SSLVoltPort extends VoltPort {
         }
 
         try {
-            if (!m_processingReads.get() && !m_processingWrites.get()) {
-                if (!processReads()) {
-                    processWrites();
-                }
-            }
-
+            processReads();
+            processWrites();
             checkBackPressure();
         } catch (IOException ioe) {
             while (!gatewaysEmpty()) {
@@ -542,7 +538,7 @@ public class SSLVoltPort extends VoltPort {
                             }
                             if (er == EncryptionResult.eosResult) {
                                 m_hasOutstandingTask.set(false);
-                                m_port.disableWriteSelection();
+//                                m_port.disableWriteSelection();
                                 m_port.doneProcessingWrites();
                                 return;
                             }
