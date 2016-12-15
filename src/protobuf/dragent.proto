@@ -106,7 +106,8 @@ message ConnectResponse {
 }
 
 message QueryResponse {
-    repeated ClusterInfo clusterInfo = 1;
+    optional bool includeMesh = 1 [default = false];
+    repeated ClusterInfo clusterInfo = 2;
 }
 
 message ClusterInfo {

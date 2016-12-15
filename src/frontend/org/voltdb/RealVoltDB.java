@@ -3564,13 +3564,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     private void prepareReplication() {
         try {
+            if (m_consumerDRGateway != null) {
+                m_consumerDRGateway.initialize(m_config.m_startAction != StartAction.CREATE);
+            }
             if (m_producerDRGateway != null) {
                 m_producerDRGateway.initialize(m_catalogContext.cluster.getDrproducerenabled(),
                         VoltDB.getReplicationPort(m_catalogContext.cluster.getDrproducerport()),
                         VoltDB.getDefaultReplicationInterface());
-            }
-            if (m_consumerDRGateway != null) {
-                m_consumerDRGateway.initialize(m_config.m_startAction != StartAction.CREATE);
             }
         } catch (Exception ex) {
             CoreUtils.printPortsInUse(hostLog);
