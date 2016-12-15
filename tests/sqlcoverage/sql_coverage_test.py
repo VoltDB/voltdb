@@ -26,7 +26,7 @@ import sys
 # add the path to the volt python client, just based on knowing
 # where we are now
 sys.path.append('../../lib/python')
-sys.path.append('./examples/sql_coverage/')
+sys.path.append('./normalizer/')
 
 import random
 import time
@@ -243,6 +243,21 @@ def get_max_mismatches(comparison_database, suite_name):
 
     return max_mismatches
 
+
+def get_config_path(basedir, config_key, config_value):
+    """Returns the correct path to a specific (ddl, normalizer, schema, or
+    template) file, given its config 'key' and 'value'. The 'key' will be one
+    of 'ddl', 'normalizer', 'schema', or 'template', the last of which is the
+    more complicated case, requiring us to check the various subdirectories.
+    """
+    for subdir in os.walk(os.path.join(basedir, config_key)):
+        filename = os.path.join(subdir[0], config_value)
+        if os.path.isfile(filename):
+            return os.path.abspath(filename)
+    # If you cannot find the file, leave the value unchanged
+    return config_value
+
+
 def run_config(suite_name, config, basedir, output_dir, random_seed,
                report_invalid, report_all, generate_only, subversion_generation,
                submit_verbosely, ascii_only, args, testConfigKit):
@@ -252,11 +267,11 @@ def run_config(suite_name, config, basedir, output_dir, random_seed,
 
     precision = 0
     for key in config.iterkeys():
-        print "in run_config key = '%s', config[key] = '%s'" % (key, config[key])
         if key == "precision":
             precision = int(config["precision"])
         elif not os.path.isabs(config[key]):
-            config[key] = os.path.abspath(os.path.join(basedir, config[key]))
+            config[key] = get_config_path(basedir, key, config[key])
+        print "in run_config key = '%s', config[key] = '%s'" % (key, str(config[key]))
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
@@ -734,7 +749,9 @@ if __name__ == "__main__":
 
     config_filename = args[0]
     output_dir = args[1]
-    basedir = os.path.dirname(config_filename)
+    # Parent directory of the 'config' directory (i.e., this would
+    # normally be the 'sqlcoverage' directory)
+    basedir = os.path.dirname(os.path.dirname(config_filename))
 
     config_list = Config(config_filename)
 #    print "config_list name = '" + config_list.__class__.__name__ + "'"
