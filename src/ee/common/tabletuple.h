@@ -336,13 +336,7 @@ public:
     inline const NValue getNValue(const int idx) const {
         assert(m_schema);
         assert(m_data);
-        int a = 0;
-        if (idx >= m_schema->columnCount()) {
-            a = idx;
-        } else {
-            a = idx;
-        }
-        assert(a < m_schema->columnCount());
+        assert(idx < m_schema->columnCount());
 
         const TupleSchema::ColumnInfo *columnInfo = m_schema->getColumnInfo(idx);
         const voltdb::ValueType columnType = columnInfo->getVoltType();
