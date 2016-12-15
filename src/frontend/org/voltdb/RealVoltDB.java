@@ -1238,7 +1238,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             }
 
             // Create secondary connections within partition group
-//            createSecondaryConnections(isRejoin);
+            createSecondaryConnections(isRejoin);
 
             if (!m_joining && (m_cartographer.getPartitionCount()) != m_configuredNumberOfPartitions) {
                 for (Map.Entry<Integer, ImmutableList<Long>> entry :
@@ -1687,6 +1687,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     }
                 }
             }
+
+            // it is possible if some nodes are inactive
+            if (peers.isEmpty()) return;
+
             /**
              *  Basic goal is each host should has the same number of connections compare to the number
              *  without partition group layout.
