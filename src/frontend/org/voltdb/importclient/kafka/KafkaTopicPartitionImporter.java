@@ -667,10 +667,6 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
     @Override
     protected void stop()
     {
-        //Cleanup kafka metrics threads
-        synchronized (this) {
-            com.yammer.metrics.Metrics.shutdown();
-        }
     }
 
     //Per topic per partition that we are responsible for.

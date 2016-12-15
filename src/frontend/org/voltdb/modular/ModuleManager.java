@@ -76,6 +76,11 @@ public class ModuleManager {
             .add("org.voltdb.importer;")
             .add("org.voltdb.importer.formatter;")
             .add("org.voltdb.types;")
+            .add("com.yammer.metrics;")
+            .add("com.yammer.metrics.core;")
+            .add("com.yammer.metrics.reporting;")
+            .add("com.yammer.metrics.stats;")
+            .add("com.yammer.metrics.util;")
             .build();
 
     private static final VoltLogger LOG = new VoltLogger("HOST");
