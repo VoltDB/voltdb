@@ -1111,7 +1111,7 @@ public class LocalCluster extends VoltServerConfig {
             assert (false);
         }
 
-        if (waitForReady && (startAction == StartAction.JOIN || startAction == StartAction.PROBE)) {
+        if (waitForReady && (startAction == StartAction.JOIN || startAction == StartAction.PROBE || startAction == StartAction.REJOIN)) {
             waitOnPTFReady(ptf, true, System.currentTimeMillis(), System.currentTimeMillis(), hostId);
         }
 
@@ -1175,6 +1175,20 @@ public class LocalCluster extends VoltServerConfig {
             throw new RuntimeException(ioe);
         }
     }
+
+    //create a new node and join to the cluster via rejoin
+    public void rejoinOne(int hostId) {
+        try {
+            if (isNewCli && !m_hostRoots.containsKey(Integer.toString(hostId))) {
+                initLocalServer(hostId, true);
+            }
+            startOne(hostId, true, ReplicationRole.NONE, StartAction.REJOIN, true, null);
+        }
+        catch (IOException ioe) {
+            throw new RuntimeException(ioe);
+        }
+    }
+
     /**
      * join multiple nodes to the cluster
      * @param hostIds a set of new host ids
