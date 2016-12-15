@@ -78,7 +78,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     public static enum EventType {
         NOT_A_EVENT(0),
         POISON_PILL(1),
-        CATALOG_UPDATE(2);
+        CATALOG_UPDATE(2),
+        DR_STREAM_START(3);
 
         private EventType(int typeId) {
             this.typeId = typeId;

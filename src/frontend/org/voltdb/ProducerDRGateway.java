@@ -69,6 +69,6 @@ public interface ProducerDRGateway {
     public void activateDRProducer();
 
     public void blockOnSyncSnapshotGeneration();
-
+    public boolean setDRProtocolVersion(int drVersion, boolean genStreamStart);
     public void startCursor(final List<ClusterInfo> requestedCursors, final DRProducerResponseHandler handler);
 }
