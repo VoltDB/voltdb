@@ -60,7 +60,6 @@ public class SSLVoltPort extends VoltPort {
 
     private final int m_appBufferSize;
 
-    private AtomicBoolean m_processingReads = new AtomicBoolean(false);
     private AtomicBoolean m_processingWrites = new AtomicBoolean(false);
     private final NetworkDBBPool m_writePool;
     private ByteBuffer m_heapBuffer;
@@ -97,9 +96,7 @@ public class SSLVoltPort extends VoltPort {
         }
 
         try {
-            if (!m_processingReads.get()) {
-                processReads();
-            }
+            processReads();
             if (!m_processingWrites.get()) {
                 processWrites();
             }
@@ -118,7 +115,7 @@ public class SSLVoltPort extends VoltPort {
     }
 
     private boolean processing() {
-        return m_processingReads.get() || m_processingWrites.get() || !m_readGateway.isEmpty() || !m_writeGateway.isEmpty();
+        return m_processingWrites.get() || !m_readGateway.isEmpty() || !m_writeGateway.isEmpty();
     }
 
     private void checkBackPressure() {
@@ -130,15 +127,11 @@ public class SSLVoltPort extends VoltPort {
     }
 
     private void processReads() throws IOException {
-        if (m_processingReads.compareAndSet(false, true)) {
             final int maxRead = m_handler.getMaxRead();
             int nRead = fillReadStream(maxRead);
             if (nRead > 0) {
                 m_decryptionGateway.submitDecryptionTasks();
-            } else {
-                m_processingReads.set(false);
             }
-        }
     }
 
     private void processWrites() {
@@ -149,10 +142,6 @@ public class SSLVoltPort extends VoltPort {
 
     private void doneProcessingWrites() {
         m_processingWrites.set(false);
-    }
-
-    public void doneProcessingReads() {
-        m_processingReads.set(false);
     }
 
     private DBBPool.BBContainer getDecryptionFrame() {
@@ -272,6 +261,7 @@ public class SSLVoltPort extends VoltPort {
         private final SSLBufferDecrypter m_sslBufferDecrypter;
         private final SSLMessageParser m_sslMessageParser;
         private final ByteBuffer m_dstBuffer;
+        private final AtomicBoolean m_hasOutstandingTask = new AtomicBoolean(false);
         private final ReadGateway m_readGateway;
         protected AtomicBoolean m_isShuttingDown = new AtomicBoolean(false);
 
@@ -284,44 +274,44 @@ public class SSLVoltPort extends VoltPort {
         }
 
         synchronized void submitDecryptionTasks() {
-            Runnable task = new Runnable() {
-                @Override
-                public void run() {
-                    if (m_isShuttingDown.get()) {
-                        return;
-                    }
-                    DBBPool.BBContainer srcC = null;
-                    try {
-                        while ((srcC = getDecryptionFrame()) != null) {
-                            if (m_isShuttingDown.get()) return;
-                            List<ByteBuffer> messages = new ArrayList<>();
-                            srcC.b().flip();
-                            m_dstBuffer.limit(m_dstBuffer.capacity());
-                            m_sslBufferDecrypter.unwrap(srcC.b(), m_dstBuffer);
-                            if (m_dstBuffer.hasRemaining()) {
-                                ByteBuffer message;
-                                while ((message = m_sslMessageParser.message(m_dstBuffer)) != null) {
-                                    messages.add(message);
+            if (m_hasOutstandingTask.compareAndSet(false, true)) {
+                Runnable task = new Runnable() {
+                    @Override
+                    public void run() {
+                        DBBPool.BBContainer srcC = null;
+                        try {
+                            while ((srcC = getDecryptionFrame()) != null) {
+                                if (m_isShuttingDown.get()) return;
+                                List<ByteBuffer> messages = new ArrayList<>();
+                                srcC.b().flip();
+                                m_dstBuffer.limit(m_dstBuffer.capacity());
+                                m_sslBufferDecrypter.unwrap(srcC.b(), m_dstBuffer);
+                                if (m_dstBuffer.hasRemaining()) {
+                                    ByteBuffer message;
+                                    while ((message = m_sslMessageParser.message(m_dstBuffer)) != null) {
+                                        messages.add(message);
+                                    }
                                 }
+                                m_dstBuffer.clear();
+                                if (!messages.isEmpty()) {
+                                    m_readGateway.enque(messages);
+                                }
+                                srcC.discard();
+                                srcC = null;
                             }
-                            m_dstBuffer.clear();
-                            if (!messages.isEmpty()) {
-                                m_readGateway.enque(messages);
+                        } catch (IOException ioe) {
+                            return;
+                        } finally {
+                            if (srcC != null) {
+                                srcC.discard();
                             }
-                            srcC.discard();
-                            srcC = null;
+                            m_hasOutstandingTask.set(false);
+                            m_port.processWrites();
                         }
-                    } catch (IOException ioe) {
-                        return;
-                    } finally {
-                        if (srcC != null) {
-                            srcC.discard();
-                        }
-                        m_port.doneProcessingReads();
                     }
-                }
-            };
-            SSLEncryptionService.instance().submitForDecryption(task);
+                };
+                SSLEncryptionService.instance().submitForDecryption(task);
+            }
         }
         public void shutdown() {
             m_isShuttingDown.set(true);
@@ -516,7 +506,7 @@ public class SSLVoltPort extends VoltPort {
         }
     }
 
-    protected int fillReadStream(int maxBytes) throws IOException {
+    protected synchronized int fillReadStream(int maxBytes) throws IOException {
         if ( maxBytes == 0 || m_isShuttingDown)
             return 0;
 
