@@ -625,13 +625,6 @@ void PersistentTable::insertPersistentTuple(TableTuple &source, bool fallible, b
     target.copyForPersistentInsert(source); // tuple in freelist must be already cleared
 
     try {
-        // Insert the tuple into the delta table first.
-        //
-        // (Note: we may hit a NOT NULL constraint violation,
-        // in which case, we want to clean up by calling
-        // deleteTupleStorage, below)
-        insertTupleIntoDeltaTable(source, fallible);
-
         insertTupleCommon(source, target, fallible);
     }
     catch (ConstraintFailureException &e) {
@@ -716,6 +709,13 @@ void PersistentTable::insertTupleCommon(TableTuple &source, TableTuple &target,
             uq->registerUndoAction(new (*uq) PersistentTableUndoInsertAction(tupleData, &m_surgeon));
         }
     }
+
+    // Insert the tuple into the delta table first.
+    //
+    // (Note: we may hit a NOT NULL constraint violation,
+    // in which case, we want to clean up by calling
+    // deleteTupleStorage, below)
+    insertTupleIntoDeltaTable(source, fallible);
 
     BOOST_FOREACH (auto viewHandler, m_viewHandlers) {
         viewHandler->handleTupleInsert(this, fallible);
@@ -2012,8 +2012,8 @@ void PersistentTable::dropViewHandler(MaterializedViewHandler *viewHandler) {
 }
 
 void PersistentTable::polluteViews() {
-    BOOST_FOREACH (auto mvHanlder, m_viewHandlers) {
-        mvHanlder->pollute();
+    BOOST_FOREACH (auto mvHandler, m_viewHandlers) {
+        mvHandler->pollute();
     }
 }
 
