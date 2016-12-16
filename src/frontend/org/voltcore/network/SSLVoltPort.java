@@ -97,9 +97,7 @@ public class SSLVoltPort extends VoltPort {
         }
 
         try {
-            if (!m_processingReads.get()) {
-                processReads();
-            }
+            processReads();
             if (!m_processingWrites.get()) {
                 processWrites();
             }
