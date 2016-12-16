@@ -261,6 +261,7 @@ public class SSLVoltPort extends VoltPort {
                 return;
             }
         }
+        m_sslReadStream.shutdown();
         m_dstBufferCont.discard();
         m_dstBufferCont = null;
         super.unregistered();

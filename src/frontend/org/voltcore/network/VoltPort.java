@@ -380,7 +380,9 @@ public class VoltPort implements Connection
                     try {
                         m_writeStream.shutdown();
                     } finally {
-                        m_readStream.shutdown();
+                        if (m_readStream != null) {
+                            m_readStream.shutdown();
+                        }
                     }
                 }
             }

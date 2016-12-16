@@ -110,6 +110,7 @@ public class SSLNIOReadStream {
         int bytesRead = 0;
         int lastRead = 1;
         DBBPool.BBContainer poolCont = null;
+        int initialPosition = 0;
         try {
             while (bytesRead < maxBytes && lastRead > 0) {
                 if (poolCont == null) {
@@ -118,6 +119,7 @@ public class SSLNIOReadStream {
                             DBBPool.BBContainer last = m_readBBContainers.peekLast();
                             last = m_readBBContainers.pollLast();
                             if (last.b().capacity() > last.b().limit()) {
+                                initialPosition = last.b().position();
                                 last.b().position(last.b().limit());
                                 last.b().limit(last.b().capacity());
                                 poolCont = last;
@@ -127,6 +129,7 @@ public class SSLNIOReadStream {
                     if (poolCont == null) {
                         poolCont = pool.acquire();
                         poolCont.b().clear();
+                        initialPosition = 0;
                     }
                 }
 
@@ -142,17 +145,21 @@ public class SSLNIOReadStream {
                     bytesRead += lastRead;
                     if (!poolCont.b().hasRemaining()) {
                         synchronized (m_readBBContainers) {
-                            poolCont.b().flip();
+                            poolCont.b().limit(poolCont.b().position());
+                            poolCont.b().position(initialPosition);
                             m_readBBContainers.addLast(poolCont);
                         }
                         poolCont = pool.acquire();
                         poolCont.b().clear();
+                        initialPosition = 0;
                     }
                 }
             }
         } finally {
             if (poolCont != null) {
                 if (poolCont.b().position() > 0) {
+                    poolCont.b().limit(poolCont.b().position());
+                    poolCont.b().position(initialPosition);
                     synchronized (m_readBBContainers) {
                         m_readBBContainers.addLast(poolCont);
                     }
@@ -166,5 +173,12 @@ public class SSLNIOReadStream {
         }
 
         return bytesRead;
+    }
+
+    void shutdown() {
+        for (DBBPool.BBContainer c : m_readBBContainers) {
+            c.discard();
+        }
+        m_readBBContainers.clear();
     }
 }
