@@ -169,16 +169,16 @@ public class TestSqlUpdateSuite extends RegressionSuite {
         String update = "update STRINGPART set desc = name, num = -1 where val1 = 1";
         executeAndTestUpdate(client, "STRINGPART", update, 1);
 
-	System.out.println("testInvalidUpdate");
-	verifyStmtFails(client, "UPDATE P1_VIEW SET NUM_SUM = 5",
-		 "Illegal to modify a materialized view.");
+        System.out.println("testInvalidUpdate");
+        verifyStmtFails(client, "UPDATE P1_VIEW SET NUM_SUM = 5",
+                 "Illegal to modify a materialized view.");
     }
 
     //
     // JUnit / RegressionSuite boilerplate
     //
     public TestSqlUpdateSuite(String name) {
-	super(name);
+        super(name);
     }
 
     static public junit.framework.Test suite() {
