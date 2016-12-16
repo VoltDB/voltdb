@@ -27,19 +27,21 @@ import org.voltcore.utils.ssl.SSLMessageParser;
 import javax.net.ssl.SSLEngine;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.net.SocketException;
 import java.nio.ByteBuffer;
+import java.nio.channels.SelectionKey;
+import java.nio.channels.SocketChannel;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Queue;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class SSLVoltPort extends VoltPort {
 
     private final SSLEngine m_sslEngine;
+    private SSLNIOReadStream m_sslReadStream;
     private final SSLBufferDecrypter m_sslBufferDecrypter;
     private final SSLBufferEncrypter m_sslBufferEncrypter;
     private DBBPool.BBContainer m_dstBufferCont;
@@ -155,7 +157,7 @@ public class SSLVoltPort extends VoltPort {
 
     private DBBPool.BBContainer getDecryptionFrame() {
         if (m_nextFrameLength == 0) {
-            readStream().getBytes(m_frameHeader);
+            m_sslReadStream.getBytes(m_frameHeader);
             if (m_frameHeader.hasRemaining()) {
                 return null;
             } else {
@@ -171,7 +173,7 @@ public class SSLVoltPort extends VoltPort {
             }
         }
 
-        readStream().getBytes(m_frameCont.b());
+        m_sslReadStream.getBytes(m_frameCont.b());
         if (m_frameCont.b().hasRemaining()) {
             return null;
         } else {
@@ -511,6 +513,47 @@ public class SSLVoltPort extends VoltPort {
         public void shutdown() {
             m_isShuttingDown.set(true);
         }
+    }
+
+    private final int fillReadStream(int maxBytes) throws IOException {
+        if ( maxBytes == 0 || m_isShuttingDown)
+            return 0;
+
+        // read from network, copy data into read buffers, which from thread local memory pool
+        final int read = m_sslReadStream.read(m_channel, maxBytes, m_pool);
+
+        if (read == -1) {
+            disableReadSelection();
+
+            if (m_channel.socket().isConnected()) {
+                try {
+                    m_channel.socket().shutdownInput();
+                } catch (SocketException e) {
+                    //Safe to ignore to these
+                }
+            }
+
+            m_isShuttingDown = true;
+            m_handler.stopping(this);
+
+            /*
+             * Allow the write queue to drain if possible
+             */
+            enableWriteSelection();
+        }
+        return read;
+    }
+
+    protected void setKey (SelectionKey key) {
+        m_selectionKey = key;
+        m_channel = (SocketChannel)key.channel();
+        m_sslReadStream = new SSLNIOReadStream();
+        m_writeStream = new NIOWriteStream(
+                this,
+                m_handler.offBackPressure(),
+                m_handler.onBackPressure(),
+                m_handler.writestreamMonitor());
+        m_interestOps = key.interestOps();
     }
 
     public static class EncryptionResult {
