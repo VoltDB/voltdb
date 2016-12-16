@@ -57,7 +57,6 @@ public class SSLVoltPort extends VoltPort {
     private final WriteGateway m_writeGateway;
 
     private final int m_appBufferSize;
-    private VoltPort m_port;
 
     private AtomicBoolean m_processingReads = new AtomicBoolean(false);
     private AtomicBoolean m_processingWrites = new AtomicBoolean(false);
@@ -76,15 +75,15 @@ public class SSLVoltPort extends VoltPort {
         this.m_appBufferSize = Math.min(appBufferSize, 16 * 1024);
         int packetBufferSize = m_sslEngine.getSession().getPacketBufferSize();
         this.m_sslBufferEncrypter = new SSLBufferEncrypter(sslEngine, appBufferSize, packetBufferSize);
-        this.m_writeGateway = new WriteGateway(network, this);
+        this.m_writeGateway = new WriteGateway();
         this.m_encryptionGateway = new EncryptionGateway(m_sslBufferEncrypter, m_writeGateway, this);
         this.m_sslMessageParser = new SSLMessageParser();
         this.m_frameHeader = ByteBuffer.allocate(5);
         this.m_dstBufferCont = DBBPool.allocateDirect(packetBufferSize);
         this.m_dstBuffer = m_dstBufferCont.b();
         this.m_dstBuffer.clear();
-        this.m_readGateway = new ReadGateway(network, this, handler);
-        this.m_decryptionGateway = new DecryptionGateway(m_sslBufferDecrypter, m_readGateway, m_sslMessageParser, m_dstBuffer, this);
+        this.m_readGateway = new ReadGateway(this, handler);
+        this.m_decryptionGateway = new DecryptionGateway(this, m_sslBufferDecrypter, m_readGateway, m_sslMessageParser, m_dstBuffer);
     }
 
     @Override
@@ -96,11 +95,16 @@ public class SSLVoltPort extends VoltPort {
         }
 
         try {
-            processReads();
-            processWrites();
+            if (!m_processingReads.get()) {
+                processReads();
+            }
+            if (!m_processingWrites.get()) {
+                processWrites();
+            }
+
             checkBackPressure();
         } catch (IOException ioe) {
-            while (!gatewaysEmpty()) {
+            while (processing()) {
             }
             throw ioe;
         } finally {
@@ -111,6 +115,10 @@ public class SSLVoltPort extends VoltPort {
         }
     }
 
+    private boolean processing() {
+        return m_processingReads.get() || m_processingWrites.get() || !m_readGateway.isEmpty() || !m_writeGateway.isEmpty();
+    }
+
     private void checkBackPressure() {
         int bytesQueued = m_bytesQueued.getAndSet(0);
         if (bytesQueued != 0) {
@@ -119,25 +127,21 @@ public class SSLVoltPort extends VoltPort {
         writeStream().checkBackpressureEnded();
     }
 
-    private boolean processReads() throws IOException {
+    private void processReads() throws IOException {
         if (m_processingReads.compareAndSet(false, true)) {
             final int maxRead = m_handler.getMaxRead();
             int nRead = fillReadStream(maxRead);
             if (nRead > 0) {
-                m_decryptionGateway.start();
-                return true;
+                m_decryptionGateway.submitDecryptionTasks();
             } else {
                 m_processingReads.set(false);
-                return false;
             }
-        } else {
-            return true;
         }
     }
 
     private void processWrites() {
         if (writeStream().hasQueuedWrites() && m_processingWrites.compareAndSet(false,true)) {
-            m_encryptionGateway.start();
+            m_encryptionGateway.submitEncryptionTasks();
         }
     }
 
@@ -147,18 +151,6 @@ public class SSLVoltPort extends VoltPort {
 
     public void doneProcessingReads() {
         m_processingReads.set(false);
-    }
-
-    private boolean gatewaysEmpty() {
-        return isWriteStreamProcessed() && isReadStreamProcessed();
-    }
-
-    private boolean isWriteStreamProcessed() {
-        return m_encryptionGateway.isEmpty() && m_writeGateway.isEmpty();
-    }
-
-    private boolean isReadStreamProcessed() {
-        return m_decryptionGateway.isEmpty() && m_readGateway.isEmpty();
     }
 
     private DBBPool.BBContainer getDecryptionFrame() {
@@ -260,7 +252,7 @@ public class SSLVoltPort extends VoltPort {
         m_readGateway.shutdown();
         m_encryptionGateway.shutdown();
         m_decryptionGateway.shutdown();
-        while (!gatewaysEmpty()) {
+        while (processing()) {
             try {
                 Thread.sleep(10);
             } catch (InterruptedException e) {
@@ -273,27 +265,22 @@ public class SSLVoltPort extends VoltPort {
     }
 
     private class DecryptionGateway {
+        private final SSLVoltPort m_port;
         private final SSLBufferDecrypter m_sslBufferDecrypter;
         private final SSLMessageParser m_sslMessageParser;
         private final ByteBuffer m_dstBuffer;
-        private final AtomicBoolean m_hasOutstandingTask = new AtomicBoolean(false);
         private final ReadGateway m_readGateway;
-        private final SSLVoltPort m_port;
         protected AtomicBoolean m_isShuttingDown = new AtomicBoolean(false);
 
-        public DecryptionGateway(SSLBufferDecrypter m_sslBufferDecrypter, ReadGateway readGateway, SSLMessageParser sslMessageParser, ByteBuffer dstBuffer, SSLVoltPort port) {
+        public DecryptionGateway(SSLVoltPort port, SSLBufferDecrypter m_sslBufferDecrypter, ReadGateway readGateway, SSLMessageParser sslMessageParser, ByteBuffer dstBuffer) {
+            this.m_port = port;
             this.m_sslBufferDecrypter = m_sslBufferDecrypter;
             this.m_sslMessageParser = sslMessageParser;
             this.m_dstBuffer = dstBuffer;
             this.m_readGateway = readGateway;
-            this.m_port = port;
         }
 
-        synchronized void start() {
-            if (m_hasOutstandingTask.get()) {
-                return;
-            }
-            m_hasOutstandingTask.set(true);
+        synchronized void submitDecryptionTasks() {
             Runnable task = new Runnable() {
                 @Override
                 public void run() {
@@ -301,56 +288,46 @@ public class SSLVoltPort extends VoltPort {
                         return;
                     }
                     DBBPool.BBContainer srcC = null;
-                    List<ByteBuffer> messages = new ArrayList<>();
                     try {
-                        srcC = getDecryptionFrame();
-                        if (srcC == null) {
-                            m_hasOutstandingTask.set(false);
-                            // empty list signals that there is no more data coming.
-                            m_readGateway.enque(messages);
-                            return;
-                        }
-                        m_hasOutstandingTask.set(true);
-                        srcC.b().flip();
-                        m_dstBuffer.limit(m_dstBuffer.capacity());
-                        m_sslBufferDecrypter.unwrap(srcC.b(), m_dstBuffer);
-                        if (m_dstBuffer.hasRemaining()) {
-                            ByteBuffer message;
-                            while ((message = m_sslMessageParser.message(m_dstBuffer)) != null) {
-                                messages.add(message);
+                        while ((srcC = getDecryptionFrame()) != null) {
+                            if (m_isShuttingDown.get()) return;
+                            List<ByteBuffer> messages = new ArrayList<>();
+                            srcC.b().flip();
+                            m_dstBuffer.limit(m_dstBuffer.capacity());
+                            m_sslBufferDecrypter.unwrap(srcC.b(), m_dstBuffer);
+                            if (m_dstBuffer.hasRemaining()) {
+                                ByteBuffer message;
+                                while ((message = m_sslMessageParser.message(m_dstBuffer)) != null) {
+                                    messages.add(message);
+                                }
                             }
+                            m_dstBuffer.clear();
+                            if (!messages.isEmpty()) {
+                                m_readGateway.enque(messages);
+                            }
+                            srcC.discard();
+                            srcC = null;
                         }
-                        m_dstBuffer.clear();
-                        if (!messages.isEmpty()) {
-                            m_readGateway.enque(messages);
-                        }
-                        SSLEncryptionService.instance().submitForEncryption(this);
                     } catch (IOException ioe) {
-                        System.err.println("Decryption gateway " + ioe.getMessage());
-                        m_hasOutstandingTask.set(false);
                         return;
                     } finally {
                         if (srcC != null) {
                             srcC.discard();
                         }
+                        m_port.doneProcessingReads();
                     }
                 }
             };
             SSLEncryptionService.instance().submitForDecryption(task);
         }
-        public boolean isEmpty() {
-            return !m_hasOutstandingTask.get();
-        }
         public void shutdown() {
             m_isShuttingDown.set(true);
-            DBBPool.BBContainer srcCont;
         }
     }
 
     private static class EncryptionGateway {
 
         private final SSLBufferEncrypter m_sslBufferEncrypter;
-        private final AtomicBoolean m_hasOutstandingTask = new AtomicBoolean(false);
         private final WriteGateway m_writeGateway;
         private final SSLVoltPort m_port;
         protected AtomicBoolean m_isShuttingDown = new AtomicBoolean(false);
@@ -361,48 +338,34 @@ public class SSLVoltPort extends VoltPort {
             this.m_port = port;
         }
 
-        synchronized void start() {
-            if (m_hasOutstandingTask.get()) {
-                // TODO: this should throw
-                return;
-            }
-            m_hasOutstandingTask.set(true);
+        synchronized void submitEncryptionTasks() {
             Runnable task = new Runnable() {
                 @Override
                 public void run() {
-                    if (m_isShuttingDown.get()) return;
                     DBBPool.BBContainer fragCont = null;
                     try {
-                        fragCont = m_port.getChunkToEncrypt();
-                        if (fragCont == null) {
-                            m_hasOutstandingTask.set(false);
-                            m_writeGateway.enque(EncryptionResult.eosResult);
-                            return;
+                        while ((fragCont = m_port.getChunkToEncrypt()) != null) {
+                            if (m_isShuttingDown.get()) return;
+                            int nBytesClear = fragCont.b().remaining();
+                            DBBPool.BBContainer encCont = m_sslBufferEncrypter.encryptBuffer(fragCont.b().slice());
+                            EncryptionResult er = new EncryptionResult(encCont, nBytesClear);
+                            m_writeGateway.enque(er);
+                            fragCont.discard();
+                            fragCont = null;
                         }
-                        m_hasOutstandingTask.set(true);
-                        int nBytesClear = fragCont.b().remaining();
-                        DBBPool.BBContainer encCont =  m_sslBufferEncrypter.encryptBuffer(fragCont.b().slice());
-                        EncryptionResult er = new EncryptionResult(encCont, nBytesClear);
-                        m_writeGateway.enque(er);
-                        SSLEncryptionService.instance().submitForEncryption(this);
                     } catch (IOException ioe) {
                         System.err.println("Encryption gateway " + ioe.getMessage());
-                        m_hasOutstandingTask.set(false);
                         return;
                     } finally {
                         if (fragCont != null) {
                             fragCont.discard();
                         }
+                        m_port.doneProcessingWrites();
                     }
                 }
             };
             SSLEncryptionService.instance().submitForEncryption(task);
         }
-
-        public boolean isEmpty() {
-            return !m_hasOutstandingTask.get();
-        }
-
         public void shutdown() {
             m_isShuttingDown.set(true);
         }
@@ -413,14 +376,12 @@ public class SSLVoltPort extends VoltPort {
         private final InputHandler m_handler;
         private final Queue<List<ByteBuffer>> m_q = new ArrayDeque<>();
         private final AtomicBoolean m_hasOutstandingTask = new AtomicBoolean(false);
-        private final VoltNetwork m_network;
         private final AtomicBoolean m_isShuttingDown = new AtomicBoolean(false);
         private final SSLVoltPort m_port;
 
-        public ReadGateway(VoltNetwork network, SSLVoltPort port, InputHandler handler) {
+        public ReadGateway(SSLVoltPort port, InputHandler handler) {
             this.m_port = port;
             this.m_handler = handler;
-            this.m_network = network;
         }
 
         void enque(List<ByteBuffer> messages) {
@@ -430,36 +391,19 @@ public class SSLVoltPort extends VoltPort {
                     Runnable task = new Runnable() {
                         @Override
                         public void run() {
-                            if (m_isShuttingDown.get()) return;
                             List<ByteBuffer> ms = null;
-                            synchronized (m_q) {
-                                ms = m_q.poll();
-                                if (ms == null) {
-                                    m_hasOutstandingTask.set(false);
-                                    return;
-                                }
-                            }
-                            if (ms.isEmpty()) {
-                                m_hasOutstandingTask.set(false);
-                                m_port.doneProcessingReads();
-                                // start the write half of the process
-                                m_port.processWrites();
-                                return;
-                            }
-                            if (ms != null) {
-                                int mCount = 0;
-                                try {
+                            try {
+                                while ((ms = m_q.poll()) != null) {
+                                    if (m_isShuttingDown.get()) return;
                                     for (ByteBuffer m : ms) {
                                         m_handler.handleMessage(m, m_port);
-                                        mCount++;
                                     }
-                                } catch (IOException e) {
-                                    System.err.println("ReadGateway: " + e.getMessage());
-                                    m_hasOutstandingTask.set(false);
-                                    return;
                                 }
+                            } catch (IOException ioe) {
+                                // TODO: logging
+                            } finally {
+                                m_hasOutstandingTask.set(false);
                             }
-                            SSLEncryptionService.instance().submitForDecryption(this);
                         }
                     };
                     SSLEncryptionService.instance().submitForDecryption(task);
@@ -485,15 +429,11 @@ public class SSLVoltPort extends VoltPort {
 
         private final Queue<EncryptionResult> m_q = new ArrayDeque<>();
         private final AtomicBoolean m_hasOutstandingTask = new AtomicBoolean(false);
-        private final VoltNetwork m_network;
-        private final SSLVoltPort m_port;
         private final AtomicBoolean m_isShuttingDown = new AtomicBoolean(false);
         DBBPool.BBContainer m_leftoverWrites = null;
         int m_leftoverBytesClear = 0;
 
-        public WriteGateway(VoltNetwork network, SSLVoltPort connection) {
-            m_network = network;
-            m_port = connection;
+        public WriteGateway() {
         }
 
         void enque(EncryptionResult encRes) {
@@ -514,12 +454,12 @@ public class SSLVoltPort extends VoltPort {
                                         SSLEncryptionService.instance().submitForEncryption(this);
                                     } else {
                                         m_bytesQueued.getAndAdd(-m_leftoverBytesClear);
+                                        m_writeStream.checkBackpressureEnded();
                                         m_leftoverWrites.discard();
                                         m_leftoverWrites = null;
 
                                     }
                                 } catch (IOException e) {
-                                    System.err.println("WriteGateway: " + e.getMessage());
                                     if (m_leftoverWrites != null) {
                                         m_leftoverWrites.discard();
                                         m_hasOutstandingTask.set(false);
@@ -529,37 +469,31 @@ public class SSLVoltPort extends VoltPort {
                             }
 
                             EncryptionResult er = null;
-                            synchronized (m_q) {
-                                er = m_q.poll();
-                                if (er == null) {
-                                    m_hasOutstandingTask.set(false);
-                                    return;
-                                }
-                            }
-                            if (er == EncryptionResult.eosResult) {
-                                m_hasOutstandingTask.set(false);
-//                                m_port.disableWriteSelection();
-                                m_port.doneProcessingWrites();
-                                return;
-                            }
-                            DBBPool.BBContainer writesCont = er.m_encCont;
+                            DBBPool.BBContainer writesCont = null;
                             try {
-                                int bytesWritten = m_channel.write(writesCont.b());
-                                if (!writesCont.b().hasRemaining()) {
-                                    m_bytesQueued.getAndAdd(-er.m_nBytesClear);
-                                    m_writeStream.checkBackpressureEnded();
-                                } else {
-                                    m_leftoverWrites = writesCont;
-                                    m_leftoverBytesClear = er.m_nBytesClear;
-                                    m_writeStream.checkBackpressureStarted();
+                                while ((er = m_q.poll()) != null) {
+                                    if (m_isShuttingDown.get()) { return; }
+                                    writesCont = er.m_encCont;
+                                    m_channel.write(writesCont.b());
+                                    if (!writesCont.b().hasRemaining()) {
+                                        m_bytesQueued.getAndAdd(-er.m_nBytesClear);
+                                        m_writeStream.checkBackpressureEnded();
+                                        writesCont.discard();
+                                        writesCont = null;
+                                    } else {
+                                        m_leftoverWrites = writesCont;
+                                        m_leftoverBytesClear = er.m_nBytesClear;
+                                        m_writeStream.checkBackpressureStarted();
+                                        SSLEncryptionService.instance().submitForEncryption(this);
+                                        return;
+                                    }
                                 }
-                                SSLEncryptionService.instance().submitForEncryption(this);
-                            } catch (IOException e) {
-                                System.err.println("WriteGateway: " + e.getMessage());
                                 m_hasOutstandingTask.set(false);
-                                return;
+                            } catch (IOException ioe) {
+                                // TODO: log
+                                m_hasOutstandingTask.set(false);
                             } finally {
-                                if (!writesCont.b().hasRemaining() && m_leftoverWrites == null) {
+                                if (writesCont != null && m_leftoverWrites == null) {
                                     writesCont.discard();
                                 }
                             }
@@ -582,7 +516,6 @@ public class SSLVoltPort extends VoltPort {
     public static class EncryptionResult {
         public final DBBPool.BBContainer m_encCont;
         public final int m_nBytesClear;
-        public static final EncryptionResult eosResult = new EncryptionResult(null, -1);
         public EncryptionResult(DBBPool.BBContainer encCont, int nBytesClear) {
             this.m_encCont = encCont;
             this.m_nBytesClear = nBytesClear;
