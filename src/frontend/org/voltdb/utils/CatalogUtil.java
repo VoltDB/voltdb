@@ -2637,6 +2637,7 @@ public abstract class CatalogUtil {
         paths.setCommandlogsnapshot(prev.getCommandlogsnapshot());
 
         clone.setPaths(paths);
+        clone.setSsl(o.getSsl());
 
         return clone;
     }
