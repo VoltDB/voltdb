@@ -515,7 +515,7 @@ public class SSLVoltPort extends VoltPort {
         }
     }
 
-    private final int fillReadStream(int maxBytes) throws IOException {
+    protected int fillReadStream(int maxBytes) throws IOException {
         if ( maxBytes == 0 || m_isShuttingDown)
             return 0;
 
