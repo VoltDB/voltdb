@@ -17,16 +17,12 @@
 
 package org.voltcore.utils.ssl;
 
-import org.voltcore.network.NetworkDBBPool;
 import org.voltcore.utils.DBBPool;
-import org.voltdb.common.Constants;
 
 import javax.net.ssl.SSLEngine;
 import javax.net.ssl.SSLEngineResult;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.List;
 
 public class SSLBufferEncrypter {
 
@@ -43,30 +39,36 @@ public class SSLBufferEncrypter {
     public DBBPool.BBContainer encryptBuffer(ByteBuffer src) throws IOException {
         // may need to encrypt in more than one step.  Need to have packe buffer size
         // remaining in the dest buffer whenever wrap is called, will overflow otherwise.
-        DBBPool.BBContainer dst = DBBPool.allocateDirectAndPool(src.remaining() + m_packetBufferSize);
-        dst.b().clear();
-        int initialSrcLimit = src.limit();
-        int i = 0;
-        while (src.hasRemaining()) {
-            if (src.remaining() > m_applicationBufferSize) {
-                src.limit(src.position() + m_applicationBufferSize);
+        DBBPool.BBContainer dst = null;
+        try {
+            dst = DBBPool.allocateDirectAndPool(src.remaining() + m_packetBufferSize);
+            dst.b().clear();
+            int initialSrcLimit = src.limit();
+            int i = 0;
+            while (src.hasRemaining()) {
+                if (src.remaining() > m_applicationBufferSize) {
+                    src.limit(src.position() + m_applicationBufferSize);
+                }
+                SSLEngineResult result = m_sslEngine.wrap(src.slice(), dst.b().slice());
+                switch (result.getStatus()) {
+                    case OK:
+                        src.position(src.position() + result.bytesConsumed());
+                        src.limit(initialSrcLimit);
+                        dst.b().position(dst.b().position() + result.bytesProduced());
+                        break;
+                    case BUFFER_OVERFLOW:
+                        throw new IOException("Overflow on ssl wrap of buffer");
+                    case BUFFER_UNDERFLOW:
+                        throw new IOException("Underflow on ssl wrap of buffer.");
+                    case CLOSED:
+                        throw new IOException("SSL engine is closed on ssl wrap of buffer.");
+                    default:
+                        throw new IOException("Unexpected SSLEngineResult.Status");
+                }
             }
-            SSLEngineResult result = m_sslEngine.wrap(src.slice(), dst.b().slice());
-            switch (result.getStatus()) {
-                case OK:
-                    src.position(src.position() + result.bytesConsumed());
-                    src.limit(initialSrcLimit);
-                    dst.b().position(dst.b().position() + result.bytesProduced());
-                    break;
-                case BUFFER_OVERFLOW:
-                    throw new IOException("Overflow on ssl wrap of buffer");
-                case BUFFER_UNDERFLOW:
-                    throw new IOException("Underflow on ssl wrap of buffer.");
-                case CLOSED:
-                    throw new IOException("SSL engine is closed on ssl wrap of buffer.");
-                default:
-                    throw new IOException("Unexpected SSLEngineResult.Status");
-            }
+        } catch (IOException ioe) {
+            if (dst != null) dst.discard();
+            throw ioe;
         }
         dst.b().flip();
         return dst;

@@ -1240,11 +1240,11 @@ class Distributer {
         m_timeoutReaperHandle.cancel(false);
         m_ex.shutdown();
         m_ex.awaitTermination(365, TimeUnit.DAYS);
+        m_network.shutdown();
         if (m_sslEncryptionService != null) {
             m_sslEncryptionService.shutdown();
             m_sslEncryptionService = null;
         }
-        m_network.shutdown();
     }
 
     void uncaughtException(ProcedureCallback cb, ClientResponse r, Throwable t) {
