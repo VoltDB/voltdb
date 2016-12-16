@@ -1204,6 +1204,12 @@ public class LocalCluster extends VoltServerConfig {
                     initLocalServer(entry.getKey(), true);
                 }
                 startOne(entry.getKey(), true, ReplicationRole.NONE, StartAction.JOIN, false, entry.getValue());
+                if (m_deplayBetweenNodeStartup > 0) {
+                    try {
+                        Thread.sleep(m_deplayBetweenNodeStartup);
+                    } catch (InterruptedException e) {
+                    }
+                }
             }
             catch (IOException ioe) {
                 throw new RuntimeException(ioe);
