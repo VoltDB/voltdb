@@ -34,11 +34,11 @@ from voltdbclient import *
 
 parser = argparse.ArgumentParser(description="This script is used to monitor current performance metrics.")
 parser.add_argument('-s', '--server', help='Hostname or IP of VoltDB server', default='localhost')
-parser.add_argument('-p', '--port', help='Port number of VoltDB server', default=21211)
+parser.add_argument('-p', '--port', help='Port number of VoltDB server', type=int, default=21211)
 parser.add_argument('-u', '--username', help='User name (if security is enabled)', default='')
 parser.add_argument('-pw', '--password', help='Password (if security is enabled)', default='')
-parser.add_argument('-f', '--frequency', help='Frequency of gathering statistics in seconds (default = 5 seconds)', default=5)
-parser.add_argument('-d', '--duration', help='Duration of gathering statistics in minutes (default = 30)', default=30)
+parser.add_argument('-f', '--frequency', help='Frequency of gathering statistics in seconds (default = 5 seconds)', type=int, default=5)
+parser.add_argument('-d', '--duration', help='Duration of gathering statistics in minutes (default = 30)', type=int, default=30)
 args = parser.parse_args()
 
 client = FastSerializer(args.server, args.port, args.username, args.password)
