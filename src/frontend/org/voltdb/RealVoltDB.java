@@ -1236,9 +1236,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 VoltDB.crashLocalVoltDB("Failed to validate cluster build string", false, e);
             }
 
-            if (!isRejoin && !m_joining) {
+            if (!isRejoin) {
+                int expectedHosts = m_catalogContext.getClusterSettings().hostcount();
+                if (m_joining) {
+                    expectedHosts += m_configuredReplicationFactor + 1;
+                }
                 try {
-                    m_messenger.waitForAllHostsToBeReady(m_catalogContext.getClusterSettings().hostcount());
+                    m_messenger.waitForAllHostsToBeReady(expectedHosts);
                 } catch (Exception e) {
                     hostLog.fatal("Failed to announce ready state.");
                     VoltDB.crashLocalVoltDB("Failed to announce ready state.", false, null);
