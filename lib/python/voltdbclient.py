@@ -83,6 +83,7 @@ class ReadBuffer(object):
             values = struct.unpack_from(format, self._buf, self._off)
         except struct.error, e:
             print 'Exception unpacking %d bytes using format "%s": %s' % (size, format, str(e))
+            raise e
         self.shift(size)
         return values
 
