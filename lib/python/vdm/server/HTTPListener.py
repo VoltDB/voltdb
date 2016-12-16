@@ -451,6 +451,38 @@ def map_deployment(request, database_id):
                 else:
                     deployment['dr']['port'] = None
 
+    if 'snmp' in request.json:
+        if 'snmp' not in deployment:
+            deployment['snmp'] = {}
+        if 'enabled' in request.json['snmp']:
+            deployment['snmp']['enabled'] = request.json['snmp']['enabled']
+        else:
+            deployment['snmp']['enabled'] = True
+        if 'target' in request.json['snmp']:
+            deployment['snmp']['target'] = request.json['snmp']['target']
+        if 'community' in request.json['snmp']:
+            deployment['snmp']['community'] = request.json['snmp']['community']
+        else:
+            deployment['snmp']['community'] = 'public'
+        if 'username' in request.json['snmp']:
+            deployment['snmp']['username'] = request.json['snmp']['username']
+        if 'authprotocol' in request.json['snmp']:
+            deployment['snmp']['authprotocol'] = request.json['snmp']['authprotocol']
+        else:
+            deployment['snmp']['authprotocol'] = 'SHA'
+        if 'authkey' in request.json['snmp']:
+            deployment['snmp']['authkey'] = request.json['snmp']['authkey']
+        else:
+            deployment['snmp']['authkey'] = 'voltdbauthkey'
+        if 'privacyprotocol' in request.json['snmp']:
+            deployment['snmp']['privacyprotocol'] = request.json['snmp']['privacyprotocol']
+        else:
+            deployment['snmp']['privacyprotocol'] = 'AES'
+        if 'privacykey' in request.json['snmp']:
+            deployment['snmp']['privacykey'] = request.json['snmp']['privacykey']
+        else:
+            deployment['snmp']['privacykey'] = 'voltdbprivacykey'
+
     return deployment
 
 
@@ -1662,6 +1694,7 @@ class DatabaseDeploymentAPI(MethodView):
     @staticmethod
     def put(database_id):
         if 'application/json' in request.headers['Content-Type']:
+
             inputs = JsonInputs(request)
             if not inputs.validate():
                 return jsonify(status=401, statusString=inputs.errors)

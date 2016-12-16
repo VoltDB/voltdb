@@ -346,10 +346,10 @@
             <div class="mainTblRight">
             <table width="100%" border="0" cellspacing="0" cellpadding="0" id="adminTbl1" class="adminTbl">
                <tr class="hasSubLabel parent" id="row-2">
-                <td class="configLabel"><a href="javascript:void(0)" class="glyphicon-triangle-right"><span class="fontFamily">Auto Snapshots</span></a></td>
-                <td align="right"><input tabindex="3" type="checkbox" id="chkAutoSnapshot" ></td>
-                <td class="onOff" id="txtAutoSnapshot">On</td>
-                <td>&nbsp;</td>
+                <td width="44%" class="configLabel"><a href="javascript:void(0)" class="glyphicon-triangle-right"><span class="fontFamily">Auto Snapshots</span></a></td>
+                <td width="40%" align="right"><input tabindex="3" type="checkbox" id="chkAutoSnapshot" ></td>
+                <td width="8%" class="onOff" id="txtAutoSnapshot">On</td>
+                <td width="8%">&nbsp;</td>
               </tr>
               <tr class="child-row-2 subLabelRow">
                 <td class="configLabel">File Prefix</td>
@@ -517,6 +517,99 @@
                   <span class="editIcon"></span></a></td>
             
               </tr>
+            <tr class="hasSubLabel parent" id="row-8">
+                <td class="configLabel" title="Click to expand/collapse" style="cursor: pointer;"><a href="javascript:void(0)" class="glyphicon-triangle-right"><span class="fontFamily">SNMP</span></a></td>
+
+                <td align="right"><input tabindex="9" type="checkbox" id="" ></td>
+                <td class="onOff" id="">On</td>
+                <td>&nbsp;&nbsp;</td>
+            </tr>
+            <tr class="child-row-8 subLabelRow" style="display: table-row;">
+                <td class="configLabel">Target</td>
+                <td align="right" class="">
+                    <form id="frmTarget" action="" method="get" class="form-horizontal">
+                        <input type="text" id="txtTarget" name="txtTarget" value="" class="overviewInputText">
+                        <label id="lblTarget" for="txtTarget" class="error ccErrorMsg" style="display: none;">This field is required</label>
+                    </form>
+                </td>
+                <td>&nbsp;</td>
+                <td>&nbsp;</td>
+            </tr>
+            <tr class="child-row-8 subLabelRow" style="display: table-row;">
+                <td class="configLabel">Community</td>
+                <td align="right" class="">
+                    <form id="frmCommunity" action="" method="get" class="form-horizontal">
+                        <input type="text" id="txtCommunity" name="txtCommunity" value="" class="overviewInputText">
+                        <label id="lblCommunity" for="txtCommunity" class="error ccErrorMsg" style="display: none;">This field is required</label>
+                    </form>
+                </td>
+                <td>&nbsp;</td>
+                <td>&nbsp;</td>
+              </tr>
+            <tr class="child-row-8 subLabelRow" style="display: table-row;">
+                <td class="configLabel">Username</td>
+                <td align="right" class="">
+                    <form id="frmUsername" action="" method="get" class="form-horizontal">
+                        <input type="text" id="txtUsername" name="txtUsername" value="" class="overviewInputText">
+                        <label id="lblUsername" for="txtUsername" class="error ccErrorMsg" style="display: none;">This field is required</label>
+                    </form>
+                </td>
+                <td>&nbsp;</td>
+                <td>&nbsp;</td>
+            </tr>
+            <tr class="child-row-8 subLabelRow" style="display: table-row;">
+                <td class="configLabel">Authentication Protocol</td>
+                <td align="right" class=" ">
+                    <form id="frmAuthProtocol" action="" method="get" class="form-horizontal">
+                        <select id="selectAuthProtocol" class="snmpSelect">
+                            <option val="SHA">SHA</option>
+                            <option val="SHA">MD5</option>
+                            <option val="SHA">NoAuth</option>
+                        </select>
+                    </form>
+                </td>
+                <td>&nbsp;</td>
+                <td>&nbsp;</td>
+            </tr>
+            <tr class="child-row-8 subLabelRow" style="display: table-row;">
+                <td class="configLabel">Authentication Key</td>
+                <td align="right" class="">
+                    <form id="frmAuthKey" action="" method="get" class="form-horizontal">
+                        <input type="text" id="txtAuthKey" name="txtAuthKey" value="" class="overviewInputText">
+                        <label id="lblAuthKey" for="txtAuthKey" class="error ccErrorMsg" style="display: none;">This field is required</label>
+                    </form>
+                </td>
+                <td>&nbsp;</td>
+                <td>&nbsp;</td>
+            </tr>
+            <tr class="child-row-8 subLabelRow" style="display: table-row;">
+                <td class="configLabel">Authentication Protocol</td>
+                <td align="right" class="">
+                    <form id="frmPrivacyProtocol" action="" method="get" class="form-horizontal">
+                        <select id="selectPrivacyProtocol" class="snmpSelect">
+                            <option val="DES">AES</option>
+                            <option val="NoPriv">DES</option>
+                            <option val="SHA">NoPriv</option>
+                            <option val="SHA">3DES</option>
+                            <option val="SHA">AES192</option>
+                            <option val="SHA">AES256</option>
+                        </select>
+                    </form>
+                </td>
+                <td>&nbsp;</td>
+                <td>&nbsp;</td>
+            </tr>
+            <tr class="child-row-8 subLabelRow" style="display: table-row;">
+                <td class="configLabel">Privacy Key</td>
+                <td align="right" class="">
+                    <form id="frmPrivacyKey" action="" method="get" class="form-horizontal">
+                        <input type="text" id="txtPrivacyKey" name="txtPrivacyKey" value="" class="overviewInputText">
+                        <label id="lblPrivacyKey" for="txtPrivacyKey" class="error ccErrorMsg" style="display: none;">This field is required</label>
+                    </form>
+                </td>
+                <td>&nbsp;</td>
+                <td>&nbsp;</td>
+            </tr>
             </table>
             </div>
             

@@ -1770,6 +1770,11 @@ color: grey;
 .serverHeadText {font-weight: bold; font-size: 16px; }
 .serverDB { float: left;cursor: pointer; margin-left:5px;}
 /******************* Database Configuration end ***************************/
+
+/******************SNMP*************************/
+
+.snmpSelect{ width:95px;}
+
 /************Media Queries for mobile compatibility***************/
 @media (min-width: 768px) {
 .form-horizontal .control-label {
