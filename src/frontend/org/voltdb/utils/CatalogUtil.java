@@ -145,7 +145,6 @@ import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
 import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.collect.Sets;
-import com.google_voltpatches.common.net.HostAndPort;
 
 /**
  *
@@ -1616,11 +1615,6 @@ public abstract class CatalogUtil {
         if (snmpType.getTarget() == null || snmpType.getTarget().trim().length() == 0) {
             throw new IllegalArgumentException("Target must be specified for SNMP configuration.");
         }
-        //Must be a good host and port
-        HostAndPort hap = HostAndPort.fromString(snmpType.getTarget());
-        if (hap == null || !hap.hasPort()) {
-            throw new IllegalArgumentException("Target must be specified as host:port");
-        }
         if (snmpType.getAuthkey() != null && snmpType.getAuthkey().length() < 8) {
             throw new IllegalArgumentException("SNMP Authkey must be > 8 characters.");
         }
@@ -2631,6 +2625,7 @@ public abstract class CatalogUtil {
 
         clone.setPaths(paths);
 
+        clone.setSnmp(o.getSnmp());
         return clone;
     }
 }
