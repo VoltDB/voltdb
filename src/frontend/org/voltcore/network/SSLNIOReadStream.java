@@ -49,58 +49,40 @@ import org.voltcore.utils.DBBPool;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ReadableByteChannel;
-import java.util.ArrayDeque;
 import java.util.Deque;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.ConcurrentLinkedDeque;
 
-public class SSLNIOReadStream {
+class SSLNIOReadStream {
 
-    private final Deque<DBBPool.BBContainer> m_readBBContainers = new ArrayDeque<>();
+    private final Deque<DBBPool.BBContainer> m_readBBContainers = new ConcurrentLinkedDeque<>();
     private int m_totalAvailable = 0;
 
     int getBytes(ByteBuffer output) {
         int totalBytesCopied = 0;
         DBBPool.BBContainer poolCont = null;
-        try {
-            while (m_totalAvailable > 0 && output.hasRemaining()) {
+        while (m_totalAvailable > 0 && output.hasRemaining()) {
+            if (poolCont == null) {
+                poolCont = m_readBBContainers.peekFirst();
                 if (poolCont == null) {
-                    synchronized (m_readBBContainers) {
-                        if (!m_readBBContainers.isEmpty()) {
-                            poolCont = m_readBBContainers.pollFirst();
-                        } else {
-                            return totalBytesCopied;
-                        }
-                    }
-                }
-
-                if (poolCont.b().remaining() >= output.remaining()) {
-                    int bytesToCopy = output.remaining();
-                    int oldLimit = poolCont.b().limit();
-                    poolCont.b().limit(poolCont.b().position() + bytesToCopy);
-                    output.put(poolCont.b());
-                    poolCont.b().limit(oldLimit);
-                    totalBytesCopied += bytesToCopy;
-                    m_totalAvailable -= bytesToCopy;
-                } else {
-                    int bytesToCopy = poolCont.b().remaining();
-                    output.put(poolCont.b());
-                    poolCont.discard();
-                    poolCont = null;
-                    totalBytesCopied += bytesToCopy;
-                    m_totalAvailable -= bytesToCopy;
+                    return totalBytesCopied;
                 }
             }
-        } finally {
-            if (poolCont != null) {
-                if (poolCont.b().hasRemaining()) {
-                    synchronized (m_readBBContainers) {
-                        m_readBBContainers.addFirst(poolCont);
-                    }
-
-                }else {
-                    poolCont.discard();
-                }
+            if (poolCont.b().remaining() > output.remaining()) {
+                int bytesToCopy = output.remaining();
+                int oldLimit = poolCont.b().limit();
+                poolCont.b().limit(poolCont.b().position() + bytesToCopy);
+                output.put(poolCont.b());
+                poolCont.b().limit(oldLimit);
+                totalBytesCopied += bytesToCopy;
+                m_totalAvailable -= bytesToCopy;
+            } else {
+                int bytesToCopy = poolCont.b().remaining();
+                output.put(poolCont.b());
+                poolCont = m_readBBContainers.pollFirst();
+                poolCont.discard();
+                poolCont = null;
+                totalBytesCopied += bytesToCopy;
+                m_totalAvailable -= bytesToCopy;
             }
         }
         return totalBytesCopied;
@@ -110,27 +92,11 @@ public class SSLNIOReadStream {
         int bytesRead = 0;
         int lastRead = 1;
         DBBPool.BBContainer poolCont = null;
-        int initialPosition = 0;
         try {
             while (bytesRead < maxBytes && lastRead > 0) {
                 if (poolCont == null) {
-                    synchronized (m_readBBContainers) {
-                        if (!m_readBBContainers.isEmpty()) {
-                            DBBPool.BBContainer last = m_readBBContainers.peekLast();
-                            last = m_readBBContainers.pollLast();
-                            if (last.b().capacity() > last.b().limit()) {
-                                initialPosition = last.b().position();
-                                last.b().position(last.b().limit());
-                                last.b().limit(last.b().capacity());
-                                poolCont = last;
-                            }
-                        }
-                    }
-                    if (poolCont == null) {
-                        poolCont = pool.acquire();
-                        poolCont.b().clear();
-                        initialPosition = 0;
-                    }
+                    poolCont = pool.acquire();
+                    poolCont.b().clear();
                 }
 
                 lastRead = channel.read(poolCont.b());
@@ -144,25 +110,17 @@ public class SSLNIOReadStream {
                 if (lastRead > 0) {
                     bytesRead += lastRead;
                     if (!poolCont.b().hasRemaining()) {
-                        synchronized (m_readBBContainers) {
-                            poolCont.b().limit(poolCont.b().position());
-                            poolCont.b().position(initialPosition);
-                            m_readBBContainers.addLast(poolCont);
-                        }
-                        poolCont = pool.acquire();
-                        poolCont.b().clear();
-                        initialPosition = 0;
+                        poolCont.b().flip();
+                        m_readBBContainers.addLast(poolCont);
+                        poolCont = null;
                     }
                 }
             }
         } finally {
             if (poolCont != null) {
                 if (poolCont.b().position() > 0) {
-                    poolCont.b().limit(poolCont.b().position());
-                    poolCont.b().position(initialPosition);
-                    synchronized (m_readBBContainers) {
-                        m_readBBContainers.addLast(poolCont);
-                    }
+                    poolCont.b().flip();
+                    m_readBBContainers.addLast(poolCont);
                 } else {
                     poolCont.discard();
                 }

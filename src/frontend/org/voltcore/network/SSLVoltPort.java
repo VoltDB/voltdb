@@ -60,6 +60,7 @@ public class SSLVoltPort extends VoltPort {
 
     private final int m_appBufferSize;
 
+    private AtomicBoolean m_processingReads = new AtomicBoolean(false);
     private AtomicBoolean m_processingWrites = new AtomicBoolean(false);
     private final NetworkDBBPool m_writePool;
     private ByteBuffer m_heapBuffer;
@@ -96,7 +97,9 @@ public class SSLVoltPort extends VoltPort {
         }
 
         try {
-            processReads();
+            if (!m_processingReads.get()) {
+                processReads();
+            }
             if (!m_processingWrites.get()) {
                 processWrites();
             }
@@ -115,7 +118,7 @@ public class SSLVoltPort extends VoltPort {
     }
 
     private boolean processing() {
-        return m_processingWrites.get() || !m_readGateway.isEmpty() || !m_writeGateway.isEmpty();
+        return m_processingReads.get() || m_processingWrites.get() || !m_readGateway.isEmpty() || !m_writeGateway.isEmpty();
     }
 
     private void checkBackPressure() {
@@ -127,11 +130,15 @@ public class SSLVoltPort extends VoltPort {
     }
 
     private void processReads() throws IOException {
+        if (m_processingReads.compareAndSet(false, true)) {
             final int maxRead = m_handler.getMaxRead();
             int nRead = fillReadStream(maxRead);
             if (nRead > 0) {
                 m_decryptionGateway.submitDecryptionTasks();
+            } else {
+                m_processingReads.set(false);
             }
+        }
     }
 
     private void processWrites() {
@@ -142,6 +149,10 @@ public class SSLVoltPort extends VoltPort {
 
     private void doneProcessingWrites() {
         m_processingWrites.set(false);
+    }
+
+    public void doneProcessingReads() {
+        m_processingReads.set(false);
     }
 
     private DBBPool.BBContainer getDecryptionFrame() {
@@ -306,7 +317,7 @@ public class SSLVoltPort extends VoltPort {
                                 srcC.discard();
                             }
                             m_hasOutstandingTask.set(false);
-                            m_port.processWrites();
+                            m_port.doneProcessingReads();
                         }
                     }
                 };
