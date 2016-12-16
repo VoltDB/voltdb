@@ -41,7 +41,7 @@ parser.add_argument('-f', '--frequency', help='Frequency of gathering statistics
 parser.add_argument('-d', '--duration', help='Duration of gathering statistics in minutes (default = 30)', default=30)
 args = parser.parse_args()
 
-client = FastSerializer(args.server, args.port, args.username, args.password)
+client = FastSerializer(args.server, int(args.port), args.username, args.password)
 
 # procedure call response error handling
 def check_response(response):
