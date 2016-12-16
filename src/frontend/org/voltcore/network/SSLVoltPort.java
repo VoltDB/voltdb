@@ -32,6 +32,7 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -398,11 +399,9 @@ public class SSLVoltPort extends VoltPort {
 
     private class WriteGateway {
 
-        private final Queue<EncryptionResult> m_q = new ArrayDeque<>();
+        private final Deque<EncryptionResult> m_q = new ArrayDeque<>();
         private final AtomicBoolean m_hasOutstandingTask = new AtomicBoolean(false);
         private final AtomicBoolean m_isShuttingDown = new AtomicBoolean(false);
-        DBBPool.BBContainer m_leftoverWrites = null;
-        int m_leftoverBytesClear = 0;
 
         public WriteGateway() {
         }
@@ -414,52 +413,33 @@ public class SSLVoltPort extends VoltPort {
                     Runnable task = new Runnable() {
                         @Override
                         public void run() {
-                            if (m_isShuttingDown.get()) return;
-
-                            // if there are leftover writes, process those rather than looking
-                            // at the queue.
-                            if (m_leftoverWrites != null) {
-                                try {
-                                    m_channel.write(m_leftoverWrites.b());
-                                    if (m_leftoverWrites.b().hasRemaining()) {
-                                        SSLEncryptionService.instance().submitForEncryption(this);
-                                    } else {
-                                        m_bytesQueued.getAndAdd(-m_leftoverBytesClear);
-                                        m_leftoverWrites.discard();
-                                        m_leftoverWrites = null;
-
-                                    }
-                                } catch (IOException e) {
-                                    if (m_leftoverWrites != null) {
-                                        m_leftoverWrites.discard();
-                                        m_hasOutstandingTask.set(false);
-                                        return;
-                                    }
-                                }
-                            }
-
-                            EncryptionResult er;
-                            DBBPool.BBContainer writesCont = null;
+                            EncryptionResult er = null;
                             try {
-                                while (((er = m_q.poll()) != null) && (!m_isShuttingDown.get()) ) {
-                                    writesCont = er.m_encCont;
-                                    m_channel.write(writesCont.b());
-                                    if (!writesCont.b().hasRemaining()) {
-                                        m_bytesQueued.getAndAdd(-er.m_nBytesClear);
-                                    } else {
-                                        m_leftoverWrites = writesCont;
-                                        m_leftoverBytesClear = er.m_nBytesClear;
+                                while ((er = m_q.peek()) != null) {
+                                    int rc = 1;
+                                    while (er.m_encCont.b().hasRemaining() && rc > 0) {
+                                        rc = m_channel.write(er.m_encCont.b());
+                                    }
+
+                                    if (er.m_encCont.b().hasRemaining()) {
+                                        er = null;
                                         SSLEncryptionService.instance().submitForEncryption(this);
                                         return;
+                                    } else {
+                                        m_bytesQueued.getAndAdd(-er.m_nBytesClear);
+                                        er = m_q.poll();
+                                        er.m_encCont.discard();
+                                        er = null;
                                     }
                                 }
+                                m_hasOutstandingTask.set(false);
+
                             } catch (IOException ioe) {
                                 // TODO: log
                             } finally {
-                                if (writesCont != null) {
-                                    writesCont.discard();
+                                if (er != null) {
+                                    er.m_encCont.discard();
                                 }
-                                m_hasOutstandingTask.set(false);
                             }
                         }
                     };
