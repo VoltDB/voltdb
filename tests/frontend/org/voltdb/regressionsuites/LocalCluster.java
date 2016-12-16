@@ -123,7 +123,7 @@ public class LocalCluster extends VoltServerConfig {
     //wait before next node is started up in millisecond
     //to help matching the host id on the real cluster with the host id on the local
     //cluster
-    private long m_deplayBetweenNodeStartup = 0;
+    private long m_deplayBetweenNodeStartupMS = 0;
 
     private final ArrayList<EEProcess> m_eeProcs = new ArrayList<EEProcess>();
     //This is additional process invironment variables that can be passed.
@@ -756,9 +756,9 @@ public class LocalCluster extends VoltServerConfig {
 
                 startOne(i, clearLocalDataDirectories, role, StartAction.CREATE, true, placementGroup);
                 //wait before next one
-                if (m_deplayBetweenNodeStartup > 0) {
+                if (m_deplayBetweenNodeStartupMS > 0) {
                     try {
-                        Thread.sleep(m_deplayBetweenNodeStartup);
+                        Thread.sleep(m_deplayBetweenNodeStartupMS);
                     } catch (InterruptedException e) {
                     }
                 }
@@ -1204,9 +1204,9 @@ public class LocalCluster extends VoltServerConfig {
                     initLocalServer(entry.getKey(), true);
                 }
                 startOne(entry.getKey(), true, ReplicationRole.NONE, StartAction.JOIN, false, entry.getValue());
-                if (m_deplayBetweenNodeStartup > 0) {
+                if (m_deplayBetweenNodeStartupMS > 0) {
                     try {
-                        Thread.sleep(m_deplayBetweenNodeStartup);
+                        Thread.sleep(m_deplayBetweenNodeStartupMS);
                     } catch (InterruptedException e) {
                     }
                 }
@@ -1942,6 +1942,6 @@ public class LocalCluster extends VoltServerConfig {
     }
 
     public void setDeplayBetweenNodeStartup(long deplayBetweenNodeStartup) {
-        m_deplayBetweenNodeStartup = deplayBetweenNodeStartup;
+        m_deplayBetweenNodeStartupMS = deplayBetweenNodeStartup;
     }
 }
