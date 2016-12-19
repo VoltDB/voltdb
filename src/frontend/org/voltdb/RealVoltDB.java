@@ -734,10 +734,21 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             }
             if (config.m_startAction == StartAction.GET && !config.m_startAction.isLegacy()) {
                 DeploymentType dt = CatalogUtil.updateRuntimeDeploymentPaths(readDepl.deployment);
+                String out = "";
                 try {
-                    System.out.println(CatalogUtil.getDeployment(dt, true));
+                    out = CatalogUtil.getDeployment(dt, true);
                 } catch (IOException ex) {
                     ex.printStackTrace();
+                }
+                if (config.m_getOutput == null || config.m_getOutput.trim().length() == 0) {
+                    System.out.println(out);
+                } else {
+                    try (FileOutputStream fos = new FileOutputStream(config.m_getOutput.trim())){
+                        fos.write(out.getBytes());
+                    } catch (IOException e) {
+                        throw new SettingsException("failed to write output to " + config.m_getOutput, e);
+                    }
+                    System.out.println("Configuration saved in: " + config.m_getOutput.trim());
                 }
                 VoltDB.exit(0);
             }
@@ -2238,6 +2249,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             // providers
             switch(config.m_startAction) {
             case GET:
+                // once a voltdbroot is inited, the path properties contain the true path values
+                Settings.initialize(config.m_voltdbRoot);
+                // only override the local sites count
+                nodeSettings = NodeSettings.create(config.asNodeSettingsMap());
+                break;
             case PROBE:
                 // once a voltdbroot is inited, the path properties contain the true path values
                 Settings.initialize(config.m_voltdbRoot);

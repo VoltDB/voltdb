@@ -258,6 +258,7 @@ public class VoltDB {
 
         /** GET option */
         public String m_getOption = "deployment";
+        public String m_getOutput = null;
 
         private final static void referToDocAndExit() {
             System.out.println("Please refer to VoltDB documentation for command line usage.");
@@ -620,6 +621,8 @@ public class VoltDB {
                 } else if (arg.equalsIgnoreCase("get")) {
                     m_startAction = StartAction.GET;
                     m_getOption = args[++i].trim();
+                } else if (arg.equalsIgnoreCase("file")) {
+                    m_getOutput = args[++i].trim();
                 }
                 else {
                     System.err.println("FATAL: Unrecognized option to VoltDB: " + arg);
