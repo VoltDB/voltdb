@@ -667,7 +667,6 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
     @Override
     protected void stop()
     {
-        // Nothing to stop. shouldRun() should take care of exiting the work loop.
     }
 
     //Per topic per partition that we are responsible for.
