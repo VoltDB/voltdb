@@ -20,7 +20,8 @@ package org.voltcore.network;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.GatheringByteChannel;
-import java.util.ArrayDeque;
+import java.util.Deque;
+import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.TimeUnit;
 
 import org.voltcore.logging.Level;
@@ -45,7 +46,7 @@ public abstract class NIOWriteStreamBase {
     /**
      * Contains serialized buffers ready to write to the socket
      */
-    protected final ArrayDeque<BBContainer> m_queuedBuffers = new ArrayDeque<BBContainer>();
+    protected final Deque<BBContainer> m_queuedBuffers = new ConcurrentLinkedDeque<BBContainer>();
 
     protected long m_bytesWritten = 0;
     protected long m_messagesWritten = 0;
@@ -87,7 +88,7 @@ public abstract class NIOWriteStreamBase {
 
     abstract int drainTo (final GatheringByteChannel channel) throws IOException;
 
-    protected abstract ArrayDeque<DeferredSerialization> getQueuedWrites();
+    protected abstract Deque<DeferredSerialization> getQueuedWrites();
 
     /**
      * Serialize all queued writes into the queue of pending buffers, which are allocated from
@@ -95,9 +96,9 @@ public abstract class NIOWriteStreamBase {
      * @return number of queued writes processed
      * @throws IOException
      */
-    final int serializeQueuedWrites(final NetworkDBBPool pool) throws IOException {
+    int serializeQueuedWrites(final NetworkDBBPool pool) throws IOException {
         int processedWrites = 0;
-        final ArrayDeque<DeferredSerialization> oldlist = getQueuedWrites();
+        final Deque<DeferredSerialization> oldlist = getQueuedWrites();
         if (oldlist.isEmpty()) return 0;
 
         DeferredSerialization ds = null;

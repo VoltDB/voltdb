@@ -240,7 +240,6 @@ class VoltNetwork implements Runnable, IOStatsIntf
                     handler,
                     (InetSocketAddress) channel.socket().getRemoteSocketAddress(),
                     m_pool,
-                    m_writePool,
                     sslEngine);
         }
     }

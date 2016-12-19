@@ -163,7 +163,7 @@ public class NIOReadStream {
      * @return -1 if closed otherwise total buffered bytes. In all cases,
      * data may be buffered in the stream - even when the channel is closed.
      */
-    final int read(ReadableByteChannel channel, int maxBytes, NetworkDBBPool pool) throws IOException {
+    int read(ReadableByteChannel channel, int maxBytes, NetworkDBBPool pool) throws IOException {
         int bytesRead = 0;
         int lastRead = 1;
         try {

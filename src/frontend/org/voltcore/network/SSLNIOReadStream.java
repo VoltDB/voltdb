@@ -52,7 +52,7 @@ import java.nio.channels.ReadableByteChannel;
 import java.util.Deque;
 import java.util.concurrent.ConcurrentLinkedDeque;
 
-class SSLNIOReadStream {
+class SSLNIOReadStream extends NIOReadStream {
 
     private final Deque<DBBPool.BBContainer> m_readBBContainers = new ConcurrentLinkedDeque<>();
     private int m_totalAvailable = 0;
@@ -88,7 +88,7 @@ class SSLNIOReadStream {
         return totalBytesCopied;
     }
 
-    final int read(ReadableByteChannel channel, int maxBytes, NetworkDBBPool pool) throws IOException {
+    int read(ReadableByteChannel channel, int maxBytes, NetworkDBBPool pool) throws IOException {
         int bytesRead = 0;
         int lastRead = 1;
         DBBPool.BBContainer poolCont = null;
