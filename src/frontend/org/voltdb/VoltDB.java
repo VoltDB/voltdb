@@ -257,7 +257,7 @@ public class VoltDB {
         public boolean m_isPaused = false;
 
         /** GET option */
-        public String m_getOption = "deployment";
+        public GetActionArgument m_getOption = GetActionArgument.DEPLOYMENT;
         public String m_getOutput = null;
 
         private final static void referToDocAndExit() {
@@ -620,7 +620,7 @@ public class VoltDB {
                     }
                 } else if (arg.equalsIgnoreCase("get")) {
                     m_startAction = StartAction.GET;
-                    m_getOption = args[++i].trim();
+                    GetActionArgument.valueOf(args[++i].trim());
                 } else if (arg.equalsIgnoreCase("file")) {
                     m_getOutput = args[++i].trim();
                 }

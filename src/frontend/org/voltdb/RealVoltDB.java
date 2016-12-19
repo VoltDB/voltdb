@@ -733,22 +733,24 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 return;
             }
             if (config.m_startAction == StartAction.GET && !config.m_startAction.isLegacy()) {
-                DeploymentType dt = CatalogUtil.updateRuntimeDeploymentPaths(readDepl.deployment);
-                String out = "";
-                try {
-                    out = CatalogUtil.getDeployment(dt, true);
-                } catch (IOException ex) {
-                    ex.printStackTrace();
-                }
-                if (config.m_getOutput == null || config.m_getOutput.trim().length() == 0) {
-                    System.out.println(out);
-                } else {
-                    try (FileOutputStream fos = new FileOutputStream(config.m_getOutput.trim())){
-                        fos.write(out.getBytes());
-                    } catch (IOException e) {
-                        throw new SettingsException("failed to write output to " + config.m_getOutput, e);
+                if (config.m_getOption == GetActionArgument.DEPLOYMENT) {
+                    DeploymentType dt = CatalogUtil.updateRuntimeDeploymentPaths(readDepl.deployment);
+                    String out = "";
+                    try {
+                        out = CatalogUtil.getDeployment(dt, true);
+                    } catch (IOException ex) {
+                        ex.printStackTrace();
                     }
-                    System.out.println("Configuration saved in: " + config.m_getOutput.trim());
+                    if (config.m_getOutput == null || config.m_getOutput.trim().length() == 0) {
+                        System.out.println(out);
+                    } else {
+                        try (FileOutputStream fos = new FileOutputStream(config.m_getOutput.trim())){
+                            fos.write(out.getBytes());
+                        } catch (IOException e) {
+                            throw new SettingsException("failed to write output to " + config.m_getOutput, e);
+                        }
+                        System.out.println("Configuration saved in: " + config.m_getOutput.trim());
+                    }
                 }
                 VoltDB.exit(0);
             }
