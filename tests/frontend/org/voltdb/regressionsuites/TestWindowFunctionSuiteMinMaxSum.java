@@ -65,24 +65,35 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
                 + "  C INTEGER"
                 + ");\n"
 
+                // Nothing nullable, no partitions.
                 +"CREATE TABLE T_STRING ("
                 + "  A INTEGER NOT NULL,"
                 + "  B INTEGER NOT NULL,"
                 + "  C VARCHAR NOT NULL"
                 + ");"
 
-                +"CREATE TABLE T_STRING_NULL ("
+                // C nullable, no partitions.
+                +"CREATE TABLE T_STRING_C_NULL ("
                 + "  A INTEGER NOT NULL,"
                 + "  B INTEGER NOT NULL,"
                 + "  C VARCHAR "
                 + ");"
 
-                +"CREATE TABLE T_STRING_A ("
-                + "  A VARCHAR NOT NULL,"
+                // C nullable, partition on B.
+                +"CREATE TABLE T_STRING_C_NULL_PB ("
+                + "  A INTEGER NOT NULL,"
                 + "  B INTEGER NOT NULL,"
-                + "  C INTEGER NOT NULL"
+                + "  C VARCHAR "
                 + ");"
-                + "PARTITION TABLE T_STRING_A ON COLUMN A;"
+                + "PARTITION TABLE T_STRING_C_NULL_PB ON COLUMN B;"
+
+                // Nothing nullable, partition on C
+                +"CREATE TABLE T_STRING_PC ("
+                + "  A INTEGER NOT NULL,"
+                + "  B INTEGER NOT NULL,"
+                + "  C VARCHAR NOT NULL"
+                + ");"
+                + "PARTITION TABLE T_STRING_PC ON COLUMN C;"
 
                 + "CREATE TABLE T_TIMESTAMP ("
                 + "  A INTEGER,"
@@ -115,7 +126,7 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
                 + "CREATE TABLE T_PB (\n"
                 + "  A INTEGER NOT NULL,"
                 + "  B INTEGER NOT NULL,"
-                + "  C INTEGER NOT NULL"
+                + "  C INTEGER"
                 + ");\n"
                 + "PARTITION TABLE T_PB ON COLUMN B;"
 
@@ -187,7 +198,7 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
         String insertProcName = tableName + ".insert";
         cr = client.callProcedure("@AdHoc", "truncate table " + tableName);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("t.insert",  1,  1,    1);
+        cr = client.callProcedure(insertProcName,  1,  1,    1);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         cr = client.callProcedure(insertProcName,  1,  1,    2);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
@@ -403,7 +414,7 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
         ClientResponse cr;
 
         String insertProcName = tableName + ".insert";
-        cr = client.callProcedure("@AdHoc", "truncate table t_string_null");
+        cr = client.callProcedure("@AdHoc", "truncate table " + tableName);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         cr = client.callProcedure(insertProcName,  1,  1,    makeLongString(5));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
@@ -476,7 +487,7 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
         ClientResponse cr;
 
         String insertProcName = tableName + ".insert";
-        cr = client.callProcedure("@AdHoc", "truncate table t_string_null");
+        cr = client.callProcedure("@AdHoc", "truncate table " + tableName);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         cr = client.callProcedure(insertProcName,  1,  1,    makeLongString(1));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
@@ -548,7 +559,7 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
         ClientResponse cr;
 
         String insertProcName = tableName + ".insert";
-        cr = client.callProcedure("@AdHoc", "truncate table t_string_null");
+        cr = client.callProcedure("@AdHoc", "truncate table " + tableName);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         cr = client.callProcedure(insertProcName,  1,  1,    null);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
@@ -640,6 +651,111 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
         }
     }
 
+
+    private void testNoNulls(Client client,
+                             String tableName,
+                             String functionStrings[],
+                             long[][] expected) throws Exception {
+        ClientResponse cr;
+        initTable(client, tableName);
+        for (String functionString : functionStrings) {
+            cr = client.callProcedure("@AdHoc",
+                    String.format("select A, "
+                                  + "     B, "
+                                  + "     %s over (partition by A order by B) as R "
+                                  + "from %s ORDER BY A, B, R;",
+                                  functionString,
+                                  tableName));
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            validateTableOfLongs(cr.getResults()[0], expected);
+        }
+    }
+
+    private void testSomeNulls(Client client,
+                               String tableName,
+                               String functionString,
+                               long[][] expected) throws Exception {
+        ClientResponse cr;
+        initTableWithSomeNulls(client, tableName);
+        cr = client.callProcedure("@AdHoc",
+                                  String.format("select A, "
+                                                + "     B, "
+                                                + "     %s over (partition by A order by B) as R "
+                                                + "from %s ORDER BY A, B, R;",
+                                                functionString,
+                                                tableName));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        validateTableOfLongs(cr.getResults()[0], expected);
+    }
+
+    private void testAllNulls(Client client,
+                              String tableName,
+                              String functionString,
+                              long[][] expected) throws Exception {
+        ClientResponse cr;
+        initTableWithAllNulls(client, tableName);
+        cr = client.callProcedure("@AdHoc",
+                                  String.format("select A, "
+                                                + "     B, "
+                                                + "     %s over (partition by A order by B) as R "
+                                                + " from %s ORDER BY A, B, R;",
+                                                functionString,
+                                                tableName));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        validateTableOfLongs(cr.getResults()[0], expected);
+    }
+
+    private void testStringsNoNulls(Client client,
+                                    String tableName,
+                                    String functionString,
+                                    Object[][] expected) throws Exception {
+        ClientResponse cr;
+        initStringTable(client, tableName);
+        cr = client.callProcedure("@AdHoc",
+                                  String.format("select A, "
+                                                + "     B, "
+                                                + "     %s over (partition by A order by B) as R "
+                                                + "from %s ORDER BY A, B, R;",
+                                                functionString,
+                                                tableName));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        validateStringTable(cr.getResults()[0], expected);
+    }
+
+    private void testStringsSomeNulls(Client client,
+                                      String tableName,
+                                      String functionString,
+                                      Object[][] expected) throws Exception {
+        ClientResponse cr;
+        initStringTableSomeNulls(client, tableName);
+        cr = client.callProcedure("@AdHoc",
+                                  String.format("select A, "
+                                                + "     B, "
+                                                + "     %s over (partition by A order by B) as R "
+                                                + "from %s ORDER BY A, B, R;",
+                                                functionString,
+                                                tableName));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        validateStringTable(cr.getResults()[0], expected);
+    }
+
+    private void testStringsAllNulls(Client client,
+                                     String tableName,
+                                     String functionString,
+                                     Object[][] expected) throws Exception {
+        ClientResponse cr;
+        initStringTableAllNulls(client, tableName);
+        cr = client.callProcedure("@AdHoc",
+                                  String.format("select A, "
+                                                + "     B, "
+                                                + "     %s over (partition by A order by B) as R "
+                                                + "from %s ORDER BY A, B, R;",
+                                                functionString,
+                                                tableName));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        validateStringTable(cr.getResults()[0], expected);
+    }
+
     public void testMin() throws Exception {
         Client client = getClient();
         ClientResponse cr;
@@ -686,49 +802,54 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
             {  2L,  3L,    0L},
             {  2L,  3L,    0L}
         };
-        initTable(client, "t");
         //
         // Test the replicated table, t.
         //
-        // Find the min at the end of the peer group.
-        cr = client.callProcedure("@AdHoc",
-                                  "select A, B, min(abs(5-C)) over (partition by A order by B) as R from T ORDER BY A, B, R;");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        validateTableOfLongs(cr.getResults()[0], expected);
+        testNoNulls(client, "t",
+                    new String []{
+                            // Test with the min at the end of the peer group.
+                            "min(abs(5-C))",
+                            // Test with the min at the middle of the peer group.
+                            "min(abs(3-C))",
+                            // Test with the min at the start of the peer group.
+                            "min(abs(1-C))"
+                    },
+                    expected);
+        //
+        // Test the partitioned table t_pc.  This is
+        // partitioned on column C, and C is the column
+        // we are querying.
+        //
+        testNoNulls(client, "t_pc",
+                    new String []{
+                            // Test with the min at the end of the peer group.
+                            "min(abs(5-C))",
+                            // Test with the min at the middle of the peer group.
+                            "min(abs(3-C))",
+                            // Test with the min at the start of the peer group.
+                            "min(abs(1-C))"
+                    },
+                    expected);
 
-        // Find the min at the middle of the peer group.
-        cr = client.callProcedure("@AdHoc",
-                                  "select A, B, min(abs(3-C)) over (partition by A order by B) as R from T ORDER BY A, B, R;");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        validateTableOfLongs(cr.getResults()[0], expected);
-
-        // Find the min at the beginning of the peer group.
-        cr = client.callProcedure("@AdHoc",
-                                  "select A, B, min(abs(1-C)) over (partition by A order by B) as R from T ORDER BY A, B, R;");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        validateTableOfLongs(cr.getResults()[0], expected);
 
         //
-        // Test the partitioned table t_pc.
+        // Test the partitioned table t_pb.  This is
+        // partitioned on column B but C is the column
+        // we are querying.
         //
-        initTable(client, "t_pc");
-        // Find the min at the end of the peer group.
-        cr = client.callProcedure("@AdHoc",
-                                  "select A, B, min(abs(5-C)) over (partition by A order by B) as R from T_PC ORDER BY A, B, R;");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        validateTableOfLongs(cr.getResults()[0], expected);
+        testNoNulls(client,
+                    "t_pb",
+                    new String[] {
+                            // Test with the min at the end of the peer group.
+                            "min(abs(5-C))",
+                            // Test with the min at the middle of the peer group.
+                            "min(abs(3-C))",
+                            // Test with the min at the start of the peer group.
+                            "min(abs(1-C))"
+                    },
+                    expected);
 
-        // Find the min at the middle of the peer group.
-        cr = client.callProcedure("@AdHoc",
-                                  "select A, B, min(abs(3-C)) over (partition by A order by B) as R from T_PC ORDER BY A, B, R;");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        validateTableOfLongs(cr.getResults()[0], expected);
 
-        // Find the min at the beginning of the peer group.
-        cr = client.callProcedure("@AdHoc",
-                                  "select A, B, min(abs(1-C)) over (partition by A order by B) as R from T_PC ORDER BY A, B, R;");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        validateTableOfLongs(cr.getResults()[0], expected);
         //
         // Now test with some nulls.
         //
@@ -769,29 +890,28 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
             {  2L,  3L,    1L},
             {  2L,  3L,    1L}
         };
-
         //
         // Test the replicated table, T.
         //
-        initTableWithSomeNulls(client, "t");
-        cr = client.callProcedure("@AdHoc",
-                                  "select A, B, min(C) over (partition by A order by B) as R from T ORDER BY A, B, R;");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        validateTableOfLongs(cr.getResults()[0], expectedWithSomeNulls);
+        testSomeNulls(client,
+                      "t",
+                      "min(C)",
+                      expectedWithSomeNulls);
 
         //
-        // Test with a partitioned table.
+        // Can't test with nulls in a partition column because
+        // that is nonsense.  But we can test with nulls in a
+        // non-partitioned column.  Here B is the partition
+        // column but C is the column with nulls.
         //
-        initTableWithSomeNulls(client, "t_pc");
-        cr = client.callProcedure("@AdHoc",
-                                  "select A, B, min(C) over (partition by A order by B) as R from T_PC ORDER BY A, B, R;");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        validateTableOfLongs(cr.getResults()[0], expectedWithSomeNulls);
+        testSomeNulls(client,
+                      "t_pb",
+                      "min(C)",
+                      expectedWithSomeNulls);
+
         //
         // Now test with all nulls.  First, the replicated table.
         //
-        initTableWithAllNulls(client, "t");
-
         long expectedWithAllNulls[] [] = new long[][] {
             {  1L,  1L,    Long.MIN_VALUE},
             {  1L,  1L,    Long.MIN_VALUE},
@@ -829,23 +949,30 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
             {  2L,  3L,    Long.MIN_VALUE},
             {  2L,  3L,    Long.MIN_VALUE}
         };
-        cr = client.callProcedure("@AdHoc",
-                                  "select A, B, min(C) over (partition by A order by B) as R from T ORDER BY A, B, R;");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        validateTableOfLongs(cr.getResults()[0], expectedWithAllNulls);
+        //
+        // Test the replicated table t.
+        //
+        testAllNulls(client,
+                     "t",
+                     "min(C)",
+                     expectedWithAllNulls);
+        //
+        // Again, can't test with nulls in a partition column
+        // because that is nonsense.  But we can test with nulls in
+        // a non-partitioned column.
+        //
+        testAllNulls(client,
+                     "t_pb",
+                     "min(C)",
+                     expectedWithAllNulls);
 
+        ////////////////////////////////////////////////////////////////////
         //
-        // Now test the partitioned table.
+        // Test with strings.
         //
-        initTableWithAllNulls(client, "t_pc");
-        cr = client.callProcedure("@AdHoc",
-                                  "select A, B, min(C) over (partition by A order by B) as R from T_PC ORDER BY A, B, R;");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        validateTableOfLongs(cr.getResults()[0], expectedWithAllNulls);
-
+        ////////////////////////////////////////////////////////////////////
         //
-        // Strings are not partitionable, so we don't test
-        // partitioned tables below here.
+        // Test with partitioned string columns.
         //
         Object expectStringTable[][] = new Object[][] {
             {  1L,  1L,    makeLongString(1)},
@@ -884,12 +1011,24 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
             {  2L,  3L,    makeLongString(1)},
             {  2L,  3L,    makeLongString(1)}
         };
-        initStringTable(client, "t");
-        cr = client.callProcedure("@AdHoc",
-                                  "select A, B, min(C) over (partition by A order by B) as R from T_STRING_NULL ORDER BY A, B, R;");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        validateStringTable(cr.getResults()[0], expectStringTable);
 
+        //
+        // Test the replicated table t_string_c_null,
+        // which is not partitioned and has C nullable string.
+        //
+        testStringsNoNulls(client,
+                           "t_string",
+                           "min(C)",
+                           expectStringTable);
+        //
+        // Test the partitioned table t_string_pc, which
+        // is partitioned on the string column C.  Nothing
+        // can be null here.
+        //
+        testStringsNoNulls(client,
+                           "t_string_pc",
+                           "min(C)",
+                           expectStringTable);
 
         Object expectStringTableSomeNull[][] = new Object[][] {
             {  1L,  1L,    makeLongString(1)},
@@ -928,12 +1067,21 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
             {  2L,  3L,    makeLongString(1)},
             {  2L,  3L,    makeLongString(1)}
         };
-        initStringTableSomeNulls(client, "t_string_null");
-        cr = client.callProcedure("@AdHoc",
-                                  "select A, B, min(C) over (partition by A order by B) as R from T_STRING_NULL ORDER BY A, B, R;");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
-        validateStringTable(cr.getResults()[0], expectStringTableSomeNull);
+        // Test the replicated table t_string.
+        testStringsSomeNulls(client,
+                             "t_string_c_null",
+                             "min(C)",
+                             expectStringTableSomeNull);
+        //
+        // We can't put nulls in the partition column, C,
+        // but we can partition on the integer column B and
+        // put nulls in the non-partitioned string column, C.
+        //
+        testStringsSomeNulls(client,
+                             "t_string_c_null_pb",
+                             "min(C)",
+                             expectStringTableSomeNull);
 
         Object expectStringTableAllNull[][] = new Object[][] {
             {  1L,  1L,    null},
@@ -973,13 +1121,22 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
             {  2L,  3L,    null},
         };
 
-        initStringTableAllNulls(client, "t_string_null");
-        cr = client.callProcedure("@AdHoc",
-                                  "select A, B, min(C) over (partition by A order by B) as R from T_STRING_NULL ORDER BY A, B, R;");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        validateStringTable(cr.getResults()[0], expectStringTableAllNull);
-
+        // Test the replicated table t_string.
+        testStringsAllNulls(client,
+                            "t_string_c_null",
+                            "min(C)",
+                            expectStringTableAllNull);
+        //
+        // We can't put nulls in the partition column, C,
+        // but we can partition on the integer column B and
+        // put nulls in the non-partitioned string column, C.
+        //
+        testStringsAllNulls(client,
+                            "t_string_c_null_pb",
+                            "min(C)",
+                            expectStringTableAllNull);
     }
+
     public void testMax() throws Exception {
         Client client = getClient();
         ClientResponse cr;
@@ -1029,46 +1186,47 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
         //
         // Test the replicated table.
         //
-        initTable(client, "t");
-        // Find the min at the end of the peer group.
-        cr = client.callProcedure("@AdHoc",
-                                  "select A, B, max(-1*abs(5-C)) over (partition by A order by B) as R from T ORDER BY A, B, R;");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        validateTableOfLongs(cr.getResults()[0], expected);
-
-        // Find the min at the middle of the peer group.
-        cr = client.callProcedure("@AdHoc",
-                                  "select A, B, max(-1*abs(3-C)) over (partition by A order by B) as R from T ORDER BY A, B, R;");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        validateTableOfLongs(cr.getResults()[0], expected);
-
-        // Find the min at the beginning of the peer group.
-        cr = client.callProcedure("@AdHoc",
-                                  "select A, B, max(-1*abs(1-C)) over (partition by A order by B) as R from T ORDER BY A, B, R;");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        validateTableOfLongs(cr.getResults()[0], expected);
+        testNoNulls(client,
+                    "t",
+                    new String[] {
+                            // Find the max at the end of the peer group.
+                            "max(-1*abs(5-C))",
+                            // Find the max at the middle of the peer group.
+                            "max(-1*abs(3-C))",
+                            // Find the max at the start of the peer group.
+                            "max(-1*abs(1-C))"
+                    },
+                    expected);
 
         //
-        // Test the partitioned table.
+        // Test a partitioned table.
         //
-        initTable(client, "t_pc");
-        // Find the min at the end of the peer group.
-        cr = client.callProcedure("@AdHoc",
-                                  "select A, B, max(-1*abs(5-C)) over (partition by A order by B) as R from T_PC ORDER BY A, B, R;");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        validateTableOfLongs(cr.getResults()[0], expected);
+        testNoNulls(client,
+                    "t_pc",
+                    new String[] {
+                            // Find the max at the end of the peer group.
+                            "max(-1*abs(5-C))",
+                            // Find the max at the middle of the peer group.
+                            "max(-1*abs(3-C))",
+                            // Find the max at the start of the peer group.
+                            "max(-1*abs(1-C))"
+                    },
+                    expected);
 
-        // Find the min at the middle of the peer group.
-        cr = client.callProcedure("@AdHoc",
-                                  "select A, B, max(-1*abs(3-C)) over (partition by A order by B) as R from T_PC ORDER BY A, B, R;");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        validateTableOfLongs(cr.getResults()[0], expected);
-
-        // Find the min at the beginning of the peer group.
-        cr = client.callProcedure("@AdHoc",
-                                  "select A, B, max(-1*abs(1-C)) over (partition by A order by B) as R from T_PC ORDER BY A, B, R;");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        validateTableOfLongs(cr.getResults()[0], expected);
+        //
+        // Test a table partitioned on C but querying B.
+        //
+        testNoNulls(client,
+                    "t_pb",
+                    new String[] {
+                            // Find the max at the end of the peer group.
+                            "max(-1*abs(5-C))",
+                            // Find the max at the middle of the peer group.
+                            "max(-1*abs(3-C))",
+                            // Find the max at the start of the peer group.
+                            "max(-1*abs(1-C))"
+                    },
+                    expected);
         //
         // Test with some nulls.
         //
@@ -1113,22 +1271,20 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
         //
         // Test the replicated table.
         //
-        initTableWithSomeNulls(client, "t");
-        // Find the min at the end of the peer group.
-        cr = client.callProcedure("@AdHoc",
-                                  "select A, B, max(C) over (partition by A order by B) as R from T ORDER BY A, B, R;");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        validateTableOfLongs(cr.getResults()[0], expectedWithSomeNulls);
+        testSomeNulls(client,
+                      "t",
+                      "max(C)",
+                      expectedWithSomeNulls);
 
         //
-        // Test a partitioned table.
+        // Test a partitioned table.  We can't put
+        // nulls in the partition column, but we can
+        // put nulls in another column.
         //
-        initTableWithSomeNulls(client, "t_pc");
-        // Find the min at the end of the peer group.
-        cr = client.callProcedure("@AdHoc",
-                                  "select A, B, max(C) over (partition by A order by B) as R from T_PC ORDER BY A, B, R;");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        validateTableOfLongs(cr.getResults()[0], expectedWithSomeNulls);
+        testSomeNulls(client,
+                      "t_pb",
+                      "max(C)",
+                      expectedWithSomeNulls);
 
         //
         // Test with all nulls.
@@ -1173,26 +1329,24 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
         //
         // Test a replicated table.
         //
-        initTableWithAllNulls(client, "t");
-        // Find the min at the end of the peer group.
-        cr = client.callProcedure("@AdHoc",
-                                  "select A, B, max(C) over (partition by A order by B) as R from T ORDER BY A, B, R;");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        validateTableOfLongs(cr.getResults()[0], expectedWithAllNulls);
+        testAllNulls(client,
+                     "t",
+                     "max(C)",
+                     expectedWithAllNulls);
 
         //
-        // Test a partitioned table.
+        // Test a partitioned table.  Put the nulls
+        // in another, non-partitioned column.
         //
-        initTableWithAllNulls(client, "t_pc");
-        // Find the min at the end of the peer group.
-        cr = client.callProcedure("@AdHoc",
-                                  "select A, B, max(C) over (partition by A order by B) as R from T_pc ORDER BY A, B, R;");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        validateTableOfLongs(cr.getResults()[0], expectedWithAllNulls);
-
-        // Since strings are not a partitionable type,
-        // we don't test partition tables below.
-
+        testAllNulls(client,
+                     "t_pb",
+                     "max(C)",
+                     expectedWithAllNulls);
+        ////////////////////////////////////////////////////////////////////
+        //
+        // Test with strings.
+        //
+        ////////////////////////////////////////////////////////////////////
         //
         // Test strings with no nulls.
         //
@@ -1233,12 +1387,20 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
             {  2L,  3L,    makeLongString(5)},
             {  2L,  3L,    makeLongString(5)}
         };
-        initStringTable(client, "t_string_null");
-        cr = client.callProcedure("@AdHoc",
-                                  "select A, B, max(C) over (partition by A order by B) as R from T_STRING_NULL ORDER BY A, B, R;");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        validateStringTable(cr.getResults()[0], expectStringTable);
+        testStringsNoNulls(client,
+                           "t_string",
+                           "max(C)",
+                           expectStringTable);
 
+        testStringsNoNulls(client,
+                           "t_string_pc",
+                           "max(C)",
+                           expectStringTable);
+
+        testStringsNoNulls(client,
+                           "t_string_c_null_pb",
+                           "max(C)",
+                           expectStringTable);
         //
         // Test strings with some nulls.
         //
@@ -1279,12 +1441,14 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
             {  2L,  3L,    makeLongString(5)},
             {  2L,  3L,    makeLongString(5)}
         };
-        initStringTableSomeNulls(client, "t_string_null");
-        cr = client.callProcedure("@AdHoc",
-                                  "select A, B, max(C) over (partition by A order by B) as R from T_STRING_NULL ORDER BY A, B, R;");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        validateStringTable(cr.getResults()[0], expectStringTableSomeNull);
-
+        testStringsSomeNulls(client,
+                             "t_string_c_null",
+                             "max(C)",
+                             expectStringTableSomeNull);
+        testStringsSomeNulls(client,
+                             "t_string_c_null_pb",
+                             "max(C)",
+                             expectStringTableSomeNull);
         //
         // Test strings with all nulls.
         //
@@ -1325,11 +1489,14 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
             {  2L,  3L,    null},
             {  2L,  3L,    null}
         };
-        initStringTableAllNulls(client, "t_string_null");
-        cr = client.callProcedure("@AdHoc",
-                                  "select A, B, max(C) over (partition by A order by B) as R from T_STRING_NULL ORDER BY A, B, R;");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        validateStringTable(cr.getResults()[0], expectStringTableAllNull);
+        testStringsAllNulls(client,
+                            "t_string_c_null",
+                            "max(C)",
+                            expectStringTableAllNull);
+        testStringsAllNulls(client,
+                             "t_string_c_null_pb",
+                             "max(C)",
+                             expectStringTableAllNull);
     }
 
     public void testSum() throws Exception {
@@ -1374,19 +1541,26 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
             {  2L,  3L,   75L}
         };
 
-        initTable(client, "t");
-        // Find the sum.
-        cr = client.callProcedure("@AdHoc",
-                                  "select A, B, sum(B+C) over (partition by A order by B) as R from T ORDER BY A, B, R;");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        validateTableOfLongs(cr.getResults()[0], expected);
+        //////////////////////////////////////////////////////////////////
+        //
+        // Integers.
+        //
+        //////////////////////////////////////////////////////////////////
+        //
+        // Test a replicated table.
+        //
+        testNoNulls(client,
+                    "t",
+                    new String[] {"sum(B+C)"},
+                    expected);
+        //
+        // Test a table partitioned on c, query on c.
+        //
+        testNoNulls(client,
+                    "t_pc",
+                    new String[] {"sum(B+C)"},
+                    expected);
 
-        initTable(client, "t_pc");
-        // Find the sum.
-        cr = client.callProcedure("@AdHoc",
-                                  "select A, B, sum(B+C) over (partition by A order by B) as R from T_PC ORDER BY A, B, R;");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        validateTableOfLongs(cr.getResults()[0], expected);
         long expectedWithSomeNulls[] [] = new long[][] {
             {  1L,  1L,   20L},
             {  1L,  1L,   20L},
@@ -1425,18 +1599,14 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
             {  2L,  3L,   55L}
         };
 
-        initTableWithSomeNulls(client, "t");
-        // Find the sum.
-        cr = client.callProcedure("@AdHoc",
-                                  "select A, B, sum(B+C) over (partition by A order by B) as R from T ORDER BY A, B, R;");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        validateTableOfLongs(cr.getResults()[0], expectedWithSomeNulls);
-
-        initTableWithSomeNulls(client, "t_pc");
-        cr = client.callProcedure("@AdHoc",
-                                  "select A, B, sum(B+C) over (partition by A order by B) as R from T_PC ORDER BY A, B, R;");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        validateTableOfLongs(cr.getResults()[0], expectedWithSomeNulls);
+        testSomeNulls(client,
+                      "t",
+                      "sum(B+C)",
+                      expectedWithSomeNulls);
+        testSomeNulls(client,
+                      "t_pb",
+                      "sum(B+C)",
+                      expectedWithSomeNulls);
 
         long expectedWithAllNulls[] [] = new long[][] {
             {  1L,  1L, 0},
@@ -1475,19 +1645,14 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
             {  2L,  3L, 0},
             {  2L,  3L, 0}
         };
-        initTableWithAllNulls(client, "t");
-        // Find the sum.
-        cr = client.callProcedure("@AdHoc",
-                                  "select A, B, sum(B+C) over (partition by A order by B) as R from T ORDER BY A, B, R;");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        validateTableOfLongs(cr.getResults()[0], expectedWithAllNulls);
-
-        initTableWithAllNulls(client, "t_pc");
-        // Find the sum.
-        cr = client.callProcedure("@AdHoc",
-                                  "select A, B, sum(B+C) over (partition by A order by B) as R from T_PC ORDER BY A, B, R;");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        validateTableOfLongs(cr.getResults()[0], expectedWithAllNulls);
+        testAllNulls(client,
+                     "t",
+                     "sum(B+C)",
+                     expectedWithAllNulls);
+        testAllNulls(client,
+                     "t_pb",
+                     "sum(B+C)",
+                     expectedWithAllNulls);
     }
 
     static public junit.framework.Test suite() {
