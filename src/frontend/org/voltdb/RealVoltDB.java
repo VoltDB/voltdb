@@ -584,7 +584,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
      */
     @Override
     public void initialize(Configuration config) {
-        ShutdownHooks.enableServerStopLogging();
+        if (config.m_startAction != StartAction.GET) {
+            ShutdownHooks.enableServerStopLogging();
+        }
         synchronized(m_startAndStopLock) {
             // Handle multiple invocations of server thread in the same JVM.
             // by clearing static variables/properties which ModuleManager,
@@ -601,7 +603,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             }
 
             // print the ascii art!
-            consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_StartupString.name(), null);
+            if (config.m_startAction != StartAction.GET) {
+                consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_StartupString.name(), null);
+            }
 
             // load license API
             if (config.m_pathToLicense == null) {
@@ -727,6 +731,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                         Joiner.on("\n  - ").join(failed);
                 VoltDB.crashLocalVoltDB(msg);
                 return;
+            }
+            if (config.m_startAction == StartAction.GET && !config.m_startAction.isLegacy()) {
+                DeploymentType dt = CatalogUtil.updateRuntimeDeploymentPaths(readDepl.deployment);
+                try {
+                    System.out.println(CatalogUtil.getDeployment(dt, true));
+                } catch (IOException ex) {
+                    ex.printStackTrace();
+                }
+                VoltDB.exit(0);
             }
 
             if (config.m_hostCount == VoltDB.UNDEFINED) {
@@ -2224,6 +2237,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             // adjust deployment host count when the cluster members are given by mesh configuration
             // providers
             switch(config.m_startAction) {
+            case GET:
             case PROBE:
                 // once a voltdbroot is inited, the path properties contain the true path values
                 Settings.initialize(config.m_voltdbRoot);
@@ -2252,7 +2266,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             }
             m_nodeSettings = nodeSettings;
             //Now its safe to save node settings
-            m_nodeSettings.store();
+            if (config.m_startAction != StartAction.GET) {
+                m_nodeSettings.store();
+            }
 
             if (config.m_startAction == StartAction.PROBE) {
                 // once initialized the path properties contain the true path values

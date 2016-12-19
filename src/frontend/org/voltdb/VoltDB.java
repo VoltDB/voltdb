@@ -256,6 +256,9 @@ public class VoltDB {
 
         public boolean m_isPaused = false;
 
+        /** GET option */
+        public String m_getOption = "deployment";
+
         private final static void referToDocAndExit() {
             System.out.println("Please refer to VoltDB documentation for command line usage.");
             System.out.flush();
@@ -614,13 +617,18 @@ public class VoltDB {
                         System.err.println("FATAL: " + e.getMessage());
                         referToDocAndExit();
                     }
+                } else if (arg.equalsIgnoreCase("get")) {
+                    m_startAction = StartAction.GET;
+                    m_getOption = args[++i].trim();
                 }
                 else {
                     System.err.println("FATAL: Unrecognized option to VoltDB: " + arg);
                     referToDocAndExit();
                 }
             }
-
+            if (m_startAction == StartAction.GET) {
+                return;
+            }
             // set file logger root file directory. From this point on you can use loggers
             if (m_startAction != null && !m_startAction.isLegacy()) {
                 VoltLog4jLogger.setFileLoggerRoot(m_voltdbRoot);
@@ -796,11 +804,12 @@ public class VoltDB {
         public boolean validate() {
             boolean isValid = true;
 
+            EnumSet<StartAction> hostNotRequred = EnumSet.of(StartAction.INITIALIZE,StartAction.GET);
             if (m_startAction == null) {
                 isValid = false;
                 hostLog.fatal("The startup action is missing (either create, recover or rejoin).");
             }
-            if (m_leader == null && m_startAction != StartAction.INITIALIZE) {
+            if (m_leader == null && !hostNotRequred.contains(m_startAction)) {
                 isValid = false;
                 hostLog.fatal("The hostname is missing.");
             }
@@ -830,7 +839,7 @@ public class VoltDB {
                 isValid = false;
                 hostLog.fatal("Starting in admin mode is only allowed when using start, create or recover.");
             }
-            if (m_startAction != StartAction.INITIALIZE && m_coordinators.isEmpty()) {
+            if (!hostNotRequred.contains(m_startAction) && m_coordinators.isEmpty()) {
                 isValid = false;
                 hostLog.fatal("List of hosts is missing");
             }
