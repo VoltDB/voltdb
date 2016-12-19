@@ -445,14 +445,14 @@ public class ExportGeneration implements Generation {
                     final Map<String, ExportDataSource> partitionSources = m_dataSourcesByPartition.get(partition);
                     if (partitionSources == null) {
                         exportLog.error("Received an export ack for partition " + partition +
-                                " which does not exist on this node");
+                                " which does not exist on this node, partitions = " + m_dataSourcesByPartition);
                         return;
                     }
 
                     final ExportDataSource eds = partitionSources.get(signature);
                     if (eds == null) {
                         exportLog.warn("Received an export ack for partition " + partition +
-                                " source signature " + signature + " which does not exist on this node");
+                                " source signature " + signature + " which does not exist on this node, sources = " + partitionSources);
                         return;
                     }
 
@@ -748,7 +748,6 @@ public class ExportGeneration implements Generation {
             Throwables.propagateIfPossible(e, IOException.class);
         }
         shutdown = true;
-        m_dataSourcesByPartition.clear();
         VoltFile.recursivelyDelete(m_directory);
 
     }
@@ -827,7 +826,6 @@ public class ExportGeneration implements Generation {
             //intentionally not failing if there is an issue with close
             exportLog.error("Error closing export data sources", e);
         }
-        m_dataSourcesByPartition.clear();
         shutdown = true;
     }
 
