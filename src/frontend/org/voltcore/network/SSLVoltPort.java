@@ -306,7 +306,6 @@ public class SSLVoltPort extends VoltPort {
 
                                     if (er.m_encCont.b().hasRemaining()) {
                                         er = null;
-                                        m_writeStream.backpressureStarted();
                                         SSLEncryptionService.instance().submitForEncryption(this);
                                         wroteAll = false;
                                         return;
