@@ -1239,7 +1239,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             if (!isRejoin) {
                 int expectedHosts = m_catalogContext.getClusterSettings().hostcount();
                 if (m_joining) {
-                    expectedHosts += m_configuredReplicationFactor + 1;
+                    expectedHosts = m_messenger.getLiveHostIds().size() + m_configuredReplicationFactor + 1;
                 }
                 try {
                     m_messenger.waitForAllHostsToBeReady(expectedHosts);
