@@ -324,9 +324,9 @@ public class CatalogContext {
             hostLog.warn("Failed to get sitesperhost information from Zookeeper", e);
             sphMap = null;
         }
+        int kFactor = deployment.getKfactor();
         if (sphMap != null) {
             int localSitesCount = sphMap.get(VoltDB.instance().getHostMessenger().getHostId());
-            int kFactor = deployment.getKfactor();
             logLines.put("deployment1",
                     String.format("Cluster has %d hosts with leader hostname: \"%s\". %d local sites count. K = %d.",
                     hostCount, VoltDB.instance().getConfig().m_leader, localSitesCount, kFactor));
@@ -346,8 +346,8 @@ public class CatalogContext {
                     partitionCount > 1 ? "s" : ""));
         } else {
             logLines.put("deployment1",
-                    String.format("Cluster has %d hosts with leader hostname: \"%s\". [unknown] local sites count. K = [unknown].",
-                    hostCount, VoltDB.instance().getConfig().m_leader));
+                    String.format("Cluster has %d hosts with leader hostname: \"%s\". [unknown] local sites count. K = %d.",
+                    hostCount, VoltDB.instance().getConfig().m_leader, kFactor));
             logLines.put("deployment2", "Unable to retrieve partition information from the cluster.");
         }
 
