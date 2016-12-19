@@ -36,7 +36,9 @@ public interface ConsumerDRGateway extends Promotable {
 
     DRConsumerMpCoordinator getDRConsumerMpCoordinator();
 
-    void queueStartCursors(byte clusterId, long clusterCreationId, List<String> clusterNodeInfo);
-    void startConsumerDispatcher(byte producerClusterId, List<String> clusterNodeInfo);
+    void clusterUnrecoverable(byte clusterId, Throwable t);
 
+    void queueStartCursors(byte clusterId, long clusterCreationId, List<String> clusterNodeInfo);
+
+    void startConsumerDispatcher(byte producerClusterId, List<String> clusterNodeInfo);
 }

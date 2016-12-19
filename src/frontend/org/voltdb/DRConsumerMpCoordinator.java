@@ -27,7 +27,7 @@ public interface DRConsumerMpCoordinator {
 
     void deliver(Dr2MultipartResponseMessage message);
 
-    void processClientResponse(int handle, ClientResponse response);
+    void processClientResponse(byte producerClusterId, ClientResponse response);
 
     void becomeLeader();
 
