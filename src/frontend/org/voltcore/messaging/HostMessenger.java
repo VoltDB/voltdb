@@ -27,6 +27,7 @@ import java.net.SocketException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -51,7 +52,6 @@ import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
-import org.apache.zookeeper_voltpatches.data.Stat;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -1135,24 +1135,36 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         return hostGroups;
     }
 
-    public Map<Integer, String> getHostGroupsFromZK()
+    public Map<Integer, String> getHostGroupsFromZKAsync()
             throws KeeperException, InterruptedException, JSONException {
         Map<Integer, String> hostGroups = Maps.newHashMap();
-            List<String> children = m_zk.getChildren(CoreZK.hosts, false);
-            for (String child : children) {
-                byte[] payload = m_zk.getData( ZKUtil.joinZKPath(CoreZK.hosts, child), false, new Stat());
-                final HostInfo info = HostInfo.fromBytes(payload);
-                hostGroups.put(parseHostId(child), info.m_group);
-            }
+        List<String> children = m_zk.getChildren(CoreZK.hosts, false);
+        Queue<ZKUtil.ByteArrayCallback> callbacks = new ArrayDeque<ZKUtil.ByteArrayCallback>();
+        for (String child : children) {
+            ZKUtil.ByteArrayCallback cb = new ZKUtil.ByteArrayCallback();
+            m_zk.getData(ZKUtil.joinZKPath(CoreZK.hosts, child), false, cb, null);
+            callbacks.offer(cb);
+        }
+        for (String child : children) {
+            byte[] payload = callbacks.poll().getData();
+            final HostInfo info = HostInfo.fromBytes(payload);
+            hostGroups.put(parseHostId(child), info.m_group);
+        }
         return hostGroups;
     }
 
-    public Map<Integer, Integer> getSitesPerHostMapFromZK()
+    public Map<Integer, Integer> getSitesPerHostMapFromZKAsync()
             throws KeeperException, InterruptedException, JSONException {
-        Map<Integer, Integer> sphMap = new HashMap<>();
+        Map<Integer, Integer> sphMap = Maps.newHashMap();
         List<String> children = m_zk.getChildren(CoreZK.hosts, false);
+        Queue<ZKUtil.ByteArrayCallback> callbacks = new ArrayDeque<ZKUtil.ByteArrayCallback>();
         for (String child : children) {
-            byte[] payload = m_zk.getData( ZKUtil.joinZKPath(CoreZK.hosts, child), false, new Stat());
+            ZKUtil.ByteArrayCallback cb = new ZKUtil.ByteArrayCallback();
+            m_zk.getData(ZKUtil.joinZKPath(CoreZK.hosts, child), false, cb, null);
+            callbacks.offer(cb);
+        }
+        for (String child : children) {
+            byte[] payload = callbacks.poll().getData();
             final HostInfo info = HostInfo.fromBytes(payload);
             sphMap.put(parseHostId(child), info.m_localSitesCount);
         }

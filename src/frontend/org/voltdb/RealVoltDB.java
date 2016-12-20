@@ -1658,7 +1658,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     {
         AbstractTopology topology = null;
         try {
-            Map<Integer, String> hostGroups = m_messenger.getHostGroupsFromZK();
+            Map<Integer, String> hostGroups = m_messenger.getHostGroupsFromZKAsync();
             if (startAction == StartAction.JOIN) {
                 assert(joinCoordinator != null);
                 JSONObject topoJson = joinCoordinator.getTopology();
@@ -1670,7 +1670,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 int hostcount = m_clusterSettings.get().hostcount();
                 Preconditions.checkArgument(hostGroups.size() == hostcount);
                 int kfactor = m_catalogContext.getDeployment().getCluster().getKfactor();
-                Map<Integer, Integer> sitesPerHostMap = m_messenger.getSitesPerHostMapFromZK();
+                Map<Integer, Integer> sitesPerHostMap = m_messenger.getSitesPerHostMapFromZKAsync();
                 String errMsg = AbstractTopology.validateLegacyClusterConfig(hostcount, sitesPerHostMap, kfactor);
                 if (errMsg != null) {
                     VoltDB.crashLocalVoltDB(errMsg, false, null);
@@ -2154,7 +2154,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                             new byte[] {},
                             null,
                             deploymentBytes,
-                            0);
+                            0,
+                            m_messenger);
 
             return m_clusterSettings.get().hostcount();
         } catch (Exception e) {
@@ -3025,7 +3026,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                             catalogBytesHash,
                             diffCommands,
                             true,
-                            deploymentBytes);
+                            deploymentBytes,
+                            m_messenger);
                 final CatalogSpecificPlanner csp = new CatalogSpecificPlanner( m_asyncCompilerAgent, m_catalogContext);
                 m_txnIdToContextTracker.put(currentTxnId,
                         new ContextTracker(

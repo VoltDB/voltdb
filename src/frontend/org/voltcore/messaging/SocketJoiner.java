@@ -143,8 +143,8 @@ public class SocketJoiner {
     }
 
     private static class RequestHostIdResponse {
-        private JSONObject m_leaderInfo;
-        private JSONObject m_responseBody;
+        final private JSONObject m_leaderInfo;
+        final private JSONObject m_responseBody;
 
         public RequestHostIdResponse(JSONObject leaderInfo, JSONObject responseBody) {
             m_leaderInfo = leaderInfo;
@@ -577,35 +577,36 @@ public class SocketJoiner {
     {
         // read the json response from socketjoiner with version info
         JSONObject jsonResponse = readJSONObjFromWire(sc, remoteAddress);
-        if (checkVersion) {
-            VersionChecker versionChecker = m_acceptor.getVersionChecker();
+        if (!checkVersion) {
+            return jsonResponse;
+        }
 
-            String remoteVersionString = jsonResponse.getString(VERSION_STRING);
-            String remoteBuildString = jsonResponse.getString(BUILD_STRING);
-            boolean remoteAcceptsLocalVersion = jsonResponse.getBoolean(VERSION_COMPATIBLE);
-            if (remoteVersionString.equals(versionChecker.getVersionString())) {
-                if (!versionChecker.getBuildString().equals(remoteBuildString)) {
-                    // ignore test/eclipse build string so tests still work
-                    if (!versionChecker.getBuildString().equals("VoltDB") && !remoteBuildString.equals("VoltDB")) {
-                        org.voltdb.VoltDB.crashLocalVoltDB("For VoltDB version " + versionChecker.getVersionString() +
-                                " git tag/hash is not identical across the cluster. Node join failed.\n" +
-                                "  joining build string:  " + versionChecker.getBuildString() + "\n" +
-                                "  existing build string: " + remoteBuildString, false, null);
-                        return null;
-                    }
-                }
-            }
-            else if (!remoteAcceptsLocalVersion) {
-                if (!versionChecker.isCompatibleVersionString(remoteVersionString)) {
-                    org.voltdb.VoltDB.crashLocalVoltDB("Cluster contains nodes running VoltDB version " + remoteVersionString +
-                            " which is incompatibile with local version " + versionChecker.getVersionString() +
-                            ".\n", false, null);
+        VersionChecker versionChecker = m_acceptor.getVersionChecker();
+        String remoteVersionString = jsonResponse.getString(VERSION_STRING);
+        String remoteBuildString = jsonResponse.getString(BUILD_STRING);
+        boolean remoteAcceptsLocalVersion = jsonResponse.getBoolean(VERSION_COMPATIBLE);
+        if (remoteVersionString.equals(versionChecker.getVersionString())) {
+            if (!versionChecker.getBuildString().equals(remoteBuildString)) {
+                // ignore test/eclipse build string so tests still work
+                if (!versionChecker.getBuildString().equals("VoltDB") && !remoteBuildString.equals("VoltDB")) {
+                    org.voltdb.VoltDB.crashLocalVoltDB("For VoltDB version " + versionChecker.getVersionString() +
+                            " git tag/hash is not identical across the cluster. Node join failed.\n" +
+                            "  joining build string:  " + versionChecker.getBuildString() + "\n" +
+                            "  existing build string: " + remoteBuildString, false, null);
                     return null;
                 }
             }
-            //Do this only after we think we are compatible.
-            activeVersions.add(remoteVersionString);
         }
+        else if (!remoteAcceptsLocalVersion) {
+            if (!versionChecker.isCompatibleVersionString(remoteVersionString)) {
+                org.voltdb.VoltDB.crashLocalVoltDB("Cluster contains nodes running VoltDB version " + remoteVersionString +
+                        " which is incompatibile with local version " + versionChecker.getVersionString() +
+                        ".\n", false, null);
+                return null;
+            }
+        }
+        //Do this only after we think we are compatible.
+        activeVersions.add(remoteVersionString);
         return jsonResponse;
     }
 
@@ -785,7 +786,7 @@ public class SocketJoiner {
         while (currentTimeBuf.hasRemaining()) {
             socket.read(currentTimeBuf);
         }
-        assert(currentTimeBuf.position() == 8);
+        assert currentTimeBuf.position() == 8 : "time buffer is at an unexpected position";
         JSONObject jsObj = new JSONObject();
         jsObj.put(TYPE, ConnectionType.REQUEST_CONNECTION.name());
         jsObj.put(VERSION_STRING, m_acceptor.getVersionChecker().getVersionString());
