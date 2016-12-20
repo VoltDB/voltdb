@@ -325,7 +325,7 @@ public class CatalogContext {
         int hostCount = m_dbSettings.getCluster().hostcount();
         Map<Integer, Integer> sphMap;
         try {
-            sphMap = m_messenger.getSitesPerHostMapFromZKAsync();
+            sphMap = m_messenger.getSitesPerHostMapFromZK();
         } catch (KeeperException | InterruptedException | JSONException e) {
             hostLog.warn("Failed to get sitesperhost information from Zookeeper", e);
             sphMap = null;

@@ -1658,7 +1658,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     {
         AbstractTopology topology = null;
         try {
-            Map<Integer, String> hostGroups = m_messenger.getHostGroupsFromZKAsync();
+            Map<Integer, String> hostGroups = m_messenger.getHostGroupsFromZK();
             if (startAction == StartAction.JOIN) {
                 assert(joinCoordinator != null);
                 JSONObject topoJson = joinCoordinator.getTopology();
@@ -1670,7 +1670,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 int hostcount = m_clusterSettings.get().hostcount();
                 Preconditions.checkArgument(hostGroups.size() == hostcount);
                 int kfactor = m_catalogContext.getDeployment().getCluster().getKfactor();
-                Map<Integer, Integer> sitesPerHostMap = m_messenger.getSitesPerHostMapFromZKAsync();
+                Map<Integer, Integer> sitesPerHostMap = m_messenger.getSitesPerHostMapFromZK();
                 String errMsg = AbstractTopology.validateLegacyClusterConfig(hostcount, sitesPerHostMap, kfactor);
                 if (errMsg != null) {
                     VoltDB.crashLocalVoltDB(errMsg, false, null);
