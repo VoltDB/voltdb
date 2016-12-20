@@ -49,10 +49,10 @@ struct TableWindow {
     std::string debug() {
         std::stringstream stream;
         stream << "Table Window: [Middle: "
-               << m_middleEdge.getLocation() << ", Leading: "
-               << m_leadingEdge.getLocation() << "], "
-               << "ssize = " << m_orderByGroupSize
-               << "\n";
+                << m_middleEdge.getLocation() << ", Leading: "
+                << m_leadingEdge.getLocation() << "], "
+                << "ssize = " << m_orderByGroupSize
+                << "\n";
         return stream.str();
     }
 
@@ -92,10 +92,8 @@ struct TableWindow {
  */
 struct WindowAggregate {
     WindowAggregate()
-        : m_needsLookahead(true),
-          m_inlineCopiedToOutline(false) {
+      : m_needsLookahead(true) {
     }
-
     virtual ~WindowAggregate() {
     }
     void* operator new(size_t size, Pool& memoryPool) {
@@ -106,6 +104,7 @@ struct WindowAggregate {
     void operator delete(void*) { /* NOOP -- deallocate wholesale with pool */ }
 
     virtual const char *getAggName() const = 0;
+
     /**
      * Do calculations needed when scanning each row ahead for
      * the end of an order by or partition by group.
@@ -154,10 +153,12 @@ struct WindowAggregate {
 
     NValue m_value;
     bool   m_needsLookahead;
+
     bool   m_inlineCopiedToOutline;
 
     const static NValue m_one;
     const static NValue m_zero;
+
 };
 
 const NValue WindowAggregate::m_one  = ValueFactory::getBigIntValue(1);
@@ -377,7 +378,7 @@ public:
 // This doesn't actually work for
 // distributed calculations.  We need to
 // calculate a value per partition, and the
-// aggregate it on teh coordinator.
+// aggregate it on the coordinator.
 //
 // I think the same is true of stddev.
 class AvgAgg : public WindowAggregate {
@@ -543,8 +544,7 @@ inline void WindowFunctionExecutor::lookaheadOneRowForAggs(const TableTuple &tup
                 = getAggregateInputExpressions()[ii];
             NValueArray vals(inputExprs.size());
             for (int idx = 0; idx < inputExprs.size(); idx += 1) {
-                auto ie = inputExprs[idx];
-                vals[idx] = ie->eval(&tuple);
+                vals[idx] = inputExprs[idx]->eval(&tuple);
             }
             aggs[ii]->lookaheadOneRow(tableWindow, vals);
         }
@@ -619,13 +619,11 @@ struct EnsureCleanupOnExit {
         : m_executor(executor) {
     }
     ~EnsureCleanupOnExit() {
-        VOLT_DEBUG("EnsureCleanupOnExit: begin\n");
         m_executor->p_execute_finish();
     }
 
     WindowFunctionExecutor *m_executor;
 };
-
 /*
  * This function is called straight from AbstractExecutor::execute,
  * which is called from executeExecutors, which is called from the
@@ -637,7 +635,7 @@ struct EnsureCleanupOnExit {
 bool WindowFunctionExecutor::p_execute(const NValueArray& params) {
     VOLT_TRACE("windowFunctionExecutor::p_execute(start)\n");
     // Input table
-    Table* input_table = m_abstractNode->getInputTable();
+    Table * input_table = m_abstractNode->getInputTable();
     assert(input_table);
     VOLT_TRACE("WindowFunctionExecutor: input table\n%s", input_table->debug().c_str());
     m_inputSchema = input_table->schema();
@@ -647,7 +645,6 @@ bool WindowFunctionExecutor::p_execute(const NValueArray& params) {
      * Do this after setting the m_inputSchema.
      */
     initWorkingTupleStorage();
-    VOLT_TRACE("windowFunctionExecutor::initWorkingTupleStorage\n");
     TableWindow tableWindow(input_table);
     ProgressMonitorProxy pmp(m_engine->getExecutorContext(), this);
     m_pmp = &pmp;
@@ -667,7 +664,7 @@ bool WindowFunctionExecutor::p_execute(const NValueArray& params) {
      */
     EnsureCleanupOnExit finishCleanup(this);
     for (EdgeType etype = START_OF_INPUT,
-             nextEtype = INVALID_EDGE_TYPE;
+                  nextEtype = INVALID_EDGE_TYPE;
          etype != END_OF_INPUT;
          etype = nextEtype) {
         // Reset the aggregates if this is the
@@ -685,14 +682,14 @@ bool WindowFunctionExecutor::p_execute(const NValueArray& params) {
         lookaheadNextGroupForAggs(tableWindow);
         // Advance to the end of the current group.
         for (int idx = 0; idx < tableWindow.m_orderByGroupSize; idx += 1) {
-            VOLT_TRACE("MiddleEdge: Window = %s", tableWindow.debug().c_str());
+            VOLT_TRACE("MiddleEdge: Window = %s", m_tableWindow->debug().c_str());
             tableWindow.m_middleEdge.next(nextTuple);
             m_pmp->countdownProgress();
             m_aggregateRow->recordPassThroughTuple(nextTuple);
             insertOutputTuple();
         }
         endGroupForAggs(tableWindow, etype);
-        VOLT_TRACE("FirstEdge: %s", tableWindow.debug().c_str());
+        VOLT_TRACE("FirstEdge: %s", m_tableWindow->debug().c_str());
     }
     VOLT_TRACE("WindowFunctionExecutor: finalizing..");
 
@@ -737,18 +734,18 @@ WindowFunctionExecutor::EdgeType WindowFunctionExecutor::findNextEdge(EdgeType  
         lookaheadOneRowForAggs(nextTuple, tableWindow);
     }
     do {
-        VOLT_TRACE("findNextEdge(loopStart): %s", tableWindow.debug().c_str());
+        VOLT_TRACE("findNextEdge(loopStart): %s", m_tableWindow->debug().c_str());
         if (tableWindow.m_leadingEdge.next(nextTuple)) {
             initPartitionByKeyTuple(nextTuple);
             initOrderByKeyTuple(nextTuple);
             if (compareTuples(getInProgressPartitionByKeyTuple(),
                               getLastPartitionByKeyTuple()) != 0) {
-                VOLT_TRACE("findNextEdge(Partition): %s", tableWindow.debug().c_str());
+                VOLT_TRACE("findNextEdge(Partition): %s", m_tableWindow->debug().c_str());
                 return START_OF_PARTITION_GROUP;
             }
             if (compareTuples(getInProgressOrderByKeyTuple(),
                               getLastOrderByKeyTuple()) != 0) {
-                VOLT_TRACE("findNextEdge(Group): %s", tableWindow.debug().c_str());
+                VOLT_TRACE("findNextEdge(Group): %s", m_tableWindow->debug().c_str());
                 return START_OF_PARTITION_BY_GROUP;
             }
             tableWindow.m_orderByGroupSize += 1;

@@ -77,6 +77,7 @@ public abstract class VoltProtocolHandler implements InputHandler {
         }
         if (m_nextLength > 0 && inputStream.dataAvailable() >= m_nextLength) {
             result = ByteBuffer.allocate(m_nextLength);
+            // Copy read buffers to result, move read buffers back to memory pool
             inputStream.getBytes(result.array());
             m_nextLength = 0;
             m_sequenceId++;

@@ -966,20 +966,11 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 }
                 break;
             case AGGREGATE_WINDOWED_COUNT:
-                if (windowFunctionExpression.getAggregateArguments().size() > 0) {
-                    if (windowFunctionExpression.getAggregateArguments().size() > 1) {
-                        throw new PlanningErrorException(
-                                "Windowed COUNT can only have one expression argument");
-                    }
-                    AbstractExpression ctArg = windowFunctionExpression.getAggregateArguments().get(0);
-                    assert(ctArg != null);
-                    VoltType vt = ctArg.getValueType();
-                    assert(vt != null);
-                    if (! (vt.isAnyIntegerType() || vt == VoltType.TIMESTAMP) ) {
-                        throw new PlanningErrorException(
-                                "Windowed COUNT arguments must have exactly one integer or timestamp type");
-                    }
+                if (windowFunctionExpression.getAggregateArguments().size() > 1) {
+                    throw new PlanningErrorException(
+                            String.format("Windowed COUNT must have exactly one argument"));
                 }
+                // Any type is ok, so we won't inspect the type.
                 break;
             case AGGREGATE_WINDOWED_MAX:
             case AGGREGATE_WINDOWED_MIN:
@@ -992,14 +983,14 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             case AGGREGATE_WINDOWED_SUM:
                 if (windowFunctionExpression.getAggregateArguments().size() != 1) {
                     throw new PlanningErrorException(
-                            String.format("Windowed %s must have exactly one integer argument", aggName));
+                            String.format("Windowed SUM must have exactly one numeric argument"));
                 }
                 AbstractExpression arg = windowFunctionExpression.getAggregateArguments().get(0);
                 VoltType vt = arg.getValueType();
                 assert(vt != null);
-                if (! vt.isAnyIntegerType() || vt == VoltType.TIMESTAMP) {
+                if (! vt.isNumber()) {
                     throw new PlanningErrorException(
-                                "Windowed SUM must have exactly one integer argument");
+                                "Windowed SUM must have exactly one numeric argument");
                 }
                 break;
             default:

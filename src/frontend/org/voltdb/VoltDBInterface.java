@@ -27,9 +27,11 @@ import org.voltcore.utils.Pair;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.dtxn.SiteTracker;
+import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.settings.ClusterSettings;
+import org.voltdb.snmp.SnmpTrapSender;
 
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
@@ -119,7 +121,7 @@ public interface VoltDBInterface
     public BackendTarget getBackendTargetType();
     public String getLocalMetadata();
     public SiteTracker getSiteTrackerForSnapshot();
-
+    public Cartographer getCartograhper();
     public void loadLegacyPathProperties(DeploymentType deployment) throws IOException;
 
     /**
@@ -294,10 +296,12 @@ public interface VoltDBInterface
      * Return the license api. This may be null in community editions!
      * @return License API based on edition.
      */
-     public LicenseApi getLicenseApi();
-     //Return JSON string represenation of license information.
-     public String getLicenseInformation();
-
+    public LicenseApi getLicenseApi();
+    //Return JSON string represenation of license information.
+    public String getLicenseInformation();
 
     public <T> ListenableFuture<T> submitSnapshotIOWork(Callable<T> work);
+
+    public SnmpTrapSender getSnmpTrapSender();
+
 }

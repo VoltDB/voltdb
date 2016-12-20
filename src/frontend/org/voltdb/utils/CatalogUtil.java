@@ -120,6 +120,7 @@ import org.voltdb.compiler.deploymentfile.SchemaType;
 import org.voltdb.compiler.deploymentfile.SecurityType;
 import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.compiler.deploymentfile.SnapshotType;
+import org.voltdb.compiler.deploymentfile.SnmpType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.compiler.deploymentfile.UsersType;
 import org.voltdb.export.ExportDataProcessor;
@@ -135,6 +136,7 @@ import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.settings.DbSettings;
 import org.voltdb.settings.NodeSettings;
+import org.voltdb.snmp.DummySnmpTrapSender;
 import org.voltdb.types.ConstraintType;
 import org.xml.sax.SAXException;
 
@@ -673,6 +675,7 @@ public abstract class CatalogUtil {
             if (!isPlaceHolderCatalog) {
                 setExportInfo(catalog, deployment.getExport());
                 setImportInfo(catalog, deployment.getImport());
+                setSnmpInfo(deployment.getSnmp());
             }
 
             setCommandLogInfo( catalog, deployment.getCommandlog());
@@ -698,7 +701,7 @@ public abstract class CatalogUtil {
 
     private static void validateResourceMonitorInfo(DeploymentType deployment) {
         // call resource monitor ctor so that it does all validations.
-        new ResourceUsageMonitor(deployment.getSystemsettings());
+        new ResourceUsageMonitor(deployment.getSystemsettings(), new DummySnmpTrapSender());
     }
 
 
@@ -1597,6 +1600,26 @@ public abstract class CatalogUtil {
             }
 
             checkImportProcessorConfiguration(importConfiguration);
+        }
+    }
+
+    /**
+     * Validate Snmp Configuration.
+     * @param snmpType
+     */
+    private static void setSnmpInfo(SnmpType snmpType) {
+        if (snmpType == null || !snmpType.isEnabled()) {
+            return;
+        }
+        //Validate Snmp Configuration.
+        if (snmpType.getTarget() == null || snmpType.getTarget().trim().length() == 0) {
+            throw new IllegalArgumentException("Target must be specified for SNMP configuration.");
+        }
+        if (snmpType.getAuthkey() != null && snmpType.getAuthkey().length() < 8) {
+            throw new IllegalArgumentException("SNMP Authkey must be > 8 characters.");
+        }
+        if (snmpType.getPrivacykey() != null && snmpType.getPrivacykey().length() < 8) {
+            throw new IllegalArgumentException("SNMP Privacy Key must be > 8 characters.");
         }
     }
 
@@ -2602,6 +2625,7 @@ public abstract class CatalogUtil {
 
         clone.setPaths(paths);
 
+        clone.setSnmp(o.getSnmp());
         return clone;
     }
 }

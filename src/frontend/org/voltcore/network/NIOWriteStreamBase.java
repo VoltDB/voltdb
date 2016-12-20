@@ -90,12 +90,12 @@ public abstract class NIOWriteStreamBase {
     protected abstract ArrayDeque<DeferredSerialization> getQueuedWrites();
 
     /**
-     * Swap the two queues of DeferredSerializations and serialize everything into the queue
-     * of pending buffers
-     * @return
+     * Serialize all queued writes into the queue of pending buffers, which are allocated from
+     * thread local memory pool.
+     * @return number of queued writes processed
      * @throws IOException
      */
-    final int swapAndSerializeQueuedWrites(final NetworkDBBPool pool) throws IOException {
+    final int serializeQueuedWrites(final NetworkDBBPool pool) throws IOException {
         int processedWrites = 0;
         final ArrayDeque<DeferredSerialization> oldlist = getQueuedWrites();
         if (oldlist.isEmpty()) return 0;
@@ -116,8 +116,8 @@ public abstract class NIOWriteStreamBase {
 
             outbuf = outCont.b();
 
-            //Fastpath, serialize to direct buffer creating no garbage
             if (outbuf.remaining() >= serializedSize) {
+                // Fast path, serialize to direct buffer creating no garbage
                 final int oldLimit = outbuf.limit();
                 outbuf.limit(outbuf.position() + serializedSize);
                 final ByteBuffer slice = outbuf.slice();
@@ -128,12 +128,13 @@ public abstract class NIOWriteStreamBase {
                 outbuf.position(outbuf.limit());
                 outbuf.limit(oldLimit);
             } else {
-                //Slow path serialize to heap, and then put in buffers
+                // Slow path serialize to heap, and then put in buffers
                 ByteBuffer buf = ByteBuffer.allocate(serializedSize);
                 ds.serialize(buf);
                 checkSloppySerialization(buf, ds);
                 buf.position(0);
                 bytesQueued += buf.remaining();
+                // Copy data allocated in heap buffer to direct buffer
                 while (buf.hasRemaining()) {
                     if (!outbuf.hasRemaining()) {
                         outCont = pool.acquire();

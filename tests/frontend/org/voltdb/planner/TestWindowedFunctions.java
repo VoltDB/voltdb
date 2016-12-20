@@ -101,37 +101,6 @@ public class TestWindowedFunctions extends PlannerTestCase {
         validateWindowedFunctionPlan(windowedQuery, 2, 100, 1, ExpressionType.AGGREGATE_WINDOWED_RANK);
     }
 
-    public void testCount() {
-        String windowedQuery;
-
-        windowedQuery = "SELECT A+B, MOD(A, B), B, COUNT(*) OVER (PARTITION BY A, C ORDER BY B DESC) AS ARANK FROM AAA;";
-        validateWindowedFunctionPlan(windowedQuery, 3, 2, 2, ExpressionType.AGGREGATE_WINDOWED_COUNT);
-
-        windowedQuery = "SELECT A+B, MOD(A, B), B, COUNT(A+B) OVER (PARTITION BY A, C ORDER BY B DESC) AS ARANK FROM AAA;";
-        validateWindowedFunctionPlan(windowedQuery, 3, 2, 2, ExpressionType.AGGREGATE_WINDOWED_COUNT);
-
-        // Altering the position of the rank column does not radically
-        // change the plan structure.
-        windowedQuery = "SELECT COUNT(*) OVER (PARTITION BY A, C ORDER BY B DESC) AS ARANK, A+B, MOD(A, B), B FROM AAA;";
-        validateWindowedFunctionPlan(windowedQuery, 3, 2, 2, ExpressionType.AGGREGATE_WINDOWED_COUNT);
-        // Try some strange edge case that trivially order by a partition
-        // by column, so they should trivially result in a rank of 1 for
-        // each partition.
-
-        windowedQuery = "SELECT A+B, MOD(A, B), B, COUNT(*) OVER (PARTITION BY A, B ORDER BY B DESC) AS ARANK FROM AAA;";
-        validateWindowedFunctionPlan(windowedQuery, 2, 1, 2, ExpressionType.AGGREGATE_WINDOWED_COUNT);
-
-        // The order in which the PARTITION BY keys are listed should not
-        // radically change the plan structure.
-        windowedQuery = "SELECT A+B, MOD(A, B), B, COUNT(*) OVER (PARTITION BY B, A ORDER BY B DESC ) AS ARANK FROM AAA;";
-        validateWindowedFunctionPlan(windowedQuery, 2, 0, 2, ExpressionType.AGGREGATE_WINDOWED_COUNT);
-
-        // Test that we can read from a subquery.  If the sort desc is 1000, we
-        // will always expect an ascending sort.
-        windowedQuery = "SELECT BBB.B, COUNT(*) OVER (PARTITION BY BBB.A ORDER BY ALPHA.A ) AS ARANK FROM (select A, B, C from AAA where A < B) ALPHA, BBB WHERE ALPHA.C <> BBB.C;";
-        validateWindowedFunctionPlan(windowedQuery, 2, 100, 1, ExpressionType.AGGREGATE_WINDOWED_COUNT);
-    }
-
     public void testMin() {
         String windowedQuery;
 
@@ -214,6 +183,37 @@ public class TestWindowedFunctions extends PlannerTestCase {
         // will always expect an ascending sort.
         windowedQuery = "SELECT BBB.B, SUM(BBB.A+BBB.B) OVER (PARTITION BY BBB.A ORDER BY ALPHA.A ) AS ARANK FROM (select A, B, C from AAA where A < B) ALPHA, BBB WHERE ALPHA.C <> BBB.C;";
         validateWindowedFunctionPlan(windowedQuery, 2, 100, 1, ExpressionType.AGGREGATE_WINDOWED_SUM);
+    }
+
+    public void testCount() {
+        String windowedQuery;
+
+        windowedQuery = "SELECT A+B, MOD(A, B), B, COUNT(*) OVER (PARTITION BY A, C ORDER BY B DESC) AS ARANK FROM AAA;";
+        validateWindowedFunctionPlan(windowedQuery, 3, 2, 2, ExpressionType.AGGREGATE_WINDOWED_COUNT);
+
+        windowedQuery = "SELECT A+B, MOD(A, B), B, COUNT(A+B) OVER (PARTITION BY A, C ORDER BY B DESC) AS ARANK FROM AAA;";
+        validateWindowedFunctionPlan(windowedQuery, 3, 2, 2, ExpressionType.AGGREGATE_WINDOWED_COUNT);
+
+        // Altering the position of the rank column does not radically
+        // change the plan structure.
+        windowedQuery = "SELECT COUNT(*) OVER (PARTITION BY A, C ORDER BY B DESC) AS ARANK, A+B, MOD(A, B), B FROM AAA;";
+        validateWindowedFunctionPlan(windowedQuery, 3, 2, 2, ExpressionType.AGGREGATE_WINDOWED_COUNT);
+        // Try some strange edge case that trivially order by a partition
+        // by column, so they should trivially result in a rank of 1 for
+        // each partition.
+
+        windowedQuery = "SELECT A+B, MOD(A, B), B, COUNT(*) OVER (PARTITION BY A, B ORDER BY B DESC) AS ARANK FROM AAA;";
+        validateWindowedFunctionPlan(windowedQuery, 2, 1, 2, ExpressionType.AGGREGATE_WINDOWED_COUNT);
+
+        // The order in which the PARTITION BY keys are listed should not
+        // radically change the plan structure.
+        windowedQuery = "SELECT A+B, MOD(A, B), B, COUNT(*) OVER (PARTITION BY B, A ORDER BY B DESC ) AS ARANK FROM AAA;";
+        validateWindowedFunctionPlan(windowedQuery, 2, 0, 2, ExpressionType.AGGREGATE_WINDOWED_COUNT);
+
+        // Test that we can read from a subquery.  If the sort desc is 1000, we
+        // will always expect an ascending sort.
+        windowedQuery = "SELECT BBB.B, COUNT(*) OVER (PARTITION BY BBB.A ORDER BY ALPHA.A ) AS ARANK FROM (select A, B, C from AAA where A < B) ALPHA, BBB WHERE ALPHA.C <> BBB.C;";
+        validateWindowedFunctionPlan(windowedQuery, 2, 100, 1, ExpressionType.AGGREGATE_WINDOWED_COUNT);
     }
 
     /**
@@ -528,14 +528,12 @@ public class TestWindowedFunctions extends PlannerTestCase {
                       "DISTINCT is not allowed in window functions.");
         failToCompile("SELECT COUNT(DISTINCT A+B) OVER (PARTITION BY A ORDER BY B) AS ARANK FROM AAA",
                       "DISTINCT is not allowed in window functions.");
-        failToCompile("SELECT COUNT(A) OVER (PARTITION BY A ORDER BY B) AS ARANK FROM AAA_STRING_PA",
-                      "Windowed COUNT arguments must have exactly one integer or timestamp type");
-        failToCompile("SELECT COUNT(A) OVER (PARTITION BY A ORDER BY B) AS ARANK FROM AAA_STRING_PA",
-                      "Windowed COUNT arguments must have exactly one integer or timestamp type");
         failToCompile("SELECT SUM(A) OVER (PARTITION BY A ORDER BY B) AS ARANK FROM AAA_TIMESTAMP",
-                      "must have exactly one integer argument");
-        // MIN and MAX can take any type, so we can't
-        // test for types here.
+                      "Windowed SUM must have exactly one numeric argument");
+        failToCompile("SELECT COUNT(DISTINCT *) OVER (PARTITION BY A ORDER BY B) AS ARANK FROM AAA",
+                      "DISTINCT is not allowed in window functions.");
+        failToCompile("SELECT COUNT(DISTINCT A+B) OVER (PARTITION BY A ORDER BY B) AS ARANK FROM AAA",
+                      "DISTINCT is not allowed in window functions.");
     }
     public void testExplainPlanText() {
         String windowedQuery = "SELECT RANK() OVER (PARTITION BY A ORDER BY B DESC) FROM AAA;";

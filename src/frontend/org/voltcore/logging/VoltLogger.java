@@ -375,6 +375,14 @@ public class VoltLogger {
         m_logger = tempLogger;
     }
 
+    /**
+     * Constructor used by VoltNullLogger
+     */
+    protected VoltLogger(CoreVoltLogger logger) {
+        assert(logger != null);
+        m_logger = logger;
+    }
+
     public void rateLimitedLog(long suppressInterval, Level level, Throwable cause, String format, Object...args) {
         RateLimitedLogger.tryLogForMessage(
                 EstTime.currentTimeMillis(),

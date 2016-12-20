@@ -113,6 +113,8 @@ public interface OpTypes {
         , WINDOWED_MIN          = 102
         , WINDOWED_MAX          = 103
         , WINDOWED_SUM          = 104
+        , WINDOWED_PERCENT_RANK = 102 // reserved but not used
+        , WINDOWED_CUME_DIST    = 103 // reserved but not used
         // End VoltDB extension
     ;
 

@@ -1841,7 +1841,8 @@ public final class InvocationDispatcher {
         assert(!isSinglePartition || (partition >= 0));
         final ClientInterfaceHandleManager cihm = m_cihm.get(connectionId);
         if (cihm == null) {
-            hostLog.warn("InvocationDispatcher.createTransaction request rejected. "
+            hostLog.rateLimitedLog(60, Level.WARN, null,
+                    "InvocationDispatcher.createTransaction request rejected. "
                     + "This is likely due to VoltDB ceasing client communication as it "
                     + "shuts down.");
             return false;
@@ -1866,22 +1867,18 @@ public final class InvocationDispatcher {
             } else {
                 initiatorHSId = m_cartographer.getHSIdForSinglePartitionMaster(partition);
             }
-        }
-        else {
+        } else {
             // Multi-part transactions go to the multi-part coordinator
             initiatorHSId = m_cartographer.getHSIdForMultiPartitionInitiator();
+
             // Treat all MP reads as short-circuit since they can run out-of-order
             // from their arrival order due to the MP Read-only execution pool
             if (isReadOnly) {
                 isShortCircuitRead = true;
             }
         }
-
-        if (initiatorHSId == null) {
-            hostLog.error("Failed to find master initiator for partition: "
-                    + Integer.toString(partition) + ". Transaction not initiated.");
-            return false;
-        }
+        Preconditions.checkArgument(initiatorHSId != null,
+                String.format("Failed to find master initiator for partition: %d. Transaction not initiated.", partition));
 
         long handle = cihm.getHandle(isSinglePartition, partition, invocation.getClientHandle(),
                 messageSize, nowNanos, invocation.getProcName(), initiatorHSId, isReadOnly, isShortCircuitRead);

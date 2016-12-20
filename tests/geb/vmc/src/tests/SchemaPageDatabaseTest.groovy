@@ -103,7 +103,6 @@ class SchemaPageDatabaseTest extends TestBase {
                 assert false
             }
         }
-        //
 
         when: 'go to SQL Query page'
         page.openSqlQueryPage()
@@ -242,7 +241,6 @@ class SchemaPageDatabaseTest extends TestBase {
                 assert false
             }
         }
-        //
 
         when: 'go to SQL Query page'
         page.openSqlQueryPage()
@@ -309,7 +307,6 @@ class SchemaPageDatabaseTest extends TestBase {
         when:
         if (result == false) {
             println("Pause VMC")
-
             page.openAdminPage()
             at AdminPage
 

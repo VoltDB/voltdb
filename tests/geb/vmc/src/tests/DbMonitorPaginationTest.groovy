@@ -34,7 +34,7 @@ import java.util.Calendar;
  * This class contains tests of the 'DB Monitor' tab of the VoltDB Management
  * Center (VMC) page, which is the VoltDB (new) web UI.
  */
-class DbMonitorTrial extends TestBase {
+class DbMonitorPaginationTest extends TestBase {
 
     def setup() { // called before each test
         // TestBase.setup gets called first (automatically)
@@ -54,7 +54,7 @@ class DbMonitorTrial extends TestBase {
         }
     }
 
-    def "Verify pagination in Database Replication table"() {
+    def verifyPaginationInDatabaseReplicationTable() {
         expect: 'at DbMonitorPage'
         at DbMonitorPage
 
@@ -223,7 +223,7 @@ class DbMonitorTrial extends TestBase {
         println("Test End: Verify pagination in Database Replication table")
     }
 
-    def VerifypaginationinCommandLogPerformancetable() {
+    def verifyPaginationinCommandLogPerformancetable() {
         boolean CLPDisplayed = false
         expect: 'at DbMonitorPage'
         at DbMonitorPage
@@ -303,24 +303,11 @@ class DbMonitorTrial extends TestBase {
         else{
             println("CLP table is not visible")
         }
-
-//        int count = 0
-//        while(count<numberOfTrials) {
-//            count ++
-//            try {
-//                waitFor(waitTime) { page.showHideCLPBlock.isDisplayed() }
-//                println("Success")
-//                break
-//            } catch(geb.waiting.WaitTimeoutException e) {
-//            }
-//        }
-
-
         then:
         println("Test End: Verify pagination in Command Log Performance table")
     }
 
-    def VerifypaginationinStoredProcedurestable() {
+    def verifyPaginationinStoredProcedurestable() {
         expect: 'at DbMonitorPage'
         at DbMonitorPage
 
@@ -398,22 +385,9 @@ class DbMonitorTrial extends TestBase {
         }
         then:
         println("Test End: Verify pagination in Stored Procedures table")
-
-//        while(count<numberOfTrials) {
-//            count ++
-//            try {
-//                waitFor(waitTime) { page.showHideData.isDisplayed() }
-//                println("Success")
-//                break
-//            } catch(geb.waiting.WaitTimeoutException e) {
-//            }
-//        }
-
-
-
     }
 
-    def "Verify pagination in Database table"() {
+    def verifyPaginationInDatabaseTable() {
         expect: 'at DbMonitorPage'
         at DbMonitorPage
 
@@ -498,6 +472,5 @@ class DbMonitorTrial extends TestBase {
         }
         then:
         println("Test End: Verify pagination in Database table")
-
     }
 }
