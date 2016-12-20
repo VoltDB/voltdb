@@ -34,7 +34,8 @@ public class SSLNIOWriteStream extends NIOWriteStream {
         return m_queuedBuffers.poll();
     }
 
-    synchronized int serializeQueuedWrites(final NetworkDBBPool pool) throws IOException {
+    @Override
+    int serializeQueuedWrites(final NetworkDBBPool pool) throws IOException {
         int processedWrites = 0;
         final Deque<DeferredSerialization> oldlist = getQueuedWrites();
         if (oldlist.isEmpty()) return 0;
