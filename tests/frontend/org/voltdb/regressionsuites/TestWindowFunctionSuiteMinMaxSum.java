@@ -72,11 +72,25 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
                 + "  C VARCHAR(128) NOT NULL"
                 + ");"
 
+                // Nothing nullable, no partitions.
+                +"CREATE TABLE T_STRING_INLINE ("
+                + "  A INTEGER NOT NULL,"
+                + "  B INTEGER NOT NULL,"
+                + "  C VARCHAR(60 bytes) NOT NULL"
+                + ");"
+
                 // C nullable, no partitions.
                 +"CREATE TABLE T_STRING_C_NULL ("
                 + "  A INTEGER NOT NULL,"
                 + "  B INTEGER NOT NULL,"
-                + "  C VARCHAR(128) "
+                + "  C VARCHAR(128)"
+                + ");"
+
+                // C nullable, no partitions.
+                +"CREATE TABLE T_STRING_INLINE_C_NULL ("
+                + "  A INTEGER NOT NULL,"
+                + "  B INTEGER NOT NULL,"
+                + "  C VARCHAR(63 bytes)"
                 + ");"
 
                 // C nullable, partition on B.
@@ -87,6 +101,14 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
                 + ");"
                 + "PARTITION TABLE T_STRING_C_NULL_PB ON COLUMN B;"
 
+                // C nullable, partition on B.
+                +"CREATE TABLE T_STRING_INLINE_C_NULL_PB ("
+                + "  A INTEGER NOT NULL,"
+                + "  B INTEGER NOT NULL,"
+                + "  C VARCHAR(128) "
+                + ");"
+                + "PARTITION TABLE T_STRING_INLINE_C_NULL_PB ON COLUMN B;"
+
                 // Nothing nullable, partition on C
                 +"CREATE TABLE T_STRING_PC ("
                 + "  A INTEGER NOT NULL,"
@@ -94,6 +116,14 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
                 + "  C VARCHAR(128) NOT NULL"
                 + ");"
                 + "PARTITION TABLE T_STRING_PC ON COLUMN C;"
+
+                // Nothing nullable, partition on C
+                +"CREATE TABLE T_STRING_INLINE_PC ("
+                + "  A INTEGER NOT NULL,"
+                + "  B INTEGER NOT NULL,"
+                + "  C VARCHAR(63 bytes) NOT NULL"
+                + ");"
+                + "PARTITION TABLE T_STRING_INLINE_PC ON COLUMN C;"
 
                 + "CREATE TABLE T_TIMESTAMP ("
                 + "  A INTEGER,"
@@ -181,14 +211,16 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
         project.setUseDDLSchema(true);
     }
 
+    private static String LONG_REPL = "abcdefghij0123456789";
+    private static String SHORT_REPL = "abcdefgh";
     /*
-     * Make a string whose length is size * 8.  This is
-     * a constant.
+     * Make a string whose length is size * 20.  This is
+     * a constant.  These can be used to test out-of-line strings.
      */
-    private String makeLongString(int size) {
+    private String makeLongString(int size, String repl) {
         StringBuffer sb = new StringBuffer();
         for (int idx = 0; idx < size; idx += 1) {
-            sb.append("abcdefghij0123456789");
+            sb.append(repl);
         }
         return sb.toString();
     }
@@ -410,116 +442,117 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
     }
 
-    private void initStringTable(Client client, String tableName) throws NoConnectionsException, IOException, ProcCallException {
+    private void initStringTable(Client client, String tableName, String repl) throws NoConnectionsException, IOException, ProcCallException {
         ClientResponse cr;
 
         String insertProcName = tableName + ".insert";
         cr = client.callProcedure("@AdHoc", "truncate table " + tableName);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure(insertProcName,  1,  1,    makeLongString(5));
+        cr = client.callProcedure(insertProcName,  1,  1,    makeLongString(5, repl));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure(insertProcName,  1,  1,    makeLongString(4));
+        cr = client.callProcedure(insertProcName,  1,  1,    makeLongString(4, repl));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure(insertProcName,  1,  1,    makeLongString(3));
+        cr = client.callProcedure(insertProcName,  1,  1,    makeLongString(3, repl));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure(insertProcName,  1,  1,    makeLongString(2));
+        cr = client.callProcedure(insertProcName,  1,  1,    makeLongString(2, repl));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure(insertProcName,  1,  1,    makeLongString(1));
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        //======================================
-        cr = client.callProcedure(insertProcName,  1,  2,    makeLongString(1));
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure(insertProcName,  1,  2,    makeLongString(2));
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure(insertProcName,  1,  2,    makeLongString(3));
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure(insertProcName,  1,  2,    makeLongString(4));
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure(insertProcName,  1,  2,    makeLongString(5));
+        cr = client.callProcedure(insertProcName,  1,  1,    makeLongString(1, repl));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         //======================================
-        cr = client.callProcedure(insertProcName,  1,  3,    makeLongString(5));
+        cr = client.callProcedure(insertProcName,  1,  2,    makeLongString(1, repl));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure(insertProcName,  1,  3,    makeLongString(4));
+        cr = client.callProcedure(insertProcName,  1,  2,    makeLongString(2, repl));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure(insertProcName,  1,  3,    makeLongString(3));
+        cr = client.callProcedure(insertProcName,  1,  2,    makeLongString(3, repl));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure(insertProcName,  1,  3,    makeLongString(2));
+        cr = client.callProcedure(insertProcName,  1,  2,    makeLongString(4, repl));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure(insertProcName,  1,  3,    makeLongString(1));
+        cr = client.callProcedure(insertProcName,  1,  2,    makeLongString(5, repl));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        //======================================
+        cr = client.callProcedure(insertProcName,  1,  3,    makeLongString(5, repl));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure(insertProcName,  1,  3,    makeLongString(4, repl));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure(insertProcName,  1,  3,    makeLongString(3, repl));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure(insertProcName,  1,  3,    makeLongString(2, repl));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure(insertProcName,  1,  3,    makeLongString(1, repl));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         //--------------------------------------
-        cr = client.callProcedure(insertProcName,  2,  1,    makeLongString(1));
+        cr = client.callProcedure(insertProcName,  2,  1,    makeLongString(1, repl));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure(insertProcName,  2,  1,    makeLongString(2));
+        cr = client.callProcedure(insertProcName,  2,  1,    makeLongString(2, repl));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure(insertProcName,  2,  1,    makeLongString(3));
+        cr = client.callProcedure(insertProcName,  2,  1,    makeLongString(3, repl));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure(insertProcName,  2,  1,    makeLongString(4));
+        cr = client.callProcedure(insertProcName,  2,  1,    makeLongString(4, repl));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure(insertProcName,  2,  1,    makeLongString(5));
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        //======================================
-        cr = client.callProcedure(insertProcName,  2,  2,    makeLongString(5));
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure(insertProcName,  2,  2,    makeLongString(4));
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure(insertProcName,  2,  2,    makeLongString(3));
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure(insertProcName,  2,  2,    makeLongString(2));
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure(insertProcName,  2,  2,    makeLongString(1));
+        cr = client.callProcedure(insertProcName,  2,  1,    makeLongString(5, repl));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         //======================================
-        cr = client.callProcedure(insertProcName,  2,  3,    makeLongString(1));
+        cr = client.callProcedure(insertProcName,  2,  2,    makeLongString(5, repl));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure(insertProcName,  2,  3,    makeLongString(2));
+        cr = client.callProcedure(insertProcName,  2,  2,    makeLongString(4, repl));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure(insertProcName,  2,  3,    makeLongString(3));
+        cr = client.callProcedure(insertProcName,  2,  2,    makeLongString(3, repl));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure(insertProcName,  2,  3,    makeLongString(4));
+        cr = client.callProcedure(insertProcName,  2,  2,    makeLongString(2, repl));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure(insertProcName,  2,  3,    makeLongString(5));
+        cr = client.callProcedure(insertProcName,  2,  2,    makeLongString(1, repl));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        //======================================
+        cr = client.callProcedure(insertProcName,  2,  3,    makeLongString(1, repl));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure(insertProcName,  2,  3,    makeLongString(2, repl));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure(insertProcName,  2,  3,    makeLongString(3, repl));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure(insertProcName,  2,  3,    makeLongString(4, repl));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure(insertProcName,  2,  3,    makeLongString(5, repl));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
     }
 
-    private void initStringTableSomeNulls(Client client, String tableName) throws NoConnectionsException, IOException, ProcCallException {
+    private void initStringTableSomeNulls(Client client, String tableName, String repl)
+                throws NoConnectionsException, IOException, ProcCallException {
         ClientResponse cr;
 
         String insertProcName = tableName + ".insert";
         cr = client.callProcedure("@AdHoc", "truncate table " + tableName);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure(insertProcName,  1,  1,    makeLongString(1));
+        cr = client.callProcedure(insertProcName,  1,  1,    makeLongString(1, repl));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure(insertProcName,  1,  1,    makeLongString(2));
+        cr = client.callProcedure(insertProcName,  1,  1,    makeLongString(2, repl));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure(insertProcName,  1,  1,    makeLongString(3));
+        cr = client.callProcedure(insertProcName,  1,  1,    makeLongString(3, repl));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure(insertProcName,  1,  1,    makeLongString(4));
+        cr = client.callProcedure(insertProcName,  1,  1,    makeLongString(4, repl));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure(insertProcName,  1,  1,    makeLongString(5));
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        //======================================
-        cr = client.callProcedure(insertProcName,  1,  2,    null);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure(insertProcName,  1,  2,    null);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure(insertProcName,  1,  2,    null);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure(insertProcName,  1,  2,    null);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure(insertProcName,  1,  2,    null);
+        cr = client.callProcedure(insertProcName,  1,  1,    makeLongString(5, repl));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         //======================================
-        cr = client.callProcedure(insertProcName,  1,  3,    makeLongString(1));
+        cr = client.callProcedure(insertProcName,  1,  2,    null);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure(insertProcName,  1,  3,    makeLongString(2));
+        cr = client.callProcedure(insertProcName,  1,  2,    null);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure(insertProcName,  1,  3,    makeLongString(3));
+        cr = client.callProcedure(insertProcName,  1,  2,    null);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure(insertProcName,  1,  3,    makeLongString(4));
+        cr = client.callProcedure(insertProcName,  1,  2,    null);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure(insertProcName,  1,  3,    makeLongString(5));
+        cr = client.callProcedure(insertProcName,  1,  2,    null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        //======================================
+        cr = client.callProcedure(insertProcName,  1,  3,    makeLongString(1, repl));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure(insertProcName,  1,  3,    makeLongString(2, repl));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure(insertProcName,  1,  3,    makeLongString(3, repl));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure(insertProcName,  1,  3,    makeLongString(4, repl));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure(insertProcName,  1,  3,    makeLongString(5, repl));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         //--------------------------------------
         cr = client.callProcedure(insertProcName,  2,  1,    null);
@@ -533,29 +566,31 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
         cr = client.callProcedure(insertProcName,  2,  1,    null);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         //======================================
-        cr = client.callProcedure(insertProcName,  2,  2,    makeLongString(5));
+        cr = client.callProcedure(insertProcName,  2,  2,    makeLongString(5, repl));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure(insertProcName,  2,  2,    makeLongString(4));
+        cr = client.callProcedure(insertProcName,  2,  2,    makeLongString(4, repl));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure(insertProcName,  2,  2,    makeLongString(3));
+        cr = client.callProcedure(insertProcName,  2,  2,    makeLongString(3, repl));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure(insertProcName,  2,  2,    makeLongString(2));
+        cr = client.callProcedure(insertProcName,  2,  2,    makeLongString(2, repl));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure(insertProcName,  2,  2,    makeLongString(1));
+        cr = client.callProcedure(insertProcName,  2,  2,    makeLongString(1, repl));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         //======================================
-        cr = client.callProcedure(insertProcName,  2,  3,    makeLongString(5));
+        cr = client.callProcedure(insertProcName,  2,  3,    makeLongString(5, repl));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure(insertProcName,  2,  3,    makeLongString(4));
+        cr = client.callProcedure(insertProcName,  2,  3,    makeLongString(4, repl));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure(insertProcName,  2,  3,    makeLongString(3));
+        cr = client.callProcedure(insertProcName,  2,  3,    makeLongString(3, repl));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure(insertProcName,  2,  3,    makeLongString(2));
+        cr = client.callProcedure(insertProcName,  2,  3,    makeLongString(2, repl));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure(insertProcName,  2,  3,    makeLongString(1));
+        cr = client.callProcedure(insertProcName,  2,  3,    makeLongString(1, repl));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
     }
-    private void initStringTableAllNulls(Client client, String tableName) throws NoConnectionsException, IOException, ProcCallException {
+
+    private void initStringTableAllNulls(Client client, String tableName)
+                throws NoConnectionsException, IOException, ProcCallException {
         ClientResponse cr;
 
         String insertProcName = tableName + ".insert";
@@ -708,9 +743,10 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
     private void testStringsNoNulls(Client client,
                                     String tableName,
                                     String functionString,
+                                    String repl,
                                     Object[][] expected) throws Exception {
         ClientResponse cr;
-        initStringTable(client, tableName);
+        initStringTable(client, tableName, repl);
         cr = client.callProcedure("@AdHoc",
                                   String.format("select A, "
                                                 + "     B, "
@@ -725,9 +761,10 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
     private void testStringsSomeNulls(Client client,
                                       String tableName,
                                       String functionString,
+                                      String repl,
                                       Object[][] expected) throws Exception {
         ClientResponse cr;
-        initStringTableSomeNulls(client, tableName);
+        initStringTableSomeNulls(client, tableName, repl);
         cr = client.callProcedure("@AdHoc",
                                   String.format("select A, "
                                                 + "     B, "
@@ -974,42 +1011,80 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
         //
         // Test with partitioned string columns.
         //
-        Object expectStringTable[][] = new Object[][] {
-            {  1L,  1L,    makeLongString(1)},
-            {  1L,  1L,    makeLongString(1)},
-            {  1L,  1L,    makeLongString(1)},
-            {  1L,  1L,    makeLongString(1)},
-            {  1L,  1L,    makeLongString(1)},
+        Object expectLongStringTable[][] = new Object[][] {
+            {  1L,  1L,    makeLongString(1, LONG_REPL)},
+            {  1L,  1L,    makeLongString(1, LONG_REPL)},
+            {  1L,  1L,    makeLongString(1, LONG_REPL)},
+            {  1L,  1L,    makeLongString(1, LONG_REPL)},
+            {  1L,  1L,    makeLongString(1, LONG_REPL)},
             //======================================
-            {  1L,  2L,    makeLongString(1)},
-            {  1L,  2L,    makeLongString(1)},
-            {  1L,  2L,    makeLongString(1)},
-            {  1L,  2L,    makeLongString(1)},
-            {  1L,  2L,    makeLongString(1)},
+            {  1L,  2L,    makeLongString(1, LONG_REPL)},
+            {  1L,  2L,    makeLongString(1, LONG_REPL)},
+            {  1L,  2L,    makeLongString(1, LONG_REPL)},
+            {  1L,  2L,    makeLongString(1, LONG_REPL)},
+            {  1L,  2L,    makeLongString(1, LONG_REPL)},
             //======================================
-            {  1L,  3L,    makeLongString(1)},
-            {  1L,  3L,    makeLongString(1)},
-            {  1L,  3L,    makeLongString(1)},
-            {  1L,  3L,    makeLongString(1)},
-            {  1L,  3L,    makeLongString(1)},
+            {  1L,  3L,    makeLongString(1, LONG_REPL)},
+            {  1L,  3L,    makeLongString(1, LONG_REPL)},
+            {  1L,  3L,    makeLongString(1, LONG_REPL)},
+            {  1L,  3L,    makeLongString(1, LONG_REPL)},
+            {  1L,  3L,    makeLongString(1, LONG_REPL)},
             //--------------------------------------
-            {  2L,  1L,    makeLongString(1)},
-            {  2L,  1L,    makeLongString(1)},
-            {  2L,  1L,    makeLongString(1)},
-            {  2L,  1L,    makeLongString(1)},
-            {  2L,  1L,    makeLongString(1)},
+            {  2L,  1L,    makeLongString(1, LONG_REPL)},
+            {  2L,  1L,    makeLongString(1, LONG_REPL)},
+            {  2L,  1L,    makeLongString(1, LONG_REPL)},
+            {  2L,  1L,    makeLongString(1, LONG_REPL)},
+            {  2L,  1L,    makeLongString(1, LONG_REPL)},
             //======================================
-            {  2L,  2L,    makeLongString(1)},
-            {  2L,  2L,    makeLongString(1)},
-            {  2L,  2L,    makeLongString(1)},
-            {  2L,  2L,    makeLongString(1)},
-            {  2L,  2L,    makeLongString(1)},
+            {  2L,  2L,    makeLongString(1, LONG_REPL)},
+            {  2L,  2L,    makeLongString(1, LONG_REPL)},
+            {  2L,  2L,    makeLongString(1, LONG_REPL)},
+            {  2L,  2L,    makeLongString(1, LONG_REPL)},
+            {  2L,  2L,    makeLongString(1, LONG_REPL)},
             //======================================
-            {  2L,  3L,    makeLongString(1)},
-            {  2L,  3L,    makeLongString(1)},
-            {  2L,  3L,    makeLongString(1)},
-            {  2L,  3L,    makeLongString(1)},
-            {  2L,  3L,    makeLongString(1)}
+            {  2L,  3L,    makeLongString(1, LONG_REPL)},
+            {  2L,  3L,    makeLongString(1, LONG_REPL)},
+            {  2L,  3L,    makeLongString(1, LONG_REPL)},
+            {  2L,  3L,    makeLongString(1, LONG_REPL)},
+            {  2L,  3L,    makeLongString(1, LONG_REPL)}
+        };
+
+        Object expectShortStringTable[][] = new Object[][] {
+            {  1L,  1L,    makeLongString(1, SHORT_REPL)},
+            {  1L,  1L,    makeLongString(1, SHORT_REPL)},
+            {  1L,  1L,    makeLongString(1, SHORT_REPL)},
+            {  1L,  1L,    makeLongString(1, SHORT_REPL)},
+            {  1L,  1L,    makeLongString(1, SHORT_REPL)},
+            //======================================
+            {  1L,  2L,    makeLongString(1, SHORT_REPL)},
+            {  1L,  2L,    makeLongString(1, SHORT_REPL)},
+            {  1L,  2L,    makeLongString(1, SHORT_REPL)},
+            {  1L,  2L,    makeLongString(1, SHORT_REPL)},
+            {  1L,  2L,    makeLongString(1, SHORT_REPL)},
+            //======================================
+            {  1L,  3L,    makeLongString(1, SHORT_REPL)},
+            {  1L,  3L,    makeLongString(1, SHORT_REPL)},
+            {  1L,  3L,    makeLongString(1, SHORT_REPL)},
+            {  1L,  3L,    makeLongString(1, SHORT_REPL)},
+            {  1L,  3L,    makeLongString(1, SHORT_REPL)},
+            //--------------------------------------
+            {  2L,  1L,    makeLongString(1, SHORT_REPL)},
+            {  2L,  1L,    makeLongString(1, SHORT_REPL)},
+            {  2L,  1L,    makeLongString(1, SHORT_REPL)},
+            {  2L,  1L,    makeLongString(1, SHORT_REPL)},
+            {  2L,  1L,    makeLongString(1, SHORT_REPL)},
+            //======================================
+            {  2L,  2L,    makeLongString(1, SHORT_REPL)},
+            {  2L,  2L,    makeLongString(1, SHORT_REPL)},
+            {  2L,  2L,    makeLongString(1, SHORT_REPL)},
+            {  2L,  2L,    makeLongString(1, SHORT_REPL)},
+            {  2L,  2L,    makeLongString(1, SHORT_REPL)},
+            //======================================
+            {  2L,  3L,    makeLongString(1, SHORT_REPL)},
+            {  2L,  3L,    makeLongString(1, SHORT_REPL)},
+            {  2L,  3L,    makeLongString(1, SHORT_REPL)},
+            {  2L,  3L,    makeLongString(1, SHORT_REPL)},
+            {  2L,  3L,    makeLongString(1, SHORT_REPL)}
         };
 
         //
@@ -1019,7 +1094,13 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
         testStringsNoNulls(client,
                            "t_string",
                            "min(C)",
-                           expectStringTable);
+                           LONG_REPL,
+                           expectLongStringTable);
+        testStringsNoNulls(client,
+                           "t_string_inline",
+                           "min(C)",
+                           SHORT_REPL,
+                           expectShortStringTable);
         //
         // Test the partitioned table t_string_pc, which
         // is partitioned on the string column C.  Nothing
@@ -1028,26 +1109,32 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
         testStringsNoNulls(client,
                            "t_string_pc",
                            "min(C)",
-                           expectStringTable);
+                           LONG_REPL,
+                           expectLongStringTable);
+        testStringsNoNulls(client,
+                           "t_string_inline_pc",
+                           "min(C)",
+                           SHORT_REPL,
+                           expectShortStringTable);
 
-        Object expectStringTableSomeNull[][] = new Object[][] {
-            {  1L,  1L,    makeLongString(1)},
-            {  1L,  1L,    makeLongString(1)},
-            {  1L,  1L,    makeLongString(1)},
-            {  1L,  1L,    makeLongString(1)},
-            {  1L,  1L,    makeLongString(1)},
+        Object expectLongStringTableSomeNull[][] = new Object[][] {
+            {  1L,  1L,    makeLongString(1, LONG_REPL)},
+            {  1L,  1L,    makeLongString(1, LONG_REPL)},
+            {  1L,  1L,    makeLongString(1, LONG_REPL)},
+            {  1L,  1L,    makeLongString(1, LONG_REPL)},
+            {  1L,  1L,    makeLongString(1, LONG_REPL)},
             //======================================
-            {  1L,  2L,    makeLongString(1)},
-            {  1L,  2L,    makeLongString(1)},
-            {  1L,  2L,    makeLongString(1)},
-            {  1L,  2L,    makeLongString(1)},
-            {  1L,  2L,    makeLongString(1)},
+            {  1L,  2L,    makeLongString(1, LONG_REPL)},
+            {  1L,  2L,    makeLongString(1, LONG_REPL)},
+            {  1L,  2L,    makeLongString(1, LONG_REPL)},
+            {  1L,  2L,    makeLongString(1, LONG_REPL)},
+            {  1L,  2L,    makeLongString(1, LONG_REPL)},
             //======================================
-            {  1L,  3L,    makeLongString(1)},
-            {  1L,  3L,    makeLongString(1)},
-            {  1L,  3L,    makeLongString(1)},
-            {  1L,  3L,    makeLongString(1)},
-            {  1L,  3L,    makeLongString(1)},
+            {  1L,  3L,    makeLongString(1, LONG_REPL)},
+            {  1L,  3L,    makeLongString(1, LONG_REPL)},
+            {  1L,  3L,    makeLongString(1, LONG_REPL)},
+            {  1L,  3L,    makeLongString(1, LONG_REPL)},
+            {  1L,  3L,    makeLongString(1, LONG_REPL)},
             //--------------------------------------
             {  2L,  1L,    null},
             {  2L,  1L,    null},
@@ -1055,24 +1142,67 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
             {  2L,  1L,    null},
             {  2L,  1L,    null},
             //======================================
-            {  2L,  2L,    makeLongString(1)},
-            {  2L,  2L,    makeLongString(1)},
-            {  2L,  2L,    makeLongString(1)},
-            {  2L,  2L,    makeLongString(1)},
-            {  2L,  2L,    makeLongString(1)},
+            {  2L,  2L,    makeLongString(1, LONG_REPL)},
+            {  2L,  2L,    makeLongString(1, LONG_REPL)},
+            {  2L,  2L,    makeLongString(1, LONG_REPL)},
+            {  2L,  2L,    makeLongString(1, LONG_REPL)},
+            {  2L,  2L,    makeLongString(1, LONG_REPL)},
             //======================================
-            {  2L,  3L,    makeLongString(1)},
-            {  2L,  3L,    makeLongString(1)},
-            {  2L,  3L,    makeLongString(1)},
-            {  2L,  3L,    makeLongString(1)},
-            {  2L,  3L,    makeLongString(1)}
+            {  2L,  3L,    makeLongString(1, LONG_REPL)},
+            {  2L,  3L,    makeLongString(1, LONG_REPL)},
+            {  2L,  3L,    makeLongString(1, LONG_REPL)},
+            {  2L,  3L,    makeLongString(1, LONG_REPL)},
+            {  2L,  3L,    makeLongString(1, LONG_REPL)}
         };
 
+        Object expectShortStringTableSomeNull[][] = new Object[][] {
+            {  1L,  1L,    makeLongString(1, SHORT_REPL)},
+            {  1L,  1L,    makeLongString(1, SHORT_REPL)},
+            {  1L,  1L,    makeLongString(1, SHORT_REPL)},
+            {  1L,  1L,    makeLongString(1, SHORT_REPL)},
+            {  1L,  1L,    makeLongString(1, SHORT_REPL)},
+            //======================================
+            {  1L,  2L,    makeLongString(1, SHORT_REPL)},
+            {  1L,  2L,    makeLongString(1, SHORT_REPL)},
+            {  1L,  2L,    makeLongString(1, SHORT_REPL)},
+            {  1L,  2L,    makeLongString(1, SHORT_REPL)},
+            {  1L,  2L,    makeLongString(1, SHORT_REPL)},
+            //======================================
+            {  1L,  3L,    makeLongString(1, SHORT_REPL)},
+            {  1L,  3L,    makeLongString(1, SHORT_REPL)},
+            {  1L,  3L,    makeLongString(1, SHORT_REPL)},
+            {  1L,  3L,    makeLongString(1, SHORT_REPL)},
+            {  1L,  3L,    makeLongString(1, SHORT_REPL)},
+            //--------------------------------------
+            {  2L,  1L,    null},
+            {  2L,  1L,    null},
+            {  2L,  1L,    null},
+            {  2L,  1L,    null},
+            {  2L,  1L,    null},
+            //======================================
+            {  2L,  2L,    makeLongString(1, SHORT_REPL)},
+            {  2L,  2L,    makeLongString(1, SHORT_REPL)},
+            {  2L,  2L,    makeLongString(1, SHORT_REPL)},
+            {  2L,  2L,    makeLongString(1, SHORT_REPL)},
+            {  2L,  2L,    makeLongString(1, SHORT_REPL)},
+            //======================================
+            {  2L,  3L,    makeLongString(1, SHORT_REPL)},
+            {  2L,  3L,    makeLongString(1, SHORT_REPL)},
+            {  2L,  3L,    makeLongString(1, SHORT_REPL)},
+            {  2L,  3L,    makeLongString(1, SHORT_REPL)},
+            {  2L,  3L,    makeLongString(1, SHORT_REPL)}
+        };
         // Test the replicated table t_string.
         testStringsSomeNulls(client,
                              "t_string_c_null",
                              "min(C)",
-                             expectStringTableSomeNull);
+                             LONG_REPL,
+                             expectLongStringTableSomeNull);
+        testStringsSomeNulls(client,
+                             "t_string_c_null",
+                             "min(C)",
+                             LONG_REPL,
+                             expectLongStringTableSomeNull);
         //
         // We can't put nulls in the partition column, C,
         // but we can partition on the integer column B and
@@ -1081,7 +1211,13 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
         testStringsSomeNulls(client,
                              "t_string_c_null_pb",
                              "min(C)",
-                             expectStringTableSomeNull);
+                             LONG_REPL,
+                             expectLongStringTableSomeNull);
+        testStringsSomeNulls(client,
+                             "t_string_c_null_pb",
+                             "min(C)",
+                             SHORT_REPL,
+                             expectShortStringTableSomeNull);
 
         Object expectStringTableAllNull[][] = new Object[][] {
             {  1L,  1L,    null},
@@ -1350,78 +1486,139 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
         //
         // Test strings with no nulls.
         //
-        Object expectStringTable[][] = new Object[][] {
-            {  1L,  1L,    makeLongString(5)},
-            {  1L,  1L,    makeLongString(5)},
-            {  1L,  1L,    makeLongString(5)},
-            {  1L,  1L,    makeLongString(5)},
-            {  1L,  1L,    makeLongString(5)},
+        Object expectLongStringTable[][] = new Object[][] {
+            {  1L,  1L,    makeLongString(5, LONG_REPL)},
+            {  1L,  1L,    makeLongString(5, LONG_REPL)},
+            {  1L,  1L,    makeLongString(5, LONG_REPL)},
+            {  1L,  1L,    makeLongString(5, LONG_REPL)},
+            {  1L,  1L,    makeLongString(5, LONG_REPL)},
             //======================================
-            {  1L,  2L,    makeLongString(5)},
-            {  1L,  2L,    makeLongString(5)},
-            {  1L,  2L,    makeLongString(5)},
-            {  1L,  2L,    makeLongString(5)},
-            {  1L,  2L,    makeLongString(5)},
+            {  1L,  2L,    makeLongString(5, LONG_REPL)},
+            {  1L,  2L,    makeLongString(5, LONG_REPL)},
+            {  1L,  2L,    makeLongString(5, LONG_REPL)},
+            {  1L,  2L,    makeLongString(5, LONG_REPL)},
+            {  1L,  2L,    makeLongString(5, LONG_REPL)},
             //======================================
-            {  1L,  3L,    makeLongString(5)},
-            {  1L,  3L,    makeLongString(5)},
-            {  1L,  3L,    makeLongString(5)},
-            {  1L,  3L,    makeLongString(5)},
-            {  1L,  3L,    makeLongString(5)},
+            {  1L,  3L,    makeLongString(5, LONG_REPL)},
+            {  1L,  3L,    makeLongString(5, LONG_REPL)},
+            {  1L,  3L,    makeLongString(5, LONG_REPL)},
+            {  1L,  3L,    makeLongString(5, LONG_REPL)},
+            {  1L,  3L,    makeLongString(5, LONG_REPL)},
             //--------------------------------------
-            {  2L,  1L,    makeLongString(5)},
-            {  2L,  1L,    makeLongString(5)},
-            {  2L,  1L,    makeLongString(5)},
-            {  2L,  1L,    makeLongString(5)},
-            {  2L,  1L,    makeLongString(5)},
+            {  2L,  1L,    makeLongString(5, LONG_REPL)},
+            {  2L,  1L,    makeLongString(5, LONG_REPL)},
+            {  2L,  1L,    makeLongString(5, LONG_REPL)},
+            {  2L,  1L,    makeLongString(5, LONG_REPL)},
+            {  2L,  1L,    makeLongString(5, LONG_REPL)},
             //======================================
-            {  2L,  2L,    makeLongString(5)},
-            {  2L,  2L,    makeLongString(5)},
-            {  2L,  2L,    makeLongString(5)},
-            {  2L,  2L,    makeLongString(5)},
-            {  2L,  2L,    makeLongString(5)},
+            {  2L,  2L,    makeLongString(5, LONG_REPL)},
+            {  2L,  2L,    makeLongString(5, LONG_REPL)},
+            {  2L,  2L,    makeLongString(5, LONG_REPL)},
+            {  2L,  2L,    makeLongString(5, LONG_REPL)},
+            {  2L,  2L,    makeLongString(5, LONG_REPL)},
             //======================================
-            {  2L,  3L,    makeLongString(5)},
-            {  2L,  3L,    makeLongString(5)},
-            {  2L,  3L,    makeLongString(5)},
-            {  2L,  3L,    makeLongString(5)},
-            {  2L,  3L,    makeLongString(5)}
+            {  2L,  3L,    makeLongString(5, LONG_REPL)},
+            {  2L,  3L,    makeLongString(5, LONG_REPL)},
+            {  2L,  3L,    makeLongString(5, LONG_REPL)},
+            {  2L,  3L,    makeLongString(5, LONG_REPL)},
+            {  2L,  3L,    makeLongString(5, LONG_REPL)}
+        };
+
+        Object expectShortStringTable[][] = new Object[][] {
+            {  1L,  1L,    makeLongString(5, SHORT_REPL)},
+            {  1L,  1L,    makeLongString(5, SHORT_REPL)},
+            {  1L,  1L,    makeLongString(5, SHORT_REPL)},
+            {  1L,  1L,    makeLongString(5, SHORT_REPL)},
+            {  1L,  1L,    makeLongString(5, SHORT_REPL)},
+            //======================================
+            {  1L,  2L,    makeLongString(5, SHORT_REPL)},
+            {  1L,  2L,    makeLongString(5, SHORT_REPL)},
+            {  1L,  2L,    makeLongString(5, SHORT_REPL)},
+            {  1L,  2L,    makeLongString(5, SHORT_REPL)},
+            {  1L,  2L,    makeLongString(5, SHORT_REPL)},
+            //======================================
+            {  1L,  3L,    makeLongString(5, SHORT_REPL)},
+            {  1L,  3L,    makeLongString(5, SHORT_REPL)},
+            {  1L,  3L,    makeLongString(5, SHORT_REPL)},
+            {  1L,  3L,    makeLongString(5, SHORT_REPL)},
+            {  1L,  3L,    makeLongString(5, SHORT_REPL)},
+            //--------------------------------------
+            {  2L,  1L,    makeLongString(5, SHORT_REPL)},
+            {  2L,  1L,    makeLongString(5, SHORT_REPL)},
+            {  2L,  1L,    makeLongString(5, SHORT_REPL)},
+            {  2L,  1L,    makeLongString(5, SHORT_REPL)},
+            {  2L,  1L,    makeLongString(5, SHORT_REPL)},
+            //======================================
+            {  2L,  2L,    makeLongString(5, SHORT_REPL)},
+            {  2L,  2L,    makeLongString(5, SHORT_REPL)},
+            {  2L,  2L,    makeLongString(5, SHORT_REPL)},
+            {  2L,  2L,    makeLongString(5, SHORT_REPL)},
+            {  2L,  2L,    makeLongString(5, SHORT_REPL)},
+            //======================================
+            {  2L,  3L,    makeLongString(5, SHORT_REPL)},
+            {  2L,  3L,    makeLongString(5, SHORT_REPL)},
+            {  2L,  3L,    makeLongString(5, SHORT_REPL)},
+            {  2L,  3L,    makeLongString(5, SHORT_REPL)},
+            {  2L,  3L,    makeLongString(5, SHORT_REPL)}
         };
         testStringsNoNulls(client,
                            "t_string",
                            "max(C)",
-                           expectStringTable);
+                           LONG_REPL,
+                           expectLongStringTable);
+
+        testStringsNoNulls(client,
+                           "t_string_inline",
+                           "max(C)",
+                           SHORT_REPL,
+                           expectShortStringTable);
 
         testStringsNoNulls(client,
                            "t_string_pc",
                            "max(C)",
-                           expectStringTable);
+                           LONG_REPL,
+                           expectLongStringTable);
+
+
+        testStringsNoNulls(client,
+                           "t_string_inline_pc",
+                           "max(C)",
+                           SHORT_REPL,
+                           expectShortStringTable);
+
 
         testStringsNoNulls(client,
                            "t_string_c_null_pb",
                            "max(C)",
-                           expectStringTable);
+                           LONG_REPL,
+                           expectLongStringTable);
+
+        testStringsNoNulls(client,
+                           "t_string_inline_c_null_pb",
+                           "max(C)",
+                           SHORT_REPL,
+                           expectShortStringTable);
         //
         // Test strings with some nulls.
         //
-        Object expectStringTableSomeNull[][] = new Object[][] {
-            {  1L,  1L,    makeLongString(5)},
-            {  1L,  1L,    makeLongString(5)},
-            {  1L,  1L,    makeLongString(5)},
-            {  1L,  1L,    makeLongString(5)},
-            {  1L,  1L,    makeLongString(5)},
+        Object expectLongStringTableSomeNull[][] = new Object[][] {
+            {  1L,  1L,    makeLongString(5, LONG_REPL)},
+            {  1L,  1L,    makeLongString(5, LONG_REPL)},
+            {  1L,  1L,    makeLongString(5, LONG_REPL)},
+            {  1L,  1L,    makeLongString(5, LONG_REPL)},
+            {  1L,  1L,    makeLongString(5, LONG_REPL)},
             //======================================
-            {  1L,  2L,    makeLongString(5)},
-            {  1L,  2L,    makeLongString(5)},
-            {  1L,  2L,    makeLongString(5)},
-            {  1L,  2L,    makeLongString(5)},
-            {  1L,  2L,    makeLongString(5)},
+            {  1L,  2L,    makeLongString(5, LONG_REPL)},
+            {  1L,  2L,    makeLongString(5, LONG_REPL)},
+            {  1L,  2L,    makeLongString(5, LONG_REPL)},
+            {  1L,  2L,    makeLongString(5, LONG_REPL)},
+            {  1L,  2L,    makeLongString(5, LONG_REPL)},
             //======================================
-            {  1L,  3L,    makeLongString(5)},
-            {  1L,  3L,    makeLongString(5)},
-            {  1L,  3L,    makeLongString(5)},
-            {  1L,  3L,    makeLongString(5)},
-            {  1L,  3L,    makeLongString(5)},
+            {  1L,  3L,    makeLongString(5, LONG_REPL)},
+            {  1L,  3L,    makeLongString(5, LONG_REPL)},
+            {  1L,  3L,    makeLongString(5, LONG_REPL)},
+            {  1L,  3L,    makeLongString(5, LONG_REPL)},
+            {  1L,  3L,    makeLongString(5, LONG_REPL)},
             //--------------------------------------
             {  2L,  1L,    null},
             {  2L,  1L,    null},
@@ -1429,26 +1626,76 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
             {  2L,  1L,    null},
             {  2L,  1L,    null},
             //======================================
-            {  2L,  2L,    makeLongString(5)},
-            {  2L,  2L,    makeLongString(5)},
-            {  2L,  2L,    makeLongString(5)},
-            {  2L,  2L,    makeLongString(5)},
-            {  2L,  2L,    makeLongString(5)},
+            {  2L,  2L,    makeLongString(5, LONG_REPL)},
+            {  2L,  2L,    makeLongString(5, LONG_REPL)},
+            {  2L,  2L,    makeLongString(5, LONG_REPL)},
+            {  2L,  2L,    makeLongString(5, LONG_REPL)},
+            {  2L,  2L,    makeLongString(5, LONG_REPL)},
             //======================================
-            {  2L,  3L,    makeLongString(5)},
-            {  2L,  3L,    makeLongString(5)},
-            {  2L,  3L,    makeLongString(5)},
-            {  2L,  3L,    makeLongString(5)},
-            {  2L,  3L,    makeLongString(5)}
+            {  2L,  3L,    makeLongString(5, LONG_REPL)},
+            {  2L,  3L,    makeLongString(5, LONG_REPL)},
+            {  2L,  3L,    makeLongString(5, LONG_REPL)},
+            {  2L,  3L,    makeLongString(5, LONG_REPL)},
+            {  2L,  3L,    makeLongString(5, LONG_REPL)}
+        };
+
+        Object expectShortStringTableSomeNull[][] = new Object[][] {
+            {  1L,  1L,    makeLongString(5, SHORT_REPL)},
+            {  1L,  1L,    makeLongString(5, SHORT_REPL)},
+            {  1L,  1L,    makeLongString(5, SHORT_REPL)},
+            {  1L,  1L,    makeLongString(5, SHORT_REPL)},
+            {  1L,  1L,    makeLongString(5, SHORT_REPL)},
+            //======================================
+            {  1L,  2L,    makeLongString(5, SHORT_REPL)},
+            {  1L,  2L,    makeLongString(5, SHORT_REPL)},
+            {  1L,  2L,    makeLongString(5, SHORT_REPL)},
+            {  1L,  2L,    makeLongString(5, SHORT_REPL)},
+            {  1L,  2L,    makeLongString(5, SHORT_REPL)},
+            //======================================
+            {  1L,  3L,    makeLongString(5, SHORT_REPL)},
+            {  1L,  3L,    makeLongString(5, SHORT_REPL)},
+            {  1L,  3L,    makeLongString(5, SHORT_REPL)},
+            {  1L,  3L,    makeLongString(5, SHORT_REPL)},
+            {  1L,  3L,    makeLongString(5, SHORT_REPL)},
+            //--------------------------------------
+            {  2L,  1L,    null},
+            {  2L,  1L,    null},
+            {  2L,  1L,    null},
+            {  2L,  1L,    null},
+            {  2L,  1L,    null},
+            //======================================
+            {  2L,  2L,    makeLongString(5, SHORT_REPL)},
+            {  2L,  2L,    makeLongString(5, SHORT_REPL)},
+            {  2L,  2L,    makeLongString(5, SHORT_REPL)},
+            {  2L,  2L,    makeLongString(5, SHORT_REPL)},
+            {  2L,  2L,    makeLongString(5, SHORT_REPL)},
+            //======================================
+            {  2L,  3L,    makeLongString(5, SHORT_REPL)},
+            {  2L,  3L,    makeLongString(5, SHORT_REPL)},
+            {  2L,  3L,    makeLongString(5, SHORT_REPL)},
+            {  2L,  3L,    makeLongString(5, SHORT_REPL)},
+            {  2L,  3L,    makeLongString(5, SHORT_REPL)}
         };
         testStringsSomeNulls(client,
                              "t_string_c_null",
                              "max(C)",
-                             expectStringTableSomeNull);
+                             LONG_REPL,
+                             expectLongStringTableSomeNull);
+        testStringsSomeNulls(client,
+                             "t_string_inline_c_null",
+                             "max(C)",
+                             SHORT_REPL,
+                             expectShortStringTableSomeNull);
         testStringsSomeNulls(client,
                              "t_string_c_null_pb",
                              "max(C)",
-                             expectStringTableSomeNull);
+                             LONG_REPL,
+                             expectLongStringTableSomeNull);
+        testStringsSomeNulls(client,
+                             "t_string_c_null_pb",
+                             "max(C)",
+                             SHORT_REPL,
+                             expectShortStringTableSomeNull);
         //
         // Test strings with all nulls.
         //
