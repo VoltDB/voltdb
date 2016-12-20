@@ -1322,20 +1322,23 @@ def check_validation_deployment(req):
                 return {'status': 401, 'statusString': 'Import: ' + result['statusString']}
 
     if 'snmp' in req.json:
-        if 'authprotocol' in req.json['snmp'] and req.json['snmp']['authprotocol'] != 'NoAuth' \
-                and ('authkey' not in req.json['snmp'] or ('authkey' in req.json['snmp'] and
-                                                                   req.json['snmp']['authkey'] == '')):
-            return {'status': 401, 'statusString': 'SNMP: Invalid or no authentication key.'}
+        if not (not req.json['snmp'] or ('enabled' in req.json['snmp'] and req.json['snmp']['enabled'] is False)):
+            if 'authprotocol' in req.json['snmp'] and req.json['snmp']['authprotocol'] != 'NoAuth' \
+                    and ('authkey' not in req.json['snmp'] or ('authkey' in req.json['snmp'] and
+                                                                       req.json['snmp']['authkey'] == '')):
+                return {'status': 401, 'statusString': 'SNMP: Invalid or no authentication key.'}
 
-        if 'privacyprotocol' in req.json['snmp'] and req.json['snmp']['privacyprotocol'] != 'NoPriv' \
-                and ('privacykey' not in req.json['snmp'] or ('privacykey' in req.json['snmp'] and
-                                                                   req.json['snmp']['privacykey'] == '')):
-            return {'status': 401, 'statusString': 'SNMP: Invalid or no privacy key.'}
+            if 'privacyprotocol' in req.json['snmp'] and req.json['snmp']['privacyprotocol'] != 'NoPriv' \
+                    and ('privacykey' not in req.json['snmp'] or ('privacykey' in req.json['snmp'] and
+                                                                       req.json['snmp']['privacykey'] == '')):
+                return {'status': 401, 'statusString': 'SNMP: Invalid or no privacy key.'}
 
-        if 'target' in req.json['snmp']:
-            result = Validation.ip_port_validation(req.json['snmp']['target'])
-            if 'result' in result and result['result'] == 'error':
-                return {'status': 401, 'statusString': 'SNMP: ' + result['status'] }
+            if 'target' in req.json['snmp']:
+                result = Validation.ip_port_validation(req.json['snmp']['target'])
+                if 'result' in result and result['result'] == 'error':
+                    return {'status': 401, 'statusString': 'SNMP: ' + result['status']}
+            else:
+                return {'status': 401, 'statusString': 'SNMP: Target is required field.'}
     return {'status': 200, 'statusString': 'success'}
 
 

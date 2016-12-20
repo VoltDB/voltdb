@@ -452,44 +452,49 @@ def map_deployment(request, database_id):
                     deployment['dr']['port'] = None
 
     if 'snmp' in request.json:
-        if 'snmp' not in deployment:
-            deployment['snmp'] = {}
+        if request.json['snmp']:
+            if 'snmp' not in deployment:
+                deployment['snmp'] = {}
 
-        if 'enabled' in request.json['snmp'] and request.json['snmp']['enabled'] != '':
-            deployment['snmp']['enabled'] = request.json['snmp']['enabled']
+            if 'enabled' in request.json['snmp'] and request.json['snmp']['enabled'] != '':
+                deployment['snmp']['enabled'] = request.json['snmp']['enabled']
+            else:
+                deployment['snmp']['enabled'] = True
+
+            if 'target' in request.json['snmp']:
+                deployment['snmp']['target'] = request.json['snmp']['target']
+
+            if 'community' in request.json['snmp']:
+                deployment['snmp']['community'] = request.json['snmp']['community']
+            else:
+                deployment['snmp']['community'] = 'public'
+
+            if 'username' in request.json['snmp']:
+                deployment['snmp']['username'] = request.json['snmp']['username']
+            else:
+                deployment['snmp']['username'] = None
+
+            if 'authprotocol' in request.json['snmp']:
+                deployment['snmp']['authprotocol'] = request.json['snmp']['authprotocol']
+            else:
+                deployment['snmp']['authprotocol'] = 'SHA'
+
+            if 'authkey' in request.json['snmp']:
+                deployment['snmp']['authkey'] = request.json['snmp']['authkey']
+            else:
+                deployment['snmp']['authkey'] = 'voltdbauthkey'
+
+            if 'privacyprotocol' in request.json['snmp']:
+                deployment['snmp']['privacyprotocol'] = request.json['snmp']['privacyprotocol']
+            else:
+                deployment['snmp']['privacyprotocol'] = 'AES'
+
+            if 'privacykey' in request.json['snmp']:
+                deployment['snmp']['privacykey'] = request.json['snmp']['privacykey']
+            else:
+                deployment['snmp']['privacykey'] = 'voltdbprivacykey'
         else:
-            deployment['snmp']['enabled'] = True
-
-        if 'target' in request.json['snmp']:
-            deployment['snmp']['target'] = request.json['snmp']['target']
-
-        if 'community' in request.json['snmp'] and request.json['snmp']['community'] != '':
-            deployment['snmp']['community'] = request.json['snmp']['community']
-        else:
-            deployment['snmp']['community'] = 'public'
-
-        if 'username' in request.json['snmp']:
-            deployment['snmp']['username'] = request.json['snmp']['username']
-
-        if 'authprotocol' in request.json['snmp'] and request.json['snmp']['authprotocol'] != '':
-            deployment['snmp']['authprotocol'] = request.json['snmp']['authprotocol']
-        else:
-            deployment['snmp']['authprotocol'] = 'SHA'
-
-        if 'authkey' in request.json['snmp'] and request.json['snmp']['authkey'] != '':
-            deployment['snmp']['authkey'] = request.json['snmp']['authkey']
-        else:
-            deployment['snmp']['authkey'] = 'voltdbauthkey'
-
-        if 'privacyprotocol' in request.json['snmp'] and request.json['snmp']['privacyprotocol'] != '':
-            deployment['snmp']['privacyprotocol'] = request.json['snmp']['privacyprotocol']
-        else:
-            deployment['snmp']['privacyprotocol'] = 'AES'
-
-        if 'privacykey' in request.json['snmp'] and request.json['snmp']['privacykey'] != '':
-            deployment['snmp']['privacykey'] = request.json['snmp']['privacykey']
-        else:
-            deployment['snmp']['privacykey'] = 'voltdbprivacykey'
+            deployment['snmp'] = None
 
     return deployment
 

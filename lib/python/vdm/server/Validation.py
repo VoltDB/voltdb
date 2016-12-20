@@ -837,6 +837,7 @@ schema = {
                 "authkey": {
                     "id": "authkey",
                     "type": "string",
+                    "minimum": 8,
                 },
                 "privacyprotocol": {
                     "id": "privacyprotocol",
@@ -846,11 +847,10 @@ schema = {
                 "privacykey": {
                     "id": "privacykey",
                     "type": "string",
-                    "default": "voltdbprivacykey"
+                    "minimum": 8,
                 }
             },
             "additionalProperties": False,
-            "required": ["target"]
         }
     },
     "additionalProperties": False
