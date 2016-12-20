@@ -44,11 +44,10 @@ public class TestSqlUpdateSuite extends RegressionSuite {
 
     static final int ROWS = 10;
 
-    private void executeAndTestUpdate(String table, String update,
+    private void executeAndTestUpdate(Client client, String table, String update,
                                       int expectedRowsChanged)
     throws IOException, ProcCallException
     {
-        Client client = getClient();
         for (int i = 0; i < ROWS; ++i)
         {
             client.callProcedure("Insert", table, i, "desc", i, 14.5);
@@ -60,152 +59,119 @@ public class TestSqlUpdateSuite extends RegressionSuite {
         String query = String.format("select count(%s.NUM) from %s where %s.NUM = -1",
                                      table, table, table);
         results = client.callProcedure("@AdHoc", query).getResults();
-        assertEquals(expectedRowsChanged, results[0].asScalarLong());
+        assertEquals(String.format("Failing SQL: %s",query), expectedRowsChanged, results[0].asScalarLong());
+        client.callProcedure("@AdHoc",String.format("truncate table %s;",table));
+
     }
 
     public void testUpdate()
     throws IOException, ProcCallException
     {
+        Client client = getClient();
         String[] tables = {"P1", "R1"};
+
+        System.out.println("testUpdate");
         for (String table : tables)
         {
             String update = String.format("update %s set %s.NUM = -1",
                                           table, table);
             // Expect all rows to change
-            executeAndTestUpdate(table, update, ROWS);
+            executeAndTestUpdate(client, table, update, ROWS);
         }
-    }
 
-    public void testUpdateWithEqualToIndexPredicate()
-    throws IOException, ProcCallException
-    {
-        String[] tables = {"P1", "R1"};
+        System.out.println("testUpdateWithEqualToIndexPredicate");
         for (String table : tables)
         {
             String update = String.format("update %s set %s.NUM = -1 where %s.ID = 5",
                                           table, table, table);
             // Only row with ID = 5 should change
-            executeAndTestUpdate(table, update, 1);
+            executeAndTestUpdate(client, table, update, 1);
         }
-    }
 
-    public void testUpdateWithEqualToNonIndexPredicate()
-    throws IOException, ProcCallException
-    {
-        String[] tables = {"P1", "R1"};
+        System.out.println("testUpdateWithEqualToNonIndexPredicate");
         for (String table : tables)
         {
             String update = String.format("update %s set %s.NUM = -1 where %s.NUM = 5",
                                           table, table, table);
             // Only row with NUM = 5 should change
-            executeAndTestUpdate(table, update, 1);
+            executeAndTestUpdate(client, table, update, 1);
         }
-    }
 
-    // This tests a bug found by the SQL coverage tool.  The code in HSQL
-    // which generates the XML eaten by the planner didn't generate
-    // anything in the <condition> element output for > or >= on an index
-    public void testUpdateWithGreaterThanIndexPredicate()
-    throws IOException, ProcCallException
-    {
-        String[] tables = {"P1", "R1"};
+        // This tests a bug found by the SQL coverage tool.  The code in HSQL
+        // which generates the XML eaten by the planner didn't generate
+        // anything in the <condition> element output for > or >= on an index
+        System.out.println("testUpdateWithGreaterThanIndexPredicate");
         for (String table : tables)
         {
             String update = String.format("update %s set %s.NUM = -1 where %s.ID > 5",
                                           table, table, table);
             // Rows 6-9 should change
-            executeAndTestUpdate(table, update, 4);
+            executeAndTestUpdate(client, table, update, 4);
         }
-    }
 
-    public void testUpdateWithGreaterThanNonIndexPredicate()
-    throws IOException, ProcCallException
-    {
-        String[] tables = {"P1", "R1"};
+        System.out.println("testUpdateWithGreaterThanNonIndexPredicate");
         for (String table : tables)
         {
             String update = String.format("update %s set %s.NUM = -1 where %s.NUM > 5",
                                           table, table, table);
             // rows 6-9 should change
-            executeAndTestUpdate(table, update, 4);
+            executeAndTestUpdate(client, table, update, 4);
         }
-    }
 
-    public void testUpdateWithLessThanIndexPredicate()
-    throws IOException, ProcCallException
-    {
-        String[] tables = {"P1", "R1"};
+        System.out.println("testUpdateWithLessThanIndexPredicate");
         for (String table : tables)
         {
             String update = String.format("update %s set %s.NUM = -1 where %s.ID < 5",
                                           table, table, table);
             // Rows 0-4 should change
-            executeAndTestUpdate(table, update, 5);
+            executeAndTestUpdate(client, table, update, 5);
         }
-    }
 
-    // This tests a bug found by the SQL coverage tool.  The code in HSQL
-    // which generates the XML eaten by the planner wouldn't combine
-    // the various index and non-index join and where conditions, so the planner
-    // would end up only seeing the first subnode written to the <condition>
-    // element
-    public void testUpdateWithOnePredicateAgainstIndexAndOneFalse()
-    throws IOException, ProcCallException
-    {
-        String[] tables = {"P1", "R1"};
+        // This tests a bug found by the SQL coverage tool.  The code in HSQL
+        // which generates the XML eaten by the planner wouldn't combine
+        // the various index and non-index join and where conditions, so the planner
+        // would end up only seeing the first subnode written to the <condition>
+        // element
+        System.out.println("testUpdateWithOnePredicateAgainstIndexAndOneFalse");
+
         for (String table : tables)
         {
             String update = "update " + table + " set " + table + ".NUM = 100" +
                 " where " + table + ".NUM = 1000 and " + table + ".ID = 4";
-            executeAndTestUpdate(table, update, 0);
+            executeAndTestUpdate(client, table, update, 0);
         }
-    }
 
-    // This tests a bug found by the SQL coverage tool.  The code in HSQL
-    // which generates the XML eaten by the planner wouldn't combine (AND)
-    // the index begin and end conditions, so the planner would only see the
-    // begin condition in the <condition> element.
-    public void testUpdateWithRangeAgainstIndex()
-    throws IOException, ProcCallException
-    {
-        String[] tables = {"P1", "R1"};
+        // This tests a bug found by the SQL coverage tool.  The code in HSQL
+        // which generates the XML eaten by the planner wouldn't combine (AND)
+        // the index begin and end conditions, so the planner would only see the
+        // begin condition in the <condition> element.
+        System.out.println("testUpdateWithRangeAgainstIndex");
         for (String table : tables)
         {
             String update = String.format("update %s set %s.NUM = -1 where %s.ID < 8 and %s.ID > 5",
                                           table, table, table, table);
-            executeAndTestUpdate(table, update, 2);
+            executeAndTestUpdate(client, table, update, 2);
         }
-    }
 
-    public void testUpdateWithRangeAgainstNonIndex()
-    throws IOException, ProcCallException
-    {
-        String[] tables = {"P1", "R1"};
+        System.out.println("testUpdateWithRangeAgainstNonIndex");
         for (String table : tables)
         {
             String update = String.format("update %s set %s.NUM = -1 where %s.NUM < 8 and %s.NUM > 5",
                                           table, table, table, table);
-            executeAndTestUpdate(table, update, 2);
+            executeAndTestUpdate(client, table, update, 2);
         }
-    }
 
-    // This is a regression test for ENG-6799
-    public void testUpdateFromInlineVarchar() throws Exception
-    {
-        Client client = getClient();
+        // This is a regression test for ENG-6799
+        System.out.println("testUpdateFromInlineVarchar");
         client.callProcedure("STRINGPART.insert",
                 "aa", 1, 1, 0, "a potentially (but not really) very long string)");
-
         // NAME is inlined varchar, DESC is not.
         String update = "update STRINGPART set desc = name, num = -1 where val1 = 1";
-        executeAndTestUpdate("STRINGPART", update, 1);
-    }
+        executeAndTestUpdate(client, "STRINGPART", update, 1);
 
-    public void testInvalidUpdate() throws Exception
-    {
-        Client client = getClient();
+        System.out.println("testInvalidUpdate");
         verifyStmtFails(client, "UPDATE P1_VIEW SET NUM_SUM = 5",
-                "Illegal to modify a materialized view.");
+                 "Illegal to modify a materialized view.");
     }
 
     //
