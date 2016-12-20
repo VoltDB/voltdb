@@ -24,13 +24,20 @@
 package org.voltdb.regressionsuites;
 
 
+import java.io.File;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.utils.MiscUtils;
 
 import junit.framework.Test;
+import org.voltdb.ServerThread;
+import org.voltdb.VoltDB;
+import org.voltdb.VoltDB.Configuration;
+import org.voltdb.VoltDB.SimulatedExitException;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.deploymentfile.DeploymentType;
+import org.voltdb.utils.CatalogUtil;
 
 
 /**
@@ -66,6 +73,25 @@ public class TestInitStartLocalClusterInProcess extends RegressionSuite {
         }
         assertTrue(found);
         assertEquals(org.voltcore.common.Constants.DEFAULT_HEARTBEAT_TIMEOUT_SECONDS, timeout);
+
+        File out = File.createTempFile("get_deployment", ".xml");
+        //Now do a get deployment using voltdb get
+        String path = (new File(m_config.getServerSpecificRoot("1"))).getCanonicalPath();
+        Configuration c1 = new VoltDB.Configuration(new String[]{"get", "deployment",
+            "voltdbroot", path,
+            "file", out.getAbsolutePath()});
+        ServerThread server = new ServerThread(c1);
+
+        try {
+            server.initialize();
+        } catch (SimulatedExitException ex) {
+            //Good
+        }
+
+        DeploymentType dt = CatalogUtil.parseDeployment(out.getAbsolutePath());
+        assertNotNull(dt);
+        assertEquals(dt.getPaths().getVoltdbroot().getPath(), path);
+
     }
 
     static public Test suite() throws Exception {

@@ -638,6 +638,8 @@ public class VoltDB {
              */
             //I am a get
             if (m_startAction == StartAction.GET) {
+                //We dont want crash file created.
+                VoltDB.exitAfterMessage = true;
                 File configInfoDir = new VoltFile(m_voltdbRoot, Constants.CONFIG_DIR);
                 File depFH = new VoltFile(configInfoDir, "deployment.xml");
                 m_pathToDeployment = depFH.getAbsolutePath();
@@ -1078,6 +1080,10 @@ public class VoltDB {
      * Exit the process with an error message, optionally with a stack trace.
      */
     public static void crashLocalVoltDB(String errMsg, boolean stackTrace, Throwable thrown) {
+        if (exitAfterMessage) {
+            System.err.println(errMsg);
+            VoltDB.exit(-1);
+        }
         try {
             OnDemandBinaryLogger.flush();
         } catch (Throwable e) {}
@@ -1215,6 +1221,7 @@ public class VoltDB {
 
     public static String crashMessage;
 
+    public static boolean exitAfterMessage = false;
     /**
      * Exit the process with an error message, optionally with a stack trace.
      * Also notify all connected peers that the node is going down.

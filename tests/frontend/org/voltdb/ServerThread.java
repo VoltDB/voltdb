@@ -59,7 +59,7 @@ public class ServerThread extends Thread {
         // Disable loading the EE if running against HSQL.
         m_config.m_noLoadLibVOLTDB = m_config.m_backend == BackendTarget.HSQLDB_BACKEND;
         m_config.m_forceVoltdbCreate = true;
-        if (config.m_startAction == StartAction.INITIALIZE) {
+        if (config.m_startAction == StartAction.INITIALIZE || config.m_startAction == StartAction.GET) {
             VoltDB.ignoreCrash = true;
         }
         setName("ServerThread");
@@ -153,7 +153,7 @@ public class ServerThread extends Thread {
         VoltDB.instance().run();
     }
 
-    //Call this if you are doing init only
+    //Call this if you are doing init only or action GET
     public void initialize() {
         VoltDB.initialize(m_config);
     }
