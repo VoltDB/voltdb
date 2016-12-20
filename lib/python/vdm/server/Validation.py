@@ -837,7 +837,7 @@ schema = {
                 "authkey": {
                     "id": "authkey",
                     "type": "string",
-                    "minimum": 8,
+                    "minLength": 9,
                 },
                 "privacyprotocol": {
                     "id": "privacyprotocol",
@@ -847,7 +847,7 @@ schema = {
                 "privacykey": {
                     "id": "privacykey",
                     "type": "string",
-                    "minimum": 8,
+                    "minLength": 9,
                 }
             },
             "additionalProperties": False,
