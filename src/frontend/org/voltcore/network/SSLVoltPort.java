@@ -55,6 +55,7 @@ public class SSLVoltPort extends VoltPort {
     private final EncryptionGateway m_encryptionGateway;
     private final Deque<DBBPool.BBContainer> m_encryptedBuffers = new ConcurrentLinkedDeque<>();
     private final Deque<List<ByteBuffer>> m_decryptedMessages = new ConcurrentLinkedDeque<>();
+    private boolean m_remainingWrites = false;
 
     public SSLVoltPort(VoltNetwork network, InputHandler handler, InetSocketAddress remoteAddress, NetworkDBBPool readPool, SSLEngine sslEngine) {
         super(network, handler, remoteAddress, readPool);
@@ -83,10 +84,19 @@ public class SSLVoltPort extends VoltPort {
         }
 
         try {
+            // if there are leftover writes try to write them.
+            if (m_remainingWrites) {
+                if (m_remainingWrites = handleEncryptedBuffers()) {
+                    // if couldn't finish writing, try again.
+                    m_network.addToChangeList(this, true);
+                }
+            }
+
+
             processReads();
             handleDecryptedMessages();
             processWrites();
-            handleEncryptedBuffers();
+            m_remainingWrites = handleEncryptedBuffers();
             writeStream().checkBackpressureEnded();
         } catch (IOException ioe) {
             throw ioe;
@@ -274,9 +284,9 @@ public class SSLVoltPort extends VoltPort {
         }
     }
 
-    private void handleEncryptedBuffers() throws IOException {
+    private boolean handleEncryptedBuffers() throws IOException {
         if (m_encryptedBuffers.isEmpty()) {
-            return;
+            return false;
         }
 
         DBBPool.BBContainer encryptedBuffer = null;
@@ -294,7 +304,7 @@ public class SSLVoltPort extends VoltPort {
             if (encryptedBuffer.b().hasRemaining()) {
                 m_writeStream.backpressureStarted();
                 m_network.addToChangeList(this, true);
-                break;
+                return true;  // there are remaining writes to process
             } else {
                 m_encryptedBuffers.poll();
                 encryptedBuffer.discard();
@@ -302,6 +312,7 @@ public class SSLVoltPort extends VoltPort {
                 m_writeStream.backpressureEnded();
             }
         }
+        return false;
     }
 
     protected synchronized int fillReadStream(int maxBytes) throws IOException {
