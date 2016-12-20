@@ -28,8 +28,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
-import junit.framework.Test;
-
 import org.voltdb.BackendTarget;
 import org.voltdb.client.Client;
 import org.voltdb.client.NoConnectionsException;
@@ -41,6 +39,8 @@ import org.voltdb_testprocs.regressionsuites.CurrentTimestampProcedure;
 import org.voltdb_testprocs.regressionsuites.LastBatchLie;
 import org.voltdb_testprocs.regressionsuites.VariableBatchSizeMP;
 import org.voltdb_testprocs.regressionsuites.VariableBatchSizeSP;
+
+import junit.framework.Test;
 
 public class TestProcedureAPISuite extends RegressionSuite {
 
@@ -155,8 +155,9 @@ public class TestProcedureAPISuite extends RegressionSuite {
     }
 
     public void testMultiPartitionCURRENT_TIMESTAMP() throws IOException, ProcCallException {
-        Client client = getClient();
+
         if (!isHSQL()) {
+        	Client client = getClient();
             client.callProcedure(CurrentTimestampProcedure.class.getSimpleName());
         }
     }

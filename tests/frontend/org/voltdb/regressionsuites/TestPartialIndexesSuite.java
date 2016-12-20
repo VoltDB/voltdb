@@ -25,8 +25,6 @@ package org.voltdb.regressionsuites;
 
 import java.io.IOException;
 
-import junit.framework.Test;
-
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
@@ -34,6 +32,8 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
+
+import junit.framework.Test;
 
 public class TestPartialIndexesSuite extends RegressionSuite {
 
@@ -55,11 +55,6 @@ public class TestPartialIndexesSuite extends RegressionSuite {
 
     public void testPartialUniqueIndex() throws Exception {
         Client client = getClient();
-
-        if (isHSQL()) {
-            // HSQL doesn't support partial indexes
-            return;
-        }
 
         // CREATE UNIQUE INDEX r1_pidx_1 ON R1 (a) where b is not null;
         // CREATE UNIQUE INDEX r1_pidx_hash_1 ON R1 (c) where b is not null;
@@ -229,10 +224,6 @@ public class TestPartialIndexesSuite extends RegressionSuite {
     public void testPartitionPartialUniqueIndex() throws Exception {
         Client client = getClient();
 
-        if (isHSQL()) {
-            // HSQL doesn't support partial indexes
-            return;
-        }
         // CREATE UNIQUE INDEX p1_pidx_1 ON P1 (a) where b is not null;
         for (String tb : partitioned_tbs) {
             emptyTable(client, tb);
@@ -340,11 +331,6 @@ public class TestPartialIndexesSuite extends RegressionSuite {
 
     public void testPartialIndex() throws Exception {
         Client client = getClient();
-
-        if (isHSQL()) {
-            // HSQL doesn't support partial indexes
-            return;
-        }
 
         // CREATE INDEX r1_pidx_2 ON R1 (d) where a > 0;
         // CREATE INDEX r1_pidx_hash_2 ON R1 (d) where a < 0;
@@ -508,9 +494,9 @@ public class TestPartialIndexesSuite extends RegressionSuite {
         builder.addServerConfig(config);
 
         // HSQLDB
-        config = new LocalCluster("testpartialindexes-cluster.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
-        if (!config.compile(project)) fail();
-        builder.addServerConfig(config);
+        //config = new LocalCluster("testpartialindexes-cluster.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
+        //if (!config.compile(project)) fail();
+        //builder.addServerConfig(config);
 
         return builder;
     }
