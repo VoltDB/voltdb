@@ -87,6 +87,7 @@ public class SSLVoltPort extends VoltPort {
             handleDecryptedMessages();
             processWrites();
             handleEncryptedBuffers();
+            writeStream().checkBackpressureEnded();
         } catch (IOException ioe) {
             throw ioe;
         } finally {
@@ -193,7 +194,7 @@ public class SSLVoltPort extends VoltPort {
                             if (queuedMessages) {
                                 m_network.addToChangeList(m_port, true);
                             }
-                        } catch (IOException ioe) {
+                        } catch (Exception e) {
                             //TODO: Add logging.
                             m_dstBuffer.clear();
                             return;
@@ -254,8 +255,9 @@ public class SSLVoltPort extends VoltPort {
                             if (queuedEncBuffers) {
                                 m_network.addToChangeList(m_port, true);
                             }
-                        } catch (IOException ioe) {
+                        } catch (Exception e) {
                             //TODO: Log
+                            return;
                         } finally {
                             if (fragCont != null) {
                                 fragCont.discard();
