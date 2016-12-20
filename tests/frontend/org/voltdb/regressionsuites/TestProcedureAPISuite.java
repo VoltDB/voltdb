@@ -157,7 +157,7 @@ public class TestProcedureAPISuite extends RegressionSuite {
     public void testMultiPartitionCURRENT_TIMESTAMP() throws IOException, ProcCallException {
 
         if (!isHSQL()) {
-        	Client client = getClient();
+            Client client = getClient();
             client.callProcedure(CurrentTimestampProcedure.class.getSimpleName());
         }
     }
