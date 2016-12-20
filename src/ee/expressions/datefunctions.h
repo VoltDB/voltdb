@@ -19,7 +19,6 @@
 #define SRC_EE_EXPRESSIONS_DATEFUNCTIONS_H
 
 #include <ctime>
-#include "expressions/dateconstants.h"
 #include "common/SQLException.h"
 #include "common/executorcontext.hpp"
 #include "common/NValue.hpp"

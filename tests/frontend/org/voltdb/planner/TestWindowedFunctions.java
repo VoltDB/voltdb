@@ -488,6 +488,11 @@ public class TestWindowedFunctions extends PlannerTestCase {
         assertEquals(0, child.getChildCount());
     }
 
+    public void testWindowFailures() {
+        failToCompile("SELECT AVG(A+B) OVER (PARTITION BY A ORDER BY B ) FROM AAA GROUP BY A;",
+                      "Unsupported window function AVG");
+    }
+
     public void testRankFailures() {
         failToCompile("SELECT RANK() OVER (PARTITION BY A ORDER BY B ) FROM AAA GROUP BY A;",
                       "Use of both a windowed function call and GROUP BY in a single query is not supported.");

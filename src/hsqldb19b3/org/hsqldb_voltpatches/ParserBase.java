@@ -655,6 +655,16 @@ public class ParserBase {
 
 	public static int getWindowedExpressionType(int tokenT) {
 		int type = windowedExpressionTypeMap.get(tokenT, -1);
+		// This is an error.  But we
+		// can't actually throw a good error
+		// message here, so we will
+		// try and do the best we can.
+		// This will be picked up later if
+		// we are trying to use an unsupported
+		// aggregate type.
+		if (type == -1) {
+			type = expressionTypeMap.get(tokenT, -1);
+		}
 		if (type == -1) {
             throw Error.runtimeError(ErrorCode.U_S0500, "Parser");
 		}

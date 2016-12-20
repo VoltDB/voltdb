@@ -968,7 +968,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             case AGGREGATE_WINDOWED_COUNT:
                 if (windowFunctionExpression.getAggregateArguments().size() > 1) {
                     throw new PlanningErrorException(
-                            String.format("Windowed COUNT must have exactly one argument"));
+                            String.format("Windowed COUNT must have either exactly one argument or else a star for an argument"));
                 }
                 // Any type is ok, so we won't inspect the type.
                 break;
