@@ -25,42 +25,83 @@ package org.voltdb.regressionsuites;
 
 
 import java.io.File;
+import static junit.framework.TestCase.assertEquals;
+import static junit.framework.TestCase.assertNotNull;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.utils.MiscUtils;
 
-import junit.framework.Test;
 import static junit.framework.TestCase.assertTrue;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
 import org.voltdb.ServerThread;
 import org.voltdb.VoltDB;
+import org.voltdb.client.ClientFactory;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.utils.CatalogUtil;
+import org.voltdb_testprocs.regressionsuites.failureprocs.CrashJVM;
+import org.voltdb_testprocs.regressionsuites.failureprocs.CrashVoltDBProc;
 
 
 /**
  * Test LocalCluster with all out of process nodes.
  *
  */
-public class TestInitStartLocalClusterAllOutOfProcess extends RegressionSuite {
+public class TestInitStartLocalClusterAllOutOfProcess extends JUnit4LocalClusterTest {
 
-    static LocalCluster m_config;
     static final int SITES_PER_HOST = 8;
     static final int HOSTS = 3;
     static final int K = MiscUtils.isPro() ? 1 : 0;
+    VoltProjectBuilder builder;
+    LocalCluster cluster;
+    String listener;
+    Client client;
+    String voltDbRootPath;
 
-    /**
-     * Constructor needed for JUnit. Should just pass on parameters to superclass.
-     * @param name The name of the method to test. This is just passed to the superclass.
-     */
-    public TestInitStartLocalClusterAllOutOfProcess(String name) {
-        super(name);
+    @Before
+    public void setUp() throws Exception {
+        String simpleSchema =
+                "create table blah (" +
+                "ival bigint default 0 not null, " +
+                "PRIMARY KEY(ival));";
+
+        builder = new VoltProjectBuilder();
+        builder.addLiteralSchema(simpleSchema);
+        builder.addProcedures(CrashJVM.class);
+        builder.addProcedures(CrashVoltDBProc.class);
+
+        cluster = new LocalCluster("collect.jar",
+                SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
+        boolean success = cluster.compile(builder);
+        assert (success);
+        File voltDbRoot;
+        cluster.startUp(true);
+        //Get server specific root after startup.
+        if (cluster.isNewCli()) {
+            voltDbRoot = new File(cluster.getServerSpecificRoot("1"));
+        } else {
+            String voltDbFilePrefix = cluster.getSubRoots().get(0).getPath();
+            voltDbRoot = new File(voltDbFilePrefix, builder.getPathToVoltRoot().getPath());
+        }
+        voltDbRootPath = voltDbRoot.getCanonicalPath();
+        listener = cluster.getListenerAddresses().get(0);
+        client = ClientFactory.createClient();
+        client.createConnection(listener);
     }
 
+    @After
+    public void tearDown() throws Exception {
+        client.close();
+        cluster.shutDown();
+    }
+
+
+    @Test
     public void testClusterUp() throws Exception
     {
-        Client client = getClient();
         boolean found = false;
         int timeout = -1;
         VoltTable result = client.callProcedure("@SystemInformation", "DEPLOYMENT").getResults()[0];
@@ -74,12 +115,8 @@ public class TestInitStartLocalClusterAllOutOfProcess extends RegressionSuite {
         assertEquals(org.voltcore.common.Constants.DEFAULT_HEARTBEAT_TIMEOUT_SECONDS, timeout);
 
         File out = File.createTempFile("get_deployment", ".xml");
-        //Now do a get deployment using voltdb get
-        String path = (new File(m_config.getServerSpecificRoot("1"))).getCanonicalPath();
-        client.close();
-        m_config.shutDown();
         VoltDB.Configuration c1 = new VoltDB.Configuration(new String[]{"get", "deployment",
-            "voltdbroot", path,
+            "getvoltdbroot", voltDbRootPath,
             "file", out.getAbsolutePath()});
         ServerThread server = new ServerThread(c1);
 
@@ -91,34 +128,8 @@ public class TestInitStartLocalClusterAllOutOfProcess extends RegressionSuite {
 
         DeploymentType dt = CatalogUtil.parseDeployment(out.getAbsolutePath());
         assertNotNull(dt);
-        assertEquals(dt.getPaths().getVoltdbroot().getPath(), path);
+        assertEquals(dt.getPaths().getVoltdbroot().getPath(), voltDbRootPath);
 
     }
 
-    static public Test suite() throws Exception {
-        // the suite made here will all be using the tests from this class
-        MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestInitStartLocalClusterAllOutOfProcess.class);
-
-        // build up a project builder for the workload
-        VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addLiteralSchema("");
-        // get a server config for the native backend with one sites/partitions
-        m_config = new LocalCluster("base-cluster.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
-        ((LocalCluster )m_config).setHasLocalServer(false);
-        // build the jarfile
-        boolean basecompile = m_config.compile(project);
-        assertTrue(basecompile);
-        builder.addServerConfig(m_config);
-        return builder;
-    }
-
-    @Override
-    public void tearDown() throws Exception {
-        super.tearDown();
-    }
-
-    @Override
-    public void setUp() throws Exception {
-        super.setUp();
-    }
 }

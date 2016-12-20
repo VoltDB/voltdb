@@ -618,6 +618,9 @@ public class VoltDB {
                         System.err.println("FATAL: " + e.getMessage());
                         referToDocAndExit();
                     }
+                } else if (arg.equalsIgnoreCase("getvoltdbroot")) {
+                    //Can not use voltdbroot which creates directory we dont intend to create for get deployment etc.
+                    m_voltdbRoot = new VoltFile(args[++i]);
                 } else if (arg.equalsIgnoreCase("get")) {
                     m_startAction = StartAction.GET;
                     GetActionArgument.valueOf(args[++i].trim().toUpperCase());
