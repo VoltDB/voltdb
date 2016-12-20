@@ -349,9 +349,9 @@ public:
 };
 
 class WindowedSumAgg : public WindowAggregate {
+    int m_numRows;
 public:
     WindowedSumAgg() {
-        m_value = m_zero;
     }
     ~WindowedSumAgg() {
     }
@@ -360,7 +360,6 @@ public:
     }
     virtual void resetAgg() {
         WindowAggregate::resetAgg();
-        m_value = m_zero;
     }
     /**
      * Calculate the min by looking ahead in the
@@ -369,40 +368,14 @@ public:
     virtual void lookaheadOneRow(TableWindow &window, NValueArray &argVals) {
         assert(argVals.size() == 1);
         if ( ! argVals[0].isNull()) {
-            m_value = m_value.op_add(argVals[0]);
+            if (m_value.isNull()) {
+                m_value = argVals[0];
+            } else {
+                m_value = m_value.op_add(argVals[0]);
+            }
         }
     }
 };
-
-#if  0
-// This doesn't actually work for
-// distributed calculations.  We need to
-// calculate a value per partition, and the
-// aggregate it on the coordinator.
-//
-// I think the same is true of stddev.
-class AvgAgg : public WindowAggregate {
-public:
-    AvgAgg()
-        : m_count(m_zero) { }
-    virtual void lookaheadOneRow(TableWindow &window, NValueArray &argVals) {
-        assert(argVals.size() == 1);
-        if ( ! argVals[0].isNull() ) {
-            m_value = m_value.op_add(argVals[0]);
-            m_count = m_count.op_add(m_one);
-        }
-    }
-    virtual NValue finalize(ValueType type) {
-        if (m_count.op_equals(m_zero).isTrue()) {
-            m_value = NValue::getNullValue(type);
-            return m_value;
-        }
-        return m_value.op_divide(m_count);
-    }
-private:
-    NValue m_count;
-};
-#endif
 
 /**
  * This class is fancification of a C array of pointers to

@@ -69,21 +69,21 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
                 +"CREATE TABLE T_STRING ("
                 + "  A INTEGER NOT NULL,"
                 + "  B INTEGER NOT NULL,"
-                + "  C VARCHAR NOT NULL"
+                + "  C VARCHAR(128) NOT NULL"
                 + ");"
 
                 // C nullable, no partitions.
                 +"CREATE TABLE T_STRING_C_NULL ("
                 + "  A INTEGER NOT NULL,"
                 + "  B INTEGER NOT NULL,"
-                + "  C VARCHAR "
+                + "  C VARCHAR(128) "
                 + ");"
 
                 // C nullable, partition on B.
                 +"CREATE TABLE T_STRING_C_NULL_PB ("
                 + "  A INTEGER NOT NULL,"
                 + "  B INTEGER NOT NULL,"
-                + "  C VARCHAR "
+                + "  C VARCHAR(128) "
                 + ");"
                 + "PARTITION TABLE T_STRING_C_NULL_PB ON COLUMN B;"
 
@@ -91,7 +91,7 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
                 +"CREATE TABLE T_STRING_PC ("
                 + "  A INTEGER NOT NULL,"
                 + "  B INTEGER NOT NULL,"
-                + "  C VARCHAR NOT NULL"
+                + "  C VARCHAR(128) NOT NULL"
                 + ");"
                 + "PARTITION TABLE T_STRING_PC ON COLUMN C;"
 
@@ -188,7 +188,7 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
     private String makeLongString(int size) {
         StringBuffer sb = new StringBuffer();
         for (int idx = 0; idx < size; idx += 1) {
-            sb.append("abcdefgh");
+            sb.append("abcdefghij0123456789");
         }
         return sb.toString();
     }
@@ -1580,11 +1580,11 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
             {  1L,  3L,   53L},
             {  1L,  3L,   53L},
             //--------------------------------------
-            {  2L,  1L,    0L},
-            {  2L,  1L,    0L},
-            {  2L,  1L,    0L},
-            {  2L,  1L,    0L},
-            {  2L,  1L,    0L},
+            {  2L,  1L,   Long.MIN_VALUE},
+            {  2L,  1L,   Long.MIN_VALUE},
+            {  2L,  1L,   Long.MIN_VALUE},
+            {  2L,  1L,   Long.MIN_VALUE},
+            {  2L,  1L,   Long.MIN_VALUE},
             //======================================
             {  2L,  2L,   25L},
             {  2L,  2L,   25L},
@@ -1609,41 +1609,41 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
                       expectedWithSomeNulls);
 
         long expectedWithAllNulls[] [] = new long[][] {
-            {  1L,  1L, 0},
-            {  1L,  1L, 0},
-            {  1L,  1L, 0},
-            {  1L,  1L, 0},
-            {  1L,  1L, 0},
+            {  1L,  1L, Long.MIN_VALUE},
+            {  1L,  1L, Long.MIN_VALUE},
+            {  1L,  1L, Long.MIN_VALUE},
+            {  1L,  1L, Long.MIN_VALUE},
+            {  1L,  1L, Long.MIN_VALUE},
             //======================================
-            {  1L,  2L, 0},
-            {  1L,  2L, 0},
-            {  1L,  2L, 0},
-            {  1L,  2L, 0},
-            {  1L,  2L, 0},
+            {  1L,  2L, Long.MIN_VALUE},
+            {  1L,  2L, Long.MIN_VALUE},
+            {  1L,  2L, Long.MIN_VALUE},
+            {  1L,  2L, Long.MIN_VALUE},
+            {  1L,  2L, Long.MIN_VALUE},
             //======================================
-            {  1L,  3L, 0},
-            {  1L,  3L, 0},
-            {  1L,  3L, 0},
-            {  1L,  3L, 0},
-            {  1L,  3L, 0},
+            {  1L,  3L, Long.MIN_VALUE},
+            {  1L,  3L, Long.MIN_VALUE},
+            {  1L,  3L, Long.MIN_VALUE},
+            {  1L,  3L, Long.MIN_VALUE},
+            {  1L,  3L, Long.MIN_VALUE},
             //--------------------------------------
-            {  2L,  1L, 0},
-            {  2L,  1L, 0},
-            {  2L,  1L, 0},
-            {  2L,  1L, 0},
-            {  2L,  1L, 0},
+            {  2L,  1L, Long.MIN_VALUE},
+            {  2L,  1L, Long.MIN_VALUE},
+            {  2L,  1L, Long.MIN_VALUE},
+            {  2L,  1L, Long.MIN_VALUE},
+            {  2L,  1L, Long.MIN_VALUE},
             //======================================
-            {  2L,  2L, 0},
-            {  2L,  2L, 0},
-            {  2L,  2L, 0},
-            {  2L,  2L, 0},
-            {  2L,  2L, 0},
+            {  2L,  2L, Long.MIN_VALUE},
+            {  2L,  2L, Long.MIN_VALUE},
+            {  2L,  2L, Long.MIN_VALUE},
+            {  2L,  2L, Long.MIN_VALUE},
+            {  2L,  2L, Long.MIN_VALUE},
             //======================================
-            {  2L,  3L, 0},
-            {  2L,  3L, 0},
-            {  2L,  3L, 0},
-            {  2L,  3L, 0},
-            {  2L,  3L, 0}
+            {  2L,  3L, Long.MIN_VALUE},
+            {  2L,  3L, Long.MIN_VALUE},
+            {  2L,  3L, Long.MIN_VALUE},
+            {  2L,  3L, Long.MIN_VALUE},
+            {  2L,  3L, Long.MIN_VALUE}
         };
         testAllNulls(client,
                      "t",
