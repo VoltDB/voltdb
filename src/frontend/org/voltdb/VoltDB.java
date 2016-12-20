@@ -620,7 +620,7 @@ public class VoltDB {
                     }
                 } else if (arg.equalsIgnoreCase("get")) {
                     m_startAction = StartAction.GET;
-                    GetActionArgument.valueOf(args[++i].trim());
+                    GetActionArgument.valueOf(args[++i].trim().toUpperCase());
                 } else if (arg.equalsIgnoreCase("file")) {
                     m_getOutput = args[++i].trim();
                 }
@@ -629,9 +629,6 @@ public class VoltDB {
                     referToDocAndExit();
                 }
             }
-            if (m_startAction == StartAction.GET) {
-                return;
-            }
             // set file logger root file directory. From this point on you can use loggers
             if (m_startAction != null && !m_startAction.isLegacy()) {
                 VoltLog4jLogger.setFileLoggerRoot(m_voltdbRoot);
@@ -639,6 +636,13 @@ public class VoltDB {
             /*
              *  !!! F R O M  T H I S  P O I N T  O N  Y O U  M A Y  U S E  hostLog  T O  L O G
              */
+            //I am a get
+            if (m_startAction == StartAction.GET) {
+                File configInfoDir = new VoltFile(m_voltdbRoot, Constants.CONFIG_DIR);
+                File depFH = new VoltFile(configInfoDir, "deployment.xml");
+                m_pathToDeployment = depFH.getAbsolutePath();
+                return;
+            }
             if (m_forceCatalogUpgrade) {
                 hostLog.info("Forced catalog upgrade will occur due to command line option.");
             }

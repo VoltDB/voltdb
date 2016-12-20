@@ -605,63 +605,63 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             // print the ascii art!
             if (config.m_startAction != StartAction.GET) {
                 consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_StartupString.name(), null);
-            }
 
-            // load license API
-            if (config.m_pathToLicense == null) {
-                m_licenseApi = MiscUtils.licenseApiFactory();
+                // load license API
+                if (config.m_pathToLicense == null) {
+                    m_licenseApi = MiscUtils.licenseApiFactory();
+                    if (m_licenseApi == null) {
+                        hostLog.fatal("Unable to open license file in default directories");
+                    }
+                } else {
+                    m_licenseApi = MiscUtils.licenseApiFactory(config.m_pathToLicense);
+                    if (m_licenseApi == null) {
+                        hostLog.fatal("Unable to open license file in provided path: " + config.m_pathToLicense);
+                    }
+                }
+
                 if (m_licenseApi == null) {
-                    hostLog.fatal("Unable to open license file in default directories");
+                    hostLog.fatal("Please contact sales@voltdb.com to request a license.");
+                    VoltDB.crashLocalVoltDB(
+                            "Failed to initialize license verifier. " + "See previous log message for details.", false,
+                            null);
                 }
-            } else {
-                m_licenseApi = MiscUtils.licenseApiFactory(config.m_pathToLicense);
-                if (m_licenseApi == null) {
-                    hostLog.fatal("Unable to open license file in provided path: " + config.m_pathToLicense);
+
+                // determine the edition
+                String edition = "Community Edition";
+                if (config.m_isEnterprise) {
+                    if (m_licenseApi.isEnterprise()) edition = "Enterprise Edition";
+                    if (m_licenseApi.isPro()) edition = "Pro Edition";
+                    if (m_licenseApi.isTrial()) edition = "Enterprise Edition";
+                    if (m_licenseApi.isAWSMarketplace()) edition = "AWS Marketplace Pro Edition";
                 }
-            }
 
-            if (m_licenseApi == null) {
-                hostLog.fatal("Please contact sales@voltdb.com to request a license.");
-                VoltDB.crashLocalVoltDB(
-                        "Failed to initialize license verifier. " + "See previous log message for details.", false,
-                        null);
-            }
+                // this also prints out the license type on the console
+                readBuildInfo(edition);
 
-            // determine the edition
-            String edition = "Community Edition";
-            if (config.m_isEnterprise) {
-                if (m_licenseApi.isEnterprise()) edition = "Enterprise Edition";
-                if (m_licenseApi.isPro()) edition = "Pro Edition";
-                if (m_licenseApi.isTrial()) edition = "Enterprise Edition";
-                if (m_licenseApi.isAWSMarketplace()) edition = "AWS Marketplace Pro Edition";
-            }
-
-            // this also prints out the license type on the console
-            readBuildInfo(edition);
-
-            // print out the licensee on the license
-            if (config.m_isEnterprise) {
-                String licensee = m_licenseApi.licensee();
-                if ((licensee != null) && (licensee.length() > 0)) {
-                    consoleLog.info(String.format("Licensed to: %s", licensee));
+                // print out the licensee on the license
+                if (config.m_isEnterprise) {
+                    String licensee = m_licenseApi.licensee();
+                    if ((licensee != null) && (licensee.length() > 0)) {
+                        consoleLog.info(String.format("Licensed to: %s", licensee));
+                    }
                 }
+
+                // Replay command line args that we can see
+                StringBuilder sb = new StringBuilder(2048).append("Command line arguments: ");
+                sb.append(System.getProperty("sun.java.command", "[not available]"));
+                hostLog.info(sb.toString());
+
+                List<String> iargs = ManagementFactory.getRuntimeMXBean().getInputArguments();
+                sb.delete(0, sb.length()).append("Command line JVM arguments:");
+                for (String iarg : iargs)
+                    sb.append(" ").append(iarg);
+                if (iargs.size() > 0) hostLog.info(sb.toString());
+                else hostLog.info("No JVM command line args known.");
+
+                sb.delete(0, sb.length()).append("Command line JVM classpath: ");
+                sb.append(System.getProperty("java.class.path", "[not available]"));
+                hostLog.info(sb.toString());
             }
-
-            // Replay command line args that we can see
-            StringBuilder sb = new StringBuilder(2048).append("Command line arguments: ");
-            sb.append(System.getProperty("sun.java.command", "[not available]"));
-            hostLog.info(sb.toString());
-
-            List<String> iargs = ManagementFactory.getRuntimeMXBean().getInputArguments();
-            sb.delete(0, sb.length()).append("Command line JVM arguments:");
-            for (String iarg : iargs)
-                sb.append(" ").append(iarg);
-            if (iargs.size() > 0) hostLog.info(sb.toString());
-            else hostLog.info("No JVM command line args known.");
-
-            sb.delete(0, sb.length()).append("Command line JVM classpath: ");
-            sb.append(System.getProperty("java.class.path", "[not available]"));
-            hostLog.info(sb.toString());
 
             // config UUID is part of the status tracker that is slated to be an
             // Information source for an http admun endpoint
@@ -725,34 +725,36 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 }
             }
 
+            if (config.m_startAction == StartAction.GET && !config.m_startAction.isLegacy()) {
+                if (config.m_getOption == GetActionArgument.DEPLOYMENT) {
+                    hostLog.info("Requested voltdb deployment configuration for path: " + config.m_voltdbRoot.getPath());
+                    DeploymentType dt = CatalogUtil.updateRuntimeDeploymentPaths(readDepl.deployment);
+                    //We dont have catalog context so host count is not there.
+                    String out = "";
+                    try {
+                        out = CatalogUtil.getDeployment(dt, true);
+                        if (config.m_getOutput == null || config.m_getOutput.trim().length() == 0) {
+                            System.out.println(out);
+                        } else {
+                            try (FileOutputStream fos = new FileOutputStream(config.m_getOutput.trim())){
+                                fos.write(out.getBytes());
+                            } catch (IOException e) {
+                                throw new SettingsException("failed to write output to " + config.m_getOutput, e);
+                            }
+                            System.out.println("Configuration saved in: " + config.m_getOutput.trim());
+                        }
+                    } catch (IOException ex) {
+                        hostLog.info("Failed to get deployment from voltdbroot: " + config.m_voltdbRoot.getPath(), ex);
+                    }
+                }
+                VoltDB.exit(0);
+            }
             List<String> failed = m_nodeSettings.ensureDirectoriesExist();
             if (!failed.isEmpty()) {
                 String msg = "Unable to access or create the following directories:\n  - " +
                         Joiner.on("\n  - ").join(failed);
                 VoltDB.crashLocalVoltDB(msg);
                 return;
-            }
-            if (config.m_startAction == StartAction.GET && !config.m_startAction.isLegacy()) {
-                if (config.m_getOption == GetActionArgument.DEPLOYMENT) {
-                    DeploymentType dt = CatalogUtil.updateRuntimeDeploymentPaths(readDepl.deployment);
-                    String out = "";
-                    try {
-                        out = CatalogUtil.getDeployment(dt, true);
-                    } catch (IOException ex) {
-                        ex.printStackTrace();
-                    }
-                    if (config.m_getOutput == null || config.m_getOutput.trim().length() == 0) {
-                        System.out.println(out);
-                    } else {
-                        try (FileOutputStream fos = new FileOutputStream(config.m_getOutput.trim())){
-                            fos.write(out.getBytes());
-                        } catch (IOException e) {
-                            throw new SettingsException("failed to write output to " + config.m_getOutput, e);
-                        }
-                        System.out.println("Configuration saved in: " + config.m_getOutput.trim());
-                    }
-                }
-                VoltDB.exit(0);
             }
 
             if (config.m_hostCount == VoltDB.UNDEFINED) {
