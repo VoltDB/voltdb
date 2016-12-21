@@ -483,39 +483,36 @@ public class Inits {
         @Override
         public void run() {
             SslType sslType = m_deployment.getSsl();
-            if ((sslType != null && sslType.isEnabled())
-                    || (m_config.m_sslEnable)) {
-                if (sslType.isExternal() || m_config.m_sslExternal) {
-                    try {
-                        m_config.m_sslContextFactory = getSSLContextFactory(sslType);
-                        m_config.m_sslContextFactory.start();
+            if ((sslType != null && sslType.isEnabled()) || (m_config.m_sslEnable)) {
+                try {
+                    m_config.m_sslContextFactory = getSSLContextFactory(sslType);
+                    m_config.m_sslContextFactory.start();
+                    hostLog.info("SSL Enabled for HTTP. Please point browser to HTTPS URL.");
+                    if ((sslType != null && sslType.isExternal()) || m_config.m_sslExternal) {
                         m_config.m_sslEncryptionService = SSLEncryptionService.initialize(CoreUtils.availableProcessors());
-                        hostLog.info("Enabled HTTPS.");
                         m_config.m_sslContext = m_config.m_sslContextFactory.getSslContext();
-                        hostLog.info("Enabled SSL on admin and client port.");
-                    } catch (Exception e) {
-                        hostLog.fatal("Failed to start SSLContextFactory, exiting.", e);
+                        hostLog.info("SSL enabled for admin and client port. Please enable SSL on client.");
                     }
+                } catch (Exception e) {
+                    VoltDB.crashLocalVoltDB("Unable to configure SSL", true, e);
                 }
             }
         }
 
         private String getResourcePath(String resource) {
             URL res = this.getClass().getResource(resource);
-            return res == null ? null : res.getPath();
+            return res == null ? resource : res.getPath();
         }
 
         private SslContextFactory getSSLContextFactory(SslType sslType) {
             SslContextFactory sslContextFactory = new SslContextFactory();
             String keyStorePath = getKeyTrustStoreAttribute("javax.net.ssl.keyStore", sslType.getKeystore(), "path");
-            if (m_config.m_sslEnable) {
-                keyStorePath = null == keyStorePath  ? getResourcePath(DEFAULT_KEYSTORE_RESOURCE):getResourcePath(keyStorePath);
-            }
+            keyStorePath = null == keyStorePath  ? getResourcePath(DEFAULT_KEYSTORE_RESOURCE):getResourcePath(keyStorePath);
             if (keyStorePath == null || keyStorePath.trim().isEmpty()) {
-                hostLog.fatal("A path for the SSL keystore file was not specified.");
+                throw new IllegalArgumentException("A path for the SSL keystore file was not specified.");
             }
             if (! new File(keyStorePath).exists()) {
-                hostLog.fatal("The specified SSL keystore file " + keyStorePath + " was not found.");
+                throw new IllegalArgumentException("The specified SSL keystore file " + keyStorePath + " was not found.");
             }
             sslContextFactory.setKeyStorePath(keyStorePath);
 
@@ -524,32 +521,30 @@ public class Inits {
                 keyStorePassword = DEFAULT_KEYSTORE_PASSWD;
             }
             if (keyStorePassword == null) {
-                hostLog.fatal("An SSL keystore password was not specified.");
+                throw new IllegalArgumentException("An SSL keystore password was not specified.");
             }
             sslContextFactory.setKeyStorePassword(keyStorePassword);
 
-            if (sslType.isExternal()) {
-                String trustStorePath = getKeyTrustStoreAttribute("javax.net.ssl.trustStore", sslType.getTruststore(), "path");
-                if (m_config.m_sslEnable) {
-                    trustStorePath = null == trustStorePath  ? getResourcePath(DEFAULT_KEYSTORE_RESOURCE):getResourcePath(trustStorePath);
-                }
-                if (trustStorePath == null || trustStorePath.trim().isEmpty()) {
-                    hostLog.fatal("A path for the SSL truststore file was not specified.");
-                }
-                if (! new File(trustStorePath).exists()) {
-                    hostLog.fatal("The specified SSL truststore file " + trustStorePath + " was not found.");
-                }
-                sslContextFactory.setTrustStorePath(trustStorePath);
-
-                String trustStorePassword = getKeyTrustStoreAttribute("javax.net.ssl.trustStorePassword", sslType.getTruststore(), "password");
-                if (m_config.m_sslEnable && null == trustStorePassword) {
-                    trustStorePassword = DEFAULT_KEYSTORE_PASSWD;
-                }
-                if (trustStorePassword == null) {
-                    hostLog.fatal("An SSL truststore password was not specified.");
-                }
-                sslContextFactory.setTrustStorePassword(trustStorePassword);
+            String trustStorePath = getKeyTrustStoreAttribute("javax.net.ssl.trustStore", sslType.getTruststore(), "path");
+            if (sslType.isEnabled() || m_config.m_sslEnable) {
+                trustStorePath = null == trustStorePath  ? getResourcePath(DEFAULT_KEYSTORE_RESOURCE):getResourcePath(trustStorePath);
             }
+            if (trustStorePath == null || trustStorePath.trim().isEmpty()) {
+                throw new IllegalArgumentException("A path for the SSL truststore file was not specified.");
+            }
+            if (! new File(trustStorePath).exists()) {
+                throw new IllegalArgumentException("The specified SSL truststore file " + trustStorePath + " was not found.");
+            }
+            sslContextFactory.setTrustStorePath(trustStorePath);
+
+            String trustStorePassword = getKeyTrustStoreAttribute("javax.net.ssl.trustStorePassword", sslType.getTruststore(), "password");
+            if (m_config.m_sslEnable && null == trustStorePassword) {
+                trustStorePassword = DEFAULT_KEYSTORE_PASSWD;
+            }
+            if (trustStorePassword == null) {
+                throw new IllegalArgumentException("An SSL truststore password was not specified.");
+            }
+            sslContextFactory.setTrustStorePassword(trustStorePassword);
             // exclude weak ciphers
             sslContextFactory.setExcludeCipherSuites("SSL_RSA_WITH_DES_CBC_SHA",
                     "SSL_DHE_RSA_WITH_DES_CBC_SHA", "SSL_DHE_DSS_WITH_DES_CBC_SHA",
