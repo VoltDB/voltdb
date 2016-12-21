@@ -145,6 +145,11 @@ public class SSLVoltPort extends VoltPort {
         }
     }
 
+    @Override
+    public SSLNIOWriteStream writeStream() {
+        assert(m_writeStream != null);
+        return (SSLNIOWriteStream) m_writeStream;
+    }
 
     @Override
     void unregistered() {
@@ -249,7 +254,7 @@ public class SSLVoltPort extends VoltPort {
                         DBBPool.BBContainer fragCont = null;
                         boolean queuedEncBuffers = false;
                         try {
-                            while ((fragCont = ((SSLNIOWriteStream) writeStream()).getWriteBuffer()) != null) {
+                            while ((fragCont = writeStream().getWriteBuffer()) != null) {
                                 fragCont.b().flip();
                                 int nBytesClear = fragCont.b().remaining();
                                 if (m_isShuttingDown.get()) return;
@@ -297,7 +302,6 @@ public class SSLVoltPort extends VoltPort {
                 int rc = 1;
                 while (er.encCont.b().hasRemaining() && rc > 0) {
                     rc = m_channel.write(er.encCont.b());
-                    bytesWritten += rc;
                 }
 
                 if (er.encCont.b().hasRemaining()) {
@@ -307,12 +311,12 @@ public class SSLVoltPort extends VoltPort {
                 } else {
                     m_encryptedBuffers.poll();
                     er.encCont.discard();
-                    m_writeStream.updateQueued(-er.m_nClearBytes, false);
+                    bytesWritten += er.m_nClearBytes;
                     m_writeStream.backpressureEnded();
                 }
             }
         } finally {
-            ((SSLNIOWriteStream) writeStream()).updateWriteState(bytesWritten);
+            writeStream().updateWriteStats(bytesWritten);
         }
         return false;
     }
