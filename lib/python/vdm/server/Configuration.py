@@ -544,6 +544,10 @@ def get_deployment(deployment, is_upload=False):
             result = set_users_field(deployment, field, new_deployment)
             if is_upload and 'success' not in result:
                 return handle_errors(field, result)
+        elif field == 'snmp':
+            result = set_snmp_field(deployment, field, new_deployment)
+            if is_upload and 'success' not in result:
+                return handle_errors(field, result)
         else:
             new_deployment[field] = convert_field_required_format(deployment, field)
     return new_deployment
@@ -674,6 +678,25 @@ def set_security_field(deployment, field, new_deployment):
         new_deployment[field]['enabled'] = parse_bool_string(deployment[field]
                                                              ['enabled'])
         new_deployment[field]['provider'] = str(deployment[field]['provider'])
+    except Exception, err:
+        result = str(err)
+        print_errors(field, result)
+    finally:
+        return result
+
+
+def set_snmp_field(deployment, field, new_deployment):
+    result = 'success'
+    try:
+        new_deployment[field] = {}
+        new_deployment[field]['enabled'] = parse_bool_string(deployment[field]['enabled'])
+        new_deployment[field]['target'] = str(deployment[field]['target'])
+        new_deployment[field]['community'] = str(deployment[field]['community'])
+        new_deployment[field]['username'] = str(deployment[field]['username'])
+        new_deployment[field]['authprotocol'] = str(deployment[field]['authprotocol'])
+        new_deployment[field]['authkey'] = str(deployment[field]['authkey'])
+        new_deployment[field]['privacyprotocol'] = str(deployment[field]['privacyprotocol'])
+        new_deployment[field]['privacykey'] = str(deployment[field]['privacykey'])
     except Exception, err:
         result = str(err)
         print_errors(field, result)
