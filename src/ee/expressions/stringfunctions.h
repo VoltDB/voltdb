@@ -155,6 +155,7 @@ template<> inline NValue NValue::call<FUNC_REPEAT>(const std::vector<NValue>& ar
     bool overflowed = false;
     int64_t outputLength = NValue::multiplyAndCheckOverflow(count, argLength, &overflowed);
     if (overflowed || outputLength > ThreadLocalPool::POOLED_MAX_VALUE_LENGTH) {
+        std::ostringstream oss;
         oss << "The result of the REPEAT function is larger than the maximum size allowed for strings ("
             << ThreadLocalPool::POOLED_MAX_VALUE_LENGTH << " bytes). "
             << "Reduce either the string size or repetition count.";
