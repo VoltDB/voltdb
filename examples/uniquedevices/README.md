@@ -28,22 +28,31 @@ Finally, it is not a difficult exercise to add a history table to this example a
 
 Quickstart
 ---------------------------
-VoltDB Examples come with a run.sh script that sets up some environment and saves some of the typing needed to work with Java clients. It should be fairly readable to show what is precisely being run to accomplish a given task.
+Make sure "bin" inside the VoltDB kit is in your PATH.  Then open a shell and go to the examples/uniquedevices directory, then execute the following commands to start the database:
 
-1. Make sure "bin" inside the VoltDB kit is in your path.
-2. Type "voltdb create -f" to start an empty, single-node VoltDB server.
-3. Open a new shell in the same directory and type "sqlcmd < ddl.sql" to load the schema and the jarfile of procedures into VoltDB.
-4. Type "./run.sh client" to run the client code.
-5. Open up the index.html the "web" directory to view the status dashboard.
+    voltdb init
+    voltdb start
 
-If you're running the example on a different machine than your web browser is running on, you can run `./run.sh webserver` in a new shell and then connect to your dashboard from a browser at [http://servername:8081](http://servername:8081).
+Wait until you see "Server completed initialization."
+Open a new shell in the same directory and run the following to load the schema:
 
-You can stop the server, running client, or webserver at any time with `ctrl-c` or `SIGINT`.
+    sqlcmd < ddl.sql
+
+In the same shell, run the following script to preload some data and run the demo client application:
+
+    ./run.sh client
+
+Open up the index.html file the "web" directory to view the status dashboard.
+
+If you're running the example on a VoltDB cluster, rather than your local desktop or laptop, run `./run.sh webserver` in a new shell on one of the machines in the cluster, then connect to your dashboard from your browser at [http://servername:8081](http://servername:8081).
+
+You can stop the server, running client, or webserver at any time with `Ctrl-c` or `SIGINT`.  Of course VoltDB can also run in the background using the -B option, in which case you can stop it with the `voltadmin shutdown` command.
 
 Note that the downloaded VoltDB kits include pre-compiled stored procedures and client code as jarfiles. To run the example from a source build, it may be necessary to compile the Java source code by typing "run.sh jars" before step 3 above. Note that this step requires a full Java JDK.
 
-Other run.sh Actions
+Using the run.sh script
 ---------------------------
+VoltDB examples come with a run.sh shell script that simplifies compiling and running the example client application and other parts of the examples.
 - *run.sh* : start the server
 - *run.sh server* : start the server
 - *run.sh init* : compile stored procedures and load the schema and stored procedures
