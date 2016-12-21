@@ -34,6 +34,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
+import org.voltdb.client.ProcCallException;
 import org.voltdb.regressionsuites.StatisticsTestSuiteBase;
 
 public class TestStatisticsSuiteDRStats extends StatisticsTestSuiteBase {
@@ -187,6 +188,35 @@ public class TestStatisticsSuiteDRStats extends StatisticsTestSuiteBase {
         columnTargets.put("HOSTNAME", results[1].getString("HOSTNAME"));
         validateRowSeenAtAllHosts(results[1], columnTargets, true);
     }
+
+    public void testDRRole() throws IOException, ProcCallException {
+        if (!VoltDB.instance().getConfig().m_isEnterprise) {
+            System.out.println("SKIPPING DRNODE STATS TESTS FOR COMMUNITY VERSION");
+            return;
+        }
+        System.out.println("\n\nTESTING DRROLE STATS\n\n\n");
+        Client client  = getFullyConnectedClient();
+
+        ColumnInfo[] expectedSchema2 = new ColumnInfo[3];
+        assertEquals("Expected DRRoleStatistics schema length is 3", 3, expectedSchema2.length);
+        expectedSchema2[0] = new ColumnInfo("ROLE", VoltType.STRING);
+        expectedSchema2[1] = new ColumnInfo("STATE", VoltType.STRING);
+        expectedSchema2[2] = new ColumnInfo("REMOTE_CLUSTER_ID", VoltType.INTEGER);
+        VoltTable expectedTable2 = new VoltTable(expectedSchema2);
+
+        VoltTable[] results = null;
+        //
+        // DRNODE
+        //
+        results = client.callProcedure("@Statistics", "DRROLE", 0).getResults();
+        // one aggregate tables returned
+        assertEquals(1, results.length);
+        System.out.println("Test DRROLE table: " + results[0].toString());
+        validateSchema(results[0], expectedTable2);
+        // Only one row for DRROLE stats
+        assertEquals(1, results[0].getRowCount());
+    }
+
     //
     // Build a list of the tests to be run. Use the regression suite
     // helpers to allow multiple backends.
