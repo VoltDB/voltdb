@@ -105,7 +105,6 @@ class VoltNetwork implements Runnable, IOStatsIntf
     private final HashSet<VoltPort> m_ports = new HashSet<VoltPort>();
     private final AtomicInteger m_numPorts = new AtomicInteger();
     final NetworkDBBPool m_pool = new NetworkDBBPool();
-    final NetworkDBBPool m_writePool = new NetworkDBBPool();
     private final String m_coreBindId;
     final String networkThreadName;
 
@@ -173,7 +172,7 @@ class VoltNetwork implements Runnable, IOStatsIntf
         Callable<Connection> registerTask = new Callable<Connection>() {
             @Override
             public Connection call() throws Exception {
-                final VoltPort port = getVoltPort(
+                final VoltPort port = VoltPortFactory.createVoltPort(
                                 channel,
                                 VoltNetwork.this,
                                 handler,
@@ -192,6 +191,7 @@ class VoltNetwork implements Runnable, IOStatsIntf
 
                 try {
                     SelectionKey key = channel.register (m_selector, interestOps, null);
+
                     port.setKey (key);
                     port.registered();
 
@@ -219,28 +219,6 @@ class VoltNetwork implements Runnable, IOStatsIntf
             return ft.get();
         } catch (Exception e) {
             throw new IOException(e);
-        }
-    }
-
-    private VoltPort getVoltPort(final SocketChannel channel,
-                                 final VoltNetwork network,
-                                 final InputHandler handler,
-                                 final InetSocketAddress remoteAddress,
-                                 final NetworkDBBPool pool,
-                                 final SSLEngine sslEngine) {
-        if (sslEngine == null) {
-            return new VoltPort(
-                    VoltNetwork.this,
-                    handler,
-                    (InetSocketAddress) channel.socket().getRemoteSocketAddress(),
-                    m_pool);
-        } else {
-            return new SSLVoltPort(
-                    VoltNetwork.this,
-                    handler,
-                    (InetSocketAddress) channel.socket().getRemoteSocketAddress(),
-                    m_pool,
-                    sslEngine);
         }
     }
 
@@ -383,7 +361,6 @@ class VoltNetwork implements Runnable, IOStatsIntf
         }
 
         m_pool.clear();
-        m_writePool.clear();
 
         try {
             m_selector.close();
