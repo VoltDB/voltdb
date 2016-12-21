@@ -20,6 +20,7 @@ message SnapshotReq {
     // The node sending this snapshot request. It includes the DR interface and
     // port that he remote clusters can use to connect back.
     optional NodeInfo nodeInfo = 2;
+    optional int32 globalPartitionCount = 3;
 }
 
 message Reset {
