@@ -23,6 +23,7 @@ import com.google_voltpatches.common.util.concurrent.MoreExecutors;
 import org.voltcore.utils.CoreUtils;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import org.voltcore.logging.VoltLogger;
 
 /**
  * A general service that accepts callables.  Used to encrypt and decrypt byte buffers
@@ -31,6 +32,7 @@ import java.util.concurrent.TimeUnit;
 public class SSLEncryptionService {
 
     private static SSLEncryptionService m_self;
+    private static final VoltLogger networkLog = new VoltLogger("NETWORK");
 
     private static final ListeningExecutorService m_EncEs = MoreExecutors.listeningDecorator(
             Executors.newFixedThreadPool(Math.max(2, CoreUtils.availableProcessors()/2),
@@ -55,6 +57,7 @@ public class SSLEncryptionService {
     }
 
     public void shutdown() throws InterruptedException {
+        networkLog.info("Shutting down Encryption and Decryption services.");
         if (m_EncEs != null) {
             m_EncEs.shutdown();
             m_EncEs.awaitTermination(365, TimeUnit.DAYS);
@@ -63,6 +66,7 @@ public class SSLEncryptionService {
             m_DecEs.shutdown();
             m_DecEs.awaitTermination(365, TimeUnit.DAYS);
         }
+        networkLog.info("Encryption and Decryption services successfully shutdown.");
     }
 
     public ListenableFuture<?> submitForEncryption(Runnable task) {
