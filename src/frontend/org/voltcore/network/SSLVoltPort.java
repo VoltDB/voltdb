@@ -34,6 +34,7 @@ import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
 import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class SSLVoltPort extends VoltPort {
@@ -223,7 +224,13 @@ public class SSLVoltPort extends VoltPort {
                         }
                     }
                 };
-                SSLEncryptionService.instance().submitForDecryption(task);
+                try {
+                    SSLEncryptionService.instance().submitForDecryption(task);
+                } catch (RejectedExecutionException e) {
+                    if (! m_isShuttingDown.get()) {
+                        throw e;
+                    }
+                }
             }
         }
         public void shutdown() {
@@ -284,8 +291,14 @@ public class SSLVoltPort extends VoltPort {
                         }
                     }
                 };
-                SSLEncryptionService.instance().submitForEncryption(task);
-        }
+                try {
+                    SSLEncryptionService.instance().submitForEncryption(task);
+                } catch (RejectedExecutionException e) {
+                    if (! m_isShuttingDown.get()) {
+                        throw e;
+                    }
+                }
+            }
         }
         public void shutdown() {
             m_isShuttingDown.set(true);
