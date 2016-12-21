@@ -52,7 +52,7 @@ public class SSLVoltPort extends VoltPort {
 
     private final DecryptionGateway m_decryptionGateway;
     private final EncryptionGateway m_encryptionGateway;
-    private final Deque<DBBPool.BBContainer> m_encryptedBuffers = new ConcurrentLinkedDeque<>();
+    private final Deque<EncryptionResult> m_encryptedBuffers = new ConcurrentLinkedDeque<>();
     private final Deque<List<ByteBuffer>> m_decryptedMessages = new ConcurrentLinkedDeque<>();
 
     public SSLVoltPort(VoltNetwork network, InputHandler handler, InetSocketAddress remoteAddress, NetworkDBBPool readPool, SSLEngine sslEngine) {
@@ -247,11 +247,12 @@ public class SSLVoltPort extends VoltPort {
                         try {
                             while ((fragCont = ((SSLNIOWriteStream) writeStream()).getWriteBuffer()) != null) {
                                 fragCont.b().flip();
+                                int nBytesClear = fragCont.b().remaining();
                                 if (m_isShuttingDown.get()) return;
                                 final DBBPool.BBContainer encCont = m_sslBufferEncrypter.encryptBuffer(fragCont.b().slice());
                                 fragCont.discard();
                                 fragCont = null;
-                                m_encryptedBuffers.offer(encCont);
+                                m_encryptedBuffers.offer(new EncryptionResult(encCont, nBytesClear));
                                 queuedEncBuffers = true;
                             }
                             if (queuedEncBuffers) {
@@ -281,26 +282,25 @@ public class SSLVoltPort extends VoltPort {
             return false;
         }
 
-        DBBPool.BBContainer encryptedBuffer = null;
+        EncryptionResult er = null;
         while (true) {
-            encryptedBuffer = m_encryptedBuffers.peek();
-            if (encryptedBuffer == null) {
+            er = m_encryptedBuffers.peek();
+            if (er == null) {
                 break;
             }
             int rc = 1;
-            int nBytesClear = encryptedBuffer.b().remaining();
-            while (encryptedBuffer.b().hasRemaining() && rc > 0) {
-                rc = m_channel.write(encryptedBuffer.b());
+            while (er.encCont.b().hasRemaining() && rc > 0) {
+                rc = m_channel.write(er.encCont.b());
             }
 
-            if (encryptedBuffer.b().hasRemaining()) {
+            if (er.encCont.b().hasRemaining()) {
                 m_writeStream.backpressureStarted();
                 m_network.addToChangeList(this, true);
                 return true;  // there are remaining writes to process
             } else {
                 m_encryptedBuffers.poll();
-                encryptedBuffer.discard();
-                m_writeStream.updateQueued(-nBytesClear, false);
+                er.encCont.discard();
+                m_writeStream.updateQueued(-er.m_nClearBytes, false);
                 m_writeStream.backpressureEnded();
             }
         }
@@ -341,5 +341,15 @@ public class SSLVoltPort extends VoltPort {
                 m_handler.onBackPressure(),
                 m_handler.writestreamMonitor());
         m_interestOps = key.interestOps();
+    }
+
+    private static class EncryptionResult {
+        private final DBBPool.BBContainer encCont;
+        private final int m_nClearBytes;
+
+        public EncryptionResult(DBBPool.BBContainer encCont, int m_nClearBytes) {
+            this.encCont = encCont;
+            this.m_nClearBytes = m_nClearBytes;
+        }
     }
 }
