@@ -26,6 +26,7 @@ import java.util.Set;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
@@ -328,10 +329,8 @@ class SetOpSubPlanAssembler extends SubPlanAssembler {
                     setOpPlanNode.setNeedTagColumn(true);
 
                     // Need to add a projection node on top of the coordinator SetOp node to weed out the tag column.
-                    // The children's output schemas are not generated yet at this point so we need to find
-                    // the first projection node going top down to get a child schema
                     assert(!childrenPlans.isEmpty());
-                    AbstractPlanNode projection = findTopProjection(childrenPlans.get(0).rootPlanGraph);
+                    AbstractPlanNode projection = buildProjection(childrenPlans.get(0).rootPlanGraph);
                     assert(projection != null);
                     ProjectionPlanNode coordinatorProjection = new ProjectionPlanNode(projection.getOutputSchema());
                     coordinatorProjection.addAndLinkChild(rootNode);
@@ -386,16 +385,54 @@ class SetOpSubPlanAssembler extends SubPlanAssembler {
         return setOpPlanNode;
     }
 
-    private AbstractPlanNode findTopProjection(AbstractPlanNode node) {
-        if (node instanceof ProjectionPlanNode) {
-            return node;
+    /**
+     * Build a projection node for the coordinator fragment in case of an extra TAG column was added
+     * to the partition's schema for the EXCEPT/INTERSECT set ops to aid the cross partition set op
+     * that has to be removed from the final output.
+     * We can't simply copy the projection from the first (or any) child statement even it's guaranteed
+     * to have the same column count and types because the child projection may have extra expression(s)
+     * that is unique to this child only. For example,
+     * SELECT ABS(F) FROM P1 EXCEPT SELECT F FROM P2;
+     *
+     * @param childRoot
+     * @return Coordinator's projection node
+     */
+    AbstractPlanNode buildProjection(AbstractPlanNode childRoot) {
+        AbstractPlanNode childProjecton = findTopProjection(childRoot);
+        assert(childProjecton != null);
+        assert(childProjecton.getOutputSchema() != null);
+
+        ProjectionPlanNode setOpProjection = new ProjectionPlanNode();
+        NodeSchema schema = new NodeSchema();
+        for (SchemaColumn column : childProjecton.getOutputSchema().getColumns()) {
+            TupleValueExpression tve = new TupleValueExpression(column.getTableName(), column.getTableAlias(),
+                    column.getColumnName(), column.getColumnAlias());
+            assert(column.getExpression() != null);
+            tve.setValueSize(column.getExpression().getValueSize());
+            tve.setValueType(column.getExpression().getValueType());
+            SchemaColumn setOpColumn = new SchemaColumn(tve.getTableName(), tve.getTableAlias(),
+                    tve.getColumnName(), tve.getColumnAlias(), tve);
+            schema.addColumn(setOpColumn);
         }
-        AbstractPlanNode inlineProjection = node.getInlinePlanNode(PlanNodeType.PROJECTION);
+        setOpProjection.setOutputSchemaWithoutClone(schema);
+        return setOpProjection;
+    }
+
+    /**
+     * Return the final projection for a given root node
+     * @param node
+     * @return
+     */
+    private AbstractPlanNode findTopProjection(AbstractPlanNode rootNode) {
+        if (rootNode instanceof ProjectionPlanNode) {
+            return rootNode;
+        }
+        AbstractPlanNode inlineProjection = rootNode.getInlinePlanNode(PlanNodeType.PROJECTION);
         if (inlineProjection != null) {
             return inlineProjection;
         }
-        for (int i = 0; i < node.getChildCount(); i++) {
-            AbstractPlanNode childProjection = findTopProjection(node.getChild(i));
+        for (int i = 0; i < rootNode.getChildCount(); i++) {
+            AbstractPlanNode childProjection = findTopProjection(rootNode.getChild(i));
             if (childProjection != null) {
                 return childProjection;
             }

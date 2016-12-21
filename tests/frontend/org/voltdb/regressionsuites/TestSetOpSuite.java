@@ -694,8 +694,8 @@ public class TestSetOpSuite extends RegressionSuite {
         Client client = this.getClient();
         VoltTable vt;
 
-        String sql = "(SELECT I FROM A EXCEPT ALL "
-                + "SELECT I FROM E EXCEPT ALL SELECT I FROM F) ORDER BY I;";
+        String sql = "(SELECT ABS(I) AS AI FROM A EXCEPT ALL "
+                + "SELECT I FROM E EXCEPT ALL SELECT I FROM F) ORDER BY AI;";
         // Empty tables
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         assertEquals(0, vt.getRowCount());
@@ -743,7 +743,7 @@ public class TestSetOpSuite extends RegressionSuite {
         VoltTable vt;
 
         String sql = "(SELECT I FROM A EXCEPT "
-                + "SELECT I FROM E EXCEPT SELECT I FROM F) ORDER BY I;";
+                + "SELECT ABS(I) FROM E EXCEPT SELECT I FROM F) ORDER BY I;";
         // Empty tables
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         assertEquals(0, vt.getRowCount());
@@ -759,7 +759,7 @@ public class TestSetOpSuite extends RegressionSuite {
         client.callProcedure("InsertA", 0, 0); // out eliminated by E (1,0)
         client.callProcedure("InsertA", 1, 0); // out eliminated by E (1,0)
         client.callProcedure("InsertA", 2, 0); // out eliminated by E (1,0)
-        client.callProcedure("InsertA", 3, 3); // in 
+        client.callProcedure("InsertA", 3, 3); // in
         client.callProcedure("InsertA", 4, 5); // out duplicate
         client.callProcedure("InsertA", 5, 5); // out duplicate
         client.callProcedure("InsertA", 7, 4); // out  eliminated by F (2,4)
@@ -787,8 +787,8 @@ public class TestSetOpSuite extends RegressionSuite {
         Client client = this.getClient();
         VoltTable vt;
 
-        String sql = "(SELECT I FROM A INTERSECT ALL "
-                + "SELECT I FROM E INTERSECT ALL SELECT I FROM F) ORDER BY I;";
+        String sql = "(SELECT ABS(I) AS AI FROM A INTERSECT ALL "
+                + "SELECT I FROM E INTERSECT ALL SELECT I FROM F) ORDER BY AI;";
         // Empty tables
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         assertEquals(0, vt.getRowCount());
@@ -835,7 +835,7 @@ public class TestSetOpSuite extends RegressionSuite {
         VoltTable vt;
 
         String sql = "(SELECT I FROM A INTERSECT "
-                + "SELECT I FROM E INTERSECT SELECT I FROM F) ORDER BY I;";
+                + "SELECT ABS(I) FROM E INTERSECT SELECT I FROM F) ORDER BY I;";
         // Empty tables
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         assertEquals(0, vt.getRowCount());

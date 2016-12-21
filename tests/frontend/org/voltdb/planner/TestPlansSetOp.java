@@ -668,9 +668,6 @@ public class TestPlansSetOp extends PlannerTestCase {
         PlanNodeType[] coordinatorTypes;
         PlanNodeType[] setOpChildren;
 
-        pns = compileToFragments("SELECT ABS(F) as tag FROM T1 INTERSECT  SELECT F FROM T1 ORDER BY tag;");
-        assert(false);
-
         // No partitioning columns in the output
         pns = compileToFragments("select T1.DESC from T1 union select T5.TEXT from T5");
         coordinatorTypes = new PlanNodeType[] {PlanNodeType.SETOPRECEIVE};
@@ -682,30 +679,35 @@ public class TestPlansSetOp extends PlannerTestCase {
         setOpChildren = new PlanNodeType[] {PlanNodeType.SEQSCAN, PlanNodeType.SEQSCAN};
         checkPushedDownSetOp(pns, coordinatorTypes, SetOpType.UNION_ALL, setOpChildren);
 
-        pns = compileToFragments("select T1.DESC from T1 except select T5.TEXT from T5");
+        pns = compileToFragments("SELECT ABS(F) as tag FROM T1 except  SELECT F FROM T1");
         coordinatorTypes = new PlanNodeType[] {PlanNodeType.PROJECTION, PlanNodeType.SETOPRECEIVE};
         setOpChildren = new PlanNodeType[] {PlanNodeType.SEQSCAN, PlanNodeType.SEQSCAN};
         checkPushedDownSetOp(pns, coordinatorTypes, SetOpType.EXCEPT, setOpChildren);
+        verifyOutputSchema(pns.get(0), 1);
 
         pns = compileToFragments("select T1.DESC from T1 except all select T5.TEXT from T5");
         coordinatorTypes = new PlanNodeType[] {PlanNodeType.PROJECTION, PlanNodeType.SETOPRECEIVE};
         setOpChildren = new PlanNodeType[] {PlanNodeType.SEQSCAN, PlanNodeType.SEQSCAN};
         checkPushedDownSetOp(pns, coordinatorTypes, SetOpType.EXCEPT_ALL, setOpChildren);
+        verifyOutputSchema(pns.get(0), 1);
 
-        pns = compileToFragments("select T1.DESC from T1 intersect select T5.TEXT from T5");
+        pns = compileToFragments("SELECT F  FROM T1 intersect  SELECT ABS(F)  FROM T1;");
         coordinatorTypes = new PlanNodeType[] {PlanNodeType.PROJECTION, PlanNodeType.SETOPRECEIVE};
         setOpChildren = new PlanNodeType[] {PlanNodeType.SEQSCAN, PlanNodeType.SEQSCAN};
         checkPushedDownSetOp(pns, coordinatorTypes, SetOpType.INTERSECT, setOpChildren);
+        verifyOutputSchema(pns.get(0), 1);
 
         pns = compileToFragments("select T1.DESC from T1 intersect all select T5.TEXT from T5");
         coordinatorTypes = new PlanNodeType[] {PlanNodeType.PROJECTION, PlanNodeType.SETOPRECEIVE};
         setOpChildren = new PlanNodeType[] {PlanNodeType.SEQSCAN, PlanNodeType.SEQSCAN};
         checkPushedDownSetOp(pns, coordinatorTypes, SetOpType.INTERSECT_ALL, setOpChildren);
+        verifyOutputSchema(pns.get(0), 1);
 
         pns = compileToFragments("select T1.A1 from T1 where T1.A1 < 100 except select T1.A1 from T1 where T1.A1 < 100");
         coordinatorTypes = new PlanNodeType[] {PlanNodeType.PROJECTION, PlanNodeType.SETOPRECEIVE};
         setOpChildren = new PlanNodeType[] {PlanNodeType.SEQSCAN, PlanNodeType.SEQSCAN};
         checkPushedDownSetOp(pns, coordinatorTypes, SetOpType.EXCEPT, setOpChildren);
+        verifyOutputSchema(pns.get(0), 1);
 
         pns = compileToFragments("select T1.A1 from T1 where T1.A1 < 100 union select T1.A1 from T1 where T1.A1 < 100");
         coordinatorTypes = new PlanNodeType[] {PlanNodeType.SETOPRECEIVE};
@@ -736,6 +738,13 @@ public class TestPlansSetOp extends PlannerTestCase {
         setOpChildren = new PlanNodeType[] {PlanNodeType.INDEXSCAN, PlanNodeType.INDEXSCAN};
         checkPushedDownSetOp(pns, coordinatorTypes, SetOpType.UNION, setOpChildren);
 
+    }
+
+    private void verifyOutputSchema(AbstractPlanNode coordinatorRootNode, int columnCount) {
+        assertEquals(columnCount, coordinatorRootNode.getOutputSchema().getColumns().size());
+        for (SchemaColumn column : coordinatorRootNode.getOutputSchema().getColumns()) {
+            assertTrue(!SetOpPlanNode.TMP_COLUMN_NAME.equals(column.getColumnName()));
+        }
     }
 
     private void checkPushedDownSetOp(List<AbstractPlanNode> pns, PlanNodeType[] coordinatorTypes, SetOpType setOpType, PlanNodeType[] setOpChildren) {
