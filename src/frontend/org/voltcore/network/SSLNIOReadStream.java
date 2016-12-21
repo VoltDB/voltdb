@@ -54,9 +54,6 @@ import java.util.concurrent.ConcurrentLinkedDeque;
 
 class SSLNIOReadStream extends NIOReadStream {
 
-    private final Deque<DBBPool.BBContainer> m_readBBContainers = new ConcurrentLinkedDeque<>();
-    private int m_totalAvailable = 0;
-
     int getBytes(ByteBuffer output) {
         int totalBytesCopied = 0;
         DBBPool.BBContainer poolCont = null;
@@ -133,10 +130,4 @@ class SSLNIOReadStream extends NIOReadStream {
         return bytesRead;
     }
 
-    void shutdown() {
-        for (DBBPool.BBContainer c : m_readBBContainers) {
-            c.discard();
-        }
-        m_readBBContainers.clear();
-    }
 }

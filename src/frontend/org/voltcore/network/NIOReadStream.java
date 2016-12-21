@@ -48,6 +48,8 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ReadableByteChannel;
 import java.util.ArrayDeque;
+import java.util.Deque;
+import java.util.concurrent.ConcurrentLinkedDeque;
 
 import org.voltcore.utils.DBBPool.BBContainer;
 
@@ -224,9 +226,9 @@ public class NIOReadStream {
         m_poolBBContainer = null;
     }
 
-    private final ArrayDeque<BBContainer> m_readBBContainers = new ArrayDeque<BBContainer>();
+    protected final Deque<BBContainer> m_readBBContainers = new ConcurrentLinkedDeque<BBContainer>();
     private BBContainer m_poolBBContainer = null;
-    private int m_totalAvailable = 0;
+    protected int m_totalAvailable = 0;
     private long m_bytesRead = 0;
     private long m_lastBytesRead = 0;
 
