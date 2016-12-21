@@ -24,8 +24,11 @@ public enum GetActionArgument {
 
     final String m_verb;
 
+    GetActionArgument() {
+        m_verb = name().toLowerCase();
+    }
+
     GetActionArgument(String verb) {
         m_verb = verb;
     }
-
 }

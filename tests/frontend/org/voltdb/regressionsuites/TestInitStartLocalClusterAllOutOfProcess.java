@@ -121,7 +121,7 @@ public class TestInitStartLocalClusterAllOutOfProcess extends JUnit4LocalCluster
         ServerThread server = new ServerThread(c1);
 
         try {
-            server.initialize();
+            server.cli();
         } catch (Throwable ex) {
             //Good
         }

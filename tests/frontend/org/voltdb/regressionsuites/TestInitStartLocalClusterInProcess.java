@@ -119,7 +119,7 @@ public class TestInitStartLocalClusterInProcess extends JUnit4LocalClusterTest {
         ServerThread server = new ServerThread(c1);
 
         try {
-            server.initialize();
+            server.cli();
         } catch (SimulatedExitException ex) {
             //Good
         }

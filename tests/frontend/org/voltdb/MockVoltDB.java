@@ -388,6 +388,13 @@ public class MockVoltDB implements VoltDBInterface
         voltconfig = config;
     }
 
+    @Override
+    public void cli(Configuration config)
+    {
+        m_noLoadLib = config.m_noLoadLibVOLTDB;
+        voltconfig = config;
+    }
+
     public void createStartActionNode(int index, StartAction action) {
         VoltZK.createStartActionNode(m_hostMessenger.getZK(), m_hostMessenger.getHostId() + index, action);
     }

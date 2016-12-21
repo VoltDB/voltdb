@@ -73,6 +73,11 @@ public interface VoltDBInterface
      * @param config Configuration from command line.
      */
     public void initialize(VoltDB.Configuration config);
+    /**
+     * CLI entry point for getting config from VoltDB
+     * @param config Configuration from command line.
+     */
+    public void cli(VoltDB.Configuration config);
 
     /**
      * Start all the site's event loops. That's it.
