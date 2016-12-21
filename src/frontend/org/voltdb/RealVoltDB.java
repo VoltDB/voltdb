@@ -1237,15 +1237,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             }
 
             if (!isRejoin) {
-                int expectedHosts = m_catalogContext.getClusterSettings().hostcount();
                 if (m_joining) {
-                    expectedHosts = m_messenger.getLiveHostIds().size() + m_configuredReplicationFactor + 1;
-                }
-                try {
+                    // elastic join
+                    int expectedHosts = m_configuredReplicationFactor + 1;
+                    m_messenger.waitForJoiningHostsToBeReady(expectedHosts);
+                } else {
+                    // initial start or recover
+                    int expectedHosts = m_catalogContext.getClusterSettings().hostcount();
                     m_messenger.waitForAllHostsToBeReady(expectedHosts);
-                } catch (Exception e) {
-                    hostLog.fatal("Failed to announce ready state.");
-                    VoltDB.crashLocalVoltDB("Failed to announce ready state.", false, null);
                 }
             }
 

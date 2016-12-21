@@ -300,7 +300,6 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     private final Config m_config;
     private final SocketJoiner m_joiner;
     private final VoltNetworkPool m_network;
-    private volatile boolean m_localhostReady = false;
     // memoized InstanceId
     private InstanceId m_instanceId = null;
     private boolean m_shuttingDown = false;
@@ -1497,27 +1496,41 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     /**
      * Block on this call until the number of ready hosts is
      * equal to the number of expected hosts.
-     *
-     * @return True if returning with all hosts ready. False if error.
      */
     public void waitForAllHostsToBeReady(int expectedHosts) {
-        m_localhostReady = true;
         try {
             m_zk.create(CoreZK.readyhosts_host, null, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
             while (true) {
                 ZKUtil.FutureWatcher fw = new ZKUtil.FutureWatcher();
-                if (m_zk.getChildren(CoreZK.readyhosts, fw).size() == expectedHosts) {
+                int readyHosts = m_zk.getChildren(CoreZK.readyhosts, fw).size();
+                if ( readyHosts == expectedHosts) {
                     break;
                 }
                 fw.get();
             }
-        } catch (Exception e) {
+        } catch (KeeperException | InterruptedException e) {
             org.voltdb.VoltDB.crashLocalVoltDB("Error waiting for hosts to be ready", false, e);
         }
     }
 
-    public synchronized boolean isLocalHostReady() {
-        return m_localhostReady;
+    /**
+     * For elastic join. Block on this call until the number of ready hosts is
+     * equal to the number of expected joining hosts.
+     */
+    public void waitForJoiningHostsToBeReady(int expectedHosts) {
+        try {
+            m_zk.create(CoreZK.readyjoininghosts_host, null, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
+            while (true) {
+                ZKUtil.FutureWatcher fw = new ZKUtil.FutureWatcher();
+                int readyHosts = m_zk.getChildren(CoreZK.readyjoininghosts, fw).size();
+                if ( readyHosts == expectedHosts) {
+                    break;
+                }
+                fw.get();
+            }
+        } catch (KeeperException | InterruptedException e) {
+            org.voltdb.VoltDB.crashLocalVoltDB("Error waiting for hosts to be ready", false, e);
+        }
     }
 
     public void shutdown() throws InterruptedException
