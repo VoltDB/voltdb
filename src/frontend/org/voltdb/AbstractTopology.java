@@ -1391,6 +1391,16 @@ public class AbstractTopology {
         return partition.k;
     }
 
+    public boolean hasMissingPartitions() {
+        Set<Partition> partitions = Sets.newHashSet();
+        for (Host host : hostsById.values()) {
+            if (host.isLive) {
+                partitions.addAll(host.partitions);
+            }
+        }
+        return getPartitionCount() > partitions.size();
+    }
+
     /**
      * reassign partition leaders from the hosts to other hosts.
      * @param topology current topology

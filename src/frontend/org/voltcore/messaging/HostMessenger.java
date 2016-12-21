@@ -26,6 +26,7 @@ import java.net.SocketException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -47,6 +48,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.zookeeper_voltpatches.CreateMode;
+import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.data.Stat;
@@ -243,15 +245,15 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     /**
      * Stores the information about the host's IP.
      */
-    private static class HostInfo {
+    public static class HostInfo {
 
         private final static String HOST_IP = "hostIp";
         private final static String GROUP = "group";
         private final static String LOCAL_SITES_COUNT = "localSitesCount";
 
         final String m_hostIp;
-        final String m_group;
-        final int m_localSitesCount;
+        public final String m_group;
+        public int m_localSitesCount;
 
         public HostInfo(String hostIp, String group, int localSitesCount) {
             m_hostIp = hostIp;
@@ -1161,6 +1163,37 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         return sphMap;
     }
 
+    public Map<Integer, HostInfo> getHostInfoMapFromZK() throws KeeperException, InterruptedException, JSONException {
+
+        Map<Integer, HostInfo> hostInfoMap = Maps.newHashMap();
+        List<String> children = m_zk.getChildren(CoreZK.hosts, false);
+        Queue<ZKUtil.ByteArrayCallback> callbacks = new ArrayDeque<ZKUtil.ByteArrayCallback>();
+        // issue all callbacks except the last one
+        for (int i = 0; i < children.size() - 1; i++) {
+            ZKUtil.ByteArrayCallback cb = new ZKUtil.ByteArrayCallback();
+            m_zk.getData(ZKUtil.joinZKPath(CoreZK.hosts, children.get(i)), false, cb, null);
+            callbacks.offer(cb);
+        }
+
+        // remember the last callback
+        ZKUtil.ByteArrayCallback lastCallback = new ZKUtil.ByteArrayCallback();
+        String lastChild = children.get(children.size() - 1);
+        m_zk.getData(ZKUtil.joinZKPath(CoreZK.hosts, lastChild), false, lastCallback, null);
+
+        // wait for the last callback to finish
+        byte[] lastPayload = lastCallback.getData();
+        final HostInfo lastOne = HostInfo.fromBytes(lastPayload);
+        hostInfoMap.put(parseHostId(lastChild), lastOne);
+
+        // now all previous callbacks should have finished
+        for (int i = 0; i < children.size() - 1; i++) {
+            byte[] payload = callbacks.poll().getData();
+            final HostInfo info = HostInfo.fromBytes(payload);
+            hostInfoMap.put(parseHostId(children.get(i)), info);
+        }
+
+        return hostInfoMap;
+    }
     public boolean isPaused() {
         return m_paused.get();
     }

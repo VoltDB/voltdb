@@ -91,7 +91,7 @@ public class MeshProber implements JoinAcceptor {
     private static final String START_ACTION = "startAction";
     private static final String ENTERPRISE = "enterprise";
     private static final String TERMINUS_NONCE = "terminusNonce";
-    private static final String INACTIVE_HOST_COUNT = "inactiveHostCount";
+    private static final String MISSING_HOST_COUNT = "missingHostCount";
 
     private static final VoltLogger m_networkLog = new VoltLogger("NETWORK");
 
@@ -197,7 +197,7 @@ public class MeshProber implements JoinAcceptor {
     protected final boolean m_addAllowed;
     protected final boolean m_safeMode;
     protected final String m_terminusNonce;
-    protected final int m_inactiveHostCount;
+    protected final int m_missingHostCount;
     protected final HostCriteriaRef m_hostCriteria = new HostCriteriaRef();
     /*
      * on probe startup mode this future is set when there are enough
@@ -211,7 +211,7 @@ public class MeshProber implements JoinAcceptor {
             boolean bare, UUID configHash, Supplier<Integer> hostCountSupplier,
             int kFactor, boolean paused, Supplier<NodeState> nodeStateSupplier,
             boolean addAllowed, boolean safeMode, String terminusNonce,
-            int inactiveHostCount) {
+            int missingHostCount) {
 
         checkArgument(versionChecker != null, "version checker is null");
         checkArgument(configHash != null, "config hash is null");
@@ -241,7 +241,7 @@ public class MeshProber implements JoinAcceptor {
         this.m_addAllowed = addAllowed;
         this.m_safeMode = safeMode;
         this.m_terminusNonce = terminusNonce;
-        this.m_inactiveHostCount = inactiveHostCount;
+        this.m_missingHostCount = missingHostCount;
 
         this.m_meshHash = Digester.md5AsUUID("hostCount="+ hostCountSupplier.get() + '|' + this.m_coordinators.toString());
     }
@@ -312,8 +312,8 @@ public class MeshProber implements JoinAcceptor {
         return m_terminusNonce;
     }
 
-    public int getInactiveHostCount() {
-        return m_inactiveHostCount;
+    public int getmissingHostCount() {
+        return m_missingHostCount;
     }
 
     public HostCriteria asHostCriteria() {
@@ -526,7 +526,7 @@ public class MeshProber implements JoinAcceptor {
         int operational = 0;
         int haveTerminus = 0;
         int hostCount = getHostCount();
-        int inactiveHostCount = getInactiveHostCount();
+        int missingHostCount = getmissingHostCount();
 
         // both paused and safemode need to be specified on only one node to
         // make them a cluster attribute. These are overridden if there are
@@ -557,7 +557,7 @@ public class MeshProber implements JoinAcceptor {
                 ++haveTerminus;
             }
         }
-        int expectedHostCount = hostCount - inactiveHostCount;
+        int expectedHostCount = hostCount - missingHostCount;
         // not enough host criteria to make a determination
         if (hostCriteria.size() < expectedHostCount && operational == 0) {
             m_networkLog.debug("have yet to receive all the required host criteria");
@@ -651,7 +651,7 @@ public class MeshProber implements JoinAcceptor {
                 + ", meshHash=" + m_meshHash + ", hostCount=" + m_hostCountSupplier.get()
                 + ", kFactor=" + m_kFactor + ", paused=" + m_paused
                 + ", addAllowed=" + m_addAllowed + ", safeMode=" + m_safeMode
-                + ", inactiveHostCount=" + m_inactiveHostCount + "]";
+                + ", missingHostCount=" + m_missingHostCount + "]";
     }
 
     public void appendTo(JSONWriter jw) throws JSONException {
@@ -672,6 +672,8 @@ public class MeshProber implements JoinAcceptor {
         jw.keySymbolValuePair(ADD_ALLOWED, m_addAllowed);
         jw.keySymbolValuePair(SAFE_MODE, m_safeMode);
         jw.keySymbolValuePair(TERMINUS_NONCE, m_terminusNonce);
+        jw.keySymbolValuePair(MISSING_HOST_COUNT, m_missingHostCount);
+
         jw.endObject();
     }
 
@@ -765,7 +767,7 @@ public class MeshProber implements JoinAcceptor {
         protected boolean m_addAllowed = false;
         protected boolean m_safeMode = false;
         protected String m_terminusNonce = null;
-        protected int m_inactiveHostCount = 0;
+        protected int m_missingHostCount = 0;
 
         protected Builder() {
         }
@@ -784,7 +786,7 @@ public class MeshProber implements JoinAcceptor {
             m_addAllowed = o.m_addAllowed;
             m_safeMode = o.m_safeMode;
             m_terminusNonce = o.m_terminusNonce;
-            m_inactiveHostCount = o.m_inactiveHostCount;
+            m_missingHostCount = o.m_missingHostCount;
             return this;
         }
 
@@ -871,8 +873,8 @@ public class MeshProber implements JoinAcceptor {
             return this;
         }
 
-        public Builder inactiveHostCount(int inactiveHostCount) {
-            m_inactiveHostCount = inactiveHostCount;
+        public Builder missingHostCount(int missingHostCount) {
+            m_missingHostCount = missingHostCount;
             return this;
         }
 
@@ -894,7 +896,7 @@ public class MeshProber implements JoinAcceptor {
                     m_addAllowed,
                     m_safeMode,
                     m_terminusNonce,
-                    m_inactiveHostCount
+                    m_missingHostCount
                     );
         }
     }
