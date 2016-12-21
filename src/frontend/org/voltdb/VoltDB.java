@@ -329,7 +329,6 @@ public class VoltDB {
 
         public Configuration(String args[]) {
             String arg;
-            exitAfterMessage = false;
             /*
              *  !!! D O  N O T  U S E  hostLog  T O  L O G ,  U S E  System.[out|err]  I N S T E A D
              */
@@ -633,13 +632,6 @@ public class VoltDB {
                     referToDocAndExit();
                 }
             }
-            // set file logger root file directory. From this point on you can use loggers
-            if (m_startAction != null && !m_startAction.isLegacy()) {
-                VoltLog4jLogger.setFileLoggerRoot(m_voltdbRoot);
-            }
-            /*
-             *  !!! F R O M  T H I S  P O I N T  O N  Y O U  M A Y  U S E  hostLog  T O  L O G
-             */
             //I am a get
             if (m_startAction == StartAction.GET) {
                 //We dont want crash file created.
@@ -649,6 +641,13 @@ public class VoltDB {
                 m_pathToDeployment = depFH.getAbsolutePath();
                 return;
             }
+            // set file logger root file directory. From this point on you can use loggers
+            if (m_startAction != null && !m_startAction.isLegacy()) {
+                VoltLog4jLogger.setFileLoggerRoot(m_voltdbRoot);
+            }
+            /*
+             *  !!! F R O M  T H I S  P O I N T  O N  Y O U  M A Y  U S E  hostLog  T O  L O G
+             */
             if (m_forceCatalogUpgrade) {
                 hostLog.info("Forced catalog upgrade will occur due to command line option.");
             }

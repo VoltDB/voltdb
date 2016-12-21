@@ -21,14 +21,16 @@ voltdbroot_help = ('Specifies the root directory for the database. The default '
 @VOLT.Command(
     description = 'Get voltdb configuration settings.',
     options = (
-        VOLT.StringOption('-D', '--dir', 'directory_spec', voltdbroot_help, default = "voltdbroot"),
         VOLT.StringOption('-o', '--out', 'output', 'File to save configuration obtained.', default=""),
     ),
     arguments = (
-        VOLT.StringArgument('deployment', 'Get deployment configuration.', default = 'deployment')
+        VOLT.StringArgument('deployment', 'Get deployment configuration of current node.', default = 'deployment'),
+        VOLT.StringArgument('voltdbroot', voltdbroot_help, min_count=1, max_count=1, optional = True, default="voltdbroot" )
     )
 )
 
 def get(runner):
-    runner.args.extend(['get', 'deployment', 'getvoltdbroot', runner.opts.directory_spec, 'file', runner.opts.output])
+    if runner.opts.voltdbroot is None:
+        runner.opts.voltdbroot = "voltdbroot"
+    runner.args.extend(['get', runner.opts.deployment, 'getvoltdbroot', runner.opts.voltdbroot, 'file', runner.opts.output])
     runner.java_execute('org.voltdb.VoltDB', None, *runner.args)
