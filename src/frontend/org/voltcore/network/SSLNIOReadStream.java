@@ -54,12 +54,14 @@ import java.util.concurrent.ConcurrentLinkedDeque;
 
 class SSLNIOReadStream extends NIOReadStream {
 
+    private final Deque<DBBPool.BBContainer> m_readBBContainers = new ConcurrentLinkedDeque<DBBPool.BBContainer>();
+
     int getBytes(ByteBuffer output) {
         int totalBytesCopied = 0;
         DBBPool.BBContainer poolCont = null;
         while (m_totalAvailable > 0 && output.hasRemaining()) {
             if (poolCont == null) {
-                poolCont = m_readBBContainers.peekFirst();
+                poolCont = getReadContainers().peekFirst();
                 if (poolCont == null) {
                     return totalBytesCopied;
                 }
@@ -75,7 +77,7 @@ class SSLNIOReadStream extends NIOReadStream {
             } else {
                 int bytesToCopy = poolCont.b().remaining();
                 output.put(poolCont.b());
-                poolCont = m_readBBContainers.pollFirst();
+                poolCont = getReadContainers().pollFirst();
                 poolCont.discard();
                 poolCont = null;
                 totalBytesCopied += bytesToCopy;
@@ -108,7 +110,7 @@ class SSLNIOReadStream extends NIOReadStream {
                     bytesRead += lastRead;
                     if (!poolCont.b().hasRemaining()) {
                         poolCont.b().flip();
-                        m_readBBContainers.addLast(poolCont);
+                        getReadContainers().addLast(poolCont);
                         poolCont = null;
                     }
                 }
@@ -117,7 +119,7 @@ class SSLNIOReadStream extends NIOReadStream {
             if (poolCont != null) {
                 if (poolCont.b().position() > 0) {
                     poolCont.b().flip();
-                    m_readBBContainers.addLast(poolCont);
+                    getReadContainers().addLast(poolCont);
                 } else {
                     poolCont.discard();
                 }
@@ -128,6 +130,10 @@ class SSLNIOReadStream extends NIOReadStream {
         }
 
         return bytesRead;
+    }
+
+    Deque<DBBPool.BBContainer> getReadContainers() {
+        return m_readBBContainers;
     }
 
 }

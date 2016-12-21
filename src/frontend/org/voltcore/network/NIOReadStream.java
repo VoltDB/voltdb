@@ -49,7 +49,6 @@ import java.nio.ByteBuffer;
 import java.nio.channels.ReadableByteChannel;
 import java.util.ArrayDeque;
 import java.util.Deque;
-import java.util.concurrent.ConcurrentLinkedDeque;
 
 import org.voltcore.utils.DBBPool.BBContainer;
 
@@ -76,36 +75,6 @@ public class NIOReadStream {
         return output;
     }
 
-    int getBytes(ByteBuffer output) {
-        int totalBytesCopied = 0;
-        while (m_totalAvailable > 0 && output.hasRemaining()) {
-            BBContainer firstC = getFirstC();
-            ByteBuffer first = firstC.b();
-            assert first.remaining() > 0;
-
-            if (first.remaining() >= output.remaining()) {
-                int bytesToCopy = output.remaining();
-                int oldLimit = first.limit();
-                first.limit(first.position() + bytesToCopy);
-                output.put(first);
-                first.limit(oldLimit);
-                totalBytesCopied += bytesToCopy;
-                m_totalAvailable -= bytesToCopy;
-            } else {
-                int bytesToCopy = first.remaining();
-                output.put(first);
-                totalBytesCopied += bytesToCopy;
-                m_totalAvailable -= bytesToCopy;
-            }
-            if (first.remaining() == 0) {
-                // read an entire block: move it to the empty buffers list
-                m_readBBContainers.poll();
-                firstC.discard();
-            }
-        }
-        return totalBytesCopied;
-    }
-
     /**
      * Move all bytes in current read buffers to output array, free read buffers
      * back to thread local memory pool.
@@ -119,11 +88,11 @@ public class NIOReadStream {
 
         int bytesCopied = 0;
         while (bytesCopied < output.length) {
-            BBContainer firstC = m_readBBContainers.peekFirst();
+            BBContainer firstC = getReadContainers().peekFirst();
             if (firstC == null) {
                 // Steal the write buffer
                 m_poolBBContainer.b().flip();
-                m_readBBContainers.add(m_poolBBContainer);
+                getReadContainers().add(m_poolBBContainer);
                 firstC = m_poolBBContainer;
                 m_poolBBContainer = null;
             }
@@ -140,22 +109,10 @@ public class NIOReadStream {
 
             if (first.remaining() == 0) {
                 // read an entire block: move it to the empty buffers list
-                m_readBBContainers.poll();
+                getReadContainers().poll();
                 firstC.discard();
             }
         }
-    }
-
-    private BBContainer getFirstC() {
-        BBContainer firstC = m_readBBContainers.peekFirst();
-        if (firstC == null) {
-            // Steal the write buffer
-            m_poolBBContainer.b().flip();
-            m_readBBContainers.add(m_poolBBContainer);
-            firstC = m_poolBBContainer;
-            m_poolBBContainer = null;
-        }
-        return firstC;
     }
 
     /**
@@ -195,7 +152,7 @@ public class NIOReadStream {
                     bytesRead += lastRead;
                     if (!poolBuffer.hasRemaining()) {
                         poolBuffer.flip();
-                        m_readBBContainers.add(m_poolBBContainer);
+                        getReadContainers().add(m_poolBBContainer);
                         m_poolBBContainer = null;
                     } else {
                         break;
@@ -216,17 +173,17 @@ public class NIOReadStream {
     }
 
     void shutdown() {
-        for (BBContainer c : m_readBBContainers) {
+        for (BBContainer c : getReadContainers()) {
             c.discard();
         }
         if (m_poolBBContainer != null) {
             m_poolBBContainer.discard();
         }
-        m_readBBContainers.clear();
+        getReadContainers().clear();
         m_poolBBContainer = null;
     }
 
-    protected final Deque<BBContainer> m_readBBContainers = new ConcurrentLinkedDeque<BBContainer>();
+    private final Deque<BBContainer> m_readBBContainers = new ArrayDeque<BBContainer>();
     private BBContainer m_poolBBContainer = null;
     protected int m_totalAvailable = 0;
     private long m_bytesRead = 0;
@@ -241,5 +198,9 @@ public class NIOReadStream {
         } else {
             return m_bytesRead;
         }
+    }
+
+    Deque<BBContainer> getReadContainers() {
+        return m_readBBContainers;
     }
 }
