@@ -6,6 +6,7 @@
 {@aftermath = " _math _value[int:1,3]"}
 {@agg = "_numagg"}
 {@distinctableagg = "_distinctableagg"}
+{@winagg = "_numwinagg"} -- [not used here?]
 {@cmp = "_cmp"} -- use all comparison operators (=, <>, !=, <, >, <=, >=)
 {@somecmp = "_somecmp"} -- a smaller list of comparison operators (=, <, >=) [not used here?]
 {@columnpredicate = "_variable[@comparabletype] @cmp _value[int16]"}

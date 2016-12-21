@@ -13,6 +13,7 @@
 -- {@plus10 = " + 10"}
 -- {@rankorderbytype = "int"} -- as used in the ORDER BY clause in a RANK function
 -- {@star = "*"}
+-- {@winagg = "_numwinagg"}
 
 -- DML, clean out and regenerate random data first.
 DELETE FROM @dmltable
@@ -31,10 +32,7 @@ INSERT INTO @dmltable VALUES (@insertvals)
 {_analyticfunc |= "RANK()"}
 {_analyticfunc |= "DENSE_RANK()"}
 {_analyticfunc |= "COUNT(*)"}
-{_analyticfunc |= "COUNT(_columnorexpr)"}
-{_analyticfunc |= "MIN(_columnorexpr)"}
-{_analyticfunc |= "MAX(_columnorexpr)"}
-{_analyticfunc |= "SUM(_columnorexpr)"}
+{_analyticfunc |= "@winagg(_columnorexpr)"}
 -- Test SQL Analytic (Window) functions, such as RANK
 -- ... without PARTITION BY clause:
 SELECT               @star,  _analyticfunc OVER (                                                        @orderbyclause) FUNC            FROM @fromtables W01
