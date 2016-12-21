@@ -153,7 +153,7 @@ class CompactingPool
     void freePendingAllocations(SizePtrPairSet& pendingReleaseSet)
     {
         const int32_t elemSize = elementSize();
-        SizePtrPair lowerKey = SizePtrPair(elemSize, NULL);
+        SizePtrPair lowerKey = SizePtrPair(elemSize, static_cast<void*>(NULL));
         while (true) {
             trimAllocationsPendingRelease(elemSize, pendingReleaseSet);
 
