@@ -321,30 +321,6 @@ public class SSLVoltPort extends VoltPort {
         return false;
     }
 
-    protected synchronized int fillReadStream(int maxBytes) throws IOException {
-        if ( maxBytes == 0 || m_isShuttingDown)
-            return 0;
-
-        // read from network, copy data into read buffers, which from thread local memory pool
-        final int read = readStream().read(m_channel, maxBytes, m_pool);
-
-        if (read == -1) {
-            disableReadSelection();
-
-            if (m_channel.socket().isConnected()) {
-                try {
-                    m_channel.socket().shutdownInput();
-                } catch (SocketException e) {
-                    //Safe to ignore to these
-                }
-            }
-
-            m_isShuttingDown = true;
-            m_handler.stopping(this);
-        }
-        return read;
-    }
-
     protected void setKey (SelectionKey key) {
         m_selectionKey = key;
         m_channel = (SocketChannel)key.channel();
