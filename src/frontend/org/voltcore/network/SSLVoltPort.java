@@ -99,9 +99,13 @@ public class SSLVoltPort extends VoltPort {
     }
 
     private void processReads() throws IOException {
-        final int maxRead = m_handler.getMaxRead();
-        int nRead = fillReadStream(maxRead);
-        if (nRead > 0) {
+        if (readStream().dataAvailable() == 0) {
+            final int maxRead = m_handler.getMaxRead();
+            int nRead = fillReadStream(maxRead);
+            if (nRead > 0) {
+                m_decryptionGateway.submitDecryptionTasks();
+            }
+        } else {
             m_decryptionGateway.submitDecryptionTasks();
         }
     }
