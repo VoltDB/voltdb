@@ -17,14 +17,21 @@
 
 package org.voltcore.network;
 
-
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.concurrent.atomic.AtomicLong;
 
 public abstract class VoltProtocolHandler implements InputHandler {
     /** VoltProtocolPorts each have a unique id */
-    private static final AtomicLong m_globalConnectionCounter = new AtomicLong(0);
+    private static AtomicLong m_globalConnectionCounter = new AtomicLong(0);
+
+    /** The distinct exception class allows better logging of these unexpected errors. */
+    class BadMessageLength extends IOException {
+        private static final long serialVersionUID = 8547352379044459911L;
+        public BadMessageLength(String string) {
+            super(string);
+        }
+    }
 
     /** messages read by this connection */
     private int m_sequenceId;
@@ -32,7 +39,7 @@ public abstract class VoltProtocolHandler implements InputHandler {
     private final long m_connectionId;
     private int m_nextLength;
 
-    private static final int MAX_MESSAGE_LENGTH = 52428800;
+    private static int MAX_MESSAGE_LENGTH = 52428800;
 
     public VoltProtocolHandler() {
         m_sequenceId = 0;
@@ -56,7 +63,16 @@ public abstract class VoltProtocolHandler implements InputHandler {
 
         if (m_nextLength == 0 && inputStream.dataAvailable() > (Integer.SIZE/8)) {
             m_nextLength = inputStream.getInt();
-            checkMessageLength(m_nextLength);
+            if (m_nextLength < 1) {
+                throw new BadMessageLength(
+                        "Next message length is " + m_nextLength + " which is less than 1 and is nonsense");
+            }
+            if (m_nextLength > MAX_MESSAGE_LENGTH) {
+                throw new BadMessageLength(
+                        "Next message length is " + m_nextLength + " which is greater then the hard coded " +
+                        "max of " + MAX_MESSAGE_LENGTH + ". Break up the work into smaller chunks (2 megabytes is reasonable) " +
+                        "and send as multiple messages or stored procedure invocations");
+            }
             assert m_nextLength > 0;
         }
         if (m_nextLength > 0 && inputStream.dataAvailable() >= m_nextLength) {
@@ -67,34 +83,6 @@ public abstract class VoltProtocolHandler implements InputHandler {
             m_sequenceId++;
         }
         return result;
-    }
-
-    @Override
-    public void checkMessageLength(int messageLength) throws BadMessageLength {
-        if (messageLength < 1) {
-            throw new BadMessageLength(
-                    "Next message length is " + messageLength + " which is less than 1 and is nonsense");
-        }
-        if (messageLength > MAX_MESSAGE_LENGTH) {
-            throw new BadMessageLength(
-                    "Next message length is " + messageLength + " which is greater then the hard coded " +
-                            "max of " + MAX_MESSAGE_LENGTH + ". Break up the work into smaller chunks (2 megabytes is reasonable) " +
-                            "and send as multiple messages or stored procedure invocations");
-        }
-    }
-
-    @Override
-    public boolean retrieveNextMessageHeader(NIOReadStream inputStream, ByteBuffer header) {
-        if (inputStream.dataAvailable() < header.remaining()) {
-            return false;
-        }
-        inputStream.getBytes(header);
-        return true;
-    }
-
-    @Override
-    public int fillBuffer(NIOReadStream inputStream, ByteBuffer message) {
-        return inputStream.getBytes(message);
     }
 
     @Override
@@ -122,14 +110,8 @@ public abstract class VoltProtocolHandler implements InputHandler {
         return m_sequenceId;
     }
 
-    @Override
-    public int getNextMessageLength() {
+    protected int getNextMessageLength() {
         return m_nextLength;
-    }
-
-    @Override
-    public void setNextMessageLength(int nextMessageLength) {
-        this.m_nextLength = nextMessageLength;
     }
 
 }

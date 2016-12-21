@@ -22,14 +22,6 @@ import java.nio.ByteBuffer;
 
 public interface InputHandler {
 
-    /** The distinct exception class allows better logging of these unexpected errors. */
-    class BadMessageLength extends IOException {
-        private static final long serialVersionUID = 8547352379044459911L;
-        public BadMessageLength(String string) {
-            super(string);
-        }
-    }
-
     /**
      * Retrieve the maximum number of bytes this input handler is willing to
      * read from the connection. If set to zero, no data will be read.
@@ -45,43 +37,6 @@ public interface InputHandler {
      * @return ByteBuffer containing the message data
      */
     ByteBuffer retrieveNextMessage(NIOReadStream inputStream) throws IOException;
-
-    /**
-     * Retrieves a message header into the given buffer from the connection,
-     * through the given inputStream.
-     * @param inputStream
-     * @param header
-     * @return  True if the header buffer was filled, false if not.
-     */
-    boolean retrieveNextMessageHeader(NIOReadStream inputStream, ByteBuffer header);
-
-    /**
-     * Fill the buffer from the read stream.  Writes into the buffer
-     * until either the buffer is full of the read stream is empty.
-     * @param inputStream  The inputStream
-     * @param buffer       The buffer
-     * @return the number of bytes copied into the buffer.
-     */
-    int fillBuffer(NIOReadStream inputStream, ByteBuffer buffer);
-
-    /**
-     * Checks the validity of the given message length.
-     * @param messageLength
-     * @throws BadMessageLength
-     */
-    void checkMessageLength(int messageLength) throws BadMessageLength;
-
-    /**
-     * Get the length of the next message.
-     * @return The length of the next message.
-     */
-    int getNextMessageLength();
-
-    /**
-     * Set the length of the next message.
-     * @param nextMessageLength
-     */
-    void setNextMessageLength(int nextMessageLength);
 
     /**
      * Handle the incoming message produced by retrieve next message

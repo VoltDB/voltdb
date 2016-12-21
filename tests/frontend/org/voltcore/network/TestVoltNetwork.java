@@ -67,33 +67,9 @@ public class TestVoltNetwork extends TestCase {
         }
 
         @Override
-        public ByteBuffer retrieveNextMessage(NIOReadStream inputStream) throws IOException {
+        public ByteBuffer retrieveNextMessage(NIOReadStream c) {
+            // TODO Auto-generated method stub
             return null;
-        }
-
-        @Override
-        public boolean retrieveNextMessageHeader(NIOReadStream inputStream, ByteBuffer header) {
-            return true;
-        }
-
-        @Override
-        public int fillBuffer(NIOReadStream inputStream, ByteBuffer buffer) {
-            return 0;
-        }
-
-        @Override
-        public void checkMessageLength(int messageLength) throws BadMessageLength {
-
-        }
-
-        @Override
-        public void setNextMessageLength(int nextMessageLength) {
-
-        }
-
-        @Override
-        public int getNextMessageLength() {
-            return 0;
         }
 
         @Override
