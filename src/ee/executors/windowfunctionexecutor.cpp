@@ -349,7 +349,6 @@ public:
 };
 
 class WindowedSumAgg : public WindowAggregate {
-    int m_numRows;
 public:
     WindowedSumAgg() {
     }
