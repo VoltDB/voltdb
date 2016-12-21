@@ -328,10 +328,10 @@ public class MiscUtils {
         boolean valid = true;
 
         // make it really expire tomorrow to deal with timezone whiners
-        Calendar tomorrow = GregorianCalendar.getInstance();
-        tomorrow.add(Calendar.DATE, 1);
+        Calendar yesterday = GregorianCalendar.getInstance();
+        yesterday.add(Calendar.DATE, -1);
 
-        if (tomorrow.after(licenseApi.expires())) {
+        if (yesterday.after(licenseApi.expires())) {
             if (licenseApi.hardExpiration()) {
                 if (licenseApi.isTrial()) {
                     hostLog.fatal("VoltDB trial license expired on " + expiresStr + ".");
