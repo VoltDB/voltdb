@@ -24,15 +24,18 @@ import org.voltcore.utils.EstTime;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Deque;
+import java.util.concurrent.ConcurrentLinkedDeque;
 
 public class SSLNIOWriteStream extends NIOWriteStream {
+
+    private final Deque<DBBPool.BBContainer> m_queuedBuffers = new ConcurrentLinkedDeque<DBBPool.BBContainer>();
 
     public SSLNIOWriteStream(VoltPort port, Runnable offBackPressureCallback, Runnable onBackPressureCallback, QueueMonitor monitor) {
         super(port, offBackPressureCallback, onBackPressureCallback, monitor);
     }
 
     DBBPool.BBContainer getWriteBuffer() {
-        return m_queuedBuffers.poll();
+        return getQueuedBuffers().poll();
     }
 
     @Override
@@ -70,7 +73,7 @@ public class SSLNIOWriteStream extends NIOWriteStream {
                 // Copy data allocated in heap buffer to direct buffer
                 while (buf.hasRemaining()) {
                     if (!outCont.b().hasRemaining()) {
-                        m_queuedBuffers.offer(outCont);
+                        getQueuedBuffers().offer(outCont);
                         outCont = pool.acquire();
                         outCont.b().clear();
                     }
@@ -88,7 +91,7 @@ public class SSLNIOWriteStream extends NIOWriteStream {
 
         if (outCont != null) {
             if (outCont.b().position() > 0) {
-                m_queuedBuffers.offer(outCont);
+                getQueuedBuffers().offer(outCont);
             } else {
                 outCont.discard();
             }
@@ -106,4 +109,7 @@ public class SSLNIOWriteStream extends NIOWriteStream {
         }
     }
 
+    protected Deque<DBBPool.BBContainer> getQueuedBuffers() {
+        return m_queuedBuffers;
+    }
 }

@@ -88,7 +88,7 @@ public class SSLVoltPort extends VoltPort {
             handleEncryptedBuffers();
             writeStream().checkBackpressureEnded();
         } catch (IOException ioe) {
-            ioe.printStackTrace();
+            networkLog.error("Exception in SSLVoltPort.run", ioe);
             throw ioe;
         } finally {
             synchronized (m_lock) {
@@ -211,8 +211,8 @@ public class SSLVoltPort extends VoltPort {
                             if (queuedMessages) {
                                 m_network.addToChangeList(m_port, true);
                             }
-                        } catch (Exception e) {
-                            //TODO: Add logging.
+                        } catch (IOException ioe) {
+                            networkLog.error("Exception unwrapping an SSL frame", ioe);
                             m_dstBuffer.clear();
                             return;
                         } finally {
@@ -273,8 +273,8 @@ public class SSLVoltPort extends VoltPort {
                             if (queuedEncBuffers) {
                                 m_network.addToChangeList(m_port, true);
                             }
-                        } catch (Exception e) {
-                            //TODO: Log
+                        } catch (IOException ioe) {
+                            networkLog.error("Exception wrapping an SSL frame", ioe);
                             return;
                         } finally {
                             if (fragCont != null) {

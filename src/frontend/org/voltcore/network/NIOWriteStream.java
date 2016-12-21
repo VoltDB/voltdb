@@ -327,13 +327,13 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
                 /*
                  * Nothing to write
                  */
-                if (m_currentWriteBuffer == null && m_queuedBuffers.isEmpty()) {
+                if (m_currentWriteBuffer == null && getQueuedBuffers().isEmpty()) {
                     return bytesWritten;
                 }
 
                 ByteBuffer buffer = null;
                 if (m_currentWriteBuffer == null) {
-                    m_currentWriteBuffer = m_queuedBuffers.poll();
+                    m_currentWriteBuffer = getQueuedBuffers().poll();
                     buffer = m_currentWriteBuffer.b();
                     buffer.flip();
                 } else {
@@ -364,7 +364,7 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
     public void updateWriteStats(int bytesWritten) {
         //We might fail after writing few bytes. make sure the ones that are written accounted for.
         //Not sure if we need to do any backpressure magic as client is dead and so no backpressure on this may be needed.
-        if (m_queuedBuffers.isEmpty() && m_hadBackPressure && m_queuedWrites.size() <= m_maxQueuedWritesBeforeBackpressure) {
+        if (getQueuedBuffers().isEmpty() && m_hadBackPressure && m_queuedWrites.size() <= m_maxQueuedWritesBeforeBackpressure) {
             backpressureEnded();
         }
         //Same here I dont know if we do need to do this housekeeping??
