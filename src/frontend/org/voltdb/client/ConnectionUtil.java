@@ -243,7 +243,7 @@ public class ConnectionUtil {
             try {
                 messagingChannel.writeMessage(b);
             } catch (IOException e) {
-                throw new IOException("Failed to write authentication message to server.");
+                throw new IOException("Failed to write authentication message to server.", e);
             }
             if (b.hasRemaining()) {
                 throw new IOException("Failed to write authentication message to server.");

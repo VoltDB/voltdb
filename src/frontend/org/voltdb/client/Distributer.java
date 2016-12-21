@@ -53,8 +53,6 @@ import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLEngine;
 import javax.security.auth.Subject;
 
-import jsr166y.ThreadLocalRandom;
-
 import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashMap;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -76,6 +74,8 @@ import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableSet;
 import com.google_voltpatches.common.collect.Maps;
+
+import jsr166y.ThreadLocalRandom;
 
 /**
  *   De/multiplexes transactions across a cluster
