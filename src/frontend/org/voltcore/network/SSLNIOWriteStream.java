@@ -19,6 +19,7 @@ package org.voltcore.network;
 
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DeferredSerialization;
+import org.voltcore.utils.EstTime;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -95,4 +96,24 @@ public class SSLNIOWriteStream extends NIOWriteStream {
         updateQueued(bytesQueued, true);
         return processedWrites;
     }
+
+    public void updateWriteState(int bytesWritten) {
+        //We might fail after writing few bytes. make sure the ones that are written accounted for.
+        //Not sure if we need to do any backpressure magic as client is dead and so no backpressure on this may be needed.
+        if (m_queuedBuffers.isEmpty() && m_hadBackPressure && m_queuedWrites.size() <= m_maxQueuedWritesBeforeBackpressure) {
+            backpressureEnded();
+        }
+        //Same here I dont know if we do need to do this housekeeping??
+        if (!isEmpty()) {
+            if (bytesWritten > 0) {
+                m_lastPendingWriteTime = EstTime.currentTimeMillis();
+            }
+        } else {
+            m_lastPendingWriteTime = -1;
+        }
+        if (bytesWritten > 0) {
+            m_bytesWritten += bytesWritten;
+        }
+    }
+
 }

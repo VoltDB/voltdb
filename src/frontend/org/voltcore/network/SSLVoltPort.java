@@ -283,26 +283,32 @@ public class SSLVoltPort extends VoltPort {
         }
 
         EncryptionResult er = null;
-        while (true) {
-            er = m_encryptedBuffers.peek();
-            if (er == null) {
-                break;
-            }
-            int rc = 1;
-            while (er.encCont.b().hasRemaining() && rc > 0) {
-                rc = m_channel.write(er.encCont.b());
-            }
+        int bytesWritten = 0;
+        try {
+            while (true) {
+                er = m_encryptedBuffers.peek();
+                if (er == null) {
+                    break;
+                }
+                int rc = 1;
+                while (er.encCont.b().hasRemaining() && rc > 0) {
+                    rc = m_channel.write(er.encCont.b());
+                    bytesWritten += rc;
+                }
 
-            if (er.encCont.b().hasRemaining()) {
-                m_writeStream.backpressureStarted();
-                m_network.addToChangeList(this, true);
-                return true;  // there are remaining writes to process
-            } else {
-                m_encryptedBuffers.poll();
-                er.encCont.discard();
-                m_writeStream.updateQueued(-er.m_nClearBytes, false);
-                m_writeStream.backpressureEnded();
+                if (er.encCont.b().hasRemaining()) {
+                    m_writeStream.backpressureStarted();
+                    m_network.addToChangeList(this, true);
+                    return true;  // there are remaining writes to process
+                } else {
+                    m_encryptedBuffers.poll();
+                    er.encCont.discard();
+                    m_writeStream.updateQueued(-er.m_nClearBytes, false);
+                    m_writeStream.backpressureEnded();
+                }
             }
+        } finally {
+            ((SSLNIOWriteStream) writeStream()).updateWriteState(bytesWritten);
         }
         return false;
     }

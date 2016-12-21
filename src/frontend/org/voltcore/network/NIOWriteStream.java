@@ -67,7 +67,7 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
 
     protected ArrayDeque<DeferredSerialization> m_queuedWrites = m_queuedWrites1;
 
-    private final int m_maxQueuedWritesBeforeBackpressure = 100;
+    protected final int m_maxQueuedWritesBeforeBackpressure = 100;
 
     private final Runnable m_offBackPressureCallback;
     private final Runnable m_onBackPressureCallback;
@@ -78,7 +78,7 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
      * Set to -1 when there are no pending writes. If there is a pending write it is set to the time
      * of the last successful write or the time the oldest pending write was queued.
      */
-    private long m_lastPendingWriteTime = -1;
+    protected long m_lastPendingWriteTime = -1;
 
     private int m_writeSize;
 
@@ -182,7 +182,7 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
      * Boolean used to store the latest back pressure state
      * Does this need to be volatile?
      */
-    private volatile boolean m_hadBackPressure = false;
+    protected volatile boolean m_hadBackPressure = false;
 
     /**
      * Queue a message and defer the serialization of the message until later. This is the ideal mechanism
