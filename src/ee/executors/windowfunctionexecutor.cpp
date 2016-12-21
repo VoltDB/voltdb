@@ -93,7 +93,7 @@ struct TableWindow {
 struct WindowAggregate {
     WindowAggregate()
       : m_needsLookahead(true),
-		m_inlineCopiedToOutline(false) {
+        m_inlineCopiedToOutline(false) {
     }
     virtual ~WindowAggregate() {
     }
