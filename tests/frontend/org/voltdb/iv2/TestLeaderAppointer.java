@@ -46,10 +46,10 @@ import org.voltcore.messaging.HostMessenger;
 import org.voltcore.zk.LeaderElector;
 import org.voltcore.zk.ZKTestBase;
 import org.voltcore.zk.ZKUtil;
+import org.voltdb.AbstractTopology;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
-import org.voltdb.compiler.ClusterConfig;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.Maps;
@@ -58,7 +58,8 @@ import com.google_voltpatches.common.collect.Sets;
 public class TestLeaderAppointer extends ZKTestBase {
 
     private final int NUM_AGREEMENT_SITES = 1;
-    private ClusterConfig m_config = null;
+    private int m_kfactor;
+    private AbstractTopology m_topo;
     private Set<Integer> m_hostIds;
     private Map<Integer, String> m_hostGroups;
     private MpInitiator m_mpi = null;
@@ -108,14 +109,20 @@ public class TestLeaderAppointer extends ZKTestBase {
         when(m_hm.getZK()).thenReturn(m_zk);
         VoltZK.createPersistentZKNodes(m_zk);
 
-        m_config = new ClusterConfig(hostCount, sitesPerHost, replicationFactor);
-        TheHashinator.initialize(TheHashinator.getConfiguredHashinatorClass(), TheHashinator.getConfigureBytes(m_config.getPartitionCount()));
+        Map<Integer, Integer> sphMap = Maps.newHashMap();
+        for (int hostId = 0; hostId < hostCount; hostId++) {
+            sphMap.put(hostId, sitesPerHost);
+        }
         m_hostIds = Sets.newTreeSet();
         m_hostGroups = Maps.newHashMap();
         for (int i = 0; i < hostCount; i++) {
             m_hostIds.add(i);
             m_hostGroups.put(i, "0");
         }
+        m_kfactor = replicationFactor;
+        m_topo = AbstractTopology.getTopology(sphMap, m_hostGroups, replicationFactor);
+        int partitionCount = m_topo.getPartitionCount();
+        TheHashinator.initialize(TheHashinator.getConfiguredHashinatorClass(), TheHashinator.getConfigureBytes(partitionCount));
         when(m_hm.getLiveHostIds()).thenReturn(m_hostIds);
         m_mpi = mock(MpInitiator.class);
         createAppointer(enablePPD);
@@ -127,9 +134,9 @@ public class TestLeaderAppointer extends ZKTestBase {
     void createAppointer(boolean enablePPD) throws JSONException
     {
         KSafetyStats stats = new KSafetyStats();
-        m_dut = new LeaderAppointer(m_hm, m_config.getPartitionCount(),
-                m_config.getReplicationFactor(),
-                null, m_config.getTopology(m_hostGroups), m_mpi, stats, false);
+        m_dut = new LeaderAppointer(m_hm, m_topo.getPartitionCount(),
+                m_kfactor,
+                null, m_topo.topologyToJSON(), m_mpi, stats, false);
         m_dut.onReplayCompletion();
     }
 
@@ -275,10 +282,10 @@ public class TestLeaderAppointer extends ZKTestBase {
         deleteReplica(0, m_cache.pointInTimeCache().get(0));
         // create a new appointer and start it up in the replay state
         m_dut = new LeaderAppointer(m_hm,
-                                    m_config.getPartitionCount(),
-                                    m_config.getReplicationFactor(),
+                                    m_topo.getPartitionCount(),
+                                    m_kfactor,
                                     null,
-                                    m_config.getTopology(m_hostGroups),
+                                    m_topo.topologyToJSON(),
                                     m_mpi,
                                     new KSafetyStats(),
                                     false);
@@ -522,10 +529,10 @@ public class TestLeaderAppointer extends ZKTestBase {
         deleteReplica(0, m_cache.pointInTimeCache().get(0));
         // create a new appointer and start it up with expectSyncSnapshot=true
         m_dut = new LeaderAppointer(m_hm,
-                                    m_config.getPartitionCount(),
-                                    m_config.getReplicationFactor(),
+                                    m_topo.getPartitionCount(),
+                                    m_kfactor,
                                     null,
-                                    m_config.getTopology(m_hostGroups),
+                                    m_topo.topologyToJSON(),
                                     m_mpi,
                                     new KSafetyStats(),
                                     true);

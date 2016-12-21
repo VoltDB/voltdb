@@ -17,21 +17,23 @@
 
 package org.voltdb.utils;
 
-import static org.voltdb.VoltDB.CONFIG_DIR;
-
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
+import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
@@ -50,6 +52,8 @@ import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.CLIConfig;
+import org.voltdb.VoltDB;
+import org.voltdb.common.Constants;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.processtools.SFTPSession;
@@ -181,16 +185,16 @@ public class Collector {
                 JSONStringer stringer = new JSONStringer();
 
                 stringer.object();
-                stringer.key("server").value(m_config.prefix);
+                stringer.keySymbolValuePair("server", m_config.prefix);
                 stringer.key("files").array();
                 for (String path: collectionFilesList) {
                     stringer.object();
-                    stringer.key("filename").value(path);
+                    stringer.keySymbolValuePair("filename", path);
                     if (Arrays.asList(cmdFilenames).contains(path.split(" ")[0])) {
-                        stringer.key("size").value(0);
+                        stringer.keySymbolValuePair("size", 0);
                     }
                     else {
-                        stringer.key("size").value(new File(path).length());
+                        stringer.keySymbolValuePair("size", new File(path).length());
                     }
                     stringer.endObject();
                 }
@@ -224,7 +228,7 @@ public class Collector {
     }
 
     private static void locatePaths(String voltDbRootPath) {
-        String configLogDirPath = voltDbRootPath + File.separator + CONFIG_DIR + File.separator;
+        String configLogDirPath = voltDbRootPath + File.separator + Constants.CONFIG_DIR + File.separator;
 
         m_configInfoPath = configLogDirPath + "config.json";
         m_catalogJarPath = configLogDirPath + "catalog.jar";
@@ -276,6 +280,44 @@ public class Collector {
         }
     }
 
+    private static String getLinuxOSInfo() {
+        // Supported Linux OS for voltdb are CentOS, Redhat and Ubuntu
+        String versionInfo = "";
+
+        BufferedReader br = null;
+        // files containing the distribution info
+        // Ubuntu - "/etc/lsb-release"
+        // Redhat, CentOS - "/etc/redhat-release"
+        final List<String> distInfoFilePaths = Arrays.asList("/etc/lsb-release",
+                                                            "/etc/redhat-release");
+        for (String filePath : distInfoFilePaths) {
+            if (Files.exists(Paths.get(filePath))) {
+                try {
+                    br = new BufferedReader(new FileReader(filePath));
+                }
+                catch (FileNotFoundException excp) {
+                    System.err.println(excp.getMessage());
+                }
+                break;
+            }
+        }
+
+        if (br != null) {
+            StringBuffer buffer = new StringBuffer();
+            try {
+                while ((versionInfo = br.readLine()) != null) {
+                    buffer.append(versionInfo);
+                }
+                versionInfo = buffer.toString();
+            }
+            catch (IOException io) {
+                System.err.println(io.getMessage());
+                versionInfo = "";
+            }
+        }
+        return versionInfo;
+    }
+
     private static Set<String> setCollection(boolean skipHeapDump) {
         Set<String> collectionFilesList = new HashSet<String>();
 
@@ -325,19 +367,23 @@ public class Collector {
             }
 
             String systemLogBase;
+            final String systemLogBaseDirPath = "/var/log/";
             if (System.getProperty("os.name").startsWith("Mac")) {
                 systemLogBase = "system.log";
             } else {
-                String[] unameCmd = {"bash", "-c", "lsb_release -id"};
-                Process p = Runtime.getRuntime().exec(unameCmd);
-                BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()));
-                String line = reader.readLine();
-                if (line.contains("Ubuntu"))
+                String versionInfo = getLinuxOSInfo();
+                if (versionInfo.contains("Ubuntu")) {
                     systemLogBase = "syslog";
-                else
+                }
+                else {
                     systemLogBase = "messages";
+                    if (versionInfo.isEmpty()) {
+                        System.err.println("Couldn't find distribution info for supported systems. Perform"
+                                + " lookup for system logs in files named: " + systemLogBase);
+                    }
+                }
             }
-            for (File file: new File("/var/log/").listFiles()) {
+            for (File file: new File(systemLogBaseDirPath).listFiles()) {
                 if (file.getName().startsWith(systemLogBase)) {
                     collectionFilesList.add(file.getCanonicalPath());
                 }
@@ -355,6 +401,8 @@ public class Collector {
             collectionFilesList.add("duvoltdbrootdata (result of executing \"du -h <voltdbroot>\")");
             collectionFilesList.add("dudroverflowdata (result of executing \"du -h <droverflow>\")");
             collectionFilesList.add("duexportoverflowdata (result of executing \"du -h <exportoverflow>\")");
+            collectionFilesList.add("ducommandlog (result of executing \"du -h <command_log>\")");
+            collectionFilesList.add("ducommandlogsnapshot (result of executing \"du -h <command_log_snapshot>\")");
 
             for (String fileName : m_systemStats.stringPropertyNames()) {
                 collectionFilesList.add(fileName + " (result of executing \"" + m_systemStats.getProperty(fileName) + "\")");
@@ -483,21 +531,29 @@ public class Collector {
 
                 String drOverflowPath = m_config.voltdbroot + File.separator + "dr_overflow";
                 String exportOverflowPath = m_config.voltdbroot + File.separator + "export_overflow";
+                String commandLogPath = m_config.voltdbroot + File.separator + "command_log";
+                String commandLogSnapshotPath = m_config.voltdbroot + File.separator + "command_log_snapshot";
                 DeploymentType deployment = CatalogPasswordScrambler.getDeployment(new File(m_deploymentPath));
                 PathsType deploymentPaths = deployment.getPaths();
                 if (deploymentPaths != null) {
                     PathsType.Droverflow drPath = deploymentPaths.getDroverflow();
                     if (drPath != null)
-                        drOverflowPath = drPath.getPath();
+                        drOverflowPath = VoltDB.instance().getDROverflowPath(drPath);
                     PathsType.Exportoverflow exportPath = deploymentPaths.getExportoverflow();
                     if (exportPath != null)
-                        exportOverflowPath = exportPath.getPath();
+                        exportOverflowPath = VoltDB.instance().getExportOverflowPath(exportPath);
                 }
                 String[] duDrOverflowCmd = {"bash", "-c", duCommand + " " + drOverflowPath};
                 cmd(zipStream, duDrOverflowCmd, folderPath + "system_logs" + File.separator, "dudroverflowdata");
 
                 String[] duExportOverflowCmd = {"bash", "-c", duCommand + " " + exportOverflowPath};
                 cmd(zipStream, duExportOverflowCmd, folderPath + "system_logs" + File.separator, "duexportoverflowdata");
+
+                String[] duCommadLodCmd = {"bash", "-c", duCommand + " " + commandLogPath};
+                cmd(zipStream, duCommadLodCmd, folderPath + "system_logs" + File.separator, "ducommandlog");
+
+                String[] commandLogSnapshotCmd = {"bash", "-c", duCommand + " " + commandLogSnapshotPath};
+                cmd(zipStream, commandLogSnapshotCmd, folderPath + "system_logs" + File.separator, "ducommandlogsnapshot");
             }
 
             for (String fileName : m_systemStats.stringPropertyNames()) {

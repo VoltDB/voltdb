@@ -850,7 +850,7 @@ public abstract class VoltTableRow {
         case TINYINT:
             value = getLong(columnIndex);
             if (wasNull()) {
-                js.value(null);
+                js.valueNull();
             }
             else {
                 js.value(value);
@@ -859,7 +859,7 @@ public abstract class VoltTableRow {
         case SMALLINT:
             value = getLong(columnIndex);
             if (wasNull()) {
-                js.value(null);
+                js.valueNull();
             }
             else {
                 js.value(value);
@@ -868,7 +868,7 @@ public abstract class VoltTableRow {
         case INTEGER:
             value = getLong(columnIndex);
             if (wasNull()) {
-                js.value(null);
+                js.valueNull();
             }
             else {
                 js.value(value);
@@ -877,7 +877,7 @@ public abstract class VoltTableRow {
         case BIGINT:
             value = getLong(columnIndex);
             if (wasNull()) {
-                js.value(null);
+                js.valueNull();
             }
             else {
                 js.value(value);
@@ -886,7 +886,7 @@ public abstract class VoltTableRow {
         case TIMESTAMP:
             value = getTimestampAsLong(columnIndex);
             if (wasNull()) {
-                js.value(null);
+                js.valueNull();
             }
             else {
                 js.value(value);
@@ -895,7 +895,7 @@ public abstract class VoltTableRow {
         case FLOAT:
             dvalue = getDouble(columnIndex);
             if (wasNull()) {
-                js.value(null);
+                js.valueNull();
             }
             else if (Double.isNaN(dvalue)) {
                 js.value(Double.toString(dvalue));
@@ -917,7 +917,7 @@ public abstract class VoltTableRow {
         case DECIMAL:
             Object dec = getDecimalAsBigDecimal(columnIndex);
             if (wasNull()) {
-                js.value(null);
+                js.valueNull();
             }
             else {
                 js.value(dec.toString());
@@ -926,7 +926,7 @@ public abstract class VoltTableRow {
         case GEOGRAPHY_POINT:
             GeographyPointValue pt = getGeographyPointValue(columnIndex);
             if (wasNull()) {
-                js.value(null);
+                js.valueNull();
             }
             else {
                 js.value(pt.toString());
@@ -935,7 +935,7 @@ public abstract class VoltTableRow {
         case GEOGRAPHY:
             GeographyValue gv = getGeographyValue(columnIndex);
             if (wasNull()) {
-                js.value(null);
+                js.valueNull();
             }
             else {
                 js.value(gv.toString());

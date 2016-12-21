@@ -70,10 +70,10 @@ public class BranchNode extends JoinNode {
         BranchNode newNode = new BranchNode(m_id, m_joinType, leftNode, rightNode);
 
         if (m_joinExpr != null) {
-            newNode.m_joinExpr = (AbstractExpression) m_joinExpr.clone();
+            newNode.m_joinExpr = m_joinExpr.clone();
         }
         if (m_whereExpr != null) {
-            newNode.m_whereExpr = (AbstractExpression) m_whereExpr.clone();
+            newNode.m_whereExpr = m_whereExpr.clone();
         }
         return newNode;
     }
@@ -108,8 +108,8 @@ public class BranchNode extends JoinNode {
         // At this moment all RIGHT joins are already converted to the LEFT ones
         assert (getJoinType() != JoinType.RIGHT);
 
-        ArrayList<AbstractExpression> joinList = new ArrayList<AbstractExpression>();
-        ArrayList<AbstractExpression> whereList = new ArrayList<AbstractExpression>();
+        ArrayList<AbstractExpression> joinList = new ArrayList<>();
+        ArrayList<AbstractExpression> whereList = new ArrayList<>();
 
         // Collect node's own join and where expressions
         joinList.addAll(ExpressionUtil.uncombineAny(getJoinExpression()));
@@ -274,6 +274,7 @@ public class BranchNode extends JoinNode {
     protected void collectEquivalenceFilters(
             HashMap<AbstractExpression, Set<AbstractExpression>> equivalenceSet,
             ArrayDeque<JoinNode> joinNodes) {
+        //* enable to debug */ System.out.println("DEBUG: Branch cEF in  " + this + " nodes:" + joinNodes.size() + " filters:" + equivalenceSet.size());
         if ( ! m_whereInnerList.isEmpty()) {
             ExpressionUtil.collectPartitioningFilters(m_whereInnerList,
                                                       equivalenceSet);
@@ -290,11 +291,10 @@ public class BranchNode extends JoinNode {
             ExpressionUtil.collectPartitioningFilters(m_joinInnerOuterList,
                                                       equivalenceSet);
         }
+        // One-sided join criteria can not be used to infer single partitioining for a
+        // non-inner query. In general, they do not prevent results from being generated
+        // on the partitions that don't have partition-key-qualified rows.
         if (m_joinType == JoinType.INNER) {
-            // HSQL sometimes tags single-table filters in inner joins as join clauses
-            // rather than where clauses? OR does analyzeJoinExpressions correct for this?
-            // If so, these CAN contain constant equivalences that get used as the basis for equivalence
-            // conditions that determine partitioning, so process them as where clauses.
             if ( ! m_joinInnerList.isEmpty()) {
                 ExpressionUtil.collectPartitioningFilters(m_joinInnerList,
                                                           equivalenceSet);
@@ -304,12 +304,14 @@ public class BranchNode extends JoinNode {
                                                           equivalenceSet);
             }
         }
+
         if (m_leftNode != null) {
             joinNodes.add(m_leftNode);
         }
         if (m_rightNode != null) {
             joinNodes.add(m_rightNode);
         }
+        //* enable to debug */ System.out.println("DEBUG: Branch cEF out " + this + " nodes:" + joinNodes.size() + " filters:" + equivalenceSet.size());
     }
 
     /**
@@ -446,5 +448,12 @@ public class BranchNode extends JoinNode {
         return m_joinType == JoinType.INNER &&
                (m_leftNode == null || m_leftNode.allInnerJoins()) &&
                (m_rightNode == null || m_rightNode.allInnerJoins());
+    }
+
+    @Override
+    public void gatherJoinExpressions(List<AbstractExpression> checkExpressions) {
+        super.gatherJoinExpressions(checkExpressions);
+        m_leftNode.gatherJoinExpressions(checkExpressions);
+        m_rightNode.gatherJoinExpressions(checkExpressions);
     }
 }

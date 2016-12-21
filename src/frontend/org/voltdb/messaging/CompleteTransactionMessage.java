@@ -22,6 +22,7 @@ import java.nio.ByteBuffer;
 
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.utils.CoreUtils;
+import org.voltdb.iv2.TxnEgo;
 
 public class CompleteTransactionMessage extends TransactionInfoBaseMessage
 {
@@ -79,9 +80,9 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
         setBit(ISRESTART, isRestart);
     }
 
-    public CompleteTransactionMessage(CompleteTransactionMessage msg)
+    public CompleteTransactionMessage(long initiatorHSId, long coordinatorHSId, CompleteTransactionMessage msg)
     {
-        super(msg.getInitiatorHSId(), msg.getCoordinatorHSId(), msg);
+        super(initiatorHSId, coordinatorHSId, msg);
         m_hash = msg.m_hash;
         m_flags = msg.m_flags;
     }
@@ -140,7 +141,9 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
         sb.append("COMPLETE_TRANSACTION (FROM COORD: ");
         sb.append(CoreUtils.hsIdToString(m_coordinatorHSId));
         sb.append(") FOR TXN ");
-        sb.append(m_txnId);
+        sb.append(TxnEgo.txnIdToString(m_txnId));
+        sb.append("\n SP HANDLE: ");
+        sb.append(TxnEgo.txnIdToString(getSpHandle()));
         sb.append("\n  FLAGS: ").append(m_flags);
 
         sb.append("\n  HASH: " + String.valueOf(m_hash));

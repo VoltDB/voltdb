@@ -454,8 +454,8 @@ string planNodeToString(PlanNodeType type)
     case PLAN_NODE_TYPE_TUPLESCAN: {
         return "TUPLESCAN";
     }
-    case PLAN_NODE_TYPE_PARTITIONBY: {
-        return "PARTITIONBY";
+    case PLAN_NODE_TYPE_WINDOWFUNCTION: {
+        return "WINDOWFUNCTION";
     }
     } // END OF SWITCH
     return "UNDEFINED";
@@ -509,8 +509,8 @@ PlanNodeType stringToPlanNode(string str )
         return PLAN_NODE_TYPE_MATERIALIZEDSCAN;
     } else if (str == "TUPLESCAN") {
         return PLAN_NODE_TYPE_TUPLESCAN;
-    } else if (str == "PARTITIONBY") {
-        return PLAN_NODE_TYPE_PARTITIONBY;
+    } else if (str == "WINDOWFUNCTION") {
+        return PLAN_NODE_TYPE_WINDOWFUNCTION;
     }
     return PLAN_NODE_TYPE_INVALID;
 }
@@ -617,6 +617,15 @@ string expressionToString(ExpressionType type)
     case EXPRESSION_TYPE_AGGREGATE_HYPERLOGLOGS_TO_CARD: {
         return "AGGREGATE_HYPERLOGLOGS_TO_CARD";
     }
+    case EXPRESSION_TYPE_AGGREGATE_WINDOWED_RANK: {
+        return "EXPRESSION_TYPE_AGGREGATE_WINDOWED_RANK";
+    }
+    case EXPRESSION_TYPE_AGGREGATE_WINDOWED_DENSE_RANK: {
+        return "EXPRESSION_TYPE_AGGREGATE_WINDOWED_RANK";
+    }
+    case EXPRESSION_TYPE_AGGREGATE_WINDOWED_COUNT: {
+        return "EXPRESSION_TYPE_AGGREGATE_WINDOWED_COUNT";
+    }
     case EXPRESSION_TYPE_AGGREGATE_SUM: {
         return "AGGREGATE_SUM";
     }
@@ -722,6 +731,12 @@ ExpressionType stringToExpression(string str )
         return EXPRESSION_TYPE_AGGREGATE_VALS_TO_HYPERLOGLOG;
     } else if (str == "AGGREGATE_HYPERLOGLOGS_TO_CARD") {
         return EXPRESSION_TYPE_AGGREGATE_HYPERLOGLOGS_TO_CARD;
+    } else if (str == "AGGREGATE_WINDOWED_RANK") {
+        return EXPRESSION_TYPE_AGGREGATE_WINDOWED_RANK;
+    } else if (str == "AGGREGATE_WINDOWED_DENSE_RANK") {
+        return EXPRESSION_TYPE_AGGREGATE_WINDOWED_DENSE_RANK;
+    } else if (str == "AGGREGATE_WINDOWED_COUNT") {
+        return EXPRESSION_TYPE_AGGREGATE_WINDOWED_COUNT;
     } else if (str == "AGGREGATE_SUM") {
         return EXPRESSION_TYPE_AGGREGATE_SUM;
     } else if (str == "AGGREGATE_MIN") {

@@ -64,7 +64,7 @@ public class TestMpTransactionTaskQueue extends TestCase
         m_MPpool = mock(MpRoSitePool.class);
         // Accept work for a while
         when(m_MPpool.canAcceptWork()).thenReturn(true);
-        m_dut = new MpTransactionTaskQueue(m_writeQueue,TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId());
+        m_dut = new MpTransactionTaskQueue(m_writeQueue);
         m_dut.setMpRoSitePool(m_MPpool);
     }
 

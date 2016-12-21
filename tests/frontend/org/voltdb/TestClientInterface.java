@@ -92,6 +92,7 @@ import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
+import org.voltdb.settings.DbSettings;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.MiscUtils;
@@ -99,7 +100,7 @@ import org.voltdb.utils.MiscUtils;
 public class TestClientInterface {
     // mocked objects that CI requires
     private VoltDBInterface m_volt;
-    private Queue<DeferredSerialization> statsAnswers = new ArrayDeque<DeferredSerialization>();
+    private Queue<DeferredSerialization> statsAnswers = new ArrayDeque<>();
     private int drStatsInvoked = 0;
     private StatsAgent m_statsAgent = new StatsAgent() {
         @Override
@@ -130,16 +131,13 @@ public class TestClientInterface {
     // the mailbox in CI
     //private static Mailbox m_mb = null;
 
-    private static int[] m_allPartitions = new int[] {0, 1, 2};
-
     @BeforeClass
     public static void setUpOnce() throws Exception {
         buildCatalog();
-
     }
 
-    BlockingQueue<ByteBuffer> responses = new LinkedTransferQueue<ByteBuffer>();
-    BlockingQueue<DeferredSerialization> responsesDS = new LinkedTransferQueue<DeferredSerialization>();
+    BlockingQueue<ByteBuffer> responses = new LinkedTransferQueue<>();
+    BlockingQueue<DeferredSerialization> responsesDS = new LinkedTransferQueue<>();
     private static final ScheduledExecutorService ses = Executors.newScheduledThreadPool(1);
 
     @Before
@@ -153,8 +151,8 @@ public class TestClientInterface {
         m_cartographer = mock(Cartographer.class);
 
         m_zk = mock(ZooKeeper.class);
-        responses = new LinkedTransferQueue<ByteBuffer>();
-        responsesDS = new LinkedTransferQueue<DeferredSerialization>();
+        responses = new LinkedTransferQueue<>();
+        responsesDS = new LinkedTransferQueue<>();
         //m_cxn = mock(SimpleClientResponseAdapter.class);
         drStatsInvoked = 0;
         m_cxn = new SimpleClientResponseAdapter(0, "foo") {
@@ -178,6 +176,8 @@ public class TestClientInterface {
         when(m_handler.connectionId()).thenReturn(0L);
         when(m_handler.isAdmin()).thenReturn(false);
         when(m_volt.getSES(anyBoolean())).thenReturn(m_periodicWorkThread);
+        when(m_volt.getCommandLogSnapshotPath()).thenReturn("/tmp");
+        when(m_volt.getSnapshotPath()).thenReturn("/tmp");
 
         doReturn(m_statsAgent).when(m_volt).getStatsAgent();
         doReturn(m_statsAgent).when(m_volt).getOpsAgent(OpsSelector.STATISTICS);
@@ -201,7 +201,7 @@ public class TestClientInterface {
 
         m_ci = spy(new ClientInterface(null, VoltDB.DEFAULT_PORT, null, VoltDB.DEFAULT_ADMIN_PORT,
                 m_context, m_messenger, ReplicationRole.NONE,
-                m_cartographer, m_allPartitions));
+                m_cartographer));
         m_ci.bindAdapter(m_cxn, null);
 
         //m_mb = m_ci.m_mailbox;
@@ -232,8 +232,8 @@ public class TestClientInterface {
 
         String deploymentPath = builder.getPathToDeployment();
         CatalogUtil.compileDeployment(catalog, deploymentPath, false);
-
-        m_context = new CatalogContext(0, 0, catalog, bytes, new byte[] {}, 0);
+        DbSettings dbSettings = CatalogUtil.asDbSettings(deploymentPath);
+        m_context = new CatalogContext(0, 0, catalog, dbSettings, bytes, null, new byte[] {}, 0);
         TheHashinator.initialize(TheHashinator.getConfiguredHashinatorClass(), TheHashinator.getConfigureBytes(3));
     }
 
@@ -246,10 +246,6 @@ public class TestClientInterface {
 
     }
 
-    private static ByteBuffer createMsg(String name, final Object...params) throws IOException {
-        return createMsg(null, name, params);
-    }
-
     /**
      * Create a VoltMessage that can be fed into CI's handleRead() method.
      * @param origTxnId The original txnId if it's a replicated transaction
@@ -258,14 +254,10 @@ public class TestClientInterface {
      * @return
      * @throws IOException
      */
-    private static ByteBuffer createMsg(Long origTxnId, String name,
-                                        final Object...params) throws IOException
+    private static ByteBuffer createMsg(String name, final Object...params) throws IOException
     {
         StoredProcedureInvocation proc = new StoredProcedureInvocation();
         proc.setProcName(name);
-        if (origTxnId != null) {
-            proc.setOriginalTxnId(origTxnId);
-        }
         proc.setParams(params);
         ByteBuffer buf = ByteBuffer.allocate(proc.getSerializedSize());
         proc.flattenToBuffer(buf);
@@ -478,7 +470,7 @@ public class TestClientInterface {
         catalogResult.deploymentString = "blah";
         catalogResult.expectedCatalogVersion = 3;
         catalogResult.encodedDiffCommands = "diff";
-        catalogResult.invocationType = ProcedureInvocationType.REPLICATED;
+        catalogResult.invocationType = ProcedureInvocationType.VERSION2;
         catalogResult.originalTxnId = 12345678l;
         catalogResult.originalUniqueId = 87654321l;
         catalogResult.diffCommandsLength = 10;
@@ -500,9 +492,7 @@ public class TestClientInterface {
         assertTrue(Arrays.equals("blah".getBytes(), (byte[]) message.getStoredProcedureInvocation().getParameterAtIndex(2)));
         assertEquals(3, message.getStoredProcedureInvocation().getParameterAtIndex(3));
         assertEquals("blah", message.getStoredProcedureInvocation().getParameterAtIndex(4));
-        assertEquals(ProcedureInvocationType.REPLICATED, message.getStoredProcedureInvocation().getType());
-        assertEquals(12345678l, message.getStoredProcedureInvocation().getOriginalTxnId());
-        assertEquals(87654321l, message.getStoredProcedureInvocation().getOriginalUniqueId());
+        assertEquals(ProcedureInvocationType.VERSION2, message.getStoredProcedureInvocation().getType());
     }
 
     @Test
@@ -682,15 +672,6 @@ public class TestClientInterface {
     }
 
     @Test
-    public void testRejectDupInvocation() throws IOException {
-        // by default, the mock initiator returns false for createTransaction()
-        ByteBuffer msg = createMsg(12345l, "hello", 1);
-        ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, m_cxn);
-        assertNotNull(resp);
-        assertEquals(ClientResponse.UNEXPECTED_FAILURE, resp.getStatus());
-    }
-
-    @Test
     public void testPolicyRejection() throws IOException {
         // incorrect parameters to @AdHoc proc
         ByteBuffer msg = createMsg("@AdHoc", 1, 3, 3);
@@ -825,7 +806,7 @@ public class TestClientInterface {
         assertEquals(3, vt.getRowCount());
         assertEquals(VoltType.INTEGER, vt.getColumnType(1));
 
-        Set<Integer> partitions = new HashSet<Integer>(Arrays.asList( 0, 1, 2));
+        Set<Integer> partitions = new HashSet<>(Arrays.asList( 0, 1, 2));
         while (vt.advanceRow()) {
             int partition = TheHashinator.getPartitionForParameter(VoltType.INTEGER.getValue(), vt.getLong(1));
             assertTrue(partitions.remove(partition));

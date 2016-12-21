@@ -148,7 +148,7 @@ public class SelectSubqueryExpression extends AbstractSubqueryExpression {
     }
 
     @Override
-    public Object clone() {
+    public SelectSubqueryExpression clone() {
         SelectSubqueryExpression clone = (SelectSubqueryExpression) super.clone();
         if (!m_allParameterIdxList.isEmpty()) {
             clone.m_allParameterIdxList = new ArrayList<Integer>();

@@ -49,6 +49,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.zk.MapCache;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.CommandLog;
+import org.voltdb.Consistency;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcedureRunner;
 import org.voltdb.SnapshotCompletionMonitor;
@@ -70,6 +71,7 @@ public class TestSpSchedulerDedupe extends TestCase
     VoltDBInterface vdbi;
     ProcedureRunner runner;
     Scheduler dut;
+    Consistency.ReadLevel m_readLevel = Consistency.ReadLevel.SAFE;
 
     static final String MockSPName = "MOCKSP";
     static final long dut_hsid = 11223344l;
@@ -101,6 +103,8 @@ public class TestSpSchedulerDedupe extends TestCase
         dut.setMailbox(mbox);
         dut.setCommandLog(cl);
         dut.setLock(mbox);
+
+        ((SpScheduler)dut).setConsistentReadLevelForTestOnly(m_readLevel);
     }
 
     private Iv2InitiateTaskMessage createMsg(long txnId, boolean readOnly,
@@ -109,7 +113,6 @@ public class TestSpSchedulerDedupe extends TestCase
         // Mock an invocation for MockSPName.
         StoredProcedureInvocation spi = mock(StoredProcedureInvocation.class);
         when(spi.getProcName()).thenReturn(MockSPName);
-        when(spi.getOriginalTxnId()).thenReturn((long)-1);
         ParameterSet bleh = mock(ParameterSet.class);
         when(spi.getParams()).thenReturn(bleh);
         Iv2InitiateTaskMessage task =
@@ -126,6 +129,7 @@ public class TestSpSchedulerDedupe extends TestCase
                                        false); // isForReplay
         // sp: sphandle == txnid
         task.setTxnId(txnId);
+        task.setSpHandle(txnId);
         return task;
     }
 
@@ -164,6 +168,9 @@ public class TestSpSchedulerDedupe extends TestCase
     @Test
     public void testReplicaInitiateTaskResponseShortCircuitRead() throws Exception
     {
+        // replica does not receive reads on SAFE mode, except for FAST mode
+        m_readLevel = Consistency.ReadLevel.FAST;
+
         long txnid = TxnEgo.makeZero(0).getTxnId();
 
         createObjs();
@@ -176,6 +183,8 @@ public class TestSpSchedulerDedupe extends TestCase
         InitiateResponseMessage resp = new InitiateResponseMessage(sptask);
         dut.deliver(resp);
         verify(mbox, times(1)).send(eq(dut_hsid), eq(resp));
+
+        m_readLevel = Consistency.ReadLevel.SAFE;
     }
 
     @Test
@@ -185,7 +194,8 @@ public class TestSpSchedulerDedupe extends TestCase
         long primary_hsid = 1111l;
 
         createObjs();
-        FragmentTaskMessage sptask = createFrag(txnid, true, primary_hsid);
+        // read only message will not be received on replicas.
+        FragmentTaskMessage sptask = createFrag(txnid, false, primary_hsid);
         dut.deliver(sptask);
         // verify no response sent yet
         verify(mbox, times(0)).send(anyLong(), (VoltMessage)anyObject());

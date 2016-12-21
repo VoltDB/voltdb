@@ -21,6 +21,8 @@ import java.net.URI;
 
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
+import org.voltdb.sysprocs.saverestore.SnapshotPathType;
+import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 
 /**
  * Encapsulate the parameters provided to @SnapshotSave needed to initiate a snapshot.
@@ -34,13 +36,16 @@ public class SnapshotInitiationInfo
     private SnapshotFormat m_format;
     private String m_data;
     private boolean m_truncationRequest;
+    private SnapshotPathType m_stype;
+    private Long m_terminus = null;
+    public static final String MAGIC_NONCE_PREFIX = "MANUAL";
 
     /**
      * Construct the object given the parameters directly.
      * @param data any additional JSON blob params.  Currently only provided by VoltDB internals
      */
     public SnapshotInitiationInfo(String path, String nonce, boolean blocking,
-            SnapshotFormat format, String data)
+            SnapshotFormat format, SnapshotPathType stype, String data)
     {
         m_path = path;
         m_nonce = nonce;
@@ -48,6 +53,17 @@ public class SnapshotInitiationInfo
         m_format = format;
         m_data = data;
         m_truncationRequest = false;
+        m_stype = stype;
+        m_terminus = null;
+        if (data != null && !data.trim().isEmpty()) {
+            try {
+                JSONObject jo = new JSONObject(data);
+                if (jo.has(SnapshotUtil.JSON_TERMINUS)) {
+                    m_terminus = jo.getLong(SnapshotUtil.JSON_TERMINUS);
+                }
+            } catch (JSONException failedToFishForTerminus) {
+            }
+        }
     }
 
     /**
@@ -61,20 +77,28 @@ public class SnapshotInitiationInfo
         m_format = SnapshotFormat.NATIVE;
         m_data = null;
         m_truncationRequest = false;
+        boolean checkNonceValidity = true;
+        switch (params.length) {
+            case 3:
+                parseLegacyParams(params);
+                break;
+            case 1:
+                checkNonceValidity = parseJsonParams(params);
+                break;
+            case 0:
+                m_nonce = MAGIC_NONCE_PREFIX + System.currentTimeMillis();
+                m_stype = SnapshotPathType.SNAP_AUTO;
+                m_path = VoltDB.instance().getSnapshotPath();
+                m_blocking = false;
+                //We will always generate a good valid nonce.
+                checkNonceValidity = false;
+                break;
+            default:
+                throw new IllegalArgumentException("Invalid number of parameters, " + params.length + ". @SnapshotSave allows, 0, 1, or 3 parameters.");
+        }
 
-        if (params.length == 3) {
-            parseLegacyParams(params);
-        }
-        else if (params.length == 1) {
-            parseJsonParams(params);
-        }
-        else {
-            throw new Exception("@SnapshotSave requires 3 parameters " +
-                    "(Path, nonce, and blocking) or alternatively a single JSON blob. ");
-        }
-
-        if (m_nonce != null && (m_nonce.contains("-") || m_nonce.contains(","))) {
-            throw new Exception("Provided nonce " + m_nonce + " contains a prohibited character (- or ,)");
+        if (checkNonceValidity && m_nonce != null && (m_nonce.contains("-") || m_nonce.contains(",") || m_nonce.startsWith(MAGIC_NONCE_PREFIX))) {
+            throw new IllegalArgumentException("Provided nonce " + m_nonce + " contains a prohibited character (- or ,) or starts with " + MAGIC_NONCE_PREFIX);
         }
     }
 
@@ -112,6 +136,7 @@ public class SnapshotInitiationInfo
         m_nonce = (String)params[1];
         m_blocking = ((Number)params[2]).byteValue() == 0 ? false : true;
         m_format = SnapshotFormat.NATIVE;
+        m_stype = SnapshotPathType.SNAP_PATH;
     }
 
     /**
@@ -132,8 +157,9 @@ public class SnapshotInitiationInfo
      *
      *   format: one of 'native' or 'csv'.
      */
-    private void parseJsonParams(Object[] params) throws Exception
+    private boolean parseJsonParams(Object[] params) throws Exception
     {
+        boolean checkValidity = true;
         if (params[0] == null) {
             throw new Exception("@SnapshotSave JSON blob is null");
         }
@@ -146,8 +172,8 @@ public class SnapshotInitiationInfo
 
         // IZZY - Make service an enum and store it in the object if
         // we every introduce another one
-        if (jsObj.has("service")) {
-            String service = jsObj.getString("service");
+        if (jsObj.has(SnapshotUtil.JSON_SERVICE)) {
+            String service = jsObj.getString(SnapshotUtil.JSON_SERVICE);
             if (service.equalsIgnoreCase("log_truncation")) {
                 m_truncationRequest = true;
                 if (!VoltDB.instance().getCommandLog().isEnabled()) {
@@ -155,16 +181,22 @@ public class SnapshotInitiationInfo
                             "command logging is not present or enabled.");
                 }
                 // for CL truncation, don't care about any of the rest of the blob.
-                return;
+                return checkValidity;
             }
             else {
                 throw new Exception("Unknown snapshot save service type: " + service);
             }
         }
 
-        m_path = jsObj.getString("uripath");
-        if (m_path.isEmpty()) {
-            throw new Exception("uripath cannot be empty");
+        m_stype = SnapshotPathType.valueOf(jsObj.optString(SnapshotUtil.JSON_PATH_TYPE, SnapshotPathType.SNAP_PATH.toString()));
+        if (jsObj.has(SnapshotUtil.JSON_URIPATH)) {
+            m_path = jsObj.getString(SnapshotUtil.JSON_URIPATH);
+            if (m_path.isEmpty()) {
+                throw new Exception("uripath cannot be empty");
+            }
+        } else {
+            m_stype = SnapshotPathType.SNAP_AUTO;
+            m_path = "file:///" + VoltDB.instance().getCommandLogSnapshotPath();
         }
         URI pathURI = new URI(m_path);
         String pathURIScheme = pathURI.getScheme();
@@ -176,15 +208,20 @@ public class SnapshotInitiationInfo
                     " if this is a file path then you must prepend file://");
         }
         m_path = pathURI.getPath();
-
-        m_nonce = jsObj.getString("nonce");
-        if (m_nonce.isEmpty()) {
-            throw new Exception("nonce cannot be empty");
+        if (jsObj.has(SnapshotUtil.JSON_NONCE)) {
+            m_nonce = jsObj.getString(SnapshotUtil.JSON_NONCE);
+            if (m_nonce.isEmpty()) {
+                throw new Exception("nonce cannot be empty");
+            }
+        } else {
+            m_nonce = MAGIC_NONCE_PREFIX + System.currentTimeMillis();
+            //This is a valid JSON
+            checkValidity = false;
         }
 
         Object blockingObj = false;
-        if (jsObj.has("block")) {
-            blockingObj = jsObj.get("block");
+        if (jsObj.has(SnapshotUtil.JSON_BLOCK)) {
+            blockingObj = jsObj.get(SnapshotUtil.JSON_BLOCK);
         }
         if (blockingObj instanceof Number) {
             m_blocking = ((Number)blockingObj).byteValue() == 0 ? false : true;
@@ -198,7 +235,9 @@ public class SnapshotInitiationInfo
         }
 
         m_format = SnapshotFormat.NATIVE;
-        String formatString = jsObj.optString("format",SnapshotFormat.NATIVE.toString());
+        String formatString = jsObj.optString(SnapshotUtil.JSON_FORMAT,SnapshotFormat.NATIVE.toString());
+
+        m_terminus = jsObj.has(SnapshotUtil.JSON_TERMINUS) ? jsObj.getLong(SnapshotUtil.JSON_TERMINUS) : null;
         /*
          * Try and be very flexible about what we will accept
          * as the type of the block parameter.
@@ -210,6 +249,7 @@ public class SnapshotInitiationInfo
                     " and should be one of [\"native\" | \"csv\"]");
         }
         m_data = (String)params[0];
+        return checkValidity;
     }
 
     public String getPath()
@@ -242,17 +282,24 @@ public class SnapshotInitiationInfo
         return m_data;
     }
 
+    public Long getTerminus()
+    {
+        return m_terminus;
+    }
+
     /**
      * When we write to ZK to request the snapshot, generate the JSON which will be written to the node's data.
      */
     public JSONObject getJSONObjectForZK() throws JSONException
     {
         final JSONObject jsObj = new JSONObject();
-        jsObj.put("path", m_path);
-        jsObj.put("nonce", m_nonce);
-        jsObj.put("block", m_blocking);
-        jsObj.put("format", m_format.toString());
-        jsObj.putOpt("data", m_data);
+        jsObj.put(SnapshotUtil.JSON_PATH, m_path);
+        jsObj.put(SnapshotUtil.JSON_PATH_TYPE, m_stype.toString());
+        jsObj.put(SnapshotUtil.JSON_NONCE, m_nonce);
+        jsObj.put(SnapshotUtil.JSON_BLOCK, m_blocking);
+        jsObj.put(SnapshotUtil.JSON_FORMAT, m_format.toString());
+        jsObj.putOpt(SnapshotUtil.JSON_DATA, m_data);
+        jsObj.putOpt(SnapshotUtil.JSON_TERMINUS, m_terminus);
         return jsObj;
     }
 }

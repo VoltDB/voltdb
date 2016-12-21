@@ -72,6 +72,13 @@ using namespace voltdb;
 
 static bool staticVerboseFlag = false;
 
+namespace {
+bool findString(const std::string &string, std::string pattern) {
+    std::string::size_type found = string.find(pattern);
+    return (found != std::string::npos);
+}
+}
+
 struct FunctionTest : public Test {
         FunctionTest() :
                 Test(),
@@ -81,7 +88,6 @@ struct FunctionTest : public Test {
                                   (UndoQuantum *)0,
                                   (Topend *)0,
                                   &m_pool,
-                                  NULL,
                                   (VoltDBEngine *)0,
                                   "localhost",
                                   0,
@@ -472,23 +478,21 @@ TEST_F(FunctionTest, NaturalLogTest) {
     ASSERT_EQ(testUnary(FUNC_LN, 1, 0),
               0);
 
-    bool sawExecption = false;
+    bool sawException = false;
     try {
         testUnary(FUNC_LN, -1, 0);
     } catch(SQLException &sqlExcp) {
-        const char *errMsg = sqlExcp.message().c_str();
-        sawExecption = (strncmp(errMsg, "Invalid result value (nan)", strlen(errMsg)) >= 0) ? true : false;
+    sawException = findString(sqlExcp.message(), "Invalid result value (nan)");
     }
-    ASSERT_EQ(sawExecption, true);
+    ASSERT_EQ(sawException, true);
 
-    sawExecption = false;
+    sawException = false;
     try {
         testUnary(FUNC_LN, 0, 0);
     } catch(SQLException &sqlExcp) {
-        const char *errMsg = sqlExcp.message().c_str();
-        sawExecption = (strncmp(errMsg, "Invalid result value (-inf)", strlen(errMsg)) >= 0)? true : false;
+    sawException = findString(sqlExcp.message(), "Invalid result value (-inf)");
     }
-    ASSERT_EQ(sawExecption, true);
+    ASSERT_EQ(sawException, true);
 }
 
 TEST_F(FunctionTest, NaturalLog10Test) {
@@ -496,34 +500,31 @@ TEST_F(FunctionTest, NaturalLog10Test) {
     ASSERT_EQ(testUnary(FUNC_LOG10, 100.0, 2.0), 0);
 
     //invalid parameter value
-    bool sawExecption = false;
+    bool sawException = false;
     try {
         testUnary(FUNC_LOG10, -100, 0);
     } catch(SQLException &sqlExcp) {
-        const char *errMsg = sqlExcp.message().c_str();
-        sawExecption = (strncmp(errMsg, "Invalid result value (nan)", strlen(errMsg)) >= 0) ? true : false;
+    sawException = findString(sqlExcp.message(), "Invalid result value (nan)");
     }
-    ASSERT_EQ(sawExecption, true);
+    ASSERT_EQ(sawException, true);
 
     //invalid parameter value
-    sawExecption = false;
+    sawException = false;
     try {
         testUnary(FUNC_LOG10, -1, 0);
     } catch(SQLException &sqlExcp) {
-        const char *errMsg = sqlExcp.message().c_str();
-        sawExecption = (strncmp(errMsg, "Invalid result value (nan)", strlen(errMsg)) >= 0) ? true : false;
+    sawException = findString(sqlExcp.message(), "Invalid result value (nan)");
     }
-    ASSERT_EQ(sawExecption, true);
+    ASSERT_EQ(sawException, true);
 
     //invalid parameter type
-    sawExecption = false;
+    sawException = false;
     try {
         testUnary(FUNC_LOG10, "100", 0);
     } catch(SQLException &sqlExcp) {
-        const char *errMsg = sqlExcp.message().c_str();
-        sawExecption = (strncmp(errMsg, "Invalid result value (nan)", strlen(errMsg)) >= 0) ? true : false;
+    sawException = findString(sqlExcp.message(), "Type VARCHAR can't be cast as FLOAT");
     }
-    ASSERT_EQ(sawExecption, true);
+    ASSERT_EQ(sawException, true);
 }
 
 TEST_F(FunctionTest, NaturalModTest) {
@@ -540,15 +541,14 @@ TEST_F(FunctionTest, NaturalModTest) {
     ASSERT_EQ(testBinary(FUNC_MOD, TTInt("-25.2"), TTInt("-7.4"), TTInt("-4.000000000000")), 0);
 
     //invalid parameter value
-    bool sawExecption = false;
+    bool sawException = false;
     try {
         testBinary(FUNC_MOD, "-100", 3, 1);
     } catch(SQLException &sqlExcp) {
-        const char *errMsg = sqlExcp.message().c_str();
-        sawExecption = (strncmp(errMsg,
-            "unsupported non-numeric type for SQL MOD function", strlen(errMsg)) >= 0) ? true : false;
+    sawException = findString(sqlExcp.message(),
+                                  "unsupported non-numeric type for SQL MOD function");
     }
-    ASSERT_EQ(sawExecption, true);
+    ASSERT_EQ(sawException, true);
 }
 
 TEST_F(FunctionTest, HexTest) {

@@ -199,4 +199,14 @@ public class SysProcFragmentId
     // @ExecuteTask
     public static final long PF_executeTask = 290;
     public static final long PF_executeTaskAggregate = 291;
+
+    // @UpdatedSettings
+    public static final long PF_updateSettingsBarrier = 300;
+    public static final long PF_updateSettingsBarrierAggregate = 301;
+    public static final long PF_updateSettings = 302;
+    public static final long PF_updateSettingsAggregate = 303;
+
+    // @PrepareShutdown
+    public static final long PF_prepareShutdown = 310;
+    public static final long PF_prepareShutdownAggregate = 311;
 }

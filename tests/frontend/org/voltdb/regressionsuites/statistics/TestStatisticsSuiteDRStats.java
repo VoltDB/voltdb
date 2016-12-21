@@ -51,6 +51,7 @@ public class TestStatisticsSuiteDRStats extends StatisticsTestSuiteBase {
         Client client  = getFullyConnectedClient();
 
         ColumnInfo[] expectedSchema2 = new ColumnInfo[8];
+        assertEquals("Expected DRNodeStatistics schema length is 8", 8, expectedSchema2.length);
         expectedSchema2[0] = new ColumnInfo("TIMESTAMP", VoltType.BIGINT);
         expectedSchema2[1] = new ColumnInfo("HOST_ID", VoltType.INTEGER);
         expectedSchema2[2] = new ColumnInfo("HOSTNAME", VoltType.STRING);
@@ -86,6 +87,7 @@ public class TestStatisticsSuiteDRStats extends StatisticsTestSuiteBase {
         Client client  = getFullyConnectedClient();
 
         ColumnInfo[] expectedSchema1 = new ColumnInfo[14];
+        assertEquals("Expected DRPartitionStatistics schema length is 14", 14, expectedSchema1.length);
         expectedSchema1[0] = new ColumnInfo("TIMESTAMP", VoltType.BIGINT);
         expectedSchema1[1] = new ColumnInfo("HOST_ID", VoltType.INTEGER);
         expectedSchema1[2] = new ColumnInfo("HOSTNAME", VoltType.STRING);
@@ -131,6 +133,7 @@ public class TestStatisticsSuiteDRStats extends StatisticsTestSuiteBase {
         Client client  = getFullyConnectedClient();
 
         ColumnInfo[] expectedSchema1 = new ColumnInfo[14];
+        assertEquals("Expected DRPartitionStatistics schema length is 14", 14, expectedSchema1.length);
         expectedSchema1[0] = new ColumnInfo("TIMESTAMP", VoltType.BIGINT);
         expectedSchema1[1] = new ColumnInfo("HOST_ID", VoltType.INTEGER);
         expectedSchema1[2] = new ColumnInfo("HOSTNAME", VoltType.STRING);
@@ -148,6 +151,7 @@ public class TestStatisticsSuiteDRStats extends StatisticsTestSuiteBase {
         VoltTable expectedTable1 = new VoltTable(expectedSchema1);
 
         ColumnInfo[] expectedSchema2 = new ColumnInfo[8];
+        assertEquals("Expected DRNodeStatistics schema length is 8", 8, expectedSchema2.length);
         expectedSchema2[0] = new ColumnInfo("TIMESTAMP", VoltType.BIGINT);
         expectedSchema2[1] = new ColumnInfo("HOST_ID", VoltType.INTEGER);
         expectedSchema2[2] = new ColumnInfo("HOSTNAME", VoltType.STRING);

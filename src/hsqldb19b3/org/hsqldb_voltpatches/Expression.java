@@ -1460,7 +1460,7 @@ public class Expression {
                                          Expression.emptyExpressionSet);
     }
 
-    static Map<Integer, VoltXMLElement> prototypes = new HashMap<Integer, VoltXMLElement>();
+    static Map<Integer, VoltXMLElement> prototypes = new HashMap<>();
 
     static {
         prototypes.put(OpTypes.VALUE,         new VoltXMLElement("value")); // constant value
@@ -1527,7 +1527,7 @@ public class Expression {
         prototypes.put(OpTypes.MATCH_UNIQUE_SIMPLE,  null); // not yet supported ExpressionLogical
         prototypes.put(OpTypes.MATCH_UNIQUE_PARTIAL, null); // not yet supported ExpressionLogical
         prototypes.put(OpTypes.MATCH_UNIQUE_FULL,    null); // not yet supported ExpressionLogical
-        // aggregate functions
+        // unwindowed aggregate functions
         prototypes.put(OpTypes.COUNT,         (new VoltXMLElement("aggregation")).withValue("optype", "count"));
         prototypes.put(OpTypes.APPROX_COUNT_DISTINCT, (new VoltXMLElement("aggregation")).withValue("optype", "approx_count_distinct"));
         prototypes.put(OpTypes.SUM,           (new VoltXMLElement("aggregation")).withValue("optype", "sum"));
@@ -1540,13 +1540,19 @@ public class Expression {
         prototypes.put(OpTypes.STDDEV_SAMP,   (new VoltXMLElement("aggregation")).withValue("optype", "stddevsamp"));
         prototypes.put(OpTypes.VAR_POP,       (new VoltXMLElement("aggregation")).withValue("optype", "varpop"));
         prototypes.put(OpTypes.VAR_SAMP,      (new VoltXMLElement("aggregation")).withValue("optype", "varsamp"));
+        // windowed aggregate functions
+        prototypes.put(OpTypes.WINDOWED_RANK, (new VoltXMLElement("win_aggregation")).withValue("optype", "windowed_rank"));
+        prototypes.put(OpTypes.WINDOWED_DENSE_RANK,  (new VoltXMLElement("win_aggregation")).withValue("optype", "windowed_dense_rank"));
+        prototypes.put(OpTypes.WINDOWED_COUNT,  (new VoltXMLElement("win_aggregation")).withValue("optype", "windowed_count"));
+        // No support for WINDOWED_PERCENT_RANK yet.
+        // No support for WINDOWED_CUME_DIST yet.
+        // prototypes.put(OpTypes.WINDOWED_PERCENT_RANK,  new VoltXMLElement("percent_rank");
+        // prototypes.put(OpTypes.WINDOWED_CUME_DIST,     new VoltXMLElement("cume_dist"));
         // other operations
         prototypes.put(OpTypes.CAST,          (new VoltXMLElement("operation")).withValue("optype", "cast"));
         prototypes.put(OpTypes.CASEWHEN,      (new VoltXMLElement("operation")).withValue("optype", "operator_case_when"));
         prototypes.put(OpTypes.ORDER_BY,      new VoltXMLElement("orderby"));
         prototypes.put(OpTypes.LIMIT,         new VoltXMLElement("limit"));
-        prototypes.put(OpTypes.RANK,          new VoltXMLElement("rank").withValue("percentage", "false"));
-        prototypes.put(OpTypes.PERCENT_RANK,  new VoltXMLElement("rank").withValue("percentage", "true"));
         prototypes.put(OpTypes.ALTERNATIVE,   (new VoltXMLElement("operation")).withValue("optype", "operator_alternative"));
         prototypes.put(OpTypes.ZONE_MODIFIER, null); // ???
         prototypes.put(OpTypes.MULTICOLUMN,   null); // an uninteresting!? ExpressionColumn case
@@ -1799,11 +1805,17 @@ public class Expression {
             exp.attributes.put("valuetype", dataType.getNameString());
             return exp;
 
-        case OpTypes.RANK:
+        case OpTypes.WINDOWED_RANK:
+        case OpTypes.WINDOWED_DENSE_RANK:
+        case OpTypes.WINDOWED_COUNT:
+        // No support for WINDOWED_PERCENT_RANK or WINDOWED_CUME_DIST yet.
+        // case OpTypes.WINDOWED_CUME_DIST:
+        // case OpTypes.WINDOWED_PERCENT_RANK:
             assert(dataType != null);
+            assert(this instanceof ExpressionWindowed);
             exp.attributes.put("valuetype", dataType.getNameString());
-            ExpressionRank erank = (ExpressionRank) this;
-            return erank.voltAnnotateRankXML(exp, context);
+            ExpressionWindowed erank = (ExpressionWindowed) this;
+            return erank.voltAnnotateWindowedAggregateXML(exp, context);
 
         default:
             return exp;
@@ -1909,7 +1921,7 @@ public class Expression {
     public Expression eliminateDuplicates(final Session session) {
         // First build the map of child expressions joined by the logical AND
         // The key is the expression id and the value is the expression itself
-        Map<String, Expression> subExprMap = new HashMap<String, Expression>();
+        Map<String, Expression> subExprMap = new HashMap<>();
         extractAndSubExpressions(session, this, subExprMap);
         // Reconstruct the expression
         if (!subExprMap.isEmpty()) {
@@ -1965,7 +1977,7 @@ public class Expression {
             //
             // Horribly inefficient, but it works for now...
             //
-            final List<String> id_list = new Vector<String>();
+            final List<String> id_list = new Vector<>();
             new Object() {
                 public void traverse(Expression exp) {
                     for (Expression expr : exp.nodes) {

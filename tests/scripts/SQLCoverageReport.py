@@ -294,7 +294,8 @@ contain the SQL statements which caused different responses on both backends.
 
 def generate_html_reports(suite, seed, statements_path, cmpdb_path, jni_path,
                           output_dir, report_invalid, report_all, extra_stats='',
-                          cmpdb='HSqlDB', modified_sql_path=None, cntonly=False):
+                          cmpdb='HSqlDB', modified_sql_path=None, max_mismatches=0,
+                          cntonly=False):
     if output_dir != None and not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
@@ -385,7 +386,7 @@ def generate_html_reports(suite, seed, statements_path, cmpdb_path, jni_path,
     topLines = getTopSummaryLines(cmpdb, False)
     currentTime = datetime.datetime.now().strftime("%A, %B %d, %I:%M:%S %p")
     keyStats = createSummaryInHTML(count, failures, len(mismatches), len(voltdb_npes),
-                                   len(cmpdb_npes), extra_stats, seed)
+                                   len(cmpdb_npes), extra_stats, seed, max_mismatches)
     report = """
 <html>
 <head>
@@ -454,7 +455,7 @@ def getTopSummaryLines(cmpdb, includeAll=True):
     topLines += """
 <td colspan=5 align=center>SQL Statements</td>
 <td colspan=5 align=center>Test Failures</td>
-<td colspan=4 align=center>SQL Statements per Pattern</td>
+<td colspan=5 align=center>SQL Statements per Pattern</td>
 <td colspan=5 align=center>Time (min:sec)</td>
 </tr><tr>
 <td>Valid</td><td>Valid %%</td>
@@ -462,7 +463,7 @@ def getTopSummaryLines(cmpdb, includeAll=True):
 <td>Total</td>
 <td>Mismatched</td><td>Mismatched %%</td>
 <td>NPE's(V)</td><td>NPE's(%s)</td><td>Crashes</td>
-<td>Minimum</td><td>Maximum</td><td># Inserts</td><td># Patterns</td>
+<td>Minimum</td><td>Maximum</td><td># Inserts</td><td># Patterns</td><td># Unresolved</td>
 <td>Generating SQL</td><td>VoltDB</td><td>%s</td>
 """ % (cmpdb[:1], cmpdb)
     if includeAll:
@@ -470,7 +471,8 @@ def getTopSummaryLines(cmpdb, includeAll=True):
     topLines += "</tr>"
     return topLines
 
-def createSummaryInHTML(count, failures, misses, voltdb_npes, cmpdb_npes, extra_stats, seed):
+def createSummaryInHTML(count, failures, misses, voltdb_npes, cmpdb_npes,
+                        extra_stats, seed, max_misses=0):
     passed = count - (failures + misses)
     passed_ps = fail_ps = cell4misPct = cell4misCnt = color = None
     count_color = fail_color = ""
@@ -491,6 +493,8 @@ def createSummaryInHTML(count, failures, misses, voltdb_npes, cmpdb_npes, extra_
         cell4misCnt = "<td align=right>0</td>"
     else:
         color = "#FF0000" # red
+        if misses <= max_misses:
+            color = "#FFA500" # orange
         mis_ps = "{0:.2f}".format((misses/float(max(count, 1))) * 100)
         cell4misPct = "<td align=right bgcolor=" + color + ">" + mis_ps + "%</td>"
         cell4misCnt = "<td align=right bgcolor=" + color + ">" + str(misses) + "</td>"
@@ -554,7 +558,8 @@ h2 {text-transform: uppercase}
 <tr><td align=right bgcolor=#FF0000>Red</td><td>table elements indicate a test failure(s), due to a mismatch between VoltDB and %s results, a crash,
                                                    or an NPE in VoltDB (or, an <i>extremely</i> slow test suite).</td></tr>
 <tr><td align=right bgcolor=#FFA500>Orange</td><td>table elements indicate a strong warning, for something that should be looked into (e.g. a pattern
-                                                   that generated no SQL queries, an NPE in %s, or a <i>very</i> slow test suite), but no test failures.</td></tr>
+                                                   that generated no SQL queries, an NPE in %s, or a <i>very</i> slow test suite), but no test failures
+                                                   (or only "known" failures).</td></tr>
 <tr><td align=right bgcolor=#FFFF00>Yellow</td><td>table elements indicate a mild warning, for something you might want to improve (e.g. a pattern
                                                    that generated a very large number of SQL queries, or a somewhat slow test suite).</td></tr>
 <tr><td align=right bgcolor=#D3D3D3>Gray</td><td>table elements indicate data that was not computed, due to a crash.</td></tr>

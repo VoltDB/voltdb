@@ -23,8 +23,14 @@
 
 package org.voltdb;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
 import java.io.File;
 
+import org.junit.Test;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
@@ -184,6 +190,7 @@ public class TestLiveDDLSchemaSwitch extends AdhocDDLTestBase {
         verifyAdhocQuery();
     }
 
+    @Test
     public void testMasterWithUAC() throws Exception
     {
         generateCatalogsAndDeployments(false);
@@ -245,6 +252,7 @@ public class TestLiveDDLSchemaSwitch extends AdhocDDLTestBase {
         }
     }
 
+    @Test
     public void testMasterWithAdhocDDL() throws Exception
     {
         generateCatalogsAndDeployments(true);
@@ -264,6 +272,7 @@ public class TestLiveDDLSchemaSwitch extends AdhocDDLTestBase {
         }
     }
 
+    @Test
     public void testReplicaWithUAC() throws Exception
     {
         generateCatalogsAndDeployments(false);
@@ -338,6 +347,7 @@ public class TestLiveDDLSchemaSwitch extends AdhocDDLTestBase {
         }
     }
 
+    @Test
     public void testReplicaWithAdhocDDL() throws Exception
     {
         generateCatalogsAndDeployments(true);

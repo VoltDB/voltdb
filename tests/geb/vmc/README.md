@@ -116,7 +116,7 @@ you will first need to download PhantomJS, as described here:
 </pre>
 (you may use 'chrome' or 'chromeTest', and 'debug' is optional), then you will
 first need to download the Chrome Driver, as described in:  <br>
-    https://code.google.com/p/selenium/wiki/ChromeDriver  <br>
+    https://github.com/SeleniumHQ/selenium/wiki/ChromeDriver  <br>
 (mainly, make sure it's in a directory included in the system PATH).
 
 3. Similarly, if you want to run these tests on Safari, on a Mac, using:

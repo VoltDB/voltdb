@@ -86,6 +86,13 @@ protected:
        return abs(hashCode % partitionCount);
    }
 
+   std::string debug() const {
+       std::ostringstream buffer;
+       buffer << "Token      " << "   Partition" << std::endl;
+       buffer << "==========================" << std::endl;
+       return buffer.str();
+   }
+
 private:
    LegacyHashinator(int32_t count) : partitionCount(count) {}
    const int32_t partitionCount;

@@ -30,6 +30,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.Snapshot;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.SnapshotFilter;
+import org.voltdb.sysprocs.saverestore.SnapshotPathType;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.SpecificSnapshotFilter;
 
 /**
@@ -92,7 +93,7 @@ public class SnapshotVerifier {
 
         Map<String, Snapshot> snapshots = new HashMap<String, Snapshot>();
         for (String directory : directories) {
-            SnapshotUtil.retrieveSnapshotFiles( new File(directory), snapshots, filter, true, CONSOLE_LOG);
+            SnapshotUtil.retrieveSnapshotFiles(new File(directory), snapshots, filter, true, SnapshotPathType.SNAP_PATH, CONSOLE_LOG);
         }
 
         if (snapshots.isEmpty()) {

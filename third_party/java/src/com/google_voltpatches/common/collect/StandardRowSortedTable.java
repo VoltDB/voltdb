@@ -21,7 +21,6 @@ import static com.google_voltpatches.common.base.Preconditions.checkNotNull;
 import com.google_voltpatches.common.annotations.GwtCompatible;
 import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.j2objc.annotations.WeakOuter;
-
 import java.util.Comparator;
 import java.util.Map;
 import java.util.Set;

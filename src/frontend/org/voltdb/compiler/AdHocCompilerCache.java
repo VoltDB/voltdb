@@ -334,6 +334,7 @@ public class AdHocCompilerCache implements Serializable {
         if (! hasUserQuestionMarkParameters) {
             AdHocPlannedStatement cachedPlan = m_literalCache.get(sql);
             if (cachedPlan == null) {
+                //* enable to debug */ System.out.println("DEBUG: Caching literal '" + sql + "'");
                 m_literalCache.put(sql, plan);
                 ++m_literalInsertions;
             }

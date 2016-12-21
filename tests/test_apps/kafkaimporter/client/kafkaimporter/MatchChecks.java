@@ -79,14 +79,15 @@ public class MatchChecks {
                     sleep = true;
                 }
                 else if (/*cr.getStatus() == ClientResponse.USER_ABORT &&*/
-                        (ss.matches("(?s).*AdHoc transaction [0-9]+ wasn.t planned against the current catalog version.*") ||
+                        (ss.matches("(?s).*AdHoc transaction -?[0-9]+ wasn.t planned against the current catalog version.*") ||
                                 ss.matches(".*Connection to database host \\(.*\\) was lost before a response was received.*") ||
                                 ss.matches(".*Transaction dropped due to change in mastership. It is possible the transaction was committed.*") ||
                                 ss.matches("(?s).*Transaction being restarted due to fault recovery or shutdown.*") ||
                                 ss.matches("(?s).*Invalid catalog update.  Catalog or deployment change was planned against one version of the cluster configuration but that version was no longer live.*")
                         )) {}
                 else if (ss.matches(".*Server is currently unavailable; try again later.*") ||
-                        ss.matches(".*Server is paused and is currently unavailable.*")) {
+                         ss.matches(".*Server is paused.*") ||
+                         ss.matches("(?s).*Server shutdown in progress.*")) {
                     sleep = true;
                 }
                 else {
@@ -188,9 +189,30 @@ public class MatchChecks {
                     importStats.getString("PROCEDURE_NAME") + ", " + importStats.getLong("SUCCESSES") + ", " +
                     importStats.getLong("FAILURES") + ", " + importStats.getLong("OUTSTANDING_REQUESTS") + ", " +
                     importStats.getLong("RETRIES");
-            //log.info("statsString:" + statsString);
+            log.info("statsString:" + statsString);
         }
         return statsString;
+    }
+
+    protected static String getClusterState(Client client) {
+        VoltTable sysinfo = null;
+
+        try {
+            sysinfo = client.callProcedure("@SystemInformation", "OVERVIEW").getResults()[0];
+        } catch (Exception e) {
+            log.warn("system info query failed");
+            return "";
+        }
+
+        for (int i = 0; i < sysinfo.getRowCount(); i++)
+        {
+            sysinfo.advanceRow();
+            if (sysinfo.get("KEY", VoltType.STRING).equals("CLUSTERSTATE"))
+            {
+                return (String) sysinfo.get("VALUE",VoltType.STRING);
+            }
+        }
+        return "";
     }
 
     protected static long[] getImportValues(Client client) {
@@ -199,11 +221,13 @@ public class MatchChecks {
 
         while (importStats.advanceRow()) {
             int statnum = 0;
-            stats[statnum++] = importStats.getLong("SUCCESSES");
-            stats[statnum++] = importStats.getLong("FAILURES");
-            stats[statnum++] = importStats.getLong("OUTSTANDING_REQUESTS");
-            stats[statnum++] = importStats.getLong("RETRIES");
+            log.info("getImportValues: " + importStats.getString("PROCEDURE_NAME"));
+            stats[statnum] = importStats.getLong("SUCCESSES"); log.info("\tSUCCESSES: " + stats[statnum++]);
+            stats[statnum] = importStats.getLong("FAILURES"); log.info("\tFAILURES: " + stats[statnum++]);
+            stats[statnum] = importStats.getLong("OUTSTANDING_REQUESTS"); log.info("\tOUTSTANDING_REQUESTS: " + stats[statnum++]);
+            stats[statnum] = importStats.getLong("RETRIES"); log.info("\tRETRIES: " + stats[statnum++]);
         }
+
         return stats;
     }
 

@@ -1,4 +1,5 @@
 import os, sys, threading, shutil, re
+import xml.etree.ElementTree as ET
 from subprocess import Popen, PIPE, STDOUT
 
 
@@ -299,7 +300,7 @@ def buildThirdPartyTools(CTX, makefile):
     makefile.write("\t    rm -rf google-s2-geometry; \\\n")
     makefile.write('\t    mkdir google-s2-geometry; \\\n')
     makefile.write('\t    cd google-s2-geometry; \\\n')
-    makefile.write('\t\tcmake -DCXX_VERSION_FLAG=\"%s\" -DVOLTDB_THIRD_PARTY_CPP_DIR=\"${THIRD_PARTY_SRC}\" -DCMAKE_INSTALL_PREFIX=\"${INSTALL_DIR}\" -DCMAKE_BUILD_TYPE=\"${S2_BUILD_TYPE}\" \"${GOOGLE_S2_SRC}\"; \\\n' % CTX.CXX_VERSION_FLAG )
+    makefile.write('\t\tcmake -DCXX_VERSION_FLAG=\"-std=%s\" -DVOLTDB_THIRD_PARTY_CPP_DIR=\"${THIRD_PARTY_SRC}\" -DCMAKE_INSTALL_PREFIX=\"${INSTALL_DIR}\" -DCMAKE_BUILD_TYPE=\"${S2_BUILD_TYPE}\" \"${GOOGLE_S2_SRC}\"; \\\n' % CTX.CXX_VERSION_FLAG )
     makefile.write("\tfi\n")
     makefile.write('\n')
     makefile.write('clean-s2-geometry:\n')
@@ -314,12 +315,12 @@ def buildThirdPartyTools(CTX, makefile):
     makefile.write('.PHONY: build-pcre2 configure-pcre2 unpack-pcre2\n')
     makefile.write('build-pcre2: configure-pcre2\n')
     makefile.write('\tif [ ! -f "${PCRE2_INSTALL}/lib/libpcre2-8.a" ] ; then \\\n')
-    makefile.write('\t  @echo Building PCRE2 ; \\\n')
+    makefile.write('\t  echo Building PCRE2 ; \\\n')
     makefile.write('\t  (cd "$(PCRE2_OBJ)"; ${MAKE} install); \\\n')
     makefile.write('\tfi\n')
     makefile.write('configure-pcre2: unpack-pcre2\n')
     makefile.write('\tif [ ! -d "${PCRE2_OBJ}" ] ; then \\\n')
-    makefile.write('\t  @echo Configuring PCRE2; \\\n')
+    makefile.write('\t  echo Configuring PCRE2; \\\n')
     makefile.write('\t  /bin/rm -rf "${PCRE2_OBJ}"; \\\n')
     makefile.write('\t  mkdir -p "${PCRE2_OBJ}"; \\\n')
     makefile.write('\t  cd "${PCRE2_OBJ}"; \\\n')
@@ -500,7 +501,7 @@ def buildMakefile(CTX):
         makefile.write("prod/voltdbipc")
     makefile.write("\n")
     makefile.write('\n')
-    makefile.write("objects/volt.a: objects/harness.o %s\n" % formatList(jni_objects))
+    makefile.write("objects/volt.a: %s\n" % formatList(jni_objects))
     makefile.write("\t$(AR) $(ARFLAGS) $@ $?\n")
     harness_source = TEST_PREFIX + "/harness.cpp"
     makefile.write("objects/harness.o: $(ROOTDIR)/" + harness_source + "\n")
@@ -582,8 +583,8 @@ def buildMakefile(CTX):
         makefile.write("\t$(CCACHE) $(COMPILE.cpp) -I$(ROOTDIR)/%s -MMD -MP -o $@ $(ROOTDIR)/%s\n" % (TEST_PREFIX, sourcename))
         makefile.write("-include %s\n" % replaceSuffix(objectname, ".d"))
         # link the test
-        makefile.write("%s: %s objects/volt.a  | build-third-party-tools \n" % (binname, objectname))
-        makefile.write("\t$(LINK.cpp) -o %s %s objects/volt.a %s\n" % (binname, objectname, CTX.LASTLDFLAGS))
+        makefile.write("%s: objects/harness.o %s objects/volt.a  | build-third-party-tools \n" % (binname, objectname))
+        makefile.write("\t$(LINK.cpp) -o %s %s objects/harness.o objects/volt.a %s\n" % (binname, objectname, CTX.LASTLDFLAGS))
         makefile.write("\n")
         targetpath = OUTPUT_PREFIX + "/" + "/".join(binname.split("/")[:-1])
         os.system("mkdir -p %s" % (targetpath))
@@ -602,13 +603,11 @@ def buildMakefile(CTX):
     makefile.write("clean: clean-s2-geometry clean-openssl clean-3pty-install\n")
     makefile.write("\t${RM} %s\n" % formatList(cleanobjs))
     makefile.write("\n")
-    makefile.write("clean-3pty-install:\n")
-    makefile.write("\t${RM} -r \"${INSTALL_DIR}\"\n")
-    makefile.write("\n")
     makefile.write(".PHONY: clean-3pty-install\n")
+    makefile.write("clean-3pty-install:\n")
+    makefile.write("\t@${RM} -r \"${INSTALL_DIR}\"\n")
     makefile.write('\t@${RM} %s\n' % formatList(cleanobjs))
     makefile.write('\t@${RM} "${PCRE2_OBJ}"\n')
-    makefile.write('\t@${RM} "${INSTALL_DIR}/*"\n')
     makefile.write('\t@${RM} "${PCRE2_SRC}"\n')
     makefile.write("\n")
     makefile.close()
@@ -617,6 +616,114 @@ def buildMakefile(CTX):
 def buildIPC(CTX):
     retval = os.system("make --directory=%s prod/voltdbipc -j4" % (CTX.OUTPUT_PREFIX))
     return retval
+
+class MemLeakError:
+    def __init__(self, bytes, blocks, errType, line):
+        self.bytes = bytes
+        self.blocks = blocks
+        self.errType = errType
+        self.line = line
+    def message(self):
+        return self.errType + '\n    ' + self.line
+
+class ValgrindError:
+    def __init__(self, errorCount, contextCount, errType, line):
+        self.errorCount = errorCount
+        self.contextCount = contextCount
+        self.line = line
+    def message(self):
+        return self.line
+
+class ValgrindErrorState:
+    def __init__(self, expectNoErrors, valgrindFile):
+        self.expectErrors = not expectNoErrors
+        self.foundErrors    = False
+        self.valgrindFile = valgrindFile
+        self.errorStrings = []
+        self._process()
+
+    def _process(self):
+        tree = ET.parse(self.valgrindFile);
+        root = tree.getroot()
+        errs = root.findall(".//error")
+        for err in errs:
+            foundErrors = True
+            self.errorStrings += [self._toString(err)]
+
+    def _toString(self, err):
+        elements = '';
+        for child in err:
+            if child.tag == 'kind':
+                elements += child.text.strip() + '\n'
+            elif child.tag == 'what':
+                elements += "  " + child.text.strip() + "\n"
+            elif child.tag == 'xwhat':
+                elements += self._parseXWhat(child) + '\n'
+            elif child.tag == 'stack':
+                elements += self._parseStack(child) + '\n'
+        return elements
+
+    def _parseXWhat(self, xwhat):
+        leakedbytes = xwhat.find('leakedbytes')
+        leakedblocks = xwhat.find("leakedblocks")
+        text = xwhat.find('text')
+        if leakedbytes is not None:
+            leakedbytes = "    Leaked Bytes: " + leakedbytes.text + "\n"
+        else:
+            leakedbytes = ""
+        if leakedblocks is not None:
+            leakedblocks = "    Leaked Blocks: " + leakedblocks.text + "\n"
+        else:
+            leakedblocks = ""
+        if text is not None:
+            text = "  " + text.text + "\n"
+        else:
+            text = ""
+        return text + leakedblocks + leakedbytes
+
+    def _parseStack(self, stack):
+        stackFrames = ""
+        stackNo = 0
+        for frame in stack:
+            if frame.tag != 'frame':
+                continue
+            ip =     "<undefined ip>"
+            fn =     "<undefined fn>"
+            dir =    "<undefined dir>"
+            file =   "<undefined file>"
+            lineNo = "<undefined line number>"
+            for elem in frame:
+                name = elem.tag
+                value = elem.text.strip()
+                if elem.tag == 'ip':
+                    ip = value
+                elif elem.tag == 'fn':
+                    fn = value
+                elif elem.tag == 'dir':
+                    dir = value
+                elif elem.tag == 'file':
+                    file = value
+                elif elem.tag == 'line':
+                    lineNo = value
+            stackFrames += ("    %03d.) %s: %s@%s/%s: line %s" % (stackNo, ip, fn, dir, file, lineNo)) + "\n"
+        return stackFrames
+
+    def isExpectedState(self):
+        return (self.expectErrors == self.foundErrors)
+
+    def errorMessage(self):
+        if self.isExpectedState():
+            exp = " (Expected)"
+        else:
+            exp = ""
+        return ("%s\n%d Valgrind Errors%s: \n" %
+                (":-----------------------------------------------------------:", \
+                 len(self.errorStrings), \
+                 exp) \
+                + "\n".join(self.errorStrings))
+
+def makeValgrindFile(pidStr):
+    return "valgrind_ee_%s.xml" % pidStr
 
 def runTests(CTX):
     failedTests = []
@@ -631,11 +738,14 @@ def runTests(CTX):
     tests = []
     for dir in CTX.TESTS.keys():
         input = CTX.TESTS[dir].split()
-        tests += [TEST_PREFIX + "/" + dir + "/" + x for x in input]
+        tests += [(dir, TEST_PREFIX + "/" + dir + "/" + x) for x in input]
     successes = 0
     failures = 0
     noValgrindTests = [ "CompactionTest", "CopyOnWriteTest", "harness_test", "serializeio_test" ]
-    for test in tests:
+    for dir, test in tests:
+        # We expect valgrind failures in all tests in memleaktests
+        # except for the test named no_losses.
+        expectNoMemLeaks = not (dir == "memleaktests") or not ( test == "no_losses" )
         binname, objectname, sourcename = namesForTestCode(test)
         targetpath = OUTPUT_PREFIX + "/" + binname
         retval = 0
@@ -649,33 +759,32 @@ def runTests(CTX):
                 if targetpath.find(test) != -1:
                     isValgrindTest = False;
             if CTX.PLATFORM == "Linux" and isValgrindTest:
-                process = Popen(executable="valgrind", args=["valgrind", 
-							     "--leak-check=full", 
-							     "--show-reachable=yes",
-							     "--error-exitcode=-1",
-							     "--suppressions=" + os.path.join(TEST_PREFIX,
-											      "test_utils/vdbsuppressions.supp"),
-							     targetpath], stderr=PIPE, bufsize=-1)
-                #out = process.stdout.readlines()
-                allHeapBlocksFreed = False
-                otherValgrindError = True
+                valgrindFile = makeValgrindFile("%p")
+                process = Popen(executable="valgrind",
+                                args=["valgrind",
+                                      "--leak-check=full",
+                                      "--show-reachable=yes",
+                                      "--error-exitcode=-1",
+                                      "--suppressions=" + os.path.join(TEST_PREFIX,
+                                                                       "test_utils/vdbsuppressions.supp"),
+                                      "--xml=yes",
+                                      "--xml-file=" + valgrindFile,
+                                      targetpath], stderr=PIPE, bufsize=-1)
                 out_err = process.stderr.readlines()
                 retval = process.wait()
-                for str in out_err:
-                    if str.find("All heap blocks were freed") != -1:
-                        allHeapBlocksFreed = True
-                    if str.find("ERROR SUMMARY: 0 errors from 0 contexts") != -1:
-                        otherValgrindError = False
-                if not allHeapBlocksFreed:
-                    print "Not all heap blocks were freed..."
+                fileName = makeValgrindFile("%d" % process.pid)
+                errorState = ValgrindErrorState(expectNoMemLeaks, fileName)
+                # If there are as many errors as we expect,
+                # then delete the xml file.  Otherwise keep it.
+                # It may be useful.
+                if ( not errorState.isExpectedState()):
+                    try:
+                        os.remove(fileName)
+                    except ex:
+                        pass
+                    print errorState.errorMessage()
                     retval = -1
-                elif otherValgrindError:
-                    print "Valgrind reported errors..."
-                    retval = -1
-                if retval == -1:
-                    for str in out_err:
-                        print str
-                sys.stdout.flush()
+                    sys.stdout.flush()
             else:
                 retval = os.system(targetpath)
         if retval == 0:
@@ -694,4 +803,3 @@ def runTests(CTX):
     print "==============================================================================="
 
     return failures
-

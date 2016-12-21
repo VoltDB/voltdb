@@ -39,7 +39,6 @@ Flask-Inputs-0.2.0.tar.gz
 Flask-Logging-0.1.3.tar.gz
 kennethreitz-requests-v2.10.0-41-g92fe51c.tar.gz
 repoze.lru-0.6.tar.gz
-xmlrunner-1.7.7.tar.gz
 xmltodict-0.10.2.tar.gz
 Flask-Cors-2.1.2.tar.gz
 

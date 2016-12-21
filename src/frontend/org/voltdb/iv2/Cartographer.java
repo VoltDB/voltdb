@@ -35,7 +35,6 @@ import java.util.concurrent.ExecutorService;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONException;
-import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.BinaryPayloadMessage;
@@ -51,9 +50,13 @@ import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.VoltZK;
 import org.voltdb.VoltZK.MailboxType;
-import org.voltdb.compiler.ClusterConfig;
 
+import com.google_voltpatches.common.base.Preconditions;
+import com.google_voltpatches.common.collect.ArrayListMultimap;
 import com.google_voltpatches.common.collect.ImmutableMap;
+import com.google_voltpatches.common.collect.Multimap;
+import com.google_voltpatches.common.collect.Multimaps;
+import com.google_voltpatches.common.collect.Sets;
 
 /**
  * Cartographer provides answers to queries about the components in a cluster.
@@ -87,8 +90,8 @@ public class Cartographer extends StatsSource
         try {
             JSONStringer stringer = new JSONStringer();
             stringer.object();
-            stringer.key(JSON_PARTITION_ID).value(partitionId);
-            stringer.key(JSON_INITIATOR_HSID).value(hsId);
+            stringer.keySymbolValuePair(JSON_PARTITION_ID, partitionId);
+            stringer.keySymbolValuePair(JSON_INITIATOR_HSID, hsId);
             stringer.endObject();
             BinaryPayloadMessage bpm = new BinaryPayloadMessage(new byte[0], stringer.toString().getBytes("UTF-8"));
             int hostId = m_hostMessenger.getHostId();
@@ -209,7 +212,7 @@ public class Cartographer extends StatsSource
             sites.add(leader);
         }
         else {
-            leader = m_iv2Masters.pointInTimeCache().get((Integer)rowKey);
+            leader = m_iv2Masters.pointInTimeCache().get(rowKey);
             sites.addAll(getReplicasForPartition((Integer)rowKey));
         }
 
@@ -229,6 +232,16 @@ public class Cartographer extends StatsSource
         else {
             return getHSIdForSinglePartitionMaster(partitionId);
         }
+    }
+
+    /**
+     * Checks whether this host is partition 0 'zero' leader
+     *
+     * @return result of the test
+     */
+    public boolean isPartitionZeroLeader()
+    {
+        return CoreUtils.getHostIdFromHSId(m_iv2Masters.get(0)) == m_hostMessenger.getHostId();
     }
 
     /**
@@ -288,6 +301,32 @@ public class Cartographer extends StatsSource
         // The list returned by getPartitions includes the MP PID.  Need to remove that for the
         // true partition count.
         return Cartographer.getPartitions(m_zk).size() - 1;
+    }
+
+    /**
+     * Convenient method, given a hostId, return the hostId of its buddies (including itself) which both
+     * belong to the same partition group.
+     * @param hostId
+     * @return A set of host IDs that both belong to the same partition group
+     */
+    public Set<Integer> getHostIdsWithinPartitionGroup(int hostId) {
+        Set<Integer> hostIds = Sets.newHashSet();
+
+        Multimap<Integer, Integer> hostByIds = ArrayListMultimap.create();
+        Multimap<Integer, Integer> partitionByIds = ArrayListMultimap.create();
+        for (int pId : getPartitions()) {
+            if (pId == MpInitiator.MP_INIT_PID) {
+                continue;
+            }
+            List<Long> hsIDs = getReplicasForPartition(pId);
+            hsIDs.forEach(hsId -> hostByIds.put(CoreUtils.getHostIdFromHSId(hsId), pId));
+        }
+        assert hostByIds.containsKey(hostId);
+        Multimaps.invertFrom(hostByIds, partitionByIds);
+        for (int partition : hostByIds.asMap().get(hostId)) {
+            hostIds.addAll(partitionByIds.get(partition));
+        }
+        return hostIds;
     }
 
     /**
@@ -396,6 +435,7 @@ public class Cartographer extends StatsSource
     public List<Integer> getIv2PartitionsToReplace(int kfactor, int sitesPerHost)
         throws JSONException
     {
+        Preconditions.checkArgument(sitesPerHost != VoltDB.UNDEFINED);
         List<Integer> partitions = getPartitions();
         hostLog.info("Computing partitions to replace.  Total partitions: " + partitions);
         Map<Integer, Integer> repsPerPart = new HashMap<Integer, Integer>();
@@ -411,22 +451,21 @@ public class Cartographer extends StatsSource
      * Compute the new partition IDs to add to the cluster based on the new topology.
      *
      * @param  zk Zookeeper client
-     * @param topo The new topology which should include the new host count
+     * @param newPartitionTotalCount The new total partition count
      * @return A list of partitions IDs to add to the cluster.
      * @throws JSONException
      */
-    public static List<Integer> getPartitionsToAdd(ZooKeeper zk, JSONObject topo)
+    public static List<Integer> getPartitionsToAdd(ZooKeeper zk, int newPartitionTotalCount)
             throws JSONException
     {
-        ClusterConfig  clusterConfig = new ClusterConfig(topo);
         List<Integer> newPartitions = new ArrayList<Integer>();
         Set<Integer> existingParts = new HashSet<Integer>(getPartitions(zk));
         // Remove MPI
         existingParts.remove(MpInitiator.MP_INIT_PID);
-        int partsToAdd = clusterConfig.getPartitionCount() - existingParts.size();
+        int partsToAdd = newPartitionTotalCount - existingParts.size();
 
         if (partsToAdd > 0) {
-            hostLog.info("Computing new partitions to add. Total partitions: " + clusterConfig.getPartitionCount());
+            hostLog.info("Computing new partitions to add. Total partitions: " + newPartitionTotalCount);
             for (int i = 0; newPartitions.size() != partsToAdd; i++) {
                 if (!existingParts.contains(i)) {
                     newPartitions.add(i);

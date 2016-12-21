@@ -68,6 +68,8 @@ public class PlannerTestAideDeCamp {
      * @throws Exception
      */
     public PlannerTestAideDeCamp(URL ddlurl, String basename) throws Exception {
+        assert(ddlurl != null);
+        String pth = ddlurl.getPath();
         String schemaPath = URLDecoder.decode(ddlurl.getPath(), "UTF-8");
         VoltCompiler compiler = new VoltCompiler();
         hsql = HSQLInterface.loadHsqldb();
@@ -169,7 +171,7 @@ public class PlannerTestAideDeCamp {
             catalogParam.setIndex(i);
         }
 
-        List<PlanNodeList> nodeLists = new ArrayList<PlanNodeList>();
+        List<PlanNodeList> nodeLists = new ArrayList<>();
         nodeLists.add(new PlanNodeList(plan.rootPlanGraph));
         if (plan.subPlanGraph != null) {
             nodeLists.add(new PlanNodeList(plan.subPlanGraph));
@@ -187,6 +189,7 @@ public class PlannerTestAideDeCamp {
             // TODO Auto-generated catch block
             e2.printStackTrace();
             System.exit(-1);
+            return null;
         }
 
         //
@@ -199,7 +202,7 @@ public class PlannerTestAideDeCamp {
             e.printStackTrace();
         }
 
-        List<AbstractPlanNode> plannodes = new ArrayList<AbstractPlanNode>();
+        List<AbstractPlanNode> plannodes = new ArrayList<>();
         for (PlanNodeList nodeList : nodeLists) {
             plannodes.add(nodeList.getRootPlanNode());
         }
@@ -208,4 +211,7 @@ public class PlannerTestAideDeCamp {
         return plannodes;
     }
 
+    public String getCatalogString() {
+        return db.getCatalog().serialize();
+    }
 }

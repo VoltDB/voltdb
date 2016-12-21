@@ -47,12 +47,18 @@ import org.voltcore.utils.ShutdownHooks;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.common.Constants;
 import org.voltdb.probe.MeshProber;
+import org.voltdb.settings.ClusterSettings;
+import org.voltdb.settings.NodeSettings;
+import org.voltdb.settings.Settings;
+import org.voltdb.snmp.SnmpTrapSender;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.PlatformProperties;
 import org.voltdb.utils.VoltFile;
 
+import com.google_voltpatches.common.collect.ImmutableList;
+import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
 import com.google_voltpatches.common.net.HostAndPort;
 
@@ -78,10 +84,12 @@ public class VoltDB {
 
     // Staged filenames for advanced deployments
     public static final String INITIALIZED_MARKER = ".initialized";
+    public static final String TERMINUS_MARKER = ".shutdown_snapshot";
+    public static final String INITIALIZED_PATHS = ".paths";
     public static final String STAGED_MESH = "_MESH";
-    public static final String CONFIG_DIR = "config";
     public static final String DEFAULT_CLUSTER_NAME = "database";
     public static final String DBROOT = Constants.DBROOT;
+    public static final String MODULE_CACHE = ".bundles-cache";
 
     // Utility to try to figure out if this is a test case.  Various junit targets in
     // build.xml set this environment variable to give us a hint
@@ -289,6 +297,9 @@ public class VoltDB {
         /** number of hosts that participate in a VoltDB cluster */
         public int m_hostCount = UNDEFINED;
 
+        /** not sites per host actually, number of local sites in this node */
+        public int m_sitesperhost = UNDEFINED;
+
         /** allow elastic joins */
         public boolean m_enableAdd = false;
 
@@ -314,7 +325,9 @@ public class VoltDB {
 
         public Configuration(String args[]) {
             String arg;
-
+            /*
+             *  !!! D O  N O T  U S E  hostLog  T O  L O G ,  U S E  System.[out|err]  I N S T E A D
+             */
             for (int i=0; i < args.length; ++i) {
                 arg = args[i];
                 // Some LocalCluster ProcessBuilder instances can result in an empty string
@@ -434,6 +447,8 @@ public class VoltDB {
                     m_meshBrokers = sbld.toString();
                 } else if (arg.equals("hostcount")) {
                     m_hostCount = Integer.parseInt(args[++i].trim());
+                } else if (arg.equals("sitesperhost")){
+                    m_sitesperhost = Integer.parseInt(args[++i].trim());
                 } else if (arg.equals("publicinterface")) {
                     m_publicInterface = args[++i].trim();
                 } else if (arg.startsWith("publicinterface ")) {
@@ -524,7 +539,9 @@ public class VoltDB {
                     m_enableAdd = true;
                 } else if (arg.equals("noadd")) {
                     m_enableAdd = false;
-                } else if (arg.equals("replica")) {
+                } else if (arg.equals("enableadd")) {
+                    m_enableAdd = true;
+                }else if (arg.equals("replica")) {
                     m_replicationRole = ReplicationRole.REPLICA;
                 }
                 else if (arg.equals("dragentportstart")) {
@@ -565,7 +582,7 @@ public class VoltDB {
                     m_ipcPort = Integer.valueOf(portStr);
                 }
                 else if (arg.equals("forcecatalogupgrade")) {
-                    hostLog.info("Forced catalog upgrade will occur due to command line option.");
+                    System.out.println("Forced catalog upgrade will occur due to command line option.");
                     m_forceCatalogUpgrade = true;
                 }
                 // version string override for testing online upgrade
@@ -604,18 +621,20 @@ public class VoltDB {
                 }
             }
 
-            if (!m_publicInterface.isEmpty()) {
-                m_httpPortInterface = m_publicInterface;
-            }
-
             // set file logger root file directory. From this point on you can use loggers
             if (m_startAction != null && !m_startAction.isLegacy()) {
                 VoltLog4jLogger.setFileLoggerRoot(m_voltdbRoot);
             }
+            /*
+             *  !!! F R O M  T H I S  P O I N T  O N  Y O U  M A Y  U S E  hostLog  T O  L O G
+             */
+            if (m_forceCatalogUpgrade) {
+                hostLog.info("Forced catalog upgrade will occur due to command line option.");
+            }
 
             // If no action is specified, issue an error.
             if (null == m_startAction) {
-                hostLog.fatal("You must specify a startup action, either initialize, probe, create, recover, rejoin, collect, or compile.");
+                hostLog.fatal("You must specify a startup action, either init, start, create, recover, rejoin, collect, or compile.");
                 referToDocAndExit();
             }
 
@@ -642,7 +661,7 @@ public class VoltDB {
                 if (isInitialized() && !m_forceVoltdbCreate) {
                     hostLog.fatal(m_voltdbRoot + " is already initialized"
                             + "\nUse the start command to start the initialized database or use init --force"
-                            + " to initialize a new database overwriting existing files.");
+                            + " to overwrite existing files.");
                     referToDocAndExit();
                 }
             } else if (m_meshBrokers == null || m_meshBrokers.trim().isEmpty()) {
@@ -666,13 +685,47 @@ public class VoltDB {
             return inzFH.exists() && inzFH.isFile() && inzFH.canRead();
         }
 
+        public Map<String,String> asClusterSettingsMap() {
+            Settings.initialize(m_voltdbRoot);
+            return ImmutableMap.<String, String>builder()
+                    .put(ClusterSettings.HOST_COUNT, Integer.toString(m_hostCount))
+                    .build();
+        }
+
+        public Map<String,String> asPathSettingsMap() {
+            Settings.initialize(m_voltdbRoot);
+            return ImmutableMap.<String, String>builder()
+                    .put(NodeSettings.VOLTDBROOT_PATH_KEY, m_voltdbRoot.getPath())
+                    .build();
+        }
+
+        public Map<String, String> asNodeSettingsMap() {
+            return ImmutableMap.<String, String>builder()
+                    .put(NodeSettings.LOCAL_SITES_COUNT_KEY, Integer.toString(m_sitesperhost))
+                    .build();
+        }
+
+        public ClusterSettings asClusterSettings() {
+            return ClusterSettings.create(asClusterSettingsMap());
+        }
+
+        List<File> getInitMarkers() {
+            return ImmutableList.<File>builder()
+                    .add(new VoltFile(m_voltdbRoot, VoltDB.INITIALIZED_MARKER))
+                    .add(new VoltFile(m_voltdbRoot, VoltDB.INITIALIZED_PATHS))
+                    .add(new VoltFile(m_voltdbRoot, Constants.CONFIG_DIR))
+                    .add(new VoltFile(m_voltdbRoot, VoltDB.STAGED_MESH))
+                    .add(new VoltFile(m_voltdbRoot, VoltDB.TERMINUS_MARKER))
+                    .build();
+        }
+
         /**
          * Checks for the initialization marker on initialized voltdbroot directory
          */
         private void checkInitializationMarker() {
 
             File inzFH = new VoltFile(m_voltdbRoot, VoltDB.INITIALIZED_MARKER);
-            File deploymentFH = new VoltFile(new VoltFile(m_voltdbRoot, CONFIG_DIR), "deployment.xml");
+            File deploymentFH = new VoltFile(new VoltFile(m_voltdbRoot, Constants.CONFIG_DIR), "deployment.xml");
             File configCFH = null;
             File optCFH = null;
 
@@ -690,7 +743,7 @@ public class VoltDB {
                     referToDocAndExit();
                 }
                 if (!configCFH.equals(optCFH)) {
-                    hostLog.fatal("In probe startup mode you may only specify " + deploymentFH + " for deployment");
+                    hostLog.fatal("In startup mode you may only specify " + deploymentFH + " for deployment, You specified: " + optCFH);
                     referToDocAndExit();
                 }
             } else {
@@ -698,7 +751,7 @@ public class VoltDB {
             }
 
             if (!inzFH.exists() || !inzFH.isFile() || !inzFH.canRead()) {
-                hostLog.fatal("Probe startup mode requires an already initialized VoltDB instance");
+                hostLog.fatal("Specified directory is not a VoltDB initialized root");
                 referToDocAndExit();
             }
 
@@ -761,7 +814,7 @@ public class VoltDB {
                 hostLog.fatal(msg);
             }
             EnumSet<StartAction> requiresDeployment = EnumSet.complementOf(
-                    EnumSet.of(StartAction.REJOIN,StartAction.LIVE_REJOIN,StartAction.JOIN,StartAction.INITIALIZE));
+                    EnumSet.of(StartAction.REJOIN,StartAction.LIVE_REJOIN,StartAction.JOIN,StartAction.INITIALIZE, StartAction.PROBE));
             // require deployment file location
             if (requiresDeployment.contains(m_startAction)) {
                 // require deployment file location (null is allowed to receive default deployment)
@@ -775,16 +828,24 @@ public class VoltDB {
             EnumSet<StartAction> pauseNotAllowed = EnumSet.of(StartAction.JOIN,StartAction.LIVE_REJOIN,StartAction.REJOIN);
             if (m_isPaused && pauseNotAllowed.contains(m_startAction)) {
                 isValid = false;
-                hostLog.fatal("Starting in paused mode is only allowed when starting using create or recover.");
+                hostLog.fatal("Starting in admin mode is only allowed when using start, create or recover.");
             }
             if (m_startAction != StartAction.INITIALIZE && m_coordinators.isEmpty()) {
                 isValid = false;
-                hostLog.fatal("Coordinator hosts are missing");
+                hostLog.fatal("List of hosts is missing");
             }
 
             if (m_startAction != StartAction.PROBE && m_hostCount != UNDEFINED) {
                 isValid = false;
-                hostLog.fatal("Option \"hostcount\" may only be specified when the start action is probe");
+                hostLog.fatal("Option \"--count\" may only be specified when using start");
+            }
+            if (m_startAction == StartAction.PROBE && m_hostCount != UNDEFINED && m_hostCount < m_coordinators.size()) {
+                isValid = false;
+                hostLog.fatal("List of hosts is greater than option \"--count\"");
+            }
+            if (m_startAction == StartAction.PROBE && m_hostCount != UNDEFINED && m_hostCount < 0) {
+                isValid = false;
+                hostLog.fatal("\"--count\" may not be specified with negative values");
             }
             if (m_startAction == StartAction.JOIN && !m_enableAdd) {
                 isValid = false;
@@ -892,7 +953,7 @@ public class VoltDB {
         if (hm != null) {
             hostId = hm.getHostId();
         }
-        String root = catalogContext != null ? catalogContext.cluster.getVoltroot() + File.separator : "";
+        String root = catalogContext != null ? VoltDB.instance().getVoltDBRootPath() + File.separator : "";
         try {
             PrintWriter writer = new PrintWriter(root + "host" + hostId + "-" + dateString + ".txt");
             writer.println(message);
@@ -975,6 +1036,29 @@ public class VoltDB {
     }
 
     /**
+     * send a SNMP trap crash notification
+     * @param msg
+     */
+    private static void sendCrashSNMPTrap(String msg) {
+        if (msg == null || msg.trim().isEmpty()) {
+            return;
+        }
+        VoltDBInterface vdbInstance = instance();
+        if (vdbInstance == null) {
+            return;
+        }
+        SnmpTrapSender snmp = vdbInstance.getSnmpTrapSender();
+        if (snmp == null) {
+            return;
+        }
+        try {
+            snmp.crash(msg);
+        } catch (Throwable t) {
+            VoltLogger log = new VoltLogger("HOST");
+            log.warn("failed to issue a crash SNMP trap", t);
+        }
+    }
+    /**
      * Exit the process with an error message, optionally with a stack trace.
      */
     public static void crashLocalVoltDB(String errMsg, boolean stackTrace, Throwable thrown) {
@@ -1001,7 +1085,8 @@ public class VoltDB {
             log.warn("Declining to drop a crash file during a junit test.");
         }
         // end test code
-
+        // send a snmp trap crash notification
+        sendCrashSNMPTrap(errMsg);
         // try/finally block does its best to ensure death, no matter what context this
         // is called in
         try {
@@ -1024,7 +1109,7 @@ public class VoltDB {
                 {
                     TimestampType ts = new TimestampType(new java.util.Date());
                     CatalogContext catalogContext = VoltDB.instance().getCatalogContext();
-                    String root = catalogContext != null ? catalogContext.cluster.getVoltroot() + File.separator : "";
+                    String root = catalogContext != null ? VoltDB.instance().getVoltDBRootPath() + File.separator : "";
                     PrintWriter writer = new PrintWriter(root + "voltdb_crash" + ts.toString().replace(' ', '-') + ".txt");
                     writer.println("Time: " + ts);
                     writer.println("Message: " + errMsg);
@@ -1127,6 +1212,8 @@ public class VoltDB {
         }
         // end test code
 
+        // send a snmp trap crash notification
+        sendCrashSNMPTrap(errMsg);
         try {
             // turn off client interface as fast as possible
             // we don't expect this to ever fail, but if it does, skip to dying immediately

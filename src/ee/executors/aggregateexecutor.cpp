@@ -138,7 +138,7 @@ struct NotDistinct {
 template<class D>
 class SumAgg : public Agg
 {
-  public:
+public:
     // We're providing a NULL pool argument here to ifDistinct because
     // SUM only operates on numeric values which don't have the same
     // issues as inlined strings.
@@ -540,11 +540,11 @@ inline Agg* getAggInstance(Pool& memoryPool, ExpressionType agg_type, bool isDis
     case EXPRESSION_TYPE_AGGREGATE_HYPERLOGLOGS_TO_CARD:
         return new (memoryPool) HyperLogLogsToCardAgg();
     default:
-    {
-        char message[128];
-        snprintf(message, sizeof(message), "Unknown aggregate type %d", agg_type);
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
-    }
+        {
+            char message[128];
+            snprintf(message, sizeof(message), "Unknown aggregate type %d", agg_type);
+            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
+        }
     }
 }
 
@@ -555,7 +555,8 @@ bool AggregateExecutorBase::p_init(AbstractPlanNode*, TempTableLimits* limits)
 
     m_inputExpressions = node->getAggregateInputExpressions();
     for (int i = 0; i < m_inputExpressions.size(); i++) {
-        VOLT_DEBUG("\nAGG INPUT EXPRESSION: %s\n",
+        VOLT_DEBUG("AGG INPUT EXPRESSION[%d]: %s",
+                   i,
                    m_inputExpressions[i] ? m_inputExpressions[i]->debug().c_str() : "null");
     }
 
@@ -598,7 +599,7 @@ bool AggregateExecutorBase::p_init(AbstractPlanNode*, TempTableLimits* limits)
         for (int ii = 0; ii < m_groupByExpressions.size(); ii++) {
             if (std::find(m_partialSerialGroupByColumns.begin(),
                           m_partialSerialGroupByColumns.end(), ii)
-                       == m_partialSerialGroupByColumns.end() )
+                == m_partialSerialGroupByColumns.end() )
             {
                 // Find the partial hash group by columns
                 m_partialHashGroupByColumns.push_back(ii);;
@@ -677,7 +678,7 @@ inline bool AggregateExecutorBase::insertOutputTuple(AggregateRow* aggregateRow)
     VOLT_TRACE("Setting passthrough columns");
     BOOST_FOREACH(int output_col_index, m_passThroughColumns) {
         tempTuple.setNValue(output_col_index,
-                         m_outputColumnExpressions[output_col_index]->eval(&(aggregateRow->m_passThroughTuple)));
+                            m_outputColumnExpressions[output_col_index]->eval(&(aggregateRow->m_passThroughTuple)));
     }
 
     bool needInsert = m_postfilter.eval(&tempTuple, NULL);
@@ -738,7 +739,7 @@ TableTuple& AggregateExecutorBase::swapWithInprogressGroupByKeyTuple() {
 }
 
 TableTuple AggregateExecutorBase::p_execute_init(const NValueArray& params,
-        ProgressMonitorProxy* pmp, const TupleSchema * schema, TempTable* newTempTable, CountingPostfilter* parentPostfilter)
+                                                 ProgressMonitorProxy* pmp, const TupleSchema * schema, TempTable* newTempTable, CountingPostfilter* parentPostfilter)
 {
     if (newTempTable != NULL) {
         m_tmpOutputTable = newTempTable;
@@ -757,8 +758,7 @@ TableTuple AggregateExecutorBase::p_execute_init(const NValueArray& params,
     // set the schema first because of the NON-null check in MOVE function
     m_inProgressGroupByKeyTuple.move(NULL);
 
-    char * storage = reinterpret_cast<char*>(
-            m_memoryPool.allocateZeroes(schema->tupleLength() + TUPLE_HEADER_SIZE));
+    char * storage = reinterpret_cast<char*>(m_memoryPool.allocateZeroes(schema->tupleLength() + TUPLE_HEADER_SIZE));
     return TableTuple(storage, schema);
 }
 
@@ -775,7 +775,10 @@ void AggregateExecutorBase::p_execute_finish()
 AggregateHashExecutor::~AggregateHashExecutor() {}
 
 TableTuple AggregateHashExecutor::p_execute_init(const NValueArray& params,
-        ProgressMonitorProxy* pmp, const TupleSchema * schema, TempTable* newTempTable, CountingPostfilter* parentPostfilter)
+                                                 ProgressMonitorProxy* pmp,
+                                                 const TupleSchema * schema,
+                                                 TempTable* newTempTable,
+                                                 CountingPostfilter* parentPostfilter)
 {
     VOLT_TRACE("hash aggregate executor init..");
     m_hash.clear();
@@ -793,7 +796,7 @@ bool AggregateHashExecutor::p_execute(const NValueArray& params)
     const TupleSchema * inputSchema = input_table->schema();
     assert(inputSchema);
     TableIterator it = input_table->iteratorDeletingAsWeGo();
-    ProgressMonitorProxy pmp(m_engine, this);
+    ProgressMonitorProxy pmp(m_engine->getExecutorContext(), this);
 
     TableTuple nextTuple = AggregateHashExecutor::p_execute_init(params, &pmp, inputSchema, NULL);
 
@@ -824,8 +827,7 @@ void AggregateHashExecutor::p_execute_tuple(const TableTuple& nextTuple) {
 
         initAggInstances(aggregateRow);
 
-        char* storage = reinterpret_cast<char*>(
-                m_memoryPool.allocateZeroes(m_inputSchema->tupleLength() + TUPLE_HEADER_SIZE));
+        char* storage = reinterpret_cast<char*>(m_memoryPool.allocateZeroes(m_inputSchema->tupleLength() + TUPLE_HEADER_SIZE));
         TableTuple passThroughTupleSource = TableTuple(storage, m_inputSchema);
 
         aggregateRow->recordPassThroughTuple(passThroughTupleSource, nextTuple);
@@ -843,7 +845,7 @@ void AggregateHashExecutor::p_execute_tuple(const TableTuple& nextTuple) {
     }
     // update the aggregation calculation.
     advanceAggs(aggregateRow, nextTuple);
- }
+}
 
 void AggregateHashExecutor::p_execute_finish() {
     VOLT_TRACE("finalizing..");
@@ -868,18 +870,19 @@ AggregateSerialExecutor::~AggregateSerialExecutor() {}
 
 
 TableTuple AggregateSerialExecutor::p_execute_init(const NValueArray& params,
-        ProgressMonitorProxy* pmp, const TupleSchema * schema, TempTable* newTempTable, CountingPostfilter* parentPostfilter)
+                                                   ProgressMonitorProxy* pmp,
+                                                   const TupleSchema * schema,
+                                                   TempTable* newTempTable,
+                                                   CountingPostfilter* parentPostfilter)
 {
     VOLT_TRACE("serial aggregate executor init..");
-    TableTuple nextInputTuple = AggregateExecutorBase::p_execute_init(
-            params, pmp, schema, newTempTable, parentPostfilter);
+    TableTuple nextInputTuple = AggregateExecutorBase::p_execute_init(params, pmp, schema, newTempTable, parentPostfilter);
 
     m_aggregateRow = new (m_memoryPool, m_aggTypes.size()) AggregateRow();
     m_noInputRows = true;
     m_failPrePredicateOnFirstRow = false;
 
-    char* storage = reinterpret_cast<char*>(
-            m_memoryPool.allocateZeroes(schema->tupleLength() + TUPLE_HEADER_SIZE));
+    char* storage = reinterpret_cast<char*>(m_memoryPool.allocateZeroes(schema->tupleLength() + TUPLE_HEADER_SIZE));
     m_passThroughTupleSource = TableTuple(storage, schema);
 
     // for next input tuple
@@ -895,7 +898,7 @@ bool AggregateSerialExecutor::p_execute(const NValueArray& params)
     TableIterator it = input_table->iteratorDeletingAsWeGo();
     TableTuple nextTuple(input_table->schema());
 
-    ProgressMonitorProxy pmp(m_engine, this);
+    ProgressMonitorProxy pmp(m_engine->getExecutorContext(), this);
     AggregateSerialExecutor::p_execute_init(params, &pmp, input_table->schema(), NULL);
 
     while (m_postfilter.isUnderLimit() && it.next(nextTuple)) {
@@ -945,7 +948,6 @@ void AggregateSerialExecutor::p_execute_tuple(const TableTuple& nextTuple) {
             break;
         }
     }
-
     // update the aggregation calculation.
     advanceAggs(m_aggregateRow, nextTuple);
 }
@@ -988,8 +990,7 @@ TableTuple AggregatePartialExecutor::p_execute_init(const NValueArray& params,
         ProgressMonitorProxy* pmp, const TupleSchema * schema, TempTable* newTempTable, CountingPostfilter* parentPostfilter)
 {
     VOLT_TRACE("partial aggregate executor init..");
-    TableTuple nextInputTuple = AggregateExecutorBase::p_execute_init(
-            params, pmp, schema, newTempTable, parentPostfilter);
+    TableTuple nextInputTuple = AggregateExecutorBase::p_execute_init(params, pmp, schema, newTempTable, parentPostfilter);
 
     m_atTheFirstRow = true;
     m_nextPartialGroupByKeyStorage.init(m_groupByKeyPartialHashSchema, &m_memoryPool);
@@ -1011,7 +1012,7 @@ bool AggregatePartialExecutor::p_execute(const NValueArray& params)
     TableIterator it = input_table->iteratorDeletingAsWeGo();
     TableTuple nextTuple(input_table->schema());
 
-    ProgressMonitorProxy pmp(m_engine, this);
+    ProgressMonitorProxy pmp(m_engine->getExecutorContext(), this);
     AggregatePartialExecutor::p_execute_init(params, &pmp, input_table->schema(), NULL);
 
     while (m_postfilter.isUnderLimit() && it.next(nextTuple)) {
@@ -1080,7 +1081,7 @@ void AggregatePartialExecutor::p_execute_tuple(const TableTuple& nextTuple) {
         initAggInstances(aggregateRow);
 
         char* storage = reinterpret_cast<char*>(
-                        m_memoryPool.allocateZeroes(m_inputSchema->tupleLength() + TUPLE_HEADER_SIZE));
+                                                m_memoryPool.allocateZeroes(m_inputSchema->tupleLength() + TUPLE_HEADER_SIZE));
         TableTuple passThroughTupleSource = TableTuple (storage, m_inputSchema);
         aggregateRow->recordPassThroughTuple(passThroughTupleSource, nextTuple);
         // The map is referencing the current key tuple for use by the new group,
@@ -1114,5 +1115,4 @@ void AggregatePartialExecutor::p_execute_finish()
 
     AggregateExecutorBase::p_execute_finish();
 }
-
 }

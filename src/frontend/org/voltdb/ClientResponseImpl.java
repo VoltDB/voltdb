@@ -88,7 +88,7 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
         this(status, ClientResponse.UNINITIALIZED_APP_STATUS_CODE, null, results, statusString, handle);
     }
 
-    ClientResponseImpl(byte status, byte appStatus, String appStatusString, VoltTable[] results, String statusString, long handle) {
+    public ClientResponseImpl(byte status, byte appStatus, String appStatusString, VoltTable[] results, String statusString, long handle) {
         this.appStatus = appStatus;
         this.appStatusString = appStatusString;
         setResults(status, results, statusString);
@@ -297,14 +297,10 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
         try {
             js.object();
 
-            js.key(JSON_STATUS_KEY);
-            js.value(status);
-            js.key(JSON_APPSTATUS_KEY);
-            js.value(appStatus);
-            js.key(JSON_STATUSSTRING_KEY);
-            js.value(statusString);
-            js.key(JSON_APPSTATUSSTRING_KEY);
-            js.value(appStatusString);
+            js.keySymbolValuePair(JSON_STATUS_KEY, status);
+            js.keySymbolValuePair(JSON_APPSTATUS_KEY, appStatus);
+            js.keySymbolValuePair(JSON_STATUSSTRING_KEY, statusString);
+            js.keySymbolValuePair(JSON_APPSTATUSSTRING_KEY, appStatusString);
             js.key(JSON_RESULTS_KEY);
             js.array();
             for (VoltTable o : results) {
@@ -316,7 +312,7 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
         }
         catch (JSONException e) {
             e.printStackTrace();
-            throw new RuntimeException("Failed to serialized a parameter set to JSON.", e);
+            throw new RuntimeException("Failed to serialize a parameter set to JSON.", e);
         }
         return js.toString();
     }

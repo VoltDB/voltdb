@@ -71,7 +71,6 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
                         boolean isForReplay)
     {
         super(initiatorHSId, coordinatorHSId, txnId, uniqueId, isReadOnly, isForReplay);
-        super.setOriginalTxnId(invocation.getOriginalTxnId());
 
         setTruncationHandle(truncationHandle);
         m_isSinglePartition = isSinglePartition;
@@ -89,11 +88,6 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
         m_invocation = rhs.m_invocation;
         m_clientInterfaceHandle = rhs.m_clientInterfaceHandle;
         m_connectionId = rhs.m_connectionId;
-    }
-
-    @Override
-    public boolean isForDRv1() {
-        return super.isForDRv1();
     }
 
     @Override
@@ -196,13 +190,12 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
         sb.append(CoreUtils.hsIdToString(getInitiatorHSId()));
         sb.append(" TO ");
         sb.append(CoreUtils.hsIdToString(getCoordinatorHSId()));
-        sb.append(") FOR TXN ");
-        sb.append(m_txnId).append(" (").append(TxnEgo.txnIdToString(m_txnId)).append(")").append("\n");
+        sb.append(") FOR TXN ").append(TxnEgo.txnIdToString(m_txnId));
         sb.append(" UNIQUE ID ").append(m_uniqueId).append(" (").append(UniqueIdGenerator.toString(m_uniqueId));
         sb.append(")").append("\n");
         sb.append(") TRUNC HANDLE ");
-        sb.append(getTruncationHandle()).append("\n");
-        sb.append("SP HANDLE: ").append(getSpHandle()).append("\n");
+        sb.append(TxnEgo.txnIdToString(getTruncationHandle())).append("\n");
+        sb.append("SP HANDLE: ").append(TxnEgo.txnIdToString(getSpHandle())).append("\n");
         sb.append("CLIENT INTERFACE HANDLE: ").append(m_clientInterfaceHandle);
         sb.append("\n");
         sb.append("CONNECTION ID: ").append(m_connectionId).append("\n");

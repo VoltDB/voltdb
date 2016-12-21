@@ -38,7 +38,7 @@ public:
     static const size_t HASH_DELIMITER_SIZE = 1 + 4;
 
     // Also update DRProducerProtocol.java if version changes
-    static const uint8_t PROTOCOL_VERSION = 5;
+    static const uint8_t PROTOCOL_VERSION = 6;
 
     DRTupleStream(int partitionId, int defaultBufferSize);
 
@@ -97,7 +97,7 @@ public:
                                    char *out);
 
 private:
-    void transactionChecks(int64_t lastCommittedSpHandle, int64_t spHandle, int64_t uniqueId);
+    bool transactionChecks(int64_t lastCommittedSpHandle, int64_t spHandle, int64_t uniqueId);
 
     void writeRowTuple(TableTuple& tuple,
             size_t rowHeaderSz,

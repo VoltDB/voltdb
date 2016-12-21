@@ -26,12 +26,9 @@
 #include "common/FatalException.hpp"
 #include "storage/TupleBlock.h"
 
-namespace voltdb
-{
-
+namespace voltdb {
 class TupleOutputStreamProcessor;
 class TableTuple;
-class TupleSerializer;
 class PersistentTable;
 class PersistentTableSurgeon;
 
@@ -143,14 +140,6 @@ public:
     }
 
     /**
-     * Tuple serializer accessor.
-     */
-    TupleSerializer &getSerializer()
-    {
-        return m_serializer;
-    }
-
-    /**
      * Partition ID accessor.
      */
     int32_t getPartitionId() const
@@ -178,7 +167,6 @@ protected:
     TableStreamerContext(PersistentTable &table,
                          PersistentTableSurgeon &surgeon,
                          int32_t partitionId,
-                         TupleSerializer &serializer,
                          const std::vector<std::string> &predicateStrings);
 
     /**
@@ -186,8 +174,7 @@ protected:
      */
     TableStreamerContext(PersistentTable &table,
                          PersistentTableSurgeon &surgeon,
-                         int32_t partitionId,
-                         TupleSerializer &serializer);
+                         int32_t partitionId);
 
     /**
      * Predicate delete flags accessor.
@@ -220,11 +207,6 @@ private:
      * Maximum serialized length of a tuple
      */
     const size_t m_maxTupleLength;
-
-    /**
-     * Serializer for tuples
-     */
-    TupleSerializer &m_serializer;
 
     /**
      * Partition ID

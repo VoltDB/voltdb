@@ -52,7 +52,6 @@ public class VoltZK {
     public static final String topology = "/db/topology";
     public static final String replicationconfig = "/db/replicationconfig";
     public static final String rejoinLock = "/db/rejoin_lock";
-    public static final String restoreMarker = "/db/did_restore";
     public static final String perPartitionTxnIds = "/db/perPartitionTxnIds";
     public static final String operationMode = "/db/operation_mode";
     public static final String exportGenerations = "/db/export_generations";
@@ -90,7 +89,6 @@ public class VoltZK {
     public static final String request_truncation_snapshot = "/db/request_truncation_snapshot";
     public static final String snapshot_truncation_master = "/db/snapshot_truncation_master";
     public static final String test_scan_path = "/db/test_scan_path";   // (test only)
-    public static final String truncation_snapshot_path = "/db/truncation_snapshot_path";
     public static final String user_snapshot_request = "/db/user_snapshot_request";
     public static final String user_snapshot_response = "/db/user_snapshot_response";
     public static final String commandlog_init_barrier = "/db/commmandlog_init_barrier";
@@ -121,6 +119,15 @@ public class VoltZK {
     // Synchronized State Machine
     public static final String syncStateMachine = "/db/synchronized_states";
 
+    // Settings base
+    public static final String settings_base = "/db/settings";
+
+    // Cluster settings
+    public static final String cluster_settings = ZKUtil.joinZKPath(settings_base, "cluster");
+
+    // Shutdown save snapshot guard
+    public static final String shutdown_save_guard = "/db/shutdown_save_guard";
+
     // Persistent nodes (mostly directories) to create on startup
     public static final String[] ZK_HIERARCHY = {
             root,
@@ -135,6 +142,8 @@ public class VoltZK {
             leaders_globalservice,
             lastKnownLiveNodes,
             syncStateMachine,
+            settings_base,
+            cluster_settings,
             catalogUpdateBlockers,
             request_truncation_snapshot
     };

@@ -152,7 +152,6 @@ public class MpProcedureTask extends ProcedureTask
                     m_msg.isForReplay());
 
             restart.setTruncationHandle(m_msg.getTruncationHandle());
-            restart.setOriginalTxnId(m_msg.getOriginalTxnId());
             m_initiator.send(com.google_voltpatches.common.primitives.Longs.toArray(m_initiatorHSIds), restart);
         }
         final InitiateResponseMessage response = processInitiateTask(txn.m_initiationMsg, siteConnection);
@@ -210,7 +209,6 @@ public class MpProcedureTask extends ProcedureTask
                 m_msg.isForReplay());
 
         complete.setTruncationHandle(m_msg.getTruncationHandle());
-        complete.setOriginalTxnId(m_msg.getOriginalTxnId());
         m_initiator.send(com.google_voltpatches.common.primitives.Longs.toArray(m_initiatorHSIds), complete);
         m_txnState.setDone();
         m_queue.flush(getTxnId());

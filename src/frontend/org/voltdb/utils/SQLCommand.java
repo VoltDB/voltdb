@@ -74,6 +74,7 @@ public class SQLCommand
     private static boolean m_stopOnError = true;
     private static boolean m_debug = false;
     private static boolean m_interactive;
+    private static boolean m_versionCheck = true;
     private static boolean m_returningToPromptAfterError = false;
     private static int m_exitCode = 0;
 
@@ -380,6 +381,18 @@ public class SQLCommand
                 System.out.printf("Ignoring extra HELP argument(s): %s\n", helpSubcommand);
             }
             printHelp(System.out); // Print readme to the screen
+            return true;
+        }
+
+        String echoArgs = SQLParser.parseEchoStatement(line);
+        if (echoArgs != null) {
+            System.out.println(echoArgs);
+            return true;
+        }
+
+        String echoErrorArgs = SQLParser.parseEchoErrorStatement(line);
+        if (echoErrorArgs != null) {
+            System.err.println(echoErrorArgs);
             return true;
         }
 
@@ -801,6 +814,14 @@ public class SQLCommand
                 return;
             }
 
+            String explainViewName = SQLParser.parseExplainViewCall(statement);
+            if (explainViewName != null) {
+                // We've got a statement that starts with "explainview", send the statement to
+                // @ExplainView (now that parseExplainViewCall() has stripped out "explainview").
+                printResponse(m_client.callProcedure("@ExplainView", explainViewName));
+                return;
+            }
+
             // LOAD CLASS <jar>?
             String loadPath = SQLParser.parseLoadClasses(statement);
             if (loadPath != null) {
@@ -927,9 +948,9 @@ public class SQLCommand
                                                              .put( 1, Arrays.asList("varchar")).build()
                 );
         Procedures.put("@SnapshotSave",
-                ImmutableMap.<Integer, List<String>>builder().put( 3, Arrays.asList("varchar", "varchar", "bit")).
-                put( 1, Arrays.asList("varchar")).build()
-                );
+                ImmutableMap.<Integer, List<String>>builder().put( 0, new ArrayList<String>())
+                                                             .put( 1, Arrays.asList("varchar"))
+                                                             .put( 3, Arrays.asList("varchar", "varchar", "bit")).build());
         Procedures.put("@SnapshotScan",
                 ImmutableMap.<Integer, List<String>>builder().put( 1,
                 Arrays.asList("varchar")).build());
@@ -953,6 +974,8 @@ public class SQLCommand
                 ImmutableMap.<Integer, List<String>>builder().put( 1, Arrays.asList("varchar")).build());
         Procedures.put("@ExplainProc",
                 ImmutableMap.<Integer, List<String>>builder().put( 1, Arrays.asList("varchar")).build());
+        Procedures.put("@ExplainView",
+                ImmutableMap.<Integer, List<String>>builder().put( 1, Arrays.asList("varchar")).build());
         Procedures.put("@ValidatePartitioning",
                 ImmutableMap.<Integer, List<String>>builder().put( 2, Arrays.asList("int", "varbinary")).build());
         Procedures.put("@GetPartitionKeys",
@@ -969,6 +992,7 @@ public class SQLCommand
 
         // Only fail if we can't connect to any servers
         boolean connectedAnyServer = false;
+        String connectionErrorMessages = "";
 
         for (String server : servers) {
             try {
@@ -976,14 +1000,15 @@ public class SQLCommand
                 connectedAnyServer = true;
             }
             catch (UnknownHostException e) {
+                connectionErrorMessages += "\n    " + server.trim() + ":" + port + " - UnknownHostException";
             }
             catch (IOException e) {
-
+                connectionErrorMessages += "\n    " + server.trim() + ":" + port + " - " + e.getMessage();
             }
         }
 
         if (!connectedAnyServer) {
-            throw new IOException("Unable to connect to VoltDB cluster");
+            throw new IOException("Unable to connect to VoltDB cluster" + connectionErrorMessages);
         }
         return client;
     }
@@ -1157,8 +1182,9 @@ public class SQLCommand
             procedures.put(proc_name, argLists);
         }
         for (String proc_name : new ArrayList<String>(procedures.keySet())) {
-            if (!proc_name.startsWith("@") && !userProcs.contains(proc_name))
+            if (!proc_name.startsWith("@") && !userProcs.contains(proc_name)) {
                 procedures.remove(proc_name);
+            }
         }
         classlist.clear();
         while (classes.advanceRow()) {
@@ -1326,6 +1352,9 @@ public class SQLCommand
                 System.out.println("\n\n");
                 printUsage(0);
             }
+            else if (arg.equals("--no-version-check")) {
+                m_versionCheck = false; // Disable new version phone home check
+            }
             else if ((arg.equals("--usage")) || (arg.equals("-?"))) {
                 printUsage(0);
             }
@@ -1338,7 +1367,9 @@ public class SQLCommand
         String[] servers = serverList.split(",");
 
         // Phone home to see if there is a newer version of VoltDB
-        openURLAsync();
+        if (m_versionCheck) {
+            openURLAsync();
+        }
 
         try
         {
@@ -1451,7 +1482,6 @@ public class SQLCommand
     private static void openURL()
     {
         URL url;
-
         try {
             // Read the response from VoltDB
             String a="http://community.voltdb.com/versioncheck?app=sqlcmd&ver=" + org.voltdb.VoltDB.instance().getVersionString();

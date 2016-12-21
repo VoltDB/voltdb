@@ -617,6 +617,8 @@
                 if (d.series[0].value == null) {
                     return '';
                 }
+                var currentTime = d.value
+                var isPartitionIdleGraph = false
                 var table = d3.select(document.createElement("table"));
                 if (headerEnabled) {
                     var theadEnter = table.selectAll("thead")
@@ -628,7 +630,7 @@
                         .attr("colspan", 4)
                         .append("strong")
                         .classed("x-value", true)
-                        .html(d.series[0].key);
+                        .html(currentTime);
                     var unit = '';
                     if (d.series[0].key == "CPU") {
                         unit = '%';
@@ -650,6 +652,7 @@
                     }
                     else {
                         unit = '%';
+                        isPartitionIdleGraph = true;
                     }
                 }
 
@@ -672,13 +675,22 @@
                 //    .classed("key", true)
                 //    .html(function (p, i) { return keyFormatter(p.key, i) });
 
-                trowEnter.append("td")
+                if(isPartitionIdleGraph){
+                    trowEnter.append("td")
+                        .classed("key", true)
+                        .html(function (p, i) { return p.key })
+                    trowEnter.append("td")
                     .classed("value", true)
                     .html(function (p, i) { return valueFormatter(p.value, i) + unit });
+                } else {
+                    trowEnter.append("td")
+                        .classed("value", true)
+                        .html(function (p, i) { return valueFormatter(p.value, i) + unit });
 
-                trowEnter.append("td")
-                    .classed("key", true)
-                    .html("at " + d.value);
+                    trowEnter.append("td")
+                        .classed("key", true)
+                        .html("at " + d.value);
+                }
 
 
                 trowEnter.selectAll("td").each(function (p) {
@@ -8985,7 +8997,7 @@
                             if (yerr === undefined)
                                 return t;
                             if (!yerr.length)
-                                return t + '±' + valueFormat(Math.abs(yerr));
+                                return t + 'Â±' + valueFormat(Math.abs(yerr));
                             return t + '+' + valueFormat(Math.abs(yerr[1])) + '-' + valueFormat(Math.abs(yerr[0]));
                         });
                     bars.watchTransition(renderWatch, 'multibarhorizontal: bars')

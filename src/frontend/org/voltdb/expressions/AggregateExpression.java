@@ -70,6 +70,8 @@ public class AggregateExpression extends AbstractExpression {
         case AGGREGATE_APPROX_COUNT_DISTINCT:
         case AGGREGATE_HYPERLOGLOGS_TO_CARD:
         case AGGREGATE_WINDOWED_RANK:
+        case AGGREGATE_WINDOWED_DENSE_RANK:
+        case AGGREGATE_WINDOWED_COUNT:
             //
             // Always an integer
             //

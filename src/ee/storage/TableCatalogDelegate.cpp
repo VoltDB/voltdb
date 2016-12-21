@@ -33,6 +33,7 @@
 #include "expressions/functionexpression.h"
 #include "indexes/tableindex.h"
 #include "indexes/tableindexfactory.h"
+#include "storage/AbstractDRTupleStream.h"
 #include "storage/constraintutil.h"
 #include "storage/MaterializedViewTriggerForWrite.h"
 #include "storage/persistenttable.h"
@@ -57,6 +58,15 @@ TableCatalogDelegate::~TableCatalogDelegate()
     if (m_table) {
         m_table->decrementRefcount();
     }
+}
+
+Table *TableCatalogDelegate::getTable() const {
+    // If a persistent table has an active delta table, return the delta table instead of the whole table.
+    PersistentTable *persistentTable = dynamic_cast<PersistentTable*>(m_table);
+    if (persistentTable && persistentTable->isDeltaTableActive()) {
+        return persistentTable->deltaTable();
+    }
+    return m_table;
 }
 
 TupleSchema *TableCatalogDelegate::createTupleSchema(catalog::Database const &catalogDatabase,
@@ -263,7 +273,8 @@ TableCatalogDelegate::getIndexIdString(const TableIndexScheme &indexScheme)
 
 
 Table *TableCatalogDelegate::constructTableFromCatalog(catalog::Database const &catalogDatabase,
-                                                       catalog::Table const &catalogTable)
+                                                       catalog::Table const &catalogTable,
+                                                       int tableAllocationTargetSize)
 {
     // Create a persistent table for this table in our catalog
     int32_t table_id = catalogTable.relativeIndex();
@@ -399,10 +410,9 @@ Table *TableCatalogDelegate::constructTableFromCatalog(catalog::Database const &
     SHA1Update(&shaCTX, reinterpret_cast<const uint8_t *>(catalogTable.signature().c_str()), (uint32_t )::strlen(catalogTable.signature().c_str()));
     SHA1Final(reinterpret_cast<unsigned char *>(m_signatureHash), &shaCTX);
     // Persistent table will use default size (2MB) if tableAllocationTargetSize is zero.
-    int tableAllocationTargetSize = 0;
     if (m_materialized) {
       catalog::MaterializedViewInfo *mvInfo = catalogTable.materializer()->views().get(catalogTable.name());
-      if (mvInfo->groupbycols().size() == 0) {
+      if (mvInfo && mvInfo->groupbycols().size() == 0) {
         // ENG-8490: If the materialized view came with no group by, set table block size to 64KB
         // to achieve better space efficiency.
         // FYI: maximum column count = 1024, largest fixed length data type is short varchars (64 bytes)
@@ -460,6 +470,20 @@ void TableCatalogDelegate::init(catalog::Database const &catalogDatabase,
     m_table->incrementRefcount();
 }
 
+PersistentTable* TableCatalogDelegate::createDeltaTable(catalog::Database const &catalogDatabase,
+        catalog::Table const &catalogTable)
+{
+    // Delta table will only have one row (currently).
+    // Set the table block size to 64KB to achieve better space efficiency.
+    // FYI: maximum column count = 1024, largest fixed length data type is short varchars (64 bytes)
+    Table *deltaTable = constructTableFromCatalog(catalogDatabase, catalogTable, 1024 * 64);
+    deltaTable->incrementRefcount();
+    // We have the restriction that view on joined table cannot have non-persistent table source.
+    // So here we could use static_cast. But if we in the future want to lift this limitation,
+    // we will have to put more thoughts on this.
+    return static_cast<PersistentTable*>(deltaTable);
+}
+
 //After catalog is updated call this to ensure your export tables are connected correctly.
 void TableCatalogDelegate::evaluateExport(catalog::Database const &catalogDatabase,
                            catalog::Table const &catalogTable)
@@ -484,7 +508,7 @@ static void migrateChangedTuples(catalog::Table const &catalogTable,
     // leaves any dependent materialized view tables untouched/intact
     // (technically, temporarily out of synch with the shrinking table).
     // But the normal "insertPersistentTuple" used here on the new table tries to populate any dependent
-    // serialized views.
+    // materialized views.
     // Rather than empty the surviving view tables, and transfer them to the new table to be re-populated "retail",
     // transfer them "wholesale" post-migration.
 
@@ -661,6 +685,7 @@ static void migrateExportViews(const catalog::CatalogMap<catalog::MaterializedVi
     MaterializedViewTriggerForStreamInsert::segregateMaterializedViews(existingTable->views(),
             views.begin(), views.end(),
             survivingInfos, survivingViews, obsoleteViews);
+    assert(obsoleteViews.size() == 0);
 
     // This process temporarily duplicates the materialized view definitions and their
     // target table reference counts for all the right materialized view tables,

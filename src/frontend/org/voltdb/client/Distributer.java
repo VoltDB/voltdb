@@ -25,23 +25,28 @@ import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Random;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.LockSupport;
 
 import javax.security.auth.Subject;
@@ -64,6 +69,8 @@ import org.voltdb.common.Constants;
 
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableList;
+import com.google_voltpatches.common.collect.ImmutableSet;
+import com.google_voltpatches.common.collect.Maps;
 
 import jsr166y.ThreadLocalRandom;
 
@@ -79,15 +86,16 @@ class Distributer {
     static final long PING_HANDLE = Long.MAX_VALUE;
     public static final Long ASYNC_TOPO_HANDLE = PING_HANDLE - 1;
     static final long USE_DEFAULT_CLIENT_TIMEOUT = 0;
+    static long PARTITION_KEYS_INFO_REFRESH_FREQUENCY = Long.getLong("PARTITION_KEYS_INFO_REFRESH_FREQUENCY", 1000);
 
     // handles used internally are negative and decrement for each call
     public final AtomicLong m_sysHandle = new AtomicLong(-1);
 
     // collection of connections to the cluster
     private final CopyOnWriteArrayList<NodeConnection> m_connections =
-            new CopyOnWriteArrayList<NodeConnection>();
+            new CopyOnWriteArrayList<>();
 
-    private final ArrayList<ClientStatusListenerExt> m_listeners = new ArrayList<ClientStatusListenerExt>();
+    private final ArrayList<ClientStatusListenerExt> m_listeners = new ArrayList<>();
 
     //Selector and connection handling, does all work in blocking selection thread
     private final VoltNetworkPool m_network;
@@ -97,6 +105,7 @@ class Distributer {
 
     private final boolean m_useMultipleThreads;
     private final boolean m_useClientAffinity;
+    private final boolean m_sendReadsToReplicasBytDefaultIfCAEnabled;
 
     private static final class Procedure {
         final static int PARAMETER_NONE = -1;
@@ -115,10 +124,15 @@ class Distributer {
         }
     }
 
-    private final Map<Integer, NodeConnection> m_partitionMasters = new HashMap<Integer, NodeConnection>();
-    private final Map<Integer, NodeConnection[]> m_partitionReplicas = new HashMap<Integer, NodeConnection[]>();
-    private final Map<Integer, NodeConnection> m_hostIdToConnection = new HashMap<Integer, NodeConnection>();
-    private final Map<String, Procedure> m_procedureInfo = new HashMap<String, Procedure>();
+    private final Map<Integer, NodeConnection> m_partitionMasters = new HashMap<>();
+    private final Map<Integer, NodeConnection[]> m_partitionReplicas = new HashMap<>();
+    private final Map<Integer, NodeConnection> m_hostIdToConnection = new HashMap<>();
+    private final Map<String, Procedure> m_procedureInfo = new HashMap<>();
+
+    private final AtomicReference<ImmutableSet<Integer>> m_partitionKeys = new AtomicReference<ImmutableSet<Integer>>();
+    private final AtomicLong m_lastPartitionKeyFetched = new AtomicLong(0);
+    private final AtomicReference<ClientResponse> m_partitionUpdateStatus = new AtomicReference<ClientResponse>();
+
     //This is the instance of the Hashinator we picked from TOPO used only for client affinity.
     private HashinatorLite m_hashinator = null;
     //This is a global timeout that will be used if a per-procedure timeout is not provided with the procedure call.
@@ -126,9 +140,13 @@ class Distributer {
     private static final long MINIMUM_LONG_RUNNING_SYSTEM_CALL_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
     private final long m_connectionResponseTimeoutNanos;
     private final Map<Integer, ClientAffinityStats> m_clientAffinityStats =
-        new HashMap<Integer, ClientAffinityStats>();
+        new HashMap<>();
 
     public final RateLimiter m_rateLimiter = new RateLimiter();
+
+    private final AtomicReference<ImmutableSet<Integer>> m_unconnectedHosts = new AtomicReference<ImmutableSet<Integer>>();
+    private AtomicBoolean m_createConnectionUponTopoChangeInProgress = new AtomicBoolean(false);
+    private boolean m_topologyChangeAware;
 
     //private final Timer m_timer;
     private final ScheduledExecutorService m_ex =
@@ -183,6 +201,33 @@ class Distributer {
         }
     }
 
+    /**
+     * Handles partition updates for client affinity
+     */
+    class PartitionUpdateCallback implements ProcedureCallback {
+
+        final CountDownLatch m_latch;
+
+        PartitionUpdateCallback(CountDownLatch latch) {
+            m_latch = latch;
+        }
+
+        @Override
+        public void clientCallback(ClientResponse clientResponse) throws Exception {
+            if (clientResponse.getStatus() == ClientResponse.SUCCESS) {
+                VoltTable results[] = clientResponse.getResults();
+                if (results != null && results.length > 0) {
+                    updatePartitioning(results[0]);
+                }
+            }
+
+            m_partitionUpdateStatus.set(clientResponse);
+
+            if (m_latch != null) {
+                m_latch.countDown();
+            }
+        }
+    }
     /**
      * Handles @Subscribe response
      */
@@ -263,7 +308,7 @@ class Distributer {
         public void run() {
             try {
                 // make a threadsafe copy of all connections
-                ArrayList<NodeConnection> connections = new ArrayList<NodeConnection>();
+                ArrayList<NodeConnection> connections = new ArrayList<>();
                 synchronized (Distributer.this) {
                     connections.addAll(m_connections);
                 }
@@ -350,8 +395,8 @@ class Distributer {
 
     class NodeConnection extends VoltProtocolHandler implements org.voltcore.network.QueueMonitor {
         private final AtomicInteger m_callbacksToInvoke = new AtomicInteger(0);
-        private final ConcurrentMap<Long, CallbackBookeeping> m_callbacks = new ConcurrentHashMap<Long, CallbackBookeeping>();
-        private final NonBlockingHashMap<String, ClientStats> m_stats = new NonBlockingHashMap<String, ClientStats>();
+        private final ConcurrentMap<Long, CallbackBookeeping> m_callbacks = new ConcurrentHashMap<>();
+        private final NonBlockingHashMap<String, ClientStats> m_stats = new NonBlockingHashMap<>();
         private Connection m_connection;
         private volatile boolean m_isConnected = true;
 
@@ -696,7 +741,7 @@ class Distributer {
                 }
 
                 Iterator<Map.Entry<Integer, NodeConnection[]>> i2 = m_partitionReplicas.entrySet().iterator();
-                List<Pair<Integer, NodeConnection[]>> entriesToRewrite = new ArrayList<Pair<Integer, NodeConnection[]>>();
+                List<Pair<Integer, NodeConnection[]>> entriesToRewrite = new ArrayList<>();
                 while (i2.hasNext()) {
                     Map.Entry<Integer, NodeConnection[]> entry = i2.next();
                     for (NodeConnection nc : entry.getValue()) {
@@ -862,7 +907,7 @@ class Distributer {
         this( false,
                 ClientConfig.DEFAULT_PROCEDURE_TIMOUT_NANOS,
                 ClientConfig.DEFAULT_CONNECTION_TIMOUT_MS,
-                false, null);
+                false, false, null);
     }
 
     Distributer(
@@ -870,6 +915,7 @@ class Distributer {
             long procedureCallTimeoutNanos,
             long connectionResponseTimeoutMS,
             boolean useClientAffinity,
+            boolean sendReadsToReplicasBytDefault,
             Subject subject) {
         m_useMultipleThreads = useMultipleThreads;
         m_network = new VoltNetworkPool(
@@ -879,6 +925,7 @@ class Distributer {
         m_procedureCallTimeoutNanos= procedureCallTimeoutNanos;
         m_connectionResponseTimeoutNanos = TimeUnit.MILLISECONDS.toNanos(connectionResponseTimeoutMS);
         m_useClientAffinity = useClientAffinity;
+        m_sendReadsToReplicasBytDefaultIfCAEnabled = sendReadsToReplicasBytDefault;
 
         // schedule the task that looks for timed-out proc calls and connections
         m_timeoutReaperHandle = m_ex.scheduleAtFixedRate(new CallExpiration(), 1, 1, TimeUnit.SECONDS);
@@ -1000,6 +1047,9 @@ class Distributer {
                         true,
                         USE_DEFAULT_CLIENT_TIMEOUT);
             }
+
+            //Partition key update
+            refreshPartitionKeys(true);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -1058,9 +1108,10 @@ class Distributer {
                                 invocation.getPartitionParamValue(procedureInfo.partitionParameter));
                     }
                     /*
-                     * If the procedure is read only and single part, load balance across replicas
+                     * If the procedure is read only and single part and the user wants it, load balance across replicas
+                     * This is probably slower for SAFE consistency.
                      */
-                    if (!procedureInfo.multiPart && procedureInfo.readOnly) {
+                    if (!procedureInfo.multiPart && procedureInfo.readOnly && m_sendReadsToReplicasBytDefaultIfCAEnabled) {
                         NodeConnection partitionReplicas[] = m_partitionReplicas.get(hashedPartition);
                         if (partitionReplicas != null && partitionReplicas.length > 0) {
                             cxn = partitionReplicas[ThreadLocalRandom.current().nextInt(partitionReplicas.length)];
@@ -1079,7 +1130,7 @@ class Distributer {
                         }
                     } else {
                         /*
-                         * Writes have to go to the master
+                         * For writes or SAFE reads, this is the best way to go
                          */
                         cxn = m_partitionMasters.get(hashedPartition);
                         if (cxn != null && !cxn.hadBackPressure() || ignoreBackpressure) {
@@ -1149,7 +1200,9 @@ class Distributer {
             }
             cxn.createWork(nowNanos, invocation.getHandle(), invocation.getProcName(), buf, cb, ignoreBackpressure, timeoutNanos);
         }
-
+        if (m_topologyChangeAware) {
+            createConnectionsUponTopologyChange();
+        }
         return !backpressure;
     }
 
@@ -1162,7 +1215,7 @@ class Distributer {
         // stop the old proc call reaper
         m_timeoutReaperHandle.cancel(false);
         m_ex.shutdown();
-        m_ex.awaitTermination(1, TimeUnit.SECONDS);
+        m_ex.awaitTermination(365, TimeUnit.DAYS);
 
         m_network.shutdown();
     }
@@ -1170,7 +1223,7 @@ class Distributer {
     void uncaughtException(ProcedureCallback cb, ClientResponse r, Throwable t) {
         boolean handledByClient = false;
         for (ClientStatusListenerExt csl : m_listeners) {
-            if (csl instanceof ClientImpl.CSL) {
+            if (csl instanceof ClientImpl.InternalClientStatusListener) {
                 continue;
             }
             try {
@@ -1202,10 +1255,10 @@ class Distributer {
 
     Map<Long, Map<String, ClientStats>> getStatsSnapshot() {
         Map<Long, Map<String, ClientStats>> retval =
-                new TreeMap<Long, Map<String, ClientStats>>();
+                new TreeMap<>();
 
             for (NodeConnection conn : m_connections) {
-                Map<String, ClientStats> connMap = new TreeMap<String, ClientStats>();
+                Map<String, ClientStats> connMap = new TreeMap<>();
                 for (Entry<String, ClientStats> e : conn.m_stats.entrySet()) {
                     connMap.put(e.getKey(), (ClientStats) e.getValue().clone());
                 }
@@ -1217,7 +1270,7 @@ class Distributer {
     }
 
     Map<Long, ClientIOStats> getIOStatsSnapshot() {
-        Map<Long, ClientIOStats> retval = new TreeMap<Long, ClientIOStats>();
+        Map<Long, ClientIOStats> retval = new TreeMap<>();
 
         Map<Long, Pair<String, long[]>> ioStats;
         try {
@@ -1244,7 +1297,7 @@ class Distributer {
 
     Map<Integer, ClientAffinityStats> getAffinityStatsSnapshot()
     {
-        Map<Integer, ClientAffinityStats> retval = new HashMap<Integer, ClientAffinityStats>();
+        Map<Integer, ClientAffinityStats> retval = new HashMap<>();
         // these get modified under this lock in queue()
         synchronized(this) {
             for (Entry<Integer, ClientAffinityStats> e : m_clientAffinityStats.entrySet()) {
@@ -1274,11 +1327,19 @@ class Distributer {
     }
 
     public List<InetSocketAddress> getConnectedHostList() {
-        ArrayList<InetSocketAddress> addressList = new ArrayList<InetSocketAddress>();
+        ArrayList<InetSocketAddress> addressList = new ArrayList<>();
         for (NodeConnection conn : m_connections) {
             addressList.add(conn.getSocketAddress());
         }
         return Collections.unmodifiableList(addressList);
+    }
+
+    public Map<String, Integer> getConnectedHostIPAndPort() {
+        Map<String, Integer> connectedHostIPAndPortMap = Maps.newHashMap();
+        for (NodeConnection conn : m_connections) {
+            connectedHostIPAndPortMap.put(conn.getSocketAddress().getAddress().getHostAddress(), (conn.getSocketAddress().getPort()));
+        }
+        return Collections.unmodifiableMap(connectedHostIPAndPortMap);
     }
 
     private void updateAffinityTopology(VoltTable tables[]) {
@@ -1310,16 +1371,19 @@ class Distributer {
         // The MPI's partition ID is 16383 (MpInitiator.MP_INIT_PID), so we shouldn't inadvertently
         // hash to it.  Go ahead and include it in the maps, we can use it at some point to
         // route MP transactions directly to the MPI node.
+        Set<Integer> unconnected = new HashSet<Integer>();
         while (vt.advanceRow()) {
             Integer partition = (int)vt.getLong("Partition");
 
-            ArrayList<NodeConnection> connections = new ArrayList<NodeConnection>();
+            ArrayList<NodeConnection> connections = new ArrayList<>();
             for (String site : vt.getString("Sites").split(",")) {
                 site = site.trim();
                 Integer hostId = Integer.valueOf(site.split(":")[0]);
                 if (m_hostIdToConnection.containsKey(hostId)) {
                     connections.add(m_hostIdToConnection.get(hostId));
-                }
+                } else {
+                    unconnected.add(hostId);
+               }
             }
             m_partitionReplicas.put(partition, connections.toArray(new NodeConnection[0]));
 
@@ -1328,6 +1392,10 @@ class Distributer {
                 m_partitionMasters.put(partition, m_hostIdToConnection.get(leaderHostId));
             }
         }
+        if (m_topologyChangeAware) {
+            m_unconnectedHosts.set(ImmutableSet.copyOf(unconnected));
+        }
+        refreshPartitionKeys(true);
     }
 
     private void updateProcedurePartitioning(VoltTable vt) {
@@ -1355,6 +1423,18 @@ class Distributer {
                 e.printStackTrace();
             }
         }
+    }
+
+    private void updatePartitioning(VoltTable vt) {
+        List<Integer> keySet = new ArrayList<Integer>();
+        while (vt.advanceRow()) {
+            //check for mock unit test
+            if (vt.getColumnCount() == 2) {
+                Integer key = (int)(vt.getLong("PARTITION_KEY"));
+                keySet.add(key);
+            }
+        }
+        m_partitionKeys.set(ImmutableSet.copyOf(keySet));
     }
 
     /**
@@ -1398,5 +1478,87 @@ class Distributer {
 
     long getProcedureTimeoutNanos() {
         return m_procedureCallTimeoutNanos;
+    }
+
+    ImmutableSet<Integer> getPartitionKeys() throws NoConnectionsException, IOException, ProcCallException {
+        refreshPartitionKeys(false);
+
+        if (m_partitionUpdateStatus.get().getStatus() != ClientResponse.SUCCESS) {
+            throw new ProcCallException(m_partitionUpdateStatus.get(), null, null);
+        }
+
+        return m_partitionKeys.get();
+    }
+
+    /**
+     * Set up partitions.
+     * @param topologyUpdate  if true, it is called from topology update
+     * @throws ProcCallException on any VoltDB specific failure.
+     * @throws NoConnectionsException if this {@link Client} instance is not connected to any servers.
+     * @throws IOException if there is a Java network or connection problem.
+     */
+    private void refreshPartitionKeys(boolean topologyUpdate)  {
+
+        long interval = System.currentTimeMillis() - m_lastPartitionKeyFetched.get();
+        if (!m_useClientAffinity && interval < PARTITION_KEYS_INFO_REFRESH_FREQUENCY) {
+            return;
+        }
+
+        try {
+            ProcedureInvocation invocation = new ProcedureInvocation(m_sysHandle.getAndDecrement(), "@GetPartitionKeys", "INTEGER");
+            CountDownLatch latch = null;
+
+            if (!topologyUpdate) {
+                latch = new CountDownLatch(1);
+            }
+            PartitionUpdateCallback cb = new PartitionUpdateCallback(latch);
+            if (!queue(invocation, cb, true, System.nanoTime(), USE_DEFAULT_CLIENT_TIMEOUT)) {
+                m_partitionUpdateStatus.set(new ClientResponseImpl(ClientResponseImpl.SERVER_UNAVAILABLE, new VoltTable[0],
+                        "Fails to queue the partition update query, please try later."));
+            }
+            if (!topologyUpdate) {
+                latch.await();
+            }
+            m_lastPartitionKeyFetched.set(System.currentTimeMillis());
+        } catch (InterruptedException | IOException e) {
+            m_partitionUpdateStatus.set(new ClientResponseImpl(ClientResponseImpl.SERVER_UNAVAILABLE, new VoltTable[0],
+                    "Fails to fetch partition keys from server:" + e.getMessage()));
+        }
+    }
+
+    void setTopologyChangeAware(boolean topoAware) {
+        m_topologyChangeAware = topoAware;
+    }
+
+    void createConnectionsUponTopologyChange() {
+
+        if(!m_topologyChangeAware || m_createConnectionUponTopoChangeInProgress.get()) {
+            return;
+        }
+        m_createConnectionUponTopoChangeInProgress.set(true);
+        ImmutableSet<Integer> unconnected = m_unconnectedHosts.get();
+        if (unconnected != null && !unconnected.isEmpty()) {
+            m_unconnectedHosts.compareAndSet(unconnected, ImmutableSet.copyOf(new HashSet<Integer>()));
+            for (Integer host : unconnected) {
+                if (!isHostConnected(host)) {
+                    for (ClientStatusListenerExt csl : m_listeners) {
+                        if (csl instanceof ClientImpl.InternalClientStatusListener) {
+                            ((ClientImpl.InternalClientStatusListener)csl).createConnectionsUponTopologyChange();
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        m_createConnectionUponTopoChangeInProgress.set(false);
+    }
+
+    void setCreateConnectionsUponTopologyChangeComplete() throws NoConnectionsException {
+        m_createConnectionUponTopoChangeInProgress.set(false);
+        ProcedureInvocation spi = new ProcedureInvocation(m_sysHandle.getAndDecrement(), "@Statistics", "TOPO", 0);
+        queue(spi, new TopoUpdateCallback(), true, System.nanoTime(), USE_DEFAULT_CLIENT_TIMEOUT);
+    }
+    boolean isHostConnected(Integer hostId) {
+        return m_hostIdToConnection.containsKey(hostId);
     }
 }

@@ -20,10 +20,7 @@ import com.google_voltpatches.common.annotations.GwtCompatible;
 import com.google_voltpatches.common.primitives.Booleans;
 import com.google_voltpatches.common.primitives.Ints;
 import com.google_voltpatches.common.primitives.Longs;
-
 import java.util.Comparator;
-
-import javax.annotation_voltpatches.CheckReturnValue;
 import javax.annotation_voltpatches.Nullable;
 
 /**
@@ -61,7 +58,6 @@ import javax.annotation_voltpatches.Nullable;
  * @author Kevin Bourrillion
  * @since 2.0
  */
-@CheckReturnValue
 @GwtCompatible
 public abstract class ComparisonChain {
   private ComparisonChain() {}

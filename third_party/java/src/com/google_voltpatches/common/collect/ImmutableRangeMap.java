@@ -22,12 +22,11 @@ import com.google_voltpatches.common.annotations.Beta;
 import com.google_voltpatches.common.annotations.GwtIncompatible;
 import com.google_voltpatches.common.collect.SortedLists.KeyAbsentBehavior;
 import com.google_voltpatches.common.collect.SortedLists.KeyPresentBehavior;
-
+import com.google_voltpatches.errorprone.annotations.CanIgnoreReturnValue;
 import java.io.Serializable;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.NoSuchElementException;
-
 import javax.annotation_voltpatches.Nullable;
 
 /**
@@ -38,7 +37,7 @@ import javax.annotation_voltpatches.Nullable;
  * @since 14.0
  */
 @Beta
-@GwtIncompatible("NavigableMap")
+@GwtIncompatible // NavigableMap
 public class ImmutableRangeMap<K extends Comparable<?>, V> implements RangeMap<K, V>, Serializable {
 
   private static final ImmutableRangeMap<Comparable<?>, Object> EMPTY =
@@ -101,6 +100,7 @@ public class ImmutableRangeMap<K extends Comparable<?>, V> implements RangeMap<K
      * @throws IllegalArgumentException if {@code range} overlaps with any other ranges inserted
      *         into this builder, or if {@code range} is empty
      */
+    @CanIgnoreReturnValue
     public Builder<K, V> put(Range<K> range, V value) {
       checkNotNull(range);
       checkNotNull(value);
@@ -126,6 +126,7 @@ public class ImmutableRangeMap<K extends Comparable<?>, V> implements RangeMap<K
      * @throws IllegalArgumentException if any of the ranges in {@code rangeMap} overlap with ranges
      *         already in this builder
      */
+    @CanIgnoreReturnValue
     public Builder<K, V> putAll(RangeMap<K, ? extends V> rangeMap) {
       for (Entry<Range<K>, ? extends V> entry : rangeMap.asMapOfRanges().entrySet()) {
         put(entry.getKey(), entry.getValue());
@@ -204,21 +205,49 @@ public class ImmutableRangeMap<K extends Comparable<?>, V> implements RangeMap<K
     return Range.create(firstRange.lowerBound, lastRange.upperBound);
   }
 
+  /**
+   * Guaranteed to throw an exception and leave the {@code RangeMap} unmodified.
+   *
+   * @throws UnsupportedOperationException always
+   * @deprecated Unsupported operation.
+   */
+  @Deprecated
   @Override
   public void put(Range<K> range, V value) {
     throw new UnsupportedOperationException();
   }
 
+  /**
+   * Guaranteed to throw an exception and leave the {@code RangeMap} unmodified.
+   *
+   * @throws UnsupportedOperationException always
+   * @deprecated Unsupported operation.
+   */
+  @Deprecated
   @Override
   public void putAll(RangeMap<K, V> rangeMap) {
     throw new UnsupportedOperationException();
   }
 
+  /**
+   * Guaranteed to throw an exception and leave the {@code RangeMap} unmodified.
+   *
+   * @throws UnsupportedOperationException always
+   * @deprecated Unsupported operation.
+   */
+  @Deprecated
   @Override
   public void clear() {
     throw new UnsupportedOperationException();
   }
 
+  /**
+   * Guaranteed to throw an exception and leave the {@code RangeMap} unmodified.
+   *
+   * @throws UnsupportedOperationException always
+   * @deprecated Unsupported operation.
+   */
+  @Deprecated
   @Override
   public void remove(Range<K> range) {
     throw new UnsupportedOperationException();

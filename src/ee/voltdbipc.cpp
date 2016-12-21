@@ -405,10 +405,16 @@ VoltDBIPC::VoltDBIPC(int fd) : m_fd(fd) {
 }
 
 VoltDBIPC::~VoltDBIPC() {
-    delete m_engine;
-    delete [] m_reusedResultBuffer;
-    delete [] m_tupleBuffer;
-    delete [] m_exceptionBuffer;
+    // If m_engine is NULL, the voltdbipc process did not even
+    // receive an initialize command and all those buffer pointers remain NULL.
+    // Attempting to release those NULL buffer pointers will cause valgrind to
+    // throw "Conditional jump or move depends on uninitialised value(s)" error.
+    if (m_engine != NULL) {
+        delete m_engine;
+        delete [] m_reusedResultBuffer;
+        delete [] m_tupleBuffer;
+        delete [] m_exceptionBuffer;
+    }
 }
 
 bool VoltDBIPC::execute(struct ipc_command *cmd) {
@@ -566,8 +572,13 @@ int8_t VoltDBIPC::updateCatalog(struct ipc_command *cmd) {
         if (m_engine->updateCatalog(ntohll(uc->timestamp), std::string(uc->data)) == true) {
             return kErrorCode_Success;
         }
-    } catch (const FatalException &e) {
-        crashVoltDB(e);
+    }
+    catch (const SerializableEEException &e) {
+        m_engine->resetReusedResultOutputBuffer();
+        e.serialize(m_engine->getExceptionOutputSerializer());
+    }
+    catch (const FatalException &fe) {
+        crashVoltDB(fe);
     }
     return kErrorCode_Error;
 }
@@ -1389,7 +1400,7 @@ void VoltDBIPC::getUSOForExportTable(struct ipc_command *cmd) {
 
 void VoltDBIPC::hashinate(struct ipc_command* cmd) {
     hashinate_msg* hash = (hashinate_msg*)cmd;
-    NValueArray& params = m_engine->getParameterContainer();
+    NValueArray& params = m_engine->getExecutorContext()->getParameterContainer();
 
     HashinatorType hashinatorType = static_cast<HashinatorType>(ntohl(hash->hashinatorType));
     int32_t configLength = ntohl(hash->configLength);

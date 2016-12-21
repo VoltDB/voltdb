@@ -25,9 +25,8 @@ import java.util.Map;
 import java.util.Set;
 
 import org.json_voltpatches.JSONException;
-import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
-import org.voltdb.catalog.ColumnRef;
+import org.voltdb.catalog.MaterializedViewHandlerInfo;
 import org.voltdb.catalog.MaterializedViewInfo;
 import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
@@ -47,11 +46,17 @@ import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.utils.CatalogUtil;
 
+/**
+ * When a materialized view has a source table that is partitioned, and the source table's
+ * partition key is not a group by key for the materialized view, we need to "re-aggregate"
+ * the contents of the view in the coordinator fragment, in order to account for possible
+ * duplicate keys coming from different sites.  This "re-aggregation" is done by injecting
+ * an extra aggregation node above the receive node on the coordinator fragment.
+ *
+ * This class encapsulates the info required for adding in re-aggregation so that scans
+ * of the materialized view get correct answers.
+ */
 public class MaterializedViewFixInfo {
-    /**
-     * This class contain all the information that Materialized view partitioned query need to be fixed.
-     */
-
     // New inlined projection node for the scan node, contain extra group by columns.
     private ProjectionPlanNode m_scanInlinedProjectionNode = null;
     // New re-Aggregation plan node on the coordinator to eliminate the duplicated rows.
@@ -95,9 +100,16 @@ public class MaterializedViewFixInfo {
     }
 
     /**
-     * Check whether the table need to be fixed or not.
-     * Set the need flag to true, only if it needs to be fixed.
-     * @return
+     * Check whether the results from a materialized view need to be
+     * re-aggregated on the coordinator by the view's GROUP BY columns
+     * prior to any of the processing specified by the query.
+     * This is normally the case when a mat view's source table is partitioned
+     * and the view's GROUP BY does not include the partition key.
+     * There is a special edge case where the query already contains the exact
+     * reaggregations that the added-cost fix would introduce, so the fix can
+     * be skipped as an optimization.
+     * Set the m_needed flag to true, only if the reaggregation fix is needed.
+     * @return The value of m_needed
      */
     public boolean processMVBasedQueryFix(StmtTableScan mvTableScan, Set<SchemaColumn> scanColumns, JoinNode joinTree,
             List<ParsedColInfo> displayColumns, List<ParsedColInfo> groupByColumns) {
@@ -114,79 +126,90 @@ public class MaterializedViewFixInfo {
         if (srcTable == null) {
             return false;
         }
-        Column partitionCol = srcTable.getPartitioncolumn();
-        if (partitionCol == null) {
+        if (table.getIsreplicated()) {
             return false;
         }
 
-        int partitionColIndex = partitionCol.getIndex();
-        MaterializedViewInfo mvInfo = srcTable.getViews().get(mvTableName);
-
-        int numOfGroupByColumns;
         // Justify whether partition column is in group by column list or not
-        String complexGroupbyJson = mvInfo.getGroupbyexpressionsjson();
-        if (complexGroupbyJson.length() > 0) {
-            List<AbstractExpression> mvComplexGroupbyCols = null;
-            try {
-                mvComplexGroupbyCols = AbstractExpression.fromJSONArrayString(complexGroupbyJson, null);
-            } catch (JSONException e) {
-                e.printStackTrace();
-            }
-            numOfGroupByColumns = mvComplexGroupbyCols.size();
-
-            for (AbstractExpression expr: mvComplexGroupbyCols) {
-                if (expr instanceof TupleValueExpression) {
-                    TupleValueExpression tve = (TupleValueExpression) expr;
-                    if (tve.getColumnIndex() == partitionColIndex) {
-                        // If group by columns contain partition column from source table.
-                        // Then, query on MV table will have duplicates from each partition.
-                        // There is no need to fix this case, so just return.
-                        return false;
-                    }
-                }
-            }
-        } else {
-            CatalogMap<ColumnRef> mvSimpleGroupbyCols = mvInfo.getGroupbycols();
-            numOfGroupByColumns = mvSimpleGroupbyCols.size();
-
-            for (ColumnRef colRef: mvSimpleGroupbyCols) {
-                if (colRef.getColumn().getIndex() == partitionColIndex) {
-                    // If group by columns contain partition column from source table.
-                    // Then, query on MV table will have duplicates from each partition.
-                    // There is no need to fix this case, so just return.
-                    return false;
-                }
-            }
+        if (table.getPartitioncolumn() != null) {
+            return false;
         }
+
         m_mvTableScan = mvTableScan;
 
-        Set<String> mvDDLGroupbyColumnNames = new HashSet<String>();
+        Set<String> mvDDLGroupbyColumnNames = new HashSet<>();
         List<Column> mvColumnArray =
                 CatalogUtil.getSortedCatalogItems(table.getColumns(), "index");
 
+        String mvTableAlias = getMVTableAlias();
+
+        // Get the number of group-by columns.
+        int numOfGroupByColumns;
+        MaterializedViewInfo mvInfo = srcTable.getViews().get(mvTableName);
+        if (mvInfo != null) {
+            // single table view
+            String complexGroupbyJson = mvInfo.getGroupbyexpressionsjson();
+            if (complexGroupbyJson.length() > 0) {
+                List<AbstractExpression> mvComplexGroupbyCols = null;
+                try {
+                    mvComplexGroupbyCols = AbstractExpression.fromJSONArrayString(complexGroupbyJson, null);
+                }
+                catch (JSONException e) {
+                    e.printStackTrace();
+                }
+                numOfGroupByColumns = mvComplexGroupbyCols.size();
+            }
+            else {
+                numOfGroupByColumns = mvInfo.getGroupbycols().size();
+            }
+        }
+        else {
+            // joined table view
+            MaterializedViewHandlerInfo mvHandlerInfo = table.getMvhandlerinfo().get("mvHandlerInfo");
+            numOfGroupByColumns = mvHandlerInfo.getGroupbycolumncount();
+        }
+
+        if (scanColumns.isEmpty() && numOfGroupByColumns == 0) {
+            // This is an edge case that can happen if the view
+            // has no group by keys, and we are just
+            // doing a count(*) on the output of the view.
+            //
+            // Having no GB keys or scan columns would cause us to
+            // produce plan nodes that have a 0-column output schema.
+            // We can't handle this in several places, so add the
+            // count(*) column from the view to the scan columns.
+            Column mvCol = mvColumnArray.get(0); // this is the "count(*)" column.
+            TupleValueExpression tve = new TupleValueExpression(
+                    mvTableName, mvTableAlias, mvCol, 0);
+            tve.setOrigStmtId(mvTableScan.getStatementId());
+
+            String colName = mvCol.getName();
+            SchemaColumn scol = new SchemaColumn(mvTableName, mvTableAlias,
+                    colName, colName, tve);
+            scanColumns.add(scol);
+        }
+
         // Start to do real materialized view processing to fix the duplicates problem.
         // (1) construct new projection columns for scan plan node.
-        Set<SchemaColumn> mvDDLGroupbyColumns = new HashSet<SchemaColumn>();
+        Set<SchemaColumn> mvDDLGroupbyColumns = new HashSet<>();
         NodeSchema inlineProjSchema = new NodeSchema();
         for (SchemaColumn scol: scanColumns) {
             inlineProjSchema.addColumn(scol);
         }
 
-        String mvTableAlias = getMVTableAlias();
 
         for (int i = 0; i < numOfGroupByColumns; i++) {
             Column mvCol = mvColumnArray.get(i);
             String colName = mvCol.getName();
 
-            TupleValueExpression tve = new TupleValueExpression(mvTableName, mvTableAlias, colName, colName, i);
-
-            tve.setTypeSizeBytes(mvCol.getType(), mvCol.getSize(), mvCol.getInbytes());
+            TupleValueExpression tve = new TupleValueExpression(
+                    mvTableName, mvTableAlias, mvCol, i);
             tve.setOrigStmtId(mvTableScan.getStatementId());
 
             mvDDLGroupbyColumnNames.add(colName);
 
-            SchemaColumn scol = new SchemaColumn(mvTableName, mvTableAlias, colName, colName, tve);
-
+            SchemaColumn scol = new SchemaColumn(mvTableName, mvTableAlias,
+                    colName, colName, tve);
             mvDDLGroupbyColumns.add(scol);
             if (!scanColumns.contains(scol)) {
                 scanColumns.add(scol);
@@ -195,9 +218,8 @@ public class MaterializedViewFixInfo {
             }
         }
 
-
         // Record the re-aggregation type for each scan columns.
-        Map<String, ExpressionType> mvColumnReAggType = new HashMap<String, ExpressionType>();
+        Map<String, ExpressionType> mvColumnReAggType = new HashMap<>();
         for (int i = numOfGroupByColumns; i < mvColumnArray.size(); i++) {
             Column mvCol = mvColumnArray.get(i);
             ExpressionType reAggType = ExpressionType.get(mvCol.getAggregatetype());
@@ -209,8 +231,9 @@ public class MaterializedViewFixInfo {
             mvColumnReAggType.put(mvCol.getName(), reAggType);
         }
 
-        m_scanInlinedProjectionNode = new ProjectionPlanNode();
-        m_scanInlinedProjectionNode.setOutputSchema(inlineProjSchema);
+        assert (inlineProjSchema.size() > 0);
+        m_scanInlinedProjectionNode =
+                new ProjectionPlanNode(inlineProjSchema);
 
         // (2) Construct the reAggregation Node.
 
@@ -221,11 +244,12 @@ public class MaterializedViewFixInfo {
         NodeSchema aggSchema = new NodeSchema();
 
         // Construct reAggregation node's aggregation and group by list.
-        for (SchemaColumn scol: scanColumns) {
+        for (SchemaColumn scol: inlineProjSchema.getColumns()) {
             if (mvDDLGroupbyColumns.contains(scol)) {
                 // Add group by expression.
                 m_reAggNode.addGroupByExpression(scol.getExpression());
-            } else {
+            }
+            else {
                 ExpressionType reAggType = mvColumnReAggType.get(scol.getColumnName());
                 assert(reAggType != null);
                 AbstractExpression agg_input_expr = scol.getExpression();
@@ -236,20 +260,20 @@ public class MaterializedViewFixInfo {
             aggSchema.addColumn(scol);
             outputColumnIndex++;
         }
+
+        assert (aggSchema.size() > 0);
         m_reAggNode.setOutputSchema(aggSchema);
 
 
         // Collect all TVEs that need to be do re-aggregation in coordinator.
-        List<TupleValueExpression> needReAggTVEs = new ArrayList<TupleValueExpression>();
-        List<AbstractExpression> aggPostExprs = new ArrayList<AbstractExpression>();
+        List<TupleValueExpression> needReAggTVEs = new ArrayList<>();
+        List<AbstractExpression> aggPostExprs = new ArrayList<>();
 
-        for (int i=numOfGroupByColumns; i < mvColumnArray.size(); i++) {
+        for (int i = numOfGroupByColumns; i < mvColumnArray.size(); i++) {
             Column mvCol = mvColumnArray.get(i);
-            String colName = mvCol.getName();
 
-            TupleValueExpression tve = new TupleValueExpression(mvTableName, mvTableAlias, colName, colName);
-
-            tve.setTypeSizeBytes(mvCol.getType(), mvCol.getSize(), mvCol.getInbytes());
+            TupleValueExpression tve = new TupleValueExpression(
+                    mvTableName, mvTableAlias, mvCol, -1);
             tve.setOrigStmtId(mvTableScan.getStatementId());
 
             needReAggTVEs.add(tve);
@@ -272,22 +296,33 @@ public class MaterializedViewFixInfo {
         return true;
     }
 
-    // ENG-5386: do not fix some cases in order to get better performance.
+    /** ENG-5386: do not fix some cases in order to get better performance.
+     * There is a special edge case when certain queries are applied to
+     * partitioned materialized views that do not contain the partition key in
+     * their GROUP BY columns. In this special case, where the query duplicates
+     * the reaggregation behavior of the fix -- which must consist of MIN, MAX
+     * and/or non-distinct SUM reaggregations -- the added-cost fix code can be
+     * skipped as an optimization.
+     */
     private boolean edgeCaseQueryNoFixNeeded(Set<String> mvDDLGroupbyColumnNames,
-            Map<String, ExpressionType> mvColumnAggType, List<ParsedColInfo> displayColumns, List<ParsedColInfo> groupByColumns) {
+            Map<String, ExpressionType> mvColumnAggType,
+            List<ParsedColInfo> displayColumns,
+            List<ParsedColInfo> groupByColumns) {
 
         // Condition (1): Group by columns must be part of or all from MV DDL group by TVEs.
         for (ParsedColInfo gcol: groupByColumns) {
             assert(gcol.expression instanceof TupleValueExpression);
             TupleValueExpression tve = (TupleValueExpression) gcol.expression;
-            if (tve.getTableName().equals(getMVTableName()) && !mvDDLGroupbyColumnNames.contains(tve.getColumnName())) {
+            if (tve.getTableName().equals(getMVTableName()) &&
+                    ! mvDDLGroupbyColumnNames.contains(tve.getColumnName())) {
                 return false;
             }
         }
 
-        // Condition (2): Aggregation must be:
+        // Condition (2): All the aggregations must qualify.
         for (ParsedColInfo dcol: displayColumns) {
             if (groupByColumns.contains(dcol)) {
+                // Skip a group-by column pass-through.
                 continue;
             }
             if (dcol.expression instanceof AggregateExpression == false) {
@@ -298,20 +333,32 @@ public class MaterializedViewFixInfo {
                 return false;
             }
             ExpressionType type = aggExpr.getExpressionType();
-            TupleValueExpression tve = (TupleValueExpression) aggExpr.getLeft();
-            String columnName = tve.getColumnName();
 
-            if (type != ExpressionType.AGGREGATE_SUM && type != ExpressionType.AGGREGATE_MIN
+            // Only MIN, MAX, and non-DISTINCT SUM
+            // can tolerate a skipped reaggregation.
+            if ((type != ExpressionType.AGGREGATE_SUM || aggExpr.isDistinct())
+                    && type != ExpressionType.AGGREGATE_MIN
                     && type != ExpressionType.AGGREGATE_MAX) {
                 return false;
             }
 
+            TupleValueExpression tve = (TupleValueExpression) aggExpr.getLeft();
             if (tve.getTableName().equals(getMVTableName())) {
+                String columnName = tve.getColumnName();
+                // The type of the aggregation in the query must match the
+                // type of aggregation defined for the view column --
+                // SUMming a SUM, MINning a MIN, or MAXxing a MAX.
                 if (mvColumnAggType.get(columnName) != type ) {
                     return false;
                 }
-            } else {
-                // The other join table.
+            }
+            else {
+                // The aggregate argument is a column from the
+                // other (non-view) side of the join.
+                // It's OK for its rows to get duplicated by joining
+                // with multiple "partial group" rows ONLY if it is
+                // feeding a MIN or MAX.
+                // The duplication would corrupt a SUM.
                 if (type == ExpressionType.AGGREGATE_SUM) {
                     return false;
                 }
@@ -347,7 +394,8 @@ public class MaterializedViewFixInfo {
                 scanNode.addInlinePlanNode(m_scanInlinedProjectionNode);
                 m_scanNode = scanNode;
                 return true;
-            } else {
+            }
+            else {
                 boolean replaced = processScanNodeWithReAggNode(child, reAggNode);
                 if (replaced) {
                     return true;
@@ -391,7 +439,7 @@ public class MaterializedViewFixInfo {
         }
 
         // Collect all TVEs that need re-aggregation in the coordinator.
-        List<AbstractExpression> remaningExprs = new ArrayList<AbstractExpression>();
+        List<AbstractExpression> remaningExprs = new ArrayList<>();
         // Check where clause.
         List<AbstractExpression> exprs = ExpressionUtil.uncombinePredicate(filters);
 
@@ -413,7 +461,8 @@ public class MaterializedViewFixInfo {
             }
             if (canPushdown) {
                 remaningExprs.add(expr);
-            } else {
+            }
+            else {
                 aggPostExprs.add(expr);
             }
         }

@@ -26,6 +26,7 @@ package org.voltcore.messaging;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotSame;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -446,6 +447,110 @@ public class TestHostMessenger {
     }
 
     @Test
+    public void testNotEnoughTerminusPropagation() throws Exception {
+        MeshProber.Builder jcb = MeshProber.builder()
+                .coordinators(coordinators(3))
+                .startAction(StartAction.PROBE)
+                .nodeState(NodeState.INITIALIZING)
+                .bare(true)
+                .kfactor(1);
+
+        MeshProber without = jcb.build();
+        MeshProber with  = jcb.terminusNonce("nonce-uno").build();
+
+        HostMessenger hm1 = createHostMessenger(0, jcb.prober(without).build(), true);
+        HostMessenger hm2 = createHostMessenger(1, with, false);
+        HostMessenger hm3 = createHostMessenger(2, jcb.prober(without).build(), false);
+
+        final AtomicReference<Exception> exception = new AtomicReference<Exception>();
+        HostMessengerThread hm2Start = new HostMessengerThread(hm2, exception);
+        HostMessengerThread hm3Start = new HostMessengerThread(hm3, exception);
+
+        hm2Start.start();
+        hm3Start.start();
+
+        hm2Start.join();
+        hm3Start.join();
+
+        if (exception.get() != null) {
+            fail(exception.get().toString());
+        }
+
+        Determination dtm = prober(hm1).waitForDetermination();
+        assertNull(dtm.terminusNonce);
+        assertEquals(3, dtm.hostCount);
+
+        assertEquals(dtm, prober(hm2).waitForDetermination());
+        assertEquals(dtm, prober(hm3).waitForDetermination());
+
+        List<String> root1 = hm1.getZK().getChildren("/", false );
+        List<String> root2 = hm2.getZK().getChildren("/", false );
+        List<String> root3 = hm3.getZK().getChildren("/", false );
+
+        assertTrue(root1.equals(root2));
+        assertTrue(root2.equals(root3));
+
+        List<String> hostids1 = hm1.getZK().getChildren(CoreZK.hostids, false );
+        List<String> hostids2 = hm2.getZK().getChildren(CoreZK.hostids, false );
+        List<String> hostids3 = hm3.getZK().getChildren(CoreZK.hostids, false );
+
+        assertTrue(hostids1.equals(hostids2));
+        assertTrue(hostids2.equals(hostids3));
+    }
+
+    @Test
+    public void testTerminusPropagation() throws Exception {
+        MeshProber.Builder jcb = MeshProber.builder()
+                .coordinators(coordinators(3))
+                .startAction(StartAction.PROBE)
+                .nodeState(NodeState.INITIALIZING)
+                .bare(true)
+                .kfactor(1);
+
+        MeshProber without = jcb.build();
+        MeshProber with  = jcb.terminusNonce("nonce-uno").build();
+
+        HostMessenger hm1 = createHostMessenger(0, with, true);
+        HostMessenger hm2 = createHostMessenger(1, with, false);
+        HostMessenger hm3 = createHostMessenger(2, jcb.prober(without).build(), false);
+
+        final AtomicReference<Exception> exception = new AtomicReference<Exception>();
+        HostMessengerThread hm2Start = new HostMessengerThread(hm2, exception);
+        HostMessengerThread hm3Start = new HostMessengerThread(hm3, exception);
+
+        hm2Start.start();
+        hm3Start.start();
+
+        hm2Start.join();
+        hm3Start.join();
+
+        if (exception.get() != null) {
+            fail(exception.get().toString());
+        }
+
+        Determination dtm = prober(hm1).waitForDetermination();
+        assertEquals("nonce-uno", dtm.terminusNonce);
+        assertEquals(3, dtm.hostCount);
+
+        assertEquals(dtm, prober(hm2).waitForDetermination());
+        assertEquals(dtm, prober(hm3).waitForDetermination());
+
+        List<String> root1 = hm1.getZK().getChildren("/", false );
+        List<String> root2 = hm2.getZK().getChildren("/", false );
+        List<String> root3 = hm3.getZK().getChildren("/", false );
+
+        assertTrue(root1.equals(root2));
+        assertTrue(root2.equals(root3));
+
+        List<String> hostids1 = hm1.getZK().getChildren(CoreZK.hostids, false );
+        List<String> hostids2 = hm2.getZK().getChildren(CoreZK.hostids, false );
+        List<String> hostids3 = hm3.getZK().getChildren(CoreZK.hostids, false );
+
+        assertTrue(hostids1.equals(hostids2));
+        assertTrue(hostids2.equals(hostids3));
+    }
+
+    @Test
     public void testSafeModePropagation() throws Exception {
         MeshProber.Builder jcb = MeshProber.builder()
                 .coordinators(coordinators(3))
@@ -795,7 +900,7 @@ public class TestHostMessenger {
             fail("did not crash on mismatched start actions");
         } catch (AssertionError pass) {
             assertTrue(VoltDB.wasCrashCalled);
-            assertTrue(VoltDB.crashMessage.contains("Only nodes that have been initialized can join this cluster"));
+            assertTrue(VoltDB.crashMessage.contains("use init and start to join this cluster"));
         }
     }
 
@@ -1020,7 +1125,7 @@ public class TestHostMessenger {
             fail("did not crash on whole cluster rejoin attempt");
         } catch (AssertionError pass) {
             assertTrue(VoltDB.wasCrashCalled);
-            assertTrue(VoltDB.crashMessage.contains("Mismatched deployment configuration"));
+            assertTrue(VoltDB.crashMessage.contains("deployment options that do not match"));
         }
     }
 
@@ -1065,7 +1170,53 @@ public class TestHostMessenger {
             fail("did not crash on whole cluster rejoin attempt");
         } catch (AssertionError pass) {
             assertTrue(VoltDB.wasCrashCalled);
-            assertTrue(VoltDB.crashMessage.contains("Mismatched host parameters"));
+            assertTrue(VoltDB.crashMessage.contains("Mismatched list of hosts"));
+        }
+    }
+
+    @Test
+    public void testProbedTerminusNonceMismatchCrash() throws Exception {
+        VoltDB.ignoreCrash = true;
+
+        MeshProber.Builder jcb = MeshProber.builder()
+                .coordinators(coordinators(2))
+                .hostCount(3)
+                .startAction(StartAction.PROBE)
+                .nodeState(NodeState.INITIALIZING)
+                .kfactor(1)
+                .paused(false)
+                .bare(true)
+                .terminusNonce("uno");
+
+        MeshProber jc1 = jcb.build();
+        MeshProber jc2 = jcb.terminusNonce("due").build();
+
+        assertNotSame(jc1.getTerminusNonce(), jc2.getTerminusNonce());
+
+        HostMessenger hm1 = createHostMessenger(0, jcb.prober(jc1).build(), false);
+        HostMessenger hm2 = createHostMessenger(1, jcb.prober(jc1).build(), false);
+        HostMessenger hm3 = createHostMessenger(2, jcb.prober(jc2).build(), false);
+
+        final AtomicReference<Exception> exception = new AtomicReference<Exception>();
+        HostMessengerThread hm1Start = new HostMessengerThread(hm1, exception);
+        HostMessengerThread hm2Start = new HostMessengerThread(hm2, exception);
+
+        hm1Start.start();
+        hm2Start.start();
+
+        hm1Start.join();
+        hm2Start.join();
+
+        if (exception.get() != null) {
+            fail(exception.get().toString());
+        }
+
+        try {
+            hm3.start();
+            fail("did not crash on whole cluster rejoin attempt");
+        } catch (AssertionError pass) {
+            assertTrue(VoltDB.wasCrashCalled);
+            assertTrue(VoltDB.crashMessage.contains("have different startup snapshots nonces"));
         }
     }
 
@@ -1215,7 +1366,7 @@ public class TestHostMessenger {
             fail("did not crash on whole cluster rejoin attempt");
         } catch (AssertionError pass) {
             assertTrue(VoltDB.wasCrashCalled);
-            assertTrue(VoltDB.crashMessage.contains("Cannot join a community edition"));
+            assertTrue(VoltDB.crashMessage.contains("cannot contain both enterprise and community editions"));
         }
     }
 
@@ -1313,7 +1464,7 @@ public class TestHostMessenger {
             assertTrue(VoltDB.wasCrashCalled);
             assertTrue(VoltDB.crashMessage.contains("Start action CREATE does not match PROBE"));
             assertTrue(VoltDB.crashMessage.contains("Mismatched host count"));
-            assertTrue(VoltDB.crashMessage.contains("Mismatched deployment configuration"));
+            assertTrue(VoltDB.crashMessage.contains("deployment options that do not match"));
         }
     }
 

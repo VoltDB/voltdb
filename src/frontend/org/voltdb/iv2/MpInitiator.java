@@ -67,14 +67,14 @@ public class MpInitiator extends BaseInitiator implements Promotable
     public void configure(BackendTarget backend,
                           CatalogContext catalogContext,
                           String serializedCatalog,
-                          int kfactor, CatalogSpecificPlanner csp,
+                          CatalogSpecificPlanner csp,
                           int numberOfPartitions,
                           StartAction startAction,
                           StatsAgent agent,
                           MemoryStats memStats,
                           CommandLog cl,
-                          ProducerDRGateway drGateway,
-                          boolean createMpDRGateway, String coreBindIds)
+                          String coreBindIds,
+                          boolean hasMPDRGateway)
         throws KeeperException, InterruptedException, ExecutionException
     {
         // note the mp initiator always uses a non-ipc site, even though it's never used for anything
@@ -83,8 +83,7 @@ public class MpInitiator extends BaseInitiator implements Promotable
         }
 
         super.configureCommon(backend, catalogContext, serializedCatalog,
-                csp, numberOfPartitions, startAction, null, null, cl, coreBindIds,
-                null, null);
+                csp, numberOfPartitions, startAction, null, null, cl, coreBindIds, false);
         // Hacky
         MpScheduler sched = (MpScheduler)m_scheduler;
         MpRoSitePool sitePool = new MpRoSitePool(m_initiatorMailbox.getHSId(),
@@ -100,6 +99,12 @@ public class MpInitiator extends BaseInitiator implements Promotable
         LeaderElector.createParticipantNode(m_messenger.getZK(),
                 LeaderElector.electionDirForPartition(VoltZK.leaders_initiators, m_partitionId),
                 Long.toString(getInitiatorHSId()), null);
+    }
+
+    @Override
+    public void initDRGateway(StartAction startAction, ProducerDRGateway nodeDRGateway, boolean createMpDRGateway)
+    {
+        // No-op on MPI
     }
 
     @Override
@@ -202,6 +207,13 @@ public class MpInitiator extends BaseInitiator implements Promotable
         m_executionSite.updateCatalog(diffCmds, context, csp, false, true, Long.MIN_VALUE, Long.MIN_VALUE);
         MpScheduler sched = (MpScheduler)m_scheduler;
         sched.updateCatalog(diffCmds, context, csp);
+    }
+
+    public void updateSettings(CatalogContext context, CatalogSpecificPlanner csp)
+    {
+        m_executionSite.updateSettings(context, csp);
+        MpScheduler sched = (MpScheduler)m_scheduler;
+        sched.updateSettings(context, csp);
     }
 
     @Override

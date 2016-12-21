@@ -22,7 +22,7 @@
         <javac
             target="1.7"
             source="1.7"
-            bootclasspath="${vendor.lib.dir}/classes-java1.7.jar"
+            bootclasspath="${vendor.lib.dir}/classes-java1.7.jar:${vendor.lib.dir}/bouncy-castle-jce.jar"
             srcdir="@{srcdir}"
             destdir="@{destdir}"
             excludes="@{excludes}"
@@ -188,6 +188,8 @@ DISTRIBUTION
             <include name="src/frontend/org/voltdb/client/Client.java" />
             <include name="src/frontend/org/voltdb/client/NoConnectionsException.java" />
             <include name="src/frontend/org/voltdb/client/ProcedureCallback.java" />
+            <include name="src/frontend/org/voltdb/client/ClientResponseWithPartitionKey.java" />
+            <include name="src/frontend/org/voltdb/client/AllPartitionProcedureCallback.java" />
             <include name="src/frontend/org/voltdb/client/ClientConfig.java" />
             <include name="src/frontend/org/voltdb/client/ClientFactory.java" />
             <include name="src/frontend/org/voltdb/client/SyncCallback.java" />

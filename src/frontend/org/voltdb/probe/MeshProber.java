@@ -30,6 +30,7 @@ import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Optional;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicReference;
@@ -89,6 +90,7 @@ public class MeshProber implements JoinAcceptor {
     private static final String BARE = "bare";
     private static final String START_ACTION = "startAction";
     private static final String ENTERPRISE = "enterprise";
+    private static final String TERMINUS_NONCE = "terminusNonce";
 
     private static final VoltLogger m_networkLog = new VoltLogger("NETWORK");
 
@@ -187,12 +189,13 @@ public class MeshProber implements JoinAcceptor {
     protected final boolean m_bare;
     protected final UUID m_configHash;
     protected final UUID m_meshHash;
-    protected final int m_hostCount;
+    protected final Supplier<Integer> m_hostCountSupplier;
     protected final int m_kFactor;
     protected final boolean m_paused;
     protected final Supplier<NodeState> m_nodeStateSupplier;
     protected final boolean m_addAllowed;
     protected final boolean m_safeMode;
+    protected final String m_terminusNonce;
     protected final HostCriteriaRef m_hostCriteria = new HostCriteriaRef();
     /*
      * on probe startup mode this future is set when there are enough
@@ -201,20 +204,26 @@ public class MeshProber implements JoinAcceptor {
     private final SettableFuture<Determination> m_probedDetermination =
             SettableFuture.create();
 
-    protected MeshProber(NavigableSet<String> coordinators, VersionChecker versionChecker,
-            boolean enterprise, StartAction startAction, boolean bare,
-            UUID configHash,int hostCount, int kFactor, boolean paused,
-            Supplier<NodeState> nodeStateSupplier, boolean addAllowed, boolean safeMode) {
+    protected MeshProber(NavigableSet<String> coordinators,
+            VersionChecker versionChecker, boolean enterprise, StartAction startAction,
+            boolean bare, UUID configHash, Supplier<Integer> hostCountSupplier,
+            int kFactor, boolean paused, Supplier<NodeState> nodeStateSupplier,
+            boolean addAllowed, boolean safeMode, String terminusNonce) {
 
         checkArgument(versionChecker != null, "version checker is null");
         checkArgument(configHash != null, "config hash is null");
         checkArgument(startAction != null, "start action is null");
         checkArgument(nodeStateSupplier != null, "nodeStateSupplier is null");
-        checkArgument(hostCount > 0, "invalid host count value: %s",hostCount);
+        checkArgument(hostCountSupplier != null, "hostCountSupplier is null");
         checkArgument(kFactor >= 0, "invalid kFactor value: %s", kFactor);
         checkArgument(coordinators != null &&
                 coordinators.stream().allMatch(h->isValidCoordinatorSpec(h)),
                 "coordinators is null or contains invalid host/interface specs %s", coordinators);
+        checkArgument(coordinators.size() <= hostCountSupplier.get(),
+                "host count %s is less then the number of coordinators %s",
+                hostCountSupplier.get(), coordinators.size());
+        checkArgument(terminusNonce == null || !terminusNonce.trim().isEmpty(),
+                "terminus should not be blank");
 
         this.m_coordinators = ImmutableSortedSet.copyOf(coordinators);
         this.m_versionChecker = versionChecker;
@@ -222,14 +231,15 @@ public class MeshProber implements JoinAcceptor {
         this.m_startAction = startAction;
         this.m_bare = bare;
         this.m_configHash = configHash;
-        this.m_hostCount = hostCount;
+        this.m_hostCountSupplier = hostCountSupplier;
         this.m_kFactor = kFactor;
         this.m_paused = paused;
         this.m_nodeStateSupplier = nodeStateSupplier;
         this.m_addAllowed = addAllowed;
         this.m_safeMode = safeMode;
+        this.m_terminusNonce = terminusNonce;
 
-        this.m_meshHash = Digester.md5AsUUID("hostCount="+ hostCount + '|' + this.m_coordinators.toString());
+        this.m_meshHash = Digester.md5AsUUID("hostCount="+ hostCountSupplier.get() + '|' + this.m_coordinators.toString());
     }
 
     public UUID getMeshHash() {
@@ -275,7 +285,7 @@ public class MeshProber implements JoinAcceptor {
     }
 
     public int getHostCount() {
-        return m_hostCount;
+        return m_hostCountSupplier.get();
     }
 
     public int getkFactor() {
@@ -294,6 +304,10 @@ public class MeshProber implements JoinAcceptor {
         return m_safeMode;
     }
 
+    public String getTerminusNonce() {
+        return m_terminusNonce;
+    }
+
     public HostCriteria asHostCriteria() {
         return new HostCriteria(
                 m_paused,
@@ -302,10 +316,11 @@ public class MeshProber implements JoinAcceptor {
                 m_enterprise,
                 m_startAction,
                 m_bare,
-                m_hostCount,
+                m_hostCountSupplier.get(),
                 m_nodeStateSupplier.get(),
                 m_addAllowed,
-                m_safeMode
+                m_safeMode,
+                m_terminusNonce
                 );
     }
 
@@ -317,10 +332,11 @@ public class MeshProber implements JoinAcceptor {
                 m_enterprise,
                 m_startAction,
                 m_bare,
-                m_hostCount,
+                m_hostCountSupplier.get(),
                 m_nodeStateSupplier.get(),
                 m_addAllowed,
-                m_safeMode
+                m_safeMode,
+                m_terminusNonce
                 );
     }
 
@@ -392,7 +408,7 @@ public class MeshProber implements JoinAcceptor {
                     .map(c->c.getStartAction())
                     .findFirst().orElse(getStartAction());
             if (operationalStartAction == StartAction.PROBE && hc.getStartAction() != StartAction.PROBE) {
-                String msg = "Only nodes that have been initialized can join this cluster";
+                String msg = "Invalid VoltDB command. Please use init and start to join this cluster";
                 return new JoinAcceptor.PleaDecision(msg, false, false);
             }
         }
@@ -419,7 +435,7 @@ public class MeshProber implements JoinAcceptor {
         // connecting to already wholly formed cluster
         if (stat.getNumChildren() >= getHostCount()) {
             return new JoinAcceptor.PleaDecision(
-                    hc.isAddAllowed()? null : "Cluster is already whole",
+                    hc.isAddAllowed()? null : "Cluster is already complete",
                     hc.isAddAllowed(), false);
         } else if (stat.getNumChildren() < getHostCount()) {
             // check for concurrent rejoins
@@ -500,6 +516,7 @@ public class MeshProber implements JoinAcceptor {
         int bare = 0; // node has no recoverable artifacts (Command Logs, Snapshots)
         int unmeshed = 0;
         int operational = 0;
+        int haveTerminus = 0;
         int hostCount = getHostCount();
 
         // both paused and safemode need to be specified on only one node to
@@ -507,6 +524,8 @@ public class MeshProber implements JoinAcceptor {
         // any nodes in operational state
         boolean paused = isPaused();
         boolean safemode = isSafeMode();
+
+        final NavigableSet<String> terminusNonces = new TreeSet<>();
 
         for (HostCriteria c: hostCriteria.values()) {
             if (c.getNodeState().operational()) {
@@ -524,6 +543,10 @@ public class MeshProber implements JoinAcceptor {
                 paused = c.isPaused();
             }
             safemode = safemode || c.isSafeMode();
+            if (c.getTerminusNonce() != null) {
+                terminusNonces.add(c.getTerminusNonce());
+                ++haveTerminus;
+            }
         }
         // not enough host criteria to make a determination
         if (hostCriteria.size() < hostCount && operational == 0) {
@@ -549,9 +572,19 @@ public class MeshProber implements JoinAcceptor {
                     + paused + ", and safemode: " + safemode);
         }
 
+        if (terminusNonces.size() > 1) {
+            org.voltdb.VoltDB.crashLocalVoltDB("Detected multiple startup snapshots, cannot "
+                    + "proceed with cluster startup. Snapshot IDs " + terminusNonces);
+        }
+
+        String terminusNonce = terminusNonces.pollFirst();
+        if (operational == 0 && haveTerminus <= (hostCount - ksafety)) {
+            terminusNonce = null;
+        }
+
         if (getStartAction() != StartAction.PROBE) {
             m_probedDetermination.set(new Determination(
-                    getStartAction(), getHostCount(), paused));
+                    getStartAction(), getHostCount(), paused, terminusNonce));
             return;
         }
 
@@ -566,7 +599,7 @@ public class MeshProber implements JoinAcceptor {
                 hostCount = hostCount + ksafety; // kfactor + 1
                 determination = StartAction.JOIN;
             } else {
-                org.voltdb.VoltDB.crashLocalVoltDB("Node is not allowed to rejoin an already whole cluster");
+                org.voltdb.VoltDB.crashLocalVoltDB("Node is not allowed to rejoin an already complete cluster");
                 return;
             }
         } else if (operational == 0 && bare == unmeshed) {
@@ -574,12 +607,13 @@ public class MeshProber implements JoinAcceptor {
         } else if (operational == 0 && bare < ksafety /* kfactor + 1 */) {
             determination = safemode ? StartAction.SAFE_RECOVER : StartAction.RECOVER;
         } else if (operational == 0 && bare >= ksafety  /* kfactor + 1 */) {
-            org.voltdb.VoltDB.crashLocalVoltDB("Unable to determine start action as "
+            org.voltdb.VoltDB.crashLocalVoltDB("Cluster has incomplete command logs: "
                     + bare + " nodes have no command logs, while "
                     + (unmeshed - bare) + " nodes have them");
             return;
         }
-        final Determination dtrm = new Determination(determination, hostCount, paused);
+
+        final Determination dtrm = new Determination(determination, hostCount, paused, terminusNonce);
         if (m_networkLog.isDebugEnabled()) {
             m_networkLog.debug("made the following " + dtrm);
         }
@@ -595,79 +629,16 @@ public class MeshProber implements JoinAcceptor {
                     "interrupted while waiting to determine the cluster start action",
                     false, e);
         }
-        return new Determination(null,-1, false);
+        return new Determination(null,-1, false, null);
     }
 
-    @Override @Generated("by eclipse's equals and hashCode source generators")
-    public int hashCode() {
-        final int prime = 31;
-        int result = 1;
-        result = prime * result + (m_paused ? 1231 : 1237);
-        result = prime * result + (m_bare ? 1231 : 1237);
-        result = prime * result + (m_addAllowed ? 1231 : 1237);
-        result = prime * result + (m_safeMode ? 1231 : 1237);
-        result = prime * result
-                + ((m_configHash == null) ? 0 : m_configHash.hashCode());
-        result = prime * result + (m_enterprise ? 1231 : 1237);
-        result = prime * result + m_hostCount;
-        result = prime * result + m_kFactor;
-        result = prime * result + ((m_coordinators == null) ? 0 : m_coordinators.hashCode());
-        result = prime * result
-                + ((m_meshHash == null) ? 0 : m_meshHash.hashCode());
-        result = prime * result
-                + ((m_startAction == null) ? 0 : m_startAction.hashCode());
-        return result;
-    }
-
-    @Override @Generated("by eclipse's equals and hashCode source generators")
-    public boolean equals(Object obj) {
-        if (this == obj)
-            return true;
-        if (obj == null)
-            return false;
-        if (getClass() != obj.getClass())
-            return false;
-        MeshProber other = (MeshProber) obj;
-        if (m_paused != other.m_paused)
-            return false;
-        if (m_bare != other.m_bare)
-            return false;
-        if (m_addAllowed != other.m_addAllowed)
-            return false;
-        if (m_safeMode != other.m_safeMode)
-            return false;
-        if (m_configHash == null) {
-            if (other.m_configHash != null)
-                return false;
-        } else if (!m_configHash.equals(other.m_configHash))
-            return false;
-        if (m_enterprise != other.m_enterprise)
-            return false;
-        if (m_hostCount != other.m_hostCount)
-            return false;
-        if (m_kFactor != other.m_kFactor)
-            return false;
-        if (m_coordinators == null) {
-            if (other.m_coordinators != null)
-                return false;
-        } else if (!m_coordinators.equals(other.m_coordinators))
-            return false;
-        if (m_meshHash == null) {
-            if (other.m_meshHash != null)
-                return false;
-        } else if (!m_meshHash.equals(other.m_meshHash))
-            return false;
-        if (m_startAction != other.m_startAction)
-            return false;
-        return true;
-    }
-
+    @Generated("by eclipse's equals and hashCode source generators")
     @Override
     public String toString() {
         return "MeshProber [coordinators=" + m_coordinators
                 + ", enterprise=" + m_enterprise + ", startAction=" + m_startAction
                 + ", bare=" + m_bare + ", configHash=" + m_configHash
-                + ", meshHash=" + m_meshHash + ", hostCount=" + m_hostCount
+                + ", meshHash=" + m_meshHash + ", hostCount=" + m_hostCountSupplier.get()
                 + ", kFactor=" + m_kFactor + ", paused=" + m_paused
                 + ", addAllowed=" + m_addAllowed + ", safeMode=" + m_safeMode + "]";
     }
@@ -679,16 +650,17 @@ public class MeshProber implements JoinAcceptor {
             jw.value(coordinator);
         }
         jw.endArray();
-        jw.key(ENTERPRISE).value(m_enterprise);
-        jw.key(START_ACTION).value(m_startAction.name());
-        jw.key(BARE).value(m_bare);
-        jw.key(CONFIG_HASH).value(m_configHash.toString());
-        jw.key(MESH_HASH).value(m_meshHash.toString());
-        jw.key(HOST_COUNT).value(m_hostCount);
-        jw.key(K_FACTOR).value(m_kFactor);
-        jw.key(PAUSED).value(m_paused);
-        jw.key(ADD_ALLOWED).value(m_addAllowed);
-        jw.key(SAFE_MODE).value(m_safeMode);
+        jw.keySymbolValuePair(ENTERPRISE, m_enterprise);
+        jw.keySymbolValuePair(START_ACTION, m_startAction.name());
+        jw.keySymbolValuePair(BARE, m_bare);
+        jw.keySymbolValuePair(CONFIG_HASH, m_configHash.toString());
+        jw.keySymbolValuePair(MESH_HASH, m_meshHash.toString());
+        jw.keySymbolValuePair(HOST_COUNT, m_hostCountSupplier.get());
+        jw.keySymbolValuePair(K_FACTOR, m_kFactor);
+        jw.keySymbolValuePair(PAUSED, m_paused);
+        jw.keySymbolValuePair(ADD_ALLOWED, m_addAllowed);
+        jw.keySymbolValuePair(SAFE_MODE, m_safeMode);
+        jw.keySymbolValuePair(TERMINUS_NONCE, m_terminusNonce);
         jw.endObject();
     }
 
@@ -707,11 +679,14 @@ public class MeshProber implements JoinAcceptor {
         public final StartAction startAction;
         public final int hostCount;
         public final boolean paused;
+        public final String terminusNonce;
 
-        private Determination(StartAction startAction, int hostCount, boolean paused) {
+        private Determination(StartAction startAction, int hostCount,
+                boolean paused, String terminusNonce) {
             this.startAction = startAction;
             this.hostCount = hostCount;
             this.paused = paused;
+            this.terminusNonce = terminusNonce;
         }
 
         @Override @Generated("by eclipse's equals and hashCode source generators")
@@ -722,6 +697,8 @@ public class MeshProber implements JoinAcceptor {
             result = prime * result + (paused ? 1231 : 1237);
             result = prime * result
                     + ((startAction == null) ? 0 : startAction.hashCode());
+            result = prime * result
+                    + ((terminusNonce == null) ? 0 : terminusNonce.hashCode());
             return result;
         }
 
@@ -740,13 +717,18 @@ public class MeshProber implements JoinAcceptor {
                 return false;
             if (startAction != other.startAction)
                 return false;
+            if (terminusNonce == null) {
+                if (other.terminusNonce != null)
+                    return false;
+            } else if (!terminusNonce.equals(other.terminusNonce))
+                return false;
             return true;
         }
 
         @Override
         public String toString() {
             return "Determination [startAction=" + startAction + ", hostCount="
-                    + hostCount + ", paused=" + paused + "]";
+                    + hostCount + ", paused=" + paused + ", terminusNonce=" + terminusNonce + "]";
         }
     }
 
@@ -764,13 +746,14 @@ public class MeshProber implements JoinAcceptor {
         protected StartAction m_startAction = StartAction.PROBE;
         protected boolean m_bare = true;
         protected UUID m_configHash = new UUID(0L, 0L);
-        protected int m_hostCount = 1;
+        protected Supplier<Integer> m_hostCountSupplier;
         protected int m_kFactor = 0;
         protected boolean m_paused = false;
         protected Supplier<NodeState> m_nodeStateSupplier =
                 Suppliers.ofInstance(NodeState.INITIALIZING);
         protected boolean m_addAllowed = false;
         protected boolean m_safeMode = false;
+        protected String m_terminusNonce = null;
 
         protected Builder() {
         }
@@ -782,12 +765,13 @@ public class MeshProber implements JoinAcceptor {
             m_startAction = o.m_startAction;
             m_bare = o.m_bare;
             m_configHash = o.m_configHash;
-            m_hostCount = o.m_hostCount;
+            m_hostCountSupplier = o.m_hostCountSupplier;
             m_kFactor = o.m_kFactor;
             m_paused = o.m_paused;
             m_nodeStateSupplier = o.m_nodeStateSupplier;
             m_addAllowed = o.m_addAllowed;
             m_safeMode = o.m_safeMode;
+            m_terminusNonce = o.m_terminusNonce;
             return this;
         }
 
@@ -845,7 +829,12 @@ public class MeshProber implements JoinAcceptor {
         }
 
         public Builder hostCount(int hostCount) {
-            m_hostCount = hostCount;
+            m_hostCountSupplier = Suppliers.ofInstance(hostCount);
+            return this;
+        }
+
+        public Builder hostCountSupplier(Supplier<Integer> supplier) {
+            m_hostCountSupplier = supplier;
             return this;
         }
 
@@ -864,7 +853,15 @@ public class MeshProber implements JoinAcceptor {
             return this;
         }
 
+        public Builder terminusNonce(String terminusNonce) {
+            m_terminusNonce = terminusNonce;
+            return this;
+        }
+
         public MeshProber build() {
+            if (m_hostCountSupplier == null && m_coordinators != null) {
+                m_hostCountSupplier = Suppliers.ofInstance(m_coordinators.size());
+            }
             return new MeshProber(
                     m_coordinators,
                     m_versionChecker,
@@ -872,12 +869,13 @@ public class MeshProber implements JoinAcceptor {
                     m_startAction,
                     m_bare,
                     m_configHash,
-                    m_hostCount < m_coordinators.size() ? m_coordinators.size() : m_hostCount,
+                    m_hostCountSupplier,
                     m_kFactor,
                     m_paused,
                     m_nodeStateSupplier,
                     m_addAllowed,
-                    m_safeMode
+                    m_safeMode,
+                    m_terminusNonce
                     );
         }
     }

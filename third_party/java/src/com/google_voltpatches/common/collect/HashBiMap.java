@@ -23,8 +23,9 @@ import com.google_voltpatches.common.annotations.GwtCompatible;
 import com.google_voltpatches.common.annotations.GwtIncompatible;
 import com.google_voltpatches.common.base.Objects;
 import com.google_voltpatches.common.collect.Maps.IteratorBasedAbstractMap;
+import com.google_voltpatches.errorprone.annotations.CanIgnoreReturnValue;
+import com.google_voltpatches.j2objc.annotations.RetainedWith;
 import com.google_voltpatches.j2objc.annotations.WeakOuter;
-
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
@@ -36,16 +37,16 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
-
 import javax.annotation_voltpatches.Nullable;
 
 /**
  * A {@link BiMap} backed by two hash tables. This implementation allows null keys and values. A
  * {@code HashBiMap} and its inverse are both serializable.
  *
+ * <p>This implementation guarantees insertion-based iteration order of its keys.
+ *
  * <p>See the Guava User Guide article on <a href=
- * "https://github.com/google/guava/wiki/NewCollectionTypesExplained#bimap"> {@code BiMap}
- * </a>.
+ * "https://github.com/google/guava/wiki/NewCollectionTypesExplained#bimap"> {@code BiMap} </a>.
  *
  * @author Louis Wasserman
  * @author Mike Bostock
@@ -253,11 +254,13 @@ public final class HashBiMap<K, V> extends IteratorBasedAbstractMap<K, V>
     return Maps.valueOrNull(seekByKey(key, smearedHash(key)));
   }
 
+  @CanIgnoreReturnValue
   @Override
   public V put(@Nullable K key, @Nullable V value) {
     return put(key, value, false);
   }
 
+  @CanIgnoreReturnValue
   @Override
   public V forcePut(@Nullable K key, @Nullable V value) {
     return put(key, value, true);
@@ -356,6 +359,7 @@ public final class HashBiMap<K, V> extends IteratorBasedAbstractMap<K, V>
     return new BiEntry[length];
   }
 
+  @CanIgnoreReturnValue
   @Override
   public V remove(@Nullable Object key) {
     BiEntry<K, V> entry = seekByKey(key, smearedHash(key));
@@ -513,6 +517,7 @@ public final class HashBiMap<K, V> extends IteratorBasedAbstractMap<K, V>
     };
   }
 
+  @RetainedWith
   private transient BiMap<V, K> inverse;
 
   @Override
@@ -689,13 +694,13 @@ public final class HashBiMap<K, V> extends IteratorBasedAbstractMap<K, V>
   /**
    * @serialData the number of entries, first key, first value, second key, second value, and so on.
    */
-  @GwtIncompatible("java.io.ObjectOutputStream")
+  @GwtIncompatible // java.io.ObjectOutputStream
   private void writeObject(ObjectOutputStream stream) throws IOException {
     stream.defaultWriteObject();
     Serialization.writeMap(this, stream);
   }
 
-  @GwtIncompatible("java.io.ObjectInputStream")
+  @GwtIncompatible // java.io.ObjectInputStream
   private void readObject(ObjectInputStream stream) throws IOException, ClassNotFoundException {
     stream.defaultReadObject();
     init(16);
@@ -703,6 +708,6 @@ public final class HashBiMap<K, V> extends IteratorBasedAbstractMap<K, V>
     Serialization.populateMap(this, stream, size);
   }
 
-  @GwtIncompatible("Not needed in emulated source")
+  @GwtIncompatible // Not needed in emulated source
   private static final long serialVersionUID = 0;
 }

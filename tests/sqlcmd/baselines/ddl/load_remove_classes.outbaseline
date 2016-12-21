@@ -17,6 +17,15 @@ Command succeeded.
 drop table dropable if exists;
 Command succeeded.
 
+drop table my_table_1 if exists;
+Command succeeded.
+
+drop table my_table_2 if exists;
+Command succeeded.
+
+drop table my_table_3 if exists;
+Command succeeded.
+
 drop table prefixes if exists;
 Command succeeded.
 
@@ -56,6 +65,7 @@ Command succeeded.
 --- System Procedures --------------------------------------
 @Explain                  	varchar
 @ExplainProc              	varchar
+@ExplainView              	varchar
 @GC                       
 @GetPartitionKeys         	varchar
 @Pause                    
@@ -67,8 +77,9 @@ Command succeeded.
 @SnapshotDelete           	varchar, varchar
 @SnapshotRestore          	varchar, varchar
 @SnapshotRestore          	varchar
-@SnapshotSave             	varchar, varchar, bit
+@SnapshotSave             
 @SnapshotSave             	varchar
+@SnapshotSave             	varchar, varchar, bit
 @SnapshotScan             	varchar
 @SnapshotStatus           
 @Statistics               	statisticscomponent, bit
@@ -92,6 +103,7 @@ Command succeeded.
 --- System Procedures --------------------------------------
 @Explain                  	varchar
 @ExplainProc              	varchar
+@ExplainView              	varchar
 @GC                       
 @GetPartitionKeys         	varchar
 @Pause                    
@@ -103,8 +115,9 @@ Command succeeded.
 @SnapshotDelete           	varchar, varchar
 @SnapshotRestore          	varchar, varchar
 @SnapshotRestore          	varchar
-@SnapshotSave             	varchar, varchar, bit
+@SnapshotSave             
 @SnapshotSave             	varchar
+@SnapshotSave             	varchar, varchar, bit
 @SnapshotScan             	varchar
 @SnapshotStatus           
 @Statistics               	statisticscomponent, bit
@@ -192,6 +205,7 @@ Command succeeded.
 --- System Procedures --------------------------------------
 @Explain                  	varchar
 @ExplainProc              	varchar
+@ExplainView              	varchar
 @GC                       
 @GetPartitionKeys         	varchar
 @Pause                    
@@ -203,8 +217,9 @@ Command succeeded.
 @SnapshotDelete           	varchar, varchar
 @SnapshotRestore          	varchar, varchar
 @SnapshotRestore          	varchar
-@SnapshotSave             	varchar, varchar, bit
+@SnapshotSave             
 @SnapshotSave             	varchar
+@SnapshotSave             	varchar, varchar, bit
 @SnapshotScan             	varchar
 @SnapshotStatus           
 @Statistics               	statisticscomponent, bit

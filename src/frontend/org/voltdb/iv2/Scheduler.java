@@ -117,7 +117,9 @@ abstract public class Scheduler implements InitiatorMessageHandler
                     "Received a transaction id at partition " + m_txnEgo.getPartitionId() +
                     " for partition " + ego.getPartitionId() + ". The partition ids should match.", true, null);
         }
-        m_txnEgo = ego;
+        if (m_txnEgo.getTxnId() < ego.getTxnId()) {
+            m_txnEgo = ego;
+        }
     }
 
     final protected TxnEgo advanceTxnEgo()
@@ -171,25 +173,11 @@ abstract public class Scheduler implements InitiatorMessageHandler
         boolean commandLog = (message instanceof TransactionInfoBaseMessage &&
                 (((TransactionInfoBaseMessage)message).isForReplay()));
 
-        boolean drV1 = ((message instanceof TransactionInfoBaseMessage &&
-                ((TransactionInfoBaseMessage)message).isForDRv1()));
-
         boolean sentinel = message instanceof MultiPartitionParticipantMessage;
 
-        boolean replay = commandLog || sentinel || drV1;
-
-        assert(!(commandLog && drV1));
-
+        // if replay
         if (commandLog || sentinel) {
             sequenceWithUniqueId = ((TransactionInfoBaseMessage)message).getUniqueId();
-        }
-        else if (drV1) {
-            // should be dead path, mark for future removal
-            VoltDB.crashLocalVoltDB("DRv1 path should never be called", true, null);
-            sequenceWithUniqueId = ((TransactionInfoBaseMessage)message).getOriginalTxnId();
-        }
-
-        if (replay) {
             // Update last seen and last polled txnId for replicas
             m_replaySequencer.updateLastSeenUniqueId(sequenceWithUniqueId,
                     (TransactionInfoBaseMessage) message);

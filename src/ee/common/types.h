@@ -218,7 +218,7 @@ enum PlanNodeType {
     PLAN_NODE_TYPE_MATERIALIZE      = 55,
     PLAN_NODE_TYPE_LIMIT            = 56,
     PLAN_NODE_TYPE_PARTIALAGGREGATE = 57,
-    PLAN_NODE_TYPE_PARTITIONBY      = 58
+    PLAN_NODE_TYPE_WINDOWFUNCTION   = 58
 };
 
 // ------------------------------------------------------------------
@@ -313,6 +313,12 @@ enum ExpressionType {
     EXPRESSION_TYPE_AGGREGATE_VALS_TO_HYPERLOGLOG   = 47,
     EXPRESSION_TYPE_AGGREGATE_HYPERLOGLOGS_TO_CARD  = 48,
 
+    // -----------------------------
+    // Windowed Expression Aggregates.
+    // -----------------------------
+    EXPRESSION_TYPE_AGGREGATE_WINDOWED_RANK                   = 70,
+    EXPRESSION_TYPE_AGGREGATE_WINDOWED_DENSE_RANK             = 71,
+    EXPRESSION_TYPE_AGGREGATE_WINDOWED_COUNT                  = 72,
     // -----------------------------
     // Functions
     // -----------------------------

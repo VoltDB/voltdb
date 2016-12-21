@@ -52,7 +52,7 @@ public class TestExplainCommandSuite extends RegressionSuite {
         vt = client.callProcedure("@Explain", (Object[]) strs ).getResults()[0];
         while( vt.advanceRow() ) {
             System.out.println(vt);
-            String plan = (String) vt.get("EXEcution_PlaN", VoltType.STRING);
+            String plan = vt.getString("EXEcution_PlaN");
             assertTrue( plan.contains( "RETURN RESULTS TO STORED PROCEDURE" ));
             // Validate bypass of no-op sort on single-row result.
             assertFalse( plan.contains( "ORDER BY (SORT)"));
@@ -63,7 +63,7 @@ public class TestExplainCommandSuite extends RegressionSuite {
         vt = client.callProcedure("@Explain", "SELECT COUNT(*) FROM t3 where I3 < 100" ).getResults()[0];
         while( vt.advanceRow() ) {
             System.out.println(vt);
-            String plan = (String) vt.get(0, VoltType.STRING );
+            String plan = vt.getString(0);
             assertTrue( plan.contains("INDEX COUNT") );
         }
 
@@ -71,7 +71,7 @@ public class TestExplainCommandSuite extends RegressionSuite {
         vt = client.callProcedure("@Explain", "SELECT * FROM t3 where I3 + I4 < 100" ).getResults()[0];
         while( vt.advanceRow() ) {
             System.out.println(vt);
-            String plan = (String) vt.get(0, VoltType.STRING );
+            String plan = vt.getString(0);
             assertTrue( plan.contains("INDEX SCAN") );
         }
 }
@@ -83,11 +83,111 @@ public class TestExplainCommandSuite extends RegressionSuite {
         vt = client.callProcedure("@ExplainProc", "T1.insert" ).getResults()[0];
         while( vt.advanceRow() ) {
             System.out.println(vt);
-            String sql = (String) vt.get(0, VoltType.STRING );
-            String plan = (String) vt.get(1, VoltType.STRING );
+            String sql = vt.getString(0);
+            String plan = vt.getString(1);
             assertTrue( sql.contains( "INSERT INTO T1 VALUES (?, ?, ?)" ));
             assertTrue( plan.contains( "INSERT into \"T1\"" ));
             assertTrue( plan.contains( "MATERIALIZE TUPLE from parameters and/or literals" ));
+        }
+    }
+
+    public void testExplainSingleTableView() throws IOException, ProcCallException {
+        Client client = getClient();
+        VoltTable vt = null;
+
+        // Test if the error checking is working properly.
+        verifyProcFails(client, "View T does not exist.", "@ExplainView", "T");
+        verifyProcFails(client, "Table T1 is not a view.", "@ExplainView", "T1");
+
+        final String[] aggTypes = {"MAX", "MIN"};
+        final int numOfMinMaxColumns = 12;
+
+        // -1- At this point there is no auxiliary indices at all,
+        //     all min/max view columns should use built-in sequential scan to refresh.
+        vt = client.callProcedure("@ExplainView", "V1" ).getResults()[0];
+        assertEquals(numOfMinMaxColumns, vt.getRowCount());
+        for (int i = 0; i < numOfMinMaxColumns; i++) {
+            vt.advanceRow();
+            String task = vt.getString(0);
+            String plan = vt.getString(1);
+            assertEquals("Refresh " + aggTypes[i % 2] + " column \"C" + i + "\"", task);
+            assertEquals("Built-in sequential scan.", plan);
+        }
+
+        // -2- Create an index on TSRC1(G1), then all columns will use built-in index scan now.
+        client.callProcedure("@AdHoc", "CREATE INDEX IDX_TSRC1_G1 ON TSRC1(G1);");
+        vt = client.callProcedure("@ExplainView", "V1" ).getResults()[0];
+        assertEquals(numOfMinMaxColumns, vt.getRowCount());
+        for (int i = 0; i < numOfMinMaxColumns; i++) {
+            vt.advanceRow();
+            String task = vt.getString(0);
+            String plan = vt.getString(1);
+            assertEquals("Refresh " + aggTypes[i % 2] + " column \"C" + i + "\"", task);
+            assertEquals("Built-in index scan \"IDX_TSRC1_G1\".", plan);
+        }
+
+        // -3- Create an index on TSRC1(G1, C1), C1 will pick up the new index.
+        client.callProcedure("@AdHoc", "CREATE INDEX IDX_TSRC1_G1C1 ON TSRC1(G1, C1);");
+        vt = client.callProcedure("@ExplainView", "V1" ).getResults()[0];
+        assertEquals(numOfMinMaxColumns, vt.getRowCount());
+        for (int i = 0; i < numOfMinMaxColumns; i++) {
+            vt.advanceRow();
+            String task = vt.getString(0);
+            String plan = vt.getString(1);
+            assertEquals("Refresh " + aggTypes[i % 2] + " column \"C" + i + "\"", task);
+            if (i != 1) {
+                assertEquals("Built-in index scan \"IDX_TSRC1_G1\".", plan);
+            }
+            else {
+                assertEquals("Built-in index scan \"IDX_TSRC1_G1C1\".", plan);
+            }
+        }
+
+        // -4- Remove index IDX_TSRC1_G1.
+        //     C1 will continue to use IDX_TSRC1_G1C1,
+        //     The rest columns will start to use query plans.
+        //     The query plans are index scans on IDX_TSRC1_G1C1 with range-scan setting.
+        client.callProcedure("@AdHoc", "DROP INDEX IDX_TSRC1_G1;");
+        vt = client.callProcedure("@ExplainView", "V1" ).getResults()[0];
+        assertEquals(numOfMinMaxColumns, vt.getRowCount());
+        for (int i = 0; i < numOfMinMaxColumns; i++) {
+            vt.advanceRow();
+            String task = vt.getString(0);
+            String plan = vt.getString(1);
+            assertEquals("Refresh " + aggTypes[i % 2] + " column \"C" + i + "\"", task);
+            if (i != 1) {
+                assertTrue(plan.contains("INDEX SCAN of \"TSRC1\" using \"IDX_TSRC1_G1C1\""));
+                assertTrue(plan.contains("range-scan on 1 of 2 cols from (G1 >= ?0) while (G1 = ?0)"));
+            }
+            else {
+                assertEquals("Built-in index scan \"IDX_TSRC1_G1C1\".", plan);
+            }
+        }
+        client.callProcedure("@AdHoc", "DROP INDEX IDX_TSRC1_G1C1;");
+    }
+
+    public void testExplainMultiTableView() throws IOException, ProcCallException {
+        Client client = getClient();
+        final String[] aggTypes = {"MAX", "MIN"};
+        final int numOfMinMaxColumns = 12;
+        VoltTable vt = client.callProcedure("@ExplainView", "V2" ).getResults()[0];
+        assertEquals(numOfMinMaxColumns + 1, vt.getRowCount());
+
+        // -1- Check the join evaluation query plan
+        // -2- Check the query plans for refreshing MIN / MAX columns
+        for (int i = 0; i <= numOfMinMaxColumns; i++) {
+            vt.advanceRow();
+            String task = vt.getString(0);
+            String plan = vt.getString(1);
+            if (i == 0) {
+                assertEquals("Join Evaluation", task);
+            }
+            else {
+                assertEquals("Refresh " + aggTypes[(i-1) % 2] + " column \"C" + (i-1) + "\"", task);
+            }
+            assertTrue(plan.contains("NESTLOOP INDEX INNER JOIN"));
+            assertTrue(plan.contains("inline INDEX SCAN of \"TSRC1\" using its primary key index"));
+            assertTrue(plan.contains("SEQUENTIAL SCAN of \"TSRC2\""));
         }
     }
 
@@ -111,6 +211,7 @@ public class TestExplainCommandSuite extends RegressionSuite {
         project.addPartitionInfo("t1", "PKEY");
         project.addPartitionInfo("t2", "PKEY");
         project.addPartitionInfo("t3", "PKEY");
+        project.setUseDDLSchema(true);
 
         boolean success;
 

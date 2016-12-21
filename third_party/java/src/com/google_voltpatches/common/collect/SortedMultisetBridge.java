@@ -16,6 +16,7 @@
 
 package com.google_voltpatches.common.collect;
 
+import com.google_voltpatches.common.annotations.GwtIncompatible;
 import java.util.SortedSet;
 
 /**
@@ -25,6 +26,7 @@ import java.util.SortedSet;
  * 
  * @author Louis Wasserman
  */
+@GwtIncompatible
 interface SortedMultisetBridge<E> extends Multiset<E> {
   @Override
   SortedSet<E> elementSet();

@@ -26,6 +26,7 @@
     <script type="text/javascript" src="js/voltdb.core.js"></script>
     <script type="text/javascript" src="js/voltdb.service.js"></script>
     <script type="text/javascript" src="js/voltdb.render.js"></script>
+    <script type="text/javascript" src="js/split.js"></script>
     <script type="text/javascript" src="js/voltdb.ui.js"></script>
     <script type="text/javascript" src="js/voltdb.graph.js"></script>
     <script type="text/javascript" src="js/jquery.tooltipster.js"></script>
@@ -36,6 +37,7 @@
     <script type="text/javascript" src="js/jquery.getSelectedText.min.js"></script>
     <script type="text/javascript" src="js/icheck.js"></script>
     <script type="text/javascript" src="js/voltdb.admin.ui.js"></script>
+    <script type="text/javascript" src="js/FileSaver.min.js"></script>
     <script type="text/javascript" src="js/jquery.validate.min.js"></script>
     <link href="css/resources/datatables/dataTables_page.css" rel="stylesheet" />
     <link href="css/resources/datatables/dataTables_table.css" rel="stylesheet" />
@@ -44,7 +46,7 @@
     <script src="js/jsonParse.js"></script>
     <!--<link href="css/resources/datatables/jquery.dataTables.min.css" rel="stylesheet" />-->
     <link href="css/resources/datatables/theme.default.min.css" rel="stylesheet" />
-    <script src="js/jquery.dataTables.js"></script>
+    <script src="js/jquery.dataTables.min.js"></script>
     <script src="js/jqueryDatatablePlugins.js"></script>
     <script src="js/sha256.js"></script>
 </head>
@@ -66,6 +68,7 @@
                                 <li id="navAdmin" style="display: none;"><a href="#">Admin</a></li>
                                 <li id="navSchema"><a href="#o">Schema</a></li>
                                 <li id="navSqlQuery"><a href="#">SQL Query</a></li>
+                                <li id="navDR" style="display: none;"><a href="#">DR</a></li>
                             </ul>
                         </nav>
                     </div>
@@ -194,35 +197,60 @@
                         </div>
                         <div class="clear"></div>
                     </div>
+
                     <div id="mainGraphBlock">
+                    <div class="errorMsgLocalStorageFull" style="display:none">
+                        <div class="errorMsgLocalWrapper">
+                        <img src="css/resources/images/alert.png" alt="Alert"/>
+                        </div>
+                        <div class="textMsgLocalWrapper">
+                        <p>Local storage is full. Please delete some saved queries from SQL Query tab or minimize the retained time interval using the above sliding window.</p>
+                        </div>
+                        <div class="clear"></div>
+                    </div>
                         <div class="graphChart" id="graphChart">
                             <div id="chartServerCPU" class="chart">
                                 <div class="chartHeader" id="chartHead">
-                                    <h1>Server CPU <span class="activeServerName" title=""></span></h1>
+                                    <h1>Server CPU <span class="activeServerName" title=""></span>
+                                    <a href="#" class="downloadBtnChart" onclick='downloadCSV(event, { filename: "cpu-data" }, "cpu");'> <img class="downloadCls" src="css/resources/images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>
+                                    <div class="clear"></div>
+                                    </h1>
                                 </div>
                                 <svg id="visualisationCpu" width="100%" height="350"></svg>
                             </div>
                             <div id="chartServerRAM" class="chart">
                                 <div class="chartHeader" id="chartRamHeader">
-                                    <h1>Server RAM<span class="activeServerName" title=""></span></h1>
+                                    <h1>Server RAM<span class="activeServerName" title=""></span>
+                                     <a href="#" class="downloadBtnChart" onclick='downloadCSV(event, { filename: "memory-data" }, "memory");'> <img class="downloadCls" src="css/resources/images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>
+                                    <div class="clear"></div>
+                                    </h1>
                                 </div>
                                 <svg id="visualisationRam" width="100%" height="400"></svg>
                             </div>
                             <div id="chartClusterLatency" class="chart">
                                 <div class="chartHeader">
-                                    <h1>Cluster Latency (99th percentile, ms)</h1>
+                                    <h1><div class="chartLeft">Cluster Latency (99th percentile, ms)</div>
+                                    <a href="#" class="downloadBtnChart" onclick='downloadCSV(event, { filename: "latency-data" }, "latency");'> <img class="downloadCls" src="css/resources/images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>
+                                    <div class="clear"></div>
+                                    </h1>
                                 </div>
                                 <svg id="visualisationLatency" width="100%" height="400"></svg>
                             </div>
                             <div id="chartClusterTransactions" class="chart">
                                 <div class="chartHeader">
-                                    <h1>Cluster Transactions (tps)</h1>
+                                    <h1>Cluster Transactions (tps)
+                                    <a href="#" class="downloadBtnChart" onclick='downloadCSV(event, { filename: "clusterTransaction-data" }, "transaction");'> <img class="downloadCls" src="css/resources/images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>
+                                    <div class="clear"></div>
+                                    </h1>
                                 </div>
                                 <svg id="visualisationTransaction" width="100%" height="400"></svg>
                             </div>
                             <div id="chartPartitionIdleTime" class="chart">
                                 <div class="chartHeader">
-                                    <h1>Partition Idle Time</h1>
+                                    <h1>Partition Idle Time
+                                    <a href="#" class="downloadBtnChart" onclick='downloadCSV(event, { filename: "partitionIdle-data" }, "partitionIdle");'> <img class="downloadCls" src="css/resources/images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>
+                                    <div class="clear"></div>
+                                    </h1>
                                 </div>
                                 <div class="legend" style="display:none;">
                                     <ul>
@@ -233,15 +261,12 @@
                                 </div>
                                 <svg id="visualisationPartitionIdleTime" class="partitionHeight"></svg>
                             </div>
-                            <div id="ChartDrReplicationRate" class="chart" style="display: none">
-                                <div class="chartHeader">
-                                    <h1>Database Replication (DR)</h1>
-                                </div>
-                                <svg id="visualizationDrReplicationRate" width="100%" height="400"></svg>
-                            </div>
                             <div id="chartCommandLogging" class="chart" style="display: none">
                                 <div class="chartHeader">
-                                    <h1>Command Log Statistics</h1>
+                                    <h1>Command Log Statistics
+                                    <a href="#" class="downloadBtnChart" onclick='downloadCSV(event, { filename: "CommandLog-data" }, "commandLog");'> <img class="downloadCls" src="css/resources/images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>
+                                    <div class="clear"></div>
+                                    </h1>
                                 </div>
                                 <div class="cmdLogLegend" style="display:none;">
                                     <ul>
@@ -322,94 +347,6 @@
                                                 </tr>
                                             </thead>
                                             <tbody id="tablesBody"></tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="drWrapper" id="divDrReplication" style="display:none">
-                        <div class="content drHeader" id="drHeader">
-                            <div class="leftShowhide">
-                                <div class="dr">
-                                    <h1 class="headText1">
-                                        <a href="javascript:void(0);" id="showHideDrBlock" class="showhideIcon collapsed arrowAdjust">Show/Hide Database Replication (DR)</a>
-                                    </h1>
-                                </div>
-                            </div>
-                            <div class="rightShowhide">
-                                <ul class="drList">
-                                    <li>Mode</li>
-                                    <li id="dbDrMode" class="drArrow">Master</li>
-                                </ul>
-                                <ul class="drList">
-                                    <!-- <li>State</li>
-                                        <li class="drArrow">On</li>-->
-                                    <li class="alertIcon warningDr" id="drAlertWarning" style="display: none">
-                                        <a id="drWarning" href="#drPartitionWarning" class="drWarning">
-                                            <span style="margin:0 0 0 24px">Warning</span>
-                                        </a>
-                                    </li>
-                                </ul>
-                                <div class="clear"></div>
-                            </div>
-                            <div class="clear"></div>
-                        </div>
-                        <div id="drSection" class="drShowHide" style="display:none;">
-                            <div id="drMasterSection" class="masterWrapper" style="display:block;">
-                                <div id="tblMAster_wrapper" class="dataTables_wrapper no-footer">
-                                    <div class="tabs-filter-wrapperDR">
-                                        <div class="drTitle icon-master" id="drMasterTitle">Master</div>
-                                        <div class="filter"><input name="filter" id="filterPartitionId" type="text" class="search-box" onBlur="" placeholder="Search Partition ID"><a id="searchDrMasterData" href="javascript:void(0)" class="icon-search drIcon" title="Search">search</a></div>
-                                        <div class="clear"></div>
-                                    </div>
-                                    <div class="clear"></div>
-                                    <div class="dataTables_paginate paging_extStyleLF paginationDefault" id="tblDrMAster_paginate">
-                                        <span class="paginate_disabled_previous paginate_button" title="Previous Page">Prev</span>
-                                        <div class="navigationLabel">Page <span class="pageIndex"> 0 </span> of <span class="totalPages">0</span></div>
-                                        <span class="paginate_enabled_next paginate_button" title="Next Page">Next</span>
-                                    </div>
-                                    <div class="drMasterContainer">
-                                        <table width="100%" border="0" cellspacing="0" id="tblDrMAster" cellpadding="0" class="storeTbl drTbl no-footer dataTable" aria-describedby="tblDrMAster_info" role="grid">
-                                            <thead>
-                                                <tr role="row">
-                                                    <th id="Th1" width="25%" data-name="none" class="" tabindex="0" aria-controls="tblDrMAster" rowspan="1" colspan="1" aria-sort="ascending" aria-label="Partition ID: activate to sort column descending">Partition ID</th>
-                                                    <th id="Th2" width="20%" data-name="none" class="sorting" tabindex="0" aria-controls="tblDrMAster" rowspan="1" colspan="1" aria-label="Status: activate to sort column ascending">Status</th>
-                                                    <th id="Th3" width="10%" data-name="none" class="sorting" tabindex="0" aria-controls="tblDrMAster" rowspan="1" colspan="1" aria-label="Total Buffer: activate to sort column ascending">Total Buffer</th>
-                                                    <th id="Th4" width="10%" data-name="none" class="sorting" tabindex="0" aria-controls="tblDrMAster" rowspan="1" colspan="1" aria-label="Buffer on disk: activate to sort column ascending">Buffer on disk</th>
-                                                    <th id="Th5" width="15%" data-name="none" class="sorting" tabindex="0" aria-controls="tblDrMAster" rowspan="1" colspan="1" aria-label="Replica Latency (ms): activate to sort column ascending">Replica Latency (ms)</th>
-                                                    <th id="Th6" width="20%" data-name="none" class="sorting" tabindex="0" aria-controls="tblDrMAster" rowspan="1" colspan="1" aria-label="Replica latency (in transactions): activate to sort column ascending">Replica latency (in transactions)</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody><tr><td colspan="6"> No data to be displayed</td></tr></tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                            </div>
-                            <div id="drReplicaSection" class="replicaWrapper" style="display:block">
-                                <div id="tblReplica_wrapper" class="dataTables_wrapper no-footer">
-                                    <div class="tabs-filter-wrapperDR">
-                                        <div class="drTitle icon-replica" id="drReplicaTitle">Replica</div>
-                                        <div class="filter"><input name="filter" id="filterHostID" type="text" class="search-box" onBlur="" placeholder="Search Server"><a id="searchDrMasterData" href="javascript:void(0)" class="icon-search drIcon" title="Search">search</a></div>
-                                        <div class="clear"></div>
-                                    </div>
-                                    <div class="clear"></div>
-                                    <div class="dataTables_paginate paging_extStyleLF paginationDefault" id="tblDrReplica_paginate">
-                                        <span class="paginate_disabled_previous paginate_button" title="Previous Page">Prev</span>
-                                        <div class="navigationLabel">Page <span class="pageIndex"> 0 </span> of <span class="totalPages">0</span></div>
-                                        <span class="paginate_enabled_next paginate_button" title="Next Page">Next</span>
-                                    </div>
-                                    <div class="drReplicaContainer">
-                                        <table width="100%" border="0" cellspacing="0" id="tblDrReplica" cellpadding="0" class="storeTbl drTbl no-footer dataTable" aria-describedby="tblDrReplica_info" role="grid">
-                                            <thead>
-                                                <tr>
-                                                    <th id="Th7" width="25%" data-name="none">Server</th>
-                                                    <th id="Th8" width="25%" data-name="none">Status</th>
-                                                    <th id="Th9" width="25%" data-name="none">Replication rate (last 1 minute)</th>
-                                                    <th id="Th10" width="25%" data-name="none">Replication rate (last 5 minutes)</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody><tr><td colspan="6"> No data to be displayed</td></tr></tbody>
                                         </table>
                                     </div>
                                 </div>
@@ -629,10 +566,10 @@
                                 </tr>
                                 <tr class="child-row-2 subLabelRow" id="snapshotPrefixRow">
                                     <td class="configLabel">File Prefix </td>
-                                    <td align="right" class="tdSnapshotPrefix">
+                                    <td class="tdSnapshotPrefix" align="right">
                                         <form id="frmSnapshotFilePrefix" method="get" action="">
                                             <div id="loadingSnapshotPrefix" class="loading-small" style="display: none;"></div>
-                                            <span id="prefixSpan"></span>
+                                            <span id="prefixSpan" class="wordBreak"></span>
                                             <input id="txtPrefix" name="txtPrefix" class="exitableTxtBx exitableFilePrefix" type="text" style="display: none" />
                                             <label id="errorSnapshotFilePrefix" for="txtPrefix" class="error" style="display: none;"></label>
                                         </form>
@@ -732,8 +669,9 @@
                                     <td align="right"></td>
                                     <td>&nbsp;</td>
                                     <td>
-                                        <!--<a href="javascript:void(0);" id="addNewConfigLink" class="plusAdd" style="display: block;" title="Add Configuration">&nbsp;</a>-->
+                                        <a href="javascript:void(0);" id="addNewImportConfigLink" class="plusAdd" style="display: block;" title="Add Import Configuration">&nbsp;</a>
                                         <div id="loadingImportConfig" class="loading-small loadImport" style="display: none"></div>
+                                        <a href="#addImportConfigPopup" id="addImportConfigPopupLink" data-id="-1" title="Add Configuration" style="display: none">Add Configuration</a>
                                     </td>
                                 </tr>
                                 <tbody id="importConfiguration" data-status="value" style="display: none;"></tbody>
@@ -976,7 +914,7 @@
             <!--Sql Query Tab-->
             <div id="sqlQuery" class="containerStudio contents">
                 <div class="blockWrapper" id="BlockContainer01">
-                    <div class="objectExplorer">
+                    <div id="a" class="objectExplorer split split-horizontal" >
                         <!-- Loading -->
                         <div id="sqlQueryOverlay" style="display: none;">
                             <div class="loading-medium"></div>
@@ -993,7 +931,7 @@
                                     <li><a href="#tab4">Stored Procedures</a></li>
                                 </ul>
                                 <div class="tab_container">
-                                    <div id="tabScroller">
+                                    <div id="tabScroller" class="tabScroller">
                                         <div id="tab1" class="tab_content">
                                             <div id="accordionTable">
                                             </div>
@@ -1013,7 +951,7 @@
                         </div>
                         <div class="clear"></div>
                     </div>
-                    <div class="queryInput" id="inputQuery">
+                    <div class="queryInput split split-horizontal" id="inputQuery">
                     <h1 class="theHeadingQuery">
                     
                     <div class="icon-query queryHeadName"><span>Query</span></div>
@@ -1055,27 +993,147 @@
                     </div>
                     <div class="clear"></div>
                 </div>
-                <!--<div class="blockWrapper" id="blockContainer02">-->
-                    <!--<div class="exportType">-->
-                        <!--<form name="" id="queryResult">-->
-                            <!--<select id="exportType">-->
-                                <!--<option selected="selected">HTML</option>-->
-                                <!--<option>CSV</option>-->
-                                <!--<option>Monospace</option>-->
-                            <!--</select>-->
-                        <!--</form>-->
-                    <!--</div>-->
-                    <!--<h1 class="theHeading icon-queryResult">Query Result</h1>-->
-                    <!--<div class="queryResult">-->
-                        <!--<div id="resultHtml" style="display: block;" class="resultHtml"></div>-->
-                        <!--<div id="resultCsv" style="display: none;" class="resultCsv"></div>-->
-                        <!--<div id="resultMonospace" style="display: none;" class="resultMonospace">-->
-                            <!--<pre>-->
-                    <!--</pre>-->
-                        <!--</div>-->
-                    <!--</div>-->
-                    <!--<div id="queryResults" class="queryStatus"></div>-->
-                <!--</div>-->
+            </div>
+            <!--DR-->
+            <div id="dr" class="container contents">
+                <!-- Loading -->
+                <div id="overlay1" style="display: none;">
+                    <div class="loading"></div>
+                </div>
+                <!-- Loading -->
+                <div class="container" id="containerMain1">
+                     <div id="dbPane" class="menu_list">
+                            <!--Code for menu starts here-->
+                            <div class="menu_head expandedDR drHead">
+                                 <span class="iconDRDatabase"></span>
+                                <h1 class="headText1 DRHeaderWrap">
+                                   <a href="#" id="showHideGraphBlock1" class="showhideIcon expandedDR arrowAdjustDR">
+                                       <span class="DRHeaderName" id="dRHeaderName">Database (1)</span>
+                                   </a>
+                               </h1>
+                                <div class="clear"></div>
+                            </div>
+                            <div class="menu_body drBody" style="display: block;">
+
+                    <div class="DRContantWrap">
+                        <div id="mainGraphBlock1">
+                            <div class="errorMsgLocalStorageFull" style="display:none">
+                            <div class="errorMsgLocalWrapper">
+                            <img src="css/resources/images/alert.png" alt="Alert"/>
+                            </div>
+                            <div class="textMsgLocalWrapper">
+                            <p>Local storage is full. Please delete some saved queries from SQL Query tab or minimize the retained time interval using the above sliding window.</p>
+                            </div>
+                            <div class="clear"></div>
+                        </div>
+                            <div class="graphChart" id="graphChart1">
+                                <div id="ChartDrReplicationRate" class="chart chartDR" style="display: block">
+                                    <div class="chartHeader">
+                                        <h1>Database Replication (DR)
+                                        <a href="#" class="downloadBtnChart" onclick='downloadCSV(event, { filename: "DrReplication-data" }, "dataReplication");'> <img class="downloadCls" src="css/resources/images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>
+                                        <div class="clear"></div>
+                                        </h1>
+                                    </div>
+                                    <svg id="visualizationDrReplicationRate" width="100%" height="400"></svg>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="drWrapper" id="divDrReplication" style="display:block">
+                            <div class="content drHeader" id="drHeader">
+                                <div class="leftShowhide">
+                                    <div class="dr">
+                                        <h1 class="headText1">
+                                            <a href="javascript:void(0);" id="showHideDrBlock" class="showhideIcon collapsed arrowAdjust">Show/Hide Database Replication (DR)</a>
+                                        </h1>
+                                    </div>
+                                </div>
+                                <div class="rightShowhide">
+                                    <ul class="drList">
+                                        <li>Mode</li>
+                                        <li id="dbDrMode" class="drArrow">Master</li>
+                                    </ul>
+                                    <ul class="drList">
+                                        <!-- <li>State</li>
+                                            <li class="drArrow">On</li>-->
+                                        <li class="alertIcon warningDr" id="drAlertWarning" style="display: none">
+                                            <a id="drWarning" href="#drPartitionWarning" class="drWarning">
+                                                <span style="margin:0 0 0 24px">Warning</span>
+                                            </a>
+                                        </li>
+                                    </ul>
+                                    <div class="clear"></div>
+                                </div>
+                                <div class="clear"></div>
+                            </div>
+                            <div id="drSection" class="drShowHide" style="display:none;">
+                                <div id="drMasterSection" class="masterWrapper" style="display:block;">
+                                    <div id="tblMAster_wrapper" class="dataTables_wrapper no-footer">
+                                        <div class="tabs-filter-wrapperDR">
+                                            <div class="drTitle icon-master" id="drMasterTitle">Master</div>
+                                            <div class="filter"><input name="filter" id="filterPartitionId" type="text" class="search-box" onBlur="" placeholder="Search Partition ID"><a id="searchDrMasterData" href="javascript:void(0)" class="icon-search drIcon" title="Search">search</a></div>
+                                            <div class="clear"></div>
+                                        </div>
+                                        <div class="clear"></div>
+                                        <div class="dataTables_paginate paging_extStyleLF paginationDefault" id="tblDrMAster_paginate">
+                                            <span class="paginate_disabled_previous paginate_button" title="Previous Page">Prev</span>
+                                            <div class="navigationLabel">Page <span class="pageIndex"> 0 </span> of <span class="totalPages">0</span></div>
+                                            <span class="paginate_enabled_next paginate_button" title="Next Page">Next</span>
+                                        </div>
+                                        <div class="drMasterContainer">
+                                            <table width="100%" border="0" cellspacing="0" id="tblDrMAster" cellpadding="0" class="storeTbl drTbl no-footer dataTable" aria-describedby="tblDrMAster_info" role="grid">
+                                                <thead>
+                                                    <tr role="row">
+                                                        <th id="Th1" width="25%" data-name="none" class="" tabindex="0" aria-controls="tblDrMAster" rowspan="1" colspan="1" aria-sort="ascending" aria-label="Partition ID: activate to sort column descending">Partition ID</th>
+                                                        <th id="Th2" width="20%" data-name="none" class="sorting" tabindex="0" aria-controls="tblDrMAster" rowspan="1" colspan="1" aria-label="Status: activate to sort column ascending">Status</th>
+                                                        <th id="Th3" width="10%" data-name="none" class="sorting" tabindex="0" aria-controls="tblDrMAster" rowspan="1" colspan="1" aria-label="Total Buffer: activate to sort column ascending">Total Buffer</th>
+                                                        <th id="Th4" width="10%" data-name="none" class="sorting" tabindex="0" aria-controls="tblDrMAster" rowspan="1" colspan="1" aria-label="Buffer on disk: activate to sort column ascending">Buffer on disk</th>
+                                                        <th id="Th5" width="15%" data-name="none" class="sorting" tabindex="0" aria-controls="tblDrMAster" rowspan="1" colspan="1" aria-label="Replica Latency (ms): activate to sort column ascending">Replica Latency (ms)</th>
+                                                        <th id="Th6" width="20%" data-name="none" class="sorting" tabindex="0" aria-controls="tblDrMAster" rowspan="1" colspan="1" aria-label="Replica latency (in transactions): activate to sort column ascending">Replica latency (in transactions)</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody><tr><td colspan="6"> No data to be displayed</td></tr></tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div id="drReplicaSection" class="replicaWrapper" style="display:block">
+                                    <div id="tblReplica_wrapper" class="dataTables_wrapper no-footer">
+                                        <div class="tabs-filter-wrapperDR">
+                                            <div class="drTitle icon-replica" id="drReplicaTitle">Replica</div>
+                                            <div class="filter"><input name="filter" id="filterHostID" type="text" class="search-box" onBlur="" placeholder="Search Server"><a id="searchDrMasterData" href="javascript:void(0)" class="icon-search drIcon" title="Search">search</a></div>
+                                            <div class="clear"></div>
+                                        </div>
+                                        <div class="clear"></div>
+                                        <div class="dataTables_paginate paging_extStyleLF paginationDefault" id="tblDrReplica_paginate">
+                                            <span class="paginate_disabled_previous paginate_button" title="Previous Page">Prev</span>
+                                            <div class="navigationLabel">Page <span class="pageIndex"> 0 </span> of <span class="totalPages">0</span></div>
+                                            <span class="paginate_enabled_next paginate_button" title="Next Page">Next</span>
+                                        </div>
+                                        <div class="drReplicaContainer">
+                                            <table width="100%" border="0" cellspacing="0" id="tblDrReplica" cellpadding="0" class="storeTbl drTbl no-footer dataTable" aria-describedby="tblDrReplica_info" role="grid">
+                                                <thead>
+                                                    <tr>
+                                                        <th id="Th7" width="25%" data-name="none">Server</th>
+                                                        <th id="Th8" width="25%" data-name="none">Status</th>
+                                                        <th id="Th9" width="25%" data-name="none">Replication rate (last 1 minute)</th>
+                                                        <th id="Th10" width="25%" data-name="none">Replication rate (last 5 minutes)</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody><tr><td colspan="6"> No data to be displayed</td></tr></tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                            </div>
+                        </div>
+
+
+
+
+                </div>
             </div>
         </div>
     </div>
@@ -1109,10 +1167,6 @@
                         Partition Idle Time
                         <input type="checkbox" id="PartitionIdleTime" name="" value="transaction" checked="checked" />
                     </li>
-                    <li class="pref-graph " id="liDrReplication" style="display:block;">
-                        <span>Data Replication (DR)</span>
-                        <input type="checkbox" id="DrReplicationRate" name="" value="drReplication" checked="checked" />
-                    </li>
                     <li class="pref-graph" id="liCommandLogStat" style="display:block">
                         <span>Command Log Statistics</span>
                         <input type="checkbox" id="CommandLogStat" name="" value="commandLogStat" checked="checked" />
@@ -1129,16 +1183,13 @@
                         <span>Command Log Data</span>
                         <input type="checkbox" id="CommandLogTables" name="" value="table" checked="checked" />
                     </li>
-                    <li class="pref-tables" id="liDrTables" style="display:block">
-                        <span>Data Replication Tables</span>
-                        <input type="checkbox" id="DRTables" name="" value="table" checked="checked" />
-                    </li>
                 </ul>
                 <input type="submit" name="account_details" id="account_details" value="Save" class="input-submit left" hidden="hidden" style="display: none;" />
             </form>
         </div>
         <div class="overlay-btns"><a href="#" class="btn" id="savePreference">Save</a></div>
     </div>
+
     <!-- POPUP Saved Preferences -->
     <!-- POPUP Alerts -->
     <div id="memoryAlerts" style="display: none">
@@ -1351,10 +1402,8 @@
     <div id="shutDownConfirmationPop" style="display: none">
         <div class="overlay-title icon-alert">Shutdown: Confirmation</div>
         <div class="clear"></div>
-        <div class="overlay-content">
-            <p class="txt-bold">Are you sure you want to shutdown the cluster?</p>
-            <p>Any data not saved to a snapshot or command log will be lost.</p>
-            <p>Continue with the shutdown?</p>
+        <div class="overlay-content" id="divSaveSnapshot">
+
         </div>
         <div class="overlay-btns"><a id="btnShutdownConfirmationOk" class="btn">Ok</a> <a id="btnShutdownConfirmationCancel" class="btn btn-gray">Cancel</a></div>
     </div>
@@ -1660,6 +1709,24 @@
         </div>
     </div>
     <!--Update error Popup-->
+    <!--Update Import Configuration error Popup-->
+    <div style="display: none"><a href="#updateImportErrorPopup" id="updateImportErrorPopupLink">Update Error</a></div>
+    <div id="updateImportErrorPopup" style="display: none">
+        <div id="updateImportInnerErrorPopup">
+            <div class="overlay-title ">
+                <img src="css/resources/images/error.png" class="imgError" />Error
+            </div>
+            <div class="clear"></div>
+            <div class="overlay-contentError errorMsg">
+                <p>
+                    Could not update the value of <span id="updateImportErrorFieldMsg"></span>
+                </p>
+                <br />
+                <div class="overlay-btns" style="padding: 0"><a class="btn" id="btnImportUpdateErrorOk">Ok</a></div>
+            </div>
+        </div>
+    </div>
+    <!--Update error Popup-->
     <!--Update error Auto Snapshot Popup-->
     <div style="display: none"><a href="#updateSnapshotErrorPopup" id="updateErrorSnapshotPopupLink">Update Error</a></div>
     <div id="updateSnapshotErrorPopup" style="display: none">
@@ -1804,6 +1871,32 @@
         </div>
     </div>
     <!--Add Disk Limit Popup-->
+    <!--Add Import Configuration Popup-->
+    <div id="addImportConfigPopup" style="display: none">
+        <div id="addImportConfigInnerPopup">
+            <div class="overlay-title icon-alert">
+                <div id="addImportConfigHeader" class="addConfigHeader">Add Configuration</div>
+                <div id="deleteImportConfig" class="deleteAddConfig "><a href="javascript:void(0);"><span class="iconDeleteAddConfig"></span>Delete this Configuration</a></div>
+                <div class="clear"></div>
+            </div>
+            <div id="addImportConfigControls">
+                <div class="clear"></div>
+                <form id="formAddImportConfiguration" method="get" action="" novalidate style="overflow:auto;">
+                    <div id="addImportConfigWrapper" class="configWrapper">
+                    </div>
+                </form>
+                <br />
+                <div class="overlay-btns"><a id="btnAddImportConfigSave" class="btn">Save</a> <a id="btnAddImportConfigCancel" class="btn btn-gray">Cancel</a></div>
+            </div>
+            <div id="saveImportConfigConfirmation" style="display: none;">
+                <div class="overlay-content ">
+                    <div class="confirmationInfo">Are you sure you want to <span data-state="edit" id="importSaveConfigText">save</span>?</div>
+                </div>
+                <div class="overlay-btns"><a id="btnSaveImportConfigOk" class="btn closeBtn">Yes</a> <a id="btnSaveImportConfigCancel" class="btn btn-gray confirmNoSave">No</a> </div>
+            </div>
+        </div>
+    </div>
+    <!--Add Import Configuration Popup-->
     <div id="addDiskLimitPopup" style="display: none">
         <div id="addDiskLimitInnerPopup">
             <div class="overlay-title icon-alert">
@@ -2042,7 +2135,9 @@
         <div class="overlay-content confirmationHeight">
             <p id="memErrorMsg" class="txt-bold">Maximum storage limit reached. Cannot save the current tab. <br/>Please remove the existing tabs or decrease the length of query.</p>
         </div>
+
         <div class="overlay-btns"><a id="btnMemoryErrorOk" class="btn">Ok</a></div>
+
     </div>
     <!-- Memory exceeded message -->
 
@@ -2057,6 +2152,57 @@
         <div class="overlay-btns"><a id="btnIsSupportedOk" class="btn">Ok</a></div>
     </div>
     <!-- HTML5 support popup -->
+
+    <!-- Prepare Shutdown popup -->
+    <a id="btnPrepareShutdown" href="#shutdownStatusPopup" style="display: none;"></a>
+    <div id="shutdownStatusPopup" style="display: none;">
+        <div class="overlay-title ">
+                <img id="" src="css/resources/images/Information.png" class="imgError" /> <span>Shutting Down</span>
+        </div>
+        <div class="clear"></div>
+        <div class="overlay-content confirmationHeight" style="width:300px">
+            <ul id="shutdownMsg">
+                <li id="liPrepareShutdownNormal"><span class='shutdownNormal'></span>Preparing for shutdown.</li>
+                <li id="liPrepareShutdownLoad" style="display:none"><span class='shutdownLoader'><img src='css/resources/images/shutdown-loader.gif'></span>Preparing for shutdown.</li>
+                <li id="liPrepareShutdownOk" style="display:none"><span class='shutdownSuccess'><img src='css/resources/images/shutdown-success.png'></span>Preparing for shutdown.</li>
+                <li id="liPrepareShutdownFailure" style="display:none"><span class='shutdownFailure'><img src='css/resources/images/shutdown-failure.png'></span>Preparing for shutdown.</li>
+
+                <li id="liQueueExpDataNormal"><span class='shutdownNormal'></span>Writing out all queued export data.</li>
+                <li id="liQueueExpDataLoad" style="display:none"><span class='shutdownLoader'><img src='css/resources/images/shutdown-loader.gif'></span>Writing out all queued export data.</li>
+                <li id="liQueueExpDataOk"  style="display:none"><span class='shutdownSuccess'><img src='css/resources/images/shutdown-success.png'></span>Writing out all queued export data.</li>
+                <li id="liQueueExpDataFailure"  style="display:none"><span class='shutdownFailure'><img src='css/resources/images/shutdown-failure.png'></span>Writing out all queued export data.</li>
+
+                <li id="liCompleteOutstandingExpDrNormal"><span class='shutdownNormal'></span>Completing outstanding export and DR transactions.</li>
+                <li id="liCompleteOutstandingExpDrLoad" style="display:none"><span class='shutdownLoader'><img src='css/resources/images/shutdown-loader.gif'></span>Completing outstanding export and DR transactions.</li>
+                <li id="liCompleteOutstandingExpDrOk" style="display:none"><span class='shutdownSuccess'><img src='css/resources/images/shutdown-success.png'></span>Completing outstanding export and DR transactions.</li>
+
+                <li id="liCompleteClientTransNormal"><span class='shutdownNormal'></span>Completing outstanding client transactions.</li>
+                <li id="liCompleteClientTransLoad" style="display:none"><span class='shutdownLoader'><img src='css/resources/images/shutdown-loader.gif'></span>Completing outstanding client transactions.</li>
+                <li id="liCompleteClientTransOk" style="display:none"><span class='shutdownSuccess'><img src='css/resources/images/shutdown-success.png'></span>Completing outstanding client transactions.</li>
+
+                <li id="liCompleteOutstandingImpNormal"><span class='shutdownNormal'></span>Completing outstanding importer requests.</li>
+                <li id="liCompleteOutstandingImpLoad" style="display:none"><span class='shutdownLoader'><img src='css/resources/images/shutdown-loader.gif'></span>Completing outstanding importer requests.</li>
+                <li id="liCompleteOutstandingImpOk" style="display:none"><span class='shutdownSuccess'><img src='css/resources/images/shutdown-success.png'></span>Completing outstanding importer requests.</li>
+
+                <li id="liShutdownReadyNormal"><span class='shutdownNormal'></span>Cluster will shutdown now.</li>
+                <li id="liShutdownReadyLoad" style="display:none"><span class='shutdownLoader'><img src='css/resources/images/shutdown-loader.gif'></span>Cluster will shutdown now.</li>
+                <li id="liShutdownReadyOk" style="display:none"><span class='shutdownSuccess'><img src='css/resources/images/shutdown-success.png'></span>Cluster will shutdown now.</li>
+                <li id="liShutdownReadyFailure" style="display:none"><span class='shutdownFailure'><img src='css/resources/images/shutdown-failure.png'></span>Cluster will shutdown now.</li>
+            </ul>
+        </div>
+        <div class="shutdownErrorMsg" id="divShutdownErrMsg" style="display:none">
+            <h2>Error Occured</h2>
+            <p><span id="shutdownErrMsg"></span></p>
+        </div>
+        <div class="shutdownRetryMsg" id="divShutdownRetryMsg"><p> Do you want to retry?</p></div>
+        <div class="overlayShutdownBtn" id="divRetryBtn" style="display:none">
+
+            <a id="btnPrepareShutdownOk" class="btn">Ok</a>
+            <a id="btnPrepareShutdownCancel" class="btn btn-gray confirmNoSave">Cancel</a>
+        </div>
+
+    </div>
+    <!-- Prepare Shutdown popup -->
 
     <!-- Placed at the end of the document so the pages load faster -->
     <script src="js/bootstrap.js"></script>

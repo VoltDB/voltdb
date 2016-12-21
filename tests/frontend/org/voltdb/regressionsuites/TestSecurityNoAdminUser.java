@@ -23,27 +23,30 @@
 
 package org.voltdb.regressionsuites;
 
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
-import java.security.SecureRandom;
 
-import static junit.framework.Assert.fail;
-import junit.framework.TestCase;
-
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
 import org.voltdb.BackendTarget;
 import org.voltdb.compiler.VoltProjectBuilder;
 
-public class TestSecurityNoAdminUser extends TestCase {
+public class TestSecurityNoAdminUser extends JUnit4LocalClusterTest {
 
+    LocalCluster config = null;
     PipeToFile pf;
 
-    public TestSecurityNoAdminUser(String name) {
-        super(name);
+    public TestSecurityNoAdminUser() {
     }
 
-    @Override
+    @Before
     public void setUp() throws Exception {
         try {
             //Build the catalog
@@ -52,7 +55,7 @@ public class TestSecurityNoAdminUser extends TestCase {
             builder.setSecurityEnabled(true, false);
             String catalogJar = "dummy.jar";
 
-            LocalCluster config = new LocalCluster(catalogJar, 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
+            config = new LocalCluster(catalogJar, 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
 
             config.setHasLocalServer(false);
             //We expect it to crash
@@ -70,9 +73,17 @@ public class TestSecurityNoAdminUser extends TestCase {
         }
     }
 
+    @After
+    public void tearDown() throws Exception {
+        if (config != null) {
+            config.shutDown();
+        }
+    }
+
     /*
      *
      */
+    @Test
     public void testSecurityNoUsers() throws Exception {
         BufferedReader bi = new BufferedReader(new FileReader(new File(pf.m_filename)));
         String line;

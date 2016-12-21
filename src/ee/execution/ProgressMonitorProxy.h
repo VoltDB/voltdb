@@ -18,24 +18,31 @@
 #ifndef PROGRESSMONITORPROXY_H
 #define PROGRESSMONITORPROXY_H
 
-#include "execution/VoltDBEngine.h"
+#include "common/executorcontext.hpp"
 
 namespace voltdb {
 
 class ProgressMonitorProxy {
 public:
-    ProgressMonitorProxy(VoltDBEngine* engine, AbstractExecutor* exec)
-        : m_engine(engine)
+    ProgressMonitorProxy(ExecutorContext* executorContext, AbstractExecutor* exec)
+        : m_executorContext(executorContext)
+        , m_limits(NULL)
         , m_tuplesRemainingUntilReport(
-              engine->pullTuplesRemainingUntilProgressReport(exec->getPlanNode()->getPlanNodeType()))
+              executorContext->pullTuplesRemainingUntilProgressReport(exec->getPlanNode()->getPlanNodeType()))
         , m_countDown(m_tuplesRemainingUntilReport)
-    { }
+    {
+        const TempTable *tt = exec->getTempOutputTable();
+        if (tt != NULL) {
+            m_limits = tt->getTempTableLimits();
+        }
+    }
 
     void countdownProgress()
     {
         if (--m_countDown == 0) {
             m_tuplesRemainingUntilReport =
-                m_engine->pushTuplesProcessedForProgressMonitoring(m_tuplesRemainingUntilReport);
+                m_executorContext->pushTuplesProcessedForProgressMonitoring(m_limits,
+                                                                   m_tuplesRemainingUntilReport);
             m_countDown = m_tuplesRemainingUntilReport;
         }
     }
@@ -43,11 +50,13 @@ public:
     ~ProgressMonitorProxy()
     {
         // Report progress against next target
-        m_engine->pushFinalTuplesProcessedForProgressMonitoring(m_tuplesRemainingUntilReport - m_countDown);
+        m_executorContext->pushFinalTuplesProcessedForProgressMonitoring(m_limits,
+                                                                m_tuplesRemainingUntilReport - m_countDown);
     }
 
 private:
-    VoltDBEngine* const m_engine;
+    ExecutorContext* const m_executorContext;
+    const TempTableLimits * m_limits;
     int64_t m_tuplesRemainingUntilReport;
     int64_t m_countDown;
 };

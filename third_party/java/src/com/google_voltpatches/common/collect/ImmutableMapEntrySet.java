@@ -19,10 +19,8 @@ package com.google_voltpatches.common.collect;
 import com.google_voltpatches.common.annotations.GwtCompatible;
 import com.google_voltpatches.common.annotations.GwtIncompatible;
 import com.google_voltpatches.j2objc.annotations.Weak;
-
 import java.io.Serializable;
 import java.util.Map.Entry;
-
 import javax.annotation_voltpatches.Nullable;
 
 /**
@@ -49,7 +47,7 @@ abstract class ImmutableMapEntrySet<K, V> extends ImmutableSet<Entry<K, V>> {
 
     @Override
     public UnmodifiableIterator<Entry<K, V>> iterator() {
-      return asList().iterator();
+      return Iterators.forArray(entries);
     }
 
     @Override
@@ -83,7 +81,7 @@ abstract class ImmutableMapEntrySet<K, V> extends ImmutableSet<Entry<K, V>> {
   }
 
   @Override
-  @GwtIncompatible("not used in GWT")
+  @GwtIncompatible // not used in GWT
   boolean isHashCodeFast() {
     return map().isHashCodeFast();
   }
@@ -93,13 +91,13 @@ abstract class ImmutableMapEntrySet<K, V> extends ImmutableSet<Entry<K, V>> {
     return map().hashCode();
   }
 
-  @GwtIncompatible("serialization")
+  @GwtIncompatible // serialization
   @Override
   Object writeReplace() {
     return new EntrySetSerializedForm<K, V>(map());
   }
 
-  @GwtIncompatible("serialization")
+  @GwtIncompatible // serialization
   private static class EntrySetSerializedForm<K, V> implements Serializable {
     final ImmutableMap<K, V> map;
 

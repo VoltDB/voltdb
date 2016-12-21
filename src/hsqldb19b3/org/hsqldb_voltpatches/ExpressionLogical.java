@@ -975,9 +975,8 @@ public class ExpressionLogical extends Expression {
                 if (o1 instanceof Object[]) {
                     return compareValues(session, (Object[]) o1,
                                          (Object[]) o2);
-                } else {
-                    return compareValues(session, o1, o2);
                 }
+                return compareValues(session, o1, o2);
             }
             default :
                 throw Error.runtimeError(ErrorCode.U_S0500, "Expression");
@@ -989,18 +988,23 @@ public class ExpressionLogical extends Expression {
      * prior to calling this method
      */
     private Boolean compareValues(Session session, Object left, Object right) {
-
-        int result = 0;
-
-        if (left == null || right == null) {
+        if (left == null) {
+            if (opType == OpTypes.NOT_DISTINCT) {
+                return right == null;
+            }
             return null;
         }
 
-        result = nodes[LEFT].dataType.compare(left, right);
+        if (right == null) {
+            return (opType == OpTypes.NOT_DISTINCT) ? Boolean.FALSE : null;
+        }
+
+        int result = nodes[LEFT].dataType.compare(left, right);
 
         switch (opType) {
 
             case OpTypes.EQUAL :
+            case OpTypes.NOT_DISTINCT :
                 return result == 0 ? Boolean.TRUE
                                    : Boolean.FALSE;
 

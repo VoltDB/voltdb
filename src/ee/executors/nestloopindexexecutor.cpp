@@ -238,7 +238,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
     assert (outer_tuple.sizeInValues() == outer_table->columnCount());
     assert (inner_tuple.sizeInValues() == inner_table->columnCount());
     const TableTuple &null_inner_tuple = m_null_inner_tuple.tuple();
-    ProgressMonitorProxy pmp(m_engine, this);
+    ProgressMonitorProxy pmp(m_engine->getExecutorContext(), this);
 
     // The table filter to keep track of inner tuples that don't match any of outer tuples for FULL joins
     TableTupleFilter innerTableFilter;
@@ -477,6 +477,9 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
                                                        index,
                                                        &indexCursor,
                                                        num_of_searchkeys)) {
+                    if (inner_tuple.isPendingDelete()) {
+                        continue;
+                    }
                     VOLT_TRACE("inner_tuple:%s",
                                inner_tuple.debug(inner_table->name()).c_str());
                     pmp.countdownProgress();

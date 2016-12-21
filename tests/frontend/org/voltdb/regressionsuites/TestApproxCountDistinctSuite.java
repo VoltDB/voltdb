@@ -127,9 +127,9 @@ public class TestApproxCountDistinctSuite extends RegressionSuite {
                 col, percentError, exact, estimate));
         // */
 
-        assertTrue("Estimate for distinct values in " + col + ":\n"
-                + "estimate: " + estimate + ", exact: " + exact + "\n"
-                + "Percent error: " + percentError,
+        assertTrue("Estimate for distinct values in " + col + ":\n" +
+                "estimate: " + estimate + ", exact: " + exact + "\n" +
+                "Percent error: " + percentError,
                 percentError < maxError);
     }
 
@@ -156,8 +156,7 @@ public class TestApproxCountDistinctSuite extends RegressionSuite {
         assertFalse(exactTable.advanceRow());
     }
 
-    public void testAsTableAgg() throws Exception
-    {
+    public void testAsTableAgg() throws Exception {
         Client client = getClient();
 
         // lock down some precise values here
@@ -212,10 +211,10 @@ public class TestApproxCountDistinctSuite extends RegressionSuite {
                 assertFalse(vt.advanceRow());
 
                 // If we filter out the null values, the answer should be exactly the same
-                String approxStmtNoNulls = String.format(
-                        "select approx_count_distinct(%s) "
-                        + "from %s "
-                        + "where %s is not null", col, tbl, col);
+                String approxStmtNoNulls =
+                        "select approx_count_distinct(" + col + ")" +
+                        " from " + tbl +
+                        " where " + col + " is not null";
                 vt = client.callProcedure("@AdHoc", approxStmtNoNulls).getResults()[0];
                 assertTrue(vt.advanceRow());
                 long actualEstimateNoNulls = vt.getLong(0);
@@ -249,19 +248,15 @@ public class TestApproxCountDistinctSuite extends RegressionSuite {
      *                       - a table name
      * @throws Exception
      */
-    public void compareEstimateAndExact(Client client, String tables[], String columns[], String queryFormat) throws Exception
-    {
-        for (int tblIdx = 0; tblIdx < tables.length; ++tblIdx) {
-            for (int colIdx = 0; colIdx < columns.length; ++colIdx) {
-                String tbl = tables[tblIdx];
-                String col = columns[colIdx];
-
+    public void compareEstimateAndExact(Client client,
+            String tables[], String columns[], String queryFormat)
+            throws Exception {
+        for (String tbl : tables) {
+            for (String col : columns) {
                 String approxStmt = String.format(queryFormat,
-                        "approx_count_distinct(",
-                        col, tbl);
+                        "approx_count_distinct(", col, tbl);
                 String exactStmt = String.format(queryFormat,
-                        "count( distinct ",
-                        col, tbl);
+                        "count( distinct ", col, tbl);
 
                 VoltTable estimateTable = client.callProcedure("@AdHoc", approxStmt).getResults()[0];
                 VoltTable exactTable = client.callProcedure("@AdHoc", exactStmt).getResults()[0];
@@ -271,42 +266,44 @@ public class TestApproxCountDistinctSuite extends RegressionSuite {
         }
     }
 
-    public void testAsGroupByAgg() throws Exception
-    {
+    public void testAsGroupByAgg() throws Exception {
         Client client = getClient();
 
         fillTable(client, "p");
         fillTable(client, "r");
+        String queryFormat;
 
         // Groups by the low 4 bits of the primary key
-        compareEstimateAndExact(client, TABLE_NAMES, COLUMN_NAMES,
-                "select bitand(cast(pk as bigint), x'03') as pk_lobits, %s %s ) "
-                + "from %s "
-                + "group by pk_lobits "
-                + "order by pk_lobits");
+        queryFormat =
+                "select bitand(cast(pk as bigint), x'03') as pk_lobits, " +
+                "%s %s ) " +
+                "from %s " +
+                "group by pk_lobits " +
+                "order by pk_lobits";
+        compareEstimateAndExact(client, TABLE_NAMES, COLUMN_NAMES, queryFormat);
 
         // Test with another aggregate that cannot be pushed down
         // (all rows will be sent to coordinator, will lock down
         // this behavior with an equivalent planner test.)
-        compareEstimateAndExact(client, TABLE_NAMES, COLUMN_NAMES,
-                "select "
-                + "  bitand(cast(pk as bigint), x'03') as pk_lobits, "
-                + "  count(distinct bi), "
-                + "  %s %s ) "
-                + "from %s "
-                + "group by pk_lobits "
-                + "order by pk_lobits");
+        queryFormat =
+                "select bitand(cast(pk as bigint), x'03') as pk_lobits, " +
+                "  count(distinct bi), " +
+                "  %s %s ) " +
+                "from %s " +
+                "group by pk_lobits " +
+                "order by pk_lobits";
+        compareEstimateAndExact(client, TABLE_NAMES, COLUMN_NAMES, queryFormat);
 
         // Test with another aggregate that can be pushed down
         // (approx_count_distinct will be distributed)
-        compareEstimateAndExact(client, TABLE_NAMES, COLUMN_NAMES,
-                "select "
-                + "  bitand(cast(pk as bigint), x'03') as pk_lobits, "
-                + "  count(dd), "
-                + "  %s %s ) "
-                + "from %s "
-                + "group by pk_lobits "
-                + "order by pk_lobits");
+        queryFormat =
+                "select bitand(cast(pk as bigint), x'03') as pk_lobits, " +
+                "  count(dd), " +
+                "  %s %s ) " +
+                "from %s " +
+                "group by pk_lobits " +
+                "order by pk_lobits";
+        compareEstimateAndExact(client, TABLE_NAMES, COLUMN_NAMES, queryFormat);
     }
 
     public void testWithPartitionKey() throws Exception {
@@ -321,15 +318,15 @@ public class TestApproxCountDistinctSuite extends RegressionSuite {
                 "select %s %s ) from %s where mod(pk, 3) = 0;");
 
         compareEstimateAndExact(client, new String[] {"p"}, new String[] {"pk"},
-                "select bitand(bi, x'05') as gbk, %s %s ) "
-                + "from %s "
-                + "group by gbk order by gbk;");
+                "select bitand(bi, x'05') as gbk, %s %s ) " +
+                "from %s " +
+                "group by gbk order by gbk;");
 
         compareEstimateAndExact(client, new String[] {"p"}, new String[] {"pk"},
-                "select bitand(bi, x'05') as gbk, %s %s ) "
-                + "from %s "
-                + "where mod(pk, 3) = 0 "
-                + "group by gbk order by gbk;");
+                "select bitand(bi, x'05') as gbk, %s %s ) " +
+                "from %s " +
+                "where mod(pk, 3) = 0 " +
+                "group by gbk order by gbk;");
     }
 
     public void testWithSubqueries() throws Exception {
@@ -341,41 +338,41 @@ public class TestApproxCountDistinctSuite extends RegressionSuite {
         // Try a query where there may be multiple approx_count_distinct aggs,
         // perhaps distributed, perhaps not.
         compareEstimateAndExact(client, TABLE_NAMES, COLUMN_NAMES,
-                "select %s %s ) "
-                + "from (select approx_count_distinct(ii) from r) as repl_subquery,"
-                + "  %s");
+                "select %s %s ) " +
+                "from (select approx_count_distinct(ii) from r) as repl_subquery," +
+                "  %s");
 
         // As above but with reorder from clause elements
         compareEstimateAndExact(client, TABLE_NAMES, COLUMN_NAMES,
-                "select %s %s ) "
-                + "from %s, "
-                + "(select approx_count_distinct(ii) from r) as repl_subquery");
+                "select %s %s ) " +
+                "from %s, " +
+                "(select approx_count_distinct(ii) from r) as repl_subquery");
 
         // As above but with other aggregates.
         compareEstimateAndExact(client, TABLE_NAMES, COLUMN_NAMES,
-                "select count(distinct bi), %s %s ) "
-                + "from (select sum(dd), approx_count_distinct(ii) from r) as repl_subquery,"
-                + "  %s");
+                "select count(distinct bi), %s %s ) " +
+                "from (select sum(dd), approx_count_distinct(ii) from r) as repl_subquery," +
+                "  %s");
 
         // As above but with other aggregates.
         compareEstimateAndExact(client, TABLE_NAMES, COLUMN_NAMES,
-                "select count(bi), %s %s ) "
-                + "from (select sum(distinct dd), approx_count_distinct(ii) from r) as repl_subquery,"
-                + "  %s");
+                "select count(bi), %s %s ) " +
+                "from (select sum(distinct dd), approx_count_distinct(ii) from r) as repl_subquery," +
+                "  %s");
 
         // This time let's put the distributed approx_count_distinct in the inner query
         compareEstimateAndExact(client, TABLE_NAMES, COLUMN_NAMES,
-                "select approx_count_distinct(bi), subq.a_count "
-                + "from (select %s %s ) as a_count from %s) as subq,"
-                + "  r "
-                + "group by subq.a_count");
+                "select approx_count_distinct(bi), subq.a_count " +
+                "from (select %s %s ) as a_count from %s) as subq," +
+                "  r " +
+                "group by subq.a_count");
 
         // As above, but break push-down-ability inner query's agg.
         compareEstimateAndExact(client, TABLE_NAMES, COLUMN_NAMES,
-                "select approx_count_distinct(bi), subq.a_count "
-                + "from (select %s %s ) as a_count, sum(distinct ii) from %s) as subq,"
-                + "  r "
-                + "group by subq.a_count");
+                "select approx_count_distinct(bi), subq.a_count " +
+                "from (select %s %s ) as a_count, sum(distinct ii) from %s) as subq," +
+                "  r " +
+                "group by subq.a_count");
     }
 
     public void testWithOtherClauses() throws Exception {
@@ -390,26 +387,26 @@ public class TestApproxCountDistinctSuite extends RegressionSuite {
 
         // ORDER BY with GROUP BY
         compareEstimateAndExact(client, TABLE_NAMES,  new String[] {"bi", "dd"},
-                "select bitand(cast(pk as bigint), x'03') lobits, %s %s ) as cnt "
-                + "from %s "
-                + "group by lobits "
-                + "order by lobits");
+                "select bitand(cast(pk as bigint), x'03') lobits, %s %s ) as cnt " +
+                "from %s " +
+                "group by lobits " +
+                "order by lobits");
 
         // HAVING (all rows evaluate to true for HAVING clause)
         compareEstimateAndExact(client, TABLE_NAMES,  new String[] {"bi", "dd"},
-                "select bitand(cast(pk as bigint), x'03') lobits, %s %s ) as cnt "
-                + "from %s "
-                + "group by lobits "
-                + "having approx_count_distinct(bi) between 225 and 275 "
-                + "order by lobits");
+                "select bitand(cast(pk as bigint), x'03') lobits, %s %s ) as cnt " +
+                "from %s " +
+                "group by lobits " +
+                "having approx_count_distinct(bi) between 225 and 275 " +
+                "order by lobits");
 
         // HAVING (all rows evaluate to false for HAVING clause)
         compareEstimateAndExact(client, TABLE_NAMES,  new String[] {"bi", "dd"},
-                "select bitand(cast(pk as bigint), x'03') lobits, %s %s ) as cnt "
-                + "from %s "
-                + "group by lobits "
-                + "having approx_count_distinct(bi) > 275 "
-                + "order by lobits");
+                "select bitand(cast(pk as bigint), x'03') lobits, %s %s ) as cnt " +
+                "from %s " +
+                "group by lobits " +
+                "having approx_count_distinct(bi) > 275 " +
+                "order by lobits");
     }
 
     public void testNegative() throws Exception {
@@ -470,16 +467,17 @@ public class TestApproxCountDistinctSuite extends RegressionSuite {
                 "ts timestamp " +
                 "); " +
                 "partition table p on column pk;" +
-                "CREATE TABLE unsupported_column_types ( "
-                + "vb varbinary(256), "
-                + "vc varchar(256),"
-                + "vb_inline varbinary(4), "
-                + "vc_inline varchar(4), "
-                + "ff float "
-                + ");";
+                "CREATE TABLE unsupported_column_types ( " +
+                "vb varbinary(256), " +
+                "vc varchar(256)," +
+                "vb_inline varbinary(4), " +
+                "vc_inline varchar(4), " +
+                "ff float " +
+                ");";
         try {
             project.addLiteralSchema(literalSchema);
-        } catch (IOException e) {
+        }
+        catch (IOException e) {
             assertFalse(true);
         }
         boolean success;

@@ -251,8 +251,8 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         project.addStmtProcedure("TO_TIMESTAMP_MICROS", "select TO_TIMESTAMP (MICROS, ?) from P2 where id = ?");
         project.addStmtProcedure("TO_TIMESTAMP_MICROSECOND", "select TO_TIMESTAMP (MICROSECOND, ?) from P2 where id = ?");
         // Test MIN_VALID_TIMESTAMP and MAX_VALID_TIMESTAMP
-        project.addStmtProcedure("GET_MAX_VALID_TIMESTAMP", "select MAX_VALID_TIMESTAMP() from P2 limit 1");
-        project.addStmtProcedure("GET_MIN_VALID_TIMESTAMP", "select MIN_VALID_TIMESTAMP() from P2 limit 1");
+        project.addStmtProcedure("GET_MAX_VALID_TIMESTAMP", "select MAX_VALID_TIMESTAMP(), MAX_VALID_TIMESTAMP from P2 limit 1");
+        project.addStmtProcedure("GET_MIN_VALID_TIMESTAMP", "select MIN_VALID_TIMESTAMP(), MIN_VALID_TIMESTAMP from P2 limit 1");
         // Test IS_VALID_TIMESTAMP
         project.addStmtProcedure("TEST_IS_VALID_TIMESTAMP", "select ID from P2 where ID = ? and IS_VALID_TIMESTAMP(TM)");
         project.addStmtProcedure("TRUNCATE", "select TRUNCATE(YEAR, TM), TRUNCATE(QUARTER, TM), TRUNCATE(MONTH, TM), " +
@@ -2923,6 +2923,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         vt.advanceRow();
         assertEquals(1,  vt.getRowCount());
         assertEquals(value, vt.getTimestampAsLong(0));
+        assertEquals(value, vt.getTimestampAsLong(1));
     }
 
     private void doTestIsValidTimestamp(long id, boolean expected) throws Exception {

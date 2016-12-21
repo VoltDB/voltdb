@@ -108,7 +108,7 @@ public class InsertSubPlanAssembler extends SubPlanAssembler {
             }
 
             List<StmtTableScan> tables = new ArrayList<>();
-            StmtTargetTableScan stmtTargetTableScan = new StmtTargetTableScan(targetTable, targetTable.getTypeName());
+            StmtTargetTableScan stmtTargetTableScan = new StmtTargetTableScan(targetTable);
             tables.add(stmtTargetTableScan);
             tables.add(subquery);
 

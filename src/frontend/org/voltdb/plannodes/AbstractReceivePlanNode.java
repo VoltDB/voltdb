@@ -24,6 +24,7 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.Database;
+import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 
@@ -76,20 +77,19 @@ public abstract class AbstractReceivePlanNode extends AbstractPlanNode {
         return true;
     }
 
-    protected void resolveColumnIndexes(NodeSchema outputSchema)
-    {
+    protected void resolveColumnIndexes(NodeSchema outputSchema) {
         // Need to order and resolve indexes of output columns
         assert(m_children.size() == 1);
-        m_children.get(0).resolveColumnIndexes();
-        NodeSchema input_schema = m_children.get(0).getOutputSchema();
-        assert (input_schema.equals(outputSchema));
-        for (SchemaColumn col : outputSchema.getColumns())
-        {
+        AbstractPlanNode childNode = m_children.get(0);
+        childNode.resolveColumnIndexes();
+        NodeSchema inputSchema = childNode.getOutputSchema();
+        assert (inputSchema.equals(outputSchema));
+        for (SchemaColumn col : outputSchema.getColumns()) {
+            AbstractExpression colExpr = col.getExpression();
             // At this point, they'd better all be TVEs.
-            assert(col.getExpression() instanceof TupleValueExpression);
-            TupleValueExpression tve = (TupleValueExpression)col.getExpression();
-            int index = tve.resolveColumnIndexesUsingSchema(input_schema);
-            tve.setColumnIndex(index);
+            assert(colExpr instanceof TupleValueExpression);
+            TupleValueExpression tve = (TupleValueExpression) colExpr;
+            tve.setColumnIndexUsingSchema(inputSchema);
         }
         // output schema for ReceivePlanNode should never be re-sorted
     }

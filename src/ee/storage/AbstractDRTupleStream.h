@@ -27,6 +27,7 @@
 namespace voltdb {
 
 // Extra space to write a StoredProcedureInvocation wrapper in Java without copying
+// this magic number is tied to the serialization size of an InvocationBuffer
 const int MAGIC_DR_TRANSACTION_PADDING = 78;
 const int SECONDARY_BUFFER_SIZE = (45 * 1024 * 1024) + 4096;
 // Use this to indicate uninitialized DR mark
@@ -41,6 +42,8 @@ struct DRCommittedInfo{
 };
 
 class AbstractDRTupleStream : public TupleStreamBase {
+    friend class ExecutorContext;
+
 public:
     AbstractDRTupleStream(int partitionId, int defaultBufferSize);
 
@@ -117,6 +120,10 @@ protected:
     int64_t m_rowTarget;
     bool m_opened;
     size_t m_txnRowCount;
+
+private:
+    // return true if stream state was switched from close to open
+    virtual bool transactionChecks(int64_t lastCommittedSpHandle, int64_t spHandle, int64_t uniqueId) = 0;
 };
 
 class DRTupleStreamDisableGuard {

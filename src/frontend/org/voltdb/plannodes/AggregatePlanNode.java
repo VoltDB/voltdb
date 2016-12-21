@@ -34,6 +34,7 @@ import org.voltdb.expressions.AbstractSubqueryExpression;
 import org.voltdb.expressions.AggregateExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.PlanNodeType;
@@ -54,20 +55,20 @@ public class AggregatePlanNode extends AbstractPlanNode {
         ;
     }
 
-    protected List<ExpressionType> m_aggregateTypes = new ArrayList<ExpressionType>();
+    protected List<ExpressionType> m_aggregateTypes = new ArrayList<>();
     // a list of whether the aggregate is over distinct elements
     // 0 is not distinct, 1 is distinct
-    protected List<Integer> m_aggregateDistinct = new ArrayList<Integer>();
+    protected List<Integer> m_aggregateDistinct = new ArrayList<>();
     // a list of column offsets/indexes not plan column guids.
-    protected List<Integer> m_aggregateOutputColumns = new ArrayList<Integer>();
+    protected List<Integer> m_aggregateOutputColumns = new ArrayList<>();
     // List of the input TVEs into the aggregates.  Maybe should become
     // a list of SchemaColumns someday
     protected List<AbstractExpression> m_aggregateExpressions =
-        new ArrayList<AbstractExpression>();
+        new ArrayList<>();
 
     // At the moment these are guaranteed to be TVES.  This might always be true
     protected List<AbstractExpression> m_groupByExpressions
-        = new ArrayList<AbstractExpression>();
+        = new ArrayList<>();
 
     // This list is only used for the special case of instances of PartialAggregatePlanNode.
     protected List<Integer> m_partialGroupByColumns = null;
@@ -249,16 +250,14 @@ public class AggregatePlanNode extends AbstractPlanNode {
         return m_groupByExpressions.size();
     }
 
-    public void setOutputSchema(NodeSchema schema)
-    {
+    public void setOutputSchema(NodeSchema schema) {
         // aggregates currently have their output schema specified
         m_outputSchema = schema.clone();
         m_hasSignificantOutputSchema = true;
     }
 
     @Override
-    public void generateOutputSchema(Database db)
-    {
+    public void generateOutputSchema(Database db) {
         // aggregate's output schema is pre-determined
         if (m_children.size() == 1) {
             m_children.get(0).generateOutputSchema(db);
@@ -275,68 +274,59 @@ public class AggregatePlanNode extends AbstractPlanNode {
     }
 
     @Override
-    public void resolveColumnIndexes()
-    {
+    public void resolveColumnIndexes() {
         // Aggregates need to resolve indexes for the output schema but don't need
         // to reorder it.  Some of the outputs may be local aggregate columns and
         // won't have a TVE to resolve.
         assert (m_children.size() == 1);
         m_children.get(0).resolveColumnIndexes();
-        NodeSchema input_schema = m_children.get(0).getOutputSchema();
+        NodeSchema inputSchema = m_children.get(0).getOutputSchema();
 
-        resolveColumnIndexesUsingSchema(input_schema);
+        resolveColumnIndexesUsingSchema(inputSchema);
     }
 
-    void resolveColumnIndexesUsingSchema(NodeSchema input_schema)
-    {
+    void resolveColumnIndexesUsingSchema(NodeSchema inputSchema) {
+        Collection<TupleValueExpression> allTves;
+
         // get all the TVEs in the output columns
-        List<TupleValueExpression> output_tves = new ArrayList<TupleValueExpression>();
         for (SchemaColumn col : m_outputSchema.getColumns()) {
-            output_tves.addAll(ExpressionUtil.getTupleValueExpressions(col.getExpression()));
-        }
-        for (TupleValueExpression tve : output_tves) {
-            int index = tve.resolveColumnIndexesUsingSchema(input_schema);
-            if (index == -1) {
-                // check to see if this TVE is the aggregate output
-                // XXX SHOULD MODE THIS STRING TO A STATIC DEF SOMEWHERE
-                if (!tve.getTableName().equals("VOLT_TEMP_TABLE")) {
-                    throw new RuntimeException("Unable to find index for column: " +
-                                               tve.getColumnName());
+            AbstractExpression colExpr = col.getExpression();
+            allTves = ExpressionUtil.getTupleValueExpressions(colExpr);
+            for (TupleValueExpression tve : allTves) {
+                int index = tve.setColumnIndexUsingSchema(inputSchema);
+                if (index == -1) {
+                    // check to see if this TVE is the aggregate output
+                    if ( ! tve.getTableName().equals(AbstractParsedStmt.TEMP_TABLE_NAME)) {
+                        throw new RuntimeException("Unable to find index for column: " +
+                                tve.getColumnName());
+                    }
                 }
-            }
-            else {
-                tve.setColumnIndex(index);
             }
         }
 
         // Aggregates also need to resolve indexes for aggregate inputs
         // Find the proper index for the sort columns.  Not quite
         // sure these should be TVEs in the long term.
-        List<TupleValueExpression> agg_tves =
-            new ArrayList<TupleValueExpression>();
+
         for (AbstractExpression agg_exp : m_aggregateExpressions) {
-            agg_tves.addAll(ExpressionUtil.getTupleValueExpressions(agg_exp));
-        }
-        for (TupleValueExpression tve : agg_tves) {
-            int index = tve.resolveColumnIndexesUsingSchema(input_schema);
-            tve.setColumnIndex(index);
+            allTves = ExpressionUtil.getTupleValueExpressions(agg_exp);
+            for (TupleValueExpression tve : allTves) {
+                tve.setColumnIndexUsingSchema(inputSchema);
+            }
         }
 
         // Aggregates also need to resolve indexes for group_by inputs
-        List<TupleValueExpression> group_tves =
-            new ArrayList<TupleValueExpression>();
         for (AbstractExpression group_exp : m_groupByExpressions) {
-            group_tves.addAll(ExpressionUtil.getTupleValueExpressions(group_exp));
-        }
-        for (TupleValueExpression tve : group_tves) {
-            int index = tve.resolveColumnIndexesUsingSchema(input_schema);
-            tve.setColumnIndex(index);
+            allTves = ExpressionUtil.getTupleValueExpressions(group_exp);
+            for (TupleValueExpression tve : allTves) {
+                tve.setColumnIndexUsingSchema(inputSchema);
+            }
         }
 
-        // Post filter also needs to resolve indexes.
-        List<TupleValueExpression> postFilter_tves =
-                ExpressionUtil.getTupleValueExpressions(m_postPredicate);
-        for (TupleValueExpression tve : postFilter_tves) {
+        // Post filter also needs to resolve indexes, but a little
+        // differently since it applies to the OUTPUT tuple.
+        allTves = ExpressionUtil.getTupleValueExpressions(m_postPredicate);
+        for (TupleValueExpression tve : allTves) {
             int index = m_outputSchema.getIndexOfTve(tve);
             tve.setColumnIndex(index);
         }
@@ -376,12 +366,12 @@ public class AggregatePlanNode extends AbstractPlanNode {
             m_aggregateDistinct.add(0);
         }
         m_aggregateOutputColumns.add(aggOutputColumn);
-        if (aggType == ExpressionType.AGGREGATE_COUNT_STAR) {
+        if (aggType.isNullary()) {
             assert(aggInputExpr == null);
             m_aggregateExpressions.add(null);
         } else {
             assert(aggInputExpr != null);
-            m_aggregateExpressions.add((AbstractExpression) aggInputExpr.clone());
+            m_aggregateExpressions.add(aggInputExpr.clone());
         }
     }
 
@@ -408,7 +398,7 @@ public class AggregatePlanNode extends AbstractPlanNode {
         if (expr == null) {
             return;
         }
-        m_groupByExpressions.add((AbstractExpression) expr.clone());
+        m_groupByExpressions.add(expr.clone());
     }
 
     @Override
@@ -419,9 +409,9 @@ public class AggregatePlanNode extends AbstractPlanNode {
         stringer.array();
         for (int ii = 0; ii < m_aggregateTypes.size(); ii++) {
             stringer.object();
-            stringer.key(Members.AGGREGATE_TYPE.name()).value(m_aggregateTypes.get(ii).name());
-            stringer.key(Members.AGGREGATE_DISTINCT.name()).value(m_aggregateDistinct.get(ii));
-            stringer.key(Members.AGGREGATE_OUTPUT_COLUMN.name()).value(m_aggregateOutputColumns.get(ii));
+            stringer.keySymbolValuePair(Members.AGGREGATE_TYPE.name(), m_aggregateTypes.get(ii).name());
+            stringer.keySymbolValuePair(Members.AGGREGATE_DISTINCT.name(), m_aggregateDistinct.get(ii));
+            stringer.keySymbolValuePair(Members.AGGREGATE_OUTPUT_COLUMN.name(), m_aggregateOutputColumns.get(ii));
             AbstractExpression ae = m_aggregateExpressions.get(ii);
             if (ae != null) {
                 stringer.key(Members.AGGREGATE_EXPRESSION.name());
@@ -460,19 +450,23 @@ public class AggregatePlanNode extends AbstractPlanNode {
         }
     }
 
+    private static String planNodeTypeToAggDescString(PlanNodeType nodeType) {
+        switch (nodeType) {
+        case AGGREGATE:
+            return "Serial";
+        case PARTIALAGGREGATE:
+            return "Partial";
+        default:
+            assert(nodeType == PlanNodeType.HASHAGGREGATE);
+            return "Hash";
+        }
+    }
+
     @Override
     protected String explainPlanForNode(String indent) {
         StringBuilder sb = new StringBuilder();
         String optionalTableName = "*NO MATCH -- USE ALL TABLE NAMES*";
-        String aggType = "Hash";
-        if (getPlanNodeType() == PlanNodeType.AGGREGATE) {
-            aggType = "Serial";
-        } else if (getPlanNodeType() == PlanNodeType.PARTIALAGGREGATE) {
-            aggType = "Partial";
-        } else {
-            assert(getPlanNodeType() == PlanNodeType.HASHAGGREGATE
-                    || getPlanNodeType() == PlanNodeType.PARTITIONBY);
-        }
+        String aggType = planNodeTypeToAggDescString(getPlanNodeType());
 
         sb.append(aggType + " AGGREGATION ops: ");
         String sep = "";
@@ -480,10 +474,11 @@ public class AggregatePlanNode extends AbstractPlanNode {
         for (ExpressionType e : m_aggregateTypes) {
             sb.append(sep).append(e.symbol());
             sep = ", ";
-            if (e == ExpressionType.AGGREGATE_COUNT_STAR) {
-                sb.append("(*)");
+            if (e == ExpressionType.AGGREGATE_WINDOWED_RANK || e == ExpressionType.AGGREGATE_WINDOWED_DENSE_RANK) {
+                sb.append("()");
             }
-            else {
+            else if (e != ExpressionType.AGGREGATE_COUNT_STAR
+                    && e != ExpressionType.AGGREGATE_WINDOWED_COUNT) {
                 if (m_aggregateDistinct.get(ii) == 1) {
                     sb.append(" DISTINCT");
                 }

@@ -47,6 +47,7 @@ import org.voltdb.sysprocs.saverestore.CSVSnapshotWritePlan;
 import org.voltdb.sysprocs.saverestore.HashinatorSnapshotData;
 import org.voltdb.sysprocs.saverestore.IndexSnapshotWritePlan;
 import org.voltdb.sysprocs.saverestore.NativeSnapshotWritePlan;
+import org.voltdb.sysprocs.saverestore.SnapshotPathType;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.SnapshotWritePlan;
 import org.voltdb.sysprocs.saverestore.StreamSnapshotWritePlan;
@@ -106,7 +107,7 @@ public class SnapshotSaveAPI
      * @return VoltTable describing the results of the snapshot attempt
      */
     public VoltTable startSnapshotting(
-            final String file_path, final String file_nonce, final SnapshotFormat format, final byte block,
+            final String file_path, final String pathType, final String file_nonce, final SnapshotFormat format, final byte block,
             final long multiPartTxnId, final long partitionTxnId, final long legacyPerPartitionTxnIds[],
             final String data, final SystemProcedureExecutionContext context, final String hostname,
             final HashinatorSnapshotData hashinatorData,
@@ -114,7 +115,6 @@ public class SnapshotSaveAPI
     {
         TRACE_LOG.trace("Creating snapshot target and handing to EEs");
         final VoltTable result = SnapshotUtil.constructNodeResultsTable();
-        final int numLocalSites = context.getCluster().getDeployment().get("deployment").getSitesperhost();
         JSONObject jsData = null;
         if (data != null && !data.isEmpty()) {
             try {
@@ -173,9 +173,10 @@ public class SnapshotSaveAPI
                     m_allLocalSiteSnapshotDigestData = new ExtensibleSnapshotDigestData(
                             SnapshotSiteProcessor.getExportSequenceNumbers(),
                             SnapshotSiteProcessor.getDRTupleStreamStateInfo(),
-                            remoteDataCenterLastIds);
+                            remoteDataCenterLastIds, finalJsData);
                     createSetupIv2(
                             file_path,
+                            pathType,
                             file_nonce,
                             format,
                             multiPartTxnId,
@@ -192,6 +193,7 @@ public class SnapshotSaveAPI
 
             // Create a barrier to use with the current number of sites to wait for
             // or if the barrier is already set up check if it is broken and reset if necessary
+            final int numLocalSites = context.getLocalSitesCount();
             SnapshotSiteProcessor.readySnapshotSetupBarriers(numLocalSites);
 
             //From within this EE, record the sequence numbers as of the start of the snapshot (now)
@@ -379,6 +381,7 @@ public class SnapshotSaveAPI
      * @return true if the node is created successfully, false if the node already exists.
      */
     public static ZKUtil.StringCallback createSnapshotCompletionNode(String path,
+                                                                     String pathType,
                                                                      String nonce,
                                                                      long txnId,
                                                                      boolean isTruncation,
@@ -391,13 +394,14 @@ public class SnapshotSaveAPI
         try {
             JSONStringer stringer = new JSONStringer();
             stringer.object();
-            stringer.key("txnId").value(txnId);
-            stringer.key("isTruncation").value(isTruncation);
-            stringer.key("didSucceed").value(false);
-            stringer.key("hostCount").value(-1);
-            stringer.key("path").value(path);
-            stringer.key("nonce").value(nonce);
-            stringer.key("truncReqId").value(truncReqId);
+            stringer.keySymbolValuePair("txnId", txnId);
+            stringer.keySymbolValuePair("isTruncation", isTruncation);
+            stringer.keySymbolValuePair("didSucceed", false);
+            stringer.keySymbolValuePair("hostCount", -1);
+            stringer.keySymbolValuePair(SnapshotUtil.JSON_PATH, path);
+            stringer.keySymbolValuePair(SnapshotUtil.JSON_PATH_TYPE, pathType);
+            stringer.keySymbolValuePair(SnapshotUtil.JSON_NONCE, nonce);
+            stringer.keySymbolValuePair("truncReqId", truncReqId);
             stringer.key("exportSequenceNumbers").object().endObject();
             stringer.endObject();
             JSONObject jsonObj = new JSONObject(stringer.toString());
@@ -473,7 +477,7 @@ public class SnapshotSaveAPI
     }
 
     private void createSetupIv2(
-            final String file_path, final String file_nonce, SnapshotFormat format,
+            String file_path, final String pathType, final String file_nonce, SnapshotFormat format,
             final long txnId, final Map<Integer, Long> partitionTransactionIds,
             JSONObject jsData, final SystemProcedureExecutionContext context,
             final VoltTable result,
@@ -498,7 +502,9 @@ public class SnapshotSaveAPI
         else {
             throw new RuntimeException("BAD BAD BAD");
         }
-        final Callable<Boolean> deferredSetup = plan.createSetup(file_path, file_nonce, txnId,
+        file_path = SnapshotUtil.getRealPath(SnapshotPathType.valueOf(pathType), file_path);
+
+        final Callable<Boolean> deferredSetup = plan.createSetup(file_path, pathType, file_nonce, txnId,
                 partitionTransactionIds, jsData, context, result, extraSnapshotData,
                 tracker, hashinatorData, timestamp);
         m_deferredSetupFuture =

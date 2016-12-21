@@ -23,34 +23,38 @@
 
 package org.voltdb.regressionsuites;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.security.SecureRandom;
 import java.util.Arrays;
 
-import junit.framework.TestCase;
-
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
 import org.voltdb.BackendTarget;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.client.ClientAuthScheme;
 import org.voltdb.client.ConnectionUtil;
 import org.voltdb.compiler.VoltProjectBuilder;
 
-public class TestClientPortChannel extends TestCase {
+public class TestClientPortChannel extends JUnit4LocalClusterTest {
 
     int m_clientPort;
     int m_adminPort;
     LocalCluster m_config;
 
-    public TestClientPortChannel(String name) {
-        super(name);
+    public TestClientPortChannel() {
     }
 
     /**
      * JUnit special method called to setup the test. This instance will start
      * the VoltDB server using the VoltServerConfig instance provided.
      */
-    @Override
+    @Before
     public void setUp() throws Exception {
         m_clientPort = SecureRandom.getInstance("SHA1PRNG").nextInt(2000) + 22000;
         m_adminPort = m_clientPort + 1;
@@ -98,7 +102,7 @@ public class TestClientPortChannel extends TestCase {
      * JUnit special method called to shutdown the test. This instance will
      * stop the VoltDB server using the VoltServerConfig instance provided.
      */
-    @Override
+    @After
     public void tearDown() throws Exception {
         if (m_config != null) {
             m_config.shutDown();
@@ -196,9 +200,12 @@ public class TestClientPortChannel extends TestCase {
         channel.close();
     }
 
+    @Test
     public void testLoginMessagesClientPort() throws Exception {
         runBadLoginMessages(m_clientPort);
     }
+
+    @Test
     public void testLoginMessagesAdminPort() throws Exception {
         runBadLoginMessages(m_adminPort);
     }
@@ -338,11 +345,13 @@ public class TestClientPortChannel extends TestCase {
 
     }
 
+    @Test
     public void testInvocationClientPort() throws Exception {
         runInvocationMessageTest(ClientAuthScheme.HASH_SHA1, m_clientPort);
         runInvocationMessageTest(ClientAuthScheme.HASH_SHA256, m_clientPort);
     }
 
+    @Test
     public void testInvocationAdminPort() throws Exception {
         runInvocationMessageTest(ClientAuthScheme.HASH_SHA1, m_adminPort);
         runInvocationMessageTest(ClientAuthScheme.HASH_SHA256, m_adminPort);
@@ -424,7 +433,7 @@ public class TestClientPortChannel extends TestCase {
         //Bad protocol version
         System.out.println("Testing good Ping invocation with bad protocol version.");
         byte bad_proto[] = VAR1.clone();
-        bad_proto[iVERSION] = StoredProcedureInvocation.CURRENT_MOST_RECENT_VERSION + 1;
+        bad_proto[iVERSION] = (byte) (StoredProcedureInvocation.CURRENT_MOST_RECENT_VERSION + 1);
         verifyInvocation(bad_proto, channel, ERROR_CODE);
 
         //Client Data - Bad Data meaning invalid number of bytes.
@@ -437,10 +446,13 @@ public class TestClientPortChannel extends TestCase {
         channel.close();
     }
 
+    @Test
     public void testInvocationParamsClientPort() throws Exception {
         runInvocationParams(ClientAuthScheme.HASH_SHA1, m_clientPort);
         runInvocationParams(ClientAuthScheme.HASH_SHA256, m_clientPort);
     }
+
+    @Test
     public void testInvocationParamsAdminPort() throws Exception {
         runInvocationParams(ClientAuthScheme.HASH_SHA1, m_adminPort);
         runInvocationParams(ClientAuthScheme.HASH_SHA256, m_adminPort);

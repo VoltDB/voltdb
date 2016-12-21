@@ -47,6 +47,7 @@ import org.codehaus.jackson.annotate.JsonPropertyOrder;
 import org.codehaus.jackson.map.DeserializationConfig;
 import org.codehaus.jackson.map.JsonMappingException;
 import org.codehaus.jackson.map.ObjectMapper;
+import org.codehaus.jackson.map.SerializationConfig;
 import org.codehaus.jackson.schema.JsonSchema;
 import org.eclipse.jetty.continuation.Continuation;
 import org.eclipse.jetty.continuation.ContinuationSupport;
@@ -69,6 +70,7 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.AuthenticationResult;
+import org.voltdb.CatalogContext;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.HTTPClientInterface;
 import org.voltdb.VoltDB;
@@ -81,6 +83,7 @@ import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.ExportType;
 import org.voltdb.compiler.deploymentfile.HttpsType;
 import org.voltdb.compiler.deploymentfile.KeyOrTrustStoreType;
+import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.compiler.deploymentfile.UsersType;
 import org.voltdb.compiler.deploymentfile.UsersType.User;
@@ -89,6 +92,7 @@ import org.voltdb.compilereport.ReportMaker;
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.io.Resources;
+import com.google_voltpatches.common.net.HostAndPort;
 
 public class HTTPAdminListener {
 
@@ -100,9 +104,11 @@ public class HTTPAdminListener {
     HTTPClientInterface httpClientInterface = new HTTPClientInterface();
     final boolean m_jsonEnabled;
 
-    Map<String, String> m_htmlTemplates = new HashMap<String, String>();
+    Map<String, String> m_htmlTemplates = new HashMap<>();
     final boolean m_mustListen;
     final DeploymentRequestHandler m_deploymentHandler;
+
+    final String m_publicIntf;
 
     // ObjectMapper is thread safe, and uses a lot of memory to cache
     // class specific serializers and deserializers. Use JSR-133
@@ -115,8 +121,21 @@ public class HTTPAdminListener {
             // configurable.setSerializationInclusion(Inclusion.NON_NULL);
             configurable.configure(DeserializationConfig.Feature.FAIL_ON_UNKNOWN_PROPERTIES, false);
             configurable.configure(JsonGenerator.Feature.AUTO_CLOSE_TARGET, false);
-            configurable.getSerializationConfig().addMixInAnnotations(UsersType.User.class, IgnorePasswordMixIn.class);
-            configurable.getSerializationConfig().addMixInAnnotations(ExportType.class, IgnoreLegacyExportAttributesMixIn.class);
+            SerializationConfig serializationConfig = configurable.getSerializationConfig();
+            serializationConfig.addMixInAnnotations(UsersType.User.class, IgnorePasswordMixIn.class);
+            serializationConfig.addMixInAnnotations(ExportType.class, IgnoreLegacyExportAttributesMixIn.class);
+            //These mixins are to ignore the "key" and redirect "path" to getNodePath()
+            serializationConfig.addMixInAnnotations(PathsType.Commandlog.class,
+                    IgnoreNodePathKeyMixIn.class);
+            serializationConfig.addMixInAnnotations(PathsType.Commandlogsnapshot.class,
+                    IgnoreNodePathKeyMixIn.class);
+            serializationConfig.addMixInAnnotations(PathsType.Droverflow.class,
+                    IgnoreNodePathKeyMixIn.class);
+            serializationConfig.addMixInAnnotations(PathsType.Exportoverflow.class,
+                    IgnoreNodePathKeyMixIn.class);
+            serializationConfig.addMixInAnnotations(PathsType.Snapshots.class,
+                    IgnoreNodePathKeyMixIn.class);
+            serializationConfig.addMixInAnnotations(PathsType.Voltdbroot.class, IgnoreNodePathKeyMixIn.class);
 
             mapper = configurable;
         }
@@ -129,6 +148,11 @@ public class HTTPAdminListener {
 
         protected String getHostHeader() {
             if (m_hostHeader != null) {
+                return m_hostHeader;
+            }
+
+            if (!m_publicIntf.isEmpty()) {
+                m_hostHeader = m_publicIntf;
                 return m_hostHeader;
             }
 
@@ -374,6 +398,10 @@ public class HTTPAdminListener {
         @JsonIgnore abstract ServerExportEnum getTarget();
         @JsonIgnore abstract Boolean isEnabled();
     }
+    abstract class IgnoreNodePathKeyMixIn {
+        @JsonProperty("path") abstract String getNodePath();
+        @JsonIgnore abstract String getKey();
+    }
 
     @JsonPropertyOrder({"name","roles","password","plaintext","id"})
     public class IdUser extends UsersType.User {
@@ -413,9 +441,15 @@ public class HTTPAdminListener {
             }
         }
 
+        private CatalogContext getCatalogContext() {
+            return VoltDB.instance().getCatalogContext();
+        }
+
         //Get deployment from catalog context
         private DeploymentType getDeployment() {
-            return VoltDB.instance().getCatalogContext().getDeployment();
+            //If running with new verbs add runtime paths.
+            DeploymentType dt = updateRuntimeDeploymentPaths(getCatalogContext().getDeployment());
+            return dt;
         }
 
         //Get deployment bytes from catalog context
@@ -484,7 +518,11 @@ public class HTTPAdminListener {
                 if (baseRequest.getRequestURI().contains("/download")) {
                     //Deployment xml is text/xml
                     response.setContentType("text/xml;charset=utf-8");
-                    response.getWriter().write(CatalogUtil.getDeployment(this.getDeployment(), true));
+                    DeploymentType dt = CatalogUtil.shallowClusterAndPathsClone(this.getDeployment());
+                    // reflect the actual number of cluster members
+                    dt.getCluster().setHostcount(getCatalogContext().getClusterSettings().hostcount());
+
+                    response.getWriter().write(CatalogUtil.getDeployment(dt, true));
                 } else if (baseRequest.getRequestURI().contains("/users")) {
                     if (request.getMethod().equalsIgnoreCase("POST")) {
                         handleUpdateUser(jsonp, target, baseRequest, request, response, authResult);
@@ -502,10 +540,15 @@ public class HTTPAdminListener {
                         handleUpdateDeployment(jsonp, target, baseRequest, request, response, authResult);
                     } else {
                         //non POST
+                        response.setCharacterEncoding("UTF-8");
                         if (jsonp != null) {
                             response.getWriter().write(jsonp + "(");
                         }
-                        m_mapper.writeValue(response.getWriter(), getDeployment());
+                        DeploymentType dt = getDeployment();
+                        // reflect the actual number of cluster members
+                        dt.getCluster().setHostcount(getCatalogContext().getClusterSettings().hostcount());
+
+                        m_mapper.writeValue(response.getWriter(), dt);
                         if (jsonp != null) {
                             response.getWriter().write(")");
                         }
@@ -539,6 +582,8 @@ public class HTTPAdminListener {
                 if (currentDeployment.getUsers() != null) {
                     newDeployment.setUsers(currentDeployment.getUsers());
                 }
+                // reset the host count so that it wont fail the deployment checks
+                newDeployment.getCluster().setHostcount(currentDeployment.getCluster().getHostcount());
 
                 String dep = CatalogUtil.getDeployment(newDeployment);
                 if (dep == null || dep.trim().length() <= 0) {
@@ -757,7 +802,7 @@ public class HTTPAdminListener {
                     response.getWriter().write(jsonp + "(");
                 }
                 if (getDeployment().getUsers() != null) {
-                    List<IdUser> id = new ArrayList<IdUser>();
+                    List<IdUser> id = new ArrayList<>();
                     for(UsersType.User u : getDeployment().getUsers().getUser()) {
                         id.add(new IdUser(u, getHostHeader()));
                     }
@@ -793,7 +838,7 @@ public class HTTPAdminListener {
                 response.getWriter().write(jsonp + "(");
             }
             JSONObject exportTypes = new JSONObject();
-            HashSet<String> exportList = new HashSet<String>();
+            HashSet<String> exportList = new HashSet<>();
             for (ServerExportEnum type : ServerExportEnum.values()) {
                 exportList.add(type.value().toUpperCase());
             }
@@ -891,9 +936,17 @@ public class HTTPAdminListener {
     }
 
     public HTTPAdminListener(
-            boolean jsonEnabled, String intf, int port, HttpsType httpsType, boolean mustListen) throws Exception {
+            boolean jsonEnabled, String intf, String publicIntf, int port,
+            HttpsType httpsType, boolean mustListen
+            ) throws Exception {
         int poolsize = Integer.getInteger("HTTP_POOL_SIZE", 50);
         int timeout = Integer.getInteger("HTTP_REQUEST_TIMEOUT_SECONDS", 15);
+
+        String resolvedIntf = intf == null ? "" : intf.trim().isEmpty() ? ""
+                : HostAndPort.fromHost(intf).withDefaultPort(port).toString();
+
+        m_publicIntf = publicIntf == null ? resolvedIntf : publicIntf.trim().isEmpty() ? resolvedIntf
+                : HostAndPort.fromHost(publicIntf).withDefaultPort(port).toString();
 
         /*
          * Don't force us to look at a huge pile of threads
@@ -925,12 +978,12 @@ public class HTTPAdminListener {
         // NOW START SocketConnector and create Jetty server but dont start.
         ServerConnector connector = null;
         try {
-            if (httpsType==null || !httpsType.isEnabled()) { // basic HTTP
+            if (httpsType == null || !httpsType.isEnabled()) { // basic HTTP
                 // The socket channel connector seems to be faster for our use
                 //SelectChannelConnector connector = new SelectChannelConnector();
                 connector = new ServerConnector(m_server);
 
-                if (intf != null && intf.length() > 0) {
+                if (intf != null && !intf.trim().isEmpty()) {
                     connector.setHost(intf);
                 }
                 connector.setPort(port);
@@ -1050,7 +1103,7 @@ public class HTTPAdminListener {
         ServerConnector connector = new ServerConnector(m_server,
             new SslConnectionFactory(sslContextFactory,HttpVersion.HTTP_1_1.asString()),
             factory);
-        if (intf != null && intf.length() > 0) {
+        if (intf != null && !intf.trim().isEmpty()) {
             connector.setHost(intf);
         }
         connector.setPort(port);
@@ -1093,4 +1146,65 @@ public class HTTPAdminListener {
             httpClientInterface.notifyOfCatalogUpdate();
         }
     }
+
+    /**
+     * Get a deployment view that represents what needs to be displayed to VMC, which
+     * reflects the paths that are used by this cluster member and the actual number of
+     * hosts that belong to this cluster whether or not it was elastically expanded
+     * @param deployment
+     * @return adjusted deployment
+     */
+    public static DeploymentType updateRuntimeDeploymentPaths(DeploymentType deployment) {
+        deployment = CatalogUtil.shallowClusterAndPathsClone(deployment);
+        PathsType paths = deployment.getPaths();
+        if (paths.getVoltdbroot() == null) {
+            PathsType.Voltdbroot root = new PathsType.Voltdbroot();
+            root.setPath(VoltDB.instance().getVoltDBRootPath());
+            paths.setVoltdbroot(root);
+        } else {
+            paths.getVoltdbroot().setPath(VoltDB.instance().getVoltDBRootPath());
+        }
+        //snapshot
+        if (paths.getSnapshots() == null) {
+            PathsType.Snapshots snap = new PathsType.Snapshots();
+            snap.setPath(VoltDB.instance().getSnapshotPath());
+            paths.setSnapshots(snap);
+        } else {
+            paths.getSnapshots().setPath(VoltDB.instance().getSnapshotPath());
+        }
+        if (paths.getCommandlog() == null) {
+            //cl
+            PathsType.Commandlog cl = new PathsType.Commandlog();
+            cl.setPath(VoltDB.instance().getCommandLogPath());
+            paths.setCommandlog(cl);
+        } else {
+            paths.getCommandlog().setPath(VoltDB.instance().getCommandLogPath());
+        }
+        if (paths.getCommandlogsnapshot() == null) {
+            //cl snap
+            PathsType.Commandlogsnapshot clsnap = new PathsType.Commandlogsnapshot();
+            clsnap.setPath(VoltDB.instance().getCommandLogSnapshotPath());
+            paths.setCommandlogsnapshot(clsnap);
+        } else {
+            paths.getCommandlogsnapshot().setPath(VoltDB.instance().getCommandLogSnapshotPath());
+        }
+        if (paths.getExportoverflow() == null) {
+            //export overflow
+            PathsType.Exportoverflow exp = new PathsType.Exportoverflow();
+            exp.setPath(VoltDB.instance().getExportOverflowPath());
+            paths.setExportoverflow(exp);
+        } else {
+            paths.getExportoverflow().setPath(VoltDB.instance().getExportOverflowPath());
+        }
+        if (paths.getDroverflow() == null) {
+            //dr overflow
+            final PathsType.Droverflow droverflow = new PathsType.Droverflow();
+            droverflow.setPath(VoltDB.instance().getDROverflowPath());
+            paths.setDroverflow(droverflow);
+        } else {
+            paths.getDroverflow().setPath(VoltDB.instance().getDROverflowPath());
+        }
+        return deployment;
+    }
+
 }

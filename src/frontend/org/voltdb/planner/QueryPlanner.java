@@ -108,8 +108,7 @@ public class QueryPlanner {
                         AbstractCostModel costModel,
                         ScalarValueHints[] paramHints,
                         String joinOrder,
-                        DeterminismMode detMode)
-    {
+                        DeterminismMode detMode) {
         assert(sql != null);
         assert(stmtName != null);
         assert(procName != null);
@@ -168,6 +167,7 @@ public class QueryPlanner {
         // this is much easier to parse than SQL and is checked against the catalog
         try {
             m_xmlSQL = m_HSQL.getXMLCompiledStatement(m_sql);
+            //* enable to debug */ System.out.println("DEBUG: HSQL parsed:" + m_xmlSQL);
         }
         catch (HSQLParseException e) {
             // XXXLOG probably want a real log message here
@@ -366,8 +366,7 @@ public class QueryPlanner {
         // Get a parsed statement from the xml
         // The callers of compilePlan are ready to catch any exceptions thrown here.
         AbstractParsedStmt parsedStmt = AbstractParsedStmt.parse(m_sql, xmlSQL, paramValues, m_db, m_joinOrder);
-        if (parsedStmt == null)
-        {
+        if (parsedStmt == null) {
             m_recentErrorMsg = "Failed to parse SQL statement: " + getOriginalSql();
             return null;
         }

@@ -100,11 +100,6 @@ public class Reporter implements Runnable {
             //
             // FAILURE REPORTING FOR PERIODIC OPERATIONS
             //
-            long partitionTrackerFailures = app.partitionTracker.failureCount.getAndSet(0);
-            if (partitionTrackerFailures > 0) {
-                System.out.printf("  Partition Tracker failed %d times since last report.\n",
-                                  partitionTrackerFailures);
-            }
             long continuousDeleterFailures = app.deleter.failureCount.getAndSet(0);
             if (continuousDeleterFailures > 0) {
                 System.out.printf("  Continuous Deleter failed %d times since last report.\n",

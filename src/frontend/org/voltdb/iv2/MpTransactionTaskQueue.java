@@ -49,9 +49,9 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
 
     private MpRoSitePool m_sitePool = null;
 
-    MpTransactionTaskQueue(SiteTaskerQueue queue, long initialTnxId)
+    MpTransactionTaskQueue(SiteTaskerQueue queue)
     {
-        super(queue, initialTnxId);
+        super(queue);
     }
 
     void setMpRoSitePool(MpRoSitePool sitePool)
@@ -62,6 +62,11 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
     synchronized void updateCatalog(String diffCmds, CatalogContext context, CatalogSpecificPlanner csp)
     {
         m_sitePool.updateCatalog(diffCmds, context, csp);
+    }
+
+    synchronized void updateSettings(CatalogContext context, CatalogSpecificPlanner csp)
+    {
+        m_sitePool.updateSettings(context, csp);
     }
 
     void shutdown()

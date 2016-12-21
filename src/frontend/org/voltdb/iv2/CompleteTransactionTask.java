@@ -19,28 +19,30 @@ package org.voltdb.iv2;
 
 import java.io.IOException;
 
+import org.voltcore.messaging.Mailbox;
 import org.voltdb.PartitionDRGateway;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.messaging.CompleteTransactionMessage;
+import org.voltdb.messaging.CompleteTransactionResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.rejoin.TaskLog;
 
 public class CompleteTransactionTask extends TransactionTask
 {
+    final private Mailbox m_initiator;
     final private CompleteTransactionMessage m_completeMsg;
-    final private PartitionDRGateway m_drGateway;
 
-    public CompleteTransactionTask(TransactionState txnState,
+    public CompleteTransactionTask(Mailbox initiator,
+                                   TransactionState txnState,
                                    TransactionTaskQueue queue,
-                                   CompleteTransactionMessage msg,
-                                   PartitionDRGateway drGateway)
+                                   CompleteTransactionMessage msg)
     {
         super(txnState, queue);
+        m_initiator = initiator;
         m_completeMsg = msg;
-        m_drGateway = drGateway;
     }
 
     @Override
@@ -61,7 +63,7 @@ public class CompleteTransactionTask extends TransactionTask
             doCommonSPICompleteActions();
 
             // Log invocation to DR
-            logToDR();
+            logToDR(siteConnection.getDRGateway());
             hostLog.debug("COMPLETE: " + this);
         }
         else
@@ -73,6 +75,10 @@ public class CompleteTransactionTask extends TransactionTask
             m_txnState.setBeginUndoToken(Site.kInvalidUndoToken);
             hostLog.debug("RESTART: " + this);
         }
+
+        final CompleteTransactionResponseMessage resp = new CompleteTransactionResponseMessage(m_completeMsg);
+        resp.m_sourceHSId = m_initiator.getHSId();
+        m_initiator.deliver(resp);
     }
 
     @Override
@@ -107,6 +113,11 @@ public class CompleteTransactionTask extends TransactionTask
             // stream faithfully
             taskLog.logTask(m_completeMsg);
         }
+
+        final CompleteTransactionResponseMessage resp = new CompleteTransactionResponseMessage(m_completeMsg);
+        resp.setIsRecovering(true);
+        resp.m_sourceHSId = m_initiator.getHSId();
+        m_initiator.deliver(resp);
     }
 
     @Override
@@ -131,17 +142,17 @@ public class CompleteTransactionTask extends TransactionTask
         if (!m_completeMsg.isRestart()) {
             // this call does the right thing with a null TransactionTaskQueue
             doCommonSPICompleteActions();
-            logToDR();
+            logToDR(siteConnection.getDRGateway());
         }
         else {
             m_txnState.setBeginUndoToken(Site.kInvalidUndoToken);
         }
     }
 
-    private void logToDR()
+    private void logToDR(PartitionDRGateway drGateway)
     {
         // Log invocation to DR
-        if (m_drGateway != null && !m_txnState.isForReplay() && !m_txnState.isReadOnly() &&
+        if (drGateway != null && !m_txnState.isForReplay() && !m_txnState.isReadOnly() &&
             !m_completeMsg.isRollback())
         {
             FragmentTaskMessage fragment = (FragmentTaskMessage) m_txnState.getNotice();
@@ -152,7 +163,7 @@ public class CompleteTransactionTask extends TransactionTask
                               "fragment: " + fragment.toString());
             }
             StoredProcedureInvocation invocation = initiateTask.getStoredProcedureInvocation().getShallowCopy();
-            m_drGateway.onSuccessfulMPCall(m_txnState.m_spHandle,
+            drGateway.onSuccessfulMPCall(m_txnState.m_spHandle,
                     m_txnState.txnId,
                     m_txnState.uniqueId,
                     m_completeMsg.getHash(),

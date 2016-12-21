@@ -18,10 +18,8 @@ package com.google_voltpatches.common.collect;
 
 import com.google_voltpatches.common.annotations.GwtCompatible;
 import com.google_voltpatches.common.base.Predicate;
-
 import java.util.Map.Entry;
 import java.util.Set;
-
 import javax.annotation_voltpatches.Nullable;
 
 /**

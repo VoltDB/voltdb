@@ -1,1 +1,3 @@
 Unable to connect to VoltDB cluster
+    fakeserver1:21212 - UnknownHostException
+    fakeserver2:21212 - UnknownHostException

@@ -26,6 +26,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.VoltTable;
 import org.voltdb.exceptions.SerializableException;
+import org.voltdb.iv2.TxnEgo;
 
 /**
  * Message from an execution site which is participating in a transaction
@@ -49,6 +50,11 @@ public class FragmentResponseMessage extends VoltMessage {
     // Not currently used; leaving it in for now
     boolean m_dirty = true;
     boolean m_recovering = false;
+    // a flag to decide whether to buffer this response or not
+    // it does not need to send over network, because it's only set to be false
+    // for BorrowTask which executes locally.
+    // Writes are always false and the flag is not used.
+    boolean m_respBufferable = true;
     // WHA?  Why do we have a separate dependency count when
     // the array lists will tell you their lengths?  Doesn't look like
     // we do anything else with this value other than track the length
@@ -84,6 +90,7 @@ public class FragmentResponseMessage extends VoltMessage {
         m_status = resp.m_status;
         m_dirty = resp.m_dirty;
         m_recovering = resp.m_recovering;
+        m_respBufferable = resp.m_respBufferable;
         m_exception = resp.m_exception;
         m_subject = Subject.DEFAULT.getId();
     }
@@ -133,6 +140,14 @@ public class FragmentResponseMessage extends VoltMessage {
 
     public long getSpHandle() {
         return m_spHandle;
+    }
+
+    public boolean getRespBufferable() {
+        return m_respBufferable;
+    }
+
+    public void setRespBufferable(boolean respBufferable) {
+        m_respBufferable = respBufferable;
     }
 
     public byte getStatusCode() {
@@ -263,9 +278,9 @@ public class FragmentResponseMessage extends VoltMessage {
         sb.append(" TO ");
         sb.append(CoreUtils.hsIdToString(m_destinationHSId));
         sb.append(") FOR TXN ");
-        sb.append(m_txnId);
+        sb.append(TxnEgo.txnIdToString(m_txnId));
         sb.append(", SP HANDLE: ");
-        sb.append(m_spHandle);
+        sb.append(TxnEgo.txnIdToString(m_spHandle));
 
         if (m_status == SUCCESS)
             sb.append("\n  SUCCESS");
@@ -278,6 +293,11 @@ public class FragmentResponseMessage extends VoltMessage {
             sb.append("\n  DIRTY");
         else
             sb.append("\n  PRISTINE");
+
+        if (m_respBufferable)
+            sb.append("\n  BUFFERABLE");
+        else
+            sb.append("\n  NOT BUFFERABLE");
 
         for (int i = 0; i < m_dependencyCount; i++) {
             sb.append("\n  DEP ").append(m_dependencyIds.get(i));

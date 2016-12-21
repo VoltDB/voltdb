@@ -46,7 +46,6 @@
 #ifndef VOLTDBENGINE_H
 #define VOLTDBENGINE_H
 
-#include "common/FullTupleSerializer.h"
 #include "common/Pool.hpp"
 #include "common/serializeio.h"
 #include "common/ThreadLocalPool.h"
@@ -56,7 +55,6 @@
 #include "logging/LogProxy.h"
 #include "logging/StdoutLogProxy.h"
 #include "stats/StatsAgent.h"
-#include "storage/AbstractDRTupleStream.h"
 #include "storage/BinaryLogSinkWrapper.h"
 
 #include "boost/scoped_ptr.hpp"
@@ -64,7 +62,6 @@
 
 #include <cassert>
 #include <map>
-#include <stack>
 #include <string>
 #include <vector>
 
@@ -83,6 +80,7 @@ class Table;
 
 namespace voltdb {
 
+class AbstractDRTupleStream;
 class AbstractExecutor;
 class AbstractPlanNode;
 class EnginePlanSet;  // Locally defined in VoltDBEngine.cpp
@@ -96,6 +94,16 @@ class TableCatalogDelegate;
 class TempTableLimits;
 class Topend;
 class TheHashinator;
+
+class TempTableTupleDeleter {
+public:
+    void operator()(TempTable* tbl) const;
+};
+
+// UniqueTempTableResult is a smart pointer wrapper around a temp
+// table.  It doesn't delete the temp table, but it will delete the
+// contents of the table when it goes out of scope.
+typedef std::unique_ptr<TempTable, TempTableTupleDeleter> UniqueTempTableResult;
 
 const int64_t DEFAULT_TEMP_TABLE_MEMORY = 1024 * 1024 * 100;
 
@@ -144,6 +152,9 @@ class __attribute__((visibility("default"))) VoltDBEngine {
             m_drReplicatedConflictStreamedTable = replicatedConflictTable;
         }
 
+        ExecutorContext* getExecutorContext() { return m_executorContext; }
+        int getCurrentIndexInBatch() const { return m_currentIndexInBatch; }
+
         // -------------------------------------------------
         // Execution Functions
         // -------------------------------------------------
@@ -161,17 +172,28 @@ class __attribute__((visibility("default"))) VoltDBEngine {
                                  int64_t uniqueId,
                                  int64_t undoToken);
 
-        int getUsedParamcnt() const { return m_usedParamcnt; }
+        /**
+         * Execute a single, top-level plan fragment.  This method is
+         * used both internally to execute fragments in a batch, and
+         * by clients that execute fragments outside of a stored
+         * procedure context, e.g., when populating a view during a
+         * catalog update.
+         *
+         * This method will produce a unique_ptr-like wrapper around a
+         * temp table, that will automatically delete the contents of
+         * the table when it goes out of scope.
+         *
+         * Callers of this method should take care to call
+         * ExecutorContext::cleanupAllExecutors when finished, since
+         * if the executed fragment may have produced cached
+         * subqueries.
+         */
+        UniqueTempTableResult executePlanFragment(ExecutorVector* executorVector,
+                                                  int64_t* tuplesModified = NULL);
 
         // Created to transition existing unit tests to context abstraction.
         // If using this somewhere new, consider if you're being lazy.
         void updateExecutorContextUndoQuantumForTest();
-
-        // Executors can call this to note a certain number of tuples have been
-        // scanned or processed.index
-        inline int64_t pullTuplesRemainingUntilProgressReport(PlanNodeType planNodeType);
-        inline int64_t pushTuplesProcessedForProgressMonitoring(int64_t tuplesProcessed);
-        inline void pushFinalTuplesProcessedForProgressMonitoring(int64_t tuplesProcessed);
 
         // If an insert will fail due to row limit constraint and user
         // has defined a delete action to make space, this method
@@ -229,8 +251,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         /** Returns the size of buffer for receiving result tables from EE. */
         int getReusedResultBufferCapacity() const { return m_reusedResultCapacity; }
 
-        NValueArray& getParameterContainer() { return m_staticParams; }
-        const NValueArray& getParameterContainer() const { return m_staticParams; }
         int64_t* getBatchFragmentIdsContainer() { return m_batchFragmentIdsContainer; }
         int64_t* getBatchDepIdsContainer() { return m_batchDepIdsContainer; }
 
@@ -242,6 +262,9 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         /** check if this hash is in the local partition */
         bool isLocalSite(const int32_t pkHash) const;
+
+        /** print out current hashinator */
+        std::string dumpCurrentHashinator() const;
 
         // -------------------------------------------------
         // Non-transactional work methods
@@ -302,28 +325,9 @@ class __attribute__((visibility("default"))) VoltDBEngine {
             setCurrentUndoQuantum(m_undoLog.generateUndoQuantum(nextUndoToken));
         }
 
-        void releaseUndoToken(int64_t undoToken)
-        {
-            if (m_currentUndoQuantum != NULL && m_currentUndoQuantum->getUndoToken() == undoToken) {
-                m_currentUndoQuantum = NULL;
-                m_executorContext->setupForPlanFragments(NULL);
-            }
-            m_undoLog.release(undoToken);
+        void releaseUndoToken(int64_t undoToken);
 
-            if (m_executorContext->drStream()) {
-                m_executorContext->drStream()->endTransaction(m_executorContext->currentUniqueId());
-            }
-            if (m_executorContext->drReplicatedStream()) {
-                m_executorContext->drReplicatedStream()->endTransaction(m_executorContext->currentUniqueId());
-            }
-        }
-
-        void undoUndoToken(int64_t undoToken)
-        {
-            m_currentUndoQuantum = NULL;
-            m_executorContext->setupForPlanFragments(NULL);
-            m_undoLog.undo(undoToken);
-        }
+        void undoUndoToken(int64_t undoToken);
 
         voltdb::UndoQuantum* getCurrentUndoQuantum() { return m_currentUndoQuantum; }
 
@@ -430,22 +434,16 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // -------------------------------------------------
         void processCatalogDeletes(int64_t timestamp);
         void initMaterializedViewsAndLimitDeletePlans();
+        template<class TABLE> void initMaterializedViews(catalog::Table *catalogTable,
+                                                                  TABLE *table);
         bool updateCatalogDatabaseReference();
         void resetDRConflictStreamedTables();
-        /**
-         * Call into the topend with information about how executing a plan fragment is going.
-         */
-        void reportProgressToTopend();
 
         /**
          * Execute a single plan fragment.
          */
         int executePlanFragment(int64_t planfragmentId,
                                 int64_t inputDependencyId,
-                                int64_t txnId,
-                                int64_t spHandle,
-                                int64_t lastCommittedSpHandle,
-                                int64_t uniqueId,
                                 bool first,
                                 bool last);
 
@@ -458,7 +456,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         void setExecutorVectorForFragmentId(int64_t fragId);
 
         bool checkTempTableCleanup(ExecutorVector * execsForFrag);
-        void resetExecutionMetadata();
 
         // -------------------------------------------------
         // Data Members
@@ -466,12 +463,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         /** True if any fragments in a batch have modified any tuples */
         bool m_dirtyFragmentBatch;
         int m_currentIndexInBatch;
-        int64_t m_allTuplesScanned;
-        int64_t m_tuplesProcessedInBatch;
-        int64_t m_tuplesProcessedInFragment;
-        int64_t m_tuplesProcessedSinceReport;
-        int64_t m_tupleReportThreshold;
-        PlanNodeType m_lastAccessedPlanNodeType;
 
         boost::scoped_ptr<EnginePlanSet> m_plans;
         voltdb::UndoLog m_undoLog;
@@ -525,11 +516,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         catalog::Database *m_database;
         bool m_isActiveActiveDREnabled;
 
-        /** reused parameter container. */
-        NValueArray m_staticParams;
-        /** TODO : should be passed as execute() parameter..*/
-        int m_usedParamcnt;
-
         /** buffer object for result tables. set when the result table is sent out to localsite. */
         FallbackSerializeOutput m_resultOutput;
 
@@ -554,9 +540,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // n.b. these are 8k each, should be boost shared arrays?
         int64_t m_batchFragmentIdsContainer[MAX_BATCH_COUNT];
         int64_t m_batchDepIdsContainer[MAX_BATCH_COUNT];
-
-        /** number of plan fragments executed so far (diagnostic?) */
-        int m_pfCount;
 
         // used for sending and recieving deps
         // set by the executeQuery / executeFrag type methods
@@ -598,8 +581,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // other components. (Components MUST NOT depend on VoltDBEngine.h).
         ExecutorContext *m_executorContext;
 
-        FullTupleSerializer m_tupleSerializer;
-
         int32_t m_compactionThreshold;
 
         /*
@@ -627,11 +608,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // This stateless member acts as a counted reference to keep the ThreadLocalPool alive
         // just while this VoltDBEngine is alive. That simplifies valgrind-compliant process shutdown.
         ThreadLocalPool m_tlPool;
-
-        /** Counts tuples modified by a plan fragments.  Top of stack is the
-         * most deeply nested executing plan fragment.
-         */
-        std::stack<int64_t> m_tuplesModifiedStack;
 };
 
 inline void VoltDBEngine::resetReusedResultOutputBuffer(const size_t headerSize)
@@ -639,36 +615,6 @@ inline void VoltDBEngine::resetReusedResultOutputBuffer(const size_t headerSize)
     m_resultOutput.initializeWithPosition(m_reusedResultBuffer, m_reusedResultCapacity, headerSize);
     m_exceptionOutput.initializeWithPosition(m_exceptionBuffer, m_exceptionBufferCapacity, headerSize);
     *reinterpret_cast<int32_t*>(m_exceptionBuffer) = voltdb::VOLT_EE_EXCEPTION_TYPE_NONE;
-}
-
-/**
- * Track total tuples accessed for this query.
- * Set up statistics for long running operations thru m_engine if total tuples accessed passes the threshold.
- */
-inline int64_t VoltDBEngine::pullTuplesRemainingUntilProgressReport(PlanNodeType planNodeType)
-{
-    m_lastAccessedPlanNodeType = planNodeType;
-    return m_tupleReportThreshold - m_tuplesProcessedSinceReport;
-}
-
-inline int64_t VoltDBEngine::pushTuplesProcessedForProgressMonitoring(int64_t tuplesProcessed)
-{
-    m_tuplesProcessedSinceReport += tuplesProcessed;
-    if (m_tuplesProcessedSinceReport >= m_tupleReportThreshold) {
-        reportProgressToTopend();
-    }
-    return m_tupleReportThreshold; // size of next batch
-}
-
-inline void VoltDBEngine::pushFinalTuplesProcessedForProgressMonitoring(int64_t tuplesProcessed)
-{
-    try {
-        pushTuplesProcessedForProgressMonitoring(tuplesProcessed);
-    } catch(const SerializableEEException &e) {
-        e.serialize(getExceptionOutputSerializer());
-    }
-
-    m_lastAccessedPlanNodeType = PLAN_NODE_TYPE_INVALID;
 }
 
 } // namespace voltdb

@@ -31,7 +31,6 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
-import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
@@ -42,6 +41,7 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.messaging.CompleteTransactionMessage;
+import org.voltdb.messaging.DummyTransactionTaskMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
@@ -83,7 +83,7 @@ public class MpScheduler extends Scheduler
     MpScheduler(int partitionId, List<Long> buddyHSIds, SiteTaskerQueue taskQueue)
     {
         super(partitionId, taskQueue);
-        m_pendingTasks = new MpTransactionTaskQueue(m_tasks, getCurrentTxnId());
+        m_pendingTasks = new MpTransactionTaskQueue(m_tasks);
         m_buddyHSIds = buddyHSIds;
         m_iv2Masters = new ArrayList<Long>();
         m_partitionMasters = Maps.newHashMap();
@@ -98,6 +98,11 @@ public class MpScheduler extends Scheduler
     void updateCatalog(String diffCmds, CatalogContext context, CatalogSpecificPlanner csp)
     {
         m_pendingTasks.updateCatalog(diffCmds, context, csp);
+    }
+
+    void updateSettings(CatalogContext context, CatalogSpecificPlanner csp)
+    {
+        m_pendingTasks.updateSettings(context, csp);
     }
 
     @Override
@@ -168,32 +173,7 @@ public class MpScheduler extends Scheduler
     @Override
     public boolean sequenceForReplay(VoltMessage message)
     {
-        boolean canDeliver = true;
-        long sequenceWithTxnId = Long.MIN_VALUE;
-
-        //--------------------------------------------
-        // DRv1 path, mark for future removal
-        boolean dr = ((message instanceof TransactionInfoBaseMessage &&
-                ((TransactionInfoBaseMessage)message).isForDRv1()));
-
-        if (dr) {
-            VoltDB.crashLocalVoltDB("DRv1 path should never be called", true, null);
-            sequenceWithTxnId = ((TransactionInfoBaseMessage)message).getOriginalTxnId();
-            InitiateResponseMessage dupe = m_replaySequencer.dedupe(sequenceWithTxnId,
-                    (TransactionInfoBaseMessage) message);
-            if (dupe != null) {
-                canDeliver = false;
-                // Duplicate initiate task message, send response
-                m_mailbox.send(dupe.getInitiatorHSId(), dupe);
-            }
-            else {
-                m_replaySequencer.updateLastSeenUniqueId(sequenceWithTxnId,
-                        (TransactionInfoBaseMessage) message);
-                canDeliver = true;
-            }
-        }
-        //--------------------------------------------
-        return canDeliver;
+        return true;
     }
 
     @Override
@@ -210,6 +190,9 @@ public class MpScheduler extends Scheduler
         }
         else if (message instanceof Iv2EndOfLogMessage) {
             handleEOLMessage();
+        }
+        else if (message instanceof DummyTransactionTaskMessage) {
+            // leave empty to ignore it on purpose
         }
         else {
             throw new RuntimeException("UNKNOWN MESSAGE TYPE, BOOM!");
@@ -235,12 +218,6 @@ public class MpScheduler extends Scheduler
         if (message.isForReplay()) {
             timestamp = message.getUniqueId();
             m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(timestamp);
-        } else if (message.isForDRv1()) {
-            timestamp = message.getStoredProcedureInvocation().getOriginalUniqueId();
-            // @LoadMultipartitionTable does not have a valid uid
-            if (UniqueIdGenerator.getPartitionIdFromUniqueId(timestamp) == m_partitionId) {
-                m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(timestamp);
-            }
         } else  {
             timestamp = m_uniqueIdGenerator.getNextUniqueId();
         }

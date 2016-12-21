@@ -23,6 +23,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.NavigableSet;
 import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
@@ -163,6 +164,7 @@ public class LeaderAppointer implements Promotable
                         int pid = aPartition.getInt("partition_id");
                         if (pid == m_partitionId) {
                             replicaCount = aPartition.getJSONArray("replicas").length();
+                            break;
                         }
                     }
                 } catch (JSONException e) {
@@ -470,6 +472,7 @@ public class LeaderAppointer implements Promotable
                     int pid = aPartition.getInt("partition_id");
                     if (pid == partitionId) {
                         masterHostId = aPartition.getInt("master");
+                        break;
                     }
                 }
             }
@@ -585,6 +588,10 @@ public class LeaderAppointer implements Promotable
         m_stats.setSafetySet(lackingReplication.build());
 
         return retval;
+    }
+
+    public NavigableSet<KSafetyStats.StatsPoint> getKSafetyStatsSet() {
+        return m_stats.getSafetySet();
     }
 
     private void removeAndCleanupPartition(int pid) {

@@ -158,8 +158,13 @@ class AggregateExecutorBase : public AbstractExecutor
 {
 public:
     AggregateExecutorBase(VoltDBEngine* engine, AbstractPlanNode* abstract_node) :
-        AbstractExecutor(engine, abstract_node), m_groupByKeySchema(NULL),
-        m_prePredicate(NULL), m_postPredicate(NULL)
+        AbstractExecutor(engine, abstract_node),
+        m_groupByKeySchema(NULL),
+        m_prePredicate(NULL),
+        m_postPredicate(NULL),
+        m_pmp(NULL),
+        m_inputSchema(NULL),
+        m_groupByKeyPartialHashSchema(NULL)
     { }
     ~AggregateExecutorBase()
     {
@@ -211,7 +216,7 @@ protected:
 
     void initGroupByKeyTuple(const TableTuple& nextTuple);
 
-    /*
+    /**
      * Swap the current group by key tuple with the in-progress group by key tuple.
      * Return the new group by key tuple associated with in-progress tuple address.
      * This function is only used in serial or partial aggregation.

@@ -17,9 +17,9 @@
 
 package org.voltdb.iv2;
 
-import java.util.Calendar;
 import java.util.Date;
 
+import org.voltcore.TransactionIdManager;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.VoltDB;
@@ -51,17 +51,7 @@ public class UniqueIdGenerator {
     // VOLT_EPOCH holds the time in millis since 1/1/2008 at 12am.
     // The current time - VOLT_EPOCH should fit nicely in 40 bits
     // of memory.
-    static final long VOLT_EPOCH = getEpoch();
-    public static long getEpoch() {
-        Calendar c = Calendar.getInstance();
-        c.setTimeInMillis(0);
-        c.set(2008, 0, 1, 0, 0, 0);
-        c.set(Calendar.MILLISECOND, 0);
-        c.set(Calendar.ZONE_OFFSET, 0);
-        c.set(Calendar.DST_OFFSET, 0);
-        long retval = c.getTimeInMillis();
-        return retval;
-    }
+    static final long VOLT_EPOCH = TransactionIdManager.getEpoch();
 
     // maximum values for the fields
     // used for bit-shifts and error checking
@@ -339,6 +329,9 @@ public class UniqueIdGenerator {
         return sb.toString();
     }
     public static String toShortString(long uniqueId) {
+        if (uniqueId == 0L) {
+            return "0";
+        }
         return new String(getPartitionIdFromUniqueId(uniqueId) + ":" +
                 getTimestampFromUniqueId(uniqueId) + ":" +
                 getSequenceNumberFromUniqueId(uniqueId));

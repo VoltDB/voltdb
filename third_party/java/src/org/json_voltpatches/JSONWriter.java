@@ -1,7 +1,25 @@
+/* This file is part of VoltDB.
+ * Copyright (C) 2008-2016 VoltDB Inc.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 package org.json_voltpatches;
 
 import java.io.IOException;
 import java.io.Writer;
+import java.util.HashSet;
 
 /*
 Copyright (c) 2006 JSON.org
@@ -55,78 +73,175 @@ SOFTWARE.
  * This can sometimes be easier than using a JSONObject to build a string.
  * @author JSON.org
  * @version 2010-03-11
+ *
+ * This code has been SIGNIFICANTLY refactored in VoltDB for readability
+ * and performance, but behaves largely as the original code did with a few
+ * convenience calls layered on.
  */
 public class JSONWriter {
-    private static final int maxdepth = 20;
+    private static final int MAX_DEPTH = 20;
 
     /**
      * The comma flag determines if a comma should be output before the next
-     * value.
+     * value. It controls an internally managed sub-state of some of the
+     * finite machine states (states 'a' and 'k').
      */
-    private boolean comma;
+    private boolean m_expectingComma;
 
     /**
-     * The current mode. Values:
-     * 'a' (array),
-     * 'd' (done),
-     * 'i' (initial),
-     * 'k' (key),
-     * 'o' (object).
+     * The current mode.
+     * These are the allowed states in a finite state machine representing the
+     * the JSONWriter AND its most deeply nested active scope, if it has one.
+     * Values:
+     * 'a' (array), an active array scope is expecting values or termination
+     * 'd' (done), no active scope, expects no further input to the writer
+     * 'i' (initial), no active scope, expects an object or array to start one.
+     * 'k' (key), an active object scope is expecting a key or termination.
+     * 'o' (object), an active object scope is expecting a value (after a key).
      */
-    protected char mode;
+    private char m_mode;
 
     /**
-     * The object/array stack.
+     * Since
+     *     private final HashSet<String> m_scopeStack[] = new HashSet<String>[MAX_DEPTH];
+     * gives
+     *     error: generic array creation
+     * define a trivially compatible class to use in place of the generic for
+     * array and array member initialization.
      */
-    private JSONObject stack[];
+    private static class HashSetOfString extends HashSet<String> {
+        private static final long serialVersionUID = 1L; // don't care
+    };
 
     /**
-     * The stack top index. A value of 0 indicates that the stack is empty.
+     * The object/array scope stack.
      */
-    private int top;
+    private final HashSet<String> m_scopeStack[] = new HashSetOfString[MAX_DEPTH];
+
+    /**
+     * The stack top index. A value of -1 indicates that the stack is empty.
+     * A value of 0 indicates the outermost active scope, 1 indicates an active
+     * scope nested within the outermost, and so on.
+     */
+    private int m_top;
 
     /**
      * The writer that will receive the output.
      */
-    protected Writer writer;
+    private final Writer m_writer;
 
     /**
      * Make a fresh JSONWriter. It can be used to build one JSON text.
+     * It expects an initial call to <code>object</code> or <code>array</code>.
      */
-    public JSONWriter(Writer w) {
-        this.comma = false;
-        this.mode = 'i';
-        this.stack = new JSONObject[maxdepth];
-        this.top = 0;
-        this.writer = w;
+    public JSONWriter(Writer writer) {
+        m_writer = writer;
+        m_top = -1;
+        m_mode = 'i';
+        m_expectingComma = false;
+    }
+
+    /** An accessor */
+    protected Writer getWriter() { return m_writer; }
+
+    /** An abstract test accessor for m_mode */
+    protected boolean isDone() { return m_mode == 'd'; }
+
+    /**
+     * Append a value, already validated, formatted and/or quoted as needed.
+     * @param s A string value.
+     * @throws JSONException If the value is out of sequence.
+     */
+    private void appendValue(String string) throws JSONException {
+        assert string != null;
+        if (m_mode == 'k' || m_mode == 'i' || m_mode == 'd') {
+            throw new JSONException("Value out of sequence.");
+        }
+        try {
+            if (m_mode == 'a') {
+                if (m_expectingComma) {
+                    m_writer.write(',');
+                }
+            }
+            else if (m_mode == 'o') {
+                m_mode = 'k';
+            }
+            m_writer.write(string);
+        }
+        catch (IOException e) {
+            throw new JSONException(e);
+        }
+        m_expectingComma = true;
+    }
+
+    private static enum ScopeOptions {
+        ArrayWithComma(",[") {
+            @Override
+            HashSetOfString createKeyTracker() { return null; }
+        },
+        ArrayWithoutComma("[") {
+            @Override
+            HashSetOfString createKeyTracker() { return null; }
+        },
+        ObjectWithComma(",{"),
+        ObjectWithoutComma("{"),
+       ;
+
+       final String m_prefix;
+
+        ScopeOptions(String prefix) {
+            m_prefix = prefix;
+        }
+
+        HashSetOfString createKeyTracker() {
+            return new HashSetOfString();
+        }
     }
 
     /**
-     * Append a value.
-     * @param s A string value.
-     * @return this
-     * @throws JSONException If the value is out of sequence.
+     * Push an array or object scope.
+     * @param options settings to control prefix output and
+     *        optional key tracking for object vs. array scopes.
+     * @throws JSONException If nesting is too deep.
      */
-    private JSONWriter append(String s) throws JSONException {
-        if (s == null) {
-            throw new JSONException("Null pointer");
+    private void push(ScopeOptions options) throws JSONException {
+        m_top += 1;
+        if (m_top >= MAX_DEPTH) {
+            throw new JSONException("Nesting too deep.");
         }
-        if (this.mode == 'o' || this.mode == 'a') {
-            try {
-                if (this.comma && this.mode == 'a') {
-                    this.writer.write(',');
-                }
-                this.writer.write(s);
-            } catch (IOException e) {
-                throw new JSONException(e);
-            }
-            if (this.mode == 'o') {
-                this.mode = 'k';
-            }
-            this.comma = true;
-            return this;
+        try {
+            m_writer.write(options.m_prefix);
         }
-        throw new JSONException("Value out of sequence.");
+        catch (IOException e) {
+            throw new JSONException(e);
+        }
+
+        HashSetOfString keyTracker = options.createKeyTracker();
+        m_scopeStack[m_top] = keyTracker;
+        m_mode = (keyTracker == null) ? 'a' : 'k';
+        m_expectingComma = false;
+    }
+
+    /**
+     * Pop an array or object scope.
+     * @param closer Closing character
+     * @throws JSONException If nesting is wrong.
+     */
+    private void pop(char closer) throws JSONException {
+        if (m_top <= -1) {
+            throw new JSONException("Nesting error.");
+        }
+        try {
+            m_writer.write(closer);
+        }
+        catch (IOException e) {
+            throw new JSONException(e);
+        }
+        --m_top;
+        m_mode = (m_top == -1) ?
+                'd' :
+                (m_scopeStack[m_top] == null) ? 'a' : 'k';
+        m_expectingComma = true;
     }
 
     /**
@@ -139,87 +254,28 @@ public class JSONWriter {
      * outermost array or object).
      */
     public JSONWriter array() throws JSONException {
-        if (this.mode == 'i' || this.mode == 'o' || this.mode == 'a') {
-            this.push(null);
-            this.append("[");
-            this.comma = false;
-            return this;
+        if (m_mode == 'k' || m_mode == 'd') {
+            throw new JSONException("Misplaced array.");
         }
-        throw new JSONException("Misplaced array.");
-    }
-
-    /**
-     * End something.
-     * @param m Mode
-     * @param c Closing character
-     * @return this
-     * @throws JSONException If unbalanced.
-     */
-    private JSONWriter end(char m, char c) throws JSONException {
-        if (this.mode != m) {
-            throw new JSONException(m == 'a' ? "Misplaced endArray." :
-                    "Misplaced endObject.");
-        }
-        this.pop(m);
-        try {
-            this.writer.write(c);
-        } catch (IOException e) {
-            throw new JSONException(e);
-        }
-        this.comma = true;
+        push(m_expectingComma ?
+                ScopeOptions.ArrayWithComma :
+                ScopeOptions.ArrayWithoutComma);
         return this;
     }
 
     /**
-     * End an array. This method most be called to balance calls to
-     * <code>array</code>.
+     * End an array. This method must be called to balance calls to
+     * <code>array()</code>.
      * @return this
      * @throws JSONException If incorrectly nested.
      */
     public JSONWriter endArray() throws JSONException {
-        return this.end('a', ']');
-    }
-
-    /**
-     * End an object. This method most be called to balance calls to
-     * <code>object</code>.
-     * @return this
-     * @throws JSONException If incorrectly nested.
-     */
-    public JSONWriter endObject() throws JSONException {
-        return this.end('k', '}');
-    }
-
-    /**
-     * Append a key. The key will be associated with the next value. In an
-     * object, every value must be preceded by a key.
-     * @param s A key string.
-     * @return this
-     * @throws JSONException If the key is out of place. For example, keys
-     *  do not belong in arrays or if the key is null.
-     */
-    public JSONWriter key(String s) throws JSONException {
-        if (s == null) {
-            throw new JSONException("Null key.");
+        if (m_mode != 'a') {
+            throw new JSONException("Misplaced endArray.");
         }
-        if (this.mode == 'k') {
-            try {
-                stack[top - 1].putOnce(s, Boolean.TRUE);
-                if (this.comma) {
-                    this.writer.write(',');
-                }
-                this.writer.write(JSONObject.quote(s));
-                this.writer.write(':');
-                this.comma = false;
-                this.mode = 'o';
-                return this;
-            } catch (IOException e) {
-                throw new JSONException(e);
-            }
-        }
-        throw new JSONException("Misplaced key.");
+        pop(']');
+        return this;
     }
-
 
     /**
      * Begin appending a new object. All keys and values until the balancing
@@ -231,93 +287,280 @@ public class JSONWriter {
      * outermost array or object).
      */
     public JSONWriter object() throws JSONException {
-        if (this.mode == 'i') {
-            this.mode = 'o';
+        if (m_mode == 'k' || m_mode == 'd') {
+            throw new JSONException("Misplaced object.");
         }
-        if (this.mode == 'o' || this.mode == 'a') {
-            this.append("{");
-            this.push(new JSONObject());
-            this.comma = false;
-            return this;
-        }
-        throw new JSONException("Misplaced object.");
-
-    }
-
-
-    /**
-     * Pop an array or object scope.
-     * @param c The scope to close.
-     * @throws JSONException If nesting is wrong.
-     */
-    private void pop(char c) throws JSONException {
-        if (this.top <= 0) {
-            throw new JSONException("Nesting error.");
-        }
-        char m = this.stack[this.top - 1] == null ? 'a' : 'k';
-        if (m != c) {
-            throw new JSONException("Nesting error.");
-        }
-        this.top -= 1;
-        this.mode = this.top == 0 ? 'd' : this.stack[this.top - 1] == null ? 'a' : 'k';
+        push(m_expectingComma ?
+                ScopeOptions.ObjectWithComma :
+                ScopeOptions.ObjectWithoutComma);
+        return this;
     }
 
     /**
-     * Push an array or object scope.
-     * @param c The scope to open.
-     * @throws JSONException If nesting is too deep.
+     * End an object. This method must be called to balance calls to
+     * <code>object()</code>.
+     * @return this
+     * @throws JSONException If incorrectly nested.
      */
-    private void push(JSONObject jo) throws JSONException {
-        if (this.top >= maxdepth) {
-            throw new JSONException("Nesting too deep.");
+    public JSONWriter endObject() throws JSONException {
+        if (m_mode != 'k') {
+            throw new JSONException("Misplaced endObject.");
         }
-        this.stack[this.top] = jo;
-        this.mode = jo == null ? 'a' : 'k';
-        this.top += 1;
+        pop('}');
+        return this;
     }
 
+    /**
+     * Append a key. The key will be associated with the next value. In an
+     * object, every value must be preceded by a key.
+     * @param string A key string.
+     * @return this
+     * @throws JSONException If the key is null or the key is out of place.
+     * For example, keys do not belong in arrays.
+     */
+    public JSONWriter key(String string) throws JSONException {
+        if (string == null) {
+            throw new JSONException("Null key.");
+        }
+        if (m_mode != 'k') {
+            throw new JSONException("Misplaced key.");
+        }
+
+        // Throw if the key has already been seen in this scope.
+        if ( ! m_scopeStack[m_top].add(string)) {
+            throw new JSONException("Duplicate key \"" + string + "\"");
+        }
+
+        try {
+            if (m_expectingComma) {
+                m_writer.write(',');
+            }
+            m_writer.write(JSONObject.quote(string));
+            m_writer.write(':');
+        }
+        catch (IOException e) {
+            throw new JSONException(e);
+        }
+        m_mode = 'o';
+        m_expectingComma = false;
+        return this;
+    }
 
     /**
      * Append either the value <code>true</code> or the value
      * <code>false</code>.
      * @param b A boolean.
      * @return this
-     * @throws JSONException
+     * @throws JSONException if the value is out of sequence or
+     * if the writer throws an IOException
      */
-    public JSONWriter value(boolean b) throws JSONException {
-        return this.append(b ? "true" : "false");
+    public JSONWriter value(boolean aValue) throws JSONException {
+        appendValue(aValue ? "true" : "false");
+        return this;
     }
 
     /**
      * Append a double value.
      * @param d A double.
      * @return this
-     * @throws JSONException If the number is not finite.
+     * @throws JSONException If the number is not finite
+     * or if the value is out of sequence or
+     * if the writer throws an IOException
      */
-    public JSONWriter value(double d) throws JSONException {
-        return this.value(new Double(d));
+    public JSONWriter value(double aValue) throws JSONException {
+        appendValue(JSONObject.numberToString(aValue));
+        return this;
     }
 
     /**
      * Append a long value.
      * @param l A long.
      * @return this
-     * @throws JSONException
+     * @throws JSONException if the value is out of sequence or
+     * if the writer throws an IOException
      */
-    public JSONWriter value(long l) throws JSONException {
-        return this.append(Long.toString(l));
+    public JSONWriter value(long aValue) throws JSONException {
+        appendValue(Long.toString(aValue));
+        return this;
     }
-
 
     /**
      * Append an object value.
      * @param o The object to append. It can be null, or a Boolean, Number,
-     *   String, JSONObject, or JSONArray, or an object with a toJSONString()
-     *   method.
+     *   String, JSONObject, or JSONArray, or an implementation of JSONString.
      * @return this
-     * @throws JSONException If the value is out of sequence.
+     * @throws JSONException if the value is out of sequence or if a
+     * toJSONString method throws an Exception or
+     * if the writer throws an IOException
      */
-    public JSONWriter value(Object o) throws JSONException {
-        return this.append(JSONObject.valueToString(o));
+    public JSONWriter value(Object aValue) throws JSONException {
+        appendValue(JSONObject.valueToString(aValue));
+        return this;
     }
+
+    /**
+     * Append an object value derived from a custom JSONString implementation.
+     * This works identically to <code>value(Object o)</code> called on a
+     * on object whose actual type implements JSONString. This method is
+     * preferable because it by-passes the run-time type checking of the more
+     * general method.
+     * @param jss The JSONString object to append.
+     * It can be null or implement JSONString.
+     * @return this
+     * @throws JSONException if the value is out of sequence or if a
+     * toJSONString method throws an Exception or
+     * if the writer throws an IOException
+     */
+    public JSONWriter value(JSONString jss) throws JSONException {
+        if (jss == null) {
+            valueNull();
+            return this;
+        }
+
+        try {
+            String asString = jss.toJSONString();
+            if (asString == null) {
+                throw new JSONException("Unexpected null from toJSONString");
+            }
+            appendValue(asString);
+            return this;
+        }
+        catch (Exception e) {
+            throw new JSONException(e);
+        }
+    }
+
+    /**
+     * Append a null value
+     * @return this
+     * @throws JSONException if the value is out of sequence or
+     * if the writer throws an IOException
+     */
+    public JSONWriter valueNull() throws JSONException {
+        appendValue("null");
+        return this;
+    }
+
+    /**
+     * Append an array value based on a custom JSONString implementation.
+     * @param jss The JSONString array or container to append.
+     * Its elements can be null or implement JSONString.
+     * @return this
+     * @throws JSONException if the value is out of sequence or if a
+     * toJSONString method throws an Exception or
+     * if the writer throws an IOException
+     */
+    public JSONWriter array(Iterable<? extends JSONString> iter) throws JSONException {
+        array();
+        for (JSONString element : iter) {
+            value(element);
+        }
+        endArray();
+        return this;
+    }
+
+    /**
+     * Write a JSON key-value pair in one optimized step that assumes that
+     * the key is a symbol composed of normal characters requiring no escaping
+     * and asserts that keys are non-null and unique within an object ONLY if
+     * asserts are enabled. This method is most suitable in the common case
+     * where the caller is making a hard-coded series of calls with the same
+     * hard-coded strings for keys. Any sequencing errors can be detected
+     * in debug runs with asserts enabled.
+     * @param aKey
+     * @param aValue
+     * @return this
+     * @throws JSONException
+     */
+    public JSONWriter keySymbolValuePair(String aKey, String aValue)
+            throws JSONException {
+        assert(aKey != null);
+        assert(m_mode == 'k');
+        // The key should not have already been seen in this scope.
+        assert(m_scopeStack[m_top].add(aKey));
+
+        try {
+            m_writer.write(m_expectingComma ? ",\"" : "\"");
+            m_writer.write(aKey);
+	        if (aValue == null) {
+                m_writer.write("\":null");
+	        }
+	        else {
+                m_writer.write("\":\"");
+                m_writer.write(JSONObject.quotable(aValue));
+                m_writer.write('"');
+	        }
+        }
+        catch (IOException e) {
+            throw new JSONException(e);
+        }
+        m_expectingComma = true;
+        return this;
+    }
+
+    /**
+     * Write a JSON key-value pair in one optimized step that assumes that
+     * the key is a symbol composed of normal characters requiring no escaping
+     * and asserts that keys are non-null and unique within an object ONLY if
+     * asserts are enabled. This method is most suitable in the common case
+     * where the caller is making a hard-coded series of calls with the same
+     * hard-coded strings for keys. Any sequencing errors can be detected
+     * in debug runs with asserts enabled.
+     * @param aKey
+     * @param aValue
+     * @return this
+     * @throws JSONException
+     */
+    public JSONWriter keySymbolValuePair(String aKey, long aValue)
+            throws JSONException {
+        assert(aKey != null);
+        assert(m_mode == 'k');
+        // The key should not have already been seen in this scope.
+        assert(m_scopeStack[m_top].add(aKey));
+
+        try {
+            m_writer.write(m_expectingComma ? ",\"" : "\"");
+            m_writer.write(aKey);
+            m_writer.write("\":");
+            m_writer.write(Long.toString(aValue));
+        }
+        catch (IOException e) {
+            throw new JSONException(e);
+        }
+        m_expectingComma = true;
+        return this;
+    }
+
+    /**
+     * Write a JSON key-value pair in one optimized step that assumes that
+     * the key is a symbol composed of normal characters requiring no escaping
+     * and asserts that keys are non-null and unique within an object ONLY if
+     * asserts are enabled. This method is most suitable in the common case
+     * where the caller is making a hard-coded series of calls with the same
+     * hard-coded strings for keys. Any sequencing errors can be detected
+     * in debug runs with asserts enabled.
+     * @param aKey
+     * @param aValue
+     * @return this
+     * @throws JSONException
+     */
+    public JSONWriter keySymbolValuePair(String aKey, boolean aValue)
+            throws JSONException {
+        assert(aKey != null);
+        assert(m_mode == 'k');
+        // The key should not have already been seen in this scope.
+        assert(m_scopeStack[m_top].add(aKey));
+
+        try {
+            m_writer.write(m_expectingComma ? ",\"" : "\"");
+            m_writer.write(aKey);
+            m_writer.write(aValue ? "\":true" : "\":false");
+        }
+        catch (IOException e) {
+            throw new JSONException(e);
+        }
+        m_expectingComma = true;
+        return this;
+    }
+
 }

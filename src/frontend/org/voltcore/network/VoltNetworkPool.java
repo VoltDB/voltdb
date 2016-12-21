@@ -22,10 +22,12 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
+import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -149,5 +151,23 @@ public class VoltNetworkPool {
         retval.put(-1L, Pair.of("GLOBAL", globalStats));
 
         return retval;
+    }
+
+    public Set<Connection> getConnections() {
+        List<Future<Set<Connection>>> futures = new ArrayList<>(m_networks.length);
+        for (VoltNetwork vn : m_networks) {
+            futures.add(vn.getConnections());
+        }
+        Set<Connection> conns = new HashSet<>();
+        for (Future<Set<Connection>> fut : futures) {
+            Set<Connection> connsForNetwork;
+            try {
+                connsForNetwork = fut.get();
+            } catch (InterruptedException | ExecutionException e) {
+                connsForNetwork = new HashSet<>();
+            }
+            conns.addAll(connsForNetwork);
+        }
+        return conns;
     }
 }

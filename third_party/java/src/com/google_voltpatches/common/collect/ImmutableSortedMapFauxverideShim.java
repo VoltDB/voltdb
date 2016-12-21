@@ -16,6 +16,8 @@
 
 package com.google_voltpatches.common.collect;
 
+import com.google_voltpatches.common.annotations.GwtIncompatible;
+
 /**
  * "Overrides" the {@link ImmutableMap} static methods that lack
  * {@link ImmutableSortedMap} equivalents with deprecated, exception-throwing
@@ -23,6 +25,7 @@ package com.google_voltpatches.common.collect;
  *
  * @author Chris Povirk
  */
+@GwtIncompatible
 abstract class ImmutableSortedMapFauxverideShim<K, V> extends ImmutableMap<K, V> {
   /**
    * Not supported. Use {@link ImmutableSortedMap#naturalOrder}, which offers

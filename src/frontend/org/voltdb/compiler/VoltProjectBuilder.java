@@ -32,6 +32,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBElement;
@@ -73,6 +74,7 @@ import org.voltdb.compiler.deploymentfile.SecurityType;
 import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.compiler.deploymentfile.ServerImportEnum;
 import org.voltdb.compiler.deploymentfile.SnapshotType;
+import org.voltdb.compiler.deploymentfile.SnmpType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType.Temptables;
 import org.voltdb.compiler.deploymentfile.UsersType;
@@ -107,6 +109,15 @@ public class VoltProjectBuilder {
             this.name = cls.getSimpleName();
             this.sql = null;
             this.partitionInfo = null;
+            assert(this.name != null);
+        }
+
+        public ProcedureInfo(final Class<?> cls, final String partitionInfo) {
+            this.roles = new String[0];
+            this.cls = cls;
+            this.name = cls.getSimpleName();
+            this.sql = null;
+            this.partitionInfo = partitionInfo;
             assert(this.name != null);
         }
 
@@ -286,6 +297,9 @@ public class VoltProjectBuilder {
     private Integer m_commandLogFsyncInterval;
     private Integer m_commandLogMaxTxnsBeforeFsync;
 
+    private Boolean m_snmpEnabled = false;
+    private String m_snmpTarget = null;
+
     private Integer m_snapshotPriority;
 
     private Integer m_maxTempTableMemory = 100;
@@ -301,8 +315,10 @@ public class VoltProjectBuilder {
     private Integer m_elasticDuration = null;
     private Integer m_queryTimeout = null;
     private String m_rssLimit = null;
+    private String m_snmpRssLimit = null;
     private Integer m_resourceCheckInterval = null;
     private Map<FeatureNameType, String> m_featureDiskLimits;
+    private Map<FeatureNameType, String> m_snmpFeatureDiskLimits;
 
     private boolean m_useDDLSchema = false;
 
@@ -319,6 +335,11 @@ public class VoltProjectBuilder {
         return this;
     }
 
+    public VoltProjectBuilder setSnmpRssLimit(String limit) {
+        m_snmpRssLimit = limit;
+        return this;
+    }
+
     public VoltProjectBuilder setResourceCheckInterval(int seconds) {
         m_resourceCheckInterval = seconds;
         return this;
@@ -326,6 +347,11 @@ public class VoltProjectBuilder {
 
     public VoltProjectBuilder setFeatureDiskLimits(Map<FeatureNameType, String> featureDiskLimits) {
         m_featureDiskLimits = featureDiskLimits;
+        return this;
+    }
+
+    public VoltProjectBuilder setSnmpFeatureDiskLimits(Map<FeatureNameType, String> featureDiskLimits) {
+        m_snmpFeatureDiskLimits = featureDiskLimits;
         return this;
     }
 
@@ -345,6 +371,11 @@ public class VoltProjectBuilder {
 
     public void setUseDDLSchema(boolean useIt) {
         m_useDDLSchema = useIt;
+    }
+
+    public void configureSnmp(String target) {
+        m_snmpTarget = target;
+        m_snmpEnabled = true;
     }
 
     public void configureLogging(String internalSnapshotPath, String commandLogPath, Boolean commandLogSync,
@@ -538,7 +569,7 @@ public class VoltProjectBuilder {
                 String[] parameter = procedure.partitionInfo.split(":");
                 String[] token = parameter[0].split("\\.");
                 String position = "";
-                if(Integer.parseInt(parameter[1].trim()) > 0) {
+                if(parameter.length >= 2 && Integer.parseInt(parameter[1].trim()) > 0) {
                     position = " PARAMETER " + parameter[1];
                 }
                 transformer.append("PARTITION PROCEDURE " + procedure.name + " ON TABLE " + token[0] + " COLUMN " + token[1] + position + ";");
@@ -671,8 +702,10 @@ public class VoltProjectBuilder {
 
         if (config == null) {
             config = new Properties();
+            //If No config provided use file with outdir to user-specific tmp.
+            config.put("outdir", "/tmp/" + System.getProperty("user.name"));
             config.putAll(ImmutableMap.<String, String>of(
-                    "type","tsv", "batched","true", "with-schema","true", "nonce","zorag", "outdir","exportdata"
+                    "type","tsv", "batched","true", "with-schema","true", "nonce","zorag"
                     ));
         }
         exportConnector.put("elConfig", config);
@@ -1137,6 +1170,14 @@ public class VoltProjectBuilder {
             httpd.setHttps(httpsType);
         }
 
+        //SNMP
+        SnmpType snmpType = factory.createSnmpType();
+        if (m_snmpEnabled) {
+            snmpType.setEnabled(true);
+            snmpType.setTarget(m_snmpTarget);
+            deployment.setSnmp(snmpType);
+        }
+
         // <export>
         ExportType export = factory.createExportType();
         deployment.setExport(export);
@@ -1261,10 +1302,15 @@ public class VoltProjectBuilder {
             query.setTimeout(m_queryTimeout);
             systemSettingType.setQuery(query);
         }
-        if (m_rssLimit != null) {
+        if (m_rssLimit != null || m_snmpRssLimit != null) {
             ResourceMonitorType monitorType = initializeResourceMonitorType(systemSettingType, factory);
             Memorylimit memoryLimit = factory.createResourceMonitorTypeMemorylimit();
-            memoryLimit.setSize(m_rssLimit);
+            if (m_rssLimit != null) {
+                memoryLimit.setSize(m_rssLimit);
+            }
+            if (m_snmpRssLimit != null) {
+                memoryLimit.setAlert(m_snmpRssLimit);
+            }
             monitorType.setMemorylimit(memoryLimit);
         }
 
@@ -1281,18 +1327,30 @@ public class VoltProjectBuilder {
     private void setupDiskLimitType(SystemSettingsType systemSettingsType,
             org.voltdb.compiler.deploymentfile.ObjectFactory factory) {
 
-        if (m_featureDiskLimits==null || m_featureDiskLimits.isEmpty()) {
+        Set<FeatureNameType> featureNames = new HashSet<> ();
+
+        if (m_featureDiskLimits!= null && !m_featureDiskLimits.isEmpty()) {
+            featureNames.addAll(m_featureDiskLimits.keySet());
+        }
+        if (m_snmpFeatureDiskLimits!= null && !m_snmpFeatureDiskLimits.isEmpty()) {
+            featureNames.addAll(m_snmpFeatureDiskLimits.keySet());
+        }
+
+        if (featureNames.isEmpty()) {
             return;
         }
 
         DiskLimitType diskLimit = factory.createDiskLimitType();
-        if (m_featureDiskLimits!=null && !m_featureDiskLimits.isEmpty()) {
-            for (FeatureNameType featureName : m_featureDiskLimits.keySet()) {
+        for (FeatureNameType featureName : featureNames) {
                 DiskLimitType.Feature feature = factory.createDiskLimitTypeFeature();
                 feature.setName(featureName);
-                feature.setSize(m_featureDiskLimits.get(featureName));
+                if (m_featureDiskLimits !=null && m_featureDiskLimits.containsKey(featureName)) {
+                    feature.setSize(m_featureDiskLimits.get(featureName));
+                }
+                if (m_snmpFeatureDiskLimits !=null && m_snmpFeatureDiskLimits.containsKey(featureName)) {
+                    feature.setAlert(m_snmpFeatureDiskLimits.get(featureName));
+                }
                 diskLimit.getFeature().add(feature);
-            }
         }
 
         ResourceMonitorType monitorType = initializeResourceMonitorType(systemSettingsType, factory);

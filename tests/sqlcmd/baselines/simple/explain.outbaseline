@@ -1,0 +1,131 @@
+
+CREATE TABLE EXPLAINTEST (
+    G0 INT DEFAULT '0' NOT NULL,
+    G1 INT DEFAULT '0' NOT NULL,
+    C0 INT DEFAULT '0' NOT NULL,
+    C1 FLOAT DEFAULT '0' NOT NULL,
+    C2 DECIMAL DEFAULT '0' NOT NULL,
+    C3 TIMESTAMP DEFAULT NOW NOT NULL,
+    C4 TINYINT DEFAULT '0' NOT NULL,
+    C5 BIGINT DEFAULT '0' NOT NULL,
+    C6 SMALLINT DEFAULT '0' NOT NULL,
+    C7 INT DEFAULT '0' NOT NULL,
+    C8 INT DEFAULT '0' NOT NULL,
+    C9 INT DEFAULT '0' NOT NULL,
+    C10 VARCHAR DEFAULT 'abc' NOT NULL,
+    C11 VARCHAR DEFAULT 'def' NOT NULL,
+    PRIMARY KEY (G0, G1)
+);
+Command succeeded.
+
+PARTITION TABLE EXPLAINTEST ON COLUMN G0;
+Command succeeded.
+
+CREATE VIEW V_EXPLAINTEST
+(G0, CNT, C0, C1, C2, C3, C4, C5, C6, C7, C8, C9, C10, C11)
+AS
+SELECT G0, COUNT(*),
+       MAX(C0), MIN(C1), MAX(C2), MIN(C3), MAX(C4), MIN(C5),
+       MAX(C6), MIN(C7), MAX(C8), MIN(C9), MAX(C10), MIN(C11)
+FROM EXPLAINTEST GROUP BY G0;
+Command succeeded.
+
+CREATE PROCEDURE P_EXPLAINTEST AS SELECT * FROM EXPLAINTEST;
+Command succeeded.
+
+explain SELECT * FROM V_EXPLAINTEST;
+EXECUTION_PLAN                 
+-------------------------------
+RETURN RESULTS TO STORED PROCEDURE
+ RECEIVE FROM ALL PARTITIONS
+  SEND PARTITION RESULTS TO COORDINATOR
+   SEQUENTIAL SCAN of "V_EXPLAINTEST"
+
+
+(Returned 1 rows in #.##s)
+
+explainproc P_EXPLAINTEST;
+SQL_STATEMENT               EXECUTION_PLAN                 
+--------------------------- -------------------------------
+SELECT * FROM EXPLAINTEST;  RETURN RESULTS TO STORED PROCEDURE
+ RECEIVE FROM ALL PARTITIONS
+  SEND PARTITION RESULTS TO COORDINATOR
+   SEQUENTIAL SCAN of "EXPLAINTEST"
+
+
+(Returned 1 rows in #.##s)
+
+explainview V_EXPLAINTEST;
+TASK                      EXECUTION_PLAN                 
+------------------------- -------------------------------
+Refresh MAX column "C0"   RETURN RESULTS TO STORED PROCEDURE
+ INDEX SCAN of "EXPLAINTEST" using its primary key index
+ range-scan on 1 of 2 cols from (G0 >= ?0) while (G0 = ?0), filter by (C0 <= ?1)
+  inline Serial AGGREGATION ops: MAX(EXPLAINTEST.C0)
+
+Refresh MIN column "C1"   RETURN RESULTS TO STORED PROCEDURE
+ INDEX SCAN of "EXPLAINTEST" using its primary key index
+ range-scan on 1 of 2 cols from (G0 >= ?0) while (G0 = ?0), filter by (C1 >= ?1)
+  inline Serial AGGREGATION ops: MIN(EXPLAINTEST.C1)
+
+Refresh MAX column "C2"   RETURN RESULTS TO STORED PROCEDURE
+ INDEX SCAN of "EXPLAINTEST" using its primary key index
+ range-scan on 1 of 2 cols from (G0 >= ?0) while (G0 = ?0), filter by (C2 <= ?1)
+  inline Serial AGGREGATION ops: MAX(EXPLAINTEST.C2)
+
+Refresh MIN column "C3"   RETURN RESULTS TO STORED PROCEDURE
+ INDEX SCAN of "EXPLAINTEST" using its primary key index
+ range-scan on 1 of 2 cols from (G0 >= ?0) while (G0 = ?0), filter by (C3 >= ?1)
+  inline Serial AGGREGATION ops: MIN(EXPLAINTEST.C3)
+
+Refresh MAX column "C4"   RETURN RESULTS TO STORED PROCEDURE
+ INDEX SCAN of "EXPLAINTEST" using its primary key index
+ range-scan on 1 of 2 cols from (G0 >= ?0) while (G0 = ?0), filter by (C4 <= ?1)
+  inline Serial AGGREGATION ops: MAX(EXPLAINTEST.C4)
+
+Refresh MIN column "C5"   RETURN RESULTS TO STORED PROCEDURE
+ INDEX SCAN of "EXPLAINTEST" using its primary key index
+ range-scan on 1 of 2 cols from (G0 >= ?0) while (G0 = ?0), filter by (C5 >= ?1)
+  inline Serial AGGREGATION ops: MIN(EXPLAINTEST.C5)
+
+Refresh MAX column "C6"   RETURN RESULTS TO STORED PROCEDURE
+ INDEX SCAN of "EXPLAINTEST" using its primary key index
+ range-scan on 1 of 2 cols from (G0 >= ?0) while (G0 = ?0), filter by (C6 <= ?1)
+  inline Serial AGGREGATION ops: MAX(EXPLAINTEST.C6)
+
+Refresh MIN column "C7"   RETURN RESULTS TO STORED PROCEDURE
+ INDEX SCAN of "EXPLAINTEST" using its primary key index
+ range-scan on 1 of 2 cols from (G0 >= ?0) while (G0 = ?0), filter by (C7 >= ?1)
+  inline Serial AGGREGATION ops: MIN(EXPLAINTEST.C7)
+
+Refresh MAX column "C8"   RETURN RESULTS TO STORED PROCEDURE
+ INDEX SCAN of "EXPLAINTEST" using its primary key index
+ range-scan on 1 of 2 cols from (G0 >= ?0) while (G0 = ?0), filter by (C8 <= ?1)
+  inline Serial AGGREGATION ops: MAX(EXPLAINTEST.C8)
+
+Refresh MIN column "C9"   RETURN RESULTS TO STORED PROCEDURE
+ INDEX SCAN of "EXPLAINTEST" using its primary key index
+ range-scan on 1 of 2 cols from (G0 >= ?0) while (G0 = ?0), filter by (C9 >= ?1)
+  inline Serial AGGREGATION ops: MIN(EXPLAINTEST.C9)
+
+Refresh MAX column "C10"  RETURN RESULTS TO STORED PROCEDURE
+ INDEX SCAN of "EXPLAINTEST" using its primary key index
+ range-scan on 1 of 2 cols from (G0 >= ?0) while (G0 = ?0), filter by (C10 <= ?1)
+  inline Serial AGGREGATION ops: MAX(EXPLAINTEST.C10)
+
+Refresh MIN column "C11"  RETURN RESULTS TO STORED PROCEDURE
+ INDEX SCAN of "EXPLAINTEST" using its primary key index
+ range-scan on 1 of 2 cols from (G0 >= ?0) while (G0 = ?0), filter by (C11 >= ?1)
+  inline Serial AGGREGATION ops: MIN(EXPLAINTEST.C11)
+
+
+(Returned 12 rows in #.##s)
+
+DROP PROCEDURE P_EXPLAINTEST;
+Command succeeded.
+
+DROP VIEW V_EXPLAINTEST;
+Command succeeded.
+
+DROP TABLE EXPLAINTEST;
+Command succeeded.

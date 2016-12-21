@@ -63,7 +63,7 @@ public class TestTransactionTaskQueue extends TestCase
         when(mbox.getHSId()).thenReturn(1337l);
 
         SpProcedureTask task =
-            new SpProcedureTask(mbox, "TestProc", queue, init, null);
+            new SpProcedureTask(mbox, "TestProc", queue, init);
         return task;
     }
 
@@ -108,7 +108,7 @@ public class TestTransactionTaskQueue extends TestCase
         CompleteTransactionMessage msg = mock(CompleteTransactionMessage.class);
         when(msg.getTxnId()).thenReturn(mpTxnId);
         CompleteTransactionTask task =
-            new CompleteTransactionTask(txn, queue, msg, null);
+            new CompleteTransactionTask(mock(InitiatorMailbox.class), txn, queue, msg);
         return task;
     }
 
@@ -128,7 +128,7 @@ public class TestTransactionTaskQueue extends TestCase
         long localTxnId = 0;
         long mpTxnId = 0;
         SiteTaskerQueue task_queue = getSiteTaskerQueue();
-        TransactionTaskQueue dut = new TransactionTaskQueue(task_queue,localTxnId);
+        TransactionTaskQueue dut = new TransactionTaskQueue(task_queue);
         Deque<TransactionTask> expected_order =
             new ArrayDeque<TransactionTask>();
 

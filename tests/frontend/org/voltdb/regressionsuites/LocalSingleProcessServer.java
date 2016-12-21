@@ -43,11 +43,10 @@ import org.voltdb.compiler.VoltProjectBuilder;
  *
  */
 @Deprecated
-public abstract class LocalSingleProcessServer implements VoltServerConfig {
+public abstract class LocalSingleProcessServer extends VoltServerConfig {
 
     public final String m_jarFileName;
     public int m_siteCount;
-    public final BackendTarget m_target;
 
     ServerThread m_server = null;
     boolean m_compiled = false;
@@ -177,20 +176,15 @@ public abstract class LocalSingleProcessServer implements VoltServerConfig {
     @Override
     public void shutDown() throws InterruptedException {
         m_server.shutdown();
-        m_siteProcess.waitForShutdown();
-        if (m_target == BackendTarget.NATIVE_EE_VALGRIND_IPC) {
-            if (!EEProcess.m_valgrindErrors.isEmpty()) {
-                String failString = "";
-                for (final String error : EEProcess.m_valgrindErrors) {
-                    failString = failString + "\n" +  error;
-                }
-                org.junit.Assert.fail(failString);
-            }
-        }
+        File valgrindOutputFile = m_siteProcess.waitForShutdown();
+        LocalCluster.failIfValgrindErrors(valgrindOutputFile);
+        VoltServerConfig.removeInstance(this);
     }
 
     @Override
     public void startUp(boolean clearLocalDataDirectories) {
+        VoltServerConfig.addInstance(this);
+
         if (clearLocalDataDirectories) {
             File exportOverflow = new File( m_pathToVoltRoot, "export_overflow");
             if (exportOverflow.exists()) {

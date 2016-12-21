@@ -18,12 +18,12 @@
 package org.voltdb.utils;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.net.BindException;
 import java.net.ServerSocket;
 import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
+import java.nio.file.Files;
 import java.text.SimpleDateFormat;
 import java.util.Arrays;
 import java.util.Calendar;
@@ -88,6 +88,7 @@ public class MiscUtils {
     /**
      * Serialize a file into bytes. Used to serialize catalog and deployment
      * file for UpdateApplicationCatalog on the client.
+     * Notice that if the file is larger than 2GB, readAllBytes() will throw a OutOfMemoryError.
      *
      * @param path
      * @return a byte array of the file
@@ -95,16 +96,7 @@ public class MiscUtils {
      *             If there are errors reading the file
      */
     public static byte[] fileToBytes(File path) throws IOException {
-        FileInputStream fin = new FileInputStream(path);
-        byte[] buffer = new byte[(int) fin.getChannel().size()];
-        try {
-            if (fin.read(buffer) == -1) {
-                throw new IOException("File " + path.getAbsolutePath() + " is empty");
-            }
-        } finally {
-            fin.close();
-        }
-        return buffer;
+        return Files.readAllBytes(path.toPath());
     }
 
     /**
@@ -178,6 +170,47 @@ public class MiscUtils {
                 public boolean isCommandLoggingAllowed() {
                     return false;
                 }
+
+                @Override
+                public boolean isAWSMarketplace() {
+                    return false;
+                }
+
+                @Override
+                public boolean isEnterprise() {
+                    return false;
+                }
+
+                @Override
+                public boolean isPro() {
+                    return false;
+                }
+
+                @Override
+                public String licensee() {
+                    return "VoltDB Community Edition User";
+                }
+
+                @Override
+                public Calendar issued() {
+                    Calendar result = Calendar.getInstance();
+                    return result;
+                }
+
+                @Override
+                public String note() {
+                    return "";
+                }
+
+                @Override
+                public boolean hardExpiration() {
+                    return false;
+                }
+
+                @Override
+                public boolean secondaryInitialization() {
+                    return true;
+                }
             };
         }
 
@@ -207,6 +240,8 @@ public class MiscUtils {
         if (licenseFile.exists() == false) {
             return null;
         }
+
+        hostLog.info("Found VoltDB license file at path: " + pathToLicense);
 
         // Initialize the API. This parses the file but does NOT verify signatures.
         if (licenseApi.initializeFromFile(licenseFile) == false) {
@@ -282,14 +317,28 @@ public class MiscUtils {
             return false;
         }
 
+        // do some extra initialization here
+        if (!licenseApi.secondaryInitialization()) {
+            return false;
+        }
+
         Calendar now = GregorianCalendar.getInstance();
         SimpleDateFormat sdf = new SimpleDateFormat("MMM d, yyyy");
         String expiresStr = sdf.format(licenseApi.expires().getTime());
         boolean valid = true;
 
-        if (now.after(licenseApi.expires())) {
-            if (licenseApi.isTrial()) {
-                hostLog.fatal("VoltDB trial license expired on " + expiresStr + ".");
+        // make it really expire tomorrow to deal with timezone whiners
+        Calendar yesterday = GregorianCalendar.getInstance();
+        yesterday.add(Calendar.DATE, -1);
+
+        if (yesterday.after(licenseApi.expires())) {
+            if (licenseApi.hardExpiration()) {
+                if (licenseApi.isTrial()) {
+                    hostLog.fatal("VoltDB trial license expired on " + expiresStr + ".");
+                }
+                else {
+                    hostLog.fatal("VoltDB license expired on " + expiresStr + ".");
+                }
                 hostLog.fatal("Please contact sales@voltdb.com to request a new license.");
                 return false;
             }
@@ -308,26 +357,48 @@ public class MiscUtils {
             }
         }
 
+        // check node count
+        if (licenseApi.maxHostcount() < numberOfNodes) {
+            // Enterprise gets a pass on this one for now
+            if (licenseApi.isEnterprise()) {
+                hostLog.error("Warning, VoltDB commercial license for " + licenseApi.maxHostcount() +
+                        " nodes, starting cluster with " + numberOfNodes + " nodes.");
+                valid = false;
+            }
+            // Trial, Pro & AWS licenses have a hard enforced limit
+            else {
+                hostLog.fatal("Warning, VoltDB license for a " + licenseApi.maxHostcount() + " node " +
+                        "attempted for use with a " + numberOfNodes + " node cluster.");
+                return false;
+            }
+        }
+
+        // If this is a commercial license, and there is less than or equal to 30 days until expiration,
+        // issue a "days remaining" warning message.
+        long diff = licenseApi.expires().getTimeInMillis() - now.getTimeInMillis();
+        // The original license is only a whole data (no minutes/millis).
+        // There should thus be no issue with daylight savings time,
+        // but just in case, if the diff is a negative number, round up to zero.
+        if (diff < 0) {
+            diff = 0;
+        }
+        long diffDays = diff / (24 * 60 * 60 * 1000);
+
         // print out trial success message
         if (licenseApi.isTrial()) {
-            consoleLog.info("Starting VoltDB with trial license. License expires on " + expiresStr + ".");
+            consoleLog.info("Starting VoltDB with trial license. License expires on " + expiresStr + " (" + diffDays + " days remaining).");
             return true;
         }
 
-        // ASSUME CUSTOMER LICENSE HERE
-
-        // single node product strictly enforces the single node detail...
-        if (licenseApi.maxHostcount() == 1 && numberOfNodes > 1) {
-            hostLog.fatal("Warning, VoltDB commercial license for a 1 node " +
-                    "attempted for use with a " + numberOfNodes + " node cluster." +
-                    " A single node subscription is only valid with a single node cluster.");
-            return false;
+        if (licenseApi.isAWSMarketplace()) {
+            return true;
         }
-        // multi-node commercial licenses only warn
-        else if (numberOfNodes > licenseApi.maxHostcount()) {
-            hostLog.error("Warning, VoltDB commercial license for " + licenseApi.maxHostcount() +
-                          " nodes, starting cluster with " + numberOfNodes + " nodes.");
-            valid = false;
+
+        // print out a warning within a month for other licenses
+        if ((diff > 0) && (diff <= 30))
+        {
+            String msg = "Warning: VoltDB license expires in " + diffDays + " day(s).";
+            consoleLog.info(msg);
         }
 
         // this gets printed even if there are non-fatal problems, so it
@@ -338,23 +409,6 @@ public class MiscUtils {
                                    licenseApi.maxHostcount(),
                                    expiresStr);
         consoleLog.info(msg);
-
-        // If this is a commercial license, and there is less than or equal to 30 days until expiration,
-        // issue a "days remaining" warning message.
-        long diff = licenseApi.expires().getTimeInMillis() - now.getTimeInMillis();
-        // The original license is only a whole data (no minutes/millis).
-        // There should thus be no issue with daylight savings time,
-        // but just in case, if the diff is a negative number, round up to zero.
-        if (diff < 0)
-        {
-            diff = 0;
-        }
-        long diffDays = diff / (24 * 60 * 60 * 1000);
-        if ((diff > 0) && (diff <= 30))
-        {
-            msg = "Warning, VoltDB commercial license expires in " + diffDays + " day(s).";
-            consoleLog.info(msg);
-        }
 
         return true;
     }
@@ -743,7 +797,7 @@ public class MiscUtils {
     /**
      * Create an ArrayListMultimap that uses TreeMap as the container map, so order is preserved.
      */
-    public static <K extends Comparable, V> ListMultimap<K, V> sortedArrayListMultimap()
+    public static <K extends Comparable<?>, V> ListMultimap<K, V> sortedArrayListMultimap()
     {
         Map<K, Collection<V>> map = Maps.newTreeMap();
         return Multimaps.newListMultimap(map, new Supplier<List<V>>() {
@@ -763,17 +817,16 @@ public class MiscUtils {
      */
     public static StoredProcedureInvocation roundTripForCL(StoredProcedureInvocation invocation) throws IOException
     {
-        if (invocation.getSerializedParams() == null) {
-            ByteBuffer buf = ByteBuffer.allocate(invocation.getSerializedSize());
-            invocation.flattenToBuffer(buf);
-            buf.flip();
-
-            StoredProcedureInvocation rti = new StoredProcedureInvocation();
-            rti.initFromBuffer(buf);
-            return rti;
-        } else {
+        if (invocation.getSerializedParams() != null) {
             return invocation;
         }
+        ByteBuffer buf = ByteBuffer.allocate(invocation.getSerializedSize());
+        invocation.flattenToBuffer(buf);
+        buf.flip();
+
+        StoredProcedureInvocation rti = new StoredProcedureInvocation();
+        rti.initFromBuffer(buf);
+        return rti;
     }
 
     /**

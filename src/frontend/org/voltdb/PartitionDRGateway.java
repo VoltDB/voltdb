@@ -26,7 +26,6 @@ import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
 import org.voltdb.jni.ExecutionEngine.EventType;
-import org.voltdb.licensetool.LicenseApi;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
 
@@ -41,6 +40,7 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
         INSERT, DELETE, UPDATE, BEGIN_TXN, END_TXN, TRUNCATE_TABLE, DELETE_BY_INDEX, UPDATE_BY_INDEX, HASH_DELIMITER;
     }
 
+    // Keep sync with EE DRTxnPartitionHashFlag at types.h
     public enum DRTxnPartitionHashFlag {
         PLACEHOLDER,
         REPLICATED,
@@ -63,12 +63,19 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
     // Keep sync with EE DRConflictType at types.h
     public static enum DRConflictType {
         NO_CONFLICT,
-        CONSTRIANT_VIOLATION,
+        CONSTRAINT_VIOLATION,
         EXPECTED_ROW_MISSING,
         EXPECTED_ROW_TIMESTAMP_MISMATCH
     }
 
     public static ImmutableMap<Integer, PartitionDRGateway> m_partitionDRGateways = ImmutableMap.of();
+
+    // all partial MP txns go into SP streams
+    public static final byte DR_NO_MP_START_PROTOCOL_VERSION = 3;
+    // all partial MP txns except those with table truncation record go to MP stream separately without coordination
+    public static final byte DR_UNCOORDINATED_MP_START_PROTOCOL_VERSION = 4;
+    // partial MP txns of the same MP txn coordinated and combined before going to MP stream
+    public static final byte DR_COORDINATED_MP_START_PROTOCOL_VERSION = 6;
 
     /**
      * Load the full subclass if it should, otherwise load the
@@ -81,14 +88,10 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
                                                  ProducerDRGateway producerGateway,
                                                  StartAction startAction)
     {
-        final VoltDBInterface vdb = VoltDB.instance();
-        LicenseApi api = vdb.getLicenseApi();
-        final boolean licensedToDR = api.isDrReplicationAllowed();
-
         // if this is a primary cluster in a DR-enabled scenario
         // try to load the real version of this class
         PartitionDRGateway pdrg = null;
-        if (licensedToDR && producerGateway != null) {
+        if (producerGateway != null) {
             pdrg = tryToLoadProVersion();
         }
         if (pdrg == null) {
@@ -166,7 +169,7 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
             ByteBuffer buf) {
         final PartitionDRGateway pdrg = m_partitionDRGateways.get(partitionId);
         if (pdrg == null) {
-            VoltDB.crashLocalVoltDB("No PRDG when there should be", true, null);
+            return -1;
         }
         return pdrg.onBinaryDR(partitionId, startSequenceNumber, lastSequenceNumber,
                 lastSpUniqueId, lastMpUniqueId, EventType.values()[eventType], buf);

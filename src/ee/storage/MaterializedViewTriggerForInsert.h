@@ -64,10 +64,7 @@ public:
         return m_mvInfo;
     }
 
-    virtual void updateDefinition(PersistentTable *destTable, catalog::MaterializedViewInfo *mvInfo)
-    {
-        setTargetTable(destTable);
-    }
+    virtual void updateDefinition(PersistentTable *destTable, catalog::MaterializedViewInfo *mvInfo);
 
     template<class MATVIEW> static void segregateMaterializedViews(
         std::vector<MATVIEW*> &viewsIn,
@@ -109,9 +106,11 @@ protected:
                                   catalog::MaterializedViewInfo *mvInfo);
     void setTargetTable(PersistentTable * target);
 
-    void initializeTupleHavingNoGroupBy();
+    void initializeTupleHavingNoGroupBy(bool fallible);
 
     void allocateBackedTuples();
+
+    void initUpdatableIndexList();
 
     /** load a predicate from the catalog structure if it's there */
     static AbstractExpression* parsePredicate(catalog::MaterializedViewInfo *mvInfo);

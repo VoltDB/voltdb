@@ -23,6 +23,8 @@
 
 package org.voltdb;
 
+import static org.junit.Assert.assertTrue;
+
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 

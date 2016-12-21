@@ -17,10 +17,10 @@
 
 package org.voltdb;
 
-import org.voltdb.AuthSystem.AuthUser;
-import org.voltdb.catalog.Procedure;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
+import org.voltdb.AuthSystem.AuthUser;
+import org.voltdb.catalog.Procedure;
 import org.voltdb.common.Permission;
 import org.voltdb.utils.LogKeys;
 
@@ -47,7 +47,7 @@ public class InvocationSysprocPermissionPolicy extends InvocationPermissionPolic
     public PolicyResult shouldAccept(AuthUser user, StoredProcedureInvocation invocation, Procedure proc) {
 
         //Since AdHoc perms are diff we only check sysprocs other than AdHoc
-        if (proc.getSystemproc() && !invocation.procName.startsWith("@AdHoc")) {
+        if (proc.getSystemproc() && !invocation.getProcName().startsWith("@AdHoc")) {
             if (!user.hasPermission(Permission.ADMIN) && !proc.getReadonly()) {
                 return PolicyResult.DENY;
             }
@@ -60,7 +60,7 @@ public class InvocationSysprocPermissionPolicy extends InvocationPermissionPolic
     public ClientResponseImpl getErrorResponse(AuthUser user, StoredProcedureInvocation invocation, Procedure procedure) {
         authLog.l7dlog(Level.INFO,
                 LogKeys.auth_ClientInterface_LackingPermissionForSysproc.name(),
-                new String[] { user.m_name, invocation.procName },
+                new String[] { user.m_name, invocation.getProcName() },
                 null);
         return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
                 new VoltTable[0],

@@ -51,7 +51,7 @@ class DbMonitorUatTest extends TestBase {
     }
 
     // Command Log Statistics
-    def "Verify Max and Min values in Command Log Statistics days"(){
+    def verifyMaxAndMinValuesInCommandLogStatisticsDays() {
         expect: 'at DbMonitorPage'
         at DbMonitorPage
 
@@ -147,7 +147,7 @@ class DbMonitorUatTest extends TestBase {
         println("")
     }
 
-    def "Verify Max and Min values in Command Log Statistics minutes"(){
+    def verifyMaxAndMinValuesInCommandLogStatisticsMinutes() {
         expect: 'at DbMonitorPage'
         at DbMonitorPage
 
@@ -215,7 +215,7 @@ class DbMonitorUatTest extends TestBase {
         println("")
     }
 
-    def "Verify Max and Min values in Command Log Statistics seconds"(){
+    def verifyMaxAndMinValuesInCommandLogStatisticsSeconds() {
         expect: 'at DbMonitorPage'
         at DbMonitorPage
 
@@ -286,7 +286,7 @@ class DbMonitorUatTest extends TestBase {
     // end of Command Log Statistics
 
     // Database Replication
-    def "Verify Max and Min values in Database Replication days"(){
+    def verifyMaxAndMinValuesInDatabaseReplicationDays() {
         expect: 'at DbMonitorPage'
         at DbMonitorPage
 
@@ -382,7 +382,7 @@ class DbMonitorUatTest extends TestBase {
         println("")
     }
 
-    def "Verify Max and Min values in Database Replication minutes"(){
+    def verifyMaxAndMinValuesInDatabaseReplicationMinutes() {
         expect: 'at DbMonitorPage'
         at DbMonitorPage
 
@@ -450,7 +450,7 @@ class DbMonitorUatTest extends TestBase {
         println("")
     }
 
-    def "Verify Max and Min values in Database Replication seconds"(){
+    def verifyMaxAndMinValuesInDatabaseReplicationSeconds() {
         expect: 'at DbMonitorPage'
         at DbMonitorPage
 
@@ -520,7 +520,7 @@ class DbMonitorUatTest extends TestBase {
     //end of Database Replication
 
     //
-    def "Verify the invisibility of the Command Log Statistics Graph using Display Preferences"() {
+    def verifyTheInvisibilityOfCommandLogStatisticsGraphUsingDisplayPreferences() {
         expect: 'at DbMonitorPage'
         at DbMonitorPage
 
@@ -585,7 +585,7 @@ class DbMonitorUatTest extends TestBase {
     }
 
 
-    def "Verify the invisibility of the Database Replication Graph using Display Preferences"() {
+    def verifyTheInvisibilityOfTheDatabaseReplicationGraphUsingDisplayPreferences() {
         expect: 'at DbMonitorPage'
         at DbMonitorPage
 

@@ -266,7 +266,7 @@ public class AsyncCompilerAgent {
                 return;
             }
 
-            if (VoltDB.instance().getMode() == OperationMode.PAUSED && !w.adminConnection) {
+            if (!allowPausedModeWork(w)) {
                 AsyncCompilerResult errResult =
                     AsyncCompilerResult.makeErrorResult(w,
                             "Server is paused and is available in read-only mode - please try again later.",
@@ -279,8 +279,14 @@ public class AsyncCompilerAgent {
         }
     }
 
+    private boolean allowPausedModeWork(AsyncCompilerWork w) {
+         return (VoltDB.instance().getMode() != OperationMode.PAUSED ||
+                 w.isServerInitiated() ||
+                 w.adminConnection);
+    }
+
     void handleCatalogChangeWork(final CatalogChangeWork w) {
-        if (VoltDB.instance().getMode() == OperationMode.PAUSED && !w.adminConnection) {
+        if (!allowPausedModeWork(w)) {
             AsyncCompilerResult errResult =
                     AsyncCompilerResult.makeErrorResult(w,
                             "Server is paused and is available in read-only mode - please try again later.",
@@ -323,21 +329,17 @@ public class AsyncCompilerAgent {
 
     private void dispatchCatalogChangeWork(CatalogChangeWork work)
     {
-        final AsyncCompilerResult result = m_helper.prepareApplicationCatalogDiff(work);
-        if (result.errorMsg != null) {
+        final CatalogChangeResult ccr = m_helper.prepareApplicationCatalogDiff(work);
+        if (ccr.errorMsg != null) {
             hostLog.info("A request to update the database catalog and/or deployment settings has been rejected. More info returned to client.");
         }
         // Log something useful about catalog upgrades when they occur.
-        if (result instanceof CatalogChangeResult) {
-            CatalogChangeResult ccr = (CatalogChangeResult)result;
-            if (ccr.upgradedFromVersion != null) {
-                hostLog.info(String.format(
-                            "In order to update the application catalog it was "
-                            + "automatically upgraded from version %s.",
-                            ccr.upgradedFromVersion));
-            }
+        if (ccr.upgradedFromVersion != null) {
+            hostLog.info(String.format("In order to update the application catalog it was "
+                    + "automatically upgraded from version %s.",
+                    ccr.upgradedFromVersion));
         }
-        work.completionHandler.onCompletion(result);
+        work.completionHandler.onCompletion(ccr);
     }
 
     public static final String AdHocErrorResponseMessage =

@@ -91,8 +91,8 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         avgrows                         { $("#AVG_ROWS") }
         tabletype                       { $("#TABLE_TYPE") }
 
-        ascending                       { $(class:"sorttable_sorted") }
-        descending                      { $(class:"sorttable_sorted_reverse") }
+        ascending                       (required: false) { $(class:"sorttable_sorted") }
+        descending                      (required: false) { $(class:"sorttable_sorted_reverse") }
 
         alertThreshold                  { $("#threshold") }
         saveThreshold                   { $("#saveThreshold") }
@@ -153,7 +153,7 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         clustertransactionmax       { $("#visualisationTransaction > g > g > g.nv-x.nv-axis > g > g:nth-child(3) > text")}
 
         //partition idle graph
-        partitiongraphmin               { $("#visualisationPartitionIdleTime > g > g > g.nv-x.nv-axis > g > g:nth-child(2) > text")}
+        partitiongraphmin               (required: false) { $("#visualisationPartitionIdleTime > g > g > g.nv-x.nv-axis > g > g:nth-child(2) > text")}
         partitiongraphmax               { $("#visualisationPartitionIdleTime > g > g > g.nv-x.nv-axis > g > g:nth-child(3) > text")}
 
         //command log statistics graph
@@ -867,12 +867,31 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
     /*
  * get query to delete a table
  */
-    def String getQueryToDeleteTable() {
+    def String getQueryToDeleteTableAndView() {
         BufferedReader br = new BufferedReader(new FileReader("src/resources/sqlQueryDbMonitor.txt"));
         String line;
         String query = ""
 
         while((line = br.readLine()) != "#delete") {
+        }
+
+        while ((line = br.readLine()) != "#deleteOnly") {
+            // process the line.
+            query = query + line + "\n"
+        }
+
+        return query
+    }
+
+    /*
+
+     */
+    def String getQueryToDeleteTableOnly() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/sqlQueryDbMonitor.txt"));
+        String line;
+        String query = ""
+
+        while((line = br.readLine()) != "#deleteOnly") {
         }
 
         while ((line = br.readLine()) != "#name") {
@@ -894,9 +913,12 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         while((line = br.readLine()) != "#name") {
         }
 
-        while ((line = br.readLine()) != null) {
+        /*while ((line = br.readLine()) != null) {
             query = query + line + "\n"
-        }
+        }*/
+
+        query = br.readLine()
+
 
         return query
     }
@@ -958,7 +980,7 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         if ( descending.displayed )
             return true
         else
-            return falsez
+            return false
     }
 
     /*
@@ -1252,4 +1274,41 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
 
         return result
     }
+
+    /*
+     *  openPartitionIdleGraph opens and checks the
+     *
+     */
+    def boolean openPartitionIdleGraph() {
+        openDisplayPreference()
+        preferencesTitleDisplayed()
+        savePreferencesBtnDisplayed()
+        popupCloseDisplayed()
+
+        partitionIdleTimeCheckboxDisplayed()
+        partitionIdleTimeCheckboxClick()
+        savePreferences()
+
+        if (partitionIdleTimeDisplayed())
+            return true
+        else
+            return false
+    }
+
+    def boolean closePartitionIdleGraph() {
+        openDisplayPreference()
+        preferencesTitleDisplayed()
+        savePreferencesBtnDisplayed()
+        popupCloseDisplayed()
+
+        partitionIdleTimeCheckboxDisplayed()
+        partitionIdleTimeCheckboxClick()
+        savePreferences()
+
+        if (partitionIdleTimeDisplayed())
+            return false
+        else
+            return true
+    }
+
 }

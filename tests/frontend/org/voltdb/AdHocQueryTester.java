@@ -23,18 +23,19 @@
 
 package org.voltdb;
 
-import java.io.IOException;
+import static org.junit.Assert.assertTrue;
 
-import junit.framework.TestCase;
+import java.io.IOException;
 
 import org.voltcore.utils.PortGenerator;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.regressionsuites.JUnit4LocalClusterTest;
 import org.voltdb.utils.MiscUtils;
 
-public abstract class AdHocQueryTester extends TestCase {
+public abstract class AdHocQueryTester extends JUnit4LocalClusterTest {
 
     // TODO: make an enum
     protected final int NOT_VALIDATING_SP_RESULT = 0;

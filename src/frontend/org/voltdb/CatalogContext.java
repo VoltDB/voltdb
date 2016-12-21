@@ -20,6 +20,7 @@ package org.voltdb;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
+import java.util.Map;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.UUID;
@@ -35,6 +36,9 @@ import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Table;
 import org.voltdb.compiler.PlannerTool;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
+import org.voltdb.settings.ClusterSettings;
+import org.voltdb.settings.DbSettings;
+import org.voltdb.settings.NodeSettings;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.VoltFile;
@@ -87,28 +91,30 @@ public class CatalogContext {
     // Some people may be interested in the JAXB rather than the raw deployment bytes.
     private DeploymentType m_memoizedDeployment;
 
+    // database settings. contains both cluster and path settings
+    private final DbSettings m_dbSettings;
+
     public CatalogContext(
             long transactionId,
             long uniqueId,
             Catalog catalog,
+            DbSettings settings,
             byte[] catalogBytes,
+            byte[] catalogBytesHash,
             byte[] deploymentBytes,
             int version)
     {
         m_transactionId = transactionId;
         m_uniqueId = uniqueId;
         // check the heck out of the given params in this immutable class
-        assert(catalog != null);
         if (catalog == null) {
-            throw new RuntimeException("Can't create CatalogContext with null catalog.");
+            throw new IllegalArgumentException("Can't create CatalogContext with null catalog.");
         }
 
-        assert(deploymentBytes != null);
         if (deploymentBytes == null) {
-            throw new RuntimeException("Can't create CatalogContext with null deployment bytes.");
+            throw new IllegalArgumentException("Can't create CatalogContext with null deployment bytes.");
         }
 
-        assert(catalogBytes != null);
         if (catalogBytes != null) {
             try {
                 m_jarfile = new InMemoryJarfile(catalogBytes);
@@ -117,10 +123,21 @@ public class CatalogContext {
             catch (Exception e) {
                 throw new RuntimeException(e);
             }
-            this.catalogHash = m_jarfile.getSha1Hash();
+
+            if (catalogBytesHash != null) {
+                // This is expensive to compute so if it was passed in to us, use it.
+                this.catalogHash = catalogBytesHash;
+            }
+            else {
+                this.catalogHash = m_jarfile.getSha1Hash();
+            }
         }
         else {
-            throw new RuntimeException("Can't create CatalogContext with null catalog bytes.");
+            throw new IllegalArgumentException("Can't create CatalogContext with null catalog bytes.");
+        }
+
+        if (settings == null) {
+            throw new IllegalArgumentException("Cant't create CatalogContent with null cluster settings");
         }
 
         this.catalog = catalog;
@@ -129,6 +146,8 @@ public class CatalogContext {
         procedures = database.getProcedures();
         tables = database.getTables();
         authSystem = new AuthSystem(database, cluster.getSecurityenabled());
+
+        this.m_dbSettings = settings;
 
         this.deploymentBytes = deploymentBytes;
         this.deploymentHash = CatalogUtil.makeDeploymentHash(deploymentBytes);
@@ -155,10 +174,19 @@ public class CatalogContext {
         return cluster;
     }
 
+    public ClusterSettings getClusterSettings() {
+        return m_dbSettings.getCluster();
+    }
+
+    public NodeSettings getNodeSettings() {
+        return m_dbSettings.getNodeSetting();
+    }
+
     public CatalogContext update(
             long txnId,
             long uniqueId,
             byte[] catalogBytes,
+            byte[] catalogBytesHash,
             String diffCommands,
             boolean incrementVersion,
             byte[] deploymentBytes)
@@ -187,7 +215,9 @@ public class CatalogContext {
                     txnId,
                     uniqueId,
                     newCatalog,
+                    this.m_dbSettings,
                     bytes,
+                    catalogBytesHash,
                     depbytes,
                     catalogVersion + incValue);
         return retval;
@@ -280,19 +310,24 @@ public class CatalogContext {
     // @UpdateApplicationCatalog
     SortedMap<String, String> getDebuggingInfoFromCatalog()
     {
-        SortedMap<String, String> logLines = new TreeMap<String, String>();
+        SortedMap<String, String> logLines = new TreeMap<>();
 
         // topology
         Deployment deployment = cluster.getDeployment().iterator().next();
-        int hostCount = deployment.getHostcount();
-        int sitesPerHost = deployment.getSitesperhost();
+        int hostCount = m_dbSettings.getCluster().hostcount();
+        Map<Integer, Integer> sphMap = VoltDB.instance().getHostMessenger().getSitesPerHostMapFromZK();
+        int totalSitesCount = 0;
+        for (Map.Entry<Integer, Integer> e : sphMap.entrySet()) {
+            totalSitesCount += e.getValue();
+        }
+        int localSitesCount = sphMap.get(VoltDB.instance().getHostMessenger().getHostId());
         int kFactor = deployment.getKfactor();
         logLines.put("deployment1",
-                String.format("Cluster has %d hosts with leader hostname: \"%s\". %d sites per host. K = %d.",
-                hostCount, VoltDB.instance().getConfig().m_leader, sitesPerHost, kFactor));
+                String.format("Cluster has %d hosts with leader hostname: \"%s\". %d local sites count. K = %d.",
+                hostCount, VoltDB.instance().getConfig().m_leader, localSitesCount, kFactor));
 
         int replicas = kFactor + 1;
-        int partitionCount = sitesPerHost * hostCount / replicas;
+        int partitionCount = totalSitesCount / replicas;
         logLines.put("deployment2",
                 String.format("The entire cluster has %d %s of%s %d logical partition%s.",
                 replicas,
@@ -302,7 +337,7 @@ public class CatalogContext {
                 partitionCount > 1 ? "s" : ""));
 
         // voltdb root
-        logLines.put("voltdbroot", "Using \"" + cluster.getVoltroot() + "\" for voltdbroot directory.");
+        logLines.put("voltdbroot", "Using \"" + VoltDB.instance().getVoltDBRootPath() + "\" for voltdbroot directory.");
 
         // partition detection
         if (cluster.getNetworkpartition()) {
@@ -340,7 +375,7 @@ public class CatalogContext {
                 msg = String.valueOf(ssched.getFrequencyvalue()) + " hours";
                 break;
             }
-            logLines.put("snapshot-schedule1", "Automatic snapshots enabled, saved to " + ssched.getPath() +
+            logLines.put("snapshot-schedule1", "Automatic snapshots enabled, saved to " + VoltDB.instance().getSnapshotPath() +
                          " and named with prefix '" + ssched.getPrefix() + "'.");
             logLines.put("snapshot-schedule2", "Database will retain a history of " + ssched.getRetain() +
                          " snapshots, generated every " + msg + ".");

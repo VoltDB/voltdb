@@ -19,10 +19,9 @@ package org.voltdb.compiler;
 
 import java.util.ArrayList;
 import java.util.List;
-import org.voltdb.planner.ParsedColInfo;
-import org.voltdb.compiler.VoltXMLElementHelper;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
+import org.voltdb.planner.ParsedColInfo;
 
 /**
  * Tune XMLs for materialized view min/max recalculation queries.
@@ -35,15 +34,18 @@ public class MatViewFallbackQueryXMLGenerator {
     private ArrayList<ParsedColInfo> m_groupByColumnsParsedInfo;
     private ArrayList<ParsedColInfo> m_displayColumnsParsedInfo;
     private ArrayList<VoltXMLElement> m_fallbackQueryXMLs;
+    private final boolean m_isMultiTableView;
 
     public MatViewFallbackQueryXMLGenerator(VoltXMLElement xmlquery,
                                             ArrayList<ParsedColInfo> groupByColumnsParsedInfo,
-                                            ArrayList<ParsedColInfo> displayColumnsParsedInfo) {
+                                            ArrayList<ParsedColInfo> displayColumnsParsedInfo,
+                                            boolean isMultiTableView) {
         m_xml = xmlquery.duplicate();
         m_groupByColumnsParsedInfo = groupByColumnsParsedInfo;
         m_displayColumnsParsedInfo = displayColumnsParsedInfo;
+        m_isMultiTableView = isMultiTableView;
         m_maxElementId = VoltXMLElementHelper.findMaxElementId( m_xml );
-        m_fallbackQueryXMLs = new ArrayList<VoltXMLElement>();
+        m_fallbackQueryXMLs = new ArrayList<>();
         generateFallbackQueryXMLs();
     }
 
@@ -84,8 +86,15 @@ public class MatViewFallbackQueryXMLGenerator {
                 VoltXMLElement column = groupcolumns.get(i);
                 // Add the column to the parameter list.
                 parameters.add( VoltXMLElementHelper.buildParamElement( nextElementId(), index, valueType ) );
+
                 // Put together the where conditions for the groupby columns.
-                VoltXMLElement columnParamJoincond = VoltXMLElementHelper.buildColumnParamJoincondElement( "equal", column, lastElementId(), nextElementId() );
+                //
+                // Note that due to ENG-11080 we need to use NOT DISTINCT for
+                // multi-table views, due to the possibility of GB columns being NULL.
+                // For single-table views, we can catch NULL GB columns at runtime and
+                // fall back to a manual scan.
+                String comparisonOp = m_isMultiTableView ? "notdistinct" : "equal";
+                VoltXMLElement columnParamJoincond = VoltXMLElementHelper.buildColumnParamJoincondElement(comparisonOp, column, lastElementId(), nextElementId() );
                 joincond = VoltXMLElementHelper.mergeTwoElementsUsingOperator( "and", nextElementId(), joincond, columnParamJoincond );
             }
             // Remove the group by columns, they are now in the form of where conditions.
@@ -93,7 +102,7 @@ public class MatViewFallbackQueryXMLGenerator {
         }
 
         // 2. Process aggregation columns =====================================================================
-        List<VoltXMLElement> originalColumns = new ArrayList<VoltXMLElement>();
+        List<VoltXMLElement> originalColumns = new ArrayList<>();
         originalColumns.addAll(columns);
         columns.clear();
         // Parameter index for min/max column
@@ -115,6 +124,7 @@ public class MatViewFallbackQueryXMLGenerator {
                 // System.out.println(m_xml.toString());
                 columns.clear();
                 joincondList.clear();
+                parameters.remove(m_groupByColumnsParsedInfo.size());
             }
         }
     }

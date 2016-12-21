@@ -57,6 +57,10 @@ public:
         return new MockHashinator();
     }
 
+    std::string debug() const {
+       return "MockHashinator";
+    }
+
     ~MockHashinator() {}
 
 protected:
@@ -90,9 +94,8 @@ class TableAndIndexTest : public Test {
         TableAndIndexTest()
             : drStream(44, 64*1024),
               drReplicatedStream(16383, 64*1024) {
-            NValueArray* noParams = NULL;
             mockEngine = new MockVoltDBEngine();
-            eContext = new ExecutorContext(0, 0, NULL, &topend, &pool, noParams, mockEngine, "", 0, &drStream, &drReplicatedStream, 0);
+            eContext = new ExecutorContext(0, 0, NULL, &topend, &pool, mockEngine, "", 0, &drStream, &drReplicatedStream, 0);
             mem = 0;
             *reinterpret_cast<int64_t*>(signature) = 42;
 

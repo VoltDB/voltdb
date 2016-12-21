@@ -54,24 +54,9 @@ MaterializedViewTriggerForInsert::MaterializedViewTriggerForInsert(PersistentTab
     // any that are not solely based on primary key components.
     // Until the DDL compiler does this analysis and marks the indexes accordingly,
     // include all target table indexes except the actual primary key index on the group by columns.
-    const std::vector<TableIndex*>& targetIndexes = m_target->allIndexes();
-    BOOST_FOREACH(TableIndex *index, targetIndexes) {
-        if (index != m_index) {
-            m_updatableIndexList.push_back(index);
-        }
-    }
-
+    initUpdatableIndexList();
     allocateBackedTuples();
 
-    /* If there is no group by column and the target table is still empty
-     * even after catching up with pre-existing source tuples, we should initialize the
-     * target table with a row of default values.
-     * COUNT() functions should have value 0, other aggregation functions should have value NULL.
-     * See ENG-7872
-     */
-    if (m_groupByColumnCount == 0 && m_target->isPersistentTableEmpty()) {
-        initializeTupleHavingNoGroupBy();
-    }
     VOLT_TRACE("Finished MaterializedViewTriggerForInsert initialization...");
 }
 
@@ -83,6 +68,24 @@ MaterializedViewTriggerForInsert::~MaterializedViewTriggerForInsert() {
         delete m_aggExprs[ii];
     }
     m_target->decrementRefcount();
+}
+
+void MaterializedViewTriggerForInsert::initUpdatableIndexList() {
+    // Note that if the way we initialize this m_updatableIndexList changes in the future,
+    //   we will also need to change the condition to detect when the m_updatableIndexList
+    //   should be refreshed in the updateDefinition() function.
+    const std::vector<TableIndex*>& targetIndexes = m_target->allIndexes();
+    m_updatableIndexList.clear();
+    BOOST_FOREACH(TableIndex *index, targetIndexes) {
+        if (index != m_index) {
+            m_updatableIndexList.push_back(index);
+        }
+    }
+}
+
+void MaterializedViewTriggerForInsert::updateDefinition(PersistentTable *destTable, catalog::MaterializedViewInfo *mvInfo) {
+    setTargetTable(destTable);
+    initUpdatableIndexList();
 }
 
 NValue MaterializedViewTriggerForInsert::getAggInputFromSrcTuple(int aggIndex,
@@ -338,7 +341,7 @@ NValue MaterializedViewTriggerForInsert::getGroupByValueFromSrcTuple(int colInde
 
 }
 
-void MaterializedViewTriggerForInsert::initializeTupleHavingNoGroupBy() {
+void MaterializedViewTriggerForInsert::initializeTupleHavingNoGroupBy(bool fallible) {
     // clear the tuple that will be built to insert or overwrite
     memset(m_updatedTuple.address(), 0, m_target->getTupleLength());
     // COUNT(*) column will be zero.
@@ -350,11 +353,11 @@ void MaterializedViewTriggerForInsert::initializeTupleHavingNoGroupBy() {
             newValue = ValueFactory::getBigIntValue(0);
         }
         else {
-            newValue = ValueFactory::getNullValue();
+            newValue = NValue::getNullValue(m_updatedTuple.getSchema()->columnType(aggOffset+aggIndex));
         }
         m_updatedTuple.setNValue(aggOffset+aggIndex, newValue);
     }
-    m_target->insertPersistentTuple(m_updatedTuple, true);
+    m_target->insertPersistentTuple(m_updatedTuple, fallible);
 }
 
 bool MaterializedViewTriggerForInsert::findExistingTuple(const TableTuple &tuple) {

@@ -652,6 +652,15 @@ public class ParserBase {
                                             scale);
     }
 
+
+	public static int getWindowedExpressionType(int tokenT) {
+		int type = windowedExpressionTypeMap.get(tokenT, -1);
+		if (type == -1) {
+            throw Error.runtimeError(ErrorCode.U_S0500, "Parser");
+		}
+		return type;
+	}
+
     static int getExpressionType(int tokenT) {
 
         int type = expressionTypeMap.get(tokenT, -1);
@@ -663,11 +672,22 @@ public class ParserBase {
         return type;
     }
 
+    /*
+     * This map associates HSQL token types with Volt Operation types.
+     */
     private static final IntKeyIntValueHashMap expressionTypeMap =
         new IntKeyIntValueHashMap(37);
 
-    static {
+    /*
+     * this map associates aggregates with their Volt windowed aggregate
+     * operation types.
+     */
+    private static final IntKeyIntValueHashMap windowedExpressionTypeMap =
+    	new IntKeyIntValueHashMap(37);
 
+    static {
+        // Statically initialize the expressionTypeMap.
+        //
         // comparison
         expressionTypeMap.put(Tokens.EQUALS, OpTypes.EQUAL);
         expressionTypeMap.put(Tokens.GREATER, OpTypes.GREATER);
@@ -692,6 +712,17 @@ public class ParserBase {
         expressionTypeMap.put(Tokens.STDDEV_SAMP, OpTypes.STDDEV_SAMP);
         expressionTypeMap.put(Tokens.VAR_POP, OpTypes.VAR_POP);
         expressionTypeMap.put(Tokens.VAR_SAMP, OpTypes.VAR_SAMP);
+        expressionTypeMap.put(Tokens.RANK, OpTypes.WINDOWED_RANK);
+        expressionTypeMap.put(Tokens.DENSE_RANK, OpTypes.WINDOWED_DENSE_RANK);
+        // Windowed aggregate operators go here
+        // as well as in the expression type map
+        // above.
+        windowedExpressionTypeMap.put(Tokens.RANK, OpTypes.WINDOWED_RANK);
+        windowedExpressionTypeMap.put(Tokens.DENSE_RANK, OpTypes.WINDOWED_DENSE_RANK);
+        windowedExpressionTypeMap.put(Tokens.COUNT, OpTypes.WINDOWED_COUNT);
+        // No support for these yet.
+        // windowedExpressionTypeMap.put(Tokens.PERCENT_RANK, OpTypes.WINDOWED_PERCENT_RANK);
+        // windowedExpressionTypeMap.put(Tokens.CUME_DIST, OpTypes.WINDOWED_CUME_DIST);
     }
 
     HsqlException unexpectedToken(String tokenS) {

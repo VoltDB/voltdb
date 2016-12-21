@@ -19,6 +19,7 @@ package org.voltdb.client;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.charset.Charset;
 
 import org.voltdb.ParameterSet;
 import org.voltdb.utils.SerializationHelper;
@@ -29,54 +30,41 @@ import org.voltdb.utils.SerializationHelper;
  */
 public class ProcedureInvocation {
 
+    public static final byte CURRENT_MOST_RECENT_VERSION = ProcedureInvocationType.VERSION2.getValue();
+
     private final long m_clientHandle;
     private final String m_procName;
-    private byte m_procNameBytes[];
+    private byte m_procNameBytes[] = null;
+    private final int m_batchTimeout;
     private final ParameterSet m_parameters;
+    private final boolean m_allPartition;
 
-    // used for replicated procedure invocations
-    private final long m_originalTxnId;
-    private final long m_originalUniqueId;
-    private final ProcedureInvocationType m_type;
-
-    private int m_batchTimeout;
+    // pre-cache this for serialization
+    // this duplicates some other code, but it's nice to keep the client code
+    //  self-contained (see Constants.UTF8ENCODING)
+    private static final Charset UTF8Encoding = Charset.forName("UTF-8");
 
     public ProcedureInvocation(long handle, String procName, Object... parameters) {
-        this(-1, -1, handle, procName, parameters);
+        this(handle, BatchTimeoutOverrideType.NO_TIMEOUT, false, procName, parameters);
     }
 
     public ProcedureInvocation(long handle, int batchTimeout, String procName, Object... parameters) {
-        this(-1, -1, handle, batchTimeout, procName, parameters);
+        this(handle, batchTimeout, false, procName, parameters);
     }
 
-    ProcedureInvocation(long originalTxnId, long originalUniqueId, long handle,
-                        String procName, Object... parameters) {
-        this(originalTxnId, originalUniqueId, handle, BatchTimeoutOverrideType.NO_TIMEOUT, procName, parameters);
-    }
+    public ProcedureInvocation(long handle, int batchTimeout, boolean allPartition, String procName, Object... parameters) {
+        if ((batchTimeout < 0) && (batchTimeout != BatchTimeoutOverrideType.NO_TIMEOUT)) {
+            throw new IllegalArgumentException("Timeout value can't be negative." );
+        }
 
-    ProcedureInvocation(long originalTxnId, long originalUniqueId, long handle,
-            int batchTimeout, String procName, Object... parameters) {
-        super();
-        m_originalTxnId = originalTxnId;
-        m_originalUniqueId = originalUniqueId;
         m_clientHandle = handle;
         m_procName = procName;
         m_parameters = (parameters != null
                             ? ParameterSet.fromArrayWithCopy(parameters)
                             : ParameterSet.emptyParameterSet());
 
-        // auto-set the type if both txn IDs are set
-        if (m_originalTxnId == -1 && m_originalUniqueId == -1) {
-            if (BatchTimeoutOverrideType.isUserSetTimeout(batchTimeout)) {
-                m_type = ProcedureInvocationType.VERSION1;
-            } else {
-                m_type = ProcedureInvocationType.ORIGINAL;
-            }
-        } else {
-            m_type = ProcedureInvocationType.REPLICATED;
-        }
-
         m_batchTimeout = batchTimeout;
+        m_allPartition = allPartition;
     }
 
     /** return the clientHandle value */
@@ -88,26 +76,6 @@ public class ProcedureInvocation {
         return m_procName;
     }
 
-    public int getSerializedSize() {
-        try {
-            m_procNameBytes = m_procName.getBytes("UTF-8");
-        } catch (Exception e) {/*No UTF-8? Really?*/}
-
-        int timeoutSize = 0;
-        if (m_type.getValue() >= BatchTimeoutOverrideType.BATCH_TIMEOUT_VERSION) {
-            // Adding 1 for NO_BATCH_TIMEOUT/HAS_BATCH_TIMEOUT flag.
-            // In the most common case, the default value, BatchTimeoutType.NO_BATCH_TIMEOUT, does not get serialized.
-            timeoutSize = 1 + (m_batchTimeout == BatchTimeoutOverrideType.NO_TIMEOUT ? 0 : 4);
-        }
-        // 16 is the size of the m_originalTxnId and m_originalUniqueId values
-        // that are required by DR internal invocations prior to DR v2.
-        int size =
-            1 + (ProcedureInvocationType.isDeprecatedInternalDRType(m_type)? 16 : 0) +
-            timeoutSize +
-            m_procNameBytes.length + 4 + 8 + m_parameters.getSerializedSize();
-        return size;
-    }
-
     public int getPassedParamCount() {
         return m_parameters.size();
     }
@@ -116,25 +84,69 @@ public class ProcedureInvocation {
         return m_parameters.getParam(index);
     }
 
-    public ByteBuffer flattenToBuffer(ByteBuffer buf) throws IOException {
-        buf.put(m_type.getValue());//Version
-        if (ProcedureInvocationType.isDeprecatedInternalDRType(m_type)) {
-            buf.putLong(m_originalTxnId);
-            buf.putLong(m_originalUniqueId);
+    public long getClientHandle() {
+        return m_clientHandle;
+    }
+
+    public int getBatchTimeout() {
+        return m_batchTimeout;
+    }
+
+    public boolean getAllPartition() {
+        return m_allPartition;
+    }
+
+    public int getSerializedSize() {
+        // convert proc name to bytes if needed
+        if (m_procNameBytes == null) {
+            m_procNameBytes = m_procName.getBytes(UTF8Encoding);
         }
 
-        if (m_type.getValue() >= BatchTimeoutOverrideType.BATCH_TIMEOUT_VERSION) {
-            if (m_batchTimeout == BatchTimeoutOverrideType.NO_TIMEOUT) {
-                buf.put(BatchTimeoutOverrideType.NO_OVERRIDE_FOR_BATCH_TIMEOUT.getValue());
-            } else {
-                buf.put(BatchTimeoutOverrideType.HAS_OVERRIDE_FOR_BATCH_TIMEOUT.getValue());
-                buf.putInt(m_batchTimeout);
-            }
+        // get extension sizes - if not present, size is 0 for each
+        // 6 is one byte for ext type, one for size, and 4 for integer value
+        int batchExtensionSize = m_batchTimeout != BatchTimeoutOverrideType.NO_TIMEOUT ? 6 : 0;
+        // 2 is one byte for ext type, one for size
+        int allPartitionExtensionSize = m_allPartition ? 2 : 0;
+
+        int size =
+            1 + // type
+            4 + m_procNameBytes.length + // procname
+            8 + // client handle
+            1 + // extension count
+            batchExtensionSize + allPartitionExtensionSize + // extensions
+            m_parameters.getSerializedSize(); // parameters
+        assert(size > 0); // sanity
+        return size;
+    }
+
+    public ByteBuffer flattenToBuffer(ByteBuffer buf) throws IOException {
+        // convert proc name to bytes if needed
+        if (m_procNameBytes == null) {
+            m_procNameBytes = m_procName.getBytes(UTF8Encoding);
         }
+
+        buf.put(CURRENT_MOST_RECENT_VERSION); //Version
 
         SerializationHelper.writeVarbinary(m_procNameBytes, buf);
+
         buf.putLong(m_clientHandle);
+
+        // there are two possible extensions, count which apply
+        byte extensionCount = 0;
+        if (m_batchTimeout != BatchTimeoutOverrideType.NO_TIMEOUT) ++extensionCount;
+        if (m_allPartition) ++extensionCount;
+        // write the count as one byte
+        buf.put(extensionCount);
+        // write any extensions that apply
+        if (m_batchTimeout != BatchTimeoutOverrideType.NO_TIMEOUT) {
+            ProcedureInvocationExtensions.writeBatchTimeoutWithTypeByte(buf, m_batchTimeout);
+        }
+        if (m_allPartition) {
+            ProcedureInvocationExtensions.writeAllPartitionWithTypeByte(buf);
+        }
+
         m_parameters.flattenToBuffer(buf);
+
         return buf;
     }
 }

@@ -17,51 +17,8 @@
 # Stop a node. Written to easily support multiple, but configured for
 # a single host for now.
 
-
-class Host(dict):
-
-    def __init__(self, id, abort_func):
-        self.id = id
-        self.abort_func = abort_func
-
-    # Provide pseudo-attributes for dictionary items with error checking
-    def __getattr__(self, name):
-        try:
-            return self[name]
-        except IndexError:
-            self.abort_func('Attribute "%s" not present for host.' % name)
-
-
-class Hosts(object):
-
-    def __init__(self, abort_func):
-        self.hosts_by_id = {}
-        self.abort_func = abort_func
-
-    def update(self, host_id_raw, prop_name_raw, value_raw):
-        host_id = int(host_id_raw)
-        prop_name = prop_name_raw.lower()
-        value = value_raw
-        if prop_name.endswith('port'):
-            value = int(value)
-        self.hosts_by_id.setdefault(host_id, Host(host_id, self.abort_func))[prop_name] = value
-
-    def get_target_and_connection_host(self, host_name):
-        """
-        Find an arbitrary host that isn't the one being stopped.
-        Returns a tuple with connection and target host objects.
-        """
-        connection_host = None
-        target_host = None
-        for host in self.hosts_by_id.values():
-            if host.hostname == host_name:
-                target_host = host
-            elif connection_host is None:
-                connection_host = host
-            if not connection_host is None and not target_host is None:
-                break
-        return (target_host, connection_host)
-
+from voltcli.hostinfo import Host
+from voltcli.hostinfo import Hosts
 
 @VOLT.Command(
     bundles = VOLT.AdminBundle(),
@@ -70,6 +27,7 @@ class Hosts(object):
         VOLT.StringArgument('target_host', 'the target HOST name or address'),
     ),
 )
+
 def stop(runner):
 
     # Exec @SystemInformation to find out about the cluster.
@@ -93,8 +51,9 @@ def stop(runner):
         user_info = ', user: %s' % runner.opts.username
     else:
         user_info = ''
-    runner.info('Connecting to host: %s:%d%s' % (chost.hostname, chost.adminport, user_info))
-    runner.voltdb_connect(chost.hostname, chost.adminport,
+    runner.info('Connecting to %s:%d%s (%s) to issue "stop" command' %
+                (chost.get_admininterface(), chost.adminport, user_info, chost.hostname))
+    runner.voltdb_connect(chost.get_admininterface(), chost.adminport,
                           runner.opts.username, runner.opts.password)
 
     # Stop the requested host using exec @StopNode HOST_ID

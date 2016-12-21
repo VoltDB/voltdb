@@ -26,15 +26,23 @@ import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.dtxn.SiteTracker;
+import org.voltdb.settings.ClusterSettings;
+import org.voltdb.settings.NodeSettings;
 
 public interface SystemProcedureExecutionContext {
     public Database getDatabase();
 
     public Cluster getCluster();
 
+    public ClusterSettings getClusterSettings();
+
+    public NodeSettings getPaths();
+
     public long getSpHandleForSnapshotDigest();
 
     public long getSiteId();
+
+    public int getLocalSitesCount();
 
     // does this site have "lowest site id" responsibilities.
     public boolean isLowestSiteId();
@@ -71,6 +79,8 @@ public interface SystemProcedureExecutionContext {
     public boolean updateCatalog(String catalogDiffCommands, CatalogContext context,
             CatalogSpecificPlanner csp, boolean requiresSnapshotIsolation, long uniqueId, long spHandle);
 
+    public boolean updateSettings(CatalogContext context, CatalogSpecificPlanner csp);
+
     public TheHashinator getCurrentHashinator();
 
     public Procedure ensureDefaultProcLoaded(String procName);
@@ -84,8 +94,8 @@ public interface SystemProcedureExecutionContext {
 
     public void forceAllDRNodeBuffersToDisk(final boolean nofsync);
 
-    public byte isExpectedApplyBinaryLog(int producerClusterId, int producerPartitionId,
-                                         long lastReceivedDRId);
+    public DRIdempotencyResult isExpectedApplyBinaryLog(int producerClusterId, int producerPartitionId,
+                                                        long lastReceivedDRId);
 
     public void appendApplyBinaryLogTxns(int producerClusterId, int producerPartitionId,
                                          long localUniqueId, DRConsumerDrIdTracker tracker);

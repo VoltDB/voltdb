@@ -19,61 +19,62 @@ package org.voltdb;
 
 import org.voltdb.compiler.deploymentfile.ReadlevelType;
 
+/**
+ * Note: A shortcut read (FAST) is a read operation sent to any replica and completed with no
+ * confirmation or communication with other replicas. In a partition scenario, it's
+ * possible to read an unconfirmed transaction's writes that will be lost.
+ */
 public abstract class Consistency {
 
     public enum ReadLevel {
-        FAST (0),
-        SAFE (1);
+        FAST (0),   // send reads everywhere, no waiting or queue, return response to clients immediately.
+        SAFE (1);   // send reads to primary, do not replicate them to replicas, but don't lose them to
+                    // clients until any previous writes have been ack-ed of the repair log.
 
-        private final int value;
+
+        private final int m_value;
 
         /** Constructor for non-JDBC-visible types.
          * This can safely stub out any attributes that are only used by jdbc. */
         private ReadLevel(int value) {
-            this.value = value;
+            this.m_value = value;
         }
 
         public int toInt() {
-            return value;
+            return m_value;
         }
 
         public static ReadLevel fromInt(int value) {
-            if (value == FAST.value) {
+            if (value == FAST.m_value) {
                 return FAST;
             }
-            else if (value == SAFE.value) {
+            if (value == SAFE.m_value) {
                 return SAFE;
             }
-            else {
-                throw new IllegalArgumentException(
-                        String.format("No Consistency.ReadLevel with value: %d", value));
-            }
+            throw new IllegalArgumentException(
+                    String.format("No Consistency.ReadLevel with value: %d", value));
         }
 
         public static ReadLevel fromReadLevelType(ReadlevelType value) {
             if (value == ReadlevelType.FAST) {
                 return FAST;
             }
-            else if (value == ReadlevelType.SAFE) {
+            if (value == ReadlevelType.SAFE) {
                 return SAFE;
             }
-            else {
-                throw new IllegalArgumentException(
-                        String.format("No Consistency.ReadLevel with value: %s", value.toString()));
-            }
+            throw new IllegalArgumentException(
+                    String.format("No Consistency.ReadLevel with value: %s", value.toString()));
         }
 
         public ReadlevelType toReadLevelType() {
             if (this == FAST) {
                 return ReadlevelType.FAST;
             }
-            else if (this == SAFE) {
+            if (this == SAFE) {
                 return ReadlevelType.SAFE;
             }
-            else {
-                throw new IllegalArgumentException(
-                        String.format("No ReadlevelType mapping for Consistency.ReadLevel: %s", toString()));
-            }
+            throw new IllegalArgumentException(
+                    String.format("No ReadlevelType mapping for Consistency.ReadLevel: %s", toString()));
         }
     }
 }

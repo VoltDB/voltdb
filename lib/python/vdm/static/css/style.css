@@ -107,6 +107,12 @@ body {
 .leftSide {
 	float: left;
 }
+.leftServWrap {position: relative; top: 5px; float:left!important;}
+.rightSideServ{float: left;padding: 0 0 0px 10px; position: relative;top: -3px;}
+.defaultServ option { font-weight:bold;}
+.defaultServ option{ padding:5px;}
+.defaultServ option:nth-child(1){ color:#222222; background:#cccccc;}
+
 .inputText {
 	height: 30px;
 	padding: 5px 10px;
@@ -135,6 +141,14 @@ label.error {
 .redC, .redC a {
 	color: #ff0000;
 }
+
+.infoClass{
+    color: #ff0000;
+    margin-right: 10px
+}
+
+.editClass { padding-right:10px;}
+.redC { padding-right:10px;}
 .left-space {
 	padding-left: 5px;
 }
@@ -259,7 +273,7 @@ label.ccErrorMsg {
 	font-size: 16px;
 	width: 73px;
 }
-.clusterDBName {
+.clusterDBName, .serverDBName {
 	font-weight: bold;
 	font-size: 16px;
 	color: #68A81A;
@@ -600,9 +614,11 @@ table td.tdROle label.error {
 	float: right
 }
 .ContentServerBody {
-	overflow: auto;
+	overflow-x:auto;
+  overflow-y:auto;
+	height:211px;
 }
-.clusterConfig {
+.clusterConfig,.serverConfig {
 	background: #e4e4e4;
 	margin: 0 15px 0 15px;
 	padding-bottom: 15px;
@@ -610,7 +626,7 @@ table td.tdROle label.error {
 	border-right: 1px solid #CCCCCC;
 	border-bottom: 1px solid #CCCCCC;
 }
-.clusterConfigLeft {
+.clusterConfigLeft,.serverConfigWrap {
 	padding: 0 0 0 5px;
 }
 .clusterConfigRight {
@@ -709,7 +725,6 @@ ul.addServerList li:nth-child(1) {
 }
 .tblCluster tr td:nth-child(1) {
 	width: 80%;
-	position: relative;
 	padding-left: 20px;
 	font-weight: bold;
 }
@@ -742,7 +757,7 @@ ul.addServerList li:nth-child(1) {
 	position: relative;
 	top: -2px;
 }
-.clusterConfigWrapper {
+.clusterConfigWrapper, .serverConfigWrapper {
 	background-color: #f5f6f6;
 	padding: 15px 20px;
 	margin: 15px 0 0 0;
@@ -760,7 +775,7 @@ ul.addServerList li:nth-child(1) {
 	height: 30px;
 	padding: 5px 10px;
 	line-height: 1.5;
-	width: 70px;
+	width: 96px;
 	text-align: center;
 }
 .overviewInputText1 {
@@ -813,14 +828,15 @@ ul.addServerList li:nth-child(1) {
 	height: 53px;
 	position: relative;
 	background: #fbfbfb;
-	border-bottom: 1px solid #aaa;
+	border: 1px solid #aaa;
+	border-bottom:none;
 }
 .mainContent h1 {
 	padding: 18px 0 0 20px;
 	font-size: 17px;
 }
 .headerAdminContent h1 {
-	padding: 18px 0 0 20px;
+	padding:0 0 15px 20px;
 	font-size: 17px;
 }
 .mainTbl {
@@ -834,6 +850,7 @@ ul.addServerList li:nth-child(1) {
 .adminTbl tr {
 	border-bottom: 1px solid #CCCCCC;
 }
+.adminTbl tr:last-child {border-bottom:none;}
 .adminTbl th {
 	margin: 0;
 	padding: 15px 25px 15px 20px;
@@ -951,21 +968,25 @@ ul.addServerList li:nth-child(1) {
 	text-align: right
 }
 .drWrapperAdmin {
-	margin: 20px 0 0 0;
+	padding: 20px 0 0 0;
+	border-top:1px solid #ccc;
 }
 .headerAdminContent {
-	height: 53px;
+/*	height: 53px;*/
 	position: relative;
 	background: #fbfbfb;
-	border-bottom: 1px solid #aaa;
+	border-bottom: 1px solid #ccc;
 }
 
 .drAdminHeaderLeft {
 	float: left;
+    font-weight:bold;
+    font-size:14px;
 }
 .drAdminHeaderRight {
 	float: right;
-	width: 65px;
+	/*width: 65px;*/
+	padding-right:46px;
 }
 .replicaWrapper {
 	position: relative;
@@ -1063,6 +1084,16 @@ table.tblPopup {
 	resize: none;
 }
 /****************Server Settings**********************/
+.modal-dialog.modal-dialog-center.modelServerDetails {
+    width: 34%;
+    margin: 0 auto;
+}
+
+.serverDetails {
+    border-bottom: 1px solid #ccc;
+    line-height: 28px;
+    margin: 0 -10px 0 -5px;
+}
 .serverTop {
 	background-color: #f5f6f6;
 	border-left: 1px solid #CCCCCC;
@@ -1246,6 +1277,7 @@ table.tblPopup {
 	text-decoration: underline;
 	font-style: italic;
 }
+.connectionSourceTbl tr td:nth-child(3) { width:81px;}
 .disableSelect {
 	background-color: #eee;
 	border-color: #ccc;
@@ -1421,6 +1453,7 @@ ul.listStalled li.pullback {
 	padding: 10px 0;
 	text-align: left;
 }
+
 a.clustBtn {
 	display: inline-block;
 	background-image: linear-gradient( #FFFFFF, #f3f3f3 );
@@ -1615,7 +1648,7 @@ select {
 	border-color: #ccc;
 }
 }
-.startFail, .stalledState { padding:15px;}
+.startFail, .stalledState, .clsShutdownCluster { padding:15px;}
 .startFail .startFailContainer, .stalledState .stalledStateContainer { margin:30px 0 0 0; width:100%;}
 .redcData {color: #ff0000; padding-right:5px; font-size:25px;}
 .warningData {color: #ff0000;font-size: 15px;}
@@ -1623,7 +1656,120 @@ select {
 .startAdminMode { margin:10px 0 0 0; padding:0;}
 .startAdminMode input[type="checkbox"] { position:relative; top:-2px;}
 .startAdminMode label { font-weight:normal;}
+.clsShutdownCluster .clsShutdownClusterContainer { margin:0 0 15px 0; width:100%; text-align:left; }
+.btnClsShutdownCluster { text-align:center; margin-top:15px;}
+.clsShutdownCluster .clsShutdownClusterContainer .modal-content .modal-body p {font-size:13px;font-weight:normal;}
+.databaseRg1 { margin-top:2%; margin-bottom:2%}
+.clsShutdownWarning { color:#FF0000; margin-right:2px;}
+.divShutdownMsg p { line-height:20px;}
+.clsShutdownBtn { background:#aa1f2f; color:#FFF;}
+
 /**************Button start/Stop ends******************/
+/**************Server List******************/
+
+.redDotDropDown span.glyphicon.glyphicon-one-fine-dot:before {
+    content: "\25cf";
+    font-size: 33px;
+    color: #c70000;
+}
+.glyphicon.glyphicon-one-fine-dot:before {
+    content: "\25cf";
+    font-size: 33px;
+    color: #68A81A;
+}
+
+
+.btnStartServer > div > .glyphicon.glyphicon-off:before, .btnStopServer > div > .glyphicon.glyphicon-off:before{
+    font-size: 1.3em;
+    color: #aa1f2f;
+    }
+.glyphicon.glyphicon-remove:before{
+    font-size: 1.5em;
+    color: #aa1f2f;
+    }
+
+.glyphicon.glyphicon-menu-hamburger:before{
+    font-size: 1.55em;
+
+    }
+
+ .startServerEnabled > div > .glyphicon.glyphicon-play:before, .btnStopServer > div > .glyphicon.glyphicon-play:before{
+    font-size: 1.5em;
+color: #68A81A;
+    }
+
+ .startServerDisabled > div > .glyphicon.glyphicon-play:before{
+    font-size: 1.5em;
+color: grey;
+    }
+
+.clsServerList, .clsServerListGreen { position:relative; top:-5px;}
+
+.serverListIcons {padding-right:2px;}
+
+.serverListRemove { font-size:1.2em}
+.deleteServerListTxt {
+    font-size: 12px;
+    position: relative;
+    top: -3px;
+
+    }
+ .tblCluster tr td.servListDD { padding-bottom:12px;}
+  .tblCluster tr td { padding-top:10px;}
+.serverListDropdown { display:inline-block; cursor:pointer; }
+.serverListDropdown .dropdown-menu {min-width:135px; font-size:13px;}
+.serverListDropdown ul.dropdown-menu { margin:0; padding:0;}
+.serverListDropdown ul.dropdown-menu li{ padding:0px 0 2px 0; line-height:20px; font-weight:normal;}
+.serverListDropdown ul.dropdown-menu li a {padding:3px 20px 3px 10px;}
+.serverListDropdown ul.dropdown-menu li a:hover { background-color:#E6E3E3; display:block;}
+.serverListDropdown ul.dropdown-menu li a span{ padding:0 10px 0 0px;}
+.iconDD {position:relative; top:-3px;}
+.modal.custom .updateServerlistWrap {
+    width: 10%;
+    left: 12%;
+    margin-top: 13%!important;
+}
+.serverListContainer {
+    background: #fff;
+    padding: 0px 0 0 0;
+}
+.redDot {
+    background: url(../images/red-dot.png) no-repeat;
+    padding-right: 26px;
+    padding-bottom: 11px;
+    position: relative;
+    top: -12px;
+    right: 6px;}
+
+ .greenDot {
+    background: url(../images/green-dot.png) no-repeat;
+    padding-right: 26px;
+    padding-bottom: 11px;
+    position: relative;
+    top: -12px;
+    right: 6px;}
+
+ .grayDot {
+    background: url(../images/gray-dot.png) no-repeat;
+    padding-right: 26px;
+    padding-bottom: 11px;
+    position: relative;
+    top: -12px;
+    right: 6px;}
+
+ .btnStartServer , .btnStopServer{
+    cursor: pointer
+ }
+
+/**************Server List Ends******************/
+
+/******************* Database Configuration ***************************/
+.wrapOverview {overflow: hidden;padding: 20px;background: #F1F1F1; border:1px solid #CCCCCC;	}
+.mainTblLeft {float: left; width: 49%; background: #FFF; border:1px solid #CCCCCC;}
+.mainTblRight { float:right; background:#fff;width:49%; border:1px solid #CCCCCC;}
+.serverHeadText {font-weight: bold; font-size: 16px; }
+.serverDB { float: left;cursor: pointer; margin-left:5px;}
+/******************* Database Configuration end ***************************/
 /************Media Queries for mobile compatibility***************/
 @media (min-width: 768px) {
 .form-horizontal .control-label {
@@ -1673,7 +1819,7 @@ ul.nav li:nth-child(1) {
 
 }
 @media (max-width: 991px) {
-.clusterConfigLeft {
+.clusterConfigLeft,.serverConfigWrap {
 	padding: 0;
 }
 .clusterConfigRight {
@@ -1687,12 +1833,11 @@ ul.nav li:nth-child(1) {
 }
 
 @media (min-width: 320px) and (max-width: 360px) {
-.headerAdminContent { width:auto; overflow:auto;}
 .drAdminHeaderRight { width:10px;}
 }
 @media (min-width: 320px) and (max-width: 480px) {
 .headerAdminContent {
-	height: 63px;
+	/*height: 63px;*/
 }
 ul.drList {
 	margin: 0 12px 0 0;
@@ -1715,6 +1860,7 @@ ul.drList {
 .formServer input[type="text"], .formServer textarea {
 	width: 100%;
 }
+
 .modal .connectionSourceModel {
 	overflow: auto;
 	height: 450px;
@@ -1726,6 +1872,7 @@ ul.drList {
 .form-horizontal >.panel-group {
 	margin: 0;
 }
+
 }
  @media (min-width: 320px) and (max-width: 640px) {
 .rightSide {
@@ -1742,6 +1889,7 @@ ul.drList {
 	margin: 35% auto;
 	right: 0;
 }
+
 }
  @media (min-width: 620px) and (max-width: 800px) {
 .modal.custom .modifiedModalCreateDB {
@@ -1766,6 +1914,10 @@ ul.drList {
 .createDB {
 	margin-left: 15px;
 }
+}
+@media (max-width: 980px) {
+	
+.mainTblLeft, .mainTblRight { float:none; width:100%; overflow:auto;}	
 }
 @media (min-width: 768px) and (max-width: 980px) {
 .modal.custom .modifiedModalCreateDB {
@@ -1811,3 +1963,4 @@ ul.drList {
   @media (width: 980px){
 	 .overlayWrapper { width:96.9%;}
  }
+

@@ -24,18 +24,51 @@
 #include "common/subquerycontext.h"
 #include "common/ValuePeeker.hpp"
 #include "common/UniqueId.hpp"
+#include "execution/ExecutorVector.h"
+#include "execution/VoltDBEngine.h"
 
 #include <vector>
+#include <stack>
 #include <map>
+#include <memory>
 
 namespace voltdb {
 
 extern const int64_t VOLT_EPOCH;
 extern const int64_t VOLT_EPOCH_IN_MILLIS;
 
+// how many initial tuples to scan before calling into java
+const int64_t LONG_OP_THRESHOLD = 10000;
+
 class AbstractExecutor;
 class AbstractDRTupleStream;
 class VoltDBEngine;
+
+class TempTable;
+
+struct ProgressStats {
+    int64_t TuplesProcessedInBatch;
+    int64_t TuplesProcessedInFragment;
+    int64_t TuplesProcessedSinceReport;
+    int64_t TupleReportThreshold;
+    PlanNodeType LastAccessedPlanNodeType;
+
+    ProgressStats() {
+        TuplesProcessedInBatch = TuplesProcessedInFragment = TuplesProcessedSinceReport = 0;
+        TupleReportThreshold = LONG_OP_THRESHOLD;
+        LastAccessedPlanNodeType = PLAN_NODE_TYPE_INVALID;
+    }
+
+    inline void resetForNewBatch() {
+        TuplesProcessedInBatch = TuplesProcessedInFragment = TuplesProcessedSinceReport = 0;
+    }
+
+    inline void rollUpForPlanFragment() {
+        TuplesProcessedInBatch += TuplesProcessedInFragment;
+        TuplesProcessedInFragment = 0;
+        TuplesProcessedSinceReport = 0;
+    }
+};
 
 /*
  * EE site global data required by executors at runtime.
@@ -55,7 +88,6 @@ class ExecutorContext {
                     UndoQuantum *undoQuantum,
                     Topend* topend,
                     Pool* tempStringPool,
-                    NValueArray* params,
                     VoltDBEngine* engine,
                     std::string hostname,
                     CatalogId hostId,
@@ -135,10 +167,6 @@ class ExecutorContext {
         return m_undoQuantum;
     }
 
-    NValueArray* getParameterContainer() {
-        return m_staticParams;
-    }
-
     static VoltDBEngine* getEngine() {
         return getExecutorContext()->m_engine;
     }
@@ -148,7 +176,7 @@ class ExecutorContext {
     }
 
     Topend* getTopend() {
-        return m_topEnd;
+        return m_topend;
     }
 
     /** Current or most recent sp handle */
@@ -216,16 +244,52 @@ class ExecutorContext {
         return &(m_subqueryContextMap.find(subqueryId)->second);
     }
 
-    Table* executeExecutors(int subqueryId);
-    Table* executeExecutors(const std::vector<AbstractExecutor*>& executorList,
-                            int subqueryId);
+    /**
+     * Execute all the executors in the given vector.
+     *
+     * This method will clean up intermediate temporary results, and
+     * return the result table of the last executor.
+     *
+     * The class UniqueTempTableResult is a smart pointer-like object
+     * that will delete the rows of the temp table when it goes out of
+     * scope.
+     *
+     * In absence of subqueries, which cache their results for
+     * performance, this method takes care of all cleanup
+     * aotomatically.
+     */
+    UniqueTempTableResult executeExecutors(const std::vector<AbstractExecutor*>& executorList,
+                                           int subqueryId = 0);
 
+    /**
+     * Similar to above method.  Execute the executors associated with
+     * the given subquery ID, as defined in m_executorsMap.
+     */
+    UniqueTempTableResult executeExecutors(int subqueryId);
+
+    /**
+     * Return the result produced by the given subquery.
+     */
     Table* getSubqueryOutputTable(int subqueryId) const;
 
+    /**
+     * Cleanup all the executors in m_executorsMap (includes top-level
+     * enclosing fragments and any subqueries), and delete any tuples
+     * in temp tables used by the executors.
+     */
     void cleanupAllExecutors();
 
+    /**
+     * Clean up the executors in the given list.
+     */
     void cleanupExecutorsForSubquery(const std::vector<AbstractExecutor*>& executorList) const;
+
+    /**
+     * Clean up the executors for the given subquery, as contained in m_executorsMap.
+     */
     void cleanupExecutorsForSubquery(int subqueryId) const;
+
+    void resetExecutionMetadata(ExecutorVector* executorVector);
 
     void setDrStream(AbstractDRTupleStream *drStream);
     void setDrReplicatedStream(AbstractDRTupleStream *drReplicatedStream);
@@ -249,13 +313,88 @@ class ExecutorContext {
 
     bool allOutputTempTablesAreEmpty() const;
 
+    void checkTransactionForDR();
+
+    void setUsedParameterCount(int usedParamcnt) { m_usedParamcnt = usedParamcnt; }
+    int getUsedParameterCount() const { return m_usedParamcnt; }
+    NValueArray& getParameterContainer() { return m_staticParams; }
+    const NValueArray& getParameterContainer() const { return m_staticParams; }
+
+    void pushNewModifiedTupleCounter() { m_tuplesModifiedStack.push(0); }
+    void popModifiedTupleCounter() { m_tuplesModifiedStack.pop(); }
+    const int64_t getModifiedTupleCount() const {
+        assert(m_tuplesModifiedStack.size() > 0);
+        return m_tuplesModifiedStack.top();
+    }
+    const size_t getModifiedTupleStackSize() const { return m_tuplesModifiedStack.size(); }
+
+    /** DML executors call this to indicate how many tuples
+         * have been modified */
+    void addToTuplesModified(int64_t amount) {
+        assert(m_tuplesModifiedStack.size() > 0);
+        m_tuplesModifiedStack.top() += amount;
+    }
+
+    /**
+     * Called just before a potentially long-running operation
+     * begins execution.
+     *
+     * Track total tuples accessed for this query.  Set up
+     * statistics for long running operations thru m_engine if
+     * total tuples accessed passes the threshold.
+     */
+    inline int64_t pullTuplesRemainingUntilProgressReport(PlanNodeType planNodeType) {
+        m_progressStats.LastAccessedPlanNodeType = planNodeType;
+        return m_progressStats.TupleReportThreshold - m_progressStats.TuplesProcessedSinceReport;
+    }
+
+    /**
+     * Called periodically during a long-running operation to see
+     * if we need to report a long-running fragment.
+     */
+    inline int64_t pushTuplesProcessedForProgressMonitoring(const TempTableLimits* limits,
+                                                            int64_t tuplesProcessed) {
+        m_progressStats.TuplesProcessedSinceReport += tuplesProcessed;
+        if (m_progressStats.TuplesProcessedSinceReport >= m_progressStats.TupleReportThreshold) {
+            reportProgressToTopend(limits);
+        }
+        return m_progressStats.TupleReportThreshold; // size of next batch
+    }
+
+    /**
+     * Called when a long-running operation completes.
+     */
+    inline void pushFinalTuplesProcessedForProgressMonitoring(const TempTableLimits* limits,
+                                                              int64_t tuplesProcessed) {
+        try {
+            pushTuplesProcessedForProgressMonitoring(limits, tuplesProcessed);
+        } catch(const SerializableEEException &e) {
+            e.serialize(m_engine->getExceptionOutputSerializer());
+        }
+
+        m_progressStats.LastAccessedPlanNodeType = PLAN_NODE_TYPE_INVALID;
+    }
+
+    /**
+     * Call into the topend with information about how executing a plan fragment is going.
+     */
+    void reportProgressToTopend(const TempTableLimits* limits);
+
   private:
-    Topend *m_topEnd;
+    Topend *m_topend;
     Pool *m_tempStringPool;
     UndoQuantum *m_undoQuantum;
 
-    // Pointer to the static parameters
-    NValueArray* m_staticParams;
+    /** reused parameter container. */
+    NValueArray m_staticParams;
+    /** TODO : should be passed as execute() parameter..*/
+    int m_usedParamcnt;
+
+    /** Counts tuples modified by a plan fragments.  Top of stack is the
+     * most deeply nested executing plan fragment.
+     */
+    std::stack<int64_t> m_tuplesModifiedStack;
+
     // Executor stack map. The key is the statement id (0 means the main/parent statement)
     // The value is the pointer to the executor stack for that statement
     std::map<int, std::vector<AbstractExecutor*>* >* m_executorsMap;
@@ -276,6 +415,7 @@ class ExecutorContext {
     std::string m_hostname;
     CatalogId m_hostId;
     CatalogId m_drClusterId;
+    ProgressStats m_progressStats;
 };
 
 }

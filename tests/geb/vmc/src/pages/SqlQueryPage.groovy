@@ -71,8 +71,8 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
 
 
         //popup query ok and cancel
-        cancelpopupquery        { $("#btnQueryDatabasePausedErrorCancel", text:"Cancel")}
-        okpopupquery            { $("#btnQueryDatabasePausedErrorOk", text:"Ok")}
+        cancelpopupquery        { $("#btnQueryDatabasePausedErrorCancel") }
+        okpopupquery            { $("#btnQueryDatabasePausedErrorOk") }
         switchadminport         { $("#queryDatabasePausedInnerErrorPopup > div.overlay-contentError.errorQueryDbPause > p:nth-child(3) > span")}
         queryexecutionerror     { $("#queryDatabasePausedInnerErrorPopup > div.overlay-title", text:"Query Execution Error")}
         queryerrortxt           { $("#queryDatabasePausedInnerErrorPopup > div.overlay-contentError.errorQueryDbPause > p:nth-child(1)")}
@@ -465,7 +465,7 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
      * @param queryText - the text to be entered into the Query textarea.
      */
     def setQueryText(def queryText) {
-        queryInput.value(queryText)
+        queryInput.jquery.html(queryText)
     }
 
     /**
@@ -473,7 +473,7 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
      * @return the current contents of the Query textarea.
      */
     def String getQueryText() {
-        return queryInput.value()
+        return queryInput.text()
     }
 
     /**
@@ -672,6 +672,7 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
         header.tabSchema.click()
     }
 
+
     /*
      * get query to create a table
      */
@@ -702,6 +703,25 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
         while((line = br.readLine()) != "#delete") {
         }
 
+        while ((line = br.readLine()) != "#deleteOnly") {
+            // process the line.
+            query = query + line + "\n"
+        }
+
+        return query
+    }
+
+    /*
+    * get query to delete a table only
+    */
+    def String getQueryToDeleteTableOnly() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/sqlQueryDbMonitor.txt"));
+        String line;
+        String query = ""
+
+        while((line = br.readLine()) != "#deleteOnly") {
+        }
+
         while ((line = br.readLine()) != "#name") {
             // process the line.
             query = query + line + "\n"
@@ -721,7 +741,7 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
         while((line = br.readLine()) != "#name") {
         }
 
-        while ((line = br.readLine()) != null) {
+        while ((line = br.readLine()) != "#index") {
             query = query + line + "\n"
         }
 
@@ -750,7 +770,7 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
     }
 
     /*
-     *  Get delete query
+     *  Get query to delete a view
      */
     def String getQueryToDeleteView() {
         BufferedReader br = new BufferedReader(new FileReader("src/resources/viewtable.txt"));
@@ -786,7 +806,6 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
         return query
     }
 
-
     def String getCssPathOfTab(int index) {
         return "#qTab-" + String.valueOf(index) +" > a"
     }
@@ -796,7 +815,7 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
     }
 
     def String getIdOfSaveButton(int index) {
-            return "#querySaveBtn-" + String.valueOf(index)
+        return "#querySaveBtn-" + String.valueOf(index)
     }
 
     def String getIdOfDeleteTab(int index) {
