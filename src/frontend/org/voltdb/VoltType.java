@@ -902,11 +902,6 @@ public enum VoltType {
         }
     }
 
-
-    public boolean isMaxValuePaddable() {
-        return getMaxValueForKeyPadding() != null;
-    }
-
     public boolean isNumber() {
         switch (this) {
             case TINYINT:
@@ -1007,14 +1002,14 @@ public enum VoltType {
 
     // OTHER METHODS that are as much about specific VALUES as about their TYPES
 
-    public Object getMaxValueForKeyPadding() {
+    public String getMaxValueForKeyPadding() {
         switch (this) {
-        case TINYINT: return MAX_TINYINT;
-        case SMALLINT: return MAX_SMALLINT;
-        case INTEGER: return MAX_INTEGER;
-        case BIGINT: return MAX_BIGINT;
-        case TIMESTAMP: return MAX_TIMESTAMP;
-        case FLOAT: return MAX_FLOAT;
+        case TINYINT: return MAX_TINYINT.toString();
+        case SMALLINT: return MAX_SMALLINT.toString();
+        case INTEGER: return MAX_INTEGER.toString();
+        case BIGINT: return MAX_BIGINT.toString();
+        case TIMESTAMP: return MAX_TIMESTAMP.toString();
+        case FLOAT: return MAX_FLOAT.toString();
         default: return null;
         }
     }
