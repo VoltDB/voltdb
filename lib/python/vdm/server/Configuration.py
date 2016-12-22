@@ -1346,22 +1346,42 @@ def check_validation_deployment(req):
 
     if 'snmp' in req.json:
         if not (not req.json['snmp'] or ('enabled' in req.json['snmp'] and req.json['snmp']['enabled'] is False)):
-            if 'authprotocol' in req.json['snmp'] and req.json['snmp']['authprotocol'] != 'NoAuth' \
-                    and ('authkey' not in req.json['snmp'] or ('authkey' in req.json['snmp'] and
-                                                                       req.json['snmp']['authkey'] == '')):
-                return {'status': 401, 'statusString': 'SNMP: Invalid or no authentication key.'}
-
-            if 'privacyprotocol' in req.json['snmp'] and req.json['snmp']['privacyprotocol'] != 'NoPriv' \
-                    and ('privacykey' not in req.json['snmp'] or ('privacykey' in req.json['snmp'] and
-                                                                       req.json['snmp']['privacykey'] == '')):
-                return {'status': 401, 'statusString': 'SNMP: Invalid or no privacy key.'}
-
             if 'target' in req.json['snmp']:
                 result = Validation.ip_port_validation(req.json['snmp']['target'])
                 if 'result' in result and result['result'] == 'error':
                     return {'status': 401, 'statusString': 'SNMP: ' + result['status']}
             else:
                 return {'status': 401, 'statusString': 'SNMP: Target is required field.'}
+
+            if 'username' in req.json['snmp'] and req.json['snmp']['username'] != '':
+                if 'authprotocol' in req.json['snmp'] and req.json['snmp']['authprotocol'] != 'NoAuth' \
+                        and ('authkey' not in req.json['snmp'] or ('authkey' in req.json['snmp'] and
+                        req.json['snmp']['authkey'] == '')):
+                        return {'status': 401, 'statusString': 'SNMP: Invalid or no authentication key.'}
+
+                if 'authprotocol' in req.json['snmp'] and req.json['snmp']['authprotocol'] != 'NoAuth' and \
+                                'authkey' in req.json['snmp'] and len(req.json['snmp']['authkey']) < 8:
+                    return {'status': 401, 'statusString': 'SNMP: Authkey must be of atleat 8 characters.'}
+
+                if 'privacyprotocol' in req.json['snmp'] and req.json['snmp']['privacyprotocol'] != 'NoPriv' \
+                        and ('privacykey' not in req.json['snmp'] or ('privacykey' in req.json['snmp'] and
+                                                                              req.json['snmp']['privacykey'] == '')):
+                        return {'status': 401, 'statusString': 'SNMP: Invalid or no privacy key.'}
+
+                if 'privacyprotocol' in req.json['snmp'] and req.json['snmp']['privacyprotocol'] != 'NoPriv' and \
+                                'privacykey' in req.json['snmp'] and len(req.json['snmp']['privacykey']) < 8:
+                   return {'status': 401, 'statusString': 'SNMP: PrivacyKey must be of atleat 8 characters.'}
+            else:
+                if 'authprotocol' in req.json['snmp'] and req.json['snmp']['authprotocol'] != 'NoAuth' \
+                        and ('authkey' not in req.json['snmp'] or ('authkey' in req.json['snmp'] and
+                                                                           req.json['snmp']['authkey'] == '')):
+                    return {'status': 401, 'statusString': 'SNMP: Invalid or no authentication key.'}
+
+                if 'privacyprotocol' in req.json['snmp'] and req.json['snmp']['privacyprotocol'] != 'NoPriv' \
+                        and ('privacykey' not in req.json['snmp'] or ('privacykey' in req.json['snmp'] and
+                                                                              req.json['snmp']['privacykey'] == '')):
+                    return {'status': 401, 'statusString': 'SNMP: Invalid or no privacy key.'}
+
     return {'status': 200, 'statusString': 'success'}
 
 

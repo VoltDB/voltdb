@@ -453,7 +453,7 @@ def map_deployment(request, database_id):
 
     if 'snmp' in request.json:
         if request.json['snmp']:
-            if 'snmp' not in deployment:
+            if 'snmp' not in deployment or ('snmp' in deployment and not deployment['snmp']):
                 deployment['snmp'] = {}
 
             if 'enabled' in request.json['snmp'] and request.json['snmp']['enabled'] != '':
