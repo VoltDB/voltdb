@@ -244,15 +244,15 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     /**
      * Stores the information about the host's IP.
      */
-    private static class HostInfo {
+    public static class HostInfo {
 
         private final static String HOST_IP = "hostIp";
         private final static String GROUP = "group";
         private final static String LOCAL_SITES_COUNT = "localSitesCount";
 
-        final String m_hostIp;
-        final String m_group;
-        final int m_localSitesCount;
+        public final String m_hostIp;
+        public final String m_group;
+        public final int m_localSitesCount;
 
         public HostInfo(String hostIp, String group, int localSitesCount) {
             m_hostIp = hostIp;
@@ -1089,8 +1089,8 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     /**
      * Wait until all the nodes have built a mesh.
      */
-    public Map<Integer, String> waitForGroupJoin(int expectedHosts) {
-        Map<Integer, String> hostGroups = Maps.newHashMap();
+    public Map<Integer, HostInfo> waitForGroupJoin(int expectedHosts) {
+        Map<Integer, HostInfo> hostInfos = Maps.newHashMap();
 
         try {
             while (true) {
@@ -1101,7 +1101,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 for (String child : children) {
                     final HostInfo info = HostInfo.fromBytes(m_zk.getData(ZKUtil.joinZKPath(CoreZK.hosts, child), false, null));
 
-                    hostGroups.put(parseHostId(child), info.m_group);
+                    hostInfos.put(parseHostId(child), info);
                 }
 
                 /*
@@ -1130,8 +1130,8 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             org.voltdb.VoltDB.crashLocalVoltDB("Error waiting for hosts to be ready", false, e);
         }
 
-        assert hostGroups.size() == expectedHosts;
-        return hostGroups;
+        assert hostInfos.size() == expectedHosts;
+        return hostInfos;
     }
 
     public Map<Integer, String> getHostGroupsFromZK()

@@ -84,6 +84,7 @@ import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
+import org.voltcore.messaging.HostMessenger.HostInfo;
 import org.voltcore.messaging.SiteMailbox;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.OnDemandBinaryLogger;
@@ -163,6 +164,7 @@ import org.voltdb.utils.TopologyZKUtils;
 import org.voltdb.utils.VoltFile;
 import org.voltdb.utils.VoltSampler;
 
+import com.google.common.collect.Maps;
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.base.Joiner;
 import com.google_voltpatches.common.base.Preconditions;
@@ -865,6 +867,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     managedPathsEmptyCheck(config);
             }
 
+            final int numberOfNodes = m_messenger.getLiveHostIds().size();
+            Map<Integer, HostInfo> hostInfos = m_messenger.waitForGroupJoin(numberOfNodes);
             if (m_messenger.isPaused() || m_config.m_isPaused) {
                 setStartMode(OperationMode.PAUSED);
             }
@@ -945,7 +949,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
              * Ning: topology may not reflect the true partitions in the cluster during join. So if another node
              * is trying to rejoin, it should rely on the cartographer's view to pick the partitions to replace.
              */
-            AbstractTopology topo = getTopology(config.m_startAction, m_joinCoordinator);
+            AbstractTopology topo = getTopology(config.m_startAction, hostInfos, m_joinCoordinator);
             m_partitionsToSitesAtStartupForExportInit = new ArrayList<>();
             try {
                 // IV2 mailbox stuff
@@ -1653,11 +1657,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     // Get topology information.  If rejoining, get it directly from
     // ZK.  Otherwise, try to do the write/read race to ZK on startup.
-    private AbstractTopology getTopology(StartAction startAction, JoinCoordinator joinCoordinator)
+    private AbstractTopology getTopology(StartAction startAction, Map<Integer, HostInfo> hostInfos, JoinCoordinator joinCoordinator)
     {
         AbstractTopology topology = null;
         try {
-            Map<Integer, String> hostGroups = m_messenger.getHostGroupsFromZK();
             if (startAction == StartAction.JOIN) {
                 assert(joinCoordinator != null);
                 JSONObject topoJson = joinCoordinator.getTopology();
@@ -1667,9 +1670,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             } else {
                 // initial start or recover
                 int hostcount = m_clusterSettings.get().hostcount();
-                Preconditions.checkArgument(hostGroups.size() == hostcount);
+                Preconditions.checkArgument(hostInfos.size() == hostcount);
                 int kfactor = m_catalogContext.getDeployment().getCluster().getKfactor();
-                Map<Integer, Integer> sitesPerHostMap = m_messenger.getSitesPerHostMapFromZK();
+                Map<Integer, String> hostGroups = Maps.newHashMap();
+                Map<Integer, Integer> sitesPerHostMap = Maps.newHashMap();
+                hostInfos.forEach((k, v) -> {
+                    hostGroups.put(k, v.m_group);
+                    sitesPerHostMap.put(k, v.m_localSitesCount);
+                });
                 String errMsg = AbstractTopology.validateLegacyClusterConfig(hostcount, sitesPerHostMap, kfactor);
                 if (errMsg != null) {
                     VoltDB.crashLocalVoltDB(errMsg, false, null);
@@ -1677,7 +1685,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 topology = AbstractTopology.getTopology(sitesPerHostMap, hostGroups, kfactor);
                 TopologyZKUtils.registerTopologyToZK(m_messenger.getZK(), topology);
             }
-        } catch (KeeperException | InterruptedException | JSONException e) {
+        } catch (JSONException e) {
             VoltDB.crashLocalVoltDB("Unable to get topology from Json object", true, e);
         }
 
