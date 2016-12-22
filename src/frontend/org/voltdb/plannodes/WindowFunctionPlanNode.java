@@ -265,4 +265,15 @@ public class WindowFunctionPlanNode extends AbstractPlanNode {
     public List<AbstractExpression> getPartitionByExpressions() {
         return m_partitionByExpressions;
     }
+    public final List<ExpressionType> getAggregateTypes() {
+        return m_aggregateTypes;
+    }
+
+    public final void setAggregateTypes(List<ExpressionType> aggregateTypes) {
+        m_aggregateTypes = aggregateTypes;
+    }
+
+    public final List<List<AbstractExpression>> getAggregateExpressions() {
+        return m_aggregateExpressions;
+    }
 }
