@@ -590,7 +590,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         // by clearing static variables/properties which ModuleManager,
         // and Settings depend on
         ConfigFactory.clearProperty(Settings.CONFIG_DIR);
-        if (!config.m_voltdbRoot.exists() || !config.m_voltdbRoot.canRead() || !config.m_voltdbRoot.canExecute() || config.m_voltdbRoot.isFile()) {
+        if (!config.m_voltdbRoot.exists() || !config.m_voltdbRoot.canRead() || !config.m_voltdbRoot.canExecute() || !config.m_voltdbRoot.isDirectory()) {
             try {
                 System.err.println("Invalid Voltdbroot directory: " + config.m_voltdbRoot.getCanonicalPath());
             } catch (IOException ex) {
