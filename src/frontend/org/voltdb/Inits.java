@@ -500,7 +500,7 @@ public class Inits {
 
         private String getResourcePath(String resource) {
             URL res = this.getClass().getResource(resource);
-            return res == null ? null : res.getPath();
+            return res == null ? resource : res.getPath();
         }
 
         private SslContextFactory getSSLContextFactory(SslType sslType) {
