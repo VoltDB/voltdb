@@ -114,10 +114,10 @@ public class TestInitStartLocalClusterAllOutOfProcess extends JUnit4LocalCluster
         assertTrue(found);
         assertEquals(org.voltcore.common.Constants.DEFAULT_HEARTBEAT_TIMEOUT_SECONDS, timeout);
 
-        File out = File.createTempFile("get_deployment", ".xml");
+        File out = File.createTempFile("get_deployment", ".xm");
         VoltDB.Configuration c1 = new VoltDB.Configuration(new String[]{"get", "deployment",
             "getvoltdbroot", voltDbRootPath,
-            "file", out.getAbsolutePath()});
+            "file", out.getAbsolutePath() + "l"});
         ServerThread server = new ServerThread(c1);
 
         try {
@@ -126,7 +126,7 @@ public class TestInitStartLocalClusterAllOutOfProcess extends JUnit4LocalCluster
             //Good
         }
 
-        DeploymentType dt = CatalogUtil.parseDeployment(out.getAbsolutePath());
+        DeploymentType dt = CatalogUtil.parseDeployment(out.getAbsolutePath() + "l");
         assertNotNull(dt);
         assertEquals(dt.getPaths().getVoltdbroot().getPath(), voltDbRootPath);
 
