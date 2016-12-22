@@ -946,12 +946,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
              * Ning: topology may not reflect the true partitions in the cluster during join. So if another node
              * is trying to rejoin, it should rely on the cartographer's view to pick the partitions to replace.
              */
-            Set<Integer> missingHosts = Sets.newHashSet();
-            int inactiveHostId = Integer.MAX_VALUE;
-            for (int i = 0; i < m_config.m_missingHostCount; i++) {
-                missingHosts.add(inactiveHostId--);
-            }
-            AbstractTopology topo = getTopology(config.m_startAction, m_joinCoordinator, missingHosts);
+            AbstractTopology topo = getTopology(config.m_startAction, m_joinCoordinator);
             m_partitionsToSitesAtStartupForExportInit = new ArrayList<>();
             try {
                 // IV2 mailbox stuff
@@ -1656,7 +1651,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     // Get topology information.  If rejoining, get it directly from
     // ZK.  Otherwise, try to do the write/read race to ZK on startup.
-    private AbstractTopology getTopology(StartAction startAction, JoinCoordinator joinCoordinator, Set<Integer> missingHosts ) {
+    private AbstractTopology getTopology(StartAction startAction, JoinCoordinator joinCoordinator) {
         AbstractTopology topology = null;
         try {
             if (startAction == StartAction.JOIN) {
@@ -1671,7 +1666,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 topology = TopologyZKUtils.readTopologyFromZK(m_messenger.getZK());
             } else {
                 int kfactor = m_catalogContext.getDeployment().getCluster().getKfactor();
-                if (kfactor == 0 && missingHosts.size() > 0) {
+                if (kfactor == 0 && m_config.m_missingHostCount > 0) {
                     VoltDB.crashLocalVoltDB("A cluster with 0 kfactor can not be started with missing nodes ", false, null);
                 }
                 Map<Integer, HostMessenger.HostInfo> hostInfoMap = m_messenger.getHostInfoMapFromZK();
@@ -1686,9 +1681,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 final Set<Integer> liveHostIds = m_messenger.getLiveHostIds();
                 Preconditions.checkArgument(hostGroups.keySet().equals(liveHostIds));
                 int sph = sitesPerHostMap.values().iterator().next();
-                for (int inactiveHostId : missingHosts) {
-                    sitesPerHostMap.put(inactiveHostId, sph);
-                    hostGroups.put(inactiveHostId, "inactiveGroup");
+                int missingHostId = Integer.MAX_VALUE;
+                Set<Integer> missingHosts = Sets.newHashSet();
+
+                //make up the missing hosts to fool the topology
+                for (int i = 0; i < m_config.m_missingHostCount; i++) {
+                    sitesPerHostMap.put(missingHostId, sph);
+                    hostGroups.put(missingHostId, "inactiveGroup");
+                    missingHosts.add(missingHostId--);
                 }
                 int hostcount = liveHostIds.size() + missingHosts.size();
                 String errMsg = AbstractTopology.validateLegacyClusterConfig(hostcount, sitesPerHostMap, kfactor);
@@ -1699,8 +1699,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 if (topology.hasMissingPartitions()) {
                     VoltDB.crashLocalVoltDB("Some partitions are missing in the topology", false, null);
                 }
-                //reassign leaders from inactive hosts to active hosts
-                if (!missingHosts.isEmpty()) {
+                //reassign leaders from missing hosts to active hosts
+                if (m_config.m_missingHostCount > 0) {
                     topology = AbstractTopology.shiftPartitionLeaders(topology, missingHosts);
                 }
                 TopologyZKUtils.registerTopologyToZK(m_messenger.getZK(), topology);
