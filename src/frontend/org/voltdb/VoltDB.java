@@ -187,10 +187,10 @@ public class VoltDB {
         public SSLContext m_sslContext = null;
 
         /** enable ssl */
-        public boolean m_sslEnable = Boolean.getBoolean("ENABLE_SSL");
+        public boolean m_sslEnable = Boolean.valueOf(System.getenv("ENABLE_SSL") == null ? Boolean.toString(Boolean.getBoolean("ENABLE_SSL")) : System.getenv("ENABLE_SSL"));
 
         /** enable ssl for external (https, client and admin port*/
-        public boolean m_sslExternal = Boolean.getBoolean("ENABLE_EXTERNAL_SSL");
+        public boolean m_sslExternal = Boolean.getBoolean("ENABLE_SSL") ? true : Boolean.getBoolean("ENABLE_EXTERNAL_SSL");
 
         /** consistency level for reads */
         public Consistency.ReadLevel m_consistencyReadLevel = Consistency.ReadLevel.SAFE;

@@ -76,7 +76,7 @@ public class ClientConfig {
     String m_sslPropsFile = null;
 
     //For unit testing.
-    private static final boolean ENABLE_SSL_FOR_TEST = Boolean.valueOf(System.getenv("ENABLE_SSL") == null ? "false" : System.getenv("ENABLE_SSL"));
+    private static final boolean ENABLE_SSL_FOR_TEST = Boolean.valueOf(System.getenv("ENABLE_SSL") == null ? Boolean.toString(Boolean.getBoolean("ENABLE_SSL")) : System.getenv("ENABLE_SSL"));
     private static final String DEFAULT_SSL_PROPS_FILE = "ssl-config";
 
     final static String getUserNameFromSubject(Subject subject) {

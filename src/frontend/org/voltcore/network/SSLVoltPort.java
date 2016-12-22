@@ -358,6 +358,7 @@ public class SSLVoltPort extends VoltPort {
         return false;
     }
 
+    @Override
     protected void setKey (SelectionKey key) {
         m_selectionKey = key;
         m_channel = (SocketChannel)key.channel();
