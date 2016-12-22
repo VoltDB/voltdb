@@ -1543,11 +1543,11 @@ public class Expression {
         // windowed aggregate functions
         prototypes.put(OpTypes.WINDOWED_RANK, (new VoltXMLElement("win_aggregation")).withValue("optype", "windowed_rank"));
         prototypes.put(OpTypes.WINDOWED_DENSE_RANK,  (new VoltXMLElement("win_aggregation")).withValue("optype", "windowed_dense_rank"));
-        prototypes.put(OpTypes.WINDOWED_COUNT,  (new VoltXMLElement("win_aggregation")).withValue("optype", "windowed_count"));
-        // No support for WINDOWED_PERCENT_RANK yet.
-        // No support for WINDOWED_CUME_DIST yet.
-        // prototypes.put(OpTypes.WINDOWED_PERCENT_RANK,  new VoltXMLElement("percent_rank");
-        // prototypes.put(OpTypes.WINDOWED_CUME_DIST,     new VoltXMLElement("cume_dist"));
+        prototypes.put(OpTypes.WINDOWED_COUNT,(new VoltXMLElement("win_aggregation")).withValue("optype", "windowed_count"));
+        prototypes.put(OpTypes.WINDOWED_MAX,  (new VoltXMLElement("win_aggregation")).withValue("optype", "windowed_max"));
+        prototypes.put(OpTypes.WINDOWED_MIN,  (new VoltXMLElement("win_aggregation")).withValue("optype", "windowed_min"));
+        prototypes.put(OpTypes.WINDOWED_SUM,  (new VoltXMLElement("win_aggregation")).withValue("optype", "windowed_sum"));
+
         // other operations
         prototypes.put(OpTypes.CAST,          (new VoltXMLElement("operation")).withValue("optype", "cast"));
         prototypes.put(OpTypes.CASEWHEN,      (new VoltXMLElement("operation")).withValue("optype", "operator_case_when"));
@@ -1808,9 +1808,9 @@ public class Expression {
         case OpTypes.WINDOWED_RANK:
         case OpTypes.WINDOWED_DENSE_RANK:
         case OpTypes.WINDOWED_COUNT:
-        // No support for WINDOWED_PERCENT_RANK or WINDOWED_CUME_DIST yet.
-        // case OpTypes.WINDOWED_CUME_DIST:
-        // case OpTypes.WINDOWED_PERCENT_RANK:
+        case OpTypes.WINDOWED_MIN:
+        case OpTypes.WINDOWED_MAX:
+        case OpTypes.WINDOWED_SUM:
             assert(dataType != null);
             assert(this instanceof ExpressionWindowed);
             exp.attributes.put("valuetype", dataType.getNameString());
