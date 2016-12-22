@@ -23,6 +23,8 @@ import com.google_voltpatches.common.util.concurrent.MoreExecutors;
 import org.voltcore.utils.CoreUtils;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+
 import org.voltcore.logging.VoltLogger;
 
 /**
@@ -30,6 +32,8 @@ import org.voltcore.logging.VoltLogger;
  * with ssl.
  */
 public class SSLEncryptionService {
+
+    private final AtomicBoolean m_isShutdown = new AtomicBoolean(false);
 
     private static SSLEncryptionService m_self;
     private static final VoltLogger networkLog = new VoltLogger("NETWORK");
@@ -57,6 +61,8 @@ public class SSLEncryptionService {
     }
 
     public void shutdown() throws InterruptedException {
+
+        m_isShutdown.set(true);
         networkLog.info("Shutting down Encryption and Decryption services.");
         if (m_EncEs != null) {
             m_EncEs.shutdown();
@@ -70,10 +76,16 @@ public class SSLEncryptionService {
     }
 
     public ListenableFuture<?> submitForEncryption(Runnable task) {
+        if (m_isShutdown.get()) {
+            return null;
+        }
         return m_EncEs.submit(task);
     }
 
     public ListenableFuture<?> submitForDecryption(Runnable task) {
+        if (m_isShutdown.get()) {
+            return null;
+        }
         return m_DecEs.submit(task);
     }
 }
