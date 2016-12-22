@@ -25,10 +25,7 @@ package org.voltdb.iv2;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 import java.util.List;
 import java.util.Map;
@@ -46,8 +43,10 @@ import org.voltcore.messaging.HostMessenger;
 import org.voltcore.zk.LeaderElector;
 import org.voltcore.zk.ZKTestBase;
 import org.voltcore.zk.ZKUtil;
+import org.voltdb.ReplicationRole;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltDBInterface;
 import org.voltdb.VoltZK;
 import org.voltdb.compiler.ClusterConfig;
 
@@ -496,6 +495,10 @@ public class TestLeaderAppointer extends ZKTestBase {
     @Test
     public void testFailureDuringSyncSnapshot() throws Exception
     {
+        final VoltDBInterface mVolt = mock(VoltDBInterface.class);
+        doReturn(ReplicationRole.REPLICA).when(mVolt).getReplicationRole();
+        VoltDB.replaceVoltDBInstanceForTest(mVolt);
+
         configure(2, 2, 1, false);
         Thread dutthread = new Thread() {
             @Override
@@ -540,5 +543,11 @@ public class TestLeaderAppointer extends ZKTestBase {
         }
         assertTrue(threw);
         assertTrue(VoltDB.wasCrashCalled);
+
+        // Promote the replica to a master before sync snapshot, failure should not crash now.
+        doReturn(ReplicationRole.NONE).when(mVolt).getReplicationRole();
+        VoltDB.wasCrashCalled = false;
+        m_dut.acceptPromotion();
+        assertFalse(VoltDB.wasCrashCalled);
     }
 }
