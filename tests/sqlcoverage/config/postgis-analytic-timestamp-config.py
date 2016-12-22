@@ -23,31 +23,17 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 
-# This file contains the "analytic" (default) and "analytic-strings" test
-# suites, which are a subset of the "analytic" tests, which in turn are a
-# subset of those run by the "postgis" sqlcoverage Jenkins job.
+# This file contains the "analytic-timestamp" test suite, which is a subset
+# of the "analytic" tests, which in turn are a subset of those run by the
+# "postgis" sqlcoverage Jenkins job.
 
 # These tests only work when run against PostgreSQL, not HSQL. Hence, to run
 # them on the command line, use something like the following:
-#     ant -Dpostgresql=1 -Dsql_coverage_suite=postgis-analytic-config.py sqlcoverage
+#     ant -Dpostgresql=1 -Dsql_coverage_suite=postgis-analytic-timestamp-config.py sqlcoverage
 {
     # Tests of SQL Analytic Windowed Functions (e.g. RANK, DENSE_RANK)
-    "analytic": {"schema": "schema.py",
-                 "ddl": "DDL.sql",
-                 "template": "analytic.sql",
-                 "normalizer": "normalizer.py"},
-    "analytic-strings": {"schema": "strings-schema.py",
-                         "ddl": "strings-DDL.sql",
-                         "template": "analytic-strings.sql",
-                         "normalizer": "normalizer.py"},
-
-    # May want to add something like these, someday:
-#     "analytic-float": {"schema": "float-schema.py",
-#                        "ddl": "float-DDL.sql",
-#                        "template": "analytic-float.sql",
-#                        "normalizer": "normalizer.py"},
-#     "analytic-varbinary": {"schema": "int-schema.py",
-#                            "ddl": "index-DDL.sql",
-#                            "template": "analytic-varbinary.sql",
-#                            "normalizer": "normalizer.py"},
+    "analytic-timestamp": {"schema": "timestamp-schema.py",
+                           "ddl": "DDL.sql",
+                           "template": "analytic-timestamp.sql",
+                           "normalizer": "normalizer.py"},
 }

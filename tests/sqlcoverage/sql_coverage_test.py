@@ -731,8 +731,6 @@ if __name__ == "__main__":
     parser.add_option("-G", "--postgis", action="store_true",
                       dest="postgis", default=False,
                       help="compare VoltDB results to PostgreSQL, with the PostGIS extension")
-    parser.add_option("-d", "--debug", dest="debug", default=None,
-                      help="pass a debug option to the Non-VoltDB backend, e.g., to the PostgreSQL backend")
     (options, args) = parser.parse_args()
 
     if options.seed == None:
@@ -768,12 +766,12 @@ if __name__ == "__main__":
         configs_to_run = config_list.get_configs()
 
     comparison_database = "HSqlDB"  # default value
+    debug_transform_sql = False
     if options.postgresql:
         comparison_database = 'PostgreSQL'
+        debug_transform_sql = True
     if options.postgis:
         comparison_database = 'PostGIS'
-    debug_transform_sql = False
-    if options.debug == 'transform_sql':
         debug_transform_sql = True
 
     testConfigKits = {}
