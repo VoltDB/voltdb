@@ -110,6 +110,9 @@ public interface OpTypes {
         , WINDOWED_RANK         = 99
         , WINDOWED_DENSE_RANK   = 100
         , WINDOWED_COUNT        = 101
+        , WINDOWED_MIN          = 102
+        , WINDOWED_MAX          = 103
+        , WINDOWED_SUM          = 104
         , WINDOWED_PERCENT_RANK = 102 // reserved but not used
         , WINDOWED_CUME_DIST    = 103 // reserved but not used
         // End VoltDB extension
@@ -130,15 +133,17 @@ public interface OpTypes {
         case WINDOWED_DENSE_RANK:
             return "DENSE_RANK";
         case WINDOWED_COUNT:
+        case COUNT:
             return "COUNT";
         case AVG:
         	return "AVG";
+        case WINDOWED_MIN:
         case MIN:
         	return "MIN";
+        case WINDOWED_MAX:
         case MAX:
         	return "MAX";
-        case COUNT:
-        	return "COUNT";
+        case WINDOWED_SUM:
         case SUM:
         	return "SUM";
         default:
