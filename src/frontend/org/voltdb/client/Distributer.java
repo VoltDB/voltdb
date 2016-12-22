@@ -1215,7 +1215,7 @@ class Distributer {
         // stop the old proc call reaper
         m_timeoutReaperHandle.cancel(false);
         m_ex.shutdown();
-        m_ex.awaitTermination(365, TimeUnit.DAYS);
+        m_ex.awaitTermination(1, TimeUnit.SECONDS);
 
         m_network.shutdown();
     }
