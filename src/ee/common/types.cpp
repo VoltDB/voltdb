@@ -626,6 +626,15 @@ string expressionToString(ExpressionType type)
     case EXPRESSION_TYPE_AGGREGATE_WINDOWED_COUNT: {
         return "EXPRESSION_TYPE_AGGREGATE_WINDOWED_COUNT";
     }
+    case EXPRESSION_TYPE_AGGREGATE_WINDOWED_MAX: {
+        return "EXPRESSION_TYPE_AGGREGATE_WINDOWED_MAX";
+    }
+    case EXPRESSION_TYPE_AGGREGATE_WINDOWED_MIN: {
+        return "EXPRESSION_TYPE_AGGREGATE_WINDOWED_MIN";
+    }
+    case EXPRESSION_TYPE_AGGREGATE_WINDOWED_SUM: {
+        return "EXPRESSION_TYPE_AGGREGATE_WINDOWED_SUM";
+    }
     case EXPRESSION_TYPE_AGGREGATE_SUM: {
         return "AGGREGATE_SUM";
     }
@@ -737,6 +746,12 @@ ExpressionType stringToExpression(string str )
         return EXPRESSION_TYPE_AGGREGATE_WINDOWED_DENSE_RANK;
     } else if (str == "AGGREGATE_WINDOWED_COUNT") {
         return EXPRESSION_TYPE_AGGREGATE_WINDOWED_COUNT;
+    } else if (str == "AGGREGATE_WINDOWED_MAX") {
+        return EXPRESSION_TYPE_AGGREGATE_WINDOWED_MAX;
+    } else if (str == "AGGREGATE_WINDOWED_MIN") {
+        return EXPRESSION_TYPE_AGGREGATE_WINDOWED_MIN;
+    } else if (str == "AGGREGATE_WINDOWED_SUM") {
+        return EXPRESSION_TYPE_AGGREGATE_WINDOWED_SUM;
     } else if (str == "AGGREGATE_SUM") {
         return EXPRESSION_TYPE_AGGREGATE_SUM;
     } else if (str == "AGGREGATE_MIN") {

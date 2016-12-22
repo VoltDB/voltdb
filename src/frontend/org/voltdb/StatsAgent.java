@@ -64,7 +64,9 @@ public class StatsAgent extends OpsAgent
             request.aggregateTables =
             aggregateProcedureOutputStats(request.aggregateTables);
             break;
-
+        case DRROLE:
+            request.aggregateTables = aggregateDRRoleStats(request.aggregateTables);
+            break;
         default:
         }
     }
@@ -436,6 +438,9 @@ public class StatsAgent extends OpsAgent
         case IMPORTER:
             stats = collectStats(StatsSelector.IMPORTER, interval);
             break;
+        case DRROLE:
+            stats = collectStats(StatsSelector.DRROLE, false);
+            break;
         default:
             // Should have been successfully groomed in collectStatsImpl().  Log something
             // for our information but let the null check below return harmlessly
@@ -470,6 +475,13 @@ public class StatsAgent extends OpsAgent
             stats = new VoltTable[2];
             stats[0] = statusStats[0];
             stats[1] = perfStats[0];
+        }
+        return stats;
+    }
+
+    private VoltTable[] aggregateDRRoleStats(VoltTable[] stats) {
+        if (stats != null && stats.length == 1) {
+            stats = new VoltTable[] {DRRoleStats.aggregateStats(stats[0])};
         }
         return stats;
     }

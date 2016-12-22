@@ -403,7 +403,8 @@ public class Inits {
                         catalogJarHash,
                         // Our starter catalog has set the deployment stuff, just yoink it out for now
                         m_rvdb.m_catalogContext.getDeploymentBytes(),
-                        catalogStuff.version);
+                        catalogStuff.version,
+                        m_rvdb.m_messenger);
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB("Error agreeing on starting catalog version", true, e);
             }

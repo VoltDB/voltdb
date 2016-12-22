@@ -32,7 +32,8 @@ public enum StartAction {
     LIVE_REJOIN("live rejoin", true, "K-Safety / Node Rejoin"),
     JOIN("add", true, "Elastic Cluster Sizing"),
     INITIALIZE("initialize", false, "Layout and prime voltdbroot"),
-    PROBE("probe", false, "Determine start action");
+    PROBE("probe", false, "Determine start action"),
+    GET("get", false, "Get Configuration");
 
     final static Pattern spaces = Pattern.compile("\\s+");
 
@@ -51,7 +52,7 @@ public enum StartAction {
             EnumSet.of(CREATE);
 
     final static EnumSet<StartAction> legacySet =
-            EnumSet.complementOf(EnumSet.of(INITIALIZE,PROBE));
+            EnumSet.complementOf(EnumSet.of(INITIALIZE,PROBE,GET));
 
     final String m_verb;
     final boolean m_enterpriseOnly;

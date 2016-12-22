@@ -17,21 +17,18 @@
 
 package org.voltdb;
 
-// Interface through which the outside world can interact with the consumer side
-// of DR. Currently, there's not much to do here, since the subsystem is
-// largely self-contained
-public interface ConsumerDRGateway extends Promotable {
+public enum GetActionArgument {
 
-    void updateCatalog(CatalogContext catalog);
+    DEPLOYMENT("deployment"),
+    DDL("ddl");
 
-    DRRoleStats.State getState();
+    final String m_verb;
 
-    void initialize(boolean resumeReplication);
+    GetActionArgument() {
+        m_verb = name().toLowerCase();
+    }
 
-    void shutdown(boolean blocking) throws InterruptedException;
-
-    void restart() throws InterruptedException;
-
-    DRConsumerMpCoordinator getDRConsumerMpCoordinator();
-
+    GetActionArgument(String verb) {
+        m_verb = verb;
+    }
 }
