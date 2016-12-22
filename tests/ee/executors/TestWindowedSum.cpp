@@ -64,287 +64,133 @@ namespace {
 extern TestConfig allTests[];
 };
 
-class TestGeneratedPlans : public PlanTestingBaseClass<EngineTestTopend> {
+class TestWindowedSum : public PlanTestingBaseClass<EngineTestTopend> {
 public:
     /*
      * This constructor lets us set the global random seed for the
      * random number generator.  It would be better to have a seed
      * just for this test.  But that is not easily done.
      */
-    TestGeneratedPlans(uint32_t randomSeed = (unsigned int)time(NULL)) {
+    TestWindowedSum(uint32_t randomSeed = (unsigned int)time(NULL)) {
         initialize(m_PartitionByExecutorDB, randomSeed);
     }
 
-    ~TestGeneratedPlans() { }
+    ~TestWindowedSum() { }
 protected:
     static DBConfig         m_PartitionByExecutorDB;
 };
 
-TEST_F(TestGeneratedPlans, test_order_by) {
+TEST_F(TestWindowedSum, test_min_last_row) {
     static int testIndex = 0;
-    executeTest(allTests[testIndex]);
-}
-TEST_F(TestGeneratedPlans, test_join) {
-    static int testIndex = 1;
     executeTest(allTests[testIndex]);
 }
 
 
 namespace {
-const char *AAA_ColumnNames[] = {
-    "A"
-    "B",
-    "C",
-};
-const char *BBB_ColumnNames[] = {
+const char *T_ColumnNames[] = {
     "A"
     "B",
     "C",
 };
 
 
-const int NUM_TABLE_ROWS_AAA = 15;
-const int NUM_TABLE_COLS_AAA = 3;
-const int AAAData[NUM_TABLE_ROWS_AAA * NUM_TABLE_COLS_AAA] = {
-      1, 10,101,
-      1, 10,102,
-      1, 20,201,
-      1, 20,202,
-      1, 30,301,
-      2, 10,101,
-      2, 10,102,
-      2, 20,201,
-      2, 20,202,
-      2, 30,301,
-      3, 10,101,
-      3, 10,102,
-      3, 20,201,
-      3, 20,202,
-      3, 30,301,
-};
-
-const int NUM_TABLE_ROWS_BBB = 15;
-const int NUM_TABLE_COLS_BBB = 3;
-const int BBBData[NUM_TABLE_ROWS_BBB * NUM_TABLE_COLS_BBB] = {
-      1, 10,101,
-      1, 10,102,
-      1, 20,201,
-      1, 20,202,
-      1, 30,301,
-      2, 10,101,
-      2, 10,102,
-      2, 20,201,
-      2, 20,202,
-      2, 30,301,
-      3, 10,101,
-      3, 10,102,
-      3, 20,201,
-      3, 20,202,
-      3, 30,301,
+const int NUM_TABLE_ROWS_T = 30;
+const int NUM_TABLE_COLS_T = 3;
+const int TData[NUM_TABLE_ROWS_T * NUM_TABLE_COLS_T] = {
+      1,  1,  1,
+      1,  1,  2,
+      1,  1,  3,
+      1,  1,  4,
+      1,  1,  5,
+      1,  2,  1,
+      1,  2,  2,
+      1,  2,  3,
+      1,  2,  4,
+      1,  2,  5,
+      1,  3,  1,
+      1,  3,  2,
+      1,  3,  3,
+      1,  3,  4,
+      1,  3,  5,
+      2,  1,  1,
+      2,  1,  2,
+      2,  1,  3,
+      2,  1,  4,
+      2,  1,  5,
+      2,  2,  1,
+      2,  2,  2,
+      2,  2,  3,
+      2,  2,  4,
+      2,  2,  5,
+      2,  3,  1,
+      2,  3,  2,
+      2,  3,  3,
+      2,  3,  4,
+      2,  3,  5,
 };
 
 
 
-const TableConfig AAAConfig = {
-    "AAA",
-    AAA_ColumnNames,
-    NUM_TABLE_ROWS_AAA,
-    NUM_TABLE_COLS_AAA,
-    AAAData
-};
-const TableConfig BBBConfig = {
-    "BBB",
-    BBB_ColumnNames,
-    NUM_TABLE_ROWS_BBB,
-    NUM_TABLE_COLS_BBB,
-    BBBData
+const TableConfig TConfig = {
+    "T",
+    T_ColumnNames,
+    NUM_TABLE_ROWS_T,
+    NUM_TABLE_COLS_T,
+    TData
 };
 
 
 const TableConfig *allTables[] = {
-    &AAAConfig,
-    &BBBConfig,
+    &TConfig,
 
 };
 
-const int NUM_OUTPUT_ROWS_TEST_ORDER_BY = 15;
-const int NUM_OUTPUT_COLS_TEST_ORDER_BY = 2;
-const int outputTable_test_order_by[NUM_OUTPUT_ROWS_TEST_ORDER_BY * NUM_OUTPUT_COLS_TEST_ORDER_BY] = {
-      1, 10,
-      1, 10,
-      1, 20,
-      1, 20,
-      1, 30,
-      2, 10,
-      2, 10,
-      2, 20,
-      2, 20,
-      2, 30,
-      3, 10,
-      3, 10,
-      3, 20,
-      3, 20,
-      3, 30,
-};
-
-const int NUM_OUTPUT_ROWS_TEST_JOIN = 45;
-const int NUM_OUTPUT_COLS_TEST_JOIN = 3;
-const int outputTable_test_join[NUM_OUTPUT_ROWS_TEST_JOIN * NUM_OUTPUT_COLS_TEST_JOIN] = {
-      1, 10,101,
-      1, 10,101,
-      1, 10,101,
-      1, 10,102,
-      1, 10,102,
-      1, 10,102,
-      1, 20,201,
-      1, 20,201,
-      1, 20,201,
-      1, 20,202,
-      1, 20,202,
-      1, 20,202,
-      1, 30,301,
-      1, 30,301,
-      1, 30,301,
-      2, 10,101,
-      2, 10,101,
-      2, 10,101,
-      2, 10,102,
-      2, 10,102,
-      2, 10,102,
-      2, 20,201,
-      2, 20,201,
-      2, 20,201,
-      2, 20,202,
-      2, 20,202,
-      2, 20,202,
-      2, 30,301,
-      2, 30,301,
-      2, 30,301,
-      3, 10,101,
-      3, 10,101,
-      3, 10,101,
-      3, 10,102,
-      3, 10,102,
-      3, 10,102,
-      3, 20,201,
-      3, 20,201,
-      3, 20,201,
-      3, 20,202,
-      3, 20,202,
-      3, 20,202,
-      3, 30,301,
-      3, 30,301,
-      3, 30,301,
+const int NUM_OUTPUT_ROWS_TEST_MIN_LAST_ROW = 30;
+const int NUM_OUTPUT_COLS_TEST_MIN_LAST_ROW = 3;
+const int outputTable_test_min_last_row[NUM_OUTPUT_ROWS_TEST_MIN_LAST_ROW * NUM_OUTPUT_COLS_TEST_MIN_LAST_ROW] = {
+      1,  1, 20,
+      1,  1, 20,
+      1,  1, 20,
+      1,  1, 20,
+      1,  1, 20,
+      1,  2, 45,
+      1,  2, 45,
+      1,  2, 45,
+      1,  2, 45,
+      1,  2, 45,
+      1,  3, 75,
+      1,  3, 75,
+      1,  3, 75,
+      1,  3, 75,
+      1,  3, 75,
+      2,  1, 20,
+      2,  1, 20,
+      2,  1, 20,
+      2,  1, 20,
+      2,  1, 20,
+      2,  2, 45,
+      2,  2, 45,
+      2,  2, 45,
+      2,  2, 45,
+      2,  2, 45,
+      2,  3, 75,
+      2,  3, 75,
+      2,  3, 75,
+      2,  3, 75,
+      2,  3, 75,
 };
 
 
 
-TestConfig allTests[2] = {
+TestConfig allTests[1] = {
     {
         // SQL Statement
-        "select A, B from AAA order by A, B;",
+        "select A, B, sum(B+C) over (partition by A order by B) as R from T ORDER BY A, B, R;",
         // Plan String
         "{\n"
         "    \"EXECUTE_LIST\": [\n"
-        "        4,\n"
-        "        3,\n"
-        "        2,\n"
-        "        1\n"
-        "    ],\n"
-        "    \"PLAN_NODES\": [\n"
-        "        {\n"
-        "            \"CHILDREN_IDS\": [2],\n"
-        "            \"ID\": 1,\n"
-        "            \"PLAN_NODE_TYPE\": \"SEND\"\n"
-        "        },\n"
-        "        {\n"
-        "            \"CHILDREN_IDS\": [3],\n"
-        "            \"ID\": 2,\n"
-        "            \"OUTPUT_SCHEMA\": [\n"
-        "                {\n"
-        "                    \"COLUMN_NAME\": \"A\",\n"
-        "                    \"EXPRESSION\": {\n"
-        "                        \"COLUMN_IDX\": 0,\n"
-        "                        \"TYPE\": 32,\n"
-        "                        \"VALUE_TYPE\": 5\n"
-        "                    }\n"
-        "                },\n"
-        "                {\n"
-        "                    \"COLUMN_NAME\": \"B\",\n"
-        "                    \"EXPRESSION\": {\n"
-        "                        \"COLUMN_IDX\": 1,\n"
-        "                        \"TYPE\": 32,\n"
-        "                        \"VALUE_TYPE\": 5\n"
-        "                    }\n"
-        "                }\n"
-        "            ],\n"
-        "            \"PLAN_NODE_TYPE\": \"PROJECTION\"\n"
-        "        },\n"
-        "        {\n"
-        "            \"CHILDREN_IDS\": [4],\n"
-        "            \"ID\": 3,\n"
-        "            \"PLAN_NODE_TYPE\": \"ORDERBY\",\n"
-        "            \"SORT_COLUMNS\": [\n"
-        "                {\n"
-        "                    \"SORT_DIRECTION\": \"ASC\",\n"
-        "                    \"SORT_EXPRESSION\": {\n"
-        "                        \"COLUMN_IDX\": 0,\n"
-        "                        \"TYPE\": 32,\n"
-        "                        \"VALUE_TYPE\": 5\n"
-        "                    }\n"
-        "                },\n"
-        "                {\n"
-        "                    \"SORT_DIRECTION\": \"ASC\",\n"
-        "                    \"SORT_EXPRESSION\": {\n"
-        "                        \"COLUMN_IDX\": 1,\n"
-        "                        \"TYPE\": 32,\n"
-        "                        \"VALUE_TYPE\": 5\n"
-        "                    }\n"
-        "                }\n"
-        "            ]\n"
-        "        },\n"
-        "        {\n"
-        "            \"ID\": 4,\n"
-        "            \"INLINE_NODES\": [{\n"
-        "                \"ID\": 5,\n"
-        "                \"OUTPUT_SCHEMA\": [\n"
-        "                    {\n"
-        "                        \"COLUMN_NAME\": \"A\",\n"
-        "                        \"EXPRESSION\": {\n"
-        "                            \"COLUMN_IDX\": 0,\n"
-        "                            \"TYPE\": 32,\n"
-        "                            \"VALUE_TYPE\": 5\n"
-        "                        }\n"
-        "                    },\n"
-        "                    {\n"
-        "                        \"COLUMN_NAME\": \"B\",\n"
-        "                        \"EXPRESSION\": {\n"
-        "                            \"COLUMN_IDX\": 1,\n"
-        "                            \"TYPE\": 32,\n"
-        "                            \"VALUE_TYPE\": 5\n"
-        "                        }\n"
-        "                    }\n"
-        "                ],\n"
-        "                \"PLAN_NODE_TYPE\": \"PROJECTION\"\n"
-        "            }],\n"
-        "            \"PLAN_NODE_TYPE\": \"SEQSCAN\",\n"
-        "            \"TARGET_TABLE_ALIAS\": \"AAA\",\n"
-        "            \"TARGET_TABLE_NAME\": \"AAA\"\n"
-        "        }\n"
-        "    ]\n"
-        "}",
-        NUM_OUTPUT_ROWS_TEST_ORDER_BY,
-        NUM_OUTPUT_COLS_TEST_ORDER_BY,
-        outputTable_test_order_by
-    },
-    {
-        // SQL Statement
-        "select AAA.A, AAA.B, BBB.C from AAA join BBB on AAA.C = BBB.C order by AAA.A, AAA.B, AAA.C;",
-        // Plan String
-        "{\n"
-        "    \"EXECUTE_LIST\": [\n"
+        "        6,\n"
         "        5,\n"
-        "        7,\n"
         "        4,\n"
         "        3,\n"
         "        2,\n"
@@ -363,7 +209,7 @@ TestConfig allTests[2] = {
         "                {\n"
         "                    \"COLUMN_NAME\": \"A\",\n"
         "                    \"EXPRESSION\": {\n"
-        "                        \"COLUMN_IDX\": 0,\n"
+        "                        \"COLUMN_IDX\": 1,\n"
         "                        \"TYPE\": 32,\n"
         "                        \"VALUE_TYPE\": 5\n"
         "                    }\n"
@@ -371,17 +217,17 @@ TestConfig allTests[2] = {
         "                {\n"
         "                    \"COLUMN_NAME\": \"B\",\n"
         "                    \"EXPRESSION\": {\n"
-        "                        \"COLUMN_IDX\": 1,\n"
+        "                        \"COLUMN_IDX\": 2,\n"
         "                        \"TYPE\": 32,\n"
         "                        \"VALUE_TYPE\": 5\n"
         "                    }\n"
         "                },\n"
         "                {\n"
-        "                    \"COLUMN_NAME\": \"C\",\n"
+        "                    \"COLUMN_NAME\": \"R\",\n"
         "                    \"EXPRESSION\": {\n"
-        "                        \"COLUMN_IDX\": 3,\n"
+        "                        \"COLUMN_IDX\": 0,\n"
         "                        \"TYPE\": 32,\n"
-        "                        \"VALUE_TYPE\": 5\n"
+        "                        \"VALUE_TYPE\": 6\n"
         "                    }\n"
         "                }\n"
         "            ],\n"
@@ -392,14 +238,6 @@ TestConfig allTests[2] = {
         "            \"ID\": 3,\n"
         "            \"PLAN_NODE_TYPE\": \"ORDERBY\",\n"
         "            \"SORT_COLUMNS\": [\n"
-        "                {\n"
-        "                    \"SORT_DIRECTION\": \"ASC\",\n"
-        "                    \"SORT_EXPRESSION\": {\n"
-        "                        \"COLUMN_IDX\": 0,\n"
-        "                        \"TYPE\": 32,\n"
-        "                        \"VALUE_TYPE\": 5\n"
-        "                    }\n"
-        "                },\n"
         "                {\n"
         "                    \"SORT_DIRECTION\": \"ASC\",\n"
         "                    \"SORT_EXPRESSION\": {\n"
@@ -415,32 +253,47 @@ TestConfig allTests[2] = {
         "                        \"TYPE\": 32,\n"
         "                        \"VALUE_TYPE\": 5\n"
         "                    }\n"
+        "                },\n"
+        "                {\n"
+        "                    \"SORT_DIRECTION\": \"ASC\",\n"
+        "                    \"SORT_EXPRESSION\": {\n"
+        "                        \"COLUMN_IDX\": 0,\n"
+        "                        \"TYPE\": 32,\n"
+        "                        \"VALUE_TYPE\": 6\n"
+        "                    }\n"
         "                }\n"
         "            ]\n"
         "        },\n"
         "        {\n"
-        "            \"CHILDREN_IDS\": [\n"
-        "                5,\n"
-        "                7\n"
-        "            ],\n"
+        "            \"AGGREGATE_COLUMNS\": [{\n"
+        "                \"AGGREGATE_EXPRESSIONS\": [{\n"
+        "                    \"LEFT\": {\n"
+        "                        \"COLUMN_IDX\": 1,\n"
+        "                        \"TYPE\": 32,\n"
+        "                        \"VALUE_TYPE\": 5\n"
+        "                    },\n"
+        "                    \"RIGHT\": {\n"
+        "                        \"COLUMN_IDX\": 2,\n"
+        "                        \"TYPE\": 32,\n"
+        "                        \"VALUE_TYPE\": 5\n"
+        "                    },\n"
+        "                    \"TYPE\": 1,\n"
+        "                    \"VALUE_TYPE\": 6\n"
+        "                }],\n"
+        "                \"AGGREGATE_OUTPUT_COLUMN\": 0,\n"
+        "                \"AGGREGATE_TYPE\": \"AGGREGATE_WINDOWED_SUM\"\n"
+        "            }],\n"
+        "            \"CHILDREN_IDS\": [5],\n"
         "            \"ID\": 4,\n"
-        "            \"JOIN_PREDICATE\": {\n"
-        "                \"LEFT\": {\n"
-        "                    \"COLUMN_IDX\": 0,\n"
-        "                    \"TABLE_IDX\": 1,\n"
-        "                    \"TYPE\": 32,\n"
-        "                    \"VALUE_TYPE\": 5\n"
-        "                },\n"
-        "                \"RIGHT\": {\n"
-        "                    \"COLUMN_IDX\": 2,\n"
-        "                    \"TYPE\": 32,\n"
-        "                    \"VALUE_TYPE\": 5\n"
-        "                },\n"
-        "                \"TYPE\": 10,\n"
-        "                \"VALUE_TYPE\": 23\n"
-        "            },\n"
-        "            \"JOIN_TYPE\": \"INNER\",\n"
         "            \"OUTPUT_SCHEMA\": [\n"
+        "                {\n"
+        "                    \"COLUMN_NAME\": \"R\",\n"
+        "                    \"EXPRESSION\": {\n"
+        "                        \"COLUMN_IDX\": 0,\n"
+        "                        \"TYPE\": 32,\n"
+        "                        \"VALUE_TYPE\": 6\n"
+        "                    }\n"
+        "                },\n"
         "                {\n"
         "                    \"COLUMN_NAME\": \"A\",\n"
         "                    \"EXPRESSION\": {\n"
@@ -464,24 +317,47 @@ TestConfig allTests[2] = {
         "                        \"TYPE\": 32,\n"
         "                        \"VALUE_TYPE\": 5\n"
         "                    }\n"
-        "                },\n"
+        "                }\n"
+        "            ],\n"
+        "            \"PARTITIONBY_EXPRESSIONS\": [{\n"
+        "                \"COLUMN_IDX\": 0,\n"
+        "                \"TYPE\": 32,\n"
+        "                \"VALUE_TYPE\": 5\n"
+        "            }],\n"
+        "            \"PLAN_NODE_TYPE\": \"WINDOWFUNCTION\",\n"
+        "            \"SORT_COLUMNS\": [{\"SORT_EXPRESSION\": {\n"
+        "                \"COLUMN_IDX\": 1,\n"
+        "                \"TYPE\": 32,\n"
+        "                \"VALUE_TYPE\": 5\n"
+        "            }}]\n"
+        "        },\n"
+        "        {\n"
+        "            \"CHILDREN_IDS\": [6],\n"
+        "            \"ID\": 5,\n"
+        "            \"PLAN_NODE_TYPE\": \"ORDERBY\",\n"
+        "            \"SORT_COLUMNS\": [\n"
         "                {\n"
-        "                    \"COLUMN_NAME\": \"C\",\n"
-        "                    \"EXPRESSION\": {\n"
+        "                    \"SORT_DIRECTION\": \"ASC\",\n"
+        "                    \"SORT_EXPRESSION\": {\n"
         "                        \"COLUMN_IDX\": 0,\n"
         "                        \"TYPE\": 32,\n"
         "                        \"VALUE_TYPE\": 5\n"
         "                    }\n"
+        "                },\n"
+        "                {\n"
+        "                    \"SORT_DIRECTION\": \"ASC\",\n"
+        "                    \"SORT_EXPRESSION\": {\n"
+        "                        \"COLUMN_IDX\": 1,\n"
+        "                        \"TYPE\": 32,\n"
+        "                        \"VALUE_TYPE\": 5\n"
+        "                    }\n"
         "                }\n"
-        "            ],\n"
-        "            \"PLAN_NODE_TYPE\": \"NESTLOOP\",\n"
-        "            \"PRE_JOIN_PREDICATE\": null,\n"
-        "            \"WHERE_PREDICATE\": null\n"
+        "            ]\n"
         "        },\n"
         "        {\n"
-        "            \"ID\": 5,\n"
+        "            \"ID\": 6,\n"
         "            \"INLINE_NODES\": [{\n"
-        "                \"ID\": 6,\n"
+        "                \"ID\": 7,\n"
         "                \"OUTPUT_SCHEMA\": [\n"
         "                    {\n"
         "                        \"COLUMN_NAME\": \"A\",\n"
@@ -511,38 +387,20 @@ TestConfig allTests[2] = {
         "                \"PLAN_NODE_TYPE\": \"PROJECTION\"\n"
         "            }],\n"
         "            \"PLAN_NODE_TYPE\": \"SEQSCAN\",\n"
-        "            \"TARGET_TABLE_ALIAS\": \"AAA\",\n"
-        "            \"TARGET_TABLE_NAME\": \"AAA\"\n"
-        "        },\n"
-        "        {\n"
-        "            \"ID\": 7,\n"
-        "            \"INLINE_NODES\": [{\n"
-        "                \"ID\": 8,\n"
-        "                \"OUTPUT_SCHEMA\": [{\n"
-        "                    \"COLUMN_NAME\": \"C\",\n"
-        "                    \"EXPRESSION\": {\n"
-        "                        \"COLUMN_IDX\": 2,\n"
-        "                        \"TYPE\": 32,\n"
-        "                        \"VALUE_TYPE\": 5\n"
-        "                    }\n"
-        "                }],\n"
-        "                \"PLAN_NODE_TYPE\": \"PROJECTION\"\n"
-        "            }],\n"
-        "            \"PLAN_NODE_TYPE\": \"SEQSCAN\",\n"
-        "            \"TARGET_TABLE_ALIAS\": \"BBB\",\n"
-        "            \"TARGET_TABLE_NAME\": \"BBB\"\n"
+        "            \"TARGET_TABLE_ALIAS\": \"T\",\n"
+        "            \"TARGET_TABLE_NAME\": \"T\"\n"
         "        }\n"
         "    ]\n"
         "}",
-        NUM_OUTPUT_ROWS_TEST_JOIN,
-        NUM_OUTPUT_COLS_TEST_JOIN,
-        outputTable_test_join
+        NUM_OUTPUT_ROWS_TEST_MIN_LAST_ROW,
+        NUM_OUTPUT_COLS_TEST_MIN_LAST_ROW,
+        outputTable_test_min_last_row
     },
 };
 
 }
 
-DBConfig TestGeneratedPlans::m_PartitionByExecutorDB =
+DBConfig TestWindowedSum::m_PartitionByExecutorDB =
 
 {
     //
@@ -821,7 +679,7 @@ DBConfig TestGeneratedPlans::m_PartitionByExecutorDB =
     "set $PREV partitionparameter 0\n"
     "set $PREV allowedInShutdown false\n"
     "",
-    2,
+    1,
     allTables
 };
 

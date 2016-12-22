@@ -4,6 +4,7 @@
 {@aftermath = ""}
 {@agg = "_genericagg"} -- points don't do SUM or AVG
 {@distinctableagg = "COUNT"} -- points don't do SUM
+{@winagg = "COUNT"} -- points don't do windowed analytic MIN, MAX, SUM (or AVG)
 {@cmp = "_eqne"} -- geo types don't do <, >, <=, >= (at least, not in a way that agrees with PostGIS)
 {@somecmp = "_eqne"} -- in this case, the "smaller" list of comparison operators is identical
 {_colpred |= "_point2numfun(_variable[point])                 _cmp _value[int:-180,180]"}    -- LATITUDE, LONGITUDE

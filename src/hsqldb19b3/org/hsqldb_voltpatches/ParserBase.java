@@ -655,6 +655,16 @@ public class ParserBase {
 
 	public static int getWindowedExpressionType(int tokenT) {
 		int type = windowedExpressionTypeMap.get(tokenT, -1);
+		// This is an error.  But we
+		// can't actually throw a good error
+		// message here, so we will
+		// try and do the best we can.
+		// This will be picked up later if
+		// we are trying to use an unsupported
+		// aggregate type.
+		if (type == -1) {
+			type = expressionTypeMap.get(tokenT, -1);
+		}
 		if (type == -1) {
             throw Error.runtimeError(ErrorCode.U_S0500, "Parser");
 		}
@@ -720,9 +730,9 @@ public class ParserBase {
         windowedExpressionTypeMap.put(Tokens.RANK, OpTypes.WINDOWED_RANK);
         windowedExpressionTypeMap.put(Tokens.DENSE_RANK, OpTypes.WINDOWED_DENSE_RANK);
         windowedExpressionTypeMap.put(Tokens.COUNT, OpTypes.WINDOWED_COUNT);
-        // No support for these yet.
-        // windowedExpressionTypeMap.put(Tokens.PERCENT_RANK, OpTypes.WINDOWED_PERCENT_RANK);
-        // windowedExpressionTypeMap.put(Tokens.CUME_DIST, OpTypes.WINDOWED_CUME_DIST);
+        windowedExpressionTypeMap.put(Tokens.MIN, OpTypes.WINDOWED_MIN);
+        windowedExpressionTypeMap.put(Tokens.MAX, OpTypes.WINDOWED_MAX);
+        windowedExpressionTypeMap.put(Tokens.SUM, OpTypes.WINDOWED_SUM);
     }
 
     HsqlException unexpectedToken(String tokenS) {
