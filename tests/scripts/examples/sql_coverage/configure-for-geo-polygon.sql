@@ -4,13 +4,14 @@
 {@aftermath = ""}
 {@agg = "_genericagg"} -- polygons don't do SUM or AVG
 {@distinctableagg = "COUNT"} -- polygons don't do SUM
+{@winagg = "COUNT"} -- polygons don't do windowed analytic MIN, MAX, SUM (or AVG)
 {@cmp = "_eqne"} -- geo types don't do <, >, <=, >= (at least, not in a way that agrees with PostGIS)
 {@somecmp = "_eqne"} -- in this case, the "smaller" list of comparison operators is identical
 {_colpred |= "_poly2numfun(_variable[polygon])            _cmp _value[int:0,270000000000]"}  -- AREA, NumPoints, NumInteriorRings
 {_colpred |= "_2geo2numfun(_variable[point],_variable[polygon]) _cmp _value[int:0,20000000]"} --DISTANCE
 {_colpred |= "_2geo2numfun(_variable[polygon],_variable[point]) _cmp _value[int:0,20000000]"} --DISTANCE
 -- Once DISTANCE(polygon,polygon) is supported, change to (uncomment) this version
--- (& delete the 2 previous lines; plus a similar one in configure-for-geo-polygon.sql??):
+-- (& delete the 2 previous lines; plus a similar one in configure-for-geo-point.sql??):
 --{_colpred |= "_2geo2numfun(_variable[geo],_variable[geo]) _cmp _value[int:0,20000000]"}      -- DISTANCE
 {_colpred |= "_geo2stringfun(_variable[polygon])          _cmp _value[string]"}              -- AsText
 {_colpred |= "_poly2pointfun(_variable[polygon])          @cmp _variable[point]              -- CENTROID

@@ -190,7 +190,7 @@ public class VoltDB {
         public boolean m_sslEnable = Boolean.valueOf(System.getenv("ENABLE_SSL") == null ? Boolean.toString(Boolean.getBoolean("ENABLE_SSL")) : System.getenv("ENABLE_SSL"));
 
         /** enable ssl for external (https, client and admin port*/
-        public boolean m_sslExternal = Boolean.getBoolean("ENABLE_SSL") ? true : Boolean.getBoolean("ENABLE_EXTERNAL_SSL");
+        public boolean m_sslExternal = Boolean.valueOf(System.getenv("ENABLE_SSL") == null ? Boolean.toString(Boolean.getBoolean("ENABLE_SSL")) : System.getenv("ENABLE_SSL"));
 
         /** consistency level for reads */
         public Consistency.ReadLevel m_consistencyReadLevel = Consistency.ReadLevel.SAFE;
@@ -274,6 +274,10 @@ public class VoltDB {
         public String m_placementGroup = null;
 
         public boolean m_isPaused = false;
+
+        /** GET option */
+        public GetActionArgument m_getOption = GetActionArgument.DEPLOYMENT;
+        public String m_getOutput = null;
 
         private final static void referToDocAndExit() {
             System.out.println("Please refer to VoltDB documentation for command line usage.");
@@ -637,13 +641,29 @@ public class VoltDB {
                     m_sslEnable = true;
                 } else if (arg.equalsIgnoreCase("externalSSL")) {
                     m_sslExternal = true;
+                } else if (arg.equalsIgnoreCase("getvoltdbroot")) {
+                    //Can not use voltdbroot which creates directory we dont intend to create for get deployment etc.
+                    m_voltdbRoot = new VoltFile(args[++i]);
+                } else if (arg.equalsIgnoreCase("get")) {
+                    m_startAction = StartAction.GET;
+                    GetActionArgument.valueOf(args[++i].trim().toUpperCase());
+                } else if (arg.equalsIgnoreCase("file")) {
+                    m_getOutput = args[++i].trim();
                 }
                 else {
                     System.err.println("FATAL: Unrecognized option to VoltDB: " + arg);
                     referToDocAndExit();
                 }
             }
-
+            //I am a get
+            if (m_startAction == StartAction.GET) {
+                //We dont want crash file created.
+                VoltDB.exitAfterMessage = true;
+                File configInfoDir = new VoltFile(m_voltdbRoot, Constants.CONFIG_DIR);
+                File depFH = new VoltFile(configInfoDir, "deployment.xml");
+                m_pathToDeployment = depFH.getAbsolutePath();
+                return;
+            }
             // set file logger root file directory. From this point on you can use loggers
             if (m_startAction != null && !m_startAction.isLegacy()) {
                 VoltLog4jLogger.setFileLoggerRoot(m_voltdbRoot);
@@ -819,11 +839,12 @@ public class VoltDB {
         public boolean validate() {
             boolean isValid = true;
 
+            EnumSet<StartAction> hostNotRequred = EnumSet.of(StartAction.INITIALIZE,StartAction.GET);
             if (m_startAction == null) {
                 isValid = false;
                 hostLog.fatal("The startup action is missing (either create, recover or rejoin).");
             }
-            if (m_leader == null && m_startAction != StartAction.INITIALIZE) {
+            if (m_leader == null && !hostNotRequred.contains(m_startAction)) {
                 isValid = false;
                 hostLog.fatal("The hostname is missing.");
             }
@@ -853,7 +874,7 @@ public class VoltDB {
                 isValid = false;
                 hostLog.fatal("Starting in admin mode is only allowed when using start, create or recover.");
             }
-            if (m_startAction != StartAction.INITIALIZE && m_coordinators.isEmpty()) {
+            if (!hostNotRequred.contains(m_startAction) && m_coordinators.isEmpty()) {
                 isValid = false;
                 hostLog.fatal("List of hosts is missing");
             }
@@ -1085,6 +1106,10 @@ public class VoltDB {
      * Exit the process with an error message, optionally with a stack trace.
      */
     public static void crashLocalVoltDB(String errMsg, boolean stackTrace, Throwable thrown) {
+        if (exitAfterMessage) {
+            System.err.println(errMsg);
+            VoltDB.exit(-1);
+        }
         try {
             OnDemandBinaryLogger.flush();
         } catch (Throwable e) {}
@@ -1222,6 +1247,7 @@ public class VoltDB {
 
     public static String crashMessage;
 
+    public static boolean exitAfterMessage = false;
     /**
      * Exit the process with an error message, optionally with a stack trace.
      * Also notify all connected peers that the node is going down.
@@ -1270,8 +1296,12 @@ public class VoltDB {
             if (!config.validate()) {
                 System.exit(-1);
             } else {
-                initialize(config);
-                instance().run();
+                if (config.m_startAction == StartAction.GET) {
+                    cli(config);
+                } else {
+                    initialize(config);
+                    instance().run();
+                }
             }
         }
         catch (OutOfMemoryError e) {
@@ -1287,6 +1317,15 @@ public class VoltDB {
     public static void initialize(VoltDB.Configuration config) {
         m_config = config;
         instance().initialize(config);
+    }
+
+    /**
+     * Run CLI operations
+     * @param config  The VoltDB.Configuration to use for getting configuration via CLI
+     */
+    public static void cli(VoltDB.Configuration config) {
+        m_config = config;
+        instance().cli(config);
     }
 
     /**

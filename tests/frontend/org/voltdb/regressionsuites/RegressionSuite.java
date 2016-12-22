@@ -58,6 +58,8 @@ import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.Encoder;
 
 import com.google_voltpatches.common.net.HostAndPort;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLEngine;
 
 import junit.framework.TestCase;
 
@@ -351,10 +353,20 @@ public class RegressionSuite extends TestCase {
             port = hNp.getPort();
         }
 
+        SSLEngine sslEngine = null;
+        boolean sslEnabled = Boolean.valueOf(System.getenv("ENABLE_SSL") == null ? Boolean.toString(Boolean.getBoolean("ENABLE_SSL")) : System.getenv("ENABLE_SSL"));
+         if (sslEnabled) {
+             ClientConfig config = new ClientConfig();
+             config.enableSSL();
+             SSLContext sslContext = config.getSslContext();
+             sslEngine = sslContext.createSSLEngine("client", port);
+             sslEngine.setUseClientMode(true);
+         }
+
         final SocketChannel channel = (SocketChannel)
             ConnectionUtil.getAuthenticatedConnection(
                     hNp.getHostText(), m_username, hashedPassword, port, null,
-                    ClientAuthScheme.getByUnencodedLength(hashedPassword.length))[0];
+                    ClientAuthScheme.getByUnencodedLength(hashedPassword.length), sslEngine)[0];
         channel.configureBlocking(true);
         if (!noTearDown) {
             synchronized (m_clientChannels) {

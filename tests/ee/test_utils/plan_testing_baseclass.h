@@ -46,6 +46,8 @@
 
 #include "execution/VoltDBEngine.h"
 #include "common/ValueFactory.hpp"
+#include "common/SerializableEEException.h"
+
 #include "test_utils/LoadTableFrom.hpp"
 #include "test_utils/plan_testing_config.h"
 
@@ -236,7 +238,11 @@ public:
             // Execute the plan.  You'd think this would be more
             // impressive.
             //
-            m_engine->executePlanFragments(1, &fragmentId, NULL, emptyParams, 1000, 1000, 1000, 1000, 1);
+            try {
+                m_engine->executePlanFragments(1, &fragmentId, NULL, emptyParams, 1000, 1000, 1000, 1000, 1);
+            } catch (voltdb::SerializableEEException &ex) {
+                throw;
+            }
     }
 
     /**
@@ -265,8 +271,8 @@ public:
             ASSERT_TRUE(iter.next(tuple));
             for (int32_t col = 0; col < nCols; col += 1) {
                 int32_t expected = answer[row * nCols + col];
-                int32_t v1 = voltdb::ValuePeeker::peekAsInteger(tuple.getNValue(col));
-                VOLT_TRACE("Row %02d, col %02d: expected %04d, got %04d (%s)",
+                int64_t v1 = voltdb::ValuePeeker::peekAsBigInt(tuple.getNValue(col));
+                VOLT_TRACE("Row %02d, col %02d: expected %04d, got %04ld (%s)",
                            row, col,
                            expected, v1,
                            (expected != v1) ? "failed" : "ok");

@@ -29,6 +29,13 @@
 {_distinctableagg |= "SUM"}
 --HSQL refuses to do AVG(DISTINCT) {_distinctableagg |= "AVG"}
 
+-- Aggregate functions when used as windowed analytic functions
+{_stringwinagg  |= "COUNT"}
+{_stringwinagg  |= "MIN"}
+{_stringwinagg  |= "MAX"}
+{_numwinagg     |= "_stringwinagg"}
+{_numwinagg     |= "SUM"}
+
 {_geofun |= ""}
 -- There are no unary point-to-point or polygon-to-polygon functions supported yet.
 {_point2numfun |= "LATITUDE"}

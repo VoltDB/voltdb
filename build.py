@@ -161,16 +161,17 @@ if "VOLT_LOG_LEVEL" in os.environ:
 else:
     LOG_LEVEL = "500"
 
+CTX.LOG_LEVEL = LOG_LEVEL
 if CTX.LEVEL == "MEMCHECK":
-    CTX.CPPFLAGS += " -g3 -DDEBUG -DMEMCHECK -DVOLT_LOG_LEVEL=%s" % LOG_LEVEL
+    CTX.CPPFLAGS += " -g3 -DDEBUG -DMEMCHECK -DVOLT_LOG_LEVEL=${VOLT_LOG_LEVEL}"
     CTX.OUTPUT_PREFIX = "obj/memcheck"
 
 if CTX.LEVEL == "DEBUG":
-    CTX.CPPFLAGS += " -g3 -DDEBUG -DVOLT_LOG_LEVEL=%s" % LOG_LEVEL
+    CTX.CPPFLAGS += " -g3 -DDEBUG -DVOLT_LOG_LEVEL=${VOLT_LOG_LEVEL}"
     CTX.OUTPUT_PREFIX = "obj/debug"
 
 if CTX.LEVEL == "RELEASE":
-    CTX.CPPFLAGS += " -g3 -O3 -mmmx -msse -msse2 -msse3 -DNDEBUG -DVOLT_LOG_LEVEL=%s" % LOG_LEVEL
+    CTX.CPPFLAGS += " -g3 -O3 -mmmx -msse -msse2 -msse3 -DNDEBUG -DVOLT_LOG_LEVEL=${VOLT_LOG_LEVEL}"
     CTX.OUTPUT_PREFIX = "obj/release"
 
 # build in parallel directory instead of subdir so that relative paths work
@@ -498,6 +499,9 @@ if whichtests in ("${eetestsuite}", "executors"):
     TestGeneratedPlans
     TestWindowedRank
     TestWindowedCount
+    TestWindowedMin
+    TestWindowedMax
+    TestWindowedSum
     """
 
 if whichtests in ("${eetestsuite}", "expressions"):

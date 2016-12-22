@@ -76,6 +76,9 @@ public class ExpressionWindowed extends Expression {
             }
             break;
         case OpTypes.WINDOWED_COUNT:
+        case OpTypes.WINDOWED_MIN:
+        case OpTypes.WINDOWED_MAX:
+        case OpTypes.WINDOWED_SUM:
         	break;
         default:
             throw Error.error("Unsupported window function " + OpTypes.aggregateName(opType), "", 0);
@@ -96,6 +99,10 @@ public class ExpressionWindowed extends Expression {
         case OpTypes.WINDOWED_DENSE_RANK:
         case OpTypes.WINDOWED_COUNT:
             return Type.SQL_BIGINT;
+        case OpTypes.WINDOWED_MAX:
+        case OpTypes.WINDOWED_MIN:
+        case OpTypes.WINDOWED_SUM:
+        	return dataType;
         default:
             throw Error.error("Unsupported windowed function " + OpTypes.aggregateName(opType), "", 0);
         }

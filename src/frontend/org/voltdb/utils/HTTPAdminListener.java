@@ -445,7 +445,7 @@ public class HTTPAdminListener {
         //Get deployment from catalog context
         private DeploymentType getDeployment() {
             //If running with new verbs add runtime paths.
-            DeploymentType dt = updateRuntimeDeploymentPaths(getCatalogContext().getDeployment());
+            DeploymentType dt = CatalogUtil.updateRuntimeDeploymentPaths(getCatalogContext().getDeployment());
             return dt;
         }
 
@@ -1102,65 +1102,4 @@ public class HTTPAdminListener {
             httpClientInterface.notifyOfCatalogUpdate();
         }
     }
-
-    /**
-     * Get a deployment view that represents what needs to be displayed to VMC, which
-     * reflects the paths that are used by this cluster member and the actual number of
-     * hosts that belong to this cluster whether or not it was elastically expanded
-     * @param deployment
-     * @return adjusted deployment
-     */
-    public static DeploymentType updateRuntimeDeploymentPaths(DeploymentType deployment) {
-        deployment = CatalogUtil.shallowClusterAndPathsClone(deployment);
-        PathsType paths = deployment.getPaths();
-        if (paths.getVoltdbroot() == null) {
-            PathsType.Voltdbroot root = new PathsType.Voltdbroot();
-            root.setPath(VoltDB.instance().getVoltDBRootPath());
-            paths.setVoltdbroot(root);
-        } else {
-            paths.getVoltdbroot().setPath(VoltDB.instance().getVoltDBRootPath());
-        }
-        //snapshot
-        if (paths.getSnapshots() == null) {
-            PathsType.Snapshots snap = new PathsType.Snapshots();
-            snap.setPath(VoltDB.instance().getSnapshotPath());
-            paths.setSnapshots(snap);
-        } else {
-            paths.getSnapshots().setPath(VoltDB.instance().getSnapshotPath());
-        }
-        if (paths.getCommandlog() == null) {
-            //cl
-            PathsType.Commandlog cl = new PathsType.Commandlog();
-            cl.setPath(VoltDB.instance().getCommandLogPath());
-            paths.setCommandlog(cl);
-        } else {
-            paths.getCommandlog().setPath(VoltDB.instance().getCommandLogPath());
-        }
-        if (paths.getCommandlogsnapshot() == null) {
-            //cl snap
-            PathsType.Commandlogsnapshot clsnap = new PathsType.Commandlogsnapshot();
-            clsnap.setPath(VoltDB.instance().getCommandLogSnapshotPath());
-            paths.setCommandlogsnapshot(clsnap);
-        } else {
-            paths.getCommandlogsnapshot().setPath(VoltDB.instance().getCommandLogSnapshotPath());
-        }
-        if (paths.getExportoverflow() == null) {
-            //export overflow
-            PathsType.Exportoverflow exp = new PathsType.Exportoverflow();
-            exp.setPath(VoltDB.instance().getExportOverflowPath());
-            paths.setExportoverflow(exp);
-        } else {
-            paths.getExportoverflow().setPath(VoltDB.instance().getExportOverflowPath());
-        }
-        if (paths.getDroverflow() == null) {
-            //dr overflow
-            final PathsType.Droverflow droverflow = new PathsType.Droverflow();
-            droverflow.setPath(VoltDB.instance().getDROverflowPath());
-            paths.setDroverflow(droverflow);
-        } else {
-            paths.getDroverflow().setPath(VoltDB.instance().getDROverflowPath());
-        }
-        return deployment;
-    }
-
 }
