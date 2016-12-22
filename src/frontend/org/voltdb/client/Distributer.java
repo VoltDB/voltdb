@@ -963,7 +963,7 @@ class Distributer {
         if (sslContext != null) {
             sslEngine = sslContext.createSSLEngine("client", port);
             sslEngine.setUseClientMode(true);
-            m_sslEncryptionService = SSLEncryptionService.initialize(CoreUtils.availableProcessors());
+            m_sslEncryptionService = SSLEncryptionService.clientInstance();
         }
 
         final Object socketChannelAndInstanceIdAndBuildString[] =

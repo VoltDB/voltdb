@@ -35,29 +35,28 @@ public class SSLEncryptionService {
 
     private final AtomicBoolean m_isShutdown = new AtomicBoolean(false);
 
-    private static SSLEncryptionService m_self;
-    private static final VoltLogger networkLog = new VoltLogger("NETWORK");
+    private static SSLEncryptionService m_self = new SSLEncryptionService();
+    private static SSLEncryptionService m_client_self = new SSLEncryptionService();
+    private final VoltLogger networkLog = new VoltLogger("NETWORK");
 
-    private static final ListeningExecutorService m_EncEs = MoreExecutors.listeningDecorator(
+    private final ListeningExecutorService m_EncEs = MoreExecutors.listeningDecorator(
             Executors.newFixedThreadPool(Math.max(2, CoreUtils.availableProcessors()/2),
                     CoreUtils.getThreadFactory("SSL encryption thread"))
     );
 
-    private static final ListeningExecutorService m_DecEs = MoreExecutors.listeningDecorator(
+    private final ListeningExecutorService m_DecEs = MoreExecutors.listeningDecorator(
             Executors.newFixedThreadPool(Math.max(2, CoreUtils.availableProcessors()/2),
                     CoreUtils.getThreadFactory("SSL decryption thread"))
     );
 
-    public static SSLEncryptionService initialize(int nThreads) {
-        m_self = new SSLEncryptionService(nThreads);
-        return m_self;
-    }
-
     public static SSLEncryptionService instance() {
         return m_self;
     }
+    public static SSLEncryptionService clientInstance() {
+        return m_client_self;
+    }
 
-    public SSLEncryptionService(int nThreads) {
+    private SSLEncryptionService() {
     }
 
     public void shutdown() throws InterruptedException {

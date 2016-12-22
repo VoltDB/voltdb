@@ -43,7 +43,6 @@ import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
-import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltcore.utils.ssl.SSLEncryptionService;
 import org.voltdb.catalog.Catalog;
@@ -489,7 +488,7 @@ public class Inits {
                     m_config.m_sslContextFactory.start();
                     hostLog.info("SSL Enabled for HTTP. Please point browser to HTTPS URL.");
                     if ((sslType != null && sslType.isExternal()) || m_config.m_sslExternal) {
-                        m_config.m_sslEncryptionService = SSLEncryptionService.initialize(CoreUtils.availableProcessors());
+                        m_config.m_sslEncryptionService = SSLEncryptionService.instance();
                         m_config.m_sslContext = m_config.m_sslContextFactory.getSslContext();
                         hostLog.info("SSL enabled for admin and client port. Please enable SSL on client.");
                     }
@@ -501,7 +500,7 @@ public class Inits {
 
         private String getResourcePath(String resource) {
             URL res = this.getClass().getResource(resource);
-            return res == null ? resource : res.getPath();
+            return res == null ? null : res.getPath();
         }
 
         private SslContextFactory getSSLContextFactory(SslType sslType) {
