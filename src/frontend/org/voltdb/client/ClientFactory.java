@@ -39,12 +39,7 @@ public abstract class ClientFactory {
      * @return Newly constructed {@link Client}
      */
     public static Client createClient() {
-        if (ACTIVE_CLIENT_COUNT.incrementAndGet() == 1) {
-            VoltLogger.startAsynchronousLogging();
-            EstTimeUpdater.start();
-            ReverseDNSCache.start();
-        }
-        return new ClientImpl(new ClientConfig(), null);
+        return createClient(new ClientConfig());
     }
 
     /**

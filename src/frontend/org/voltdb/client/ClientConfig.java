@@ -101,12 +101,7 @@ public class ClientConfig {
      * work with a server with security disabled. Also specifies no status listener.</p>
      */
     public ClientConfig() {
-        m_username = "";
-        m_password = "";
-        m_listener = null;
-        m_cleartext = true;
-        m_hashScheme = ClientAuthScheme.HASH_SHA256;
-        m_sslConfig = null;
+        this("", "", true, (ClientStatusListenerExt) null, ClientAuthScheme.HASH_SHA256, false, null);
     }
 
 
