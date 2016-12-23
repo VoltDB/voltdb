@@ -199,6 +199,7 @@ enum PlanNodeType {
     PLAN_NODE_TYPE_INSERT           = 31,
     PLAN_NODE_TYPE_DELETE           = 32,
     // PLAN_NODE_TYPE_UPSERT           = 33, // RESERVED, but not used in the EE
+    PLAN_NODE_TYPE_SWAPTABLES       = 34,
 
     //
     // Communication Nodes

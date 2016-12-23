@@ -55,6 +55,7 @@
 #include "PersistentTableUndoInsertAction.h"
 #include "PersistentTableUndoDeleteAction.h"
 #include "PersistentTableUndoTruncateTableAction.h"
+#include "PersistentTableUndoSwapTableAction.h"
 #include "PersistentTableUndoUpdateAction.h"
 #include "TableCatalogDelegate.hpp"
 #include "tablefactory.h"
@@ -89,6 +90,7 @@
 #include <cassert>
 #include <cstdio>
 #include <sstream>
+#include <utility>
 
 namespace voltdb {
 
@@ -381,8 +383,11 @@ void PersistentTable::truncateTableRelease(PersistentTable* originalTable) {
 }
 
 
-template<class T> static inline PersistentTable* constructEmptyDestTable(VoltDBEngine* engine,
-        PersistentTable* destTable, catalog::Table* catalogViewTable, T* viewHandler) {
+template<class T> static inline PersistentTable* constructEmptyDestTable(
+        VoltDBEngine* engine,
+        PersistentTable* destTable,
+        catalog::Table* catalogViewTable,
+        T* viewHandler) {
     TableCatalogDelegate* destTcd = engine->getTableDelegate(destTable->name());
     destTcd->init(*engine->getDatabase(), *catalogViewTable);
     PersistentTable* destEmptyTable = destTcd->getPersistentTable();
@@ -499,11 +504,11 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
                 destTable, catalogViewTable, viewHandler);
 
         auto mvHandlerInfo = catalogViewTable->mvHandlerInfo().get("mvHandlerInfo");
-        bool populateInitialTuple = mvHandlerInfo->groupByColumnCount() == 0;
         auto newHandler = new MaterializedViewHandler(destEmptyTable,
                                                       mvHandlerInfo,
                                                       engine);
-        if (populateInitialTuple) {
+        if (mvHandlerInfo->groupByColumnCount() == 0) {
+            // Pre-load a table-wide summary view row.
             newHandler->catchUpWithExistingData(fallible);
         }
     }
@@ -552,6 +557,140 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
         //Skip the undo log and "commit" immediately by asking the new emptyTable to perform
         //the truncate table release work rather then having it invoked by PersistentTableUndoTruncateTableAction
         emptyTable->truncateTableRelease(this);
+    }
+}
+
+/**
+ *  This helper does name validation and resolution for parameters to the SWAP TABLE command.
+ *  It provides pointers to the actual metadata components that need to be updated.
+ **/
+struct CompiledSwap {
+    std::vector<TableIndex*> m_theIndexes;
+    std::vector<TableIndex*> m_otherIndexes;
+
+    CompiledSwap(PersistentTable& theTable, PersistentTable& otherTable,
+            std::vector<std::string> const& theIndexNames,
+            std::vector<std::string> const& otherIndexNames) {
+        // assert symmetry of the input vectors.
+        assert(theIndexNames.size() == otherIndexNames.size());
+
+        // Claim an initializer for each index defined directly
+        // on the tables being swapped.
+        size_t nUsedInitializers = theTable.indexCount();
+        // assert symmetry of the table definitions.
+        assert(nUsedInitializers == otherTable.indexCount());
+        // assert coverage of input vectors.
+        assert (nUsedInitializers == theIndexNames.size());
+
+        for (size_t ii = 0; ii < nUsedInitializers; ++ii) {
+            TableIndex* theIndex = theTable.index(theIndexNames[ii]);
+            assert(theIndex);
+            TableIndex* otherIndex = otherTable.index(otherIndexNames[ii]);
+            assert(otherIndex);
+
+            m_theIndexes.push_back(theIndex);
+            m_otherIndexes.push_back(otherIndex);
+        }
+    }
+};
+
+#ifndef NDEBUG
+static bool hasNameIntegrity(std::string const& tableName,
+        std::vector<std::string> const& indexNames) {
+    // Validate that future queries will be able to resolve the table
+    // name and its associated index names.
+    VoltDBEngine* engine = ExecutorContext::getEngine();
+    auto tcd = engine->getTableDelegate(tableName);
+    auto table = tcd->getPersistentTable();
+    char errMsg[1024];
+    if (tableName != table->name()) {
+        snprintf(errMsg, sizeof(errMsg), "Integrity check failure: "
+                 "catalog name %s resolved to table named %s.",
+                 tableName.c_str(), table->name().c_str());
+        LogManager::getThreadLogger(LOGGERID_SQL)->log(LOGLEVEL_ERROR, errMsg);
+        return false;
+    }
+    BOOST_FOREACH (std::string const& iName, indexNames) {
+        if ( ! table->index(iName)) {
+            snprintf(errMsg, sizeof(errMsg), "Integrity check failure: "
+                     "table named %s failed to resolve index name %s.",
+                     tableName.c_str(), iName.c_str());
+            LogManager::getThreadLogger(LOGGERID_SQL)->log(LOGLEVEL_ERROR, errMsg);
+            return false;
+        }
+    }
+    return true;
+}
+#endif
+
+void PersistentTable::swapTable(PersistentTable* otherTable,
+        std::vector<std::string> const& theIndexNames,
+        std::vector<std::string> const& otherIndexNames,
+        bool fallible) {
+    assert(hasNameIntegrity(name(), theIndexNames));
+    assert(hasNameIntegrity(otherTable->name(), otherIndexNames));
+    CompiledSwap compiled(*this, *otherTable,
+            theIndexNames, otherIndexNames);
+    swapTableState(otherTable);
+    swapTableIndexes(otherTable,
+            compiled.m_theIndexes,
+            compiled.m_otherIndexes);
+    if (fallible) {
+        UndoQuantum *uq = ExecutorContext::currentUndoQuantum();
+        uq->registerUndoAction(
+                new (*uq) PersistentTableUndoSwapTableAction(this, otherTable,
+                        theIndexNames,
+                        otherIndexNames));
+    }
+
+    // Switch arguments here to Account here for the actual table pointers
+    // having been switched to use each other's table and index names.
+    assert(hasNameIntegrity(name(), otherIndexNames));
+    assert(hasNameIntegrity(otherTable->name(), theIndexNames));
+}
+
+void PersistentTable::swapTableState(PersistentTable* otherTable) {
+    VoltDBEngine* engine = ExecutorContext::getEngine();
+    auto tcd1 = engine->getTableDelegate(m_name);
+    assert(tcd1->getTable() == this);
+    tcd1->setTable(otherTable);
+
+    auto tcd2 = engine->getTableDelegate(otherTable->m_name);
+    assert(tcd2->getTable() == otherTable);
+    tcd2->setTable(this);
+
+    // Swap the table attributes that must continue to be associated with each
+    // table's name/identity, not its swapped content.
+    // We MIGHT want to consider making these attributes of TableCatalogDelegate
+    // instead of PersistentTable?
+
+    std::swap(m_name, otherTable->m_name);
+
+    auto heldStreamIndexingTable = tableForStreamIndexing();
+    setTableForStreamIndexing(otherTable->tableForStreamIndexing());
+    otherTable->setTableForStreamIndexing(heldStreamIndexingTable);
+
+    std::swap(m_tableStreamer, otherTable->m_tableStreamer);
+}
+
+void PersistentTable::swapTableIndexes(PersistentTable* otherTable,
+        std::vector<TableIndex*> const& theIndexes,
+        std::vector<TableIndex*> const& otherIndexes) {
+    size_t nSwaps = theIndexes.size();
+    assert(nSwaps == otherIndexes.size());
+
+    // FIXME: FOR NOW, every index on the two tables must be swappable
+    // because swapping never repopulates them.
+    assert(nSwaps == otherTable->indexCount());
+    assert(nSwaps == indexCount());
+
+    for (int ii = 0; ii < nSwaps; ++ii) {
+        TableIndex* theIndex = theIndexes[ii];
+        TableIndex* otherIndex = otherIndexes[ii];
+
+        auto heldName = theIndex->getName();
+        theIndex->rename(otherIndex->getName());
+        otherIndex->rename(heldName);
     }
 }
 
@@ -1231,7 +1370,8 @@ void PersistentTable::deleteFromAllIndexes(TableTuple* tuple) {
     BOOST_FOREACH (auto index, m_indexes) {
         if (!index->deleteEntry(tuple)) {
             throwFatalException(
-                    "Failed to delete tuple in Table: %s Index %s", m_name.c_str(), index->getName().c_str());
+                    "Failed to delete tuple in Table: %s Index %s",
+                    m_name.c_str(), index->getName().c_str());
         }
     }
 }
