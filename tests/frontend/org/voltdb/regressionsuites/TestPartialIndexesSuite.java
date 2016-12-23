@@ -437,10 +437,6 @@ public class TestPartialIndexesSuite extends RegressionSuite {
     }
 
     public void testPartialIndexPlanCache() throws Exception {
-        if (isHSQL()) {
-            // HSQL doesn't support partial indexes
-            return;
-        }
         Client client = getClient();
 
         //CREATE INDEX r1_pidx_2 ON R1 (d) where a > 0;
@@ -493,7 +489,7 @@ public class TestPartialIndexesSuite extends RegressionSuite {
         if (!config.compile(project)) fail();
         builder.addServerConfig(config);
 
-        // HSQLDB
+        // HSQLDB does not support partial indexes. If it ever does, here's the code to run it.
         //config = new LocalCluster("testpartialindexes-cluster.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
         //if (!config.compile(project)) fail();
         //builder.addServerConfig(config);

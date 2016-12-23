@@ -2902,7 +2902,9 @@ public class TestFunctionsSuite extends RegressionSuite {
         System.out.println("STARTING test CHAR");
 
         // Hsql has wrong answers.
-        if (isHSQL()) return;
+        if (isHSQL()) {
+            return;
+        }
 
         Client client = getClient();
         ClientResponse cr;
