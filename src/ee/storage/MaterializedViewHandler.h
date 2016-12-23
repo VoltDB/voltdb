@@ -89,6 +89,22 @@ public:
     void handleTupleInsert(PersistentTable *sourceTable, bool fallible);
     void handleTupleDelete(PersistentTable *sourceTable, bool fallible);
 
+    void swapPlans(MaterializedViewHandler* otherView) {
+        auto createQueryExecutorVector = m_createQueryExecutorVector;
+        m_createQueryExecutorVector = otherView->m_createQueryExecutorVector;
+        otherView->m_createQueryExecutorVector = createQueryExecutorVector;
+
+        auto createQuerySQL = m_createQuerySQL;
+        m_createQuerySQL = otherView->m_createQuerySQL;
+        otherView->m_createQuerySQL = createQuerySQL;
+
+        auto minMaxExecutorVectors = m_minMaxExecutorVectors;
+        m_minMaxExecutorVectors = otherView->m_minMaxExecutorVectors;
+        otherView->m_minMaxExecutorVectors = minMaxExecutorVectors;
+    }
+
+    std::string getSwappableSQL(PersistentTable* sourceTable) const;
+
 private:
     std::vector<PersistentTable*> m_sourceTables;
     PersistentTable *m_destTable;
@@ -96,6 +112,8 @@ private:
     TableIndex *m_index;
     // Vector of query plans (executors) for every min/max column.
     std::vector<boost::shared_ptr<ExecutorVector>> m_minMaxExecutorVectors;
+    // The text of the view definition query.
+    std::string m_createQuerySQL;
     // The executor vector for the view definition query.
     boost::shared_ptr<ExecutorVector> m_createQueryExecutorVector;
     const int m_groupByColumnCount;

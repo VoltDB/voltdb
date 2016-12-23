@@ -16,14 +16,16 @@
  */
 
 #include "MaterializedViewHandler.h"
+#include "MaterializedViewUtil.h"
+#include "TableCatalogDelegate.hpp"
+#include "temptable.h"
+
 #include "catalog/column.h"
 #include "catalog/statement.h"
 #include "catalog/table.h"
 #include "catalog/tableref.h"
 #include "common/executorcontext.hpp"
 #include "indexes/tableindex.h"
-#include "TableCatalogDelegate.hpp"
-#include "temptable.h"
 
 
 ENABLE_BOOST_FOREACH_ON_CONST_MAP(TableRef);
@@ -134,6 +136,7 @@ namespace voltdb {
     void MaterializedViewHandler::setUpCreateQuery(catalog::MaterializedViewHandlerInfo *mvHandlerInfo,
                                                       VoltDBEngine *engine) {
         catalog::Statement *createQueryStatement = mvHandlerInfo->createQuery().get("createQuery");
+        m_createQuerySQL = createQueryStatement->sqltext();
         m_createQueryExecutorVector = ExecutorVector::fromCatalogStatement(engine, createQueryStatement);
         m_createQueryExecutorVector->getRidOfSendExecutor();
 #ifdef VOLT_TRACE_ENABLED
@@ -410,6 +413,36 @@ namespace voltdb {
                                                             m_updatableIndexList, fallible);
             }
         }
+    }
+
+    // Replace each occurence of the table name in the view's select statement
+    // with a generic tracer symbol. This is intended to produce identical
+    // results for two swappable views -- that is, two views that are defined
+    // identically except that each names a different table for ONE of their
+    // source tables.
+    //
+    // CAVEAT: The current algorithm is less than perfect since it is
+    // too case sensitive and subject to edge case false positives.
+    // In the most likely problematic edge cases where it erroneously
+    // makes or misses a substitution, it will err on the side of
+    // rejecting a legit SWAP TABLES command.
+    // The user workaround may be as simple as following certain conventions
+    // like consistent (upper?) case for table names in view definitions
+    // and avoiding table names that may occur in string constants, etc.
+    //
+    // TODO: Longer term, it probably makes more sense for DDLCompiler.java
+    // to precompute for each catalog view a map of source table names
+    // to versions of the view's sql statement with that table name
+    // didacted. If needed for catalog performance, this information would
+    // be easy to encode into a compressed string and decode upon EE
+    // deserialization of the view definition.
+    // For one thing, doing the work in DDLCompiler would save runtime here.
+    // For another, the pattern matching tools in java are more familiar
+    // and possibly just better.
+    std::string MaterializedViewHandler::getSwappableSQL(
+            PersistentTable* sourceTable) const {
+        std::string const& tableName = sourceTable->name();
+        return MaterializedViewUtil::sourceTableDidact(m_createQuerySQL, tableName);
     }
 
 } // namespace voltdb

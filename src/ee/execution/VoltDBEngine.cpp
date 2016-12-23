@@ -1757,16 +1757,16 @@ int64_t VoltDBEngine::tableStreamSerializeMore(
             table->decrementRefcount();
         }
     }
-    else if (tableStreamTypeAppliesToPreTruncateTable(streamType)) {
+    else if (tableStreamTypeAppliesToPreSwapTable(streamType)) {
         Table* found = getTable(tableId);
         if (found == NULL) {
             return TABLE_STREAM_SERIALIZATION_ERROR;
         }
 
-        PersistentTable * currentTable = dynamic_cast<PersistentTable*>(found);
+        PersistentTable* currentTable = dynamic_cast<PersistentTable*>(found);
         assert(currentTable != NULL);
         // The ongoing TABLE STREAM needs the original table from the first table truncate.
-        PersistentTable * originalTable = currentTable->currentPreTruncateTable();
+        PersistentTable* originalTable = currentTable->currentPreSwapTable();
 
         VOLT_DEBUG("tableStreamSerializeMore: type %s, rewinds to the table before the first truncate",
                 tableStreamTypeToString(streamType).c_str());
@@ -1775,7 +1775,7 @@ int64_t VoltDBEngine::tableStreamSerializeMore(
         if (remaining <= 0) {
             // The on going TABLE STREAM of the original table before the first table truncate has finished.
             // Reset all the previous table pointers to be NULL.
-            currentTable->unsetPreTruncateTable();
+            currentTable->unsetPreSwapTable();
             VOLT_DEBUG("tableStreamSerializeMore: type %s, null the previous truncate table pointer",
                     tableStreamTypeToString(streamType).c_str());
         }

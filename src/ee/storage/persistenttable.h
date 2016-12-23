@@ -255,7 +255,10 @@ public:
     // ------------------------------------------------------------------
     virtual void deleteAllTuples(bool, bool fallible = true);
 
-    virtual void truncateTable(VoltDBEngine* engine, bool fallible = true);
+    void truncateTable(VoltDBEngine* engine, bool fallible = true);
+
+    void swapTable(PersistentTable* otherTable, VoltDBEngine* engine, bool fallible = true);
+
     // The fallible flag is used to denote a change to a persistent table
     // which is part of a long transaction that has been vetted and can
     // never fail (e.g. violate a constraint).
@@ -369,6 +372,8 @@ public:
 
     std::vector<MaterializedViewTriggerForWrite*>& views() { return m_views; }
 
+    std::vector<MaterializedViewHandler*> const& allViewHandlers() { return m_viewHandlers; }
+
     TableTuple& copyIntoTempTuple(TableTuple &source) {
         assert (m_tempTuple.m_data);
         m_tempTuple.copy(source);
@@ -464,35 +469,32 @@ public:
 
     virtual int64_t validatePartitioning(TheHashinator *hashinator, int32_t partitionId);
 
-    void truncateTableForUndo(VoltDBEngine * engine, TableCatalogDelegate * tcd, PersistentTable *originalTable);
-    void truncateTableRelease(PersistentTable *originalTable);
+    void truncateTableForUndo(TableCatalogDelegate* tcd, PersistentTable* originalTable);
+    void truncateTableRelease(PersistentTable* originalTable);
 
-    PersistentTable * getPreTruncateTable() const { return m_preTruncateTable; }
-
-    PersistentTable * currentPreTruncateTable() {
-        if (m_preTruncateTable != NULL) {
-            return m_preTruncateTable;
+    PersistentTable* currentPreSwapTable() {
+        if (m_preSwapTable != NULL) {
+            return m_preSwapTable;
         }
         return this;
     }
 
-    void setPreTruncateTable(PersistentTable * tb) {
-        if (tb->getPreTruncateTable() != NULL) {
-            m_preTruncateTable = tb->getPreTruncateTable();
-        } else {
-            m_preTruncateTable= tb;
+    void setPreSwapTable(PersistentTable*  tb) {
+        if (this == tb) {
+            // For example, two identical swap statements in the same XA
+            // should restore the status quo.
+            // Likewise, the swapTable call to undo a SWAP TABLES statement.
+            unsetPreSwapTable();
         }
-
-        if (m_preTruncateTable != NULL) {
-            m_preTruncateTable->incrementRefcount();
-        }
+        m_preSwapTable = (tb->m_preSwapTable == NULL) ?
+            tb : tb->m_preSwapTable;
+        m_preSwapTable->incrementRefcount();
     }
 
-    void unsetPreTruncateTable() {
-        PersistentTable * prev = this->m_preTruncateTable;
-        if (prev != NULL) {
-            this->m_preTruncateTable = NULL;
-            prev->decrementRefcount();
+    void unsetPreSwapTable() {
+        if (m_preSwapTable != NULL) {
+            m_preSwapTable->decrementRefcount();
+            m_preSwapTable = NULL;
         }
     }
 
@@ -658,6 +660,70 @@ private:
     // If there is no delta table affiliated with this table, then take no action.
     void insertTupleIntoDeltaTable(TableTuple &source, bool fallible);
 
+    //
+    // SWAP TABLE helpers
+    //
+
+    typedef std::vector<TableIndex*> const TableIndexVector;
+    typedef std::vector<MaterializedViewTriggerForWrite*> const ScanViewVector;
+    typedef std::vector<MaterializedViewHandler*> const JoinViewVector;
+
+    /**
+     * Do the actual SWAP TABLES work on the tables and delegate to specific
+     * methods to handle the implications on indexes and views on the tables.
+     */
+    void swapTable(PersistentTable* otherTable, VoltDBEngine* engine,
+            TableIndexVector& theIndexesToSwap,
+            TableIndexVector& otherIndexesToSwap,
+            TableIndexVector& theIndexesToRepopulate,
+            TableIndexVector& otherIndexesToRepopulate,
+            ScanViewVector& theScanViewsToSwap,
+            ScanViewVector& otherScanViewsToSwap,
+            ScanViewVector& theScanViewsToRepopulate,
+            ScanViewVector& otherScanViewsToRepopulate,
+            JoinViewVector& theJoinViewsToSwap,
+            JoinViewVector& otherJoinViewsToSwap,
+            JoinViewVector& theJoinViewsToRepopulate,
+            JoinViewVector& otherJoinViewsToRepopulate);
+
+    /**
+     * Process corresponding identically defined indexes on two tables being swapped.
+     * The vector arguments contain parallel elements.
+     */
+    void swapTableIndexes(PersistentTable* otherTable,
+            TableIndexVector& theIndexesToSwap,
+            TableIndexVector& otherIndexesToSwap);
+
+    /**
+     * Process any disparate indexes on each of two tables being swapped.
+     * Each vector argument's contents are unrelated to the other's.
+     */
+    void repopulateSwappedTableIndexes(PersistentTable* otherTable,
+            TableIndexVector& theIndexesToRepopulate,
+            TableIndexVector& otherIndexesToRepopulate);
+
+    /**
+     * Process corresponding identically defined views on two tables being swapped.
+     * This includes recursively swapping the target tables of the view.
+     * The vector arguments contain parallel elements.
+     */
+    void swapTableViews(PersistentTable* otherTable,
+            VoltDBEngine* engine,
+            ScanViewVector& theScanViewsToSwap,
+            ScanViewVector& otherScanViewsToSwap,
+            JoinViewVector& theJoinViewsToSwap,
+            JoinViewVector& otherJoinViewsToSwap);
+
+    /**
+     * Process any disparate views on each of two tables being swapped.
+     * Each vector argument's contents are unrelated to the other's.
+     */
+    void repopulateSwappedTableViews(PersistentTable* otherTable,
+            ScanViewVector& theScanViewsToRepopulate,
+            ScanViewVector& otherScanViewsToRepopulate,
+            JoinViewVector& theJoinViewsToRepopulate,
+            JoinViewVector& otherJoinViewsToRepopulate);
+
     // CONSTRAINTS
     std::vector<bool> m_allowNulls;
 
@@ -706,8 +772,8 @@ private:
     // Surgeon passed to classes requiring "deep" access to avoid excessive friendship.
     PersistentTableSurgeon m_surgeon;
 
-    // The original table from the first truncated table
-    PersistentTable * m_preTruncateTable;
+    // The original table prior to any swaps or truncates in the current transaction.
+    PersistentTable*  m_preSwapTable;
 
     //Is this a materialized view?
     bool m_isMaterialized;
