@@ -214,10 +214,18 @@ public class TestClientPortChannel extends JUnit4LocalClusterTest {
         //Just connect and disconnect
         PortConnector channel = new PortConnector("localhost", port);
         System.out.println("Testing Connect and Close");
+        int scnt = 0;
+        int fcnt = 0;
         for (int i = 0; i < 100; i++) {
-            channel.connect();
-            channel.close();
-            System.out.println("Successfully connect/close: " + i);
+            try {
+                channel.connect();
+                channel.close();
+            } catch (Exception ex) {
+                fcnt++;
+                continue;
+            }
+            scnt++;
+            System.out.println("Success: " + scnt + " Failed: " + fcnt);
         }
 
         //Bad +ve length
