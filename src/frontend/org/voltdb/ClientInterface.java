@@ -424,8 +424,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         try {
                             handshakeStatus = handshaker.handshake();
                         } catch (IOException e) {
-                            e.printStackTrace();
-                            // possibly timeout firing
                             try {
                                 socket.close();
                             } catch (IOException e1) {
