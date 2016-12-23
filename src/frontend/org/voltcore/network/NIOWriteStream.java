@@ -356,12 +356,12 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
 
             } while (rc > 0);
         } finally {
-            updateWriteStats(bytesWritten);
+            checkBackPressureAndUpdateWriteStats(bytesWritten);
         }
         return bytesWritten;
     }
 
-    public void updateWriteStats(int bytesWritten) {
+    public void checkBackPressureAndUpdateWriteStats(int bytesWritten) {
         //We might fail after writing few bytes. make sure the ones that are written accounted for.
         //Not sure if we need to do any backpressure magic as client is dead and so no backpressure on this may be needed.
         if (getQueuedBuffers().isEmpty() && m_hadBackPressure && m_queuedWrites.size() <= m_maxQueuedWritesBeforeBackpressure) {

@@ -49,11 +49,6 @@ public class SSLVoltPort extends VoltPort {
     private final ByteBuffer m_dstBuffer;
     private final SSLMessageParser m_sslMessageParser;
 
-    private final ByteBuffer m_frameHeader;
-    private DBBPool.BBContainer m_frameCont;
-
-    private int m_nextFrameLength = 0;
-
     private final DecryptionGateway m_decryptionGateway;
     private final EncryptionGateway m_encryptionGateway;
     private final Deque<EncryptionResult> m_encryptedBuffers = new ConcurrentLinkedDeque<>();
@@ -73,7 +68,6 @@ public class SSLVoltPort extends VoltPort {
         this.m_sslBufferEncrypter = new SSLBufferEncrypter(sslEngine, appBufferSize, packetBufferSize);
         this.m_encryptionGateway = new EncryptionGateway(m_sslBufferEncrypter, this);
         this.m_sslMessageParser = new SSLMessageParser();
-        this.m_frameHeader = ByteBuffer.allocate(5);
         this.m_dstBufferCont = DBBPool.allocateDirect(packetBufferSize);
         this.m_dstBuffer = m_dstBufferCont.b();
         this.m_dstBuffer.clear();
@@ -106,6 +100,7 @@ public class SSLVoltPort extends VoltPort {
     }
 
     private void processReads() throws IOException {
+        // if the read stream is empty  (dataAvailable == 0), then fill it.
         if (readStream().dataAvailable() == 0) {
             final int maxRead = m_handler.getMaxRead();
             int nRead = fillReadStream(maxRead);
@@ -120,35 +115,6 @@ public class SSLVoltPort extends VoltPort {
     private void processWrites() throws IOException {
         if (writeStream().serializeQueuedWrites(m_pool) > 0) {
             m_encryptionGateway.submitEncryptionTasks();
-        }
-    }
-
-    private DBBPool.BBContainer getDecryptionFrame() {
-        if (m_nextFrameLength == 0) {
-            readStream().getBytes(m_frameHeader);
-            if (m_frameHeader.hasRemaining()) {
-                return null;
-            } else {
-                m_frameHeader.flip();
-                m_frameHeader.position(3);
-                m_nextFrameLength = m_frameHeader.getShort();
-                m_frameHeader.flip();
-                m_frameCont = DBBPool.allocateDirectAndPool(m_nextFrameLength + 5);
-                m_frameCont.b().clear();
-                m_frameCont.b().limit(m_nextFrameLength + 5);
-                m_frameCont.b().put(m_frameHeader);
-                m_frameHeader.clear();
-            }
-        }
-
-        readStream().getBytes(m_frameCont.b());
-        if (m_frameCont.b().hasRemaining()) {
-            return null;
-        } else {
-            m_nextFrameLength = 0;
-            DBBPool.BBContainer frame = m_frameCont;
-            m_frameCont = null;
-            return frame;
         }
     }
 
@@ -173,10 +139,6 @@ public class SSLVoltPort extends VoltPort {
             m_dstBufferCont.discard();
             m_dstBufferCont = null;
         }
-        if (m_frameCont != null) {
-            m_frameCont.discard();
-            m_frameCont = null;
-        }
         super.unregistered();
     }
 
@@ -187,6 +149,57 @@ public class SSLVoltPort extends VoltPort {
         private final AtomicBoolean m_hasOutstandingTask = new AtomicBoolean(false);
         private final VoltPort m_port;
         final AtomicBoolean m_isShuttingDown = new AtomicBoolean(false);
+        private int m_nextFrameLength = 0;
+        private final ByteBuffer m_frameHeader = ByteBuffer.allocate(5);
+        private DBBPool.BBContainer m_frameCont;
+
+
+        private final Runnable m_decTask = new Runnable() {
+            @Override
+            public void run() {
+                DBBPool.BBContainer srcC = null;
+                boolean queuedMessages = false;
+                SettableFuture<Void> sf = null;
+                try {
+                    while ((srcC = getDecryptionFrame()) != null) {
+                        sf = SettableFuture.create();
+                        m_decryptionResults.add(sf);
+                        final List<ByteBuffer> messages = new ArrayList<>();
+                        srcC.b().flip();
+                        m_dstBuffer.limit(m_dstBuffer.capacity());
+                        m_sslBufferDecrypter.unwrap(srcC.b(), m_dstBuffer);
+                        if (m_dstBuffer.hasRemaining()) {
+                            ByteBuffer message;
+                            while ((message = m_sslMessageParser.message(m_dstBuffer)) != null) {
+                                messages.add(message);
+                            }
+                        }
+                        srcC.discard();
+                        srcC = null;
+                        m_dstBuffer.clear();
+                        m_decryptedMessages.offer(new DecryptionResult(messages, sf));
+                        sf = null;
+                        queuedMessages = true;
+                    }
+
+                    if (!m_isShuttingDown.get() && queuedMessages) {
+                        m_network.addToChangeList(m_port, true);
+                    }
+                } catch(IOException ioe){
+                    networkLog.error("Exception unwrapping an SSL frame", ioe);
+                    m_dstBuffer.clear();
+                    return;
+                } finally{
+                    if (srcC != null) {
+                        srcC.discard();
+                    }
+                    if (sf != null) {
+                        sf.setException(new Throwable("Decryption of buffer failed."));
+                    }
+                    m_hasOutstandingTask.set(false);
+                }
+            }
+        };
 
         public DecryptionGateway(SSLBufferDecrypter m_sslBufferDecrypter, SSLVoltPort port, SSLMessageParser sslMessageParser, ByteBuffer dstBuffer) {
             this.m_sslBufferDecrypter = m_sslBufferDecrypter;
@@ -195,56 +208,39 @@ public class SSLVoltPort extends VoltPort {
             this.m_port = port;
         }
 
+        private DBBPool.BBContainer getDecryptionFrame() {
+            if (m_nextFrameLength == 0) {
+                readStream().getBytes(m_frameHeader);
+                if (m_frameHeader.hasRemaining()) {
+                    return null;
+                } else {
+                    m_frameHeader.flip();
+                    m_frameHeader.position(3);
+                    m_nextFrameLength = m_frameHeader.getShort();
+                    m_frameHeader.flip();
+                    m_frameCont = DBBPool.allocateDirectAndPool(m_nextFrameLength + 5);
+                    m_frameCont.b().clear();
+                    m_frameCont.b().limit(m_nextFrameLength + 5);
+                    m_frameCont.b().put(m_frameHeader);
+                    m_frameHeader.clear();
+                }
+            }
+
+            readStream().getBytes(m_frameCont.b());
+            if (m_frameCont.b().hasRemaining()) {
+                return null;
+            } else {
+                m_nextFrameLength = 0;
+                DBBPool.BBContainer frame = m_frameCont;
+                m_frameCont = null;
+                return frame;
+            }
+        }
+
         synchronized void submitDecryptionTasks() {
             if (m_hasOutstandingTask.compareAndSet(false, true)) {
-                Runnable task = new Runnable() {
-                    @Override
-                    public void run() {
-                        DBBPool.BBContainer srcC = null;
-                        boolean queuedMessages = false;
-                        SettableFuture<Void> sf = null;
-                        try {
-                            while ((srcC = getDecryptionFrame()) != null) {
-                                sf = SettableFuture.create();
-                                m_decryptionResults.add(sf);
-                                final List<ByteBuffer> messages = new ArrayList<>();
-                                srcC.b().flip();
-                                m_dstBuffer.limit(m_dstBuffer.capacity());
-                                m_sslBufferDecrypter.unwrap(srcC.b(), m_dstBuffer);
-                                if (m_dstBuffer.hasRemaining()) {
-                                    ByteBuffer message;
-                                    while ((message = m_sslMessageParser.message(m_dstBuffer)) != null) {
-                                        messages.add(message);
-                                    }
-                                }
-                                srcC.discard();
-                                srcC = null;
-                                m_dstBuffer.clear();
-                                m_decryptedMessages.offer(new DecryptionResult(messages, sf));
-                                sf = null;
-                                queuedMessages = true;
-                            }
-
-                            if (!m_isShuttingDown.get() && queuedMessages) {
-                                m_network.addToChangeList(m_port, true);
-                            }
-                        } catch(IOException ioe){
-                            networkLog.error("Exception unwrapping an SSL frame", ioe);
-                            m_dstBuffer.clear();
-                            return;
-                        } finally{
-                            if (srcC != null) {
-                                srcC.discard();
-                            }
-                            if (sf != null) {
-                                sf.setException(new Throwable("Decryption of buffer failed."));
-                            }
-                            m_hasOutstandingTask.set(false);
-                        }
-                    }
-                };
                 try {
-                    m_sslEncryptionService.submitForDecryption(task);
+                    m_sslEncryptionService.submitForDecryption(m_decTask);
                 } catch (RejectedExecutionException e) {
                     // the thread pool has been shutdown.
                 }
@@ -274,6 +270,42 @@ public class SSLVoltPort extends VoltPort {
         private final SSLVoltPort m_port;
         final AtomicBoolean m_isShuttingDown = new AtomicBoolean(false);
         private final AtomicBoolean m_hasOutstandingTask = new AtomicBoolean(false);
+        private final Runnable m_encTask = new Runnable() {
+            @Override
+            public void run() {
+                DBBPool.BBContainer fragCont = null;
+                boolean queuedEncBuffers = false;
+                SettableFuture<Void> sf = null;
+                try {
+                    while ((fragCont = writeStream().getWriteBuffer()) != null) {
+                        sf = SettableFuture.create();
+                        m_encryptionResults.add(sf);
+                        fragCont.b().flip();
+                        int nBytesClear = fragCont.b().remaining();
+                        final DBBPool.BBContainer encCont = m_sslBufferEncrypter.encryptBuffer(fragCont.b().slice());
+                        fragCont.discard();
+                        fragCont = null;
+                        m_encryptedBuffers.offer(new EncryptionResult(encCont, nBytesClear, sf));
+                        sf = null;
+                        queuedEncBuffers = true;
+                    }
+                    if (! m_isShuttingDown.get() && queuedEncBuffers) {
+                        m_network.addToChangeList(m_port, true);
+                    }
+                } catch (IOException ioe) {
+                    networkLog.error("Exception wrapping an SSL frame", ioe);
+                    return;
+                } finally {
+                    if (fragCont != null) {
+                        fragCont.discard();
+                    }
+                    if (sf != null) {
+                        sf.setException(new Throwable("Encryption of buffer failed."));
+                    }
+                    m_hasOutstandingTask.set(false);
+                }
+            }
+        };
 
         public EncryptionGateway(SSLBufferEncrypter m_sslBufferEncrypter, SSLVoltPort port) {
             this.m_sslBufferEncrypter = m_sslBufferEncrypter;
@@ -282,44 +314,8 @@ public class SSLVoltPort extends VoltPort {
 
         synchronized void submitEncryptionTasks() {
             if (m_hasOutstandingTask.compareAndSet(false, true)) {
-                Runnable task = new Runnable() {
-                    @Override
-                    public void run() {
-                        DBBPool.BBContainer fragCont = null;
-                        boolean queuedEncBuffers = false;
-                        SettableFuture<Void> sf = null;
-                        try {
-                            while ((fragCont = writeStream().getWriteBuffer()) != null) {
-                                sf = SettableFuture.create();
-                                m_encryptionResults.add(sf);
-                                fragCont.b().flip();
-                                int nBytesClear = fragCont.b().remaining();
-                                final DBBPool.BBContainer encCont = m_sslBufferEncrypter.encryptBuffer(fragCont.b().slice());
-                                fragCont.discard();
-                                fragCont = null;
-                                m_encryptedBuffers.offer(new EncryptionResult(encCont, nBytesClear, sf));
-                                sf = null;
-                                queuedEncBuffers = true;
-                            }
-                            if (! m_isShuttingDown.get() && queuedEncBuffers) {
-                                m_network.addToChangeList(m_port, true);
-                            }
-                        } catch (IOException ioe) {
-                            networkLog.error("Exception wrapping an SSL frame", ioe);
-                            return;
-                        } finally {
-                            if (fragCont != null) {
-                                fragCont.discard();
-                            }
-                            if (sf != null) {
-                                sf.setException(new Throwable("Encryption of buffer failed."));
-                            }
-                            m_hasOutstandingTask.set(false);
-                        }
-                    }
-                };
                 try {
-                    m_sslEncryptionService.submitForEncryption(task);
+                    m_sslEncryptionService.submitForEncryption(m_encTask);
                 } catch (RejectedExecutionException e) {
                     // the thread pool has been shutdown.
                 }
@@ -361,7 +357,7 @@ public class SSLVoltPort extends VoltPort {
                 }
             }
         } finally {
-            writeStream().updateWriteStats(bytesWritten);
+            writeStream().checkBackPressureAndUpdateWriteStats(bytesWritten);
         }
         return false;
     }
