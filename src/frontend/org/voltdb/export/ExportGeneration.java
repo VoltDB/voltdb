@@ -445,14 +445,14 @@ public class ExportGeneration implements Generation {
                     final Map<String, ExportDataSource> partitionSources = m_dataSourcesByPartition.get(partition);
                     if (partitionSources == null) {
                         exportLog.error("Received an export ack for partition " + partition +
-                                " which does not exist on this node");
+                                " which does not exist on this node, partitions = " + m_dataSourcesByPartition);
                         return;
                     }
 
                     final ExportDataSource eds = partitionSources.get(signature);
                     if (eds == null) {
                         exportLog.warn("Received an export ack for partition " + partition +
-                                " source signature " + signature + " which does not exist on this node");
+                                " source signature " + signature + " which does not exist on this node, sources = " + partitionSources);
                         return;
                     }
 

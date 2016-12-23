@@ -1471,4 +1471,20 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         }
         stringer.endArray();
     }
+
+    /**
+     * Ferret out the first argument.  This can be m_left or else
+     * the first element of m_args.
+     */
+    public AbstractExpression getFirstArgument() {
+        if (m_left != null) {
+            assert(m_args == null);
+            return m_left;
+        }
+        if (m_args != null && m_args.size() > 0) {
+            assert(m_left == null && m_right == null);
+            return m_args.get(0);
+        }
+        return null;
+    }
 }

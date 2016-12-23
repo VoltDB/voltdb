@@ -48,7 +48,7 @@ h1 {
     color: #FFFFFF;
     font: 14px Arial, Helvetica, sans-serif;
     text-shadow: none;
-    text-decoration: none;
+    text-decoration: none !important;
     border-radius: 0;
     border: none;
 }
@@ -316,7 +316,7 @@ html, body {
 
     .headLeft .logo {
         float: left;
-        width: 140px;
+        width: 85px;
         padding: 8px 0 0 0;
 		margin-right:90px;
     }
@@ -408,6 +408,8 @@ ul.topRightList {
 
         .menuHome ul li ul {
             display: none;
+            position:absolute;
+            right:5px;
         }
 
         .menuHome ul li a {
@@ -415,7 +417,7 @@ ul.topRightList {
             text-decoration: none;
             color: #000000;
 		  /*padding: 3px 2px 5px 15px;*/
-            padding: 3px 2px 5px 72px;
+            padding: 3px 2px 5px 10px;
             white-space: nowrap;
         }
 
@@ -1940,6 +1942,9 @@ ul.topRightList li a {
         float: left;
     }
 
+#Ul1 {
+    float: right !important;
+}
 .blockWrapper h1.theHeading {
     margin: 0 0 10px 0 !important;
     padding: 17px 20px 9px 0;
@@ -2793,7 +2798,7 @@ ul.adminClusterList li a.shutdown {
 }
 
 input.exitableTxtBx {
-    width: 35px; /*position:relative; top:6px;*/
+    width: 55px; /*position:relative; top:6px;*/
     padding: 2px 3px;
 }
 
@@ -2803,7 +2808,7 @@ input.exitableFilePrefix {
 }
 
 input.exitableMemoryLimit {
-    width: 90px; /*position:relative; top:6px;*/
+    width: 60px; /*position:relative; top:6px;*/
     padding: 2px 3px;
 }
 
@@ -3061,7 +3066,7 @@ td.heartbeattd span.unit, td.queryTimeOut span.unit {
 }
 
     .overviewTbl table td {
-       /*white-space: nowrap !important;*/
+       white-space: nowrap !important;
     }
 
 .confirmationHeight {
@@ -4828,6 +4833,14 @@ ul#shutdownMsg li{ font-size:13px; line-height:20px; }
   margin-left: 30%;
 }
 .refreshBtn { margin-bottom:10px;}
+}
+
+@media (min-width: 700px) and (max-width: 800px) {
+
+    .headLeft .logo {width: 60px;}
+    .menuHome ul li a {padding-right:5px;}
+    #nav ul li a { padding:28px 9px 0 9px;}
+
 }
 
 

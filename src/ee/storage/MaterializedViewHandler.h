@@ -68,7 +68,7 @@ public:
     // This must be done outside of the constructor, since the
     // catching up executes a plan fragment which may throw an
     // exception.
-    void catchUpWithExistingData(VoltDBEngine* engine, bool fallible);
+    void catchUpWithExistingData(bool fallible);
 
     PersistentTable *destTable() const { return m_destTable; }
     /* A view handler becomes dirty (and needs to be recreated) when:

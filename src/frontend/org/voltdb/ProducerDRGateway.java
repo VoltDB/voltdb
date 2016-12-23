@@ -29,6 +29,14 @@ public interface ProducerDRGateway {
     public void startAndWaitForGlobalAgreement() throws IOException;
 
     /**
+     * Truncate the DR log using the snapshot restore truncation point cached
+     * earlier. This is called on recover before the command log replay starts
+     * to drop all binary logs generated after the snapshot. Command log replay
+     * will recreate those binary logs.
+     */
+    public void truncateDRLog();
+
+    /**
      * Start listening on the ports
      */
     public abstract void startListening(boolean drProducerEnabled, int listenPort, String portInterface) throws IOException;
@@ -55,7 +63,7 @@ public interface ProducerDRGateway {
 
     public abstract int getDRClusterId();
 
-    public void truncateDRLogsForRestore(Map<Integer, Long> sequenceNumbers);
+    public void cacheSnapshotRestoreTruncationPoint(Map<Integer, Long> sequenceNumbers);
 
     /**
      * Clear all queued DR buffers for a master, useful when the replica goes away
@@ -64,4 +72,12 @@ public interface ProducerDRGateway {
     public void activateDRProducer();
 
     public void blockOnSyncSnapshotGeneration();
+
+    /**
+     * Get the DR producer node stats. This method may block because the task
+     * runs on the producer thread and it waits for the asynchronous task to
+     * finish.
+     * @return The producer node stats or null if on error
+     */
+    public DRProducerNodeStats getNodeDRStats();
 }

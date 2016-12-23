@@ -4,6 +4,7 @@
 {@aftermath = " "}
 {@agg = "_genericagg"} -- varbinary don't do SUM or AVG
 {@distinctableagg = "COUNT"} -- varbinary don't do SUM
+{@winagg = "_stringwinagg"} -- varbinary don't do SUM (or AVG) [not currently used here?]
 {@cmp = "_cmp"} -- use all comparison operators (=, <>, !=, <, >, <=, >=)
 {@somecmp = "_somecmp"} -- a smaller list of comparison operators (=, <, >=) [not used here?]
 {@columnpredicate = "@cmp"}

@@ -4,6 +4,7 @@
 {@aftermath = " "}
 {@agg = "_genericagg"} -- strings don't do SUM or AVG
 {@distinctableagg = "COUNT"} -- strings don't do SUM
+{@winagg = "_stringwinagg"} -- strings don't do SUM (or AVG)
 {@cmp = "_cmp"} -- use all comparison operators (=, <>, !=, <, >, <=, >=)
 {@somecmp = "_somecmp"} -- a smaller list of comparison operators (=, <, >=)
 {@columnpredicate = "_stringcolumnpredicate"}

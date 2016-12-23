@@ -2679,9 +2679,16 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertTrue(result.advanceRow());
         assertEquals("foofoofoo", result.getString(1));
         if (!isHSQL()) {
+            String expectedError = "VOLTDB ERROR: SQL ERROR\\s*+The result of the REPEAT function is larger than the maximum size allowed "
+                + "for strings \\(1048576 bytes\\)\\. Reduce either the string size or repetition count\\.";
             verifyProcFails(client,
-                            "VOLTDB ERROR: SQL ERROR\\s*REPEAT function call would create a string of size \\d+ which is larger than the maximum size \\d+",
-                            "REPEAT", 10000000, 1);
+                expectedError,
+                "REPEAT", 10000000, 1);
+            // The multiply needed to do the size check for this call to REPEAT will
+            // overflow a 64-bit signed int.  This was ticket ENG-11559.
+            verifyProcFails(client,
+                expectedError,
+                "REPEAT", 4611686018427387903L, 1);
         }
     }
 
