@@ -64,6 +64,7 @@
 #include "plannodes/receivenode.h"
 #include "plannodes/sendnode.h"
 #include "plannodes/seqscannode.h"
+#include "plannodes/swaptablesnode.h"
 #include "plannodes/tuplescannode.h"
 #include "plannodes/unionnode.h"
 #include "plannodes/updatenode.h"
@@ -145,6 +146,12 @@ voltdb::AbstractPlanNode* getEmptyPlanNode(voltdb::PlanNodeType type) {
         // ------------------------------------------------------------------
         case (voltdb::PLAN_NODE_TYPE_DELETE):
             ret = new voltdb::DeletePlanNode();
+            break;
+        // ------------------------------------------------------------------
+        // SwapTables
+        // ------------------------------------------------------------------
+        case (voltdb::PLAN_NODE_TYPE_SWAPTABLES):
+            ret = new voltdb::SwapTablesPlanNode();
             break;
         // ------------------------------------------------------------------
         // Aggregate

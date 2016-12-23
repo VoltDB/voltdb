@@ -48,7 +48,9 @@ public class TruncateTable extends VoltProcedure {
         voltQueueSQL(checkPTable);
 
         VoltTable[] results = voltExecuteSQL();
-        if (results.length != 4 || results[1].asScalarLong() != 0 ||  results[3].asScalarLong() != 0) {
+        if (results.length != 4 ||
+                results[1].asScalarLong() != 0 ||
+                results[3].asScalarLong() != 0) {
             throw new VoltAbortException(
                     "A table truncation behaved unexpectedly PRIOR to the intentional violation.");
         }
