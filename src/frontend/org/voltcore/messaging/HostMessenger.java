@@ -1136,65 +1136,24 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     public Map<Integer, String> getHostGroupsFromZK()
             throws KeeperException, InterruptedException, JSONException {
         Map<Integer, String> hostGroups = Maps.newHashMap();
-        List<String> children = m_zk.getChildren(CoreZK.hosts, false);
-        Queue<ZKUtil.ByteArrayCallback> callbacks = new ArrayDeque<ZKUtil.ByteArrayCallback>();
-        // issue all callbacks except the last one
-        for (int i = 0; i < children.size() - 1; i++) {
-            ZKUtil.ByteArrayCallback cb = new ZKUtil.ByteArrayCallback();
-            m_zk.getData(ZKUtil.joinZKPath(CoreZK.hosts, children.get(i)), false, cb, null);
-            callbacks.offer(cb);
-        }
-        // remember the last callback
-        ZKUtil.ByteArrayCallback lastCallback = new ZKUtil.ByteArrayCallback();
-        String lastChild = children.get(children.size() - 1);
-        m_zk.getData(ZKUtil.joinZKPath(CoreZK.hosts, lastChild), false, lastCallback, null);
-
-        // wait for the last callback to finish
-        byte[] lastPayload = lastCallback.getData();
-        final HostInfo lastOne = HostInfo.fromBytes(lastPayload);
-        hostGroups.put(parseHostId(lastChild), lastOne.m_group);
-
-        // now all previous callbacks should have finished
-        for (int i = 0; i < children.size() - 1; i++) {
-            byte[] payload = callbacks.poll().getData();
-            final HostInfo info = HostInfo.fromBytes(payload);
-            hostGroups.put(parseHostId(children.get(i)), info.m_group);
-        }
+        Map<Integer, HostInfo> hostInfos = getHostInfoMapFromZK();
+        hostInfos.forEach((k, v) -> {
+            hostGroups.put(k, v.m_group);
+        });
         return hostGroups;
     }
 
     public Map<Integer, Integer> getSitesPerHostMapFromZK()
             throws KeeperException, InterruptedException, JSONException {
         Map<Integer, Integer> sphMap = Maps.newHashMap();
-        List<String> children = m_zk.getChildren(CoreZK.hosts, false);
-        Queue<ZKUtil.ByteArrayCallback> callbacks = new ArrayDeque<ZKUtil.ByteArrayCallback>();
-        // issue all callbacks except the last one
-        for (int i = 0; i < children.size() - 1; i++) {
-            ZKUtil.ByteArrayCallback cb = new ZKUtil.ByteArrayCallback();
-            m_zk.getData(ZKUtil.joinZKPath(CoreZK.hosts, children.get(i)), false, cb, null);
-            callbacks.offer(cb);
-        }
-        // remember the last callback
-        ZKUtil.ByteArrayCallback lastCallback = new ZKUtil.ByteArrayCallback();
-        String lastChild = children.get(children.size() - 1);
-        m_zk.getData(ZKUtil.joinZKPath(CoreZK.hosts, lastChild), false, lastCallback, null);
-
-        // wait for the last callback to finish
-        byte[] lastPayload = lastCallback.getData();
-        final HostInfo lastOne = HostInfo.fromBytes(lastPayload);
-        sphMap.put(parseHostId(lastChild), lastOne.m_localSitesCount);
-
-        // now all previous callbacks should have finished
-        for (int i = 0; i < children.size() - 1; i++) {
-            byte[] payload = callbacks.poll().getData();
-            final HostInfo info = HostInfo.fromBytes(payload);
-            sphMap.put(parseHostId(children.get(i)), info.m_localSitesCount);
-        }
+        Map<Integer, HostInfo> hostInfos = getHostInfoMapFromZK();
+        hostInfos.forEach((k, v) -> {
+            sphMap.put(k, v.m_localSitesCount);
+        });
         return sphMap;
     }
 
     public Map<Integer, HostInfo> getHostInfoMapFromZK() throws KeeperException, InterruptedException, JSONException {
-
         Map<Integer, HostInfo> hostInfoMap = Maps.newHashMap();
         List<String> children = m_zk.getChildren(CoreZK.hosts, false);
         Queue<ZKUtil.ByteArrayCallback> callbacks = new ArrayDeque<ZKUtil.ByteArrayCallback>();
