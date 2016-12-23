@@ -233,7 +233,7 @@ public class TestClientInterface {
         String deploymentPath = builder.getPathToDeployment();
         CatalogUtil.compileDeployment(catalog, deploymentPath, false);
         DbSettings dbSettings = CatalogUtil.asDbSettings(deploymentPath);
-        m_context = new CatalogContext(0, 0, catalog, dbSettings, bytes, null, new byte[] {}, 0);
+        m_context = new CatalogContext(0, 0, catalog, dbSettings, bytes, null, new byte[] {}, 0, mock(HostMessenger.class));
         TheHashinator.initialize(TheHashinator.getConfiguredHashinatorClass(), TheHashinator.getConfigureBytes(3));
     }
 

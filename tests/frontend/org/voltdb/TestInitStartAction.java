@@ -209,7 +209,7 @@ final public class TestInitStartAction {
         assertTrue(VoltDB.crashMessage.contains("Cannot use legacy start action"));
 
         // this test which action should be considered legacy
-        EnumSet<StartAction> legacyOnes = EnumSet.complementOf(EnumSet.of(StartAction.INITIALIZE,StartAction.PROBE));
+        EnumSet<StartAction> legacyOnes = EnumSet.complementOf(EnumSet.of(StartAction.INITIALIZE,StartAction.PROBE, StartAction.GET));
         assertTrue(legacyOnes.stream().allMatch(StartAction::isLegacy));
     }
 }
