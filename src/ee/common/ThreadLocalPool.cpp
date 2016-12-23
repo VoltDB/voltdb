@@ -408,7 +408,7 @@ ScopedPoolDeferredReleaseMode::~ScopedPoolDeferredReleaseMode() {
         entry.second->freePendingAllocations(pendingReleaseSet);
     }
     assert (pendingReleaseSet.empty());
-    getPerThreadPools()->setRelocatablePoolReleaseMode(DEFERRED_RELEASE);
+    getPerThreadPools()->setRelocatablePoolReleaseMode(IMMEDIATE_RELEASE);
 }
 
 }
