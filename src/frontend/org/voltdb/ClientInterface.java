@@ -23,7 +23,6 @@ import java.io.StringWriter;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
-import java.nio.channels.AsynchronousCloseException;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
@@ -413,7 +412,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         } catch (Exception e) {
                             networkLog.warn("Rejected accepting new connection, failed to create SSLEngine; " +
                                     "indicates problem with SSL configuration: " + e.getMessage());
-                            return;
+                            continue;
                         }
                         sslEngine.setUseClientMode(false);
                         sslEngine.setNeedClientAuth(false);
@@ -428,6 +427,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             try {
                                 socket.close();
                             } catch (IOException e1) {
+                                e1.printStackTrace();
                             }
                             networkLog.warn("Rejected accepting new connection, SSL handshake failed: " + e.getMessage());
                             continue;
