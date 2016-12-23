@@ -629,6 +629,9 @@ public class SocketJoiner {
                   |java.net.NoRouteToHostException
                   |java.net.PortUnreachableException e)
             {
+                // reset the socket to null for loop purposes
+                socket = null;
+
                 if (mode == ConnectStrategy.PROBE) {
                     return null;
                 }
