@@ -42,6 +42,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class SSLVoltPort extends VoltPort {
 
     private final SSLEngine m_sslEngine;
+    private final SSLEncryptionService m_sslEncryptionService;
     private final SSLBufferDecrypter m_sslBufferDecrypter;
     private final SSLBufferEncrypter m_sslBufferEncrypter;
     private DBBPool.BBContainer m_dstBufferCont;
@@ -60,8 +61,9 @@ public class SSLVoltPort extends VoltPort {
     private final Deque<SettableFuture<Void>> m_encryptionResults = new ArrayDeque<>();
     private final Deque<SettableFuture<Void>> m_decryptionResults = new ArrayDeque<>();
 
-    public SSLVoltPort(VoltNetwork network, InputHandler handler, InetSocketAddress remoteAddress, NetworkDBBPool readPool, SSLEngine sslEngine) {
+    public SSLVoltPort(VoltNetwork network, InputHandler handler, InetSocketAddress remoteAddress, NetworkDBBPool readPool, SSLEncryptionService sslEncryptionService, SSLEngine sslEngine) {
         super(network, handler, remoteAddress, readPool);
+        this.m_sslEncryptionService = sslEncryptionService;
         this.m_sslEngine = sslEngine;
         this.m_sslBufferDecrypter = new SSLBufferDecrypter(sslEngine);
         int appBufferSize = m_sslEngine.getSession().getApplicationBufferSize();
@@ -236,7 +238,7 @@ public class SSLVoltPort extends VoltPort {
                     }
                 };
                 try {
-                    SSLEncryptionService.instance().submitForDecryption(task);
+                    m_sslEncryptionService.submitForDecryption(task);
                 } catch (RejectedExecutionException e) {
                     // the thread pool has been shutdown.
                 }
@@ -311,7 +313,7 @@ public class SSLVoltPort extends VoltPort {
                     }
                 };
                 try {
-                    SSLEncryptionService.instance().submitForEncryption(task);
+                    m_sslEncryptionService.submitForEncryption(task);
                 } catch (RejectedExecutionException e) {
                     // the thread pool has been shutdown.
                 }

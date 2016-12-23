@@ -3001,11 +3001,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 m_latencyStats = null;
                 m_latencyHistogramStats = null;
 
-                if (m_config.m_sslEncryptionService != null) {
-                    m_config.m_sslEncryptionService.shutdown();
-                    m_config.m_sslEncryptionService = null;
-                }
-
                 AdHocCompilerCache.clearHashCache();
                 org.voltdb.iv2.InitiatorMailbox.m_allInitiatorMailboxes.clear();
 

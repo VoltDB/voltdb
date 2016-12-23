@@ -123,13 +123,15 @@ public final class ClientImpl implements Client {
             throw new IllegalArgumentException("The client affinity must be enabled to enable topology awareness.");
         }
 
+        m_sslContext = sslContext;
         m_distributer = new Distributer(
                 config.m_heavyweight,
                 config.m_procedureCallTimeoutNanos,
                 config.m_connectionResponseTimeoutMS,
                 config.m_useClientAffinity,
                 config.m_sendReadsToReplicasBytDefaultIfCAEnabled,
-                config.m_subject);
+                config.m_subject,
+                m_sslContext);
         m_distributer.addClientStatusListener(m_listener);
         String username = config.m_username;
         if (config.m_subject != null) {
@@ -170,7 +172,6 @@ public final class ClientImpl implements Client {
             m_distributer.m_rateLimiter.setLimits(
                     config.m_maxTransactionsPerSecond, config.m_maxOutstandingTxns);
         }
-        m_sslContext = sslContext;
     }
 
     private boolean verifyCredentialsAreAlwaysTheSame(String username, byte[] hashedPassword) {
@@ -226,7 +227,7 @@ public final class ClientImpl implements Client {
             throw new IOException("New connection authorization credentials do not match previous credentials for client.");
         }
 
-        m_distributer.createConnectionWithHashedCredentials(host, subProgram, subPassword, port, m_hashScheme, m_sslContext);
+        m_distributer.createConnectionWithHashedCredentials(host, subProgram, subPassword, port, m_hashScheme);
     }
 
     /**

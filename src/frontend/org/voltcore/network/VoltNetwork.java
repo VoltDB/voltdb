@@ -90,6 +90,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.VoltNetworkPool.IOStatsIntf;
 import org.voltcore.utils.LatencyWatchdog;
 import org.voltcore.utils.Pair;
+import org.voltcore.utils.ssl.SSLEncryptionService;
 
 import javax.net.ssl.SSLEngine;
 
@@ -165,6 +166,7 @@ class VoltNetwork implements Runnable, IOStatsIntf
             final InputHandler handler,
             final int interestOps,
             final ReverseDNSPolicy dns,
+            final SSLEncryptionService sslEncryptionService,
             final SSLEngine sslEngine) throws IOException {
         channel.configureBlocking (false);
         channel.socket().setKeepAlive(true);
@@ -178,6 +180,7 @@ class VoltNetwork implements Runnable, IOStatsIntf
                                 handler,
                                 (InetSocketAddress)channel.socket().getRemoteSocketAddress(),
                                 m_pool,
+                                sslEncryptionService,
                                 sslEngine);
                 port.registering();
 

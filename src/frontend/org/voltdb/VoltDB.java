@@ -180,9 +180,6 @@ public class VoltDB {
         /** ssl context factory */
         public SslContextFactory m_sslContextFactory = null;
 
-        /** executor service for ssl ecncryption/decryption */
-        public SSLEncryptionService m_sslEncryptionService = null;
-
         /** ssl context for client and admin ports */
         public SSLContext m_sslContext = null;
 

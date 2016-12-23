@@ -489,7 +489,6 @@ public class Inits {
                     m_config.m_sslContextFactory.start();
                     hostLog.info("SSL Enabled for HTTP. Please point browser to HTTPS URL.");
                     if ((sslType != null && sslType.isExternal()) || m_config.m_sslExternal) {
-                        m_config.m_sslEncryptionService = SSLEncryptionService.instance();
                         m_config.m_sslContext = m_config.m_sslContextFactory.getSslContext();
                         hostLog.info("SSL enabled for admin and client port. Please enable SSL on client.");
                     }

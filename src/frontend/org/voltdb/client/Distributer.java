@@ -103,6 +103,8 @@ class Distributer {
     //Selector and connection handling, does all work in blocking selection thread
     private final VoltNetworkPool m_network;
 
+    private final SSLContext m_sslContext;
+
     // Temporary until a distribution/affinity algorithm is written
     private int m_nextConnection = 0;
 
@@ -917,7 +919,7 @@ class Distributer {
         this( false,
                 ClientConfig.DEFAULT_PROCEDURE_TIMOUT_NANOS,
                 ClientConfig.DEFAULT_CONNECTION_TIMOUT_MS,
-                false, false, null);
+                false, false, null, null);
     }
 
     Distributer(
@@ -926,8 +928,16 @@ class Distributer {
             long connectionResponseTimeoutMS,
             boolean useClientAffinity,
             boolean sendReadsToReplicasBytDefault,
-            Subject subject) {
+            Subject subject,
+            SSLContext sslContext) {
         m_useMultipleThreads = useMultipleThreads;
+        m_sslContext = sslContext;
+        if (m_sslContext != null) {
+            m_sslEncryptionService = new SSLEncryptionService(false);
+            m_sslEncryptionService.startup();
+        } else {
+            m_sslEncryptionService = null;
+        }
         m_network = new VoltNetworkPool(
                 m_useMultipleThreads ? Math.max(1, CoreUtils.availableProcessors() / 4 ) : 1,
                 1, null, "Client");
@@ -943,27 +953,20 @@ class Distributer {
     }
 
     void createConnection(String host, String program, String password, int port, ClientAuthScheme scheme)
-            throws UnknownHostException, IOException
-    {
-        createConnection(host, program, password, port, scheme, null);
-    }
-
-    void createConnection(String host, String program, String password, int port, ClientAuthScheme scheme, SSLContext sslContext)
     throws UnknownHostException, IOException
     {
         byte hashedPassword[] = ConnectionUtil.getHashedPassword(scheme, password);
-        createConnectionWithHashedCredentials(host, program, hashedPassword, port, scheme, sslContext);
+        createConnectionWithHashedCredentials(host, program, hashedPassword, port, scheme);
     }
 
-    void createConnectionWithHashedCredentials(String host, String program, byte[] hashedPassword, int port, ClientAuthScheme scheme, SSLContext sslContext)
+    void createConnectionWithHashedCredentials(String host, String program, byte[] hashedPassword, int port, ClientAuthScheme scheme)
     throws UnknownHostException, IOException
     {
         SSLEngine sslEngine = null;
 
-        if (sslContext != null) {
-            sslEngine = sslContext.createSSLEngine("client", port);
+        if (m_sslContext != null) {
+            sslEngine = m_sslContext.createSSLEngine("client", port);
             sslEngine.setUseClientMode(true);
-            m_sslEncryptionService = SSLEncryptionService.clientInstance();
         }
 
         final Object socketChannelAndInstanceIdAndBuildString[] =
@@ -973,7 +976,7 @@ class Distributer {
         final int hostId = (int)instanceIdWhichIsTimestampAndLeaderIp[0];
 
         NodeConnection cxn = new NodeConnection(instanceIdWhichIsTimestampAndLeaderIp);
-        Connection c = m_network.registerChannel( aChannel, cxn, sslEngine);
+        Connection c = m_network.registerChannel( aChannel, cxn, m_sslEncryptionService, sslEngine);
         cxn.m_connection = c;
 
         synchronized (this) {

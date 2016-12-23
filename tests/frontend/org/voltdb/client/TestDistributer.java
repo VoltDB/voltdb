@@ -241,7 +241,7 @@ public class TestDistributer extends TestCase {
                         client.configureBlocking(false);
                         channels.add(client);
                         if (handleConnection) {
-                            network.registerChannel( client, handler, null);
+                            network.registerChannel( client, handler, null, null);
                         }
                     }
                     Thread.yield();
@@ -426,7 +426,7 @@ public class TestDistributer extends TestCase {
             Distributer dist = new Distributer(false,
                     ClientConfig.DEFAULT_PROCEDURE_TIMOUT_NANOS,
                     ClientConfig.DEFAULT_CONNECTION_TIMOUT_MS,
-                    false, false, null /* subject */);
+                    false, false, null /* subject */, null);
             dist.addClientStatusListener(csl);
             dist.createConnection("localhost", "", "", 20000, ClientAuthScheme.HASH_SHA1);
             dist.createConnection("localhost", "", "", 20001, ClientAuthScheme.HASH_SHA1);
@@ -494,7 +494,7 @@ public class TestDistributer extends TestCase {
             Distributer dist = new Distributer(false,
                     ClientConfig.DEFAULT_PROCEDURE_TIMOUT_NANOS,
                     ClientConfig.DEFAULT_CONNECTION_TIMOUT_MS,
-                    false, false, null /* subject */);
+                    false, false, null /* subject */, null);
             dist.addClientStatusListener(csl);
             dist.createConnection("localhost", "", "", 20000, ClientAuthScheme.HASH_SHA1);
             dist.createConnection("localhost", "", "", 20001, ClientAuthScheme.HASH_SHA256);
@@ -579,7 +579,7 @@ public class TestDistributer extends TestCase {
         Distributer dist = new Distributer(false,
                 ClientConfig.DEFAULT_PROCEDURE_TIMOUT_NANOS,
                 1000 /* One second connection timeout */,
-                false, false, null /* subject */);
+                false, false, null /* subject */, null);
         dist.addClientStatusListener(new TimeoutMonitorCSL());
         dist.createConnection("localhost", "", "", 20000, ClientAuthScheme.HASH_SHA1);
 
@@ -643,7 +643,7 @@ public class TestDistributer extends TestCase {
         Distributer dist = new Distributer(false,
                 ClientConfig.DEFAULT_PROCEDURE_TIMOUT_NANOS,
                 2000 /* Two seconds connection timeout */,
-                false, false, null /* subject */);
+                false, false, null /* subject */, null);
         dist.addClientStatusListener(new TimeoutMonitorCSL());
         dist.createConnection("localhost", "", "", 20000, ClientAuthScheme.HASH_SHA1);
 
@@ -710,7 +710,7 @@ public class TestDistributer extends TestCase {
         Distributer dist = new Distributer(false,
                 ClientConfig.DEFAULT_PROCEDURE_TIMOUT_NANOS,
                 30000 /* thirty second connection timeout */,
-                false, false, null /* subject */);
+                false, false, null /* subject */, null);
         dist.createConnection("localhost", "", "", 20000, ClientAuthScheme.HASH_SHA1);
 
         // make sure it connected
@@ -763,7 +763,7 @@ public class TestDistributer extends TestCase {
         Distributer dist = new Distributer( false,
                 ClientConfig.DEFAULT_PROCEDURE_TIMOUT_NANOS,
                 CONNECTION_TIMEOUT /* six second connection timeout */,
-                false, false, null /* subject */);
+                false, false, null /* subject */, null);
         dist.addClientStatusListener(new TimeoutMonitorCSL());
         long start = System.currentTimeMillis();
         dist.createConnection("localhost", "", "", 20000, ClientAuthScheme.HASH_SHA1);

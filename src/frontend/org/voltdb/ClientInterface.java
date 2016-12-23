@@ -67,6 +67,7 @@ import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
 import org.voltcore.utils.ssl.MessagingChannel;
+import org.voltcore.utils.ssl.SSLEncryptionService;
 import org.voltdb.AuthSystem.AuthProvider;
 import org.voltdb.AuthSystem.AuthUser;
 import org.voltdb.CatalogContext.ProcedurePartitionInfo;
@@ -350,6 +351,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                             handler,
                                             0,
                                             ReverseDNSPolicy.ASYNCHRONOUS,
+                                            SSLEncryptionService.serverInstance(),
                                             m_sslEngine);
                             /*
                              * If IV2 is enabled the logic initially enabling read is

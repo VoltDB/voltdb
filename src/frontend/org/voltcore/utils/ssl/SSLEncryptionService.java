@@ -33,43 +33,54 @@ import org.voltcore.logging.VoltLogger;
  */
 public class SSLEncryptionService {
 
+    private static SSLEncryptionService m_server_self = new SSLEncryptionService(true);
+
     private final AtomicBoolean m_isShutdown = new AtomicBoolean(false);
 
-    private static SSLEncryptionService m_self = new SSLEncryptionService();
-    private static SSLEncryptionService m_client_self = new SSLEncryptionService();
     private final VoltLogger networkLog = new VoltLogger("NETWORK");
 
-    private final ListeningExecutorService m_EncEs = MoreExecutors.listeningDecorator(
-            Executors.newFixedThreadPool(Math.max(2, CoreUtils.availableProcessors()/2),
-                    CoreUtils.getThreadFactory("SSL encryption thread"))
-    );
+    private final ListeningExecutorService m_encEs;
 
-    private final ListeningExecutorService m_DecEs = MoreExecutors.listeningDecorator(
-            Executors.newFixedThreadPool(Math.max(2, CoreUtils.availableProcessors()/2),
-                    CoreUtils.getThreadFactory("SSL decryption thread"))
-    );
+    private final ListeningExecutorService m_decEs;
 
-    public static SSLEncryptionService instance() {
-        return m_self;
-    }
-    public static SSLEncryptionService clientInstance() {
-        return m_client_self;
+    public static SSLEncryptionService serverInstance() {
+        return m_server_self;
     }
 
-    private SSLEncryptionService() {
+    public SSLEncryptionService(boolean serverConfig) {
+        if (serverConfig) {
+            m_encEs = MoreExecutors.listeningDecorator(
+                    Executors.newFixedThreadPool(Math.max(2, CoreUtils.availableProcessors()/2),
+                            CoreUtils.getThreadFactory("SSL encryption thread")));
+            m_decEs = MoreExecutors.listeningDecorator(
+                    Executors.newFixedThreadPool(Math.max(2, CoreUtils.availableProcessors()/2),
+                            CoreUtils.getThreadFactory("SSL decryption thread")));
+        } else {
+            // client config
+            m_encEs = MoreExecutors.listeningDecorator(
+                    Executors.newFixedThreadPool(1,
+                            CoreUtils.getThreadFactory("SSL encryption thread")));
+            m_decEs = MoreExecutors.listeningDecorator(
+                    Executors.newFixedThreadPool(1,
+                            CoreUtils.getThreadFactory("SSL decryption thread")));
+        }
+    }
+
+    public void startup() {
+        m_isShutdown.set(false);
     }
 
     public void shutdown() throws InterruptedException {
 
         m_isShutdown.set(true);
         networkLog.info("Shutting down Encryption and Decryption services.");
-        if (m_EncEs != null) {
-            m_EncEs.shutdown();
-            m_EncEs.awaitTermination(365, TimeUnit.DAYS);
+        if (m_encEs != null) {
+            m_encEs.shutdown();
+            m_encEs.awaitTermination(365, TimeUnit.DAYS);
         }
-        if (m_DecEs != null) {
-            m_DecEs.shutdown();
-            m_DecEs.awaitTermination(365, TimeUnit.DAYS);
+        if (m_decEs != null) {
+            m_decEs.shutdown();
+            m_decEs.awaitTermination(365, TimeUnit.DAYS);
         }
         networkLog.info("Encryption and Decryption services successfully shutdown.");
     }
@@ -78,13 +89,13 @@ public class SSLEncryptionService {
         if (m_isShutdown.get()) {
             return null;
         }
-        return m_EncEs.submit(task);
+        return m_encEs.submit(task);
     }
 
     public ListenableFuture<?> submitForDecryption(Runnable task) {
         if (m_isShutdown.get()) {
             return null;
         }
-        return m_DecEs.submit(task);
+        return m_decEs.submit(task);
     }
 }
