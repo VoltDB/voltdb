@@ -48,6 +48,7 @@ import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
 import com.google_voltpatches.common.collect.Maps;
+import org.voltdb.common.Constants;
 
 /**
  * Implementation of a VoltServerConfig for a multi-process
@@ -170,6 +171,12 @@ public class LocalCluster extends VoltServerConfig {
 
     private String m_prefix = null;
     private boolean m_isPaused = false;
+
+    private int m_httpOverridePort = -1;
+    public void setHttpOverridePort(int port) {
+        m_httpOverridePort = port;
+    }
+    public int getHttpOverridePort() { return m_httpOverridePort; };
 
     public LocalCluster(String jarFileName,
                         int siteCount,
@@ -1001,7 +1008,8 @@ public class LocalCluster extends VoltServerConfig {
 
             cmdln.port(portGenerator.nextClient());
             cmdln.adminPort(portGenerator.nextAdmin());
-            cmdln.httpPort(portGenerator.nextHttp());
+            if (cmdln.m_httpPort != Constants.HTTP_PORT_DISABLED)
+                cmdln.httpPort(portGenerator.nextHttp());
             cmdln.replicaMode(replicaMode);
             cmdln.timestampSalt(getRandomTimestampSalt());
             cmdln.setPlacementGroup(placementGroup);

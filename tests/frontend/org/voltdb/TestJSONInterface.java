@@ -67,6 +67,8 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.security.cert.CertificateException;
+import java.security.cert.X509Certificate;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -74,6 +76,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import javax.net.ssl.SSLContext;
 
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
@@ -85,7 +88,6 @@ import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.ContentType;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.json_voltpatches.JSONArray;
@@ -119,14 +121,29 @@ import org.voltdb.utils.Encoder;
 import org.voltdb.utils.MiscUtils;
 
 import junit.framework.TestCase;
+import org.apache.http.config.Registry;
+import org.apache.http.config.RegistryBuilder;
+import org.apache.http.conn.socket.ConnectionSocketFactory;
+import org.apache.http.conn.socket.PlainConnectionSocketFactory;
+import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
+import org.apache.http.conn.ssl.SSLContextBuilder;
+import org.apache.http.conn.ssl.TrustStrategy;
+import org.apache.http.impl.client.HttpClientBuilder;
+import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.voltdb.compiler.deploymentfile.SnmpType;
+import org.voltdb.regressionsuites.LocalCluster;
 
 public class TestJSONInterface extends TestCase {
     final static ContentType utf8ApplicationFormUrlEncoded =
             ContentType.create("application/x-www-form-urlencoded","UTF-8");
 
-    ServerThread server;
+    static LocalCluster server;
     Client client;
+    static String protocolPrefix = "http://";
+
+    public static void setupProtocol() {
+        protocolPrefix = server.isEnableSSL() ? "https://" : "http://";
+    }
 
     static class Response {
 
@@ -154,12 +171,33 @@ public class TestJSONInterface extends TestCase {
         if (port == null) {
             port = VoltDB.DEFAULT_HTTP_PORT;
         }
-        return String.format("http://localhost:%d/%s", port, path);
+        return String.format(protocolPrefix + "localhost:%d/%s", port, path);
     }
 
     public static String callProcOverJSONRaw(String varString, final int expectedCode) throws Exception {
-        URI jsonAPIURI = URI.create("http://localhost:8095/api/1.0/");
-        try (CloseableHttpClient httpclient = HttpClients.createDefault()) {
+        setupProtocol();
+        URI jsonAPIURI = URI.create(protocolPrefix + "localhost:8095/api/1.0/");
+        SSLContext sslContext = new SSLContextBuilder().loadTrustMaterial(null, new TrustStrategy() {
+            @Override
+            public boolean isTrusted(X509Certificate[] arg0, String arg1) throws CertificateException {
+                return true;
+            }
+        }).build();
+        SSLConnectionSocketFactory sf = new SSLConnectionSocketFactory(sslContext,
+          SSLConnectionSocketFactory.ALLOW_ALL_HOSTNAME_VERIFIER);
+        Registry<ConnectionSocketFactory> socketFactoryRegistry = RegistryBuilder.<ConnectionSocketFactory>create()
+                .register("http", PlainConnectionSocketFactory.getSocketFactory())
+                .register("https", sf)
+                .build();
+
+        // allows multi-threaded use
+        PoolingHttpClientConnectionManager connMgr = new PoolingHttpClientConnectionManager( socketFactoryRegistry);
+
+        HttpClientBuilder b = HttpClientBuilder.create();
+        b.setSslcontext(sslContext);
+        b.setConnectionManager(connMgr);
+
+        try (CloseableHttpClient httpclient = b.build()) {
             HttpPost post = new HttpPost(jsonAPIURI);
             // play nice by using HTTP 1.1 continue requests where the client sends the request headers first
             // to the server to see if the server is willing to accept it. This allows us to test large requests
@@ -201,6 +239,7 @@ public class TestJSONInterface extends TestCase {
     }
 
     private static String httpUrlOverJSON(String method, String url, String user, String password, String scheme, int expectedCode, String expectedCt, Map<String,String> params) throws Exception {
+        setupProtocol();
         URL jsonAPIURL = new URL(url);
 
         HttpURLConnection conn = (HttpURLConnection) jsonAPIURL.openConnection();
@@ -406,12 +445,10 @@ public class TestJSONInterface extends TestCase {
             boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
             assertTrue(success);
 
-            VoltDB.Configuration config = new VoltDB.Configuration();
-            config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
-            config.m_pathToDeployment = builder.getPathToDeployment();
-            server = new ServerThread(config);
-            server.start();
-            server.waitForInitialization();
+            server = new LocalCluster("json.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
+            server.setHasLocalServer(false);
+            success = server.compile(builder);
+            server.startUp();
 
             int pkStart = 0;
             pkStart = runPauseTests(pkStart, false, false);
@@ -432,11 +469,11 @@ public class TestJSONInterface extends TestCase {
 
             pkStart = runPauseTests(pkStart, false, false);
             pkStart = runPauseTests(pkStart, false, true);
-
+        } catch (Throwable th) {
+            th.printStackTrace();
         } finally {
             if (server != null) {
-                server.shutdown();
-                server.join();
+                server.shutDown();
             }
             server = null;
         }
@@ -509,12 +546,13 @@ public class TestJSONInterface extends TestCase {
             VoltDB.Configuration config = new VoltDB.Configuration();
             config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
             config.m_pathToDeployment = builder.getPathToDeployment();
-            server = new ServerThread(config);
-            server.start();
-            server.waitForInitialization();
+            server = new LocalCluster("json.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
+            server.setHasLocalServer(false);
+            success = server.compile(builder);
+            server.startUp();
 
             //Get deployment
-            String jdep = getUrlOverJSON("http://localhost:8095/deployment", null, null, null, 200,  "application/json");
+            String jdep = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment", null, null, null, 200,  "application/json");
             Map<String,String> params = new HashMap<>();
 
             ObjectMapper mapper = new ObjectMapper();
@@ -525,9 +563,9 @@ public class TestJSONInterface extends TestCase {
             deptype.setSnmp(snmpConfig);
             String ndeptype = URLEncoder.encode(mapper.writeValueAsString(deptype), StandardCharsets.UTF_8.toString());
             params.put("deployment", ndeptype);
-            String pdep = postUrlOverJSON("http://localhost:8095/deployment/", null, null, null, 200, "application/json", params);
+            String pdep = postUrlOverJSON(protocolPrefix + "localhost:8095/deployment/", null, null, null, 200, "application/json", params);
             assertTrue(pdep.contains("Deployment Updated"));
-            jdep = getUrlOverJSON("http://localhost:8095/deployment", null, null, null, 200,  "application/json");
+            jdep = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment", null, null, null, 200,  "application/json");
             DeploymentType gotValue = mapper.readValue(jdep, DeploymentType.class);
             assertEquals("public", gotValue.getSnmp().getCommunity());
 
@@ -535,16 +573,15 @@ public class TestJSONInterface extends TestCase {
             deptype.setSnmp(snmpConfig);
             ndeptype = URLEncoder.encode(mapper.writeValueAsString(deptype), StandardCharsets.UTF_8.toString());
             params.put("deployment", ndeptype);
-            pdep = postUrlOverJSON("http://localhost:8095/deployment/", null, null, null, 200, "application/json", params);
+            pdep = postUrlOverJSON(protocolPrefix + "localhost:8095/deployment/", null, null, null, 200, "application/json", params);
             assertTrue(pdep.contains("Deployment Updated"));
-            jdep = getUrlOverJSON("http://localhost:8095/deployment", null, null, null, 200,  "application/json");
+            jdep = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment", null, null, null, 200,  "application/json");
             gotValue = mapper.readValue(jdep, DeploymentType.class);
             assertEquals("foobar", gotValue.getSnmp().getCommunity());
 
         } finally {
             if (server != null) {
-                server.shutdown();
-                server.join();
+                server.shutDown();
             }
             server = null;
         }
@@ -567,9 +604,10 @@ public class TestJSONInterface extends TestCase {
             VoltDB.Configuration config = new VoltDB.Configuration();
             config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
             config.m_pathToDeployment = builder.getPathToDeployment();
-            server = new ServerThread(config);
-            server.start();
-            server.waitForInitialization();
+            server = new LocalCluster("json.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
+            server.setHasLocalServer(false);
+            success = server.compile(builder);
+            server.startUp();
 
             client = ClientFactory.createClient(new ClientConfig());
             client.createConnection("localhost");
@@ -656,10 +694,11 @@ public class TestJSONInterface extends TestCase {
             //Make sure we are still good.
             ClientResponse resp = client.callProcedure("@AdHoc", "SELECT count(*) from foo");
             assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+        } catch (Throwable th) {
+            th.printStackTrace();
         } finally {
             if (server != null) {
-                server.shutdown();
-                server.join();
+                server.shutDown();
             }
             server = null;
             if (client != null) {
@@ -697,10 +736,10 @@ public class TestJSONInterface extends TestCase {
 
             config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
             config.m_pathToDeployment = builder.getPathToDeployment();
-
-            server = new ServerThread(config);
-            server.start();
-            server.waitForInitialization();
+            server = new LocalCluster("json.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
+            server.setHasLocalServer(false);
+            success = server.compile(builder);
+            server.startUp();
 
             ParameterSet pset;
             String responseJSON;
@@ -763,8 +802,7 @@ public class TestJSONInterface extends TestCase {
             assertTrue(response.status == ClientResponse.SERVER_UNAVAILABLE);
         } finally {
             if (server != null) {
-                server.shutdown();
-                server.join();
+                server.shutDown();
             }
             server = null;
         }
@@ -798,10 +836,10 @@ public class TestJSONInterface extends TestCase {
 
             config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
             config.m_pathToDeployment = builder.getPathToDeployment();
-
-            server = new ServerThread(config);
-            server.start();
-            server.waitForInitialization();
+            server = new LocalCluster("json.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
+            server.setHasLocalServer(false);
+            success = server.compile(builder);
+            server.startUp();
 
             ParameterSet pset;
             String responseJSON;
@@ -967,8 +1005,7 @@ public class TestJSONInterface extends TestCase {
 
         } finally {
             if (server != null) {
-                server.shutdown();
-                server.join();
+                server.shutDown();
             }
             server = null;
         }
@@ -1001,9 +1038,10 @@ public class TestJSONInterface extends TestCase {
             VoltDB.Configuration config = new VoltDB.Configuration();
             config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
             config.m_pathToDeployment = builder.getPathToDeployment();
-            server = new ServerThread(config);
-            server.start();
-            server.waitForInitialization();
+            server = new LocalCluster("json.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
+            server.setHasLocalServer(false);
+            success = server.compile(builder);
+            server.startUp();
 
             String response = callProcOverJSONRaw(japaneseTestVarStrings, 200);
             Response r = responseFromJSON(response);
@@ -1027,8 +1065,7 @@ public class TestJSONInterface extends TestCase {
             assertTrue(response.contains(test2));
         } finally {
             if (server != null) {
-                server.shutdown();
-                server.join();
+                server.shutDown();
             }
             server = null;
         }
@@ -1078,9 +1115,10 @@ public class TestJSONInterface extends TestCase {
             VoltDB.Configuration config = new VoltDB.Configuration();
             config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
             config.m_pathToDeployment = builder.getPathToDeployment();
-            server = new ServerThread(config);
-            server.start();
-            server.waitForInitialization();
+            server = new LocalCluster("json.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
+            server.setHasLocalServer(false);
+            success = server.compile(builder);
+            server.startUp();
 
             ParameterSet pset;
 
@@ -1215,8 +1253,7 @@ public class TestJSONInterface extends TestCase {
             assertEquals(ClientResponse.SUCCESS, resp.status);
         } finally {
             if (server != null) {
-                server.shutdown();
-                server.join();
+                server.shutDown();
             }
             server = null;
         }
@@ -1251,9 +1288,10 @@ public class TestJSONInterface extends TestCase {
             VoltDB.Configuration config = new VoltDB.Configuration();
             config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
             config.m_pathToDeployment = builder.getPathToDeployment();
-            server = new ServerThread(config);
-            server.start();
-            server.waitForInitialization();
+            server = new LocalCluster("json.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
+            server.setHasLocalServer(false);
+            success = server.compile(builder);
+            server.startUp();
 
             // test not enabled
             ParameterSet pset = ParameterSet.fromArrayNoCopy("foo", "bar", "foobar");
@@ -1265,8 +1303,7 @@ public class TestJSONInterface extends TestCase {
             }
         } finally {
             if (server != null) {
-                server.shutdown();
-                server.join();
+                server.shutDown();
             }
             server = null;
         }
@@ -1291,9 +1328,10 @@ public class TestJSONInterface extends TestCase {
             VoltDB.Configuration config = new VoltDB.Configuration();
             config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
             config.m_pathToDeployment = builder.getPathToDeployment();
-            server = new ServerThread(config);
-            server.start();
-            server.waitForInitialization();
+            server = new LocalCluster("json.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
+            server.setHasLocalServer(false);
+            success = server.compile(builder);
+            server.startUp();
 
             ParameterSet pset = ParameterSet.fromArrayNoCopy(14_000);
             String response = callProcOverJSON("DelayProc", pset, null, null, false);
@@ -1301,8 +1339,7 @@ public class TestJSONInterface extends TestCase {
             assertEquals(ClientResponse.SUCCESS, r.status);
         } finally {
             if (server != null) {
-                server.shutdown();
-                server.join();
+                server.shutDown();
             }
             server = null;
         }
@@ -1328,9 +1365,10 @@ public class TestJSONInterface extends TestCase {
             VoltDB.Configuration config = new VoltDB.Configuration();
             config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
             config.m_pathToDeployment = builder.getPathToDeployment();
-            server = new ServerThread(config);
-            server.start();
-            server.waitForInitialization();
+            server = new LocalCluster("json.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
+            server.setHasLocalServer(false);
+            success = server.compile(builder);
+            server.startUp();
 
             ParameterSet pset = null;
 
@@ -1349,8 +1387,7 @@ public class TestJSONInterface extends TestCase {
             assertTrue(r.statusString.contains("Transaction Interrupted"));
         } finally {
             if (server != null) {
-                server.shutdown();
-                server.join();
+                server.shutDown();
             }
             server = null;
         }
@@ -1401,9 +1438,10 @@ public class TestJSONInterface extends TestCase {
             VoltDB.Configuration config = new VoltDB.Configuration();
             config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
             config.m_pathToDeployment = builder.getPathToDeployment();
-            server = new ServerThread(config);
-            server.start();
-            server.waitForInitialization();
+            server = new LocalCluster("json.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
+            server.setHasLocalServer(false);
+            success = server.compile(builder);
+            server.startUp();
 
             //create a large query string
             final StringBuilder s = new StringBuilder();
@@ -1435,8 +1473,7 @@ public class TestJSONInterface extends TestCase {
 
         } finally {
             if (server != null) {
-                server.shutdown();
-                server.join();
+                server.shutDown();
             }
             server = null;
         }
@@ -1462,9 +1499,10 @@ public class TestJSONInterface extends TestCase {
             VoltDB.Configuration config = new VoltDB.Configuration();
             config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
             config.m_pathToDeployment = builder.getPathToDeployment();
-            server = new ServerThread(config);
-            server.start();
-            server.waitForInitialization();
+            server = new LocalCluster("json.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
+            server.setHasLocalServer(false);
+            success = server.compile(builder);
+            server.startUp();
 
             // try a good insert
             String varString = "Procedure=Insert&Parameters=[5,\"aa\"]";
@@ -1493,8 +1531,7 @@ public class TestJSONInterface extends TestCase {
             assertEquals(ClientResponse.SUCCESS, r.status);
         } finally {
             if (server != null) {
-                server.shutdown();
-                server.join();
+                server.shutDown();
             }
             server = null;
         }
@@ -1523,16 +1560,16 @@ public class TestJSONInterface extends TestCase {
             VoltDB.Configuration config = new VoltDB.Configuration();
             config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
             config.m_pathToDeployment = builder.getPathToDeployment();
-            server = new ServerThread(config);
-            server.start();
-            server.waitForInitialization();
+            server = new LocalCluster("json.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
+            server.setHasLocalServer(false);
+            success = server.compile(builder);
+            server.startUp();
 
             callProcOverJSONRaw(getHTTPURL(null, "api/1.0/Tim"), 400);
             callProcOverJSONRaw(getHTTPURL(null, "api/1.0/Tim?Procedure=foo&Parameters=[x4{]"), 400);
         } finally {
             if (server != null) {
-                server.shutdown();
-                server.join();
+                server.shutDown();
             }
             server = null;
         }
@@ -1561,21 +1598,21 @@ public class TestJSONInterface extends TestCase {
             VoltDB.Configuration config = new VoltDB.Configuration();
             config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
             config.m_pathToDeployment = builder.getPathToDeployment();
-            server = new ServerThread(config);
-            server.start();
-            server.waitForInitialization();
+            server = new LocalCluster("json.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
+            server.setHasLocalServer(false);
+            success = server.compile(builder);
+            server.startUp();
 
             //Get deployment
-            String jdep = getUrlOverJSON("http://localhost:8095/deployment", null, null, null, 200,  "application/json");
+            String jdep = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment", null, null, null, 200,  "application/json");
             assertTrue(jdep.contains("cluster"));
             //Download deployment
-            String xdep = getUrlOverJSON("http://localhost:8095/deployment/download", null, null, null, 200, "text/xml");
+            String xdep = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment/download", null, null, null, 200, "text/xml");
             assertTrue(xdep.contains("<deployment>"));
             assertTrue(xdep.contains("</deployment>"));
         } finally {
             if (server != null) {
-                server.shutdown();
-                server.join();
+                server.shutDown();
             }
             server = null;
         }
@@ -1604,24 +1641,25 @@ public class TestJSONInterface extends TestCase {
             VoltDB.Configuration config = new VoltDB.Configuration();
             config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
             config.m_pathToDeployment = builder.getPathToDeployment();
-            server = new ServerThread(config);
-            server.start();
-            server.waitForInitialization();
+            server = new LocalCluster("json.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
+            server.setHasLocalServer(false);
+            success = server.compile(builder);
+            server.startUp();
 
             //Get deployment
-            String jdep = getUrlOverJSON("http://localhost:8095/deployment", null, null, null, 200,  "application/json");
+            String jdep = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment", null, null, null, 200,  "application/json");
             assertTrue(jdep.contains("cluster"));
             //POST deployment with no content
-            String pdep = postUrlOverJSON("http://localhost:8095/deployment/", null, null, null, 200, "application/json", null);
+            String pdep = postUrlOverJSON(protocolPrefix + "localhost:8095/deployment/", null, null, null, 200, "application/json", null);
             assertTrue(pdep.contains("Failed"));
             Map<String,String> params = new HashMap<>();
             params.put("deployment", URLEncoder.encode(jdep, "UTF-8"));
-            pdep = postUrlOverJSON("http://localhost:8095/deployment/", null, null, null, 200, "application/json", params);
+            pdep = postUrlOverJSON(protocolPrefix + "localhost:8095/deployment/", null, null, null, 200, "application/json", params);
             assertTrue(pdep.contains("Deployment Updated"));
 
             //POST deployment in admin mode
             params.put("admin", "true");
-            pdep = postUrlOverJSON("http://localhost:8095/deployment/", null, null, null, 200, "application/json", params);
+            pdep = postUrlOverJSON(protocolPrefix + "localhost:8095/deployment/", null, null, null, 200, "application/json", params);
             assertTrue(pdep.contains("Deployment Updated"));
 
             ObjectMapper mapper = new ObjectMapper();
@@ -1637,10 +1675,10 @@ public class TestJSONInterface extends TestCase {
             }
             String ndeptype = mapper.writeValueAsString(deptype);
             params.put("deployment", URLEncoder.encode(ndeptype, "UTF-8"));
-            pdep = postUrlOverJSON("http://localhost:8095/deployment/", null, null, null, 200, "application/json", params);
+            pdep = postUrlOverJSON(protocolPrefix + "localhost:8095/deployment/", null, null, null, 200, "application/json", params);
             System.out.println("POST result is: " + pdep);
             assertTrue(pdep.contains("Deployment Updated"));
-            jdep = getUrlOverJSON("http://localhost:8095/deployment", null, null, null, 200,  "application/json");
+            jdep = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment", null, null, null, 200,  "application/json");
             assertTrue(jdep.contains("cluster"));
             deptype = mapper.readValue(jdep, DeploymentType.class);
             int nto = deptype.getHeartbeat().getTimeout();
@@ -1663,10 +1701,10 @@ public class TestJSONInterface extends TestCase {
             deptype.setSystemsettings(ss);
             ndeptype = mapper.writeValueAsString(deptype);
             params.put("deployment", URLEncoder.encode(ndeptype, "UTF-8"));
-            pdep = postUrlOverJSON("http://localhost:8095/deployment/", null, null, null, 200, "application/json", params);
+            pdep = postUrlOverJSON(protocolPrefix + "localhost:8095/deployment/", null, null, null, 200, "application/json", params);
             System.out.println("POST result is: " + pdep);
             assertTrue(pdep.contains("Deployment Updated"));
-            jdep = getUrlOverJSON("http://localhost:8095/deployment", null, null, null, 200,  "application/json");
+            jdep = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment", null, null, null, 200,  "application/json");
             assertTrue(jdep.contains("cluster"));
             deptype = mapper.readValue(jdep, DeploymentType.class);
             nto = deptype.getSystemsettings().getQuery().getTimeout();
@@ -1677,10 +1715,10 @@ public class TestJSONInterface extends TestCase {
             deptype.setSystemsettings(ss);
             ndeptype = mapper.writeValueAsString(deptype);
             params.put("deployment", URLEncoder.encode(ndeptype, "UTF-8"));
-            pdep = postUrlOverJSON("http://localhost:8095/deployment/", null, null, null, 200, "application/json", params);
+            pdep = postUrlOverJSON(protocolPrefix + "localhost:8095/deployment/", null, null, null, 200, "application/json", params);
             System.out.println("POST result is: " + pdep);
             assertTrue(pdep.contains("Deployment Updated"));
-            jdep = getUrlOverJSON("http://localhost:8095/deployment", null, null, null, 200,  "application/json");
+            jdep = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment", null, null, null, 200,  "application/json");
             assertTrue(jdep.contains("cluster"));
             deptype = mapper.readValue(jdep, DeploymentType.class);
             nto = deptype.getSystemsettings().getQuery().getTimeout();
@@ -1688,8 +1726,7 @@ public class TestJSONInterface extends TestCase {
 
         } finally {
             if (server != null) {
-                server.shutdown();
-                server.join();
+                server.shutDown();
             }
             server = null;
         }
@@ -1718,12 +1755,13 @@ public class TestJSONInterface extends TestCase {
             VoltDB.Configuration config = new VoltDB.Configuration();
             config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
             config.m_pathToDeployment = builder.getPathToDeployment();
-            server = new ServerThread(config);
-            server.start();
-            server.waitForInitialization();
+            server = new LocalCluster("json.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
+            server.setHasLocalServer(false);
+            success = server.compile(builder);
+            server.startUp();
 
             //Get deployment
-            String jdep = getUrlOverJSON("http://localhost:8095/deployment", null, null, null, 200,  "application/json");
+            String jdep = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment", null, null, null, 200,  "application/json");
             Map<String,String> params = new HashMap<>();
 
             ObjectMapper mapper = new ObjectMapper();
@@ -1743,18 +1781,18 @@ public class TestJSONInterface extends TestCase {
             ss.setResourcemonitor(resourceMonitor);
             String ndeptype = mapper.writeValueAsString(deptype);
             params.put("deployment", ndeptype);
-            String pdep = postUrlOverJSON("http://localhost:8095/deployment/", null, null, null, 200, "application/json", params);
+            String pdep = postUrlOverJSON(protocolPrefix + "localhost:8095/deployment/", null, null, null, 200, "application/json", params);
             assertTrue(pdep.contains("Deployment Updated"));
-            jdep = getUrlOverJSON("http://localhost:8095/deployment", null, null, null, 200,  "application/json");
+            jdep = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment", null, null, null, 200,  "application/json");
             DeploymentType gotValue = mapper.readValue(jdep, DeploymentType.class);
             assertEquals("10", gotValue.getSystemsettings().getResourcemonitor().getMemorylimit().getSize());
 
             memLimit.setSize("90%25");
             ndeptype = mapper.writeValueAsString(deptype);
             params.put("deployment", ndeptype);
-            pdep = postUrlOverJSON("http://localhost:8095/deployment/", null, null, null, 200, "application/json", params);
+            pdep = postUrlOverJSON(protocolPrefix + "localhost:8095/deployment/", null, null, null, 200, "application/json", params);
             assertTrue(pdep.contains("Deployment Updated"));
-            jdep = getUrlOverJSON("http://localhost:8095/deployment", null, null, null, 200,  "application/json");
+            jdep = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment", null, null, null, 200,  "application/json");
             gotValue = mapper.readValue(jdep, DeploymentType.class);
             assertEquals("90%", gotValue.getSystemsettings().getResourcemonitor().getMemorylimit().getSize());
 
@@ -1762,16 +1800,15 @@ public class TestJSONInterface extends TestCase {
             memLimit.setSize("90.5%25");
             ndeptype = mapper.writeValueAsString(deptype);
             params.put("deployment", ndeptype);
-            pdep = postUrlOverJSON("http://localhost:8095/deployment/", null, null, null, 200, "application/json", params);
-            jdep = getUrlOverJSON("http://localhost:8095/deployment", null, null, null, 200,  "application/json");
+            pdep = postUrlOverJSON(protocolPrefix + "localhost:8095/deployment/", null, null, null, 200, "application/json", params);
+            jdep = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment", null, null, null, 200,  "application/json");
             gotValue = mapper.readValue(jdep, DeploymentType.class);
             // must be still the old value
             assertEquals("90%", gotValue.getSystemsettings().getResourcemonitor().getMemorylimit().getSize());
 
         } finally {
             if (server != null) {
-                server.shutdown();
-                server.join();
+                server.shutDown();
             }
             server = null;
         }
@@ -1809,42 +1846,42 @@ public class TestJSONInterface extends TestCase {
             VoltDB.Configuration config = new VoltDB.Configuration();
             config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
             config.m_pathToDeployment = builder.getPathToDeployment();
-            server = new ServerThread(config);
-            server.start();
-            server.waitForInitialization();
+            server = new LocalCluster("json.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
+            server.setHasLocalServer(false);
+            success = server.compile(builder);
+            server.startUp();
 
             //Get deployment with diff hashed password
             //20E3AAE7FC23385295505A6B703FD1FBA66760D5 FD19534FBF9B75DF7CD046DE3EAF93DB77367CA7C1CC017FFA6CED2F14D32E7D
             //D033E22AE348AEB5660FC2140AEC35850C4DA997 8C6976E5B5410415BDE908BD4DEE15DFB167A9C873FC4BB8A81F6F2AB448A918
             //sha-256
-            String dep = getUrlOverJSON("http://localhost:8095/deployment/?User=" + "user3&" + "Hashedpassword=8C6976E5B5410415BDE908BD4DEE15DFB167A9C873FC4BB8A81F6F2AB448A918", null, null, null, 200, "application/json");
+            String dep = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment/?User=" + "user3&" + "Hashedpassword=8C6976E5B5410415BDE908BD4DEE15DFB167A9C873FC4BB8A81F6F2AB448A918", null, null, null, 200, "application/json");
             assertTrue(dep.contains("cluster"));
             //sha-1
-            dep = getUrlOverJSON("http://localhost:8095/deployment/?User=" + "user3&" + "Hashedpassword=D033E22AE348AEB5660FC2140AEC35850C4DA997", null, null, null, 200, "application/json");
+            dep = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment/?User=" + "user3&" + "Hashedpassword=D033E22AE348AEB5660FC2140AEC35850C4DA997", null, null, null, 200, "application/json");
             assertTrue(dep.contains("cluster"));
 
             //Get deployment bad user
-            dep = getUrlOverJSON("http://localhost:8095/deployment/?User=" + "user1&" + "Hashedpassword=d033e22ae348aeb5660fc2140aec35850c4da997", null, null, null, 200, "application/json");
+            dep = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment/?User=" + "user1&" + "Hashedpassword=d033e22ae348aeb5660fc2140aec35850c4da997", null, null, null, 200, "application/json");
             assertTrue(dep.contains("Permission denied"));
             //good user
-            dep = getUrlOverJSON("http://localhost:8095/deployment/?User=" + "user2&" + "Hashedpassword=d033e22ae348aeb5660fc2140aec35850c4da997", null, null, null, 200, "application/json");
+            dep = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment/?User=" + "user2&" + "Hashedpassword=d033e22ae348aeb5660fc2140aec35850c4da997", null, null, null, 200, "application/json");
             assertTrue(dep.contains("cluster"));
             //Download deployment bad user
-            dep = getUrlOverJSON("http://localhost:8095/deployment/download?User=" + "user1&" + "Hashedpassword=d033e22ae348aeb5660fc2140aec35850c4da997", null, null, null, 200, "application/json");
+            dep = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment/download?User=" + "user1&" + "Hashedpassword=d033e22ae348aeb5660fc2140aec35850c4da997", null, null, null, 200, "application/json");
             assertTrue(dep.contains("Permission denied"));
             //good user
-            dep = getUrlOverJSON("http://localhost:8095/deployment/download?User=" + "user2&" + "Hashedpassword=d033e22ae348aeb5660fc2140aec35850c4da997", null, null, null, 200, "text/xml");
+            dep = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment/download?User=" + "user2&" + "Hashedpassword=d033e22ae348aeb5660fc2140aec35850c4da997", null, null, null, 200, "text/xml");
             assertTrue(dep.contains("<deployment>"));
             assertTrue(dep.contains("</deployment>"));
             //get with jsonp
-            dep = getUrlOverJSON("http://localhost:8095/deployment/?User=" + "user2&" + "Hashedpassword=d033e22ae348aeb5660fc2140aec35850c4da997&jsonp=jackson5", null, null, null, 200, "application/json");
+            dep = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment/?User=" + "user2&" + "Hashedpassword=d033e22ae348aeb5660fc2140aec35850c4da997&jsonp=jackson5", null, null, null, 200, "application/json");
             assertTrue(dep.contains("cluster"));
             assertTrue(dep.contains("jackson5"));
             assertTrue(dep.matches("^jackson5(.*)"));
         } finally {
             if (server != null) {
-                server.shutdown();
-                server.join();
+                server.shutDown();
             }
             server = null;
         }
@@ -1881,35 +1918,35 @@ public class TestJSONInterface extends TestCase {
             VoltDB.Configuration config = new VoltDB.Configuration();
             config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
             config.m_pathToDeployment = builder.getPathToDeployment();
-            server = new ServerThread(config);
-            server.start();
-            server.waitForInitialization();
+            server = new LocalCluster("json.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
+            server.setHasLocalServer(false);
+            success = server.compile(builder);
+            server.startUp();
 
             //Get deployment bad user
-            String dep = getUrlOverJSON("http://localhost:8095/deployment/", "user1", "admin", "hashed", 200, "application/json");
+            String dep = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment/", "user1", "admin", "hashed", 200, "application/json");
             assertTrue(dep.contains("Permission denied"));
             //good user
-            dep = getUrlOverJSON("http://localhost:8095/deployment/", "user2", "admin", "hashed", 200, "application/json");
+            dep = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment/", "user2", "admin", "hashed", 200, "application/json");
             assertTrue(dep.contains("cluster"));
             //Download deployment bad user
-            dep = getUrlOverJSON("http://localhost:8095/deployment/download", "user1", "admin", "hashed", 200, "application/json");
+            dep = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment/download", "user1", "admin", "hashed", 200, "application/json");
             assertTrue(dep.contains("Permission denied"));
             //good user
-            dep = getUrlOverJSON("http://localhost:8095/deployment/download", "user2", "admin", "hashed", 200, "text/xml");
+            dep = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment/download", "user2", "admin", "hashed", 200, "text/xml");
             assertTrue(dep.contains("<deployment>"));
             assertTrue(dep.contains("</deployment>"));
-            dep = getUrlOverJSON("http://localhost:8095/deployment/download", "user2", "admin", "hashed256", 200, "text/xml");
+            dep = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment/download", "user2", "admin", "hashed256", 200, "text/xml");
             assertTrue(dep.contains("<deployment>"));
             assertTrue(dep.contains("</deployment>"));
             //Test back with sha1
-            dep = getUrlOverJSON("http://localhost:8095/deployment/download", "user2", "admin", "hashed", 200, "text/xml");
+            dep = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment/download", "user2", "admin", "hashed", 200, "text/xml");
             assertTrue(dep.contains("<deployment>"));
             assertTrue(dep.contains("</deployment>"));
 
         } finally {
             if (server != null) {
-                server.shutdown();
-                server.join();
+                server.shutDown();
             }
             server = null;
         }
@@ -1946,27 +1983,27 @@ public class TestJSONInterface extends TestCase {
             VoltDB.Configuration config = new VoltDB.Configuration();
             config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
             config.m_pathToDeployment = builder.getPathToDeployment();
-            server = new ServerThread(config);
-            server.start();
-            server.waitForInitialization();
+            server = new LocalCluster("json.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
+            server.setHasLocalServer(false);
+            success = server.compile(builder);
+            server.startUp();
 
             //Get deployment bad user
-            String dep = getUrlOverJSON("http://localhost:8095/deployment/", "user1", "admin", "basic", 200, "application/json");
+            String dep = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment/", "user1", "admin", "basic", 200, "application/json");
             assertTrue(dep.contains("Permission denied"));
             //good user
-            dep = getUrlOverJSON("http://localhost:8095/deployment/", "user2", "admin", "basic", 200, "application/json");
+            dep = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment/", "user2", "admin", "basic", 200, "application/json");
             assertTrue(dep.contains("cluster"));
             //Download deployment bad user
-            dep = getUrlOverJSON("http://localhost:8095/deployment/download", "user1", "admin", "basic", 200, "application/json");
+            dep = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment/download", "user1", "admin", "basic", 200, "application/json");
             assertTrue(dep.contains("Permission denied"));
             //good user
-            dep = getUrlOverJSON("http://localhost:8095/deployment/download", "user2", "admin", "basic", 200, "text/xml");
+            dep = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment/download", "user2", "admin", "basic", 200, "text/xml");
             assertTrue(dep.contains("<deployment>"));
             assertTrue(dep.contains("</deployment>"));
         } finally {
             if (server != null) {
-                server.shutdown();
-                server.join();
+                server.shutDown();
             }
             server = null;
         }
@@ -1996,14 +2033,15 @@ public class TestJSONInterface extends TestCase {
             VoltDB.Configuration config = new VoltDB.Configuration();
             config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
             config.m_pathToDeployment = builder.getPathToDeployment();
-            server = new ServerThread(config);
-            server.start();
-            server.waitForInitialization();
+            server = new LocalCluster("json.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
+            server.setHasLocalServer(false);
+            success = server.compile(builder);
+            server.startUp();
 
             //Get users
-            String json = getUrlOverJSON("http://localhost:8095/deployment/users/", null, null, null, 200,  "application/json");
+            String json = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment/users/", null, null, null, 200,  "application/json");
             assertEquals(json, "");
-            getUrlOverJSON("http://localhost:8095/deployment/users/foo", null, null, null, 404,  "application/json");
+            getUrlOverJSON(protocolPrefix + "localhost:8095/deployment/users/foo", null, null, null, 404,  "application/json");
 
             //Put users
             ObjectMapper mapper = new ObjectMapper();
@@ -2013,10 +2051,10 @@ public class TestJSONInterface extends TestCase {
             String map = mapper.writeValueAsString(user);
             Map<String,String> params = new HashMap<>();
             params.put("user", map);
-            putUrlOverJSON("http://localhost:8095/deployment/users/foo/", null, null, null, 201,  "application/json", params);
+            putUrlOverJSON(protocolPrefix + "localhost:8095/deployment/users/foo/", null, null, null, 201,  "application/json", params);
 
             //Get users
-            json = getUrlOverJSON("http://localhost:8095/deployment/users/", null, null, null, 200,  "application/json");
+            json = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment/users/", null, null, null, 200,  "application/json");
             JSONArray jarray = new JSONArray(json);
             assertEquals(jarray.length(), 1);
             JSONObject jobj = jarray.getJSONObject(0);
@@ -2027,25 +2065,24 @@ public class TestJSONInterface extends TestCase {
             user.setRoles("foo");
             map = mapper.writeValueAsString(user);
             params.put("user", map);
-            postUrlOverJSON("http://localhost:8095/deployment/users/foo/", null, null, null, 200,  "application/json", params);
+            postUrlOverJSON(protocolPrefix + "localhost:8095/deployment/users/foo/", null, null, null, 200,  "application/json", params);
 
             //Get users
-            json = getUrlOverJSON("http://localhost:8095/deployment/users/", null, null, null, 200,  "application/json");
+            json = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment/users/", null, null, null, 200,  "application/json");
             jarray = new JSONArray(json);
             assertEquals(jarray.length(), 1);
             jobj = jarray.getJSONObject(0);
             assertTrue(jobj.getString("roles").equals("foo"));
 
             //Delete users
-            deleteUrlOverJSON("http://localhost:8095/deployment/users/foo/", null, null, null, 204,  "application/json");
+            deleteUrlOverJSON(protocolPrefix + "localhost:8095/deployment/users/foo/", null, null, null, 204,  "application/json");
 
             //Get users
-            json = getUrlOverJSON("http://localhost:8095/deployment/users/", null, null, null, 200,  "application/json");
+            json = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment/users/", null, null, null, 200,  "application/json");
             assertEquals(json, "");
         } finally {
             if (server != null) {
-                server.shutdown();
-                server.join();
+                server.shutDown();
             }
             server = null;
         }
@@ -2061,12 +2098,13 @@ public class TestJSONInterface extends TestCase {
             VoltDB.Configuration config = new VoltDB.Configuration();
             config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
             config.m_pathToDeployment = builder.getPathToDeployment();
-            server = new ServerThread(config);
-            server.start();
-            server.waitForInitialization();
+            server = new LocalCluster("json.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
+            server.setHasLocalServer(false);
+            success = server.compile(builder);
+            server.startUp();
 
             //Get exportTypes
-            String json = getUrlOverJSON("http://localhost:8095/deployment/export/type", null, null, null, 200,  "application/json");
+            String json = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment/export/type", null, null, null, 200,  "application/json");
             JSONObject jobj = new JSONObject(json);
             assertTrue(jobj.getString("types").contains("FILE"));
             assertTrue(jobj.getString("types").contains("JDBC"));
@@ -2076,8 +2114,7 @@ public class TestJSONInterface extends TestCase {
             assertTrue(jobj.getString("types").contains("CUSTOM"));
         } finally {
             if (server != null) {
-                server.shutdown();
-                server.join();
+                server.shutDown();
             }
             server = null;
         }
@@ -2106,18 +2143,18 @@ public class TestJSONInterface extends TestCase {
             VoltDB.Configuration config = new VoltDB.Configuration();
             config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
             config.m_pathToDeployment = builder.getPathToDeployment();
-            server = new ServerThread(config);
-            server.start();
-            server.waitForInitialization();
+            server = new LocalCluster("json.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
+            server.setHasLocalServer(false);
+            success = server.compile(builder);
+            server.startUp();
 
             //Get profile
-            String dep = getUrlOverJSON("http://localhost:8095/profile", null, null, null, 200, "application/json");
+            String dep = getUrlOverJSON(protocolPrefix + "localhost:8095/profile", null, null, null, 200, "application/json");
             assertTrue(dep.contains("\"user\""));
             assertTrue(dep.contains("\"permissions\""));
         } finally {
             if (server != null) {
-                server.shutdown();
-                server.join();
+                server.shutDown();
             }
             server = null;
         }
@@ -2166,9 +2203,10 @@ public class TestJSONInterface extends TestCase {
             VoltDB.Configuration config = new VoltDB.Configuration();
             config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
             config.m_pathToDeployment = builder.getPathToDeployment();
-            server = new ServerThread(config);
-            server.start();
-            server.waitForInitialization();
+            server = new LocalCluster("json.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
+            server.setHasLocalServer(false);
+            success = server.compile(builder);
+            server.startUp();
 
             TestWorker.s_insertCount = new AtomicLong(0);
             int poolSize = 25;
@@ -2188,8 +2226,7 @@ public class TestJSONInterface extends TestCase {
             assertTrue(TestWorker.s_success);
         } finally {
             if (server != null) {
-                server.shutdown();
-                server.join();
+                server.shutDown();
             }
             server = null;
         }
@@ -2219,7 +2256,7 @@ public class TestJSONInterface extends TestCase {
                 if (m_id==0) { // do all deployment update from one thread to avoid version error on server side
                     for (int i=0; i<m_catUpdateCount; i++) {
                         // update deployment to force a catalog update and resetting connections
-                        String jdep = getUrlOverJSON("http://localhost:8095/deployment", m_username, m_password, "hashed", 200,  "application/json");
+                        String jdep = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment", m_username, m_password, "hashed", 200,  "application/json");
                         ObjectMapper mapper = new ObjectMapper();
                         DeploymentType deptype = mapper.readValue(jdep, DeploymentType.class);
                         int timeout = 100 + m_id;
@@ -2233,7 +2270,7 @@ public class TestJSONInterface extends TestCase {
                         Map<String,String> params = new HashMap<>();
                         params.put("deployment", URLEncoder.encode(mapper.writeValueAsString(deptype), "UTF-8"));
                         params.put("admin", "true");
-                        String responseJSON = postUrlOverJSON("http://localhost:8095/deployment/", m_username, m_password, "hashed", 200, "application/json", params);
+                        String responseJSON = postUrlOverJSON(protocolPrefix + "localhost:8095/deployment/", m_username, m_password, "hashed", 200, "application/json", params);
                         if (!responseJSON.contains("Deployment Updated.")) {
                             System.out.println("Failed to update deployment");
                             s_success = false;
