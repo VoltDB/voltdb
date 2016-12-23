@@ -422,31 +422,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         SSLHandshaker handshaker = new SSLHandshaker(socket, sslEngine);
                         boolean handshakeStatus;
 
-                        // time out the ssl handshake using the same timeout as authentication.
-                        final AtomicReference<String> timeoutRef = new AtomicReference<>();
-                        final long start = System.currentTimeMillis();
-                        ScheduledFuture<?> timeoutFuture =
-                                VoltDB.instance().schedulePriorityWork(new Runnable() {
-                                    @Override
-                                    public void run() {
-                                        long delta = System.currentTimeMillis() - start;
-                                        double seconds = delta / 1000.0;
-                                        StringBuilder sb = new StringBuilder();
-                                        sb.append("Timed out ssh handshake with client ");
-                                        sb.append(socket.socket().getRemoteSocketAddress().toString());
-                                        sb.append(String.format(" after %.2f seconds (timeout target is %.2f seconds)", seconds, AUTH_TIMEOUT_MS / 1000.0));
-                                        timeoutRef.set(sb.toString());
-                                        try {
-                                            socket.close();
-                                        } catch (IOException e) {
-                                            //Don't care
-                                        }
-                                    }
-                                }, AUTH_TIMEOUT_MS, 0, TimeUnit.MILLISECONDS);
                         try {
                             handshakeStatus = handshaker.handshake();
                         } catch (IOException e) {
-                            // possibly timeout firing
                             try {
                                 socket.close();
                             } catch (IOException e1) {
@@ -460,10 +438,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             } catch (IOException e) {
                             }
                             networkLog.warn("Rejected accepting new connection, SSL handshake failed.");
-                            continue;
-                        }
-                        // cancel the timeout.  If the cancel failed then the connection is lost.
-                        if (!timeoutFuture.cancel(false)) {
                             continue;
                         }
                         networkLog.info("SSL enabled on connection " + socket.socket().getRemoteSocketAddress() +
