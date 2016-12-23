@@ -21,30 +21,28 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <vector>
-#include <string>
-
-#include "boost/scoped_ptr.hpp"
-
 #include "harness.h"
 #include "test_utils/ScopedTupleSchema.hpp"
 
 #include "common/tabletuple.h"
-#include "common/types.h"
 #include "common/TupleSchemaBuilder.h"
+#include "common/types.h"
 #include "common/ValueFactory.hpp"
+
 #include "execution/VoltDBEngine.h"
-#include "storage/table.h"
 #include "storage/persistenttable.h"
+#include "storage/table.h"
+#include "storage/TableCatalogDelegate.hpp"
 #include "storage/tablefactory.h"
 #include "storage/tableutil.h"
+
+#include "boost/scoped_ptr.hpp"
 
 using voltdb::ExecutorContext;
 using voltdb::NValue;
 using voltdb::PersistentTable;
 using voltdb::Table;
 using voltdb::TableFactory;
-using voltdb::TableIterator;
 using voltdb::TableTuple;
 using voltdb::TupleSchemaBuilder;
 using voltdb::VALUE_TYPE_BIGINT;
@@ -176,9 +174,10 @@ TEST_F(PersistentTableTest, DRTimestampColumn) {
 
     // Load a catalog where active/active DR is turned on for the database,
     // And we have a table "T" which is being DRed.
-    getEngine()->loadCatalog(0, catalogPayload());
-    PersistentTable *table = dynamic_cast<PersistentTable*>(
-        getEngine()->getTable("T"));
+    VoltDBEngine* engine = getEngine();
+    engine->loadCatalog(0, catalogPayload());
+    PersistentTable *table =
+            engine->getTableDelegate("T")->getPersistentTable();
     ASSERT_NE(NULL, table);
     ASSERT_EQ(true, table->hasDRTimestampColumn());
     ASSERT_EQ(0, table->getDRTimestampColumnIndex());
@@ -217,7 +216,7 @@ TEST_F(PersistentTableTest, DRTimestampColumn) {
     NValue drTimestampValueOrig = ValueFactory::getBigIntValue(drTimestampOrig);
 
     TableTuple tuple(schema);
-    TableIterator iterator = table->iteratorDeletingAsWeGo();
+    auto iterator = table->iteratorDeletingAsWeGo();
     int i = 0;
     const int timestampColIndex = table->getDRTimestampColumnIndex();
     while (iterator.next(tuple)) {
@@ -283,31 +282,33 @@ TEST_F(PersistentTableTest, DRTimestampColumn) {
 }
 
 TEST_F(PersistentTableTest, TruncateTableTest) {
+    bool added;
     VoltDBEngine* engine = getEngine();
     engine->loadCatalog(0, catalogPayload());
-    PersistentTable *table = dynamic_cast<PersistentTable*>(engine->getTable("T"));
+    PersistentTable *table = dynamic_cast<PersistentTable*>(engine->getTableByName("T"));
     ASSERT_NE(NULL, table);
     ASSERT_EQ(1, table->allocatedBlockCount());
 
     beginWork();
     const int tuplesToInsert = 10;
-    (void) tuplesToInsert;  // to make compiler happy
-    assert(tableutil::addRandomTuples(table, tuplesToInsert));
+    added = tableutil::addRandomTuples(table, tuplesToInsert);
+    assert(added);
     commit();
 
     size_t blockCount = table->allocatedBlockCount();
-    table = dynamic_cast<PersistentTable*>(engine->getTable("T"));
+    table = dynamic_cast<PersistentTable*>(engine->getTableByName("T"));
     ASSERT_NE(NULL, table);
     ASSERT_EQ(blockCount, table->allocatedBlockCount());
 
     beginWork();
-    assert(tableutil::addRandomTuples(table, tuplesToInsert));
+    added = tableutil::addRandomTuples(table, tuplesToInsert);
+    assert(added);
     table->truncateTable(engine);
     commit();
 
     // refresh table pointer by fetching the table from catalog as in truncate old table
     // gets replaced with new cloned empty table
-    table = dynamic_cast<PersistentTable*>(engine->getTable("T"));
+    table = dynamic_cast<PersistentTable*>(engine->getTableByName("T"));
     ASSERT_NE(NULL, table);
     ASSERT_EQ(1, table->allocatedBlockCount());
 }

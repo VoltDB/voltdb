@@ -445,7 +445,7 @@ inline bool tableStreamTypeIsValid(TableStreamType streamType) {
     return streamType != TABLE_STREAM_NONE;
 }
 
-inline bool tableStreamTypeAppliesToPreTruncateTable(TableStreamType streamType) {
+inline bool tableStreamTypeIsStreamIndexing(TableStreamType streamType) {
     return streamType == TABLE_STREAM_ELASTIC_INDEX;
 }
 

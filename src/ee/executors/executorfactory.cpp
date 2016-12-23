@@ -71,11 +71,6 @@
 #include "executors/updateexecutor.h"
 #include "executors/windowfunctionexecutor.h"
 
-#include "plannodes/abstractplannode.h"
-
-
-#include <cassert>
-
 namespace voltdb {
 
 AbstractExecutor* getNewExecutor(VoltDBEngine *engine,
