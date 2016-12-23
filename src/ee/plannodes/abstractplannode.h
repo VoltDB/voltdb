@@ -228,7 +228,13 @@ protected:
     // and by AbstractJoinPlanNode::loadFromJSONObject for its pre-agg output tuple.
     static TupleSchema* generateTupleSchema(const std::vector<SchemaColumn*>& outputSchema);
 
-    static void loadIntArrayFromJSONObject(const char* label, PlannerDomValue obj, std::vector<int>& ary);
+    static void loadIntArrayFromJSONObject(const char* label,
+                                           PlannerDomValue obj,
+                                           std::vector<int>& ary);
+
+    static void loadStringArrayFromJSONObject(const char* label,
+                                              PlannerDomValue obj,
+                                              std::vector<std::string>& ary);
 
     static AbstractExpression* loadExpressionFromJSONObject(const char* label,
                                                             PlannerDomValue obj);
