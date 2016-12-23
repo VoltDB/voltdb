@@ -203,8 +203,8 @@ public class SSLVoltPort extends VoltPort {
                         DBBPool.BBContainer srcC = null;
                         boolean queuedMessages = false;
                         SettableFuture<Void> sf = null;
-                        while ((srcC = getDecryptionFrame()) != null) {
-                            try {
+                        try {
+                            while ((srcC = getDecryptionFrame()) != null) {
                                 sf = SettableFuture.create();
                                 m_decryptionResults.add(sf);
                                 final List<ByteBuffer> messages = new ArrayList<>();
@@ -223,23 +223,23 @@ public class SSLVoltPort extends VoltPort {
                                 m_decryptedMessages.offer(new DecryptionResult(messages, sf));
                                 sf = null;
                                 queuedMessages = true;
-
-                                if (!m_isShuttingDown.get() && queuedMessages) {
-                                    m_network.addToChangeList(m_port, true);
-                                }
-                            } catch(IOException ioe){
-                                networkLog.error("Exception unwrapping an SSL frame", ioe);
-                                m_dstBuffer.clear();
-                                return;
-                            } finally{
-                                if (srcC != null) {
-                                    srcC.discard();
-                                }
-                                if (sf != null) {
-                                    sf.setException(new Throwable("Decryption of buffer failed."));
-                                }
-                                m_hasOutstandingTask.set(false);
                             }
+
+                            if (!m_isShuttingDown.get() && queuedMessages) {
+                                m_network.addToChangeList(m_port, true);
+                            }
+                        } catch(IOException ioe){
+                            networkLog.error("Exception unwrapping an SSL frame", ioe);
+                            m_dstBuffer.clear();
+                            return;
+                        } finally{
+                            if (srcC != null) {
+                                srcC.discard();
+                            }
+                            if (sf != null) {
+                                sf.setException(new Throwable("Decryption of buffer failed."));
+                            }
+                            m_hasOutstandingTask.set(false);
                         }
                     }
                 };
