@@ -294,7 +294,7 @@ public class MockVoltDB implements VoltDBInterface
         long now = System.currentTimeMillis();
         DbSettings settings = new DbSettings(ClusterSettings.create().asSupplier(), NodeSettings.create());
 
-        m_context = new CatalogContext( now, now, m_catalog, settings, new byte[] {}, null, new byte[] {}, 0) {
+        m_context = new CatalogContext( now, now, m_catalog, settings, new byte[] {}, null, new byte[] {}, 0, m_hostMessenger) {
             @Override
             public long getCatalogCRC() {
                 return 13;
