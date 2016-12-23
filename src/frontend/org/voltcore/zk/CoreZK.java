@@ -44,6 +44,8 @@ public class CoreZK {
     public static final String hosts_host = "/core/hosts/host";
     public static final String readyhosts = "/core/readyhosts";
     public static final String readyhosts_host = "/core/readyhosts/host";
+    public static final String readyjoininghosts = "/core/readyjoininghosts";
+    public static final String readyjoininghosts_host = "/core/readyjoininghosts/host";
 
     // hosts since beginning of time (persistent)
     public static final String hostids = "/core/hostids";
@@ -55,7 +57,7 @@ public class CoreZK {
 
     // Persistent nodes (mostly directories) to create on startup
     public static final String[] ZK_HIERARCHY = {
-        root, hosts, readyhosts, hostids
+        root, hosts, readyhosts, readyjoininghosts, hostids
     };
 
     /**

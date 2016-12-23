@@ -65,6 +65,8 @@ import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.settings.DbSettings;
 import org.voltdb.settings.NodeSettings;
+import org.voltdb.snmp.DummySnmpTrapSender;
+import org.voltdb.snmp.SnmpTrapSender;
 
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
@@ -292,7 +294,7 @@ public class MockVoltDB implements VoltDBInterface
         long now = System.currentTimeMillis();
         DbSettings settings = new DbSettings(ClusterSettings.create().asSupplier(), NodeSettings.create());
 
-        m_context = new CatalogContext( now, now, m_catalog, settings, new byte[] {}, null, new byte[] {}, 0) {
+        m_context = new CatalogContext( now, now, m_catalog, settings, new byte[] {}, null, new byte[] {}, 0, m_hostMessenger) {
             @Override
             public long getCatalogCRC() {
                 return 13;
@@ -381,6 +383,13 @@ public class MockVoltDB implements VoltDBInterface
 
     @Override
     public void initialize(Configuration config)
+    {
+        m_noLoadLib = config.m_noLoadLibVOLTDB;
+        voltconfig = config;
+    }
+
+    @Override
+    public void cli(Configuration config)
     {
         m_noLoadLib = config.m_noLoadLibVOLTDB;
         voltconfig = config;
@@ -818,5 +827,10 @@ public class MockVoltDB implements VoltDBInterface
     @Override
     public Cartographer getCartograhper() {
         return null;
+    }
+
+    @Override
+    public SnmpTrapSender getSnmpTrapSender() {
+        return new DummySnmpTrapSender();
     }
 }

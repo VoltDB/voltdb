@@ -56,7 +56,7 @@ import com.google_voltpatches.common.collect.Maps;
 public class ModuleManager {
 
     /*
-     * Note for developers: please keep list in alpha-numerical order
+     * Note for developers: please keep list in alpha-numerical order. Exclude ; and use only package names.
      */
     final static List<String> SYSTEM_PACKAGES = ImmutableList.<String>builder()
             .add("com.google_voltpatches.common.base;")
@@ -64,6 +64,11 @@ public class ModuleManager {
             .add("com.google_voltpatches.common.io;")
             .add("com.google_voltpatches.common.net;")
             .add("com.google_voltpatches.common.util.concurrent;")
+            .add("com.yammer.metrics;")
+            .add("com.yammer.metrics.core;")
+            .add("com.yammer.metrics.reporting;")
+            .add("com.yammer.metrics.stats;")
+            .add("com.yammer.metrics.util;")
             .add("jsr166y;")
             .add("org.apache.log4j;")
             .add("org.slf4j;")

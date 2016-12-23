@@ -40,6 +40,7 @@ import org.voltdb.utils.CatalogUtil.ImportConfiguration;
 
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.base.Throwables;
+import java.util.concurrent.ExecutionException;
 
 public class ImportProcessor implements ImportDataProcessor {
 
@@ -205,19 +206,18 @@ public class ImportProcessor implements ImportDataProcessor {
                 }
             }
         });
+
         //And wait for it.
         try {
             task.get();
-        } catch (Exception ex) {
+        } catch (InterruptedException | ExecutionException ex) {
             m_logger.error("Failed to stop import processor.", ex);
-            ex.printStackTrace();
         }
         try {
             m_es.shutdown();
             m_es.awaitTermination(365, TimeUnit.DAYS);
-        } catch (Exception ex) {
+        } catch (InterruptedException ex) {
             m_logger.error("Failed to stop import processor executor.", ex);
-            ex.printStackTrace();
         }
     }
 

@@ -6,19 +6,27 @@ This application simulates a simple position keeper application that maintains p
 
 Quickstart
 ---------------------------
-VoltDB examples come with a run.sh script that sets up some environment and saves some of the typing needed to build and run the Java clients. The script is readable and when run, shows what commands are being executed to accomplish a given task.
+Make sure "bin" inside the VoltDB kit is in your PATH.  Then open a shell and go to the examples/positionkeeper directory, then execute the following commands to start the database:
 
-1. Make sure "bin" inside the VoltDB kit is in your path.
-2. Type "voltdb create -f" to start an empty, single-node VoltDB server.
-3. Open a new shell in the same directory and type "sqlcmd < ddl.sql" to load the schema and the jarfile of procedures into VoltDB.
-4. Type "./run.sh client" to run the client code.
+    voltdb init
+    voltdb start
 
-You can stop the server or running client at any time with `ctrl-c` or `SIGINT`.
+Wait until you see "Server completed initialization."
+Open a new shell in the same directory and run the following to load the schema:
+
+    sqlcmd < ddl.sql
+
+In the same shell, run the following script to preload some data and run the demo client application:
+
+    ./run.sh client
+
+You can stop the server or running client at any time with `ctrl-c` or `SIGINT`.  Of course VoltDB can also run in the background using the -B option, in which case you can stop it with the `voltadmin shutdown` command.
 
 Note that the downloaded VoltDB kits include pre-compiled stored procedures and client code as jarfiles. To run the example from a source build, it may be necessary to compile the Java source code by typing "run.sh jars" before step 3 above. Note that this step requires a full Java JDK.
 
-Other run.sh Actions
+Using the run.sh script
 ---------------------------
+VoltDB examples come with a run.sh shell script that simplifies compiling and running the example client application and other parts of the examples.
 - *run.sh* : start the server
 - *run.sh server* : start the server
 - *run.sh init* : compile stored procedures and load the schema and stored procedures
@@ -52,7 +60,7 @@ You can control various characteristics of the demo by modifying the parameters 
 **Parameters Affecting Simulation:**
 
     --traders=1000                (number of traders)
-	--secpercnt=10                (number of securities each trader has in their portfolio)
+    --secpercnt=10                (number of securities each trader has in their portfolio)
 
 Customizing this Example
 ---------------------------

@@ -235,6 +235,16 @@ public class Cartographer extends StatsSource
     }
 
     /**
+     * Checks whether this host is partition 0 'zero' leader
+     *
+     * @return result of the test
+     */
+    public boolean isPartitionZeroLeader()
+    {
+        return CoreUtils.getHostIdFromHSId(m_iv2Masters.get(0)) == m_hostMessenger.getHostId();
+    }
+
+    /**
      * Get the HSID of the single partition master for the specified partition ID
      */
     public long getHSIdForSinglePartitionMaster(int partitionId)
