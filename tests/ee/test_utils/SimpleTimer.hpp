@@ -34,7 +34,6 @@
 struct SimpleTimer {
 
     typedef std::chrono::microseconds microseconds;
-    typedef std::chrono::high_resolution_clock::time_point time_point;
 
     /**
      * Construct a SimpleTimer with a start time of right now.
@@ -74,8 +73,7 @@ struct SimpleTimer {
     }
 
 private:
-    time_point m_start;
-
+    std::chrono::high_resolution_clock::time_point m_start;
 };
 
 #endif // TESTS_EE_TEST_UTILS_SIMPLETIMER_HPP

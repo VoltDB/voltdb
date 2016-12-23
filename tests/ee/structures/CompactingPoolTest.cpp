@@ -114,6 +114,42 @@ TEST_F(CompactingPoolTest, bytes_allocated_test)
 }
 
 TEST_F(CompactingPoolTest, deferred_release) {
+    // A pool of 16k objects, 4 objects to each allocated buffer
+    const int allocSize = 16384;
+    CompactingPool pool(allocSize, 4);
+
+    char* ptrs[5];
+
+    ASSERT_EQ(0, pool.allocationCount());
+    for (int i = 0; i < 5; ++i) {
+        ptrs[i] = static_cast<char*>(pool.malloc(&ptrs[i]));
+    }
+
+    ASSERT_EQ(5, pool.allocationCount());
+
+    // Test the freeIfLast method
+    ASSERT_TRUE(pool.freeIfLast(ptrs[4]));
+    ASSERT_EQ(4, pool.allocationCount());
+
+    ASSERT_FALSE(pool.freeIfLast(ptrs[1]));
+    ASSERT_EQ(4, pool.allocationCount());
+
+    char* savePtrs0 = ptrs[0];
+
+    // Delete the 0th, 2nd and 3rd element
+    // The 1st element will get memcpy'd to the 0th spot.
+    SizePtrPairSet objectsPendingRelease;
+    objectsPendingRelease.insert(SizePtrPair(allocSize, ptrs[0]));
+    objectsPendingRelease.insert(SizePtrPair(allocSize, ptrs[2]));
+    objectsPendingRelease.insert(SizePtrPair(allocSize, ptrs[3]));
+
+    pool.freePendingAllocations(objectsPendingRelease);
+    ASSERT_EQ(1, pool.allocationCount());
+
+    // The 1st element is now in what was the address of the 0th element
+    ASSERT_EQ(savePtrs0, ptrs[1]);
+
+    pool.free(ptrs[1]);
 }
 
 int main() {

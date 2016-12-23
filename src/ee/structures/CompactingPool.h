@@ -171,6 +171,10 @@ class CompactingPool
     std::size_t getBytesAllocated() const
     { return m_allocator.bytesAllocated(); }
 
+    int64_t allocationCount() const {
+        return m_allocator.count();
+    }
+
     static int32_t FIXED_OVERHEAD_PER_ENTRY()
     { return static_cast<int32_t>(sizeof(Relocatable)); }
 

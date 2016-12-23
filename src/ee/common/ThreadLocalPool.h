@@ -141,10 +141,10 @@ public:
 struct ScopedPoolDeferredReleaseMode {
     ScopedPoolDeferredReleaseMode();
     ~ScopedPoolDeferredReleaseMode();
+private:
+    bool m_origMode;
 };
 
 }
-
-
 
 #endif /* THREADLOCALPOOL_H_ */

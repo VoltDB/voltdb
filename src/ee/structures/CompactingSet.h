@@ -67,17 +67,6 @@ private:
     tree_type m_map;
 };
 
-/**
- * A simple comparator that works for any kind of pointer.
- */
-struct PointerComparator {
-    int operator()(const void* v1, const void* v2) const {
-        // C++ does not like it if you try to subtract void pointers,
-        // because the size of void is ambiguous
-        return static_cast<const char*>(v1) - static_cast<const char*>(v2);
-    }
-};
-
 } // namespace voltdb
 
 #endif // COMPACTINGSET_H_

@@ -31,7 +31,6 @@
 #include "common/ThreadLocalPool.h"
 
 using voltdb::CompactingSet;
-using voltdb::PointerComparator;
 using voltdb::SizePtrPair;
 using voltdb::SizePtrPairComparator;
 
@@ -43,6 +42,24 @@ public:
     ~CompactingSetTest() {
     }
 };
+
+/**
+ * A simple comparator that works for any kind of pointer.
+ */
+struct PointerComparator {
+    int operator()(const void* v1, const void* v2) const {
+        if (v1 < v2) {
+            return -1;
+        }
+
+        if (v1 > v2) {
+            return 1;
+        }
+
+        return 0;
+    }
+};
+
 
 TEST_F(CompactingSetTest, Simple) {
     CompactingSet<int*, PointerComparator> mySet;
@@ -115,8 +132,8 @@ TEST_F(CompactingSetTest, RangeScan) {
     }
 
     BOOST_FOREACH(int32_t size, std::vector<int32_t>({2, 4, 8})) {
-        SizePtrPair lowerKey(size, 0);
-        SizePtrPair upperKey(size + 1, 0);
+        SizePtrPair lowerKey(size, static_cast<void*>(NULL));
+        SizePtrPair upperKey(size + 1, static_cast<void*>(NULL));
 
         auto myIt = mySet.lowerBound(lowerKey);
         auto stdIt = stdSet.lower_bound(lowerKey);

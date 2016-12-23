@@ -60,6 +60,11 @@ static const bool IMMEDIATE_RELEASE = false;
 static const bool DEFERRED_RELEASE = true;
 
 namespace {
+
+/**
+ * A class that contains per-thread info on the memory pools used for
+ * persistent data structures and other metadata.
+ */
 struct PerThreadPools {
     PerThreadPools()
         : m_refCount(1)
@@ -397,6 +402,8 @@ void voltdb_pool_allocator_new_delete::free(char * const block) {
 }
 
 ScopedPoolDeferredReleaseMode::ScopedPoolDeferredReleaseMode() {
+    PerThreadPools* ptp = getPerThreadPools();
+    m_origMode = ptp->getRelocatablePoolReleaseMode();
     getPerThreadPools()->setRelocatablePoolReleaseMode(DEFERRED_RELEASE);
 }
 
@@ -408,7 +415,7 @@ ScopedPoolDeferredReleaseMode::~ScopedPoolDeferredReleaseMode() {
         entry.second->freePendingAllocations(pendingReleaseSet);
     }
     assert (pendingReleaseSet.empty());
-    getPerThreadPools()->setRelocatablePoolReleaseMode(IMMEDIATE_RELEASE);
+    getPerThreadPools()->setRelocatablePoolReleaseMode(m_origMode);
 }
 
 }
