@@ -217,6 +217,7 @@ public class TestClientPortChannel extends JUnit4LocalClusterTest {
         for (int i = 0; i < 100; i++) {
             channel.connect();
             channel.close();
+            System.out.println("Successfully connect/close: " + i);
         }
 
         //Bad +ve length

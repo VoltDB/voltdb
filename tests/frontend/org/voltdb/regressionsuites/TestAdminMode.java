@@ -199,6 +199,9 @@ public class TestAdminMode extends RegressionSuite
         ClientConfig config = new ClientConfig();
         config.setProcedureCallTimeout(600000);
         final Client adminclient = ClientFactory.createClient(config);
+        if (config.getSslContext() != null) {
+            return;
+        }
 
         SocketChannel channel = getClientChannel();
 
