@@ -1361,7 +1361,7 @@ def check_validation_deployment(req):
 
                 if 'authprotocol' in req.json['snmp'] and req.json['snmp']['authprotocol'] != 'NoAuth' and \
                                 'authkey' in req.json['snmp'] and len(req.json['snmp']['authkey']) < 8:
-                    return {'status': 401, 'statusString': 'SNMP: Authkey must be of atleat 8 characters.'}
+                    return {'status': 401, 'statusString': 'SNMP: Authkey must be of atleast 8 characters.'}
 
                 if 'privacyprotocol' in req.json['snmp'] and req.json['snmp']['privacyprotocol'] != 'NoPriv' \
                         and ('privacykey' not in req.json['snmp'] or ('privacykey' in req.json['snmp'] and
@@ -1370,7 +1370,7 @@ def check_validation_deployment(req):
 
                 if 'privacyprotocol' in req.json['snmp'] and req.json['snmp']['privacyprotocol'] != 'NoPriv' and \
                                 'privacykey' in req.json['snmp'] and len(req.json['snmp']['privacykey']) < 8:
-                   return {'status': 401, 'statusString': 'SNMP: PrivacyKey must be of atleat 8 characters.'}
+                   return {'status': 401, 'statusString': 'SNMP: PrivacyKey must be of atleast 8 characters.'}
             else:
                 if 'authprotocol' in req.json['snmp'] and req.json['snmp']['authprotocol'] != 'NoAuth' \
                         and ('authkey' not in req.json['snmp'] or ('authkey' in req.json['snmp'] and
