@@ -1049,7 +1049,12 @@ class Template:
 
     def __init_from_file(self, filename):
         file_lines = []
-        fd = open(filename, "r")
+        if os.path.isfile(filename):
+            fd = open(filename, "r")
+        # If the file does not exist in the current directory, try the
+        # adjacent 'include' directory
+        else:
+            fd = open('/../include/'.join(filename.rsplit('/', 1)), "r")
         for line in fd:
             if Template.LINE_COMMENT_PATTERN.search(line): # Skip classic SQL-style comments
                 continue
