@@ -138,6 +138,15 @@ public class TestSSL extends TestCase {
     private void checkAdminAndClient(int adminPort, int clientPort, String sslPropsFile) throws Exception {
         ClientConfig clientConfig = new ClientConfig("", "", null, true, getResourcePath(sslPropsFile));
         clientConfig.enableSSL();
+        //Add long loopy test
+        for (int i = 0; i < 100;  i++) {
+            m_admin = ClientFactory.createClient(clientConfig);
+            m_admin.createConnection("localhost", adminPort);
+            m_admin.close();
+            m_client = ClientFactory.createClient(clientConfig);
+            m_client.createConnection("localhost", clientPort);
+            m_client.close();
+        }
 
         m_admin = ClientFactory.createClient(clientConfig);
         m_admin.createConnection("localhost", adminPort);

@@ -70,66 +70,60 @@ public class PortConnector {
         }
     }
 
-    public void connect() {
-        try {
-            InetSocketAddress address = new InetSocketAddress(m_host, m_port);
-            m_socket = SocketChannel.open(address);
-            if (!m_socket.isConnected()) {
-                throw new IOException("Failed to open host " + m_host);
-            }
-            //configure non blocking.
-            m_socket.configureBlocking(true);
-            m_socket.socket().setTcpNoDelay(true);
-            if (m_enableSSL) {
-                SSLConfiguration.SslConfig sslConfig;
-                String sslPropsFile = Inits.class.getResource(DEFAULT_SSL_PROPS_FILE).getFile();
-
-                if ((sslPropsFile == null || sslPropsFile.trim().length() == 0) ) {
-                    sslConfig = new SSLConfiguration.SslConfig(null, null, null, null);
-                    SSLConfiguration.applySystemProperties(sslConfig);
-                } else {
-                    File configFile = new File(sslPropsFile);
-                    Properties sslProperties = new Properties();
-                    try ( FileInputStream configFis = new FileInputStream(configFile) ) {
-                        sslProperties.load(configFis);
-                        sslConfig = new SSLConfiguration.SslConfig(
-                                sslProperties.getProperty(SSLConfiguration.KEYSTORE_CONFIG_PROP),
-                                sslProperties.getProperty(SSLConfiguration.KEYSTORE_PASSWORD_CONFIG_PROP),
-                                sslProperties.getProperty(SSLConfiguration.TRUSTSTORE_CONFIG_PROP),
-                                sslProperties.getProperty(SSLConfiguration.TRUSTSTORE_PASSWORD_CONFIG_PROP));
-                        SSLConfiguration.applySystemProperties(sslConfig);
-                    } catch (IOException ioe) {
-                        throw new IllegalArgumentException("Unable to access SSL configuration.", ioe);
-                    }
-                }
-                SSLContext sslContext;
-                try {
-                    sslContext = SSLConfiguration.initializeSslContext(sslConfig);
-                } catch (NoSuchAlgorithmException | KeyStoreException | IOException | CertificateException | UnrecoverableKeyException | KeyManagementException ex) {
-                    throw new IllegalArgumentException(ex.getMessage());
-                }
-                SSLEngine sslEngine = sslContext.createSSLEngine("client", m_port);
-                sslEngine.setUseClientMode(true);
-                SSLHandshaker handshaker = new SSLHandshaker(m_socket, sslEngine);
-                boolean shookHands = false;
-                try {
-                    shookHands = handshaker.handshake();
-                } catch (IOException e) {
-                    throw new IOException("SSL handshake failed", e);
-                }
-                if (! shookHands) {
-                    throw new IOException("SSL handshake failed");
-                }
-                int appBufferSize = sslEngine.getSession().getApplicationBufferSize();
-                m_packetBufferSize = sslEngine.getSession().getPacketBufferSize();
-                m_enc = new SSLBufferEncrypter(sslEngine, appBufferSize, m_packetBufferSize);
-                m_dec = new SSLBufferDecrypter(sslEngine);
-            }
-
-        } catch (IOException ex) {
-            ex.printStackTrace();
+    public void connect() throws IOException {
+        InetSocketAddress address = new InetSocketAddress(m_host, m_port);
+        m_socket = SocketChannel.open(address);
+        if (!m_socket.isConnected()) {
+            throw new IOException("Failed to open host " + m_host);
         }
+        //configure non blocking.
+        m_socket.configureBlocking(true);
+        m_socket.socket().setTcpNoDelay(true);
+        if (m_enableSSL) {
+            SSLConfiguration.SslConfig sslConfig;
+            String sslPropsFile = Inits.class.getResource(DEFAULT_SSL_PROPS_FILE).getFile();
 
+            if ((sslPropsFile == null || sslPropsFile.trim().length() == 0) ) {
+                sslConfig = new SSLConfiguration.SslConfig(null, null, null, null);
+                SSLConfiguration.applySystemProperties(sslConfig);
+            } else {
+                File configFile = new File(sslPropsFile);
+                Properties sslProperties = new Properties();
+                try ( FileInputStream configFis = new FileInputStream(configFile) ) {
+                    sslProperties.load(configFis);
+                    sslConfig = new SSLConfiguration.SslConfig(
+                            sslProperties.getProperty(SSLConfiguration.KEYSTORE_CONFIG_PROP),
+                            sslProperties.getProperty(SSLConfiguration.KEYSTORE_PASSWORD_CONFIG_PROP),
+                            sslProperties.getProperty(SSLConfiguration.TRUSTSTORE_CONFIG_PROP),
+                            sslProperties.getProperty(SSLConfiguration.TRUSTSTORE_PASSWORD_CONFIG_PROP));
+                    SSLConfiguration.applySystemProperties(sslConfig);
+                } catch (IOException ioe) {
+                    throw new IllegalArgumentException("Unable to access SSL configuration.", ioe);
+                }
+            }
+            SSLContext sslContext;
+            try {
+                sslContext = SSLConfiguration.initializeSslContext(sslConfig);
+            } catch (NoSuchAlgorithmException | KeyStoreException | IOException | CertificateException | UnrecoverableKeyException | KeyManagementException ex) {
+                throw new IllegalArgumentException(ex.getMessage());
+            }
+            SSLEngine sslEngine = sslContext.createSSLEngine("client", m_port);
+            sslEngine.setUseClientMode(true);
+            SSLHandshaker handshaker = new SSLHandshaker(m_socket, sslEngine);
+            boolean shookHands = false;
+            try {
+                shookHands = handshaker.handshake();
+            } catch (IOException e) {
+                throw new IOException("SSL handshake failed", e);
+            }
+            if (! shookHands) {
+                throw new IOException("SSL handshake failed");
+            }
+            int appBufferSize = sslEngine.getSession().getApplicationBufferSize();
+            m_packetBufferSize = sslEngine.getSession().getPacketBufferSize();
+            m_enc = new SSLBufferEncrypter(sslEngine, appBufferSize, m_packetBufferSize);
+            m_dec = new SSLBufferDecrypter(sslEngine);
+        }
     }
 
     public long write(ByteBuffer buf) throws IOException {
