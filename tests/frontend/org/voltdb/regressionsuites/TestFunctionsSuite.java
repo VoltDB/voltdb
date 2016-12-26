@@ -2907,12 +2907,15 @@ public class TestFunctionsSuite extends RegressionSuite {
     // Unicode character to UTF8 string character
     public void testChar() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING test CHAR");
+
+        // Hsql has wrong answers.
+        if (isHSQL()) {
+            return;
+        }
+
         Client client = getClient();
         ClientResponse cr;
         VoltTable result;
-
-        // Hsql has wrong answers.
-        if (isHSQL()) return;
 
         cr = client.callProcedure("P1.insert", 1, "Xin@VoltDB", 1, 1.0, new Timestamp(1000000000000L));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());

@@ -26,8 +26,6 @@ package org.voltdb.regressionsuites;
 import java.io.IOException;
 import java.util.UUID;
 
-import junit.framework.Test;
-
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -39,6 +37,8 @@ import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.BatchedMultiPartitionTest;
 import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.PopulateTruncateTable;
 import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.TruncateTable;
+
+import junit.framework.Test;
 
 public class TestSQLFeaturesNewSuite extends RegressionSuite {
     // procedures used by these tests
@@ -156,12 +156,13 @@ public class TestSQLFeaturesNewSuite extends RegressionSuite {
 
     public void testTableLimitAndPercentage() throws Exception {
         System.out.println("STARTING TABLE LIMIT AND PERCENTAGE FULL TEST......");
-        Client client = getClient();
-        VoltTable vt = null;
+
         if(isHSQL()) {
             return;
         }
 
+        Client client = getClient();
+        VoltTable vt = null;
         // When table limit feature is fully supported, there needs to be more test cases.
         // generalize this test within a loop, maybe.
         // Test max row 0
