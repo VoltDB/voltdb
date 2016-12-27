@@ -1198,4 +1198,17 @@ public class CoreUtils {
             log.fatal("Unable to list ports in use at this time.");
         }
     }
+
+    // Utility method to figure out if this is a test case.  Various junit targets in
+    // build.xml set a environment variable to give us a hint
+    public static boolean isJunitTest() {
+
+        //check os environment variable
+        if ("true".equalsIgnoreCase(System.getenv().get("VOLT_JUSTATEST")) ){
+            return true;
+        }
+
+        //check system variable
+        return "true".equalsIgnoreCase(System.getProperty("VOLT_JUSTATEST"));
+    }
 }

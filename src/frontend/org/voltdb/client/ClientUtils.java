@@ -91,14 +91,4 @@ public class ClientUtils {
         }
         return buffer;
     }
-
-    // Utility to try to figure out if this is a test case.  Various junit targets in
-    // build.xml set this environment variable to give us a hint
-    public static boolean isThisATest() {
-        String test = System.getenv().get("VOLT_JUSTATEST");
-        if (test == null) {
-            test = System.getProperty("VOLT_JUSTATEST");
-        }
-        return ("YESYESYES".equalsIgnoreCase(test));
-    }
 }

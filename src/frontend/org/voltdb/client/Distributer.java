@@ -1215,7 +1215,7 @@ class Distributer {
         // stop the old proc call reaper
         m_timeoutReaperHandle.cancel(false);
         m_ex.shutdown();
-        if (ClientUtils.isThisATest()) {
+        if (CoreUtils.isJunitTest()) {
             m_ex.awaitTermination(1, TimeUnit.SECONDS);
         } else {
             m_ex.awaitTermination(365, TimeUnit.DAYS);
