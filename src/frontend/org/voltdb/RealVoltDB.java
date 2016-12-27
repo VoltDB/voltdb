@@ -1746,6 +1746,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             if (kfactor == 0 && m_config.m_missingHostCount > 0) {
                 VoltDB.crashLocalVoltDB("A cluster with 0 kfactor can not be started with missing nodes ", false, null);
             }
+            if (hostcount <= kfactor) {
+                VoltDB.crashLocalVoltDB("Not enough nodes to ensure K-Safety.", false, null);
+            }
 
             Map<Integer, String> hostGroups = Maps.newHashMap();
             Map<Integer, Integer> sitesPerHostMap = Maps.newHashMap();
@@ -1754,29 +1757,25 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 sitesPerHostMap.put(k, v.m_localSitesCount);
             });
 
+            //make up the missing hosts to fool the topology
             int sph = sitesPerHostMap.values().iterator().next();
             int missingHostId = Integer.MAX_VALUE;
             Set<Integer> missingHosts = Sets.newHashSet();
-
-            //make up the missing hosts to fool the topology
             for (int i = 0; i < m_config.m_missingHostCount; i++) {
                 sitesPerHostMap.put(missingHostId, sph);
                 hostGroups.put(missingHostId, "inactiveGroup");
                 missingHosts.add(missingHostId--);
             }
-            String errMsg = AbstractTopology.validateLegacyClusterConfig(hostcount, sitesPerHostMap, kfactor);
-            if (errMsg != null) {
-                VoltDB.crashLocalVoltDB(errMsg, false, null);
+            int totalSites = sitesPerHostMap.values().stream().mapToInt(Number::intValue).sum();
+            if (totalSites % (kfactor + 1) != 0) {
+                VoltDB.crashLocalVoltDB("Total number of sites is not divisable by the number of partitions.", false, null);
             }
-            System.out.println("missing count:" + m_config.m_missingHostCount);
             topology = AbstractTopology.getTopology(sitesPerHostMap, hostGroups, kfactor);
             if (topology.hasMissingPartitions()) {
                 VoltDB.crashLocalVoltDB("Some partitions are missing in the topology", false, null);
             }
             //reassign leaders from missing hosts to active hosts
-            if (m_config.m_missingHostCount > 0) {
-                topology = AbstractTopology.shiftPartitionLeaders(topology, missingHosts);
-            }
+            topology = AbstractTopology.shiftPartitionLeaders(topology, missingHosts);
             TopologyZKUtils.registerTopologyToZK(m_messenger.getZK(), topology);
         }
 

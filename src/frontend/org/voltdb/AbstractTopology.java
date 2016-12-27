@@ -57,7 +57,7 @@ public class AbstractTopology {
     public final static String TOPO_HOSTS = "hosts";
     public final static String TOPO_HOST = "host";
     public final static String TOPO_SPH = "targetSiteCount";
-    public final static String TOPO_HOST_LIVE = "live";
+    public final static String TOPO_HOST_MISSING = "missing";
 
     public final long version;
     public final ImmutableMap<Integer, Host> hostsById;
@@ -171,7 +171,9 @@ public class AbstractTopology {
         public final int targetSiteCount;
         public final HAGroup haGroup;
         public final ImmutableSortedSet<Partition> partitions;
-        public boolean isLive = true;
+
+        //a flag indicating if the host is missing or not
+        public boolean isMissing = false;
         private Host(int id, int targetSiteCount, HAGroup haGroup, Collection<Partition> partitions) {
             assert(id >= 0);
             assert(targetSiteCount >= 0);
@@ -192,8 +194,10 @@ public class AbstractTopology {
                     .collect(Collectors.toList());
         }
 
-        public void markHostInactive() {
-            this.isLive = false;
+        public void markHostMissing(boolean isMissing) {
+            if (isMissing) {
+                this.isMissing = true;
+            }
         }
 
         @Override
@@ -208,7 +212,7 @@ public class AbstractTopology {
             stringer.key(TOPO_HOST_ID).value(id);
             stringer.key(TOPO_SPH).value(targetSiteCount);
             stringer.key(TOPO_HAGROUP).value(haGroup.token);
-            stringer.key(TOPO_HOST_LIVE).value(isLive);
+            stringer.key(TOPO_HOST_MISSING).value(isMissing);
             stringer.key(TOPO_PARTITIONS).array();
             for (Partition partition : partitions) {
                 stringer.value(partition.id);
@@ -233,11 +237,8 @@ public class AbstractTopology {
                 int partitionId = jsonPartitions.getInt(i);
                 partitions.add(partitionsById.get(partitionId));
             }
-            boolean isLive = json.getBoolean(TOPO_HOST_LIVE);
             Host host =  new Host(id, targetSiteCount, haGroup, partitions);
-            if (!isLive) {
-                host.markHostInactive();
-            }
+            host.markHostMissing(json.getBoolean(TOPO_HOST_MISSING));
             return host;
         }
 
@@ -293,7 +294,8 @@ public class AbstractTopology {
     private static class MutableHost implements Comparable<MutableHost> {
         final int id;
         int targetSiteCount;
-        boolean isLive = true;
+        //a flag indicating if the host is missing or not
+        boolean isMissing = false;
         HAGroup haGroup;
         Set<MutablePartition> partitions = new TreeSet<MutablePartition>();
 
@@ -312,8 +314,10 @@ public class AbstractTopology {
             return (int) partitions.stream().filter(p -> p.leader == this).count();
         }
 
-        public void markHostInactive() {
-            this.isLive = false;
+        public void markHostMissing(boolean isMissing) {
+            if (isMissing) {
+                this.isMissing = true;
+            }
         }
 
         @Override
@@ -346,31 +350,6 @@ public class AbstractTopology {
         public PartitionDescription(int k) {
             this.k = k;
         }
-    }
-
-    /**
-     *
-     *
-     * @param hostCount
-     * @param sitesPerHost
-     * @param k
-     * @return
-     */
-    public static String validateLegacyClusterConfig(int hostCount, Map<Integer, Integer> sitesPerHostMap, int k) {
-        int totalSites = 0;
-        for (Map.Entry<Integer, Integer> entry : sitesPerHostMap.entrySet()) {
-            totalSites += entry.getValue();
-        }
-
-        if (hostCount <= k) {
-            return "Not enough nodes to ensure K-Safety.";
-        }
-        if (totalSites % (k + 1) != 0) {
-            return "Total number of sites is not divisable by the number of partitions.";
-        }
-
-        // valid config
-        return null;
     }
 
     public static AbstractTopology mutateAddHosts(AbstractTopology currentTopology,
@@ -967,9 +946,7 @@ public class AbstractTopology {
                     .map(mp -> partitionsById.get(mp.id))
                     .collect(Collectors.toList());
             Host newHost = new Host(mutableHost.id, mutableHost.targetSiteCount, mutableHost.haGroup, hostPartitions);
-            if (!mutableHost.isLive) {
-                newHost.markHostInactive();
-            }
+            newHost.markHostMissing(mutableHost.isMissing);
             fullHostSet.add(newHost);
         }
 
@@ -1394,7 +1371,7 @@ public class AbstractTopology {
     public boolean hasMissingPartitions() {
         Set<Partition> partitions = Sets.newHashSet();
         for (Host host : hostsById.values()) {
-            if (host.isLive) {
+            if (!host.isMissing) {
                 partitions.addAll(host.partitions);
             }
         }
@@ -1404,18 +1381,21 @@ public class AbstractTopology {
     /**
      * reassign partition leaders from the hosts to other hosts.
      * @param topology current topology
-     * @param hosts The hosts on which partition leaders will be reassigned.
+     * @param missingHosts The hosts on which partition leaders will be reassigned.
      * @return new AbstractTopology
      */
-    public static AbstractTopology shiftPartitionLeaders(AbstractTopology topology, Set<Integer> hosts) {
+    public static AbstractTopology shiftPartitionLeaders(AbstractTopology topology, Set<Integer> missingHosts) {
+        if (missingHosts == null || missingHosts.isEmpty()) {
+            return topology;
+        }
         Map<Integer, MutableHost> mutableHostMap = new TreeMap<>();
         Map<Integer, MutablePartition> mutablePartitionMap = new TreeMap<>();
 
-        // create mutable hosts without partitions
+        // create mutable missing Hosts without partitions
         for (Host host : topology.hostsById.values()) {
             final MutableHost mutableHost = new MutableHost(host.id, host.targetSiteCount, host.haGroup);
-            if (hosts.contains(host.id)) {
-                mutableHost.markHostInactive();
+            if (missingHosts.contains(host.id)) {
+                mutableHost.markHostMissing(true);
             }
             mutableHostMap.put(host.id, mutableHost);
         }
@@ -1429,10 +1409,10 @@ public class AbstractTopology {
                 mutableHost.partitions.add(mp);
             }
             int leaderId = partition.leaderHostId;
-            if (hosts.contains(partition.leaderHostId)) {
+            if (missingHosts.contains(partition.leaderHostId)) {
                 //find the first host other than hosts with the partition
                 for (Host host : topology.hostsById.values()) {
-                    if (!hosts.contains(host.id)) {
+                    if (!missingHosts.contains(host.id)) {
                         List<Integer> list = topology.getPartitionIdList(host.id);
                         if (list.contains(partition.id)) {
                             leaderId = host.id;

@@ -47,6 +47,7 @@ import org.voltcore.utils.Pair;
 import org.voltcore.zk.BabySitter;
 import org.voltcore.zk.LeaderElector;
 import org.voltcore.zk.ZKUtil;
+import org.voltdb.AbstractTopology;
 import org.voltdb.Promotable;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
@@ -158,26 +159,26 @@ public class LeaderAppointer implements Promotable
                 // and gate leader assignment on that many copies showing up.
                 int replicaCount = m_kfactor + 1;
                 JSONArray parts;
-                Set<Integer> inactiveHosts = Sets.newHashSet();
+                Set<Integer> missingHosts = Sets.newHashSet();
                 try {
-                    //find all inactive hosts
-                    JSONArray hosts = m_topo.getJSONArray("hosts");
+                    //find all missing hosts
+                    JSONArray hosts = m_topo.getJSONArray(AbstractTopology.TOPO_HOSTS);
                     for (int h = 0; h < hosts.length(); h++) {
                         JSONObject host = hosts.getJSONObject(h);
-                        boolean isLive = host.getBoolean("live");
-                        if (!isLive) {
-                            inactiveHosts.add(host.getInt("host_id"));
+                        boolean isMissing = host.getBoolean(AbstractTopology.TOPO_HOST_MISSING);
+                        if (isMissing) {
+                            missingHosts.add(host.getInt(AbstractTopology.TOPO_HOST_ID));
                         }
                     }
-                    parts = m_topo.getJSONArray("partitions");
+                    parts = m_topo.getJSONArray(AbstractTopology.TOPO_PARTITIONS);
                     for (int p = 0; p < parts.length(); p++) {
                         JSONObject aPartition = parts.getJSONObject(p);
-                        if (m_partitionId == aPartition.getInt("partition_id")) {
-                            JSONArray replicas = aPartition.getJSONArray("replicas");
+                        if (m_partitionId == aPartition.getInt(AbstractTopology.TOPO_PARTITION_ID)) {
+                            JSONArray replicas = aPartition.getJSONArray(AbstractTopology.TOPO_REPLICA);
                             replicaCount = replicas.length();
-                            //replica may be placed on an inactive nodes. do not wait for the replica on inactive hosts
+                            //replica may be placed on a missing node. do not wait for the replica on missing hosts
                             for (int r = 0; r < replicas.length(); r++) {
-                                if (inactiveHosts.contains(replicas.getInt(r))) {
+                                if (missingHosts.contains(replicas.getInt(r))) {
                                     replicaCount--;
                                 }
                             }
