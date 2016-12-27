@@ -171,5 +171,6 @@ class SSLNIOReadStream implements ReadStream {
             c.discard();
         }
         m_readBBContainers.clear();
+        m_totalAvailable.set(0);
     }
 }
