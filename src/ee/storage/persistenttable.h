@@ -258,7 +258,14 @@ public:
     // ------------------------------------------------------------------
     virtual void deleteAllTuples(bool, bool fallible = true);
 
-    virtual void truncateTable(VoltDBEngine* engine, bool fallible = true);
+    void truncateTable(VoltDBEngine* engine, bool fallible = true);
+
+    void swapTable
+           (PersistentTable* otherTable,
+            std::vector<std::string> const& theIndexes,
+            std::vector<std::string> const& otherIndexes,
+            bool fallible = true);
+
     // The fallible flag is used to denote a change to a persistent table
     // which is part of a long transaction that has been vetted and can
     // never fail (e.g. violate a constraint).
@@ -423,20 +430,14 @@ public:
         m_nonInlinedMemorySize -= bytes;
     }
 
-    size_t allocatedBlockCount() const {
-        return m_data.size();
-    }
+    size_t allocatedBlockCount() const { return m_data.size(); }
 
     // This is a testability feature not intended for use in product logic.
     int visibleTupleCount() const { return m_tupleCount - m_invisibleTuplesPendingDeleteCount; }
 
-    int tupleLimit() const {
-        return m_tupleLimit;
-    }
+    int tupleLimit() const { return m_tupleLimit; }
 
-    bool isReplicatedTable() const {
-        return (m_partitionColumn == -1);
-    }
+    bool isReplicatedTable() const { return (m_partitionColumn == -1); }
 
     /** Returns true if DR is enabled for this table */
     bool isDREnabled() const { return m_drEnabled; }
@@ -468,6 +469,7 @@ public:
     virtual int64_t validatePartitioning(TheHashinator* hashinator, int32_t partitionId);
 
     void truncateTableUndo(TableCatalogDelegate* tcd, PersistentTable* originalTable);
+
     void truncateTableRelease(PersistentTable* originalTable);
 
     /** Once ELASTIC INDEX streaming starts, it needs to continue on the same
@@ -533,7 +535,7 @@ public:
     bool isDeltaTableActive() { return m_deltaTableActive; }
 
     // STATS
-    TableStats* getTableStats() {  return &m_stats; };
+    TableStats* getTableStats() { return &m_stats; };
 
     std::vector<uint64_t> getBlockAddresses() const;
 
@@ -584,12 +586,17 @@ private:
     }
 
     void nextFreeTuple(TableTuple* tuple);
+
     bool doCompactionWithinSubset(TBBucketPtrVector* bucketVector);
+
     bool doForcedCompaction();  // Returns true if a compaction was performed
 
     void insertIntoAllIndexes(TableTuple* tuple);
+
     void deleteFromAllIndexes(TableTuple* tuple);
+
     void tryInsertOnAllIndexes(TableTuple* tuple, TableTuple* conflict);
+
     bool checkUpdateOnUniqueIndexes(TableTuple& targetTupleToUpdate,
                                     TableTuple const& sourceTupleWithNewValues,
                                     std::vector<TableIndex*> const& indexesToUpdate);
@@ -609,13 +616,19 @@ private:
     // source tuple's memory should still be retained until the exception is
     // handled.
     void insertTupleCommon(TableTuple& source, TableTuple& target, bool fallible, bool shouldDRStream = true);
+
     void insertTupleForUndo(char* tuple);
+
     void updateTupleForUndo(char* targetTupleToUpdate,
                             char* sourceTupleWithNewValues,
                             bool revertIndexes);
+
     void deleteTupleForUndo(char* tupleData, bool skipLookup = false);
+
     void deleteTupleRelease(char* tuple);
+
     void deleteTupleFinalize(TableTuple& tuple);
+
     /**
      * Normally this will return the tuple storage to the free list.
      * In the memcheck build it will return the storage to the heap.
@@ -637,16 +650,13 @@ private:
         LOOKUP_FOR_DR,
         LOOKUP_FOR_UNDO
     };
+
     TableTuple lookupTuple(TableTuple tuple, LookupType lookupType);
 
     TBPtr allocateNextBlock();
 
     AbstractDRTupleStream* getDRTupleStream(ExecutorContext* ec) {
-        if (isReplicatedTable()) {
-            return ec->drReplicatedStream();
-        } else {
-            return ec->drStream();
-        }
+        return isReplicatedTable() ? ec->drReplicatedStream() : ec->drStream();
     }
 
     void setDRTimestampForTuple(ExecutorContext* ec, TableTuple& tuple, bool update);
@@ -654,14 +664,35 @@ private:
     void computeSmallestUniqueIndex();
 
     void addViewHandler(MaterializedViewHandler* viewHandler);
+
     void dropViewHandler(MaterializedViewHandler* viewHandler);
+
     // Mark all the view handlers referencing this table as dirty so they will be
     // recreated when being visited.
     // We use this only when a table index is added / dropped.
     void polluteViews();
+
     // Insert the source tuple into this table's delta table.
     // If there is no delta table affiliated with this table, then take no action.
     void insertTupleIntoDeltaTable(TableTuple& source, bool fallible);
+
+    //
+    // SWAP TABLE helpers
+    //
+
+    /**
+     * Do the actual SWAP TABLES work on the tables before calling specific
+     * methods to handle the implications on indexes on the tables.
+     */
+    void swapTableState(PersistentTable* otherTable);
+
+    /**
+     * Process corresponding identically defined indexes on two tables being swapped.
+     * The vector arguments contain parallel elements.
+     */
+    void swapTableIndexes(PersistentTable* otherTable,
+                          std::vector<TableIndex*> const& theIndexes,
+                          std::vector<TableIndex*> const& otherIndexes);
 
     // CONSTRAINTS
     std::vector<bool> m_allowNulls;
@@ -686,6 +717,7 @@ private:
 
     // Map from load to the blocks with level of load
     TBBucketPtrVector m_blocksNotPendingSnapshotLoad;
+
     TBBucketPtrVector m_blocksPendingSnapshotLoad;
 
     // Map containing blocks that aren't pending snapshot
@@ -703,6 +735,7 @@ private:
 
     // pointers to chunks of data. Specific to table impl. Don't leak this type.
     TBMap m_data;
+
     int m_failedCompactionCount;
 
     // This is a testability feature not intended for use in product logic.
@@ -725,13 +758,18 @@ private:
     char m_signature[20];
 
     bool m_noAvailableUniqueIndex;
+
     TableIndex* m_smallestUniqueIndex;
+
     uint32_t m_smallestUniqueIndexCrc;
+
     int m_drTimestampColumnIndex;
 
     // indexes
     std::vector<TableIndex*> m_indexes;
+
     std::vector<TableIndex*> m_uniqueIndexes;
+
     TableIndex* m_pkeyIndex;
 
     // If this is a view table, maintain a handler to handle the view update work.
@@ -749,6 +787,7 @@ private:
     // WARNING: Do not manually flip this m_deltaTableActive flag. Instead,
     // use ScopedDeltaTableContext (currently defined in MaterializedViewHandler.h).
     PersistentTable* m_deltaTable;
+
     bool m_deltaTableActive;
 };
 
