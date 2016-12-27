@@ -99,7 +99,7 @@ public class PicoNetwork implements Runnable, Connection, IOStatsIntf
 
     private final Selector m_selector;
     private final NetworkDBBPool m_pool = new NetworkDBBPool(64);
-    private final NIOReadStream m_readStream = new NIOReadStream();
+    private final ReadStream m_readStream = new NIOReadStream();
     private final PicoNIOWriteStream m_writeStream = new PicoNIOWriteStream();
     private final ConcurrentLinkedQueue<Runnable> m_tasks = new ConcurrentLinkedQueue<Runnable>();
     private volatile boolean m_shouldStop = false;//volatile boolean is sufficient
@@ -422,7 +422,7 @@ public class PicoNetwork implements Runnable, Connection, IOStatsIntf
     }
 
     @Override
-    public NIOReadStream readStream() {
+    public ReadStream readStream() {
         throw new UnsupportedOperationException();
     }
 

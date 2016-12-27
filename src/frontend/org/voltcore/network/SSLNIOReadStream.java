@@ -51,17 +51,31 @@ import java.nio.ByteBuffer;
 import java.nio.channels.ReadableByteChannel;
 import java.util.Deque;
 import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.concurrent.atomic.AtomicInteger;
 
-class SSLNIOReadStream extends NIOReadStream {
+class SSLNIOReadStream implements ReadStream {
 
+    private final AtomicInteger m_bytesRead = new AtomicInteger(0);
+    private long m_lastBytesRead = 0;
+    private final AtomicInteger m_totalAvailable = new AtomicInteger(0);
     private final Deque<DBBPool.BBContainer> m_readBBContainers = new ConcurrentLinkedDeque<DBBPool.BBContainer>();
 
-    int getBytes(ByteBuffer output) {
+    @Override
+    public int dataAvailable() {
+        return m_totalAvailable.get();
+    }
+
+    @Override
+    public void getBytes(byte[] output) {
+        throw new UnsupportedOperationException();
+    }
+
+    public int getBytes(ByteBuffer output) {
         int totalBytesCopied = 0;
         DBBPool.BBContainer poolCont = null;
-        while (m_totalAvailable > 0 && output.hasRemaining()) {
+        while (m_totalAvailable.get() > 0 && output.hasRemaining()) {
             if (poolCont == null) {
-                poolCont = getReadContainers().peekFirst();
+                poolCont = m_readBBContainers.peekFirst();
                 if (poolCont == null) {
                     return totalBytesCopied;
                 }
@@ -73,21 +87,39 @@ class SSLNIOReadStream extends NIOReadStream {
                 output.put(poolCont.b());
                 poolCont.b().limit(oldLimit);
                 totalBytesCopied += bytesToCopy;
-                m_totalAvailable -= bytesToCopy;
+                m_totalAvailable.addAndGet(-bytesToCopy);
             } else {
                 int bytesToCopy = poolCont.b().remaining();
                 output.put(poolCont.b());
-                poolCont = getReadContainers().pollFirst();
+                poolCont = m_readBBContainers.pollFirst();
                 poolCont.discard();
                 poolCont = null;
                 totalBytesCopied += bytesToCopy;
-                m_totalAvailable -= bytesToCopy;
+                m_totalAvailable.addAndGet(-bytesToCopy);
             }
         }
         return totalBytesCopied;
     }
 
-    int read(ReadableByteChannel channel, int maxBytes, NetworkDBBPool pool) throws IOException {
+    @Override
+    public long getBytesRead(boolean interval) {
+        if (interval) {
+            final long bytesRead = m_bytesRead.get();
+            final long bytesReadThisTime = bytesRead - m_lastBytesRead;
+            m_lastBytesRead = bytesRead;
+            return bytesReadThisTime;
+        } else {
+            return m_bytesRead.get();
+        }
+    }
+
+    @Override
+    public int getInt() {
+        throw new UnsupportedOperationException();
+    }
+
+
+    public int read(ReadableByteChannel channel, int maxBytes, NetworkDBBPool pool) throws IOException {
         int bytesRead = 0;
         int lastRead = 1;
         DBBPool.BBContainer poolCont = null;
@@ -110,7 +142,7 @@ class SSLNIOReadStream extends NIOReadStream {
                     bytesRead += lastRead;
                     if (!poolCont.b().hasRemaining()) {
                         poolCont.b().flip();
-                        getReadContainers().addLast(poolCont);
+                        m_readBBContainers.addLast(poolCont);
                         poolCont = null;
                     }
                 }
@@ -119,21 +151,25 @@ class SSLNIOReadStream extends NIOReadStream {
             if (poolCont != null) {
                 if (poolCont.b().position() > 0) {
                     poolCont.b().flip();
-                    getReadContainers().addLast(poolCont);
+                    m_readBBContainers.addLast(poolCont);
                 } else {
                     poolCont.discard();
                 }
             }
             if (bytesRead > 0) {
-                m_totalAvailable += bytesRead;
+                m_bytesRead.addAndGet(bytesRead);
+                m_totalAvailable.addAndGet(bytesRead);
             }
         }
 
         return bytesRead;
     }
 
-    Deque<DBBPool.BBContainer> getReadContainers() {
-        return m_readBBContainers;
+    @Override
+    public void shutdown() {
+        for (DBBPool.BBContainer c : m_readBBContainers) {
+            c.discard();
+        }
+        m_readBBContainers.clear();
     }
-
 }

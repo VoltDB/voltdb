@@ -34,7 +34,7 @@ public class MockConnection implements Connection {
     }
 
     @Override
-    public NIOReadStream readStream() {
+    public ReadStream readStream() {
         throw new UnsupportedOperationException();
     }
 

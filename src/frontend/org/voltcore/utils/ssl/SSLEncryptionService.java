@@ -73,7 +73,7 @@ public class SSLEncryptionService {
     public void shutdown() throws InterruptedException {
 
         m_isShutdown.set(true);
-        networkLog.info("Shutting down Encryption and Decryption services.");
+        networkLog.debug("Shutting down Encryption and Decryption services.");
         if (m_encEs != null) {
             m_encEs.shutdown();
             m_encEs.awaitTermination(365, TimeUnit.DAYS);
@@ -82,7 +82,7 @@ public class SSLEncryptionService {
             m_decEs.shutdown();
             m_decEs.awaitTermination(365, TimeUnit.DAYS);
         }
-        networkLog.info("Encryption and Decryption services successfully shutdown.");
+        networkLog.debug("Encryption and Decryption services successfully shutdown.");
     }
 
     public ListenableFuture<?> submitForEncryption(Runnable task) {

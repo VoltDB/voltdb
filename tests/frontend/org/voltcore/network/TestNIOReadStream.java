@@ -58,7 +58,7 @@ import java.io.IOException;
 
 public class TestNIOReadStream extends TestCase {
     MockReadableByteChannel channel;
-    NIOReadStream stream;
+    ReadStream stream;
     NetworkDBBPool pool;
 
     private static class MockReadableByteChannel implements ReadableByteChannel {

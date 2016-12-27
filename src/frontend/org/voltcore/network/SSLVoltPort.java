@@ -119,7 +119,7 @@ public class SSLVoltPort extends VoltPort {
     }
 
     @Override
-    public SSLNIOReadStream readStream() {
+    public ReadStream readStream() {
         assert(m_readStream != null);
         return (SSLNIOReadStream) m_readStream;
     }

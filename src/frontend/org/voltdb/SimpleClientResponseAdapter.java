@@ -30,7 +30,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltcore.network.Connection;
-import org.voltcore.network.NIOReadStream;
+import org.voltcore.network.ReadStream;
 import org.voltcore.network.WriteStream;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.Pair;
@@ -249,7 +249,7 @@ public class SimpleClientResponseAdapter implements Connection, WriteStream {
     }
 
     @Override
-    public NIOReadStream readStream() {
+    public ReadStream readStream() {
         throw new UnsupportedOperationException();
     }
 

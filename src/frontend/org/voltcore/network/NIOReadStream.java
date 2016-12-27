@@ -56,14 +56,15 @@ import org.voltcore.utils.DBBPool.BBContainer;
 Provides a non-blocking stream-like interface on top of the Java NIO ReadableByteChannel. It calls
 the underlying read() method only when needed.
 */
-public class NIOReadStream {
+public class NIOReadStream implements ReadStream {
 
-    /** @returns the number of bytes available to be read. */
+    @Override
     public int dataAvailable() {
         return m_totalAvailable;
     }
 
-    int getInt() {
+    @Override
+    public int getInt() {
         // TODO: Optimize?
         byte[] intbytes = new byte[4];
         getBytes(intbytes);
@@ -75,12 +76,8 @@ public class NIOReadStream {
         return output;
     }
 
-    /**
-     * Move all bytes in current read buffers to output array, free read buffers
-     * back to thread local memory pool.
-     * @param output
-     */
-    void getBytes(byte[] output) {
+    @Override
+    public void getBytes(byte[] output) {
         if (m_totalAvailable < output.length) {
             throw new IllegalStateException("Requested " + output.length + " bytes; only have "
                     + m_totalAvailable + " bytes; call tryRead() first");
@@ -88,11 +85,11 @@ public class NIOReadStream {
 
         int bytesCopied = 0;
         while (bytesCopied < output.length) {
-            BBContainer firstC = getReadContainers().peekFirst();
+            BBContainer firstC = m_readBBContainers.peekFirst();
             if (firstC == null) {
                 // Steal the write buffer
                 m_poolBBContainer.b().flip();
-                getReadContainers().add(m_poolBBContainer);
+                m_readBBContainers.add(m_poolBBContainer);
                 firstC = m_poolBBContainer;
                 m_poolBBContainer = null;
             }
@@ -109,20 +106,14 @@ public class NIOReadStream {
 
             if (first.remaining() == 0) {
                 // read an entire block: move it to the empty buffers list
-                getReadContainers().poll();
+                m_readBBContainers.poll();
                 firstC.discard();
             }
         }
     }
 
-    /**
-     * Read at most maxBytes from the network. Will read until the network would
-     * block, the stream is closed or the maximum bytes to read is reached.
-     * @param maxBytes
-     * @return -1 if closed otherwise total buffered bytes. In all cases,
-     * data may be buffered in the stream - even when the channel is closed.
-     */
-    int read(ReadableByteChannel channel, int maxBytes, NetworkDBBPool pool) throws IOException {
+    @Override
+    public int read(ReadableByteChannel channel, int maxBytes, NetworkDBBPool pool) throws IOException {
         int bytesRead = 0;
         int lastRead = 1;
         try {
@@ -152,7 +143,7 @@ public class NIOReadStream {
                     bytesRead += lastRead;
                     if (!poolBuffer.hasRemaining()) {
                         poolBuffer.flip();
-                        getReadContainers().add(m_poolBBContainer);
+                        m_readBBContainers.add(m_poolBBContainer);
                         m_poolBBContainer = null;
                     } else {
                         break;
@@ -172,15 +163,21 @@ public class NIOReadStream {
         return bytesRead;
     }
 
-    void shutdown() {
-        for (BBContainer c : getReadContainers()) {
+    @Override
+    public void shutdown() {
+        for (BBContainer c : m_readBBContainers) {
             c.discard();
         }
         if (m_poolBBContainer != null) {
             m_poolBBContainer.discard();
         }
-        getReadContainers().clear();
+        m_readBBContainers.clear();
         m_poolBBContainer = null;
+    }
+
+    @Override
+    public int getBytes(ByteBuffer output) {
+        throw new UnsupportedOperationException();
     }
 
     private final Deque<BBContainer> m_readBBContainers = new ArrayDeque<BBContainer>();
@@ -189,7 +186,8 @@ public class NIOReadStream {
     private long m_bytesRead = 0;
     private long m_lastBytesRead = 0;
 
-    long getBytesRead(boolean interval) {
+    @Override
+    public long getBytesRead(boolean interval) {
         if (interval) {
             final long bytesRead = m_bytesRead;
             final long bytesReadThisTime = bytesRead - m_lastBytesRead;
@@ -200,7 +198,4 @@ public class NIOReadStream {
         }
     }
 
-    Deque<BBContainer> getReadContainers() {
-        return m_readBBContainers;
-    }
 }

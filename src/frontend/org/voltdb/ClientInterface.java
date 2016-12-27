@@ -54,8 +54,8 @@ import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.network.Connection;
-import org.voltcore.network.NIOReadStream;
 import org.voltcore.network.QueueMonitor;
+import org.voltcore.network.ReadStream;
 import org.voltcore.network.ReverseDNSPolicy;
 import org.voltcore.network.VoltNetworkPool;
 import org.voltcore.network.VoltPort;
@@ -1638,7 +1638,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
 
         @Override
-        public NIOReadStream readStream() {
+        public ReadStream readStream() {
             throw new UnsupportedOperationException();
         }
 
