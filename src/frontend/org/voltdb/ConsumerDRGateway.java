@@ -26,7 +26,7 @@ public interface ConsumerDRGateway extends Promotable {
 
     void updateCatalog(CatalogContext catalog);
 
-    boolean isActive();
+    DRRoleStats.State getState();
 
     void initialize(boolean resumeReplication);
 

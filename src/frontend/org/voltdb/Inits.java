@@ -56,6 +56,7 @@ import org.voltdb.iv2.UniqueIdGenerator;
 import org.voltdb.modular.ModuleManager;
 import org.voltdb.settings.DbSettings;
 import org.voltdb.settings.NodeSettings;
+import org.voltdb.snmp.SnmpTrapSender;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CatalogUtil.CatalogAndIds;
 import org.voltdb.utils.HTTPAdminListener;
@@ -402,7 +403,8 @@ public class Inits {
                         catalogJarHash,
                         // Our starter catalog has set the deployment stuff, just yoink it out for now
                         m_rvdb.m_catalogContext.getDeploymentBytes(),
-                        catalogStuff.version);
+                        catalogStuff.version,
+                        m_rvdb.m_messenger);
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB("Error agreeing on starting catalog version", true, e);
             }
@@ -466,6 +468,31 @@ public class Inits {
                     } catch (Exception e) {
                         VoltDB.crashLocalVoltDB("Unable to instantiate command log", true, e);
                     }
+                }
+            }
+        }
+    }
+
+    class SetupSNMP extends InitWork {
+        SetupSNMP() {
+        }
+
+        @Override
+        public void run() {
+            if (m_config.m_isEnterprise && m_deployment.getSnmp() != null && m_deployment.getSnmp().isEnabled()) {
+                try {
+                    Class<?> loggerClass = MiscUtils.loadProClass("org.voltdb.snmp.SnmpTrapSenderImpl",
+                                                               "SNMP Adapter", false);
+                    if (loggerClass != null) {
+                        final Constructor<?> constructor = loggerClass.getConstructor();
+                        m_rvdb.m_snmp = (SnmpTrapSender) constructor.newInstance();
+                        m_rvdb.m_snmp.initialize(
+                                m_deployment.getSnmp(),
+                                m_rvdb.getHostMessenger(),
+                                m_rvdb.getCatalogContext().cluster.getDrclusterid());
+                    }
+                } catch (Exception e) {
+                    VoltDB.crashLocalVoltDB("Unable to instantiate SNMP", true, e);
                 }
             }
         }

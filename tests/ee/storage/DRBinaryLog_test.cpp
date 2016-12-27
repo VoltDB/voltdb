@@ -116,7 +116,7 @@ class MockVoltDBEngine : public VoltDBEngine {
 public:
     MockVoltDBEngine(int clusterId, Topend* topend, Pool* pool,
                      DRTupleStream* drStream, DRTupleStream* drReplicatedStream)
-      : m_context(new ExecutorContext(1, 1, NULL, topend, pool, NULL, this,
+      : m_context(new ExecutorContext(1, 1, NULL, topend, pool, this,
                                       "localhost", 2, drStream, drReplicatedStream, clusterId))
     {
 

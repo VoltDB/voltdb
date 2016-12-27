@@ -127,6 +127,7 @@ public class CommandLine extends VoltDB.Configuration
         cl.m_voltdbRoot = m_voltdbRoot;
         cl.m_newCli = m_newCli;
         cl.m_datasourceClusterId = m_datasourceClusterId;
+        cl.m_placementGroup = m_placementGroup;
         // deep copy the property map if it exists
         if (javaProperties != null) {
             cl.javaProperties = new TreeMap<String, String>();
@@ -780,6 +781,9 @@ public class CommandLine extends VoltDB.Configuration
             cmdline.add("datasourcecluster"); cmdline.add(Byte.toString(m_datasourceClusterId));
         }
 
+        if (m_placementGroup != null) {
+            cmdline.add("placementgroup"); cmdline.add(m_placementGroup);
+        }
         return cmdline;
     }
 
@@ -1046,4 +1050,8 @@ public class CommandLine extends VoltDB.Configuration
     }
     public void setNewCli(boolean flag) { m_newCli = flag; };
 
+    String m_placementGroup = "";
+    public void setPlacementGroup(String placementGroup) {
+        m_placementGroup = placementGroup;
+    }
 }

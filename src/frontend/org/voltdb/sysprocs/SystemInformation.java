@@ -20,19 +20,24 @@ package org.voltdb.sysprocs;
 import java.io.File;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 
 import org.apache.log4j.Logger;
 import org.apache.log4j.net.SocketHubAppender;
+import org.apache.zookeeper_voltpatches.KeeperException;
+import org.apache.zookeeper_voltpatches.data.Stat;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.common.Constants;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.zk.CoreZK;
 import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
@@ -446,8 +451,22 @@ public class SystemInformation extends VoltSystemProcedure
         if (MiscUtils.isPro()) {
             vt.addRow(hostId, "LICENSE", VoltDB.instance().getLicenseInformation());
         }
-
+        populatePartitionGroups(hostId, vt);
         return vt;
+    }
+
+    private static void populatePartitionGroups(Integer hostId, VoltTable vt) {
+        try {
+            byte[]  bytes = VoltDB.instance().getHostMessenger().getZK().getData(CoreZK.hosts_host + hostId, false, new Stat());
+            String hostInfo = new String(bytes, StandardCharsets.UTF_8);
+            JSONObject obj = new JSONObject(hostInfo);
+            vt.addRow(hostId, "PLACEMENTGROUP",obj.getString("group"));
+        } catch (KeeperException | InterruptedException | JSONException e) {
+            vt.addRow(hostId, "PLACEMENTGROUP","NULL");
+        }
+        Set<Integer> buddies = VoltDB.instance().getCartograhper().getHostIdsWithinPartitionGroup(hostId);
+        String[] strIds = buddies.stream().sorted().map(i -> String.valueOf(i)).toArray(String[]::new);
+        vt.addRow(hostId, "PARTITIONGROUP",String.join(",", strIds));
     }
 
     static public VoltTable populateDeploymentProperties(

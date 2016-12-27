@@ -35,6 +35,7 @@ import org.voltdb.HsqlBackend;
 import org.voltdb.LoadedProcedureSet;
 import org.voltdb.NonVoltDBBackend;
 import org.voltdb.ParameterSet;
+import org.voltdb.PartitionDRGateway;
 import org.voltdb.PostGISBackend;
 import org.voltdb.PostgreSQLBackend;
 import org.voltdb.ProcedureRunner;
@@ -422,6 +423,12 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     public int getCorrespondingClusterId()
     {
         return m_context.cluster.getDrclusterid();
+    }
+
+    @Override
+    public PartitionDRGateway getDRGateway()
+    {
+        throw new UnsupportedOperationException("RO MP Site doesn't have DR gateway");
     }
 
     @Override

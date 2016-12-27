@@ -50,6 +50,7 @@ import org.voltdb.probe.MeshProber;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.settings.NodeSettings;
 import org.voltdb.settings.Settings;
+import org.voltdb.snmp.SnmpTrapSender;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.MiscUtils;
@@ -254,6 +255,10 @@ public class VoltDB {
         public String m_placementGroup = null;
 
         public boolean m_isPaused = false;
+
+        /** GET option */
+        public GetActionArgument m_getOption = GetActionArgument.DEPLOYMENT;
+        public String m_getOutput = null;
 
         private final static void referToDocAndExit() {
             System.out.println("Please refer to VoltDB documentation for command line usage.");
@@ -622,12 +627,29 @@ public class VoltDB {
                         throw new IllegalArgumentException("Invalid data cluster id value: " +
                             m_datasourceClusterId + ". Data source cluster id must be >= 0");
                     }
-                } else {
+                } else if (arg.equalsIgnoreCase("getvoltdbroot")) {
+                    //Can not use voltdbroot which creates directory we dont intend to create for get deployment etc.
+                    m_voltdbRoot = new VoltFile(args[++i]);
+                } else if (arg.equalsIgnoreCase("get")) {
+                    m_startAction = StartAction.GET;
+                    GetActionArgument.valueOf(args[++i].trim().toUpperCase());
+                } else if (arg.equalsIgnoreCase("file")) {
+                    m_getOutput = args[++i].trim();
+                }
+                else {
                     System.err.println("FATAL: Unrecognized option to VoltDB: " + arg);
                     referToDocAndExit();
                 }
             }
-
+            //I am a get
+            if (m_startAction == StartAction.GET) {
+                //We dont want crash file created.
+                VoltDB.exitAfterMessage = true;
+                File configInfoDir = new VoltFile(m_voltdbRoot, Constants.CONFIG_DIR);
+                File depFH = new VoltFile(configInfoDir, "deployment.xml");
+                m_pathToDeployment = depFH.getAbsolutePath();
+                return;
+            }
             // set file logger root file directory. From this point on you can use loggers
             if (m_startAction != null && !m_startAction.isLegacy()) {
                 VoltLog4jLogger.setFileLoggerRoot(m_voltdbRoot);
@@ -803,11 +825,12 @@ public class VoltDB {
         public boolean validate() {
             boolean isValid = true;
 
+            EnumSet<StartAction> hostNotRequred = EnumSet.of(StartAction.INITIALIZE,StartAction.GET);
             if (m_startAction == null) {
                 isValid = false;
                 hostLog.fatal("The startup action is missing (either create, recover or rejoin).");
             }
-            if (m_leader == null && m_startAction != StartAction.INITIALIZE) {
+            if (m_leader == null && !hostNotRequred.contains(m_startAction)) {
                 isValid = false;
                 hostLog.fatal("The hostname is missing.");
             }
@@ -837,7 +860,7 @@ public class VoltDB {
                 isValid = false;
                 hostLog.fatal("Starting in admin mode is only allowed when using start, create or recover.");
             }
-            if (m_startAction != StartAction.INITIALIZE && m_coordinators.isEmpty()) {
+            if (!hostNotRequred.contains(m_startAction) && m_coordinators.isEmpty()) {
                 isValid = false;
                 hostLog.fatal("List of hosts is missing");
             }
@@ -1043,9 +1066,36 @@ public class VoltDB {
     }
 
     /**
+     * send a SNMP trap crash notification
+     * @param msg
+     */
+    private static void sendCrashSNMPTrap(String msg) {
+        if (msg == null || msg.trim().isEmpty()) {
+            return;
+        }
+        VoltDBInterface vdbInstance = instance();
+        if (vdbInstance == null) {
+            return;
+        }
+        SnmpTrapSender snmp = vdbInstance.getSnmpTrapSender();
+        if (snmp == null) {
+            return;
+        }
+        try {
+            snmp.crash(msg);
+        } catch (Throwable t) {
+            VoltLogger log = new VoltLogger("HOST");
+            log.warn("failed to issue a crash SNMP trap", t);
+        }
+    }
+    /**
      * Exit the process with an error message, optionally with a stack trace.
      */
     public static void crashLocalVoltDB(String errMsg, boolean stackTrace, Throwable thrown) {
+        if (exitAfterMessage) {
+            System.err.println(errMsg);
+            VoltDB.exit(-1);
+        }
         try {
             OnDemandBinaryLogger.flush();
         } catch (Throwable e) {}
@@ -1069,7 +1119,8 @@ public class VoltDB {
             log.warn("Declining to drop a crash file during a junit test.");
         }
         // end test code
-
+        // send a snmp trap crash notification
+        sendCrashSNMPTrap(errMsg);
         // try/finally block does its best to ensure death, no matter what context this
         // is called in
         try {
@@ -1182,6 +1233,7 @@ public class VoltDB {
 
     public static String crashMessage;
 
+    public static boolean exitAfterMessage = false;
     /**
      * Exit the process with an error message, optionally with a stack trace.
      * Also notify all connected peers that the node is going down.
@@ -1195,6 +1247,8 @@ public class VoltDB {
         }
         // end test code
 
+        // send a snmp trap crash notification
+        sendCrashSNMPTrap(errMsg);
         try {
             // turn off client interface as fast as possible
             // we don't expect this to ever fail, but if it does, skip to dying immediately
@@ -1228,8 +1282,12 @@ public class VoltDB {
             if (!config.validate()) {
                 System.exit(-1);
             } else {
-                initialize(config);
-                instance().run();
+                if (config.m_startAction == StartAction.GET) {
+                    cli(config);
+                } else {
+                    initialize(config);
+                    instance().run();
+                }
             }
         }
         catch (OutOfMemoryError e) {
@@ -1245,6 +1303,15 @@ public class VoltDB {
     public static void initialize(VoltDB.Configuration config) {
         m_config = config;
         instance().initialize(config);
+    }
+
+    /**
+     * Run CLI operations
+     * @param config  The VoltDB.Configuration to use for getting configuration via CLI
+     */
+    public static void cli(VoltDB.Configuration config) {
+        m_config = config;
+        instance().cli(config);
     }
 
     /**

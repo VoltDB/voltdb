@@ -166,9 +166,9 @@ namespace voltdb {
     // to catch up with the existing data.
     //TODO: *non-grouped views could instead set up a hard-coded initial
     // row as they do in the single-table case to avoid querying empty tables.
-    void MaterializedViewHandler::catchUpWithExistingData(VoltDBEngine *engine, bool fallible) {
+    void MaterializedViewHandler::catchUpWithExistingData(bool fallible) {
         ExecutorContext* ec = ExecutorContext::getExecutorContext();
-        UniqueTempTableResult viewContent = engine->executePlanFragment(m_createQueryExecutorVector.get());
+        UniqueTempTableResult viewContent = ec->getEngine()->executePlanFragment(m_createQueryExecutorVector.get());
         TableIterator ti = viewContent->iterator();
         TableTuple tuple(viewContent->schema());
         while (ti.next(tuple)) {
@@ -353,7 +353,7 @@ namespace voltdb {
     NValue MaterializedViewHandler::fallbackMinMaxColumn(int columnIndex, int minMaxColumnIndex) {
         NValue newValue = NValue::getNullValue(m_destTable->schema()->columnType(columnIndex));
         ExecutorContext* ec = ExecutorContext::getExecutorContext();
-        NValueArray &params = *ec->getParameterContainer();
+        NValueArray &params = ec->getParameterContainer();
         // We first backup the params array and fill it with our parameters.
         // Is it really necessary???
         vector<NValue> backups(m_groupByColumnCount+1);

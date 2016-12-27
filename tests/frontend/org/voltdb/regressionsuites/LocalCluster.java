@@ -122,6 +122,12 @@ public class LocalCluster extends VoltServerConfig {
     ArrayList<CommandLine> m_cmdLines = null;
     ServerThread m_localServer = null;
     ProcessBuilder m_procBuilder;
+
+    //wait before next node is started up in millisecond
+    //to help matching the host id on the real cluster with the host id on the local
+    //cluster
+    private long m_deplayBetweenNodeStartupMS = 0;
+
     private final ArrayList<EEProcess> m_eeProcs = new ArrayList<EEProcess>();
     //This is additional process invironment variables that can be passed.
     // This is used to pass JMX port. Any additional use cases can use this too.
@@ -143,7 +149,7 @@ public class LocalCluster extends VoltServerConfig {
 
     private String[] m_modeOverrides = null;
     private Map<Integer, Integer> m_sitesperhostOverrides = null;
-
+    private String[] m_placementGroups = null;
     // The base command line - each process copies and customizes this.
     // Each local cluster process has a CommandLine instance configured
     // with the port numbers and command line parameter value specific to that
@@ -750,7 +756,19 @@ public class LocalCluster extends VoltServerConfig {
                 if (isNewCli && !skipInit) {
                     initOne(i, clearLocalDataDirectories);
                 }
-                startOne(i, clearLocalDataDirectories, role, StartAction.CREATE, true);
+                String placementGroup = null;
+                if (m_placementGroups != null && m_placementGroups.length == m_hostCount) {
+                    placementGroup = m_placementGroups[i];
+                }
+
+                startOne(i, clearLocalDataDirectories, role, StartAction.CREATE, true, placementGroup);
+                //wait before next one
+                if (m_deplayBetweenNodeStartupMS > 0) {
+                    try {
+                        Thread.sleep(m_deplayBetweenNodeStartupMS);
+                    } catch (InterruptedException e) {
+                    }
+                }
             }
             catch (IOException ioe) {
                 throw new RuntimeException(ioe);
@@ -929,7 +947,8 @@ public class LocalCluster extends VoltServerConfig {
         m_hostRoots.put(hostIdStr, cmdln.voltdbRoot().getPath());
     }
 
-    private void startOne(int hostId, boolean clearLocalDataDirectories, ReplicationRole replicaMode, StartAction startAction, boolean waitForReady)
+    private void startOne(int hostId, boolean clearLocalDataDirectories, ReplicationRole replicaMode,
+            StartAction startAction, boolean waitForReady, String placementGroup)
     throws IOException {
         PipeToFile ptf = null;
         CommandLine cmdln = (templateCmdLine.makeCopy());
@@ -981,7 +1000,7 @@ public class LocalCluster extends VoltServerConfig {
             cmdln.httpPort(portGenerator.nextHttp());
             cmdln.replicaMode(replicaMode);
             cmdln.timestampSalt(getRandomTimestampSalt());
-
+            cmdln.setPlacementGroup(placementGroup);
             if (m_debug) {
                 cmdln.debugPort(portGenerator.next());
             }
@@ -1144,25 +1163,60 @@ public class LocalCluster extends VoltServerConfig {
             if (isNewCli && !m_hostRoots.containsKey(Integer.toString(hostId))) {
                 initLocalServer(hostId, true);
             }
-            startOne(hostId, true, ReplicationRole.NONE, StartAction.JOIN, true);
+            startOne(hostId, true, ReplicationRole.NONE, StartAction.JOIN, true, null);
         }
         catch (IOException ioe) {
             throw new RuntimeException(ioe);
         }
     }
 
+    public void joinOne(int hostId, String placementGroup) {
+        try {
+            if (isNewCli && !m_hostRoots.containsKey(Integer.toString(hostId))) {
+                initLocalServer(hostId, true);
+            }
+            startOne(hostId, true, ReplicationRole.NONE, StartAction.JOIN, true, placementGroup);
+        }
+        catch (IOException ioe) {
+            throw new RuntimeException(ioe);
+        }
+    }
     /**
      * join multiple nodes to the cluster
      * @param hostIds a set of new host ids
      */
     public void join(Set<Integer> hostIds) {
-        m_pipes.clear();
         for (int hostId : hostIds) {
             try {
                 if (isNewCli && !m_hostRoots.containsKey(Integer.toString(hostId))) {
                     initLocalServer(hostId, true);
                 }
-                startOne(hostId, true, ReplicationRole.NONE, StartAction.JOIN, false);
+                startOne(hostId, true, ReplicationRole.NONE, StartAction.JOIN, false, null);
+            }
+            catch (IOException ioe) {
+                throw new RuntimeException(ioe);
+            }
+        }
+        waitForAllReady();
+    }
+
+    /**
+     * join multiple nodes to the cluster under their placement groups
+     * @param hostIds a set of new host ids and their placement groups
+     */
+    public void join(Map<Integer, String> hostIdByPlacementGroup) {
+        for (Map.Entry<Integer, String> entry : hostIdByPlacementGroup.entrySet()) {
+            try {
+                if (isNewCli && !m_hostRoots.containsKey(Integer.toString(entry.getKey()))) {
+                    initLocalServer(entry.getKey(), true);
+                }
+                startOne(entry.getKey(), true, ReplicationRole.NONE, StartAction.JOIN, false, entry.getValue());
+                if (m_deplayBetweenNodeStartupMS > 0) {
+                    try {
+                        Thread.sleep(m_deplayBetweenNodeStartupMS);
+                    } catch (InterruptedException e) {
+                    }
+                }
             }
             catch (IOException ioe) {
                 throw new RuntimeException(ioe);
@@ -1710,6 +1764,9 @@ public class LocalCluster extends VoltServerConfig {
         m_sitesperhostOverrides = sphMap;
     }
 
+    public void setPlacementGroups(String[] placementGroups) {
+        this.m_placementGroups = placementGroups;
+    }
     @Override
     public void setMaxHeap(int heap) {
         templateCmdLine.setMaxHeap(heap);
@@ -1926,5 +1983,9 @@ public class LocalCluster extends VoltServerConfig {
             client.createConnection(address);
         }
         return client;
+    }
+
+    public void setDeplayBetweenNodeStartup(long deplayBetweenNodeStartup) {
+        m_deplayBetweenNodeStartupMS = deplayBetweenNodeStartup;
     }
 }

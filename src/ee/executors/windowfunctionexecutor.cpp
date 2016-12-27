@@ -20,55 +20,361 @@
 
 #include "executors/windowfunctionexecutor.h"
 
+#include <sstream>
+#include <memory>
+#include <limits.h>
+
 #include "plannodes/windowfunctionnode.h"
 #include "execution/ProgressMonitorProxy.h"
+#include "common/ValueFactory.hpp"
+#include "common/ValuePeeker.hpp"
+#include "expressions/dateconstants.h"
+
 namespace voltdb {
 
 /**
- * A WindowAggregate is used to calculate one kind of
- * window function.  The input will look like a sequence
- * of rows which matches this regular expression:
- *    (F(l*n)*)(P(l*n)*)*E
- * where F is the first row, P is a row in a new partition
- * by group, l is a row in the last order by group, n
- * is a row in a new order by group and E is the end.
- * The event E occurs after all rows have been processed.
- * Each new partition by group is a new order by group as
- * well.
- *
- * For each row in this pattern:
- *   F:  advance(exprs, tuple, true)
- *   l:  advance(exprs, tuple, false)
- *   n:  advance(exprs, tuple, true)
- *   P:  resetAgg();
- *       advance(exprs, tuple, true);
- *   E:  finalize(type);
+ * This class holds all the iterators used when iterating
+ * through an input table.  There is one of these each time
+ * the executor runs.  Since it contains table iterators
+ * which have no default constructor, it really needs to
+ * know its input table at construction time.  This is not
+ * available when the executor object is constructed, so
+ * this needs to be heap allocated.
  */
-class WindowAggregate {
-public:
-    virtual ~WindowAggregate() {
-
+struct TableWindow {
+    TableWindow(Table *tbl)
+        : m_middleEdge(tbl->iterator()),
+          m_leadingEdge(tbl->iterator()),
+          m_orderByGroupSize(0) {}
+    std::string debug() {
+        std::stringstream stream;
+        stream << "Table Window: [Middle: "
+                << m_middleEdge.getLocation() << ", Leading: "
+                << m_leadingEdge.getLocation() << "], "
+                << "ssize = " << m_orderByGroupSize
+                << "\n";
+        return stream.str();
     }
-    void* operator new(size_t size, Pool& memoryPool) { return memoryPool.allocate(size); }
+
+    void resetCounts() {
+        m_orderByGroupSize = 0;
+    }
+    TableIterator m_middleEdge;
+    TableIterator m_leadingEdge;
+    /**
+     * This is handy for the aggregators.  It's maintained
+     * in findOrderByEdge();
+     */
+    size_t m_orderByGroupSize;
+};
+
+/**
+ * A WindowAggregate is the base class of aggregate calculations.
+ * In the algorithm for calculating window function values we are
+ * sensitive to some requirements.
+ *   <ol>
+ *     <li>All aggregates look at each input row in each order by group to
+ *         calculate a value at each input row.</li>
+ *     <li>For each such input row, some aggregates can use only values
+ *         which can be computed before the input row, and some need to know
+ *         values after the input row.  For example, RANK and DENSE_RANK
+ *         only need to know how many rows precede the input row.  On the
+ *         other hand, COUNT(*) needs to know how many rows are in the
+ *         order by group of the input row, which includes rows after the
+ *         input row.<li>
+ *     <li>Some aggregates needs to inspect each row to compute values.
+ *         For example, COUNT(E) must evaluate E in each input row in
+ *         the order by group and only count those where the evaluation
+ *         of E is non-null.</li>
+ *   </ol>
+ * Since it's expensive to evaluate expressions when they are not used,
+ * we want to be able to turn off evaluation when it's not needed.
+ */
+struct WindowAggregate {
+    WindowAggregate()
+      : m_needsLookahead(true),
+        m_inlineCopiedToOutline(false) {
+    }
+    virtual ~WindowAggregate() {
+    }
+    void* operator new(size_t size, Pool& memoryPool) {
+        void *answer = memoryPool.allocate(size);
+        return answer;
+    }
     void operator delete(void*, Pool& memoryPool) { /* NOOP -- on alloc error unroll nothing */ }
     void operator delete(void*) { /* NOOP -- deallocate wholesale with pool */ }
 
-    virtual void advance(const AbstractPlanNode::OwningExpressionVector &val,
-                         const TableTuple &nextTuple,
-                         bool newOrderByGroup) = 0;
+    virtual const char *getAggName() const = 0;
 
+    /**
+     * Do calculations needed when scanning each row ahead for
+     * the end of an order by or partition by group.
+     */
+    virtual void lookaheadOneRow(TableWindow &window, NValueArray &argValues) {
+        ;
+    }
+
+    /**
+     * Do calculations at the end of a scan of an order by
+     * group.
+     */
+    virtual void lookaheadNextGroup(TableWindow &window) {
+        ;
+    }
+
+    /**
+     * Do calculations to end the group and start the
+     * next group.
+     */
+    virtual void endGroup(TableWindow &window,
+                          WindowFunctionExecutor::EdgeType edgeType) {
+        ;
+    }
+
+    /**
+     * Calculate the final value for the output tuple.
+     */
     virtual NValue finalize(ValueType type)
     {
         m_value.castAs(type);
+        if (m_inlineCopiedToOutline) {
+            m_value.allocateObjectFromOutlinedValue();
+        }
         return m_value;
     }
 
+    /**
+     * Initialize the aggregate.  This is called at the
+     * beginning of each partition by group.
+     */
     virtual void resetAgg()
     {
         m_value.setNull();
     }
-protected:
+
     NValue m_value;
+    bool   m_needsLookahead;
+
+    bool   m_inlineCopiedToOutline;
+
+    const static NValue m_one;
+    const static NValue m_zero;
+
+};
+
+const NValue WindowAggregate::m_one  = ValueFactory::getBigIntValue(1);
+const NValue WindowAggregate::m_zero = ValueFactory::getBigIntValue(0);
+
+/**
+ * Dense rank is the easiest.  We just count
+ * the number of times the order by expression values
+ * change.
+ */
+class WindowedDenseRankAgg : public WindowAggregate {
+public:
+    WindowedDenseRankAgg() {
+        m_value = ValueFactory::getBigIntValue(1);
+        m_orderByPeerIncrement = m_value;
+        m_needsLookahead = false;
+    }
+
+    virtual ~WindowedDenseRankAgg() {
+    }
+
+    virtual const char *getAggName() const {
+        return "DENSE_RANK";
+    }
+    virtual void endGroup(TableWindow &window, WindowFunctionExecutor::EdgeType etype) {
+        m_value = m_value.op_add(orderByPeerIncrement());
+    }
+
+    virtual void resetAgg() {
+        WindowAggregate::resetAgg();
+        m_value = ValueFactory::getBigIntValue(1);
+        m_orderByPeerIncrement = m_value;
+    }
+
+    virtual NValue orderByPeerIncrement() {
+        return m_orderByPeerIncrement;
+    }
+
+    NValue m_orderByPeerIncrement;
+};
+
+/**
+ * Rank is like dense rank, but we increment
+ * the m_rank by the size of the order by group.
+ */
+class WindowedRankAgg : public WindowedDenseRankAgg {
+public:
+    virtual const char *getAggName() const {
+        return "RANK";
+    }
+    void lookaheadNextGroup(TableWindow &window) {
+        m_orderByPeerIncrement = ValueFactory::getBigIntValue(window.m_orderByGroupSize);
+    }
+    ~WindowedRankAgg() {
+    }
+};
+
+/**
+ * Count is a bit like rank, but we need to contrive
+ * to calculate when the argument expression is null,
+ * and add the count of non-null rows to the count output
+ * before we output the rows.
+ */
+class WindowedCountAgg : public WindowAggregate {
+public:
+    virtual ~WindowedCountAgg() {
+    }
+
+    virtual const char *getAggName() const {
+        return "COUNT";
+    }
+    virtual void lookaheadOneRow(TableWindow &window, NValueArray &argVals) {
+        /*
+         * COUNT(*) has no arguments.  If there are arguments,
+         * and the argument value is null, then don't count the row.
+         */
+        if (argVals.size() == 0 || ! argVals[0].isNull()) {
+            m_value = m_value.op_add(m_one);
+        }
+    }
+
+    virtual void resetAgg() {
+        WindowAggregate::resetAgg();
+        m_value = m_zero;
+    }
+};
+
+/*
+ * Calculate MIN.
+ */
+class WindowedMinAgg : public WindowAggregate {
+public:
+    /*
+     * Since min can operate on strings, we need to
+     * be careful that the memory is allocated in
+     * our pool.
+     */
+    WindowedMinAgg(Pool &pool)
+        : WindowAggregate(),
+          m_isEmpty(true),
+          m_pool(pool) {
+    }
+
+    ~WindowedMinAgg() {
+    }
+    virtual const char *getAggName() const {
+        return "MIN";
+    }
+    virtual void resetAgg() {
+        WindowAggregate::resetAgg();
+        m_isEmpty = true;
+    }
+    virtual NValue finalize(ValueType type)
+    {
+        /*
+         * If we looked at no values, this is null.
+         */
+        if (! m_isEmpty) {
+            return WindowAggregate::finalize(type);
+        }
+        m_value = NValue::getNullValue(type);
+        return m_value;
+    }
+    /**
+     * Calculate the min by looking ahead in the
+     * order by group.
+     */
+    virtual void lookaheadOneRow(TableWindow &window, NValueArray &argVals) {
+        assert(argVals.size() == 1);
+        if ( ! argVals[0].isNull()) {
+            if (m_isEmpty || argVals[0].op_lessThan(m_value).isTrue()) {
+                m_value = argVals[0];
+                if (m_value.getSourceInlined()) {
+                    m_value.allocateObjectFromInlinedValue(&m_pool);
+                    m_inlineCopiedToOutline = true;
+                }
+                m_isEmpty = false;
+            }
+        }
+    }
+    bool m_isEmpty;
+    Pool &m_pool;
+};
+
+class WindowedMaxAgg : public WindowAggregate {
+public:
+    WindowedMaxAgg(Pool &pool) : WindowAggregate(), m_isEmpty(true), m_pool(pool) {
+    }
+    ~WindowedMaxAgg() {
+    }
+    virtual const char *getAggName() const {
+        return "MAX";
+    }
+    virtual void resetAgg() {
+        WindowAggregate::resetAgg();
+        m_isEmpty = true;
+    }
+    virtual NValue finalize(ValueType type)
+    {
+        /*
+         * If we looked at no values, this is null.
+         */
+        if (! m_isEmpty) {
+            return WindowAggregate::finalize(type);
+        }
+        m_value = NValue::getNullValue(type);
+        return m_value;
+    }
+    /**
+     * Calculate the min by looking ahead in the
+     * order by group.
+     */
+    virtual void lookaheadOneRow(TableWindow &window, NValueArray &argVals) {
+        assert(argVals.size() == 1);
+        if ( ! argVals[0].isNull()) {
+            if (m_isEmpty || argVals[0].op_greaterThan(m_value).isTrue()) {
+                m_value = argVals[0];
+                if (m_value.getSourceInlined()) {
+                    m_value.allocateObjectFromInlinedValue(&m_pool);
+                    m_inlineCopiedToOutline = true;
+                }
+                m_isEmpty = false;
+            }
+        }
+    }
+    bool m_isEmpty;
+    Pool &m_pool;
+};
+
+class WindowedSumAgg : public WindowAggregate {
+public:
+    WindowedSumAgg() {
+    }
+    ~WindowedSumAgg() {
+    }
+    virtual const char *getAggName() const {
+        return "SUM";
+    }
+    virtual void resetAgg() {
+        WindowAggregate::resetAgg();
+    }
+    /**
+     * Calculate the min by looking ahead in the
+     * order by group.
+     */
+    virtual void lookaheadOneRow(TableWindow &window, NValueArray &argVals) {
+        assert(argVals.size() == 1);
+        if ( ! argVals[0].isNull()) {
+            if (m_value.isNull()) {
+                m_value = argVals[0];
+            } else {
+                m_value = m_value.op_add(argVals[0]);
+            }
+        }
+    }
 };
 
 /**
@@ -76,18 +382,15 @@ protected:
  * WindowAgg.  It has a pass through tuple and at the end has a
  * bunch of pointers to WindowAggregate objects.  These latter
  * calculate the actual aggregate values.
- *
- * Don't define anything which needs virtuality here, or awful things will happen.
  */
-class WindowAggregateRow {
-public:
+struct WindowAggregateRow {
     WindowAggregateRow(const TupleSchema *inputSchema, Pool &pool) {
         m_passThroughStorage.init(inputSchema, &pool);
         m_passThroughStorage.allocateActiveTuple();
     }
     void* operator new(size_t size, Pool& memoryPool, size_t nAggs)
     {
-      return memoryPool.allocateZeroes(size + (sizeof(void*) * (nAggs + 1)));
+        return memoryPool.allocateZeroes(size + (sizeof(void*) * (nAggs + 1)));
     }
     void operator delete(void*, Pool& memoryPool, size_t nAggs) { /* NOOP -- on alloc error unroll */ }
     void operator delete(void*) { /* NOOP -- deallocate wholesale with pool */ }
@@ -120,25 +423,6 @@ WindowFunctionExecutor::~WindowFunctionExecutor() {
     TupleSchema::freeTupleSchema(m_orderByKeySchema);
 }
 
-TupleSchema* WindowFunctionExecutor::constructSchemaFromExpressionVector
-        (const AbstractPlanNode::OwningExpressionVector &exprs) {
-    std::vector<ValueType> columnTypes;
-    std::vector<int32_t> columnSizes;
-    std::vector<bool> columnAllowNull;
-    std::vector<bool> columnInBytes;
-
-    BOOST_FOREACH (AbstractExpression* expr, exprs) {
-            columnTypes.push_back(expr->getValueType());
-            columnSizes.push_back(expr->getValueSize());
-            columnAllowNull.push_back(true);
-            columnInBytes.push_back(expr->getInBytes());
-    }
-    return TupleSchema::createTupleSchema(columnTypes,
-                                          columnSizes,
-                                          columnAllowNull,
-                                          columnInBytes);
-}
-
 /**
  * When this function is called, the AbstractExecutor's init function
  * will have set the input tables in the plan node, but nothing else.
@@ -162,8 +446,8 @@ bool WindowFunctionExecutor::p_init(AbstractPlanNode *init_node, TempTableLimits
     assert( getLastPartitionByKeyTuple().isNullTuple());
     assert( getLastOrderByKeyTuple().isNullTuple());
 
-    m_partitionByKeySchema = constructSchemaFromExpressionVector(m_partitionByExpressions);
-    m_orderByKeySchema = constructSchemaFromExpressionVector(m_orderByExpressions);
+    m_partitionByKeySchema = TupleSchema::createTupleSchema(m_partitionByExpressions);
+    m_orderByKeySchema = TupleSchema::createTupleSchema(m_orderByExpressions);
 
     /*
      * Initialize all the data for partition by and
@@ -174,77 +458,33 @@ bool WindowFunctionExecutor::p_init(AbstractPlanNode *init_node, TempTableLimits
 }
 
 /**
- * Dense rank is the easiest.  We just count
- * the number of times the order by expression values
- * change.
+ * Create an instance of a window aggregator for the specified aggregate type.
+ * The object is allocated from the provided memory pool.
  */
-class DenseRankAgg : public WindowAggregate {
-public:
-    DenseRankAgg()
-      : m_rank(0) {
-    }
-
-    virtual ~DenseRankAgg() {}
-    virtual void advance(const AbstractPlanNode::OwningExpressionVector &val,
-                         const TableTuple &nextTuple,
-                         bool newOrderByGroup) {
-        assert(val.size() == 0);
-        if (newOrderByGroup) {
-            m_rank += 1;
-        }
-    }
-    virtual NValue finalize(ValueType type) {
-        return ValueFactory::getBigIntValue(m_rank);
-    }
-    virtual void resetAgg() {
-        WindowAggregate::resetAgg();
-        m_rank = 0;
-    }
-protected:
-    int m_rank;
-};
-
-/**
- * Rank is like dense rank, but we remember how
- * many rows there are between order by expression
- * changes.
- */
-class RankAgg : public DenseRankAgg {
-public:
-    RankAgg()
-    : DenseRankAgg(),
-      m_numOrderByPeers(1) {}
-    ~RankAgg() {}
-    void advance(const AbstractPlanNode::OwningExpressionVector & val,
-                 const TableTuple &nextTuple,
-                 bool newOrderByGroup) {
-       assert(val.size() == 0);
-       if (newOrderByGroup) {
-           m_rank += m_numOrderByPeers;
-           m_numOrderByPeers = 1;
-       } else {
-           m_numOrderByPeers += 1;
-       }
-    }
-
-    void resetAgg() {
-        DenseRankAgg::resetAgg();
-        m_numOrderByPeers = 1;
-    }
-private:
-    long m_numOrderByPeers;
-};
-/*
- * Create an instance of a window aggregator for the specified aggregate type
- * and "distinct" flag.  The object is allocated from the provided memory pool.
- */
-inline WindowAggregate* getWindowedAggInstance(Pool& memoryPool, ExpressionType agg_type, bool isDistinct)
+inline WindowAggregate* getWindowedAggInstance(Pool& memoryPool,
+                                               ExpressionType agg_type)
 {
+    WindowAggregate *answer = NULL;
+
     switch (agg_type) {
     case EXPRESSION_TYPE_AGGREGATE_WINDOWED_RANK:
-        return new (memoryPool) RankAgg();
+        answer = new (memoryPool) WindowedRankAgg();
+        break;
     case EXPRESSION_TYPE_AGGREGATE_WINDOWED_DENSE_RANK:
-        return new (memoryPool) DenseRankAgg();
+        answer = new (memoryPool) WindowedDenseRankAgg();
+        break;
+    case EXPRESSION_TYPE_AGGREGATE_WINDOWED_COUNT:
+        answer = new (memoryPool) WindowedCountAgg();
+        break;
+    case EXPRESSION_TYPE_AGGREGATE_WINDOWED_MAX:
+        answer = new (memoryPool) WindowedMaxAgg(memoryPool);
+        break;
+    case EXPRESSION_TYPE_AGGREGATE_WINDOWED_MIN:
+        answer = new (memoryPool) WindowedMinAgg(memoryPool);
+        break;
+    case EXPRESSION_TYPE_AGGREGATE_WINDOWED_SUM:
+        answer = new (memoryPool) WindowedSumAgg();
+        break;
     default:
         {
             char message[128];
@@ -252,29 +492,49 @@ inline WindowAggregate* getWindowedAggInstance(Pool& memoryPool, ExpressionType 
             throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
         }
     }
+    return answer;
 }
 
 /*
  * Create an instance of an aggregate calculator for the specified aggregate type.
  * The object is constructed in memory from the provided memory pool.
  */
-inline void WindowFunctionExecutor::initAggInstances(WindowAggregateRow* aggregateRow)
+inline void WindowFunctionExecutor::initAggInstances()
 {
-    WindowAggregate** aggs = aggregateRow->getAggregates();
+    WindowAggregate** aggs = m_aggregateRow->getAggregates();
     for (int ii = 0; ii < m_aggTypes.size(); ii++) {
-        aggs[ii] = getWindowedAggInstance(m_memoryPool, m_aggTypes[ii], m_distinctAggs[ii]);
+        aggs[ii] = getWindowedAggInstance(m_memoryPool,
+                                          m_aggTypes[ii]);
+        assert(aggs[ii] != NULL);
     }
 }
 
-inline void WindowFunctionExecutor::advanceAggs(const TableTuple& tuple,
-                                                bool newOrderByGroup)
-{
-    m_aggregateRow->recordPassThroughTuple(tuple);
+inline void WindowFunctionExecutor::lookaheadOneRowForAggs(const TableTuple &tuple, TableWindow &tableWindow) {
     WindowAggregate **aggs = m_aggregateRow->getAggregates();
     for (int ii = 0; ii < m_aggTypes.size(); ii++) {
-        const AbstractPlanNode::OwningExpressionVector &inputExprs
-            = getAggregateInputExpressions()[ii];
-        aggs[ii]->advance(inputExprs, tuple, newOrderByGroup);
+        if (aggs[ii]->m_needsLookahead) {
+            const AbstractPlanNode::OwningExpressionVector &inputExprs
+                = getAggregateInputExpressions()[ii];
+            NValueArray vals(inputExprs.size());
+            for (int idx = 0; idx < inputExprs.size(); idx += 1) {
+                vals[idx] = inputExprs[idx]->eval(&tuple);
+            }
+            aggs[ii]->lookaheadOneRow(tableWindow, vals);
+        }
+    }
+}
+
+inline void WindowFunctionExecutor::lookaheadNextGroupForAggs(TableWindow &tableWindow) {
+    WindowAggregate** aggs = m_aggregateRow->getAggregates();
+    for (int ii = 0; ii < m_aggTypes.size(); ii++) {
+        aggs[ii]->lookaheadNextGroup(tableWindow);
+    }
+}
+
+inline void WindowFunctionExecutor::endGroupForAggs(TableWindow &tableWindow, EdgeType edgeType) {
+    WindowAggregate** aggs = m_aggregateRow->getAggregates();
+    for (int ii = 0; ii < m_aggTypes.size(); ii++) {
+        aggs[ii]->endGroup(tableWindow, edgeType);
     }
 }
 
@@ -284,13 +544,13 @@ inline void WindowFunctionExecutor::advanceAggs(const TableTuple& tuple,
  * aggregation into a new tuple in the output table as well as passing
  * through any additional columns from the input table.
  */
-inline void WindowFunctionExecutor::insertOutputTuple(WindowAggregateRow* winFunRow)
+inline void WindowFunctionExecutor::insertOutputTuple()
 {
     TableTuple& tempTuple = m_tmpOutputTable->tempTuple();
 
     // We copy the aggregate values into the output tuple,
     // then the passthrough columns.
-    WindowAggregate** aggs = winFunRow->getAggregates();
+    WindowAggregate** aggs = m_aggregateRow->getAggregates();
     for (int ii = 0; ii < getAggregateCount(); ii++) {
         NValue result = aggs[ii]->finalize(tempTuple.getSchema()->columnType(ii));
         tempTuple.setNValue(ii, result);
@@ -300,7 +560,7 @@ inline void WindowFunctionExecutor::insertOutputTuple(WindowAggregateRow* winFun
     size_t tupleSize = tempTuple.sizeInValues();
     for (int ii = getAggregateCount(); ii < tupleSize; ii += 1) {
         AbstractExpression *expr = m_outputColumnExpressions[ii];
-        tempTuple.setNValue(ii, expr->eval(&(winFunRow->getPassThroughTuple())));
+        tempTuple.setNValue(ii, expr->eval(&(m_aggregateRow->getPassThroughTuple())));
     }
 
     m_tmpOutputTable->insertTempTuple(tempTuple);
@@ -314,7 +574,7 @@ int WindowFunctionExecutor::compareTuples(const TableTuple &tuple1,
 
     for (int ii = schema->columnCount() - 1; ii >= 0; --ii) {
         int cmp = tuple2.getNValue(ii)
-                        .compare(tuple1.getNValue(ii));
+            .compare(tuple1.getNValue(ii));
         if (cmp != 0) {
             return cmp;
         }
@@ -322,72 +582,21 @@ int WindowFunctionExecutor::compareTuples(const TableTuple &tuple1,
     return 0;
 
 }
-void WindowFunctionExecutor::p_execute_tuple(const TableTuple& nextTuple, bool firstTuple)
-{
-    VOLT_TRACE("WindowFunctionExecutor::p_execute_tuple(start)\n");
-    /*
-     * Evaluate the parition by and order by keys.  We don't evaluate
-     * the order by keys here, because we may not need to.
-     */
-    initPartitionByKeyTuple(nextTuple);
-    initOrderByKeyTuple(nextTuple);
-    bool newPartitionByGroup = firstTuple;
-    /*
-     * If this is not the first tuple, see if this is
-     * the start of a new group.  Compare the getInProgressPartitionByKeyTuple()
-     * with the getLastPartitionByKeyTuple().  If this is the first tuple,
-     * we know it's a new group already, so no comparison is required.
-     */
-    if (!firstTuple) {
-        newPartitionByGroup = (compareTuples(getInProgressPartitionByKeyTuple(),
-                                             getLastPartitionByKeyTuple()) != 0);
-    }
-    if (newPartitionByGroup) {
-        m_pmp->countdownProgress();
-        m_aggregateRow->resetAggs();
-    }
-    // Update the aggregation calculation.
-    // If this is a new group, it's necessarily a
-    // new order by group.  So don't bother comparing.
-    // Otherwise compare the order by keys.
-    bool newOrderByGroup;
-    if (newPartitionByGroup) {
-        newOrderByGroup = true;
-    } else {
-        newOrderByGroup = (compareTuples(getInProgressOrderByKeyTuple(),
-                                         getLastOrderByKeyTuple()) != 0);
-    }
-    /*
-     * The first tuple is not a new order by group.
-     */
-    advanceAggs(nextTuple, newOrderByGroup);
-    // Output the current row.
-    insertOutputTuple(m_aggregateRow);
-    VOLT_TRACE("WindowFunctionExecutor::p_execute_tuple(end)\n");
-}
 
 /**
- * This RAII class sets a pointer to null when it is goes out of scope.
- * We could use boost::scoped_ptr with a specialized destructor, but it
- * seems more obscure than this simple class.
+ * This ensures that the function is called with the
+ * given argument.
  */
-template <typename T>
-struct ScopedNullingPointer {
-    ScopedNullingPointer(T *&ptr, T *value)
-        : m_ptr(ptr) {
-        ptr = value;
+struct EnsureCleanupOnExit {
+    EnsureCleanupOnExit(WindowFunctionExecutor *executor)
+        : m_executor(executor) {
     }
-    ~ScopedNullingPointer() {
-        if (m_ptr) {
-            m_ptr = NULL;
-        }
+    ~EnsureCleanupOnExit() {
+        m_executor->p_execute_finish();
     }
-    T *&operator*() {
-        return m_ptr;
-    }
-    T           *&m_ptr;
-};
 
+    WindowFunctionExecutor *m_executor;
+};
 /*
  * This function is called straight from AbstractExecutor::execute,
  * which is called from executeExecutors, which is called from the
@@ -398,53 +607,128 @@ struct ScopedNullingPointer {
  */
 bool WindowFunctionExecutor::p_execute(const NValueArray& params) {
     VOLT_TRACE("windowFunctionExecutor::p_execute(start)\n");
-    assert( getInProgressPartitionByKeyTuple().isNullTuple());
-    assert( getInProgressOrderByKeyTuple().isNullTuple());
-    assert( getLastPartitionByKeyTuple().isNullTuple());
-    assert( getLastOrderByKeyTuple().isNullTuple());
-    initWorkingTupleStorage();
     // Input table
-    bool firstTuple = true;
-    Table* input_table = m_abstractNode->getInputTable();
+    Table * input_table = m_abstractNode->getInputTable();
     assert(input_table);
     VOLT_TRACE("WindowFunctionExecutor: input table\n%s", input_table->debug().c_str());
     m_inputSchema = input_table->schema();
-    TableTuple nextTuple(m_inputSchema);
+    assert(m_inputSchema);
 
-    ProgressMonitorProxy pmp(m_engine, this);
     /*
-     * This will set m_pmp to NULL on return, which avoids
-     * a reference to the dangling pointer pmp.  Note that
-     * m_pmp is set to &pmp here.
+     * Do this after setting the m_inputSchema.
      */
-    ScopedNullingPointer<ProgressMonitorProxy> np(m_pmp, &pmp);
+    initWorkingTupleStorage();
+    TableWindow tableWindow(input_table);
+    ProgressMonitorProxy pmp(m_engine->getExecutorContext(), this);
+    m_pmp = &pmp;
 
     m_aggregateRow
         = new (m_memoryPool, m_aggTypes.size())
-             WindowAggregateRow(m_inputSchema, m_memoryPool);
+        WindowAggregateRow(m_inputSchema, m_memoryPool);
 
-    initAggInstances(m_aggregateRow);
+    initAggInstances();
+
+    VOLT_TRACE("Beginning: %s", tableWindow.debug().c_str());
+
+    TableTuple nextTuple(m_inputSchema);
+
     /*
-     * This will not do when we implement proper windowing.
-     * We won't be able to use a DeletingAsWeGo iterator,
-     * at least not here.
+     * Force a call p_execute_finish when this is all over.
      */
-    TableIterator it = input_table->iteratorDeletingAsWeGo();
-    /*
-     * The first tuple is somewhat special.  We need to do
-     * some initialization but we need to see the first tuple.
-     */
-    while (it.next(nextTuple)) {
-        m_pmp->countdownProgress();
-        p_execute_tuple(nextTuple, firstTuple);
-        firstTuple = false;
+    EnsureCleanupOnExit finishCleanup(this);
+    for (EdgeType etype = START_OF_INPUT,
+                  nextEtype = INVALID_EDGE_TYPE;
+         etype != END_OF_INPUT;
+         etype = nextEtype) {
+        // Reset the aggregates if this is the
+        // start of a partition group.  The start of
+        // input is a special form of this.
+        if (etype == START_OF_INPUT || etype == START_OF_PARTITION_GROUP) {
+            m_aggregateRow->resetAggs();
+        }
+        // Find the next edge.  This will
+        // give the aggs a crack at each row
+        // if they want it.
+        nextEtype = findNextEdge(etype, tableWindow);
+        // Let the aggs know the results
+        // of the lookahead.
+        lookaheadNextGroupForAggs(tableWindow);
+        // Advance to the end of the current group.
+        for (int idx = 0; idx < tableWindow.m_orderByGroupSize; idx += 1) {
+            VOLT_TRACE("MiddleEdge: Window = %s", m_tableWindow->debug().c_str());
+            tableWindow.m_middleEdge.next(nextTuple);
+            m_pmp->countdownProgress();
+            m_aggregateRow->recordPassThroughTuple(nextTuple);
+            insertOutputTuple();
+        }
+        endGroupForAggs(tableWindow, etype);
+        VOLT_TRACE("FirstEdge: %s", m_tableWindow->debug().c_str());
     }
-    p_execute_finish();
     VOLT_TRACE("WindowFunctionExecutor: finalizing..");
 
     cleanupInputTempTable(input_table);
     VOLT_TRACE("WindowFunctionExecutor::p_execute(end)\n");
     return true;
+}
+
+WindowFunctionExecutor::EdgeType WindowFunctionExecutor::findNextEdge(EdgeType     edgeType, TableWindow &tableWindow)
+{
+    // This is just an alias for the buffered input tuple.
+    TableTuple &nextTuple = getBufferedInputTuple();
+    VOLT_TRACE("findNextEdge(start): %s", tableWindow.debug().c_str());
+    /*
+     * At the start of the input we need to prime the
+     * tuple pairs.
+     */
+    if (edgeType == START_OF_INPUT) {
+        if (tableWindow.m_leadingEdge.next(nextTuple)) {
+            initPartitionByKeyTuple(nextTuple);
+            initOrderByKeyTuple(nextTuple);
+            /* First row.  Nothing to compare it with. */
+            tableWindow.m_orderByGroupSize = 1;
+            lookaheadOneRowForAggs(nextTuple, tableWindow);
+        } else {
+            /*
+             * If there is no first row, then just
+             * return false.  The leading edge iterator
+             * will never have a next row, so we can
+             * ask for its next again and will always get false.
+             * We return a zero length group here.
+             */
+            tableWindow.m_orderByGroupSize = 0;
+            return END_OF_INPUT;
+        }
+    } else {
+        /*
+         * We've already got a row, so
+         * count it.
+         */
+        tableWindow.m_orderByGroupSize = 1;
+        lookaheadOneRowForAggs(nextTuple, tableWindow);
+    }
+    do {
+        VOLT_TRACE("findNextEdge(loopStart): %s", m_tableWindow->debug().c_str());
+        if (tableWindow.m_leadingEdge.next(nextTuple)) {
+            initPartitionByKeyTuple(nextTuple);
+            initOrderByKeyTuple(nextTuple);
+            if (compareTuples(getInProgressPartitionByKeyTuple(),
+                              getLastPartitionByKeyTuple()) != 0) {
+                VOLT_TRACE("findNextEdge(Partition): %s", m_tableWindow->debug().c_str());
+                return START_OF_PARTITION_GROUP;
+            }
+            if (compareTuples(getInProgressOrderByKeyTuple(),
+                              getLastOrderByKeyTuple()) != 0) {
+                VOLT_TRACE("findNextEdge(Group): %s", m_tableWindow->debug().c_str());
+                return START_OF_PARTITION_BY_GROUP;
+            }
+            tableWindow.m_orderByGroupSize += 1;
+            lookaheadOneRowForAggs(nextTuple, tableWindow);
+            VOLT_TRACE("findNextEdge(loop): %s", tableWindow.debug().c_str());
+        } else {
+            VOLT_TRACE("findNextEdge(EOI): %s", tableWindow.debug().c_str());
+            return END_OF_INPUT;
+        }
+    } while (true);
 }
 
 void WindowFunctionExecutor::initPartitionByKeyTuple(const TableTuple& nextTuple)
@@ -533,6 +817,8 @@ void WindowFunctionExecutor::swapOrderByKeyTupleData() {
 
 
 void WindowFunctionExecutor::p_execute_finish() {
+    VOLT_DEBUG("WindowFunctionExecutor::p_execute_finish() start\n");
+    m_pmp = NULL;
     /*
      * The working tuples should not be null.
      */
@@ -540,10 +826,12 @@ void WindowFunctionExecutor::p_execute_finish() {
     assert( ! getInProgressOrderByKeyTuple().isNullTuple());
     assert( ! getLastPartitionByKeyTuple().isNullTuple());
     assert( ! getLastOrderByKeyTuple().isNullTuple());
+    assert( ! getBufferedInputTuple().isNullTuple());
     getInProgressPartitionByKeyTuple().move(NULL);
     getInProgressOrderByKeyTuple().move(NULL);
     getLastPartitionByKeyTuple().move(NULL);
     getLastOrderByKeyTuple().move(NULL);
+    getBufferedInputTuple().move(NULL);
     /*
      * The working tuples have just been set to null.
      */
@@ -551,7 +839,9 @@ void WindowFunctionExecutor::p_execute_finish() {
     assert( getInProgressOrderByKeyTuple().isNullTuple());
     assert( getLastPartitionByKeyTuple().isNullTuple());
     assert( getLastOrderByKeyTuple().isNullTuple());
+    assert( getBufferedInputTuple().isNullTuple());
     m_memoryPool.purge();
+    VOLT_DEBUG("WindowFunctionExecutor::p_execute_finish() end\n");
 }
 
 void WindowFunctionExecutor::initWorkingTupleStorage() {
@@ -559,6 +849,7 @@ void WindowFunctionExecutor::initWorkingTupleStorage() {
     assert( getInProgressOrderByKeyTuple().isNullTuple());
     assert( getLastPartitionByKeyTuple().isNullTuple());
     assert( getLastOrderByKeyTuple().isNullTuple());
+    assert( getBufferedInputTuple().isNullTuple());
 
     m_inProgressPartitionByKeyStorage.init(m_partitionByKeySchema, &m_memoryPool);
     m_lastPartitionByKeyStorage.init(m_partitionByKeySchema, &m_memoryPool);
@@ -566,16 +857,21 @@ void WindowFunctionExecutor::initWorkingTupleStorage() {
     m_lastOrderByKeyStorage.init(m_orderByKeySchema, &m_memoryPool);
     m_inProgressOrderByKeyStorage.init(m_orderByKeySchema, &m_memoryPool);
 
+    m_bufferedInputStorage.init(m_inputSchema, &m_memoryPool);
+
     m_inProgressPartitionByKeyStorage.allocateActiveTuple();
     m_lastPartitionByKeyStorage.allocateActiveTuple();
 
     m_inProgressOrderByKeyStorage.allocateActiveTuple();
     m_lastOrderByKeyStorage.allocateActiveTuple();
 
+    m_bufferedInputStorage.allocateActiveTuple();
+
     assert( ! getInProgressPartitionByKeyTuple().isNullTuple());
     assert( ! getInProgressOrderByKeyTuple().isNullTuple());
     assert( ! getLastPartitionByKeyTuple().isNullTuple());
     assert( ! getLastOrderByKeyTuple().isNullTuple());
+    assert( ! getBufferedInputTuple().isNullTuple());
 
 }
 } /* namespace voltdb */

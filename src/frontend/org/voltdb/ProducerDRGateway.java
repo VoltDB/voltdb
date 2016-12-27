@@ -17,8 +17,9 @@
 
 package org.voltdb;
 
-import org.voltdb.pmsg.DRAgent.ClusterInfo;
+import org.voltdb.pmsg.DRAgent;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
@@ -28,15 +29,24 @@ public interface ProducerDRGateway {
         public void notifyOfResponse(boolean success, boolean shouldRetry, String failureCause);
     }
 
-    /*
-     * Ensure that all enabled DR Producer Hosts have agreed on the PBD file name
+    /**
+     * Start the main thread and the state machine, wait until all nodes converge on the initial state.
+     * @throws IOException
      */
-    public abstract void blockOnDRStateConvergence();
+    public void startAndWaitForGlobalAgreement() throws IOException;
+
+    /**
+     * Truncate the DR log using the snapshot restore truncation point cached
+     * earlier. This is called on recover before the command log replay starts
+     * to drop all binary logs generated after the snapshot. Command log replay
+     * will recreate those binary logs.
+     */
+    public void truncateDRLog();
 
     /**
      * Start listening on the ports
      */
-    public abstract void initialize(boolean drProducerEnabled, int listenPort, String portInterface);
+    public abstract void startListening(boolean drProducerEnabled, int listenPort, String portInterface) throws IOException;
 
     /**
      * @return true if bindPorts has been called.
@@ -60,7 +70,7 @@ public interface ProducerDRGateway {
 
     public abstract int getDRClusterId();
 
-    public void truncateDRLogsForRestore(Map<Integer, Long> sequenceNumbers);
+    public void cacheSnapshotRestoreTruncationPoint(Map<Integer, Long> sequenceNumbers);
 
     /**
      * Clear all queued DR buffers for a master, useful when the replica goes away
@@ -97,5 +107,13 @@ public interface ProducerDRGateway {
      * @param requestedCursors the clusters for which cursors must be started
      * @param handler callback to notify the status of the operation
      */
-    public void startCursor(final List<ClusterInfo> requestedCursors, final DRProducerResponseHandler handler);
+    public void startCursor(final List<DRAgent.ClusterInfo> requestedCursors, final DRProducerResponseHandler handler);
+
+    /**
+     * Get the DR producer node stats. This method may block because the task
+     * runs on the producer thread and it waits for the asynchronous task to
+     * finish.
+     * @return The producer node stats or null if on error
+     */
+    public DRProducerNodeStats getNodeDRStats();
 }

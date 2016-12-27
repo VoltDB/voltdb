@@ -546,7 +546,7 @@ public abstract class AbstractParsedStmt {
         return m_windowFunctionExpressions;
     }
     /**
-     * Parse the rank expression.  This actually just returns a TVE.  The
+     * Parse a windowed expression.  This actually just returns a TVE.  The
      * WindowFunctionExpression is squirreled away in the m_windowFunctionExpressions
      * object, though, because we will need it later.
      *
@@ -608,13 +608,12 @@ public abstract class AbstractParsedStmt {
                     }
                 }
             }
-            else if (childEle.name.equals("winargs")) {
-                for (VoltXMLElement ele : childEle.children) {
-                    aggParams.add(parseExpressionNode(ele));
-                }
-            }
             else {
-                throw new PlanningErrorException("Invalid windowed expression found: " + childEle.name);
+                AbstractExpression aggParam = parseExpressionNode(childEle);
+                if (aggParam != null) {
+                    aggParam.finalizeValueTypes();
+                    aggParams.add(aggParam);
+                }
             }
         }
 

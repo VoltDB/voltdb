@@ -91,11 +91,4 @@ class SqlQueriesTabTest extends SqlQueriesTestBase {
         then: 'Assert that the second tab is deleted'
         $(id:page.getIdOfDeleteTab(1)).isDisplayed()
     }
-
-    /*def () {
-        when:
-
-        then:
-
-    }*/
 }

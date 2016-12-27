@@ -948,25 +948,49 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             List<AbstractExpression> orderByExpressions =
                     windowFunctionExpression.getOrderByExpressions();
             ExpressionType exprType = windowFunctionExpression.getExpressionType();
+            String aggName = exprType.symbol().toUpperCase();
             switch (exprType) {
             case AGGREGATE_WINDOWED_RANK:
             case AGGREGATE_WINDOWED_DENSE_RANK:
                 if (orderByExpressions.size() == 0) {
-                    String aggName = exprType.symbol().toUpperCase();
                     throw new PlanningErrorException(
                             "Windowed " + aggName +
                             " function call expressions require an ORDER BY specification.");
                 }
 
-                if (orderByExpressions.size() > 1) {
-                    // This is perhaps slightly misleading.
-                    throw new PlanningErrorException(
-                            "Windowed function call expressions can have only one ORDER BY expression in their window.");
-                }
                 VoltType valType = orderByExpressions.get(0).getValueType();
+                assert(valType != null);
                 if (!valType.isAnyIntegerType() && (valType != VoltType.TIMESTAMP)) {
                     throw new PlanningErrorException(
                             "Windowed function call expressions can have only integer or TIMESTAMP value types in the ORDER BY expression of their window.");
+                }
+                break;
+            case AGGREGATE_WINDOWED_COUNT:
+                if (windowFunctionExpression.getAggregateArguments().size() > 1) {
+                    throw new PlanningErrorException(
+                            String.format("Windowed COUNT must have either exactly one argument or else a star for an argument"));
+                }
+                // Any type is ok, so we won't inspect the type.
+                break;
+            case AGGREGATE_WINDOWED_MAX:
+            case AGGREGATE_WINDOWED_MIN:
+                if (windowFunctionExpression.getAggregateArguments().size() != 1) {
+                    throw new PlanningErrorException(
+                            String.format("Windowed %s must have exactly one argument", aggName));
+                }
+                // Any type is ok, so we won't inspect the type.
+                break;
+            case AGGREGATE_WINDOWED_SUM:
+                if (windowFunctionExpression.getAggregateArguments().size() != 1) {
+                    throw new PlanningErrorException(
+                            String.format("Windowed SUM must have exactly one numeric argument"));
+                }
+                AbstractExpression arg = windowFunctionExpression.getAggregateArguments().get(0);
+                VoltType vt = arg.getValueType();
+                assert(vt != null);
+                if (! vt.isNumber()) {
+                    throw new PlanningErrorException(
+                                "Windowed SUM must have exactly one numeric argument");
                 }
                 break;
             default:

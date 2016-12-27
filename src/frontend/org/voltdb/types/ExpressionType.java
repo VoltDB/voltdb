@@ -134,10 +134,14 @@ public enum ExpressionType {
     // ----------------------------
     AGGREGATE_WINDOWED_RANK       (WindowFunctionExpression.class,  70, "RANK"),
     AGGREGATE_WINDOWED_DENSE_RANK (WindowFunctionExpression.class,  71, "DENSE_RANK"),
+    AGGREGATE_WINDOWED_COUNT      (WindowFunctionExpression.class,  72, "COUNT"),
+    AGGREGATE_WINDOWED_MAX        (WindowFunctionExpression.class,  73, "MAX"),
+    AGGREGATE_WINDOWED_MIN        (WindowFunctionExpression.class,  74, "MIN"),
+    AGGREGATE_WINDOWED_SUM        (WindowFunctionExpression.class,  75, "SUM"),
     // No support for PERCENT_RANK yet.
-    // AGGREGATE_WINDOWED_PERCENT_RANK(WindowFunctionExpression.class, 72, "PERCENT_RANK"),
+    // AGGREGATE_WINDOWED_PERCENT_RANK(WindowFunctionExpression.class, 73, "PERCENT_RANK"),
     // No support for CUME_DIST yet.
-    // AGGREGATE_WINDOWED_CUME_DIST  (WindowFunctionExpression.class,  73, "CUME_DIST"),
+    // AGGREGATE_WINDOWED_CUME_DIST  (WindowFunctionExpression.class,  74, "CUME_DIST"),
 
     // ----------------------------
     // Function
@@ -263,9 +267,7 @@ public enum ExpressionType {
     }
 
     public boolean isNullary() {
-        return this == ExpressionType.AGGREGATE_COUNT_STAR
-                || this == ExpressionType.AGGREGATE_WINDOWED_RANK
-                || this == ExpressionType.AGGREGATE_WINDOWED_DENSE_RANK;
+        return this == ExpressionType.AGGREGATE_COUNT_STAR;
     }
 
     private static Map<ExpressionType, String> m_windowedAggName;
@@ -274,5 +276,9 @@ public enum ExpressionType {
         m_windowedAggName = new HashMap<>();
         m_windowedAggName.put(ExpressionType.AGGREGATE_WINDOWED_RANK, "RANK");
         m_windowedAggName.put(ExpressionType.AGGREGATE_WINDOWED_DENSE_RANK, "DENSE_RANK");
+        m_windowedAggName.put(ExpressionType.AGGREGATE_WINDOWED_COUNT, "COUNT");
+        m_windowedAggName.put(ExpressionType.AGGREGATE_MAX, "MAX");
+        m_windowedAggName.put(ExpressionType.AGGREGATE_MIN, "MIN");
+        m_windowedAggName.put(ExpressionType.AGGREGATE_SUM, "SUM");
     }
 }

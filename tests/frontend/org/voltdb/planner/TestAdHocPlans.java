@@ -25,12 +25,14 @@ package org.voltdb.planner;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
+import static org.mockito.Mockito.mock;
 
 import java.io.File;
 import java.io.IOException;
 
 import org.junit.Before;
 import org.junit.Test;
+import org.voltcore.messaging.HostMessenger;
 import org.voltdb.AdHocQueryTester;
 import org.voltdb.CatalogContext;
 import org.voltdb.VoltDB;
@@ -60,7 +62,7 @@ public class TestAdHocPlans extends AdHocQueryTester {
         DbSettings dbSettings = new DbSettings(
                 config.asClusterSettings().asSupplier(),
                 NodeSettings.create(config.asPathSettingsMap()));
-        CatalogContext context = new CatalogContext(0, 0, catalog, dbSettings, bytes, null, new byte[] {}, 0);
+        CatalogContext context = new CatalogContext(0, 0, catalog, dbSettings, bytes, null, new byte[] {}, 0, mock(HostMessenger.class));
         m_pt = new PlannerTool(context.cluster, context.database, context.getCatalogHash());
     }
 

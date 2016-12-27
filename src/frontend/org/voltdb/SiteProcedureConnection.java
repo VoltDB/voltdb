@@ -64,6 +64,11 @@ public interface SiteProcedureConnection {
     public int getCorrespondingClusterId();
 
     /**
+     * Get the DR gateway
+     */
+    public PartitionDRGateway getDRGateway();
+
+    /**
      * Log settings changed. Signal EE to update log level.
      */
     public void updateBackendLogLevels();

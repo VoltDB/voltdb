@@ -37,10 +37,6 @@ public:
         return m_aggregates;
     }
 
-    const std::vector<bool>& getDistinctAggregates() const {
-        return m_distinctAggregates;
-    }
-
     const AggregateExpressionList& getAggregateInputExpressions() const {
         return m_aggregateInputExpressions;
     }
@@ -58,7 +54,6 @@ protected:
     void loadFromJSONObject(PlannerDomValue obj);
 private:
     std::vector<ExpressionType> m_aggregates;
-    std::vector<bool> m_distinctAggregates;
     std::vector<int> m_aggregateOutputColumns;
     AggregateExpressionList m_aggregateInputExpressions;
     //
