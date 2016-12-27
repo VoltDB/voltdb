@@ -126,7 +126,6 @@ public class CommandLine extends VoltDB.Configuration
         cl.m_enableAdd = m_enableAdd;
         cl.m_voltdbRoot = m_voltdbRoot;
         cl.m_newCli = m_newCli;
-        cl.m_datasourceClusterId = m_datasourceClusterId;
         cl.m_placementGroup = m_placementGroup;
         // deep copy the property map if it exists
         if (javaProperties != null) {
@@ -774,11 +773,6 @@ public class CommandLine extends VoltDB.Configuration
 
         if (!m_startAction.isLegacy()) {
             cmdline.add("voltdbroot"); cmdline.add(m_voltdbRoot.getPath());
-        }
-
-        if (m_datasourceClusterId != -1)
-        {
-            cmdline.add("datasourcecluster"); cmdline.add(Byte.toString(m_datasourceClusterId));
         }
 
         if (m_placementGroup != null) {
