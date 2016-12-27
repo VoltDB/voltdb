@@ -68,7 +68,34 @@ public interface ProducerDRGateway {
     public void deactivateDRProducer();
     public void activateDRProducer();
 
-    public void blockOnSyncSnapshotGeneration();
+    /**
+     * Blocks until snaphot is generated for the specified cluster id.
+     * If the snapshot has already been generated, this will return immediately
+     *
+     * @param forClusterId the cluster for which producer should generate snapshot.
+     *        This is used and has a meaningful value only in MULTICLUSTER_PROTOCOL_VERSION
+     *        or higher.
+     */
+    public void blockOnSyncSnapshotGeneration(byte forClusterId);
+
+    /**
+     * Sets the DR protocol version with EE. This will also generate a <code>DR_STREAM_START</code>
+     * event for all partitions, if <code>genStreamStart</code> flag is true.
+     *
+     * @param drVersion the DR protocol version that must be set with EE.
+     * @param genStreamStart <code>DR_STREAM_START</code> event will be generated for all partitions
+     * if this is true.
+     *
+     * @return Returns true if the operation was successful. False otherwise.
+     */
     public boolean setDRProtocolVersion(int drVersion, boolean genStreamStart);
+
+    /**
+     * Use this to set up cursors in DR binary logs for clusters. This will initiate the process.
+     * When the process is complete, the passed in handler will be notified of the status.
+     *
+     * @param requestedCursors the clusters for which cursors must be started
+     * @param handler callback to notify the status of the operation
+     */
     public void startCursor(final List<ClusterInfo> requestedCursors, final DRProducerResponseHandler handler);
 }
