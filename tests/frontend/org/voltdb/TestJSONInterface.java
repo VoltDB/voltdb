@@ -53,21 +53,14 @@
  */
 package org.voltdb;
 
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
 import java.io.UnsupportedEncodingException;
 import java.math.BigDecimal;
-import java.net.HttpURLConnection;
-import java.net.URI;
-import java.net.URL;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.HashMap;
 import java.util.Map;
@@ -121,29 +114,27 @@ import org.voltdb.utils.Encoder;
 import org.voltdb.utils.MiscUtils;
 
 import junit.framework.TestCase;
+import org.apache.http.client.methods.HttpDelete;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpPut;
+import org.apache.http.client.methods.HttpRequestBase;
 import org.apache.http.config.Registry;
 import org.apache.http.config.RegistryBuilder;
 import org.apache.http.conn.socket.ConnectionSocketFactory;
 import org.apache.http.conn.socket.PlainConnectionSocketFactory;
 import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
 import org.apache.http.conn.ssl.SSLContextBuilder;
-import org.apache.http.conn.ssl.TrustStrategy;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.voltdb.compiler.deploymentfile.SnmpType;
-import org.voltdb.regressionsuites.LocalCluster;
 
 public class TestJSONInterface extends TestCase {
     final static ContentType utf8ApplicationFormUrlEncoded =
             ContentType.create("application/x-www-form-urlencoded","UTF-8");
 
-    static LocalCluster server;
+    ServerThread server;
     Client client;
-    static String protocolPrefix = "http://";
-
-    public static void setupProtocol() {
-        protocolPrefix = server.isEnableSSL() ? "https://" : "http://";
-    }
+    final static String protocolPrefix = ClientConfig.ENABLE_SSL_FOR_TEST ? "https://" : "http://";
 
     static class Response {
 
@@ -159,6 +150,7 @@ public class TestJSONInterface extends TestCase {
 
     static String getHTTPVarString(Map<String, String> params) throws UnsupportedEncodingException {
         String s = "";
+        if (params == null) return s;
         for (Entry<String, String> e : params.entrySet()) {
             String encodedValue = URLEncoder.encode(e.getValue(), "UTF-8");
             s += "&" + e.getKey() + "=" + encodedValue;
@@ -174,52 +166,12 @@ public class TestJSONInterface extends TestCase {
         return String.format(protocolPrefix + "localhost:%d/%s", port, path);
     }
 
+    public static String callProcOverJSONRaw(Map params, final int expectedCode) throws Exception {
+        return httpUrlOverJSON("POST", protocolPrefix + "localhost:8095/api/1.0/", null, null, null, expectedCode, null, params);
+    }
+
     public static String callProcOverJSONRaw(String varString, final int expectedCode) throws Exception {
-        setupProtocol();
-        URI jsonAPIURI = URI.create(protocolPrefix + "localhost:8095/api/1.0/");
-        SSLContext sslContext = new SSLContextBuilder().loadTrustMaterial(null, new TrustStrategy() {
-            @Override
-            public boolean isTrusted(X509Certificate[] arg0, String arg1) throws CertificateException {
-                return true;
-            }
-        }).build();
-        SSLConnectionSocketFactory sf = new SSLConnectionSocketFactory(sslContext,
-          SSLConnectionSocketFactory.ALLOW_ALL_HOSTNAME_VERIFIER);
-        Registry<ConnectionSocketFactory> socketFactoryRegistry = RegistryBuilder.<ConnectionSocketFactory>create()
-                .register("http", PlainConnectionSocketFactory.getSocketFactory())
-                .register("https", sf)
-                .build();
-
-        // allows multi-threaded use
-        PoolingHttpClientConnectionManager connMgr = new PoolingHttpClientConnectionManager( socketFactoryRegistry);
-
-        HttpClientBuilder b = HttpClientBuilder.create();
-        b.setSslcontext(sslContext);
-        b.setConnectionManager(connMgr);
-
-        try (CloseableHttpClient httpclient = b.build()) {
-            HttpPost post = new HttpPost(jsonAPIURI);
-            // play nice by using HTTP 1.1 continue requests where the client sends the request headers first
-            // to the server to see if the server is willing to accept it. This allows us to test large requests
-            // without incurring server socket connection terminations
-            RequestConfig rc = RequestConfig.copy(RequestConfig.DEFAULT).setExpectContinueEnabled(true).build();
-            post.setProtocolVersion(HttpVersion.HTTP_1_1);
-            post.setConfig(rc);
-            post.setEntity(new StringEntity(varString, utf8ApplicationFormUrlEncoded));
-            ResponseHandler<String> rh = new ResponseHandler<String>() {
-                @Override
-                public String handleResponse(final HttpResponse response) throws ClientProtocolException, IOException {
-                    int status = response.getStatusLine().getStatusCode();
-                    assertEquals(expectedCode, status);
-                    if ((status >= 200 && status < 300) || status == 400) {
-                        HttpEntity entity = response.getEntity();
-                        return entity != null ? EntityUtils.toString(entity) : null;
-                    }
-                    return null;
-                }
-            };
-            return httpclient.execute(post,rh);
-        }
+        return httpUrlOverJSONExecute("POST", protocolPrefix + "localhost:8095/api/1.0/", null, null, null, expectedCode, null, varString);
     }
 
     public static String getUrlOverJSON(String url, String user, String password, String scheme, int expectedCode, String expectedCt) throws Exception {
@@ -238,92 +190,87 @@ public class TestJSONInterface extends TestCase {
         return httpUrlOverJSON("DELETE", url, user, password, scheme, expectedCode, expectedCt, null);
     }
 
-    private static String httpUrlOverJSON(String method, String url, String user, String password, String scheme, int expectedCode, String expectedCt, Map<String,String> params) throws Exception {
-        setupProtocol();
-        URL jsonAPIURL = new URL(url);
+    private static String httpUrlOverJSONExecute(String method, String url, String user, String password, String scheme, int expectedCode, String expectedCt, String varString) throws Exception {
+        SSLContext sslContext = new SSLContextBuilder().loadTrustMaterial(null, (X509Certificate[] arg0, String arg1) -> true).build();
+        SSLConnectionSocketFactory sf = new SSLConnectionSocketFactory(sslContext,
+          SSLConnectionSocketFactory.ALLOW_ALL_HOSTNAME_VERIFIER);
+        Registry<ConnectionSocketFactory> socketFactoryRegistry = RegistryBuilder.<ConnectionSocketFactory>create()
+                .register("http", PlainConnectionSocketFactory.getSocketFactory())
+                .register("https", sf)
+                .build();
 
-        HttpURLConnection conn = (HttpURLConnection) jsonAPIURL.openConnection();
-        conn.setRequestMethod(method);
-        conn.setDoOutput(true);
-        conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
-        if (user != null && password != null) {
-            if (scheme.equalsIgnoreCase("hashed")) {
-                MessageDigest md = MessageDigest.getInstance("SHA-1");
-                byte hashedPasswordBytes[] = md.digest(password.getBytes("UTF-8"));
-                String h = user + ":" + Encoder.hexEncode(hashedPasswordBytes);
-                conn.setRequestProperty("Authorization", "Hashed " + h);
-            } else if (scheme.equalsIgnoreCase("hashed256")) {
-                MessageDigest md = MessageDigest.getInstance("SHA-256");
-                byte hashedPasswordBytes[] = md.digest(password.getBytes("UTF-8"));
-                String h = user + ":" + Encoder.hexEncode(hashedPasswordBytes);
-                conn.setRequestProperty("Authorization", "Hashed " + h);
-            } else if (scheme.equalsIgnoreCase("basic")) {
-                conn.setRequestProperty("Authorization", "Basic " + new String(Base64.encodeToString(new String(user + ":" + password).getBytes(), false)));
+        // allows multi-threaded use
+        PoolingHttpClientConnectionManager connMgr = new PoolingHttpClientConnectionManager(socketFactoryRegistry);
+        HttpClientBuilder hb = HttpClientBuilder.create();
+        hb.setSslcontext(sslContext);
+        hb.setConnectionManager(connMgr);
+        try (CloseableHttpClient httpclient = hb.build()) {
+            HttpRequestBase request;
+            switch (method) {
+                case "POST":
+                    HttpPost post = new HttpPost(url);
+                    post.setEntity(new StringEntity(varString, utf8ApplicationFormUrlEncoded));
+                    request = post;
+                    break;
+                case "PUT":
+                    HttpPut put = new HttpPut(url);
+                    put.setEntity(new StringEntity(varString, utf8ApplicationFormUrlEncoded));
+                    request = put;
+                    break;
+                case "DELETE":
+                    HttpDelete delete = new HttpDelete(url);
+                    request = delete;
+                    break;
+                case "GET":
+                    request = new HttpGet(url + "?" + varString);
+                    break;
+                default:
+                    request = new HttpGet(url + "?" + varString);
+                    break;
             }
-        }
-        conn.connect();
-        byte andbyte[] = String.valueOf('&').getBytes();
-        if (params != null && params.size() > 0) {
-            OutputStream os = conn.getOutputStream();
-            for (String key : params.keySet()) {
-                os.write(key.getBytes());
-                if (params.get(key) != null) {
-                    String b = "=" + params.get(key);
-                    os.write(b.getBytes());
+            // play nice by using HTTP 1.1 continue requests where the client sends the request headers first
+            // to the server to see if the server is willing to accept it. This allows us to test large requests
+            // without incurring server socket connection terminations
+            RequestConfig rc = RequestConfig.copy(RequestConfig.DEFAULT).setExpectContinueEnabled(true).build();
+            request.setProtocolVersion(HttpVersion.HTTP_1_1);
+            request.setConfig(rc);
+            if (user != null && password != null) {
+                if (scheme.equalsIgnoreCase("hashed")) {
+                    MessageDigest md = MessageDigest.getInstance("SHA-1");
+                    byte hashedPasswordBytes[] = md.digest(password.getBytes("UTF-8"));
+                    String h = user + ":" + Encoder.hexEncode(hashedPasswordBytes);
+                    request.setHeader("Authorization", "Hashed " + h);
+                } else if (scheme.equalsIgnoreCase("hashed256")) {
+                    MessageDigest md = MessageDigest.getInstance("SHA-256");
+                    byte hashedPasswordBytes[] = md.digest(password.getBytes("UTF-8"));
+                    String h = user + ":" + Encoder.hexEncode(hashedPasswordBytes);
+                    request.setHeader("Authorization", "Hashed " + h);
+                } else if (scheme.equalsIgnoreCase("basic")) {
+                    request.setHeader("Authorization", "Basic " + new String(Base64.encodeToString(new String(user + ":" + password).getBytes(), false)));
                 }
-                os.write(andbyte);
             }
+            ResponseHandler<String> rh = new ResponseHandler<String>() {
+                @Override
+                public String handleResponse(final HttpResponse response) throws ClientProtocolException, IOException {
+                    int status = response.getStatusLine().getStatusCode();
+                    String ct = response.getHeaders("Content-Type")[0].getValue();
+                    if (expectedCt != null) {
+                        assertTrue(ct.contains(expectedCt));
+                    }
+                    assertEquals(expectedCode, status);
+                    if ((status >= 200 && status < 300) || status == 400) {
+                        HttpEntity entity = response.getEntity();
+                        return entity != null ? EntityUtils.toString(entity) : null;
+                    }
+                    return null;
+                }
+            };
+            return httpclient.execute(request,rh);
         }
+    }
 
-        BufferedReader in = null;
-        try {
-            if (conn.getInputStream() != null) {
-                in = new BufferedReader(
-                        new InputStreamReader(
-                                conn.getInputStream(), "UTF-8"));
-            }
-        } catch (IOException e) {
-            if (conn.getErrorStream() != null) {
-                in = new BufferedReader(
-                        new InputStreamReader(
-                                conn.getErrorStream(), "UTF-8"));
-            }
-        }
-        if (in == null) {
-            throw new Exception("Unable to read response from server");
-        }
-        String ct = conn.getContentType();
-        assertTrue(ct.contains(expectedCt));
-
-        StringBuilder decodedString = new StringBuilder();
-        String line;
-        try {
-            while ((line = in.readLine()) != null) {
-                decodedString.append(line);
-            }
-        } catch (Exception ex) {
-            ex.printStackTrace();
-        } finally {
-            in.close();
-            in = null;
-        }
-        // get result code
-        int responseCode = conn.getResponseCode();
-
-        String response = decodedString.toString();
-
-        assertEquals(expectedCode, responseCode);
-
-        try {
-            conn.getInputStream().close();
-            conn.disconnect();
-        } // ignore closing problems here
-        catch (Exception e) {
-        }
-        conn = null;
-
-        //System.err.println(response);
-        return response;
+    private static String httpUrlOverJSON(String method, String url, String user, String password, String scheme, int expectedCode, String expectedCt, Map<String,String> params) throws Exception {
+        return httpUrlOverJSONExecute(method, url, user, password, scheme, expectedCode, expectedCt, getHTTPVarString(params));
     }
 
     public static String getHashedPasswordForHTTPVar(String password, ClientAuthScheme scheme) {
@@ -363,7 +310,7 @@ public class TestJSONInterface extends TestCase {
         // Call insert
         String paramsInJSON = pset.toJSONString();
         //System.out.println(paramsInJSON);
-        HashMap<String, String> params = new HashMap<>();
+        Map<String, String> params = new HashMap<>();
         params.put("Procedure", procName);
         params.put("Parameters", paramsInJSON);
         if (procCallTimeout > 0) {
@@ -383,18 +330,11 @@ public class TestJSONInterface extends TestCase {
             params.put("admin", "true");
         }
 
-        String varString = getHTTPVarString(params);
-
-        varString = getHTTPVarString(params);
-
-        String ret = callProcOverJSONRaw(varString, expectedCode);
+        String ret = callProcOverJSONRaw(params, expectedCode);
         if (preHash) {
             //If prehash make same call with SHA1 to check expected code.
             params.put("Hashedpassword", getHashedPasswordForHTTPVar(password, ClientAuthScheme.HASH_SHA1));
-            varString = getHTTPVarString(params);
-
-            varString = getHTTPVarString(params);
-            callProcOverJSONRaw(varString, expectedCode);
+            callProcOverJSONRaw(params, expectedCode);
         }
         return ret;
     }
@@ -445,10 +385,12 @@ public class TestJSONInterface extends TestCase {
             boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
             assertTrue(success);
 
-            server = new LocalCluster("json.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
-            server.setHasLocalServer(false);
-            success = server.compile(builder);
-            server.startUp();
+            VoltDB.Configuration config = new VoltDB.Configuration();
+            config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
+            config.m_pathToDeployment = builder.getPathToDeployment();
+            server = new ServerThread(config);
+            server.start();
+            server.waitForInitialization();
 
             int pkStart = 0;
             pkStart = runPauseTests(pkStart, false, false);
@@ -469,11 +411,11 @@ public class TestJSONInterface extends TestCase {
 
             pkStart = runPauseTests(pkStart, false, false);
             pkStart = runPauseTests(pkStart, false, true);
-        } catch (Throwable th) {
-            th.printStackTrace();
+
         } finally {
             if (server != null) {
-                server.shutDown();
+                server.shutdown();
+                server.join();
             }
             server = null;
         }
@@ -546,10 +488,9 @@ public class TestJSONInterface extends TestCase {
             VoltDB.Configuration config = new VoltDB.Configuration();
             config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
             config.m_pathToDeployment = builder.getPathToDeployment();
-            server = new LocalCluster("json.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
-            server.setHasLocalServer(false);
-            success = server.compile(builder);
-            server.startUp();
+            server = new ServerThread(config);
+            server.start();
+            server.waitForInitialization();
 
             //Get deployment
             String jdep = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment", null, null, null, 200,  "application/json");
@@ -581,7 +522,8 @@ public class TestJSONInterface extends TestCase {
 
         } finally {
             if (server != null) {
-                server.shutDown();
+                server.shutdown();
+                server.join();
             }
             server = null;
         }
@@ -604,10 +546,9 @@ public class TestJSONInterface extends TestCase {
             VoltDB.Configuration config = new VoltDB.Configuration();
             config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
             config.m_pathToDeployment = builder.getPathToDeployment();
-            server = new LocalCluster("json.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
-            server.setHasLocalServer(false);
-            success = server.compile(builder);
-            server.startUp();
+            server = new ServerThread(config);
+            server.start();
+            server.waitForInitialization();
 
             client = ClientFactory.createClient(new ClientConfig());
             client.createConnection("localhost");
@@ -694,11 +635,10 @@ public class TestJSONInterface extends TestCase {
             //Make sure we are still good.
             ClientResponse resp = client.callProcedure("@AdHoc", "SELECT count(*) from foo");
             assertEquals(ClientResponse.SUCCESS, resp.getStatus());
-        } catch (Throwable th) {
-            th.printStackTrace();
         } finally {
             if (server != null) {
-                server.shutDown();
+                server.shutdown();
+                server.join();
             }
             server = null;
             if (client != null) {
@@ -736,10 +676,10 @@ public class TestJSONInterface extends TestCase {
 
             config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
             config.m_pathToDeployment = builder.getPathToDeployment();
-            server = new LocalCluster("json.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
-            server.setHasLocalServer(false);
-            success = server.compile(builder);
-            server.startUp();
+
+            server = new ServerThread(config);
+            server.start();
+            server.waitForInitialization();
 
             ParameterSet pset;
             String responseJSON;
@@ -802,7 +742,8 @@ public class TestJSONInterface extends TestCase {
             assertTrue(response.status == ClientResponse.SERVER_UNAVAILABLE);
         } finally {
             if (server != null) {
-                server.shutDown();
+                server.shutdown();
+                server.join();
             }
             server = null;
         }
@@ -836,10 +777,10 @@ public class TestJSONInterface extends TestCase {
 
             config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
             config.m_pathToDeployment = builder.getPathToDeployment();
-            server = new LocalCluster("json.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
-            server.setHasLocalServer(false);
-            success = server.compile(builder);
-            server.startUp();
+
+            server = new ServerThread(config);
+            server.start();
+            server.waitForInitialization();
 
             ParameterSet pset;
             String responseJSON;
@@ -1005,7 +946,8 @@ public class TestJSONInterface extends TestCase {
 
         } finally {
             if (server != null) {
-                server.shutDown();
+                server.shutdown();
+                server.join();
             }
             server = null;
         }
@@ -1038,10 +980,9 @@ public class TestJSONInterface extends TestCase {
             VoltDB.Configuration config = new VoltDB.Configuration();
             config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
             config.m_pathToDeployment = builder.getPathToDeployment();
-            server = new LocalCluster("json.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
-            server.setHasLocalServer(false);
-            success = server.compile(builder);
-            server.startUp();
+            server = new ServerThread(config);
+            server.start();
+            server.waitForInitialization();
 
             String response = callProcOverJSONRaw(japaneseTestVarStrings, 200);
             Response r = responseFromJSON(response);
@@ -1065,7 +1006,8 @@ public class TestJSONInterface extends TestCase {
             assertTrue(response.contains(test2));
         } finally {
             if (server != null) {
-                server.shutDown();
+                server.shutdown();
+                server.join();
             }
             server = null;
         }
@@ -1115,10 +1057,9 @@ public class TestJSONInterface extends TestCase {
             VoltDB.Configuration config = new VoltDB.Configuration();
             config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
             config.m_pathToDeployment = builder.getPathToDeployment();
-            server = new LocalCluster("json.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
-            server.setHasLocalServer(false);
-            success = server.compile(builder);
-            server.startUp();
+            server = new ServerThread(config);
+            server.start();
+            server.waitForInitialization();
 
             ParameterSet pset;
 
@@ -1155,8 +1096,7 @@ public class TestJSONInterface extends TestCase {
             params.put("Parameters", paramsInJSON);
             params.put("User", u.name);
             params.put("Password", Encoder.hexEncode(new byte[]{1, 2, 3}));
-            String varString = getHTTPVarString(params);
-            response = callProcOverJSONRaw(varString, 200);
+            response = callProcOverJSONRaw(params, 200);
             r = responseFromJSON(response);
             assertEquals(ClientResponse.UNEXPECTED_FAILURE, r.status);
 
@@ -1168,8 +1108,7 @@ public class TestJSONInterface extends TestCase {
             params.put("Parameters", paramsInJSON);
             params.put("User", u.name);
             params.put("Password", "abcdefghiabcdefghiabcdefghiabcdefghi");
-            varString = getHTTPVarString(params);
-            response = callProcOverJSONRaw(varString, 200);
+            response = callProcOverJSONRaw(params, 200);
             r = responseFromJSON(response);
             assertEquals(ClientResponse.UNEXPECTED_FAILURE, r.status);
 
@@ -1253,7 +1192,8 @@ public class TestJSONInterface extends TestCase {
             assertEquals(ClientResponse.SUCCESS, resp.status);
         } finally {
             if (server != null) {
-                server.shutDown();
+                server.shutdown();
+                server.join();
             }
             server = null;
         }
@@ -1288,10 +1228,9 @@ public class TestJSONInterface extends TestCase {
             VoltDB.Configuration config = new VoltDB.Configuration();
             config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
             config.m_pathToDeployment = builder.getPathToDeployment();
-            server = new LocalCluster("json.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
-            server.setHasLocalServer(false);
-            success = server.compile(builder);
-            server.startUp();
+            server = new ServerThread(config);
+            server.start();
+            server.waitForInitialization();
 
             // test not enabled
             ParameterSet pset = ParameterSet.fromArrayNoCopy("foo", "bar", "foobar");
@@ -1303,7 +1242,8 @@ public class TestJSONInterface extends TestCase {
             }
         } finally {
             if (server != null) {
-                server.shutDown();
+                server.shutdown();
+                server.join();
             }
             server = null;
         }
@@ -1328,10 +1268,9 @@ public class TestJSONInterface extends TestCase {
             VoltDB.Configuration config = new VoltDB.Configuration();
             config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
             config.m_pathToDeployment = builder.getPathToDeployment();
-            server = new LocalCluster("json.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
-            server.setHasLocalServer(false);
-            success = server.compile(builder);
-            server.startUp();
+            server = new ServerThread(config);
+            server.start();
+            server.waitForInitialization();
 
             ParameterSet pset = ParameterSet.fromArrayNoCopy(14_000);
             String response = callProcOverJSON("DelayProc", pset, null, null, false);
@@ -1339,7 +1278,8 @@ public class TestJSONInterface extends TestCase {
             assertEquals(ClientResponse.SUCCESS, r.status);
         } finally {
             if (server != null) {
-                server.shutDown();
+                server.shutdown();
+                server.join();
             }
             server = null;
         }
@@ -1365,10 +1305,9 @@ public class TestJSONInterface extends TestCase {
             VoltDB.Configuration config = new VoltDB.Configuration();
             config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
             config.m_pathToDeployment = builder.getPathToDeployment();
-            server = new LocalCluster("json.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
-            server.setHasLocalServer(false);
-            success = server.compile(builder);
-            server.startUp();
+            server = new ServerThread(config);
+            server.start();
+            server.waitForInitialization();
 
             ParameterSet pset = null;
 
@@ -1387,7 +1326,8 @@ public class TestJSONInterface extends TestCase {
             assertTrue(r.statusString.contains("Transaction Interrupted"));
         } finally {
             if (server != null) {
-                server.shutDown();
+                server.shutdown();
+                server.join();
             }
             server = null;
         }
@@ -1438,10 +1378,9 @@ public class TestJSONInterface extends TestCase {
             VoltDB.Configuration config = new VoltDB.Configuration();
             config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
             config.m_pathToDeployment = builder.getPathToDeployment();
-            server = new LocalCluster("json.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
-            server.setHasLocalServer(false);
-            success = server.compile(builder);
-            server.startUp();
+            server = new ServerThread(config);
+            server.start();
+            server.waitForInitialization();
 
             //create a large query string
             final StringBuilder s = new StringBuilder();
@@ -1473,7 +1412,8 @@ public class TestJSONInterface extends TestCase {
 
         } finally {
             if (server != null) {
-                server.shutDown();
+                server.shutdown();
+                server.join();
             }
             server = null;
         }
@@ -1499,10 +1439,9 @@ public class TestJSONInterface extends TestCase {
             VoltDB.Configuration config = new VoltDB.Configuration();
             config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
             config.m_pathToDeployment = builder.getPathToDeployment();
-            server = new LocalCluster("json.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
-            server.setHasLocalServer(false);
-            success = server.compile(builder);
-            server.startUp();
+            server = new ServerThread(config);
+            server.start();
+            server.waitForInitialization();
 
             // try a good insert
             String varString = "Procedure=Insert&Parameters=[5,\"aa\"]";
@@ -1531,7 +1470,8 @@ public class TestJSONInterface extends TestCase {
             assertEquals(ClientResponse.SUCCESS, r.status);
         } finally {
             if (server != null) {
-                server.shutDown();
+                server.shutdown();
+                server.join();
             }
             server = null;
         }
@@ -1560,16 +1500,16 @@ public class TestJSONInterface extends TestCase {
             VoltDB.Configuration config = new VoltDB.Configuration();
             config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
             config.m_pathToDeployment = builder.getPathToDeployment();
-            server = new LocalCluster("json.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
-            server.setHasLocalServer(false);
-            success = server.compile(builder);
-            server.startUp();
+            server = new ServerThread(config);
+            server.start();
+            server.waitForInitialization();
 
             callProcOverJSONRaw(getHTTPURL(null, "api/1.0/Tim"), 400);
             callProcOverJSONRaw(getHTTPURL(null, "api/1.0/Tim?Procedure=foo&Parameters=[x4{]"), 400);
         } finally {
             if (server != null) {
-                server.shutDown();
+                server.shutdown();
+                server.join();
             }
             server = null;
         }
@@ -1598,10 +1538,9 @@ public class TestJSONInterface extends TestCase {
             VoltDB.Configuration config = new VoltDB.Configuration();
             config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
             config.m_pathToDeployment = builder.getPathToDeployment();
-            server = new LocalCluster("json.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
-            server.setHasLocalServer(false);
-            success = server.compile(builder);
-            server.startUp();
+            server = new ServerThread(config);
+            server.start();
+            server.waitForInitialization();
 
             //Get deployment
             String jdep = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment", null, null, null, 200,  "application/json");
@@ -1612,7 +1551,8 @@ public class TestJSONInterface extends TestCase {
             assertTrue(xdep.contains("</deployment>"));
         } finally {
             if (server != null) {
-                server.shutDown();
+                server.shutdown();
+                server.join();
             }
             server = null;
         }
@@ -1641,10 +1581,9 @@ public class TestJSONInterface extends TestCase {
             VoltDB.Configuration config = new VoltDB.Configuration();
             config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
             config.m_pathToDeployment = builder.getPathToDeployment();
-            server = new LocalCluster("json.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
-            server.setHasLocalServer(false);
-            success = server.compile(builder);
-            server.startUp();
+            server = new ServerThread(config);
+            server.start();
+            server.waitForInitialization();
 
             //Get deployment
             String jdep = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment", null, null, null, 200,  "application/json");
@@ -1726,7 +1665,8 @@ public class TestJSONInterface extends TestCase {
 
         } finally {
             if (server != null) {
-                server.shutDown();
+                server.shutdown();
+                server.join();
             }
             server = null;
         }
@@ -1755,10 +1695,9 @@ public class TestJSONInterface extends TestCase {
             VoltDB.Configuration config = new VoltDB.Configuration();
             config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
             config.m_pathToDeployment = builder.getPathToDeployment();
-            server = new LocalCluster("json.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
-            server.setHasLocalServer(false);
-            success = server.compile(builder);
-            server.startUp();
+            server = new ServerThread(config);
+            server.start();
+            server.waitForInitialization();
 
             //Get deployment
             String jdep = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment", null, null, null, 200,  "application/json");
@@ -1808,7 +1747,8 @@ public class TestJSONInterface extends TestCase {
 
         } finally {
             if (server != null) {
-                server.shutDown();
+                server.shutdown();
+                server.join();
             }
             server = null;
         }
@@ -1846,10 +1786,9 @@ public class TestJSONInterface extends TestCase {
             VoltDB.Configuration config = new VoltDB.Configuration();
             config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
             config.m_pathToDeployment = builder.getPathToDeployment();
-            server = new LocalCluster("json.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
-            server.setHasLocalServer(false);
-            success = server.compile(builder);
-            server.startUp();
+            server = new ServerThread(config);
+            server.start();
+            server.waitForInitialization();
 
             //Get deployment with diff hashed password
             //20E3AAE7FC23385295505A6B703FD1FBA66760D5 FD19534FBF9B75DF7CD046DE3EAF93DB77367CA7C1CC017FFA6CED2F14D32E7D
@@ -1881,7 +1820,8 @@ public class TestJSONInterface extends TestCase {
             assertTrue(dep.matches("^jackson5(.*)"));
         } finally {
             if (server != null) {
-                server.shutDown();
+                server.shutdown();
+                server.join();
             }
             server = null;
         }
@@ -1918,10 +1858,9 @@ public class TestJSONInterface extends TestCase {
             VoltDB.Configuration config = new VoltDB.Configuration();
             config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
             config.m_pathToDeployment = builder.getPathToDeployment();
-            server = new LocalCluster("json.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
-            server.setHasLocalServer(false);
-            success = server.compile(builder);
-            server.startUp();
+            server = new ServerThread(config);
+            server.start();
+            server.waitForInitialization();
 
             //Get deployment bad user
             String dep = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment/", "user1", "admin", "hashed", 200, "application/json");
@@ -1946,7 +1885,8 @@ public class TestJSONInterface extends TestCase {
 
         } finally {
             if (server != null) {
-                server.shutDown();
+                server.shutdown();
+                server.join();
             }
             server = null;
         }
@@ -1983,10 +1923,9 @@ public class TestJSONInterface extends TestCase {
             VoltDB.Configuration config = new VoltDB.Configuration();
             config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
             config.m_pathToDeployment = builder.getPathToDeployment();
-            server = new LocalCluster("json.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
-            server.setHasLocalServer(false);
-            success = server.compile(builder);
-            server.startUp();
+            server = new ServerThread(config);
+            server.start();
+            server.waitForInitialization();
 
             //Get deployment bad user
             String dep = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment/", "user1", "admin", "basic", 200, "application/json");
@@ -2003,7 +1942,8 @@ public class TestJSONInterface extends TestCase {
             assertTrue(dep.contains("</deployment>"));
         } finally {
             if (server != null) {
-                server.shutDown();
+                server.shutdown();
+                server.join();
             }
             server = null;
         }
@@ -2033,10 +1973,9 @@ public class TestJSONInterface extends TestCase {
             VoltDB.Configuration config = new VoltDB.Configuration();
             config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
             config.m_pathToDeployment = builder.getPathToDeployment();
-            server = new LocalCluster("json.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
-            server.setHasLocalServer(false);
-            success = server.compile(builder);
-            server.startUp();
+            server = new ServerThread(config);
+            server.start();
+            server.waitForInitialization();
 
             //Get users
             String json = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment/users/", null, null, null, 200,  "application/json");
@@ -2082,7 +2021,8 @@ public class TestJSONInterface extends TestCase {
             assertEquals(json, "");
         } finally {
             if (server != null) {
-                server.shutDown();
+                server.shutdown();
+                server.join();
             }
             server = null;
         }
@@ -2098,10 +2038,9 @@ public class TestJSONInterface extends TestCase {
             VoltDB.Configuration config = new VoltDB.Configuration();
             config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
             config.m_pathToDeployment = builder.getPathToDeployment();
-            server = new LocalCluster("json.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
-            server.setHasLocalServer(false);
-            success = server.compile(builder);
-            server.startUp();
+            server = new ServerThread(config);
+            server.start();
+            server.waitForInitialization();
 
             //Get exportTypes
             String json = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment/export/type", null, null, null, 200,  "application/json");
@@ -2114,7 +2053,8 @@ public class TestJSONInterface extends TestCase {
             assertTrue(jobj.getString("types").contains("CUSTOM"));
         } finally {
             if (server != null) {
-                server.shutDown();
+                server.shutdown();
+                server.join();
             }
             server = null;
         }
@@ -2143,10 +2083,9 @@ public class TestJSONInterface extends TestCase {
             VoltDB.Configuration config = new VoltDB.Configuration();
             config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
             config.m_pathToDeployment = builder.getPathToDeployment();
-            server = new LocalCluster("json.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
-            server.setHasLocalServer(false);
-            success = server.compile(builder);
-            server.startUp();
+            server = new ServerThread(config);
+            server.start();
+            server.waitForInitialization();
 
             //Get profile
             String dep = getUrlOverJSON(protocolPrefix + "localhost:8095/profile", null, null, null, 200, "application/json");
@@ -2154,7 +2093,8 @@ public class TestJSONInterface extends TestCase {
             assertTrue(dep.contains("\"permissions\""));
         } finally {
             if (server != null) {
-                server.shutDown();
+                server.shutdown();
+                server.join();
             }
             server = null;
         }
@@ -2203,10 +2143,9 @@ public class TestJSONInterface extends TestCase {
             VoltDB.Configuration config = new VoltDB.Configuration();
             config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
             config.m_pathToDeployment = builder.getPathToDeployment();
-            server = new LocalCluster("json.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
-            server.setHasLocalServer(false);
-            success = server.compile(builder);
-            server.startUp();
+            server = new ServerThread(config);
+            server.start();
+            server.waitForInitialization();
 
             TestWorker.s_insertCount = new AtomicLong(0);
             int poolSize = 25;
@@ -2226,7 +2165,8 @@ public class TestJSONInterface extends TestCase {
             assertTrue(TestWorker.s_success);
         } finally {
             if (server != null) {
-                server.shutDown();
+                server.shutdown();
+                server.join();
             }
             server = null;
         }

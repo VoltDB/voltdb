@@ -90,8 +90,6 @@ public class TestClientPortChannel extends JUnit4LocalClusterTest {
             assertTrue(success);
 
             m_config.startUp();
-
-            Thread.currentThread().sleep(5000);
         } catch (IOException ex) {
             fail(ex.getMessage());
         } finally {
@@ -220,11 +218,11 @@ public class TestClientPortChannel extends JUnit4LocalClusterTest {
             try {
                 channel.connect();
                 channel.close();
+                scnt++;
             } catch (Exception ex) {
+                ex.printStackTrace();
                 fcnt++;
-                continue;
             }
-            scnt++;
             System.out.println("Success: " + scnt + " Failed: " + fcnt);
         }
 

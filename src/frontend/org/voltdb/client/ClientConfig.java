@@ -75,8 +75,8 @@ public class ClientConfig {
     boolean m_enableSSL = false;
     String m_sslPropsFile = null;
 
-    //For unit testing.
-    private static final boolean ENABLE_SSL_FOR_TEST = Boolean.valueOf(System.getenv("ENABLE_SSL") == null ? Boolean.toString(Boolean.getBoolean("ENABLE_SSL")) : System.getenv("ENABLE_SSL"));
+    //For unit testing. This should really be in Environment class we should assemble all such there.
+    public static final boolean ENABLE_SSL_FOR_TEST = Boolean.valueOf(System.getenv("ENABLE_SSL") == null ? Boolean.toString(Boolean.getBoolean("ENABLE_SSL")) : System.getenv("ENABLE_SSL"));
     private static final String DEFAULT_SSL_PROPS_FILE = "ssl-config";
 
     final static String getUserNameFromSubject(Subject subject) {
