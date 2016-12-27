@@ -39,6 +39,7 @@ import java.util.logging.Logger;
 
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.ClientResponseImpl;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.client.HashinatorLite.HashinatorLiteType;
 import org.voltdb.client.VoltBulkLoader.BulkLoaderFailureCallBack;
@@ -622,7 +623,11 @@ public final class ClientImpl implements Client {
 
         if (m_ex != null) {
             m_ex.shutdown();
-            m_ex.awaitTermination(1, TimeUnit.SECONDS);
+            if (VoltDB.isThisATest()) {
+                m_ex.awaitTermination(1, TimeUnit.SECONDS);
+            } else {
+                m_ex.awaitTermination(365, TimeUnit.DAYS);
+            }
         }
         m_distributer.shutdown();
         ClientFactory.decreaseClientNum();
