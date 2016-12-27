@@ -324,20 +324,88 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         //Thread for Running authentication of client.
         class AuthRunnable implements Runnable {
             final SocketChannel m_socket;
-            final SSLEngine m_sslEngine;
 
-            AuthRunnable(SocketChannel socket, SSLEngine sslEngine) {
+            AuthRunnable(SocketChannel socket) {
                 this.m_socket = socket;
-                this.m_sslEngine = sslEngine;
             }
 
             @Override
             public void run() {
                 if (m_socket != null) {
+
+                    SSLEngine sslEngine = null;
+                    if (m_sslContext != null) {
+                        try {
+                            sslEngine = m_sslContext.createSSLEngine();
+                        } catch (Exception e) {
+                            networkLog.warn("Rejected accepting new connection, failed to create SSLEngine; " +
+                                    "indicates problem with SSL configuration: " + e.getMessage());
+                            return;
+                        }
+                        sslEngine.setUseClientMode(false);
+                        sslEngine.setNeedClientAuth(false);
+                        // blocking needs to be false for handshaking.
+                        boolean handshakeStatus;
+
+                        try {
+                            m_socket.configureBlocking(false);
+                            SSLHandshaker handshaker = new SSLHandshaker(m_socket, sslEngine);
+                            handshakeStatus = handshaker.handshake();
+                        } catch (IOException e) {
+                            try {
+                                m_socket.close();
+                            } catch (IOException e1) {
+                                e1.printStackTrace();
+                            }
+                            networkLog.warn("Rejected accepting new connection, SSL handshake failed: " + e.getMessage());
+                            return;
+                        }
+                        if (!handshakeStatus) {
+                            try {
+                                m_socket.close();
+                            } catch (IOException e) {
+                            }
+                            networkLog.warn("Rejected accepting new connection, SSL handshake failed.");
+                            return;
+                        }
+                        networkLog.info("SSL enabled on connection " + m_socket.socket().getRemoteSocketAddress() +
+                                " with protocol " + sslEngine.getSession().getProtocol() + " and with cipher " + sslEngine.getSession().getCipherSuite());
+                    }
+                    MessagingChannel messagingChannel = MessagingChannel.get(m_socket, sslEngine);
+
+                    /*
+                     * Enforce a limit on the maximum number of connections
+                     */
+                    if (m_numConnections.get() >= MAX_CONNECTIONS.get()) {
+                        networkLog.warn("Rejected connection from " +
+                                m_socket.socket().getRemoteSocketAddress() +
+                                " because the connection limit of " + MAX_CONNECTIONS + " has been reached");
+                        try {
+                            /*
+                             * Send rejection message with reason code
+                             */
+                            ByteBuffer b = ByteBuffer.allocate(1);
+                            b.put(MAX_CONNECTIONS_LIMIT_ERROR);
+                            b.flip();
+                            m_socket.configureBlocking(true);
+                            for (int ii = 0; ii < 4 && b.hasRemaining(); ii++) {
+                                messagingChannel.writeMessage(b);
+                            }
+                            m_socket.close();
+                        } catch (IOException e) {}//don't care keep running
+                        return;
+                    }
+
+                    /*
+                     * Increment the number of connections even though this one hasn't been authenticated
+                     * so that a flood of connection attempts (with many doomed) will not result in
+                     * successful authentication of connections that would put us over the limit.
+                     */
+                    m_numConnections.incrementAndGet();
+
                     boolean success = false;
                     //Populated on timeout
                     AtomicReference<String> timeoutRef = new AtomicReference<String>();
-                    MessagingChannel messagingChannel = MessagingChannel.get(m_socket, m_sslEngine);
                     try {
                         final ClientInputHandler handler = authenticate(m_socket, messagingChannel, timeoutRef);
                         if (handler != null) {
@@ -351,7 +419,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                             0,
                                             ReverseDNSPolicy.ASYNCHRONOUS,
                                             SSLEncryptionService.serverInstance(),
-                                            m_sslEngine);
+                                            sslEngine);
                             /*
                              * If IV2 is enabled the logic initially enabling read is
                              * in the started method of the InputHandler
@@ -405,75 +473,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         }
                     }
 
-                    SSLEngine sslEngine = null;
-                    if (m_sslContext != null) {
-                        try {
-                            sslEngine = m_sslContext.createSSLEngine();
-                        } catch (Exception e) {
-                            networkLog.warn("Rejected accepting new connection, failed to create SSLEngine; " +
-                                    "indicates problem with SSL configuration: " + e.getMessage());
-                            continue;
-                        }
-                        sslEngine.setUseClientMode(false);
-                        sslEngine.setNeedClientAuth(false);
-                        // blocking needs to be false for handshaking.
-                        socket.configureBlocking(false);
-                        SSLHandshaker handshaker = new SSLHandshaker(socket, sslEngine);
-                        boolean handshakeStatus;
-
-                        try {
-                            handshakeStatus = handshaker.handshake();
-                        } catch (IOException e) {
-                            try {
-                                socket.close();
-                            } catch (IOException e1) {
-                                e1.printStackTrace();
-                            }
-                            networkLog.warn("Rejected accepting new connection, SSL handshake failed: " + e.getMessage());
-                            continue;
-                        }
-                        if (!handshakeStatus) {
-                            try {
-                                socket.close();
-                            } catch (IOException e) {
-                            }
-                            networkLog.warn("Rejected accepting new connection, SSL handshake failed.");
-                            continue;
-                        }
-                        networkLog.info("SSL enabled on connection " + socket.socket().getRemoteSocketAddress() +
-                                " with protocol " + sslEngine.getSession().getProtocol() + " and with cipher " + sslEngine.getSession().getCipherSuite());
-                    }
-                    /*
-                     * Enforce a limit on the maximum number of connections
-                     */
-                    if (m_numConnections.get() >= MAX_CONNECTIONS.get()) {
-                        networkLog.warn("Rejected connection from " +
-                                socket.socket().getRemoteSocketAddress() +
-                                " because the connection limit of " + MAX_CONNECTIONS + " has been reached");
-                        try {
-                            /*
-                             * Send rejection message with reason code
-                             */
-                            ByteBuffer b = ByteBuffer.allocate(1);
-                            b.put(MAX_CONNECTIONS_LIMIT_ERROR);
-                            b.flip();
-                            socket.configureBlocking(true);
-                            for (int ii = 0; ii < 4 && b.hasRemaining(); ii++) {
-                                socket.write(b);
-                            }
-                            socket.close();
-                        } catch (IOException e) {}//don't care keep running
-                        continue;
-                    }
-
-                    /*
-                     * Increment the number of connections even though this one hasn't been authenticated
-                     * so that a flood of connection attempts (with many doomed) will not result in
-                     * successful authentication of connections that would put us over the limit.
-                     */
-                    m_numConnections.incrementAndGet();
-
-                    final AuthRunnable authRunnable = new AuthRunnable(socket, sslEngine);
+                    final AuthRunnable authRunnable = new AuthRunnable(socket);
                     while (true) {
                         try {
                             m_executor.execute(authRunnable);
