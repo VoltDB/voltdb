@@ -1204,7 +1204,7 @@ public class CoreUtils {
     public static boolean isJunitTest() {
 
         //check os environment variable
-        if ("true".equalsIgnoreCase(System.getenv().get("VOLT_JUSTATEST")) ){
+        if ("true".equalsIgnoreCase(System.getenv().get("VOLT_JUSTATEST"))){
             return true;
         }
 
