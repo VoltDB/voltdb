@@ -53,6 +53,13 @@ import java.util.Deque;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.atomic.AtomicInteger;
 
+/**
+ * SSLNIOReadStream needs to be thread safe.  The supposition is that the get methods,
+ * which empty the stream, don't race against the read method, which fills the stream.
+ * Both the get and read methods race with the shutdown method, which may empty the stream
+ * while a get or read is in progress.  This code depends on the shutdown sequence to make
+ * sure gets and reads are finished and blocked before shutdown is invoked.
+ */
 class SSLNIOReadStream implements ReadStream {
 
     private final AtomicInteger m_bytesRead = new AtomicInteger(0);
