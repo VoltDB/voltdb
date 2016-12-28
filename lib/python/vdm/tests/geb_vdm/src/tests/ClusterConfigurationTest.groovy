@@ -34,7 +34,6 @@ class ClusterConfigurationTest extends TestBase {
     static String _export = "Export"
     static String _import = "Import"
     static String advanced = "Advanced"
-    static String snmpTitle = "SNMP"
 
     static String maxJavaHeap = "Max Java Heap"
     static String heartbeatTimeout = "Heartbeat time out"
@@ -67,14 +66,6 @@ class ClusterConfigurationTest extends TestBase {
     static String connectionSource = "Connection Source"
     static String masterCluster = "Master Cluster"
     static String servers = "Servers"
-
-    static String snmpTarget = "Target"
-    static String snmpCommunity = "Community"
-    static String snmpUsername = "Username"
-    static String snmpAuthProtocol = "Authentication Protocol"
-    static String snmpAuthkey = "Authentication Key"
-    static String snmpPrivacyProtocol = "Privacy Protocol"
-    static String snmpPrivacyKey = "Privacy Key"
 
     String saveMessage = "Changes have been saved."
     boolean statusOfTest
