@@ -179,6 +179,14 @@ public class ServerThread extends Thread {
         }
     }
 
+    public void waitForClientInterface() {
+        while (!VoltDB.instance().isRunning() ||
+                VoltDB.instance().getClientInterface() == null ||
+                !VoltDB.instance().getClientInterface().isAcceptingConnections()) {
+            Thread.yield();
+        }
+    }
+
     public void shutdown() throws InterruptedException {
         assert Thread.currentThread() != this;
         VoltDB.instance().shutdown(this);

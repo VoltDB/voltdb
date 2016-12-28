@@ -18,6 +18,7 @@
 package org.voltdb;
 
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 
 // Interface through which the outside world can interact with the consumer side
 // of DR. Currently, there's not much to do here, since the subsystem is
@@ -30,9 +31,9 @@ public interface ConsumerDRGateway extends Promotable {
 
     void initialize(boolean resumeReplication);
 
-    void shutdown(boolean blocking) throws InterruptedException;
+    void shutdown(final boolean blocking) throws InterruptedException, ExecutionException;
 
-    void restart() throws InterruptedException;
+    void restart() throws InterruptedException, ExecutionException;
 
     DRConsumerMpCoordinator getDRConsumerMpCoordinator();
 
@@ -42,5 +43,5 @@ public interface ConsumerDRGateway extends Promotable {
 
     void startConsumerDispatcher(byte producerClusterId, List<String> clusterNodeInfo, boolean awaitProducerSnapshot);
 
-    boolean addLocallyLedPartition(int partitionId);
+    void addLocallyLedPartition(int partitionId);
 }
