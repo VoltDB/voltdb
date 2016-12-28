@@ -25,20 +25,25 @@
 #include "catalog/columnref.h"
 #include "catalog/constraint.h"
 #include "catalog/materializedviewinfo.h"
+
 #include "common/CatalogUtil.h"
 #include "common/types.h"
 #include "common/TupleSchemaBuilder.h"
 #include "common/ValueFactory.hpp"
+
 #include "expressions/expressionutil.h"
 #include "expressions/functionexpression.h"
+
 #include "indexes/tableindex.h"
 #include "indexes/tableindexfactory.h"
+
 #include "storage/AbstractDRTupleStream.h"
 #include "storage/constraintutil.h"
 #include "storage/MaterializedViewTriggerForWrite.h"
 #include "storage/persistenttable.h"
 #include "storage/table.h"
 #include "storage/tablefactory.h"
+
 #include "sha1/sha1.h"
 
 #include <boost/algorithm/string.hpp>
@@ -49,46 +54,44 @@
 #include <vector>
 #include <map>
 
-using namespace std;
-
 namespace voltdb {
 
-TableCatalogDelegate::~TableCatalogDelegate()
-{
+TableCatalogDelegate::~TableCatalogDelegate() {
     if (m_table) {
         m_table->decrementRefcount();
     }
 }
 
-Table *TableCatalogDelegate::getTable() const {
+Table* TableCatalogDelegate::getTable() const {
     // If a persistent table has an active delta table, return the delta table instead of the whole table.
-    PersistentTable *persistentTable = dynamic_cast<PersistentTable*>(m_table);
+    auto persistentTable = dynamic_cast<PersistentTable*>(m_table);
     if (persistentTable && persistentTable->isDeltaTableActive()) {
         return persistentTable->deltaTable();
     }
+
     return m_table;
 }
 
-TupleSchema *TableCatalogDelegate::createTupleSchema(catalog::Database const &catalogDatabase,
-                                                     catalog::Table const &catalogTable) {
+TupleSchema* TableCatalogDelegate::createTupleSchema(catalog::Database const& catalogDatabase,
+                                                     catalog::Table const& catalogTable) {
     // Columns:
-    // Column is stored as map<String, Column*> in Catalog. We have to
+    // Column is stored as map<std::string, Column*> in Catalog. We have to
     // sort it by Column index to preserve column order.
-    const int numColumns = static_cast<int>(catalogTable.columns().size());
+    auto numColumns = catalogTable.columns().size();
     bool needsDRTimestamp = catalogDatabase.isActiveActiveDRed() && catalogTable.isDRed();
     TupleSchemaBuilder schemaBuilder(numColumns,
                                      needsDRTimestamp ? 1 : 0); // number of hidden columns
 
-    map<string, catalog::Column*>::const_iterator col_iterator;
-    for (col_iterator = catalogTable.columns().begin();
-         col_iterator != catalogTable.columns().end(); col_iterator++) {
+    std::map<std::string, catalog::Column*>::const_iterator colIterator;
+    for (colIterator = catalogTable.columns().begin();
+         colIterator != catalogTable.columns().end(); colIterator++) {
 
-        const catalog::Column *catalog_column = col_iterator->second;
-        schemaBuilder.setColumnAtIndex(catalog_column->index(),
-                                       static_cast<ValueType>(catalog_column->type()),
-                                       static_cast<int32_t>(catalog_column->size()),
-                                       catalog_column->nullable(),
-                                       catalog_column->inbytes());
+        auto catalogColumn = colIterator->second;
+        schemaBuilder.setColumnAtIndex(catalogColumn->index(),
+                                       static_cast<ValueType>(catalogColumn->type()),
+                                       static_cast<int32_t>(catalogColumn->size()),
+                                       catalogColumn->nullable(),
+                                       catalogColumn->inbytes());
     }
 
     if (needsDRTimestamp) {
@@ -107,17 +110,16 @@ TupleSchema *TableCatalogDelegate::createTupleSchema(catalog::Database const &ca
     return schemaBuilder.build();
 }
 
-bool TableCatalogDelegate::getIndexScheme(catalog::Table const &catalogTable,
-                                          catalog::Index const &catalogIndex,
-                                          const TupleSchema *schema,
-                                          TableIndexScheme *scheme)
-{
-    vector<int> index_columns;
-    vector<ValueType> column_types;
+bool TableCatalogDelegate::getIndexScheme(catalog::Table const& catalogTable,
+                                          catalog::Index const& catalogIndex,
+                                          TupleSchema const* schema,
+                                          TableIndexScheme* scheme) {
+    std::vector<int> index_columns;
+    std::vector<ValueType> column_types;
 
     // The catalog::Index object now has a list of columns that are to be
     // used
-    if (catalogIndex.columns().size() == (size_t)0) {
+    if (catalogIndex.columns().size() == (size_t) 0) {
         VOLT_ERROR("Index '%s' in table '%s' does not declare any columns"
                    " to use",
                    catalogIndex.name().c_str(),
@@ -125,8 +127,8 @@ bool TableCatalogDelegate::getIndexScheme(catalog::Table const &catalogTable,
         return false;
     }
 
-    vector<AbstractExpression*> indexedExpressions = TableIndex::simplyIndexColumns();
-    const std::string expressionsAsText = catalogIndex.expressionsjson();
+    auto indexedExpressions = TableIndex::simplyIndexColumns();
+    std::string const& expressionsAsText = catalogIndex.expressionsjson();
     if (expressionsAsText.length() != 0) {
         ExpressionUtil::loadIndexedExprsFromJson(indexedExpressions, expressionsAsText);
     }
@@ -135,22 +137,16 @@ bool TableCatalogDelegate::getIndexScheme(catalog::Table const &catalogTable,
     // the catalogs, we'll use the index attribute to make sure we put them
     // in the right order
     index_columns.resize(catalogIndex.columns().size());
-    map<string, catalog::ColumnRef*>::const_iterator colref_iterator;
-    for (colref_iterator = catalogIndex.columns().begin();
-         colref_iterator != catalogIndex.columns().end();
-         colref_iterator++) {
-        catalog::ColumnRef *catalog_colref = colref_iterator->second;
-        if (catalog_colref->index() < 0) {
-            VOLT_ERROR("Invalid column '%d' for index '%s' in table '%s'",
-                       catalog_colref->index(),
-                       catalogIndex.name().c_str(),
-                       catalogTable.name().c_str());
-            return false;
-        }
-        index_columns[catalog_colref->index()] = catalog_colref->column()->index();
+    std::map<std::string, catalog::ColumnRef*>::const_iterator colrefIterator;
+    for (colrefIterator = catalogIndex.columns().begin();
+         colrefIterator != catalogIndex.columns().end();
+         colrefIterator++) {
+        auto catalogColref = colrefIterator->second;
+        assert(catalogColref->index() >= 0);
+        index_columns[catalogColref->index()] = catalogColref->column()->index();
     }
     // partial index predicate
-    const std::string predicateAsText = catalogIndex.predicatejson();
+    std::string const& predicateAsText  = catalogIndex.predicatejson();
     AbstractExpression* predicate = NULL;
     if (!predicateAsText.empty()) {
         predicate = ExpressionUtil::loadExpressionFromJson(predicateAsText);
@@ -173,35 +169,30 @@ bool TableCatalogDelegate::getIndexScheme(catalog::Table const &catalogTable,
  */
 static std::string
 getIndexIdFromMap(TableIndexType type, bool countable, bool isUnique,
-                  const std::string& expressionsAsText, vector<int32_t> columnIndexes,
-                  const std::string& predicateAsText) {
+                  std::string const& expressionsAsText, std::vector<int32_t> columnIndexes,
+                  std::string const& predicateAsText) {
     // add the uniqueness of the index
     std::string retval = isUnique ? "U" : "M";
 
     // add the type of the index
     switch (type) {
-        case BALANCED_TREE_INDEX:
-            retval += "B";
-            break;
-        case HASH_TABLE_INDEX:
-            retval += "H";
-            break;
-        case COVERING_CELL_INDEX:
-            retval += "G"; // C is taken
-            break;
-        default:
-            // this would need to change if we added index types
-            assert(false);
-            break;
+    case BALANCED_TREE_INDEX:
+        retval += "B";
+        break;
+    case HASH_TABLE_INDEX:
+        retval += "H";
+        break;
+    case COVERING_CELL_INDEX:
+        retval += "G"; // C is taken
+        break;
+    default:
+        // this would need to change if we added index types
+        assert(false);
+        break;
     }
 
     // add whether it's counting or not
-    if (countable) {
-        retval += "C";
-    }
-    else {
-        retval += "N"; // (N)ot countable?
-    }
+    retval += countable ? "C" : "N"; // (N)ot countable?
 
     // concat the target table column indexes into a unique string
     // using the order they appear in the index
@@ -213,30 +204,28 @@ getIndexIdFromMap(TableIndexType type, bool countable, bool isUnique,
 
     // Expression indexes need to have IDs that stand out as unique from each other and from colunn indexes
     // that may reference the exact same set of columns.
-    if (expressionsAsText.length() != 0) {
+    if ( ! expressionsAsText.empty()) {
         retval += expressionsAsText;
     }
     // Add partial index predicate if any
-    if (!predicateAsText.empty()) {
+    if ( ! predicateAsText.empty()) {
         retval += predicateAsText;
     }
     return retval;
 }
 
 std::string
-TableCatalogDelegate::getIndexIdString(const catalog::Index &catalogIndex)
-{
-    vector<int32_t> columnIndexes(catalogIndex.columns().size());
+TableCatalogDelegate::getIndexIdString(const catalog::Index& catalogIndex) {
+    std::vector<int32_t> columnIndexes(catalogIndex.columns().size());
 
     // get the list of column indexes in the target table
     // in the order they appear in the index
-    map<string, catalog::ColumnRef*>::const_iterator col_iterator;
-    for (col_iterator = catalogIndex.columns().begin();
-         col_iterator != catalogIndex.columns().end();
-         col_iterator++)
-    {
-        int32_t index = col_iterator->second->index();
-        const catalog::Column *catalogColumn = col_iterator->second->column();
+    std::map<std::string, catalog::ColumnRef*>::const_iterator colIterator;
+    for (colIterator = catalogIndex.columns().begin();
+         colIterator != catalogIndex.columns().end();
+         colIterator++) {
+        int32_t index = colIterator->second->index();
+        auto catalogColumn = colIterator->second->column();
         columnIndexes[index] = catalogColumn->index();
     }
 
@@ -253,9 +242,8 @@ TableCatalogDelegate::getIndexIdString(const catalog::Index &catalogIndex)
 }
 
 std::string
-TableCatalogDelegate::getIndexIdString(const TableIndexScheme &indexScheme)
-{
-    vector<int32_t> columnIndexes(indexScheme.columnIndices.size());
+TableCatalogDelegate::getIndexIdString(const TableIndexScheme& indexScheme) {
+    std::vector<int32_t> columnIndexes(indexScheme.columnIndices.size());
 
     // get the list of column indexes in the target table
     // in the order they appear in the index
@@ -272,146 +260,125 @@ TableCatalogDelegate::getIndexIdString(const TableIndexScheme &indexScheme)
 }
 
 
-Table *TableCatalogDelegate::constructTableFromCatalog(catalog::Database const &catalogDatabase,
-                                                       catalog::Table const &catalogTable,
-                                                       int tableAllocationTargetSize)
-{
+Table* TableCatalogDelegate::constructTableFromCatalog(catalog::Database const& catalogDatabase,
+                                                       catalog::Table const& catalogTable,
+                                                       int tableAllocationTargetSize) {
     // Create a persistent table for this table in our catalog
-    int32_t table_id = catalogTable.relativeIndex();
+    int32_t tableId = catalogTable.relativeIndex();
 
     // get an array of table column names
     const int numColumns = static_cast<int>(catalogTable.columns().size());
-    map<string, catalog::Column*>::const_iterator col_iterator;
-    vector<string> columnNames(numColumns);
-    for (col_iterator = catalogTable.columns().begin();
-         col_iterator != catalogTable.columns().end();
-         col_iterator++)
-    {
-        const catalog::Column *catalog_column = col_iterator->second;
-        columnNames[catalog_column->index()] = catalog_column->name();
+    std::map<std::string, catalog::Column*>::const_iterator colIterator;
+    std::vector<std::string> columnNames(numColumns);
+    for (colIterator = catalogTable.columns().begin();
+         colIterator != catalogTable.columns().end();
+         colIterator++) {
+        auto catalogColumn = colIterator->second;
+        columnNames[catalogColumn->index()] = catalogColumn->name();
     }
 
     // get the schema for the table
-    TupleSchema *schema = createTupleSchema(catalogDatabase, catalogTable);
+    TupleSchema* schema = createTupleSchema(catalogDatabase, catalogTable);
 
     // Indexes
-    map<string, TableIndexScheme> index_map;
-    map<string, catalog::Index*>::const_iterator idx_iterator;
-    for (idx_iterator = catalogTable.indexes().begin();
-         idx_iterator != catalogTable.indexes().end(); idx_iterator++) {
-        catalog::Index *catalog_index = idx_iterator->second;
+    std::map<std::string, TableIndexScheme> index_map;
+    std::map<std::string, catalog::Index*>::const_iterator idxIterator;
+    for (idxIterator = catalogTable.indexes().begin();
+         idxIterator != catalogTable.indexes().end(); idxIterator++) {
+        auto catalogIndex = idxIterator->second;
 
         TableIndexScheme index_scheme;
-        if (getIndexScheme(catalogTable, *catalog_index, schema, &index_scheme)) {
-            index_map[catalog_index->name()] = index_scheme;
+        if (getIndexScheme(catalogTable, *catalogIndex, schema, &index_scheme)) {
+            index_map[catalogIndex->name()] = index_scheme;
         }
     }
 
     // Constraints
-    string pkey_index_id;
-    map<string, catalog::Constraint*>::const_iterator constraint_iterator;
-    for (constraint_iterator = catalogTable.constraints().begin();
-         constraint_iterator != catalogTable.constraints().end();
-         constraint_iterator++) {
-        catalog::Constraint *catalog_constraint = constraint_iterator->second;
+    std::string pkeyIndexId;
+    std::map<std::string, catalog::Constraint*>::const_iterator constraintIterator;
+    for (constraintIterator = catalogTable.constraints().begin();
+         constraintIterator != catalogTable.constraints().end();
+         constraintIterator++) {
+        auto catalogConstraint = constraintIterator->second;
 
         // Constraint Type
-        ConstraintType type = (ConstraintType)catalog_constraint->type();
+        ConstraintType type = (ConstraintType) catalogConstraint->type();
         switch (type) {
-            case CONSTRAINT_TYPE_PRIMARY_KEY:
-                // Make sure we have an index to use
-                if (catalog_constraint->index() == NULL) {
-                    VOLT_ERROR("The '%s' constraint '%s' on table '%s' does"
-                               " not specify an index",
-                               constraintutil::getTypeName(type).c_str(),
-                               catalog_constraint->name().c_str(),
-                               catalogTable.name().c_str());
-                    return NULL;
-                }
-                // Make sure they didn't declare more than one primary key index
-                else if (pkey_index_id.size() > 0) {
-                    VOLT_ERROR("Trying to declare a primary key on table '%s'"
-                               "using index '%s' but '%s' was already set as"
-                               " the primary key",
-                               catalogTable.name().c_str(),
-                               catalog_constraint->index()->name().c_str(),
-                               pkey_index_id.c_str());
-                    return NULL;
-                }
-                pkey_index_id = catalog_constraint->index()->name();
-                break;
-            case CONSTRAINT_TYPE_UNIQUE:
-                // Make sure we have an index to use
-                // TODO: In the future I would like bring back my Constraint
-                //       object so that we can keep track of everything that a
-                //       table has...
-                if (catalog_constraint->index() == NULL) {
-                    VOLT_ERROR("The '%s' constraint '%s' on table '%s' does"
-                               " not specify an index",
-                               constraintutil::getTypeName(type).c_str(),
-                               catalog_constraint->name().c_str(),
-                               catalogTable.name().c_str());
-                    return NULL;
-                }
-                break;
-            // Unsupported
-            case CONSTRAINT_TYPE_CHECK:
-            case CONSTRAINT_TYPE_FOREIGN_KEY:
-            case CONSTRAINT_TYPE_MAIN:
-                VOLT_WARN("Unsupported type '%s' for constraint '%s'",
-                          constraintutil::getTypeName(type).c_str(),
-                          catalog_constraint->name().c_str());
-                break;
-            // Unknown
-            default:
-                VOLT_ERROR("Invalid constraint type '%s' for '%s'",
-                           constraintutil::getTypeName(type).c_str(),
-                           catalog_constraint->name().c_str());
-                return NULL;
+        case CONSTRAINT_TYPE_PRIMARY_KEY:
+            // Make sure we have an index to use
+            assert(catalogConstraint->index());
+            // Make sure they didn't declare more than one primary key index
+            assert(pkeyIndexId.empty());
+            pkeyIndexId = catalogConstraint->index()->name();
+            break;
+        case CONSTRAINT_TYPE_UNIQUE:
+            // Make sure we have an index to use
+            // TODO: In the future I would like bring back my Constraint
+            //       object so that we can keep track of everything that a
+            //       table has...
+            assert(catalogConstraint->index());
+            break;
+        // Unsupported
+        case CONSTRAINT_TYPE_CHECK:
+        case CONSTRAINT_TYPE_FOREIGN_KEY:
+        case CONSTRAINT_TYPE_MAIN:
+            VOLT_WARN("Unsupported type '%s' for constraint '%s'",
+                      constraintutil::getTypeName(type).c_str(),
+                      catalogConstraint->name().c_str());
+            break;
+        // Unknown
+        default:
+            VOLT_ERROR("Invalid constraint type '%s' for '%s'",
+                       constraintutil::getTypeName(type).c_str(),
+                       catalogConstraint->name().c_str());
+            assert(false);
+            return NULL;
         }
     }
 
     // Build the index array
     // Please note the index array should follow the order of primary key first,
     // all unique indices afterwards, and all the non-unique indices at the end.
-    deque<TableIndexScheme> indexes;
-    TableIndexScheme pkey_index_scheme;
-    map<string, TableIndexScheme>::const_iterator index_iterator;
-    for (index_iterator = index_map.begin(); index_iterator != index_map.end();
-         index_iterator++) {
+    std::deque<TableIndexScheme> indexes;
+    TableIndexScheme pkeyIndex_scheme;
+    std::map<std::string, TableIndexScheme>::const_iterator indexIterator;
+    for (indexIterator = index_map.begin(); indexIterator != index_map.end();
+         indexIterator++) {
         // Exclude the primary key
-        if (index_iterator->second.name.compare(pkey_index_id) == 0) {
-            pkey_index_scheme = index_iterator->second;
+        if (indexIterator->second.name.compare(pkeyIndexId) == 0) {
+            pkeyIndex_scheme = indexIterator->second;
         // Just add it to the list
-        } else {
-            if (index_iterator->second.unique) {
-                indexes.push_front(index_iterator->second);
-            } else {
-                indexes.push_back(index_iterator->second);
+        }
+        else {
+            if (indexIterator->second.unique) {
+                indexes.push_front(indexIterator->second);
+            }
+            else {
+                indexes.push_back(indexIterator->second);
             }
         }
     }
 
     // partition column:
-    const catalog::Column* partitionColumn = catalogTable.partitioncolumn();
+    catalog::Column const* partitionColumn = catalogTable.partitioncolumn();
     int partitionColumnIndex = -1;
     if (partitionColumn != NULL) {
         partitionColumnIndex = partitionColumn->index();
     }
 
-    bool exportEnabled = isExportEnabledForTable(catalogDatabase, table_id);
-    bool tableIsExportOnly = isTableExportOnly(catalogDatabase, table_id);
+    bool exportEnabled = isExportEnabledForTable(catalogDatabase, tableId);
+    bool tableIsExportOnly = isTableExportOnly(catalogDatabase, tableId);
     bool drEnabled = catalogTable.isDRed();
     m_materialized = isTableMaterialized(catalogTable);
-    const string& tableName = catalogTable.name();
+    std::string const& tableName = catalogTable.name();
     int32_t databaseId = catalogDatabase.relativeIndex();
     SHA1_CTX shaCTX;
     SHA1Init(&shaCTX);
-    SHA1Update(&shaCTX, reinterpret_cast<const uint8_t *>(catalogTable.signature().c_str()), (uint32_t )::strlen(catalogTable.signature().c_str()));
-    SHA1Final(reinterpret_cast<unsigned char *>(m_signatureHash), &shaCTX);
+    SHA1Update(&shaCTX, reinterpret_cast<const uint8_t*>(catalogTable.signature().c_str()), (uint32_t )::strlen(catalogTable.signature().c_str()));
+    SHA1Final(reinterpret_cast<unsigned char*>(m_signatureHash), &shaCTX);
     // Persistent table will use default size (2MB) if tableAllocationTargetSize is zero.
     if (m_materialized) {
-      catalog::MaterializedViewInfo *mvInfo = catalogTable.materializer()->views().get(catalogTable.name());
+      catalog::MaterializedViewInfo* mvInfo = catalogTable.materializer()->views().get(catalogTable.name());
       if (mvInfo && mvInfo->groupbycols().size() == 0) {
         // ENG-8490: If the materialized view came with no group by, set table block size to 64KB
         // to achieve better space efficiency.
@@ -419,7 +386,7 @@ Table *TableCatalogDelegate::constructTableFromCatalog(catalog::Database const &
         tableAllocationTargetSize = 1024 * 64;
       }
     }
-    Table *table = TableFactory::getPersistentTable(databaseId, tableName,
+    Table* table = TableFactory::getPersistentTable(databaseId, tableName,
                                                     schema, columnNames, m_signatureHash,
                                                     m_materialized,
                                                     partitionColumnIndex, exportEnabled,
@@ -430,20 +397,22 @@ Table *TableCatalogDelegate::constructTableFromCatalog(catalog::Database const &
                                                     drEnabled);
     PersistentTable* persistentTable = dynamic_cast<PersistentTable*>(table);
     if ( ! persistentTable) {
+        assert(pkeyIndexId.empty());
+        assert(indexes.empty());
         return table;
     }
 
     // add a pkey index if one exists
-    if (pkey_index_id.size() != 0) {
-        TableIndex *pkeyIndex = TableIndexFactory::getInstance(pkey_index_scheme);
+    if ( ! pkeyIndexId.empty()) {
+        TableIndex* pkeyIndex = TableIndexFactory::getInstance(pkeyIndex_scheme);
         assert(pkeyIndex);
         persistentTable->addIndex(pkeyIndex);
         persistentTable->setPrimaryKeyIndex(pkeyIndex);
     }
 
     // add other indexes
-    BOOST_FOREACH(TableIndexScheme &scheme, indexes) {
-        TableIndex *index = TableIndexFactory::getInstance(scheme);
+    BOOST_FOREACH(TableIndexScheme& scheme, indexes) {
+        TableIndex* index = TableIndexFactory::getInstance(scheme);
         assert(index);
         persistentTable->addIndex(index);
     }
@@ -451,12 +420,11 @@ Table *TableCatalogDelegate::constructTableFromCatalog(catalog::Database const &
     return table;
 }
 
-void TableCatalogDelegate::init(catalog::Database const &catalogDatabase,
-        catalog::Table const &catalogTable)
-{
+void TableCatalogDelegate::init(catalog::Database const& catalogDatabase,
+        catalog::Table const& catalogTable) {
     m_table = constructTableFromCatalog(catalogDatabase,
                                         catalogTable);
-    if (!m_table) {
+    if ( ! m_table) {
         return;
     }
 
@@ -470,13 +438,12 @@ void TableCatalogDelegate::init(catalog::Database const &catalogDatabase,
     m_table->incrementRefcount();
 }
 
-PersistentTable* TableCatalogDelegate::createDeltaTable(catalog::Database const &catalogDatabase,
-        catalog::Table const &catalogTable)
-{
+PersistentTable* TableCatalogDelegate::createDeltaTable(catalog::Database const& catalogDatabase,
+        catalog::Table const& catalogTable) {
     // Delta table will only have one row (currently).
     // Set the table block size to 64KB to achieve better space efficiency.
     // FYI: maximum column count = 1024, largest fixed length data type is short varchars (64 bytes)
-    Table *deltaTable = constructTableFromCatalog(catalogDatabase, catalogTable, 1024 * 64);
+    Table* deltaTable = constructTableFromCatalog(catalogDatabase, catalogTable, 1024 * 64);
     deltaTable->incrementRefcount();
     // We have the restriction that view on joined table cannot have non-persistent table source.
     // So here we could use static_cast. But if we in the future want to lift this limitation,
@@ -485,19 +452,17 @@ PersistentTable* TableCatalogDelegate::createDeltaTable(catalog::Database const 
 }
 
 //After catalog is updated call this to ensure your export tables are connected correctly.
-void TableCatalogDelegate::evaluateExport(catalog::Database const &catalogDatabase,
-                           catalog::Table const &catalogTable)
-{
+void TableCatalogDelegate::evaluateExport(catalog::Database const& catalogDatabase,
+        catalog::Table const& catalogTable) {
     m_exportEnabled = isExportEnabledForTable(catalogDatabase, catalogTable.relativeIndex());
 }
 
-static void migrateChangedTuples(catalog::Table const &catalogTable,
-        PersistentTable* existingTable, PersistentTable* newTable)
-{
+static void migrateChangedTuples(catalog::Table const& catalogTable,
+        PersistentTable* existingTable, PersistentTable* newTable) {
     int64_t existingTupleCount = existingTable->activeTupleCount();
 
     // remove all indexes from the existing table
-    const vector<TableIndex*> currentIndexes = existingTable->allIndexes();
+    const std::vector<TableIndex*> currentIndexes = existingTable->allIndexes();
     for (int i = 0; i < currentIndexes.size(); i++) {
         existingTable->removeIndex(currentIndexes[i]);
     }
@@ -519,7 +484,7 @@ static void migrateChangedTuples(catalog::Table const &catalogTable,
 
     // default values
     boost::scoped_array<NValue> defaults_array(new NValue[columnCount]);
-    NValue *defaults = defaults_array.get();
+    NValue* defaults = defaults_array.get();
 
     // map from existing table
     int columnSourceMap[columnCount];
@@ -528,15 +493,14 @@ static void migrateChangedTuples(catalog::Table const &catalogTable,
     // to cover an explosion from an inline-sized to an out-of-line-sized string.
     bool columnExploded[columnCount];
 
-    vector<std::string> oldColumnNames = existingTable->getColumnNames();
+    std::vector<std::string> oldColumnNames = existingTable->getColumnNames();
 
     catalog::CatalogMap<catalog::Column>::field_map_iter colIter;
     for (colIter = catalogTable.columns().begin();
          colIter != catalogTable.columns().end();
-         colIter++)
-    {
-        std::string colName = colIter->second->name();
-        catalog::Column *column = colIter->second;
+         colIter++) {
+        auto column = colIter->second;
+        std::string colName = column->name();
         int newIndex = column->index();
 
         // assign a default value, if one exists
@@ -571,8 +535,8 @@ static void migrateChangedTuples(catalog::Table const &catalogTable,
     size_t blocksLeft = existingTable->allocatedBlockCount();
     while (blocksLeft) {
 
-        TableIterator &iterator = existingTable->iterator();
-        TableTuple &tupleToInsert = newTable->tempTuple();
+        TableIterator& iterator = existingTable->iterator();
+        TableTuple& tupleToInsert = newTable->tempTuple();
 
         while (iterator.next(scannedTuple)) {
 
@@ -628,8 +592,7 @@ static void migrateChangedTuples(catalog::Table const &catalogTable,
 
 static void migrateViews(const catalog::CatalogMap<catalog::MaterializedViewInfo>& views,
                          PersistentTable* existingTable, PersistentTable* newTable,
-                         std::map<std::string, TableCatalogDelegate*> const& delegatesByName)
-{
+                         std::map<std::string, TableCatalogDelegate*> const& delegatesByName) {
     std::vector<catalog::MaterializedViewInfo*> survivingInfos;
     std::vector<MaterializedViewTriggerForWrite*> survivingViews;
     std::vector<MaterializedViewTriggerForWrite*> obsoleteViews;
@@ -654,28 +617,26 @@ static void migrateViews(const catalog::CatalogMap<catalog::MaterializedViewInfo
     // See initMaterializedViews
 
     for (int ii = 0; ii < survivingInfos.size(); ++ii) {
-        catalog::MaterializedViewInfo * currInfo = survivingInfos[ii];
-        PersistentTable* oldTargetTable = survivingViews[ii]->targetTable();
+        catalog::MaterializedViewInfo* currInfo = survivingInfos[ii];
+        PersistentTable* oldDestTable = survivingViews[ii]->destTable();
         // Use the now-current definiton of the target table, to be updated later, if needed.
-        TableCatalogDelegate* targetDelegate = findInMapOrNull(oldTargetTable->name(),
+        TableCatalogDelegate* targetDelegate = findInMapOrNull(oldDestTable->name(),
                                                                delegatesByName);
-        PersistentTable* targetTable = oldTargetTable; // fallback value if not (yet) redefined.
+        PersistentTable* destTable = oldDestTable; // fallback value if not (yet) redefined.
         if (targetDelegate) {
-            PersistentTable* newTargetTable =
-                dynamic_cast<PersistentTable*>(targetDelegate->getTable());
-            if (newTargetTable) {
-                targetTable = newTargetTable;
+            PersistentTable* newDestTable = targetDelegate->getPersistentTable();
+            if (newDestTable) {
+                destTable = newDestTable;
             }
         }
-        // This guards its targetTable from accidental deletion with a refcount bump.
-        MaterializedViewTriggerForWrite::build(newTable, targetTable, currInfo);
+        // This guards its destTable from accidental deletion with a refcount bump.
+        MaterializedViewTriggerForWrite::build(newTable, destTable, currInfo);
     }
 }
 
-static void migrateExportViews(const catalog::CatalogMap<catalog::MaterializedViewInfo>& views,
-                  StreamedTable* existingTable, StreamedTable* newTable,
-                  std::map<std::string, TableCatalogDelegate*> const& delegatesByName)
-{
+static void migrateExportViews(catalog::CatalogMap<catalog::MaterializedViewInfo> const& views,
+                               StreamedTable* existingTable, StreamedTable* newTable,
+                  std::map<std::string, TableCatalogDelegate*> const& delegatesByName) {
     std::vector<catalog::MaterializedViewInfo*> survivingInfos;
     std::vector<MaterializedViewTriggerForStreamInsert*> survivingViews;
     std::vector<MaterializedViewTriggerForStreamInsert*> obsoleteViews;
@@ -701,29 +662,27 @@ static void migrateExportViews(const catalog::CatalogMap<catalog::MaterializedVi
     // See initMaterializedViews
 
     for (int ii = 0; ii < survivingInfos.size(); ++ii) {
-        catalog::MaterializedViewInfo * currInfo = survivingInfos[ii];
-        PersistentTable* oldTargetTable = survivingViews[ii]->targetTable();
+        catalog::MaterializedViewInfo* currInfo = survivingInfos[ii];
+        PersistentTable* oldDestTable = survivingViews[ii]->destTable();
         // Use the now-current definiton of the target table, to be updated later, if needed.
-        TableCatalogDelegate* targetDelegate = findInMapOrNull(oldTargetTable->name(),
+        TableCatalogDelegate* targetDelegate = findInMapOrNull(oldDestTable->name(),
                                                                delegatesByName);
-        PersistentTable* targetTable = oldTargetTable; // fallback value if not (yet) redefined.
+        PersistentTable* destTable = oldDestTable; // fallback value if not (yet) redefined.
         if (targetDelegate) {
-            PersistentTable* newTargetTable =
-                dynamic_cast<PersistentTable*>(targetDelegate->getTable());
-            if (newTargetTable) {
-                targetTable = newTargetTable;
+            PersistentTable* newDestTable = targetDelegate->getPersistentTable();
+            if (newDestTable) {
+                destTable = newDestTable;
             }
         }
-        // This guards its targetTable from accidental deletion with a refcount bump.
-        MaterializedViewTriggerForStreamInsert::build(newTable, targetTable, currInfo);
+        // This guards its destTable from accidental deletion with a refcount bump.
+        MaterializedViewTriggerForStreamInsert::build(newTable, destTable, currInfo);
     }
 }
 
 void
-TableCatalogDelegate::processSchemaChanges(catalog::Database const &catalogDatabase,
-                                           catalog::Table const &catalogTable,
-                                           std::map<std::string, TableCatalogDelegate*> const &delegatesByName)
-{
+TableCatalogDelegate::processSchemaChanges(catalog::Database const& catalogDatabase,
+                                           catalog::Table const& catalogTable,
+                                           std::map<std::string, TableCatalogDelegate*> const& delegatesByName) {
     DRTupleStreamDisableGuard guard(ExecutorContext::getExecutorContext());
 
     ///////////////////////////////////////////////
@@ -749,7 +708,7 @@ TableCatalogDelegate::processSchemaChanges(catalog::Database const &catalogDatab
     }
     else {
         StreamedTable* newStreamedTable = dynamic_cast<StreamedTable*>(m_table);
-        StreamedTable *existingStreamedTable = dynamic_cast<StreamedTable*>(existingTable);
+        StreamedTable* existingStreamedTable = dynamic_cast<StreamedTable*>(existingTable);
         if (existingStreamedTable && newStreamedTable) {
             migrateExportViews(catalogTable.views(), existingStreamedTable, newStreamedTable, delegatesByName);
         }
@@ -770,15 +729,14 @@ TableCatalogDelegate::processSchemaChanges(catalog::Database const &catalogDatab
     }
 }
 
-void TableCatalogDelegate::deleteCommand()
-{
+void TableCatalogDelegate::deleteCommand() {
     if (m_table) {
         m_table->decrementRefcount();
         m_table = NULL;
     }
 }
 
-static bool isDefaultNow(const std::string& defaultValue) {
+static bool isDefaultNow(std::string const& defaultValue) {
     std::vector<std::string> tokens;
     boost::split(tokens, defaultValue, boost::is_any_of(":"));
     if (tokens.size() != 2) {
@@ -786,27 +744,22 @@ static bool isDefaultNow(const std::string& defaultValue) {
     }
 
     int funcId = boost::lexical_cast<int>(tokens[1]);
-    if (funcId == FUNC_CURRENT_TIMESTAMP) {
-        return true;
-    }
-
-    return false;
+    return funcId == FUNC_CURRENT_TIMESTAMP;
 }
 
 // This method produces a row containing all the default values for
 // the table, skipping over fields explictly set, and adding "default
 // now" fields to nowFields.
 void TableCatalogDelegate::initTupleWithDefaultValues(Pool* pool,
-                                                      catalog::Table const *catalogTable,
-                                                      const std::set<int>& fieldsExplicitlySet,
+                                                      catalog::Table const* catalogTable,
+                                                      std::set<int> const& fieldsExplicitlySet,
                                                       TableTuple& tbTuple,
                                                       std::vector<int>& nowFields) {
     catalog::CatalogMap<catalog::Column>::field_map_iter colIter;
     for (colIter = catalogTable->columns().begin();
          colIter != catalogTable->columns().end();
          colIter++) {
-
-        catalog::Column *col = colIter->second;
+        auto col = colIter->second;
         if (fieldsExplicitlySet.find(col->index()) != fieldsExplicitlySet.end()) {
             // this field will be set explicitly so no need to
             // serialize the default value
@@ -829,7 +782,6 @@ void TableCatalogDelegate::initTupleWithDefaultValues(Pool* pool,
             }
             // else, fall through to default case
         default:
-
             NValue defaultValue = ValueFactory::nvalueFromSQLDefaultType(defaultColType,
                                                                          col->defaultvalue(),
                                                                          pool);
