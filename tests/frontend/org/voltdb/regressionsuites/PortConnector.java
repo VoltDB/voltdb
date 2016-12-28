@@ -77,7 +77,7 @@ public class PortConnector {
             throw new IOException("Failed to open host " + m_host);
         }
         //configure non blocking.
-        m_socket.configureBlocking(true);
+        m_socket.configureBlocking(false);
         m_socket.socket().setTcpNoDelay(true);
         if (m_enableSSL) {
             SSLConfiguration.SslConfig sslConfig;
@@ -153,11 +153,15 @@ public class PortConnector {
         }
         if (m_dec != null) {
             DBBPool.BBContainer m_dstBufferCont = DBBPool.allocateDirect(m_packetBufferSize);
-            ByteBuffer m_dstBuffer = m_dstBufferCont.b();
-            m_dec.unwrap(buf, m_dstBuffer);
-            buf.limit(m_dstBuffer.remaining());
-            buf.put(m_dstBuffer);
-            buf.flip();
+            try {
+                ByteBuffer m_dstBuffer = m_dstBufferCont.b();
+                m_dec.unwrap(buf, m_dstBuffer);
+                buf.limit(m_dstBuffer.remaining());
+                buf.put(m_dstBuffer);
+                buf.flip();
+            } finally {
+                m_dstBufferCont.discard();
+            }
         }
     }
 
