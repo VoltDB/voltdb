@@ -2524,8 +2524,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             // so there is no need to wait for the truncation snapshot requested
             // above to finish.
             if (logRecoveryCompleted || m_joining) {
+                if (m_rejoining) {
+                   final String node = VoltZK.rejoinNodesBlockerHost + m_myHostId;
+                   VoltZK.removeRejoinNodeIndicator(m_messenger.getZK(), node);
+                   m_rejoining = false;
+                }
                 String actionName = m_joining ? "join" : "rejoin";
-                m_rejoining = false;
                 m_joining = false;
                 consoleLog.info(String.format("Node %s completed", actionName));
             }
