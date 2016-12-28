@@ -40,6 +40,7 @@ import org.voltcore.logging.VoltLog4jLogger;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.network.ReverseDNSCache;
+import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.EstTimeUpdater;
 import org.voltcore.utils.OnDemandBinaryLogger;
 import org.voltcore.utils.PortGenerator;
@@ -90,22 +91,6 @@ public class VoltDB {
     public static final String DEFAULT_CLUSTER_NAME = "database";
     public static final String DBROOT = Constants.DBROOT;
     public static final String MODULE_CACHE = ".bundles-cache";
-
-    // Utility to try to figure out if this is a test case.  Various junit targets in
-    // build.xml set this environment variable to give us a hint
-    public static boolean isThisATest()
-    {
-        String test = System.getenv().get("VOLT_JUSTATEST");
-        if (test == null) {
-            test = System.getProperty("VOLT_JUSTATEST");
-        }
-        if (test != null && test.equalsIgnoreCase("YESYESYES")) {
-            return true;
-        }
-        else {
-            return false;
-        }
-    }
 
     // The name of the SQLStmt implied by a statement procedure's sql statement.
     public static final String ANON_STMT_NAME = "sql";
@@ -966,7 +951,7 @@ public class VoltDB {
      * human readable stack traces for all java threads in the current process.
      */
     public static void dropStackTrace(String message) {
-        if (VoltDB.isThisATest()) {
+        if (CoreUtils.isJunitTest()) {
             VoltLogger log = new VoltLogger("HOST");
             log.warn("Declining to drop a stack trace during a junit test.");
             return;
@@ -1110,7 +1095,7 @@ public class VoltDB {
         if (ignoreCrash) {
             throw new AssertionError("Faux crash of VoltDB successful.");
         }
-        if (VoltDB.isThisATest()) {
+        if (CoreUtils.isJunitTest()) {
             VoltLogger log = new VoltLogger("HOST");
             log.warn("Declining to drop a crash file during a junit test.");
         }
@@ -1376,7 +1361,7 @@ public class VoltDB {
     }
 
     public static void exit(int status) {
-        if (isThisATest() || ignoreCrash) {
+        if (CoreUtils.isJunitTest() || ignoreCrash) {
             throw new SimulatedExitException(status);
         }
         System.exit(status);
