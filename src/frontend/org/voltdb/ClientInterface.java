@@ -371,42 +371,44 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         networkLog.info("SSL enabled on connection " + m_socket.socket().getRemoteSocketAddress() +
                                 " with protocol " + sslEngine.getSession().getProtocol() + " and with cipher " + sslEngine.getSession().getCipherSuite());
                     }
+
+                    boolean success = false;
                     MessagingChannel messagingChannel = MessagingChannel.get(m_socket, sslEngine);
+                    AtomicReference<String> timeoutRef = null;
+                    try {
 
                     /*
                      * Enforce a limit on the maximum number of connections
                      */
-                    if (m_numConnections.get() >= MAX_CONNECTIONS.get()) {
-                        networkLog.warn("Rejected connection from " +
-                                m_socket.socket().getRemoteSocketAddress() +
-                                " because the connection limit of " + MAX_CONNECTIONS + " has been reached");
-                        try {
+                        if (m_numConnections.get() >= MAX_CONNECTIONS.get()) {
+                            networkLog.warn("Rejected connection from " +
+                                    m_socket.socket().getRemoteSocketAddress() +
+                                    " because the connection limit of " + MAX_CONNECTIONS + " has been reached");
+                            try {
                             /*
                              * Send rejection message with reason code
                              */
-                            ByteBuffer b = ByteBuffer.allocate(1);
-                            b.put(MAX_CONNECTIONS_LIMIT_ERROR);
-                            b.flip();
-                            m_socket.configureBlocking(true);
-                            for (int ii = 0; ii < 4 && b.hasRemaining(); ii++) {
-                                messagingChannel.writeMessage(b);
-                            }
-                            m_socket.close();
-                        } catch (IOException e) {}//don't care keep running
-                        return;
-                    }
+                                ByteBuffer b = ByteBuffer.allocate(1);
+                                b.put(MAX_CONNECTIONS_LIMIT_ERROR);
+                                b.flip();
+                                m_socket.configureBlocking(true);
+                                for (int ii = 0; ii < 4 && b.hasRemaining(); ii++) {
+                                    messagingChannel.writeMessage(b);
+                                }
+                                m_socket.close();
+                            } catch (IOException e) {}//don't care keep running
+                            return;
+                        }
 
                     /*
                      * Increment the number of connections even though this one hasn't been authenticated
                      * so that a flood of connection attempts (with many doomed) will not result in
                      * successful authentication of connections that would put us over the limit.
                      */
-                    m_numConnections.incrementAndGet();
+                        m_numConnections.incrementAndGet();
 
-                    boolean success = false;
-                    //Populated on timeout
-                    AtomicReference<String> timeoutRef = new AtomicReference<String>();
-                    try {
+                        //Populated on timeout
+                        timeoutRef = new AtomicReference<String>();
                         final ClientInputHandler handler = authenticate(m_socket, messagingChannel, timeoutRef);
                         if (handler != null) {
                             m_socket.configureBlocking(false);
@@ -414,12 +416,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             m_socket.socket().setKeepAlive(true);
 
                             m_network.registerChannel(
-                                            m_socket,
-                                            handler,
-                                            0,
-                                            ReverseDNSPolicy.ASYNCHRONOUS,
-                                            SSLEncryptionService.serverInstance(),
-                                            sslEngine);
+                                    m_socket,
+                                    handler,
+                                    0,
+                                    ReverseDNSPolicy.ASYNCHRONOUS,
+                                    SSLEncryptionService.serverInstance(),
+                                    sslEngine);
                             /*
                              * If IV2 is enabled the logic initially enabling read is
                              * in the started method of the InputHandler
