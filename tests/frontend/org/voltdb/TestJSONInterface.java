@@ -222,10 +222,10 @@ public class TestJSONInterface extends TestCase {
                     request = delete;
                     break;
                 case "GET":
-                    request = new HttpGet(url + "?" + varString);
+                    request = new HttpGet(url + ((varString != null && varString.trim().length() > 0) ? ("?" + varString.trim()) : ""));
                     break;
                 default:
-                    request = new HttpGet(url + "?" + varString);
+                    request = new HttpGet(url + ((varString != null && varString.trim().length() > 0) ? ("?" + varString.trim()) : ""));
                     break;
             }
             // play nice by using HTTP 1.1 continue requests where the client sends the request headers first
