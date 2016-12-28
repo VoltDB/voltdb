@@ -1205,6 +1205,23 @@ var loadPage = function (serverName, portid) {
             }
         });
 
+        voltDbRenderer.GetDeploymentInformation(function (deploymentDetails) {
+                if (deploymentDetails != undefined) {
+                    var clusterDetails = voltDbRenderer.getClusterDetail(getCurrentServer());
+                    if (clusterDetails != undefined && clusterDetails.LICENSE != undefined) {
+                        licenseInfo = clusterDetails.LICENSE;
+
+                        if (licenseInfo != undefined && licenseInfo != "") {
+                            $("#row-7").show();
+                        }
+                        else
+                        {
+                            $("#row-7").hide();
+                        }
+                    }
+                }
+        });
+
         var hideDrInformation =  function(){
             $('#navDR').hide()
             $('#clusterId').hide();
