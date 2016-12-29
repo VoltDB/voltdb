@@ -237,39 +237,81 @@ class AdminSnmpTest extends TestBase {
     }
 
     def checkAuthKeyDefaultValue(){
+        int count = 0
+        testStatus = false
         expect: 'at Admin Page'
-
-        when: "click edit button"
-        if (page.editSnmpButton.isDisplayed()) {
-            page.editSnmpButton.click()
+        while(count<numberOfTrials) {
+            count ++
+            try {
+                when:
+                waitFor(waitTime) {
+                    if (page.editSnmpButton.isDisplayed()) {
+                        page.editSnmpButton.click()
+                    }
+                }
+                then:
+                if(page.txtAuthkey.value().equals("voltdbauthkey")){
+                    assert true
+                }
+                else{
+                    println("default value for authkey is not set")
+                    assert false
+                }
+                testStatus = true
+                break
+            } catch(geb.waiting.WaitTimeoutException e) {
+                println("RETRYING: WaitTimeoutException occured")
+            } catch(org.openqa.selenium.StaleElementReferenceException e) {
+                println("RETRYING: StaleElementReferenceException occured")
+            }
         }
-        then:
-        if(page.txtAuthkey.value().equals("voltdbauthkey")){
-            assert true
+        if(testStatus == true) {
+            println("PASS")
         }
-        else{
-            println("default value for authkey is not set")
+        else {
+            println("FAIL: Test didn't pass in " + numberOfTrials + " trials")
             assert false
         }
     }
 
     def checkPrivKeyDefaultValue(){
-
+        int count = 0
+        testStatus = false
         expect: 'at Admin Page'
 
-        when: "click edit button"
-        if (page.editSnmpButton.isDisplayed()) {
-            page.editSnmpButton.click()
+        while(count<numberOfTrials) {
+            count ++
+            try {
+                when:
+                waitFor(waitTime) {
+                    if (page.editSnmpButton.isDisplayed()) {
+                        page.editSnmpButton.click()
+                    }
+                }
+                then:
+                if(page.txtPrivkey.value().equals("voltdbprivacykey")){
+                    assert true
+                }
+                else{
+                    println("default value for privkey is not set")
+                    assert false
+                }
+
+                testStatus = true
+                break
+            } catch(geb.waiting.WaitTimeoutException e) {
+                println("RETRYING: WaitTimeoutException occured")
+            } catch(org.openqa.selenium.StaleElementReferenceException e) {
+                println("RETRYING: StaleElementReferenceException occured")
+            }
         }
-        then:
-        if(page.txtPrivkey.value().equals("voltdbprivacykey")){
-            assert true
+        if(testStatus == true) {
+            println("PASS")
         }
-        else{
-            println("default value for privkey is not set")
+        else {
+            println("FAIL: Test didn't pass in " + numberOfTrials + " trials")
             assert false
         }
-
     }
 
     def checkInvalidTarget(){
