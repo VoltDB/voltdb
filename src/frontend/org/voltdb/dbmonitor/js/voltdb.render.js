@@ -793,6 +793,22 @@ function alertNodeClicked(obj) {
                 if (data["import"] != null) {
                     adminConfigValues['importConfiguration'] = data["import"].configuration;
                 }
+                //snmp
+
+                if(data['snmp'] != null){
+                    adminConfigValues['target'] = data['snmp'].target;
+                    adminConfigValues['community'] = data['snmp'].community;
+                    adminConfigValues['username'] = data['snmp'].username;
+                    adminConfigValues['enabled'] = data['snmp'].enabled;
+                    adminConfigValues['authprotocol'] = data['snmp'].authprotocol;
+                    adminConfigValues['authkey'] = data['snmp'].authkey;
+                    adminConfigValues['privacyprotocol'] = data['snmp'].privacyprotocol;
+                    adminConfigValues['privacykey'] = data['snmp'].privacykey;
+
+
+                }
+
+
             }
             return adminConfigValues;
         };
