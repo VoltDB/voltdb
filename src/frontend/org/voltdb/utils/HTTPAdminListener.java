@@ -90,6 +90,7 @@ import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.io.Resources;
 import com.google_voltpatches.common.net.HostAndPort;
+import java.net.URLDecoder;
 
 public class HTTPAdminListener {
 
@@ -568,8 +569,9 @@ public class HTTPAdminListener {
                 response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, "Failed to get deployment information."));
                 return;
             }
+            String decoded_deployment = URLDecoder.decode(deployment, "UTF-8");
             try {
-                DeploymentType newDeployment = m_mapper.readValue(deployment, DeploymentType.class);
+                DeploymentType newDeployment = m_mapper.readValue(decoded_deployment, DeploymentType.class);
                 if (newDeployment == null) {
                     response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, "Failed to parse deployment information."));
                     return;

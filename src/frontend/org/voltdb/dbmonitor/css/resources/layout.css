@@ -4021,6 +4021,10 @@ ul#shutdownMsg li{ font-size:13px; line-height:20px; }
 .shutdownErrorMsg h2 { font-weight:bold; font-size:13px;}
 .shutdownRetryMsg { padding: 0 0 11px 0; text-align: center;}
 
+/******************SNMP******************************/
+.snmpForm > form input[type="text"],.snmpFormSelect > form > select { width:156px;}
+.loadingSNMP { position:static;}
+
 
 
 /*********************************************media Qu********************/
