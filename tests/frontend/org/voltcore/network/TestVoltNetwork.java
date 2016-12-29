@@ -23,6 +23,9 @@
 
 package org.voltcore.network;
 
+import org.voltcore.utils.ssl.SSLConfiguration;
+import org.voltcore.utils.ssl.SSLEncryptionService;
+
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -35,8 +38,11 @@ import java.nio.channels.spi.SelectorProvider;
 import java.util.HashSet;
 import java.util.Set;
 
-import jsr166y.ThreadLocalRandom;
+import javax.net.ssl.SSLEngine;
+
 import junit.framework.TestCase;
+
+import jsr166y.ThreadLocalRandom;
 
 public class TestVoltNetwork extends TestCase {
 
@@ -44,6 +50,17 @@ public class TestVoltNetwork extends TestCase {
     private static class MockVoltPort extends VoltPort {
         MockVoltPort(VoltNetwork vn, InputHandler handler) throws UnknownHostException {
             super (vn, handler, new InetSocketAddress(InetAddress.getByName("127.0.0.1"), 21212), vn.m_pool);
+        }
+
+        @Override
+        public void run() {
+            m_running = false;
+        }
+    }
+
+    private static class MockSSLVoltPort extends SSLVoltPort {
+        MockSSLVoltPort(VoltNetwork vn, InputHandler handler, SSLEncryptionService encryptSrvc, SSLEngine engine) throws UnknownHostException {
+            super (vn, handler, new InetSocketAddress(InetAddress.getByName("127.0.0.1"), 21212), vn.m_pool, encryptSrvc, engine);
         }
 
         @Override
@@ -235,42 +252,51 @@ public class TestVoltNetwork extends TestCase {
         }
     }
 
-    public void testInstallInterests() throws Exception {
-        new MockSelector();
-        VoltNetwork vn = new VoltNetwork( 0, null, "Test");
-        MockVoltPort vp = new MockVoltPort(vn, new MockInputHandler());
-        MockSelectionKey selectionKey = new MockSelectionKey();
-        vp.m_selectionKey = selectionKey;
+    private void runInstallInterests (VoltNetwork voltNetwork, VoltPort voltPort) {
+        SelectionKey sk = new MockSelectionKey();
+        voltPort.m_selectionKey = sk;
 
         // add the port to the changelist set and run install interests.
         // the ports desired ops should be set to the selection key.
-        vn.addToChangeList(vp);
-        vn.installInterests(vp);
-        assertEquals(selectionKey.interestOps(), vp.interestOps());
+        voltNetwork.addToChangeList(voltPort);
+        voltNetwork.installInterests(voltPort);
+        assertEquals(sk.interestOps(), voltPort.interestOps());
 
         // should be able to wash, rinse and repeat this a few times.
         // interesting as voltnetwork recycles some lists underneath
         // the covers.
-        vp.setInterests(SelectionKey.OP_WRITE, 0);
-        vn.addToChangeList(vp);
-        vn.installInterests(vp);
-        assertEquals(selectionKey.interestOps(), SelectionKey.OP_WRITE);
+        voltPort.setInterests(SelectionKey.OP_WRITE, 0);
+        voltNetwork.addToChangeList(voltPort);
+        voltNetwork.installInterests(voltPort);
+        assertEquals(sk.interestOps(), SelectionKey.OP_WRITE);
 
-        vp.setInterests(SelectionKey.OP_WRITE | SelectionKey.OP_READ, 0);
-        vn.addToChangeList(vp);
-        vn.installInterests(vp);
-        assertEquals(selectionKey.interestOps(), vp.interestOps());
+        voltPort.setInterests(SelectionKey.OP_WRITE | SelectionKey.OP_READ, 0);
+        voltNetwork.addToChangeList(voltPort);
+        voltNetwork.installInterests(voltPort);
+        assertEquals(sk.interestOps(), voltPort.interestOps());
     }
 
-    public void testInvokeCallbacks() throws Exception{
-        MockSelector selector = new MockSelector();
-        VoltNetwork vn = new VoltNetwork(selector);               // network with fake selector
-        MockVoltPort vp = new MockVoltPort(vn, new MockInputHandler());             // implement abstract run()
+    public void testInstallInterests() throws Exception {
+        VoltNetwork vn = new VoltNetwork( 0, null, "Test");
+        MockVoltPort vp = new MockVoltPort(vn, new MockInputHandler());
+        runInstallInterests(vn, vp);
+    }
+
+    public void testInstallInterestsSSLMode() throws Exception {
+        SSLEngine sslEngine = SSLConfiguration.initializeSslContext(null).createSSLEngine("client", 21212);
+        SSLEncryptionService encryptionSrvc = new SSLEncryptionService(false);
+
+        VoltNetwork voltNetwork = new VoltNetwork( 0, null, "Test");
+        MockSSLVoltPort sslVoltPort = new MockSSLVoltPort(voltNetwork, new MockInputHandler(), encryptionSrvc, sslEngine);
+        runInstallInterests(voltNetwork, sslVoltPort);
+    }
+
+    private void runInvokeCallbacks(MockSelector baseSelector, VoltNetwork vn, VoltPort vp) throws Exception {
         MockSelectionKey selectionKey = new MockSelectionKey();   // fake selection key
 
         // glue the key, the selector and the port together.
         selectionKey.interestOps(SelectionKey.OP_WRITE);
-        selector.setFakeKey(selectionKey);
+        baseSelector.setFakeKey(selectionKey);
         vp.m_selectionKey = selectionKey;
         selectionKey.attach(vp);
         selectionKey.readyOps(SelectionKey.OP_WRITE);
@@ -288,4 +314,23 @@ public class TestVoltNetwork extends TestCase {
         vn.shutdown();
         assertEquals(SelectionKey.OP_ACCEPT, vp.readyOps());
     }
+
+    public void testInvokeCallbacks() throws Exception {
+        MockSelector selector = new MockSelector();
+        VoltNetwork vn = new VoltNetwork(selector);               // network with fake selector
+        MockVoltPort vp = new MockVoltPort(vn, new MockInputHandler());             // implement abstract run()
+        runInvokeCallbacks(selector, vn, vp);
+    }
+
+
+    public void testInvokeCallbacksSSL() throws Exception {
+        SSLEngine sslEngine = SSLConfiguration.initializeSslContext(null).createSSLEngine("client", 21212);
+        SSLEncryptionService encryptionSrvc = new SSLEncryptionService(false);
+
+        MockSelector selector = new MockSelector();
+        VoltNetwork vn = new VoltNetwork(selector);
+        MockSSLVoltPort vp = new MockSSLVoltPort(vn, new MockInputHandler(), encryptionSrvc, sslEngine);
+        runInvokeCallbacks(selector, vn, vp);
+    }
+
 }
