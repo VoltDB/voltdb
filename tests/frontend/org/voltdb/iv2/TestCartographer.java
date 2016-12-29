@@ -23,30 +23,41 @@
 
 package org.voltdb.iv2;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.anyLong;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.timeout;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.apache.zookeeper_voltpatches.ZooKeeper;
-
 import org.json_voltpatches.JSONObject;
-
-import org.mockito.ArgumentCaptor;
-
-import org.voltcore.messaging.BinaryPayloadMessage;
-import org.voltcore.messaging.HostMessenger;
-import org.voltcore.messaging.VoltMessage;
-
-import org.voltcore.zk.ZKTestBase;
-
-import static org.junit.Assert.*;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-
-import static org.mockito.Mockito.*;
-
+import org.mockito.ArgumentCaptor;
+import org.voltcore.messaging.BinaryPayloadMessage;
+import org.voltcore.messaging.HostMessenger;
+import org.voltcore.messaging.VoltMessage;
+import org.voltcore.utils.CoreUtils;
+import org.voltcore.zk.LeaderElector;
+import org.voltcore.zk.ZKTestBase;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
+
+import com.google_voltpatches.common.collect.Lists;
+import com.google_voltpatches.common.collect.Maps;
+import com.google_voltpatches.common.collect.Sets;
 
 public class TestCartographer extends ZKTestBase {
 
@@ -92,11 +103,10 @@ public class TestCartographer extends ZKTestBase {
         repsPerPart.put(3, 2);
         repsPerPart.put(4, 1);
         int kfactor = 2;
-        int numberOfPartitions = 5;
         int sitesPerHost = 3;
 
-        List<Integer> firstRejoin =
-            Cartographer.computeReplacementPartitions(repsPerPart, kfactor, sitesPerHost);
+        List<Integer> firstRejoin = new ArrayList<Integer>();
+        Cartographer.computeReplacementPartitions(repsPerPart, kfactor, sitesPerHost, firstRejoin);
         assertEquals(3, firstRejoin.size());
         assertEquals((Integer)4, firstRejoin.get(0));
         assertEquals((Integer)0, firstRejoin.get(1));
@@ -107,8 +117,8 @@ public class TestCartographer extends ZKTestBase {
         }
 
         // now do it again and make sure we fully replicate
-        List<Integer> secondRejoin =
-            Cartographer.computeReplacementPartitions(repsPerPart, kfactor, sitesPerHost);
+        List<Integer> secondRejoin = new ArrayList<Integer>();
+        Cartographer.computeReplacementPartitions(repsPerPart, kfactor, sitesPerHost, secondRejoin);
         assertEquals(3, secondRejoin.size());
         assertEquals((Integer)2, secondRejoin.get(0));
         assertEquals((Integer)3, secondRejoin.get(1));
@@ -122,7 +132,6 @@ public class TestCartographer extends ZKTestBase {
         // than we need.  This particular case could never happen but should test the logic correctly.
         // Also, test that we don't replicate the same partition twice on the same host again.
         int kfactor = 2;
-        int numberOfPartitions = 5;
         int sitesPerHost = 3;
 
         Map<Integer, Integer> repsPerPart = new HashMap<Integer, Integer>();
@@ -132,8 +141,8 @@ public class TestCartographer extends ZKTestBase {
         repsPerPart.put(3, 3);
         repsPerPart.put(4, 1);
 
-        List<Integer> firstRejoin =
-            Cartographer.computeReplacementPartitions(repsPerPart, kfactor, sitesPerHost);
+        List<Integer> firstRejoin = new ArrayList<Integer>();
+        Cartographer.computeReplacementPartitions(repsPerPart, kfactor, sitesPerHost, firstRejoin);
         assertEquals(1, firstRejoin.size());
         assertEquals((Integer)4, firstRejoin.get(0));
     }
@@ -199,5 +208,70 @@ public class TestCartographer extends ZKTestBase {
         assertEquals(MpInitiator.MP_INIT_PID, partitionId);
         assertEquals(3, initiatorHSId);
         mpwriter.shutdown();
+    }
+
+    @Test
+    public void testRackAwareRejoin() throws Exception
+    {
+        ZooKeeper zk = getClient(0);
+        VoltZK.createPersistentZKNodes(zk);
+        HostMessenger hm = mock(HostMessenger.class);
+        when(hm.getZK()).thenReturn(m_messengers.get(0).getZK());
+        Cartographer dut = new Cartographer(hm, 0, false);
+
+        // In total there are 4 partitions, let's say there are two nodes missing
+        // and one is rejoining back
+        int kfactor = 1;
+        int sitesPerHost = 2;
+        int hostCount = 4;
+        int totalPartitions = (hostCount * sitesPerHost) / (kfactor + 1);
+        Map<Integer, String> hostGroups = Maps.newHashMap();
+        hostGroups.put(0, "rack1");
+        hostGroups.put(1, "rack1");     // this is rejoining node
+        hostGroups.put(2, "rack2");
+        // hostGroups.put(3, "rack2");  // this node is dead
+        Set<Integer> deadHosts = Sets.newHashSet();
+        deadHosts.add(1);
+        deadHosts.add(3);
+        int rejoiningHostId = 1;
+
+        // Depends on number of partitions this part can be slow.
+        int hostIdCounter = 0;
+        int[] siteIds = new int[hostCount];
+        for (int i = 0; i < hostCount; i++) {
+            siteIds[i] = 0;
+        }
+        // assign partitions
+        for (int pid = 0; pid < totalPartitions; pid++) {
+            LeaderElector.createRootIfNotExist(zk, LeaderElector.electionDirForPartition(VoltZK.leaders_initiators, pid));
+            Thread.sleep(500); // I'm evil
+            assertFalse(VoltDB.wasCrashCalled);
+            // add replica
+            for (int k = 0; k <= kfactor; k++) {
+                int hid = hostIdCounter++ % hostCount;
+                if (deadHosts.contains(hid)) continue;
+                long HSId = CoreUtils.getHSIdFromHostAndSite(hid, siteIds[hid]++);
+                LeaderElector.createParticipantNode(zk,
+                        LeaderElector.electionDirForPartition(VoltZK.leaders_initiators, pid),
+                        Long.toString(HSId++),
+                        null);
+            }
+        }
+
+        /*
+         * Partition layout should be:
+         * H0: p0, p2
+         * H1: ?, ?  (rejoining, expect p1, p3)
+         * H2: p1, p3
+         * H3: p0, p2 (dead)
+         */
+        List<Integer> expectedPartitions = Lists.newArrayList();
+        expectedPartitions.add(1);
+        expectedPartitions.add(3);
+        List<Integer> partitionsToReplace = dut.getIv2PartitionsToReplace(kfactor, sitesPerHost, rejoiningHostId, hostGroups);
+        assertTrue(partitionsToReplace.size() == sitesPerHost);
+        for (Integer p : partitionsToReplace) {
+            assertTrue(expectedPartitions.contains(p));
+        }
     }
 }

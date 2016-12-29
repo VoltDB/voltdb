@@ -37,9 +37,11 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 
+import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableSet;
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
+import com.google_voltpatches.common.collect.Lists;
 import com.google_voltpatches.common.collect.Sets;
 
 public class AbstractTopology {
@@ -1013,7 +1015,7 @@ public class AbstractTopology {
      * Not the most efficient way to do this, but even n^2 for 100 nodes is computable
      */
     private static int computeHADistance(/*final Map<String, Integer> distanceCache,*/ String token1, String token2) {
-        // ensure token1 < token2 (swap if need be)
+        // ensure token1 is no shorter than token2 (swap if need be)
         if (token1.compareTo(token2) > 0) {
             String temp = token1;
             token1 = token2;
@@ -1021,16 +1023,15 @@ public class AbstractTopology {
         }
 
         // break into arrays of graph edges
-        String[] token1parts = token1.split(".");
-        String[] token2parts = token1.split(".");
+        String[] token1parts = token1.split("\\.");
+        String[] token2parts = token2.split("\\.");
 
         // trim shared path prefix
         while (token1parts.length > 0) {
             if (token2parts.length == 0) break;
-            if (token1parts.equals(token2parts)) {
-                token1parts = Arrays.copyOfRange(token1parts, 1, token1parts.length);
-                token2parts = Arrays.copyOfRange(token2parts, 1, token2parts.length);
-            }
+            if (!token1parts[0].equals(token2parts[0])) break;
+            token1parts = Arrays.copyOfRange(token1parts, 1, token1parts.length);
+            token2parts = Arrays.copyOfRange(token2parts, 1, token2parts.length);
         }
 
         // distance is now the sum of the two path lengths
@@ -1369,5 +1370,48 @@ public class AbstractTopology {
         //assume all partitions have the same k factor.
         Partition partition =  partitionsById.values().iterator().next();
         return partition.k;
+    }
+
+    /**
+     * Sort all nodes in reverse hostGroup distance order, then group by rack-aware group, local host id is excluded.
+     * @param hostId the local host id
+     * @param hostGroups a host id to group map
+     * @return sorted grouped host ids from farthest to nearest
+     */
+    public static List<List<Integer>> sortHostIdByHGDistance(int hostId, Map<Integer, String> hostGroups) {
+        String localHostGroup = hostGroups.get(hostId);
+        Preconditions.checkArgument(localHostGroup != null);
+        List<Integer> sortedList = hostGroups.keySet().stream()
+                                                      .filter(hid -> hid != hostId)
+                                                      .sorted((hid1, hid2) ->
+                                                          computeHADistance(localHostGroup, hostGroups.get(hid2)) -
+                                                          computeHADistance(localHostGroup, hostGroups.get(hid1))
+                                                      )
+                                                      .collect(Collectors.toList());
+        List<List<Integer>> result = Lists.newArrayList();
+        if (sortedList.size() == 1) {
+            result.add(sortedList);
+            return result;
+        }
+        List<Integer> subgroup = Lists.newArrayList();
+        subgroup.add(sortedList.get(0));
+        for (int i = 1; i < sortedList.size(); i++) {
+            int hid1 = sortedList.get(i - 1);
+            int hid2 = sortedList.get(i);
+            int distance1 = computeHADistance(localHostGroup, hostGroups.get(hid1));
+            int distance2 = computeHADistance(localHostGroup, hostGroups.get(hid2));
+            if (distance1 == distance2) {
+                subgroup.add(hid2);
+            } else {
+                // found a new subgroup
+                result.add(subgroup);
+                subgroup = Lists.newArrayList();
+                subgroup.add(hid2);
+            }
+        }
+        if (!subgroup.isEmpty()) {
+            result.add(subgroup);
+        }
+        return result;
     }
 }
