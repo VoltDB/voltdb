@@ -116,7 +116,7 @@ function client() {
 # Use this target for argument help
 function benchmark-help() {
     jars-ifneeded
-    java -classpath uac-client.jar:$CLIENTCLASSPATH uac.BenchmarkUAC --help
+    java -classpath uac-client.jar:$CLIENTCLASSPATH uac.UpdateClassesBenchmark --help
 }
 
 # latencyreport: default is OFF
@@ -129,7 +129,7 @@ function benchmark() {
     source ben.config
 
     jars-ifneeded
-    java -classpath uac-client.jar:$CLIENTCLASSPATH uac.BenchmarkUAC \
+    java -classpath uac-client.jar:$CLIENTCLASSPATH uac.UpdateClassesBenchmark \
         --servers=$SERVERS \
         --dir=${PWD} \
         --name=${BENCHMARK_NAME} \

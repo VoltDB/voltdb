@@ -81,15 +81,6 @@ public class UpdateClassesBenchmark {
         }
     }
 
-    static boolean isDeleteBenchmark(String benStr) {
-        ProcBenchmark ben = fromString(benStr);
-        if (ben == null) return false;
-        if (ben == ProcBenchmark.DELETE || ben == ProcBenchmark.DELETE_BATCH) {
-            return true;
-        }
-        return false;
-    }
-
     /**
      * Uses included {@link CLIConfig} class to
      * declaratively state command line options with defaults
