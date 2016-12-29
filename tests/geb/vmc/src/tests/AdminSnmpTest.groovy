@@ -682,6 +682,55 @@ class AdminSnmpTest extends TestBase {
         then:"check save status"
         if(page.loadingSnmp.isDisplayed()){
             //need to check saved data here
+            waitFor(10){page.txtTarget.text().toLowerCase().equals("10.10.1.89")}
+            println("save is working properly")
+        }
+
+        when: "check Pro version"
+
+        if (waitFor(10){page.snmpTitle.isDisplayed()}) {
+            isPro = true
+        }
+        else{
+            assert false
+        }
+        then: "check SNMP enabled"
+        if (isPro == true) {
+            if (page.snmpEnabled.text().toLowerCase().equals("On")) {
+                snmpEnabled = true
+            }
+        }
+        when: "check edit snmp button displayed"
+        if (page.editSnmpButton.isDisplayed()) {
+            page.editSnmpButton.click()
+
+        }
+
+        then:
+        if(page.chkSNMPDiv.isDisplayed()){
+            page.chkSNMPDiv.click()
+            page.snmpEnabled.text().toLowerCase().equals("Off")
+        }
+
+        when: "check edit snmp button displayed"
+        if (page.editSnmpButton.isDisplayed()) {
+            page.editSnmpButton.click()
+
+        }
+        then: "click edit ok button"
+        if (waitFor(10) { page.editSnmpOkButton.isDisplayed() }) {
+            page.txtTarget.value("")
+            page.editSnmpOkButton.click()
+            println("must save SNMP config")
+        }
+        when:"click confirm ok button"
+        if(waitFor(10){page.btnSaveSnmp.isDisplayed()}){
+            page.btnSaveSnmp.click()
+        }
+        then:"check save status"
+        if(page.loadingSnmp.isDisplayed()){
+            //need to check saved data here
+            waitFor(10){page.txtTarget.text().toLowerCase().equals("")}
             println("save is working properly")
         }
 
