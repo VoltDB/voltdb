@@ -156,7 +156,7 @@ def generate_ddl(tables):
                 yield line
             yield table_end
             if table.partcol is not None:
-        		yield ddl_partition % (name, table.columns[table.partcol].name)
+                yield ddl_partition % (name, table.columns[table.partcol].name)
     yield ddl_end
 
 def generate_file(path, generator):
