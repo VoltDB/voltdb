@@ -1154,6 +1154,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             m_commandLogStats = new CommandLogStats(m_commandLog);
             getStatsAgent().registerStatsSource(StatsSelector.COMMANDLOG, 0, m_commandLogStats);
 
+            // Dummy DRCONSUMER stats
+            replaceDRConsumerStatsWithDummy();
+
             /*
              * Initialize the command log on rejoin and join before configuring the IV2
              * initiators.  This will prevent them from receiving transactions
@@ -3549,17 +3552,22 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             consoleLog.info("Promoting replication role from replica to master.");
             hostLog.info("Promoting replication role from replica to master.");
             shutdownReplicationConsumerRole();
-            getStatsAgent().deregisterStatsSourcesFor(StatsSelector.DRCONSUMERNODE, 0);
-            getStatsAgent().deregisterStatsSourcesFor(StatsSelector.DRCONSUMERPARTITION, 0);
-            getStatsAgent().registerStatsSource(StatsSelector.DRCONSUMERNODE, 0,
-                    new DRConsumerStatsBase.DRConsumerNodeStatsBase());
-            getStatsAgent().registerStatsSource(StatsSelector.DRCONSUMERPARTITION, 0,
-                    new DRConsumerStatsBase.DRConsumerPartitionStatsBase());
+            replaceDRConsumerStatsWithDummy();
         }
         m_config.m_replicationRole = role;
         if (m_clientInterface != null) {
             m_clientInterface.setReplicationRole(m_config.m_replicationRole);
         }
+    }
+
+    private void replaceDRConsumerStatsWithDummy()
+    {
+        getStatsAgent().deregisterStatsSourcesFor(StatsSelector.DRCONSUMERNODE, 0);
+        getStatsAgent().deregisterStatsSourcesFor(StatsSelector.DRCONSUMERPARTITION, 0);
+        getStatsAgent().registerStatsSource(StatsSelector.DRCONSUMERNODE, 0,
+                new DRConsumerStatsBase.DRConsumerNodeStatsBase());
+        getStatsAgent().registerStatsSource(StatsSelector.DRCONSUMERPARTITION, 0,
+                new DRConsumerStatsBase.DRConsumerPartitionStatsBase());
     }
 
     private void shutdownReplicationConsumerRole() {
@@ -3804,13 +3812,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         if (!m_config.m_isEnterprise
                 || (m_consumerDRGateway != null)
                 || !m_catalogContext.cluster.getDrconsumerenabled()) {
-            if (!m_config.m_isEnterprise || !m_catalogContext.cluster.getDrconsumerenabled()) {
-                // This is called multiple times but the new value will be ignored if a StatSource has been assigned
-                getStatsAgent().registerStatsSource(StatsSelector.DRCONSUMERNODE, 0,
-                        new DRConsumerStatsBase.DRConsumerNodeStatsBase());
-                getStatsAgent().registerStatsSource(StatsSelector.DRCONSUMERPARTITION, 0,
-                        new DRConsumerStatsBase.DRConsumerPartitionStatsBase());
-            }
             return false;
         }
         if (m_config.m_replicationRole == ReplicationRole.REPLICA ||
@@ -3823,8 +3824,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 VoltDB.crashLocalVoltDB("Cannot start as DR consumer without an enabled DR data connection.");
             }
             try {
-                getStatsAgent().deregisterStatsSourcesFor(StatsSelector.DRCONSUMERNODE, 0);
-                getStatsAgent().deregisterStatsSourcesFor(StatsSelector.DRCONSUMERPARTITION, 0);
                 Class<?> rdrgwClass = Class.forName("org.voltdb.dr2.ConsumerDRGatewayImpl");
                 Constructor<?> rdrgwConstructor = rdrgwClass.getConstructor(
                         ClientInterface.class,
@@ -3845,12 +3844,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 VoltDB.crashLocalVoltDB("Unable to load DR system", true, e);
             }
             return true;
-        }
-        else {
-            getStatsAgent().registerStatsSource(StatsSelector.DRCONSUMERNODE, 0,
-                    new DRConsumerStatsBase.DRConsumerNodeStatsBase());
-            getStatsAgent().registerStatsSource(StatsSelector.DRCONSUMERPARTITION, 0,
-                    new DRConsumerStatsBase.DRConsumerPartitionStatsBase());
         }
         return false;
     }
