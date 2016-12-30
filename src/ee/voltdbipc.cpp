@@ -636,18 +636,18 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
         m_tupleBufferSize = MAX_MSG_SZ;
         m_tupleBuffer = new char[m_tupleBufferSize];
         std::memset(m_tupleBuffer, 0, m_tupleBufferSize);
-        if (m_engine->initialize(cs->clusterId,
-                                 cs->siteId,
-                                 cs->partitionId,
-                                 cs->hostId,
-                                 hostname,
-                                 cs->drClusterId,
-                                 cs->defaultDrBufferSize,
-                                 cs->tempTableMemory,
-                                 createDrReplicatedStream) == true) {
-            return kErrorCode_Success;
-        }
-    } catch (const FatalException &e) {
+        m_engine->initialize(cs->clusterId,
+                             cs->siteId,
+                             cs->partitionId,
+                             cs->hostId,
+                             hostname,
+                             cs->drClusterId,
+                             cs->defaultDrBufferSize,
+                             cs->tempTableMemory,
+                             createDrReplicatedStream);
+        return kErrorCode_Success;
+    }
+    catch (const FatalException &e) {
         crashVoltDB(e);
     }
     return kErrorCode_Error;

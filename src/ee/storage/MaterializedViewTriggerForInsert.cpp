@@ -33,9 +33,9 @@ namespace voltdb {
 
 MaterializedViewTriggerForInsert::MaterializedViewTriggerForInsert(PersistentTable *destTable,
                                                                    catalog::MaterializedViewInfo *mvInfo)
-    : m_target(destTable)
+    : m_filterPredicate(parsePredicate(mvInfo))
+    , m_dest(destTable)
     , m_index(destTable->primaryKeyIndex())
-    , m_filterPredicate(parsePredicate(mvInfo))
     , m_groupByColumnCount(parseGroupBy(mvInfo)) // also loads m_groupByExprs/Columns as needed
     , m_searchKeyValue(m_groupByColumnCount)
     , m_aggColumnCount(parseAggregation(mvInfo))
@@ -46,14 +46,14 @@ MaterializedViewTriggerForInsert::MaterializedViewTriggerForInsert(PersistentTab
 
     // best not to have to worry about the destination table disappearing
     // out from under the source table that feeds it.
-    m_target->incrementRefcount();
+    m_dest->incrementRefcount();
 
     // When updateTupleWithSpecificIndexes needs to be called,
     // the context is lost that identifies which base table columns potentially changed.
     // So the minimal set of indexes that MIGHT need to be updated must include
     // any that are not solely based on primary key components.
     // Until the DDL compiler does this analysis and marks the indexes accordingly,
-    // include all target table indexes except the actual primary key index on the group by columns.
+    // include all dest table indexes except the actual primary key index on the group by columns.
     initUpdatableIndexList();
     allocateBackedTuples();
 
@@ -61,22 +61,22 @@ MaterializedViewTriggerForInsert::MaterializedViewTriggerForInsert(PersistentTab
 }
 
 MaterializedViewTriggerForInsert::~MaterializedViewTriggerForInsert() {
-    for (int ii = 0; ii < m_groupByExprs.size(); ++ii) {
-        delete m_groupByExprs[ii];
+    BOOST_FOREACH (auto groupByExpr, m_groupByExprs) {
+        delete groupByExpr;
     }
-    for (int ii = 0; ii < m_aggExprs.size(); ++ii) {
-        delete m_aggExprs[ii];
+    BOOST_FOREACH (auto aggExpr, m_aggExprs) {
+        delete aggExpr;
     }
-    m_target->decrementRefcount();
+    m_dest->decrementRefcount();
 }
 
 void MaterializedViewTriggerForInsert::initUpdatableIndexList() {
     // Note that if the way we initialize this m_updatableIndexList changes in the future,
     //   we will also need to change the condition to detect when the m_updatableIndexList
     //   should be refreshed in the updateDefinition() function.
-    const std::vector<TableIndex*>& targetIndexes = m_target->allIndexes();
+    const std::vector<TableIndex*>& destIndexes = m_dest->allIndexes();
     m_updatableIndexList.clear();
-    BOOST_FOREACH(TableIndex *index, targetIndexes) {
+    BOOST_FOREACH (auto index, destIndexes) {
         if (index != m_index) {
             m_updatableIndexList.push_back(index);
         }
@@ -84,7 +84,7 @@ void MaterializedViewTriggerForInsert::initUpdatableIndexList() {
 }
 
 void MaterializedViewTriggerForInsert::updateDefinition(PersistentTable *destTable, catalog::MaterializedViewInfo *mvInfo) {
-    setTargetTable(destTable);
+    setDestTable(destTable);
     initUpdatableIndexList();
 }
 
@@ -113,11 +113,11 @@ void MaterializedViewTriggerForInsert::processTupleInsert(const TableTuple &newT
     }
 
     // clear the tuple that will be built to insert or overwrite
-    memset(m_updatedTuple.address(), 0, m_target->getTupleLength());
+    memset(m_updatedTuple.address(), 0, m_dest->getTupleLength());
 
     // set up the first n columns, based on group-by columns
     for (int colindex = 0; colindex < m_groupByColumnCount; colindex++) {
-        // note that if the tuple is in the mv's target table,
+        // note that if the tuple is in the mv's dest table,
         // tuple values should be pulled from the existing tuple in
         // that table. This works around a memory ownership issue
         // related to out-of-line strings.
@@ -171,8 +171,8 @@ void MaterializedViewTriggerForInsert::processTupleInsert(const TableTuple &newT
 
         // Shouldn't need to update group-key-only indexes such as the primary key
         // since their keys shouldn't ever change, but do update other indexes.
-        m_target->updateTupleWithSpecificIndexes(m_existingTuple, m_updatedTuple,
-                                                 m_updatableIndexList, fallible);
+        m_dest->updateTupleWithSpecificIndexes(m_existingTuple, m_updatedTuple,
+                                               m_updatableIndexList, fallible);
     }
     else {
         // set the next column, which is a count(*), to 1
@@ -193,21 +193,21 @@ void MaterializedViewTriggerForInsert::processTupleInsert(const TableTuple &newT
             }
             m_updatedTuple.setNValue(aggOffset+aggIndex, newValue);
         }
-        m_target->insertPersistentTuple(m_updatedTuple, fallible);
+        m_dest->insertPersistentTuple(m_updatedTuple, fallible);
     }
 }
 
-void MaterializedViewTriggerForInsert::setTargetTable(PersistentTable * target) {
-    PersistentTable * oldTarget = m_target;
-    m_target = target;
-    target->incrementRefcount();
+void MaterializedViewTriggerForInsert::setDestTable(PersistentTable * dest) {
+    PersistentTable * oldDest = m_dest;
+    m_dest = dest;
+    dest->incrementRefcount();
 
-    // Re-initialize dependencies on the target table, allowing for widened columns
-    m_index = m_target->primaryKeyIndex();
+    // Re-initialize dependencies on the dest table, allowing for widened columns
+    m_index = m_dest->primaryKeyIndex();
 
     allocateBackedTuples();
 
-    oldTarget->decrementRefcount();
+    oldDest->decrementRefcount();
 }
 
 void MaterializedViewTriggerForInsert::allocateBackedTuples() {
@@ -227,17 +227,17 @@ void MaterializedViewTriggerForInsert::allocateBackedTuples() {
         m_searchKeyTuple.move(backingStore);
     }
 
-    m_existingTuple = TableTuple(m_target->schema());
+    m_existingTuple = TableTuple(m_dest->schema());
 
-    m_updatedTuple = TableTuple(m_target->schema());
-    storeLength = m_target->getTupleLength();
+    m_updatedTuple = TableTuple(m_dest->schema());
+    storeLength = m_dest->getTupleLength();
     backingStore = new char[storeLength];
     memset(backingStore, 0, storeLength);
     m_updatedTupleBackingStore.reset(backingStore);
     m_updatedTuple.move(backingStore);
 
-    m_emptyTuple = TableTuple(m_target->schema());
-    storeLength = m_target->getTupleLength();
+    m_emptyTuple = TableTuple(m_dest->schema());
+    storeLength = m_dest->getTupleLength();
     backingStore = new char[storeLength];
     memset(backingStore, 0, storeLength);
     m_emptyTupleBackingStore.reset(backingStore);
@@ -291,7 +291,7 @@ std::size_t MaterializedViewTriggerForInsert::parseAggregation(catalog::Material
     }
     for (catalog::CatalogMap<catalog::Column>::field_map_iter colIterator = columns.begin();
          colIterator != columns.end(); colIterator++) {
-        const catalog::Column *destCol = colIterator->second;
+        auto destCol = colIterator->second;
         if (destCol->index() < m_groupByColumnCount + 1) {
             continue;
         }
@@ -343,7 +343,7 @@ NValue MaterializedViewTriggerForInsert::getGroupByValueFromSrcTuple(int colInde
 
 void MaterializedViewTriggerForInsert::initializeTupleHavingNoGroupBy(bool fallible) {
     // clear the tuple that will be built to insert or overwrite
-    memset(m_updatedTuple.address(), 0, m_target->getTupleLength());
+    memset(m_updatedTuple.address(), 0, m_dest->getTupleLength());
     // COUNT(*) column will be zero.
     m_updatedTuple.setNValue((int)m_groupByColumnCount, ValueFactory::getBigIntValue(0));
     int aggOffset = (int)m_groupByColumnCount + 1;
@@ -357,14 +357,14 @@ void MaterializedViewTriggerForInsert::initializeTupleHavingNoGroupBy(bool falli
         }
         m_updatedTuple.setNValue(aggOffset+aggIndex, newValue);
     }
-    m_target->insertPersistentTuple(m_updatedTuple, fallible);
+    m_dest->insertPersistentTuple(m_updatedTuple, fallible);
 }
 
 bool MaterializedViewTriggerForInsert::findExistingTuple(const TableTuple &tuple) {
     // For the case where there is no grouping column, like SELECT COUNT(*) FROM T;
     // We directly return the only row in the view. See ENG-7872.
     if (m_groupByColumnCount == 0) {
-        TableIterator iterator = m_target->iterator();
+        TableIterator iterator = m_dest->iterator();
         iterator.next(m_existingTuple);
         assert( ! m_existingTuple.isNullTuple());
         return true;

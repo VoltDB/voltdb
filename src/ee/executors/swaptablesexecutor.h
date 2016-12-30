@@ -43,45 +43,24 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "sendexecutor.h"
+#ifndef HSTORESWAPTABLESEXECUTOR_H
+#define HSTORESWAPTABLESEXECUTOR_H
 
-#include "common/debuglog.h"
-#include "common/common.h"
-#include "common/tabletuple.h"
-#include "common/FatalException.hpp"
-#include "plannodes/sendnode.h"
-
-#include "execution/VoltDBEngine.h"
-
-#include "storage/table.h"
-#include "storage/tablefactory.h"
-#include "indexes/tableindex.h"
-#include "storage/tableiterator.h"
-#include "storage/tableutil.h"
-#include "storage/temptable.h"
+#include "executors/abstractexecutor.h"
 
 namespace voltdb {
 
-bool SendExecutor::p_init(AbstractPlanNode* abstractNode,
-                          TempTableLimits* limits)
-{
-    VOLT_TRACE("init Send Executor");
-    assert(dynamic_cast<SendPlanNode*>(m_abstractNode));
-    assert(m_abstractNode->getInputTableCount() == 1);
-    return true;
-}
+class SwapTablesExecutor : public AbstractExecutor {
+public:
+    SwapTablesExecutor(VoltDBEngine* engine, AbstractPlanNode* abstractNode)
+      : AbstractExecutor(engine, abstractNode)
+    { }
 
-bool SendExecutor::p_execute(const NValueArray &params) {
-    VOLT_DEBUG("started SEND");
-
-    Table* inputTable = m_abstractNode->getInputTable();
-    assert(inputTable);
-    //inputTable->setDependencyId(m_dependencyId);//Multiple send executors sharing the same input table apparently.
-    // Just blast the input table on through VoltDBEngine!
-    m_engine->send(inputTable);
-    VOLT_DEBUG("SEND TABLE: %s", inputTable->debug().c_str());
-
-    return true;
-}
+private:
+    bool p_init(AbstractPlanNode*, TempTableLimits* limits);
+    bool p_execute(const NValueArray &params);
+};
 
 }
+
+#endif

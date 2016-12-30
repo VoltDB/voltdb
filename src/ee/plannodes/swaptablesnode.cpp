@@ -42,46 +42,57 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
+#include "swaptablesnode.h"
 
-#include "sendexecutor.h"
-
-#include "common/debuglog.h"
-#include "common/common.h"
-#include "common/tabletuple.h"
-#include "common/FatalException.hpp"
-#include "plannodes/sendnode.h"
-
-#include "execution/VoltDBEngine.h"
-
-#include "storage/table.h"
-#include "storage/tablefactory.h"
-#include "indexes/tableindex.h"
-#include "storage/tableiterator.h"
-#include "storage/tableutil.h"
-#include "storage/temptable.h"
+#include "common/executorcontext.hpp"
+#include "storage/TableCatalogDelegate.hpp"
 
 namespace voltdb {
 
-bool SendExecutor::p_init(AbstractPlanNode* abstractNode,
-                          TempTableLimits* limits)
-{
-    VOLT_TRACE("init Send Executor");
-    assert(dynamic_cast<SendPlanNode*>(m_abstractNode));
-    assert(m_abstractNode->getInputTableCount() == 1);
-    return true;
+SwapTablesPlanNode::~SwapTablesPlanNode() { }
+
+PlanNodeType SwapTablesPlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_SWAPTABLES; }
+
+PersistentTable* SwapTablesPlanNode::getOtherTargetTable() const {
+    if (m_otherTcd == NULL) {
+        return NULL;
+    }
+    return m_otherTcd->getPersistentTable();
 }
 
-bool SendExecutor::p_execute(const NValueArray &params) {
-    VOLT_DEBUG("started SEND");
-
-    Table* inputTable = m_abstractNode->getInputTable();
-    assert(inputTable);
-    //inputTable->setDependencyId(m_dependencyId);//Multiple send executors sharing the same input table apparently.
-    // Just blast the input table on through VoltDBEngine!
-    m_engine->send(inputTable);
-    VOLT_DEBUG("SEND TABLE: %s", inputTable->debug().c_str());
-
-    return true;
+static std::string commaJoined(const std::vector<std::string>& array) {
+    std::ostringstream buffer;
+    const char* prefix = "";
+    int len = array.size();
+    for (int i = 0; i < len; ++i) {
+        buffer << prefix << array[i];
+        prefix = ",";
+    }
+    return buffer.str();
 }
 
+std::string SwapTablesPlanNode::debugInfo(const std::string &spacer) const {
+    std::ostringstream buffer;
+    buffer << spacer << "OtherTargetTable[" << m_otherTargetTableName << "]\n";
+    buffer << spacer << "INDEXES[" << commaJoined(m_theIndexes) << "]\n";
+    buffer << spacer << "OTHER_INDEXES[" << commaJoined(m_otherIndexes) << "]\n";
+    return buffer.str();
 }
+
+void SwapTablesPlanNode::loadFromJSONObject(PlannerDomValue obj) {
+    AbstractOperationPlanNode::loadFromJSONObject(obj);
+    m_otherTargetTableName = obj.valueForKey("OTHER_TARGET_TABLE_NAME").asStr();
+    loadStringArrayFromJSONObject("INDEXES", obj, m_theIndexes);
+    loadStringArrayFromJSONObject("OTHER_INDEXES", obj, m_otherIndexes);
+
+    VoltDBEngine* engine = ExecutorContext::getEngine();
+    m_otherTcd = engine->getTableDelegate(m_otherTargetTableName);
+    if ( ! m_otherTcd) {
+        VOLT_ERROR("Failed to retrieve second target table from execution engine for PlanNode: %s",
+                   debug().c_str());
+        //TODO: throw something
+    }
+
+}
+
+} // namespace voltdb
