@@ -22,6 +22,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -1027,15 +1028,15 @@ public class AbstractTopology {
         String[] token2parts = token2.split("\\.");
 
         // trim shared path prefix
-        while (token1parts.length > 0) {
-            if (token2parts.length == 0) break;
-            if (!token1parts[0].equals(token2parts[0])) break;
-            token1parts = Arrays.copyOfRange(token1parts, 1, token1parts.length);
-            token2parts = Arrays.copyOfRange(token2parts, 1, token2parts.length);
+        int index = 0;
+        while (index < token1parts.length) {
+            if (index == token2parts.length) break;
+            if (!token1parts[index].equals(token2parts[index])) break;
+            index++;
         }
 
-        // distance is now the sum of the two path lengths
-        return token1parts.length + token2parts.length;
+        // distance is the sum of the two diverting path lengths
+        return token1parts.length + token2parts.length - 2 * index;
     }
 
     /**
@@ -1381,6 +1382,22 @@ public class AbstractTopology {
     public static List<List<Integer>> sortHostIdByHGDistance(int hostId, Map<Integer, String> hostGroups) {
         String localHostGroup = hostGroups.get(hostId);
         Preconditions.checkArgument(localHostGroup != null);
+        List<List<Integer>> result = Lists.newArrayList();
+
+        // special case, only one node to compare
+        if (hostGroups.keySet().size() == 2 && hostGroups.keySet().contains(hostId)) {
+            List<Integer> aList = Lists.newArrayList();
+            Iterator<Integer> iter = hostGroups.keySet().iterator();
+            while (iter.hasNext()) {
+                Integer hid = iter.next();
+                if (hid != hostId) {
+                    aList.add(hid);
+                    result.add(aList);
+                    return result;
+                }
+            }
+        }
+        // sort by distance
         List<Integer> sortedList = hostGroups.keySet().stream()
                                                       .filter(hid -> hid != hostId)
                                                       .sorted((hid1, hid2) ->
@@ -1388,11 +1405,8 @@ public class AbstractTopology {
                                                           computeHADistance(localHostGroup, hostGroups.get(hid1))
                                                       )
                                                       .collect(Collectors.toList());
-        List<List<Integer>> result = Lists.newArrayList();
-        if (sortedList.size() == 1) {
-            result.add(sortedList);
-            return result;
-        }
+
+        // group by rack-aware group
         List<Integer> subgroup = Lists.newArrayList();
         subgroup.add(sortedList.get(0));
         for (int i = 1; i < sortedList.size(); i++) {
