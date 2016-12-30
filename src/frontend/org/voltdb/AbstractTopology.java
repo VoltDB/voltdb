@@ -22,7 +22,6 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -1384,37 +1383,32 @@ public class AbstractTopology {
         Preconditions.checkArgument(localHostGroup != null);
         List<List<Integer>> result = Lists.newArrayList();
 
-        // special case, only one node to compare
+        // special case, cluster has two nodes and one is the rejoining node.
         if (hostGroups.keySet().size() == 2 && hostGroups.keySet().contains(hostId)) {
+            Set<Integer> aSet = Sets.newHashSet();
             List<Integer> aList = Lists.newArrayList();
-            Iterator<Integer> iter = hostGroups.keySet().iterator();
-            while (iter.hasNext()) {
-                Integer hid = iter.next();
-                if (hid != hostId) {
-                    aList.add(hid);
-                    result.add(aList);
-                    return result;
-                }
-            }
+            aSet.add(hostId);
+            aList.addAll(Sets.difference(hostGroups.keySet(), aSet));
+            result.add(aList);
+            return result;
+        }
+        // Memorize the distance
+        int[] dVector = new int[hostGroups.size()];
+        for (int i = 0; i < dVector.length; i++) {
+            dVector[i] = computeHADistance(localHostGroup, hostGroups.get(i));
         }
         // sort by distance
         List<Integer> sortedList = hostGroups.keySet().stream()
                                                       .filter(hid -> hid != hostId)
-                                                      .sorted((hid1, hid2) ->
-                                                          computeHADistance(localHostGroup, hostGroups.get(hid2)) -
-                                                          computeHADistance(localHostGroup, hostGroups.get(hid1))
-                                                      )
+                                                      .sorted((hid1, hid2) -> dVector[hid2] - dVector[hid1])
                                                       .collect(Collectors.toList());
-
         // group by rack-aware group
         List<Integer> subgroup = Lists.newArrayList();
         subgroup.add(sortedList.get(0));
         for (int i = 1; i < sortedList.size(); i++) {
             int hid1 = sortedList.get(i - 1);
             int hid2 = sortedList.get(i);
-            int distance1 = computeHADistance(localHostGroup, hostGroups.get(hid1));
-            int distance2 = computeHADistance(localHostGroup, hostGroups.get(hid2));
-            if (distance1 == distance2) {
+            if (dVector[hid1] == dVector[hid2]) {
                 subgroup.add(hid2);
             } else {
                 // found a new subgroup
