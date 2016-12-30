@@ -682,7 +682,8 @@ class AdminSnmpTest extends TestBase {
         then:"check save status"
         if(page.loadingSnmp.isDisplayed()){
             //need to check saved data here
-            waitFor(10){page.txtTarget.text().toLowerCase().equals("10.10.1.89")}
+            println(page.targetSpan.text())
+            waitFor(10){page.targetSpan.text().toLowerCase().equals("10.10.1.2:89")}
             println("save is working properly")
         }
 
@@ -703,7 +704,6 @@ class AdminSnmpTest extends TestBase {
         when: "check edit snmp button displayed"
         if (page.editSnmpButton.isDisplayed()) {
             page.editSnmpButton.click()
-
         }
 
         then:
@@ -712,22 +712,17 @@ class AdminSnmpTest extends TestBase {
             page.snmpEnabled.text().toLowerCase().equals("Off")
         }
 
-        when: "check edit snmp button displayed"
-        if (page.editSnmpButton.isDisplayed()) {
-            page.editSnmpButton.click()
-
-        }
-        then: "click edit ok button"
+        when: "click edit ok button"
         if (waitFor(10) { page.editSnmpOkButton.isDisplayed() }) {
-            page.txtTarget.value("")
+            waitFor(10){page.txtTarget.value("")}
             page.editSnmpOkButton.click()
             println("must save SNMP config")
         }
-        when:"click confirm ok button"
+        then:"click confirm ok button"
         if(waitFor(10){page.btnSaveSnmp.isDisplayed()}){
             page.btnSaveSnmp.click()
         }
-        then:"check save status"
+
         if(page.loadingSnmp.isDisplayed()){
             //need to check saved data here
             waitFor(10){page.txtTarget.text().toLowerCase().equals("")}
