@@ -32,18 +32,18 @@ typedef std::pair<std::string, catalog::Statement*> LabeledStatement;
 using namespace std;
 namespace voltdb {
 
-MaterializedViewTriggerForWrite::MaterializedViewTriggerForWrite(PersistentTable *srcTable,
-                                                                 PersistentTable *destTable,
+MaterializedViewTriggerForWrite::MaterializedViewTriggerForWrite(PersistentTable *srcTbl,
+                                                                 PersistentTable *destTbl,
                                                                  catalog::MaterializedViewInfo *mvInfo)
-    : MaterializedViewTriggerForInsert(destTable, mvInfo)
-    , m_srcPersistentTable(srcTable)
+    : MaterializedViewTriggerForInsert(destTbl, mvInfo)
+    , m_srcPersistentTable(srcTbl)
     , m_minMaxSearchKeyBackingStoreSize(0)
 {
     // set up mechanisms for min/max recalculation
     setupMinMaxRecalculation(mvInfo->indexForMinMax(), mvInfo->fallbackQueryStmts());
 
-    // Catch up on pre-existing source tuples UNLESS target tuples have already been migrated in.
-    if (m_target->isPersistentTableEmpty()) {
+    // Catch up on pre-existing source tuples UNLESS dest tuples have already been migrated in.
+    if (destTbl->isPersistentTableEmpty()) {
         /* If there is no group by column, a special initialization is required.
          * COUNT() functions should have value 0, other aggregation functions should have value NULL.
          * See ENG-7872
@@ -57,9 +57,9 @@ MaterializedViewTriggerForWrite::MaterializedViewTriggerForWrite(PersistentTable
              */
             initializeTupleHavingNoGroupBy(false);
         }
-        if ( ! srcTable->isPersistentTableEmpty()) {
-            TableTuple scannedTuple(srcTable->schema());
-            TableIterator &iterator = srcTable->iterator();
+        if ( ! srcTbl->isPersistentTableEmpty()) {
+            TableTuple scannedTuple(srcTbl->schema());
+            TableIterator &iterator = srcTbl->iterator();
             while (iterator.next(scannedTuple)) {
                 processTupleInsert(scannedTuple, false);
             }
@@ -67,13 +67,13 @@ MaterializedViewTriggerForWrite::MaterializedViewTriggerForWrite(PersistentTable
     }
 }
 
-void MaterializedViewTriggerForWrite::build(PersistentTable *srcTable,
-                                            PersistentTable *destTable,
+void MaterializedViewTriggerForWrite::build(PersistentTable *srcTbl,
+                                            PersistentTable *destTbl,
                                             catalog::MaterializedViewInfo *mvInfo) {
     VOLT_TRACE("construct MaterializedViewTriggerForWrite...");
     MaterializedViewTriggerForWrite* view =
-        new MaterializedViewTriggerForWrite(srcTable, destTable, mvInfo);
-    srcTable->addMaterializedView(view);
+        new MaterializedViewTriggerForWrite(srcTbl, destTbl, mvInfo);
+    srcTbl->addMaterializedView(view);
     VOLT_TRACE("finished initialization.");
 }
 
@@ -238,7 +238,7 @@ NValue MaterializedViewTriggerForWrite::findMinMaxFallbackValueIndexed(const Tab
             selectedIndex->moveToPriorEntry(minMaxCursor);
         }
         while ( ! (tuple = selectedIndex->nextValue(minMaxCursor)).isNullTuple() ) {
-            // If the cursor already moved out of the target group range, exit the loop.
+            // If the cursor already moved out of the dest group range, exit the loop.
             for (int colindex = 0; colindex < m_groupByColumnCount; colindex++) {
                 NValue value = getGroupByValueFromSrcTuple(colindex, tuple);
                 if ( value.compare(m_searchKeyValue[colindex]) != 0 ) {
@@ -390,22 +390,24 @@ void MaterializedViewTriggerForWrite::processTupleDelete(const TableTuple &oldTu
         return;
     }
 
+    auto destTbl = destTable();
+
     if ( ! findExistingTuple(oldTuple)) {
-        std::string name = m_target->name();
+        std::string name = destTbl->name();
         throwFatalException("MaterializedViewTriggerForWrite for table %s went"
                             " looking for a tuple in the view and"
                             " expected to find it but didn't", name.c_str());
     }
 
     // clear the tuple that will be built to insert or overwrite
-    memset(m_updatedTuple.address(), 0, m_target->getTupleLength());
+    memset(m_updatedTuple.address(), 0, destTbl->getTupleLength());
 
     // set up the first column, which is a count
-    NValue count = m_existingTuple.getNValue((int)m_groupByColumnCount).op_decrement();
+    NValue count = m_existingTuple.getNValue((int) m_groupByColumnCount).op_decrement();
 
     // check if we should remove the tuple
     if (count.isZero()) {
-        m_target->deleteTuple(m_existingTuple, fallible);
+        destTbl->deleteTuple(m_existingTuple, fallible);
         // If there is no group by column, the count() should remain 0 and other functions should
         // have value null. See ENG-7872.
         if (m_groupByColumnCount == 0) {
@@ -420,7 +422,7 @@ void MaterializedViewTriggerForWrite::processTupleDelete(const TableTuple &oldTu
     bool allowUsingPlanForMinMax = true;
     const bool viewHasFallbackPlans = m_fallbackExecutorVectors.size() > 0;
     for (int colindex = 0; colindex < m_groupByColumnCount; colindex++) {
-        // note that if the tuple is in the mv's target table,
+        // note that if the tuple is in the mv's dest table,
         // tuple values should be pulled from the existing tuple in
         // that table. This works around a memory ownership issue
         // related to out-of-line strings.
@@ -434,9 +436,9 @@ void MaterializedViewTriggerForWrite::processTupleDelete(const TableTuple &oldTu
         m_updatedTuple.setNValue(colindex, val);
     }
 
-    m_updatedTuple.setNValue((int)m_groupByColumnCount, count);
+    m_updatedTuple.setNValue((int) m_groupByColumnCount, count);
 
-    int aggOffset = (int)m_groupByColumnCount + 1;
+    int aggOffset = (int) m_groupByColumnCount + 1;
     int minMaxAggIdx = 0;
     // set values for the other columns
     for (int aggIndex = 0; aggIndex < m_aggColumnCount; aggIndex++) {
@@ -458,7 +460,7 @@ void MaterializedViewTriggerForWrite::processTupleDelete(const TableTuple &oldTu
             case EXPRESSION_TYPE_AGGREGATE_MAX:
                 if (oldValue.compare(existingValue) == 0) {
                     // re-calculate MIN / MAX
-                    newValue = NValue::getNullValue(m_target->schema()->columnType(aggOffset+aggIndex));
+                    newValue = NValue::getNullValue(destTbl->schema()->columnType(aggOffset+aggIndex));
                     if (m_usePlanForAgg[minMaxAggIdx] && allowUsingPlanForMinMax) {
                         newValue = findFallbackValueUsingPlan(oldTuple, newValue, aggIndex, minMaxAggIdx);
                     }
@@ -491,7 +493,7 @@ void MaterializedViewTriggerForWrite::processTupleDelete(const TableTuple &oldTu
     // update the row
     // Shouldn't need to update group-key-only indexes such as the primary key
     // since their keys shouldn't ever change, but do update other indexes.
-    m_target->updateTupleWithSpecificIndexes(m_existingTuple, m_updatedTuple,
+    destTbl->updateTupleWithSpecificIndexes(m_existingTuple, m_updatedTuple,
                                              m_updatableIndexList, fallible);
 }
 

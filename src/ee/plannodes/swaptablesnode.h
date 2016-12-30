@@ -43,45 +43,57 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "sendexecutor.h"
+#ifndef HSTORESWAPTABLESNODE_H
+#define HSTORESWAPTABLESNODE_H
 
-#include "common/debuglog.h"
-#include "common/common.h"
-#include "common/tabletuple.h"
-#include "common/FatalException.hpp"
-#include "plannodes/sendnode.h"
-
-#include "execution/VoltDBEngine.h"
-
-#include "storage/table.h"
-#include "storage/tablefactory.h"
-#include "indexes/tableindex.h"
-#include "storage/tableiterator.h"
-#include "storage/tableutil.h"
-#include "storage/temptable.h"
+#include "abstractoperationnode.h"
 
 namespace voltdb {
+class PersistentTable;
 
-bool SendExecutor::p_init(AbstractPlanNode* abstractNode,
-                          TempTableLimits* limits)
-{
-    VOLT_TRACE("init Send Executor");
-    assert(dynamic_cast<SendPlanNode*>(m_abstractNode));
-    assert(m_abstractNode->getInputTableCount() == 1);
-    return true;
-}
+/**
+ * A mostly self-sufficient plan for swapping the content of two identically
+ * shaped and indexed tables, such as would be required to implement a
+ * hypothetical extended SQL "SWAP TABLE A B;" statement.
+ */
+class SwapTablesPlanNode : public AbstractOperationPlanNode {
+public:
+    SwapTablesPlanNode()
+        : m_otherTcd(NULL)
+        , m_otherTargetTableName("NOT SPECIFIED")
+    { }
 
-bool SendExecutor::p_execute(const NValueArray &params) {
-    VOLT_DEBUG("started SEND");
+    virtual ~SwapTablesPlanNode();
+    virtual PlanNodeType getPlanNodeType() const;
+    virtual std::string debugInfo(std::string const& spacer) const;
 
-    Table* inputTable = m_abstractNode->getInputTable();
-    assert(inputTable);
-    //inputTable->setDependencyId(m_dependencyId);//Multiple send executors sharing the same input table apparently.
-    // Just blast the input table on through VoltDBEngine!
-    m_engine->send(inputTable);
-    VOLT_DEBUG("SEND TABLE: %s", inputTable->debug().c_str());
+    PersistentTable* getOtherTargetTable() const;
+    std::string const& getOtherTargetTableName() const {
+        return m_otherTargetTableName;
+    }
 
-    return true;
-}
+    std::vector<std::string> const& theIndexes() const {
+        return m_theIndexes;
+    }
 
-}
+    std::vector<std::string> const& otherIndexes() const {
+        return m_otherIndexes;
+    }
+
+protected:
+     virtual void loadFromJSONObject(PlannerDomValue obj);
+
+     // Other Target Table
+     // These tables are different from the input and the output tables
+     // The plannode can read in tuples from the input table(s) and apply them to the target table
+     // The results of the operations will be written to the the output table
+     TableCatalogDelegate* m_otherTcd;
+     std::string m_otherTargetTableName;
+
+     std::vector<std::string> m_theIndexes;
+     std::vector<std::string> m_otherIndexes;
+};
+
+} // namepace voltdb
+
+#endif

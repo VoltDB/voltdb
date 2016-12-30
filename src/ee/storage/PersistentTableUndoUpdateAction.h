@@ -19,21 +19,24 @@
 #define PERSISTENTTABLEUNDOUPDATEACTION_H_
 
 #include "common/UndoAction.h"
-#include "common/NValue.hpp"
-#include "common/types.h"
 #include "storage/persistenttable.h"
 
 namespace voltdb {
 
 class PersistentTableUndoUpdateAction: public UndoAction {
 public:
-
-    inline PersistentTableUndoUpdateAction(char* oldTuple, char* newTuple,
-                                           std::vector<char*> const & oldObjects, std::vector<char*> const & newObjects,
-                                           PersistentTableSurgeon *table, bool revertIndexes)
-      : m_oldTuple(oldTuple), m_newTuple(newTuple),
-        m_table(table), m_revertIndexes(revertIndexes),
-        m_oldUninlineableColumns(oldObjects), m_newUninlineableColumns(newObjects)
+    PersistentTableUndoUpdateAction(char* oldTuple,
+                                    char* newTuple,
+                                    std::vector<char*> const & oldObjects,
+                                    std::vector<char*> const & newObjects,
+                                    PersistentTableSurgeon *tableSurgeon,
+                                    bool revertIndexes)
+        : m_oldTuple(oldTuple)
+        , m_newTuple(newTuple)
+        , m_tableSurgeon(tableSurgeon)
+        , m_revertIndexes(revertIndexes)
+        , m_oldUninlineableColumns(oldObjects)
+        , m_newUninlineableColumns(newObjects)
     { }
 
     /*
@@ -41,9 +44,8 @@ public:
      * case the string allocations of the new tuple must be freed and
      * the tuple must be overwritten with the old one.
      */
-    virtual void undo()
-    {
-        m_table->updateTupleForUndo(m_newTuple, m_oldTuple, m_revertIndexes);
+    virtual void undo() {
+        m_tableSurgeon->updateTupleForUndo(m_newTuple, m_oldTuple, m_revertIndexes);
         NValue::freeObjectsFromTupleStorage(m_newUninlineableColumns);
     }
 
@@ -59,7 +61,7 @@ public:
 private:
     char* const m_oldTuple;
     char* const m_newTuple;
-    PersistentTableSurgeon * const m_table;
+    PersistentTableSurgeon * const m_tableSurgeon;
     bool const m_revertIndexes;
     std::vector<char*> const m_oldUninlineableColumns;
     std::vector<char*> const m_newUninlineableColumns;

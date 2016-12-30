@@ -479,7 +479,7 @@ int64_t JNITopend::pushDRBuffer(int32_t partitionId, StreamBlock *block) {
 
 static boost::shared_array<char> serializeToDirectByteBuffer(JNIEnv *jniEngine, Table *table, jobject &byteBuffer) {
     if (table) {
-        size_t serializeSize = table->getAccurateSizeToSerialize(false);
+        size_t serializeSize = table->getAccurateSizeToSerialize();
         boost::shared_array<char> backingArray(new char[serializeSize]);
         ReferenceSerializeOutput conflictSerializeOutput(backingArray.get(), serializeSize);
         table->serializeToWithoutTotalSize(conflictSerializeOutput);

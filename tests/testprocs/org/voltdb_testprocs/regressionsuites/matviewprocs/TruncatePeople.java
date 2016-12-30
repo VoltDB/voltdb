@@ -67,7 +67,14 @@ public class TruncatePeople extends VoltProcedure {
             int leaveTruncated = repeats - restores;
             for (int ii = 0; ii < repeats; ++ii) {
                 voltQueueSQL(truncatebase0); // ("TRUNCATE TABLE PEOPLE;");
-                voltExecuteSQL();
+                voltQueueSQL(validatebase0); // ("SELECT COUNT(*) FROM PEOPLE;");
+                VoltTable validated = voltExecuteSQL()[1];
+
+                throwVoltAbortExceptionIf(
+                        "Rolling back unexpectedly after truncate misbehavior.",
+                        ( ! validated.advanceRow()) || validated.getLong(0) != 0,
+                        null, null);
+
                 // Optionally leave the table truncated between early truncates,
                 // but always restore the rows towards the end of the iterations.
                 if (leaveTruncated-- <= 0) {
