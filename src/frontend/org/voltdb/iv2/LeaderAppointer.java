@@ -162,7 +162,8 @@ public class LeaderAppointer implements Promotable
                 JSONArray parts;
                 Set<Integer> missingHosts = Sets.newHashSet();
                 try {
-                    //find all missing hosts
+                    //A cluster may be started or recovered with missing hosts.
+                    //find all missing hosts, exclude the replica on this missing hosts
                     JSONArray hosts = m_topo.getJSONArray(AbstractTopology.TOPO_HOSTS);
                     for (int h = 0; h < hosts.length(); h++) {
                         JSONObject host = hosts.getJSONObject(h);
@@ -191,7 +192,7 @@ public class LeaderAppointer implements Promotable
                 }
                 if (children.size() == replicaCount) {
                     m_currentLeader = assignLeader(m_partitionId, updatedHSIds);
-                } else {
+                } else  if (tmLog.isInfoEnabled()) {
                     tmLog.info("Waiting on " + ((m_kfactor + 1) - children.size()) + " more nodes " +
                             "for k-safety before startup");
                 }
@@ -407,8 +408,9 @@ public class LeaderAppointer implements Promotable
             // call our callback, get the current full set of replicas, and
             // appoint a new leader if the seeded one has actually failed
             Map<Integer, Long> masters = m_iv2masters.pointInTimeCache();
-            tmLog.info("LeaderAppointer repairing with master set: " + CoreUtils.hsIdValueMapToString(masters));
-
+            if (tmLog.isInfoEnabled()) {
+                tmLog.info("LeaderAppointer repairing with master set: " + CoreUtils.hsIdValueMapToString(masters));
+            }
             //Setting the map to non-null causes the babysitters to populate it when cleaning up partitions
             //We are only racing with ourselves in that the creation of a babysitter can trigger callbacks
             //that result in partitions being cleaned up. We don't have to worry about some other leader appointer.
@@ -420,7 +422,9 @@ public class LeaderAppointer implements Promotable
                 //Skip processing the partition if it was cleaned up by a babysitter that was previously
                 //instantiated
                 if (m_removedPartitionsAtPromotionTime.contains(master.getKey())) {
-                    tmLog.info("During promotion partition " + master.getKey() + " was cleaned up. Skipping.");
+                    if (tmLog.isInfoEnabled()) {
+                        tmLog.info("During promotion partition " + master.getKey() + " was cleaned up. Skipping.");
+                    }
                     continue;
                 }
 
@@ -485,12 +489,12 @@ public class LeaderAppointer implements Promotable
         if (m_state.get() == AppointerState.CLUSTER_START) {
             try {
                 // find master in topo
-                JSONArray parts = m_topo.getJSONArray("partitions");
+                JSONArray parts = m_topo.getJSONArray(AbstractTopology.TOPO_PARTITIONS);
                 for (int p = 0; p < parts.length(); p++) {
                     JSONObject aPartition = parts.getJSONObject(p);
-                    int pid = aPartition.getInt("partition_id");
+                    int pid = aPartition.getInt(AbstractTopology.TOPO_PARTITION_ID);
                     if (pid == partitionId) {
-                        masterHostId = aPartition.getInt("master");
+                        masterHostId = aPartition.getInt(AbstractTopology.TOPO_MASTER);
                         break;
                     }
                 }
@@ -517,8 +521,10 @@ public class LeaderAppointer implements Promotable
                 break;
             }
         }
-        tmLog.info("Appointing HSId " + CoreUtils.hsIdToString(masterHSId) + " as leader for partition " +
-                partitionId);
+        if (tmLog.isInfoEnabled()) {
+            tmLog.info("Appointing HSId " + CoreUtils.hsIdToString(masterHSId) + " as leader for partition " +
+                    partitionId);
+        }
         try {
             m_iv2appointees.put(partitionId, masterHSId);
         }

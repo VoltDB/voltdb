@@ -910,13 +910,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
             // determine if this is a rejoining node
             // (used for license check and later the actual rejoin)
-            boolean isRejoin = m_config.m_startAction.doesRejoin();
-            m_rejoining = isRejoin;
+            m_rejoining = m_config.m_startAction.doesRejoin();
             m_rejoinDataPending = m_config.m_startAction.doesJoin();
 
             m_joining = m_config.m_startAction == StartAction.JOIN;
 
-            if (isRejoin || m_joining) {
+            if (m_rejoining || m_joining) {
                 m_statusTracker.setNodeState(NodeState.REJOINING);
             }
             //Register dummy agents immediately
@@ -1032,7 +1031,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     }
                 };
                 List<Integer> partitions = null;
-                if (isRejoin) {
+                if (m_rejoining) {
                     m_configuredNumberOfPartitions = m_cartographer.getPartitionCount();
                     partitions = m_cartographer.getIv2PartitionsToReplace(m_configuredReplicationFactor,
                                                                           m_catalogContext.getNodeSettings().getLocalSitesCount());
@@ -1075,7 +1074,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     }
                 }
                 OnDemandBinaryLogger.path = VoltDB.instance().getVoltDBRootPath();
-                if (isRejoin) {
+                if (m_rejoining) {
                     SnapshotSaveAPI.recoveringSiteCount.set(partsToHSIdsToRejoin.size());
                     hostLog.info("Set recovering site count to " + partsToHSIdsToRejoin.size());
 
@@ -1169,7 +1168,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             else {
                 consoleLog.l7dlog(Level.INFO, LogKeys.host_VoltDB_StayTunedForNoLogging.name(), null);
             }
-            if (m_commandLog != null && (isRejoin || m_joining)) {
+            if (m_commandLog != null && (m_rejoining || m_joining)) {
                 //On rejoin the starting IDs are all 0 so technically it will load any snapshot
                 //but the newest snapshot will always be the truncation snapshot taken after rejoin
                 //completes at which point the node will mark itself as actually recovered.
@@ -1312,7 +1311,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 VoltDB.crashLocalVoltDB("Failed to validate cluster build string", false, e);
             }
 
-            if (!isRejoin && !m_joining) {
+            if (!m_rejoining && !m_joining) {
                 try {
                     m_messenger.waitForAllHostsToBeReady(m_catalogContext.getClusterSettings().hostcount() - m_config.m_missingHostCount);
                 } catch (Exception e) {
@@ -1322,7 +1321,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             }
 
             // Create secondary connections within partition group
-            createSecondaryConnections(isRejoin);
+            createSecondaryConnections(m_rejoining);
 
             if (!m_joining && (m_cartographer.getPartitionCount()) != m_configuredNumberOfPartitions) {
                 for (Map.Entry<Integer, ImmutableList<Long>> entry :
@@ -1758,7 +1757,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 sitesPerHostMap.put(k, v.m_localSitesCount);
             });
 
-            //make up the missing hosts to fool the topology
+            //startup or recover a cluster with missing nodes. make up the missing hosts to fool the topology
+            //The topology will contain hosts which are marked as missing.The missing hosts will not host any master partitions.
+            //At least one partition replica must be on the live hosts (not missing). Otherwise, the cluster will not be started up.
+            //LeaderAppointer will ignore these hosts during startup.
             int sph = sitesPerHostMap.values().iterator().next();
             int missingHostId = Integer.MAX_VALUE;
             Set<Integer> missingHosts = Sets.newHashSet();
@@ -1775,7 +1777,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             if (topology.hasMissingPartitions()) {
                 VoltDB.crashLocalVoltDB("Some partitions are missing in the topology", false, null);
             }
-            //reassign leaders from missing hosts to active hosts
+            //move partition masters from missing hosts to live hosts
             topology = AbstractTopology.shiftPartitionLeaders(topology, missingHosts);
             TopologyZKUtils.registerTopologyToZK(m_messenger.getZK(), topology);
         }
