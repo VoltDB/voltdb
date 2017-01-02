@@ -1719,13 +1719,6 @@ function loadAdminPage() {
 
     var toggleSnmpEdit = function(state){
         adminEditObjects.editStateSnmp = state;
-        if (adminEditObjects.chkSnmpValue) {
-            adminEditObjects.chkSnmp.iCheck('check');
-        } else {
-            adminEditObjects.chkSnmp.iCheck('uncheck');
-        }
-
-
         adminEditObjects.txtTarget.val(adminEditObjects.txtTargetValue);
         adminEditObjects.txtCommunity.val(adminEditObjects.txtCommunityValue);
         adminEditObjects.txtUsername.val(adminEditObjects.txtUsernameValue);
@@ -1733,8 +1726,6 @@ function loadAdminPage() {
         adminEditObjects.ddlPrivProtocol.val(adminEditObjects.ddlPrivProtocolValue);
         adminEditObjects.txtAuthkey.val(adminEditObjects.txtAuthkeyValue);
         adminEditObjects.txtPrivKey.val(adminEditObjects.txtPrivkeyValue);
-
-
 
         if (state == editStates.ShowLoading) {
 
@@ -1869,6 +1860,12 @@ function loadAdminPage() {
             adminEditObjects.loadingAuthkey.hide();
             adminEditObjects.loadingPrivKey.hide();
 
+        }
+
+        if (adminEditObjects.chkSnmpValue) {
+            adminEditObjects.chkSnmp.iCheck('check');
+        } else {
+            adminEditObjects.chkSnmp.iCheck('uncheck');
         }
     }
 
