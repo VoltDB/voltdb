@@ -2428,12 +2428,8 @@ function loadAdminPage() {
                     adminConfigurations.heartbeat = {};
                 }
                 //Set the new value to be saved.
-//                adminConfigurations.heartbeat.timeout = adminEditObjects.tBoxHeartbeatTimeout.val();
+                adminConfigurations.heartbeat.timeout = adminEditObjects.tBoxHeartbeatTimeout.val();
                 //Call the loading image only after setting the new value to be saved.
-//
-                adminConfigurations.snmp = {};
-                adminConfigurations.snmp.target = "test";
-                adminConfigurations.snmp.community = "community-name";
                 toggleHeartbeatTimeoutEdit(editStates.ShowLoading);
                 voltDbRenderer.updateAdminConfiguration(adminConfigurations, function (result) {
 
