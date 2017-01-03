@@ -77,6 +77,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.VoltZK;
 import org.voltdb.catalog.Catalog;
+import org.voltdb.catalog.CatalogDiffEngine;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.CatalogType;
 import org.voltdb.catalog.Cluster;
@@ -96,6 +97,7 @@ import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Systemsettings;
 import org.voltdb.catalog.Table;
+import org.voltdb.catalog.Catalog.CatalogCmd;
 import org.voltdb.client.ClientAuthScheme;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltCompiler;
@@ -2687,6 +2689,37 @@ public abstract class CatalogUtil {
             paths.getDroverflow().setPath(VoltDB.instance().getDROverflowPath());
         }
         return deployment;
+    }
+
+    /**
+     * {@link CatalogDiffEngine} generates statement commands that will apply on catalog.
+     * Most of these diffCmds are useful for java in memory catalog, but only very few are used in EE.
+     * This function will generate EE applicable diffCmds.
+     * @param diffCmds
+     * @return
+     */
+    public static String getDiffCommandsForEE(String diffCmds) {
+        if (diffCmds == null || diffCmds.length() == 0) return "";
+        // We know EE does not care procedure changes, so we can skip them for EE diffs.
+        // There are more like deployment changes, the better way is to filter all the other
+        // catalog type changes other than the ones used in EE.
+        // Refer the EE catalog usage.
+
+        StringBuilder sb = new StringBuilder();
+        String[] cmds = diffCmds.split("\n");
+        boolean skip = false;
+        for (int i = 0; i < cmds.length; i++) {
+            String stmt = cmds[i];
+
+            CatalogCmd catCmd = Catalog.parseStmt(stmt);
+            if (catCmd.cmd == 'a' || catCmd.cmd == 'd') { // add, del
+                skip = catCmd.isProcedureRelatedCmd() ? true : false;
+            }
+            if (!skip) {
+                sb.append(stmt).append("\n");
+            }
+        }
+        return sb.toString();
     }
 
 }

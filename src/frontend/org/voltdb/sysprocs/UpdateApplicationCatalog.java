@@ -407,7 +407,6 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
     }
 
     private final void performCatalogVerifyWork(
-            String catalogDiffCommands,
             int expectedCatalogVersion,
             String[] tablesThatMustBeEmpty,
             String[] reasonsForEmptyTables,
@@ -548,7 +547,6 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
 
         try {
             performCatalogVerifyWork(
-                    catalogDiffCommands,
                     expectedCatalogVersion,
                     tablesThatMustBeEmpty,
                     reasonsForEmptyTables,
