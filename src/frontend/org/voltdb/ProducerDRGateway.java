@@ -105,9 +105,10 @@ public interface ProducerDRGateway {
      * When the process is complete, the passed in handler will be notified of the status.
      *
      * @param requestedCursors the clusters for which cursors must be started
+     * @param leaderClusterId ID of the cluster that needs to be marked as the snapshot source
      * @param handler callback to notify the status of the operation
      */
-    public void startCursor(final List<DRAgent.ClusterInfo> requestedCursors, final DRProducerResponseHandler handler);
+    public void startCursor(final List<DRAgent.ClusterInfo> requestedCursors, final byte leaderClusterId, final DRProducerResponseHandler handler);
 
     /**
      * Get the DR producer node stats. This method may block because the task
