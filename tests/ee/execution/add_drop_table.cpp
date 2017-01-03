@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -305,10 +305,10 @@ TEST_F(AddDropTableTest, AddTable)
     ASSERT_TRUE(changeResult);
 
     Table *table1, *table2;
-    table1 = m_engine->getTable("tableA");
+    table1 = m_engine->getTableByName("tableA");
     ASSERT_TRUE(table1 != NULL);
 
-    table2 = m_engine->getTable(1); // catalogId
+    table2 = m_engine->getTableById(1); // catalogId
     ASSERT_TRUE(table2 != NULL);
     ASSERT_TRUE(table1 == table2);
 }
@@ -333,18 +333,18 @@ TEST_F(AddDropTableTest, AddTwoTablesDropTwoTables)
     ASSERT_EQ(2, db->tables().size());
 
     // verify first table
-    table1 = m_engine->getTable("tableA");
+    table1 = m_engine->getTableByName("tableA");
     ASSERT_TRUE(table1 != NULL);
 
-    table2 = m_engine->getTable(1); // catalogId
+    table2 = m_engine->getTableById(1); // catalogId
     ASSERT_TRUE(table2 != NULL);
     ASSERT_TRUE(table1 == table2);
 
     // verify second table
-    table1 = m_engine->getTable("tableB");
+    table1 = m_engine->getTableByName("tableB");
     ASSERT_TRUE(table1 != NULL);
 
-    table2 = m_engine->getTable(2); // catalogId
+    table2 = m_engine->getTableById(2); // catalogId
     ASSERT_TRUE(table2 != NULL);
     ASSERT_TRUE(table1 == table2);
 
@@ -356,10 +356,10 @@ TEST_F(AddDropTableTest, AddTwoTablesDropTwoTables)
     changeResult = m_engine->updateCatalog( 1,drop);
     ASSERT_TRUE(changeResult);
     ASSERT_EQ(0, db->tables().size());
-    ASSERT_EQ(NULL, m_engine->getTable(1)); // catalogId
-    ASSERT_EQ(NULL, m_engine->getTable("tableA"));
-    ASSERT_EQ(NULL, m_engine->getTable(2)); // catalogId
-    ASSERT_EQ(NULL, m_engine->getTable("tableB"));
+    ASSERT_EQ(NULL, m_engine->getTableById(1)); // catalogId
+    ASSERT_EQ(NULL, m_engine->getTableByName("tableA"));
+    ASSERT_EQ(NULL, m_engine->getTableById(2)); // catalogId
+    ASSERT_EQ(NULL, m_engine->getTableByName("tableB"));
 
     table1->decrementRefcount();
     table2->decrementRefcount();
@@ -379,7 +379,7 @@ TEST_F(AddDropTableTest, DropTable)
 
     // grab the table. need some data from it to complete the
     // test. hold a reference to keep it safe.
-    table1 = m_engine->getTable("tableA");
+    table1 = m_engine->getTableByName("tableA");
     table1->incrementRefcount();
 
     ASSERT_TRUE(table1 != NULL);
@@ -388,10 +388,10 @@ TEST_F(AddDropTableTest, DropTable)
     result = m_engine->updateCatalog( 1, tableADeleteCmd());
     ASSERT_TRUE(result);
 
-    table2 = m_engine->getTable("tableA");
+    table2 = m_engine->getTableByName("tableA");
     ASSERT_TRUE(table2 == NULL);
 
-    table2 = m_engine->getTable(0);
+    table2 = m_engine->getTableById(0);
     ASSERT_TRUE(table2 == NULL);
 
     // release the last reference.

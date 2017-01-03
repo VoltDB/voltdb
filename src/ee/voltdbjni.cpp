@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -287,25 +287,20 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeIniti
         // initialization is separated from constructor so that constructor
         // never fails.
         VOLT_DEBUG("calling initialize...");
-        bool success =
-                engine->initialize(clusterIndex,
-                                   siteId,
-                                   partitionId,
-                                   hostId,
-                                   hostString,
-                                   drClusterId,
-                                   defaultDrBufferSize,
-                                   tempTableMemory,
-                                   createDrReplicatedStream,
-                                   static_cast<int32_t>(compactionThreshold));
-        if (success) {
-            VOLT_DEBUG("initialize succeeded");
-            return org_voltdb_jni_ExecutionEngine_ERRORCODE_SUCCESS;
-        } else {
-            throwFatalException("initialize failed");
-            return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;
-        }
-    } catch (const FatalException &e) {
+        engine->initialize(clusterIndex,
+                           siteId,
+                           partitionId,
+                           hostId,
+                           hostString,
+                           drClusterId,
+                           defaultDrBufferSize,
+                           tempTableMemory,
+                           createDrReplicatedStream,
+                           static_cast<int32_t>(compactionThreshold));
+        VOLT_DEBUG("initialize succeeded");
+        return org_voltdb_jni_ExecutionEngine_ERRORCODE_SUCCESS;
+    }
+    catch (const FatalException &e) {
         topend->crashVoltDB(e);
     }
     return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;
