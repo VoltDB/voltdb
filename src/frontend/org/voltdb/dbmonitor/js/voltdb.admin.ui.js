@@ -402,11 +402,11 @@ function loadAdminPage() {
         },
         targetRules:{
             required: true,
-            portRegex : /^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$/
+            portRegex : /^[a-zA-Z0-9.-]+$/,
         },
         targetMessages:{
             required:"This field is required",
-            portRegex : "Please enter a valid value.(e.g, 127.0.0.1:(1-65535))"
+            portRegex : "Please enter a valid value.(e.g, hostname:(1-65535))"
         }
     };
 
@@ -481,10 +481,10 @@ function loadAdminPage() {
 
             $("#txtTarget").rules("add",{
                 required: true,
-                portRegex : /^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$/,
+                portRegex : /^[a-zA-Z0-9.-]+$/,
                 messages:{
                     required:"This field is required",
-                    portRegex : "Please enter a valid value.(e.g, 127.0.0.1:(1-65535))"
+                    portRegex : "Please enter a valid value.(e.g, hostname:(1-65535))"
                 }
             })
         }
@@ -1719,13 +1719,6 @@ function loadAdminPage() {
 
     var toggleSnmpEdit = function(state){
         adminEditObjects.editStateSnmp = state;
-        if (adminEditObjects.chkSnmpValue) {
-            adminEditObjects.chkSnmp.iCheck('check');
-        } else {
-            adminEditObjects.chkSnmp.iCheck('uncheck');
-        }
-
-
         adminEditObjects.txtTarget.val(adminEditObjects.txtTargetValue);
         adminEditObjects.txtCommunity.val(adminEditObjects.txtCommunityValue);
         adminEditObjects.txtUsername.val(adminEditObjects.txtUsernameValue);
@@ -1733,8 +1726,6 @@ function loadAdminPage() {
         adminEditObjects.ddlPrivProtocol.val(adminEditObjects.ddlPrivProtocolValue);
         adminEditObjects.txtAuthkey.val(adminEditObjects.txtAuthkeyValue);
         adminEditObjects.txtPrivKey.val(adminEditObjects.txtPrivkeyValue);
-
-
 
         if (state == editStates.ShowLoading) {
 
@@ -1799,9 +1790,10 @@ function loadAdminPage() {
             adminEditObjects.txtTarget.show();
             adminEditObjects.txtCommunity.show();
             adminEditObjects.txtUsername.show();
-
+            adminEditObjects.ddlAuthProtocol.html('');
             adminEditObjects.ddlAuthProtocol.append("<option>SHA</option><option>MD5</option><option>NoAuth</option>")
             adminEditObjects.ddlAuthProtocol.show();
+            adminEditObjects.ddlPrivProtocol.html('');
             adminEditObjects.ddlPrivProtocol.append("<option>AES</option><option>DES</option><option>NoPriv</option><option>3DES</option><option>AES192</option><option>AES256</option>")
             adminEditObjects.ddlPrivProtocol.show();
 
@@ -1868,6 +1860,12 @@ function loadAdminPage() {
             adminEditObjects.loadingAuthkey.hide();
             adminEditObjects.loadingPrivKey.hide();
 
+        }
+
+        if (adminEditObjects.chkSnmpValue) {
+            adminEditObjects.chkSnmp.iCheck('check');
+        } else {
+            adminEditObjects.chkSnmp.iCheck('uncheck');
         }
     }
 
@@ -2058,10 +2056,10 @@ function loadAdminPage() {
 
             $("#txtTarget").rules("add",{
                 required: true,
-                portRegex : /^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$/,
+                portRegex : /^[a-zA-Z0-9.-]+$/,
                 messages:{
                     required:"This field is required",
-                    portRegex : "Please enter a valid value.(e.g, 127.0.0.1:(1-65535))"
+                    portRegex : "Please enter a valid value.(e.g, hostname:(1-65535))"
                 }
             })
         }
@@ -2427,12 +2425,8 @@ function loadAdminPage() {
                     adminConfigurations.heartbeat = {};
                 }
                 //Set the new value to be saved.
-//                adminConfigurations.heartbeat.timeout = adminEditObjects.tBoxHeartbeatTimeout.val();
+                adminConfigurations.heartbeat.timeout = adminEditObjects.tBoxHeartbeatTimeout.val();
                 //Call the loading image only after setting the new value to be saved.
-//
-                adminConfigurations.snmp = {};
-                adminConfigurations.snmp.target = "test";
-                adminConfigurations.snmp.community = "community-name";
                 toggleHeartbeatTimeoutEdit(editStates.ShowLoading);
                 voltDbRenderer.updateAdminConfiguration(adminConfigurations, function (result) {
 

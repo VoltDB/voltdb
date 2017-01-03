@@ -295,6 +295,7 @@ class AdminPage extends VoltDBManagementCenterPage {
         txtUsername                     {$("#txtUsername")}
         btnSaveSnmp                     {$("#btnSaveSnmp")}
         loadingSnmp                     {$("#loadingSnmp")}
+        targetSpan                      {$("#targetSpan")}
 
     }
     static at = {
