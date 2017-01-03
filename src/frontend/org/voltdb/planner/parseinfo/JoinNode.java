@@ -396,7 +396,7 @@ public abstract class JoinNode implements Cloneable {
         ExpressionUtil.collectPartitioningFilters(singleTableExprs, eqMap1);
 
         for (AbstractExpression expr : twoTableExprs) {
-            if (! ExpressionUtil.isColumnEquivalenceFilter(expr)) {
+            if (! expr.isColumnEquivalenceFilter()) {
                 continue;
             }
             AbstractExpression leftExpr = expr.getLeft();
