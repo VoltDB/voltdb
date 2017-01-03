@@ -1207,7 +1207,7 @@ class UpdateDeployment(Deployment):
             response = requests.put(dep_url,
                                     json=json_data, headers=headers)
             value = response.json()
-            self.assertEqual(str(value['statusString']), "SNMP: Authkey must be of atleast 8 characters.")
+            self.assertEqual(str(value['statusString']), "SNMP: Authkey must be of at least 8 characters.")
             self.assertEqual(response.status_code, 200)
 
             # 2.2 When privacykey length is less that 8
@@ -1228,7 +1228,7 @@ class UpdateDeployment(Deployment):
             response = requests.put(dep_url,
                                     json=json_data, headers=headers)
             value = response.json()
-            self.assertEqual(str(value['statusString']), "SNMP: PrivacyKey must be of atleast 8 characters.")
+            self.assertEqual(str(value['statusString']), "SNMP: PrivacyKey must be of at least 8 characters.")
             self.assertEqual(response.status_code, 200)
 
             # 3. When invalid authprotocal is given

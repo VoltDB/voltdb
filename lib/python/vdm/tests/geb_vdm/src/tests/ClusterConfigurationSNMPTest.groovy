@@ -187,7 +187,7 @@ class ClusterConfigurationSNMPTest extends TestBase {
 
             //1.2 When target is invalid.
             when: 'Fill the form'
-            snmp.txtTarget.value('dfsdfsdfdf')
+            snmp.txtTarget.value('test@@')
             snmp.btnSaveSNMP.click()
             then:
             waitFor{ snmp.errorTarget.isDisplayed() }
@@ -249,7 +249,7 @@ class ClusterConfigurationSNMPTest extends TestBase {
 
             //1.2 When target is invalid.
             when: 'Fill the form'
-            snmp.txtTarget.value('dfsdfsdfdf')
+            snmp.txtTarget.value('test@@')
             snmp.btnSaveSNMP.click()
             then:
             waitFor{ snmp.errorTarget.isDisplayed() }
