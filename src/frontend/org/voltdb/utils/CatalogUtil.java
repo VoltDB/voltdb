@@ -2705,15 +2705,27 @@ public abstract class CatalogUtil {
         // catalog type changes other than the ones used in EE.
         // Refer the EE catalog usage.
 
+        // e.g.
+        // add /clusters#cluster/databases#database procedures Vote
+        // set /clusters#cluster/databases#database/procedures#Vote classname "voter.Vote"
+        // set $PREV readonly false
+        // set $PREV singlepartition true
+        // add /clusters#cluster/databases#database/procedures#Vote statements checkContestantStmt
+        // set /clusters#cluster/databases#database/procedures#Vote/statements#checkContestantStmt sqltext "SELECT contes...
+        // set $PREV querytype 2
+        // set $PREV readonly true
+        // set $PREV singlepartition true
+
         StringBuilder sb = new StringBuilder();
         String[] cmds = diffCmds.split("\n");
         boolean skip = false;
         for (int i = 0; i < cmds.length; i++) {
             String stmt = cmds[i];
 
-            CatalogCmd catCmd = Catalog.parseStmt(stmt);
-            if (catCmd.cmd == 'a' || catCmd.cmd == 'd') { // add, del
-                skip = catCmd.isProcedureRelatedCmd() ? true : false;
+            char cmd = Catalog.parseStmtCmd(stmt);
+            if (cmd == 'a' || cmd == 'd') { // add, del
+                CatalogCmd catCmd = Catalog.parseStmt(stmt);
+                skip = catCmd.isProcedureRelatedCmd();
             }
             if (!skip) {
                 sb.append(stmt).append("\n");

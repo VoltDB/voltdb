@@ -130,6 +130,15 @@ public class Catalog extends CatalogType {
         }
     }
 
+    public static char parseStmtCmd(String stmt) {
+        // command comes before the first space (add or set)
+        int pos = 0;
+        while (Character.isWhitespace(stmt.charAt(pos))) {
+            ++pos;
+        }
+        return stmt.charAt(pos++);
+    }
+
     public static CatalogCmd parseStmt(String stmt) {
         // command comes before the first space (add or set)
         int pos = 0;
