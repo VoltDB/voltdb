@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -26,6 +26,8 @@ package org.voltdb.regressionsuites;
 import java.io.IOException;
 import java.util.UUID;
 
+import junit.framework.Test;
+
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -37,8 +39,6 @@ import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.BatchedMultiPartitionTest;
 import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.PopulateTruncateTable;
 import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.TruncateTable;
-
-import junit.framework.Test;
 
 public class TestSQLFeaturesNewSuite extends RegressionSuite {
     // procedures used by these tests
@@ -93,15 +93,12 @@ public class TestSQLFeaturesNewSuite extends RegressionSuite {
             return;
         }
 
-        Exception e = null;
         try {
             client.callProcedure("TruncateTable");
+            fail("Stored proc failed to throw the expected CONSTRAINT VIOLATION");
         } catch (ProcCallException ex) {
-            System.out.println(ex.getMessage());
-            e = ex;
+            //*enable to debug*/ System.out.println(ex.getMessage());
             assertTrue(ex.getMessage().contains("CONSTRAINT VIOLATION"));
-        } finally {
-            assertNotNull(e);
         }
         for (String tb: tbs) {
             vt = client.callProcedure("@AdHoc", "select count(*) from " + tb).getResults()[0];

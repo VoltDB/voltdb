@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -136,7 +136,7 @@ public:
                              m_exception_buffer.get(), 4096);
         m_engine->resetReusedResultOutputBuffer();
         int partitionCount = 3;
-        ASSERT_TRUE(m_engine->initialize(this->m_cluster_id, this->m_site_id, 0, 0, "", 0, 1024, voltdb::DEFAULT_TEMP_TABLE_MEMORY, false));
+        m_engine->initialize(m_cluster_id, m_site_id, 0, 0, "", 0, 1024, voltdb::DEFAULT_TEMP_TABLE_MEMORY, false);
         m_engine->updateHashinator(voltdb::HASHINATOR_LEGACY, (char*)&partitionCount, NULL, 0);
         ASSERT_TRUE(m_engine->loadCatalog( -2, m_catalog_string));
 
@@ -170,7 +170,7 @@ public:
         if (id != NULL) {
             *id = tbl->relativeIndex();
         }
-        return dynamic_cast<voltdb::PersistentTable *>(m_engine->getTable(name));
+        return dynamic_cast<voltdb::PersistentTable *>(m_engine->getTableByName(name));
     }
 
     void initTable(voltdb::PersistentTable       **table,

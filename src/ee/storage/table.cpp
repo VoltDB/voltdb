@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -218,20 +218,14 @@ std::string Table::debug() {
 // ------------------------------------------------------------------
 // Serialization Methods
 // ------------------------------------------------------------------
-int Table::getApproximateSizeToSerialize() const {
-    // HACK to get this over quick
-    // just max table serialization to 10MB
-    return 1024 * 1024 * 10;
-}
 
 /*
  * Warn: Iterate all tuples to get accurate size, don't use it on
  * performance critical path if table is large.
  */
-size_t Table::getAccurateSizeToSerialize(bool includeTotalSize) {
-
+size_t Table::getAccurateSizeToSerialize() {
     // column header size
-    size_t bytes = getColumnHeaderSizeToSerialize(includeTotalSize);
+    size_t bytes = getColumnHeaderSizeToSerialize();
 
     // tuples
     bytes += sizeof(int32_t);  // tuple count
@@ -247,33 +241,30 @@ size_t Table::getAccurateSizeToSerialize(bool includeTotalSize) {
     return bytes;
 }
 
-size_t Table::getColumnHeaderSizeToSerialize(bool includeTotalSize) const {
-    // table size
-    size_t bytes = includeTotalSize ? sizeof(int32_t) : 0;
-
+size_t Table::getColumnHeaderSizeToSerialize() const {
     // use a cache if possible
     if (m_columnHeaderData) {
         assert(m_columnHeaderSize != -1);
-        bytes += m_columnHeaderSize;
+        return m_columnHeaderSize;
     }
-    else {
-        // column header size, status code, column count
-        bytes += sizeof(int32_t) + sizeof(int8_t) + sizeof(int16_t);
-        // column types
-        bytes += sizeof(int8_t) * m_columnCount;
-        // column names
-        bytes += sizeof(int32_t) * m_columnCount;
-        for (int i = 0; i < m_columnCount; ++i) {
-            bytes += static_cast<int32_t>(columnName(i).size());
-        }
+
+    size_t bytes = 0;
+
+    // column header size, status code, column count
+    bytes += sizeof(int32_t) + sizeof(int8_t) + sizeof(int16_t);
+    // column types
+    bytes += sizeof(int8_t) * m_columnCount;
+    // column names
+    bytes += sizeof(int32_t) * m_columnCount;
+    for (int i = 0; i < m_columnCount; ++i) {
+        bytes += columnName(i).size();
     }
 
     return bytes;
 }
 
 
-bool Table::serializeColumnHeaderTo(SerializeOutput &serialize_io) {
-
+void Table::serializeColumnHeaderTo(SerializeOutput &serialOutput) {
     /* NOTE:
        VoltDBEngine uses a binary template to create tables of single integers.
        It's called m_templateSingleLongTable and if you are seeing a serialization
@@ -286,26 +277,26 @@ bool Table::serializeColumnHeaderTo(SerializeOutput &serialize_io) {
     // use a cache
     if (m_columnHeaderData) {
         assert(m_columnHeaderSize != -1);
-        serialize_io.writeBytes(m_columnHeaderData, m_columnHeaderSize);
-        return true;
+        serialOutput.writeBytes(m_columnHeaderData, m_columnHeaderSize);
+        return;
     }
     assert(m_columnHeaderSize == -1);
 
-    start = serialize_io.position();
+    start = serialOutput.position();
 
     // skip header position
-    serialize_io.writeInt(-1);
+    serialOutput.writeInt(-1);
 
     //status code
-    serialize_io.writeByte(-128);
+    serialOutput.writeByte(-128);
 
     // column counts as a short
-    serialize_io.writeShort(static_cast<int16_t>(m_columnCount));
+    serialOutput.writeShort(static_cast<int16_t>(m_columnCount));
 
     // write an array of column types as bytes
     for (int i = 0; i < m_columnCount; ++i) {
         ValueType type = m_schema->columnType(i);
-        serialize_io.writeByte(static_cast<int8_t>(type));
+        serialOutput.writeByte(static_cast<int8_t>(type));
     }
 
     // write the array of column names as voltdb strings
@@ -318,26 +309,23 @@ bool Table::serializeColumnHeaderTo(SerializeOutput &serialize_io) {
         assert(length >= 0);
 
         // this is standard string serialization for voltdb
-        serialize_io.writeInt(length);
-        serialize_io.writeBytes(name.data(), length);
+        serialOutput.writeInt(length);
+        serialOutput.writeBytes(name.data(), length);
     }
 
 
     // write the header size which is a non-inclusive int
-    size_t position = serialize_io.position();
+    size_t position = serialOutput.position();
     m_columnHeaderSize = static_cast<int32_t>(position - start);
     int32_t nonInclusiveHeaderSize = static_cast<int32_t>(m_columnHeaderSize - sizeof(int32_t));
-    serialize_io.writeIntAt(start, nonInclusiveHeaderSize);
+    serialOutput.writeIntAt(start, nonInclusiveHeaderSize);
 
     // cache the results
     m_columnHeaderData = new char[m_columnHeaderSize];
-    memcpy(m_columnHeaderData, static_cast<const char*>(serialize_io.data()) + start, m_columnHeaderSize);
-
-    return true;
-
+    memcpy(m_columnHeaderData, static_cast<const char*>(serialOutput.data()) + start, m_columnHeaderSize);
 }
 
-bool Table::serializeTo(SerializeOutput &serialize_io) {
+void Table::serializeTo(SerializeOutput &serialOutput) {
     // The table is serialized as:
     // [(int) total size]
     // [(int) header size] [num columns] [column types] [column names]
@@ -350,100 +338,112 @@ bool Table::serializeTo(SerializeOutput &serialize_io) {
     */
 
     // a placeholder for the total table size
-    std::size_t pos = serialize_io.position();
-    serialize_io.writeInt(-1);
+    std::size_t pos = serialOutput.position();
+    serialOutput.writeInt(-1);
 
-    if (!serializeColumnHeaderTo(serialize_io))
-        return false;
+    serializeColumnHeaderTo(serialOutput);
 
     // active tuple counts
-    serialize_io.writeInt(static_cast<int32_t>(m_tupleCount));
+    serialOutput.writeInt(static_cast<int32_t>(m_tupleCount));
     int64_t written_count = 0;
     TableIterator titer = iterator();
     TableTuple tuple(m_schema);
     while (titer.next(tuple)) {
-        tuple.serializeTo(serialize_io);
+        tuple.serializeTo(serialOutput);
         ++written_count;
     }
     assert(written_count == m_tupleCount);
 
     // length prefix is non-inclusive
-    int32_t sz = static_cast<int32_t>(serialize_io.position() - pos - sizeof(int32_t));
+    int32_t sz = static_cast<int32_t>(serialOutput.position() - pos - sizeof(int32_t));
     assert(sz > 0);
-    serialize_io.writeIntAt(pos, sz);
-
-    return true;
+    serialOutput.writeIntAt(pos, sz);
 }
 
-bool Table::serializeToWithoutTotalSize(SerializeOutput &serialize_io) {
-    if (!serializeColumnHeaderTo(serialize_io))
-        return false;
+void Table::serializeToWithoutTotalSize(SerializeOutput &serialOutput) {
+    serializeColumnHeaderTo(serialOutput);
 
     // active tuple counts
-    serialize_io.writeInt(static_cast<int32_t>(m_tupleCount));
+    serialOutput.writeInt(static_cast<int32_t>(m_tupleCount));
     int64_t written_count = 0;
     TableIterator titer = iterator();
     TableTuple tuple(m_schema);
     while (titer.next(tuple)) {
-        tuple.serializeTo(serialize_io);
+        tuple.serializeTo(serialOutput);
         ++written_count;
     }
     assert(written_count == m_tupleCount);
-
-    return true;
 }
 
 /**
  * Serialized the table, but only includes the tuples specified (columns data and all).
  * Used by the exception stuff Ariel put in.
  */
-bool Table::serializeTupleTo(SerializeOutput &serialize_io, voltdb::TableTuple *tuples, int numTuples) {
+void Table::serializeTupleTo(SerializeOutput &serialOutput, voltdb::TableTuple *tuples, int numTuples) {
     //assert(m_schema->equals(tuples[0].getSchema()));
 
-    std::size_t pos = serialize_io.position();
-    serialize_io.writeInt(-1);
+    std::size_t pos = serialOutput.position();
+    serialOutput.writeInt(-1);
 
     assert(!tuples[0].isNullTuple());
 
-    if (!serializeColumnHeaderTo(serialize_io))
-        return false;
+    serializeColumnHeaderTo(serialOutput);
 
-    serialize_io.writeInt(static_cast<int32_t>(numTuples));
+    serialOutput.writeInt(static_cast<int32_t>(numTuples));
     for (int ii = 0; ii < numTuples; ii++) {
-        tuples[ii].serializeTo(serialize_io);
+        tuples[ii].serializeTo(serialOutput);
     }
 
-    serialize_io.writeIntAt(pos, static_cast<int32_t>(serialize_io.position() - pos - sizeof(int32_t)));
-
-    return true;
+    serialOutput.writeIntAt(pos, static_cast<int32_t>(serialOutput.position() - pos - sizeof(int32_t)));
 }
 
 bool Table::equals(voltdb::Table *other) {
-    if (!(columnCount() == other->columnCount())) return false;
-    if (!(activeTupleCount() == other->activeTupleCount())) return false;
-    if (!(databaseId() == other->databaseId())) return false;
-    if (!(name() == other->name())) return false;
-    if (!(tableType() == other->tableType())) return false;
+    if (columnCount() != other->columnCount()) {
+        return false;
+    }
+
+    if (activeTupleCount() != other->activeTupleCount()) {
+        return false;
+    }
+
+    if (databaseId() != other->databaseId()) {
+        return false;
+    }
+
+    if (name() != other->name()) {
+        return false;
+    }
+
+    if (tableType() != other->tableType()) {
+        return false;
+    }
 
     const voltdb::TupleSchema *otherSchema = other->schema();
-    if ((!m_schema->equals(otherSchema))) return false;
+    if ( ! m_schema->equals(otherSchema)) {
+        return false;
+    }
 
     voltdb::TableIterator firstTI = iterator();
     voltdb::TableIterator secondTI = other->iterator();
     voltdb::TableTuple firstTuple(m_schema);
     voltdb::TableTuple secondTuple(otherSchema);
-    while(firstTI.next(firstTuple)) {
-        if (!(secondTI.next(secondTuple))) return false;
-        if (!(firstTuple.equals(secondTuple))) return false;
+    while (firstTI.next(firstTuple)) {
+        if ( ! secondTI.next(secondTuple)) {
+            return false;
+        }
+
+        if ( ! firstTuple.equals(secondTuple)) {
+            return false;
+        }
     }
     return true;
 }
 
-void Table::loadTuplesFromNoHeader(SerializeInputBE &serialize_io,
+void Table::loadTuplesFromNoHeader(SerializeInputBE &serialInput,
                                    Pool *stringPool,
                                    ReferenceSerializeOutput *uniqueViolationOutput,
                                    bool shouldDRStreamRow) {
-    int tupleCount = serialize_io.readInt();
+    int tupleCount = serialInput.readInt();
     assert(tupleCount >= 0);
 
     TableTuple target(m_schema);
@@ -456,6 +456,7 @@ void Table::loadTuplesFromNoHeader(SerializeInputBE &serialize_io,
     if (uniqueViolationOutput != NULL) {
         lengthPosition = uniqueViolationOutput->reserveBytes(4);
     }
+
     for (int i = 0; i < tupleCount; ++i) {
         nextFreeTuple(&target);
         target.setActiveTrue();
@@ -463,7 +464,7 @@ void Table::loadTuplesFromNoHeader(SerializeInputBE &serialize_io,
         target.setPendingDeleteFalse();
         target.setPendingDeleteOnUndoReleaseFalse();
 
-        target.deserializeFrom(serialize_io, stringPool);
+        target.deserializeFrom(serialInput, stringPool);
 
         processLoadedTuple(target, uniqueViolationOutput, serializedTupleCount, tupleCountPosition, shouldDRStreamRow);
     }
@@ -481,7 +482,7 @@ void Table::loadTuplesFromNoHeader(SerializeInputBE &serialize_io,
     }
 }
 
-void Table::loadTuplesFrom(SerializeInputBE &serialize_io,
+void Table::loadTuplesFrom(SerializeInputBE &serialInput,
                            Pool *stringPool,
                            ReferenceSerializeOutput *uniqueViolationOutput,
                            bool shouldDRStreamRow) {
@@ -501,11 +502,11 @@ void Table::loadTuplesFrom(SerializeInputBE &serialize_io,
      */
 
     // todo: just skip ahead to this position
-    serialize_io.readInt(); // rowstart
+    serialInput.readInt(); // rowstart
 
-    serialize_io.readByte();
+    serialInput.readByte();
 
-    int16_t colcount = serialize_io.readShort();
+    int16_t colcount = serialInput.readShort();
     assert(colcount >= 0);
 
     // Store the following information so that we can provide them to the user
@@ -515,12 +516,12 @@ void Table::loadTuplesFrom(SerializeInputBE &serialize_io,
 
     // skip the column types
     for (int i = 0; i < colcount; ++i) {
-        types[i] = (ValueType) serialize_io.readEnumInSingleByte();
+        types[i] = (ValueType) serialInput.readEnumInSingleByte();
     }
 
     // skip the column names
     for (int i = 0; i < colcount; ++i) {
-        names[i] = serialize_io.readTextString();
+        names[i] = serialInput.readTextString();
     }
 
     // Check if the column count matches what the temp table is expecting
@@ -542,7 +543,7 @@ void Table::loadTuplesFrom(SerializeInputBE &serialize_io,
                                       message.str().c_str());
     }
 
-    loadTuplesFromNoHeader(serialize_io, stringPool, uniqueViolationOutput, shouldDRStreamRow);
+    loadTuplesFromNoHeader(serialInput, stringPool, uniqueViolationOutput, shouldDRStreamRow);
 }
 
 }
