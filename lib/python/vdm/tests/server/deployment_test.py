@@ -1042,7 +1042,7 @@ class UpdateDeployment(Deployment):
             self.assertEqual(str(value['statusString']), "SNMP: Invalid target.")
             self.assertEqual(response.status_code, 200)
 
-            # 2. ip_address
+            # 2. ip_address only
             json_data['snmp']['target'] = '192.168.2.222'
             response = requests.put(dep_url,
                                     json=json_data, headers=headers)
@@ -1058,15 +1058,15 @@ class UpdateDeployment(Deployment):
             self.assertEqual(str(value['statusString']), "SNMP: Port must be greater than 1 and less than 65535")
             self.assertEqual(response.status_code, 200)
 
-            # 3. ip_address with invalid ip
-            json_data['snmp']['target'] = '192.168.1.22222:8080'
+            # 3. invalid target
+            json_data['snmp']['target'] = 'test@@@:8080'
             response = requests.put(dep_url,
                                     json=json_data, headers=headers)
             value = response.json()
-            self.assertEqual(str(value['statusString']), "SNMP: Invalid IP address")
+            self.assertEqual(str(value['statusString']), "SNMP: Invalid target.")
             self.assertEqual(response.status_code, 200)
 
-            # 4. correct ip_address with port id
+            # 4. correct target with port id
             json_data['snmp']['target'] = '192.168.1.222:8080'
             response = requests.put(dep_url,
                                     json=json_data, headers=headers)
@@ -1273,7 +1273,6 @@ class UpdateDeployment(Deployment):
             self.assertEqual(str(value['statusString'][0]), "u'test' is not one of ['AES', 'DES', 'NoPriv', '3DES', 'AES192', 'AES256']")
             self.assertEqual(response.status_code, 200)
 
-            #4. When
 
     def test_delete_snmp_configuration(self):
         """ensure snmp configuration can be reset properly"""

@@ -19,6 +19,7 @@ from flask_inputs import Inputs
 import socket
 import traceback
 from flask_inputs.validators import JsonSchema
+import re
 
 
 class Validation(object):
@@ -86,19 +87,9 @@ class Validation(object):
                 return {'result': 'error', 'status': 'Invalid target.'}
             array = field.split(":")
             if len(array) == 2:
-                try:
-                    socket.inet_pton(socket.AF_INET, array[0])
-                except AttributeError:
-                    #print traceback.format_exc()
-                    try:
-                        socket.inet_aton(array[0])
-                    except socket.error:
-                        print traceback.format_exc()
-                        return {'result': 'error', 'status': 'Invalid IP address'}
-                    return array[0].count('.') == 3
-                except socket.error:
-                    #print traceback.format_exc()
-                    return {'result': 'error', 'status': 'Invalid IP address'}
+                pattern = re.compile("^[a-zA-Z0-9.-]+$")
+                if pattern.match(array[0]) is None:
+                    return {'result': 'error', 'status': 'Invalid target.'}
                 try:
                     val = int(array[1])
                     if val < 1 or val >= 65535:
