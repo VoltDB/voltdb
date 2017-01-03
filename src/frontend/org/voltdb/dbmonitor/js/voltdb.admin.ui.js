@@ -402,11 +402,11 @@ function loadAdminPage() {
         },
         targetRules:{
             required: true,
-            portRegex : /^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$/
+            portRegex : /^[a-zA-Z0-9.-]+$/,
         },
         targetMessages:{
             required:"This field is required",
-            portRegex : "Please enter a valid value.(e.g, 127.0.0.1:(1-65535))"
+            portRegex : "Please enter a valid value.(e.g, hostname:(1-65535))"
         }
     };
 
@@ -481,10 +481,10 @@ function loadAdminPage() {
 
             $("#txtTarget").rules("add",{
                 required: true,
-                portRegex : /^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$/,
+                portRegex : /^[a-zA-Z0-9.-]+$/,
                 messages:{
                     required:"This field is required",
-                    portRegex : "Please enter a valid value.(e.g, 127.0.0.1:(1-65535))"
+                    portRegex : "Please enter a valid value.(e.g, hostname:(1-65535))"
                 }
             })
         }
@@ -2056,10 +2056,10 @@ function loadAdminPage() {
 
             $("#txtTarget").rules("add",{
                 required: true,
-                portRegex : /^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$/,
+                portRegex : /^[a-zA-Z0-9.-]+$/,
                 messages:{
                     required:"This field is required",
-                    portRegex : "Please enter a valid value.(e.g, 127.0.0.1:(1-65535))"
+                    portRegex : "Please enter a valid value.(e.g, hostname:(1-65535))"
                 }
             })
         }
