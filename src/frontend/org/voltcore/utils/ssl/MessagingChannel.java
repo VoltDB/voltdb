@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,14 +17,12 @@
 
 package org.voltcore.utils.ssl;
 
-import org.voltcore.utils.DBBPool;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 
 import javax.net.ssl.SSLEngine;
-import javax.net.ssl.SSLEngineResult;
 
 /**
  * Wraps a SocketChannel, knows how to read and write VoltDB
