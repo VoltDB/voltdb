@@ -75,7 +75,9 @@ public class SpDurabilityListener implements DurabilityListener {
 
         @Override
         public void addTask(TransactionTask task) {
-            setLastDurableUniqueId(task.m_txnState.uniqueId);
+            if (!task.m_txnState.isReadOnly()) {
+                setLastDurableUniqueId(task.m_txnState.uniqueId);
+            }
         }
 
         @Override
@@ -133,6 +135,11 @@ public class SpDurabilityListener implements DurabilityListener {
         public void addTask(TransactionTask task) {
             m_pendingTransactions.add(task);
             super.addTask(task);
+        }
+
+        @Override
+        public boolean isChanged() {
+            return !m_pendingTransactions.isEmpty();
         }
 
         @Override
