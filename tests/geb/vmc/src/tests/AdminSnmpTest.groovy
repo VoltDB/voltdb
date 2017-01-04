@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -237,39 +237,81 @@ class AdminSnmpTest extends TestBase {
     }
 
     def checkAuthKeyDefaultValue(){
+        int count = 0
+        testStatus = false
         expect: 'at Admin Page'
-
-        when: "click edit button"
-        if (page.editSnmpButton.isDisplayed()) {
-            page.editSnmpButton.click()
+        while(count<numberOfTrials) {
+            count ++
+            try {
+                when:
+                waitFor(waitTime) {
+                    if (page.editSnmpButton.isDisplayed()) {
+                        page.editSnmpButton.click()
+                    }
+                }
+                then:
+                if(page.txtAuthkey.value().equals("voltdbauthkey")){
+                    assert true
+                }
+                else{
+                    println("default value for authkey is not set")
+                    assert false
+                }
+                testStatus = true
+                break
+            } catch(geb.waiting.WaitTimeoutException e) {
+                println("RETRYING: WaitTimeoutException occured")
+            } catch(org.openqa.selenium.StaleElementReferenceException e) {
+                println("RETRYING: StaleElementReferenceException occured")
+            }
         }
-        then:
-        if(page.txtAuthkey.value().equals("voltdbauthkey")){
-            assert true
+        if(testStatus == true) {
+            println("PASS")
         }
-        else{
-            println("default value for authkey is not set")
+        else {
+            println("FAIL: Test didn't pass in " + numberOfTrials + " trials")
             assert false
         }
     }
 
     def checkPrivKeyDefaultValue(){
-
+        int count = 0
+        testStatus = false
         expect: 'at Admin Page'
 
-        when: "click edit button"
-        if (page.editSnmpButton.isDisplayed()) {
-            page.editSnmpButton.click()
+        while(count<numberOfTrials) {
+            count ++
+            try {
+                when:
+                waitFor(waitTime) {
+                    if (page.editSnmpButton.isDisplayed()) {
+                        page.editSnmpButton.click()
+                    }
+                }
+                then:
+                if(page.txtPrivkey.value().equals("voltdbprivacykey")){
+                    assert true
+                }
+                else{
+                    println("default value for privkey is not set")
+                    assert false
+                }
+
+                testStatus = true
+                break
+            } catch(geb.waiting.WaitTimeoutException e) {
+                println("RETRYING: WaitTimeoutException occured")
+            } catch(org.openqa.selenium.StaleElementReferenceException e) {
+                println("RETRYING: StaleElementReferenceException occured")
+            }
         }
-        then:
-        if(page.txtPrivkey.value().equals("voltdbprivacykey")){
-            assert true
+        if(testStatus == true) {
+            println("PASS")
         }
-        else{
-            println("default value for privkey is not set")
+        else {
+            println("FAIL: Test didn't pass in " + numberOfTrials + " trials")
             assert false
         }
-
     }
 
     def checkInvalidTarget(){
@@ -640,6 +682,50 @@ class AdminSnmpTest extends TestBase {
         then:"check save status"
         if(page.loadingSnmp.isDisplayed()){
             //need to check saved data here
+            println(page.targetSpan.text())
+            waitFor(10){page.targetSpan.text().toLowerCase().equals("10.10.1.2:89")}
+            println("save is working properly")
+        }
+
+        when: "check Pro version"
+
+        if (waitFor(10){page.snmpTitle.isDisplayed()}) {
+            isPro = true
+        }
+        else{
+            assert false
+        }
+        then: "check SNMP enabled"
+        if (isPro == true) {
+            if (page.snmpEnabled.text().toLowerCase().equals("On")) {
+                snmpEnabled = true
+            }
+        }
+        when: "check edit snmp button displayed"
+        if (page.editSnmpButton.isDisplayed()) {
+            page.editSnmpButton.click()
+        }
+
+        then:
+        if(page.chkSNMPDiv.isDisplayed()){
+            page.chkSNMPDiv.click()
+            page.snmpEnabled.text().toLowerCase().equals("Off")
+        }
+
+        when: "click edit ok button"
+        if (waitFor(10) { page.editSnmpOkButton.isDisplayed() }) {
+            waitFor(10){page.txtTarget.value("")}
+            page.editSnmpOkButton.click()
+            println("must save SNMP config")
+        }
+        then:"click confirm ok button"
+        if(waitFor(10){page.btnSaveSnmp.isDisplayed()}){
+            page.btnSaveSnmp.click()
+        }
+
+        if(page.loadingSnmp.isDisplayed()){
+            //need to check saved data here
+            waitFor(10){page.txtTarget.text().toLowerCase().equals("")}
             println("save is working properly")
         }
 

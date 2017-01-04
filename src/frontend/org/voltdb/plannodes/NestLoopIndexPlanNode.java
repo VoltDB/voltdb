@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -205,9 +205,7 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
         if ( ! super.isOrderDeterministic()) {
             return false;
         }
-        IndexScanPlanNode index_scan =
-            (IndexScanPlanNode) getInlinePlanNode(PlanNodeType.INDEXSCAN);
-        assert(index_scan != null);
+        IndexScanPlanNode index_scan = getInlineIndexScan();
         if ( ! index_scan.isOrderDeterministic()) {
             m_nondeterminismDetail = index_scan.m_nondeterminismDetail;
             return false;
@@ -217,8 +215,7 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
 
     @Override
     public boolean hasInlinedIndexScanOfTable(String tableName) {
-        IndexScanPlanNode index_scan = (IndexScanPlanNode) getInlinePlanNode(PlanNodeType.INDEXSCAN);
-        assert(index_scan != null);
+        IndexScanPlanNode index_scan = getInlineIndexScan();
         if (index_scan.getTargetTableName().equals(tableName)) {
             return true;
         } else {
@@ -234,13 +231,18 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
         // per input tuple, but I think it will still cause the plan selector to pick the join
         // order with the lowest total access cost.
 
-        IndexScanPlanNode indexScan =
-                (IndexScanPlanNode) getInlinePlanNode(PlanNodeType.INDEXSCAN);
-        assert(indexScan != null);
+        IndexScanPlanNode indexScan = getInlineIndexScan();
 
         m_estimatedOutputTupleCount = indexScan.getEstimatedOutputTupleCount() + childOutputTupleCountEstimate;
         // Discount outer child estimates based on the number of its filters
         m_estimatedProcessedTupleCount = indexScan.getEstimatedProcessedTupleCount() + discountEstimatedProcessedTupleCount(m_children.get(0));
+    }
+
+    public IndexScanPlanNode getInlineIndexScan() {
+        IndexScanPlanNode indexScan =
+                (IndexScanPlanNode) getInlinePlanNode(PlanNodeType.INDEXSCAN);
+        assert(indexScan != null);
+        return indexScan;
     }
 
     @Override
