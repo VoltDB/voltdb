@@ -35,20 +35,29 @@ public class AccessPath {
     // The initial expression is needed to adjust (forward) the start of the reverse
     // iteration when it had to initially settle for starting at
     // "greater than a prefix key".
-    final ArrayList<AbstractExpression> initialExpr = new ArrayList<AbstractExpression>();
-    final ArrayList<AbstractExpression> indexExprs = new ArrayList<AbstractExpression>();
-    final ArrayList<AbstractExpression> endExprs = new ArrayList<AbstractExpression>();
-    final ArrayList<AbstractExpression> otherExprs = new ArrayList<AbstractExpression>();
-    final ArrayList<AbstractExpression> joinExprs = new ArrayList<AbstractExpression>();
-    final ArrayList<AbstractExpression> bindings = new ArrayList<AbstractExpression>();
-    final ArrayList<AbstractExpression> eliminatedPostExprs = new ArrayList<AbstractExpression>();
-
+    final ArrayList<AbstractExpression> initialExpr = new ArrayList<>();
+    final ArrayList<AbstractExpression> indexExprs = new ArrayList<>();
+    final ArrayList<AbstractExpression> endExprs = new ArrayList<>();
+    final ArrayList<AbstractExpression> otherExprs = new ArrayList<>();
+    final ArrayList<AbstractExpression> joinExprs = new ArrayList<>();
+    final ArrayList<AbstractExpression> bindings = new ArrayList<>();
+    final ArrayList<AbstractExpression> eliminatedPostExprs = new ArrayList<>();
+    //
+    // If a window function uses the index, then this will be set
+    // to the number of the window function which uses this index.
+    // If it is set to -1 then no window function uses the index, but
+    // the window function ordering is compatible with the statement
+    // level ordering, and the statement level order does not need
+    // an order by node.  If it is set to -2, then nothing uses the
+    // index.
+    int m_windowFunctionUsesIndex = -2;
     @Override
     public String toString() {
         String retval = "";
 
         retval += "INDEX: " + ((index == null) ? "NULL" : (index.getParent().getTypeName() + "." + index.getTypeName())) + "\n";
         retval += "USE:   " + use.toString() + "\n";
+        retval += "FOR:   " + indexPurposeString() + "\n";
         retval += "TYPE:  " + lookupType.toString() + "\n";
         retval += "DIR:   " + sortDirection.toString() + "\n";
         retval += "ITER?: " + String.valueOf(keyIterate) + "\n";
@@ -80,5 +89,21 @@ public class AccessPath {
             retval += "\t(" + String.valueOf(i++) + ") " + expr.toString() + "\n";
 
         return retval;
+    }
+    private String indexPurposeString() {
+        if (0 <= m_windowFunctionUsesIndex) {
+            return "Window function plan node " + m_windowFunctionUsesIndex;
+        }
+        if (-1 == m_windowFunctionUsesIndex) {
+            return "Statement Level Order By";
+        }
+        if (-2 == m_windowFunctionUsesIndex) {
+            return "No Indexing Used";
+        }
+        /*
+         * This should never happen.
+         */
+        assert(false);
+        return "";
     }
 }

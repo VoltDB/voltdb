@@ -67,6 +67,15 @@ public class WindowFunctionPlanNode extends AbstractPlanNode {
     // is empty, not null.
     protected List<AbstractExpression> m_orderByExpressions = new ArrayList<>();
 
+    //
+    // This is true if this window function uses an index.  Only
+    // one window function may use an index.  If no window function
+    // uses an index then the statement level order by can use an index.
+    // But if some window function uses an index then the statement
+    // level order by must use an explicit sort.
+    //
+    private boolean m_isCompatibleWithStmtOrderBy = false;
+
     private int getAggregateFunctionCount() {
         return m_aggregateTypes.size();
     }
@@ -275,5 +284,12 @@ public class WindowFunctionPlanNode extends AbstractPlanNode {
 
     public final List<List<AbstractExpression>> getAggregateExpressions() {
         return m_aggregateExpressions;
+    }
+
+    public void setIsCompatibleWithStmtOrderBy() {
+        m_isCompatibleWithStmtOrderBy = true;
+    }
+    public boolean isCompatibleWithStmtOrderBy() {
+        return m_isCompatibleWithStmtOrderBy;
     }
 }

@@ -52,6 +52,7 @@ import org.voltdb.planner.parseinfo.BranchNode;
 import org.voltdb.planner.parseinfo.JoinNode;
 import org.voltdb.planner.parseinfo.StmtSubqueryScan;
 import org.voltdb.planner.parseinfo.StmtTableScan;
+import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.plannodes.AbstractJoinPlanNode;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractReceivePlanNode;
@@ -68,7 +69,6 @@ import org.voltdb.plannodes.NestLoopPlanNode;
 import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.plannodes.OrderByPlanNode;
 import org.voltdb.plannodes.PartialAggregatePlanNode;
-import org.voltdb.plannodes.WindowFunctionPlanNode;
 import org.voltdb.plannodes.ProjectionPlanNode;
 import org.voltdb.plannodes.ReceivePlanNode;
 import org.voltdb.plannodes.SchemaColumn;
@@ -76,6 +76,7 @@ import org.voltdb.plannodes.SendPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.plannodes.UnionPlanNode;
 import org.voltdb.plannodes.UpdatePlanNode;
+import org.voltdb.plannodes.WindowFunctionPlanNode;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.IndexType;
@@ -1815,8 +1816,34 @@ public class PlanAssembler {
         // However, this probably is not optimal if there are low cardinality results.
         // Again, we have to replace the TVEs for ORDER BY clause for these cases in planning.
 
-        if (nonAggPlan.getPlanNodeType() == PlanNodeType.AGGREGATE) {
-            nonAggPlan = nonAggPlan.getChild(0);
+        // Look through the plan until we see either a WindowFunctionPlanNode
+        // which uses an index for sorting or else an IndexScanPlanNode or
+        // else an AbstractJoinPlanNode.
+        //   o If we see the scan or join node before the window function node there
+        //     are no window function nodes and the node's sort direction tells us
+        //     if we can use it for the order by.
+        //   o If we see a window function node it will either use the index itself
+        //     or else add its own order by node.  If the window function's order by
+        //     node provides an ordering which is compatible with the statement level
+        //     order by then we also don't need an order by node.  The window function
+        //     will know this and tell us.
+        //
+        while (nonAggPlan != null) {
+            if (nonAggPlan instanceof IndexScanPlanNode
+                    || nonAggPlan instanceof AbstractJoinPlanNode) {
+                break;
+            }
+            if (nonAggPlan instanceof WindowFunctionPlanNode) {
+                WindowFunctionPlanNode wfp = (WindowFunctionPlanNode)nonAggPlan;
+                if (!wfp.isCompatibleWithStmtOrderBy()) {
+                    return true;
+                }
+            }
+            nonAggPlan = (nonAggPlan.getChildCount() > 0) ? nonAggPlan.getChild(0) : null;
+        }
+
+        if (nonAggPlan == null) {
+            return false;
         }
         if (nonAggPlan instanceof IndexScanPlanNode) {
             sortDirection = ((IndexScanPlanNode)nonAggPlan).getSortDirection();
@@ -2215,6 +2242,14 @@ public class PlanAssembler {
         // we will add the input columns.
         WindowFunctionPlanNode pnode = new WindowFunctionPlanNode();
         pnode.setWindowFunctionExpression(winExpr);
+        /*
+         * WORKHERE: Make sure that the tables and indexes
+         *           cover the window function.  Only generate an
+         *           order by node if necessary.
+         */
+        Map<String, StmtTargetTableScan> tablesRead = new HashMap<>();
+        List<String> indexes = new ArrayList<>();
+        pnode.getTablesAndIndexes(tablesRead, indexes);
         OrderByPlanNode onode = new OrderByPlanNode();
         // We need to extract more information from the windowed expression.
         // to construct the output schema.
