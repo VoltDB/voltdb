@@ -75,9 +75,7 @@ public class SpDurabilityListener implements DurabilityListener {
 
         @Override
         public void addTask(TransactionTask task) {
-            if (!task.m_txnState.isReadOnly()) {
-                setLastDurableUniqueId(task.m_txnState.uniqueId);
-            }
+            setLastDurableUniqueId(task.m_txnState.uniqueId);
         }
 
         @Override
