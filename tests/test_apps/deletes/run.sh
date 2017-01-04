@@ -19,6 +19,13 @@ fi
 # java classpaths and binary paths
 source $VOLTDB_BIN/voltenv
 
+CLASSPATH=$({ \
+    \ls -1 "$VOLTDB_VOLTDB"/voltdb-*.jar; \
+    \ls -1 "$VOLTDB_LIB"/*.jar; \
+    \ls -1 "$VOLTDB_LIB"/extension/*.jar; \
+} 2> /dev/null | paste -sd ':' - )
+
+
 # leader host for startup purposes only
 # (once running, all nodes are the same -- no leaders)
 STARTUPLEADERHOST="localhost"
@@ -36,13 +43,16 @@ function clean() {
 # compile the source code for procedures and the client into jarfiles
 function jars() {
     # compile java source
-    javac -classpath $APPCLASSPATH \
-        src/$APPNAME/*java src/$APPNAME/procedures/*.java
+    mkdir -p obj
+    javac -classpath $CLASSPATH -d obj \
+        src/com/*.java \
+        src/com/deletes/*.java
+
     # build procedure and client jars
-    jar cf $APPNAME-client.jar -C src $APPNAME
-    jar cf $APPNAME-procs.jar -C src $APPNAME/procedures
+    jar cf $APPNAME-client.jar -C obj com
+    jar cf $APPNAME-procs.jar -C obj com/deletes
     # remove compiled .class files
-    rm -rf src/$APPNAME/*.class src/$APPNAME/procedures/*.class
+    rm -rf obj
 }
 
 # compile the procedure and client jarfiles if they don't exist

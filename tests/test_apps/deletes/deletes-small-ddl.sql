@@ -61,8 +61,8 @@ LOAD CLASSES deletes-procs.jar;
 
 -- The following CREATE PROCEDURE statements can all be batched.
 file -inlinebatch END_OF_2ND_BATCH
-CREATE PROCEDURE FROM CLASS deletes.procedures.Insert;
-CREATE PROCEDURE FROM CLASS deletes.procedures.DeleteOldBatches;
-CREATE PROCEDURE FROM CLASS deletes.procedures.DeleteDeceased;
+CREATE PROCEDURE FROM CLASS com.deletes.Insert;
+CREATE PROCEDURE FROM CLASS com.deletes.DeleteOldBatches;
+CREATE PROCEDURE FROM CLASS com.deletes.DeleteDeceased;
 
 END_OF_2ND_BATCH
