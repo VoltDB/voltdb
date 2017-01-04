@@ -114,7 +114,7 @@ public interface ProducerDRGateway {
      * Get the DR producer node stats. This method may block because the task
      * runs on the producer thread and it waits for the asynchronous task to
      * finish.
-     * @return The producer node stats or null if on error
+     * @return The producer node stats keyed by cluster IDs or null if on error
      */
-    public DRProducerNodeStats getNodeDRStats();
+    public Map<Byte, DRProducerNodeStats> getNodeDRStats();
 }

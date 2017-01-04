@@ -18,6 +18,7 @@
 package org.voltdb;
 
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutionException;
 
 // Interface through which the outside world can interact with the consumer side
@@ -32,7 +33,7 @@ public interface ConsumerDRGateway extends Promotable {
      */
     void updateCatalog(CatalogContext catalog, String newConnectionSource);
 
-    DRRoleStats.State getState();
+    Map<Byte, DRRoleStats.State> getStates();
 
     void initialize(boolean resumeReplication);
 

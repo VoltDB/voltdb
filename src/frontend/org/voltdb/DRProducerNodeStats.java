@@ -18,6 +18,13 @@
 package org.voltdb;
 
 public class DRProducerNodeStats {
+    public static final DRProducerNodeStats DISABLED_NODE_STATS =
+        new DRProducerNodeStats((short) -1, DRRoleStats.State.DISABLED, "",
+                                -1, -1, 0);
+    public static final DRProducerNodeStats PENDING_NODE_STATS =
+        new DRProducerNodeStats((short) -1, DRRoleStats.State.PENDING, "",
+                                -1, -1, 0);
+
     public final short consumerClusterId;
     public final DRRoleStats.State state;
     public String syncSnapshotState;
