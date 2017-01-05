@@ -21,7 +21,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package com.aggregates;
+package aggregates;
 
 import java.io.IOException;
 
@@ -44,7 +44,6 @@ public class Loader {
             if (status != ClientResponse.SUCCESS) {
                 System.err.println("Loader failed an insertion.");
                 System.err.println(clientResponse.getStatusString());
-                System.err.println(clientResponse.getException());
                 System.exit(-1);
             }
         }
@@ -108,8 +107,9 @@ public class Loader {
     throws Exception
     {
         org.voltdb.client.Client myApp = null;
-        myApp = ClientFactory.createClient();
-        myApp.createConnection(hostname, user, password);
+        ClientConfig config = new ClientConfig(user, password);
+        myApp = ClientFactory.createClient(config);
+        myApp.createConnection(hostname);
         return myApp;
     }
 }

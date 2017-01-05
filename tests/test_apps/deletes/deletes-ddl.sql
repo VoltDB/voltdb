@@ -1,3 +1,5 @@
+file -inlinebatch END_OF_BATCH
+
 CREATE TABLE big_table (
     fullname VARCHAR(16) NOT NULL,
     age BIGINT DEFAULT 0 NOT NULL,
@@ -18,11 +20,14 @@ CREATE TABLE big_table (
     CONSTRAINT NO_PK_TREE PRIMARY KEY (fullname, sig, addr3, addr2)
 );
 
+PARTITION TABLE big_table ON COLUMN fullname;
+
+
 CREATE INDEX treeBigTableFullnameCompany ON big_table (fullname, sig, addr3, company, ts);
 CREATE INDEX treeBigTableFullnameTs ON big_table (fullname, ts);
 
 -- This index uses string concatenation to exercise index-managed out-of-line storage.
--- It purposely avoids NULL-able strings that would produce lots of duplicate NULL 
+-- It purposely avoids NULL-able strings that would produce lots of duplicate NULL
 -- concatenation results, since (NULL||x) == (x||NULL) == NULL,
 -- that would have to be serially scanned on deletes.
 CREATE INDEX treeBigTableConcatNonNullStrings ON big_table (text1 || fullname || sig || addr1 || addr2);
@@ -56,3 +61,16 @@ CREATE VIEW view6(fullname, deceased, total)
     AS SELECT fullname, deceased, COUNT(*)
     FROM big_table
     GROUP BY fullname, deceased;
+
+END_OF_BATCH
+
+LOAD CLASSES deletes-procs.jar;
+
+-- The following CREATE PROCEDURE statements can all be batched.
+file -inlinebatch END_OF_2ND_BATCH
+CREATE PROCEDURE FROM CLASS com.deletes.Insert;
+CREATE PROCEDURE FROM CLASS com.deletes.DeleteOldBatches;
+CREATE PROCEDURE FROM CLASS com.deletes.DeleteDeceased;
+
+END_OF_2ND_BATCH
+

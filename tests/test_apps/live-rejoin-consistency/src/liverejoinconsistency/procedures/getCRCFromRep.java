@@ -25,34 +25,44 @@
 // Returns the heat map data (winning contestant by state) for display on nthe Live Statistics dashboard.
 //
 
-package LiveRejoinConsistency.procedures;
+package liverejoinconsistency.procedures;
 
-import java.util.ArrayList;
+import java.util.zip.CRC32;
 
 import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
-import org.voltdb.VoltType;
+
 
 @ProcInfo (
         partitionInfo = "joiner.id:0",
         singlePartition = true
         )
-public class getRowFromRep extends VoltProcedure {
 
-    // potential return codes
-    public static final long ERR_INVALID_COUNTER = 1;
+public class getCRCFromRep extends VoltProcedure {
 
     // get Counter
-    public final SQLStmt getCounterStmt = new SQLStmt(
-            "SELECT j.id as id, c.counter as counter FROM joiner j, counters_rep c WHERE j.id = c.id and j.id = ? order by 1;");
+    public final SQLStmt Stmt = new SQLStmt(
+            "SELECT j.id as id, c.counter as counter FROM joiner j, like_counters_rep c WHERE j.id=c.id and c.id = ? order by 1;");
 
-    public VoltTable[] run(int id) {
+    public long run(int id) {
 
-        voltQueueSQL(getCounterStmt, id);
-        VoltTable[] result = voltExecuteSQL();
+        CRC32 crc = new CRC32();
 
-        return result;
+        voltQueueSQL(Stmt, id);
+        VoltTable[] result = voltExecuteSQL(true);
+
+        while (result[0].advanceRow()) {
+            long counter = result[0].getLong("counter");
+
+            byte [] b = new byte[8];
+            for(int i= 0; i < 8; i++) {
+                b[7 - i] = (byte)(counter >>> (i * 8));
+            }
+
+            crc.update(b);
+        }
+        return crc.getValue();
     }
 }

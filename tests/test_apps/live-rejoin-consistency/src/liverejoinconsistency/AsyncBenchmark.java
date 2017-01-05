@@ -48,7 +48,7 @@
  *        read behavior in voltdb which permits the reading of local data.
  */
 
-package LiveRejoinConsistency;
+package liverejoinconsistency;
 
 import java.io.IOException;
 import java.io.File;

@@ -21,39 +21,22 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-//
-// Returns the heat map data (winning contestant by state) for display on nthe Live Statistics dashboard.
-//
+package ctindex;
 
-package LiveRejoinConsistency.procedures;
+import org.voltdb.*;
 
-import java.util.ArrayList;
+@ProcInfo(
+    partitionInfo = "GAME.game_id: 0",
+    singlePartition = true
+)
 
-import org.voltdb.ProcInfo;
-import org.voltdb.SQLStmt;
-import org.voltdb.VoltProcedure;
-import org.voltdb.VoltTable;
-import org.voltdb.VoltType;
+public class CountStarSmaller extends VoltProcedure {
 
-@ProcInfo (
-        partitionInfo = "joiner.id:0",
-        singlePartition = true
-        )
-public class getCountFromPtn extends VoltProcedure {
+  public final SQLStmt sql0 = new SQLStmt( "SELECT COUNT(*) FROM GAME WHERE game_id = ? and score < ?");
 
-    // potential return codes
-    public static final long ERR_INVALID_COUNTER = 1;
-
-    // get Counter
-    public final SQLStmt getCounterStmt = new SQLStmt(
-            "SELECT c.counter counter FROM joiner j, counters_ptn c WHERE j.id = c.id and j.id = ? order by 1;");
-
-    public long run(int id) {
-
-        voltQueueSQL(getCounterStmt, EXPECT_SCALAR, id);
-        VoltTable result[] = voltExecuteSQL();
-        long count = result[0].fetchRow(0).getLong(0);
-
-        return count;
-    }
+  public VoltTable[] run( long game_id, long scoreMin)
+      throws VoltAbortException {
+          voltQueueSQL( sql0, game_id, scoreMin );
+          return voltExecuteSQL();
+      }
 }

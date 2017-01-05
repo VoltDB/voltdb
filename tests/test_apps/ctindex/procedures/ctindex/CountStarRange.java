@@ -21,48 +21,23 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-//
-// Returns the heat map data (winning contestant by state) for display on nthe Live Statistics dashboard.
-//
+package ctindex;
 
-package LiveRejoinConsistency.procedures;
+import org.voltdb.*;
 
-import java.util.zip.CRC32;
+@ProcInfo(
+    partitionInfo = "GAME.game_id: 0",
+    singlePartition = true
+)
 
-import org.voltdb.ProcInfo;
-import org.voltdb.SQLStmt;
-import org.voltdb.VoltProcedure;
-import org.voltdb.VoltTable;
+public class CountStarRange extends VoltProcedure {
 
+  public final SQLStmt sql1 = new SQLStmt( "SELECT COUNT(*) FROM GAME WHERE game_id = ? and score > ? and score <= ?");
 
-@ProcInfo (
-        partitionInfo = "joiner.id:0",
-        singlePartition = true
-        )
-
-public class getCRCFromPtn extends VoltProcedure {
-
-    // get Counter
-    public final SQLStmt Stmt = new SQLStmt(
-            "SELECT j.id as id, c.counter as counter FROM joiner j, like_counters_ptn c WHERE j.id=c.id and c.id = ? order by 1;");
-
-    public long run(int id) {
-
-        CRC32 crc = new CRC32();
-
-        voltQueueSQL(Stmt, id);
-        VoltTable[] result = voltExecuteSQL(true);
-
-        while (result[0].advanceRow()) {
-            long counter = result[0].getLong("counter");
-
-            byte [] b = new byte[8];
-            for(int i= 0; i < 8; i++) {
-                b[7 - i] = (byte)(counter >>> (i * 8));
-            }
-
-            crc.update(b);
-        }
-        return crc.getValue();
-    }
+  public VoltTable[] run( long game_id, long scoreMin, long scoreMax)
+      throws VoltAbortException {
+          voltQueueSQL( sql1, game_id, scoreMin, scoreMax );
+          return voltExecuteSQL();
+      }
 }
+

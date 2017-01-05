@@ -25,7 +25,7 @@
 // Returns the heat map data (winning contestant by state) for display on nthe Live Statistics dashboard.
 //
 
-package LiveRejoinConsistency.procedures;
+package liverejoinconsistency.procedures;
 
 import java.util.ArrayList;
 
@@ -39,20 +39,21 @@ import org.voltdb.VoltType;
         partitionInfo = "joiner.id:0",
         singlePartition = true
         )
-public class getRowFromPtn extends VoltProcedure {
+public class getCountFromRep extends VoltProcedure {
 
     // potential return codes
     public static final long ERR_INVALID_COUNTER = 1;
 
     // get Counter
     public final SQLStmt getCounterStmt = new SQLStmt(
-            "SELECT j.id as id, c.counter as counter FROM joiner j, counters_ptn c WHERE j.id = c.id and j.id = ? order by 1;");
+            "SELECT c.counter counter FROM joiner j, counters_rep c WHERE j.id = c.id and j.id = ? order by 1;");
 
-    public VoltTable[] run(int id) {
+    public long run(int id) {
 
-        voltQueueSQL(getCounterStmt, id);
-        VoltTable[] result = voltExecuteSQL();
+        voltQueueSQL(getCounterStmt, EXPECT_SCALAR, id);
+        VoltTable result[] = voltExecuteSQL();
+        long count = result[0].fetchRow(0).getLong(0);
 
-        return result;
+        return count;
     }
 }

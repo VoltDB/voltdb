@@ -25,47 +25,37 @@
 // Initializes the database, pushing the list of contestants and documenting domain data (Area codes and States).
 //
 
-package LiveRejoinConsistency.procedures;
+package liverejoinconsistency.procedures;
 
 import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
+
+import java.util.Random;
 
 @ProcInfo (
         singlePartition = false
         )
-public class Initialize extends VoltProcedure
+public class MPUpdateRep extends VoltProcedure
 {
 
-    // Inserts a counter
-    public final SQLStmt insert1 = new SQLStmt("INSERT INTO joiner (id) VALUES (?);");
-    public final SQLStmt insert2 = new SQLStmt("INSERT INTO counters_ptn (id, counter) VALUES (?, ?);");
-    public final SQLStmt insert3 = new SQLStmt("INSERT INTO counters_rep (id, counter) VALUES (?, ?);");
+    public final SQLStmt sql3 = new SQLStmt("UPDATE counters_rep set counter=counter*2;");
+    public final SQLStmt sql4 = new SQLStmt("UPDATE counters_rep set counter=counter/2;");
 
+    Random rand = new Random();
 
-    // Delete a counter
-    public final SQLStmt delete1 = new SQLStmt("DELETE FROM joiner;");
-    public final SQLStmt delete2 = new SQLStmt("DELETE FROM counters_rep;");
-    public final SQLStmt delete3 = new SQLStmt("DELETE FROM counters_ptn;");
-    public final SQLStmt delete4 = new SQLStmt("DELETE FROM like_counters_rep;");
-    public final SQLStmt delete5 = new SQLStmt("DELETE FROM like_counters_ptn;");
+    public long run() {
 
-
-    public long run(int inc) {
-
-        voltQueueSQL(delete1);
-        voltQueueSQL(delete2);
-        voltQueueSQL(delete3);
-        voltQueueSQL(delete4);
-        voltQueueSQL(delete5);
-
-        // initialize the data
-        for (int i=0; i < inc; i++) {
-            voltQueueSQL(insert1, i);
-            voltQueueSQL(insert2, i, i);
-            voltQueueSQL(insert3, i, i);
+        switch(rand.nextInt(2)) {
+        case 0:
+            voltQueueSQL(sql3);
+            break;
+        case 1:
+            voltQueueSQL(sql4);
+            break;
         }
-        voltExecuteSQL();
+        VoltTable result[] = voltExecuteSQL(true);
 
         return 0;
     }
