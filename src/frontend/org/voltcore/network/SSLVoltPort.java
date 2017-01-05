@@ -179,7 +179,7 @@ public class SSLVoltPort extends VoltPort {
                             srcC = null;
                             m_dstBuffer.clear();
                             m_decryptedMessages.offer(new DecryptionResult(messages, sf));
-                            sf = null;
+                            sf.set(null);
                             queuedMessages = true;
                         } catch (IOException ioe) {
                             networkLog.error("Exception unwrapping an SSL frame", ioe);
@@ -301,7 +301,7 @@ public class SSLVoltPort extends VoltPort {
                             fragCont.discard();
                             fragCont = null;
                             m_encryptedBuffers.offer(new EncryptionResult(encCont, nBytesClear, sf));
-                            sf = null;
+                            sf.set(null);
                             queuedEncBuffers = true;
                         } catch (IOException ioe) {
                             networkLog.error("Exception wrapping an SSL frame", ioe);
@@ -435,7 +435,7 @@ public class SSLVoltPort extends VoltPort {
 
     private void drainGateways() {
         SettableFuture<Void> sf;
-        while ((sf = m_encryptionResults.poll()) != null) {
+        while ((sf = m_decryptionResults.poll()) != null) {
             try {
                 sf.get();
             } catch (InterruptedException e) {
@@ -443,7 +443,7 @@ public class SSLVoltPort extends VoltPort {
                 networkLog.error("SSLVoltPort task failed", e);
             }
         }
-        while ((sf = m_decryptionResults.poll()) != null) {
+        while ((sf = m_encryptionResults.poll()) != null) {
             try {
                 sf.get();
             } catch (InterruptedException e) {
