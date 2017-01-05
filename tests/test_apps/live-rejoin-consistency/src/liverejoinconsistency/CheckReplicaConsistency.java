@@ -25,7 +25,7 @@
  * it relies on a "short circuit" behavior in to obtain the node local data
  */
 
-package LiveRejoinConsistency;
+package liverejoinconsistency;
 
 import java.io.IOException;
 

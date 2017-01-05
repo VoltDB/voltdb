@@ -25,15 +25,12 @@ package org.voltdb.utils;
 
 import java.io.CharArrayReader;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.LineNumberReader;
 import java.io.UnsupportedEncodingException;
 import java.net.URL;
 import java.net.URLDecoder;
 import java.util.Arrays;
-import java.util.jar.JarEntry;
-import java.util.jar.JarInputStream;
 
 import junit.framework.TestCase;
 
@@ -50,7 +47,7 @@ public class TestInMemoryJarfile extends TestCase {
     protected Catalog m_catalog;
     protected Database m_catalogDb;
 
-    private Catalog createTestJarFile(String jarFileName, boolean adhoc, String elemPfx)
+    private Catalog createTestJarFile(String jarFileName, boolean adhoc)
     {
         String schemaPath = "";
         try {
@@ -60,36 +57,26 @@ public class TestInMemoryJarfile extends TestCase {
             e.printStackTrace();
             System.exit(-1);
         }
-        String simpleProjectTmpl =
-            "<?xml version=\"1.0\"?>\n" +
-            "<project>" +
-            "<database name='database'>" +
-            "<%ss>" +
-            "<%s adhoc='" + Boolean.toString(adhoc) + "' name='default' sysproc='false'/>" +
-            "</%ss>" +
-            "<schemas><schema path='" + schemaPath + "' /></schemas>" +
-            "<procedures><procedure class='org.voltdb.compiler.procedures.TPCCTestProc' /></procedures>" +
-            "<partitions><partition table='WAREHOUSE' column='W_ID' /></partitions>" +
-            "</database>" +
-            "</project>";
-        String simpleProject = String.format(simpleProjectTmpl, elemPfx, elemPfx, elemPfx);
-        System.out.println(simpleProject);
-        File projectFile = VoltProjectBuilder.writeStringToTempFile(simpleProject);
-        String projectPath = projectFile.getPath();
-        VoltCompiler compiler = new VoltCompiler();
-        assertTrue(compiler.compileWithProjectXML(projectPath, jarFileName));
-        return compiler.getCatalog();
-    }
 
-    private Catalog createTestJarFile(String jarFileName, boolean adhoc) {
-        return createTestJarFile(jarFileName, adhoc, "role");
+        String schema2 = "partition table WAREHOUSE on column W_ID;\n" +
+                         "create procedure from class org.voltdb.compiler.procedures.TPCCTestProc;\n";
+        if (adhoc) {
+            schema2 += "create role default with sql, adhoc;";
+        }
+
+        final File schema2File = VoltProjectBuilder.writeStringToTempFile(schema2);
+        final String schema2Path = schema2File.getPath();
+
+        VoltCompiler compiler = new VoltCompiler();
+        assertTrue(compiler.compileFromDDL(jarFileName, schemaPath, schema2Path));
+        return compiler.getCatalog();
     }
 
     @Override
     protected void setUp() throws Exception {
         System.out.print("START: " + System.currentTimeMillis());
         super.setUp();
-        m_catalog = createTestJarFile("testout.jar", true, "role");
+        m_catalog = createTestJarFile("testout.jar", true);
         assertNotNull(m_catalog);
         m_catalogDb = m_catalog.getClusters().get("cluster").getDatabases().get("database");
         assertNotNull(m_catalogDb);
@@ -99,8 +86,9 @@ public class TestInMemoryJarfile extends TestCase {
     @Override
     protected void tearDown() throws Exception {
         super.tearDown();
-        if (m_jarPath != null)
+        if (m_jarPath != null) {
             assertTrue(m_jarPath.delete());
+        }
         File dupeFile = new File("testout-dupe.jar");
         dupeFile.delete();
     }
@@ -158,10 +146,7 @@ public class TestInMemoryJarfile extends TestCase {
     public void testDifferentJarContentsDontMatchCRCs()
     throws IOException, InterruptedException
     {
-        // Create a second jarfile with identical contents
-        // Sleep for 5 seconds so the timestamps will differ
-        // and cause different global CRCs
-        Thread.sleep(5000);
+        // Create a second jarfile with different contents
         createTestJarFile("testout-dupe.jar", false);
         long crc1 = new InMemoryJarfile("testout.jar").getCRC();
         long crc2 = new InMemoryJarfile("testout-dupe.jar").getCRC();

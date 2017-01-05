@@ -25,7 +25,7 @@
 // Returns the heat map data (winning contestant by state) for display on nthe Live Statistics dashboard.
 //
 
-package LiveRejoinConsistency.procedures;
+package liverejoinconsistency.procedures;
 
 import java.util.zip.CRC32;
 
@@ -40,11 +40,11 @@ import org.voltdb.VoltTable;
         singlePartition = true
         )
 
-public class getCRCFromRep extends VoltProcedure {
+public class getCRCFromPtn extends VoltProcedure {
 
     // get Counter
     public final SQLStmt Stmt = new SQLStmt(
-            "SELECT j.id as id, c.counter as counter FROM joiner j, like_counters_rep c WHERE j.id=c.id and c.id = ? order by 1;");
+            "SELECT j.id as id, c.counter as counter FROM joiner j, like_counters_ptn c WHERE j.id=c.id and c.id = ? order by 1;");
 
     public long run(int id) {
 

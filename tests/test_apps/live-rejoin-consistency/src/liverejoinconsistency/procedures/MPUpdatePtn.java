@@ -22,38 +22,42 @@
  */
 
 //
-// Returns the heat map data (winning contestant by state) for display on nthe Live Statistics dashboard.
+// Initializes the database, pushing the list of contestants and documenting domain data (Area codes and States).
 //
 
-package LiveRejoinConsistency.procedures;
-
-import java.util.ArrayList;
+package liverejoinconsistency.procedures;
 
 import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
-import org.voltdb.VoltType;
+
+import java.util.Random;
 
 @ProcInfo (
-        partitionInfo = "joiner.id:0",
-        singlePartition = true
+        singlePartition = false
         )
-public class getCountFromRep extends VoltProcedure {
+public class MPUpdatePtn extends VoltProcedure
+{
 
-    // potential return codes
-    public static final long ERR_INVALID_COUNTER = 1;
+    public final SQLStmt sql1 = new SQLStmt("UPDATE counters_ptn set counter=counter*2;");
+    public final SQLStmt sql2 = new SQLStmt("UPDATE counters_ptn set counter=counter/2;");
 
-    // get Counter
-    public final SQLStmt getCounterStmt = new SQLStmt(
-            "SELECT c.counter counter FROM joiner j, counters_rep c WHERE j.id = c.id and j.id = ? order by 1;");
+    Random rand = new Random();
 
-    public long run(int id) {
+    public long run() {
 
-        voltQueueSQL(getCounterStmt, EXPECT_SCALAR, id);
-        VoltTable result[] = voltExecuteSQL();
-        long count = result[0].fetchRow(0).getLong(0);
+        switch(rand.nextInt(2)) {
+        case 0:
+            voltQueueSQL(sql1);
+            break;
+        case 1:
+            voltQueueSQL(sql2);
+            break;
+        }
+        VoltTable result[] = voltExecuteSQL(true);
 
-        return count;
+        return 0;
     }
 }
+;

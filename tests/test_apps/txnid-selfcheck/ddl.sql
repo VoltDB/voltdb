@@ -1,3 +1,7 @@
+-- Tell sqlcmd to batch the following commands together,
+-- so that the schema loads quickly.
+file -inlinebatch END_OF_BATCH
+
 -- partitioned table
 CREATE TABLE partitioned
 (
@@ -29,6 +33,13 @@ CREATE TABLE replicated
 , UNIQUE ( cnt )
 );
 
+END_OF_BATCH
+
+LOAD CLASSES txnid-procs.jar;
+
+-- The following CREATE PROCEDURE statements can all be batched.
+file -inlinebatch END_OF_2ND_BATCH
+
 -- procedures
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.Initialize;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.doTxn;
@@ -38,3 +49,5 @@ CREATE PROCEDURE getLastRow AS
        SELECT cid, MAX(-1 * rid) AS last_rid FROM partitioned GROUP BY cid;
 CREATE PROCEDURE getLastReplicatedRow AS
        SELECT rid FROM replicated;
+
+END_OF_2ND_BATCH

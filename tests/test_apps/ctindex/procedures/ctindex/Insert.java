@@ -21,6 +21,8 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+package ctindex;
+
 import org.voltdb.*;
 
 @ProcInfo(

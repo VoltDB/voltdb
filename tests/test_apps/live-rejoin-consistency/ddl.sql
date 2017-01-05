@@ -1,3 +1,5 @@
+file -inlinebatch END_OF_BATCH
+
 CREATE TABLE counters_ptn
 (
   id int NOT NULL,
@@ -14,7 +16,7 @@ CREATE TABLE counters_rep
 );
 
 -- this table used to test @LoadTable procedures
--- it has the same shape as counters and the same 
+-- it has the same shape as counters and the same
 -- distribution but no primary key
 CREATE TABLE like_counters_ptn
 (
@@ -35,3 +37,23 @@ CREATE TABLE joiner
     PRIMARY KEY(ID)
 );
 PARTITION TABLE joiner ON COLUMN id;
+
+END_OF_BATCH
+
+LOAD CLASSES liverejoinconsistency-procs.jar;
+
+-- The following CREATE PROCEDURE statements can all be batched.
+file -inlinebatch END_OF_2ND_BATCH
+
+CREATE PROCEDURE FROM CLASS liverejoinconsistency.procedures.Initialize;
+CREATE PROCEDURE FROM CLASS liverejoinconsistency.procedures.getCountFromPtn;
+CREATE PROCEDURE FROM CLASS liverejoinconsistency.procedures.getCountFromRep;
+CREATE PROCEDURE FROM CLASS liverejoinconsistency.procedures.getRowFromPtn;
+CREATE PROCEDURE FROM CLASS liverejoinconsistency.procedures.getRowFromRep;
+CREATE PROCEDURE FROM CLASS liverejoinconsistency.procedures.getCRCFromPtn;
+CREATE PROCEDURE FROM CLASS liverejoinconsistency.procedures.getCRCFromRep;
+CREATE PROCEDURE FROM CLASS liverejoinconsistency.procedures.getNextFromPtn;
+CREATE PROCEDURE FROM CLASS liverejoinconsistency.procedures.MPUpdatePtn;
+CREATE PROCEDURE FROM CLASS liverejoinconsistency.procedures.MPUpdateRep;
+
+END_OF_2ND_BATCH

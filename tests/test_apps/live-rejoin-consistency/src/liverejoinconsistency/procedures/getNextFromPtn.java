@@ -28,7 +28,7 @@
 // number of allowed votes.
 //
 
-package LiveRejoinConsistency.procedures;
+package liverejoinconsistency.procedures;
 
 import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
