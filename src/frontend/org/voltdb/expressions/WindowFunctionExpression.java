@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -49,7 +49,6 @@ public class WindowFunctionExpression extends AbstractExpression {
     private List<AbstractExpression> m_partitionByExpressions = new ArrayList<>();
     private List<AbstractExpression> m_orderByExpressions     = new ArrayList<>();
     private List<SortDirectionType>  m_orderByDirections      = new ArrayList<>();
-    private List<AbstractExpression> m_aggArguments           = new ArrayList<>();
 
     // This object is not in the display list.  It's squirreled away in the ParsedSelectStatment.  But
     // the display list has a TVE which references the column which holds the values this aggregate
@@ -79,9 +78,11 @@ public class WindowFunctionExpression extends AbstractExpression {
         m_partitionByExpressions.addAll(partitionbyExprs);
         m_orderByExpressions.addAll(orderbyExprs);
         m_orderByDirections.addAll(orderByDirections);
-        m_aggArguments.addAll(aggArguments);
-        setValueType(VoltType.BIGINT);
-        setValueSize(VoltType.BIGINT.getLengthInBytesForFixedTypes());
+        if (m_args == null) {
+            m_args = new ArrayList<>();
+        }
+        m_args.addAll(aggArguments);
+        finalizeValueTypes();
         m_xmlID = id;
     }
 
@@ -107,7 +108,7 @@ public class WindowFunctionExpression extends AbstractExpression {
     }
 
     public List<AbstractExpression> getAggregateArguments() {
-        return m_aggArguments;
+        return m_args;
     }
 
     @Override
@@ -129,14 +130,16 @@ public class WindowFunctionExpression extends AbstractExpression {
         hash += m_orderByDirections.hashCode();
         hash += m_orderByExpressions.hashCode();
         hash += m_partitionByExpressions.hashCode();
-        hash += m_aggArguments.hashCode();
+        hash += m_args.hashCode();
         return hash;
     }
 
     @Override
     public void finalizeValueTypes() {
-        m_valueType = VoltType.BIGINT;
-        m_valueSize = VoltType.BIGINT.getLengthInBytesForFixedTypes();
+        // This is a kind of logical aggregate
+        // function, even if it is not a subclass
+        // of AggregateExpression.
+        AggregateExpression.finalizeAggregateValueTypes(this);
     }
 
     @Override
@@ -159,7 +162,7 @@ public class WindowFunctionExpression extends AbstractExpression {
         for (AbstractExpression sortExpr : m_orderByExpressions) {
             list.addAll(sortExpr.findAllSubexpressionsOfClass(aeClass));
         }
-        for (AbstractExpression aggExpr : m_aggArguments) {
+        for (AbstractExpression aggExpr : m_args) {
             list.addAll(aggExpr.findAllSubexpressionsOfClass(aeClass));
         }
         return list;
@@ -180,7 +183,7 @@ public class WindowFunctionExpression extends AbstractExpression {
                 return true;
             }
         }
-        for (AbstractExpression aggExpr : m_aggArguments) {
+        for (AbstractExpression aggExpr : m_args) {
             if (aggExpr.hasAnySubexpressionOfClass(aeClass)) {
                 return true;
             }

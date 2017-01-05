@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -58,60 +58,74 @@ public class AggregateExpression extends AbstractExpression {
         return result;
     }
 
-    private final String FLOAT_AGG_ERR_MSG = "Aggregate functions of floating point columns may not be deterministic.  We suggest converting to DECIMAL.";
+    private static final String FLOAT_AGG_ERR_MSG = "Aggregate functions of floating point columns may not be deterministic.  We suggest converting to DECIMAL.";
     @Override
     public void finalizeValueTypes()
     {
-        finalizeChildValueTypes();
-        ExpressionType type = getExpressionType();
+        finalizeAggregateValueTypes(this);
+    }
+
+    public static void finalizeAggregateValueTypes(AbstractExpression expr)
+    {
+        expr.finalizeChildValueTypes();
+        ExpressionType type = expr.getExpressionType();
+        AbstractExpression aggArg;
+
         switch (type) {
         case AGGREGATE_COUNT:
-        case AGGREGATE_COUNT_STAR:
-        case AGGREGATE_APPROX_COUNT_DISTINCT:
-        case AGGREGATE_HYPERLOGLOGS_TO_CARD:
         case AGGREGATE_WINDOWED_RANK:
         case AGGREGATE_WINDOWED_DENSE_RANK:
         case AGGREGATE_WINDOWED_COUNT:
+        case AGGREGATE_COUNT_STAR:
+        case AGGREGATE_APPROX_COUNT_DISTINCT:
+        case AGGREGATE_HYPERLOGLOGS_TO_CARD:
             //
             // Always an integer
             //
-            m_valueType = VoltType.BIGINT;
-            m_valueSize = m_valueType.getLengthInBytesForFixedTypes();
+            expr.m_valueType = VoltType.BIGINT;
+            expr.m_valueSize = expr.m_valueType.getLengthInBytesForFixedTypes();
             break;
         case AGGREGATE_VALS_TO_HYPERLOGLOG:
-            m_valueType = VoltType.VARBINARY;
-            m_valueSize = 65537;
+            expr.m_valueType = VoltType.VARBINARY;
+            expr.m_valueSize = 65537;
             break;
         case AGGREGATE_AVG:
         case AGGREGATE_MAX:
         case AGGREGATE_MIN:
+        case AGGREGATE_WINDOWED_MIN:
+        case AGGREGATE_WINDOWED_MAX:
             //
             // It's always whatever the base type is
             //
-            m_valueType = m_left.getValueType();
-            m_valueSize = m_left.getValueSize();
+            aggArg = expr.getFirstArgument();
+            assert(aggArg != null);
+            expr.m_valueType = aggArg.getValueType();
+            expr.m_valueSize = aggArg.getValueSize();
             // Of these aggregate functions, only AVG is
             // non-deterministic on floating point types.
-            if (m_valueType == VoltType.FLOAT && type == ExpressionType.AGGREGATE_AVG) {
-                updateContentDeterminismMessage(FLOAT_AGG_ERR_MSG);
+            if (expr.m_valueType == VoltType.FLOAT && type == ExpressionType.AGGREGATE_AVG) {
+                expr.updateContentDeterminismMessage(FLOAT_AGG_ERR_MSG);
             }
             break;
+        case AGGREGATE_WINDOWED_SUM:
         case AGGREGATE_SUM:
-            if (m_left.getValueType() == VoltType.TINYINT ||
-                m_left.getValueType() == VoltType.SMALLINT ||
-                m_left.getValueType() == VoltType.INTEGER) {
-                m_valueType = VoltType.BIGINT;
-                m_valueSize = m_valueType.getLengthInBytesForFixedTypes();
+            aggArg = expr.getFirstArgument();
+            assert(aggArg != null);
+            if (aggArg.getValueType() == VoltType.TINYINT ||
+                aggArg.getValueType() == VoltType.SMALLINT ||
+                aggArg.getValueType() == VoltType.INTEGER) {
+                expr.m_valueType = VoltType.BIGINT;
+                expr.m_valueSize = expr.m_valueType.getLengthInBytesForFixedTypes();
             } else {
-                m_valueType = m_left.getValueType();
-                m_valueSize = m_left.getValueSize();
+                expr.m_valueType = aggArg.getValueType();
+                expr.m_valueSize = aggArg.getValueSize();
             }
-            if (m_valueType == VoltType.FLOAT) {
-                updateContentDeterminismMessage(FLOAT_AGG_ERR_MSG);
+            if (expr.m_valueType == VoltType.FLOAT) {
+                expr.updateContentDeterminismMessage(FLOAT_AGG_ERR_MSG);
             }
             break;
         default:
-            throw new RuntimeException("ERROR: Invalid Expression type '" + type + "' for Expression '" + this + "'");
+            throw new RuntimeException("ERROR: Invalid Expression type '" + type + "' for Expression '" + expr + "'");
         }
     }
 

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -28,8 +28,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
-import junit.framework.Test;
-
 import org.voltdb.BackendTarget;
 import org.voltdb.client.Client;
 import org.voltdb.client.NoConnectionsException;
@@ -41,6 +39,8 @@ import org.voltdb_testprocs.regressionsuites.CurrentTimestampProcedure;
 import org.voltdb_testprocs.regressionsuites.LastBatchLie;
 import org.voltdb_testprocs.regressionsuites.VariableBatchSizeMP;
 import org.voltdb_testprocs.regressionsuites.VariableBatchSizeSP;
+
+import junit.framework.Test;
 
 public class TestProcedureAPISuite extends RegressionSuite {
 
@@ -155,10 +155,11 @@ public class TestProcedureAPISuite extends RegressionSuite {
     }
 
     public void testMultiPartitionCURRENT_TIMESTAMP() throws IOException, ProcCallException {
-        Client client = getClient();
-        if (!isHSQL()) {
-            client.callProcedure(CurrentTimestampProcedure.class.getSimpleName());
+        if (isHSQL()) {
+            return;
         }
+        Client client = getClient();
+        client.callProcedure(CurrentTimestampProcedure.class.getSimpleName());
     }
 
     /**

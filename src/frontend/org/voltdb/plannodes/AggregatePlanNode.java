@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -474,11 +474,7 @@ public class AggregatePlanNode extends AbstractPlanNode {
         for (ExpressionType e : m_aggregateTypes) {
             sb.append(sep).append(e.symbol());
             sep = ", ";
-            if (e == ExpressionType.AGGREGATE_WINDOWED_RANK || e == ExpressionType.AGGREGATE_WINDOWED_DENSE_RANK) {
-                sb.append("()");
-            }
-            else if (e != ExpressionType.AGGREGATE_COUNT_STAR
-                    && e != ExpressionType.AGGREGATE_WINDOWED_COUNT) {
+            if (e != ExpressionType.AGGREGATE_COUNT_STAR) {
                 if (m_aggregateDistinct.get(ii) == 1) {
                     sb.append(" DISTINCT");
                 }

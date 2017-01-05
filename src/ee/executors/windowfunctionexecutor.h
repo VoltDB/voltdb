@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -14,8 +14,8 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
-#ifndef SRC_EE_EXECUTORS_PARTITIONBYEXECUTOR_H_
-#define SRC_EE_EXECUTORS_PARTITIONBYEXECUTOR_H_
+#ifndef WINDOWFUNCTIONEXECUTOR_H_
+#define WINDOWFUNCTIONEXECUTOR_H_
 
 #include "abstractexecutor.h"
 #include "plannodes/windowfunctionnode.h"
@@ -330,4 +330,4 @@ private:
 
 } /* namespace voltdb */
 
-#endif /* SRC_EE_EXECUTORS_PARTITIONBYEXECUTOR_H_ */
+#endif /* WINDOWFUNCTIONEXECUTOR_H_ */

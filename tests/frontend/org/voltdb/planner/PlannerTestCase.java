@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -30,9 +30,11 @@ import java.io.PrintWriter;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.EmptyStackException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Stack;
 
 import junit.framework.TestCase;
 
@@ -43,7 +45,11 @@ import org.voltdb.compiler.DeterminismMode;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.NestLoopPlanNode;
 import org.voltdb.plannodes.OrderByPlanNode;
+import org.voltdb.plannodes.SeqScanPlanNode;
+import org.voltdb.types.ExpressionType;
+import org.voltdb.types.JoinType;
 import org.voltdb.types.PlanNodeType;
 import org.voltdb.types.SortDirectionType;
 
@@ -74,8 +80,7 @@ public class PlannerTestCase extends TestCase {
         return paramCount;
     }
 
-    protected void failToCompile(String sql, String... patterns)
-    {
+    protected void failToCompile(String sql, String... patterns) {
         int paramCount = countQuestionMarks(sql);
         try {
             List<AbstractPlanNode> unexpected = m_aide.compile(sql, paramCount,
@@ -221,6 +226,29 @@ public class PlannerTestCase extends TestCase {
         return compileSPWithJoinOrder(sql, paramCount, joinOrder);
     }
 
+    /**
+     * Assert that the plan for a statement produces a plan that meets some
+     * basic expectations.
+     * @param sql a statement to plan
+     *            as if for a single-partition stored procedure
+     * @param nOutputColumns the expected number of plan result columns,
+     *                       because of the planner's history of such errors
+     * @param nodeTypes the expected node types of the resulting plan tree
+     *                  listed in top-down order with wildcard support.
+     *                  See assertTopDownTree.
+     * @return the plan for more detailed testing.
+     */
+    protected AbstractPlanNode compileToTopDownTree(String sql,
+            int nOutputColumns, PlanNodeType... nodeTypes) {
+        // Yes, we ARE assuming that test queries don't
+        // contain quoted question marks.
+        int paramCount = StringUtils.countMatches(sql, "?");
+        AbstractPlanNode result = compileSPWithJoinOrder(sql, paramCount, null);
+        assertEquals(nOutputColumns, result.getOutputSchema().size());
+        assertTopDownTree(result, nodeTypes);
+        return result;
+    }
+
     /** A helper here where the junit test can assert success */
     protected AbstractPlanNode compile(String sql) {
         // Yes, we ARE assuming that test queries don't contain quoted question marks.
@@ -340,45 +368,53 @@ public class PlannerTestCase extends TestCase {
         List<SortDirectionType>  dirs  = orderByPlanNode.getSortDirections();
         assertEquals(exprs.size(), dirs.size());
         assertEquals(columnDescrs.length/2, exprs.size());
-        for (int idx = 0; idx < exprs.size(); idx += 1) {
+        for (int idx = 0; idx < exprs.size(); ++idx) {
+            // Assert that an expected one-part name matches a tve by column name
+            // and an expected two-part name matches a tve by table and column name.
             AbstractExpression expr = exprs.get(idx);
-            SortDirectionType  dir  = dirs.get(idx);
             assertTrue(expr instanceof TupleValueExpression);
             TupleValueExpression tve = (TupleValueExpression)expr;
             String expectedNames[] = ((String)columnDescrs[2*idx]).split("\\.");
-            String tableName = null;
             String columnName = null;
-            if (expectedNames.length == 2) {
-                tableName = expectedNames[0].toUpperCase();
-                columnName = expectedNames[1].toUpperCase();
-            } else {
-                columnName = expectedNames[0].toUpperCase();
-            }
-            assertEquals(columnName, tve.getColumnName().toUpperCase());
-            if (tableName != null) {
+            int nParts = expectedNames.length;
+            if (nParts > 1) {
+                assertEquals(2, nParts);
+                String tableName = expectedNames[0].toUpperCase();
                 assertEquals(tableName, tve.getTableName().toUpperCase());
             }
-            assertEquals(columnDescrs[2*idx+1],       dir);
+            // In either case, the column name must match the LAST part.
+            columnName = expectedNames[nParts-1].toUpperCase();
+            assertEquals(columnName, tve.getColumnName().toUpperCase());
+
+            SortDirectionType dir = dirs.get(idx);
+            assertEquals(columnDescrs[2*idx+1], dir);
         }
     }
 
-    /** Given a list of Class objects for plan node subclasses, asserts
-     * if the given plan doesn't contain instances of those classes.
+    /**
+     * Assert that a plan's left-most branch is made up of plan nodes of
+     * specified classes.
+     * @param expectedClasses a list of expected AbstractPlanNode classes
+     * @param actualPlan the top of a plan node tree expected to have instances
+     *                   of the expected classes along its left-most branch
+     *                   listed from top to bottom.
      */
     static protected void assertClassesMatchNodeChain(
             List<Class<? extends AbstractPlanNode>> expectedClasses,
             AbstractPlanNode actualPlan) {
         AbstractPlanNode pn = actualPlan;
         for (Class<? extends AbstractPlanNode> c : expectedClasses) {
-            assertFalse("Actual plan shorter than expected",
+            assertFalse("The actual plan is shallower than expected",
                     pn == null);
             assertTrue("Expected plan to contain an instance of " + c.getSimpleName() +", "
                     + "instead found " + pn.getClass().getSimpleName(),
                     c.isInstance(pn));
-            if (pn.getChildCount() > 0)
+            if (pn.getChildCount() > 0) {
                 pn = pn.getChild(0);
-            else
+            }
+            else {
                 pn = null;
+            }
         }
 
         assertTrue("Actual plan longer than expected", pn == null);
@@ -467,8 +503,10 @@ public class PlannerTestCase extends TestCase {
     private static void ensureTable(int data[][]) {
         // Ensure there is at least one row, and that
         // all rows have the same length.
-        for (int idx = 1; idx < data.length; idx += 1) {
-            assertTrue(data[idx].length == data[0].length);
+        assertTrue(data.length > 0);
+        int length = data[0].length;
+        for (int[] row : data) {
+            assertEquals(length, row.length);
         }
     }
 
@@ -557,13 +595,14 @@ public class PlannerTestCase extends TestCase {
                     result.write(buffer, 0, length);
                 }
                 return result.toString("UTF-8");
-            } finally {
+            }
+            finally {
                 try {
                     if (inputStream != null) {
                         inputStream.close();
                     }
-                } catch (Exception ex) {
-                    ;
+                }
+                catch (Exception ex) {
                 }
             }
         }
@@ -586,7 +625,7 @@ public class PlannerTestCase extends TestCase {
 
         public String getTestCases(Map<String, String> params) {
             StringBuffer sb = new StringBuffer();
-            for (int testIdx = 0; testIdx < m_testConfigs.size(); testIdx += 1) {
+            for (int testIdx = 0; testIdx < m_testConfigs.size(); ++testIdx) {
                 TestConfig tc = m_testConfigs.get(testIdx);
                 sb.append(String.format("TEST_F(%s, %s) {\n" +
                                         "    static int testIndex = %d;\n" +
@@ -626,10 +665,10 @@ public class PlannerTestCase extends TestCase {
                                     tableName,
                                     rowCountName,
                                     colCountName));
-            for (int ridx = 0; ridx < data.length; ridx += 1) {
+            for (int[] row : data) {
                 sb.append("    ");
-                for (int cidx = 0; cidx < data[ridx].length; cidx += 1) {
-                    sb.append(String.format("%3d,", data[ridx][cidx]));
+                for (int column : row) {
+                    sb.append(String.format("%3d,", column));
                 }
                 sb.append("\n");
             }
@@ -676,8 +715,7 @@ public class PlannerTestCase extends TestCase {
 
         public String getTestResultData(Map<String, String> params) {
             StringBuffer sb = new StringBuffer();
-            for (int testIdx = 0; testIdx < m_testConfigs.size(); testIdx += 1) {
-                TestConfig tc = m_testConfigs.get(testIdx);
+            for (TestConfig tc : m_testConfigs) {
                 String rowCountName = tc.getRowCountName();
                 String colCountName = tc.getColCountName();
                 String tableName    = tc.getOutputTableName();
@@ -802,12 +840,13 @@ public class PlannerTestCase extends TestCase {
         try {
             out = new PrintWriter(path);
             out.print(contents);
-        } finally {
+        }
+        finally {
             if (out != null) {
                 try {
                     out.close();
-                } catch (Exception ex) {
-                    ;
+                }
+                catch (Exception ex) {
                 }
             }
         }
@@ -822,4 +861,188 @@ public class PlannerTestCase extends TestCase {
         }
         writeFile(new File(String.format("tests/ee/%s/%s.cpp", testFolder, testClassName)), template);
     }
+
+    /**
+     * Find a specific node in a plan tree following the left-most path,
+     * (child[0]), and asserting the expected class of each plan node along the
+     * way, inclusive of the start and end.
+     * @param expectedClasses a list of expected AbstractPlanNode classes
+     * @param actualPlan the top of a plan node tree expected to have instances
+     *                   of the expected classes along its left-most branch
+     *                   listed in top-down order.
+     * @return the child node matching the last expected class in the list.
+     *                   It need not be a leaf node.
+     */
+    protected static AbstractPlanNode followAssertedLeftChain(
+            AbstractPlanNode start,
+            PlanNodeType startType, PlanNodeType... nodeTypes) {
+        AbstractPlanNode result = start;
+        assertEquals(startType, result.getPlanNodeType());
+        for (PlanNodeType type : nodeTypes) {
+            assertTrue(result.getChildCount() > 0);
+            result = result.getChild(0);
+            assertEquals(type, result.getPlanNodeType());
+        }
+        return result;
+    }
+
+    /**
+     * Assert that a plan's left-most branch is made up of plan nodes of
+     * expected classes.
+     * @param expectedClasses a list of expected AbstractPlanNode classes
+     * @param actualPlan the top of a plan node tree expected to have instances
+     *                   of the expected classes along its left-most branch
+     *                   listed from top to bottom.
+     */
+    protected static void assertLeftChain(
+            AbstractPlanNode start, PlanNodeType... nodeTypes) {
+        AbstractPlanNode pn = start;
+        for (PlanNodeType type : nodeTypes) {
+            assertFalse("Child node(s) are missing from the actual plan chain.",
+                    pn == null);
+            if ( ! type.equals(pn.getPlanNodeType())) {
+                fail("Expecting plan node of type " + type + ", " +
+                        "instead found " + pn.getPlanNodeType() + ".");
+            }
+            pn = (pn.getChildCount() > 0) ? pn.getChild(0) : null;
+        }
+        assertTrue("Actual plan chain was longer than expected",
+                pn == null);
+    }
+
+    /**
+     * Assert that a two-fragment plan's coordinator fragment does a simple
+     * projection.
+     **/
+    protected static void assertProjectingCoordinator(
+            List<AbstractPlanNode> lpn) {
+        AbstractPlanNode pn;
+        pn = lpn.get(0);
+        assertTopDownTree(pn, PlanNodeType.SEND,
+                PlanNodeType.PROJECTION,
+                PlanNodeType.RECEIVE);
+    }
+
+    /**
+     * Assert that a two-fragment plan's coordinator fragment does a left join
+     * with a specific replicated table on its outer side.
+     **/
+    protected static void assertReplicatedLeftJoinCoordinator(
+            List<AbstractPlanNode> lpn, String replicatedTable) {
+        AbstractPlanNode pn;
+        AbstractPlanNode node;
+        NestLoopPlanNode nlj;
+        SeqScanPlanNode seqScan;
+        pn = lpn.get(0);
+        assertTopDownTree(pn, PlanNodeType.SEND,
+                PlanNodeType.PROJECTION,
+                PlanNodeType.NESTLOOP,
+                PlanNodeType.SEQSCAN,
+                PlanNodeType.RECEIVE);
+        node = followAssertedLeftChain(pn, PlanNodeType.SEND,
+                PlanNodeType.PROJECTION,
+                PlanNodeType.NESTLOOP);
+        nlj = (NestLoopPlanNode) node;
+        assertEquals(JoinType.LEFT, nlj.getJoinType());
+        assertEquals(2, nlj.getChildCount());
+        seqScan = (SeqScanPlanNode) nlj.getChild(0);
+        assertEquals(replicatedTable, seqScan.getTargetTableName().toUpperCase());
+    }
+
+    /**
+     * Assert that an expression tree contains the expected types of expressions
+     * in the order listed, assuming a top-down left-to-right depth-first
+     * traversal through left, right, and args children.
+     * A null expression type in the list will match any expression
+     * node or tree at the corresponding position.
+     **/
+    protected static void assertExprTopDownTree(AbstractExpression start,
+            ExpressionType... exprTypes) {
+        assertNotNull(start);
+        Stack<AbstractExpression> stack = new Stack<>();
+        stack.push(start);
+        for (ExpressionType type : exprTypes) {
+            // Process each node before its children or later siblings.
+            AbstractExpression parent;
+            try {
+                parent = stack.pop();
+            }
+            catch (EmptyStackException ese) {
+                fail("No expression was found in the tree to match type " + type);
+                return; // This dead code hushes warnings.
+            }
+            List<AbstractExpression> args = parent.getArgs();
+            AbstractExpression rightExpr = parent.getRight();
+            AbstractExpression leftExpr = parent.getLeft();
+            int argCount = (args == null) ? 0 : args.size();
+            int childCount = argCount +
+                    (rightExpr == null ? 0 : 1) +
+                    (leftExpr == null ? 0 : 1);
+            if (type == null) {
+                // A null type wildcard matches any child TREE or NODE.
+                System.out.println("DEBUG: Suggestion -- expect " +
+                        parent.getExpressionType() +
+                        " with " + childCount + " direct children.");
+                continue;
+            }
+            assertEquals(type, parent.getExpressionType());
+            // Iterate from the last child to the first.
+            while (argCount > 0) {
+                // Push each child to be processed before its parent's
+                // or its own later siblings (already pushed).
+                stack.push(parent.getArgs().get(--argCount));
+            }
+            if (rightExpr != null) {
+                stack.push(rightExpr);
+            }
+            if (leftExpr != null) {
+                stack.push(leftExpr);
+            }
+        }
+        assertTrue("Extra expression node(s) (" + stack.size() +
+                ") were found in the tree with no expression type to match",
+                stack.isEmpty());
+    }
+
+    /**
+     * Assert that a plan node tree contains the expected types of plan nodes
+     * in the order listed, assuming a top-down left-to-right depth-first
+     * traversal through the child vector. A null plan node type in the list
+     * will match any plan node or subtree at the corresponding position.
+     **/
+    protected static void assertTopDownTree(AbstractPlanNode start,
+            PlanNodeType... nodeTypes) {
+        Stack<AbstractPlanNode> stack = new Stack<>();
+        stack.push(start);
+        for (PlanNodeType type : nodeTypes) {
+            // Process each node before its children or later siblings.
+            AbstractPlanNode parent;
+            try {
+                parent = stack.pop();
+            }
+            catch (EmptyStackException ese) {
+                fail("No node was found in the tree to match node type " + type);
+                return; // This dead code hushes warnings.
+            }
+            int childCount = parent.getChildCount();
+            if (type == null) {
+                // A null type wildcard matches any child TREE or NODE.
+                System.out.println("DEBUG: Suggestion -- expect " +
+                        parent.getPlanNodeType() +
+                        " with " + childCount + " direct children.");
+                continue;
+            }
+            assertEquals(type, parent.getPlanNodeType());
+            // Iterate from the last child to the first.
+            while (childCount > 0) {
+                // Push each child to be processed before its parent's
+                // or its own later (already pushed) siblings.
+                stack.push(parent.getChild(--childCount));
+            }
+        }
+        assertTrue("Extra plan node(s) (" + stack.size() +
+                ") were found in the tree with no node type to match",
+                stack.isEmpty());
+    }
+
 }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -78,10 +78,7 @@ bool SendExecutor::p_execute(const NValueArray &params) {
     assert(inputTable);
     //inputTable->setDependencyId(m_dependencyId);//Multiple send executors sharing the same input table apparently.
     // Just blast the input table on through VoltDBEngine!
-    if (!m_engine->send(inputTable)) {
-        VOLT_ERROR("Failed to send table '%s'", inputTable->name().c_str());
-        return false;
-    }
+    m_engine->send(inputTable);
     VOLT_DEBUG("SEND TABLE: %s", inputTable->debug().c_str());
 
     return true;

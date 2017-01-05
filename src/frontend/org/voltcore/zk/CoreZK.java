@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -44,6 +44,8 @@ public class CoreZK {
     public static final String hosts_host = "/core/hosts/host";
     public static final String readyhosts = "/core/readyhosts";
     public static final String readyhosts_host = "/core/readyhosts/host";
+    public static final String readyjoininghosts = "/core/readyjoininghosts";
+    public static final String readyjoininghosts_host = "/core/readyjoininghosts/host";
 
     // hosts since beginning of time (persistent)
     public static final String hostids = "/core/hostids";
@@ -55,7 +57,7 @@ public class CoreZK {
 
     // Persistent nodes (mostly directories) to create on startup
     public static final String[] ZK_HIERARCHY = {
-        root, hosts, readyhosts, hostids
+        root, hosts, readyhosts, readyjoininghosts, hostids
     };
 
     /**

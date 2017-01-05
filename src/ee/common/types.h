@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -199,6 +199,7 @@ enum PlanNodeType {
     PLAN_NODE_TYPE_INSERT           = 31,
     PLAN_NODE_TYPE_DELETE           = 32,
     // PLAN_NODE_TYPE_UPSERT           = 33, // RESERVED, but not used in the EE
+    PLAN_NODE_TYPE_SWAPTABLES       = 34,
 
     //
     // Communication Nodes
@@ -319,6 +320,9 @@ enum ExpressionType {
     EXPRESSION_TYPE_AGGREGATE_WINDOWED_RANK                   = 70,
     EXPRESSION_TYPE_AGGREGATE_WINDOWED_DENSE_RANK             = 71,
     EXPRESSION_TYPE_AGGREGATE_WINDOWED_COUNT                  = 72,
+    EXPRESSION_TYPE_AGGREGATE_WINDOWED_MAX                    = 73,
+    EXPRESSION_TYPE_AGGREGATE_WINDOWED_MIN                    = 74,
+    EXPRESSION_TYPE_AGGREGATE_WINDOWED_SUM                    = 75,
     // -----------------------------
     // Functions
     // -----------------------------
@@ -442,7 +446,7 @@ inline bool tableStreamTypeIsValid(TableStreamType streamType) {
     return streamType != TABLE_STREAM_NONE;
 }
 
-inline bool tableStreamTypeAppliesToPreTruncateTable(TableStreamType streamType) {
+inline bool tableStreamTypeIsStreamIndexing(TableStreamType streamType) {
     return streamType == TABLE_STREAM_ELASTIC_INDEX;
 }
 

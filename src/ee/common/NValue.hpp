@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -2134,39 +2134,45 @@ private:
         return getBigIntValue(lhs - rhs);
     }
 
-    static NValue opMultiplyBigInts(const int64_t lhs, const int64_t rhs) {
-        bool overflow = false;
+    static int64_t multiplyAndCheckOverflow(const int64_t lhs, const int64_t rhs, bool *overflowed) {
+        *overflowed = false;
         //Scary overflow check from https://www.securecoding.cert.org/confluence/display/cplusplus/INT32-CPP.+Ensure+that+operations+on+signed+integers+do+not+result+in+overflow
         if (lhs > 0){  /* lhs is positive */
             if (rhs > 0) {  /* lhs and rhs are positive */
                 if (lhs > (INT64_MAX / rhs)) {
-                    overflow= true;
+                    *overflowed = true;
                 }
             } /* end if lhs and rhs are positive */
             else { /* lhs positive, rhs non-positive */
                 if (rhs < (INT64_MIN / lhs)) {
-                    overflow = true;
+                    *overflowed = true;
                 }
             } /* lhs positive, rhs non-positive */
         } /* end if lhs is positive */
         else { /* lhs is non-positive */
             if (rhs > 0) { /* lhs is non-positive, rhs is positive */
                 if (lhs < (INT64_MIN / rhs)) {
-                    overflow = true;
+                    *overflowed = true;
                 }
             } /* end if lhs is non-positive, rhs is positive */
             else { /* lhs and rhs are non-positive */
                 if ( (lhs != 0) && (rhs < (INT64_MAX / lhs))) {
-                    overflow = true;
+                    *overflowed = true;
                 }
             } /* end if lhs and rhs non-positive */
         } /* end if lhs is non-positive */
 
         const int64_t result = lhs * rhs;
-
         if (result == INT64_NULL) {
-            overflow = true;
+            *overflowed = true;
         }
+
+        return result;
+    }
+
+    static NValue opMultiplyBigInts(const int64_t lhs, const int64_t rhs) {
+        bool overflow = false;
+        int64_t result = multiplyAndCheckOverflow(lhs, rhs, &overflow);
 
         if (overflow) {
             char message[4096];

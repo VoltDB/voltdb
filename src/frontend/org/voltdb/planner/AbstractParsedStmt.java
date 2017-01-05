@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -546,7 +546,7 @@ public abstract class AbstractParsedStmt {
         return m_windowFunctionExpressions;
     }
     /**
-     * Parse the rank expression.  This actually just returns a TVE.  The
+     * Parse a windowed expression.  This actually just returns a TVE.  The
      * WindowFunctionExpression is squirreled away in the m_windowFunctionExpressions
      * object, though, because we will need it later.
      *
@@ -952,7 +952,7 @@ public abstract class AbstractParsedStmt {
         // The only known-safe case is where each (column) argument to a
         // RowSubqueryExpression is based on exactly one column value.
         for (AbstractExpression arg : rowExpression.getArgs()) {
-            Collection<AbstractExpression> tves = arg.findAllTupleValueSubexpressions();
+            Collection<TupleValueExpression> tves = arg.findAllTupleValueSubexpressions();
             if (tves.size() != 1) {
                 if (tves.isEmpty()) {
                     throw new PlanningErrorException(
@@ -1743,12 +1743,11 @@ public abstract class AbstractParsedStmt {
             //      The table must have an alias.  It might not have a name.
             //   3. If the HashSet has size > 1 we can't use this expression.
             //
-            List<AbstractExpression> baseTVEExpressions = expr.findAllTupleValueSubexpressions();
+            List<TupleValueExpression> baseTVEExpressions =
+                    expr.findAllTupleValueSubexpressions();
             Set<String> baseTableNames = new HashSet<>();
-            for (AbstractExpression ae : baseTVEExpressions) {
-                assert(ae instanceof TupleValueExpression);
-                TupleValueExpression atve = (TupleValueExpression)ae;
-                String tableAlias = atve.getTableAlias();
+            for (TupleValueExpression tve : baseTVEExpressions) {
+                String tableAlias = tve.getTableAlias();
                 assert(tableAlias != null);
                 baseTableNames.add(tableAlias);
             }

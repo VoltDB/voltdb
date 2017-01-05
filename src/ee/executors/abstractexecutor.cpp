@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -109,7 +109,7 @@ bool AbstractExecutor::init(VoltDBEngine* engine,
         // Really, we can't enforce this when we load the plan? --izzy 7/3/2010
         bool is_subquery = (scan_node != NULL && scan_node->isSubQuery());
         if (target_table == NULL && !is_subquery) {
-            target_table = engine->getTable(targetTableName);
+            target_table = engine->getTableByName(targetTableName);
             if (target_table == NULL) {
                 VOLT_ERROR("Failed to retrieve target table '%s' "
                            "from execution engine for PlanNode '%s'",

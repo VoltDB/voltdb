@@ -404,6 +404,7 @@ def buildMakefile(CTX):
     makefile.write("BUILD=%s\n" % CTX.LEVEL.lower())
     makefile.write("CC = %s\n" % CTX.CC)
     makefile.write("CXX = %s\n" % CTX.CXX)
+    makefile.write("VOLT_LOG_LEVEL = %s\n" % CTX.LOG_LEVEL)
     makefile.write("CPPFLAGS += %s\n" % (MAKECPPFLAGS))
     makefile.write("LDFLAGS += %s\n" % (CTX.LDFLAGS))
     makefile.write("JNILIBFLAGS += %s\n" % (JNILIBFLAGS))
