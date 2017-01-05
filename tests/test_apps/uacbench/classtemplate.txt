@@ -1,0 +1,16 @@
+package uac;
+
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
+
+public class Proc$procnum extends VoltProcedure {
+
+$stmts
+
+$static_data
+
+    public long run() {
+
+        return 0;
+    }
+}
