@@ -54,6 +54,7 @@ public abstract class LocalSingleProcessServer extends VoltServerConfig {
     private File m_pathToVoltRoot = null;
     private EEProcess m_siteProcess = null;
     private int m_adminPort;
+    private boolean m_paused = false;
 
     public LocalSingleProcessServer(String jarFileName, int siteCount,
                                     BackendTarget target)
@@ -106,8 +107,7 @@ public abstract class LocalSingleProcessServer extends VoltServerConfig {
     }
 
     @Override
-    public boolean compileWithAdminMode(VoltProjectBuilder builder,
-                                        int adminPort, boolean adminOnStartup)
+    public boolean compileWithAdminMode(VoltProjectBuilder builder, boolean adminOnStartup)
     {
         int hostCount = 1;
         int replication = 0;
@@ -115,9 +115,8 @@ public abstract class LocalSingleProcessServer extends VoltServerConfig {
         if (m_compiled) {
             return true;
         }
-        m_adminPort = adminPort;
-        m_compiled = builder.compile(m_jarFileName, m_siteCount, hostCount, replication,
-                                     adminPort, adminOnStartup, 0);
+        m_paused = adminOnStartup;
+        m_compiled = builder.compile(m_jarFileName, m_siteCount, hostCount, replication, 0);
         m_pathToDeployment = builder.getPathToDeployment();
         return m_compiled;
 
@@ -204,6 +203,7 @@ public abstract class LocalSingleProcessServer extends VoltServerConfig {
         config.m_pathToCatalog = m_jarFileName;
         config.m_pathToDeployment = m_pathToDeployment;
         config.m_startAction = StartAction.CREATE;
+        config.m_isPaused = m_paused;
 
         m_siteProcess = new EEProcess(m_target, m_siteCount, "LocalSingleProcessServer.log");
         config.m_ipcPort = m_siteProcess.port();
