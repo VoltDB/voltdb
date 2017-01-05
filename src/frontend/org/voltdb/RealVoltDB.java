@@ -719,6 +719,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 }
             }
 
+            if (config.m_startAction.isLegacy()) {
+                consoleLog.warn("The \"" + config.m_startAction.m_verb + "\" command is deprecated, please use \"init\" and \"start\" for your cluster operations.");
+            }
             // Replay command line args that we can see
             StringBuilder sb = new StringBuilder(2048).append("Command line arguments: ");
             sb.append(System.getProperty("sun.java.command", "[not available]"));
