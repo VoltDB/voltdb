@@ -25,6 +25,7 @@ package org.voltdb;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
@@ -47,7 +48,7 @@ import org.voltdb.AbstractTopology.KSafetyViolationException;
 import org.voltdb.AbstractTopology.Partition;
 import org.voltdb.AbstractTopology.PartitionDescription;
 
-import com.google.common.collect.Lists;
+import com.google_voltpatches.common.collect.Lists;
 import com.google_voltpatches.common.collect.Maps;
 
 import junit.framework.TestCase;
@@ -367,7 +368,7 @@ public class TestAbstractTopology extends TestCase {
         distanceVector.put(7, new ArrayList<Integer>(Arrays.asList(1, 3, 3, 5, 5, 5, 2, 0)));
         // Verify the order is correct
         for (int i = 0; i < hostGroups.size(); i++) {
-            List<List<Integer>> sortedList = AbstractTopology.sortHostIdByHGDistance(i, hostGroups);
+            List<Collection<Integer>> sortedList = AbstractTopology.sortHostIdByHGDistance(i, hostGroups);
             TreeMap<Integer, List<Integer>> sortedMap = Maps.newTreeMap();
             int index = -1;
             for (Integer distance : distanceVector.get(i)) {
@@ -375,7 +376,7 @@ public class TestAbstractTopology extends TestCase {
                 if (distance == 0) continue;
                 List<Integer> hids = sortedMap.get(distance);
                 if (hids == null) {
-                    hids = Lists.newArrayList();
+                    hids = com.google_voltpatches.common.collect.Lists.newArrayList();
                     sortedMap.put(distance, hids);
                 }
                 hids.add(index);

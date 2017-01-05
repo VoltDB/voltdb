@@ -442,11 +442,11 @@ public class Cartographer extends StatsSource
         Preconditions.checkArgument(sitesPerHost != VoltDB.UNDEFINED);
         List<Integer> partitionsToReplace = new ArrayList<Integer>();
         Map<Integer, Integer> repsPerPart = new HashMap<Integer, Integer>();
-        List<List<Integer>> sortedHosts = AbstractTopology.sortHostIdByHGDistance(localHostId, hostGroups);
+        List<Collection<Integer>> sortedHosts = AbstractTopology.sortHostIdByHGDistance(localHostId, hostGroups);
 
         // attach partitions to each hosts
         Multimap<Integer, Integer> hostToPartitions = getHostToPartitionMap();
-        for (List<Integer> subgroup : sortedHosts) {
+        for (Collection<Integer> subgroup : sortedHosts) {
             Set<Integer> partitions = new HashSet<Integer>();
             for (Integer hid : subgroup) {
                 partitions.addAll(hostToPartitions.get(hid));

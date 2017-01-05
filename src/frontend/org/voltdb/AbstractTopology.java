@@ -20,6 +20,7 @@ package org.voltdb;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -41,7 +42,9 @@ import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableSet;
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
+import com.google_voltpatches.common.collect.LinkedListMultimap;
 import com.google_voltpatches.common.collect.Lists;
+import com.google_voltpatches.common.collect.Multimap;
 import com.google_voltpatches.common.collect.Sets;
 
 public class AbstractTopology {
@@ -1015,21 +1018,13 @@ public class AbstractTopology {
      * Not the most efficient way to do this, but even n^2 for 100 nodes is computable
      */
     private static int computeHADistance(/*final Map<String, Integer> distanceCache,*/ String token1, String token2) {
-        // ensure token1 is no shorter than token2 (swap if need be)
-        if (token1.compareTo(token2) > 0) {
-            String temp = token1;
-            token1 = token2;
-            token2 = temp;
-        }
 
         // break into arrays of graph edges
         String[] token1parts = token1.split("\\.");
         String[] token2parts = token2.split("\\.");
-
-        // trim shared path prefix
+        int size = Math.min(token1parts.length, token2parts.length);
         int index = 0;
-        while (index < token1parts.length) {
-            if (index == token2parts.length) break;
+        while (index < size) {
             if (!token1parts[index].equals(token2parts[index])) break;
             index++;
         }
@@ -1378,10 +1373,11 @@ public class AbstractTopology {
      * @param hostGroups a host id to group map
      * @return sorted grouped host ids from farthest to nearest
      */
-    public static List<List<Integer>> sortHostIdByHGDistance(int hostId, Map<Integer, String> hostGroups) {
+    @SuppressWarnings("unchecked")
+    public static List<Collection<Integer>> sortHostIdByHGDistance(int hostId, Map<Integer, String> hostGroups) {
         String localHostGroup = hostGroups.get(hostId);
         Preconditions.checkArgument(localHostGroup != null);
-        List<List<Integer>> result = Lists.newArrayList();
+        List<Collection<Integer>> result = Lists.newArrayList();
 
         // special case, cluster has two nodes and one is the rejoining node.
         if (hostGroups.keySet().size() == 2 && hostGroups.keySet().contains(hostId)) {
@@ -1393,33 +1389,17 @@ public class AbstractTopology {
             return result;
         }
         // Memorize the distance
-        int[] dVector = new int[hostGroups.size()];
-        for (int i = 0; i < dVector.length; i++) {
-            dVector[i] = computeHADistance(localHostGroup, hostGroups.get(i));
+        Multimap<Integer, Integer> distanceMap = LinkedListMultimap.create();
+        for (Map.Entry<Integer, String> entry : hostGroups.entrySet()) {
+            if (hostId == entry.getKey()) continue;
+            distanceMap.put(computeHADistance(localHostGroup, entry.getValue()), entry.getKey());
         }
-        // sort by distance
-        List<Integer> sortedList = hostGroups.keySet().stream()
-                                                      .filter(hid -> hid != hostId)
-                                                      .sorted((hid1, hid2) -> dVector[hid2] - dVector[hid1])
-                                                      .collect(Collectors.toList());
-        // group by rack-aware group
-        List<Integer> subgroup = Lists.newArrayList();
-        subgroup.add(sortedList.get(0));
-        for (int i = 1; i < sortedList.size(); i++) {
-            int hid1 = sortedList.get(i - 1);
-            int hid2 = sortedList.get(i);
-            if (dVector[hid1] == dVector[hid2]) {
-                subgroup.add(hid2);
-            } else {
-                // found a new subgroup
-                result.add(subgroup);
-                subgroup = Lists.newArrayList();
-                subgroup.add(hid2);
-            }
-        }
-        if (!subgroup.isEmpty()) {
-            result.add(subgroup);
-        }
+
+        result = distanceMap.asMap().entrySet().stream()
+                .sorted(Comparator.comparingInt(k->((Entry<Integer, Integer>) k).getKey()).reversed())
+                .map(x->x.getValue())
+                .collect(Collectors.toList());
+
         return result;
     }
 }
