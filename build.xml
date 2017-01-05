@@ -1750,7 +1750,7 @@ TEST CASES
             <env key="VOLT_ENABLEIV2" value="${enableiv2}" />
             <!-- Leave breadcrumbs so we can figure out deep in the bowels of VoltDB if
                  this is a test -->
-            <env key="VOLT_JUSTATEST" value="YESYESYES" />
+            <env key="VOLT_JUSTATEST" value="true" />
             <!-- Following two env vars are used by Java code
                  when running ant check -Dbuild=memcheck
                  The voltdbipc client is used in concert with valgrind

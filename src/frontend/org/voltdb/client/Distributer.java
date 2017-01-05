@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -1215,7 +1215,11 @@ class Distributer {
         // stop the old proc call reaper
         m_timeoutReaperHandle.cancel(false);
         m_ex.shutdown();
-        m_ex.awaitTermination(365, TimeUnit.DAYS);
+        if (CoreUtils.isJunitTest()) {
+            m_ex.awaitTermination(1, TimeUnit.SECONDS);
+        } else {
+            m_ex.awaitTermination(365, TimeUnit.DAYS);
+        }
 
         m_network.shutdown();
     }
