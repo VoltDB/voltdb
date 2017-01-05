@@ -116,6 +116,52 @@ function loadAdminPage() {
         iconAutoSnapshotOption: $("#autoSnapshotIcon"),
         txtAutoSnapshot: $("#txtAutoSnapshot"),
 
+        //        //Edit Snmp objects
+        btnEditSnmpOk: $("#btnEditSnmpOk"),
+        btnEditSnmpCancel: $("#btnEditSnmpCancel"),
+        LinkSnmpEdit: $("#snmpEdit"),
+        chkSnmp: $("#chkSnmp"),
+        chkSnmpValue: $("#chkSnmp").is(":checked"),
+        iconSnmpOption: $("#snmpIcon"),
+        txtSnmp: $("#txtSnmp"),
+        txtTarget: $("#txtTarget"),
+        txtTargetValue: $("#txtTarget").text(),
+        txtCommunity: $("#txtCommunity"),
+        txtCommunityValue : $("#txtCommunity").text(),
+        txtUsername: $("#txtUsername"),
+        txtUsernameValue : $("#txtUsername").text(),
+        targetSpan: $("#targetSpan"),
+        communitySpan: $("#communitySpan"),
+        usernameSpan:$("#usernameSpan"),
+        authKeySpan: $("#authKeySpan"),
+        privProtocolSpan: $("#privProtocolSpan"),
+        privKeySpan: $("#privKeySpan"),
+        ddlAuthProtocol: $("#ddlAuthProtocol"),
+        ddlAuthProtocolValue: $("#authProtocolSpan").value,
+        ddlPrivProtocol: $("#ddlPrivProtocol"),
+        ddlPrivProtocolValue: $("#privProtocolSpan").value,
+        txtPrivKey: $("#txtPrivKey"),
+        txtPrivkeyValue: $("#txtPrivKey").text(),
+        authProtocolSpan: $("#authProtocolSpan"),
+        txtAuthkey: $("#txtAuthkey"),
+        txtAuthkeyValue: $("#txtAuthkey").text(),
+        snmpLabel: $("#row-7").find("td:first-child").text(),
+        errorTarget: $("#errorTarget"),
+        errorCommunity: $("#errorCommunity"),
+        errorUserName: $("#errorUsername"),
+        errorAuthkey: $("#errorAuthkey"),
+        errorPrivKey: $("#errorPrivKey"),
+        targetSpanValue: $("#targetSpan").text(),
+        communitySpanValue: $("#communitySpan").text(),
+        usernameSpanValue: $("#usernameSpan").text(),
+        authKeySpanValue: $("#authKeySoan").text(),
+        privProtocolSpanValue: $("#privProtocolSpan").text(),
+        privKeySpanValue: $("#privKeySpan").text(),
+        authProtocolSpanValue: $("#authProtocolSpan").text(),
+
+
+
+
         //File Prefix objects
         tBoxFilePrefix: $("#txtPrefix"),
         tBoxFilePrefixValue: $("#txtPrefix").text(),
@@ -143,6 +189,17 @@ function loadAdminPage() {
         //snapshot
         editStateSnapshot: editStates.ShowEdit,
         loadingSnapshot: $("#loadingSnapshot"),
+
+                //snmp
+        editStateSnmp : editStates.ShowEdit,
+        loadingSnmp: $("#loadingSnmp"),
+        loadingTarget: $("#loadingTarget"),
+        loadingCommunity: $("#loadingCommunity"),
+        loadingUsername: $("#loadingUsername"),
+        loadingAuthProtocol: $("#loadingAuthProtocol"),
+        loadingAuthkey : $("#loadingAuthkey"),
+        loadingPrivProtocol: $("#loadingPrivProtocol"),
+        loadingPrivKey: $("#loadingPrivKey"),
 
         //Heartbeat Timeout
         rowHeartbeatTimeout: $("#heartbeatTimeoutRow"),
@@ -186,6 +243,7 @@ function loadAdminPage() {
         //Update Error
         updateErrorFieldMsg: $("#updateErrorFieldMsg"),
         updateSnapshotErrorFieldMsg: $("#updateSnapshotErrorFieldMsg"),
+        updateSnmpErrorFieldMsg: $("#updateSnapshotErrorFieldMsg"),
         heartbeatTimeoutLabel: $("#heartbeatTimeoutRow").find("td:first-child").text(),
         queryTimeoutUpdateErrorFieldMsg: $("#queryTimeoutUpdateErrorFieldMsg"),
         snapshotLabel: $("#row-2").find("td:first-child").text(),
@@ -326,6 +384,30 @@ function loadAdminPage() {
             max: "Please enter a positive number between 0 and " + INT_MAX_VALUE + ".",
             digits: "Please enter a positive number without any decimal."
         },
+        authKeyRules:{
+            required: true,
+            minlength: 8
+        },
+        authKeyMessages:{
+            required: "This field is required",
+            minlength: "Please enter at least 8 characters."
+        },
+        privKeyRules:{
+            required: true,
+            minlength: 8
+        },
+        privKeyMessages:{
+            required: "This field is required",
+            minlength: "Please enter at least 8 characters.",
+        },
+        targetRules:{
+            required: true,
+            portRegex : /^[a-zA-Z0-9.-]+$/,
+        },
+        targetMessages:{
+            required:"This field is required",
+            portRegex : "Please enter a valid value.(e.g, hostname:(1-65535))"
+        }
     };
 
     //Admin Page download link
@@ -349,6 +431,63 @@ function loadAdminPage() {
 
     adminEditObjects.chkDrMaster.on('ifChanged', function () {
         adminEditObjects.txtDrMaster.text(getOnOffText(adminEditObjects.chkDrMaster.is(":checked")));
+    });
+
+     adminEditObjects.chkSnmp.on('ifChanged', function () {
+        adminEditObjects.txtSnmp.text(getOnOffText(adminEditObjects.chkSnmp.is(":checked")));
+        if(adminEditObjects.txtSnmp.text() == "Off"){
+            $("#txtAuthkey").rules("remove");
+            $("#txtPrivKey").rules("remove");
+            $("#txtTarget").rules("remove");
+        }
+        else{
+            if(adminEditObjects.ddlAuthProtocol.val().toLowerCase() != "noauth" && adminEditObjects.txtUsername.val() != ""){
+                    $("#txtAuthkey").rules("add",{
+                        required: true,
+                        minlength: 8,
+                        messages:{
+                            required: "This field is required",
+                            minlength: "Please enter at least 8 characters.",
+                        }
+                    })
+            }
+            else if(adminEditObjects.ddlAuthProtocol.val().toLowerCase() != "noauth" && adminEditObjects.txtUsername.val() == ""){
+                 $("#txtAuthkey").rules("add",{
+                    required: true,
+                    messages:{
+                        required: "This field is required",
+                    }
+                })
+            }
+
+            if(adminEditObjects.ddlPrivProtocol.val().toLowerCase() != "nopriv" && adminEditObjects.txtUsername.val() != ""){
+                    $("#txtPrivKey").rules("add",{
+                        required: true,
+                        minlength: 8,
+                        messages:{
+                            required: "This field is required",
+                            minlength: "Please enter at least 8 characters.",
+                        }
+                    })
+            }
+            else if(adminEditObjects.ddlPrivProtocol.val().toLowerCase() != "nopriv" && adminEditObjects.txtUsername.val() == ""){
+                 $("#txtPrivKey").rules("add",{
+                    required: true,
+                    messages:{
+                        required: "This field is required",
+                    }
+                })
+            }
+
+            $("#txtTarget").rules("add",{
+                required: true,
+                portRegex : /^[a-zA-Z0-9.-]+$/,
+                messages:{
+                    required:"This field is required",
+                    portRegex : "Please enter a valid value.(e.g, hostname:(1-65535))"
+                }
+            })
+        }
     });
 
     $(".tblshutdown").find(".edit").on("click", function () {
@@ -1578,6 +1717,158 @@ function loadAdminPage() {
         }
     };
 
+    var toggleSnmpEdit = function(state){
+        adminEditObjects.editStateSnmp = state;
+        adminEditObjects.txtTarget.val(adminEditObjects.txtTargetValue);
+        adminEditObjects.txtCommunity.val(adminEditObjects.txtCommunityValue);
+        adminEditObjects.txtUsername.val(adminEditObjects.txtUsernameValue);
+        adminEditObjects.ddlAuthProtocol.val(adminEditObjects.ddlAuthProtocolValue);
+        adminEditObjects.ddlPrivProtocol.val(adminEditObjects.ddlPrivProtocolValue);
+        adminEditObjects.txtAuthkey.val(adminEditObjects.txtAuthkeyValue);
+        adminEditObjects.txtPrivKey.val(adminEditObjects.txtPrivkeyValue);
+
+        if (state == editStates.ShowLoading) {
+
+            adminEditObjects.iconSnmpOption.hide();
+            adminEditObjects.LinkSnmpEdit.hide();
+            adminEditObjects.btnEditSnmpOk.hide();
+            adminEditObjects.btnEditSnmpCancel.hide();
+            adminEditObjects.chkSnmp.parent().removeClass("customCheckbox");
+            adminEditObjects.txtSnmp.hide();
+            adminEditObjects.errorTarget.hide();
+            adminEditObjects.errorUserName.hide();
+            adminEditObjects.errorCommunity.hide();
+            adminEditObjects.errorAuthkey.hide();
+            adminEditObjects.errorPrivKey.hide();
+
+
+            adminEditObjects.targetSpan.hide();
+            adminEditObjects.communitySpan.hide();
+            adminEditObjects.usernameSpan.hide();
+            adminEditObjects.authKeySpan.hide();
+            adminEditObjects.privProtocolSpan.hide();
+            adminEditObjects.privKeySpan.hide();
+            adminEditObjects.authProtocolSpan.hide();
+            adminEditObjects.txtAuthkey.hide();
+            adminEditObjects.txtPrivKey.hide();
+            adminEditObjects.txtTarget.hide();
+            adminEditObjects.txtCommunity.hide();
+            adminEditObjects.txtUsername.hide();
+            adminEditObjects.ddlAuthProtocol.hide();
+            adminEditObjects.ddlPrivProtocol.hide();
+
+
+
+            adminEditObjects.loadingSnmp.show();
+            adminEditObjects.loadingTarget.show();
+            adminEditObjects.loadingCommunity.show();
+            adminEditObjects.loadingUsername.show();
+            adminEditObjects.loadingAuthProtocol.show();
+            adminEditObjects.loadingPrivProtocol.show();
+            adminEditObjects.loadingAuthkey.show();
+            adminEditObjects.loadingPrivKey.show()
+
+
+
+        } else if (state == editStates.ShowOkCancel) {
+
+            adminEditObjects.iconSnmpOption.hide();
+            adminEditObjects.LinkSnmpEdit.hide();
+            adminEditObjects.btnEditSnmpOk.show();
+            adminEditObjects.btnEditSnmpCancel.show();
+            adminEditObjects.chkSnmp.parent().addClass("customCheckbox");
+
+            adminEditObjects.targetSpan.hide();
+            adminEditObjects.communitySpan.hide();
+            adminEditObjects.usernameSpan.hide();
+            adminEditObjects.authKeySpan.hide();
+            adminEditObjects.privProtocolSpan.hide();
+            adminEditObjects.privKeySpan.hide();
+            adminEditObjects.authProtocolSpan.hide();
+            adminEditObjects.txtAuthkey.show();
+            adminEditObjects.txtPrivKey.show();
+            adminEditObjects.txtTarget.show();
+            adminEditObjects.txtCommunity.show();
+            adminEditObjects.txtUsername.show();
+            adminEditObjects.ddlAuthProtocol.html('');
+            adminEditObjects.ddlAuthProtocol.append("<option>SHA</option><option>MD5</option><option>NoAuth</option>")
+            adminEditObjects.ddlAuthProtocol.show();
+            adminEditObjects.ddlPrivProtocol.html('');
+            adminEditObjects.ddlPrivProtocol.append("<option>AES</option><option>DES</option><option>NoPriv</option><option>3DES</option><option>AES192</option><option>AES256</option>")
+            adminEditObjects.ddlPrivProtocol.show();
+
+            adminEditObjects.loadingSnmp.hide();
+            adminEditObjects.loadingTarget.hide();
+            adminEditObjects.loadingCommunity.hide();
+            adminEditObjects.loadingUsername.hide();
+            adminEditObjects.loadingAuthProtocol.hide();
+            adminEditObjects.loadingPrivProtocol.hide();
+            adminEditObjects.loadingAuthkey.hide();
+            adminEditObjects.loadingPrivKey.hide();
+
+            if(adminEditObjects.txtCommunity.val() == "" || adminEditObjects.txtCommunity.val() == null){
+                adminEditObjects.txtCommunity.val("public");
+            }
+
+            if(adminEditObjects.txtAuthkey.val() == "" || adminEditObjects.txtAuthkey.val() == null)
+            {
+                adminEditObjects.txtAuthkey.val("voltdbauthkey")
+            }
+
+            if(adminEditObjects.txtPrivKey.val() == "" || adminEditObjects.txtPrivKey.val() == null)
+            {
+                adminEditObjects.txtPrivKey.val("voltdbprivacykey")
+            }
+
+            VoltDbAdminConfig.isSnmpEditMode = true;
+
+        } else {
+           adminEditObjects.iconSnmpOption.show();
+            adminEditObjects.LinkSnmpEdit.show();
+            adminEditObjects.btnEditSnmpOk.hide();
+            adminEditObjects.btnEditSnmpCancel.hide();
+            adminEditObjects.chkSnmp.parent().removeClass("customCheckbox");
+
+            adminEditObjects.errorTarget.hide();
+            adminEditObjects.errorUserName.hide();
+            adminEditObjects.errorCommunity.hide();
+            adminEditObjects.errorAuthkey.hide();
+            adminEditObjects.errorPrivKey.hide();
+
+            adminEditObjects.txtSnmp.show();
+            adminEditObjects.targetSpan.show();
+            adminEditObjects.communitySpan.show();
+            adminEditObjects.usernameSpan.show();
+            adminEditObjects.authKeySpan.show();
+            adminEditObjects.privProtocolSpan.show();
+            adminEditObjects.privKeySpan.show();
+            adminEditObjects.authProtocolSpan.show();
+            adminEditObjects.txtTarget.hide();
+            adminEditObjects.txtCommunity.hide();
+            adminEditObjects.txtUsername.hide();
+            adminEditObjects.ddlAuthProtocol.hide();
+            adminEditObjects.ddlPrivProtocol.hide();
+            adminEditObjects.txtAuthkey.hide();
+            adminEditObjects.txtPrivKey.hide();
+
+            adminEditObjects.loadingSnmp.hide();
+            adminEditObjects.loadingTarget.hide();
+            adminEditObjects.loadingCommunity.hide();
+            adminEditObjects.loadingUsername.hide();
+            adminEditObjects.loadingAuthProtocol.hide();
+            adminEditObjects.loadingPrivProtocol.hide();
+            adminEditObjects.loadingAuthkey.hide();
+            adminEditObjects.loadingPrivKey.hide();
+
+        }
+
+        if (adminEditObjects.chkSnmpValue) {
+            adminEditObjects.chkSnmp.iCheck('check');
+        } else {
+            adminEditObjects.chkSnmp.iCheck('uncheck');
+        }
+    }
+
     adminEditObjects.btnEditAutoSnapshotCancel.on("click", function () {
         toggleAutoSnapshotEdit(editStates.ShowEdit);
     });
@@ -1615,6 +1906,208 @@ function loadAdminPage() {
         }
 
     });
+
+
+    adminEditObjects.btnEditSnmpCancel.on("click", function () {
+        toggleSnmpEdit(editStates.ShowEdit);
+    });
+
+    adminEditObjects.btnEditSnmpOk.on("click", function (e) {
+        if(adminEditObjects.txtSnmp.text() == "On"){
+            if(adminEditObjects.ddlAuthProtocol.val().toLowerCase() != "noauth" && adminEditObjects.txtUsername.val() != ""){
+                    $("#txtAuthkey").rules("add",{
+                        required: true,
+                        minlength: 8,
+                        messages:{
+                            required: "This field is required",
+                            minlength: "Please enter at least 8 characters.",
+                        }
+                    })
+            }
+            else if(adminEditObjects.ddlAuthProtocol.val().toLowerCase() != "noauth" && adminEditObjects.txtUsername.val() == ""){
+                 $("#txtAuthkey").rules("add",{
+                    required: true,
+                    messages:{
+                        required: "This field is required",
+                    }
+                })
+            }
+
+            if(adminEditObjects.ddlPrivProtocol.val().toLowerCase() != "nopriv" && adminEditObjects.txtUsername.val() != ""){
+                    $("#txtPrivKey").rules("add",{
+                        required: true,
+                        minlength: 8,
+                        messages:{
+                            required: "This field is required",
+                            minlength: "Please enter at least 8 characters.",
+                        }
+                    })
+            }
+            else if(adminEditObjects.ddlPrivProtocol.val().toLowerCase() != "nopriv" && adminEditObjects.txtUsername.val() == ""){
+                 $("#txtPrivKey").rules("add",{
+                    required: true,
+                    messages:{
+                        required: "This field is required",
+                    }
+                })
+            }
+
+
+             if(!$("#frmAuthkey").valid()){
+                        e.preventDefault();
+                        e.stopPropagation();
+
+                        adminEditObjects.txtAuthkey.focus();
+
+                        adminEditObjects.errorAuthkey.css("background-color", "yellow");
+                    setTimeout(function () {
+                        adminEditObjects.errorAuthkey.animate({ backgroundColor: 'white' }, 'slow');
+                    }, 2000);
+                    }
+
+
+            if(!$("#frmPrivKey").valid()){
+                e.preventDefault();
+                e.stopPropagation();
+
+                adminEditObjects.txtPrivKey.focus();
+
+               adminEditObjects.errorPrivKey.css("background-color", "yellow");
+            setTimeout(function () {
+                adminEditObjects.errorPrivKey.animate({ backgroundColor: 'white' }, 'slow');
+            }, 2000);
+            }
+        }
+        else{
+
+            $("#txtAuthkey").rules("remove");
+            $("#txtPrivKey").rules("remove");
+            $("#txtTarget").rules("remove");
+
+        }
+
+
+        if(!$("#frmTarget").valid()){
+            e.preventDefault();
+            e.stopPropagation();
+
+            adminEditObjects.txtTarget.focus();
+
+            adminEditObjects.errorTarget.css("background-color", "yellow");
+            setTimeout(function () {
+                adminEditObjects.errorTarget.animate({ backgroundColor: 'white' }, 'slow');
+            }, 2000);
+        }
+    });
+
+
+    adminEditObjects.ddlAuthProtocol.on("change", function(e){
+        if(adminEditObjects.txtSnmp.text() == "Off"){
+            $("#txtAuthkey").rules("remove");
+            $("#txtPrivKey").rules("remove");
+            $("#txtTarget").rules("remove");
+        }
+        else{
+
+            if(adminEditObjects.ddlAuthProtocol.val().toLowerCase() != "noauth" && adminEditObjects.txtUsername.val() != ""){
+                    $("#txtAuthkey").rules("add",{
+                        required: true,
+                        minlength: 8,
+                        messages:{
+                            required: "This field is required",
+                            minlength: "Please enter at least 8 characters.",
+                        }
+                    })
+            }
+            else if(adminEditObjects.ddlAuthProtocol.val().toLowerCase() != "noauth" && adminEditObjects.txtUsername.val() == ""){
+                 $("#txtAuthkey").rules("add",{
+                    required: true,
+                    messages:{
+                        required: "This field is required",
+                    }
+                })
+            }
+            else{
+                $("#txtAuthkey").rules("remove");
+            }
+
+
+            if(adminEditObjects.ddlPrivProtocol.val().toLowerCase() != "nopriv" && adminEditObjects.txtUsername.val() != ""){
+                    $("#txtPrivKey").rules("add",{
+                        required: true,
+                        minlength: 8,
+                        messages:{
+                            required: "This field is required",
+                            minlength: "Please enter at least 8 characters.",
+                        }
+                    })
+            }
+            else if(adminEditObjects.ddlPrivProtocol.val().toLowerCase() != "nopriv" && adminEditObjects.txtUsername.val() == ""){
+                 $("#txtPrivKey").rules("add",{
+                    required: true,
+                    messages:{
+                        required: "This field is required",
+                    }
+                })
+            }
+            else{
+                $("#txtPrivKey").rules("remove");
+            }
+
+            $("#txtTarget").rules("add",{
+                required: true,
+                portRegex : /^[a-zA-Z0-9.-]+$/,
+                messages:{
+                    required:"This field is required",
+                    portRegex : "Please enter a valid value.(e.g, hostname:(1-65535))"
+                }
+            })
+        }
+    })
+
+    adminEditObjects.ddlPrivProtocol.on("change", function(e){
+        if(adminEditObjects.ddlPrivProtocol.val().toLowerCase() == "nopriv"){
+             $("#txtPrivKey").rules("remove");
+        }
+    })
+
+    adminEditObjects.txtUsername.on("change", function(e){
+        $("#txtAuthkey").rules("remove");
+        $("#txtPrivKey").rules("remove");
+        if(adminEditObjects.txtSnmp.text() == "On"){
+             if(adminEditObjects.ddlAuthProtocol.val().toLowerCase() != "noauth" && adminEditObjects.txtUsername.val() != ""){
+                    $("#txtAuthkey").rules("add",{
+                        required: true,
+                        minlength: 8,
+                        messages:{
+                            required: "This field is required",
+                            minlength: "Please enter at least 8 characters.",
+                        }
+                    })
+            }
+
+            else if(adminEditObjects.ddlAuthProtocol.val().toLowerCase() != "noauth" && adminEditObjects.txtUsername.val() == ""){
+                 $("#txtAuthkey").rules("add",{
+                    required: true,
+                    messages:{
+                        required: "This field is required",
+                    }
+                })
+            }
+
+            if(adminEditObjects.ddlPrivProtocol.val().toLowerCase() != "nopriv" && adminEditObjects.txtUsername.val() != ""){
+                    $("#txtPrivKey").rules("add",{
+                        required: true,
+                        minlength: 8,
+                        messages:{
+                            required: "This field is required",
+                            minlength: "Please enter at least 8 characters.",
+                        }
+                    })
+            }
+
+        }
+    })
 
 
     $("#frmSnapshotFrequency").validate({
@@ -1663,6 +2156,19 @@ function loadAdminPage() {
     });
 
     $("#formAddDiskLimit").validate();
+
+    $("#frmAuthkey").validate()
+
+    $("#frmPrivKey").validate()
+
+    $("#frmTarget").validate({
+        rules:{
+            txtTarget : adminValidationRules.targetRules
+        },
+        messages:{
+            txtTarget : adminValidationRules.targetMessages
+        }
+    })
 
     adminEditObjects.btnEditAutoSnapshotOk.popup({
         open: function (event, ui, ele) {
@@ -1738,12 +2244,100 @@ function loadAdminPage() {
         }
     });
 
+    adminEditObjects.btnEditSnmpOk.popup({
+        open: function (event, ui, ele) {
+        },
+        afterOpen: function () {
+            var popup = $(this)[0];
+            $("#btnSaveSnmp").unbind("click");
+            $("#btnSaveSnmp").on("click", function () {
+                var adminConfigurations = VoltDbAdminConfig.getLatestRawAdminConfigurations();
+
+                adminConfigurations.snmp = {};
+
+                //Set the new value to be saved.
+
+                adminConfigurations.snmp.username = adminEditObjects.txtUsername.val();
+                adminConfigurations.snmp.enabled = adminEditObjects.chkSnmp.is(':checked');
+                adminConfigurations.snmp.community = adminEditObjects.txtCommunity.val();
+                adminConfigurations.snmp.authprotocol = adminEditObjects.ddlAuthProtocol.val();
+                adminConfigurations.snmp.target = adminEditObjects.txtTarget.val();
+                adminConfigurations.snmp.authkey = adminEditObjects.txtAuthkey.val();
+                adminConfigurations.snmp.privacyprotocol = adminEditObjects.ddlPrivProtocol.val();
+                adminConfigurations.snmp.privacykey = adminEditObjects.txtPrivKey.val();
+                //Call the loading image only after setting the new value to be saved.
+
+                toggleSnmpEdit(editStates.ShowLoading);
+                voltDbRenderer.updateAdminConfiguration(adminConfigurations, function (result) {
+                    if (result.status == "1") {
+
+                          adminEditObjects.txtTargetValue = adminEditObjects.txtTarget.val();
+                          adminEditObjects.txtCommunityValue = adminEditObjects.txtCommunity.val();
+                          adminEditObjects.txtUsernameValue = adminEditObjects.txtUsername.val();
+                          adminEditObjects.ddlPrivProtocolValue = adminEditObjects.ddlPrivProtocol.val();
+                          adminEditObjects.ddlAuthProtocolValue = adminEditObjects.ddlAuthProtocol.val();
+                          adminEditObjects.txtAuthkeyValue = adminEditObjects.txtAuthkey.val();
+                          adminEditObjects.txtPrivkeyValue = adminEditObjects.txtPrivKey.val();
+
+                          adminEditObjects.targetSpan.html(adminEditObjects.targetSpanValue)
+                          adminEditObjects.usernameSpan.html(adminEditObjects.usernameSpanValue);
+                          adminEditObjects.communitySpan.html(adminEditObjects.communitySpanValue);
+                          adminEditObjects.authProtocolSpan.html(adminEditObjects.authProtocolSpanValue);
+                          adminEditObjects.privProtocolSpan.html(adminEditObjects.privProtocolSpanValue);
+                          adminEditObjects.authKeySpan.html(adminEditObjects.authKeySpanValue);
+                          adminEditObjects.privKeySpan.html(adminEditObjects.privKeySpanValue)
+
+                        //Reload Admin configurations for displaying the updated value
+                        voltDbRenderer.GetAdminDeploymentInformation(false, function (adminConfigValues, rawConfigValues) {
+                            VoltDbAdminConfig.displayAdminConfiguration(adminConfigValues, rawConfigValues);
+                            toggleSnmpEdit(editStates.ShowEdit);
+                        });
+                    } else {
+                        toggleSnmpEdit(editStates.ShowEdit);
+                        var msg = '"' + adminEditObjects.snmpLabel + '". ';
+                        if (result.status == "-1" && result.statusstring == "Query timeout.") {
+                            msg += "The Database is either down, very slow to respond or the server refused connection. Please try to edit when the server is back online.";
+                        } else {
+                            msg += "Please try again later.";
+                        }
+
+                        adminEditObjects.updateSnmpErrorFieldMsg.text(msg);
+                        $("#updateErrorSnmpPopupLink").trigger("click");
+                    }
+                });
+                //Close the popup
+                popup.close();
+            });
+
+            $("#btnPopupSnmpCancel").on("click", function () {
+                toggleSnmpEdit(editStates.ShowEdit);
+                popup.close();
+            });
+
+            $(".popup_back").on("click", function () {
+                toggleSnmpEdit(editStates.ShowEdit);
+            });
+
+            $(".popup_close").on("click", function () {
+                toggleSnmpEdit(editStates.ShowEdit);
+            });
+        }
+    });
+
     adminEditObjects.LinkAutoSnapshotEdit.click(function () {
         var parent = $(this).parent().parent();
         parent.siblings('.child-' + parent.attr("id")).show();
         parent.find(".labelCollapsed").addClass("labelExpanded");
         toggleAutoSnapshotEdit(editStates.ShowOkCancel);
     });
+
+
+    adminEditObjects.LinkSnmpEdit.click(function(){
+         var parent = $(this).parent().parent();
+        parent.siblings('.child-' + parent.attr("id")).show();
+        parent.find(".labelCollapsed").addClass("labelExpanded");
+        toggleSnmpEdit(editStates.ShowOkCancel);
+    })
 
     $("#formHeartbeatTimeout").validate({
         rules: {
@@ -4381,6 +4975,30 @@ function loadAdminPage() {
         "Username already exists."
     );
 
+     $.validator.addMethod(
+        "portRegex",
+        function(value, element, regexp){
+            var result = true
+            var values = value.split(':');
+            var re = new RegExp(regexp);
+           if(values.length == 2){
+                if(!$.isNumeric(values[1]) || !(values[1] > 1 && values[1] < 65536))
+                    result = false;
+                else{
+                    if(values[1].split('.').length > 1)
+                        result = false;
+                }
+                if(!re.test(values[0]))
+                    result = false;
+            } else {
+                result = false;
+            }
+
+            return this.optional(element) || result;
+        },
+        "Please enter only valid character."
+    );
+
     showHideIntSnapshotMsg = function(isProVersion){
         if(!VoltDbAdminConfig.isCommandLogEnabled && isProVersion){
             $('#continueShutdownMsg').show()
@@ -4411,6 +5029,7 @@ function loadAdminPage() {
         this.drReplicaEnabled = true;
         this.isDrMasterEditMode = false;
         this.isSnapshotEditMode = false;
+        this.isSnmpEditMode = false;
         this.isMemoryLimitEditMode = false;
         this.newStreamMinmPropertyName = {
             "outdir": "#txtOutdirValue",
@@ -4457,10 +5076,8 @@ function loadAdminPage() {
         };
 
         this.displayAdminConfiguration = function (adminConfigValues, rawConfigValues) {
-
             if (!VoltDbAdminConfig.firstResponseReceived)
                 VoltDbAdminConfig.firstResponseReceived = true;
-
             if (adminConfigValues != undefined && VoltDbAdminConfig.isAdmin) {
                 configureAdminValues(adminConfigValues);
                 configureDirectoryValues(adminConfigValues);
@@ -4590,6 +5207,62 @@ function loadAdminPage() {
                     getDrReplicaStatus(false);
                 }
             }
+
+
+
+            //snmp setting
+
+            adminEditObjects.chkSnmpValue = adminConfigValues.enabled;
+            if (!VoltDbAdminConfig.isSnmpEditMode)
+                adminEditObjects.txtSnmp.text(adminConfigValues.enabled == true ? 'On' : 'Off');
+
+            if(adminConfigValues.enabled != null){
+                adminEditObjects.iconSnmpOption.removeClass().addClass(getOnOffClass(adminConfigValues.enabled));
+            }
+
+            if(adminConfigValues.target!= null){
+                adminEditObjects.targetSpan.text(adminConfigValues.target);
+                adminEditObjects.txtTargetValue = adminConfigValues.target;
+            }
+
+            if(adminConfigValues.community != null){
+                adminEditObjects.communitySpan.text(adminConfigValues.community);
+                adminEditObjects.txtCommunityValue = adminConfigValues.community;
+            }
+
+            if(adminConfigValues.username != null){
+                adminEditObjects.usernameSpan.text(adminConfigValues.username);
+                adminEditObjects.txtUsernameValue = adminConfigValues.username;
+            }
+
+            if(adminConfigValues.authprotocol != null){
+                adminEditObjects.authProtocolSpan.text(adminConfigValues.authprotocol)
+                adminEditObjects.ddlAuthProtocolValue = adminConfigValues.authprotocol;
+            }
+            else{
+                adminEditObjects.ddlAuthProtocolValue = "SHA";
+            }
+
+             if(adminConfigValues.privacyprotocol != null){
+                adminEditObjects.privProtocolSpan.text(adminConfigValues.privacyprotocol)
+                adminEditObjects.ddlPrivProtocolValue = adminConfigValues.privacyprotocol;
+            }
+            else{
+                adminEditObjects.ddlPrivProtocolValue = "AES";
+            }
+
+            if(adminConfigValues.authkey != null){
+                adminEditObjects.authKeySpan.text(adminConfigValues.authkey);
+                adminEditObjects.txtAuthkeyValue = adminConfigValues.authkey;
+            }
+
+            if(adminConfigValues.privacykey != null){
+                adminEditObjects.privKeySpan.text(adminConfigValues.privacykey);
+                adminEditObjects.txtPrivkeyValue = adminConfigValues.privacykey;
+            }
+
+
+
         };
 
         var getDrReplicaStatus = function (result) {

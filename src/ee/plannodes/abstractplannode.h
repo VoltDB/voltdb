@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -228,7 +228,13 @@ protected:
     // and by AbstractJoinPlanNode::loadFromJSONObject for its pre-agg output tuple.
     static TupleSchema* generateTupleSchema(const std::vector<SchemaColumn*>& outputSchema);
 
-    static void loadIntArrayFromJSONObject(const char* label, PlannerDomValue obj, std::vector<int>& ary);
+    static void loadIntArrayFromJSONObject(const char* label,
+                                           PlannerDomValue obj,
+                                           std::vector<int>& ary);
+
+    static void loadStringArrayFromJSONObject(const char* label,
+                                              PlannerDomValue obj,
+                                              std::vector<std::string>& ary);
 
     static AbstractExpression* loadExpressionFromJSONObject(const char* label,
                                                             PlannerDomValue obj);

@@ -492,7 +492,7 @@
                                 </tr>
                                 <!--<tr class="security" id="securityRow">
                                     <td class="configLabel">Security</td>-->
-                                <tr class="hasSubLabel parent security" id="row-6">
+                                <tr class="hasSubLabel parent security" id="row-8">
                                     <td class="configLabel"><a href="javascript:void(0)" class="labelCollapsed">Security</a></td>
                                     <td align="right" class="securitytd">
                                         <div id="securityOptionIcon" class="offIcon"></div>
@@ -506,7 +506,7 @@
                                         <a href="#securityPop" id="securityEdit" class="edit" title="Edit">&nbsp;</a>
                                     </td>
                                 </tr>
-                                <tr class="child-row-6 subLabelRow">
+                                <tr class="child-row-8 subLabelRow">
                                     <td colspan="4">
                                         <div id="loadingUserList" class="userSecurity" style="display: none;">
                                             <div class="loading-small loadingSecurity"></div>
@@ -675,6 +675,113 @@
                                     </td>
                                 </tr>
                                 <tbody id="importConfiguration" data-status="value" style="display: none;"></tbody>
+                                 <tr class="hasSubLabel parent" id="row-7" style="display: none;">
+                                    <td class="configLabel"><a href="javascript:void(0)" class="labelCollapsed">SNMP</a></td>
+                                    <td align="right" id="snmpOption" class="snmptd">
+                                        <div id="snmpIcon" class="offIcon"></div>
+                                        <input style="display: none;" type="checkbox" id="chkSnmp" class="snapshot" />
+                                        <div id="loadingSnmp" class="loading-small loadingSNMP" style="display: none"></div>
+                                    </td>
+                                    <td>
+                                        <div id="txtSnmp" class="snmpOn">Off</div>
+                                    </td>
+                                    <td><a id="btnEditSnmpOk" href="#snmpPop" class="editOk" title="Save" style="">Ok</a> <a id="btnEditSnmpCancel" href="javascript:void(0)" class="editCancel" title="Cancel" style="">Cancel</a> <a href="javascript:void(0)" id="snmpEdit" class="edit" title="Edit">&nbsp;</a></td>
+                                </tr>
+                                <tr class="child-row-7 subLabelRow">
+                                    <td class="configLabel">Target</td>
+                                    <td class="tdTarget snmpForm" align="right">
+                                       <form id="frmTarget" method="get" action="">
+                                            <div id="loadingTarget" class="loading-small loadingSNMP" style="display: none;"></div>
+                                            <span id="targetSpan" class="wordBreak"></span>
+                                            <input id="txtTarget" name="txtTarget" class="exitableTxtBx exitableTarget" type="text" style="display: none" />
+                                            <label id="errorTarget" for="txtTarget" class="error" style="display: none;"></label>
+                                        </form>
+                                    </td>
+                                    <td>&nbsp;</td>
+                                    <td>&nbsp;</td>
+                                </tr>
+                                <tr class="child-row-7 subLabelRow">
+                                    <td class="configLabel">Community</td>
+                                    <td class="tdCommunity snmpForm" align="right">
+                                        <form id="frmCommunity" method="get" action="">
+                                            <div id="loadingCommunity" class="loading-small loadingSNMP" style="display: none;"></div>
+                                            <span id="communitySpan" class="wordBreak"></span>
+                                            <input id="txtCommunity" name="txtCommunity"  class="exitableTxtBx exitableCommunity" type="text" style="display: none" />
+                                            <label id="errorCommunity" for="txtCommunity" class="error" style="display: none;"></label>
+                                        </form>
+                                        <!--<input type="textbox" placeholder="public">-->
+                                    </td>
+                                    <td>&nbsp;</td>
+                                    <td>&nbsp;</td>
+                                </tr>
+                                <tr class="child-row-7 subLabelRow">
+                                    <td class="configLabel">Username</td>
+                                    <td class="tdUsername snmpForm" align="right">
+                                         <form id="frmUsername" method="get" action="">
+                                            <div id="loadingUsername" class="loading-small loadingSNMP" style="display: none;"></div>
+                                            <span id="usernameSpan" class="wordBreak"></span>
+                                            <input id="txtUsername" name="txtUsername"  class="exitableTxtBx exitableUsername" type="text" style="display: none" />
+                                            <label id="errorUsername" for="txtUsername" class="error" style="display: none;"></label>
+                                        </form>
+
+                                    </td>
+                                    <td>&nbsp;</td>
+                                    <td>&nbsp;</td>
+                                </tr>
+                                 <tr class="child-row-7 subLabelRow">
+                                    <td class="configLabel">Authentication Protocol</td>
+                                    <td class="tdAuthProtocol snmpFormSelect" align="right">
+                                        <form id="frmAuthProtocol" method="get" action="">
+                                            <div id="loadingAuthProtocol" class="loading-small loadingSNMP" style="display: none;"></div>
+                                            <span id="authProtocolSpan" class="wordBreak"></span>
+                                             <select id="ddlAuthProtocol" style="display: none;">
+                                            </select>
+                                            <label id="errorAuthProtocol" for="txtAuthProtocol" class="error" style="display: none;"></label>
+                                        </form>
+                                    </td>
+                                    <td>&nbsp;</td>
+                                    <td>&nbsp;</td>
+                                </tr>
+                                 <tr class="child-row-7 subLabelRow">
+                                    <td class="configLabel">Authentication Key</td>
+                                    <td class="tdAuthKey snmpForm" align="right">
+                                        <form id="frmAuthkey" method="get" action="">
+                                            <div id="loadingAuthkey" class="loading-small loadingSNMP" style="display: none;"></div>
+                                            <span id="authKeySpan" class="wordBreak"></span>
+                                            <input id="txtAuthkey" name="txtAuthkey"  class="exitableTxtBx exitableAuthKey" type="text" style="display: none" />
+                                            <label id="errorAuthkey" for="txtAuthkey" class="error" style="display: none;"></label>
+                                        </form>
+                                    </td>
+                                    <td>&nbsp;</td>
+                                    <td>&nbsp;</td>
+                                </tr>
+                                 <tr class="child-row-7 subLabelRow">
+                                    <td class="configLabel">Privacy Protocol</td>
+                                    <td class="snmpFormSelect" align="right">
+                                         <form id="frmPrivProtocol" method="get" action="">
+                                            <div id="loadingPrivProtocol" class="loading-small loadingSNMP" style="display: none;"></div>
+                                            <span id="privProtocolSpan" class="wordBreak"></span>
+                                             <select id="ddlPrivProtocol" style="display: none;">
+                                            </select>
+                                            <label id="errorPrivProtocol" for="txtPrivProtocol" class="error" style="display: none;"></label>
+                                        </form>
+                                    </td>
+                                    <td>&nbsp;</td>
+                                    <td>&nbsp;</td>
+                                </tr>
+                                <tr class="child-row-7 subLabelRow">
+                                    <td class="configLabel">Privacy Key</td>
+                                    <td class="snmpForm" align="right">
+                                         <form id="frmPrivKey" method="get" action="">
+                                            <div id="loadingPrivKey" class="loading-small loadingSNMP" style="display: none;"></div>
+                                            <span id="privKeySpan" class="wordBreak"></span>
+                                            <input id="txtPrivKey" name="txtPrivKey"  class="exitableTxtBx exitablePrivKey" type="text" style="display: none" />
+                                            <label id="errorPrivKey" for="txtPrivKey" class="error" style="display: none;"></label>
+                                        </form>
+                                    </td>
+                                    <td>&nbsp;</td>
+                                    <td>&nbsp;</td>
+                                </tr>
                                 <tr class="hasSubLabel parent" id="row-6">
                                     <td class="configLabel"><a href="javascript:void(0)" class="labelCollapsed">Advanced</a></td>
                                     <td>&nbsp;</td>
@@ -1138,7 +1245,7 @@
         </div>
     </div>
     <div class="footer" id="mainFooter">
-        <p>Copyright (C) 2008-2016 VoltDB Inc. All rights reserved. </p>
+        <p>Copyright (C) 2008-2017 VoltDB Inc. All rights reserved. </p>
     </div>
     <!-- POPUP Saved Preferences -->
     <div id="myPreference" style="display: none">
@@ -1502,6 +1609,14 @@
         <div class="overlay-btns"><a id="btnSaveSnapshot" class="btn">Ok</a> <a id="btnPopupAutoSnapshotCancel" class="btn btn-gray">Cancel</a></div>
     </div>
     <!-- POPUP autoSnapshotyPop -->
+    <div id="snmpPop" style="display: none">
+        <div class="overlay-title icon-alert">SNMP</div>
+        <div class="clear"></div>
+        <div class="overlay-content confirmationHeight">
+            <p class="txt-bold">Do you want to save the value?</p>
+        </div>
+        <div class="overlay-btns"><a id="btnSaveSnmp" class="btn">Ok</a> <a id="btnPopupSnmpCancel" class="btn btn-gray">Cancel</a></div>
+    </div>
     <!-- POPUP securityPop -->
     <div id="securityPop" style="display: none">
         <div class="overlay-title icon-alert">Security: Confirmation</div>
@@ -1741,6 +1856,25 @@
                 </p>
                 <br />
                 <div class="overlay-btns" style="padding: 0"><a class="btn" id="btnUpdateSnapshotErrorOk">Ok</a></div>
+            </div>
+        </div>
+    </div>
+
+    <!--Update error Popup-->
+    <!--Update error Auto Snapshot Popup-->
+    <div style="display: none"><a href="#updateSnmpErrorPopup" id="updateErrorSnmpPopupLink">Update Error</a></div>
+    <div id="updateSnmpErrorPopup" style="display: none">
+        <div id="updateInnerSnmpErrorPopup">
+            <div class="overlay-title ">
+                <img src="css/resources/images/error.png" class="imgError" />Error
+            </div>
+            <div class="clear"></div>
+            <div class="overlay-contentError errorMsg">
+                <p>
+                    Could not update the value of <span id="updateSnmpErrorFieldMsg"></span>
+                </p>
+                <br />
+                <div class="overlay-btns" style="padding: 0"><a class="btn" id="btnUpdateSnmpErrorOk">Ok</a></div>
             </div>
         </div>
     </div>

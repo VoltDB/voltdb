@@ -85,9 +85,6 @@
 <property name='src.ee.dir'                  location='src/ee' />
 <property name='src.catalog.dir'             location='src/catgen' />
 <property name='depcache'                    value='.depcache' />
-<property name='project.parsergen.dir'       location='${src.gpl.dir}/org/voltdb/compiler/projectfile' />
-<property name='project.parsergen.pkg'       value='org.voltdb.compiler.projectfile' />
-<property name='project.parsergen.xsd'       value='org/voltdb/compiler/ProjectFileSchema.xsd' />
 <property name='deployment.parsergen.dir'    location='${src.gpl.dir}/org/voltdb/compiler/deploymentfile' />
 <property name='deployment.parsergen.pkg'    value='org.voltdb.compiler.deploymentfile' />
 <property name='deployment.parsergen.xsd'    value='org/voltdb/compiler/DeploymentFileSchema.xsd' />
@@ -789,7 +786,6 @@ DISTRIBUTION
     </copy>
 
     <!-- add the Project and Deployment file schemas to the dist -->
-    <copy todir="${dist.dir}/tools" file="src/frontend/org/voltdb/compiler/ProjectFileSchema.xsd"/>
     <copy todir="${dist.dir}/tools" file="src/frontend/org/voltdb/compiler/DeploymentFileSchema.xsd"/>
 
     <!-- add misc. other tools in the tools directory -->
@@ -1078,7 +1074,7 @@ CLEANING
 
 <target name='clean'
     description="Remove all compiled and generated files."
-    depends="cleantmp, clean_client, clean_project_gen, clean_deployment_gen,
+    depends="cleantmp, clean_client, clean_deployment_gen,
              clean_debian_package, clean_rpm_package, clean_bindoc, clean_other_gen">
   <exec dir='examples/adperformance' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
   <exec dir='examples/bank-offers' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
@@ -1326,7 +1322,7 @@ JAVA COMPILATION
 ***************************************
 -->
 
-<target name="compile" depends="catalog, dbbpool_gen, project_gen, deployment_gen, compile_core, compile_pro"
+<target name="compile" depends="catalog, dbbpool_gen, deployment_gen, compile_core, compile_pro"
         description="Compile all Java source and test classes"/>
 
 <target name="compile_client">
@@ -1750,7 +1746,7 @@ TEST CASES
             <env key="VOLT_ENABLEIV2" value="${enableiv2}" />
             <!-- Leave breadcrumbs so we can figure out deep in the bowels of VoltDB if
                  this is a test -->
-            <env key="VOLT_JUSTATEST" value="YESYESYES" />
+            <env key="VOLT_JUSTATEST" value="true" />
             <!-- Following two env vars are used by Java code
                  when running ant check -Dbuild=memcheck
                  The voltdbipc client is used in concert with valgrind
@@ -2334,13 +2330,13 @@ TEST CASES
     description="Run the SQL coverage tests.">
     <property name="build.dir.suffix" value="" /> <!-- Default -->
     <property name="sqlcoverage.failonerror" value="true" />
-    <property name="test.example.dir"
-    location="tests/scripts/examples/sql_coverage" />
+    <property name="test.main.dir"       location="tests/sqlcoverage" />
+    <property name="test.config.dir"     location="${test.main.dir}/config" />
+    <property name="test.ddl.dir"        location="${test.main.dir}/ddl" />
     <property name="log4j.configuration" location="tests/log4j-allconsole.xml" />
-    <property name="default_config" location="${test.example.dir}/config.py" />
-    <property name="regression_config"
-              location="${test.example.dir}/regression-config.py" />
-    <property name="sqlcov.dir" location="${build.dir}/sqlcoverage" />
+    <property name="default_config"      location="${test.config.dir}/config.py" />
+    <property name="regression_config"   location="${test.config.dir}/regression-config.py" />
+    <property name="sqlcov.dir"          location="${build.dir}/sqlcoverage" />
     <exec dir='.' executable='/bin/sh'>
         <arg line="-c 'rm -rf ${sqlcov.dir}'"/>
     </exec>
@@ -2351,15 +2347,12 @@ TEST CASES
     <condition property="config_seed" value="-s ${sql_coverage_seed}" else="">
         <isset property="sql_coverage_seed"/>
     </condition>
-    <condition property="config_suite" value="${test.example.dir}/${sql_coverage_suite}"
+    <condition property="config_suite" value="${test.config.dir}/${sql_coverage_suite}"
                else="${regression_config}">
         <isset property="sql_coverage_suite"/>
     </condition>
     <condition property="config_config" value="-c ${sql_coverage_config}" else="">
         <isset property="sql_coverage_config"/>
-    </condition>
-    <condition property="config_debug" value="-d ${debug}" else="">
-        <isset property="debug"/>
     </condition>
     <condition property="config_postgresql" value="-P" else="">
         <isset property="postgresql"/>
@@ -2414,23 +2407,22 @@ TEST CASES
     sitesperhost=${sitesperhost} replicas=${replicas}
     ' />
     <copy todir="${build.test.dir}/org/voltdb/sqlgenerator">
-      <fileset dir="${test.example.dir}">
+      <fileset dir="${test.ddl.dir}">
         <include name="**/*.sql"/>
       </fileset>
     </copy>
-    <copy todir="tests/scripts">
+    <copy todir="${test.main.dir}">
       <fileset dir=".">
         <include name="buildstring.txt"/>
         <include name="version.txt"/>
       </fileset>
     </copy>
-    <exec dir='tests/scripts' executable='python2.6' failonerror="${sqlcoverage.failonerror}">
+    <exec dir='tests/sqlcoverage' executable='python2.6' failonerror="${sqlcoverage.failonerror}">
         <env key="TEST_DIR" value="${build.testobjects.dir}" />
         <env key="VOLTDB_BUILD_DIR" value="${build.dir}"/>
         <arg line='sql_coverage_test.py' />
         <arg line="${config_seed}" />
         <arg line="${config_config}" />
-        <arg line="${config_debug}" />
         <arg line="${config_postgresql}" />
         <arg line="${config_postgis}" />
         <arg line="${config_ascii_only}" />
@@ -2695,38 +2687,6 @@ UTILITIES
       <arg value='${newversion}' />
     </exec>
     <echo message='Be sure to commit this change to the voltdb repository'/>
-</target>
-
-
-<!--
-***************************************
-PROJECT FILE SCHEMA CODE GENERATION
-***************************************
--->
-
-<target name="project_gen"
-        depends="project_gen_check"
-        unless="project.parsergen.uptodate"
-        description="Use JAXB to generate source from the project file schema">
-    <delete file="${project.parsergen.dir}/.flagfile" />
-    <exec dir="${src.gpl.dir}" executable="xjc" failonerror="true">
-        <arg line="-p ${project.parsergen.pkg} ${project.parsergen.xsd}" />
-    </exec>
-    <touch file="${project.parsergen.dir}/.flagfile" />
-</target>
-
-<target name="project_gen_check" depends="">
-    <uptodate property="project.parsergen.uptodate"
-              targetfile="${project.parsergen.dir}/.flagfile">
-        <srcfiles file="${src.gpl.dir}/${project.parsergen.xsd}" />
-    </uptodate>
-</target>
-
-<target name="clean_project_gen"
-        description="Remove all source files generated by JAXB for project file schema.">
-    <exec dir='.' executable='/bin/sh' failonerror='false'>
-        <arg line="-c 'rm -rfv ${project.parsergen.dir}'" />
-    </exec>
 </target>
 
 <target name="clean_other_gen"
