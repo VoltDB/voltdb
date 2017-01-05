@@ -39,6 +39,9 @@ import org.voltdb.client.exampleutils.ClientConnectionPool;
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.io.FileWriter;
 
 public class MyTPCC
     implements TPCCSimulation.ProcCaller
@@ -60,6 +63,8 @@ public class MyTPCC
     public static long[] latencyCounter = new long[] {0,0,0,0,0,0,0,0,0};
     public static boolean checkLatency = false;
     public static final ReentrantLock counterLock = new ReentrantLock();
+    // Yiwen: Add a arraylist to store latency of every transaction; let's ignore setting initial capacity for now
+    public static ArrayList<Long> latencyArray;
 
     public static void main(String args[])
     {
@@ -71,7 +76,10 @@ public class MyTPCC
         long transactions_per_second = m_helpah.longValue("ratelimit");
         long transactions_per_milli = transactions_per_second / 1000l;
         long client_feedback_interval_secs = m_helpah.longValue("displayinterval");
-        long testDurationSecs = m_helpah.longValue("duration");
+        // Yiwen: Use # of transction instead of duration
+        long totalTransactions = m_helpah.longValue("transactions");
+        latencyArray = new ArrayList<Long>((int)totalTransactions);
+//        long testDurationSecs = m_helpah.longValue("duration");
         long lag_latency_seconds = 0;
         long lag_latency_millis = lag_latency_seconds * 1000l;
         long thisOutstanding = 0;
@@ -85,23 +93,25 @@ public class MyTPCC
         setTransactionDisplayNames();
 
         long startTime = System.currentTimeMillis();
-        long endTime = startTime + (1000l * testDurationSecs);
+//        long endTime = startTime + (1000l * testDurationSecs);
         long currentTime = startTime;
         long lastFeedbackTime = startTime;
+        // Yiwen: the number of Stored Procedure calls equals the current number of transactions
         long numSPCalls = 0;
         long startRecordingLatency = startTime + lag_latency_millis;
 
-        while (endTime > currentTime)
+        while (numSPCalls < totalTransactions)
         {
             numSPCalls++;
 
             try
             {
-                tpccSim.doOne();
+                tpccSim.doOne(); // Yiwen: this method requests to perform one of the transactions randomly
             }
             catch (IOException e)
             {}
-
+            // Yiwen: They block tps to 200,000 (can be modified). The following block limits transactions per millisecond to 200. 
+            // Since our 100% workload only gives around 32,000 tps, the blocking will never happen in our case.
             transactions_this_second++;
             if (transactions_this_second >= transactions_per_milli)
             {
@@ -121,21 +131,21 @@ public class MyTPCC
                 // time to start recording latency information
                 checkLatency = true;
             }
-
+            // Yiwen: Originally, they took measurements every 10 seconds (5.556% of 180 seconds)
+            // Let's make it record # of transactions every 5 seconds. (modify "displayinterval": 10 -> 5)
             if (currentTime >= (lastFeedbackTime + (client_feedback_interval_secs * 1000)))
             {
                 final long elapsedTimeMillis2 = System.currentTimeMillis() - startTime;
                 lastFeedbackTime = currentTime;
-
-                final long runTimeMillis = endTime - startTime;
+//                final long runTimeMillis = endTime - startTime;
 
                 float elapsedTimeSec2 = (System.currentTimeMillis() - startTime) / 1000F;
                 if (totExecutionsLatency == 0)
                 {
                     totExecutionsLatency = 1;
                 }
-
-                double percentComplete = ((double) elapsedTimeMillis2 / (double) runTimeMillis) * 100;
+                
+                double percentComplete = ((double) numSPCalls / (double) totalTransactions) * 100;
                 if (percentComplete > 100.0)
                 {
                     percentComplete = 100.0;
@@ -149,8 +159,8 @@ public class MyTPCC
                     double avgLatency = (double) totExecutionMilliseconds / (double) totExecutionsLatency;
                     double tps = numSPCalls / elapsedTimeSec2;
 
-                    System.out.printf("%.3f%% Complete | Allowing %,d SP calls/sec: made %,d SP calls at %,.2f SP/sec | outstanding = %d (%d) | min = %d | max = %d | avg = %.2f\n",
-                            percentComplete, (transactions_per_milli * 1000l), numSPCalls, tps, thisOutstanding, (thisOutstanding - lastOutstanding), minExecutionMilliseconds, maxExecutionMilliseconds, avgLatency);
+                    System.out.printf("%.3f%% Complete | %.3f seconds elapsed | Allowing %,d SP calls/sec: made %,d SP calls at %,.2f SP/sec | outstanding = %d (%d) | min = %d | max = %d | avg = %.2f\n",
+                            percentComplete, elapsedTimeSec2, (transactions_per_milli * 1000l), numSPCalls, tps, thisOutstanding, (thisOutstanding - lastOutstanding), minExecutionMilliseconds, maxExecutionMilliseconds, avgLatency);
                     for (int i = 0; i < procNames.length; i++)
                     {
                         System.out.printf("%16s: %10d total,", procNames[i], procCounts[i].intValue());
@@ -165,7 +175,7 @@ public class MyTPCC
                 }
             }
         }
-
+        // Yiwen: the method "drain" makes sure all outstanding procudure calls will be handled
         try
         {
             m_clientCon.drain();
@@ -224,18 +234,44 @@ public class MyTPCC
         }
 
         m_clientCon.close();
+        
+        
+        // Yiwen: For CDF:
+        Collections.sort(latencyArray);
+        long[] cdfArray = new long[101];
+        cdfArray[0] = latencyArray.get(0);
+        for (int i = 1; i < 101; ++i)
+        {
+        	int idx = (int) (latencyArray.size() * 0.01 * i - 1);
+        	cdfArray[i] = latencyArray.get(idx);
+        }
+        
+        try
+        {
+        	FileWriter writer = new FileWriter("cdf.txt");
+            for (long latency: cdfArray) {
+            	writer.write(String.valueOf(latency) + "\n");
+            }
+            writer.close();
+        }
+        catch (IOException e)
+        {
+        	System.err.println("Unable to write to file");
+        }
     }
 
     public MyTPCC(String args[])
     {
         m_helpah = new AppHelper(MyTPCC.class.getCanonicalName());
-        m_helpah.add("duration", "run_duration_in_seconds", "Benchmark duration, in seconds.", 180);
+        // Yiwen: Replaced "duration" with "transactions"; non-default values can be specified in the run.sh script
+        m_helpah.add("transactions", "number_of_transactions", "Number of total transactions", 2000000);
+//        m_helpah.add("duration", "run_duration_in_seconds", "Benchmark duration, in seconds.", 180);
         m_helpah.add("warehouses", "number_of_warehouses", "Number of warehouses", 256);
         m_helpah.add("scalefactor", "scale_factor", "Reduces per-warehouse data by warehouses/scalefactor", 22.0);
         m_helpah.add("skewfactor", "skew_factor", "Skew factor", 0.0);
         m_helpah.add("loadthreads", "number_of_load_threads", "Number of load threads", 4);
         m_helpah.add("ratelimit", "rate_limit", "Rate limit to start from (tps)", 200000);
-        m_helpah.add("displayinterval", "display_interval_in_seconds", "Interval for performance feedback, in seconds.", 10);
+        m_helpah.add("displayinterval", "display_interval_in_seconds", "Interval for performance feedback, in seconds.", 5);
         m_helpah.add("servers", "comma_separated_server_list", "List of VoltDB servers to connect to.", "localhost");
         m_helpah.setArguments(args);
 
@@ -322,8 +358,10 @@ public class MyTPCC
 
                 if (checkLatency)
                 {
+                	// Yiwen: Description in ClientRespnse.java: Get the amount of time it took to 
+                	// run the transaction through the Client API, database, and back to the callback.
                     long executionTime =  clientResponse.getClientRoundtrip();
-
+                    latencyArray.add(executionTime);
                     totExecutionsLatency++;
                     totExecutionMilliseconds += executionTime;
 
@@ -395,7 +433,7 @@ public class MyTPCC
                 if (checkLatency)
                 {
                     long executionTime =  clientResponse.getClientRoundtrip();
-
+                    latencyArray.add(executionTime);
                     totExecutionsLatency++;
                     totExecutionMilliseconds += executionTime;
 
@@ -493,10 +531,10 @@ public class MyTPCC
                     if (checkLatency)
                     {
                         long executionTime =  clientResponse.getClientRoundtrip();
-
+                        latencyArray.add(executionTime);
                         totExecutionsLatency++;
                         totExecutionMilliseconds += executionTime;
-
+                        
                         if (executionTime < minExecutionMilliseconds)
                         {
                             minExecutionMilliseconds = executionTime;
@@ -620,7 +658,7 @@ public class MyTPCC
                 if (checkLatency)
                 {
                     long executionTime =  clientResponse.getClientRoundtrip();
-
+                    latencyArray.add(executionTime);
                     totExecutionsLatency++;
                     totExecutionMilliseconds += executionTime;
 
@@ -683,7 +721,7 @@ public class MyTPCC
                     if (checkLatency)
                     {
                         long executionTime =  clientResponse.getClientRoundtrip();
-
+                        latencyArray.add(executionTime);
                         totExecutionsLatency++;
                         totExecutionMilliseconds += executionTime;
 
