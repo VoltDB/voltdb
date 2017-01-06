@@ -556,7 +556,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
                                   BackendTarget.NATIVE_EE_JNI);
         ((LocalCluster) config).setHasLocalServer(hasLocalServer);
         //boolean success = config.compile(project);
-        boolean success = config.compileWithAdminMode(project, false);
+        boolean success = config.compileWithAdminMode(project, -1, false);
         assertTrue(success);
         builder.addServerConfig(config);
 

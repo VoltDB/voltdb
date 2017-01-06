@@ -350,7 +350,7 @@ public class TestAdminMode extends RegressionSuite
                 new ForcedLocalSingleProcessServer("admin-mode1.jar", 2, BackendTarget.NATIVE_EE_JNI);
 
         // Start in admin mode
-        success = config.compileWithAdminMode(project, true);
+        success = config.compileWithAdminMode(project, 32323, true);
         assertTrue(success);
 
         // add this config to the set of tests to run

@@ -135,7 +135,7 @@ public abstract class VoltServerConfig {
             String snapshotPath,
             String ppdPrefix);
 
-    abstract boolean compileWithAdminMode(VoltProjectBuilder builder, boolean adminOnStartup);
+    abstract boolean compileWithAdminMode(VoltProjectBuilder builder, int adminPort, boolean adminOnStartup);
 
     /**
      * Create a directory so it is accessible

@@ -151,7 +151,7 @@ public class TestPrepareShutdown extends RegressionSuite
         LocalCluster config = new LocalCluster("prepare_shutdown_importer.jar", 4, 1, 0, BackendTarget.NATIVE_EE_JNI,
                 LocalCluster.FailureState.ALL_RUNNING, true, false, additionalEnv);
         config.setHasLocalServer(false);
-        boolean compile = config.compileWithAdminMode(project, false);
+        boolean compile = config.compileWithAdminMode(project, -1, false);
         assertTrue(compile);
         builder.addServerConfig(config);
         return builder;

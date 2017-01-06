@@ -424,7 +424,7 @@ public class LocalCluster extends VoltServerConfig {
     }
 
     @Override
-    public boolean compileWithAdminMode(VoltProjectBuilder builder, boolean adminOnStartup)
+    public boolean compileWithAdminMode(VoltProjectBuilder builder, int adminPort, boolean adminOnStartup)
     {
         if (adminOnStartup) {
             setToStartPaused();
