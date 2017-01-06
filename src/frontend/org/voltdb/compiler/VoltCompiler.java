@@ -1743,10 +1743,7 @@ public class VoltCompiler {
             InMemoryJarfile jarOut = compileInternal(canonicalDDLReader, oldCatalog, ddlList, jarfile);
             // Trim the compiler output to try to provide a concise failure
             // explanation
-            if (jarOut != null) {
-                compilerLog.debug("Successfully recompiled InMemoryJarfile");
-            }
-            else {
+            if (jarOut == null) {
                 String errString = "Adhoc DDL failed";
                 if (m_errors.size() > 0) {
                     errString = m_errors.get(m_errors.size() - 1).getLogString();
@@ -1757,6 +1754,7 @@ public class VoltCompiler {
                 String trimmed = errString.substring(0, endtrim);
                 throw new VoltCompilerException(trimmed);
             }
+            compilerLog.debug("Successfully recompiled InMemoryJarfile");
         }
         finally {
             // Restore the original class loader

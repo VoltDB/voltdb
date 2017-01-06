@@ -591,7 +591,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
             fail();
         }
         catch (Exception e) {
-            assertTrue(e.getMessage().startsWith("Database catalog not found"));
+            assertTrue(e.getMessage().contains("Database catalog not found"));
         }
     }
 
