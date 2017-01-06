@@ -1867,23 +1867,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * @throws IOException
      * @throws InterruptedException
      */
-    public ClientResponse callExecuteTask(long timeoutMS, byte[] params ) throws IOException, InterruptedException {
-        final String procedureName = "@ExecuteTask";
-        Config procedureConfig = SystemProcedureCatalog.listing.get(procedureName);
-        Procedure proc = procedureConfig.asCatalogProcedure();
-        StoredProcedureInvocation spi = new StoredProcedureInvocation();
-        spi.setProcName(procedureName);
-        spi.setParams(params);
+    public ClientResponse callExecuteTask(long timeoutMS, byte[] params) throws IOException, InterruptedException {
         SimpleClientResponseAdapter.SyncCallback syncCb = new SimpleClientResponseAdapter.SyncCallback();
-        spi.setClientHandle(m_executeTaskAdpater.registerCallback(syncCb));
-        if (spi.getSerializedParams() == null) {
-            spi = MiscUtils.roundTripForCL(spi);
-        }
-        createTransaction(m_executeTaskAdpater.connectionId(), spi,
-                proc.getReadonly(), proc.getSinglepartition(), proc.getEverysite(),
-                0 /* Can provide anything for multi-part */,
-                spi.getSerializedSize(), System.nanoTime());
-
+        callExecuteTaskAsync(syncCb, params);
         return syncCb.getResponse(timeoutMS);
     }
 
@@ -1907,11 +1893,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         if (spi.getSerializedParams() == null) {
             spi = MiscUtils.roundTripForCL(spi);
         }
-        createTransaction(m_executeTaskAdpater.connectionId(), spi,
-                proc.getReadonly(), proc.getSinglepartition(), proc.getEverysite(),
-                0 /* Can provide anything for multi-part */,
-                spi.getSerializedSize(), System.nanoTime());
-
+        synchronized (m_executeTaskAdpater) {
+            createTransaction(m_executeTaskAdpater.connectionId(), spi,
+                    proc.getReadonly(), proc.getSinglepartition(), proc.getEverysite(),
+                    0 /* Can provide anything for multi-part */,
+                    spi.getSerializedSize(), System.nanoTime());
+        }
     }
 
     /**

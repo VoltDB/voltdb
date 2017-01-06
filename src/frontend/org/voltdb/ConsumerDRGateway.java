@@ -39,9 +39,9 @@ public interface ConsumerDRGateway extends Promotable {
 
     void clusterUnrecoverable(byte clusterId, Throwable t);
 
-    void queueStartCursors(byte clusterId, long clusterCreationId, List<String> clusterNodeInfo);
+    void queueStartCursors(byte producerClusterId, long producerClusterCreationId, List<String> producerHosts, int producerClusterPartitionCount);
 
-    void startConsumerDispatcher(byte producerClusterId, List<String> clusterNodeInfo, boolean awaitProducerSnapshot);
+    void startConsumerDispatcher(byte producerClusterId, List<String> producerHosts, boolean awaitProducerSnapshot);
 
     void addLocallyLedPartition(int partitionId);
 }

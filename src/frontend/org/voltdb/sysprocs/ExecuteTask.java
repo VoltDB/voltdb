@@ -163,6 +163,23 @@ public class ExecuteTask extends VoltSystemProcedure {
                 }
                 break;
             }
+            case INIT_DRID_TRACKER:
+            {
+                result = new VoltTable(STATUS_SCHEMA);
+                try {
+                    byte[] paramBuf = new byte[buffer.remaining()];
+                    buffer.get(paramBuf);
+                    ByteArrayInputStream bais = new ByteArrayInputStream(paramBuf);
+                    ObjectInputStream ois = new ObjectInputStream(bais);
+                    Map<Byte, Integer> clusterIdToPartitionCountMap = (Map<Byte, Integer>)ois.readObject();
+                    context.initDRAppliedTracker(clusterIdToPartitionCountMap);
+                    result.addRow(STATUS_OK);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    result.addRow("FAILURE");
+                }
+                break;
+            }
             default:
                 throw new VoltAbortException("Unable to find the task associated with the given task id");
             }
