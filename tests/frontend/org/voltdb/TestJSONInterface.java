@@ -697,7 +697,8 @@ public class TestJSONInterface extends TestCase {
 
             config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
             config.m_pathToDeployment = builder.getPathToDeployment();
-
+            config.m_adminPort = 21213;
+            config.m_isPaused = true;
             server = new ServerThread(config);
             server.start();
             server.waitForInitialization();
