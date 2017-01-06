@@ -1077,42 +1077,13 @@ public final class DRAgent {
     com.google.protobuf.ByteString
         getNonceBytes();
 
-    // optional .pmsg.NodeInfo nodeInfo = 2;
+    // optional int32 globalPartitionCount = 2;
     /**
-     * <code>optional .pmsg.NodeInfo nodeInfo = 2;</code>
-     *
-     * <pre>
-     * The node sending this snapshot request. It includes the DR interface and
-     * port that he remote clusters can use to connect back.
-     * </pre>
-     */
-    boolean hasNodeInfo();
-    /**
-     * <code>optional .pmsg.NodeInfo nodeInfo = 2;</code>
-     *
-     * <pre>
-     * The node sending this snapshot request. It includes the DR interface and
-     * port that he remote clusters can use to connect back.
-     * </pre>
-     */
-    org.voltdb.pmsg.DRAgent.NodeInfo getNodeInfo();
-    /**
-     * <code>optional .pmsg.NodeInfo nodeInfo = 2;</code>
-     *
-     * <pre>
-     * The node sending this snapshot request. It includes the DR interface and
-     * port that he remote clusters can use to connect back.
-     * </pre>
-     */
-    org.voltdb.pmsg.DRAgent.NodeInfoOrBuilder getNodeInfoOrBuilder();
-
-    // optional int32 globalPartitionCount = 3;
-    /**
-     * <code>optional int32 globalPartitionCount = 3;</code>
+     * <code>optional int32 globalPartitionCount = 2;</code>
      */
     boolean hasGlobalPartitionCount();
     /**
-     * <code>optional int32 globalPartitionCount = 3;</code>
+     * <code>optional int32 globalPartitionCount = 2;</code>
      */
     int getGlobalPartitionCount();
   }
@@ -1172,21 +1143,8 @@ public final class DRAgent {
               nonce_ = input.readBytes();
               break;
             }
-            case 18: {
-              org.voltdb.pmsg.DRAgent.NodeInfo.Builder subBuilder = null;
-              if (((bitField0_ & 0x00000002) == 0x00000002)) {
-                subBuilder = nodeInfo_.toBuilder();
-              }
-              nodeInfo_ = input.readMessage(org.voltdb.pmsg.DRAgent.NodeInfo.PARSER, extensionRegistry);
-              if (subBuilder != null) {
-                subBuilder.mergeFrom(nodeInfo_);
-                nodeInfo_ = subBuilder.buildPartial();
-              }
+            case 16: {
               bitField0_ |= 0x00000002;
-              break;
-            }
-            case 24: {
-              bitField0_ |= 0x00000004;
               globalPartitionCount_ = input.readInt32();
               break;
             }
@@ -1273,54 +1231,17 @@ public final class DRAgent {
       }
     }
 
-    // optional .pmsg.NodeInfo nodeInfo = 2;
-    public static final int NODEINFO_FIELD_NUMBER = 2;
-    private org.voltdb.pmsg.DRAgent.NodeInfo nodeInfo_;
+    // optional int32 globalPartitionCount = 2;
+    public static final int GLOBALPARTITIONCOUNT_FIELD_NUMBER = 2;
+    private int globalPartitionCount_;
     /**
-     * <code>optional .pmsg.NodeInfo nodeInfo = 2;</code>
-     *
-     * <pre>
-     * The node sending this snapshot request. It includes the DR interface and
-     * port that he remote clusters can use to connect back.
-     * </pre>
+     * <code>optional int32 globalPartitionCount = 2;</code>
      */
-    public boolean hasNodeInfo() {
+    public boolean hasGlobalPartitionCount() {
       return ((bitField0_ & 0x00000002) == 0x00000002);
     }
     /**
-     * <code>optional .pmsg.NodeInfo nodeInfo = 2;</code>
-     *
-     * <pre>
-     * The node sending this snapshot request. It includes the DR interface and
-     * port that he remote clusters can use to connect back.
-     * </pre>
-     */
-    public org.voltdb.pmsg.DRAgent.NodeInfo getNodeInfo() {
-      return nodeInfo_;
-    }
-    /**
-     * <code>optional .pmsg.NodeInfo nodeInfo = 2;</code>
-     *
-     * <pre>
-     * The node sending this snapshot request. It includes the DR interface and
-     * port that he remote clusters can use to connect back.
-     * </pre>
-     */
-    public org.voltdb.pmsg.DRAgent.NodeInfoOrBuilder getNodeInfoOrBuilder() {
-      return nodeInfo_;
-    }
-
-    // optional int32 globalPartitionCount = 3;
-    public static final int GLOBALPARTITIONCOUNT_FIELD_NUMBER = 3;
-    private int globalPartitionCount_;
-    /**
-     * <code>optional int32 globalPartitionCount = 3;</code>
-     */
-    public boolean hasGlobalPartitionCount() {
-      return ((bitField0_ & 0x00000004) == 0x00000004);
-    }
-    /**
-     * <code>optional int32 globalPartitionCount = 3;</code>
+     * <code>optional int32 globalPartitionCount = 2;</code>
      */
     public int getGlobalPartitionCount() {
       return globalPartitionCount_;
@@ -1328,7 +1249,6 @@ public final class DRAgent {
 
     private void initFields() {
       nonce_ = "";
-      nodeInfo_ = org.voltdb.pmsg.DRAgent.NodeInfo.getDefaultInstance();
       globalPartitionCount_ = 0;
     }
     private byte memoizedIsInitialized = -1;
@@ -1347,10 +1267,7 @@ public final class DRAgent {
         output.writeBytes(1, getNonceBytes());
       }
       if (((bitField0_ & 0x00000002) == 0x00000002)) {
-        output.writeMessage(2, nodeInfo_);
-      }
-      if (((bitField0_ & 0x00000004) == 0x00000004)) {
-        output.writeInt32(3, globalPartitionCount_);
+        output.writeInt32(2, globalPartitionCount_);
       }
       getUnknownFields().writeTo(output);
     }
@@ -1367,11 +1284,7 @@ public final class DRAgent {
       }
       if (((bitField0_ & 0x00000002) == 0x00000002)) {
         size += com.google.protobuf.CodedOutputStream
-          .computeMessageSize(2, nodeInfo_);
-      }
-      if (((bitField0_ & 0x00000004) == 0x00000004)) {
-        size += com.google.protobuf.CodedOutputStream
-          .computeInt32Size(3, globalPartitionCount_);
+          .computeInt32Size(2, globalPartitionCount_);
       }
       size += getUnknownFields().getSerializedSize();
       memoizedSerializedSize = size;
@@ -1481,7 +1394,6 @@ public final class DRAgent {
       }
       private void maybeForceBuilderInitialization() {
         if (com.google.protobuf.GeneratedMessage.alwaysUseFieldBuilders) {
-          getNodeInfoFieldBuilder();
         }
       }
       private static Builder create() {
@@ -1492,14 +1404,8 @@ public final class DRAgent {
         super.clear();
         nonce_ = "";
         bitField0_ = (bitField0_ & ~0x00000001);
-        if (nodeInfoBuilder_ == null) {
-          nodeInfo_ = org.voltdb.pmsg.DRAgent.NodeInfo.getDefaultInstance();
-        } else {
-          nodeInfoBuilder_.clear();
-        }
-        bitField0_ = (bitField0_ & ~0x00000002);
         globalPartitionCount_ = 0;
-        bitField0_ = (bitField0_ & ~0x00000004);
+        bitField0_ = (bitField0_ & ~0x00000002);
         return this;
       }
 
@@ -1535,14 +1441,6 @@ public final class DRAgent {
         if (((from_bitField0_ & 0x00000002) == 0x00000002)) {
           to_bitField0_ |= 0x00000002;
         }
-        if (nodeInfoBuilder_ == null) {
-          result.nodeInfo_ = nodeInfo_;
-        } else {
-          result.nodeInfo_ = nodeInfoBuilder_.build();
-        }
-        if (((from_bitField0_ & 0x00000004) == 0x00000004)) {
-          to_bitField0_ |= 0x00000004;
-        }
         result.globalPartitionCount_ = globalPartitionCount_;
         result.bitField0_ = to_bitField0_;
         onBuilt();
@@ -1564,9 +1462,6 @@ public final class DRAgent {
           bitField0_ |= 0x00000001;
           nonce_ = other.nonce_;
           onChanged();
-        }
-        if (other.hasNodeInfo()) {
-          mergeNodeInfo(other.getNodeInfo());
         }
         if (other.hasGlobalPartitionCount()) {
           setGlobalPartitionCount(other.getGlobalPartitionCount());
@@ -1672,196 +1567,34 @@ public final class DRAgent {
         return this;
       }
 
-      // optional .pmsg.NodeInfo nodeInfo = 2;
-      private org.voltdb.pmsg.DRAgent.NodeInfo nodeInfo_ = org.voltdb.pmsg.DRAgent.NodeInfo.getDefaultInstance();
-      private com.google.protobuf.SingleFieldBuilder<
-          org.voltdb.pmsg.DRAgent.NodeInfo, org.voltdb.pmsg.DRAgent.NodeInfo.Builder, org.voltdb.pmsg.DRAgent.NodeInfoOrBuilder> nodeInfoBuilder_;
+      // optional int32 globalPartitionCount = 2;
+      private int globalPartitionCount_ ;
       /**
-       * <code>optional .pmsg.NodeInfo nodeInfo = 2;</code>
-       *
-       * <pre>
-       * The node sending this snapshot request. It includes the DR interface and
-       * port that he remote clusters can use to connect back.
-       * </pre>
+       * <code>optional int32 globalPartitionCount = 2;</code>
        */
-      public boolean hasNodeInfo() {
+      public boolean hasGlobalPartitionCount() {
         return ((bitField0_ & 0x00000002) == 0x00000002);
       }
       /**
-       * <code>optional .pmsg.NodeInfo nodeInfo = 2;</code>
-       *
-       * <pre>
-       * The node sending this snapshot request. It includes the DR interface and
-       * port that he remote clusters can use to connect back.
-       * </pre>
-       */
-      public org.voltdb.pmsg.DRAgent.NodeInfo getNodeInfo() {
-        if (nodeInfoBuilder_ == null) {
-          return nodeInfo_;
-        } else {
-          return nodeInfoBuilder_.getMessage();
-        }
-      }
-      /**
-       * <code>optional .pmsg.NodeInfo nodeInfo = 2;</code>
-       *
-       * <pre>
-       * The node sending this snapshot request. It includes the DR interface and
-       * port that he remote clusters can use to connect back.
-       * </pre>
-       */
-      public Builder setNodeInfo(org.voltdb.pmsg.DRAgent.NodeInfo value) {
-        if (nodeInfoBuilder_ == null) {
-          if (value == null) {
-            throw new NullPointerException();
-          }
-          nodeInfo_ = value;
-          onChanged();
-        } else {
-          nodeInfoBuilder_.setMessage(value);
-        }
-        bitField0_ |= 0x00000002;
-        return this;
-      }
-      /**
-       * <code>optional .pmsg.NodeInfo nodeInfo = 2;</code>
-       *
-       * <pre>
-       * The node sending this snapshot request. It includes the DR interface and
-       * port that he remote clusters can use to connect back.
-       * </pre>
-       */
-      public Builder setNodeInfo(
-          org.voltdb.pmsg.DRAgent.NodeInfo.Builder builderForValue) {
-        if (nodeInfoBuilder_ == null) {
-          nodeInfo_ = builderForValue.build();
-          onChanged();
-        } else {
-          nodeInfoBuilder_.setMessage(builderForValue.build());
-        }
-        bitField0_ |= 0x00000002;
-        return this;
-      }
-      /**
-       * <code>optional .pmsg.NodeInfo nodeInfo = 2;</code>
-       *
-       * <pre>
-       * The node sending this snapshot request. It includes the DR interface and
-       * port that he remote clusters can use to connect back.
-       * </pre>
-       */
-      public Builder mergeNodeInfo(org.voltdb.pmsg.DRAgent.NodeInfo value) {
-        if (nodeInfoBuilder_ == null) {
-          if (((bitField0_ & 0x00000002) == 0x00000002) &&
-              nodeInfo_ != org.voltdb.pmsg.DRAgent.NodeInfo.getDefaultInstance()) {
-            nodeInfo_ =
-              org.voltdb.pmsg.DRAgent.NodeInfo.newBuilder(nodeInfo_).mergeFrom(value).buildPartial();
-          } else {
-            nodeInfo_ = value;
-          }
-          onChanged();
-        } else {
-          nodeInfoBuilder_.mergeFrom(value);
-        }
-        bitField0_ |= 0x00000002;
-        return this;
-      }
-      /**
-       * <code>optional .pmsg.NodeInfo nodeInfo = 2;</code>
-       *
-       * <pre>
-       * The node sending this snapshot request. It includes the DR interface and
-       * port that he remote clusters can use to connect back.
-       * </pre>
-       */
-      public Builder clearNodeInfo() {
-        if (nodeInfoBuilder_ == null) {
-          nodeInfo_ = org.voltdb.pmsg.DRAgent.NodeInfo.getDefaultInstance();
-          onChanged();
-        } else {
-          nodeInfoBuilder_.clear();
-        }
-        bitField0_ = (bitField0_ & ~0x00000002);
-        return this;
-      }
-      /**
-       * <code>optional .pmsg.NodeInfo nodeInfo = 2;</code>
-       *
-       * <pre>
-       * The node sending this snapshot request. It includes the DR interface and
-       * port that he remote clusters can use to connect back.
-       * </pre>
-       */
-      public org.voltdb.pmsg.DRAgent.NodeInfo.Builder getNodeInfoBuilder() {
-        bitField0_ |= 0x00000002;
-        onChanged();
-        return getNodeInfoFieldBuilder().getBuilder();
-      }
-      /**
-       * <code>optional .pmsg.NodeInfo nodeInfo = 2;</code>
-       *
-       * <pre>
-       * The node sending this snapshot request. It includes the DR interface and
-       * port that he remote clusters can use to connect back.
-       * </pre>
-       */
-      public org.voltdb.pmsg.DRAgent.NodeInfoOrBuilder getNodeInfoOrBuilder() {
-        if (nodeInfoBuilder_ != null) {
-          return nodeInfoBuilder_.getMessageOrBuilder();
-        } else {
-          return nodeInfo_;
-        }
-      }
-      /**
-       * <code>optional .pmsg.NodeInfo nodeInfo = 2;</code>
-       *
-       * <pre>
-       * The node sending this snapshot request. It includes the DR interface and
-       * port that he remote clusters can use to connect back.
-       * </pre>
-       */
-      private com.google.protobuf.SingleFieldBuilder<
-          org.voltdb.pmsg.DRAgent.NodeInfo, org.voltdb.pmsg.DRAgent.NodeInfo.Builder, org.voltdb.pmsg.DRAgent.NodeInfoOrBuilder> 
-          getNodeInfoFieldBuilder() {
-        if (nodeInfoBuilder_ == null) {
-          nodeInfoBuilder_ = new com.google.protobuf.SingleFieldBuilder<
-              org.voltdb.pmsg.DRAgent.NodeInfo, org.voltdb.pmsg.DRAgent.NodeInfo.Builder, org.voltdb.pmsg.DRAgent.NodeInfoOrBuilder>(
-                  nodeInfo_,
-                  getParentForChildren(),
-                  isClean());
-          nodeInfo_ = null;
-        }
-        return nodeInfoBuilder_;
-      }
-
-      // optional int32 globalPartitionCount = 3;
-      private int globalPartitionCount_ ;
-      /**
-       * <code>optional int32 globalPartitionCount = 3;</code>
-       */
-      public boolean hasGlobalPartitionCount() {
-        return ((bitField0_ & 0x00000004) == 0x00000004);
-      }
-      /**
-       * <code>optional int32 globalPartitionCount = 3;</code>
+       * <code>optional int32 globalPartitionCount = 2;</code>
        */
       public int getGlobalPartitionCount() {
         return globalPartitionCount_;
       }
       /**
-       * <code>optional int32 globalPartitionCount = 3;</code>
+       * <code>optional int32 globalPartitionCount = 2;</code>
        */
       public Builder setGlobalPartitionCount(int value) {
-        bitField0_ |= 0x00000004;
+        bitField0_ |= 0x00000002;
         globalPartitionCount_ = value;
         onChanged();
         return this;
       }
       /**
-       * <code>optional int32 globalPartitionCount = 3;</code>
+       * <code>optional int32 globalPartitionCount = 2;</code>
        */
       public Builder clearGlobalPartitionCount() {
-        bitField0_ = (bitField0_ & ~0x00000004);
+        bitField0_ = (bitField0_ & ~0x00000002);
         globalPartitionCount_ = 0;
         onChanged();
         return this;
@@ -2793,6 +2526,20 @@ public final class DRAgent {
      * <code>optional fixed64 clusterRecoveryId = 4;</code>
      */
     long getClusterRecoveryId();
+
+    // optional .pmsg.NodeInfo nodeInfo = 5;
+    /**
+     * <code>optional .pmsg.NodeInfo nodeInfo = 5;</code>
+     */
+    boolean hasNodeInfo();
+    /**
+     * <code>optional .pmsg.NodeInfo nodeInfo = 5;</code>
+     */
+    org.voltdb.pmsg.DRAgent.NodeInfo getNodeInfo();
+    /**
+     * <code>optional .pmsg.NodeInfo nodeInfo = 5;</code>
+     */
+    org.voltdb.pmsg.DRAgent.NodeInfoOrBuilder getNodeInfoOrBuilder();
   }
   /**
    * Protobuf type {@code pmsg.Connect}
@@ -2863,6 +2610,19 @@ public final class DRAgent {
             case 33: {
               bitField0_ |= 0x00000008;
               clusterRecoveryId_ = input.readFixed64();
+              break;
+            }
+            case 42: {
+              org.voltdb.pmsg.DRAgent.NodeInfo.Builder subBuilder = null;
+              if (((bitField0_ & 0x00000010) == 0x00000010)) {
+                subBuilder = nodeInfo_.toBuilder();
+              }
+              nodeInfo_ = input.readMessage(org.voltdb.pmsg.DRAgent.NodeInfo.PARSER, extensionRegistry);
+              if (subBuilder != null) {
+                subBuilder.mergeFrom(nodeInfo_);
+                nodeInfo_ = subBuilder.buildPartial();
+              }
+              bitField0_ |= 0x00000010;
               break;
             }
           }
@@ -2969,11 +2729,34 @@ public final class DRAgent {
       return clusterRecoveryId_;
     }
 
+    // optional .pmsg.NodeInfo nodeInfo = 5;
+    public static final int NODEINFO_FIELD_NUMBER = 5;
+    private org.voltdb.pmsg.DRAgent.NodeInfo nodeInfo_;
+    /**
+     * <code>optional .pmsg.NodeInfo nodeInfo = 5;</code>
+     */
+    public boolean hasNodeInfo() {
+      return ((bitField0_ & 0x00000010) == 0x00000010);
+    }
+    /**
+     * <code>optional .pmsg.NodeInfo nodeInfo = 5;</code>
+     */
+    public org.voltdb.pmsg.DRAgent.NodeInfo getNodeInfo() {
+      return nodeInfo_;
+    }
+    /**
+     * <code>optional .pmsg.NodeInfo nodeInfo = 5;</code>
+     */
+    public org.voltdb.pmsg.DRAgent.NodeInfoOrBuilder getNodeInfoOrBuilder() {
+      return nodeInfo_;
+    }
+
     private void initFields() {
       clusterId_ = 0;
       clusterCreationId_ = 0L;
       protocolVersion_ = 0;
       clusterRecoveryId_ = 0L;
+      nodeInfo_ = org.voltdb.pmsg.DRAgent.NodeInfo.getDefaultInstance();
     }
     private byte memoizedIsInitialized = -1;
     public final boolean isInitialized() {
@@ -2999,6 +2782,9 @@ public final class DRAgent {
       if (((bitField0_ & 0x00000008) == 0x00000008)) {
         output.writeFixed64(4, clusterRecoveryId_);
       }
+      if (((bitField0_ & 0x00000010) == 0x00000010)) {
+        output.writeMessage(5, nodeInfo_);
+      }
       getUnknownFields().writeTo(output);
     }
 
@@ -3023,6 +2809,10 @@ public final class DRAgent {
       if (((bitField0_ & 0x00000008) == 0x00000008)) {
         size += com.google.protobuf.CodedOutputStream
           .computeFixed64Size(4, clusterRecoveryId_);
+      }
+      if (((bitField0_ & 0x00000010) == 0x00000010)) {
+        size += com.google.protobuf.CodedOutputStream
+          .computeMessageSize(5, nodeInfo_);
       }
       size += getUnknownFields().getSerializedSize();
       memoizedSerializedSize = size;
@@ -3132,6 +2922,7 @@ public final class DRAgent {
       }
       private void maybeForceBuilderInitialization() {
         if (com.google.protobuf.GeneratedMessage.alwaysUseFieldBuilders) {
+          getNodeInfoFieldBuilder();
         }
       }
       private static Builder create() {
@@ -3148,6 +2939,12 @@ public final class DRAgent {
         bitField0_ = (bitField0_ & ~0x00000004);
         clusterRecoveryId_ = 0L;
         bitField0_ = (bitField0_ & ~0x00000008);
+        if (nodeInfoBuilder_ == null) {
+          nodeInfo_ = org.voltdb.pmsg.DRAgent.NodeInfo.getDefaultInstance();
+        } else {
+          nodeInfoBuilder_.clear();
+        }
+        bitField0_ = (bitField0_ & ~0x00000010);
         return this;
       }
 
@@ -3192,6 +2989,14 @@ public final class DRAgent {
           to_bitField0_ |= 0x00000008;
         }
         result.clusterRecoveryId_ = clusterRecoveryId_;
+        if (((from_bitField0_ & 0x00000010) == 0x00000010)) {
+          to_bitField0_ |= 0x00000010;
+        }
+        if (nodeInfoBuilder_ == null) {
+          result.nodeInfo_ = nodeInfo_;
+        } else {
+          result.nodeInfo_ = nodeInfoBuilder_.build();
+        }
         result.bitField0_ = to_bitField0_;
         onBuilt();
         return result;
@@ -3219,6 +3024,9 @@ public final class DRAgent {
         }
         if (other.hasClusterRecoveryId()) {
           setClusterRecoveryId(other.getClusterRecoveryId());
+        }
+        if (other.hasNodeInfo()) {
+          mergeNodeInfo(other.getNodeInfo());
         }
         this.mergeUnknownFields(other.getUnknownFields());
         return this;
@@ -3377,6 +3185,123 @@ public final class DRAgent {
         clusterRecoveryId_ = 0L;
         onChanged();
         return this;
+      }
+
+      // optional .pmsg.NodeInfo nodeInfo = 5;
+      private org.voltdb.pmsg.DRAgent.NodeInfo nodeInfo_ = org.voltdb.pmsg.DRAgent.NodeInfo.getDefaultInstance();
+      private com.google.protobuf.SingleFieldBuilder<
+          org.voltdb.pmsg.DRAgent.NodeInfo, org.voltdb.pmsg.DRAgent.NodeInfo.Builder, org.voltdb.pmsg.DRAgent.NodeInfoOrBuilder> nodeInfoBuilder_;
+      /**
+       * <code>optional .pmsg.NodeInfo nodeInfo = 5;</code>
+       */
+      public boolean hasNodeInfo() {
+        return ((bitField0_ & 0x00000010) == 0x00000010);
+      }
+      /**
+       * <code>optional .pmsg.NodeInfo nodeInfo = 5;</code>
+       */
+      public org.voltdb.pmsg.DRAgent.NodeInfo getNodeInfo() {
+        if (nodeInfoBuilder_ == null) {
+          return nodeInfo_;
+        } else {
+          return nodeInfoBuilder_.getMessage();
+        }
+      }
+      /**
+       * <code>optional .pmsg.NodeInfo nodeInfo = 5;</code>
+       */
+      public Builder setNodeInfo(org.voltdb.pmsg.DRAgent.NodeInfo value) {
+        if (nodeInfoBuilder_ == null) {
+          if (value == null) {
+            throw new NullPointerException();
+          }
+          nodeInfo_ = value;
+          onChanged();
+        } else {
+          nodeInfoBuilder_.setMessage(value);
+        }
+        bitField0_ |= 0x00000010;
+        return this;
+      }
+      /**
+       * <code>optional .pmsg.NodeInfo nodeInfo = 5;</code>
+       */
+      public Builder setNodeInfo(
+          org.voltdb.pmsg.DRAgent.NodeInfo.Builder builderForValue) {
+        if (nodeInfoBuilder_ == null) {
+          nodeInfo_ = builderForValue.build();
+          onChanged();
+        } else {
+          nodeInfoBuilder_.setMessage(builderForValue.build());
+        }
+        bitField0_ |= 0x00000010;
+        return this;
+      }
+      /**
+       * <code>optional .pmsg.NodeInfo nodeInfo = 5;</code>
+       */
+      public Builder mergeNodeInfo(org.voltdb.pmsg.DRAgent.NodeInfo value) {
+        if (nodeInfoBuilder_ == null) {
+          if (((bitField0_ & 0x00000010) == 0x00000010) &&
+              nodeInfo_ != org.voltdb.pmsg.DRAgent.NodeInfo.getDefaultInstance()) {
+            nodeInfo_ =
+              org.voltdb.pmsg.DRAgent.NodeInfo.newBuilder(nodeInfo_).mergeFrom(value).buildPartial();
+          } else {
+            nodeInfo_ = value;
+          }
+          onChanged();
+        } else {
+          nodeInfoBuilder_.mergeFrom(value);
+        }
+        bitField0_ |= 0x00000010;
+        return this;
+      }
+      /**
+       * <code>optional .pmsg.NodeInfo nodeInfo = 5;</code>
+       */
+      public Builder clearNodeInfo() {
+        if (nodeInfoBuilder_ == null) {
+          nodeInfo_ = org.voltdb.pmsg.DRAgent.NodeInfo.getDefaultInstance();
+          onChanged();
+        } else {
+          nodeInfoBuilder_.clear();
+        }
+        bitField0_ = (bitField0_ & ~0x00000010);
+        return this;
+      }
+      /**
+       * <code>optional .pmsg.NodeInfo nodeInfo = 5;</code>
+       */
+      public org.voltdb.pmsg.DRAgent.NodeInfo.Builder getNodeInfoBuilder() {
+        bitField0_ |= 0x00000010;
+        onChanged();
+        return getNodeInfoFieldBuilder().getBuilder();
+      }
+      /**
+       * <code>optional .pmsg.NodeInfo nodeInfo = 5;</code>
+       */
+      public org.voltdb.pmsg.DRAgent.NodeInfoOrBuilder getNodeInfoOrBuilder() {
+        if (nodeInfoBuilder_ != null) {
+          return nodeInfoBuilder_.getMessageOrBuilder();
+        } else {
+          return nodeInfo_;
+        }
+      }
+      /**
+       * <code>optional .pmsg.NodeInfo nodeInfo = 5;</code>
+       */
+      private com.google.protobuf.SingleFieldBuilder<
+          org.voltdb.pmsg.DRAgent.NodeInfo, org.voltdb.pmsg.DRAgent.NodeInfo.Builder, org.voltdb.pmsg.DRAgent.NodeInfoOrBuilder> 
+          getNodeInfoFieldBuilder() {
+        if (nodeInfoBuilder_ == null) {
+          nodeInfoBuilder_ = new com.google.protobuf.SingleFieldBuilder<
+              org.voltdb.pmsg.DRAgent.NodeInfo, org.voltdb.pmsg.DRAgent.NodeInfo.Builder, org.voltdb.pmsg.DRAgent.NodeInfoOrBuilder>(
+                  nodeInfo_,
+                  getParentForChildren(),
+                  isClean());
+          nodeInfo_ = null;
+        }
+        return nodeInfoBuilder_;
       }
 
       // @@protoc_insertion_point(builder_scope:pmsg.Connect)
@@ -17106,68 +17031,68 @@ public final class DRAgent {
       "\n\rdragent.proto\022\004pmsg\"\'\n\004UUID\022\020\n\010instanc" +
       "e\030\001 \002(\006\022\r\n\005count\030\002 \002(\006\"M\n\003Ack\022\023\n\013partiti" +
       "onId\030\001 \001(\005\022\021\n\ttimestamp\030\002 \001(\006\022\036\n\026average" +
-      "RowLatencyNanos\030\003 \001(\006\"\\\n\013SnapshotReq\022\r\n\005" +
-      "nonce\030\001 \001(\t\022 \n\010nodeInfo\030\002 \001(\0132\016.pmsg.Nod" +
-      "eInfo\022\034\n\024globalPartitionCount\030\003 \001(\005\"/\n\005R" +
-      "eset\022\023\n\013partitionId\030\001 \001(\005\022\021\n\ttimestamp\030\002" +
-      " \001(\006\"\034\n\005Pause\022\023\n\013partitionId\030\001 \001(\005\"k\n\007Co" +
-      "nnect\022\021\n\tclusterId\030\001 \001(\005\022\031\n\021clusterCreat" +
-      "ionId\030\002 \001(\006\022\027\n\017protocolVersion\030\003 \001(\005\022\031\n\021",
-      "clusterRecoveryId\030\004 \001(\006\"t\n\tSubscribe\022\023\n\013" +
-      "partitionId\030\001 \001(\005\022\021\n\ttimestamp\030\002 \001(\006\022\022\n\n" +
-      "isCovering\030\003 \001(\010\022\030\n\020rewindToUniqueId\030\004 \001" +
-      "(\006\022\021\n\tisSyncing\030\005 \001(\010\"#\n\005Query\022\032\n\013includ" +
-      "eMesh\030\001 \001(\010:\005false\"5\n\013StartCursor\022&\n\013clu" +
-      "sterInfo\030\001 \003(\0132\021.pmsg.ClusterInfo\"\231\004\n\010Re" +
-      "sponse\022\026\n\002id\030\001 \002(\0132\n.pmsg.UUID\022,\n\004mode\030\002" +
-      " \001(\0162\036.pmsg.Response.ReplicationMode\022\031\n\021" +
-      "snapshotTimestamp\030\003 \001(\006\022\026\n\016instanceIdHas" +
-      "h\030\004 \001(\006\022\017\n\007version\030\005 \001(\t\022 \n\010nodeInfo\030\006 \003",
-      "(\0132\016.pmsg.NodeInfo\022\034\n\024globalPartitionCou" +
-      "nt\030\007 \001(\005\022*\n\rpartitionInfo\030\010 \003(\0132\023.pmsg.P" +
-      "artitionInfo\022\021\n\006status\030\t \001(\005:\0010\022%\n\004type\030" +
-      "\n \001(\0162\027.pmsg.CtrlEnvelope.Type\022\022\n\ncatalo" +
-      "gCRC\030\013 \001(\006\022\030\n\020catalogSignature\030\014 \001(\t\022\024\n\014" +
-      "failureCause\030\r \001(\t\022\025\n\risEndOfStream\030\016 \001(" +
-      "\010\022\027\n\017protocolVersion\030\017 \001(\005\"i\n\017Replicatio" +
-      "nMode\022\010\n\004IDLE\020\001\022\026\n\022SYNCING_REPLICATED\020\002\022" +
-      "\027\n\023SYNCING_PARTITIONED\020\003\022\n\n\006ACTIVE\020\004\022\017\n\013" +
-      "UNAVAILABLE\020\005\"\377\001\n\021CtrlProtoResponse\022\026\n\002i",
-      "d\030\001 \002(\0132\n.pmsg.UUID\022%\n\004type\030\002 \001(\0162\027.pmsg" +
-      ".CtrlEnvelope.Type\022\021\n\006status\030\003 \001(\005:\0010\022\024\n" +
-      "\014failureCause\030\004 \001(\t\022.\n\017connectResponse\030\005" +
-      " \001(\0132\025.pmsg.ConnectResponse\022*\n\rqueryResp" +
-      "onse\030\006 \001(\0132\023.pmsg.QueryResponse\022&\n\013ackRe" +
-      "sponse\030\007 \001(\0132\021.pmsg.AckResponse\"$\n\013AckRe" +
-      "sponse\022\025\n\risEndOfStream\030\001 \001(\010\"\200\001\n\017Connec" +
-      "tResponse\022\022\n\ncatalogCRC\030\001 \001(\006\022\030\n\020catalog" +
-      "Signature\030\002 \001(\t\022\027\n\017protocolVersion\030\003 \001(\005" +
-      "\022&\n\013clusterInfo\030\004 \003(\0132\021.pmsg.ClusterInfo",
-      "\"S\n\rQueryResponse\022\032\n\013includeMesh\030\001 \001(\010:\005" +
-      "false\022&\n\013clusterInfo\030\002 \003(\0132\021.pmsg.Cluste" +
-      "rInfo\"\315\001\n\013ClusterInfo\022\021\n\tclusterId\030\001 \002(\005" +
-      "\022\022\n\ncreationId\030\002 \002(\006\022\022\n\nrecoveryId\030\003 \001(\006" +
-      "\022\027\n\017protocolVersion\030\004 \001(\005\022\034\n\024globalParti" +
-      "tionCount\030\005 \001(\005\022 \n\010nodeInfo\030\006 \003(\0132\016.pmsg" +
-      ".NodeInfo\022*\n\rpartitionInfo\030\007 \003(\0132\023.pmsg." +
-      "PartitionInfo\":\n\010NodeInfo\022\020\n\010hostname\030\001 " +
-      "\001(\t\022\016\n\006drport\030\002 \001(\005\022\014\n\004isUp\030\003 \001(\010\":\n\rPar" +
-      "titionInfo\022\023\n\013partitionId\030\001 \001(\005\022\024\n\014nextU",
-      "niqueId\030\n \001(\003\"\222\004\n\014CtrlEnvelope\022%\n\004type\030\001" +
-      " \002(\0162\027.pmsg.CtrlEnvelope.Type\022\026\n\002id\030\002 \002(" +
-      "\0132\n.pmsg.UUID\022\026\n\003ack\030\003 \001(\0132\t.pmsg.Ack\022\032\n" +
-      "\005reset\030\004 \001(\0132\013.pmsg.Reset\022\032\n\005pause\030\005 \001(\013" +
-      "2\013.pmsg.Pause\022 \n\010response\030\006 \001(\0132\016.pmsg.R" +
-      "esponse\022&\n\013snapshotReq\030\007 \001(\0132\021.pmsg.Snap" +
-      "shotReq\022\"\n\tsubscribe\030\010 \001(\0132\017.pmsg.Subscr" +
-      "ibe\022\036\n\007connect\030\n \001(\0132\r.pmsg.Connect\022\032\n\005q" +
-      "uery\030\013 \001(\0132\013.pmsg.Query\022&\n\013startCursor\030\014" +
-      " \001(\0132\021.pmsg.StartCursor\"\240\001\n\004Type\022\007\n\003ACK\020",
-      "\001\022\t\n\005RESET\020\002\022\t\n\005PAUSE\020\003\022\t\n\005QUERY\020\004\022\014\n\010RE" +
-      "SPONSE\020\005\022\020\n\014SNAPSHOT_REQ\020\006\022\021\n\rSNAPSHOT_T" +
-      "ERM\020\007\022\r\n\tSTOP_SYNC\020\010\022\013\n\007CONNECT\020\t\022\r\n\tSUB" +
-      "SCRIBE\020\n\022\020\n\014START_CURSOR\020\013B\032\n\017org.voltdb" +
-      ".pmsgB\007DRAgent"
+      "RowLatencyNanos\030\003 \001(\006\":\n\013SnapshotReq\022\r\n\005" +
+      "nonce\030\001 \001(\t\022\034\n\024globalPartitionCount\030\002 \001(" +
+      "\005\"/\n\005Reset\022\023\n\013partitionId\030\001 \001(\005\022\021\n\ttimes" +
+      "tamp\030\002 \001(\006\"\034\n\005Pause\022\023\n\013partitionId\030\001 \001(\005" +
+      "\"\215\001\n\007Connect\022\021\n\tclusterId\030\001 \001(\005\022\031\n\021clust" +
+      "erCreationId\030\002 \001(\006\022\027\n\017protocolVersion\030\003 " +
+      "\001(\005\022\031\n\021clusterRecoveryId\030\004 \001(\006\022 \n\010nodeIn",
+      "fo\030\005 \001(\0132\016.pmsg.NodeInfo\"t\n\tSubscribe\022\023\n" +
+      "\013partitionId\030\001 \001(\005\022\021\n\ttimestamp\030\002 \001(\006\022\022\n" +
+      "\nisCovering\030\003 \001(\010\022\030\n\020rewindToUniqueId\030\004 " +
+      "\001(\006\022\021\n\tisSyncing\030\005 \001(\010\"#\n\005Query\022\032\n\013inclu" +
+      "deMesh\030\001 \001(\010:\005false\"5\n\013StartCursor\022&\n\013cl" +
+      "usterInfo\030\001 \003(\0132\021.pmsg.ClusterInfo\"\231\004\n\010R" +
+      "esponse\022\026\n\002id\030\001 \002(\0132\n.pmsg.UUID\022,\n\004mode\030" +
+      "\002 \001(\0162\036.pmsg.Response.ReplicationMode\022\031\n" +
+      "\021snapshotTimestamp\030\003 \001(\006\022\026\n\016instanceIdHa" +
+      "sh\030\004 \001(\006\022\017\n\007version\030\005 \001(\t\022 \n\010nodeInfo\030\006 ",
+      "\003(\0132\016.pmsg.NodeInfo\022\034\n\024globalPartitionCo" +
+      "unt\030\007 \001(\005\022*\n\rpartitionInfo\030\010 \003(\0132\023.pmsg." +
+      "PartitionInfo\022\021\n\006status\030\t \001(\005:\0010\022%\n\004type" +
+      "\030\n \001(\0162\027.pmsg.CtrlEnvelope.Type\022\022\n\ncatal" +
+      "ogCRC\030\013 \001(\006\022\030\n\020catalogSignature\030\014 \001(\t\022\024\n" +
+      "\014failureCause\030\r \001(\t\022\025\n\risEndOfStream\030\016 \001" +
+      "(\010\022\027\n\017protocolVersion\030\017 \001(\005\"i\n\017Replicati" +
+      "onMode\022\010\n\004IDLE\020\001\022\026\n\022SYNCING_REPLICATED\020\002" +
+      "\022\027\n\023SYNCING_PARTITIONED\020\003\022\n\n\006ACTIVE\020\004\022\017\n" +
+      "\013UNAVAILABLE\020\005\"\377\001\n\021CtrlProtoResponse\022\026\n\002",
+      "id\030\001 \002(\0132\n.pmsg.UUID\022%\n\004type\030\002 \001(\0162\027.pms" +
+      "g.CtrlEnvelope.Type\022\021\n\006status\030\003 \001(\005:\0010\022\024" +
+      "\n\014failureCause\030\004 \001(\t\022.\n\017connectResponse\030" +
+      "\005 \001(\0132\025.pmsg.ConnectResponse\022*\n\rqueryRes" +
+      "ponse\030\006 \001(\0132\023.pmsg.QueryResponse\022&\n\013ackR" +
+      "esponse\030\007 \001(\0132\021.pmsg.AckResponse\"$\n\013AckR" +
+      "esponse\022\025\n\risEndOfStream\030\001 \001(\010\"\200\001\n\017Conne" +
+      "ctResponse\022\022\n\ncatalogCRC\030\001 \001(\006\022\030\n\020catalo" +
+      "gSignature\030\002 \001(\t\022\027\n\017protocolVersion\030\003 \001(" +
+      "\005\022&\n\013clusterInfo\030\004 \003(\0132\021.pmsg.ClusterInf",
+      "o\"S\n\rQueryResponse\022\032\n\013includeMesh\030\001 \001(\010:" +
+      "\005false\022&\n\013clusterInfo\030\002 \003(\0132\021.pmsg.Clust" +
+      "erInfo\"\315\001\n\013ClusterInfo\022\021\n\tclusterId\030\001 \002(" +
+      "\005\022\022\n\ncreationId\030\002 \002(\006\022\022\n\nrecoveryId\030\003 \001(" +
+      "\006\022\027\n\017protocolVersion\030\004 \001(\005\022\034\n\024globalPart" +
+      "itionCount\030\005 \001(\005\022 \n\010nodeInfo\030\006 \003(\0132\016.pms" +
+      "g.NodeInfo\022*\n\rpartitionInfo\030\007 \003(\0132\023.pmsg" +
+      ".PartitionInfo\":\n\010NodeInfo\022\020\n\010hostname\030\001" +
+      " \001(\t\022\016\n\006drport\030\002 \001(\005\022\014\n\004isUp\030\003 \001(\010\":\n\rPa" +
+      "rtitionInfo\022\023\n\013partitionId\030\001 \001(\005\022\024\n\014next",
+      "UniqueId\030\n \001(\003\"\222\004\n\014CtrlEnvelope\022%\n\004type\030" +
+      "\001 \002(\0162\027.pmsg.CtrlEnvelope.Type\022\026\n\002id\030\002 \002" +
+      "(\0132\n.pmsg.UUID\022\026\n\003ack\030\003 \001(\0132\t.pmsg.Ack\022\032" +
+      "\n\005reset\030\004 \001(\0132\013.pmsg.Reset\022\032\n\005pause\030\005 \001(" +
+      "\0132\013.pmsg.Pause\022 \n\010response\030\006 \001(\0132\016.pmsg." +
+      "Response\022&\n\013snapshotReq\030\007 \001(\0132\021.pmsg.Sna" +
+      "pshotReq\022\"\n\tsubscribe\030\010 \001(\0132\017.pmsg.Subsc" +
+      "ribe\022\036\n\007connect\030\n \001(\0132\r.pmsg.Connect\022\032\n\005" +
+      "query\030\013 \001(\0132\013.pmsg.Query\022&\n\013startCursor\030" +
+      "\014 \001(\0132\021.pmsg.StartCursor\"\240\001\n\004Type\022\007\n\003ACK",
+      "\020\001\022\t\n\005RESET\020\002\022\t\n\005PAUSE\020\003\022\t\n\005QUERY\020\004\022\014\n\010R" +
+      "ESPONSE\020\005\022\020\n\014SNAPSHOT_REQ\020\006\022\021\n\rSNAPSHOT_" +
+      "TERM\020\007\022\r\n\tSTOP_SYNC\020\010\022\013\n\007CONNECT\020\t\022\r\n\tSU" +
+      "BSCRIBE\020\n\022\020\n\014START_CURSOR\020\013B\032\n\017org.voltd" +
+      "b.pmsgB\007DRAgent"
     };
     com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner assigner =
       new com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner() {
@@ -17191,7 +17116,7 @@ public final class DRAgent {
           internal_static_pmsg_SnapshotReq_fieldAccessorTable = new
             com.google.protobuf.GeneratedMessage.FieldAccessorTable(
               internal_static_pmsg_SnapshotReq_descriptor,
-              new java.lang.String[] { "Nonce", "NodeInfo", "GlobalPartitionCount", });
+              new java.lang.String[] { "Nonce", "GlobalPartitionCount", });
           internal_static_pmsg_Reset_descriptor =
             getDescriptor().getMessageTypes().get(3);
           internal_static_pmsg_Reset_fieldAccessorTable = new
@@ -17209,7 +17134,7 @@ public final class DRAgent {
           internal_static_pmsg_Connect_fieldAccessorTable = new
             com.google.protobuf.GeneratedMessage.FieldAccessorTable(
               internal_static_pmsg_Connect_descriptor,
-              new java.lang.String[] { "ClusterId", "ClusterCreationId", "ProtocolVersion", "ClusterRecoveryId", });
+              new java.lang.String[] { "ClusterId", "ClusterCreationId", "ProtocolVersion", "ClusterRecoveryId", "NodeInfo", });
           internal_static_pmsg_Subscribe_descriptor =
             getDescriptor().getMessageTypes().get(6);
           internal_static_pmsg_Subscribe_fieldAccessorTable = new
