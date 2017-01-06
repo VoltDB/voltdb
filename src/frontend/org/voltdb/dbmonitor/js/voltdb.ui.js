@@ -2357,7 +2357,6 @@ var getCurrentTab = function () {
         $(".nvtooltip").hide();
         return NavigationTabs.Admin;
     } else if (activeLinkId == "navDR"){
-        $(".nvtooltip").hide();
         return NavigationTabs.DR;
     }
     $(".nvtooltip").show();
