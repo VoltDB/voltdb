@@ -1045,10 +1045,25 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 List<Integer> partitions = null;
                 if (isRejoin) {
                     m_configuredNumberOfPartitions = m_cartographer.getPartitionCount();
-                    partitions = m_cartographer.getIv2PartitionsToReplace(m_configuredReplicationFactor,
+
+                    //best effort to recover
+                    AbstractTopology recoveredTopo = AbstractTopology.mutateRecoverTopology(topo,
+                            m_messenger.getLiveHostIds(), m_messenger.getHostId(), hostGroups.get(m_messenger.getHostId()));
+                    if (hostLog.isDebugEnabled()) {
+                        hostLog.debug("rejoin topology from zk:" + topo.topologyToJSON().toString(2));
+                    }
+                    if (recoveredTopo != null) {
+                        TopologyZKUtils.updateTopologyToZK(m_messenger.getZK(), recoveredTopo);
+                        partitions = recoveredTopo.getPartitionIdList(m_messenger.getHostId());
+                        if (hostLog.isDebugEnabled()) {
+                            hostLog.debug("recovered topology:" + recoveredTopo.topologyToJSON().toString(2));
+                        }
+                    } else {
+                        partitions = m_cartographer.getIv2PartitionsToReplace(m_configuredReplicationFactor,
                                                                           m_catalogContext.getNodeSettings().getLocalSitesCount(),
                                                                           m_messenger.getHostId(),
                                                                           hostGroups);
+                    }
                     if (partitions.size() == 0) {
                         VoltDB.crashLocalVoltDB("The VoltDB cluster already has enough nodes to satisfy " +
                                 "the requested k-safety factor of " +

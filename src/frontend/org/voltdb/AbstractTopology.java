@@ -1402,4 +1402,66 @@ public class AbstractTopology {
 
         return result;
     }
+    /**
+     * Best effort to find the matching host on the existing topology from ZK
+     * @param topology The topology
+     * @param liveHosts The live host id
+     * @param localHostId The rejoining host id
+     * @param placementGroup The rejoining placement group
+     * @return recovered topology if a matching node is found
+     */
+    public static AbstractTopology mutateRecoverTopology(AbstractTopology topology,
+            Set<Integer> liveHosts, int localHostId, String placementGroup) {
+
+        Map<Integer, MutableHost> mutableHostMap = new TreeMap<>();
+        Map<Integer, MutablePartition> mutablePartitionMap = new TreeMap<>();
+
+        // create mutable hosts without partitions
+        int replacementHostId = -1;
+        for (Host host : topology.hostsById.values()) {
+            int hostId = host.id;
+            Set<Integer> groupHosts = Sets.newHashSet();
+            groupHosts.addAll(host.haGroup.hostIds);
+            if (host.haGroup.token.equalsIgnoreCase(placementGroup) &&
+                    !liveHosts.contains(hostId) && replacementHostId < 0) {
+                replacementHostId = host.id;
+                hostId = localHostId;
+            }
+
+            if (replacementHostId > 0) {
+                if (groupHosts.contains(replacementHostId)) {
+                    groupHosts.remove(replacementHostId);
+                    groupHosts.add(localHostId);
+                }
+            }
+            final MutableHost mutableHost = new MutableHost(hostId,
+                    host.targetSiteCount,
+                    new HAGroup(host.haGroup.token, groupHosts.stream().mapToInt(Number::intValue).toArray()));
+            mutableHostMap.put(hostId, mutableHost);
+        }
+        //no matching candidate found.
+        if (replacementHostId < 0) {
+            return null;
+        }
+
+        for (Partition partition : topology.partitionsById.values()) {
+            MutablePartition mp = new MutablePartition(partition.id, partition.k);
+            mutablePartitionMap.put(mp.id, mp);
+            for (Integer hId : partition.hostIds) {
+                int hostId = hId;
+                if (hostId == replacementHostId) {
+                    hostId = localHostId;
+                }
+                final MutableHost mutableHost = mutableHostMap.get(hostId);
+                mp.hosts.add(mutableHost);
+                mutableHost.partitions.add(mp);
+            }
+            if (partition.leaderHostId == replacementHostId) {
+                mp.leader = mutableHostMap.get(localHostId);
+            } else {
+            mp.leader = mutableHostMap.get(partition.leaderHostId);
+            }
+        }
+        return convertMutablesToTopology(topology.version, mutableHostMap, mutablePartitionMap);
+    }
 }
