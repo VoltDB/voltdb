@@ -13830,6 +13830,24 @@ public final class DRAgent {
      * </pre>
      */
     long getNextUniqueId();
+
+    // optional bool isSynced = 9 [default = true];
+    /**
+     * <code>optional bool isSynced = 9 [default = true];</code>
+     *
+     * <pre>
+     * for backward compatibility only
+     * </pre>
+     */
+    boolean hasIsSynced();
+    /**
+     * <code>optional bool isSynced = 9 [default = true];</code>
+     *
+     * <pre>
+     * for backward compatibility only
+     * </pre>
+     */
+    boolean getIsSynced();
   }
   /**
    * Protobuf type {@code pmsg.PartitionInfo}
@@ -13885,6 +13903,11 @@ public final class DRAgent {
             case 8: {
               bitField0_ |= 0x00000001;
               partitionId_ = input.readInt32();
+              break;
+            }
+            case 72: {
+              bitField0_ |= 0x00000004;
+              isSynced_ = input.readBool();
               break;
             }
             case 80: {
@@ -13980,9 +14003,34 @@ public final class DRAgent {
       return nextUniqueId_;
     }
 
+    // optional bool isSynced = 9 [default = true];
+    public static final int ISSYNCED_FIELD_NUMBER = 9;
+    private boolean isSynced_;
+    /**
+     * <code>optional bool isSynced = 9 [default = true];</code>
+     *
+     * <pre>
+     * for backward compatibility only
+     * </pre>
+     */
+    public boolean hasIsSynced() {
+      return ((bitField0_ & 0x00000004) == 0x00000004);
+    }
+    /**
+     * <code>optional bool isSynced = 9 [default = true];</code>
+     *
+     * <pre>
+     * for backward compatibility only
+     * </pre>
+     */
+    public boolean getIsSynced() {
+      return isSynced_;
+    }
+
     private void initFields() {
       partitionId_ = 0;
       nextUniqueId_ = 0L;
+      isSynced_ = true;
     }
     private byte memoizedIsInitialized = -1;
     public final boolean isInitialized() {
@@ -13999,6 +14047,9 @@ public final class DRAgent {
       if (((bitField0_ & 0x00000001) == 0x00000001)) {
         output.writeInt32(1, partitionId_);
       }
+      if (((bitField0_ & 0x00000004) == 0x00000004)) {
+        output.writeBool(9, isSynced_);
+      }
       if (((bitField0_ & 0x00000002) == 0x00000002)) {
         output.writeInt64(10, nextUniqueId_);
       }
@@ -14014,6 +14065,10 @@ public final class DRAgent {
       if (((bitField0_ & 0x00000001) == 0x00000001)) {
         size += com.google.protobuf.CodedOutputStream
           .computeInt32Size(1, partitionId_);
+      }
+      if (((bitField0_ & 0x00000004) == 0x00000004)) {
+        size += com.google.protobuf.CodedOutputStream
+          .computeBoolSize(9, isSynced_);
       }
       if (((bitField0_ & 0x00000002) == 0x00000002)) {
         size += com.google.protobuf.CodedOutputStream
@@ -14139,6 +14194,8 @@ public final class DRAgent {
         bitField0_ = (bitField0_ & ~0x00000001);
         nextUniqueId_ = 0L;
         bitField0_ = (bitField0_ & ~0x00000002);
+        isSynced_ = true;
+        bitField0_ = (bitField0_ & ~0x00000004);
         return this;
       }
 
@@ -14175,6 +14232,10 @@ public final class DRAgent {
           to_bitField0_ |= 0x00000002;
         }
         result.nextUniqueId_ = nextUniqueId_;
+        if (((from_bitField0_ & 0x00000004) == 0x00000004)) {
+          to_bitField0_ |= 0x00000004;
+        }
+        result.isSynced_ = isSynced_;
         result.bitField0_ = to_bitField0_;
         onBuilt();
         return result;
@@ -14196,6 +14257,9 @@ public final class DRAgent {
         }
         if (other.hasNextUniqueId()) {
           setNextUniqueId(other.getNextUniqueId());
+        }
+        if (other.hasIsSynced()) {
+          setIsSynced(other.getIsSynced());
         }
         this.mergeUnknownFields(other.getUnknownFields());
         return this;
@@ -14318,6 +14382,55 @@ public final class DRAgent {
       public Builder clearNextUniqueId() {
         bitField0_ = (bitField0_ & ~0x00000002);
         nextUniqueId_ = 0L;
+        onChanged();
+        return this;
+      }
+
+      // optional bool isSynced = 9 [default = true];
+      private boolean isSynced_ = true;
+      /**
+       * <code>optional bool isSynced = 9 [default = true];</code>
+       *
+       * <pre>
+       * for backward compatibility only
+       * </pre>
+       */
+      public boolean hasIsSynced() {
+        return ((bitField0_ & 0x00000004) == 0x00000004);
+      }
+      /**
+       * <code>optional bool isSynced = 9 [default = true];</code>
+       *
+       * <pre>
+       * for backward compatibility only
+       * </pre>
+       */
+      public boolean getIsSynced() {
+        return isSynced_;
+      }
+      /**
+       * <code>optional bool isSynced = 9 [default = true];</code>
+       *
+       * <pre>
+       * for backward compatibility only
+       * </pre>
+       */
+      public Builder setIsSynced(boolean value) {
+        bitField0_ |= 0x00000004;
+        isSynced_ = value;
+        onChanged();
+        return this;
+      }
+      /**
+       * <code>optional bool isSynced = 9 [default = true];</code>
+       *
+       * <pre>
+       * for backward compatibility only
+       * </pre>
+       */
+      public Builder clearIsSynced() {
+        bitField0_ = (bitField0_ & ~0x00000004);
+        isSynced_ = true;
         onChanged();
         return this;
       }
@@ -17076,23 +17189,23 @@ public final class DRAgent {
       "itionCount\030\005 \001(\005\022 \n\010nodeInfo\030\006 \003(\0132\016.pms" +
       "g.NodeInfo\022*\n\rpartitionInfo\030\007 \003(\0132\023.pmsg" +
       ".PartitionInfo\":\n\010NodeInfo\022\020\n\010hostname\030\001" +
-      " \001(\t\022\016\n\006drport\030\002 \001(\005\022\014\n\004isUp\030\003 \001(\010\":\n\rPa" +
+      " \001(\t\022\016\n\006drport\030\002 \001(\005\022\014\n\004isUp\030\003 \001(\010\"R\n\rPa" +
       "rtitionInfo\022\023\n\013partitionId\030\001 \001(\005\022\024\n\014next",
-      "UniqueId\030\n \001(\003\"\222\004\n\014CtrlEnvelope\022%\n\004type\030" +
-      "\001 \002(\0162\027.pmsg.CtrlEnvelope.Type\022\026\n\002id\030\002 \002" +
-      "(\0132\n.pmsg.UUID\022\026\n\003ack\030\003 \001(\0132\t.pmsg.Ack\022\032" +
-      "\n\005reset\030\004 \001(\0132\013.pmsg.Reset\022\032\n\005pause\030\005 \001(" +
-      "\0132\013.pmsg.Pause\022 \n\010response\030\006 \001(\0132\016.pmsg." +
-      "Response\022&\n\013snapshotReq\030\007 \001(\0132\021.pmsg.Sna" +
-      "pshotReq\022\"\n\tsubscribe\030\010 \001(\0132\017.pmsg.Subsc" +
-      "ribe\022\036\n\007connect\030\n \001(\0132\r.pmsg.Connect\022\032\n\005" +
-      "query\030\013 \001(\0132\013.pmsg.Query\022&\n\013startCursor\030" +
-      "\014 \001(\0132\021.pmsg.StartCursor\"\240\001\n\004Type\022\007\n\003ACK",
-      "\020\001\022\t\n\005RESET\020\002\022\t\n\005PAUSE\020\003\022\t\n\005QUERY\020\004\022\014\n\010R" +
-      "ESPONSE\020\005\022\020\n\014SNAPSHOT_REQ\020\006\022\021\n\rSNAPSHOT_" +
-      "TERM\020\007\022\r\n\tSTOP_SYNC\020\010\022\013\n\007CONNECT\020\t\022\r\n\tSU" +
-      "BSCRIBE\020\n\022\020\n\014START_CURSOR\020\013B\032\n\017org.voltd" +
-      "b.pmsgB\007DRAgent"
+      "UniqueId\030\n \001(\003\022\026\n\010isSynced\030\t \001(\010:\004true\"\222" +
+      "\004\n\014CtrlEnvelope\022%\n\004type\030\001 \002(\0162\027.pmsg.Ctr" +
+      "lEnvelope.Type\022\026\n\002id\030\002 \002(\0132\n.pmsg.UUID\022\026" +
+      "\n\003ack\030\003 \001(\0132\t.pmsg.Ack\022\032\n\005reset\030\004 \001(\0132\013." +
+      "pmsg.Reset\022\032\n\005pause\030\005 \001(\0132\013.pmsg.Pause\022 " +
+      "\n\010response\030\006 \001(\0132\016.pmsg.Response\022&\n\013snap" +
+      "shotReq\030\007 \001(\0132\021.pmsg.SnapshotReq\022\"\n\tsubs" +
+      "cribe\030\010 \001(\0132\017.pmsg.Subscribe\022\036\n\007connect\030" +
+      "\n \001(\0132\r.pmsg.Connect\022\032\n\005query\030\013 \001(\0132\013.pm" +
+      "sg.Query\022&\n\013startCursor\030\014 \001(\0132\021.pmsg.Sta",
+      "rtCursor\"\240\001\n\004Type\022\007\n\003ACK\020\001\022\t\n\005RESET\020\002\022\t\n" +
+      "\005PAUSE\020\003\022\t\n\005QUERY\020\004\022\014\n\010RESPONSE\020\005\022\020\n\014SNA" +
+      "PSHOT_REQ\020\006\022\021\n\rSNAPSHOT_TERM\020\007\022\r\n\tSTOP_S" +
+      "YNC\020\010\022\013\n\007CONNECT\020\t\022\r\n\tSUBSCRIBE\020\n\022\020\n\014STA" +
+      "RT_CURSOR\020\013B\032\n\017org.voltdb.pmsgB\007DRAgent"
     };
     com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner assigner =
       new com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner() {
@@ -17200,7 +17313,7 @@ public final class DRAgent {
           internal_static_pmsg_PartitionInfo_fieldAccessorTable = new
             com.google.protobuf.GeneratedMessage.FieldAccessorTable(
               internal_static_pmsg_PartitionInfo_descriptor,
-              new java.lang.String[] { "PartitionId", "NextUniqueId", });
+              new java.lang.String[] { "PartitionId", "NextUniqueId", "IsSynced", });
           internal_static_pmsg_CtrlEnvelope_descriptor =
             getDescriptor().getMessageTypes().get(17);
           internal_static_pmsg_CtrlEnvelope_fieldAccessorTable = new
