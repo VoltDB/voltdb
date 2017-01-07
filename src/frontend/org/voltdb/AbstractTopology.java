@@ -44,6 +44,7 @@ import com.google_voltpatches.common.collect.ImmutableSet;
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
 import com.google_voltpatches.common.collect.LinkedListMultimap;
 import com.google_voltpatches.common.collect.Lists;
+import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.collect.Multimap;
 import com.google_voltpatches.common.collect.Sets;
 
@@ -1417,50 +1418,49 @@ public class AbstractTopology {
         Map<Integer, MutablePartition> mutablePartitionMap = new TreeMap<>();
 
         // create mutable hosts without partitions
-        int replacementHostId = -1;
+        int recoveredHostId = -1;
+        Map<String, Set<Integer>> haGroupMaps = Maps.newHashMap();
         for (Host host : topology.hostsById.values()) {
             int hostId = host.id;
-            Set<Integer> groupHosts = Sets.newHashSet();
-            groupHosts.addAll(host.haGroup.hostIds);
+            //recover from the 1st none-living node in the same placement group
             if (host.haGroup.token.equalsIgnoreCase(placementGroup) &&
-                    !liveHosts.contains(hostId) && replacementHostId < 0) {
-                replacementHostId = host.id;
+                    !liveHosts.contains(hostId) && recoveredHostId < 0) {
+                recoveredHostId = host.id;
                 hostId = localHostId;
             }
-
-            if (replacementHostId > 0) {
-                if (groupHosts.contains(replacementHostId)) {
-                    groupHosts.remove(replacementHostId);
-                    groupHosts.add(localHostId);
-                }
+            Set<Integer> groupHostIds = haGroupMaps.get(host.haGroup.token);
+            if (groupHostIds == null) {
+                groupHostIds = Sets.newHashSet();
+                haGroupMaps.put(host.haGroup.token, groupHostIds);
             }
-            final MutableHost mutableHost = new MutableHost(hostId,
-                    host.targetSiteCount,
-                    new HAGroup(host.haGroup.token, groupHosts.stream().mapToInt(Number::intValue).toArray()));
+            groupHostIds.add(hostId);
+            final MutableHost mutableHost = new MutableHost(hostId, host.targetSiteCount, null);
             mutableHostMap.put(hostId, mutableHost);
         }
         //no matching candidate found.
-        if (replacementHostId < 0) {
+        if (recoveredHostId < 0) {
             return null;
+        }
+
+        for (Map.Entry<String, Set<Integer>> entry : haGroupMaps.entrySet()) {
+            HAGroup haGroup = new HAGroup(entry.getKey(), entry.getValue().stream().mapToInt(Number::intValue).toArray());
+            for (Integer hostId : entry.getValue()) {
+                final MutableHost mutableHost = mutableHostMap.get(hostId);
+                mutableHost.haGroup = haGroup;
+            }
         }
 
         for (Partition partition : topology.partitionsById.values()) {
             MutablePartition mp = new MutablePartition(partition.id, partition.k);
             mutablePartitionMap.put(mp.id, mp);
             for (Integer hId : partition.hostIds) {
-                int hostId = hId;
-                if (hostId == replacementHostId) {
-                    hostId = localHostId;
-                }
+                int hostId = (hId == recoveredHostId) ? localHostId : hId;
                 final MutableHost mutableHost = mutableHostMap.get(hostId);
                 mp.hosts.add(mutableHost);
                 mutableHost.partitions.add(mp);
             }
-            if (partition.leaderHostId == replacementHostId) {
-                mp.leader = mutableHostMap.get(localHostId);
-            } else {
-            mp.leader = mutableHostMap.get(partition.leaderHostId);
-            }
+            int leader = (partition.leaderHostId == recoveredHostId) ? localHostId : partition.leaderHostId;
+            mp.leader = mutableHostMap.get(leader);
         }
         return convertMutablesToTopology(topology.version, mutableHostMap, mutablePartitionMap);
     }

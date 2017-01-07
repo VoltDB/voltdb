@@ -1045,20 +1045,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 List<Integer> partitions = null;
                 if (isRejoin) {
                     m_configuredNumberOfPartitions = m_cartographer.getPartitionCount();
-
-                    //best effort to recover
-                    AbstractTopology recoveredTopo = AbstractTopology.mutateRecoverTopology(topo,
-                            m_messenger.getLiveHostIds(), m_messenger.getHostId(), hostGroups.get(m_messenger.getHostId()));
-                    if (hostLog.isDebugEnabled()) {
-                        hostLog.debug("rejoin topology from zk:" + topo.topologyToJSON().toString(2));
-                    }
-                    if (recoveredTopo != null) {
-                        TopologyZKUtils.updateTopologyToZK(m_messenger.getZK(), recoveredTopo);
-                        partitions = recoveredTopo.getPartitionIdList(m_messenger.getHostId());
-                        if (hostLog.isDebugEnabled()) {
-                            hostLog.debug("recovered topology:" + recoveredTopo.topologyToJSON().toString(2));
-                        }
-                    } else {
+                    partitions = recoverPartitions(topo, hostGroups.get(m_messenger.getHostId()));
+                    if (partitions == null) {
                         partitions = m_cartographer.getIv2PartitionsToReplace(m_configuredReplicationFactor,
                                                                           m_catalogContext.getNodeSettings().getLocalSitesCount(),
                                                                           m_messenger.getHostId(),
@@ -1070,8 +1058,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                                 m_configuredReplicationFactor + ".\n" +
                                 "No more nodes can join.", false, null);
                     }
-                }
-                else {
+                } else {
                     m_configuredNumberOfPartitions = topo.getPartitionCount();
                     partitions = topo.getPartitionIdList(m_messenger.getHostId());
                 }
@@ -1458,6 +1445,23 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
             scheduleDailyLoggingWorkInNextCheckTime();
         }
+    }
+
+    private List<Integer> recoverPartitions(AbstractTopology topology, String haGroup) {
+
+        //best effort to recover
+        List<Integer>partitions = null;
+        AbstractTopology recoveredTopo = AbstractTopology.mutateRecoverTopology(topology,
+                m_messenger.getLiveHostIds(),
+                m_messenger.getHostId(),
+                haGroup);
+        if (recoveredTopo != null) {
+            partitions = recoveredTopo.getPartitionIdList(m_messenger.getHostId());
+            if (partitions != null && partitions.size() == m_catalogContext.getNodeSettings().getLocalSitesCount()) {
+                TopologyZKUtils.updateTopologyToZK(m_messenger.getZK(), recoveredTopo);
+            }
+        }
+        return partitions;
     }
 
     @Override
