@@ -3104,6 +3104,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 // get old debugging info
                 SortedMap<String, String> oldDbgMap = m_catalogContext.getDebuggingInfoFromCatalog();
                 byte[] oldDeployHash = m_catalogContext.deploymentHash;
+                final String oldDRConnectionSource = m_catalogContext.cluster.getDrmasterhost();
 
                 // 0. A new catalog! Update the global context and the context tracker
                 m_catalogContext =
@@ -3200,7 +3201,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 // 6.2. If we are a DR replica, we may care about a
                 // deployment update
                 if (m_consumerDRGateway != null) {
-                    m_consumerDRGateway.updateCatalog(m_catalogContext);
+                    final String newDRConnectionSource = m_catalogContext.cluster.getDrmasterhost();
+                    m_consumerDRGateway.updateCatalog(m_catalogContext,
+                                                      (newDRConnectionSource != null && !newDRConnectionSource.equals(oldDRConnectionSource)
+                                                       ? newDRConnectionSource
+                                                       : null));
                 }
                 // 6.3. If we are a DR master, update the DR table signature hash
                 if (m_producerDRGateway != null) {
