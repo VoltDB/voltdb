@@ -25,7 +25,12 @@ import java.util.concurrent.ExecutionException;
 // largely self-contained
 public interface ConsumerDRGateway extends Promotable {
 
-    void updateCatalog(CatalogContext catalog);
+    /**
+     * Notify the consumer of catalog updates.
+     * @param catalog             The new catalog.
+     * @param newConnectionSource The new connection source if changed, or null if not.
+     */
+    void updateCatalog(CatalogContext catalog, String newConnectionSource);
 
     DRRoleStats.State getState();
 
