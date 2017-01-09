@@ -1405,6 +1405,7 @@ public class AbstractTopology {
     }
     /**
      * Best effort to find the matching host on the existing topology from ZK
+     * Use the placement group of the recovering host to match a lost node in the topology
      * @param topology The topology
      * @param liveHosts The live host id
      * @param localHostId The rejoining host id
@@ -1442,6 +1443,7 @@ public class AbstractTopology {
             return null;
         }
 
+        //update placement groups with recovering host
         for (Map.Entry<String, Set<Integer>> entry : haGroupMaps.entrySet()) {
             HAGroup haGroup = new HAGroup(entry.getKey(), entry.getValue().stream().mapToInt(Number::intValue).toArray());
             for (Integer hostId : entry.getValue()) {
@@ -1450,6 +1452,7 @@ public class AbstractTopology {
             }
         }
 
+        //move partitions to host
         for (Partition partition : topology.partitionsById.values()) {
             MutablePartition mp = new MutablePartition(partition.id, partition.k);
             mutablePartitionMap.put(mp.id, mp);
