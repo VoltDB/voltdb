@@ -43,7 +43,6 @@ import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableSet;
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
 import com.google_voltpatches.common.collect.LinkedListMultimap;
-import com.google_voltpatches.common.collect.Lists;
 import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.collect.Multimap;
 import com.google_voltpatches.common.collect.Sets;
@@ -1018,7 +1017,7 @@ public class AbstractTopology {
      * Compute the tree-edge distance between any two ha group tokens
      * Not the most efficient way to do this, but even n^2 for 100 nodes is computable
      */
-    private static int computeHADistance(/*final Map<String, Integer> distanceCache,*/ String token1, String token2) {
+    private static int computeHADistance(String token1, String token2) {
 
         // break into arrays of graph edges
         String[] token1parts = token1.split("\\.");
@@ -1378,25 +1377,18 @@ public class AbstractTopology {
     public static List<Collection<Integer>> sortHostIdByHGDistance(int hostId, Map<Integer, String> hostGroups) {
         String localHostGroup = hostGroups.get(hostId);
         Preconditions.checkArgument(localHostGroup != null);
-        List<Collection<Integer>> result = Lists.newArrayList();
 
-        // special case, cluster has two nodes and one is the rejoining node.
-        if (hostGroups.keySet().size() == 2 && hostGroups.keySet().contains(hostId)) {
-            Set<Integer> aSet = Sets.newHashSet();
-            List<Integer> aList = Lists.newArrayList();
-            aSet.add(hostId);
-            aList.addAll(Sets.difference(hostGroups.keySet(), aSet));
-            result.add(aList);
-            return result;
-        }
-        // Memorize the distance
+        // Memorize the distance, map the distance to host ids.
         Multimap<Integer, Integer> distanceMap = LinkedListMultimap.create();
         for (Map.Entry<Integer, String> entry : hostGroups.entrySet()) {
             if (hostId == entry.getKey()) continue;
             distanceMap.put(computeHADistance(localHostGroup, entry.getValue()), entry.getKey());
         }
 
-        result = distanceMap.asMap().entrySet().stream()
+        //sort the multipmap of distance to host ids by the distances in descending order
+        //and collect the host ids in lists.For example, if the distance map contains
+        //1=[0.2.3], 3=[1,4] 4=[5,6,7]. The results will be [5,6,7], [1,4], [0,2,3]
+        List<Collection<Integer>> result = distanceMap.asMap().entrySet().stream()
                 .sorted(Comparator.comparingInt(k->((Entry<Integer, Integer>) k).getKey()).reversed())
                 .map(x->x.getValue())
                 .collect(Collectors.toList());
@@ -1407,7 +1399,7 @@ public class AbstractTopology {
      * Best effort to find the matching host on the existing topology from ZK
      * Use the placement group of the recovering host to match a lost node in the topology
      * @param topology The topology
-     * @param liveHosts The live host id
+     * @param liveHosts The live host ids
      * @param localHostId The rejoining host id
      * @param placementGroup The rejoining placement group
      * @return recovered topology if a matching node is found

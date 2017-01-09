@@ -22,6 +22,7 @@ import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.data.Stat;
+import org.json_voltpatches.JSONException;
 import org.voltdb.AbstractTopology;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
@@ -68,16 +69,14 @@ public abstract class TopologyZKUtils {
         return topology;
     }
 
-    public static AbstractTopology updateTopologyToZK(ZooKeeper zk, AbstractTopology topology) {
+    public static void updateTopologyToZK(ZooKeeper zk, AbstractTopology topology) {
+        Stat stat = new Stat();
         try {
-            Stat stat = new Stat();
             zk.getData(VoltZK.topology, false, stat);
             byte[] payload = topology.topologyToJSON().toString().getBytes(Charsets.UTF_8);
             zk.setData(VoltZK.topology, payload, stat.getVersion());
-            return readTopologyFromZK(zk);
-        } catch (Exception e) {
-            VoltDB.crashLocalVoltDB("Unable to read topology from ZK, dying", true, e);
+        } catch (KeeperException | InterruptedException | JSONException e) {
+            VoltDB.crashLocalVoltDB("Unable to update topology to ZK, dying", true, e);
         }
-        return topology;
     }
 }
