@@ -1066,9 +1066,12 @@ public abstract class SubPlanAssembler {
             List<AbstractExpression> bindingsForOrder)
     {
         if (!m_parsedStmt.hasOrderByColumns()
-                || m_parsedStmt.orderByColumns().isEmpty()) {
+                || m_parsedStmt.orderByColumns().isEmpty()
+                // There need to be enough indexed expressions to provide full sort coverage.
+                || m_parsedStmt.orderByColumns().size() > keyComponentCount) {
             return 0;
-        } else if (m_parsedStmt instanceof ParsedSelectStmt) {
+        }
+        if (m_parsedStmt instanceof ParsedSelectStmt) {
             // If this parsed select statement has a windowed expression,
             // we don't want to consider the order by at all.
             // Note that this is the content of ENG-10474.
@@ -1078,60 +1081,56 @@ public abstract class SubPlanAssembler {
             }
         }
         int nSpoilers = 0;
-        int countOrderBys = m_parsedStmt.orderByColumns().size();
-        // There need to be enough indexed expressions to provide full sort coverage.
-        if (countOrderBys > 0 && countOrderBys <= keyComponentCount) {
-            boolean ascending = m_parsedStmt.orderByColumns().get(0).ascending;
-            retval.sortDirection = ascending ? SortDirectionType.ASC : SortDirectionType.DESC;
-            int jj = 0;
-            for (ParsedColInfo colInfo : m_parsedStmt.orderByColumns()) {
-                // This retry loop allows catching special cases that don't perfectly match the
-                // ORDER BY columns but may still be usable for ordering.
-                for ( ; jj < keyComponentCount; ++jj) {
-                    if (colInfo.ascending == ascending) {
-                        // Explicitly advance to the each indexed expression/column
-                        // to match them with the query's "ORDER BY" expressions.
-                        if (indexedExprs == null) {
-                            ColumnRef nextColRef = indexedColRefs.get(jj);
-                            if (colInfo.expression instanceof TupleValueExpression &&
-                                colInfo.tableAlias.equals(tableScan.getTableAlias()) &&
-                                colInfo.columnName.equals(nextColRef.getColumn().getTypeName())) {
-                                break;
-                            }
-                        } else {
-                            assert(jj < indexedExprs.size());
-                            AbstractExpression nextExpr = indexedExprs.get(jj);
-                            List<AbstractExpression> moreBindings =
-                                colInfo.expression.bindingToIndexedExpression(nextExpr);
-                            // Non-null bindings (even an empty list) denotes a match.
-                            if (moreBindings != null) {
-                                bindingsForOrder.addAll(moreBindings);
-                                break;
-                            }
+        boolean ascending = m_parsedStmt.orderByColumns().get(0).ascending;
+        retval.sortDirection = ascending ? SortDirectionType.ASC : SortDirectionType.DESC;
+        int jj = 0;
+        for (ParsedColInfo colInfo : m_parsedStmt.orderByColumns()) {
+            // This retry loop allows catching special cases that don't perfectly match the
+            // ORDER BY columns but may still be usable for ordering.
+            for ( ; jj < keyComponentCount; ++jj) {
+                if (colInfo.ascending == ascending) {
+                    // Explicitly advance to the each indexed expression/column
+                    // to match them with the query's "ORDER BY" expressions.
+                    if (indexedExprs == null) {
+                        ColumnRef nextColRef = indexedColRefs.get(jj);
+                        if (colInfo.expression instanceof TupleValueExpression &&
+                            colInfo.tableAlias.equals(tableScan.getTableAlias()) &&
+                            colInfo.columnName.equals(nextColRef.getColumn().getTypeName())) {
+                            break;
+                        }
+                    } else {
+                        assert(jj < indexedExprs.size());
+                        AbstractExpression nextExpr = indexedExprs.get(jj);
+                        List<AbstractExpression> moreBindings =
+                            colInfo.expression.bindingToIndexedExpression(nextExpr);
+                        // Non-null bindings (even an empty list) denotes a match.
+                        if (moreBindings != null) {
+                            bindingsForOrder.addAll(moreBindings);
+                            break;
                         }
                     }
-                    // The ORDER BY column did not match the established ascending/descending
-                    // pattern OR did not match the next index key component.
-                    // The only hope for the sort being preserved is that
-                    // (A) the ORDER BY column matches a later index key component
-                    // -- so keep searching -- AND
-                    // (B) the current (and each intervening) index key component is constrained
-                    // to a single value, i.e. it is equality-filtered.
-                    // -- so note the current component's position (jj).
-                    orderSpoilers[nSpoilers++] = jj;
                 }
-                if (jj < keyComponentCount) {
-                    // The loop exited prematurely.
-                    // That means the current ORDER BY column matched the current key component,
-                    // so move on to the next key component (to match the next ORDER BY column).
-                    ++jj;
-                } else {
-                    // The current ORDER BY column ran out of key components to try to match.
-                    // This is an outright failure case.
-                    retval.sortDirection = SortDirectionType.INVALID;
-                    bindingsForOrder.clear(); // suddenly irrelevant
-                    return 0;  // Any orderSpoilers are also suddenly irrelevant.
-                }
+                // The ORDER BY column did not match the established ascending/descending
+                // pattern OR did not match the next index key component.
+                // The only hope for the sort being preserved is that
+                // (A) the ORDER BY column matches a later index key component
+                // -- so keep searching -- AND
+                // (B) the current (and each intervening) index key component is constrained
+                // to a single value, i.e. it is equality-filtered.
+                // -- so note the current component's position (jj).
+                orderSpoilers[nSpoilers++] = jj;
+            }
+            if (jj < keyComponentCount) {
+                // The loop exited prematurely.
+                // That means the current ORDER BY column matched the current key component,
+                // so move on to the next key component (to match the next ORDER BY column).
+                ++jj;
+            } else {
+                // The current ORDER BY column ran out of key components to try to match.
+                // This is an outright failure case.
+                retval.sortDirection = SortDirectionType.INVALID;
+                bindingsForOrder.clear(); // suddenly irrelevant
+                return 0;  // Any orderSpoilers are also suddenly irrelevant.
             }
         }
         return nSpoilers;
