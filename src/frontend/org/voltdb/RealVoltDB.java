@@ -2893,12 +2893,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                  * Various scheduled tasks get crashy in unit tests if they happen to run
                  * while other stuff is being shut down
                  */
-                for (ScheduledFuture<?> sc : m_periodicWorks) {
-                    sc.cancel(false);
-                    try {
+                try {
+                    for (ScheduledFuture<?> sc : m_periodicWorks) {
+                        sc.cancel(false);
                         sc.get();
-                    } catch (Throwable t) {}
-                }
+                    }
+                } catch (Throwable t) { }
 
                 //Shutdown import processors.
                 ImportManager.instance().shutdown();
