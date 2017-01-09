@@ -494,7 +494,6 @@ public:
     }
 
     void unsetTableForStreamIndexing() {
-        assert(m_tableForStreamIndexing);
         if (m_tableForStreamIndexing) {
             m_tableForStreamIndexing->decrementRefcount();
             m_tableForStreamIndexing = NULL;
