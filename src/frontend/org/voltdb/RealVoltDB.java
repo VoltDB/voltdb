@@ -168,7 +168,6 @@ import org.voltdb.utils.VoltSampler;
 
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.base.Joiner;
-import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.common.base.Suppliers;
 import com.google_voltpatches.common.base.Throwables;
@@ -1744,7 +1743,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         } else {
             // initial start or recover
             int hostcount = m_clusterSettings.get().hostcount();
-            Preconditions.checkArgument(hostInfos.size() == (hostcount - m_config.m_missingHostCount));
+            if (hostInfos.size() != (hostcount - m_config.m_missingHostCount)) {
+                VoltDB.crashLocalVoltDB("The total number of live and missing hosts must be the same as the cluster host count", false, null);
+            }
             int kfactor = m_catalogContext.getDeployment().getCluster().getKfactor();
             if (kfactor == 0 && m_config.m_missingHostCount > 0) {
                 VoltDB.crashLocalVoltDB("A cluster with 0 kfactor can not be started with missing nodes ", false, null);
@@ -1769,7 +1770,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             Set<Integer> missingHosts = Sets.newHashSet();
             for (int i = 0; i < m_config.m_missingHostCount; i++) {
                 sitesPerHostMap.put(missingHostId, sph);
-                hostGroups.put(missingHostId, "inactiveGroup");
+                hostGroups.put(missingHostId, AbstractTopology.PLACEMENT_GROUP_DEFAULT);
                 missingHosts.add(missingHostId--);
             }
             int totalSites = sitesPerHostMap.values().stream().mapToInt(Number::intValue).sum();

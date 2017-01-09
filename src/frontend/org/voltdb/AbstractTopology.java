@@ -59,6 +59,8 @@ public class AbstractTopology {
     public final static String TOPO_SPH = "targetSiteCount";
     public final static String TOPO_HOST_MISSING = "missing";
 
+    public final static String PLACEMENT_GROUP_DEFAULT="0";
+
     public final long version;
     public final ImmutableMap<Integer, Host> hostsById;
     public final ImmutableMap<Integer, Partition> partitionsById;
@@ -195,9 +197,7 @@ public class AbstractTopology {
         }
 
         public void markHostMissing(boolean isMissing) {
-            if (isMissing) {
-                this.isMissing = true;
-            }
+            this.isMissing = isMissing;
         }
 
         @Override

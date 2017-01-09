@@ -70,6 +70,7 @@ import org.voltcore.utils.PortGenerator;
 import org.voltcore.utils.ShutdownHooks;
 import org.voltcore.zk.CoreZK;
 import org.voltcore.zk.ZKUtil;
+import org.voltdb.AbstractTopology;
 import org.voltdb.probe.MeshProber;
 
 import com.google_voltpatches.common.base.Preconditions;
@@ -142,7 +143,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         public int networkThreads =  Math.max(2, CoreUtils.availableProcessors() / 4);
         public Queue<String> coreBindIds;
         public JoinAcceptor acceptor = null;
-        public String group = "0";
+        public String group = AbstractTopology.PLACEMENT_GROUP_DEFAULT;
         public int localSitesCount;
 
         public Config(String coordIp, int coordPort) {
