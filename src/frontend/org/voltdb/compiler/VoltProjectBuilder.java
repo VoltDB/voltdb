@@ -724,17 +724,6 @@ public class VoltProjectBuilder {
         addExport(enabled, null, null);
     }
 
-    public void setTableAsExportOnly(String name) {
-        assert(name != null);
-        transformer.append("Export TABLE " + name + ";");
-    }
-
-    public void setTableAsExportOnly(String name, String stream) {
-        assert(name != null);
-        assert(stream != null);
-        transformer.append("Export TABLE " + name + " TO STREAM " + stream + ";");
-    }
-
     public void setCompilerDebugPrintStream(final PrintStream out) {
         m_compilerDebugPrintStream = out;
     }

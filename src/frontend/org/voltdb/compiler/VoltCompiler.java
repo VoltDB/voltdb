@@ -1228,11 +1228,11 @@ public class VoltCompiler {
                                         "materialized view.  A view cannot be export source.");
             throw new VoltCompilerException("View configured as export source");
         }
-        if (tableref.getIndexes().size() > 0) {
-            compilerLog.error("While configuring export, stream " + tableName + " has indexes defined. " +
-                    "Streams can't have indexes (including primary keys).");
-            throw new VoltCompilerException("Streams cannot be configured with indexes");
-        }
+//        if (tableref.getIndexes().size() > 0) {
+//            compilerLog.error("While configuring export, stream " + tableName + " has indexes defined. " +
+//                    "Streams can't have indexes (including primary keys).");
+//            throw new VoltCompilerException("Streams cannot be configured with indexes");
+//        }
         if (tableref.getIsreplicated()) {
             // if you don't specify partition columns, make
             // export tables partitioned, but on no specific column (iffy)

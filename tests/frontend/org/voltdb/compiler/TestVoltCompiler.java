@@ -321,8 +321,6 @@ public class TestVoltCompiler extends TestCase {
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(getClass().getResource("ExportTester-ddl.sql"));
         project.addExport(false /* disabled */);
-        project.setTableAsExportOnly("A");
-        project.setTableAsExportOnly("B");
         try {
             assertTrue(project.compile("/tmp/exportsettingstest.jar"));
             String catalogContents =
@@ -351,15 +349,7 @@ public class TestVoltCompiler extends TestCase {
         project.addSchema(TestVoltCompiler.class.getResource("ExportTester-ddl.sql"));
         project.addStmtProcedure("Dummy", "insert into a values (?, ?, ?);",
                                 "a.a_id: 0");
-        project.addPartitionInfo("A", "A_ID");
-        project.addPartitionInfo("B", "B_ID");
-        project.addPartitionInfo("e", "e_id");
-        project.addPartitionInfo("f", "f_id");
         project.addExport(true /* enabled */);
-        project.setTableAsExportOnly("A"); // uppercase DDL, uppercase export
-        project.setTableAsExportOnly("b"); // uppercase DDL, lowercase export
-        project.setTableAsExportOnly("E"); // lowercase DDL, uppercase export
-        project.setTableAsExportOnly("f"); // lowercase DDL, lowercase export
         try {
             assertTrue(project.compile("/tmp/exportsettingstest.jar"));
             String catalogContents =
@@ -388,7 +378,6 @@ public class TestVoltCompiler extends TestCase {
         project.addSchema(TestVoltCompiler.class.getResource("ExportTesterWithView-ddl.sql"));
         project.addStmtProcedure("Dummy", "select * from v_table1r_el_only");
         project.addExport(true /* enabled */);
-        project.setTableAsExportOnly("table1r_el_only");
         try {
             assertFalse(project.compile("/tmp/exporttestview.jar"));
         }
@@ -403,8 +392,6 @@ public class TestVoltCompiler extends TestCase {
         project.addSchema(TestVoltCompiler.class.getResource("ExportTesterWithView-ddl.sql"));
         project.addStmtProcedure("Dummy", "select * from v_table2r_el_only");
         project.addExport(true /* enabled */);
-        project.setTableAsExportOnly("table2r_el_only");
-        project.addPartitionInfo("table2r_el_only", "column1_bigint");
 
         try {
             assertTrue(project.compile("/tmp/exporttestview.jar"));
@@ -420,7 +407,6 @@ public class TestVoltCompiler extends TestCase {
         project.addSchema(TestVoltCompiler.class.getResource("ExportTesterWithView-ddl.sql"));
         project.addStmtProcedure("Dummy", "select * from v_table3r_el_only");
         project.addExport(true /* enabled */);
-        project.setTableAsExportOnly("table3r_el_only");
         try {
             assertFalse(project.compile("/tmp/exporttestview.jar"));
         }
@@ -435,8 +421,6 @@ public class TestVoltCompiler extends TestCase {
         project.addSchema(TestVoltCompiler.class.getResource("ExportTesterWithView-ddl.sql"));
         project.addStmtProcedure("Dummy", "select * from v_table4r_el_only");
         project.addExport(true /* enabled */);
-        project.setTableAsExportOnly("table4r_el_only");
-        project.addPartitionInfo("table4r_el_only", "column1_bigint");
 
         try {
             assertFalse(project.compile("/tmp/exporttestview.jar"));
@@ -453,7 +437,6 @@ public class TestVoltCompiler extends TestCase {
         project.addSchema(TestVoltCompiler.class.getResource("ExportTesterWithView-ddl.sql"));
         project.addStmtProcedure("Dummy", "select * from table1r_el_only");
         project.addExport(true /* enabled */);
-        project.setTableAsExportOnly("v_table1r_el_only");
         try {
             assertFalse(project.compile("/tmp/exporttestview.jar"));
         }

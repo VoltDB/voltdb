@@ -133,7 +133,6 @@ public class TPCCProjectBuilder extends VoltProjectBuilder {
         // setTableAsExportOnly("NEW_ORDER");     // 1 insert per new order; 10 deletes per delivery (4%)
         // setTableAsExportOnly("ORDER_LINE");    // 10 inserts per new order */
 
-        setTableAsExportOnly("HISTORY");
     }
 
     @Override

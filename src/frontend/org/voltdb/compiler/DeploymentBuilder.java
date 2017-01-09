@@ -447,7 +447,6 @@ public class DeploymentBuilder {
         // <export>
         ExportType export = factory.createExportType();
         deployment.setExport(export);
-        export.setEnabled(m_elenabled);
 
         // Have some yummy boilerplate!
         String xml = null;
