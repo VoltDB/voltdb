@@ -1448,13 +1448,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     /**
-     * recover the partition assignment from one lost hosts for rejoin
-     * Use the placement group of the recovering host to match a lost node in the topology
+     * recover the partition assignment from one of lost hosts in the same placement group for rejoin
+     * Use the placement group of the recovering host to find a matched host from the lost nodes in the topology
      * If the partition count from the lost node is the same as the site count of the recovering host,
-     * The partitions on the lost node will be placed on the recovering host. Topology will be updated.
+     * The partitions on the lost node will be placed on the recovering host. Partition group layout will be maintained.
+     * Topology will be updated on ZK if successful
      * @param topology The topology from ZK, which contains the partition assignments for live or lost hosts
-     * @param haGroup The placement group of the recover host
-     * @return A list of partitions if recover is successful
+     * @param haGroup The placement group of the recovering host
+     * @return A list of partitions if recover effort is a success.
      */
     private List<Integer> recoverPartitions(AbstractTopology topology, String haGroup) {
 
