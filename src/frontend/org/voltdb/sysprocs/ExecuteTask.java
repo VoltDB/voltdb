@@ -32,6 +32,7 @@ import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.TupleStreamStateInfo;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.jni.ExecutionEngine.TaskType;
@@ -101,12 +102,20 @@ public class ExecuteTask extends VoltSystemProcedure {
                 result = new VoltTable(STATUS_SCHEMA);
                 result.addRow(STATUS_OK);
                 int drVersion = buffer.getInt();
-                context.getSiteProcedureConnection().setDRProtocolVersion(drVersion);
+                int createStartStream = buffer.getInt();
+                if (createStartStream > 0) {
+                    long uniqueId = m_runner.getUniqueId();
+                    long spHandle = m_runner.getTxnState().getNotice().getSpHandle();
+                    context.getSiteProcedureConnection().setDRProtocolVersion(drVersion, spHandle, uniqueId);
+                } else {
+                    context.getSiteProcedureConnection().setDRProtocolVersion(drVersion);
+                }
                 break;
             }
-            case SET_DRID_TRACKER:
+            case SET_DRID_TRACKER_START:
             {
-                result = new VoltTable(STATUS_SCHEMA);
+                result = new VoltTable(STATUS_SCHEMA,
+                        new ColumnInfo("LOCAL_UNIQUEID", VoltType.BIGINT));
                 try {
                     byte[] paramBuf = new byte[buffer.remaining()];
                     buffer.get(paramBuf);
@@ -122,7 +131,7 @@ public class ExecuteTask extends VoltSystemProcedure {
                             context.appendApplyBinaryLogTxns(producerClusterId, producerPartitionId, -1L, tracker);
                         }
                     }
-                    result.addRow(STATUS_OK);
+                    result.addRow(STATUS_OK, m_runner.getTxnState().uniqueId);
 
                 } catch (Exception e) {
                     e.printStackTrace();
@@ -135,6 +144,40 @@ public class ExecuteTask extends VoltSystemProcedure {
                 result = new VoltTable(STATUS_SCHEMA);
                 result.addRow(STATUS_OK);
                 context.resetDrAppliedTracker();
+                break;
+            }
+            case SET_MERGED_DRID_TRACKER:
+            {
+                result = new VoltTable(STATUS_SCHEMA);
+                try {
+                    byte[] paramBuf = new byte[buffer.remaining()];
+                    buffer.get(paramBuf);
+                    ByteArrayInputStream bais = new ByteArrayInputStream(paramBuf);
+                    ObjectInputStream ois = new ObjectInputStream(bais);
+                    Map<Integer, Map<Integer, DRConsumerDrIdTracker>> clusterToPartitionMap = (Map<Integer, Map<Integer, DRConsumerDrIdTracker>>)ois.readObject();
+                    context.recoverWithDrAppliedTrackers(clusterToPartitionMap);
+                    result.addRow(STATUS_OK);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    result.addRow("FAILURE");
+                }
+                break;
+            }
+            case INIT_DRID_TRACKER:
+            {
+                result = new VoltTable(STATUS_SCHEMA);
+                try {
+                    byte[] paramBuf = new byte[buffer.remaining()];
+                    buffer.get(paramBuf);
+                    ByteArrayInputStream bais = new ByteArrayInputStream(paramBuf);
+                    ObjectInputStream ois = new ObjectInputStream(bais);
+                    Map<Byte, Integer> clusterIdToPartitionCountMap = (Map<Byte, Integer>)ois.readObject();
+                    context.initDRAppliedTracker(clusterIdToPartitionCountMap);
+                    result.addRow(STATUS_OK);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    result.addRow("FAILURE");
+                }
                 break;
             }
             default:

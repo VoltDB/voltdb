@@ -45,10 +45,10 @@ import com.google_voltpatches.common.collect.TreeRangeSet;
 public class DRConsumerDrIdTracker implements Serializable {
     private static final long serialVersionUID = -4057397384030151271L;
 
-    private transient RangeSet<Long> m_map;
+    private RangeSet<Long> m_map;
     private long m_lastSpUniqueId;
     private long m_lastMpUniqueId;
-    private transient int m_producerPartitionId;
+    private int m_producerPartitionId;
 
     /**
      * Returns a canonical range that can be added to the internal range
@@ -189,6 +189,7 @@ public class DRConsumerDrIdTracker implements Serializable {
     private void writeObject(ObjectOutputStream out) throws IOException {
         out.writeLong(m_lastSpUniqueId);
         out.writeLong(m_lastMpUniqueId);
+        out.writeShort(m_producerPartitionId);
         out.writeInt(m_map.asRanges().size());
         for(Range<Long> entry : m_map.asRanges()) {
             out.writeLong(start(entry));
@@ -200,6 +201,7 @@ public class DRConsumerDrIdTracker implements Serializable {
         m_map = TreeRangeSet.create();
         m_lastSpUniqueId = in.readLong();
         m_lastMpUniqueId = in.readLong();
+        m_producerPartitionId = in.readShort();
         int mapSize = in.readInt();
         for (int ii = 0; ii < mapSize; ii++) {
             m_map.add(range(in.readLong(), in.readLong()));
