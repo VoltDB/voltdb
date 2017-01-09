@@ -3197,16 +3197,18 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                         callback.repairCompleted(pid, m_cartographer.getHSIdForMaster(pid));
                     }
                     m_consumerDRGateway.initialize(false);
-                }
-                // 6.2. If we are a DR replica, we may care about a
-                // deployment update
-                if (m_consumerDRGateway != null) {
+                } else if (m_consumerDRGateway != null) {
+                    // 6.2. If we are a DR replica and the consumer was created
+                    // before the catalog update, we may care about a deployment
+                    // update. If it was created above, no need to notify
+                    // because the consumer already has the latest catalog.
                     final String newDRConnectionSource = m_catalogContext.cluster.getDrmasterhost();
                     m_consumerDRGateway.updateCatalog(m_catalogContext,
                                                       (newDRConnectionSource != null && !newDRConnectionSource.equals(oldDRConnectionSource)
                                                        ? newDRConnectionSource
                                                        : null));
                 }
+
                 // 6.3. If we are a DR master, update the DR table signature hash
                 if (m_producerDRGateway != null) {
                     m_producerDRGateway.updateCatalog(m_catalogContext,
