@@ -52,7 +52,6 @@ import org.voltdb.planner.parseinfo.BranchNode;
 import org.voltdb.planner.parseinfo.JoinNode;
 import org.voltdb.planner.parseinfo.StmtSubqueryScan;
 import org.voltdb.planner.parseinfo.StmtTableScan;
-import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.plannodes.AbstractJoinPlanNode;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractReceivePlanNode;
@@ -1375,7 +1374,7 @@ public class PlanAssembler {
         // Right now, the EE is going to use the original column names
         // and compare these to the persistent table column names in the
         // update executor in order to figure out which table columns get
-        // updated.  We'll associate the actual values with VOLT_TEMP_TABLE
+        // updated.  We'll associate the actual values with AbstractParsedStmt.TEMP_TABLE_NAME
         // to avoid any false schema/column matches with the actual table.
         for (Entry<Column, AbstractExpression> colEntry :
             m_parsedUpdate.columns.entrySet()) {
@@ -2247,46 +2246,63 @@ public class PlanAssembler {
          *           cover the window function.  Only generate an
          *           order by node if necessary.
          */
-        Map<String, StmtTargetTableScan> tablesRead = new HashMap<>();
-        List<String> indexes = new ArrayList<>();
-        pnode.getTablesAndIndexes(tablesRead, indexes);
-        OrderByPlanNode onode = new OrderByPlanNode();
-        // We need to extract more information from the windowed expression.
-        // to construct the output schema.
-        List<AbstractExpression> partitionByExpressions = winExpr.getPartitionByExpressions();
-        // If the order by expression list contains a partition by expression then
-        // we won't have to sort by it twice.  We sort by the partition by expressions
-        // first, and we don't care what order we sort by them.  So, find the
-        // sort direction in the order by list and use that in the partition by
-        // list, and then mark that it was deleted in the order by
-        // list.
-        //
-        // We choose to make this dontsort rather than dosort because the
-        // Java default value for boolean is false, and we want to sort by
-        // default.
-        boolean dontsort[] = new boolean[winExpr.getOrderbySize()];
-        List<AbstractExpression> orderByExpressions = winExpr.getOrderByExpressions();
-        List<SortDirectionType>  orderByDirections  = winExpr.getOrderByDirections();
-        for (int idx = 0; idx < winExpr.getPartitionbySize(); ++idx) {
-            SortDirectionType pdir = SortDirectionType.ASC;
-            AbstractExpression partitionByExpression = partitionByExpressions.get(idx);
-            int sidx = winExpr.getSortIndexOfOrderByExpression(partitionByExpression);
-            if (0 <= sidx) {
-                pdir = orderByDirections.get(sidx);
-                dontsort[sidx] = true;
+        int indexForWindowFunction = findIndexForWindowFunction(root);
+        // When we support more than one
+        // window function, indexForWindowFunction will have the
+        // window function number of the index we've scanned.
+        // Until then, we just use 0.
+        AbstractPlanNode cnode;
+        if (indexForWindowFunction == 0) {
+            cnode = root;
+        } else {
+            OrderByPlanNode onode = new OrderByPlanNode();
+            cnode = onode;
+            // We need to extract more information from the windowed expression.
+            // to construct the output schema.
+            List<AbstractExpression> partitionByExpressions = winExpr.getPartitionByExpressions();
+            // If the order by expression list contains a partition by expression then
+            // we won't have to sort by it twice.  We sort by the partition by expressions
+            // first, and we don't care what order we sort by them.  So, find the
+            // sort direction in the order by list and use that in the partition by
+            // list, and then mark that it was deleted in the order by
+            // list.
+            //
+            // We choose to make this dontsort rather than dosort because the
+            // Java default value for boolean is false, and we want to sort by
+            // default.
+            boolean dontsort[] = new boolean[winExpr.getOrderbySize()];
+            List<AbstractExpression> orderByExpressions = winExpr.getOrderByExpressions();
+            List<SortDirectionType>  orderByDirections  = winExpr.getOrderByDirections();
+            for (int idx = 0; idx < winExpr.getPartitionbySize(); ++idx) {
+                SortDirectionType pdir = SortDirectionType.ASC;
+                AbstractExpression partitionByExpression = partitionByExpressions.get(idx);
+                int sidx = winExpr.getSortIndexOfOrderByExpression(partitionByExpression);
+                if (0 <= sidx) {
+                    pdir = orderByDirections.get(sidx);
+                    dontsort[sidx] = true;
+                }
+                onode.addSort(partitionByExpression, pdir);
             }
-            onode.addSort(partitionByExpression, pdir);
-        }
-        for (int idx = 0; idx < winExpr.getOrderbySize(); ++idx) {
-            if (!dontsort[idx]) {
-                AbstractExpression orderByExpr = orderByExpressions.get(idx);
-                SortDirectionType  orderByDir  = orderByDirections.get(idx);
-                onode.addSort(orderByExpr, orderByDir);
+            for (int idx = 0; idx < winExpr.getOrderbySize(); ++idx) {
+                if (!dontsort[idx]) {
+                    AbstractExpression orderByExpr = orderByExpressions.get(idx);
+                    SortDirectionType  orderByDir  = orderByDirections.get(idx);
+                    onode.addSort(orderByExpr, orderByDir);
+                }
             }
+            onode.addAndLinkChild(root);
         }
-        onode.addAndLinkChild(root);
-        pnode.addAndLinkChild(onode);
+        pnode.addAndLinkChild(cnode);
         return pnode;
+    }
+
+    private int findIndexForWindowFunction(AbstractPlanNode root) {
+        while ((0 <= root.getChildCount())
+                && ! ( ( root instanceof AbstractScanPlanNode )
+                        || ( root instanceof AbstractJoinPlanNode ) ) ) {
+            root = root.getChild(0);
+        }
+        return root.getWindowFunctionUsesIndex();
     }
 
     private AbstractPlanNode handleAggregationOperators(AbstractPlanNode root) {

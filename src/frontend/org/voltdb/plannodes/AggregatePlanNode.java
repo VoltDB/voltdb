@@ -493,7 +493,7 @@ public class AggregatePlanNode extends AbstractPlanNode {
             // HAVING is always defined WRT to the current outputSchema (NOT inputschema).
             // This might be a little surprising to the user
             // -- maybe we can find some better way to describe the TVEs, here.
-            sb.append(" HAVING " + m_postPredicate.explain("VOLT_TEMP_TABLE"));
+            sb.append(" HAVING " + m_postPredicate.explain(AbstractParsedStmt.TEMP_TABLE_NAME));
         }
 
         return sb.toString();

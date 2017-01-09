@@ -51,6 +51,14 @@ public class AccessPath {
     // an order by node.  If it is set to -2, then nothing uses the
     // index.
     int m_windowFunctionUsesIndex = -2;
+    //
+    // This is true iff there is a window function which
+    // uses an index for order, but the statement level
+    // order by can use the same index.  In this case we
+    // will not use any sorts at all.
+    //
+    boolean m_stmtOrderByIsCompatible = false;
+
     @Override
     public String toString() {
         String retval = "";

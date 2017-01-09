@@ -34,7 +34,7 @@ import org.voltdb.plannodes.SchemaColumn;
  * up.
  */
 public class ParsedColInfo implements Cloneable {
-    /* Schema information: table may be "VOLT_TEMP_TABLE" */
+    /* Schema information: table may be AbstractParsedStmt.TEMP_TABLE_NAME */
     public String alias = null;
     public String columnName = null;
     public String tableName = null;
@@ -129,8 +129,8 @@ public class ParsedColInfo implements Cloneable {
         else {
             String alias = child.attributes.get("alias");
             orderCol.alias = alias;
-            orderCol.tableName = "VOLT_TEMP_TABLE";
-            orderCol.tableAlias = "VOLT_TEMP_TABLE";
+            orderCol.tableName = AbstractParsedStmt.TEMP_TABLE_NAME;
+            orderCol.tableAlias = AbstractParsedStmt.TEMP_TABLE_NAME;
             orderCol.columnName = "";
             // Replace its expression to TVE after we build the ExpressionIndexMap
 

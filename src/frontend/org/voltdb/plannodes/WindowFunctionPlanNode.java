@@ -68,11 +68,17 @@ public class WindowFunctionPlanNode extends AbstractPlanNode {
     protected List<AbstractExpression> m_orderByExpressions = new ArrayList<>();
 
     //
-    // This is true if this window function uses an index.  Only
-    // one window function may use an index.  If no window function
-    // uses an index then the statement level order by can use an index.
-    // But if some window function uses an index then the statement
-    // level order by must use an explicit sort.
+    // This is true if this window function uses an index, and
+    // if the statment level order by is compatible with the
+    // sort provided by the index.
+
+    // Only one window function may use an index.  If no window function
+    // uses an index then the statement level order by can use an
+    // appropriate index.  If some window function uses an index
+    // and the statement level order by expressions are compatible
+    // with the window function's induced ordering then both can
+    // use the index.  Otherwise the statement level order by must
+    // use an order by plan node to sort.
     //
     private boolean m_isCompatibleWithStmtOrderBy = false;
 

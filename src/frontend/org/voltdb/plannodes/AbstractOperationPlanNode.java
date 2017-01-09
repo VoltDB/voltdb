@@ -23,6 +23,7 @@ import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Database;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.planner.AbstractParsedStmt;
 
 public abstract class AbstractOperationPlanNode extends AbstractPlanNode {
 
@@ -101,12 +102,12 @@ public abstract class AbstractOperationPlanNode extends AbstractPlanNode {
             // This TVE is magic and repeats unfortunately like this
             // throughout the planner.  Consolidate at some point --izzy
             TupleValueExpression tve = new TupleValueExpression(
-                    "VOLT_TEMP_TABLE", "VOLT_TEMP_TABLE",
+                    AbstractParsedStmt.TEMP_TABLE_NAME, AbstractParsedStmt.TEMP_TABLE_NAME,
                     "modified_tuples", "modified_tuples", 0);
             tve.setValueType(VoltType.BIGINT);
             tve.setValueSize(VoltType.BIGINT.getLengthInBytesForFixedTypes());
             m_outputSchema.addColumn(
-                    "VOLT_TEMP_TABLE", "VOLT_TEMP_TABLE",
+                    AbstractParsedStmt.TEMP_TABLE_NAME, AbstractParsedStmt.TEMP_TABLE_NAME,
                     "modified_tuples", "modified_tuples",
                     tve);
         }

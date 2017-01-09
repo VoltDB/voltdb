@@ -48,6 +48,7 @@ import java.util.List;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.NestLoopPlanNode;
 import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.plannodes.OrderByPlanNode;
@@ -547,6 +548,43 @@ public class TestWindowedFunctions extends PlannerTestCase {
         String expected = "WindowFunctionPlanNode: ops: AGGREGATE_WINDOWED_RANK()";
         assertTrue("Expected to find \"" + expected + "\" in explain plan text, but did not:\n"
                 + explainPlanText, explainPlanText.contains(expected));
+    }
+
+    public void validatePlan(String SQL,
+                             Object ...objects) {
+        AbstractPlanNode plan = compile(SQL);
+        int nchildren = objects.length;
+        for (int idx = 0; idx < nchildren; idx += 1) {
+            assertEquals(objects[idx], plan.getClass());
+            if (plan.getChildCount() > 0) {
+                plan = plan.getChild(0);
+            } else {
+                break;
+            }
+        }
+    }
+
+    public void testIndexOnWindowFunction() throws Exception {
+        validatePlan("SELECT COUNT(A) OVER ( PARTITION BY A ) FROM ITBL_ONLY_A;",
+                     SendPlanNode.class,
+                     ProjectionPlanNode.class,
+                     WindowFunctionPlanNode.class,
+                     IndexScanPlanNode.class);
+        validatePlan("SELECT COUNT(A) OVER ( PARTITION BY A, B ) FROM ITBL_ONLY_A",
+                     SendPlanNode.class,
+                     ProjectionPlanNode.class,
+                     WindowFunctionPlanNode.class,
+                     OrderByPlanNode.class,
+                     SeqScanPlanNode.class);
+        /*
+         * Ok, this is currently borked.
+         *
+        validatePlan("SELECT COUNT(A) OVER ( PARTITION BY A ORDER BY A ) FROM ITBL_ONLY_A",
+                     SendPlanNode.class,
+                     ProjectionPlanNode.class,
+                     WindowFunctionPlanNode.class,
+                     IndexScanPlanNode.class);
+         */
     }
 
     @Override

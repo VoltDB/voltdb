@@ -64,7 +64,7 @@ public class TupleValueExpression extends AbstractValueExpression {
      * Create a new TupleValueExpression
      * @param tableName  The name of the table where this column originated,
      *        if any.  Currently, internally created columns will be assigned
-     *        the table name "VOLT_TEMP_TABLE" for disambiguation.
+     *        the table name AbstractParsedStmt.TEMP_TABLE_NAME for disambiguation.
      * @param tableAlias  The alias assigned to this table, if any
      * @param columnName  The name of this column, if any
      * @param columnAlias  The alias assigned to this column, if any

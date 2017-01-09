@@ -94,12 +94,12 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     }
 
     protected int m_id = -1;
-    protected List<AbstractPlanNode> m_children = new ArrayList<AbstractPlanNode>();
-    protected List<AbstractPlanNode> m_parents = new ArrayList<AbstractPlanNode>();
-    protected Set<AbstractPlanNode> m_dominators = new HashSet<AbstractPlanNode>();
+    protected List<AbstractPlanNode> m_children = new ArrayList<>();
+    protected List<AbstractPlanNode> m_parents = new ArrayList<>();
+    protected Set<AbstractPlanNode> m_dominators = new HashSet<>();
 
     // TODO: planner accesses this data directly. Should be protected.
-    protected List<ScalarValueHints> m_outputColumnHints = new ArrayList<ScalarValueHints>();
+    protected List<ScalarValueHints> m_outputColumnHints = new ArrayList<>();
     protected long m_estimatedOutputTupleCount = 0;
     protected long m_estimatedProcessedTupleCount = 0;
     protected boolean m_hasComputedEstimates = false;
@@ -114,13 +114,25 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
      * having to re-read tuples from intermediate results
      */
     protected Map<PlanNodeType, AbstractPlanNode> m_inlineNodes =
-        new LinkedHashMap<PlanNodeType, AbstractPlanNode>();
+        new LinkedHashMap<>();
     protected boolean m_isInline = false;
 
     /**
      * The textual explanation of why the plan may fail to have a deterministic result or effect when replayed.
      */
     protected String  m_nondeterminismDetail = "the query result does not guarantee a consistent ordering";
+
+    // Flag marking the sub-query plan
+    protected boolean m_isSubQuery = false;
+    protected StmtTableScan m_tableScan = null;
+
+    // If a window function uses an index, we
+    // mark which window function it is here.
+    // If this is -1, the statement level order by
+    // function uses this index.  If this is
+    // -2, nothing uses this index.
+    private int m_windowFunctionUsesIndex = -2;
+    private boolean m_windowFunctionIsCompatibleWithOrderBy = false;
 
     /**
      * Instantiates a new plan node.
@@ -280,7 +292,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
 
     public boolean hasReplicatedResult()
     {
-        Map<String, StmtTargetTableScan> tablesRead = new TreeMap<String, StmtTargetTableScan>();
+        Map<String, StmtTargetTableScan> tablesRead = new TreeMap<>();
         getTablesAndIndexes(tablesRead, null);
         for (StmtTableScan tableScan : tablesRead.values()) {
             if ( ! tableScan.getIsReplicated()) {
@@ -680,7 +692,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     *   of the plan-graph in reverse-execution order (from root to leaves)).
     */
     public void calculateDominators() {
-        HashSet<AbstractPlanNode> visited = new HashSet<AbstractPlanNode>();
+        HashSet<AbstractPlanNode> visited = new HashSet<>();
         calculateDominators_recurse(visited);
     }
 
@@ -696,7 +708,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
 
         // find nodes that are in every parent's dominator set.
 
-        HashMap<AbstractPlanNode, Integer> union = new HashMap<AbstractPlanNode, Integer>();
+        HashMap<AbstractPlanNode, Integer> union = new HashMap<>();
         for (AbstractPlanNode n : m_parents) {
             for (AbstractPlanNode d : n.getDominators()) {
                 if (union.containsKey(d))
@@ -720,8 +732,8 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
      * @return a list of nodes that are eventual successors of this node of the desired type
      */
     public ArrayList<AbstractPlanNode> findAllNodesOfType(PlanNodeType type) {
-        HashSet<AbstractPlanNode> visited = new HashSet<AbstractPlanNode>();
-        ArrayList<AbstractPlanNode> collected = new ArrayList<AbstractPlanNode>();
+        HashSet<AbstractPlanNode> visited = new HashSet<>();
+        ArrayList<AbstractPlanNode> collected = new ArrayList<>();
         findAllNodesOfType_recurse(type, null, collected, visited);
         return collected;
     }
@@ -731,8 +743,8 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
      * @return a list of nodes that are eventual successors of this node of the desired class
      */
     public ArrayList<AbstractPlanNode> findAllNodesOfClass(Class< ? extends AbstractPlanNode> pnClass) {
-        HashSet<AbstractPlanNode> visited = new HashSet<AbstractPlanNode>();
-        ArrayList<AbstractPlanNode> collected = new ArrayList<AbstractPlanNode>();
+        HashSet<AbstractPlanNode> visited = new HashSet<>();
+        ArrayList<AbstractPlanNode> collected = new ArrayList<>();
         findAllNodesOfType_recurse(null, pnClass, collected, visited);
         return collected;
     }
@@ -759,7 +771,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     }
 
     final public Collection<AbstractExpression> findAllSubquerySubexpressions() {
-        Set<AbstractExpression> collected = new HashSet<AbstractExpression>();
+        Set<AbstractExpression> collected = new HashSet<>();
         findAllExpressionsOfClass(AbstractSubqueryExpression.class, collected);
         return collected;
     }
@@ -837,7 +849,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         int diff = 0;
 
         // compare child nodes
-        HashMap<Integer, AbstractPlanNode> nodesById = new HashMap<Integer, AbstractPlanNode>();
+        HashMap<Integer, AbstractPlanNode> nodesById = new HashMap<>();
         for (AbstractPlanNode node : m_children)
             nodesById.put(node.getPlanNodeId(), node);
         for (AbstractPlanNode node : other.m_children) {
@@ -848,7 +860,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
 
         // compare inline nodes
         HashMap<Integer, Entry<PlanNodeType, AbstractPlanNode>> inlineNodesById =
-               new HashMap<Integer, Entry<PlanNodeType, AbstractPlanNode>>();
+               new HashMap<>();
         for (Entry<PlanNodeType, AbstractPlanNode> e : m_inlineNodes.entrySet())
             inlineNodesById.put(e.getValue().getPlanNodeId(), e);
         for (Entry<PlanNodeType, AbstractPlanNode> e : other.m_inlineNodes.entrySet()) {
@@ -967,7 +979,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         Pattern subqueryPattern = Pattern.compile(
                 String.format("(%s)([0-9]+)(.*)(\\s*)%s(\\2)", AbstractSubqueryExpression.SUBQUERY_TAG, AbstractSubqueryExpression.SUBQUERY_TAG),
                 Pattern.DOTALL);
-        Map<String, String> subqueries = new TreeMap<String, String>();
+        Map<String, String> subqueries = new TreeMap<>();
         String topStmt = extractExplainedSubquries(fullExpalinString, subqueryPattern, subqueries);
         StringBuilder fullSb = new StringBuilder(topStmt);
         for (Map.Entry<String, String> subquery : subqueries.entrySet()) {
@@ -1019,7 +1031,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         // Agg < Proj < Limit < Scan
         // Order the inline nodes with integer in ascending order
         TreeMap<Integer, AbstractPlanNode> sort_inlineNodes =
-                new TreeMap<Integer, AbstractPlanNode>();
+                new TreeMap<>();
 
         // every inline plan node is unique
         int ii = 4;
@@ -1065,8 +1077,8 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     protected abstract String explainPlanForNode(String indent);
 
     public ArrayList<AbstractScanPlanNode> getScanNodeList () {
-        HashSet<AbstractPlanNode> visited = new HashSet<AbstractPlanNode>();
-        ArrayList<AbstractScanPlanNode> collected = new ArrayList<AbstractScanPlanNode>();
+        HashSet<AbstractPlanNode> visited = new HashSet<>();
+        ArrayList<AbstractScanPlanNode> collected = new ArrayList<>();
         getScanNodeList_recurse( collected, visited);
         return collected;
     }
@@ -1089,8 +1101,8 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     }
 
     public ArrayList<AbstractPlanNode> getPlanNodeList () {
-        HashSet<AbstractPlanNode> visited = new HashSet<AbstractPlanNode>();
-        ArrayList<AbstractPlanNode> collected = new ArrayList<AbstractPlanNode>();
+        HashSet<AbstractPlanNode> visited = new HashSet<>();
+        ArrayList<AbstractPlanNode> collected = new ArrayList<>();
         getPlanNodeList_recurse( collected, visited);
         return collected;
     }
@@ -1178,5 +1190,21 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     public void adjustDifferentiatorField(TupleValueExpression tve) {
         assert (m_children.size() == 1);
         m_children.get(0).adjustDifferentiatorField(tve);
+    }
+
+    public int getWindowFunctionUsesIndex() {
+        return m_windowFunctionUsesIndex;
+    }
+
+    public void setWindowFunctionUsesIndex(int windowFunctionUsesIndex) {
+        m_windowFunctionUsesIndex = windowFunctionUsesIndex;
+    }
+
+    public boolean isWindowFunctionCompatibleWithOrderBy() {
+        return m_windowFunctionIsCompatibleWithOrderBy;
+    }
+
+    public void setWindowFunctionIsCompatibleWithOrderBy(boolean value) {
+        m_windowFunctionIsCompatibleWithOrderBy = value;
     }
 }
