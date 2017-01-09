@@ -3034,33 +3034,21 @@ public class TestPlansJoin extends PlannerTestCase {
                     joinOp + "P3.A AND P1.A = ? AND P3.F = 1 " +
                     "ORDER BY P1.A, P1.C, P3.A, P3.F";
             explained = buildExplainPlan(compileToFragments(query));
-            if (joinOp == JoinOp.EQUAL) { // weaken test for now
-                assertTrue(explained.contains("NESTLOOP INDEX FULL JOIN"));
-            }
-            else {
-                assertTrue(explained.contains("NEST LOOP FULL JOIN"));
-            }
+            assertTrue(explained.contains("NESTLOOP INDEX FULL JOIN"));
             query = "SELECT R1.A, R1.C, R3.A, R3.C " +
                     "FROM R1 FULL JOIN R3 ON R3.A" +
                     joinOp + "R1.A AND R3.A < 2 " +
                     "ORDER BY R1.A, R1.D, R3.A, R3.C";
             explained = buildExplainPlan(compileToFragments(query));
             //* enable to debug */ System.out.println("DEBUG: " + explained);
-            if (joinOp == JoinOp.EQUAL) { // weaken test for now
-                assertTrue(explained.contains("NESTLOOP INDEX FULL JOIN"));
-            }
-            else {
-                assertTrue(explained.contains("NEST LOOP FULL JOIN"));
-            }
+            assertTrue(explained.contains("NESTLOOP INDEX FULL JOIN"));
             query = "SELECT LHS.A, LHS.C, RHS.A, RHS.C " +
                     "FROM R3 LHS FULL JOIN R3 RHS ON LHS.A" +
                     joinOp + "RHS.A AND LHS.A < 2 " +
                     "ORDER BY 1, 2, 3, 4";
             explained = buildExplainPlan(compileToFragments(query));
             //* enable to debug */ System.out.println("DEBUG: " + explained);
-            if (joinOp == JoinOp.EQUAL) { // weaken test for now
-                assertTrue(explained.contains("NESTLOOP INDEX FULL JOIN"));
-            }
+            assertTrue(explained.contains("NESTLOOP INDEX FULL JOIN"));
             query = "SELECT * " +
                     "FROM R1 FULL JOIN R2 " +
                     "ON R1.A" +
