@@ -450,6 +450,11 @@ public class ProcedureRunner {
      */
     public boolean checkPartition(TransactionState txnState, TheHashinator hashinator) {
         if (m_isSinglePartition) {
+            // can happen when a proc changes from multi-to-single after it's routed
+            if (hashinator == null) {
+                return false; // this will kick it back to CI for re-routing
+            }
+
             TheHashinator.HashinatorType hashinatorType = hashinator.getConfigurationType();
             if (hashinatorType == TheHashinator.HashinatorType.LEGACY) {
                 // Legacy hashinator is not used for elastic, no need to check partitioning. In fact,
