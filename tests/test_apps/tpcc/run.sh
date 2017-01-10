@@ -27,18 +27,18 @@ SERVERS="localhost"
 
 # remove build artifacts
 function clean() {
-    rm -rf voltdbroot log $APPNAME.jar src/com/*.class src/com/procedures/*.class
+    rm -rf voltdbroot log $APPNAME.jar client/com/*.class src/com/procedures/*.class
 }
 
 # compile the source code for procedures and the client into jarfiles
 function jars() {
     # compile java source
-    javac -classpath $APPCLASSPATH src/com/procedures/*.java src/com/*.java
+    javac -classpath $APPCLASSPATH src/com/procedures/*.java client/com/*.java
     # build procedure and client jars
-    jar cf $APPNAME-procs.jar -C src com/Constants.class -C src com/procedures
-    jar cf $APPNAME-client.jar -C src com
+    jar cf $APPNAME-procs.jar -C client com/Constants.class -C src com/procedures
+    jar cf $APPNAME-client.jar -C client com
     # remove compiled .class files
-    rm -rf src/com/procedures/*.class src/com/*.class
+    rm -rf src/com/procedures/*.class client/com/*.class
 }
 
 # compile the procedure and client jarfiles if they don't exist
@@ -63,7 +63,7 @@ function init() {
 # run the client that drives the example
 function client() {
     jars-ifneeded
-    java -classpath $APPNAME-client.jar:$APPCLASSPATH com.MyTPCC \
+    java -classpath $APPNAME-client.jar:$APPCLASSPATH MyTPCC \
         --servers=localhost \
         --duration=180 \
         --warehouses=256 \

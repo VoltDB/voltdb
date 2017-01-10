@@ -168,7 +168,6 @@ import org.voltdb.utils.VoltSampler;
 
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.base.Joiner;
-import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.common.base.Suppliers;
 import com.google_voltpatches.common.base.Throwables;
@@ -944,8 +943,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     managedPathsEmptyCheck(config);
             }
 
+            // wait to make sure every host actually *see* each other's ZK node state.
             final int numberOfNodes = m_messenger.getLiveHostIds().size();
             Map<Integer, HostInfo> hostInfos = m_messenger.waitForGroupJoin(numberOfNodes);
+            Map<Integer, String> hostGroups = Maps.newHashMap();
+            Map<Integer, Integer> sitesPerHostMap = Maps.newHashMap();
+            hostInfos.forEach((k, v) -> {
+                hostGroups.put(k, v.m_group);
+                sitesPerHostMap.put(k, v.m_localSitesCount);
+            });
             if (m_messenger.isPaused() || m_config.m_isPaused) {
                 setStartMode(OperationMode.PAUSED);
             }
@@ -1026,7 +1032,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
              * Ning: topology may not reflect the true partitions in the cluster during join. So if another node
              * is trying to rejoin, it should rely on the cartographer's view to pick the partitions to replace.
              */
-            AbstractTopology topo = getTopology(config.m_startAction, hostInfos, m_joinCoordinator);
+            AbstractTopology topo = getTopology(config.m_startAction, hostGroups, sitesPerHostMap, m_joinCoordinator);
             m_partitionsToSitesAtStartupForExportInit = new ArrayList<>();
             try {
                 // IV2 mailbox stuff
@@ -1042,16 +1048,20 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 List<Integer> partitions = null;
                 if (isRejoin) {
                     m_configuredNumberOfPartitions = m_cartographer.getPartitionCount();
-                    partitions = m_cartographer.getIv2PartitionsToReplace(m_configuredReplicationFactor,
-                                                                          m_catalogContext.getNodeSettings().getLocalSitesCount());
+                    partitions = recoverPartitions(topo, hostGroups.get(m_messenger.getHostId()));
+                    if (partitions == null) {
+                        partitions = m_cartographer.getIv2PartitionsToReplace(m_configuredReplicationFactor,
+                                                                          m_catalogContext.getNodeSettings().getLocalSitesCount(),
+                                                                          m_messenger.getHostId(),
+                                                                          hostGroups);
+                    }
                     if (partitions.size() == 0) {
                         VoltDB.crashLocalVoltDB("The VoltDB cluster already has enough nodes to satisfy " +
                                 "the requested k-safety factor of " +
                                 m_configuredReplicationFactor + ".\n" +
                                 "No more nodes can join.", false, null);
                     }
-                }
-                else {
+                } else {
                     m_configuredNumberOfPartitions = topo.getPartitionCount();
                     partitions = topo.getPartitionIdList(m_messenger.getHostId());
                 }
@@ -1443,6 +1453,33 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
     }
 
+    /**
+     * recover the partition assignment from one of lost hosts in the same placement group for rejoin
+     * Use the placement group of the recovering host to find a matched host from the lost nodes in the topology
+     * If the partition count from the lost node is the same as the site count of the recovering host,
+     * The partitions on the lost node will be placed on the recovering host. Partition group layout will be maintained.
+     * Topology will be updated on ZK if successful
+     * @param topology The topology from ZK, which contains the partition assignments for live or lost hosts
+     * @param haGroup The placement group of the recovering host
+     * @return A list of partitions if recover effort is a success.
+     */
+    private List<Integer> recoverPartitions(AbstractTopology topology, String haGroup) {
+
+        AbstractTopology recoveredTopo = AbstractTopology.mutateRecoverTopology(topology,
+                m_messenger.getLiveHostIds(),
+                m_messenger.getHostId(),
+                haGroup);
+        if (recoveredTopo == null) {
+            return null;
+        }
+        List<Integer> partitions = recoveredTopo.getPartitionIdList(m_messenger.getHostId());
+        if (partitions != null && partitions.size() == m_catalogContext.getNodeSettings().getLocalSitesCount()) {
+            TopologyZKUtils.updateTopologyToZK(m_messenger.getZK(), recoveredTopo);
+            return partitions;
+        }
+        return null;
+    }
+
     @Override
     public void hostsFailed(Set<Integer> failedHosts)
     {
@@ -1739,7 +1776,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     // Get topology information.  If rejoining, get it directly from
     // ZK.  Otherwise, try to do the write/read race to ZK on startup.
-    private AbstractTopology getTopology(StartAction startAction, Map<Integer, HostInfo> hostInfos, JoinCoordinator joinCoordinator)
+    private AbstractTopology getTopology(StartAction startAction, Map<Integer, String> hostGroups,
+            Map<Integer, Integer> sitesPerHostMap, JoinCoordinator joinCoordinator)
     {
         AbstractTopology topology = null;
         try {
@@ -1752,14 +1790,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             } else {
                 // initial start or recover
                 int hostcount = m_clusterSettings.get().hostcount();
-                Preconditions.checkArgument(hostInfos.size() == hostcount);
                 int kfactor = m_catalogContext.getDeployment().getCluster().getKfactor();
-                Map<Integer, String> hostGroups = Maps.newHashMap();
-                Map<Integer, Integer> sitesPerHostMap = Maps.newHashMap();
-                hostInfos.forEach((k, v) -> {
-                    hostGroups.put(k, v.m_group);
-                    sitesPerHostMap.put(k, v.m_localSitesCount);
-                });
                 String errMsg = AbstractTopology.validateLegacyClusterConfig(hostcount, sitesPerHostMap, kfactor);
                 if (errMsg != null) {
                     VoltDB.crashLocalVoltDB(errMsg, false, null);
