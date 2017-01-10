@@ -1513,26 +1513,6 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         }
     }
 
-    /**
-     * For elastic join. Block on this call until the number of ready hosts is
-     * equal to the number of expected joining hosts.
-     */
-    public void waitForJoiningHostsToBeReady(int expectedHosts) {
-        try {
-            m_zk.create(CoreZK.readyjoininghosts_host, null, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
-            while (true) {
-                ZKUtil.FutureWatcher fw = new ZKUtil.FutureWatcher();
-                int readyHosts = m_zk.getChildren(CoreZK.readyjoininghosts, fw).size();
-                if ( readyHosts == expectedHosts) {
-                    break;
-                }
-                fw.get();
-            }
-        } catch (KeeperException | InterruptedException e) {
-            org.voltdb.VoltDB.crashLocalVoltDB("Error waiting for hosts to be ready", false, e);
-        }
-    }
-
     public void shutdown() throws InterruptedException
     {
         if (m_zk != null) {
