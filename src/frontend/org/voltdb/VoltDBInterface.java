@@ -217,7 +217,7 @@ public interface VoltDBInterface
 
     public OperationMode getStartMode();
 
-    public void setReplicationRole(ReplicationRole role);
+    public void promoteToMaster();
 
     public ReplicationRole getReplicationRole();
 
