@@ -40,6 +40,7 @@ function clean() {
 
 # compile the source code for procedures and the client into jarfiles
 function jars() {
+    $GENERATE
     # compile java source
     javac -classpath $APPCLASSPATH src/$APPNAME/*.java
     # build procedure and client jars

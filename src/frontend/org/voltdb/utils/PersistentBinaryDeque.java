@@ -32,6 +32,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.DeferredSerialization;
+import org.voltcore.utils.Pair;
 import org.voltdb.EELibraryLoader;
 import org.voltdb.utils.BinaryDeque.TruncatorResponse.Status;
 import org.voltdb.utils.PBDSegment.PBDSegmentReader;
@@ -514,6 +515,23 @@ public class PersistentBinaryDeque implements BinaryDeque {
         return (entry!=null) ? entry.getValue() : null;
     }
 
+    private void closeAndDeleteSegmentsBefore(long segmentId, String reason) throws IOException {
+        // Remove this segment and segments with a smaller sequence number if there are any
+        Iterator<Map.Entry<Long, PBDSegment>> iter = m_segments.entrySet().iterator();
+        while (iter.hasNext()) {
+            Map.Entry<Long, PBDSegment> entry = iter.next();
+            if (entry.getKey() > segmentId) {
+                break;
+            }
+            PBDSegment segmentToDelete = entry.getValue();
+            if (m_usageSpecificLog.isDebugEnabled()) {
+                m_usageSpecificLog.debug("Segment " + segmentToDelete.file() + " has been closed and deleted " + reason);
+            }
+            closeAndDeleteSegment(segmentToDelete);
+            iter.remove();
+        }
+    }
+
     @Override
     public synchronized void offer(BBContainer object) throws IOException {
         offer(object, true);
@@ -675,6 +693,46 @@ public class PersistentBinaryDeque implements BinaryDeque {
         return reader;
     }
 
+    @Override
+    public synchronized void closeCursor(String cursorId) {
+        if (m_closed) {
+            return;
+        }
+        ReadCursor reader = m_readCursors.remove(cursorId);
+        if (reader != null && reader.m_segment != null) {
+            try {
+                reader.m_segment.getReader(cursorId).close();
+            }
+            catch (IOException e) {
+                // TODO ignore this for now, it is just the segment file failed to be closed
+            }
+        }
+        // check all segments from latest to oldest (excluding the last write segment) to see if they can be deleted
+        // in a separate try catch block because these two are independent
+        // We need this only in closeCursor() now, which is currently only used when removing snapshot placeholder
+        // cursor in one-to-many DR, this extra check is needed because other normal cursors may have read past some
+        // segments, leaving them hold only by the placeholder cursor, since we won't have triggers to check deletion
+        // eligibility for these segments anymore, the check needs to take place here to prevent leaking of segments
+        // file
+        try {
+            boolean isLastSegment = true;
+            for (PBDSegment segment : m_segments.descendingMap().values()) {
+                // skip the last segment
+                if (isLastSegment) {
+                    isLastSegment = false;
+                    continue;
+                }
+                if (canDeleteSegment(segment)) {
+                    closeAndDeleteSegmentsBefore(segment.segmentId(), "because of close of cursor");
+                    break;
+                }
+            }
+        }
+        catch (IOException e) {
+            LOG.error("Exception closing and deleting PBD segment", e);
+        }
+    }
+
     private boolean canDeleteSegment(PBDSegment segment) throws IOException {
         for (ReadCursor cursor : m_readCursors.values()) {
             if (cursor.m_segment != null && (cursor.m_segment.segmentId() >= segment.segmentId())) {
@@ -684,7 +742,9 @@ public class PersistentBinaryDeque implements BinaryDeque {
                     segmentReader = segment.openForRead(cursor.m_cursorId);
                 }
 
-                if (!segmentReader.allReadAndDiscarded()) return false;
+                if (!segmentReader.allReadAndDiscarded()) {
+                    return false;
+                }
             } else { // this cursor hasn't reached this segment yet
                 return false;
             }
@@ -706,7 +766,6 @@ public class PersistentBinaryDeque implements BinaryDeque {
     }
 
     @Override
-    //TODO: Should we get rid of persisted cursors on close?
     public synchronized void close() throws IOException {
         if (m_closed) {
             return;
@@ -719,28 +778,30 @@ public class PersistentBinaryDeque implements BinaryDeque {
         m_closed = true;
     }
 
-    /*
-     * Don't use size in bytes to determine empty, could potentially
-     * diverge from object count on crash or power failure
-     * although incredibly unlikely
-     */
     @Override
-    public synchronized long sizeInBytes() throws IOException {
+    public synchronized Pair<Integer, Long> getBufferCountAndSize() throws IOException {
+        int count = 0;
         long size = 0;
         for (PBDSegment segment : m_segments.values()) {
+            count += segment.getNumEntries();
             size += segment.size();
         }
-        return size;
+        return Pair.of(count, size);
     }
 
     @Override
     public synchronized void closeAndDelete() throws IOException {
-        if (m_closed) return;
-        m_closed = true;
+        if (m_closed) {
+            return;
+        }
+        m_readCursors.clear();
+
         for (PBDSegment qs : m_segments.values()) {
             m_usageSpecificLog.debug("Segment " + qs.file() + " has been closed and deleted due to delete all");
             closeAndDeleteSegment(qs);
         }
+        m_segments.clear();
+        m_closed = true;
     }
 
     public static class ByteBufferTruncatorResponse extends TruncatorResponse {
@@ -788,16 +849,6 @@ public class PersistentBinaryDeque implements BinaryDeque {
 
     public static TruncatorResponse fullTruncateResponse() {
         return new TruncatorResponse(Status.FULL_TRUNCATE);
-    }
-
-    @Override
-    public synchronized int getNumObjects() throws IOException {
-        int numObjects = 0;
-        for (PBDSegment segment : m_segments.values()) {
-            numObjects += segment.getNumEntries();
-        }
-
-        return numObjects;
     }
 
     @Override
