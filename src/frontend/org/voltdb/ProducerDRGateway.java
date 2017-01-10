@@ -31,30 +31,34 @@ public interface ProducerDRGateway {
     }
 
     static class MeshMemberInfo {
-        public MeshMemberInfo(byte clusterId, long creationTime, int protocolVersion, List<HostAndPort> nodes) {
+        public MeshMemberInfo(byte clusterId, long creationTime, int partitionCount,
+                int protocolVersion, List<HostAndPort> nodes) {
             m_clusterId = clusterId;
             m_creationTime = creationTime;
+            m_partitionCount = partitionCount;
             m_protocolVersion = protocolVersion;
             m_nodes = nodes;
         }
 
         public MeshMemberInfo(byte clusterId, List<HostAndPort> nodes) {
-            this(clusterId, 0, 0, nodes);
+            this(clusterId, 0, 0, 0, nodes);
         }
 
         public MeshMemberInfo(MeshMemberInfo staleNodeInfo, List<HostAndPort> nodes) {
             m_clusterId = staleNodeInfo.m_clusterId;
             m_creationTime = staleNodeInfo.m_creationTime;
             m_protocolVersion = staleNodeInfo.m_protocolVersion;
+            m_partitionCount = staleNodeInfo.m_partitionCount;
             m_nodes = nodes;
         }
 
-        public static MeshMemberInfo createFromHostStrings(byte clusterId, long creationTime, int protocolVersion, List<String> nodes) {
+        public static MeshMemberInfo createFromHostStrings(byte clusterId, long creationTime, int partitionCount,
+                int protocolVersion, List<String> nodes) {
             List<HostAndPort> hostAndPorts = new ArrayList<>(nodes.size());
             for (String hostPortString : nodes) {
                 hostAndPorts.add(HostAndPort.fromString(hostPortString));
             }
-            return new MeshMemberInfo(clusterId, creationTime, protocolVersion, hostAndPorts);
+            return new MeshMemberInfo(clusterId, creationTime, partitionCount, protocolVersion, hostAndPorts);
         }
 
         public int getClusterId() { return (int)m_clusterId; }
@@ -67,6 +71,10 @@ public interface ProducerDRGateway {
          * ProtocolVersion may or may not be valid depending on who generates this object
          */
         public final int m_protocolVersion;
+        /**
+         * Number of partitions in this cluster (excluding MP Site)
+         */
+        public final int m_partitionCount;
         /**
          * This is either the configured (by conversation file) HostAndPort pairs or the
          * HostAndPort pairs found in the MeshQuery response
@@ -158,9 +166,11 @@ public interface ProducerDRGateway {
      * When the process is complete, the passed in handler will be notified of the status.
      *
      * @param requestedCursors the clusters for which cursors must be started
+     * @param leaderClusterId ID of the cluster that needs to be marked as the snapshot source
      * @param handler callback to notify the status of the operation
      */
-    public void startCursor(final List<MeshMemberInfo> requestedCursors, final DRProducerResponseHandler handler);
+    public void startCursor(final List<MeshMemberInfo> requestedCursors,
+            final byte leaderClusterId, final DRProducerResponseHandler handler);
 
     /**
      * Get the DR producer node stats. This method may block because the task
