@@ -366,18 +366,15 @@ public class TestSqlUpsertSuite extends RegressionSuite {
                 "PARTITION TABLE UP2 ON COLUMN ID;" +
 
                 // Export table
-                "CREATE TABLE UR3 ( " +
+                "CREATE STREAM UR3 ( " +
                 "ID INTEGER NOT NULL, " +
                 "WAGE INTEGER DEFAULT 1, " +
                 "DEPT INTEGER);" +
-                "EXPORT TABLE UR3;" +
 
-                "CREATE TABLE UP3 ( " +
+                "CREATE STREAM UP3 PARTITION ON COLUMN ID ( " +
                 "ID INTEGER NOT NULL, " +
                 "WAGE INTEGER DEFAULT 1, " +
                 "DEPT INTEGER);" +
-                "PARTITION TABLE UP3 ON COLUMN ID;" +
-                "EXPORT TABLE UP3;" +
 
                 ""
                 ;
