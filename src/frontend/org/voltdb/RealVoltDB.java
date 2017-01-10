@@ -1315,7 +1315,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 int expectedHosts = m_catalogContext.getClusterSettings().hostcount() - m_config.m_missingHostCount;
                 m_messenger.waitForAllHostsToBeReady(expectedHosts);
             }
-        }
 
             // Create secondary connections within partition group
             createSecondaryConnections(m_rejoining);
