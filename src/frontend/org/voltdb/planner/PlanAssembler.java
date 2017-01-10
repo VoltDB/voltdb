@@ -1842,7 +1842,11 @@ public class PlanAssembler {
         }
 
         if (nonAggPlan == null) {
-            return false;
+            // If we got to here without seeing
+            // a plan node which provides sorting,
+            // then we need an order by node to do
+            // the sorting.
+            return true;
         }
         if (nonAggPlan instanceof IndexScanPlanNode) {
             sortDirection = ((IndexScanPlanNode)nonAggPlan).getSortDirection();
@@ -2242,16 +2246,20 @@ public class PlanAssembler {
         WindowFunctionPlanNode pnode = new WindowFunctionPlanNode();
         pnode.setWindowFunctionExpression(winExpr);
         /*
-         * WORKHERE: Make sure that the tables and indexes
-         *           cover the window function.  Only generate an
-         *           order by node if necessary.
+         * Search the join tree to see if there is an
+         * index we can use.  The planner will have left
+         * an indication there if this is true.
          */
         int indexForWindowFunction = findIndexForWindowFunction(root);
+        // This is the next node.  It's either the root or
+        // else an order by grafted onto the root.
+        AbstractPlanNode cnode;
         // When we support more than one
         // window function, indexForWindowFunction will have the
         // window function number of the index we've scanned.
-        // Until then, we just use 0.
-        AbstractPlanNode cnode;
+        // Until then, we just use 0.  If the statement level
+        // order by uses the index, this will be -1.  If nothing
+        // can use an index this will be -2.
         if (indexForWindowFunction == 0) {
             cnode = root;
         } else {

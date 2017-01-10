@@ -1066,6 +1066,7 @@ public abstract class SubPlanAssembler {
             m_colRef = colRef;
             m_indexEntryNumber = aIndexEntryNumber;
             m_tableScan = tableScan;
+            m_sortDirection = sortDir;
         }
 
         @Override
@@ -1117,6 +1118,8 @@ public abstract class SubPlanAssembler {
      * order by expressions.
      */
     class WindowFunctionScore {
+        private static final int MAX_LIST_REMOVAL = 1000000;
+
         /**
          * A constructor for creating a score from a
          * WindowFunctionExpression.
@@ -1138,6 +1141,7 @@ public abstract class SubPlanAssembler {
             assert(0 <= winFuncNum);
             m_windowFunctionNumber = winFuncNum;
             m_isWindowFunction = true;
+            m_sortDirection = SortDirectionType.INVALID;
         }
 
         /**
@@ -1154,6 +1158,7 @@ public abstract class SubPlanAssembler {
             // Statement level order by expressions are number -1.
             m_windowFunctionNumber = -1;
             m_isWindowFunction = false;
+            m_sortDirection = SortDirectionType.INVALID;
         }
 
         // Set of active partition by expressions
@@ -1235,9 +1240,27 @@ public abstract class SubPlanAssembler {
                         // Good.  We matched.  Add the bindings.
                         // But we can't set the sort direction
                         // yet, because partition by doesn't
-                        // care.
-                        m_orderedMatchingExpressions.add(indexEntry);
-                        m_partitionByExprs.remove(indexEntry);
+                        // care.  Note that eorc and indexEntry
+                        // may not be equal.  They are just
+                        // matching.  An expression in eorc
+                        // might match a column reference in
+                        // indexEntry, or eorc may have parameters
+                        // which need to match expressions in indexEntry.
+                        m_orderedMatchingExpressions.add(eorc);
+                        // If there are expressions later on in the
+                        // m_partitionByExprs or m_unmatchedOrderByExprs
+                        // which match this expression we need to
+                        // delete them.  We can safely ignore them.
+                        // But guard against an infinite loop here.
+                        int idx;
+                        for (idx = 0; m_partitionByExprs.remove(eorc) && idx < MAX_LIST_REMOVAL; idx += 1) {
+                            ;
+                        }
+                        assert(idx < MAX_LIST_REMOVAL);
+                        for (idx = 0; m_unmatchedOrderByExprs.remove(eorc) && idx < MAX_LIST_REMOVAL; idx += 1) {
+                            ;
+                        }
+                        assert(idx < MAX_LIST_REMOVAL);
                         m_bindings.addAll(moreBindings);
                         return;
                     }
@@ -1257,7 +1280,6 @@ public abstract class SubPlanAssembler {
             // These need to be AbstractExpressions.  But we may
             // match with a ColumnRef in the index.
             ExpressionOrColumn nextStatementEOC = m_unmatchedOrderByExprs.get(m_unmatchedOrderByCursor);
-            m_unmatchedOrderByCursor += 1;
             // If we have not settled on a sort direction
             // yet, we have to decide now.
             if (m_sortDirection == SortDirectionType.INVALID) {
@@ -1270,9 +1292,11 @@ public abstract class SubPlanAssembler {
                 m_isDead = true;
                 return;
             }
+            m_unmatchedOrderByCursor += 1;
             // NOTABENE: This is really the important part of
             //           this function.
-            List<AbstractExpression> moreBindings = findBindingsForOneIndexedExpression(nextStatementEOC, indexEntry);
+            List<AbstractExpression> moreBindings
+                = findBindingsForOneIndexedExpression(nextStatementEOC, indexEntry);
             if ( moreBindings != null ) {
                 // We matched, because moreBindings != null, and
                 // the sort direction matched as well.  So
@@ -1370,6 +1394,7 @@ public abstract class SubPlanAssembler {
             // Fill in the failing return values as a fallback.
             retval.bindings.clear();
             retval.m_windowFunctionUsesIndex = -2;
+            retval.sortDirection = SortDirectionType.INVALID;
             int numOrderSpoilers = 0;
 
             // The statement level order by expressions
@@ -1401,6 +1426,7 @@ public abstract class SubPlanAssembler {
                 }
             }
             if (answer != null) {
+                assert(answer.m_sortDirection != null);
                 retval.sortDirection = answer.m_sortDirection;
                 if (answer.m_sortDirection != SortDirectionType.INVALID) {
 

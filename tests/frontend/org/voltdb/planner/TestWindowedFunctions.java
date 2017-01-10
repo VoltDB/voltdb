@@ -576,15 +576,23 @@ public class TestWindowedFunctions extends PlannerTestCase {
                      WindowFunctionPlanNode.class,
                      OrderByPlanNode.class,
                      SeqScanPlanNode.class);
-        /*
-         * Ok, this is currently borked.
-         *
         validatePlan("SELECT COUNT(A) OVER ( PARTITION BY A ORDER BY A ) FROM ITBL_ONLY_A",
                      SendPlanNode.class,
                      ProjectionPlanNode.class,
                      WindowFunctionPlanNode.class,
                      IndexScanPlanNode.class);
-         */
+        validatePlan("SELECT COUNT(A) OVER ( PARTITION BY A, A ORDER BY A, A ) FROM ITBL_ONLY_A",
+                     SendPlanNode.class,
+                     ProjectionPlanNode.class,
+                     WindowFunctionPlanNode.class,
+                     IndexScanPlanNode.class);
+        validatePlan("SELECT A FROM AAA ORDER BY A",
+                     SendPlanNode.class,
+                     ProjectionPlanNode.class,
+                     OrderByPlanNode.class,
+                     SeqScanPlanNode.class);
+
+
     }
 
     @Override
