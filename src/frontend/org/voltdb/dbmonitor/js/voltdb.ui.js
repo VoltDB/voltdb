@@ -2346,7 +2346,6 @@ var getCurrentTab = function () {
     if (activeLink.length > 0) {
         activeLinkId = activeLink.attr("id");
     }
-
     if (activeLinkId == "navSqlQuery") {
         $(".nvtooltip").hide();
         return NavigationTabs.SQLQuery;
@@ -2357,6 +2356,7 @@ var getCurrentTab = function () {
         $(".nvtooltip").hide();
         return NavigationTabs.Admin;
     } else if (activeLinkId == "navDR"){
+        $(".nvtooltip").show();
         return NavigationTabs.DR;
     }
     $(".nvtooltip").show();
