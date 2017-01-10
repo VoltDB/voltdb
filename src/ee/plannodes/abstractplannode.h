@@ -236,6 +236,10 @@ protected:
                                               PlannerDomValue obj,
                                               std::vector<std::string>& ary);
 
+    static void loadBooleanArrayFromJSONObject(const char* label,
+                                              PlannerDomValue obj,
+                                              std::vector<bool>& ary);
+
     static AbstractExpression* loadExpressionFromJSONObject(const char* label,
                                                             PlannerDomValue obj);
 

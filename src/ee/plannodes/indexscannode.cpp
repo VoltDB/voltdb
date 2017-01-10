@@ -110,6 +110,7 @@ void IndexScanPlanNode::loadFromJSONObject(PlannerDomValue obj)
     m_skip_null_predicate.reset(loadExpressionFromJSONObject("SKIP_NULL_PREDICATE", obj));
 
     m_searchkey_expressions.loadExpressionArrayFromJSONObject("SEARCHKEY_EXPRESSIONS", obj);
+    loadBooleanArrayFromJSONObject("IGNORE_NULL_CANDIDATE", obj, m_ignore_null_candidate);
 }
 
 } // namespace voltdb

@@ -464,7 +464,9 @@ public abstract class SubPlanAssembler {
             // Equality filters get first priority.
             boolean allowIndexedJoinFilters = (inListExpr == null);
             IndexableExpression eqExpr = getIndexableExpressionFromFilters(
-                ExpressionType.COMPARE_EQUAL, ExpressionType.COMPARE_EQUAL,
+                // NOT DISTINCT can be also considered as an equality comparison.
+                // The only difference is that NULL is not distinct from NULL, but NULL != NULL. (ENG-11096)
+                ExpressionType.COMPARE_EQUAL, ExpressionType.COMPARE_NOTDISTINCT,
                 coveringExpr, coveringColId, tableScan, filtersToCover,
                 allowIndexedJoinFilters, EXCLUDE_FROM_POST_FILTERS);
 
@@ -1572,6 +1574,7 @@ public abstract class SubPlanAssembler {
         for (AbstractExpression expr : path.indexExprs) {
             if (path.lookupType == IndexLookupType.GEO_CONTAINS) {
                 scanNode.addSearchKeyExpression(expr);
+                scanNode.addIgnoreNullCandidateFlag(true);
                 continue;
             }
             AbstractExpression expr2 = expr.getRight();
@@ -1599,6 +1602,8 @@ public abstract class SubPlanAssembler {
                 assert(false);
             }
             scanNode.addSearchKeyExpression(expr2);
+            // If the index expression is an "IS NOT DISTINCT FROM" comaprison, let the NULL values go through. (ENG-11096)
+            scanNode.addIgnoreNullCandidateFlag(expr.getExpressionType() != ExpressionType.COMPARE_NOTDISTINCT);
         }
         // create the IndexScanNode with all its metadata
         scanNode.setLookupType(path.lookupType);

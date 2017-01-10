@@ -145,7 +145,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
     }
 
     private void setSkipNullPredicate(boolean isReverseScan) {
-        int nextKeyIndex;
+        int nullExprIndex;
         if (isReverseScan) {
             if (m_searchkeyExpressions.size() >= m_endkeyExpressions.size()) {
                 return;
@@ -153,7 +153,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
 
             assert(m_endType == IndexLookupType.LT || m_endType == IndexLookupType.LTE);
             assert(m_endkeyExpressions.size() - m_searchkeyExpressions.size() == 1);
-            nextKeyIndex = m_searchkeyExpressions.size();
+            nullExprIndex = m_searchkeyExpressions.size();
         }
         else {
             // useful for underflow case to eliminate nulls
@@ -163,10 +163,12 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
             }
 
             assert(m_searchkeyExpressions.size() > 0);
-            nextKeyIndex = m_searchkeyExpressions.size() - 1;
+            nullExprIndex = m_searchkeyExpressions.size() - 1;
         }
+        List<Boolean> noIgnoreNullCandidateFlagVector = null;
         m_skip_null_predicate = IndexScanPlanNode.buildSkipNullPredicate(
-                nextKeyIndex, m_catalogIndex, m_tableScan, m_searchkeyExpressions);
+                nullExprIndex, m_catalogIndex, m_tableScan,
+                m_searchkeyExpressions, noIgnoreNullCandidateFlagVector);
         if (m_skip_null_predicate != null) {
             m_skip_null_predicate.resolveForTable((Table)m_catalogIndex.getParent());
         }
