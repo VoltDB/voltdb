@@ -774,6 +774,7 @@ public class CommandLine extends VoltDB.Configuration
         if (!m_startAction.isLegacy()) {
             cmdline.add("voltdbroot"); cmdline.add(m_voltdbRoot.getPath());
         }
+
         if (m_placementGroup != null) {
             cmdline.add("placementgroup"); cmdline.add(m_placementGroup);
         }
