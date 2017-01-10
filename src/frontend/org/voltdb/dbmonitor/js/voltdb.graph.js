@@ -1850,8 +1850,7 @@
                 else {
                     dataDrReplicationRate[0]["values"] = drData;
                 }
-
-                if (currentTab == NavigationTabs.DBMonitor && currentView == graphView && drReplicationChart.is(":visible")) {
+                if (currentTab == NavigationTabs.DR && currentView == graphView && drReplicationChart.is(":visible")) {
                     d3.select('#visualizationDrReplicationRate')
                         .datum(dataDrReplicationRate)
                         .transition().duration(500)
