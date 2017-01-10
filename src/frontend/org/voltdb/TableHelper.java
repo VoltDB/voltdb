@@ -1001,7 +1001,7 @@ public class TableHelper {
             colLines[i] = getDDLColumnDefinition(table, table.m_extraMetadata.originalColumnInfos[i]);
         }
 
-        String s = "CREATE " + (isStream ? "STREAM" : "TABLE") + table.m_extraMetadata.name;
+        String s = (isStream ? "CREATE STREAM " : "CREATE TABLE ") + table.m_extraMetadata.name;
         if (isStream) {
             // partition this table if need be
             if (table.m_extraMetadata.partitionColIndex != -1) {
