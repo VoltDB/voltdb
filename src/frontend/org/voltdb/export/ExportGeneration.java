@@ -748,6 +748,7 @@ public class ExportGeneration implements Generation {
             Throwables.propagateIfPossible(e, IOException.class);
         }
         shutdown = true;
+        m_dataSourcesByPartition.clear();
         VoltFile.recursivelyDelete(m_directory);
 
     }
@@ -826,6 +827,7 @@ public class ExportGeneration implements Generation {
             //intentionally not failing if there is an issue with close
             exportLog.error("Error closing export data sources", e);
         }
+        m_dataSourcesByPartition.clear();
         shutdown = true;
     }
 
