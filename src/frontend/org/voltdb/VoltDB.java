@@ -611,8 +611,7 @@ public class VoltDB {
                     GetActionArgument.valueOf(args[++i].trim().toUpperCase());
                 } else if (arg.equalsIgnoreCase("file")) {
                     m_getOutput = args[++i].trim();
-                }
-                else {
+                } else {
                     System.err.println("FATAL: Unrecognized option to VoltDB: " + arg);
                     referToDocAndExit();
                 }
