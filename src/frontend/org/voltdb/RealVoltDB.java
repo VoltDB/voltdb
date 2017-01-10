@@ -2925,12 +2925,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
                 /*
                  * Various scheduled tasks get crashy in unit tests if they happen to run
-                 * while other stuff is being shut down
+                 * while other stuff is being shut down. Double catch of throwable is only for the sake of tests.
                  */
                 try {
                     for (ScheduledFuture<?> sc : m_periodicWorks) {
                         sc.cancel(false);
-                        sc.get();
+                        try {
+                            sc.get();
+                        } catch (Throwable t) { }
                     }
                 } catch (Throwable t) { }
 
