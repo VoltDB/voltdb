@@ -1459,19 +1459,19 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
      */
     private List<Integer> recoverPartitions(AbstractTopology topology, String haGroup) {
 
-        List<Integer> partitions = null;
         AbstractTopology recoveredTopo = AbstractTopology.mutateRecoverTopology(topology,
                 m_messenger.getLiveHostIds(),
                 m_messenger.getHostId(),
                 haGroup);
         if (recoveredTopo == null) {
-            return partitions;
+            return null;
         }
-        partitions = recoveredTopo.getPartitionIdList(m_messenger.getHostId());
+        List<Integer> partitions = recoveredTopo.getPartitionIdList(m_messenger.getHostId());
         if (partitions != null && partitions.size() == m_catalogContext.getNodeSettings().getLocalSitesCount()) {
             TopologyZKUtils.updateTopologyToZK(m_messenger.getZK(), recoveredTopo);
+            return partitions;
         }
-        return partitions;
+        return null;
     }
 
     @Override
