@@ -587,19 +587,6 @@ public class Inits {
         public void run() {
             int adminPort = VoltDB.DEFAULT_ADMIN_PORT;
 
-            // See if we should bring the server up in admin mode
-            if (m_deployment.getAdminMode() != null) {
-                // rejoining nodes figure out admin mode from other nodes
-                if (m_isRejoin == false) {
-                    if (m_deployment.getAdminMode().isAdminstartup()) {
-                        m_rvdb.setStartMode(OperationMode.PAUSED);
-                    }
-                }
-
-                // set the adminPort from the deployment file
-                adminPort = m_deployment.getAdminMode().getPort();
-            }
-
             // allow command line override
             if (m_config.m_adminPort > 0)
                 adminPort = m_config.m_adminPort;

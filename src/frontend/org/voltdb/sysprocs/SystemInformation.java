@@ -537,14 +537,7 @@ public class SystemInformation extends VoltSystemProcedure
         results.addRow("partitiondetection", partition_detect_enabled);
 
         results.addRow("heartbeattimeout", Integer.toString(cluster.getHeartbeattimeout()));
-
         results.addRow("adminport", Integer.toString(VoltDB.instance().getConfig().m_adminPort));
-        String adminstartup = "false";
-        if (cluster.getAdminstartup())
-        {
-            adminstartup = "true";
-        }
-        results.addRow("adminstartup", adminstartup);
 
         String command_log_enabled = "false";
         // log name is MAGIC, you knoooow

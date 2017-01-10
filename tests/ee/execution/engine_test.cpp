@@ -111,8 +111,6 @@ const char *catalog_string =
             "set $PREV voltRoot \"\"\n"
             "set $PREV exportOverflow \"\"\n"
             "set $PREV drOverflow \"\"\n"
-            "set $PREV adminport 0\n"
-            "set $PREV adminstartup false\n"
             "set $PREV heartbeatTimeout 0\n"
             "set $PREV useddlschema false\n"
             "set $PREV drConsumerEnabled false\n"
