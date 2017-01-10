@@ -52,7 +52,7 @@ public class TestLiveTableSchemaMigration extends TestCase {
      */
     String catalogPathForTable(VoltTable t, String jarname) throws IOException {
         CatalogBuilder builder = new CatalogBuilder();
-        String ddl = TableHelper.ddlForTable(t);
+        String ddl = TableHelper.ddlForTable(t, false);
         builder.addLiteralSchema(ddl);
         String retval = Configuration.getPathToCatalogForTest(jarname);
         boolean success = builder.compile(retval);
@@ -101,8 +101,8 @@ public class TestLiveTableSchemaMigration extends TestCase {
             server.start();
             server.waitForInitialization();
 
-            System.out.printf("PRE:  %s\n", TableHelper.ddlForTable(t1));
-            System.out.printf("POST: %s\n", TableHelper.ddlForTable(t2));
+            System.out.printf("PRE:  %s\n", TableHelper.ddlForTable(t1, false));
+            System.out.printf("POST: %s\n", TableHelper.ddlForTable(t2, false));
 
             ClientConfig clientConfig = new ClientConfig();
             client = ClientFactory.createClient(clientConfig);
@@ -178,8 +178,8 @@ public class TestLiveTableSchemaMigration extends TestCase {
             server.start();
             server.waitForInitialization();
 
-            System.out.printf("PRE:  %s\n", TableHelper.ddlForTable(t1));
-            System.out.printf("POST: %s\n", TableHelper.ddlForTable(t2));
+            System.out.printf("PRE:  %s\n", TableHelper.ddlForTable(t1, false));
+            System.out.printf("POST: %s\n", TableHelper.ddlForTable(t2, false));
 
             TableHelper.migrateTable(t1, t2);
             t2 = TableHelper.sortTable(t2);

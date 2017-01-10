@@ -412,10 +412,7 @@ public class TestCatalogDiffs extends TestCase {
 
     private Catalog getCatalogForTable(String tableName, String catname, VoltTable t, boolean export) throws IOException {
         CatalogBuilder builder = new CatalogBuilder();
-        builder.addLiteralSchema(TableHelper.ddlForTable(t));
-        if (export) {
-            builder.addLiteralSchema("EXPORT TABLE " + TableHelper.getTableName(t) + ";");
-        }
+        builder.addLiteralSchema(TableHelper.ddlForTable(t, export));
 
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "test-" + catname + ".jar"));
@@ -1206,21 +1203,19 @@ public class TestCatalogDiffs extends TestCase {
         verifyDiffIfEmptyTable(catOriginal, catUpdated);
     }
 
-    public void testChangeTableReplicationSettingOfExportTable() throws IOException {
-        String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
-
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
-        builder.addLiteralSchema("\nEXPORT TABLE A;");
-        builder.addStmtProcedure("the_requisite_procedure", "insert into A values (?, ?);");
-        assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "elastic1a.jar"));
-        Catalog catOriginal = catalogForJar(testDir +  File.separator + "elastic1a.jar");
-
-        builder.addPartitionInfo("A", "C1");
-        assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "elastic2a.jar"));
-        Catalog catUpdated = catalogForJar(testDir + File.separator + "elastic2a.jar");
-        verifyDiffRejected(catOriginal, catUpdated);
-    }
+//    public void testChangeTableReplicationSettingOfExportTable() throws IOException {
+//        String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
+//
+//        VoltProjectBuilder builder = new VoltProjectBuilder();
+//        builder.addLiteralSchema("\nCREATE STREAM A PARTITION ON COLUMN C1 (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+//        builder.addStmtProcedure("the_requisite_procedure", "insert into A values (?, ?);");
+//        assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "elastic1a.jar"));
+//        Catalog catOriginal = catalogForJar(testDir +  File.separator + "elastic1a.jar");
+//
+//        assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "elastic2a.jar"));
+//        Catalog catUpdated = catalogForJar(testDir + File.separator + "elastic2a.jar");
+//        verifyDiffRejected(catOriginal, catUpdated);
+//    }
 
     public void testChangeCompatibleWithElasticNoChange() throws IOException {
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
@@ -1390,7 +1385,7 @@ public class TestCatalogDiffs extends TestCase {
                 + "<deployment>"
                 + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
                 + "    <export>"
-                + "        <configuration stream='default' enabled='true' type='file'>"
+                + "        <configuration target='default' enabled='true' type='file'>"
                 + "            <property name=\"type\">CSV</property>"
                 + "            <property name=\"with-schema\">false</property>"
                 + "            <property name=\"nonce\">pre-fix</property>"
@@ -1407,28 +1402,6 @@ public class TestCatalogDiffs extends TestCase {
         String msg = CatalogUtil.compileDeployment(cat, deployment, false);
         assertTrue("Deployment file failed to parse: " + msg, msg == null);
 
-        depXml =
-                "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
-                + "<deployment>"
-                + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
-                + "    <export>"
-                + "        <configuration stream='default' target='newtarget' enabled='true' type='file'>"
-                + "            <property name=\"type\">CSV</property>"
-                + "            <property name=\"with-schema\">false</property>"
-                + "            <property name=\"nonce\">pre-fix</property>"
-                + "            <property name=\"outdir\">"+m_dir+"</property>"
-                + "        </configuration>"
-                + "    </export>"
-                + "</deployment>";
-
-        builder.compile(testDir + File.separator + "exporttarget2.jar");
-        cat = catalogForJar(testDir + File.separator + "exporttarget2.jar");
-        file = VoltProjectBuilder.writeStringToTempFile(depXml);
-        deployment = CatalogUtil.getDeployment(new FileInputStream(file));
-
-        msg = CatalogUtil.compileDeployment(cat, deployment, false);
-        assertTrue("Must fail when both 'stream' and 'target' attributes are specified",
-                msg.contains("Only one of 'target' or 'stream' attribute must be specified"));
     }
 
     public void testConnectorPropertiesChanges() throws Exception {
@@ -1436,8 +1409,7 @@ public class TestCatalogDiffs extends TestCase {
 
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
         final String ddl =
-                "CREATE TABLE export_data ( id BIGINT default 0 , value BIGINT DEFAULT 0 );\n"
-              + "EXPORT TABLE export_data;";
+                "CREATE STREAM export_data ( id BIGINT default 0 , value BIGINT DEFAULT 0 );";
 
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema(ddl);

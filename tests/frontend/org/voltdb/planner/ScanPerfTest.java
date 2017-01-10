@@ -142,7 +142,7 @@ public class ScanPerfTest extends JUnit4LocalClusterTest {
         // build and compile a catalog
         System.out.println("Compiling catalog.");
         VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema(TableHelper.ddlForTable(pTable));
+        builder.addLiteralSchema(TableHelper.ddlForTable(pTable, false));
         builder.addLiteralSchema("PARTITION TABLE P ON COLUMN ID;\n" +
                 "CREATE PROCEDURE FROM CLASS org.voltdb.planner.ScanPerfTest$ScanTable;\n" +
                 "PARTITION PROCEDURE ScanPerfTest$ScanTable ON TABLE P COLUMN ID;\n");

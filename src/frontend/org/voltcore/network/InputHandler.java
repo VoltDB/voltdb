@@ -42,6 +42,7 @@ public interface InputHandler {
      * Handle the incoming message produced by retrieve next message
      *
      * @param message
+     * @param c
      * @param channelFacade
      * @throws IOException
      */
