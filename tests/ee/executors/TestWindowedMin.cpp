@@ -973,8 +973,6 @@ DBConfig TestWindowedMin::m_PartitionByExecutorDB =
     "set $PREV httpdportno 0\n"
     "set $PREV jsonapi false\n"
     "set $PREV networkpartition false\n"
-    "set $PREV adminport 0\n"
-    "set $PREV adminstartup false\n"
     "set $PREV heartbeatTimeout 0\n"
     "set $PREV useddlschema false\n"
     "set $PREV drConsumerEnabled false\n"

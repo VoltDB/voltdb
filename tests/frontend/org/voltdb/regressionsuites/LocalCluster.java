@@ -433,16 +433,12 @@ public class LocalCluster extends VoltServerConfig {
     @Override
     public boolean compileWithAdminMode(VoltProjectBuilder builder, int adminPort, boolean adminOnStartup)
     {
-        // ATTN: LocalCluster does not support non-default admin ports.
-        // Need a way to correctly initializing the portGenerator
-        // and then resetting it after tests to the usual default.
-        if (adminPort != VoltDB.DEFAULT_ADMIN_PORT) {
-            return false;
+        if (adminOnStartup) {
+            setToStartPaused();
         }
 
         if (!m_compiled) {
-            m_compiled = builder.compile(templateCmdLine.jarFileName(), m_siteCount, m_hostCount, m_kfactor,
-                    adminPort, adminOnStartup, m_clusterId);
+            m_compiled = builder.compile(templateCmdLine.jarFileName(), m_siteCount, m_hostCount, m_kfactor, m_clusterId);
             templateCmdLine.pathToDeployment(builder.getPathToDeployment());
             m_voltdbroot = builder.getPathToVoltRoot().getAbsolutePath();
         }

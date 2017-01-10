@@ -2011,8 +2011,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             }
         }
 
-        //In init/start mode we save adminmode to false always.
-        dt.getAdminMode().setAdminstartup(false);
         //Now its safe to Save .paths
         m_nodeSettings.store();
 
@@ -2927,14 +2925,16 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
                 /*
                  * Various scheduled tasks get crashy in unit tests if they happen to run
-                 * while other stuff is being shut down
+                 * while other stuff is being shut down. Double catch of throwable is only for the sake of tests.
                  */
-                for (ScheduledFuture<?> sc : m_periodicWorks) {
-                    sc.cancel(false);
-                    try {
-                        sc.get();
-                    } catch (Throwable t) {}
-                }
+                try {
+                    for (ScheduledFuture<?> sc : m_periodicWorks) {
+                        sc.cancel(false);
+                        try {
+                            sc.get();
+                        } catch (Throwable t) { }
+                    }
+                } catch (Throwable t) { }
 
                 //Shutdown import processors.
                 ImportManager.instance().shutdown();

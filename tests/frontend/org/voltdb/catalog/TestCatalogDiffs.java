@@ -329,26 +329,6 @@ public class TestCatalogDiffs extends TestCase {
         verifyDiff (catOriginal, catUpdated);
     }
 
-    public void testAdminStartupChange() throws IOException {
-        String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
-
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
-        builder.addPartitionInfo("A", "C1");
-        assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "adminstartup1.jar",
-                1, 1, 0, 1000, true, 0));
-        Catalog catOriginal = catalogForJar(testDir + File.separator + "adminstartup1.jar");
-
-        builder = new VoltProjectBuilder();
-        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
-        builder.addPartitionInfo("A", "C1");
-        assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "adminstartup2.jar",
-                1, 1, 0, 1000, false, 0)); // setting adminstartup to false is the test
-        Catalog catUpdated = catalogForJar(testDir + File.separator + "adminstartup2.jar");
-
-        verifyDiff(catOriginal, catUpdated);
-    }
-
     public void testDiffOfIdenticalCatalogs() throws IOException {
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
 

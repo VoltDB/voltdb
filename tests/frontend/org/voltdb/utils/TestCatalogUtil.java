@@ -141,7 +141,6 @@ public class TestCatalogUtil extends TestCase {
             "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
             "<deployment>" +
             "   <cluster hostcount='3' kfactor='1' sitesperhost='2'/>" +
-            "   <admin-mode port='32323' adminstartup='true'/>" +
             "   <heartbeat timeout='30'/>" +
             "   <paths><voltdbroot path=\"/tmp/" + System.getProperty("user.name") + "\" /></paths>" +
             "   <httpd port='0' >" +
@@ -154,7 +153,6 @@ public class TestCatalogUtil extends TestCase {
             "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
             "<deployment>" +
             "   <cluster hostcount='3' kfactor='1' sitesperhost='2'/>" +
-            "   <admin-mode port='32323' adminstartup='true'/>" +
             "   <paths><voltdbroot path=\"/tmp/" + System.getProperty("user.name") + "\" /></paths>" +
             "   <httpd port='0' >" +
             "       <jsonapi enabled='true'/>" +
@@ -166,7 +164,6 @@ public class TestCatalogUtil extends TestCase {
             "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
             "<deployment>" +
             "   <cluster hostcount='3' kfactor='1' sitesperhost='2'/>" +
-            "   <admin-mode port='32323' adminstartup='true'/>" +
             "   <heartbeat timeout='0'/>" +
             "   <paths><voltdbroot path=\"/tmp/" + System.getProperty("user.name") + "\" /></paths>" +
             "   <httpd port='0' >" +
