@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -586,19 +586,6 @@ public class Inits {
         @Override
         public void run() {
             int adminPort = VoltDB.DEFAULT_ADMIN_PORT;
-
-            // See if we should bring the server up in admin mode
-            if (m_deployment.getAdminMode() != null) {
-                // rejoining nodes figure out admin mode from other nodes
-                if (m_isRejoin == false) {
-                    if (m_deployment.getAdminMode().isAdminstartup()) {
-                        m_rvdb.setStartMode(OperationMode.PAUSED);
-                    }
-                }
-
-                // set the adminPort from the deployment file
-                adminPort = m_deployment.getAdminMode().getPort();
-            }
 
             // allow command line override
             if (m_config.m_adminPort > 0)

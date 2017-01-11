@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -26,6 +26,7 @@ import java.nio.ByteBuffer;
 public class Dr2MultipartResponseMessage extends VoltMessage {
 
     private boolean m_drain;
+    private byte m_producerClusterId;
     private int m_producerPID;
     private ClientResponseImpl m_response;
 
@@ -33,18 +34,24 @@ public class Dr2MultipartResponseMessage extends VoltMessage {
         super();
     }
 
-    public Dr2MultipartResponseMessage(int producerPID, ClientResponseImpl response)  {
+    public Dr2MultipartResponseMessage(byte producerClusterId, int producerPID, ClientResponseImpl response)  {
         m_drain = false;
+        m_producerClusterId = producerClusterId;
         m_producerPID = producerPID;
         m_response = response;
     }
 
-    public static Dr2MultipartResponseMessage createDrainMessage(int producerPID) {
+    public static Dr2MultipartResponseMessage createDrainMessage(byte producerClusterId, int producerPID) {
         final Dr2MultipartResponseMessage msg = new Dr2MultipartResponseMessage();
         msg.m_drain = true;
+        msg.m_producerClusterId = producerClusterId;
         msg.m_producerPID = producerPID;
         msg.m_response = null;
         return msg;
+    }
+
+    public byte getProducerClusterId() {
+        return m_producerClusterId;
     }
 
     public int getProducerPID() {
@@ -62,6 +69,7 @@ public class Dr2MultipartResponseMessage extends VoltMessage {
     @Override
     protected void initFromBuffer(ByteBuffer buf) throws IOException {
         m_drain = buf.get() == 1;
+        m_producerClusterId = buf.get();
         m_producerPID = buf.getInt();
         if (buf.remaining() > 0) {
             m_response = new ClientResponseImpl();
@@ -73,6 +81,7 @@ public class Dr2MultipartResponseMessage extends VoltMessage {
     public void flattenToBuffer(ByteBuffer buf) throws IOException {
         buf.put(VoltDbMessageFactory.DR2_MULTIPART_RESPONSE_ID);
         buf.put((byte) (m_drain ? 1 : 0));
+        buf.put(m_producerClusterId);
         buf.putInt(m_producerPID);
 
         if (!m_drain) {
@@ -87,6 +96,7 @@ public class Dr2MultipartResponseMessage extends VoltMessage {
     public int getSerializedSize() {
         int size = super.getSerializedSize()
                    + 1  // drain or not
+                   + 1  // producer cluster ID
                    + 4; // producer partition ID
         if (!m_drain) {
             size += m_response.getSerializedSize();

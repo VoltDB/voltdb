@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,10 +17,17 @@
 
 package org.voltdb;
 
+import org.voltdb.pmsg.DRAgent;
+
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 
 public interface ProducerDRGateway {
+
+    public interface DRProducerResponseHandler {
+        public void notifyOfResponse(boolean success, boolean shouldRetry, String failureCause);
+    }
 
     /**
      * Start the main thread and the state machine, wait until all nodes converge on the initial state.
@@ -71,7 +78,37 @@ public interface ProducerDRGateway {
     public void deactivateDRProducer();
     public void activateDRProducer();
 
-    public void blockOnSyncSnapshotGeneration();
+    /**
+     * Blocks until snaphot is generated for the specified cluster id.
+     * If the snapshot has already been generated, this will return immediately
+     *
+     * @param forClusterId the cluster for which producer should generate snapshot.
+     *        This is used and has a meaningful value only in MULTICLUSTER_PROTOCOL_VERSION
+     *        or higher.
+     */
+    public void blockOnSyncSnapshotGeneration(byte forClusterId);
+
+    /**
+     * Sets the DR protocol version with EE. This will also generate a <code>DR_STREAM_START</code>
+     * event for all partitions, if <code>genStreamStart</code> flag is true.
+     *
+     * @param drVersion the DR protocol version that must be set with EE.
+     * @param genStreamStart <code>DR_STREAM_START</code> event will be generated for all partitions
+     * if this is true.
+     *
+     * @return Returns true if the operation was successful. False otherwise.
+     */
+    public boolean setDRProtocolVersion(int drVersion, boolean genStreamStart);
+
+    /**
+     * Use this to set up cursors in DR binary logs for clusters. This will initiate the process.
+     * When the process is complete, the passed in handler will be notified of the status.
+     *
+     * @param requestedCursors the clusters for which cursors must be started
+     * @param leaderClusterId ID of the cluster that needs to be marked as the snapshot source
+     * @param handler callback to notify the status of the operation
+     */
+    public void startCursor(final List<DRAgent.ClusterInfo> requestedCursors, final byte leaderClusterId, final DRProducerResponseHandler handler);
 
     /**
      * Get the DR producer node stats. This method may block because the task

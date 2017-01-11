@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -692,12 +692,13 @@ public class TestJSONInterface extends TestCase {
             builder.addStmtProcedure("Insert", "insert into blah values (?,?,?,?,?);");
             builder.addProcedures(CrazyBlahProc.class);
             builder.setHTTPDPort(8095);
-            boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"), 1, 1, 0, 21213, true, 0);
+            boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"), 1, 1, 0, 0);
             assertTrue(success);
 
             config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
             config.m_pathToDeployment = builder.getPathToDeployment();
-
+            config.m_adminPort = 21213;
+            config.m_isPaused = true;
             server = new ServerThread(config);
             server.start();
             server.waitForInitialization();
@@ -793,7 +794,7 @@ public class TestJSONInterface extends TestCase {
             builder.addStmtProcedure("Insert", "insert into blah values (?,?,?,?,?);");
             builder.addProcedures(CrazyBlahProc.class);
             builder.setHTTPDPort(8095);
-            boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"), 1, 1, 0, 21213, false, 0);
+            boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"), 1, 1, 0, 0);
             assertTrue(success);
 
             config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");

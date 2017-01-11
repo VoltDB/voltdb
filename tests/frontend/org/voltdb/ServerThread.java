@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -175,6 +175,14 @@ public class ServerThread extends Thread {
         while (!VoltDB.instance().isRunning() ||
                VoltDB.instance().getMode() == OperationMode.INITIALIZING ||
                VoltDB.instance().rejoining()) {
+            Thread.yield();
+        }
+    }
+
+    public void waitForClientInterface() {
+        while (!VoltDB.instance().isRunning() ||
+                VoltDB.instance().getClientInterface() == null ||
+                !VoltDB.instance().getClientInterface().isAcceptingConnections()) {
             Thread.yield();
         }
     }

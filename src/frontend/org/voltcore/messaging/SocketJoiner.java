@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -621,13 +621,17 @@ public class SocketJoiner {
         int connectAttempts = 0;
         while (socket == null) {
             try {
-                socket = SocketChannel.open(hostAddr);
+                socket = SocketChannel.open();
+                socket.socket().connect(hostAddr, 5000);
             }
             catch (java.net.ConnectException
                   |java.nio.channels.UnresolvedAddressException
                   |java.net.NoRouteToHostException
                   |java.net.PortUnreachableException e)
             {
+                // reset the socket to null for loop purposes
+                socket = null;
+
                 if (mode == ConnectStrategy.PROBE) {
                     return null;
                 }

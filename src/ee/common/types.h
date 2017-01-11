@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -199,6 +199,7 @@ enum PlanNodeType {
     PLAN_NODE_TYPE_INSERT           = 31,
     PLAN_NODE_TYPE_DELETE           = 32,
     // PLAN_NODE_TYPE_UPSERT           = 33, // RESERVED, but not used in the EE
+    PLAN_NODE_TYPE_SWAPTABLES       = 34,
 
     //
     // Communication Nodes
@@ -445,7 +446,7 @@ inline bool tableStreamTypeIsValid(TableStreamType streamType) {
     return streamType != TABLE_STREAM_NONE;
 }
 
-inline bool tableStreamTypeAppliesToPreTruncateTable(TableStreamType streamType) {
+inline bool tableStreamTypeIsStreamIndexing(TableStreamType streamType) {
     return streamType == TABLE_STREAM_ELASTIC_INDEX;
 }
 
@@ -495,7 +496,9 @@ enum TaskType {
     TASK_TYPE_SP_JAVA_GET_DRID_TRACKER = 4,      // not supported in EE
     TASK_TYPE_SET_DRID_TRACKER = 5,              // not supported in EE
     TASK_TYPE_GENERATE_DR_EVENT = 6,
-    TASK_TYPE_RESET_DR_APPLIED_TRACKER = 7       // not supported in EE
+    TASK_TYPE_RESET_DR_APPLIED_TRACKER = 7,      // not supported in EE
+    TASK_TYPE_SET_MERGED_DRID_TRACKER = 8,       // not supported in EE
+    TASK_TYPE_INIT_DRID_TRACKER = 9,             // not supported in EE
 };
 
 // ------------------------------------------------------------------
@@ -505,6 +508,7 @@ enum DREventType {
     NOT_A_EVENT = 0,
     POISON_PILL = 1,      // not supported in EE
     CATALOG_UPDATE = 2,
+    DR_STREAM_START = 3,
 };
 
 

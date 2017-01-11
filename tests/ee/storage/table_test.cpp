@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -168,7 +168,8 @@ TEST_F(TableTest, ValueTypes) {
 }
 
 TEST_F(TableTest, TableSerialize) {
-    size_t serializeSize = m_table->getAccurateSizeToSerialize(true);
+    // Add sizeof(int32_t) to cover table size prefix
+    size_t serializeSize = m_table->getAccurateSizeToSerialize() + sizeof(int32_t);
     char* backingCharArray = new char[serializeSize];
     ReferenceSerializeOutput conflictSerializeOutput(backingCharArray, serializeSize);
     m_table->serializeTo(conflictSerializeOutput);
@@ -179,7 +180,7 @@ TEST_F(TableTest, TableSerialize) {
 }
 
 TEST_F(TableTest, TableSerializeWithoutTotalSize) {
-    size_t serializeSize = m_table->getAccurateSizeToSerialize(false);
+    size_t serializeSize = m_table->getAccurateSizeToSerialize();
     char* backingCharArray = new char[serializeSize];
     ReferenceSerializeOutput conflictSerializeOutput(backingCharArray, serializeSize);
     m_table->serializeToWithoutTotalSize(conflictSerializeOutput);

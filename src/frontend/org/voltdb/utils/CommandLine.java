@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -774,6 +774,7 @@ public class CommandLine extends VoltDB.Configuration
         if (!m_startAction.isLegacy()) {
             cmdline.add("voltdbroot"); cmdline.add(m_voltdbRoot.getPath());
         }
+
         if (m_placementGroup != null) {
             cmdline.add("placementgroup"); cmdline.add(m_placementGroup);
         }

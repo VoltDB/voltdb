@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -58,7 +58,7 @@ public:
      */
     void processTupleInsert(const TableTuple &newTuple, bool fallible);
 
-    PersistentTable * targetTable() const { return m_target; }
+    PersistentTable * destTable() const { return m_dest; }
 
     catalog::MaterializedViewInfo* getMaterializedViewInfo() const {
         return m_mvInfo;
@@ -72,11 +72,10 @@ public:
         std::map<std::string, catalog::MaterializedViewInfo*>::const_iterator const & end,
         std::vector<catalog::MaterializedViewInfo*> &survivingInfosOut,
         std::vector<MATVIEW*> &survivingViewsOut,
-        std::vector<MATVIEW*> &obsoleteViewsOut)
-    {
+        std::vector<MATVIEW*> &obsoleteViewsOut) {
         // iterate through all of the existing views
         BOOST_FOREACH(MATVIEW* currView, viewsIn) {
-            std::string currentViewId = currView->targetTable()->name();
+            std::string currentViewId = currView->destTable()->name();
 
             // iterate through all of the catalog views, looking for a match.
             std::map<std::string, catalog::MaterializedViewInfo*>::const_iterator viewIter;
@@ -104,7 +103,7 @@ public:
 protected:
     MaterializedViewTriggerForInsert(PersistentTable *destTable,
                                   catalog::MaterializedViewInfo *mvInfo);
-    void setTargetTable(PersistentTable * target);
+    void setDestTable(PersistentTable * dest);
 
     void initializeTupleHavingNoGroupBy(bool fallible);
 
@@ -126,15 +125,6 @@ protected:
      */
     bool findExistingTuple(const TableTuple &oldTuple);
 
-    // the materialized view table
-    PersistentTable *m_target;
-
-    catalog::MaterializedViewInfo *m_mvInfo;
-
-    // the primary index on the view table whose columns
-    // are the same as the group by in the view query
-    TableIndex *m_index;
-
     // space to store temp view tuples
     TableTuple m_existingTuple;
     TableTuple m_updatedTuple;
@@ -149,21 +139,34 @@ protected:
     // until the transaction ends, leaving only one of them.
     boost::shared_ptr<AbstractExpression> m_filterPredicate;
 
-    inline bool failsPredicate(const TableTuple& tuple) const {
+    bool failsPredicate(const TableTuple& tuple) const {
         return (m_filterPredicate && !m_filterPredicate->eval(&tuple, NULL).isTrue());
     }
+
+private:
+    // the materialized view table
+    PersistentTable *m_dest;
+
+    catalog::MaterializedViewInfo *m_mvInfo;
+
+    // the primary index on the view table whose columns
+    // are the same as the group by in the view query
+    TableIndex *m_index;
+
+    // storage to hold the value for the search key
+    boost::shared_array<char> m_searchKeyBackingStore;
 
     std::vector<AbstractExpression *> m_groupByExprs;
     std::vector<int32_t> m_groupByColIndexes;
     // How many columns (or expressions) is the view aggregated on?
     // This MUST be declared/initialized AFTER m_groupByExprs/m_groupByColIndexes
     // but BEFORE m_searchKeyValues/m_searchKeyTuple/m_searchKeyBackingStore.
+
+protected:
     std::size_t m_groupByColumnCount;
     std::vector<NValue> m_searchKeyValue;
     // space to hold the search key for the view table
     TableTuple m_searchKeyTuple;
-    // storage to hold the value for the search key
-    boost::shared_array<char> m_searchKeyBackingStore;
 
     // what are the indexes of columns in the src table for
     // the columns in the view table
@@ -176,9 +179,10 @@ protected:
     std::size_t m_aggColumnCount;
 
     // vector of target table indexes to update.
-    // Ideally, these should be a subset of the target table indexes that depend on the count and/or
-    // aggregated columns, but there might be some other mostly harmless ones in there that are based
-    // solely on the immutable primary key (GROUP BY columns).
+    // Ideally, these should be a subset of the target table indexes that
+    // depend on the count and/or aggregated columns,
+    // but there might be some other mostly harmless ones in there that are
+    // based solely on the immutable primary key (GROUP BY columns).
     std::vector<TableIndex*> m_updatableIndexList;
 };
 

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -611,8 +611,7 @@ public class VoltDB {
                     GetActionArgument.valueOf(args[++i].trim().toUpperCase());
                 } else if (arg.equalsIgnoreCase("file")) {
                     m_getOutput = args[++i].trim();
-                }
-                else {
+                } else {
                     System.err.println("FATAL: Unrecognized option to VoltDB: " + arg);
                     referToDocAndExit();
                 }

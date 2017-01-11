@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -29,8 +29,6 @@ import javax.xml.bind.JAXBElement;
 import javax.xml.bind.JAXBException;
 import javax.xml.bind.Marshaller;
 
-import org.voltdb.VoltDB;
-import org.voltdb.compiler.deploymentfile.AdminModeType;
 import org.voltdb.compiler.deploymentfile.ClusterType;
 import org.voltdb.compiler.deploymentfile.CommandLogType;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
@@ -80,8 +78,6 @@ public class DeploymentBuilder {
     int m_hostCount = 1;
     int m_sitesPerHost = 1;
     int m_replication = 0;
-    boolean m_useCustomAdmin = false;
-    int m_adminPort = VoltDB.DEFAULT_ADMIN_PORT;
     boolean m_adminOnStartup = false;
 
     final LinkedHashSet<UserInfo> m_users = new LinkedHashSet<UserInfo>();
@@ -125,21 +121,11 @@ public class DeploymentBuilder {
     }
 
     public DeploymentBuilder(final int sitesPerHost,
-                             final int hostCount,
-                             final int replication)
-    {
-        this(sitesPerHost, hostCount, replication, 0, false);
-    }
-
-    public DeploymentBuilder(final int sitesPerHost,
-            final int hostCount, final int replication,
-            final int adminPort, final boolean adminOnStartup)
+            final int hostCount, final int replication)
     {
         m_sitesPerHost = sitesPerHost;
         m_hostCount = hostCount;
         m_replication = replication;
-        m_adminPort = adminPort;
-        m_adminOnStartup = adminOnStartup;
 
         // set default deployment stuff
         String voltRootPath = "/tmp/" + System.getProperty("user.name");
@@ -386,17 +372,6 @@ public class DeploymentBuilder {
         Snapshot ppdsnapshot = factory.createPartitionDetectionTypeSnapshot();
         ppd.setSnapshot(ppdsnapshot);
         ppdsnapshot.setPrefix(m_ppdPrefix);
-
-        // <admin-mode>
-        // can't be disabled, but only write out the non-default config if
-        // requested by a test. otherwise, take the implied defaults (or
-        // whatever local cluster overrides on the command line).
-        if (m_useCustomAdmin) {
-            AdminModeType admin = factory.createAdminModeType();
-            deployment.setAdminMode(admin);
-            admin.setPort(m_adminPort);
-            admin.setAdminstartup(m_adminOnStartup);
-        }
 
         // <systemsettings>
         SystemSettingsType systemSettingType = factory.createSystemSettingsType();

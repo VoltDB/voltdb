@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -227,6 +227,25 @@ public class VoltZK {
             try {
                clusterMetadata.put( hostId, new String(cb.getData(), "UTF-8"));
             } catch (KeeperException.NoNodeException e){}
+        }
+    }
+
+    public static Pair<String, Integer> getDRInterfaceAndPortFromMetadata(String metadata)
+    throws IllegalArgumentException {
+        try {
+            JSONObject obj = new JSONObject(metadata);
+            //Pick drInterface if specified...it will be empty if none specified.
+            //we should pick then from the "interfaces" array and use 0th element.
+            String hostName = obj.getString("drInterface");
+            if (hostName == null || hostName.length() <= 0) {
+                hostName = obj.getJSONArray("interfaces").getString(0);
+            }
+            assert(hostName != null);
+            assert(hostName.length() > 0);
+
+            return Pair.of(hostName, obj.getInt("drPort"));
+        } catch (JSONException e) {
+            throw new IllegalArgumentException("Error parsing host metadata", e);
         }
     }
 

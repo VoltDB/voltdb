@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -2163,7 +2163,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         // the hard cases on that basis.
         HashSet<AbstractExpression> orderByTVEs = new HashSet<>();
         ArrayList<AbstractExpression> orderByNonTVEs = new ArrayList<>();
-        ArrayList<List<AbstractExpression>> orderByNonTVEBaseTVEs = new ArrayList<>();
+        ArrayList<List<TupleValueExpression>> orderByNonTVEBaseTVEs = new ArrayList<>();
         HashSet<AbstractExpression> orderByAllBaseTVEs = new HashSet<>();
 
         for (AbstractExpression orderByExpr : orderByExprs) {
@@ -2173,7 +2173,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             }
             else {
                 orderByNonTVEs.add(orderByExpr);
-                List<AbstractExpression> baseTVEs =
+                List<TupleValueExpression> baseTVEs =
                         orderByExpr.findAllTupleValueSubexpressions();
                 orderByNonTVEBaseTVEs.add(baseTVEs);
                 orderByAllBaseTVEs.addAll(baseTVEs);
@@ -2183,7 +2183,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         boolean result = true;
 
         for (AbstractExpression candidateExpr : candidateExprHardCases) {
-            Collection<AbstractExpression> candidateBases =
+            Collection<TupleValueExpression> candidateBases =
                     candidateExpr.findAllTupleValueSubexpressions();
             if (orderByTVEs.containsAll(candidateBases)) {
                 continue;

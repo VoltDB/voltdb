@@ -1,5 +1,5 @@
 # This file is part of VoltDB.
-# Copyright (C) 2008-2016 VoltDB Inc.
+# Copyright (C) 2008-2017 VoltDB Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -982,6 +982,344 @@ class UpdateDeployment(Deployment):
             value = response.json()
             self.assertEqual(str(value['statusString'][0]), "Additional properties are not allowed (u'liste' was unexpected)")
             self.assertEqual(response.status_code, 200)
+
+    def test_validate_snmp_enabled(self):
+        """ensure enabled field is validated properly"""
+        response = requests.get(__db_url__)
+        value = response.json()
+        if value:
+            db_length = len(value['databases'])
+            last_db_id = value['databases'][db_length - 1]['id']
+            dep_url = __db_url__ + str(last_db_id) + '/deployment/'
+            json_data = {
+                "snmp":
+                    {
+                        "enabled": "true"
+                    }
+            }
+            headers = {'Content-Type': 'application/json; charset=UTF-8'}
+            response = requests.put(dep_url,
+                                    json=json_data, headers=headers)
+            value = response.json()
+            self.assertEqual(str(value['statusString'][0]), "u'true' is not of type 'boolean'")
+            self.assertEqual(response.status_code, 200)
+
+            json_data['snmp']['enabled'] = True
+            response = requests.put(dep_url,
+                        json=json_data, headers=headers)
+            value = response.json()
+            self.assertEqual(str(value['statusString']), "SNMP: Target is required field.")
+            self.assertEqual(response.status_code, 200)
+
+    def test_validate_target_when_snmp_enabled(self):
+        """ensure target is validated properly when snmp is enabled"""
+        response = requests.get(__db_url__)
+        value = response.json()
+        if value:
+            db_length = len(value['databases'])
+            last_db_id = value['databases'][db_length - 1]['id']
+            dep_url = __db_url__ + str(last_db_id) + '/deployment/'
+            # checking if target is required field if enabled is true
+            json_data = {
+                "snmp":
+                    {
+                        "enabled": True
+                    }
+            }
+            headers = {'Content-Type': 'application/json; charset=UTF-8'}
+            response = requests.put(dep_url,
+                                    json=json_data, headers=headers)
+            value = response.json()
+            self.assertEqual(str(value['statusString']), "SNMP: Target is required field.")
+            self.assertEqual(response.status_code, 200)
+
+            # checking the valid target value
+            # 1. test_ip
+            json_data['snmp']['target'] = 'test_ip'
+            response = requests.put(dep_url,
+                                    json=json_data, headers=headers)
+            value = response.json()
+            self.assertEqual(str(value['statusString']), "SNMP: Invalid target.")
+            self.assertEqual(response.status_code, 200)
+
+            # 2. ip_address only
+            json_data['snmp']['target'] = '192.168.2.222'
+            response = requests.put(dep_url,
+                                    json=json_data, headers=headers)
+            value = response.json()
+            self.assertEqual(str(value['statusString']), "SNMP: Invalid target.")
+            self.assertEqual(response.status_code, 200)
+
+            # 3. ip_address with invalid port
+            json_data['snmp']['target'] = '192.168.1.2:111111111333311'
+            response = requests.put(dep_url,
+                                    json=json_data, headers=headers)
+            value = response.json()
+            self.assertEqual(str(value['statusString']), "SNMP: Port must be greater than 1 and less than 65535")
+            self.assertEqual(response.status_code, 200)
+
+            # 3. invalid target
+            json_data['snmp']['target'] = 'test@@@:8080'
+            response = requests.put(dep_url,
+                                    json=json_data, headers=headers)
+            value = response.json()
+            self.assertEqual(str(value['statusString']), "SNMP: Invalid target.")
+            self.assertEqual(response.status_code, 200)
+
+            # 4. correct target with port id
+            json_data['snmp']['target'] = '192.168.1.222:8080'
+            response = requests.put(dep_url,
+                                    json=json_data, headers=headers)
+            value = response.json()
+            self.assertEqual(str(value['statusString']), "Ok")
+            self.assertEqual(response.status_code, 200)
+
+    def test_validate_target_when_snmp_disabled(self):
+        """ensure target is not validated when snmp is disabled"""
+        response = requests.get(__db_url__)
+        value = response.json()
+        if value:
+            db_length = len(value['databases'])
+            last_db_id = value['databases'][db_length - 1]['id']
+            dep_url = __db_url__ + str(last_db_id) + '/deployment/'
+            # checking if target is not required field if enabled is false
+            json_data = {
+                "snmp":
+                    {
+                        "enabled": False
+                    }
+            }
+            headers = {'Content-Type': 'application/json; charset=UTF-8'}
+            response = requests.put(dep_url,
+                                    json=json_data, headers=headers)
+            value = response.json()
+            self.assertEqual(str(value['statusString']), "Ok")
+            self.assertEqual(response.status_code, 200)
+
+            json_data['snmp']['target'] = 'test_ip'
+            response = requests.put(dep_url,
+                                    json=json_data, headers=headers)
+            value = response.json()
+            self.assertEqual(str(value['statusString']), "Ok")
+            self.assertEqual(response.status_code, 200)
+
+    def test_validate_authkey_privacykey(self):
+        """ensure authkey and privacykey are validated properly"""
+        response = requests.get(__db_url__)
+        value = response.json()
+        if value:
+            db_length = len(value['databases'])
+            last_db_id = value['databases'][db_length - 1]['id']
+            dep_url = __db_url__ + str(last_db_id) + '/deployment/'
+            # 1. When enabled True and username not specified.
+            # 1.1 When auth protocol is NoAuth and privacy protocol is NoPriv
+            json_data = {
+                "snmp":
+                    {
+                        "enabled": True,
+                        "target": "127.0.0.1:8080",
+                        "community": "public",
+                        "authprotocol": "NoAuth",
+                        "privacyprotocol": "NoPriv"
+                    }
+            }
+            headers = {'Content-Type': 'application/json; charset=UTF-8'}
+            response = requests.put(dep_url,
+                                    json=json_data, headers=headers)
+            value = response.json()
+            self.assertEqual(str(value['statusString']), "Ok")
+            self.assertEqual(response.status_code, 200)
+
+            # 1.2 When auth protocol is other than NoAuth and privacy protocol NoPriv
+            json_data = {
+                "snmp":
+                    {
+                        "enabled": True,
+                        "target": "127.0.0.1:8080",
+                        "community": "public",
+                        "authprotocol": "SHA",
+                        "privacyprotocol": "NoPriv"
+                    }
+            }
+            headers = {'Content-Type': 'application/json; charset=UTF-8'}
+            response = requests.put(dep_url,
+                                    json=json_data, headers=headers)
+            value = response.json()
+            self.assertEqual(str(value['statusString']), "SNMP: Invalid or no authentication key.")
+            self.assertEqual(response.status_code, 200)
+
+            # 1.3 When auth protocol isNoAuth and privacy protocol is other than NoPriv
+            json_data = {
+                "snmp":
+                    {
+                        "enabled": True,
+                        "target": "127.0.0.1:8080",
+                        "community": "public",
+                        "authprotocol": "NoAuth",
+                        "privacyprotocol": "DES"
+                    }
+            }
+            headers = {'Content-Type': 'application/json; charset=UTF-8'}
+            response = requests.put(dep_url,
+                                    json=json_data, headers=headers)
+            value = response.json()
+            self.assertEqual(str(value['statusString']), "SNMP: Invalid or no privacy key.")
+            self.assertEqual(response.status_code, 200)
+
+            # 1.4 When auth protocol is other than isNoAuth and privacy protocol is other than NoPriv
+            # Also authkey and privacy key of length less than 8 is given
+            json_data = {
+                "snmp":
+                    {
+                        "enabled": True,
+                        "target": "127.0.0.1:8080",
+                        "community": "public",
+                        "authprotocol": "SHA",
+                        "authkey": "test",
+                        "privacyprotocol": "DES",
+                        "privacykey": "test"
+                    }
+            }
+            headers = {'Content-Type': 'application/json; charset=UTF-8'}
+            response = requests.put(dep_url,
+                                    json=json_data, headers=headers)
+            value = response.json()
+            self.assertEqual(str(value['statusString']), "Ok")
+            self.assertEqual(response.status_code, 200)
+
+            # 2 When enabled True and username is specified.
+            # All the validation are same as that in 1 except 1.4
+            # 2.1 When authkey length is less that 8
+            json_data = {
+                "snmp":
+                    {
+                        "enabled": True,
+                        "target": "127.0.0.1:8080",
+                        "username":"test",
+                        "community": "public",
+                        "authprotocol": "SHA",
+                        "authkey": "test",
+                        "privacyprotocol": "DES",
+                        "privacykey": "test"
+                    }
+            }
+            headers = {'Content-Type': 'application/json; charset=UTF-8'}
+            response = requests.put(dep_url,
+                                    json=json_data, headers=headers)
+            value = response.json()
+            self.assertEqual(str(value['statusString']), "SNMP: Authkey must be of at least 8 characters.")
+            self.assertEqual(response.status_code, 200)
+
+            # 2.2 When privacykey length is less that 8
+            json_data = {
+                "snmp":
+                    {
+                        "enabled": True,
+                        "target": "127.0.0.1:8080",
+                        "username": "test",
+                        "community": "public",
+                        "authprotocol": "SHA",
+                        "authkey": "test1234",
+                        "privacyprotocol": "DES",
+                        "privacykey": "test"
+                    }
+            }
+            headers = {'Content-Type': 'application/json; charset=UTF-8'}
+            response = requests.put(dep_url,
+                                    json=json_data, headers=headers)
+            value = response.json()
+            self.assertEqual(str(value['statusString']), "SNMP: PrivacyKey must be of at least 8 characters.")
+            self.assertEqual(response.status_code, 200)
+
+            # 3. When invalid authprotocal is given
+            json_data = {
+                "snmp":
+                    {
+                        "enabled": True,
+                        "target": "127.0.0.1:8080",
+                        "username": "test",
+                        "community": "public",
+                        "authprotocol": "test",
+                        "authkey": "test1234",
+                        "privacyprotocol": "DES",
+                        "privacykey": "test11111"
+                    }
+            }
+            headers = {'Content-Type': 'application/json; charset=UTF-8'}
+            response = requests.put(dep_url,
+                                    json=json_data, headers=headers)
+            value = response.json()
+            self.assertEqual(str(value['statusString'][0]), "u'test' is not one of ['SHA', 'MD5', 'NoAuth']")
+            self.assertEqual(response.status_code, 200)
+
+            # 4. When invalid privacyprotocol is given
+            json_data = {
+                "snmp":
+                    {
+                        "enabled": True,
+                        "target": "127.0.0.1:8080",
+                        "username": "test",
+                        "community": "public",
+                        "authprotocol": "SHA",
+                        "authkey": "test1234",
+                        "privacyprotocol": "test",
+                        "privacykey": "test11111"
+                    }
+            }
+            headers = {'Content-Type': 'application/json; charset=UTF-8'}
+            response = requests.put(dep_url,
+                                    json=json_data, headers=headers)
+            value = response.json()
+            self.assertEqual(str(value['statusString'][0]), "u'test' is not one of ['AES', 'DES', 'NoPriv', '3DES', 'AES192', 'AES256']")
+            self.assertEqual(response.status_code, 200)
+
+
+    def test_delete_snmp_configuration(self):
+        """ensure snmp configuration can be reset properly"""
+        response = requests.get(__db_url__)
+        value = response.json()
+        if value:
+            db_length = len(value['databases'])
+            last_db_id = value['databases'][db_length - 1]['id']
+            dep_url = __db_url__ + str(last_db_id) + '/deployment/'
+            json_data = {
+                "snmp":
+                    {}
+            }
+            headers = {'Content-Type': 'application/json; charset=UTF-8'}
+            response = requests.put(dep_url,
+                                    json=json_data, headers=headers)
+            value = response.json()
+            self.assertEqual(str(value['statusString']), "Ok")
+            self.assertEqual(response.status_code, 200)
+
+    def test_update_snmp_config(self):
+        """update snmp config"""
+        response = requests.get(__db_url__)
+        value = response.json()
+        if value:
+            db_length = len(value['databases'])
+            last_db_id = value['databases'][db_length - 1]['id']
+            dep_url = __db_url__ + str(last_db_id) + '/deployment/'
+            json_data = {
+                "snmp":
+                    {
+                        "enabled": True,
+                        "target": "127.0.0.1:8080",
+                        "community": "public",
+                        "authprotocol": "NoAuth",
+                        "authkey": "test1234",
+                        "privacyprotocol": "NoPriv",
+                        "privacykey": "test2345"
+                    }
+            }
+            headers = {'Content-Type': 'application/json; charset=UTF-8'}
+            response = requests.put(dep_url,
+                                    json=json_data, headers=headers)
+            value = response.json()
+            self.assertEqual(str(value['statusString']), "Ok")
+            self.assertEqual(response.status_code, 200)
+
 
 if __name__ == '__main__':
     unittest.main(testRunner=xmlrunner.XMLTestRunner(output='test-reports'))

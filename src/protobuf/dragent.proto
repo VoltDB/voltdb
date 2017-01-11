@@ -17,6 +17,7 @@ message Ack {
 
 message SnapshotReq {
     optional string nonce = 1;
+    optional int32 globalPartitionCount = 2;
 }
 
 message Reset {
@@ -30,8 +31,10 @@ message Pause {
 
 message Connect {
     optional int32 clusterId = 1;
-    optional fixed64 persistInstanceId = 2;
+    optional fixed64 clusterCreationId = 2;
     optional int32 protocolVersion = 3;
+    optional fixed64 clusterRecoveryId = 4;
+    optional NodeInfo nodeInfo = 5;
 }
 
 message Subscribe {
@@ -40,6 +43,15 @@ message Subscribe {
     optional bool isCovering = 3;
     optional fixed64 rewindToUniqueId = 4;
     optional bool isSyncing = 5;
+}
+
+message Query {
+    // whether or not to include other clusters in the mesh
+    optional bool includeMesh = 1 [default = false];
+}
+
+message StartCursor {
+    repeated ClusterInfo clusterInfo = 1;
 }
 
 message Response {
@@ -71,32 +83,61 @@ message Response {
     optional int32 protocolVersion = 15;
 }
 
+// More structured Response object for use with VoltDB 7.0 and higher.
+message CtrlProtoResponse {
+    required UUID id = 1;
+    optional CtrlEnvelope.Type type = 2;
+    // status. 0 means ok
+    optional int32 status = 3 [default = 0];
+    optional string failureCause = 4;
+    optional ConnectResponse connectResponse = 5;
+    optional QueryResponse queryResponse = 6;
+    optional AckResponse ackResponse = 7;
+}
+
+message AckResponse {
+    optional bool isEndOfStream = 1;
+}
+
+message ConnectResponse {
+    optional fixed64 catalogCRC = 1;
+    optional string catalogSignature = 2;
+    optional int32 protocolVersion = 3;
+    repeated ClusterInfo clusterInfo = 4;
+}
+
+message QueryResponse {
+    optional bool includeMesh = 1 [default = false];
+    repeated ClusterInfo clusterInfo = 2;
+}
+
+message ClusterInfo {
+    required int32 clusterId = 1;
+    required fixed64 creationId = 2;
+
+    optional fixed64 recoveryId = 3;
+    optional int32 protocolVersion = 4;
+    optional int32 globalPartitionCount = 5;
+
+    repeated NodeInfo nodeInfo = 6;
+    repeated PartitionInfo partitionInfo = 7;
+}
+
 message NodeInfo {
     optional string hostname = 1;
-    optional int32 drport = 2;
-    optional fixed64 catalogCRC = 3;
+    optional int32 drport = 2; // can be combined with hostname
+    optional bool isUp = 3;
 }
 
 message PartitionInfo {
-    optional int32 partitionId = 1;
-
-    // info for active replication
-    optional fixed64 lastSentTimestamp = 2;
-
-    // info for syncing snapshots
-    optional int64 lowestTupleIndex = 3;
-    optional int64 lastSentTupleIndex = 4;
-    optional int64 totalTupleCount = 5;
-
-    // common info
-    optional int64 outstandingBufferCount = 6;
-    optional int64 outstandingByteCount = 7;
-    optional bool isPaused = 8;
-    optional bool isSynced = 9;
+    optional int32 partitionId = 1; // should be required
 
     // info for event synchronization
-    optional int64 nextUniqueId = 10;
-    optional bool isEnded = 11;
+    optional int64 nextUniqueId = 10; // rename to nextDRId
+
+    optional bool isSynced = 9 [default = true]; // for backward compatibility only
+
+    // Intentionally skip fields 2, 3, 4, 5, 6, 7, 8, 11 -- deprecated
 }
 
 message CtrlEnvelope {
@@ -111,6 +152,7 @@ message CtrlEnvelope {
         STOP_SYNC = 8;
         CONNECT = 9;
         SUBSCRIBE = 10;
+        START_CURSOR = 11;
     }
     required Type type = 1;
     required UUID id = 2;
@@ -122,4 +164,6 @@ message CtrlEnvelope {
     optional Subscribe subscribe = 8;
     // Intentionally skip field 9 -- deprecated message type
     optional Connect connect = 10;
+    optional Query query = 11;
+    optional StartCursor startCursor = 12;
 }

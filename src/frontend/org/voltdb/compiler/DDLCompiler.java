@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -743,6 +743,12 @@ public class DDLCompiler {
                         checkIdentifierStart(statementMatcher.group(1), statement),
                         partitionInfo
                         );
+
+                // this command is now deprecated as of VoltDB 7.0
+                m_compiler.addWarn("The standalone \"PARTITION PROCEDURE ...\" statement is deprecated. " +
+                                   "Please use the combined statement \"CREATE PROCEDURE PARTITION ON ...\" " +
+                                   "instead. See the documentation of \"CREATE PROCEDURE\" for more information.",
+                                   ddlStatement.lineNo);
 
                 return true;
             }
