@@ -1,5 +1,5 @@
 # This file is part of VoltDB.
-# Copyright (C) 2008-2016 VoltDB Inc.
+# Copyright (C) 2008-2017 VoltDB Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -125,24 +125,24 @@ def dr_producer_stats(runner, partition_min_host, partition_min, partition_max):
             partition_min[pid] = partition_max[pid]
     if len(partition_data.tuples()) == 0:
         return
-    for r in partition_data.tuples():
-        pid = r[3]
-        hostname = str(r[2])
-        if str(r[8]) == 'None':
+    for row in partition_data.tuples():
+        pid = row[4]
+        hostname = str(row[2])
+        if str(row[9]) == 'None':
             last_queued = -1
         else:
-            last_queued = r[8]
-        if str(r[9]) == 'None':
+            last_queued = row[9]
+        if str(row[10]) == 'None':
             last_acked = -1
         else:
-            last_acked = r[9]
+            last_acked = row[10]
 
         # Initial state, no transactions are queued and acknowledged.
         if last_queued == -1 and last_acked == -1:
             continue
 
         # check TOTALBYTES
-        if r[5] > 0:
+        if row[6] > 0:
             # track the highest seen drId for each partition. use last queued to get the upper bound
             if pid in partition_max:
                 partition_max[pid] = max(last_queued, partition_max[pid])

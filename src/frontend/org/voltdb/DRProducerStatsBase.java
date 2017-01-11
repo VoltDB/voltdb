@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -25,9 +25,6 @@ import org.voltdb.VoltTable.ColumnInfo;
 import com.google_voltpatches.common.collect.ImmutableSet;
 
 public class DRProducerStatsBase {
-
-    //  DR_STATS_CONSUMER_CLUSTER_ID java property must equal "true"
-    private static boolean m_addConsumerIdStat = Boolean.getBoolean("DR_STATS_CONSUMER_CLUSTER_ID");
 
     public static interface Columns {
         // column for both tables
@@ -62,9 +59,7 @@ public class DRProducerStatsBase {
         @Override
         protected void populateColumnSchema(ArrayList<VoltTable.ColumnInfo> columns) {
             super.populateColumnSchema(columns);
-            if (m_addConsumerIdStat) {
-                columns.add(new ColumnInfo(Columns.CONSUMER_CLUSTER_ID, VoltType.SMALLINT));
-            }
+            columns.add(new ColumnInfo(Columns.CONSUMER_CLUSTER_ID, VoltType.SMALLINT));
             columns.add(new ColumnInfo(Columns.STATE, VoltType.STRING));
             columns.add(new ColumnInfo(Columns.SYNC_SNAPSHOT_STATE, VoltType.STRING));
             columns.add(new ColumnInfo(Columns.ROWS_IN_SYNC_SNAPSHOT, VoltType.BIGINT));
@@ -87,9 +82,7 @@ public class DRProducerStatsBase {
         @Override
         protected void populateColumnSchema(ArrayList<VoltTable.ColumnInfo> columns) {
             super.populateColumnSchema(columns);
-            if (m_addConsumerIdStat) {
-                columns.add(new ColumnInfo(Columns.CONSUMER_CLUSTER_ID, VoltType.SMALLINT));
-            }
+            columns.add(new ColumnInfo(Columns.CONSUMER_CLUSTER_ID, VoltType.SMALLINT));
             columns.add(new ColumnInfo(VoltSystemProcedure.CNAME_PARTITION_ID, VoltType.INTEGER));
             columns.add(new ColumnInfo(Columns.STREAM_TYPE, VoltType.STRING));
             columns.add(new ColumnInfo(Columns.TOTAL_BYTES, VoltType.BIGINT));

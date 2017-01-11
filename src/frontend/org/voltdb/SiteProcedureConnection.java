@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -211,4 +211,9 @@ public interface SiteProcedureConnection {
     public void notifyOfSnapshotNonce(String nonce, long snapshotSpHandle);
     public long applyBinaryLog(long txnId, long spHandle, long uniqueId, int remoteClusterId, byte logData[]);
     public void setDRProtocolVersion(int drVersion);
+    /*
+     * Starting in DR version 7.0, we also generate a special event indicating the beginning of
+     * binary log stream when we set protocol version.
+     */
+    public void setDRProtocolVersion(int drVersion, long spHandle, long uniqueId);
 }

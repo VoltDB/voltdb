@@ -1,0 +1,8 @@
+This directory contains the source files for the performance test of UpdateClasses.
+
+A run.sh script is provided to run the test app. The commands to process these files are the following:
+
+./run.sh prepare: generate schema, classes, jar files, config files, etc.
+./run.sh server: start a VoltDB server with the existing catalog.
+./run.sh init: start a VoltDB server with the existing catalog.
+./run.sh client: start a client that runs a bunch of CREATEs or DROPs to test performance.

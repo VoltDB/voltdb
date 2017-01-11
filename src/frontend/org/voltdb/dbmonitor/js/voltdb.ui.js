@@ -308,15 +308,23 @@ $(document).ready(function () {
             }
 
             var queryLength = $("#ulTabList li").length -1;
-            if(VoltDbUI.gutterInstanceVer != undefined)
-                VoltDbUI.gutterInstanceVer.destroy()
-            VoltDbUI.gutterInstanceVer = Split(['#querybox-'+ queryLength, '#blockContainer' + queryLength], {
-                direction: 'vertical',
-                sizes: [30, 70],
-                gutterSize: 15,
-                minSize: [120, 150]
-            })
-        }
+
+            for(var i=1; i<=queryLength;i++){
+
+               if(VoltDbUI.vars['gutterInstanceVer' + i] != undefined)
+                    VoltDbUI.vars['gutterInstanceVer' + i].destroy()
+
+               VoltDbUI.vars['gutterInstanceVer' + i] =  Split(['#querybox-'+ i, '#blockContainer' + i], {
+                        direction: 'vertical',
+                        gutterSize: 15,
+                        minSize: [120, 150]
+                    })
+
+                VoltDbUI.vars['gutterInstanceVer' + i].setSizes([30, 70])
+            }
+
+
+            }
 
         VoltDbUI.CurrentTab = getCurrentTab();
         refreshCss();
@@ -2346,7 +2354,6 @@ var getCurrentTab = function () {
     if (activeLink.length > 0) {
         activeLinkId = activeLink.attr("id");
     }
-
     if (activeLinkId == "navSqlQuery") {
         $(".nvtooltip").hide();
         return NavigationTabs.SQLQuery;
@@ -2357,7 +2364,7 @@ var getCurrentTab = function () {
         $(".nvtooltip").hide();
         return NavigationTabs.Admin;
     } else if (activeLinkId == "navDR"){
-        $(".nvtooltip").hide();
+        $(".nvtooltip").show();
         return NavigationTabs.DR;
     }
     $(".nvtooltip").show();
@@ -2584,6 +2591,7 @@ var adjustGraphSpacing = function () {
         this.partitionGraphInterval = null;
         this.gutterInstanceHor = null;
         this.gutterInstanceVer = null;
+        this.vars = {};
         //load schema tab and table and views tabs inside sql query
         this.refreshSqlAndSchemaTab = function () {
             this.loadSchemaTab();

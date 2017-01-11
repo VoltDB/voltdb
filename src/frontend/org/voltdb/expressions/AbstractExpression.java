@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -1316,7 +1316,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         return findAllSubexpressionsOfClass(ParameterValueExpression.class);
     }
 
-    public List<AbstractExpression> findAllTupleValueSubexpressions() {
+    public List<TupleValueExpression> findAllTupleValueSubexpressions() {
         return findAllSubexpressionsOfClass(TupleValueExpression.class);
     }
 
@@ -1486,5 +1486,27 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
             return m_args.get(0);
         }
         return null;
+    }
+
+    public boolean isColumnEquivalenceFilter() {
+        // Ignore expressions that are not of COMPARE_EQUAL or
+        // COMPARE_NOTDISTINCT type
+        ExpressionType type = getExpressionType();
+        if (type != ExpressionType.COMPARE_EQUAL &&
+                type != ExpressionType.COMPARE_NOTDISTINCT) {
+            return false;
+        }
+        AbstractExpression leftExpr = getLeft();
+        // Can't use an expression that is based on a column value but is not just a simple column value.
+        if ( ( ! (leftExpr instanceof TupleValueExpression)) &&
+                leftExpr.hasAnySubexpressionOfClass(TupleValueExpression.class) ) {
+            return false;
+        }
+        AbstractExpression rightExpr = getRight();
+        if ( ( ! (rightExpr instanceof TupleValueExpression)) &&
+                rightExpr.hasAnySubexpressionOfClass(TupleValueExpression.class) ) {
+            return false;
+        }
+        return true;
     }
 }

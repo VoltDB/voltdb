@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -973,8 +973,6 @@ DBConfig TestWindowedMin::m_PartitionByExecutorDB =
     "set $PREV httpdportno 0\n"
     "set $PREV jsonapi false\n"
     "set $PREV networkpartition false\n"
-    "set $PREV adminport 0\n"
-    "set $PREV adminstartup false\n"
     "set $PREV heartbeatTimeout 0\n"
     "set $PREV useddlschema false\n"
     "set $PREV drConsumerEnabled false\n"

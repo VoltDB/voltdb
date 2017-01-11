@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -541,6 +541,27 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             m_maxSeenDrLogsBySrcPartition.clear();
             m_lastLocalSpUniqueId = -1L;
             m_lastLocalMpUniqueId = -1L;
+        }
+
+        @Override
+        public void initDRAppliedTracker(Map<Byte, Integer> clusterIdToPartitionCountMap) {
+            for (Map.Entry<Byte, Integer> entry : clusterIdToPartitionCountMap.entrySet()) {
+                int producerClusterId = entry.getKey();
+                if (m_maxSeenDrLogsBySrcPartition.containsKey(producerClusterId)) {
+                    continue;
+                }
+                int producerPartitionCount = entry.getValue();
+                assert(producerPartitionCount != -1);
+                Map<Integer, DRConsumerDrIdTracker> clusterSources = new HashMap<>();
+                for (int i = 0; i < producerPartitionCount; i++) {
+                    DRConsumerDrIdTracker tracker =
+                            DRConsumerDrIdTracker.createPartitionTracker(
+                                    DRLogSegmentId.makeEmptyDRId(producerClusterId),
+                                    Long.MIN_VALUE, Long.MIN_VALUE, i);
+                    clusterSources.put(i, tracker);
+                }
+                m_maxSeenDrLogsBySrcPartition.put(producerClusterId, clusterSources);
+            }
         }
 
         @Override
@@ -1614,6 +1635,13 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         paramBuffer.putInt(drVersion);
         m_ee.executeTask(TaskType.SET_DR_PROTOCOL_VERSION, paramBuffer);
         hostLog.info("DR protocol version has been set to " + drVersion);
+    }
+
+    @Override
+    public void setDRProtocolVersion(int drVersion, long spHandle, long uniqueId) {
+        setDRProtocolVersion(drVersion);
+        generateDREvent(
+                EventType.DR_STREAM_START, uniqueId, m_lastCommittedSpHandle, spHandle, new byte[0]);
     }
 
     /**

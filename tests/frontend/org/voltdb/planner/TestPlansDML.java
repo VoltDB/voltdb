@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -29,70 +29,65 @@ import java.util.List;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.DeletePlanNode;
-import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.InsertPlanNode;
-import org.voltdb.plannodes.OrderByPlanNode;
 import org.voltdb.plannodes.ReceivePlanNode;
-import org.voltdb.plannodes.SendPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.plannodes.UpdatePlanNode;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.PlanNodeType;
 
-import java.util.Arrays;
-
 public class TestPlansDML extends PlannerTestCase {
 
-    List<AbstractPlanNode> pns;
     public void testBasicUpdateAndDelete() {
         // select * with ON clause should return all columns from all tables
-        AbstractPlanNode n;
+        List<AbstractPlanNode> pns;
         AbstractPlanNode pn;
+        AbstractPlanNode node;
 
         pns = compileToFragments("UPDATE R1 SET C = 1 WHERE C = 0");
         pn = pns.get(0);
         System.out.println(pn.toExplainPlanString());
-        n = pn.getChild(0).getChild(0);
-        assertTrue(n instanceof ReceivePlanNode);
+        node = pn.getChild(0).getChild(0);
+        assertTrue(node instanceof ReceivePlanNode);
         pn = pns.get(1);
-        n = pn.getChild(0);
-        assertTrue(n instanceof UpdatePlanNode);
+        node = pn.getChild(0);
+        assertTrue(node instanceof UpdatePlanNode);
 
         pns = compileToFragments("DELETE FROM R1 WHERE C = 0");
         pn = pns.get(0);
         System.out.println(pn.toExplainPlanString());
-        n = pn.getChild(0).getChild(0);
-        assertTrue(n instanceof ReceivePlanNode);
+        node = pn.getChild(0).getChild(0);
+        assertTrue(node instanceof ReceivePlanNode);
         pn = pns.get(1);
-        n = pn.getChild(0);
-        assertTrue(n instanceof DeletePlanNode);
+        node = pn.getChild(0);
+        assertTrue(node instanceof DeletePlanNode);
 
         pns = compileToFragments("INSERT INTO R1 VALUES (1, 2, 3)");
         pn = pns.get(0);
         System.out.println(pn.toExplainPlanString());
-        n = pn.getChild(0).getChild(0);
-        assertTrue(n instanceof ReceivePlanNode);
+        node = pn.getChild(0).getChild(0);
+        assertTrue(node instanceof ReceivePlanNode);
         pn = pns.get(1);
-        n = pn.getChild(0);
-        assertTrue(n instanceof InsertPlanNode);
+        node = pn.getChild(0);
+        assertTrue(node instanceof InsertPlanNode);
 
         pns = compileToFragments("UPDATE P1 SET C = 1 WHERE C = 0");
         pn = pns.get(0);
         System.out.println(pn.toExplainPlanString());
-        n = pn.getChild(0).getChild(0);
-        assertTrue(n instanceof ReceivePlanNode);
+        node = pn.getChild(0).getChild(0);
+        assertTrue(node instanceof ReceivePlanNode);
         pn = pns.get(1);
-        n = pn.getChild(0);
-        assertTrue(n instanceof UpdatePlanNode);
+        node = pn.getChild(0);
+        assertTrue(node instanceof UpdatePlanNode);
 
         pns = compileToFragments("DELETE FROM P1 WHERE C = 0");
         pn = pns.get(0);
         System.out.println(pn.toExplainPlanString());
-        n = pn.getChild(0).getChild(0);
-        assertTrue(n instanceof ReceivePlanNode);
+        node = pn.getChild(0).getChild(0);
+        assertTrue(node instanceof ReceivePlanNode);
         pn = pns.get(1);
-        n = pn.getChild(0);
-        assertTrue(n instanceof DeletePlanNode);
+        node = pn.getChild(0);
+        assertTrue(node instanceof DeletePlanNode);
 
         pns = compileToFragments("UPDATE P1 SET C = 1 WHERE A = 0");
         pn = pns.get(0);
@@ -115,18 +110,20 @@ public class TestPlansDML extends PlannerTestCase {
     }
 
     public void testTruncateTable() {
+        List<AbstractPlanNode> pns;
         String tbs[] = {"R1", "P1"};
         for (String tb: tbs) {
             pns = compileToFragments("Truncate table " + tb);
-            checkTruncateFlag();
+            checkTruncateFlag(pns);
 
             pns = compileToFragments("DELETE FROM " + tb);
-            checkTruncateFlag();
+            checkTruncateFlag(pns);
         }
     }
 
     public void testInsertIntoSelectPlan() {
-        System.out.println("\n\n\nRUNNING testInsertIntoSelectPlan\n\n");
+        System.out.println("\n\nRUNNING testInsertIntoSelectPlan\n\n");
+        List<AbstractPlanNode> pns;
 
         // This should be inferred as single-partition
         pns = compileToFragments("INSERT INTO P1 SELECT * FROM P2 WHERE A = ?");
@@ -192,6 +189,7 @@ public class TestPlansDML extends PlannerTestCase {
 
     public void testInsertSingleRowPlan() {
         System.out.println("\n\n\nRUNNING testInsertSingleRowPlan\n\n");
+        List<AbstractPlanNode> pns;
 
         // These test cases are from ENG-5929.
 
@@ -208,68 +206,60 @@ public class TestPlansDML extends PlannerTestCase {
 
     public void testDeleteOrderByPlan() {
         System.out.println("\n\n\nRUNNING testDeleteOrderByPlan\n\n");
+        List<AbstractPlanNode> pns;
+
+        PlanNodeType[] deleteFromIndexScan = { PlanNodeType.SEND,
+                PlanNodeType.DELETE,
+                PlanNodeType.INDEXSCAN,
+        };
+        PlanNodeType[] deleteFromSortedIndexScan = { PlanNodeType.SEND,
+                PlanNodeType.DELETE,
+                PlanNodeType.ORDERBY,
+                PlanNodeType.INDEXSCAN,
+        };
+        PlanNodeType[] deleteFromSortedSeqScan = { PlanNodeType.SEND,
+                PlanNodeType.DELETE,
+                PlanNodeType.ORDERBY,
+                PlanNodeType.SEQSCAN,
+        };
 
         // No ORDER BY node, since we can use index instead
         pns = compileToFragments("DELETE FROM R5 ORDER BY A LIMIT ?");
         assertEquals(2, pns.size());
         AbstractPlanNode collectorRoot = pns.get(1);
-        assertClassesMatchNodeChain(Arrays.asList(
-                SendPlanNode.class,
-                DeletePlanNode.class,
-                IndexScanPlanNode.class),
-                collectorRoot
-                );
+        assertLeftChain(collectorRoot, deleteFromIndexScan);
 
         // No ORDER BY node, since index scan is used to evaluate predicate
         pns = compileToFragments("DELETE FROM R5 WHERE A = 1 ORDER BY A LIMIT ?");
         assertEquals(2, pns.size());
         collectorRoot = pns.get(1);
-        assertClassesMatchNodeChain(Arrays.asList(
-                SendPlanNode.class,
-                DeletePlanNode.class,
-                IndexScanPlanNode.class),
-                collectorRoot
-                );
+        assertLeftChain(collectorRoot, deleteFromIndexScan);
 
         // Index used to evaluate predicate not suitable for ORDER BY
         pns = compileToFragments("DELETE FROM R5 WHERE A = 1 ORDER BY B, A, C, D LIMIT ?");
         assertEquals(2, pns.size());
         collectorRoot = pns.get(1);
-        assertClassesMatchNodeChain(Arrays.asList(
-                SendPlanNode.class,
-                DeletePlanNode.class,
-                OrderByPlanNode.class,
-                IndexScanPlanNode.class),
-                collectorRoot
-                );
+        assertLeftChain(collectorRoot, deleteFromSortedIndexScan);
 
         // Index can't be used either for predicate evaluation or ORDER BY
         pns = compileToFragments("DELETE FROM R5 WHERE B = 1 ORDER BY B, A, C, D LIMIT ?");
         assertEquals(2, pns.size());
         collectorRoot = pns.get(1);
-        assertClassesMatchNodeChain(Arrays.asList(
-                SendPlanNode.class,
-                DeletePlanNode.class,
-                OrderByPlanNode.class,
-                SeqScanPlanNode.class),
-                collectorRoot
-                );
+        assertLeftChain(collectorRoot, deleteFromSortedSeqScan);
     }
 
     /**
      * ENG-7384 Redundant predicate in DELETE/UPDATE statement plans.
      */
     public void testDMLPredicate() {
-        {
-            pns = compileToFragments("UPDATE P1 SET C = 1 WHERE A = 0");
-            assertEquals(1, pns.size());
-            checkPredicate(pns.get(0).getChild(0), ExpressionType.COMPARE_EQUAL);
-        }
-        {
-            pns = compileToFragments("DELETE FROM P1 WHERE A > 0");
-            assertTrue(pns.size() == 2);
-            checkPredicate(pns.get(1).getChild(0).getChild(0), ExpressionType.COMPARE_GREATERTHAN);
-        }
+        List<AbstractPlanNode> pns;
+        pns = compileToFragments("UPDATE P1 SET C = 1 WHERE A = 0");
+        assertEquals(1, pns.size());
+        checkPredicate(pns.get(0).getChild(0), ExpressionType.COMPARE_EQUAL);
+
+        pns = compileToFragments("DELETE FROM P1 WHERE A > 0");
+        assertTrue(pns.size() == 2);
+        checkPredicate(pns.get(1).getChild(0).getChild(0), ExpressionType.COMPARE_GREATERTHAN);
     }
 
     private void checkPredicate(AbstractPlanNode pn, ExpressionType type) {
@@ -278,7 +268,7 @@ public class TestPlansDML extends PlannerTestCase {
         assertEquals(type, e.getExpressionType());
     }
 
-    private void checkTruncateFlag() {
+    private void checkTruncateFlag(List<AbstractPlanNode> pns) {
         assertTrue(pns.size() == 2);
 
         ArrayList<AbstractPlanNode> deletes = pns.get(1).findAllNodesOfType(PlanNodeType.DELETE);

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -420,11 +420,10 @@ public class MaterializedViewFixInfo {
     }
 
 
-    private boolean fromMVTableOnly(List<AbstractExpression> tves) {
+    private boolean fromMVTableOnly(List<TupleValueExpression> tves) {
         String mvTableName = getMVTableName();
-        for (AbstractExpression tve: tves) {
-            assert(tve instanceof TupleValueExpression);
-            String tveTableName = ((TupleValueExpression)tve).getTableName();
+        for (TupleValueExpression tve: tves) {
+            String tveTableName = tve.getTableName();
             if (!mvTableName.equals(tveTableName)) {
                 return false;
             }
@@ -444,7 +443,8 @@ public class MaterializedViewFixInfo {
         List<AbstractExpression> exprs = ExpressionUtil.uncombinePredicate(filters);
 
         for (AbstractExpression expr: exprs) {
-            List<AbstractExpression> tves = expr.findAllTupleValueSubexpressions();
+            List<TupleValueExpression> tves =
+                    expr.findAllTupleValueSubexpressions();
 
             boolean canPushdown = true;
 

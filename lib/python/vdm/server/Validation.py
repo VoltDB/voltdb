@@ -1,5 +1,5 @@
 # This file is part of VoltDB.
-# Copyright (C) 2008-2016 VoltDB Inc.
+# Copyright (C) 2008-2017 VoltDB Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -19,6 +19,7 @@ from flask_inputs import Inputs
 import socket
 import traceback
 from flask_inputs.validators import JsonSchema
+import re
 
 
 class Validation(object):
@@ -74,6 +75,37 @@ class Validation(object):
                     raise ValidationError('Port must be greater than 1 and less than 65535')
                 else:
                     raise ValidationError('Value must be positive.')
+
+    @staticmethod
+    def ip_port_validation(field):
+        """
+        IP Port Validation part
+        """
+        if ":" in field:
+            count = field.count(":")
+            if count > 1:
+                return {'result': 'error', 'status': 'Invalid target.'}
+            array = field.split(":")
+            if len(array) == 2:
+                pattern = re.compile("^[a-zA-Z0-9.-]+$")
+                if pattern.match(array[0]) is None:
+                    return {'result': 'error', 'status': 'Invalid target.'}
+                try:
+                    val = int(array[1])
+                    if val < 1 or val >= 65535:
+                        return {'result': 'error', 'status': 'Port must be greater than 1 and less than 65535'}
+                except ValueError as err:
+                    msg = err.args[0]
+                    #print traceback.format_exc()
+                    if msg is 'Port must be greater than 1 and less than 65535':
+                        return {'result': 'error', 'status': 'Port must be greater than 1 and less than 65535'}
+                    else:
+                        return {'result': 'error', 'status': 'Port value must be positive.'}
+            else:
+                return {'result': 'error', 'status': 'Invalid target'}
+        else:
+            return {'result': 'error', 'status': 'Invalid target.'}
+        return {'result': 'success'}
 
 
 class ServerInputs(Inputs):
@@ -765,6 +797,51 @@ schema = {
                 }
             },
             "additionalProperties": False
+        },
+        "snmp": {
+            "id": "snmp",
+            "type": "object",
+            "properties": {
+                "enabled": {
+                    "id": "enabled",
+                    "type": "boolean",
+                    "default": True
+                },
+                "target": {
+                    "id": "target",
+                    "type": "string",
+                },
+                "community": {
+                    "id": "community",
+                    "type": "string",
+                    "default": "public"
+                },
+                "username": {
+                    "id": "username",
+                    "type": "string"
+                },
+                "authprotocol": {
+                    "id": "authprotocol",
+                    "type": "string",
+                    "enum": ["SHA", "MD5", "NoAuth"]
+                },
+                "authkey": {
+                    "id": "authkey",
+                    "type": "string",
+                    #"minLength": 9,
+                },
+                "privacyprotocol": {
+                    "id": "privacyprotocol",
+                    "type": "string",
+                    "enum": ["AES", "DES", "NoPriv", "3DES", "AES192", "AES256"]
+                },
+                "privacykey": {
+                    "id": "privacykey",
+                    "type": "string",
+                    #"minLength": 9,
+                }
+            },
+            "additionalProperties": False,
         }
     },
     "additionalProperties": False
