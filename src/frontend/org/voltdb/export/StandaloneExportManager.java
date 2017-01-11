@@ -374,13 +374,13 @@ public class StandaloneExportManager
         m_processorConfig = newConfig;
     }
 
-    public void shutdown() {
+    public void shutdown(final HostMessenger messenger) {
         StandaloneExportDataProcessor proc = m_processor.getAndSet(null);
         if (proc != null) {
             proc.shutdown();
         }
         for (StandaloneExportGeneration generation : m_generations.values()) {
-            generation.close();
+            generation.close(messenger);
         }
         m_generations.clear();
         m_loaderClass = null;

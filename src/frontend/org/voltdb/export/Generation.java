@@ -18,6 +18,7 @@ package org.voltdb.export;
 
 import java.nio.ByteBuffer;
 import java.util.Map;
+import org.voltcore.messaging.HostMessenger;
 
 /**
  * Export data from a single catalog version and database instance.
@@ -30,7 +31,7 @@ public interface Generation {
     public void kickOffLeaderElection();
 
     public void acceptMastershipTask(int partitionId);
-    public void close();
+    public void close(final HostMessenger messenger);
 
     public long getQueuedExportBytes(int partitionId, String signature);
 

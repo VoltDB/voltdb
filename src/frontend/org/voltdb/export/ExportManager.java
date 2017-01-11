@@ -270,7 +270,7 @@ public class ExportManager
         }
         try {
             //We close and delete regardless
-            drainedGeneration.closeAndDelete();
+            drainedGeneration.closeAndDelete(m_messenger);
         } catch (IOException e) {
             e.printStackTrace();
             exportLog.error(e);
@@ -655,7 +655,7 @@ public class ExportManager
 
     public void shutdown() {
         for (ExportGeneration generation : m_generations.values()) {
-            generation.close();
+            generation.close(m_messenger);
         }
         ExportDataProcessor proc = m_processor.getAndSet(null);
         if (proc != null) {

@@ -735,7 +735,7 @@ public class ExportGeneration implements Generation {
         source.pushExportBuffer(uso, buffer, sync, endOfStream);
     }
 
-    public void closeAndDelete() throws IOException {
+    public void closeAndDelete(final HostMessenger messenger) throws IOException {
         List<ListenableFuture<?>> tasks = new ArrayList<ListenableFuture<?>>();
         for (Map<String, ExportDataSource> map : m_dataSourcesByPartition.values()) {
             for (ExportDataSource source : map.values()) {
@@ -744,8 +744,14 @@ public class ExportGeneration implements Generation {
         }
         try {
             Futures.allAsList(tasks).get();
+            if (m_mbox != null) {
+                messenger.removeMailbox(m_mbox);
+            }
         } catch (Exception e) {
             Throwables.propagateIfPossible(e, IOException.class);
+        }
+        if (m_mbox != null) {
+            messenger.removeMailbox(m_mbox);
         }
         shutdown = true;
         VoltFile.recursivelyDelete(m_directory);
@@ -812,7 +818,7 @@ public class ExportGeneration implements Generation {
         }
     }
 
-    public void close() {
+    public void close(final HostMessenger messenger) {
         List<ListenableFuture<?>> tasks = new ArrayList<ListenableFuture<?>>();
         for (Map<String, ExportDataSource> sources : m_dataSourcesByPartition.values()) {
             for (ExportDataSource source : sources.values()) {
@@ -825,6 +831,9 @@ public class ExportGeneration implements Generation {
             //Logging of errors  is done inside the tasks so nothing to do here
             //intentionally not failing if there is an issue with close
             exportLog.error("Error closing export data sources", e);
+        }
+        if (m_mbox != null) {
+            messenger.removeMailbox(m_mbox);
         }
         shutdown = true;
     }
