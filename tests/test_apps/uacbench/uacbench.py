@@ -33,7 +33,7 @@ from optparse import OptionParser
 
 DEFAULT_CLASSES_DIR = "procedures/uac"
 DEFAULT_JARS_DIR = "jars"
-JARS_CMD_PRFIX = "./run.sh jars "
+JARS_CMD_PRFIX = "./run.sh uacjars "
 
 
 def generate_ddl(tables, ddlname):
@@ -105,7 +105,7 @@ def generate_base_jar(tablecount, procedurecount):
 
     # invoke shell script to compile jars
     # TODO: xin
-    subprocess.call(shlex.split('./run.sh jars uac_base.jar'))
+    subprocess.call(shlex.split('./run.sh uacjars uac_base.jar'))
 
     # generate procedure stmts
     filename = "%s/stmts_base.txt" % (DEFAULT_JARS_DIR)
@@ -147,9 +147,9 @@ def generate_add_batch_jars(procedurecount, invocations, batchsize):
 
 # cleaning the input dir
 def clean_dirpath(dirpath):
-    if os.path.exists(dirpath):
-        shutil.rmtree(dirpath)
-    os.makedirs(dirpath, 0755)
+    #if os.path.exists(dirpath):
+    #    shutil.rmtree(dirpath)
+    #os.makedirs(dirpath, 0755)
     return
 
 def clean():

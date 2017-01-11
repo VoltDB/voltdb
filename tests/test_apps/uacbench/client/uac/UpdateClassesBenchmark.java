@@ -312,13 +312,16 @@ public class UpdateClassesBenchmark {
         // write stats to file
         //client.writeSummaryCSV(stats, config.statsfile);
 
-        fw.append(String.format("%s,%d,-1,%f,0,0,%f,%f,0,0,0,0,0,0\n",
+        fw.append(String.format("%s,%d,-1,%f,%f,%f,0,0,0,0,0,0,0\n",
                                 config.name,
                                 stats.getStartTimestamp(),
-                                toMillis(max),
                                 toMillis(min),
-                                avg/1000.0));
+                                toMillis(max),
+                                avg/1000.0
+                                ));
 
+        fw.flush();
+        fw.close();
         // block until all outstanding txns return
         client.drain();
         // close down the client connections
