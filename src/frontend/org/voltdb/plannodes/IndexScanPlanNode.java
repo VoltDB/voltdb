@@ -928,14 +928,19 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         String result = "(";
         int prefixSize = nCovered - 1;
         for (int ii = 0; ii < prefixSize; ++ii) {
-            result += conjunction + asIndexed[ii] + " = " +
+            result += conjunction + asIndexed[ii] + (m_ignoreNullCandidate.get(ii) ? " = " : " NOT DISTINCT ") +
                     m_searchkeyExpressions.get(ii).explain(getTableNameForExplain());
             conjunction = ") AND (";
         }
         // last element
-        result += conjunction +
-                asIndexed[prefixSize] + " " + m_lookupType.getSymbol() + " " +
-                m_searchkeyExpressions.get(prefixSize).explain(getTableNameForExplain()) + ")";
+        result += conjunction + asIndexed[prefixSize] + " ";
+        if (m_lookupType == IndexLookupType.EQ && m_ignoreNullCandidate.get(prefixSize) == false) {
+            result += "NOT DISTINCT";
+        }
+        else {
+            result += m_lookupType.getSymbol();
+        }
+        result += " " + m_searchkeyExpressions.get(prefixSize).explain(getTableNameForExplain()) + ")";
         return result;
     }
 
