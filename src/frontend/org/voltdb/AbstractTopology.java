@@ -320,9 +320,7 @@ public class AbstractTopology {
         }
 
         public void markHostMissing(boolean isMissing) {
-            if (isMissing) {
-                this.isMissing = true;
-            }
+            this.isMissing = isMissing;
         }
 
         @Override
