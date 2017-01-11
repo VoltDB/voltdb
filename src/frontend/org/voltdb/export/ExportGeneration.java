@@ -744,9 +744,6 @@ public class ExportGeneration implements Generation {
         }
         try {
             Futures.allAsList(tasks).get();
-            if (m_mbox != null) {
-                messenger.removeMailbox(m_mbox);
-            }
         } catch (Exception e) {
             Throwables.propagateIfPossible(e, IOException.class);
         }
