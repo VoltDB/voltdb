@@ -91,9 +91,8 @@ public class TestLiveDDLCompiler extends TestCase {
         jarOut.deleteOnExit();
 
         String schema =
-            "CREATE TABLE T (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL, C3 INTEGER NOT NULL);\n" +
-            "EXPORT TABLE T;\n" +
-            "DROP TABLE T;\n";
+            "CREATE STREAM T (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL, C3 INTEGER NOT NULL);\n" +
+            "DROP STREAM T;\n";
         File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema);
         String schemaPath = schemaFile.getPath();
 
