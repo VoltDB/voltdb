@@ -1408,10 +1408,6 @@ public abstract class CatalogUtil {
 
             boolean connectorEnabled = exportConfiguration.isEnabled();
             String targetName = exportConfiguration.getTarget();
-            if (targetName == null || targetName.trim().isEmpty()) {
-                    throw new RuntimeException("Target must be specified along with type in export configuration.");
-            }
-
             if (connectorEnabled) {
                 m_exportEnabled = true;
                 if (targetList.contains(targetName)) {

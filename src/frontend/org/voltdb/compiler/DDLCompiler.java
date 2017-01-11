@@ -1076,13 +1076,13 @@ public class DDLCompiler {
             if (tableXML != null) {
                 if (tableXML.attributes.containsKey("drTable") && tableXML.attributes.get("drTable").equals("ENABLE")) {
                     throw m_compiler.new VoltCompilerException(String.format(
-                            "Invalid EXPORT statement: table %s is a DR table.", tableName));
+                            "Invalid CREATE STREAM statement: table %s is a DR table.", tableName));
                 } else {
                     tableXML.attributes.put("export", targetName);
                 }
             } else {
                 throw m_compiler.new VoltCompilerException(String.format(
-                        "Invalid EXPORT statement: table %s was not present in the catalog.", tableName));
+                        "Invalid CREATE STREAM statement: table %s was not present in the catalog.", tableName));
             }
         } else {
             throw m_compiler.new VoltCompilerException(String.format("Invalid CREATE STREAM statement: \"%s\", "
