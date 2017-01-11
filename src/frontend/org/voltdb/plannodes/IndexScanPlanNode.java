@@ -236,7 +236,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
                 AbstractExpression idxExpr = indexedExprs.get(i);
                 ExpressionType exprType = ExpressionType.COMPARE_EQUAL;
                 if (ignoreNullCandidate != null
-                        && nullExprIndex == searchkeyExpressions.size() - 1
+                        && i < ignoreNullCandidate.size()
                         && (! ignoreNullCandidate.get(nullExprIndex))) {
                     exprType = ExpressionType.COMPARE_NOTDISTINCT;
                 }
