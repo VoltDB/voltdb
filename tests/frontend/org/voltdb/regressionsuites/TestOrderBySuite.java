@@ -1078,31 +1078,82 @@ public class TestOrderBySuite extends RegressionSuite {
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         expected = new long[][] {{1}, {4}, {6}, {11}};
         validateTableOfLongs(vt, expected);
-}
+    }
+
+    /*
+     * To disable a test, set these to false.  This is convenient
+     * for testing.  For example, to test subtestOrderByMP, set
+     * everything but do_subtestOrderByMP to false.  Then only
+     * subtestOrderByMP will run.
+     */
+    private static boolean do_subtestOrderBySingleColumnAscending = false;
+    private static boolean do_subtestOrderBySingleColumnDescending = false;
+    private static boolean do_subtestMultiColumnOrderBy = false;
+    private static boolean do_subtestOrderByUseIndex = false;
+    private static boolean do_subtestAggOrderByGroupBy = false;
+    private static boolean do_subtestOrderByCountStarAlias = false;
+    private static boolean do_subtestOrderByCountStarCardinal = false;
+    private static boolean do_subtestOrderByCountStarWithLimit = false;
+    private static boolean do_subtestOrderByWithNewExpression = false;
+    private static boolean do_subtestEng1133 = false;
+    private static boolean do_subtestEng4676 = false;
+    private static boolean do_subtestEng5021 = false;
+    private static boolean do_subtestPartialIndex = false;
+    private static boolean do_subtestOrderByMP = true;
+    private static boolean do_subtestOrderByMP_Agg = false;
+    private static boolean do_subtestOrderByMP_Subquery = false;
 
     public void testAll()
     throws Exception
     {
-        /*
-         * WORKHERE: Enable all of these down to subtestOrderByMP.
-         *           The first few pass, but the last three do not.
-        subtestOrderBySingleColumnAscending();
-        subtestOrderBySingleColumnDescending();
-        subtestMultiColumnOrderBy();
-        subtestOrderByUseIndex();
-        subtestAggOrderByGroupBy();
-        subtestOrderByCountStarAlias();
-        subtestOrderByCountStarCardinal();
-        subtestOrderByCountStarWithLimit();
-        subtestOrderByWithNewExpression();
-        subtestEng1133();
-        subtestEng4676();
-        subtestEng5021();
-        subtestPartialIndex();
-        */
-        subtestOrderByMP();
-        subtestOrderByMP_Agg();
-        subtestOrderByMP_Subquery();
+        if (do_subtestOrderBySingleColumnAscending) {
+            subtestOrderBySingleColumnAscending();
+        }
+        if (do_subtestOrderBySingleColumnDescending) {
+            subtestOrderBySingleColumnDescending();
+        }
+        if (do_subtestMultiColumnOrderBy) {
+            subtestMultiColumnOrderBy();
+        }
+        if (do_subtestOrderByUseIndex) {
+            subtestOrderByUseIndex();
+        }
+        if (do_subtestAggOrderByGroupBy) {
+            subtestAggOrderByGroupBy();
+        }
+        if (do_subtestOrderByCountStarAlias) {
+            subtestOrderByCountStarAlias();
+        }
+        if (do_subtestOrderByCountStarCardinal) {
+            subtestOrderByCountStarCardinal();
+        }
+        if (do_subtestOrderByCountStarWithLimit) {
+            subtestOrderByCountStarWithLimit();
+        }
+        if (do_subtestOrderByWithNewExpression) {
+            subtestOrderByWithNewExpression();
+        }
+        if (do_subtestEng1133) {
+            subtestEng1133();
+        }
+        if (do_subtestEng4676) {
+            subtestEng4676();
+        }
+        if (do_subtestEng5021) {
+            subtestEng5021();
+        }
+        if (do_subtestPartialIndex) {
+            subtestPartialIndex();
+        }
+        if (do_subtestOrderByMP) {
+            subtestOrderByMP();
+        }
+        if (do_subtestOrderByMP_Agg) {
+            subtestOrderByMP_Agg();
+        }
+        if (do_subtestOrderByMP_Subquery) {
+            subtestOrderByMP_Subquery();
+        }
     }
 
     //

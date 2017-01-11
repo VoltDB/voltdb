@@ -1370,9 +1370,7 @@ public abstract class SubPlanAssembler {
 
         public void matchIndexEntry(ExpressionOrColumn indexEntry) {
             for (WindowFunctionScore score : m_winFunctions) {
-                if ( ! score.isDead() ) {
-                    score.matchIndexEntry(indexEntry);
-                }
+                score.matchIndexEntry(indexEntry);
             }
         }
 
