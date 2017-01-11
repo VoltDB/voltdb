@@ -747,7 +747,7 @@ public class ExportGeneration implements Generation {
         } catch (Exception e) {
             Throwables.propagateIfPossible(e, IOException.class);
         }
-        if (m_mbox != null) {
+        if (m_mbox != null && messenger != null) {
             messenger.removeMailbox(m_mbox);
         }
         shutdown = true;
@@ -829,7 +829,7 @@ public class ExportGeneration implements Generation {
             //intentionally not failing if there is an issue with close
             exportLog.error("Error closing export data sources", e);
         }
-        if (m_mbox != null) {
+        if (m_mbox != null && messenger != null) {
             messenger.removeMailbox(m_mbox);
         }
         shutdown = true;
