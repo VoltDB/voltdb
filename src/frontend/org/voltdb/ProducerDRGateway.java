@@ -40,8 +40,8 @@ public interface ProducerDRGateway {
             m_nodes = nodes;
         }
 
-        public MeshMemberInfo(byte clusterId, List<HostAndPort> nodes) {
-            this(clusterId, 0, 0, 0, nodes);
+        public MeshMemberInfo(byte clusterId,  long creationTime, List<HostAndPort> nodes) {
+            this(clusterId, creationTime, 0, 0, nodes);
         }
 
         public MeshMemberInfo(MeshMemberInfo staleNodeInfo, List<HostAndPort> nodes) {
