@@ -27,6 +27,7 @@ import java.util.Set;
 
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.lib.StringUtil;
+import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
@@ -771,13 +772,20 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
                 jobj.getInt(Members.PURPOSE.name()) : FOR_SCANNING_PERFORMANCE_OR_ORDERING;
         m_targetIndexName = jobj.getString(Members.TARGET_INDEX_NAME.name());
         m_catalogIndex = db.getTables().get(super.m_targetTableName).getIndexes().get(m_targetIndexName);
-        //load end_expression
+        // load end_expression
         m_endExpression = AbstractExpression.fromJSONChild(jobj, Members.END_EXPRESSION.name(), m_tableScan);
         // load initial_expression
         m_initialExpression = AbstractExpression.fromJSONChild(jobj, Members.INITIAL_EXPRESSION.name(), m_tableScan);
-        //load searchkey_expressions
+        // load searchkey_expressions
         AbstractExpression.loadFromJSONArrayChild(m_searchkeyExpressions, jobj,
                 Members.SEARCHKEY_EXPRESSIONS.name(), m_tableScan);
+        // load ignore_null_candidate flag vector
+        JSONArray jarray = jobj.getJSONArray(Members.IGNORE_NULL_CANDIDATE.name());
+        int numCols = jarray.length();
+        for (int ii = 0; ii < numCols; ++ii) {
+            m_ignoreNullCandidate.add(jarray.getBoolean(ii));
+        }
+        // load skip_null_predicate
         m_skip_null_predicate = AbstractExpression.fromJSONChild(jobj, Members.SKIP_NULL_PREDICATE.name(), m_tableScan);
     }
 
