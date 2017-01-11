@@ -945,7 +945,13 @@ public class VoltCompiler {
         // Actually parse and handle all the DDL
         // DDLCompiler also provides partition descriptors for DDL PARTITION
         // and REPLICATE statements.
-        final DDLCompiler ddlcompiler = new DDLCompiler(this, hsql, voltDdlTracker, m_classLoader);
+        final DDLCompiler ddlcompiler;
+        try {
+            ddlcompiler = new DDLCompiler(this, hsql, voltDdlTracker, m_classLoader);
+        } catch (Throwable t) {
+            t.printStackTrace();
+            return;
+        }
 
         if (cannonicalDDLIfAny != null) {
             // add the file object's path to the list of files for the jar
@@ -1228,11 +1234,11 @@ public class VoltCompiler {
                                         "materialized view.  A view cannot be export source.");
             throw new VoltCompilerException("View configured as export source");
         }
-//        if (tableref.getIndexes().size() > 0) {
-//            compilerLog.error("While configuring export, stream " + tableName + " has indexes defined. " +
-//                    "Streams can't have indexes (including primary keys).");
-//            throw new VoltCompilerException("Streams cannot be configured with indexes");
-//        }
+        if (tableref.getIndexes().size() > 0) {
+            compilerLog.error("While configuring export, stream " + tableName + " has indexes defined. " +
+                    "Streams can't have indexes (including primary keys).");
+            throw new VoltCompilerException("Streams cannot be configured with indexes");
+        }
         if (tableref.getIsreplicated()) {
             // if you don't specify partition columns, make
             // export tables partitioned, but on no specific column (iffy)

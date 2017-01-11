@@ -839,29 +839,21 @@ public class TestCatalogDiffs extends TestCase {
         Catalog catOriginal = catalogForJar(testDir + File.separator + "testAddTableConstraintRejected1.jar");
 
         builder = new VoltProjectBuilder();
-        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
-        builder.addPartitionInfo("A", "C1");
-        builder.addLiteralSchema("\nEXPORT TABLE A;");
+        builder.addLiteralSchema("\nCREATE STREAM A PARTITION ON COLUMN C1 (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
         builder.compile(testDir + File.separator + "testAddTableConstraintRejected2.jar");
         Catalog catUpdated = catalogForJar(testDir + File.separator + "testAddTableConstraintRejected2.jar");
         verifyDiffIfEmptyTable(catOriginal, catUpdated);
 
         builder = new VoltProjectBuilder();
-        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
-        builder.addPartitionInfo("A", "C1");
-        builder.addLiteralSchema("\nEXPORT TABLE A;");
+        builder.addLiteralSchema("\nCREATE TABLE A PARTITION ON COLUMN C1 (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
         builder.addLiteralSchema("\nCREATE TABLE B (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
         builder.addPartitionInfo("B", "C1");
         builder.compile(testDir + File.separator + "testAddTableConstraintRejected1.jar");
         catOriginal = catalogForJar(testDir + File.separator + "testAddTableConstraintRejected1.jar");
 
         builder = new VoltProjectBuilder();
-        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
-        builder.addPartitionInfo("A", "C1");
-        builder.addLiteralSchema("\nEXPORT TABLE A;");
-        builder.addLiteralSchema("\nCREATE TABLE B (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
-        builder.addPartitionInfo("B", "C1");
-        builder.addLiteralSchema("\nEXPORT TABLE B;");
+        builder.addLiteralSchema("\nCREATE TABLE A PARTITION ON COLUMN C1 (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addLiteralSchema("\nCREATE TABLE B PARTITION ON COLUMN C1 (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
         builder.compile(testDir + File.separator + "testAddTableConstraintRejected2.jar");
         catUpdated = catalogForJar(testDir + File.separator + "testAddTableConstraintRejected2.jar");
         verifyDiffIfEmptyTable(catOriginal, catUpdated);

@@ -1,4 +1,4 @@
-create sream table1r_el_only (
+create stream table1r_el_only (
  column1_bigint      bigint not null,
  column2_integer     integer,
  column3_smallint    smallint,

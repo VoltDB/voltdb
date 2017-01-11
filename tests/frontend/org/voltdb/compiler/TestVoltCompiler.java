@@ -3311,69 +3311,16 @@ public class TestVoltCompiler extends TestCase {
         Database db;
 
         db = goodDDLAgainstSimpleSchema(
-                "create table e1 (id integer, f1 varchar(16));",
-                "export table e1;"
+                "create stream e1 export to target e1 (id integer, f1 varchar(16));"
                 );
         assertNotNull(getConnectorTableInfoFor(db, "e1"));
 
         db = goodDDLAgainstSimpleSchema(
-                "create table e1 (id integer, f1 varchar(16));",
-                "create table e2 (id integer, f1 varchar(16));",
-                "export table e1;",
-                "eXpOrt TABle E2;"
+                "create stream e1 export to target e1 (id integer, f1 varchar(16));",
+                "create stream e2 export to target E2 (id integer, f1 varchar(16));"
                 );
         assertNotNull(getConnectorTableInfoFor(db, "e1"));
         assertNotNull(getConnectorTableInfoFor(db, "e2"));
-    }
-
-    public void testBadExportTable() throws Exception {
-
-        badDDLAgainstSimpleSchema(".+\\sEXPORT statement: table non_existant was not present in the catalog.*",
-                "export table non_existant;"
-                );
-
-        badDDLAgainstSimpleSchema(".+contains invalid identifier \"1table_name_not_valid\".*",
-                "export table 1table_name_not_valid;"
-                );
-
-        badDDLAgainstSimpleSchema(".+Invalid EXPORT TABLE statement.*",
-                "export table one, two, three;"
-                );
-
-        badDDLAgainstSimpleSchema(".+Invalid EXPORT TABLE statement.*",
-                "export export table one;"
-                );
-
-        badDDLAgainstSimpleSchema(".+Invalid EXPORT TABLE statement.*",
-                "export table table one;"
-                );
-
-        badDDLAgainstSimpleSchema("Streams cannot be configured with indexes.*",
-                "export table books;"
-                );
-
-        badDDLAgainstSimpleSchema("Stream configured with materialized view.*",
-                "create table view_source( id integer, f1 varchar(16), f2 varchar(12));",
-                "create view my_view as select f2, count(*) as f2cnt from view_source group by f2;",
-                "export table view_source;"
-                );
-
-        badDDLAgainstSimpleSchema("Stream configured with materialized view.*",
-                "create stream view_source (id integer, f1 varchar(16), f2 varchar(12));",
-                "create view my_view as select f2, count(*) as f2cnt from view_source group by f2;"
-                );
-
-        badDDLAgainstSimpleSchema("View configured as export source.*",
-                "create table view_source( id integer, f1 varchar(16), f2 varchar(12));",
-                "create view my_view as select f2, count(*) as f2cnt from view_source group by f2;",
-                "export table my_view;"
-                );
-
-        badDDLAgainstSimpleSchema("View configured as export source.*",
-                "create stream view_source (id integer, f1 varchar(16), f2 varchar(12));",
-                "create view my_view as select f2, count(*) as f2cnt from view_source group by f2;",
-                "export table my_view;"
-                );
     }
 
     public void testGoodCreateStream() throws Exception {
@@ -3436,10 +3383,9 @@ public class TestVoltCompiler extends TestCase {
                 "create stream foo export to target bar (id integer, primary key(id));"
                 );
 
-        badDDLAgainstSimpleSchema("View configured as export source.*",
+        badDDLAgainstSimpleSchema("Stream configured with materialized view without partitioned.*",
                 "create stream view_source partition on column id (id integer not null, f1 varchar(16), f2 varchar(12));",
-                "create view my_view as select f2, count(*) as f2cnt from view_source group by f2;",
-                "export table my_view;"
+                "create view my_view as select f2, count(*) as f2cnt from view_source group by f2;"
                 );
     }
 
