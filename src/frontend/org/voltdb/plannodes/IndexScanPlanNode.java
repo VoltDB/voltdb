@@ -780,10 +780,12 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         AbstractExpression.loadFromJSONArrayChild(m_searchkeyExpressions, jobj,
                 Members.SEARCHKEY_EXPRESSIONS.name(), m_tableScan);
         // load ignore_null_candidate flag vector
-        JSONArray jarray = jobj.getJSONArray(Members.IGNORE_NULL_CANDIDATE.name());
-        int numCols = jarray.length();
-        for (int ii = 0; ii < numCols; ++ii) {
-            m_ignoreNullCandidate.add(jarray.getBoolean(ii));
+        if ( ! jobj.isNull(Members.IGNORE_NULL_CANDIDATE.name())) {
+            JSONArray jarray = jobj.getJSONArray(Members.IGNORE_NULL_CANDIDATE.name());
+            int numCols = jarray.length();
+            for (int ii = 0; ii < numCols; ++ii) {
+                m_ignoreNullCandidate.add(jarray.getBoolean(ii));
+            }
         }
         // load skip_null_predicate
         m_skip_null_predicate = AbstractExpression.fromJSONChild(jobj, Members.SKIP_NULL_PREDICATE.name(), m_tableScan);
