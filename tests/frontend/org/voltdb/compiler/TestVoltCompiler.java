@@ -408,21 +408,6 @@ public class TestVoltCompiler extends TestCase {
         }
     }
 
-    // test that a view is not export only
-    public void testViewNotExportOnly() throws IOException {
-        VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addSchema(TestVoltCompiler.class.getResource("ExportTesterWithView-ddl.sql"));
-        project.addStmtProcedure("Dummy", "select * from table1r_el_only");
-        project.addExport(true /* enabled */);
-        try {
-            assertFalse(project.compile("/tmp/exporttestview.jar"));
-        }
-        finally {
-            File jar = new File("/tmp/exporttestview.jar");
-            jar.delete();
-        }
-    }
-
     public void testBadPath() {
         VoltCompiler compiler = new VoltCompiler();
         final boolean success = compiler.compileFromDDL(nothing_jar, "invalidnonsense");
