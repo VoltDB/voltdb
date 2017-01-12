@@ -36,10 +36,6 @@
         },
         "enabled": true
     },
-    "admin-mode": {
-        "port": 21211,
-        "adminstartup": false
-    },
     "heartbeat": {
         "timeout": 90
     },
