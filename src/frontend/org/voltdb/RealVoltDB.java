@@ -1331,17 +1331,16 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB("Failed to validate cluster build string", false, e);
             }
-            // initial start or recover
-            if (!isRejoin && !m_joining) {
-                int expectedHosts = m_catalogContext.getClusterSettings().hostcount();
-                m_messenger.waitForAllHostsToBeReady(expectedHosts);
-            }
 
-            // elastic join, make sure all the joining nodes are ready
+            //elastic join, make sure all the joining nodes are ready
             //so that the secondary connections can be created.
             if (m_joining) {
                 int expectedHosts = m_configuredReplicationFactor + 1;
                 m_messenger.waitForJoiningHostsToBeReady(expectedHosts, this.m_myHostId);
+            } else if (!isRejoin) {
+                // initial start or recover
+                int expectedHosts = m_catalogContext.getClusterSettings().hostcount();
+                m_messenger.waitForAllHostsToBeReady(expectedHosts);
             }
 
             // Create secondary connections within partition group

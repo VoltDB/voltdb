@@ -1519,6 +1519,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      */
     public void waitForJoiningHostsToBeReady(int expectedHosts, int localHostId) {
         try {
+            //register this host as joining. The host registration will be deleted after joining is completed.
             m_zk.create(ZKUtil.joinZKPath(CoreZK.readyjoininghosts, Integer.toString(localHostId)) , null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
             while (true) {
                 ZKUtil.FutureWatcher fw = new ZKUtil.FutureWatcher();
