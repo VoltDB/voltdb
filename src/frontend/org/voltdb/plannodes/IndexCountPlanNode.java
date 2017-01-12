@@ -533,7 +533,11 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         else {
             result += lookupType.getSymbol();
         }
-        result += " " + keyExpressions.get(prefixSize).explain(targetTableName) + ")";
+        result += " " + keyExpressions.get(prefixSize).explain(targetTableName);
+        if (lookupType != IndexLookupType.EQ && ignoreNullCandidate.get(prefixSize) == false) {
+            result += ", including NULLs";
+        }
+        result += ")";
         return result;
     }
 

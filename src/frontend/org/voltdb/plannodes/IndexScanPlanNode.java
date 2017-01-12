@@ -943,7 +943,11 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         else {
             result += m_lookupType.getSymbol();
         }
-        result += " " + m_searchkeyExpressions.get(prefixSize).explain(getTableNameForExplain()) + ")";
+        result += " " + m_searchkeyExpressions.get(prefixSize).explain(getTableNameForExplain());
+        if (m_lookupType != IndexLookupType.EQ && m_ignoreNullCandidate.get(prefixSize) == false) {
+            result += ", including NULLs";
+        }
+        result += ")";
         return result;
     }
 
