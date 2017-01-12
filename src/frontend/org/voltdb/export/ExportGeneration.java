@@ -750,6 +750,7 @@ public class ExportGeneration implements Generation {
         if (m_mbox != null && messenger != null) {
             messenger.removeMailbox(m_mbox);
         }
+        m_dataSourcesByPartition.clear();
         shutdown = true;
         VoltFile.recursivelyDelete(m_directory);
 
@@ -832,6 +833,7 @@ public class ExportGeneration implements Generation {
         if (m_mbox != null && messenger != null) {
             messenger.removeMailbox(m_mbox);
         }
+        m_dataSourcesByPartition.clear();
         shutdown = true;
     }
 
