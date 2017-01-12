@@ -85,6 +85,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     // This list of expressions corresponds to the values that we will use
     // at runtime in the lookup on the index
     protected final List<AbstractExpression> m_searchkeyExpressions = new ArrayList<AbstractExpression>();
+
     // If the search key expression is actually a "not distinct" expression, we do not want the executor to skip null candidates.
     protected final List<Boolean> m_ignoreNullCandidate = new ArrayList<Boolean>();
 
@@ -237,7 +238,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
                 ExpressionType exprType = ExpressionType.COMPARE_EQUAL;
                 if (ignoreNullCandidate != null
                         && i < ignoreNullCandidate.size()
-                        && (! ignoreNullCandidate.get(nullExprIndex))) {
+                        && (! ignoreNullCandidate.get(i))) {
                     exprType = ExpressionType.COMPARE_NOTDISTINCT;
                 }
                 AbstractExpression expr = new ComparisonExpression(exprType, idxExpr, searchkeyExpressions.get(i).clone());
@@ -252,7 +253,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
                 AbstractExpression expr = new OperatorExpression(ExpressionType.OPERATOR_IS_NULL, nullExpr, null);
                 exprs.add(expr);
             }
-            if (exprs.size() == 0) {
+            else {
                 return null;
             }
             skipNullPredicate = ExpressionUtil.combinePredicates(exprs);

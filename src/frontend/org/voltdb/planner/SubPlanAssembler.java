@@ -1577,22 +1577,22 @@ public abstract class SubPlanAssembler {
                 scanNode.addIgnoreNullCandidateFlag(true);
                 continue;
             }
-            AbstractExpression expr2 = expr.getRight();
-            assert(expr2 != null);
+            AbstractExpression exprRightChild = expr.getRight();
+            assert(exprRightChild != null);
             if (expr.getExpressionType() == ExpressionType.COMPARE_IN) {
                 // Replace this method's result with an injected NLIJ.
-                resultNode = injectIndexedJoinWithMaterializedScan(expr2, scanNode);
+                resultNode = injectIndexedJoinWithMaterializedScan(exprRightChild, scanNode);
                 // Extract a TVE from the LHS MaterializedScan for use by the IndexScan in its new role.
                 MaterializedScanPlanNode matscan = (MaterializedScanPlanNode)resultNode.getChild(0);
                 AbstractExpression elemExpr = matscan.getOutputExpression();
                 assert(elemExpr != null);
                 // Replace the IN LIST condition in the end expression referencing all the list elements
                 // with a more efficient equality filter referencing the TVE for each element in turn.
-                replaceInListFilterWithEqualityFilter(path.endExprs, expr2, elemExpr);
+                replaceInListFilterWithEqualityFilter(path.endExprs, exprRightChild, elemExpr);
                 // Set up the similar VectorValue --> TVE replacement of the search key expression.
-                expr2 = elemExpr;
+                exprRightChild = elemExpr;
             }
-            if (expr2 instanceof AbstractSubqueryExpression) {
+            if (exprRightChild instanceof AbstractSubqueryExpression) {
                 // The AbstractSubqueryExpression must be wrapped up into a
                 // ScalarValueExpression which extracts the actual row/column from
                 // the subquery
@@ -1601,7 +1601,7 @@ public abstract class SubPlanAssembler {
                 // DEAD CODE with the guards on index: ENG-8203
                 assert(false);
             }
-            scanNode.addSearchKeyExpression(expr2);
+            scanNode.addSearchKeyExpression(exprRightChild);
             // If the index expression is an "IS NOT DISTINCT FROM" comaprison, let the NULL values go through. (ENG-11096)
             scanNode.addIgnoreNullCandidateFlag(expr.getExpressionType() != ExpressionType.COMPARE_NOTDISTINCT);
         }

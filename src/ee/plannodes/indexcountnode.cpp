@@ -40,6 +40,11 @@ std::string IndexCountPlanNode::debugInfo(const std::string &spacer) const
         buffer << m_searchkey_expressions[ctr]->debug(spacer);
     }
 
+    buffer << spacer << "Ignore null candidate value flags for search keys:\n";
+    for (int ctr = 0, cnt = (int)m_ignore_null_candidate.size(); ctr < cnt; ctr++) {
+        buffer << spacer << (m_ignore_null_candidate[ctr] ? "true" : "false");
+    }
+
     buffer << spacer << "EndKey Expressions:\n";
     for (int ctr = 0, cnt = (int)m_endkey_expressions.size(); ctr < cnt; ctr++) {
         buffer << m_endkey_expressions[ctr]->debug(spacer);
@@ -67,6 +72,7 @@ void IndexCountPlanNode::loadFromJSONObject(PlannerDomValue obj)
     m_target_index_name = obj.valueForKey("TARGET_INDEX_NAME").asStr();
 
     m_searchkey_expressions.loadExpressionArrayFromJSONObject("SEARCHKEY_EXPRESSIONS", obj);
+    loadBooleanArrayFromJSONObject("IGNORE_NULL_CANDIDATE", obj, m_ignore_null_candidate);
     m_endkey_expressions.loadExpressionArrayFromJSONObject("ENDKEY_EXPRESSIONS", obj);
 
     m_skip_null_predicate.reset(loadExpressionFromJSONObject("SKIP_NULL_PREDICATE", obj));

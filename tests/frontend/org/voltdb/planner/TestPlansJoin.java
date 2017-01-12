@@ -3029,12 +3029,14 @@ public class TestPlansJoin extends PlannerTestCase {
         String query;
         String explained;
         for (JoinOp joinOp : JoinOp.JOIN_OPS) {
+            int notDistinctCount = joinOp == JoinOp.NOT_DISTINCT ? 1 : 0;
             query = "SELECT P1.A, P1.C, P3.A, P3.F " +
                     "FROM P1 FULL JOIN P3 ON P1.A" +
                     joinOp + "P3.A AND P1.A = ? AND P3.F = 1 " +
                     "ORDER BY P1.A, P1.C, P3.A, P3.F";
             explained = buildExplainPlan(compileToFragments(query));
             assertTrue(explained.contains("NESTLOOP INDEX FULL JOIN"));
+            assertEquals(notDistinctCount, StringUtils.countMatches(explained, "NOT DISTINCT"));
             query = "SELECT R1.A, R1.C, R3.A, R3.C " +
                     "FROM R1 FULL JOIN R3 ON R3.A" +
                     joinOp + "R1.A AND R3.A < 2 " +
@@ -3042,6 +3044,7 @@ public class TestPlansJoin extends PlannerTestCase {
             explained = buildExplainPlan(compileToFragments(query));
             //* enable to debug */ System.out.println("DEBUG: " + explained);
             assertTrue(explained.contains("NESTLOOP INDEX FULL JOIN"));
+            assertEquals(notDistinctCount, StringUtils.countMatches(explained, "NOT DISTINCT"));
             query = "SELECT LHS.A, LHS.C, RHS.A, RHS.C " +
                     "FROM R3 LHS FULL JOIN R3 RHS ON LHS.A" +
                     joinOp + "RHS.A AND LHS.A < 2 " +
@@ -3049,6 +3052,7 @@ public class TestPlansJoin extends PlannerTestCase {
             explained = buildExplainPlan(compileToFragments(query));
             //* enable to debug */ System.out.println("DEBUG: " + explained);
             assertTrue(explained.contains("NESTLOOP INDEX FULL JOIN"));
+            assertEquals(notDistinctCount, StringUtils.countMatches(explained, "NOT DISTINCT"));
             query = "SELECT * " +
                     "FROM R1 FULL JOIN R2 " +
                     "ON R1.A" +

@@ -70,6 +70,11 @@ std::string IndexScanPlanNode::debugInfo(const std::string &spacer) const
         buffer << m_searchkey_expressions[ctr]->debug(spacer);
     }
 
+    buffer << spacer << "Ignore null candidate value flags for search keys:\n";
+    for (int ctr = 0, cnt = (int)m_ignore_null_candidate.size(); ctr < cnt; ctr++) {
+        buffer << spacer << (m_ignore_null_candidate[ctr] ? "true" : "false");
+    }
+
     buffer << spacer << "End Expression: ";
     if (m_end_expression != NULL) {
         buffer << "\n" << m_end_expression->debug(spacer);
