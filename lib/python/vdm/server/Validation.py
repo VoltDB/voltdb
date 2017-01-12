@@ -341,23 +341,6 @@ schema = {
             },
             "additionalProperties": False
         },
-        "admin-mode": {
-            "id": "admin-mode",
-            "type": "object",
-            "properties": {
-                "port": {
-                    "id": "port",
-                    "type": "integer",
-                    "minimum": 1,
-                    "maximum": 65536
-                },
-                "adminstartup": {
-                    "id": "adminstartup",
-                    "type": "boolean"
-                }
-            },
-            "additionalProperties": False
-        },
         "heartbeat": {
             "id": "heartbeat",
             "type": "object",

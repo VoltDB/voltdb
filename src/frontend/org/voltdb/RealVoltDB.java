@@ -96,6 +96,7 @@ import org.voltcore.utils.VersionChecker;
 import org.voltcore.zk.CoreZK;
 import org.voltcore.zk.ZKCountdownLatch;
 import org.voltcore.zk.ZKUtil;
+import org.voltdb.ProducerDRGateway.MeshMemberInfo;
 import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.catalog.Catalog;
@@ -1332,7 +1333,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 VoltDB.crashLocalVoltDB("Failed to validate cluster build string", false, e);
             }
 
-            if (!m_rejoining && !m_joining) {
+            //elastic join, make sure all the joining nodes are ready
+            //so that the secondary connections can be created.
+            if (m_joining) {
+                int expectedHosts = m_configuredReplicationFactor + 1;
+                m_messenger.waitForJoiningHostsToBeReady(expectedHosts, this.m_myHostId);
+            } else if (!m_rejoining) {
                 // initial start or recover
                 int expectedHosts = m_catalogContext.getClusterSettings().hostcount() - m_config.m_missingHostCount;
                 m_messenger.waitForAllHostsToBeReady(expectedHosts);
@@ -3261,7 +3267,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                         ClientInterfaceRepairCallback callback = (ClientInterfaceRepairCallback) m_consumerDRGateway;
                         callback.repairCompleted(pid, m_cartographer.getHSIdForMaster(pid));
                     }
-                    m_consumerDRGateway.initialize(false);
+                    // Even though we are active-active, we must be a joiner so our conversation file must be empty
+                    m_consumerDRGateway.initialize(false, new ArrayList<>());
                 } else if (m_consumerDRGateway != null) {
                     // 6.2. If we are a DR replica and the consumer was created
                     // before the catalog update, we may care about a deployment
@@ -3558,6 +3565,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 if (m_rejoining) {
                     CoreZK.removeRejoinNodeIndicatorForHost(m_messenger.getZK(), m_myHostId);
                     m_rejoining = false;
+                }
+
+                if (m_joining) {
+                    CoreZK.removeJoinNodeIndicatorForHost(m_messenger.getZK(), m_myHostId);
                 }
 
                 String actionName = m_joining ? "join" : "rejoin";
@@ -3861,7 +3872,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     private void prepareReplication() {
         try {
             if (m_consumerDRGateway != null) {
-                m_consumerDRGateway.initialize(m_config.m_startAction != StartAction.CREATE);
+                List<MeshMemberInfo> expectedClusterMembers;
+                if (m_producerDRGateway != null) {
+                    expectedClusterMembers = m_producerDRGateway.getInitialConversations();
+                }
+                else {
+                    expectedClusterMembers = new ArrayList<>();
+                }
+                m_consumerDRGateway.initialize(m_config.m_startAction != StartAction.CREATE, expectedClusterMembers);
             }
             if (m_producerDRGateway != null) {
                 m_producerDRGateway.startListening(m_catalogContext.cluster.getDrproducerenabled(),

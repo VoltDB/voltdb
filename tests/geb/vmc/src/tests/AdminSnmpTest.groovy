@@ -719,15 +719,32 @@ class AdminSnmpTest extends TestBase {
             println("must save SNMP config")
         }
         then:"click confirm ok button"
-        if(waitFor(10){page.btnSaveSnmp.isDisplayed()}){
-            page.btnSaveSnmp.click()
+        while(count<numberOfTrials) {
+            count ++
+            try {
+                when:
+                waitFor(waitTime) {
+                    if(page.btnSaveSnmp.isDisplayed()){
+                        page.btnSaveSnmp.click()
+                    }
+                }
+                then:
+                if(page.loadingSnmp.isDisplayed()){
+                    //need to check saved data here
+                    waitFor(10){page.txtTarget.text().toLowerCase().equals("")}
+                    println("save is working properly")
+                }
+
+                testStatus = true
+                break
+            } catch(geb.waiting.WaitTimeoutException e) {
+                println("RETRYING: WaitTimeoutException occured")
+            } catch(org.openqa.selenium.StaleElementReferenceException e) {
+                println("RETRYING: StaleElementReferenceException occured")
+            }
         }
 
-        if(page.loadingSnmp.isDisplayed()){
-            //need to check saved data here
-            waitFor(10){page.txtTarget.text().toLowerCase().equals("")}
-            println("save is working properly")
-        }
+
 
 
     }
