@@ -316,13 +316,16 @@ public class ExportGeneration implements Generation {
     }
 
     private Watcher constructLeaderChildWatcher(final Integer partition, final HostMessenger messenger) {
+        if (shutdown || m_drainedSources.get() == m_numSources) {
+            return null;
+        }
         return new Watcher() {
             @Override
             public void process(final WatchedEvent event) {
                 final Runnable processRunnable = new Runnable() {
                     @Override
                     public void run() {
-                        if (m_drainedSources.get() == m_numSources) {
+                        if (shutdown || m_drainedSources.get() == m_numSources) {
                             return;
                         }
                         final AsyncCallback.ChildrenCallback childrenCallback =
@@ -530,6 +533,9 @@ public class ExportGeneration implements Generation {
     }
 
     private Watcher constructMailboxChildWatcher(final HostMessenger messenger) {
+        if (shutdown || m_drainedSources.get() == m_numSources) {
+            return null;
+        }
         return new Watcher() {
 
             @Override
@@ -554,6 +560,9 @@ public class ExportGeneration implements Generation {
     }
 
     private AsyncCallback.ChildrenCallback constructChildRetrievalCallback() {
+        if (shutdown || m_drainedSources.get() == m_numSources) {
+            return null;
+        }
         return new AsyncCallback.ChildrenCallback() {
             @Override
             public void processResult(final int rc, final String path, Object ctx,
