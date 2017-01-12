@@ -168,12 +168,6 @@ def map_deployment(request, database_id):
     if 'cluster' in request.json and 'kfactor' in request.json['cluster']:
         deployment['cluster']['kfactor'] = request.json['cluster']['kfactor']
 
-    if 'admin-mode' in request.json and 'adminstartup' in request.json['admin-mode']:
-        deployment['admin-mode']['adminstartup'] = request.json['admin-mode']['adminstartup']
-
-    if 'admin-mode' in request.json and 'port' in request.json['admin-mode']:
-        deployment['admin-mode']['port'] = request.json['admin-mode']['port']
-
     if 'commandlog' in request.json and 'adminstartup' in request.json['commandlog']:
         deployment['commandlog']['adminstartup'] = request.json['commandlog']['adminstartup']
 
