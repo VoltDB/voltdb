@@ -167,7 +167,7 @@ public class StandaloneExportGeneration implements Generation {
      *
      */
     @Override
-    public void kickOffLeaderElection() {
+    public void kickOffLeaderElection(final HostMessenger ignored) {
         for (Map<String, ExportDataSource> sources : getDataSourceByPartition().values()) {
 
             for (final ExportDataSource source : sources.values()) {

@@ -28,7 +28,7 @@ public interface Generation {
 
     public boolean isContinueingGeneration();
 
-    public void kickOffLeaderElection();
+    public void kickOffLeaderElection(final HostMessenger messenger);
 
     public void acceptMastershipTask(int partitionId);
     public void close(final HostMessenger messenger);

@@ -189,7 +189,7 @@ public class StandaloneExportManager
                     newProcessor.setProcessorConfig(m_processorConfig);
                     newProcessor.readyForData();
 
-                    nextGeneration.kickOffLeaderElection();
+                    nextGeneration.kickOffLeaderElection(m_messenger);
                     oldProcessor = m_processor.getAndSet(newProcessor);
                 } else {
                     //All drained
@@ -313,7 +313,7 @@ public class StandaloneExportManager
              */
             newProcessor.setExportGeneration(nextGeneration);
             newProcessor.readyForData();
-            nextGeneration.kickOffLeaderElection();
+            nextGeneration.kickOffLeaderElection(m_messenger);
             /*
              * If the oldest known generation was disk based,
              * and we are using server side export we need to kick off a leader election
