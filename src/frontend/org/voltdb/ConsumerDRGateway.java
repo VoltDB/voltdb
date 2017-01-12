@@ -53,4 +53,6 @@ public interface ConsumerDRGateway extends Promotable {
     void startConsumerDispatcher(final MeshMemberInfo member, final boolean awaitProducerSnapshot);
 
     void addLocallyLedPartition(int partitionId);
+
+    void populateEmptyTrackersIfNeeded(byte producerClusterId, int producerPartitionCount);
 }
