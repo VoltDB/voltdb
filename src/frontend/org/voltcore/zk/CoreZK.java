@@ -45,7 +45,6 @@ public class CoreZK {
     public static final String readyhosts = "/core/readyhosts";
     public static final String readyhosts_host = "/core/readyhosts/host";
     public static final String readyjoininghosts = "/core/readyjoininghosts";
-    public static final String readyjoininghosts_host = "/core/readyjoininghosts/host";
 
     // hosts since beginning of time (persistent)
     public static final String hostids = "/core/hostids";
@@ -151,6 +150,30 @@ public class CoreZK {
             if (e.code() == KeeperException.Code.NONODE ||
                 e.code() == KeeperException.Code.BADVERSION) {
                 // Okay if the rejoin blocker for the given hostId is already gone.
+                return true;
+            }
+        } catch (InterruptedException e) {
+            return false;
+        }
+        return false;
+    }
+
+    /**
+     * Removes the join indicator for the given host ID.
+     * @return true if the indicator is removed successfully, false otherwise.
+     */
+    public static boolean removeJoinNodeIndicatorForHost(ZooKeeper zk, int hostId)
+    {
+        try {
+            Stat stat = new Stat();
+            String path = ZKUtil.joinZKPath(readyjoininghosts, Integer.toString(hostId));
+            zk.getData(path, false, stat);
+            zk.delete(path, stat.getVersion());
+            return true;
+        } catch (KeeperException e) {
+            if (e.code() == KeeperException.Code.NONODE ||
+                    e.code() == KeeperException.Code.BADVERSION) {
+                // Okay if the join indicator for the given hostId is already gone.
                 return true;
             }
         } catch (InterruptedException e) {
