@@ -106,9 +106,9 @@ function client() {
     benchmark
 }
 
-function catalog() {
-    prepare
-}
+#function catalog() {
+#    prepare
+#}
 
 function jars() {
     prepare
