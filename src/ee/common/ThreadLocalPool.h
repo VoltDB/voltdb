@@ -48,7 +48,10 @@ public:
         Sized(int32_t requested_size) : m_size(requested_size) { }
     };
 
-    static const int POOLED_MAX_VALUE_LENGTH;
+    // This needs to be >= the VoltType.MAX_VALUE_LENGTH defined in java, currently 1048576.
+    // The rationale for making it any larger would be to allow calculating wider "temp"
+    // values for use in situations where they are not being stored as column values.
+    static const int POOLED_MAX_VALUE_LENGTH = 1024 * 1024;
 
     /**
      * Allocate space from a page of objects of the requested size.
