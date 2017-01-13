@@ -60,9 +60,6 @@ public class TestSQLParser extends TestCase {
         assertTrue(SQLParser.appearsToBeValidDDLBatch(
                 "partition table t on column i;"));
 
-        assertTrue(SQLParser.appearsToBeValidDDLBatch(
-                "export table ex_tbl;"));
-
         // Seems to be considered DDL.  Is that what we want?
         assertTrue(SQLParser.appearsToBeValidDDLBatch(
                 "import table ex_tbl;"));

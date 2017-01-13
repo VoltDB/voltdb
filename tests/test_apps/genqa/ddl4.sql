@@ -55,7 +55,7 @@ CREATE STREAM export_partitioned_table2_foo PARTITION ON COLUMN rowid
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 );
 
-CREATE TABLE export_mirror_partitioned_table2
+CREATE STREAM export_mirror_partitioned_table2 PARTITION ON COLUMN rowid
 (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
@@ -80,9 +80,7 @@ CREATE TABLE export_mirror_partitioned_table2
 , type_not_null_varchar128  VARCHAR(128)  NOT NULL
 , type_null_varchar1024     VARCHAR(1024)
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
-, PRIMARY KEY (rowid)
 );
-PARTITION TABLE export_mirror_partitioned_table2 ON COLUMN rowid;
 
 CREATE STREAM export_skinny_partitioned_table2 PARTITION ON COLUMN rowid
 (

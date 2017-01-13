@@ -70,14 +70,6 @@ public class TestSQLLexer {
         checkDDL("-- alter table pants", null);
         checkDDL("altar table pants", null);
 
-        checkDDL("export table pants", "export");
-        checkDDL("EXPORT table pants", "export");
-        checkDDL("ExPoRt table pants", "export");
-        checkDDL("   export table pants    ", "export");
-        checkDDL("exporttable pants", null);
-        checkDDL("-- export table pants", null);
-        checkDDL("exprot table pants", null);
-
         checkDDL("dr table pants", "dr");
         checkDDL("DR table pants", "dr");
         checkDDL("Dr table pants", "dr");

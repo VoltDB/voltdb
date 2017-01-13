@@ -365,7 +365,7 @@ public class TestSqlUpsertSuite extends RegressionSuite {
                 "DEPT INTEGER);" +
                 "PARTITION TABLE UP2 ON COLUMN ID;" +
 
-                // Export table
+                // Stream table
                 "CREATE STREAM UR3 ( " +
                 "ID INTEGER NOT NULL, " +
                 "WAGE INTEGER DEFAULT 1, " +

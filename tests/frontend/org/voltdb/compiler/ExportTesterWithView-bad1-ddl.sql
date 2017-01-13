@@ -1,4 +1,4 @@
--- partition column on export table but not in view
+-- partition column on stream table but not in view
 create stream table4r_el_only partition on column column1_bigint (
  column1_bigint      bigint not null,
  column2_integer     integer,

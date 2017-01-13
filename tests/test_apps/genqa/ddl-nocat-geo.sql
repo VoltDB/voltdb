@@ -75,7 +75,7 @@ CREATE STREAM export_partitioned_table PARTITION ON COLUMN rowid EXPORT TO TARGE
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 );
 
-CREATE TABLE  export_mirror_partitioned_table
+CREATE STREAM export_mirror_partitioned_table PARTITION ON COLUMN rowid
 (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
@@ -102,7 +102,6 @@ CREATE TABLE  export_mirror_partitioned_table
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 , PRIMARY KEY (rowid)
 );
-PARTITION TABLE export_mirror_partitioned_table ON COLUMN rowid;
 
 CREATE STREAM export_done_table PARTITION ON COLUMN txnid EXPORT TO TARGET abc
 (
@@ -239,7 +238,7 @@ CREATE STREAM export_geo_partitioned_table PARTITION ON COLUMN rowid EXPORT TO T
 
 -- should be an exact copy of the stream. Used for verifiing
 -- export stream contents.
-CREATE TABLE  export_geo_mirror_partitioned_table
+CREATE STREAM export_geo_mirror_partitioned_table PARTITION ON COLUMN rowid
 (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
@@ -268,10 +267,7 @@ CREATE TABLE  export_geo_mirror_partitioned_table
 , type_not_null_geography   GEOGRAPHY(1024)   NOT NULL
 , type_null_geography_point GEOGRAPHY_POINT
 , type_not_null_geography_point GEOGRAPHY_POINT NOT NULL
-
-, PRIMARY KEY (rowid)
 );
-PARTITION TABLE export_geo_mirror_partitioned_table ON COLUMN rowid;
 
 CREATE STREAM export_geo_done_table PARTITION ON COLUMN txnid EXPORT TO TARGET abc
 (

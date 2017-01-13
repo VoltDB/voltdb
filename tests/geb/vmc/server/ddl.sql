@@ -50,7 +50,7 @@ AS
      FROM partitioned_table
  GROUP BY rowid_group;
 
--- Export Table for Partitioned Data Table deletions
+-- Stream Table for Partitioned Data Table deletions
 CREATE STREAM export_partitioned_table PARTITION ON COLUMN rowid
 (
   txnid                     BIGINT          NOT NULL
@@ -167,7 +167,7 @@ AS
      FROM replicated_table
  GROUP BY rowid_group;
 
--- Export Table for Replicated Data Table deletions
+-- Stream Table for Replicated Data Table deletions
 CREATE STREAM export_replicated_table
 (
   txnid                     BIGINT          NOT NULL

@@ -1,4 +1,4 @@
--- partition column missing on export table
+-- partition column missing on stream table
 create stream table4r_el_only (
  column1_bigint      bigint not null,
  column2_integer     integer,
