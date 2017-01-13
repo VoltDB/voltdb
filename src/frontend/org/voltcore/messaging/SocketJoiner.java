@@ -621,13 +621,17 @@ public class SocketJoiner {
         int connectAttempts = 0;
         while (socket == null) {
             try {
-                socket = SocketChannel.open(hostAddr);
+                socket = SocketChannel.open();
+                socket.socket().connect(hostAddr, 5000);
             }
             catch (java.net.ConnectException
                   |java.nio.channels.UnresolvedAddressException
                   |java.net.NoRouteToHostException
                   |java.net.PortUnreachableException e)
             {
+                // reset the socket to null for loop purposes
+                socket = null;
+
                 if (mode == ConnectStrategy.PROBE) {
                     return null;
                 }

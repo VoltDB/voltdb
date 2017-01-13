@@ -20,6 +20,7 @@ package org.voltdb;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -37,9 +38,13 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 
+import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableSet;
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
+import com.google_voltpatches.common.collect.LinkedListMultimap;
+import com.google_voltpatches.common.collect.Maps;
+import com.google_voltpatches.common.collect.Multimap;
 import com.google_voltpatches.common.collect.Sets;
 
 public class AbstractTopology {
@@ -1012,29 +1017,20 @@ public class AbstractTopology {
      * Compute the tree-edge distance between any two ha group tokens
      * Not the most efficient way to do this, but even n^2 for 100 nodes is computable
      */
-    private static int computeHADistance(/*final Map<String, Integer> distanceCache,*/ String token1, String token2) {
-        // ensure token1 < token2 (swap if need be)
-        if (token1.compareTo(token2) > 0) {
-            String temp = token1;
-            token1 = token2;
-            token2 = temp;
-        }
+    private static int computeHADistance(String token1, String token2) {
 
         // break into arrays of graph edges
-        String[] token1parts = token1.split(".");
-        String[] token2parts = token1.split(".");
-
-        // trim shared path prefix
-        while (token1parts.length > 0) {
-            if (token2parts.length == 0) break;
-            if (token1parts.equals(token2parts)) {
-                token1parts = Arrays.copyOfRange(token1parts, 1, token1parts.length);
-                token2parts = Arrays.copyOfRange(token2parts, 1, token2parts.length);
-            }
+        String[] token1parts = token1.split("\\.");
+        String[] token2parts = token2.split("\\.");
+        int size = Math.min(token1parts.length, token2parts.length);
+        int index = 0;
+        while (index < size) {
+            if (!token1parts[index].equals(token2parts[index])) break;
+            index++;
         }
 
-        // distance is now the sum of the two path lengths
-        return token1parts.length + token2parts.length;
+        // distance is the sum of the two diverting path lengths
+        return token1parts.length + token2parts.length - 2 * index;
     }
 
     /**
@@ -1369,5 +1365,98 @@ public class AbstractTopology {
         //assume all partitions have the same k factor.
         Partition partition =  partitionsById.values().iterator().next();
         return partition.k;
+    }
+
+    /**
+     * Sort all nodes in reverse hostGroup distance order, then group by rack-aware group, local host id is excluded.
+     * @param hostId the local host id
+     * @param hostGroups a host id to group map
+     * @return sorted grouped host ids from farthest to nearest
+     */
+    @SuppressWarnings("unchecked")
+    public static List<Collection<Integer>> sortHostIdByHGDistance(int hostId, Map<Integer, String> hostGroups) {
+        String localHostGroup = hostGroups.get(hostId);
+        Preconditions.checkArgument(localHostGroup != null);
+
+        // Memorize the distance, map the distance to host ids.
+        Multimap<Integer, Integer> distanceMap = LinkedListMultimap.create();
+        for (Map.Entry<Integer, String> entry : hostGroups.entrySet()) {
+            if (hostId == entry.getKey()) continue;
+            distanceMap.put(computeHADistance(localHostGroup, entry.getValue()), entry.getKey());
+        }
+
+        //sort the multipmap of distance to host ids by the distances in descending order
+        //and collect the host ids in lists.For example, if the distance map contains
+        //1=[0.2.3], 3=[1,4] 4=[5,6,7]. The results will be [5,6,7], [1,4], [0,2,3]
+        List<Collection<Integer>> result = distanceMap.asMap().entrySet().stream()
+                .sorted(Comparator.comparingInt(k->((Entry<Integer, Integer>) k).getKey()).reversed())
+                .map(x->x.getValue())
+                .collect(Collectors.toList());
+
+        return result;
+    }
+    /**
+     * Best effort to find the matching host on the existing topology from ZK
+     * Use the placement group of the recovering host to match a lost node in the topology
+     * @param topology The topology
+     * @param liveHosts The live host ids
+     * @param localHostId The rejoining host id
+     * @param placementGroup The rejoining placement group
+     * @return recovered topology if a matching node is found
+     */
+    public static AbstractTopology mutateRecoverTopology(AbstractTopology topology,
+            Set<Integer> liveHosts, int localHostId, String placementGroup) {
+
+        Map<Integer, MutableHost> mutableHostMap = new TreeMap<>();
+        Map<Integer, MutablePartition> mutablePartitionMap = new TreeMap<>();
+
+        // create mutable hosts without partitions
+        int recoveredHostId = -1;
+        Map<String, Set<Integer>> haGroupMaps = Maps.newHashMap();
+        for (Host host : topology.hostsById.values()) {
+            int hostId = host.id;
+            //recover from the 1st none-living node in the same placement group
+            if (host.haGroup.token.equalsIgnoreCase(placementGroup) &&
+                    !liveHosts.contains(hostId) && recoveredHostId < 0) {
+                recoveredHostId = host.id;
+                hostId = localHostId;
+            }
+            Set<Integer> groupHostIds = haGroupMaps.get(host.haGroup.token);
+            if (groupHostIds == null) {
+                groupHostIds = Sets.newHashSet();
+                haGroupMaps.put(host.haGroup.token, groupHostIds);
+            }
+            groupHostIds.add(hostId);
+            final MutableHost mutableHost = new MutableHost(hostId, host.targetSiteCount, null);
+            mutableHostMap.put(hostId, mutableHost);
+        }
+        //no matching candidate found.
+        if (recoveredHostId < 0) {
+            return null;
+        }
+
+        //update placement groups with recovering host
+        for (Map.Entry<String, Set<Integer>> entry : haGroupMaps.entrySet()) {
+            HAGroup haGroup = new HAGroup(entry.getKey(), entry.getValue().stream().mapToInt(Number::intValue).toArray());
+            for (Integer hostId : entry.getValue()) {
+                final MutableHost mutableHost = mutableHostMap.get(hostId);
+                mutableHost.haGroup = haGroup;
+            }
+        }
+
+        //move partitions to host
+        for (Partition partition : topology.partitionsById.values()) {
+            MutablePartition mp = new MutablePartition(partition.id, partition.k);
+            mutablePartitionMap.put(mp.id, mp);
+            for (Integer hId : partition.hostIds) {
+                int hostId = (hId == recoveredHostId) ? localHostId : hId;
+                final MutableHost mutableHost = mutableHostMap.get(hostId);
+                mp.hosts.add(mutableHost);
+                mutableHost.partitions.add(mp);
+            }
+            int leader = (partition.leaderHostId == recoveredHostId) ? localHostId : partition.leaderHostId;
+            mp.leader = mutableHostMap.get(leader);
+        }
+        return convertMutablesToTopology(topology.version, mutableHostMap, mutablePartitionMap);
     }
 }

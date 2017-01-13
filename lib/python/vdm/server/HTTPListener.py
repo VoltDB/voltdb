@@ -168,12 +168,6 @@ def map_deployment(request, database_id):
     if 'cluster' in request.json and 'kfactor' in request.json['cluster']:
         deployment['cluster']['kfactor'] = request.json['cluster']['kfactor']
 
-    if 'admin-mode' in request.json and 'adminstartup' in request.json['admin-mode']:
-        deployment['admin-mode']['adminstartup'] = request.json['admin-mode']['adminstartup']
-
-    if 'admin-mode' in request.json and 'port' in request.json['admin-mode']:
-        deployment['admin-mode']['port'] = request.json['admin-mode']['port']
-
     if 'commandlog' in request.json and 'adminstartup' in request.json['commandlog']:
         deployment['commandlog']['adminstartup'] = request.json['commandlog']['adminstartup']
 
@@ -450,6 +444,51 @@ def map_deployment(request, database_id):
                     deployment['dr']['port'] = request.json['dr']['port']
                 else:
                     deployment['dr']['port'] = None
+
+    if 'snmp' in request.json:
+        if request.json['snmp']:
+            if 'snmp' not in deployment or ('snmp' in deployment and not deployment['snmp']):
+                deployment['snmp'] = {}
+
+            if 'enabled' in request.json['snmp'] and request.json['snmp']['enabled'] != '':
+                deployment['snmp']['enabled'] = request.json['snmp']['enabled']
+            else:
+                deployment['snmp']['enabled'] = True
+
+            if 'target' in request.json['snmp']:
+                deployment['snmp']['target'] = request.json['snmp']['target']
+
+            if 'community' in request.json['snmp']:
+                deployment['snmp']['community'] = request.json['snmp']['community']
+            else:
+                deployment['snmp']['community'] = 'public'
+
+            if 'username' in request.json['snmp']:
+                deployment['snmp']['username'] = request.json['snmp']['username']
+            else:
+                deployment['snmp']['username'] = None
+
+            if 'authprotocol' in request.json['snmp']:
+                deployment['snmp']['authprotocol'] = request.json['snmp']['authprotocol']
+            else:
+                deployment['snmp']['authprotocol'] = 'SHA'
+
+            if 'authkey' in request.json['snmp']:
+                deployment['snmp']['authkey'] = request.json['snmp']['authkey']
+            else:
+                deployment['snmp']['authkey'] = 'voltdbauthkey'
+
+            if 'privacyprotocol' in request.json['snmp']:
+                deployment['snmp']['privacyprotocol'] = request.json['snmp']['privacyprotocol']
+            else:
+                deployment['snmp']['privacyprotocol'] = 'AES'
+
+            if 'privacykey' in request.json['snmp']:
+                deployment['snmp']['privacykey'] = request.json['snmp']['privacykey']
+            else:
+                deployment['snmp']['privacykey'] = 'voltdbprivacykey'
+        else:
+            deployment['snmp'] = None
 
     return deployment
 
@@ -1662,6 +1701,7 @@ class DatabaseDeploymentAPI(MethodView):
     @staticmethod
     def put(database_id):
         if 'application/json' in request.headers['Content-Type']:
+
             inputs = JsonInputs(request)
             if not inputs.validate():
                 return jsonify(status=401, statusString=inputs.errors)

@@ -51,5 +51,4 @@
 <dr id="6" listen="true" port="12112">
 <connection source="uuuu"/>
 </dr>
-<admin-mode adminstartup="false" port="21211"/>
 </deployment>

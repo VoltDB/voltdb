@@ -104,6 +104,8 @@ public interface SystemProcedureExecutionContext {
 
     public void resetDrAppliedTracker();
 
+    public void initDRAppliedTracker(Map<Byte, Integer> clusterIdToPartitionCountMap);
+
     public Map<Integer, Map<Integer, DRConsumerDrIdTracker>> getDrAppliedTrackers();
 
     public Pair<Long, Long> getDrLastAppliedUniqueIds();

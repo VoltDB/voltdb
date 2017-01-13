@@ -16,6 +16,7 @@
  */
 package org.voltdb;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 
@@ -81,7 +82,7 @@ public interface SnapshotCompletionInterest {
                 long clusterCreateTime) {
             return new SnapshotCompletionEvent(
                     path, stype, nonce, multipartTxnId, partitionTxnIds, truncationSnapshot,
-                    true, "", null, null, null, drVersion, clusterCreateTime);
+                    true, "", null, null, new HashMap<>(), drVersion, clusterCreateTime);
         }
     }
 
