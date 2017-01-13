@@ -37,10 +37,10 @@ JARS_CMD_PRFIX = "./run.sh uacjars "
 
 
 def generate_ddl(tables, ddlname):
-    tb = ('create table t{} (a integer not null, b varchar(10), c integer,'
+    tb = ('create table t{0} (a integer not null, b varchar(10), c integer,'
             'd smallint, e integer, primary key(a, b));'
-          'create index t{}_idx1 on t{}(a,c);'
-          'create index t{}_idx2 on t{}(a,d);'
+          'create index t{1}_idx1 on t{2}(a,c);'
+          'create index t{3}_idx2 on t{4}(a,d);'
     )
 
     ddl = "file -inlinebatch END_OF_BATCH\n";
@@ -54,7 +54,7 @@ def generate_ddl(tables, ddlname):
     return
 
 def generate_procedure_stmts(pfrom, pto, filename):
-    stmt = "CREATE PROCEDURE FROM CLASS uac.Proc{};"
+    stmt = "CREATE PROCEDURE FROM CLASS uac.Proc{0};"
 
     stmts = ""
     for i in range(pfrom, pto):
