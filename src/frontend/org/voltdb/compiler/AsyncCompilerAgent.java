@@ -224,6 +224,11 @@ public class AsyncCompilerAgent {
         if (hasDDL == null) {
             // we saw neither DDL or DQL/DML.  Make sure that we get a
             // response back to the client
+            if (w.invocationName.equals("@SwapTables")) {
+                final AsyncCompilerResult result = compileSysProcPlan(w);
+                w.completionHandler.onCompletion(result);
+                return;
+            }
             AsyncCompilerResult errResult =
                 AsyncCompilerResult.makeErrorResult(w,
                         "Failed to plan, no SQL statement provided.");
@@ -348,7 +353,6 @@ public class AsyncCompilerAgent {
                     + "Pass each parameterized SQL statement to a separate callProcedure invocation.";
 
     AsyncCompilerResult compileAdHocPlan(AdHocPlannerWork work) {
-
         // record the catalog version the query is planned against to
         // catch races vs. updateApplicationCatalog.
         CatalogContext context = work.catalogContext;
@@ -358,8 +362,8 @@ public class AsyncCompilerAgent {
 
         final PlannerTool ptool = context.m_ptool;
 
-        List<String> errorMsgs = new ArrayList<String>();
-        List<AdHocPlannedStatement> stmts = new ArrayList<AdHocPlannedStatement>();
+        List<String> errorMsgs = new ArrayList<>();
+        List<AdHocPlannedStatement> stmts = new ArrayList<>();
         int partitionParamIndex = -1;
         VoltType partitionParamType = null;
         Object partitionParamValue = null;
@@ -381,7 +385,8 @@ public class AsyncCompilerAgent {
             }
             else if (work.userPartitionKey == null) {
                 partitioning = StatementPartitioning.forceMP();
-            } else {
+            }
+            else {
                 partitioning = StatementPartitioning.forceSP();
             }
             try {
@@ -432,12 +437,61 @@ public class AsyncCompilerAgent {
             errorSummary = StringUtils.join(errorMsgs, "\n");
         }
 
+        AdHocPlannedStmtBatch plannedStmtBatch =
+                new AdHocPlannedStmtBatch(work, stmts,
+                        partitionParamIndex, partitionParamType, partitionParamValue,
+                        errorSummary);
+
+        if (adhocLog.isDebugEnabled()) {
+            logBatch(plannedStmtBatch);
+        }
+
+        return plannedStmtBatch;
+    }
+
+    /**
+     * A simplified variant of compileAdHoc that translates a
+     * pseudo-statement generated internally from a system stored proc
+     * invocation into a multi-part EE statement plan.
+     * @param work
+     * @return
+     */
+    AsyncCompilerResult compileSysProcPlan(AdHocPlannerWork work) {
+        // record the catalog version the query is planned against to
+        // catch races vs. updateApplicationCatalog.
+        CatalogContext context = work.catalogContext;
+        if (context == null) {
+            context = VoltDB.instance().getCatalogContext();
+        }
+
+        final PlannerTool ptool = context.m_ptool;
+
+        List<String> errorMsgs = new ArrayList<>();
+        List<AdHocPlannedStatement> stmts = new ArrayList<>();
+        assert(work.sqlStatements != null);
+        assert(work.sqlStatements.length == 1);
+
+        String sqlStatement = work.sqlStatements[0];
+        StatementPartitioning partitioning = StatementPartitioning.forceMP();
+        try {
+            AdHocPlannedStatement result = ptool.planSql(sqlStatement, partitioning,
+                    false, work.userParamSet);
+            stmts.add(result);
+        }
+        catch (Exception ex) {
+            errorMsgs.add("Unexpected System Stored Procedure Planning Error: " + ex);
+        }
+        catch (AssertionError ae) {
+            errorMsgs.add("Assertion Error in System Stored Procedure Planning: " + ae);
+        }
+
+        String errorSummary = null;
+        if ( ! errorMsgs.isEmpty()) {
+            errorSummary = StringUtils.join(errorMsgs, "\n");
+        }
+
         AdHocPlannedStmtBatch plannedStmtBatch = new AdHocPlannedStmtBatch(work,
-                                                                           stmts,
-                                                                           partitionParamIndex,
-                                                                           partitionParamType,
-                                                                           partitionParamValue,
-                                                                           errorSummary);
+                stmts, -1, null, null, errorSummary);
 
         if (adhocLog.isDebugEnabled()) {
             logBatch(plannedStmtBatch);
