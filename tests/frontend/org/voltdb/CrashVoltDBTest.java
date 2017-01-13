@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -23,16 +23,17 @@
 
 package org.voltdb;
 
-import junit.framework.TestCase;
-
+import org.junit.Test;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.regressionsuites.JUnit4LocalClusterTest;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb_testprocs.regressionsuites.failureprocs.CrashVoltDBProc;
 
-public class CrashVoltDBTest extends TestCase {
+public class CrashVoltDBTest extends JUnit4LocalClusterTest {
 
+    @Test
     public void testSimple() throws Exception {
         String simpleSchema =
             "create table blah (" +

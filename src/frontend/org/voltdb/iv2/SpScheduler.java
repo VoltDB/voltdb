@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -147,7 +147,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     private final Map<Long, Queue<TransactionTask>> m_mpsPendingDurability =
         new HashMap<Long, Queue<TransactionTask>>();
     private CommandLog m_cl;
-    private PartitionDRGateway m_drGateway = new PartitionDRGateway();
     private final SnapshotCompletionMonitor m_snapMonitor;
     // used to decide if we should shortcut reads
     private Consistency.ReadLevel m_defaultConsistencyReadLevel;
@@ -209,12 +208,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 m_durabilityListener.setUniqueIdListener(listener);
             }
         });
-    }
-
-    public void setDRGateway(PartitionDRGateway gateway)
-    {
-        m_drGateway = gateway;
-        setDurableUniqueIdListener(gateway);
     }
 
     @Override
@@ -430,7 +423,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
     // SpScheduler expects to see InitiateTaskMessages corresponding to single-partition
     // procedures only.
-    public void handleIv2InitiateTaskMessage(Iv2InitiateTaskMessage message)
+    private void handleIv2InitiateTaskMessage(Iv2InitiateTaskMessage message)
     {
         if (!message.isSinglePartition()) {
             throw new RuntimeException("SpScheduler.handleIv2InitiateTaskMessage " +
@@ -610,7 +603,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         final boolean shortcutRead = msg.isReadOnly() && (m_defaultConsistencyReadLevel == ReadLevel.FAST);
         final String procedureName = msg.getStoredProcedureName();
         final SpProcedureTask task =
-            new SpProcedureTask(m_mailbox, procedureName, m_pendingTasks, msg, m_drGateway);
+            new SpProcedureTask(m_mailbox, procedureName, m_pendingTasks, msg);
         if (!shortcutRead) {
             ListenableFuture<Object> durabilityBackpressureFuture =
                     m_cl.log(msg, msg.getSpHandle(), null, m_durabilityListener, task);
@@ -725,7 +718,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     }
 
     // Pass a response through the duplicate counters.
-    public void handleInitiateResponseMessage(InitiateResponseMessage message)
+    private void handleInitiateResponseMessage(InitiateResponseMessage message)
     {
         /**
          * A shortcut read is a read operation sent to any replica and completed with no
@@ -919,9 +912,11 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             // AND we've never seen anything for this transaction before.  We can't
             // actually log until we create a TransactionTask, though, so just keep track
             // of whether it needs to be done.
-            if (msg.getInitiateTask() != null) {
-                logThis = !msg.getInitiateTask().isReadOnly();
-            }
+
+            // Like SP, we should log writes and safe reads.
+            // Fast reads can be directly put on the task queue.
+            boolean shortcutRead = msg.isReadOnly() && (m_defaultConsistencyReadLevel == ReadLevel.FAST);
+            logThis = !shortcutRead;
         }
 
         // Check to see if this is the final task for this txn, and if so, if we can close it out early
@@ -1007,7 +1002,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
     // Eventually, the master for a partition set will need to be able to dedupe
     // FragmentResponses from its replicas.
-    public void handleFragmentResponseMessage(FragmentResponseMessage message)
+    private void handleFragmentResponseMessage(FragmentResponseMessage message)
     {
         // Send the message to the duplicate counter, if any
         DuplicateCounter counter =
@@ -1054,7 +1049,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         m_mailbox.send(message.getDestinationSiteId(), message);
     }
 
-    public void handleCompleteTransactionMessage(CompleteTransactionMessage message)
+    private void handleCompleteTransactionMessage(CompleteTransactionMessage message)
     {
         CompleteTransactionMessage msg = message;
         if (m_isLeader) {
@@ -1088,7 +1083,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
             Iv2Trace.logCompleteTransactionMessage(msg, m_mailbox.getHSId());
             final CompleteTransactionTask task =
-                new CompleteTransactionTask(m_mailbox, txn, m_pendingTasks, msg, m_drGateway);
+                new CompleteTransactionTask(m_mailbox, txn, m_pendingTasks, msg);
             queueOrOfferMPTask(task);
         } else {
             // Generate a dummy response message when this site has not seen previous FragmentTaskMessage,
@@ -1101,7 +1096,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
     }
 
-    public void handleCompleteTransactionResponseMessage(CompleteTransactionResponseMessage msg)
+    private void handleCompleteTransactionResponseMessage(CompleteTransactionResponseMessage msg)
     {
         final DuplicateCounterKey duplicateCounterKey = new DuplicateCounterKey(msg.getTxnId(), msg.getSpHandle());
         DuplicateCounter counter = m_duplicateCounters.get(duplicateCounterKey);
@@ -1143,7 +1138,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     /**
      * Should only receive these messages at replicas, when told by the leader
      */
-    public void handleIv2LogFaultMessage(Iv2LogFaultMessage message)
+    private void handleIv2LogFaultMessage(Iv2LogFaultMessage message)
     {
         //call the internal log write with the provided SP handle and wait for the fault log IO to complete
         SettableFuture<Boolean> written = writeIv2ViableReplayEntryInternal(message.getSpHandle());
@@ -1181,23 +1176,23 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
     }
 
-    public void handleDumpMessage()
+    private void handleDumpMessage()
     {
         String who = CoreUtils.hsIdToString(m_mailbox.getHSId());
         hostLog.warn("State dump for site: " + who);
-        hostLog.warn("" + who + ": partition: " + m_partitionId + ", isLeader: " + m_isLeader);
+        hostLog.warn(who + ": partition: " + m_partitionId + ", isLeader: " + m_isLeader);
         if (m_isLeader) {
-            hostLog.warn("" + who + ": replicas: " + CoreUtils.hsIdCollectionToString(m_replicaHSIds));
+            hostLog.warn(who + ": replicas: " + CoreUtils.hsIdCollectionToString(m_replicaHSIds));
             if (m_sendToHSIds.length > 0) {
                 m_mailbox.send(m_sendToHSIds, new DumpMessage());
             }
         }
-        hostLog.warn("" + who + ": most recent SP handle: " + TxnEgo.txnIdToString(getCurrentTxnId()));
-        hostLog.warn("" + who + ": outstanding txns: " + m_outstandingTxns.keySet() + " " +
+        hostLog.warn(who + ": most recent SP handle: " + TxnEgo.txnIdToString(getCurrentTxnId()));
+        hostLog.warn(who + ": outstanding txns: " + m_outstandingTxns.keySet() + " " +
                 TxnEgo.txnIdCollectionToString(m_outstandingTxns.keySet()));
-        hostLog.warn("" + who + ": TransactionTaskQueue: " + m_pendingTasks.toString());
+        hostLog.warn(who + ": TransactionTaskQueue: " + m_pendingTasks.toString());
         if (m_duplicateCounters.size() > 0) {
-            hostLog.warn("" + who + ": duplicate counters: ");
+            hostLog.warn(who + ": duplicate counters: ");
             for (Entry<DuplicateCounterKey, DuplicateCounter> e : m_duplicateCounters.entrySet()) {
                 hostLog.warn("\t" + who + ": " + e.getKey().toString() + ": " + e.getValue().toString());
             }
@@ -1376,6 +1371,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
     }
 
+    // This is for test only
     public void setConsistentReadLevelForTestOnly(ReadLevel readLevel) {
         m_defaultConsistencyReadLevel = readLevel;
         if (m_defaultConsistencyReadLevel == ReadLevel.SAFE) {

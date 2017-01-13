@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -394,14 +394,14 @@ public class SnapshotSaveAPI
         try {
             JSONStringer stringer = new JSONStringer();
             stringer.object();
-            stringer.key("txnId").value(txnId);
-            stringer.key("isTruncation").value(isTruncation);
-            stringer.key("didSucceed").value(false);
-            stringer.key("hostCount").value(-1);
-            stringer.key(SnapshotUtil.JSON_PATH).value(path);
-            stringer.key(SnapshotUtil.JSON_PATH_TYPE).value(pathType);
-            stringer.key(SnapshotUtil.JSON_NONCE).value(nonce);
-            stringer.key("truncReqId").value(truncReqId);
+            stringer.keySymbolValuePair("txnId", txnId);
+            stringer.keySymbolValuePair("isTruncation", isTruncation);
+            stringer.keySymbolValuePair("didSucceed", false);
+            stringer.keySymbolValuePair("hostCount", -1);
+            stringer.keySymbolValuePair(SnapshotUtil.JSON_PATH, path);
+            stringer.keySymbolValuePair(SnapshotUtil.JSON_PATH_TYPE, pathType);
+            stringer.keySymbolValuePair(SnapshotUtil.JSON_NONCE, nonce);
+            stringer.keySymbolValuePair("truncReqId", truncReqId);
             stringer.key("exportSequenceNumbers").object().endObject();
             stringer.endObject();
             JSONObject jsonObj = new JSONObject(stringer.toString());

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -238,7 +238,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
     assert (outer_tuple.sizeInValues() == outer_table->columnCount());
     assert (inner_tuple.sizeInValues() == inner_table->columnCount());
     const TableTuple &null_inner_tuple = m_null_inner_tuple.tuple();
-    ProgressMonitorProxy pmp(m_engine, this);
+    ProgressMonitorProxy pmp(m_engine->getExecutorContext(), this);
 
     // The table filter to keep track of inner tuples that don't match any of outer tuples for FULL joins
     TableTupleFilter innerTableFilter;

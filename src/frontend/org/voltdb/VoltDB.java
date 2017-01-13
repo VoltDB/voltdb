@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -40,6 +40,7 @@ import org.voltcore.logging.VoltLog4jLogger;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.network.ReverseDNSCache;
+import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.EstTimeUpdater;
 import org.voltcore.utils.OnDemandBinaryLogger;
 import org.voltcore.utils.PortGenerator;
@@ -50,6 +51,7 @@ import org.voltdb.probe.MeshProber;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.settings.NodeSettings;
 import org.voltdb.settings.Settings;
+import org.voltdb.snmp.SnmpTrapSender;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.MiscUtils;
@@ -89,22 +91,6 @@ public class VoltDB {
     public static final String DEFAULT_CLUSTER_NAME = "database";
     public static final String DBROOT = Constants.DBROOT;
     public static final String MODULE_CACHE = ".bundles-cache";
-
-    // Utility to try to figure out if this is a test case.  Various junit targets in
-    // build.xml set this environment variable to give us a hint
-    public static boolean isThisATest()
-    {
-        String test = System.getenv().get("VOLT_JUSTATEST");
-        if (test == null) {
-            test = System.getProperty("VOLT_JUSTATEST");
-        }
-        if (test != null && test.equalsIgnoreCase("YESYESYES")) {
-            return true;
-        }
-        else {
-            return false;
-        }
-    }
 
     // The name of the SQLStmt implied by a statement procedure's sql statement.
     public static final String ANON_STMT_NAME = "sql";
@@ -254,6 +240,10 @@ public class VoltDB {
         public String m_placementGroup = null;
 
         public boolean m_isPaused = false;
+
+        /** GET option */
+        public GetActionArgument m_getOption = GetActionArgument.DEPLOYMENT;
+        public String m_getOutput = null;
 
         private final static void referToDocAndExit() {
             System.out.println("Please refer to VoltDB documentation for command line usage.");
@@ -613,13 +603,28 @@ public class VoltDB {
                         System.err.println("FATAL: " + e.getMessage());
                         referToDocAndExit();
                     }
-                }
-                else {
+                } else if (arg.equalsIgnoreCase("getvoltdbroot")) {
+                    //Can not use voltdbroot which creates directory we dont intend to create for get deployment etc.
+                    m_voltdbRoot = new VoltFile(args[++i]);
+                } else if (arg.equalsIgnoreCase("get")) {
+                    m_startAction = StartAction.GET;
+                    GetActionArgument.valueOf(args[++i].trim().toUpperCase());
+                } else if (arg.equalsIgnoreCase("file")) {
+                    m_getOutput = args[++i].trim();
+                } else {
                     System.err.println("FATAL: Unrecognized option to VoltDB: " + arg);
                     referToDocAndExit();
                 }
             }
-
+            //I am a get
+            if (m_startAction == StartAction.GET) {
+                //We dont want crash file created.
+                VoltDB.exitAfterMessage = true;
+                File configInfoDir = new VoltFile(m_voltdbRoot, Constants.CONFIG_DIR);
+                File depFH = new VoltFile(configInfoDir, "deployment.xml");
+                m_pathToDeployment = depFH.getAbsolutePath();
+                return;
+            }
             // set file logger root file directory. From this point on you can use loggers
             if (m_startAction != null && !m_startAction.isLegacy()) {
                 VoltLog4jLogger.setFileLoggerRoot(m_voltdbRoot);
@@ -795,11 +800,12 @@ public class VoltDB {
         public boolean validate() {
             boolean isValid = true;
 
+            EnumSet<StartAction> hostNotRequred = EnumSet.of(StartAction.INITIALIZE,StartAction.GET);
             if (m_startAction == null) {
                 isValid = false;
                 hostLog.fatal("The startup action is missing (either create, recover or rejoin).");
             }
-            if (m_leader == null && m_startAction != StartAction.INITIALIZE) {
+            if (m_leader == null && !hostNotRequred.contains(m_startAction)) {
                 isValid = false;
                 hostLog.fatal("The hostname is missing.");
             }
@@ -829,7 +835,7 @@ public class VoltDB {
                 isValid = false;
                 hostLog.fatal("Starting in admin mode is only allowed when using start, create or recover.");
             }
-            if (m_startAction != StartAction.INITIALIZE && m_coordinators.isEmpty()) {
+            if (!hostNotRequred.contains(m_startAction) && m_coordinators.isEmpty()) {
                 isValid = false;
                 hostLog.fatal("List of hosts is missing");
             }
@@ -939,7 +945,7 @@ public class VoltDB {
      * human readable stack traces for all java threads in the current process.
      */
     public static void dropStackTrace(String message) {
-        if (VoltDB.isThisATest()) {
+        if (CoreUtils.isJunitTest()) {
             VoltLogger log = new VoltLogger("HOST");
             log.warn("Declining to drop a stack trace during a junit test.");
             return;
@@ -1035,9 +1041,36 @@ public class VoltDB {
     }
 
     /**
+     * send a SNMP trap crash notification
+     * @param msg
+     */
+    private static void sendCrashSNMPTrap(String msg) {
+        if (msg == null || msg.trim().isEmpty()) {
+            return;
+        }
+        VoltDBInterface vdbInstance = instance();
+        if (vdbInstance == null) {
+            return;
+        }
+        SnmpTrapSender snmp = vdbInstance.getSnmpTrapSender();
+        if (snmp == null) {
+            return;
+        }
+        try {
+            snmp.crash(msg);
+        } catch (Throwable t) {
+            VoltLogger log = new VoltLogger("HOST");
+            log.warn("failed to issue a crash SNMP trap", t);
+        }
+    }
+    /**
      * Exit the process with an error message, optionally with a stack trace.
      */
     public static void crashLocalVoltDB(String errMsg, boolean stackTrace, Throwable thrown) {
+        if (exitAfterMessage) {
+            System.err.println(errMsg);
+            VoltDB.exit(-1);
+        }
         try {
             OnDemandBinaryLogger.flush();
         } catch (Throwable e) {}
@@ -1056,12 +1089,13 @@ public class VoltDB {
         if (ignoreCrash) {
             throw new AssertionError("Faux crash of VoltDB successful.");
         }
-        if (VoltDB.isThisATest()) {
+        if (CoreUtils.isJunitTest()) {
             VoltLogger log = new VoltLogger("HOST");
             log.warn("Declining to drop a crash file during a junit test.");
         }
         // end test code
-
+        // send a snmp trap crash notification
+        sendCrashSNMPTrap(errMsg);
         // try/finally block does its best to ensure death, no matter what context this
         // is called in
         try {
@@ -1174,6 +1208,7 @@ public class VoltDB {
 
     public static String crashMessage;
 
+    public static boolean exitAfterMessage = false;
     /**
      * Exit the process with an error message, optionally with a stack trace.
      * Also notify all connected peers that the node is going down.
@@ -1187,6 +1222,8 @@ public class VoltDB {
         }
         // end test code
 
+        // send a snmp trap crash notification
+        sendCrashSNMPTrap(errMsg);
         try {
             // turn off client interface as fast as possible
             // we don't expect this to ever fail, but if it does, skip to dying immediately
@@ -1220,8 +1257,12 @@ public class VoltDB {
             if (!config.validate()) {
                 System.exit(-1);
             } else {
-                initialize(config);
-                instance().run();
+                if (config.m_startAction == StartAction.GET) {
+                    cli(config);
+                } else {
+                    initialize(config);
+                    instance().run();
+                }
             }
         }
         catch (OutOfMemoryError e) {
@@ -1237,6 +1278,15 @@ public class VoltDB {
     public static void initialize(VoltDB.Configuration config) {
         m_config = config;
         instance().initialize(config);
+    }
+
+    /**
+     * Run CLI operations
+     * @param config  The VoltDB.Configuration to use for getting configuration via CLI
+     */
+    public static void cli(VoltDB.Configuration config) {
+        m_config = config;
+        instance().cli(config);
     }
 
     /**
@@ -1305,7 +1355,7 @@ public class VoltDB {
     }
 
     public static void exit(int status) {
-        if (isThisATest() || ignoreCrash) {
+        if (CoreUtils.isJunitTest() || ignoreCrash) {
             throw new SimulatedExitException(status);
         }
         System.exit(status);

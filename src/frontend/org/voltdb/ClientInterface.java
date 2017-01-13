@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -24,7 +24,6 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.AsynchronousCloseException;
-import java.nio.channels.SelectionKey;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
@@ -56,7 +55,6 @@ import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.network.Connection;
-import org.voltcore.network.InputHandler;
 import org.voltcore.network.NIOReadStream;
 import org.voltcore.network.QueueMonitor;
 import org.voltcore.network.ReverseDNSPolicy;
@@ -331,31 +329,21 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     //Populated on timeout
                     AtomicReference<String> timeoutRef = new AtomicReference<String>();
                     try {
-                        final InputHandler handler = authenticate(m_socket, timeoutRef);
+                        final ClientInputHandler handler = authenticate(m_socket, timeoutRef);
                         if (handler != null) {
                             m_socket.configureBlocking(false);
-                            if (handler instanceof ClientInputHandler) {
-                                m_socket.socket().setTcpNoDelay(true);
-                            }
+                            m_socket.socket().setTcpNoDelay(true);
                             m_socket.socket().setKeepAlive(true);
 
-                            if (handler instanceof ClientInputHandler) {
-                                m_network.registerChannel(
-                                                m_socket,
-                                                handler,
-                                                0,
-                                                ReverseDNSPolicy.ASYNCHRONOUS);
-                                /*
-                                 * If IV2 is enabled the logic initially enabling read is
-                                 * in the started method of the InputHandler
-                                 */
-                            } else {
-                                m_network.registerChannel(
-                                        m_socket,
-                                        handler,
-                                        SelectionKey.OP_READ,
-                                        ReverseDNSPolicy.ASYNCHRONOUS);
-                            }
+                            m_network.registerChannel(
+                                            m_socket,
+                                            handler,
+                                            0,
+                                            ReverseDNSPolicy.ASYNCHRONOUS);
+                            /*
+                             * If IV2 is enabled the logic initially enabling read is
+                             * in the started method of the InputHandler
+                             */
                             success = true;
                         }
                     } catch (Exception e) {
@@ -476,7 +464,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
          * @return AuthUser a set of user permissions or null if authentication fails
          * @throws IOException
          */
-        private InputHandler
+        private ClientInputHandler
         authenticate(final SocketChannel socket, final AtomicReference<String> timeoutRef) throws IOException
         {
             ByteBuffer responseBuffer = ByteBuffer.allocate(6);
@@ -701,7 +689,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             /*
              * Create an input handler.
              */
-            InputHandler handler = new ClientInputHandler(username, m_isAdmin);
+            ClientInputHandler handler = new ClientInputHandler(username, m_isAdmin);
 
             byte buildString[] = VoltDB.instance().getBuildString().getBytes(Charsets.UTF_8);
             responseBuffer = ByteBuffer.allocate(34 + buildString.length);
@@ -1198,7 +1186,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
 
         List<Iv2InFlight> transactions =
-                cihm.removeHandlesForPartitionAndInitiator( partitionId, initiatorHSId);
+                cihm.removeHandlesForPartitionAndInitiator(partitionId, initiatorHSId);
 
         for (Iv2InFlight inFlight : transactions) {
             ClientResponseImpl response =
@@ -1209,7 +1197,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             new VoltTable[0],
                             "Transaction dropped due to change in mastership. " +
                             "It is possible the transaction was committed");
-            response.setClientHandle( inFlight.m_clientHandle );
+            response.setClientHandle(inFlight.m_clientHandle);
             ByteBuffer buf = ByteBuffer.allocate(response.getSerializedSize() + 4);
             buf.putInt(buf.capacity() - 4);
             response.flattenToBuffer(buf);
@@ -1360,7 +1348,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             return errorResponse(ccxn, task.clientHandle, ClientResponse.UNEXPECTED_FAILURE, errorMessage, null, false);
         }
 
-        return m_dispatcher.dispatch(task, handler, ccxn, user);
+        return m_dispatcher.dispatch(task, handler, ccxn, user, null);
     }
 
     public Procedure getProcedureFromName(String procName, CatalogContext catalogContext) {
@@ -1556,7 +1544,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     }
 
     public void startAcceptingConnections() throws IOException {
-        m_dispatcher.asynchronouslyDetermineLocalReplicas();
+        Future<?> replicaFuture = m_dispatcher.asynchronouslyDetermineLocalReplicas();
 
         /*
          * Periodically check the limit on the number of open files
@@ -1578,6 +1566,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
         mayActivateSnapshotDaemon();
         m_notifier.start();
+
+        try {
+            replicaFuture.get();
+        } catch (InterruptedException e) {
+            throw new IOException("Interrupted while determining local replicas",e);
+        } catch (ExecutionException e) {
+            throw new IOException("Failed to determine local replicas", e.getCause());
+        }
 
         m_isAcceptingConnections.compareAndSet(false, true);
     }
@@ -1871,23 +1867,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * @throws IOException
      * @throws InterruptedException
      */
-    public ClientResponse callExecuteTask(long timeoutMS, byte[] params ) throws IOException, InterruptedException {
-        final String procedureName = "@ExecuteTask";
-        Config procedureConfig = SystemProcedureCatalog.listing.get(procedureName);
-        Procedure proc = procedureConfig.asCatalogProcedure();
-        StoredProcedureInvocation spi = new StoredProcedureInvocation();
-        spi.setProcName(procedureName);
-        spi.setParams(params);
+    public ClientResponse callExecuteTask(long timeoutMS, byte[] params) throws IOException, InterruptedException {
         SimpleClientResponseAdapter.SyncCallback syncCb = new SimpleClientResponseAdapter.SyncCallback();
-        spi.setClientHandle(m_executeTaskAdpater.registerCallback(syncCb));
-        if (spi.getSerializedParams() == null) {
-            spi = MiscUtils.roundTripForCL(spi);
-        }
-        createTransaction(m_executeTaskAdpater.connectionId(), spi,
-                proc.getReadonly(), proc.getSinglepartition(), proc.getEverysite(),
-                0 /* Can provide anything for multi-part */,
-                spi.getSerializedSize(), System.nanoTime());
-
+        callExecuteTaskAsync(syncCb, params);
         return syncCb.getResponse(timeoutMS);
     }
 
@@ -1911,11 +1893,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         if (spi.getSerializedParams() == null) {
             spi = MiscUtils.roundTripForCL(spi);
         }
-        createTransaction(m_executeTaskAdpater.connectionId(), spi,
-                proc.getReadonly(), proc.getSinglepartition(), proc.getEverysite(),
-                0 /* Can provide anything for multi-part */,
-                spi.getSerializedSize(), System.nanoTime());
-
+        synchronized (m_executeTaskAdpater) {
+            createTransaction(m_executeTaskAdpater.connectionId(), spi,
+                    proc.getReadonly(), proc.getSinglepartition(), proc.getEverysite(),
+                    0 /* Can provide anything for multi-part */,
+                    spi.getSerializedSize(), System.nanoTime());
+        }
     }
 
     /**

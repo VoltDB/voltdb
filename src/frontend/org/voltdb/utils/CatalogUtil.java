@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -99,7 +99,6 @@ import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientAuthScheme;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltCompiler;
-import org.voltdb.compiler.deploymentfile.AdminModeType;
 import org.voltdb.compiler.deploymentfile.ClusterType;
 import org.voltdb.compiler.deploymentfile.CommandLogType;
 import org.voltdb.compiler.deploymentfile.CommandLogType.Frequency;
@@ -120,6 +119,7 @@ import org.voltdb.compiler.deploymentfile.SchemaType;
 import org.voltdb.compiler.deploymentfile.SecurityType;
 import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.compiler.deploymentfile.SnapshotType;
+import org.voltdb.compiler.deploymentfile.SnmpType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.compiler.deploymentfile.UsersType;
 import org.voltdb.export.ExportDataProcessor;
@@ -135,6 +135,7 @@ import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.settings.DbSettings;
 import org.voltdb.settings.NodeSettings;
+import org.voltdb.snmp.DummySnmpTrapSender;
 import org.voltdb.types.ConstraintType;
 import org.xml.sax.SAXException;
 
@@ -172,7 +173,6 @@ public abstract class CatalogUtil {
     final static Pattern JAR_EXTENSION_RE  = Pattern.compile("(?:.+)\\.jar/(?:.+)" ,Pattern.CASE_INSENSITIVE);
     public final static Pattern XML_COMMENT_RE = Pattern.compile("<!--.+?-->",Pattern.MULTILINE|Pattern.DOTALL);
     public final static Pattern HOSTCOUNT_RE = Pattern.compile("\\bhostcount\\s*=\\s*(?:\"\\s*\\d+\\s*\"|'\\s*\\d+\\s*')",Pattern.MULTILINE);
-    public final static Pattern ADMINMODE_RE = Pattern.compile("\\badminstartup\\s*=\\s*(?:\"\\s*\\w+\\s*\"|'\\s*\\w+\\s*')",Pattern.MULTILINE);
 
     public static final VoltTable.ColumnInfo DR_HIDDEN_COLUMN_INFO =
             new VoltTable.ColumnInfo(DR_HIDDEN_COLUMN_NAME, VoltType.BIGINT);
@@ -673,6 +673,7 @@ public abstract class CatalogUtil {
             if (!isPlaceHolderCatalog) {
                 setExportInfo(catalog, deployment.getExport());
                 setImportInfo(catalog, deployment.getImport());
+                setSnmpInfo(deployment.getSnmp());
             }
 
             setCommandLogInfo( catalog, deployment.getCommandlog());
@@ -698,7 +699,7 @@ public abstract class CatalogUtil {
 
     private static void validateResourceMonitorInfo(DeploymentType deployment) {
         // call resource monitor ctor so that it does all validations.
-        new ResourceUsageMonitor(deployment.getSystemsettings());
+        new ResourceUsageMonitor(deployment.getSystemsettings(), new DummySnmpTrapSender());
     }
 
 
@@ -845,11 +846,6 @@ public abstract class CatalogUtil {
             PartitionDetectionType.Snapshot sshot = new PartitionDetectionType.Snapshot();
             pd.setSnapshot(sshot);
         }
-        //admin mode
-        if (deployment.getAdminMode() == null) {
-            AdminModeType amode = new AdminModeType();
-            deployment.setAdminMode(amode);
-        }
         //heartbeat
         if (deployment.getHeartbeat() == null) {
             HeartbeatType hb = new HeartbeatType();
@@ -969,7 +965,7 @@ public abstract class CatalogUtil {
     /**
      * Computes a MD5 digest (128 bits -> 2 longs -> UUID which is comprised of
      * two longs) of a deployment file stripped of all comments and its hostcount
-     * attribute set to 0, and adminstartup set to false
+     * attribute set to 0.
      *
      * @param deploymentBytes
      * @return MD5 digest for for configuration
@@ -980,8 +976,6 @@ public abstract class CatalogUtil {
         normalized = matcher.replaceAll("");
         matcher = HOSTCOUNT_RE.matcher(normalized);
         normalized = matcher.replaceFirst("hostcount=\"0\"");
-        matcher = ADMINMODE_RE.matcher(normalized);
-        normalized = matcher.replaceFirst("adminstartup=\"false\"");
         return Digester.md5AsUUID(normalized);
     }
 
@@ -1120,9 +1114,6 @@ public abstract class CatalogUtil {
         else {
             catCluster.setNetworkpartition(false);
         }
-
-        catCluster.setAdminport(deployment.getAdminMode().getPort());
-        catCluster.setAdminstartup(deployment.getAdminMode().isAdminstartup());
 
         setSystemSettings(deployment, catDeploy);
 
@@ -1597,6 +1588,26 @@ public abstract class CatalogUtil {
             }
 
             checkImportProcessorConfiguration(importConfiguration);
+        }
+    }
+
+    /**
+     * Validate Snmp Configuration.
+     * @param snmpType
+     */
+    private static void setSnmpInfo(SnmpType snmpType) {
+        if (snmpType == null || !snmpType.isEnabled()) {
+            return;
+        }
+        //Validate Snmp Configuration.
+        if (snmpType.getTarget() == null || snmpType.getTarget().trim().length() == 0) {
+            throw new IllegalArgumentException("Target must be specified for SNMP configuration.");
+        }
+        if (snmpType.getAuthkey() != null && snmpType.getAuthkey().length() < 8) {
+            throw new IllegalArgumentException("SNMP Authkey must be > 8 characters.");
+        }
+        if (snmpType.getPrivacykey() != null && snmpType.getPrivacykey().length() < 8) {
+            throw new IllegalArgumentException("SNMP Privacy Key must be > 8 characters.");
         }
     }
 
@@ -2565,7 +2576,6 @@ public abstract class CatalogUtil {
         DeploymentType clone = new DeploymentType();
 
         clone.setPartitionDetection(o.getPartitionDetection());
-        clone.setAdminMode(o.getAdminMode());
         clone.setHeartbeat(o.getHeartbeat());
         clone.setHttpd(o.getHttpd());
         clone.setSnapshot(o.getSnapshot());
@@ -2602,6 +2612,68 @@ public abstract class CatalogUtil {
 
         clone.setPaths(paths);
 
+        clone.setSnmp(o.getSnmp());
         return clone;
     }
+
+    /**
+     * Get a deployment view that represents what needs to be displayed to VMC, which
+     * reflects the paths that are used by this cluster member and the actual number of
+     * hosts that belong to this cluster whether or not it was elastically expanded
+     * @param deployment
+     * @return adjusted deployment
+     */
+    public static DeploymentType updateRuntimeDeploymentPaths(DeploymentType deployment) {
+        deployment = CatalogUtil.shallowClusterAndPathsClone(deployment);
+        PathsType paths = deployment.getPaths();
+        if (paths.getVoltdbroot() == null) {
+            PathsType.Voltdbroot root = new PathsType.Voltdbroot();
+            root.setPath(VoltDB.instance().getVoltDBRootPath());
+            paths.setVoltdbroot(root);
+        } else {
+            paths.getVoltdbroot().setPath(VoltDB.instance().getVoltDBRootPath());
+        }
+        //snapshot
+        if (paths.getSnapshots() == null) {
+            PathsType.Snapshots snap = new PathsType.Snapshots();
+            snap.setPath(VoltDB.instance().getSnapshotPath());
+            paths.setSnapshots(snap);
+        } else {
+            paths.getSnapshots().setPath(VoltDB.instance().getSnapshotPath());
+        }
+        if (paths.getCommandlog() == null) {
+            //cl
+            PathsType.Commandlog cl = new PathsType.Commandlog();
+            cl.setPath(VoltDB.instance().getCommandLogPath());
+            paths.setCommandlog(cl);
+        } else {
+            paths.getCommandlog().setPath(VoltDB.instance().getCommandLogPath());
+        }
+        if (paths.getCommandlogsnapshot() == null) {
+            //cl snap
+            PathsType.Commandlogsnapshot clsnap = new PathsType.Commandlogsnapshot();
+            clsnap.setPath(VoltDB.instance().getCommandLogSnapshotPath());
+            paths.setCommandlogsnapshot(clsnap);
+        } else {
+            paths.getCommandlogsnapshot().setPath(VoltDB.instance().getCommandLogSnapshotPath());
+        }
+        if (paths.getExportoverflow() == null) {
+            //export overflow
+            PathsType.Exportoverflow exp = new PathsType.Exportoverflow();
+            exp.setPath(VoltDB.instance().getExportOverflowPath());
+            paths.setExportoverflow(exp);
+        } else {
+            paths.getExportoverflow().setPath(VoltDB.instance().getExportOverflowPath());
+        }
+        if (paths.getDroverflow() == null) {
+            //dr overflow
+            final PathsType.Droverflow droverflow = new PathsType.Droverflow();
+            droverflow.setPath(VoltDB.instance().getDROverflowPath());
+            paths.setDroverflow(droverflow);
+        } else {
+            paths.getDroverflow().setPath(VoltDB.instance().getDROverflowPath());
+        }
+        return deployment;
+    }
+
 }

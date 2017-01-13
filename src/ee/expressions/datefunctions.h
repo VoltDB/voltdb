@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -15,21 +15,14 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "boost/date_time/gregorian/greg_date.hpp"
-#include "boost/date_time/posix_time/posix_time_types.hpp"
-#include "boost/date_time/posix_time/posix_time_duration.hpp"
-#include "boost/date_time/posix_time/ptime.hpp"
-#include "boost/date_time/posix_time/conversion.hpp"
-#include "boost/date_time/posix_time/posix_time.hpp"
-#include "boost/date_time/gregorian/gregorian.hpp"
+#ifndef SRC_EE_EXPRESSIONS_DATEFUNCTIONS_H
+#define SRC_EE_EXPRESSIONS_DATEFUNCTIONS_H
+
 #include <ctime>
 #include "common/SQLException.h"
 #include "common/executorcontext.hpp"
 #include "common/NValue.hpp"
-
-static const boost::posix_time::ptime EPOCH(boost::gregorian::date(1970,1,1));
-static const int64_t GREGORIAN_EPOCH = -12212553600000000;  //  1583-01-01 00:00:00
-static const int64_t NYE9999         = 253402300799999999;  //  9999-12-31 23:59:59.999999
+#include "expressions/dateconstants.h"
 
 static const int8_t QUARTER_START_MONTH_BY_MONTH[] = {
         /*[0] not used*/-1,  1, 1, 1,  4, 4, 4,  7, 7, 7,  10, 10, 10 };
@@ -888,3 +881,4 @@ template<> inline NValue NValue::callUnary<FUNC_VOLT_IS_VALID_TIMESTAMP>() const
 
 
 }
+#endif /* defined(SRC_EE_EXPRESSIONS_DATEFUNCTIONS_H) */

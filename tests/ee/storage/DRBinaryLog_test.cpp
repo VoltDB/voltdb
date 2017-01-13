@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -116,7 +116,7 @@ class MockVoltDBEngine : public VoltDBEngine {
 public:
     MockVoltDBEngine(int clusterId, Topend* topend, Pool* pool,
                      DRTupleStream* drStream, DRTupleStream* drReplicatedStream)
-      : m_context(new ExecutorContext(1, 1, NULL, topend, pool, NULL, this,
+      : m_context(new ExecutorContext(1, 1, NULL, topend, pool, this,
                                       "localhost", 2, drStream, drReplicatedStream, clusterId))
     {
 

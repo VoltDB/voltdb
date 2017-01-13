@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -550,16 +550,13 @@ public class StoredProcedureInvocation implements JSONString {
         JSONStringer js = new JSONStringer();
         try {
             js.object();
-            js.key("proc_name");
-            js.value(procName);
-            js.key("client_handle");
-            js.value(clientHandle);
+            js.keySymbolValuePair("proc_name", procName);
+            js.keySymbolValuePair("client_handle", clientHandle);
             // @ApplyBinaryLog is exempted because it's often
             // got a large binary payload and this is annoying for testing
             // also users shouldn't ever directly call it
             if (!procName.startsWith("@ApplyBinaryLog")) {
-                js.key("parameters");
-                js.value(params.get());
+                js.key("parameters").value(params.get());
             }
             js.endObject();
         }

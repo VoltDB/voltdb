@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -207,20 +207,6 @@ public:
                                            std::vector<AbstractExpression*> *sortExprs,
                                            std::vector<SortDirectionType>   *sortDirs);
 
-protected:
-    AbstractPlanNode();
-
-    virtual void loadFromJSONObject(PlannerDomValue obj) = 0;
-
-    // Common code for use by the public generateTupleSchema() overload
-    // and by AbstractJoinPlanNode::loadFromJSONObject for its pre-agg output tuple.
-    static TupleSchema* generateTupleSchema(const std::vector<SchemaColumn*>& outputSchema);
-
-    static void loadIntArrayFromJSONObject(const char* label, PlannerDomValue obj, std::vector<int>& ary);
-
-    static AbstractExpression* loadExpressionFromJSONObject(const char* label,
-                                                            PlannerDomValue obj);
-
     // A simple method of managing the lifetime of AbstractExpressions referenced by
     // a vector that is never mutated once it is loaded.
     struct OwningExpressionVector : public std::vector<AbstractExpression*> {
@@ -232,6 +218,26 @@ protected:
         void loadExpressionArrayFromJSONObject(const char* label,
                                                PlannerDomValue obj);
     };
+
+protected:
+    AbstractPlanNode();
+
+    virtual void loadFromJSONObject(PlannerDomValue obj) = 0;
+
+    // Common code for use by the public generateTupleSchema() overload
+    // and by AbstractJoinPlanNode::loadFromJSONObject for its pre-agg output tuple.
+    static TupleSchema* generateTupleSchema(const std::vector<SchemaColumn*>& outputSchema);
+
+    static void loadIntArrayFromJSONObject(const char* label,
+                                           PlannerDomValue obj,
+                                           std::vector<int>& ary);
+
+    static void loadStringArrayFromJSONObject(const char* label,
+                                              PlannerDomValue obj,
+                                              std::vector<std::string>& ary);
+
+    static AbstractExpression* loadExpressionFromJSONObject(const char* label,
+                                                            PlannerDomValue obj);
 
     // Every PlanNode will have a unique id assigned to it at compile time
     int32_t m_planNodeId;

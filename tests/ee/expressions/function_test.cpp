@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -88,7 +88,6 @@ struct FunctionTest : public Test {
                                   (UndoQuantum *)0,
                                   (Topend *)0,
                                   &m_pool,
-                                  NULL,
                                   (VoltDBEngine *)0,
                                   "localhost",
                                   0,

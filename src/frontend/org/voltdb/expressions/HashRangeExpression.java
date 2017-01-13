@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -47,14 +47,6 @@ public class HashRangeExpression extends AbstractValueExpression {
         super(ExpressionType.HASH_RANGE);
         //See the comment in ConjunctionExpression
         setValueType(VoltType.BOOLEAN);
-    }
-
-    @Override
-    public Object clone() {
-        HashRangeExpression clone = (HashRangeExpression)super.clone();
-        clone.m_ranges = m_ranges;
-        clone.m_hashColumn = m_hashColumn;
-        return clone;
     }
 
     @Override
@@ -143,12 +135,12 @@ public class HashRangeExpression extends AbstractValueExpression {
     @Override
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
-        stringer.key(Members.HASH_COLUMN.name()).value(m_hashColumn);
+        stringer.keySymbolValuePair(Members.HASH_COLUMN.name(), m_hashColumn);
         stringer.key(Members.RANGES.name()).array();
         for (Map.Entry<Integer, Integer> e : m_ranges.entrySet()) {
             stringer.object();
-            stringer.key(Members.RANGE_START.name()).value(e.getKey().intValue());
-            stringer.key(Members.RANGE_END.name()).value(e.getValue().intValue());
+            stringer.keySymbolValuePair(Members.RANGE_START.name(), e.getKey().intValue());
+            stringer.keySymbolValuePair(Members.RANGE_END.name(), e.getValue().intValue());
             stringer.endObject();
         }
         stringer.endArray();

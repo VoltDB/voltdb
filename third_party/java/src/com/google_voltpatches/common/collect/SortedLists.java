@@ -19,12 +19,10 @@ import static com.google_voltpatches.common.base.Preconditions.checkNotNull;
 import com.google_voltpatches.common.annotations.Beta;
 import com.google_voltpatches.common.annotations.GwtCompatible;
 import com.google_voltpatches.common.base.Function;
-
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.RandomAccess;
-
 import javax.annotation_voltpatches.Nullable;
 
 /**
@@ -279,8 +277,9 @@ import javax.annotation_voltpatches.Nullable;
       } else if (c > 0) {
         lower = middle + 1;
       } else {
-        return lower + presentBehavior.resultIndex(
-            comparator, key, list.subList(lower, upper + 1), middle - lower);
+        return lower
+            + presentBehavior.resultIndex(
+                comparator, key, list.subList(lower, upper + 1), middle - lower);
       }
     }
     return absentBehavior.resultIndex(lower);

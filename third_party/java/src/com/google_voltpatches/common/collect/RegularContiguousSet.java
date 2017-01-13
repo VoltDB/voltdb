@@ -20,10 +20,8 @@ import static com.google_voltpatches.common.collect.BoundType.CLOSED;
 
 import com.google_voltpatches.common.annotations.GwtCompatible;
 import com.google_voltpatches.common.annotations.GwtIncompatible;
-
 import java.io.Serializable;
 import java.util.Collection;
-
 import javax.annotation_voltpatches.Nullable;
 
 /**
@@ -70,7 +68,7 @@ final class RegularContiguousSet<C extends Comparable> extends ContiguousSet<C> 
     return intersectionInCurrentDomain(Range.downTo(fromElement, BoundType.forBoolean(inclusive)));
   }
 
-  @GwtIncompatible("not used by GWT emulation")
+  @GwtIncompatible // not used by GWT emulation
   @Override
   int indexOf(Object target) {
     return contains(target) ? (int) domain.distance(first(), (C) target) : -1;
@@ -88,7 +86,7 @@ final class RegularContiguousSet<C extends Comparable> extends ContiguousSet<C> 
     };
   }
 
-  @GwtIncompatible("NavigableSet")
+  @GwtIncompatible // NavigableSet
   @Override
   public UnmodifiableIterator<C> descendingIterator() {
     return new AbstractSequentialIterator<C>(last()) {
@@ -157,7 +155,7 @@ final class RegularContiguousSet<C extends Comparable> extends ContiguousSet<C> 
     } else {
       C lowerEndpoint = Ordering.natural().max(this.first(), other.first());
       C upperEndpoint = Ordering.natural().min(this.last(), other.last());
-      return (lowerEndpoint.compareTo(upperEndpoint) < 0)
+      return (lowerEndpoint.compareTo(upperEndpoint) <= 0)
           ? ContiguousSet.create(Range.closed(lowerEndpoint, upperEndpoint), domain)
           : new EmptyContiguousSet<C>(domain);
     }
@@ -194,7 +192,7 @@ final class RegularContiguousSet<C extends Comparable> extends ContiguousSet<C> 
     return Sets.hashCodeImpl(this);
   }
 
-  @GwtIncompatible("serialization")
+  @GwtIncompatible // serialization
   private static final class SerializedForm<C extends Comparable> implements Serializable {
     final Range<C> range;
     final DiscreteDomain<C> domain;
@@ -209,7 +207,7 @@ final class RegularContiguousSet<C extends Comparable> extends ContiguousSet<C> 
     }
   }
 
-  @GwtIncompatible("serialization")
+  @GwtIncompatible // serialization
   @Override
   Object writeReplace() {
     return new SerializedForm<C>(range, domain);

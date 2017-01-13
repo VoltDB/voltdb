@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # This file is part of VoltDB.
-# Copyright (C) 2008-2016 VoltDB Inc.
+# Copyright (C) 2008-2017 VoltDB Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -233,8 +233,8 @@ def read_pid_file(pidfile):
             pf = file(pidfile,'r')
             pid = int(pf.read().strip())
             pf.close()
-        except IOError:
-            pass
+        except (IOError, ValueError), e:
+            pid = -1
     return pid
 
 def get_status(pidfile):

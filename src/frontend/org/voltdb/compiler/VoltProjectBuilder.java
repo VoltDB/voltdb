@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -32,6 +32,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBElement;
@@ -43,8 +44,6 @@ import org.voltdb.Consistency;
 import org.voltdb.ProcInfoData;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.common.Constants;
-import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
-import org.voltdb.compiler.deploymentfile.AdminModeType;
 import org.voltdb.compiler.deploymentfile.ClusterType;
 import org.voltdb.compiler.deploymentfile.CommandLogType;
 import org.voltdb.compiler.deploymentfile.ConnectionType;
@@ -74,6 +73,7 @@ import org.voltdb.compiler.deploymentfile.SecurityType;
 import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.compiler.deploymentfile.ServerImportEnum;
 import org.voltdb.compiler.deploymentfile.SnapshotType;
+import org.voltdb.compiler.deploymentfile.SnmpType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType.Temptables;
 import org.voltdb.compiler.deploymentfile.UsersType;
@@ -92,7 +92,7 @@ import com.google_voltpatches.common.collect.ImmutableMap;
  */
 public class VoltProjectBuilder {
 
-    final LinkedHashSet<String> m_schemas = new LinkedHashSet<String>();
+    final LinkedHashSet<String> m_schemas = new LinkedHashSet<>();
     private StringBuffer transformer = new StringBuffer();
 
     public static final class ProcedureInfo {
@@ -235,25 +235,18 @@ public class VoltProjectBuilder {
         final int hostCount;
         final int sitesPerHost;
         final int replication;
-        final boolean useCustomAdmin;
-        final int adminPort;
-        final boolean adminOnStartup;
         final int clusterId;
 
-        public DeploymentInfo(int hostCount, int sitesPerHost, int replication,
-                boolean useCustomAdmin, int adminPort, boolean adminOnStartup, int id) {
+        public DeploymentInfo(int hostCount, int sitesPerHost, int replication, int id) {
             this.hostCount = hostCount;
             this.sitesPerHost = sitesPerHost;
             this.replication = replication;
-            this.useCustomAdmin = useCustomAdmin;
-            this.adminPort = adminPort;
-            this.adminOnStartup = adminOnStartup;
             this.clusterId = id;
         }
     }
 
-    final LinkedHashSet<UserInfo> m_users = new LinkedHashSet<UserInfo>();
-    final LinkedHashSet<Class<?>> m_supplementals = new LinkedHashSet<Class<?>>();
+    final LinkedHashSet<UserInfo> m_users = new LinkedHashSet<>();
+    final LinkedHashSet<Class<?>> m_supplementals = new LinkedHashSet<>();
 
     // zero defaults to first open port >= the default port.
     // negative one means disabled in the deployment file.
@@ -272,7 +265,7 @@ public class VoltProjectBuilder {
     boolean m_securityEnabled = false;
     String m_securityProvider = SecurityProviderString.HASH.value();
 
-    final Map<String, ProcInfoData> m_procInfoOverrides = new HashMap<String, ProcInfoData>();
+    final Map<String, ProcInfoData> m_procInfoOverrides = new HashMap<>();
 
     private String m_snapshotPath = null;
     private int m_snapshotRetain = 0;
@@ -296,14 +289,17 @@ public class VoltProjectBuilder {
     private Integer m_commandLogFsyncInterval;
     private Integer m_commandLogMaxTxnsBeforeFsync;
 
+    private Boolean m_snmpEnabled = false;
+    private String m_snmpTarget = null;
+
     private Integer m_snapshotPriority;
 
     private Integer m_maxTempTableMemory = 100;
 
     private List<String> m_diagnostics;
 
-    private List<HashMap<String, Object>> m_ilImportConnectors = new ArrayList<HashMap<String, Object>>();
-    private List<HashMap<String, Object>> m_elExportConnectors = new ArrayList<HashMap<String, Object>>();
+    private List<HashMap<String, Object>> m_ilImportConnectors = new ArrayList<>();
+    private List<HashMap<String, Object>> m_elExportConnectors = new ArrayList<>();
 
     private Integer m_deadHostTimeout = null;
 
@@ -311,8 +307,10 @@ public class VoltProjectBuilder {
     private Integer m_elasticDuration = null;
     private Integer m_queryTimeout = null;
     private String m_rssLimit = null;
+    private String m_snmpRssLimit = null;
     private Integer m_resourceCheckInterval = null;
     private Map<FeatureNameType, String> m_featureDiskLimits;
+    private Map<FeatureNameType, String> m_snmpFeatureDiskLimits;
 
     private boolean m_useDDLSchema = false;
 
@@ -329,6 +327,11 @@ public class VoltProjectBuilder {
         return this;
     }
 
+    public VoltProjectBuilder setSnmpRssLimit(String limit) {
+        m_snmpRssLimit = limit;
+        return this;
+    }
+
     public VoltProjectBuilder setResourceCheckInterval(int seconds) {
         m_resourceCheckInterval = seconds;
         return this;
@@ -336,6 +339,11 @@ public class VoltProjectBuilder {
 
     public VoltProjectBuilder setFeatureDiskLimits(Map<FeatureNameType, String> featureDiskLimits) {
         m_featureDiskLimits = featureDiskLimits;
+        return this;
+    }
+
+    public VoltProjectBuilder setSnmpFeatureDiskLimits(Map<FeatureNameType, String> featureDiskLimits) {
+        m_snmpFeatureDiskLimits = featureDiskLimits;
         return this;
     }
 
@@ -355,6 +363,11 @@ public class VoltProjectBuilder {
 
     public void setUseDDLSchema(boolean useIt) {
         m_useDDLSchema = useIt;
+    }
+
+    public void configureSnmp(String target) {
+        m_snmpTarget = target;
+        m_snmpEnabled = true;
     }
 
     public void configureLogging(String internalSnapshotPath, String commandLogPath, Boolean commandLogSync,
@@ -499,7 +512,7 @@ public class VoltProjectBuilder {
     }
 
     public void addProcedures(final Class<?>... procedures) {
-        final ArrayList<ProcedureInfo> procArray = new ArrayList<ProcedureInfo>();
+        final ArrayList<ProcedureInfo> procArray = new ArrayList<>();
         for (final Class<?> procedure : procedures)
             procArray.add(new ProcedureInfo(new String[0], procedure));
         addProcedures(procArray);
@@ -509,7 +522,7 @@ public class VoltProjectBuilder {
      * List of roles permitted to invoke the procedure
      */
     public void addProcedures(final ProcedureInfo... procedures) {
-        final ArrayList<ProcedureInfo> procArray = new ArrayList<ProcedureInfo>();
+        final ArrayList<ProcedureInfo> procArray = new ArrayList<>();
         for (final ProcedureInfo procedure : procedures)
             procArray.add(procedure);
         addProcedures(procArray);
@@ -517,7 +530,7 @@ public class VoltProjectBuilder {
 
     public void addProcedures(final Iterable<ProcedureInfo> procedures) {
         // check for duplicates and existings
-        final HashSet<ProcedureInfo> newProcs = new HashSet<ProcedureInfo>();
+        final HashSet<ProcedureInfo> newProcs = new HashSet<>();
         for (final ProcedureInfo procedure : procedures) {
             assert(newProcs.contains(procedure) == false);
             newProcs.add(procedure);
@@ -557,7 +570,7 @@ public class VoltProjectBuilder {
     }
 
     public void addSupplementalClasses(final Class<?>... supplementals) {
-        final ArrayList<Class<?>> suppArray = new ArrayList<Class<?>>();
+        final ArrayList<Class<?>> suppArray = new ArrayList<>();
         for (final Class<?> supplemental : supplementals)
             suppArray.add(supplemental);
         addSupplementalClasses(suppArray);
@@ -565,7 +578,7 @@ public class VoltProjectBuilder {
 
     public void addSupplementalClasses(final Iterable<Class<?>> supplementals) {
         // check for duplicates and existings
-        final HashSet<Class<?>> newSupps = new HashSet<Class<?>>();
+        final HashSet<Class<?>> newSupps = new HashSet<>();
         for (final Class<?> supplemental : supplementals) {
             assert(newSupps.contains(supplemental) == false);
             assert(m_supplementals.contains(supplemental) == false);
@@ -648,7 +661,7 @@ public class VoltProjectBuilder {
     }
 
     public void addImport(boolean enabled, String importType, String importFormat, String importBundle, Properties config, Properties formatConfig) {
-        HashMap<String, Object> importConnector = new HashMap<String, Object>();
+        HashMap<String, Object> importConnector = new HashMap<>();
         importConnector.put("ilEnabled", enabled);
         importConnector.put("ilModule", importBundle);
 
@@ -675,14 +688,16 @@ public class VoltProjectBuilder {
     }
 
     public void addExport(boolean enabled, String exportTarget, Properties config, String target) {
-        HashMap<String, Object> exportConnector = new HashMap<String, Object>();
+        HashMap<String, Object> exportConnector = new HashMap<>();
         exportConnector.put("elLoader", "org.voltdb.export.processors.GuestProcessor");
         exportConnector.put("elEnabled", enabled);
 
         if (config == null) {
             config = new Properties();
+            //If No config provided use file with outdir to user-specific tmp.
+            config.put("outdir", "/tmp/" + System.getProperty("user.name"));
             config.putAll(ImmutableMap.<String, String>of(
-                    "type","tsv", "batched","true", "with-schema","true", "nonce","zorag", "outdir","exportdata"
+                    "type","tsv", "batched","true", "with-schema","true", "nonce","zorag"
                     ));
         }
         exportConnector.put("elConfig", config);
@@ -767,6 +782,14 @@ public class VoltProjectBuilder {
                 replication, null, 0) != null;
     }
 
+    public boolean compile(final String jarPath,
+            final int sitesPerHost,
+            final int hostCount,
+            final int replication, final int clusterId) {
+        return compile(jarPath, sitesPerHost, hostCount,
+                replication, null, clusterId) != null;
+    }
+
     public Catalog compile(final String jarPath,
             final int sitesPerHost,
             final int hostCount,
@@ -783,7 +806,7 @@ public class VoltProjectBuilder {
             final int clusterId) {
         VoltCompiler compiler = new VoltCompiler();
         if (compile(compiler, jarPath, voltRoot,
-                       new DeploymentInfo(hostCount, sitesPerHost, replication, false, 0, false, clusterId),
+                       new DeploymentInfo(hostCount, sitesPerHost, replication, clusterId),
                        m_ppdEnabled, m_snapshotPath, m_ppdPrefix)) {
             return compiler.getCatalog();
         } else {
@@ -800,18 +823,8 @@ public class VoltProjectBuilder {
     {
         VoltCompiler compiler = new VoltCompiler();
         return compile(compiler, jarPath, voltRoot,
-                       new DeploymentInfo(hostCount, sitesPerHost, replication, false, 0, false, clusterId),
+                       new DeploymentInfo(hostCount, sitesPerHost, replication, clusterId),
                        ppdEnabled, snapshotPath, ppdPrefix);
-    }
-
-    public boolean compile(final String jarPath, final int sitesPerHost,
-            final int hostCount, final int replication,
-            final int adminPort, final boolean adminOnStartup, final int clusterId)
-    {
-        VoltCompiler compiler = new VoltCompiler();
-        return compile(compiler, jarPath, null,
-                       new DeploymentInfo(hostCount, sitesPerHost, replication, true, adminPort, adminOnStartup, clusterId),
-                       m_ppdEnabled,  m_snapshotPath, m_ppdPrefix);
     }
 
     public boolean compile(final VoltCompiler compiler,
@@ -871,12 +884,7 @@ public class VoltProjectBuilder {
         }
 
         boolean success = false;
-        try {
-            success = compiler.compileFromDDL(jarPath, schemaPath);
-        } catch (VoltCompilerException e1) {
-            e1.printStackTrace();
-            return false;
-        }
+        success = compiler.compileFromDDL(jarPath, schemaPath);
 
         m_diagnostics = compiler.harvestCapturedDetail();
         if (m_compilerDebugPrintStream != null) {
@@ -900,10 +908,6 @@ public class VoltProjectBuilder {
                 System.out.println("ppdEnabled: " + ppdEnabled);
                 System.out.println("snapshotPath: " + snapshotPath);
                 System.out.println("ppdPrefix: " + ppdPrefix);
-                System.out.println("adminEnabled: " + deployment.useCustomAdmin);
-                System.out.println("adminPort: " + deployment.adminPort);
-                System.out.println("adminOnStartup: " + deployment.adminOnStartup);
-
                 // sufficient to escape and fail test cases?
                 throw new RuntimeException(e);
             }
@@ -1086,17 +1090,6 @@ public class VoltProjectBuilder {
             ct.setReadlevel(m_consistencyReadLevel.toReadLevelType());
         }
 
-        // <admin-mode>
-        // can't be disabled, but only write out the non-default config if
-        // requested by a test. otherwise, take the implied defaults (or
-        // whatever local cluster overrides on the command line).
-        if (dinfo.useCustomAdmin) {
-            AdminModeType admin = factory.createAdminModeType();
-            deployment.setAdminMode(admin);
-            admin.setPort(dinfo.adminPort);
-            admin.setAdminstartup(dinfo.adminOnStartup);
-        }
-
         deployment.setSystemsettings(createSystemSettingsType(factory));
 
         // <users>
@@ -1150,6 +1143,14 @@ public class VoltProjectBuilder {
                 httpsType.setTruststore(store);
             }
             httpd.setHttps(httpsType);
+        }
+
+        //SNMP
+        SnmpType snmpType = factory.createSnmpType();
+        if (m_snmpEnabled) {
+            snmpType.setEnabled(true);
+            snmpType.setTarget(m_snmpTarget);
+            deployment.setSnmp(snmpType);
         }
 
         // <export>
@@ -1276,10 +1277,15 @@ public class VoltProjectBuilder {
             query.setTimeout(m_queryTimeout);
             systemSettingType.setQuery(query);
         }
-        if (m_rssLimit != null) {
+        if (m_rssLimit != null || m_snmpRssLimit != null) {
             ResourceMonitorType monitorType = initializeResourceMonitorType(systemSettingType, factory);
             Memorylimit memoryLimit = factory.createResourceMonitorTypeMemorylimit();
-            memoryLimit.setSize(m_rssLimit);
+            if (m_rssLimit != null) {
+                memoryLimit.setSize(m_rssLimit);
+            }
+            if (m_snmpRssLimit != null) {
+                memoryLimit.setAlert(m_snmpRssLimit);
+            }
             monitorType.setMemorylimit(memoryLimit);
         }
 
@@ -1296,18 +1302,30 @@ public class VoltProjectBuilder {
     private void setupDiskLimitType(SystemSettingsType systemSettingsType,
             org.voltdb.compiler.deploymentfile.ObjectFactory factory) {
 
-        if (m_featureDiskLimits==null || m_featureDiskLimits.isEmpty()) {
+        Set<FeatureNameType> featureNames = new HashSet<> ();
+
+        if (m_featureDiskLimits!= null && !m_featureDiskLimits.isEmpty()) {
+            featureNames.addAll(m_featureDiskLimits.keySet());
+        }
+        if (m_snmpFeatureDiskLimits!= null && !m_snmpFeatureDiskLimits.isEmpty()) {
+            featureNames.addAll(m_snmpFeatureDiskLimits.keySet());
+        }
+
+        if (featureNames.isEmpty()) {
             return;
         }
 
         DiskLimitType diskLimit = factory.createDiskLimitType();
-        if (m_featureDiskLimits!=null && !m_featureDiskLimits.isEmpty()) {
-            for (FeatureNameType featureName : m_featureDiskLimits.keySet()) {
+        for (FeatureNameType featureName : featureNames) {
                 DiskLimitType.Feature feature = factory.createDiskLimitTypeFeature();
                 feature.setName(featureName);
-                feature.setSize(m_featureDiskLimits.get(featureName));
+                if (m_featureDiskLimits !=null && m_featureDiskLimits.containsKey(featureName)) {
+                    feature.setSize(m_featureDiskLimits.get(featureName));
+                }
+                if (m_snmpFeatureDiskLimits !=null && m_snmpFeatureDiskLimits.containsKey(featureName)) {
+                    feature.setAlert(m_snmpFeatureDiskLimits.get(featureName));
+                }
                 diskLimit.getFeature().add(feature);
-            }
         }
 
         ResourceMonitorType monitorType = initializeResourceMonitorType(systemSettingsType, factory);
@@ -1333,7 +1351,7 @@ public class VoltProjectBuilder {
     public void enableDiagnostics() {
         // This empty dummy value enables the feature and provides a default fallback return value,
         // but gets replaced in the normal code path.
-        m_diagnostics = new ArrayList<String>();
+        m_diagnostics = new ArrayList<>();
     }
 
     /** Access the VoltCompiler's recent plan output, for diagnostic purposes */

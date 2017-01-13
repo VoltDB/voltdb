@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -58,7 +58,7 @@ class AdminExportEditTest extends TestBase {
      *  This test creates a new configuration, adds a property to it and deletes it
      */
 
-    def VerifyAddconfigurationinExportanddeleteit() {
+    def verifyAddconfigurationinExportanddeleteit() {
         boolean isPro = false
         println("Test Start: Verify 'Add configuration' in Export and delete it")
         int count = 0
@@ -227,7 +227,7 @@ class AdminExportEditTest extends TestBase {
     /*
      *  This test creates a new configuration, edits it and deletes it
      */
-    def "Verify edit in Export and delete it"() {
+    def verifyEditInExportAndDeleteIt() {
         boolean isPro = false
         println("Test Start: Verify edit in Export and delete it")
         int count = 0

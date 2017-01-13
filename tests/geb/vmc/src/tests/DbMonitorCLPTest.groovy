@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -56,15 +56,15 @@ class DbMonitorCLPTest extends TestBase {
     }
 
 
-    def "Verify Show and Hide in Command Log Performance  table" (){
+    def verifyShowAndHideInCommandLogPerformanceTable() {
         when: "ensure CLP section is present or not"
         println("test" +page.isCmdLogSectionOpen())
         if( page.isCmdLogSectionOpen()==false) {
             println("CLP section is not present")
             assert true
         }
-            then:
-            println("proceed")
+        then:
+        println("proceed")
         if( page.isCmdLogSectionOpen()) {
             println("CLP section is present")
             when: "ensure the CLP section is open"
@@ -91,11 +91,10 @@ class DbMonitorCLPTest extends TestBase {
         }
     }
 
-    def "Verify the Ascending and Descending in the Cmd Server column of Command Log Performance table"(){
+    def verifyTheAscendingAndDescendingInTheCmdServerColumnOfCommandLogPerformanceTable() {
         String before = ""
         String after  = ""
         when:"Check if Command log is Displayed"
-
         if( page.isCmdLogSectionOpen()==false) {
             println("CLP section is not present")
             assert true
@@ -117,7 +116,6 @@ class DbMonitorCLPTest extends TestBase {
             else
                 before = "descending"
 
-
             if (before.equals("ascending") && after.equals("descending"))
                 assert true
             else
@@ -127,11 +125,10 @@ class DbMonitorCLPTest extends TestBase {
         assert true
     }
 
-    def "Verify the Ascending and Descending in the PendingBytes column of Command Log Performance table"(){
+    def verifyAscendingAndDescendingInThePendingBytesColumnOfCommandLogPerformanceTable() {
         String before = ""
         String after  = ""
         when:"Check if Command Log is Displayed"
-
         if( page.isCmdLogSectionOpen()==false) {
             println("CLP section is not present")
             assert true
@@ -161,11 +158,10 @@ class DbMonitorCLPTest extends TestBase {
         assert true
     }
 
-    def "Verify the Ascending and Descending in the PendingTrans column of Command Log Performance table"(){
+    def verifyTheAscendingAndDescendingInThePendingTransColumnOfCommandLogPerformanceTable() {
         String before = ""
         String after  = ""
         when:"Check if Command Log is Displayed"
-
         if( page.isCmdLogSectionOpen()==false) {
             println("CLP section is not present")
             assert true
@@ -195,11 +191,10 @@ class DbMonitorCLPTest extends TestBase {
         assert true
     }
 
-    def "Verify the Ascending and Descending in the TotalSegments column of Command Log Performance table"(){
+    def verifyTheAscendingAndDescendingInTheTotalSegmentsColumnOfCommandLogPerformanceTable() {
         String before = ""
         String after  = ""
         when:"Check if Command Log is Displayed"
-
         if( page.isCmdLogSectionOpen()==false) {
             println("CLP section is not present")
             assert true
@@ -229,11 +224,10 @@ class DbMonitorCLPTest extends TestBase {
         assert true
     }
 
-    def "Verify the Ascending and Descending in the SegmentsInUse column of Command Log Performance table"(){
+    def verifyTheAscendingAndDescendingInTheSegmentsInUseColumnOfCommandLogPerformanceTable() {
         String before = ""
         String after  = ""
         when:"Check if Command Log is Displayed"
-
         if( page.isCmdLogSectionOpen()==false) {
             println("CLP section is not present")
             assert true
@@ -263,11 +257,10 @@ class DbMonitorCLPTest extends TestBase {
         assert true
     }
 
-    def "Verify the Ascending and Descending in the FsyncInterval column of Command Log Performance table"(){
+    def verifyTheAscendingAndDescendingInTheFsyncIntervalColumnOfCommandLogPerformanceTable() {
         String before = ""
         String after  = ""
         when:"Check if Command Log is Displayed"
-
         if( page.isCmdLogSectionOpen()==false) {
             println("CLP section is not present")
             assert true
@@ -298,7 +291,7 @@ class DbMonitorCLPTest extends TestBase {
     }
 
 
-    def "Verify the text in the Title in Command Log Performance "(){
+    def verifyTheTextInTheTitleInCommandLogPerformance() {
         when: "Check Command Log Performance Title is displayed or not"
         if(page.drCLPTitleDisplayed()) {
             assert true
@@ -313,7 +306,7 @@ class DbMonitorCLPTest extends TestBase {
         }
     }
 
-    def "Verify search in Command Log Performance Table"(){
+    def verifySearchInCommandLogPerformanceTable() {
         boolean isValid=false
         String searchText = ""
         boolean isCLPOpen = false
@@ -333,6 +326,7 @@ class DbMonitorCLPTest extends TestBase {
         }
         then:
         println("proceed")
+
         when: "Set the value of Master filter"
         println("isCLPOpen" + isCLPOpen)
         if(isCLPOpen==true) {
@@ -366,5 +360,4 @@ class DbMonitorCLPTest extends TestBase {
             assert false;
         }
     }
-
 }

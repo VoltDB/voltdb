@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -814,6 +814,14 @@ public class SQLCommand
                 return;
             }
 
+            String explainViewName = SQLParser.parseExplainViewCall(statement);
+            if (explainViewName != null) {
+                // We've got a statement that starts with "explainview", send the statement to
+                // @ExplainView (now that parseExplainViewCall() has stripped out "explainview").
+                printResponse(m_client.callProcedure("@ExplainView", explainViewName));
+                return;
+            }
+
             // LOAD CLASS <jar>?
             String loadPath = SQLParser.parseLoadClasses(statement);
             if (loadPath != null) {
@@ -966,6 +974,8 @@ public class SQLCommand
                 ImmutableMap.<Integer, List<String>>builder().put( 1, Arrays.asList("varchar")).build());
         Procedures.put("@ExplainProc",
                 ImmutableMap.<Integer, List<String>>builder().put( 1, Arrays.asList("varchar")).build());
+        Procedures.put("@ExplainView",
+                ImmutableMap.<Integer, List<String>>builder().put( 1, Arrays.asList("varchar")).build());
         Procedures.put("@ValidatePartitioning",
                 ImmutableMap.<Integer, List<String>>builder().put( 2, Arrays.asList("int", "varbinary")).build());
         Procedures.put("@GetPartitionKeys",
@@ -984,6 +994,7 @@ public class SQLCommand
 
         // Only fail if we can't connect to any servers
         boolean connectedAnyServer = false;
+        String connectionErrorMessages = "";
 
         for (String server : servers) {
             try {
@@ -991,14 +1002,15 @@ public class SQLCommand
                 connectedAnyServer = true;
             }
             catch (UnknownHostException e) {
+                connectionErrorMessages += "\n    " + server.trim() + ":" + port + " - UnknownHostException";
             }
             catch (IOException e) {
-
+                connectionErrorMessages += "\n    " + server.trim() + ":" + port + " - " + e.getMessage();
             }
         }
 
         if (!connectedAnyServer) {
-            throw new IOException("Unable to connect to VoltDB cluster");
+            throw new IOException("Unable to connect to VoltDB cluster" + connectionErrorMessages);
         }
         return client;
     }

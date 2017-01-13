@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -64,11 +64,11 @@
 #include "plannodes/receivenode.h"
 #include "plannodes/sendnode.h"
 #include "plannodes/seqscannode.h"
+#include "plannodes/swaptablesnode.h"
 #include "plannodes/tuplescannode.h"
 #include "plannodes/unionnode.h"
 #include "plannodes/updatenode.h"
-#include "plannodes/partitionbynode.h"
-
+#include "plannodes/windowfunctionnode.h"
 #include <sstream>
 
 namespace plannodeutil {
@@ -148,6 +148,12 @@ voltdb::AbstractPlanNode* getEmptyPlanNode(voltdb::PlanNodeType type) {
             ret = new voltdb::DeletePlanNode();
             break;
         // ------------------------------------------------------------------
+        // SwapTables
+        // ------------------------------------------------------------------
+        case (voltdb::PLAN_NODE_TYPE_SWAPTABLES):
+            ret = new voltdb::SwapTablesPlanNode();
+            break;
+        // ------------------------------------------------------------------
         // Aggregate
         // ------------------------------------------------------------------
         case (voltdb::PLAN_NODE_TYPE_HASHAGGREGATE):
@@ -204,10 +210,10 @@ voltdb::AbstractPlanNode* getEmptyPlanNode(voltdb::PlanNodeType type) {
             ret = new voltdb::MergeReceivePlanNode();
             break;
         // ------------------------------------------------------------------
-        // PartitionBy
+        // Window Function
         // ------------------------------------------------------------------
-        case (voltdb::PLAN_NODE_TYPE_PARTITIONBY):
-            ret = new voltdb::PartitionByPlanNode();
+        case (voltdb::PLAN_NODE_TYPE_WINDOWFUNCTION):
+            ret = new voltdb::WindowFunctionPlanNode();
             break;
         // default: Don't provide a default, let the compiler enforce complete coverage.
     }

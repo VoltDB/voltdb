@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -373,6 +373,14 @@ public class VoltLogger {
         }
         // set the final variable for the core logger
         m_logger = tempLogger;
+    }
+
+    /**
+     * Constructor used by VoltNullLogger
+     */
+    protected VoltLogger(CoreVoltLogger logger) {
+        assert(logger != null);
+        m_logger = logger;
     }
 
     public void rateLimitedLog(long suppressInterval, Level level, Throwable cause, String format, Object...args) {

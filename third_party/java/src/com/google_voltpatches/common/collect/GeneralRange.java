@@ -21,10 +21,8 @@ import static com.google_voltpatches.common.collect.BoundType.OPEN;
 
 import com.google_voltpatches.common.annotations.GwtCompatible;
 import com.google_voltpatches.common.base.Objects;
-
 import java.io.Serializable;
 import java.util.Comparator;
-
 import javax.annotation_voltpatches.Nullable;
 
 /**
@@ -258,14 +256,15 @@ final class GeneralRange<T> implements Serializable {
   GeneralRange<T> reverse() {
     GeneralRange<T> result = reverse;
     if (result == null) {
-      result = new GeneralRange<T>(
-          Ordering.from(comparator).reverse(),
-          hasUpperBound,
-          getUpperEndpoint(),
-          getUpperBoundType(),
-          hasLowerBound,
-          getLowerEndpoint(),
-          getLowerBoundType());
+      result =
+          new GeneralRange<T>(
+              Ordering.from(comparator).reverse(),
+              hasUpperBound,
+              getUpperEndpoint(),
+              getUpperBoundType(),
+              hasLowerBound,
+              getLowerEndpoint(),
+              getLowerBoundType());
       result.reverse = this;
       return this.reverse = result;
     }
@@ -274,15 +273,13 @@ final class GeneralRange<T> implements Serializable {
 
   @Override
   public String toString() {
-    return new StringBuilder()
-        .append(comparator)
-        .append(":")
-        .append(lowerBoundType == CLOSED ? '[' : '(')
-        .append(hasLowerBound ? lowerEndpoint : "-\u221e")
-        .append(',')
-        .append(hasUpperBound ? upperEndpoint : "\u221e")
-        .append(upperBoundType == CLOSED ? ']' : ')')
-        .toString();
+    return comparator
+        + ":"
+        + (lowerBoundType == CLOSED ? '[' : '(')
+        + (hasLowerBound ? lowerEndpoint : "-\u221e")
+        + ','
+        + (hasUpperBound ? upperEndpoint : "\u221e")
+        + (upperBoundType == CLOSED ? ']' : ')');
   }
 
   T getLowerEndpoint() {

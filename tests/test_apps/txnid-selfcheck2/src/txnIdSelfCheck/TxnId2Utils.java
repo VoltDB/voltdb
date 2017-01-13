@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -75,7 +75,8 @@ public enum TxnId2Utils {;
                 else if (ss.matches("(?s).*No response received in the allotted time.*") ||
                          ss.matches(".*Server is currently unavailable; try again later.*") ||
                          ss.matches(".*Server is paused.*") ||
-                         ss.matches("(?s).*Server shutdown in progress.*")
+                         ss.matches("(?s).*Server shutdown in progress.*") ||
+                         ss.matches("(?s).*Server is shutting down.*")
                         ) {
                     sleep = true;
                 }

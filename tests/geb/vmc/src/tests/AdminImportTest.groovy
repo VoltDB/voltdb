@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -54,7 +54,7 @@ class AdminImportTest extends TestBase {
         }
     }
 
-    def "Check import Click and check its value"() {
+    def checkImportClickAndCheckItsValue() {
         when:
         waitFor(waitTime) { page.importbtn.isDisplayed() }
         page.importbtn.click()
@@ -68,7 +68,7 @@ class AdminImportTest extends TestBase {
         page.importbtn.click()
     }
 
-    def VerifyErrorMessagesOfAddImportConfigurationForKafka() {
+    def verifyErrorMessagesOfAddImportConfigurationForKafka() {
         when:
         if (waitFor(10){page.overview.addImportConfig.isDisplayed()}) {
             when: 'Open Add Import Configuration Popup'
@@ -101,7 +101,7 @@ class AdminImportTest extends TestBase {
         println("passed")
     }
 
-    def VerifyErrorMessagesOfAddImportConfigurationForKinesis() {
+    def verifyErrorMessagesOfAddImportConfigurationForKinesis() {
         when:
         if (waitFor(10){page.overview.addImportConfig.isDisplayed()}) {
             when: 'Open Add Import Configuration Popup'
@@ -143,7 +143,7 @@ class AdminImportTest extends TestBase {
         println("passed")
     }
 
-    def VerifyAddConfigurationForImportKafkaCreated() {
+    def verifyAddConfigurationForImportKafkaCreated() {
         when: 'Open Add Import Configuration Popup'
         page.overview.openAddImportConfigurationPopup()
         page.overview.textImportType.value("KAFKA")
@@ -235,7 +235,7 @@ class AdminImportTest extends TestBase {
 
     }
 
-    def VerifyAddConfigurationForImportKinesisCreated() {
+    def verifyAddConfigurationForImportKinesisCreated() {
         when: 'Open Add Import Configuration Popup'
         page.overview.openAddImportConfigurationPopup()
         page.overview.textImportType.value("KINESIS")
@@ -293,7 +293,6 @@ class AdminImportTest extends TestBase {
         waitFor(waitTime) { page.overview.importConfig.isDisplayed() }
         page.overview.importConfig.click()
         waitFor(waitTime) { page.overview.importExpanded.isDisplayed() }
-
         then: 'Display the created Kinesis'
         waitFor(waitTime) { page.overview.KinesisImportName.isDisplayed() }
         println("Configuration created")
@@ -336,7 +335,7 @@ class AdminImportTest extends TestBase {
 
     }
 
-    def VerifyAddPropertyInImportConfiguration(){
+    def verifyAddPropertyInImportConfiguration(){
         when: 'Open Add Import Configuration Popup'
         page.overview.openAddImportConfigurationPopup()
         page.overview.textImportType.value("KAFKA")
@@ -394,7 +393,6 @@ class AdminImportTest extends TestBase {
         report 'OpenAddConfig'
         waitFor(waitTime){page.overview.importConfig.click()}
         waitFor(waitTime) { page.overview.importExpanded.isDisplayed() }
-
         then: 'Display the created KAFKA'
         waitFor(waitTime) { page.overview.KafkaImportName.isDisplayed() }
         println("Configuration created")
@@ -434,10 +432,9 @@ class AdminImportTest extends TestBase {
         }
         then: 'Print Deleted'
         println("Deleted Configuration")
-
     }
 
-    def VerifyErrorMessagesForAddProperty() {
+    def verifyErrorMessagesForAddProperty() {
         when: 'Open Add Import Configuration Popup'
         page.overview.openAddImportConfigurationPopup()
         waitFor(waitTime) {
@@ -461,6 +458,7 @@ class AdminImportTest extends TestBase {
         page.overview.newImportTextField.isDisplayed()
         page.overview.newImportValueField.isDisplayed()
         page.overview.deleteFirstImportProperty.isDisplayed()
+
         when: 'Save button is clicked'
         page.overview.saveImport.click()
         then: 'Error messages are displayed'

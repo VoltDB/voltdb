@@ -1,5 +1,5 @@
 # This file is part of VoltDB.
-# Copyright (C) 2008-2016 VoltDB Inc.
+# Copyright (C) 2008-2017 VoltDB Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -127,9 +127,6 @@ class XML(Database):
                     if subnode.tag == "resourcemonitor":
                         for supersubnode in subnode:
                             self.assertEqual(supersubnode.attrib['size'], "80%")
-            if child.tag == "admin-mode":
-                self.assertEqual(child.attrib['adminstartup'], "false")
-                self.assertEqual(child.attrib['port'], "21211")
             if child.tag == "cluster":
                 self.assertEqual(child.attrib['elastic'], "enabled")
                 self.assertEqual(child.attrib['hostcount'], "0")
@@ -177,7 +174,7 @@ class Deployment(unittest.TestCase):
                       "commandlogsnapshot": {"path": "command_log_snapshot"}},
             "partition-detection": {"snapshot": {"prefix": "voltdb_partition_detection"},
                                     "enabled": True},
-            "admin-mode": {"port": 21211, "adminstartup": False}, "heartbeat": {"timeout": 90},
+            "heartbeat": {"timeout": 90},
             "httpd": {"jsonapi": {"enabled": True}, "port": 8080, "enabled": True},
             "snapshot": {"frequency": "1h", "retain": 1,
                          "prefix": "AUTOSNAP", "enabled": False},
@@ -273,9 +270,6 @@ class UpdateDeployment(Deployment):
                         for supersubnode in subnode:
                             if supersubnode == "memorylimit":
                                 self.assertEqual(supersubnode.attrib['size'], "1")
-            if child.tag == "admin-mode":
-                self.assertEqual(child.attrib['adminstartup'], "false")
-                self.assertEqual(child.attrib['port'], "21211")
             if child.tag == "cluster":
                 self.assertEqual(child.attrib['elastic'], "enabled")
                 self.assertEqual(child.attrib['kfactor'], "0")

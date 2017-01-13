@@ -1,17 +1,15 @@
 /*
  * Copyright (C) 2014 The Guava Authors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
+ * in compliance with the License. You may obtain a copy of the License at
  *
  * http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software distributed under the License
+ * is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
+ * or implied. See the License for the specific language governing permissions and limitations under
+ * the License.
  */
 
 package com.google_voltpatches.common.eventbus;
@@ -20,16 +18,14 @@ import static com.google_voltpatches.common.base.Preconditions.checkNotNull;
 
 import com.google_voltpatches.common.annotations.VisibleForTesting;
 import com.google_voltpatches.j2objc.annotations.Weak;
-
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.concurrent.Executor;
-
 import javax.annotation_voltpatches.Nullable;
 
 /**
- * A subscriber method on a specific object, plus the executor that should be used for
- * dispatching events to it.
+ * A subscriber method on a specific object, plus the executor that should be used for dispatching
+ * events to it.
  *
  * <p>Two subscribers are equivalent when they refer to the same method on the same object (not
  * class). This property is used to ensure that no subscriber method is registered more than once.
@@ -50,9 +46,8 @@ class Subscriber {
   /** The event bus this subscriber belongs to. */
   @Weak private EventBus bus;
 
-  /** Object sporting the subscriber method. */
-  @VisibleForTesting
-  final Object target;
+  /** The object with the subscriber method. */
+  @VisibleForTesting final Object target;
 
   /** Subscriber method. */
   private final Method method;
@@ -73,16 +68,17 @@ class Subscriber {
    * Dispatches {@code event} to this subscriber using the proper executor.
    */
   final void dispatchEvent(final Object event) {
-    executor.execute(new Runnable() {
-      @Override
-      public void run() {
-        try {
-          invokeSubscriberMethod(event);
-        } catch (InvocationTargetException e) {
-          bus.handleSubscriberException(e.getCause(), context(event));
-        }
-      }
-    });
+    executor.execute(
+        new Runnable() {
+          @Override
+          public void run() {
+            try {
+              invokeSubscriberMethod(event);
+            } catch (InvocationTargetException e) {
+              bus.handleSubscriberException(e.getCause(), context(event));
+            }
+          }
+        });
   }
 
   /**

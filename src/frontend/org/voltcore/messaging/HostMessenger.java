@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -21,16 +21,19 @@ import static com.google_voltpatches.common.base.Preconditions.checkArgument;
 import static com.google_voltpatches.common.base.Predicates.equalTo;
 import static com.google_voltpatches.common.base.Predicates.not;
 
+import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.SocketException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -46,9 +49,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.zookeeper_voltpatches.CreateMode;
+import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
-import org.apache.zookeeper_voltpatches.data.Stat;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -67,15 +70,16 @@ import org.voltcore.utils.PortGenerator;
 import org.voltcore.utils.ShutdownHooks;
 import org.voltcore.zk.CoreZK;
 import org.voltcore.zk.ZKUtil;
-import org.voltdb.VoltDB;
 import org.voltdb.probe.MeshProber;
 
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.base.Predicate;
+import com.google_voltpatches.common.collect.ImmutableCollection;
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;
-import com.google_voltpatches.common.collect.ImmutableSet;
+import com.google_voltpatches.common.collect.ImmutableMultimap;
 import com.google_voltpatches.common.collect.Maps;
+import com.google_voltpatches.common.collect.Multimaps;
 import com.google_voltpatches.common.collect.Sets;
 import com.google_voltpatches.common.net.HostAndPort;
 import com.google_voltpatches.common.primitives.Longs;
@@ -92,6 +96,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     private static final VoltLogger m_hostLog = new VoltLogger("HOST");
     private static final VoltLogger m_tmLog = new VoltLogger("TM");
 
+    //VERBOTEN_THREADS is a set of threads that are not allowed to use ZK client.
     public static final CopyOnWriteArraySet<Long> VERBOTEN_THREADS = new CopyOnWriteArraySet<Long>();
 
     /**
@@ -216,16 +221,16 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             JSONStringer js = new JSONStringer();
             try {
                 js.object();
-                js.key(GROUP).value(group);
-                js.key(COORDINATOR_IP).value(coordinatorIp.toString());
-                js.key(ZK_INTERFACE).value(zkInterface);
-                js.key(INTERNAL_INTERFACE).value(internalInterface);
-                js.key(INTERNAL_PORT).value(internalPort);
-                js.key(DEAD_HOST_TIMEOUT).value(deadHostTimeout);
-                js.key(BACKWARDS_TIME_FORGIVENESS_WINDOW).value(backwardsTimeForgivenessWindow);
-                js.key(NETWORK_THREADS).value(networkThreads);
+                js.keySymbolValuePair(GROUP, group);
+                js.keySymbolValuePair(COORDINATOR_IP, coordinatorIp.toString());
+                js.keySymbolValuePair(ZK_INTERFACE, zkInterface);
+                js.keySymbolValuePair(INTERNAL_INTERFACE, internalInterface);
+                js.keySymbolValuePair(INTERNAL_PORT, internalPort);
+                js.keySymbolValuePair(DEAD_HOST_TIMEOUT, deadHostTimeout);
+                js.keySymbolValuePair(BACKWARDS_TIME_FORGIVENESS_WINDOW, backwardsTimeForgivenessWindow);
+                js.keySymbolValuePair(NETWORK_THREADS, networkThreads);
                 js.key(ACCEPTOR).value(acceptor);
-                js.key(LOCAL_SITES_COUNT).value(localSitesCount);
+                js.keySymbolValuePair(LOCAL_SITES_COUNT, localSitesCount);
                 js.endObject();
 
                 return js.toString();
@@ -239,15 +244,15 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     /**
      * Stores the information about the host's IP.
      */
-    private static class HostInfo {
+    public static class HostInfo {
 
         private final static String HOST_IP = "hostIp";
         private final static String GROUP = "group";
         private final static String LOCAL_SITES_COUNT = "localSitesCount";
 
-        final String m_hostIp;
-        final String m_group;
-        final int m_localSitesCount;
+        public final String m_hostIp;
+        public final String m_group;
+        public final int m_localSitesCount;
 
         public HostInfo(String hostIp, String group, int localSitesCount) {
             m_hostIp = hostIp;
@@ -259,9 +264,9 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         {
             final JSONStringer js = new JSONStringer();
             js.object();
-            js.key(HOST_IP).value(m_hostIp);
-            js.key(GROUP).value(m_group);
-            js.key(LOCAL_SITES_COUNT).value(m_localSitesCount);
+            js.keySymbolValuePair(HOST_IP, m_hostIp);
+            js.keySymbolValuePair(GROUP, m_group);
+            js.keySymbolValuePair(LOCAL_SITES_COUNT, m_localSitesCount);
             js.endObject();
             return js.toString().getBytes(StandardCharsets.UTF_8);
         }
@@ -295,7 +300,6 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     private final Config m_config;
     private final SocketJoiner m_joiner;
     private final VoltNetworkPool m_network;
-    private volatile boolean m_localhostReady = false;
     // memoized InstanceId
     private InstanceId m_instanceId = null;
     private boolean m_shuttingDown = false;
@@ -304,14 +308,23 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     private boolean m_partitionDetected = false;
 
     private final HostWatcher m_hostWatcher;
+    private boolean m_hasAllSecondaryConnectionCreated = false;
 
     private final Object m_mapLock = new Object();
 
     /*
-     * References to other hosts in the mesh.
+     * References to other hosts in the mesh. To any foreign host, there
+     * will be one primary connection and, if possible, multiple auxiliary
+     * connections.
      * Updates via COW
      */
-    volatile ImmutableMap<Integer, ForeignHost> m_foreignHosts = ImmutableMap.of();
+    volatile ImmutableMultimap<Integer, ForeignHost> m_foreignHosts = ImmutableMultimap.of();
+
+    /*
+     * Reference to the target HSId to FH mapping
+     * Updates via COW
+     */
+    volatile ImmutableMap<Long, ForeignHost> m_fhMapping = ImmutableMap.of();
 
     /*
      * References to all the local mailboxes
@@ -323,11 +336,12 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      * All failed hosts that have ever been seen.
      * Used to dedupe failures so that they are only processed once.
      */
-    private volatile ImmutableSet<Integer> m_knownFailedHosts = ImmutableSet.of();
+    private volatile ImmutableMap<Integer,String> m_knownFailedHosts = ImmutableMap.of();
 
     private AgreementSite m_agreementSite;
     private ZooKeeper m_zk;
     private final AtomicInteger m_nextSiteId = new AtomicInteger(0);
+    private final AtomicInteger m_nextForeignHost = new AtomicInteger();
     private final AtomicBoolean m_paused = new AtomicBoolean(false);
 
     /*
@@ -517,19 +531,27 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
 
     private final void addFailedHosts(Set<Integer> rip) {
         synchronized (m_mapLock) {
-            m_knownFailedHosts = ImmutableSet.<Integer>builder()
-                    .addAll(Sets.filter(m_knownFailedHosts, not(in(rip))))
-                    .addAll(rip)
-                    .build();
+            ImmutableMap.Builder<Integer, String> bldr = ImmutableMap.<Integer,String>builder()
+                    .putAll(Maps.filterKeys(m_knownFailedHosts, not(in(rip))));
+            for (int hostId: rip) {
+                Iterator<ForeignHost> fhs = m_foreignHosts.get(hostId).iterator();
+
+                String hostname = fhs.hasNext() ? fhs.next().hostnameAndIPAndPort() : "UNKNOWN";
+                bldr.put(hostId, hostname);
+            }
+            m_knownFailedHosts = bldr.build();
         }
     }
 
     private final void addFailedHost(int hostId) {
-        if (!m_knownFailedHosts.contains(hostId)) {
+        if (!m_knownFailedHosts.containsKey(hostId)) {
             synchronized (m_mapLock) {
-                m_knownFailedHosts = ImmutableSet.<Integer>builder()
-                        .addAll(Sets.filter(m_knownFailedHosts, not(equalTo(hostId))))
-                        .build();
+                ImmutableMap.Builder<Integer, String> bldr = ImmutableMap.<Integer,String>builder()
+                        .putAll(Maps.filterKeys(m_knownFailedHosts, not(equalTo(hostId))));
+                Iterator<ForeignHost> fhs = m_foreignHosts.get(hostId).iterator();
+                String hostname = fhs.hasNext() ? fhs.next().hostnameAndIPAndPort() : "UNKNOWN";
+                bldr.put(hostId, hostname);
+                m_knownFailedHosts = bldr.build();
             }
         }
     }
@@ -717,7 +739,8 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         prepSocketChannel(socket);
         ForeignHost fhost = null;
         try {
-            fhost = new ForeignHost(this, hostId, socket, m_config.deadHostTimeout, listeningAddress, new PicoNetwork(socket));
+            fhost = new ForeignHost(this, hostId, socket, m_config.deadHostTimeout,
+                    listeningAddress, new PicoNetwork(socket));
             putForeignHost(hostId, fhost);
             fhost.enableRead(VERBOTEN_THREADS);
         } catch (java.io.IOException e) {
@@ -743,7 +766,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      */
     private void putForeignHost(int hostId, ForeignHost fh) {
         synchronized (m_mapLock) {
-            m_foreignHosts = ImmutableMap.<Integer, ForeignHost>builder()
+            m_foreignHosts = ImmutableMultimap.<Integer, ForeignHost>builder()
                     .putAll(m_foreignHosts)
                     .put(hostId, fh)
                     .build();
@@ -759,17 +782,29 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         };
     }
 
+
     /*
      * Convenience method for doing the verbose COW remove from the map
      */
-    private void removeForeignHost(int hostId) {
-        ForeignHost fh = m_foreignHosts.get(hostId);
+    private void removeForeignHost(final int hostId) {
+        ImmutableCollection<ForeignHost> fhs = m_foreignHosts.get(hostId);
         synchronized (m_mapLock) {
-            m_foreignHosts = ImmutableMap.<Integer, ForeignHost>builder()
-                    .putAll(Maps.filterKeys(m_foreignHosts, not(equalTo(hostId))))
+            m_foreignHosts = ImmutableMultimap.<Integer, ForeignHost>builder()
+                    .putAll(Multimaps.filterKeys(m_foreignHosts, not(equalTo(hostId))))
+                    .build();
+
+            Predicate<Long> hostIdNotEqual = new Predicate<Long>() {
+                @Override
+                public boolean apply(Long intput) {
+                    return CoreUtils.getHostIdFromHSId(intput) != hostId;
+                }
+            };
+
+            m_fhMapping = ImmutableMap.<Long, ForeignHost>builder()
+                    .putAll(Maps.filterKeys(m_fhMapping, hostIdNotEqual))
                     .build();
         }
-        if (fh != null) {
+        for (ForeignHost fh : fhs) {
             fh.close();
         }
     }
@@ -784,10 +819,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      * in the MembershipAcceptor.
      */
     @Override
-    public void requestJoin(
-            SocketChannel socket,
-            InetSocketAddress listeningAddress,
-            JSONObject jo) throws Exception {
+    public void requestJoin(SocketChannel socket, InetSocketAddress listeningAddress, JSONObject jo) throws Exception {
         /*
          * Generate the host id via creating an ephemeral sequential node
          */
@@ -829,7 +861,8 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 /*
                  * Now add the host to the mailbox system
                  */
-                fhost = new ForeignHost(this, hostId, socket, m_config.deadHostTimeout, listeningAddress, new PicoNetwork(socket));
+                fhost = new ForeignHost(this, hostId, socket, m_config.deadHostTimeout,
+                        listeningAddress, new PicoNetwork(socket));
                 putForeignHost(hostId, fhost);
                 fhost.enableRead(VERBOTEN_THREADS);
 
@@ -879,45 +912,50 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
 
         JSONObject jsObj = new JSONObject();
 
-        jsObj.put("accepted", decision.accepted);
+        jsObj.put(SocketJoiner.ACCEPTED, decision.accepted);
         if (decision.accepted) {
             /*
              * Tell the new node what its host id is
              */
-            jsObj.put("newHostId", hostId);
+            jsObj.put(SocketJoiner.NEW_HOST_ID, hostId);
 
             /*
              * Echo back the address that the node connected from
              */
-            jsObj.put("reportedAddress",
+            jsObj.put(SocketJoiner.REPORTED_ADDRESS,
                       ((InetSocketAddress) socket.socket().getRemoteSocketAddress()).getAddress().getHostAddress());
 
             /*
-             * Create an array containing an ad for every node including this one
+             * Create an array containing an id for every node including this one
              * even though the connection has already been made
              */
             JSONArray jsArray = new JSONArray();
             JSONObject hostObj = new JSONObject();
-            hostObj.put("hostId", getHostId());
-            hostObj.put("address",
+            hostObj.put(SocketJoiner.HOST_ID, getHostId());
+            hostObj.put(SocketJoiner.ADDRESS,
                         m_config.internalInterface.isEmpty() ?
-                        socket.socket().getLocalAddress().getHostAddress() : m_config.internalInterface);
-            hostObj.put("port", m_config.internalPort);
+                        socket.socket().getLocalAddress().getHostAddress() :
+                        m_config.internalInterface);
+            hostObj.put(SocketJoiner.PORT, m_config.internalPort);
             jsArray.put(hostObj);
-            for (Map.Entry<Integer, ForeignHost> entry : m_foreignHosts.entrySet()) {
-                if (entry.getValue() == null) continue;
+            for (Entry<Integer, Collection<ForeignHost>> entry : m_foreignHosts.asMap().entrySet()) {
+                if (entry.getValue().isEmpty()) continue;
                 int hsId = entry.getKey();
-                ForeignHost fh = entry.getValue();
+                Iterator<ForeignHost> it = entry.getValue().iterator();
+                // all fhs to same host have the same address and port
+                ForeignHost fh = it.next();
                 hostObj = new JSONObject();
-                hostObj.put("hostId", hsId);
-                hostObj.put("address", fh.m_listeningAddress.getAddress().getHostAddress());
-                hostObj.put("port", fh.m_listeningAddress.getPort());
+                hostObj.put(SocketJoiner.HOST_ID, hsId);
+                hostObj.put(SocketJoiner.ADDRESS,
+                        fh.m_listeningAddress.getAddress().getHostAddress());
+                hostObj.put(SocketJoiner.PORT, fh.m_listeningAddress.getPort());
                 jsArray.put(hostObj);
             }
-            jsObj.put("hosts", jsArray);
-        } else {
-            jsObj.put("reason", decision.errMsg);
-            jsObj.put("mayRetry", decision.mayRetry);
+            jsObj.put(SocketJoiner.HOSTS, jsArray);
+        }
+        else {
+            jsObj.put(SocketJoiner.REASON, decision.errMsg);
+            jsObj.put(SocketJoiner.MAY_RETRY, decision.mayRetry);
         }
 
         byte messageBytes[] = jsObj.toString(4).getBytes("UTF-8");
@@ -957,7 +995,8 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             prepSocketChannel(sockets[ii]);
             ForeignHost fhost = null;
             try {
-                fhost = new ForeignHost(this, hosts[ii], sockets[ii], m_config.deadHostTimeout, listeningAddresses[ii], new PicoNetwork(sockets[ii]));
+                fhost = new ForeignHost(this, hosts[ii], sockets[ii], m_config.deadHostTimeout,
+                        listeningAddresses[ii], new PicoNetwork(sockets[ii]));
                 putForeignHost(hosts[ii], fhost);
             } catch (java.io.IOException e) {
                 org.voltdb.VoltDB.crashLocalVoltDB("Failed to instantiate foreign host", true, e);
@@ -1022,6 +1061,26 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         m_zk.create(CoreZK.hosts_host + getHostId(), hostInfo.toBytes(), Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
     }
 
+    /**
+     * SocketJoiner receives the request of creating a new connection from given host id,
+     * create a new ForeignHost for this connection.
+     */
+    @Override
+    public void notifyOfConnection(
+            int hostId,
+            SocketChannel socket,
+            InetSocketAddress listeningAddress) throws Exception
+    {
+        m_networkLog.info("Host " + getHostId() + " receives a new connection from host " + hostId);
+        prepSocketChannel(socket);
+        // Auxiliary connection never time out
+        ForeignHost fhost = new ForeignHost(this, hostId, socket, Integer.MAX_VALUE,
+                listeningAddress, new PicoNetwork(socket));
+        putForeignHost(hostId, fhost);
+        fhost.enableRead(VERBOTEN_THREADS);
+}
+
+
     private static int parseHostId(String name) {
         // HostInfo ZK node name has the form "host#", hence the offset of 4 to skip the "host".
         return Integer.parseInt(name.substring(name.indexOf("host") + 4));
@@ -1030,8 +1089,8 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     /**
      * Wait until all the nodes have built a mesh.
      */
-    public Map<Integer, String> waitForGroupJoin(int expectedHosts) {
-        Map<Integer, String> hostGroups = Maps.newHashMap();
+    public Map<Integer, HostInfo> waitForGroupJoin(int expectedHosts) {
+        Map<Integer, HostInfo> hostInfos = Maps.newHashMap();
 
         try {
             while (true) {
@@ -1042,7 +1101,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 for (String child : children) {
                     final HostInfo info = HostInfo.fromBytes(m_zk.getData(ZKUtil.joinZKPath(CoreZK.hosts, child), false, null));
 
-                    hostGroups.put(parseHostId(child), info.m_group);
+                    hostInfos.put(parseHostId(child), info);
                 }
 
                 /*
@@ -1071,21 +1130,66 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             org.voltdb.VoltDB.crashLocalVoltDB("Error waiting for hosts to be ready", false, e);
         }
 
-        assert hostGroups.size() == expectedHosts;
+        assert hostInfos.size() == expectedHosts;
+        return hostInfos;
+    }
+
+    public Map<Integer, String> getHostGroupsFromZK()
+            throws KeeperException, InterruptedException, JSONException {
+        Map<Integer, String> hostGroups = Maps.newHashMap();
+        List<String> children = m_zk.getChildren(CoreZK.hosts, false);
+        Queue<ZKUtil.ByteArrayCallback> callbacks = new ArrayDeque<ZKUtil.ByteArrayCallback>();
+        // issue all callbacks except the last one
+        for (int i = 0; i < children.size() - 1; i++) {
+            ZKUtil.ByteArrayCallback cb = new ZKUtil.ByteArrayCallback();
+            m_zk.getData(ZKUtil.joinZKPath(CoreZK.hosts, children.get(i)), false, cb, null);
+            callbacks.offer(cb);
+        }
+        // remember the last callback
+        ZKUtil.ByteArrayCallback lastCallback = new ZKUtil.ByteArrayCallback();
+        String lastChild = children.get(children.size() - 1);
+        m_zk.getData(ZKUtil.joinZKPath(CoreZK.hosts, lastChild), false, lastCallback, null);
+
+        // wait for the last callback to finish
+        byte[] lastPayload = lastCallback.getData();
+        final HostInfo lastOne = HostInfo.fromBytes(lastPayload);
+        hostGroups.put(parseHostId(lastChild), lastOne.m_group);
+
+        // now all previous callbacks should have finished
+        for (int i = 0; i < children.size() - 1; i++) {
+            byte[] payload = callbacks.poll().getData();
+            final HostInfo info = HostInfo.fromBytes(payload);
+            hostGroups.put(parseHostId(children.get(i)), info.m_group);
+        }
         return hostGroups;
     }
 
-    public Map<Integer, Integer> getSitesPerHostMapFromZK() {
-        Map<Integer, Integer> sphMap = new HashMap<>();
-        try {
-            List<String> children = m_zk.getChildren(CoreZK.hosts, false);
-            for (String child : children) {
-                byte[] payload = m_zk.getData( ZKUtil.joinZKPath(CoreZK.hosts, child), false, new Stat());
-                final HostInfo info = HostInfo.fromBytes(payload);
-                sphMap.put(parseHostId(child), info.m_localSitesCount);
-            }
-        } catch (Exception e) {
-            VoltDB.crashGlobalVoltDB("Unable to get sitesperhost from Zookeeper", false, e);
+    public Map<Integer, Integer> getSitesPerHostMapFromZK()
+            throws KeeperException, InterruptedException, JSONException {
+        Map<Integer, Integer> sphMap = Maps.newHashMap();
+        List<String> children = m_zk.getChildren(CoreZK.hosts, false);
+        Queue<ZKUtil.ByteArrayCallback> callbacks = new ArrayDeque<ZKUtil.ByteArrayCallback>();
+        // issue all callbacks except the last one
+        for (int i = 0; i < children.size() - 1; i++) {
+            ZKUtil.ByteArrayCallback cb = new ZKUtil.ByteArrayCallback();
+            m_zk.getData(ZKUtil.joinZKPath(CoreZK.hosts, children.get(i)), false, cb, null);
+            callbacks.offer(cb);
+        }
+        // remember the last callback
+        ZKUtil.ByteArrayCallback lastCallback = new ZKUtil.ByteArrayCallback();
+        String lastChild = children.get(children.size() - 1);
+        m_zk.getData(ZKUtil.joinZKPath(CoreZK.hosts, lastChild), false, lastCallback, null);
+
+        // wait for the last callback to finish
+        byte[] lastPayload = lastCallback.getData();
+        final HostInfo lastOne = HostInfo.fromBytes(lastPayload);
+        sphMap.put(parseHostId(lastChild), lastOne.m_localSitesCount);
+
+        // now all previous callbacks should have finished
+        for (int i = 0; i < children.size() - 1; i++) {
+            byte[] payload = callbacks.poll().getData();
+            final HostInfo info = HostInfo.fromBytes(payload);
+            sphMap.put(parseHostId(children.get(i)), info.m_localSitesCount);
         }
         return sphMap;
     }
@@ -1132,8 +1236,13 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         if (hostId == m_localHostId) {
             return CoreUtils.getHostnameOrAddress();
         }
-        ForeignHost fh = m_foreignHosts.get(hostId);
-        return fh == null ? "UNKNOWN" : fh.hostname();
+        Iterator<ForeignHost> it = m_foreignHosts.get(hostId).iterator();
+        if (it.hasNext()) {
+            ForeignHost fh = it.next();
+            return fh.hostname();
+        }
+        return m_knownFailedHosts.get(hostId) != null ? m_knownFailedHosts.get(hostId) :
+                "UNKNOWN";
     }
 
     /**
@@ -1161,20 +1270,41 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         }
 
         // the foreign machine case
-        ForeignHost fhost = m_foreignHosts.get(hostId);
-
-        if (fhost == null)
-        {
-            if (!m_knownFailedHosts.contains(hostId)) {
+        ImmutableCollection<ForeignHost> fhosts = m_foreignHosts.get(hostId);
+        if (fhosts.isEmpty()) {
+            if (!m_knownFailedHosts.containsKey(hostId)) {
                 m_networkLog.warn(
                         "Attempted to send a message to foreign host with id " +
                         hostId + " but there is no such host.");
             }
             return null;
         }
-
-        if (!fhost.isUp())
-        {
+        ForeignHost fhost = null;
+        if (CoreUtils.getSiteIdFromHSId(hsId) < 0 ) {
+            // special mailbox, always use primary connection
+            fhost = getPrimary(fhosts, hostId);
+        } else {
+            /**
+             *  Because the secondary connections are created rather late, just after cluster mesh network has
+             *  established, but before the whole cluster has been initialized. It's possible that some non-transactional
+             * iv2 messages to be sent through foreign host when there is only one primary connection, So in
+             * case of binding all sites to the primary connection, this check has been added to prevent it.
+             */
+            if (m_hasAllSecondaryConnectionCreated) {
+                // assign a foreign host for regular mailbox
+                fhost = m_fhMapping.get(hsId);
+                if (fhost == null) {
+                    int index = Math.abs(m_nextForeignHost.getAndIncrement() % fhosts.size());
+                    fhost = (ForeignHost) fhosts.toArray()[index];
+                    bindForeignHost(hsId, fhost);
+                }
+            } else {
+                // otherwise use primary for a short while
+                // REPAIR_LOG_REQUEST, REPAIR_LOG_RESPONSE,DummyTaskMessage, DUMMY_TRANSACTION_RESPONSE will be sent on primary
+                fhost = getPrimary(fhosts, hostId);
+            }
+        }
+        if (!fhost.isUp()) {
             if (!m_shuttingDown) {
                 m_networkLog.info("Attempted delivery of message to failed site: " + CoreUtils.hsIdToString(hsId));
             }
@@ -1199,6 +1329,33 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             }
             m_siteMailboxes = b.build();
         }
+    }
+
+    private void bindForeignHost(Long hsId, ForeignHost fh) {
+        synchronized (m_mapLock) {
+            if (m_fhMapping.containsKey(hsId)) {
+                return;
+            }
+            ImmutableMap.Builder<Long, ForeignHost> b = ImmutableMap.builder();
+            m_fhMapping = b.putAll(m_fhMapping)
+                           .put(hsId, fh)
+                           .build();
+        }
+    }
+
+    private ForeignHost getPrimary(ImmutableCollection<ForeignHost> fhosts, int hostId) {
+        ForeignHost fhost = null;
+        for (ForeignHost f : fhosts) {
+            if (f.isPrimary()) {
+                fhost = f;
+                break;
+            }
+        }
+        if (fhost == null) { // unlikely
+            m_networkLog.warn("Attempted to deliver a message to host " +
+                        hostId + " but there is no primary connection to the host.");
+        }
+        return fhost;
     }
 
     /*
@@ -1339,27 +1496,42 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     /**
      * Block on this call until the number of ready hosts is
      * equal to the number of expected hosts.
-     *
-     * @return True if returning with all hosts ready. False if error.
      */
     public void waitForAllHostsToBeReady(int expectedHosts) {
-        m_localhostReady = true;
         try {
             m_zk.create(CoreZK.readyhosts_host, null, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
             while (true) {
                 ZKUtil.FutureWatcher fw = new ZKUtil.FutureWatcher();
-                if (m_zk.getChildren(CoreZK.readyhosts, fw).size() == expectedHosts) {
+                int readyHosts = m_zk.getChildren(CoreZK.readyhosts, fw).size();
+                if ( readyHosts == expectedHosts) {
                     break;
                 }
                 fw.get();
             }
-        } catch (Exception e) {
+        } catch (KeeperException | InterruptedException e) {
             org.voltdb.VoltDB.crashLocalVoltDB("Error waiting for hosts to be ready", false, e);
         }
     }
 
-    public synchronized boolean isLocalHostReady() {
-        return m_localhostReady;
+    /**
+     * For elastic join. Block on this call until the number of ready hosts is
+     * equal to the number of expected joining hosts.
+     */
+    public void waitForJoiningHostsToBeReady(int expectedHosts, int localHostId) {
+        try {
+            //register this host as joining. The host registration will be deleted after joining is completed.
+            m_zk.create(ZKUtil.joinZKPath(CoreZK.readyjoininghosts, Integer.toString(localHostId)) , null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+            while (true) {
+                ZKUtil.FutureWatcher fw = new ZKUtil.FutureWatcher();
+                int readyHosts = m_zk.getChildren(CoreZK.readyjoininghosts, fw).size();
+                if ( readyHosts == expectedHosts) {
+                    break;
+                }
+                fw.get();
+            }
+        } catch (KeeperException | InterruptedException e) {
+            org.voltdb.VoltDB.crashLocalVoltDB("Error waiting for hosts to be ready", false, e);
+        }
     }
 
     public void shutdown() throws InterruptedException
@@ -1420,9 +1592,12 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      * @param hostId The id of the foreign host to kill.
      */
     public void closeForeignHostSocket(int hostId) {
-        ForeignHost fh = m_foreignHosts.get(hostId);
-        if (fh != null && fh.isUp()) {
-            fh.killSocket();
+        Iterator<ForeignHost> it = m_foreignHosts.get(hostId).iterator();
+        while (it.hasNext()) {
+            ForeignHost fh = it.next();
+            if (fh.isUp()) {
+                fh.killSocket();
+            }
         }
         reportForeignHostFailed(hostId);
     }
@@ -1435,33 +1610,47 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         return m_acceptor;
     }
 
+    /*
+     * Foreign hosts that share the same host id belong to the same machine, one
+     * poison pill is deadly enough
+     */
     public void sendPoisonPill(Collection<Integer> hostIds, String err, int cause) {
         for (int hostId : hostIds) {
-            ForeignHost fh = m_foreignHosts.get(hostId);
-            if (fh != null && fh.isUp()) {
-                fh.sendPoisonPill(err, ForeignHost.CRASH_SPECIFIED);
+            Iterator<ForeignHost> it = m_foreignHosts.get(hostId).iterator();
+            // No need to overdose the poison pill
+            if (it.hasNext()) {
+                ForeignHost fh = it.next();
+                if (fh.isUp()) {
+                    fh.sendPoisonPill(err, ForeignHost.CRASH_SPECIFIED);
+                }
             }
         }
     }
 
     public void sendPoisonPill(String err) {
         for (int hostId : m_foreignHosts.keySet()) {
-            ForeignHost fh = m_foreignHosts.get(hostId);
-            if (fh != null && fh.isUp()) {
-                fh.sendPoisonPill(err, ForeignHost.CRASH_ALL);
+            Iterator<ForeignHost> it = m_foreignHosts.get(hostId).iterator();
+            if (it.hasNext()) {
+                ForeignHost fh = it.next();
+                if (fh.isUp()) {
+                    fh.sendPoisonPill(err, ForeignHost.CRASH_ALL);
+                }
             }
         }
     }
 
     public void sendPoisonPill(String err, int targetHostId, int cause) {
-        ForeignHost fh = m_foreignHosts.get(targetHostId);
-        if (fh != null && fh.isUp()) {
-            fh.sendPoisonPill(err, cause);
+        Iterator<ForeignHost> it = m_foreignHosts.get(targetHostId).iterator();
+        if (it.hasNext()) {
+            ForeignHost fh = it.next();
+            if (fh.isUp()) {
+                fh.sendPoisonPill(err, cause);
+            }
         }
     }
 
     public boolean validateForeignHostId(Integer hostId) {
-        return !m_knownFailedHosts.contains(hostId);
+        return !m_knownFailedHosts.containsKey(hostId);
     }
 
     public void setDeadHostTimeout(int timeout) {
@@ -1475,8 +1664,8 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
 
     public Map<Long, Pair<String, long[]>>
         getIOStats(final boolean interval) throws InterruptedException, ExecutionException {
-        final ImmutableMap<Integer, ForeignHost> fhosts = m_foreignHosts;
-        ArrayList<IOStatsIntf> picoNetworks = new ArrayList<IOStatsIntf>(fhosts.size());
+        final ImmutableMultimap<Integer, ForeignHost> fhosts = m_foreignHosts;
+        ArrayList<IOStatsIntf> picoNetworks = new ArrayList<IOStatsIntf>();
 
         for (ForeignHost fh : fhosts.values()) {
             picoNetworks.add(fh.m_network);
@@ -1491,17 +1680,44 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      */
     public void cutLink(int hostIdA, int hostIdB) {
         if (m_localHostId == hostIdA) {
-            ForeignHost fh = m_foreignHosts.get(hostIdB);
-            if (fh != null) {
+            Iterator<ForeignHost> it = m_foreignHosts.get(hostIdB).iterator();
+            while (it.hasNext()) {
+                ForeignHost fh = it.next();
                 fh.cutLink();
             }
         }
         if (m_localHostId == hostIdB) {
-            ForeignHost fh = m_foreignHosts.get(hostIdA);
-            if (fh != null) {
+            Iterator<ForeignHost> it = m_foreignHosts.get(hostIdA).iterator();
+            while (it.hasNext()) {
+                ForeignHost fh = it.next();
                 fh.cutLink();
             }
         }
+    }
+
+    // Create connections to nodes within the same partition group
+    public void createAuxiliaryConnections(Set<Integer> peers, int secondaryConnections) {
+        for (int hostId : peers) {
+            for (int ii = 0; ii < secondaryConnections; ii++) {
+                Iterator<ForeignHost> it = m_foreignHosts.get(hostId).iterator();
+                if (it.hasNext()) {
+                    ForeignHost fh = it.next();
+                    try {
+                        SocketChannel socket = m_joiner.requestForConnection(fh.m_listeningAddress);
+                        // Auxiliary connection never time out
+                        ForeignHost fhost = new ForeignHost(this, hostId, socket, Integer.MAX_VALUE,
+                                fh.m_listeningAddress, new PicoNetwork(socket));
+                        putForeignHost(hostId, fhost);
+                        fhost.enableRead(VERBOTEN_THREADS);
+                    } catch (IOException | JSONException e) {
+                        m_hostLog.error("Failed to connect to peer nodes.", e);
+                        throw new RuntimeException("Failed to establish socket connection with " +
+                                fh.m_listeningAddress.getAddress().getHostAddress(), e);
+                    }
+                }
+            }
+        }
+        m_hasAllSecondaryConnectionCreated = true;
     }
 
 }

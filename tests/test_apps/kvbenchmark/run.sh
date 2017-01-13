@@ -60,7 +60,7 @@ function catalog() {
     echo
     echo "voltdb compile --classpath obj -o $APPNAME.jar ddl.sql"
     echo
-    $VOLTDB compile --classpath obj -o $APPNAME.jar ddl.sql
+    $VOLTDB legacycompile --classpath obj -o $APPNAME.jar ddl.sql
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
 }
@@ -69,20 +69,23 @@ function catalog() {
 function server() {
     # if a catalog doesn't exist, build one
     if [ ! -f $APPNAME.jar ]; then catalog; fi
-    FR_TEMP=/tmp/${USER}/fr
-    mkdir -p ${FR_TEMP}
-    # Set up flight recorder options
-    VOLTDB_OPTS="-XX:+UseParNewGC -XX:+UseConcMarkSweepGC -XX:+CMSParallelRemarkEnabled -XX:+UseTLAB"
-    VOLTDB_OPTS="${VOLTDB_OPTS} -XX:CMSInitiatingOccupancyFraction=75 -XX:+UseCMSInitiatingOccupancyOnly"
-    VOLTDB_OPTS="${VOLTDB_OPTS} -XX:+UnlockCommercialFeatures -XX:+FlightRecorder"
-    VOLTDB_OPTS="${VOLTDB_OPTS} -XX:FlightRecorderOptions=maxage=1d,defaultrecording=true,disk=true,repository=${FR_TEMP},threadbuffersize=128k,globalbuffersize=32m"
-    VOLTDB_OPTS="${VOLTDB_OPTS} -XX:StartFlightRecording=name=${APPNAME}"
+    # only on Oracle jdk...
+    if  java -version 2>&1 | grep -q 'Java HotSpot' ; then
+        FR_TEMP=/tmp/${USER}/fr
+        mkdir -p ${FR_TEMP}
+        # Set up flight recorder options
+        VOLTDB_OPTS="-XX:+UseParNewGC -XX:+UseConcMarkSweepGC -XX:+CMSParallelRemarkEnabled -XX:+UseTLAB"
+        VOLTDB_OPTS="${VOLTDB_OPTS} -XX:CMSInitiatingOccupancyFraction=75 -XX:+UseCMSInitiatingOccupancyOnly"
+        VOLTDB_OPTS="${VOLTDB_OPTS} -XX:+UnlockCommercialFeatures -XX:+FlightRecorder"
+        VOLTDB_OPTS="${VOLTDB_OPTS} -XX:FlightRecorderOptions=maxage=1d,defaultrecording=true,disk=true,repository=${FR_TEMP},threadbuffersize=128k,globalbuffersize=32m"
+        VOLTDB_OPTS="${VOLTDB_OPTS} -XX:StartFlightRecording=name=${APPNAME}"
+    fi
     # truncate the voltdb log
     [[ -d log && -w log ]] && > log/volt.log
     # run the server
     echo "Starting the VoltDB server."
     echo "To perform this action manually, use the command line: "
-    echo 
+    echo
     echo "VOLTDB_OPTS=\"${VOLTDB_OPTS}\" ${VOLTDB} create -d deployment.xml -l ${LICENSE} -H ${HOST} ${APPNAME}.jar"
     echo
     VOLTDB_OPTS="${VOLTDB_OPTS}" ${VOLTDB} create -d deployment.xml -l ${LICENSE} -H ${HOST} ${APPNAME}.jar

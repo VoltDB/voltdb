@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -470,16 +470,22 @@ public class CatalogDiffEngine {
         }
 
         else if (suspect instanceof Table) {
+            if (ChangeType.DELETION == changeType) {
+                // No special guard against dropping a table or view
+                // (although some procedures may fail to plan)
+                return null;
+            }
+
             Table tbl = (Table)suspect;
             String tableName = tbl.getTypeName();
-            if (   ChangeType.ADDITION == changeType ) {
-                // Remember the name of the new table.
-                m_newTables.add(tableName.toUpperCase());
-                if (CatalogUtil.isTableExportOnly((Database)tbl.getParent(), tbl)) {
-                    // Remember that it's a new export table.
-                    m_newTablesForExport.add(tbl.getTypeName());
-                }
+
+            // Remember the name of the new table.
+            m_newTables.add(tableName.toUpperCase());
+            if (CatalogUtil.isTableExportOnly((Database)tbl.getParent(), tbl)) {
+                // Remember that it's a new export table.
+                m_newTablesForExport.add(tbl.getTypeName());
             }
+
             String viewName = null;
             String sourceTableName = null;
             // If this is a materialized view, and it's not safe for non-empty
@@ -751,7 +757,7 @@ public class CatalogDiffEngine {
                         : ""),
                 (singleTable
                         ? "the table already contains data"
-                        : "all of the tables already contain data"));
+                        : "none of the source tables are empty"));
     }
 
     /**

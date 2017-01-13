@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -51,7 +51,7 @@ public abstract class ExpressionUtil {
                 continue;
             }
             for (AbstractExpression expr : exps) {
-                stack.add((AbstractExpression)expr.clone());
+                stack.add(expr.clone());
             }
         }
         if (stack.isEmpty()) {
@@ -177,28 +177,6 @@ public abstract class ExpressionUtil {
         return out;
     }
 
-    public static boolean isColumnEquivalenceFilter(AbstractExpression expr) {
-        // Ignore expressions that are not of COMPARE_EQUAL or
-        // COMPARE_NOTDISTINCT type
-        ExpressionType type = expr.getExpressionType();
-        if (type != ExpressionType.COMPARE_EQUAL &&
-                type != ExpressionType.COMPARE_NOTDISTINCT) {
-            return false;
-        }
-        AbstractExpression leftExpr = expr.getLeft();
-        AbstractExpression rightExpr = expr.getRight();
-        // Can't use an expression that is based on a column value but is not just a simple column value.
-        if ( ( ! (leftExpr instanceof TupleValueExpression)) &&
-                leftExpr.hasAnySubexpressionOfClass(TupleValueExpression.class) ) {
-            return false;
-        }
-        if ( ( ! (rightExpr instanceof TupleValueExpression)) &&
-                rightExpr.hasAnySubexpressionOfClass(TupleValueExpression.class) ) {
-            return false;
-        }
-        return true;
-    }
-
     /**
      * Find any listed expressions that qualify as potential partitioning where filters,
      * which is to say are equality comparisons with a TupleValueExpression on at least one side,
@@ -213,7 +191,7 @@ public abstract class ExpressionUtil {
                                HashMap<AbstractExpression, Set<AbstractExpression> > equivalenceSet)
     {
         for (AbstractExpression expr : filterList) {
-            if ( ! isColumnEquivalenceFilter(expr)) {
+            if ( ! expr.isColumnEquivalenceFilter()) {
                 continue;
             }
             AbstractExpression leftExpr = expr.getLeft();
@@ -457,7 +435,8 @@ public abstract class ExpressionUtil {
      * @return true is expression contains an aggregate subexpression
      */
     public static boolean containsAggregateExpression(AbstractExpression expr) {
-        AbstractExpression.SubexprFinderPredicate pred = new AbstractExpression.SubexprFinderPredicate() {
+        AbstractExpression.SubexprFinderPredicate pred =
+                new AbstractExpression.SubexprFinderPredicate() {
             @Override
             public boolean matches(AbstractExpression expr) {
                 return expr.getExpressionType().isAggregateExpression();
@@ -466,15 +445,12 @@ public abstract class ExpressionUtil {
         return expr.hasAnySubexpressionWithPredicate(pred);
     }
 
-    private static boolean containsMatchingTVE(AbstractExpression expr, String tableAlias) {
+    private static boolean containsMatchingTVE(AbstractExpression expr,
+            String tableAlias) {
         assert(expr != null);
         List<TupleValueExpression> tves = getTupleValueExpressions(expr);
         for (TupleValueExpression tve : tves) {
-            if (tve.m_tableAlias != null) {
-                if (tve.m_tableAlias.equals(tableAlias)) {
-                    return true;
-                }
-            } else if (tve.m_tableName.equals(tableAlias)) {
+            if (tve.matchesTableAlias(tableAlias)) {
                 return true;
             }
         }

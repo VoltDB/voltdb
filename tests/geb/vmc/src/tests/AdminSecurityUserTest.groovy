@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -45,7 +45,6 @@ class AdminSecurityUserTest extends TestBase {
     def setup() { // called before each test
         int count = 0
 
-
         while(count<numberOfTrials) {
             try {
                 setup: 'Open VMC page'
@@ -66,7 +65,7 @@ class AdminSecurityUserTest extends TestBase {
         }
     }
 
-    def "Add users in security"(){
+    def addUsersInSecurity() {
         insideCount = 0
         loopStatus              = false
         boolean created         = false
@@ -87,12 +86,10 @@ class AdminSecurityUserTest extends TestBase {
         at AdminPage
         waitFor(waitTime) { page.overview.securityValue.isDisplayed() }
         then:
-        if(page.overview.securityValue.text().equals("Off"))
-        {
+        if(page.overview.securityValue.text().equals("Off")) {
             println("PASS")
         }
-        else if (page.overview.securityValue.text().equals("On"))
-        {
+        else if (page.overview.securityValue.text().equals("On")) {
             if( created == false ) {
                 while (insideCount < numberOfTrials) {
                     insideCount ++
@@ -123,12 +120,9 @@ class AdminSecurityUserTest extends TestBase {
                 }
             }
         }
-
-
     }
 
-
-    def "LOGOUT AND THEN LOGIN AS usernameOne" (){
+    def logoutAndThenLoginAsUsernameOne() {
         String usernameOne  = page.overview.getUsernameOneForSecurity()
 
         String passwordOne  = page.overview.getPasswordOneForSecurity()
@@ -137,18 +131,15 @@ class AdminSecurityUserTest extends TestBase {
         at AdminPage
         waitFor(waitTime) { page.overview.securityValue.isDisplayed() }
         then:
-        if(page.overview.securityValue.text().equals("Off"))
-        {
+        if(page.overview.securityValue.text().equals("Off")) {
             println("PASS")
         }
-        else if (page.overview.securityValue.text().equals("On"))
-        {
+        else if (page.overview.securityValue.text().equals("On")) {
             when: 'logout button is clicked and popup is displayed'
             waitFor(waitTime) {
                 page.header.logout.click()
                 page.header.logoutPopupOkButton.isDisplayed()
             }
-
             then: 'logout is confirmed and popup is removed'
             waitFor(waitTime) {
                 page.header.logoutPopupOkButton.click()
@@ -168,7 +159,6 @@ class AdminSecurityUserTest extends TestBase {
                     page.loginbtn.click()
                     at VoltDBManagementCenterPage
                     break
-
                 } catch (org.openqa.selenium.ElementNotVisibleException e) {
                     println("ElementNotVisibleException: Unable to Start the test")
                     println("Retrying")
@@ -177,14 +167,12 @@ class AdminSecurityUserTest extends TestBase {
         }
     }
 
-
-    def "LOGOUT as usernameOne and LOGIN as admin" (){
+    def logoutAsUsernameOneAndLoginAsAdmin() {
         when:'Check Security Enabled'
         at AdminPage
         waitFor(waitTime) { page.overview.securityValue.isDisplayed() }
         then:
-        if(page.overview.securityValue.text().equals("Off"))
-        {
+        if(page.overview.securityValue.text().equals("Off")) {
             println("PASS")
         }
         else if (page.overview.securityValue.text().equals("On")) {
@@ -219,12 +207,9 @@ class AdminSecurityUserTest extends TestBase {
                 }
             }
         }
-
-
-
     }
 
-    def "Try to create new user with the same username AS usernameOne"(){
+    def tryToCreateNewUserWithTheSameUsernameAsUsernameOne() {
     String usernameOne  = page.overview.getUsernameOneForSecurity()
     String roleOne      = page.overview.getRoleOneForSecurity()
     String passwordOne  = page.overview.getPasswordOneForSecurity()
@@ -235,22 +220,17 @@ class AdminSecurityUserTest extends TestBase {
         at AdminPage
         waitFor(waitTime) { page.overview.securityValue.isDisplayed() }
         then:
-        if(page.overview.securityValue.text().equals("Off"))
-        {
+        if(page.overview.securityValue.text().equals("Off")) {
             println("PASS")
         }
         else if (page.overview.securityValue.text().equals("On")) {
             when: 'Security button is clicked'
             page.overview.expandSecurity()
             then: 'Check if Security expanded or notes'
-
             try {
                 waitFor(10) { page.overview.securityExpanded.isDisplayed() }
-
             } catch (geb.error.RequiredPageContentNotPresent e) {
-
             } catch (org.openqa.selenium.StaleElementReferenceException e) {
-
             }
             //waitFor(20){ page.overview.checkIfSecurityIsExpanded()}
 
@@ -272,20 +252,18 @@ class AdminSecurityUserTest extends TestBase {
         }
     }
 
-    def "EDIT THE USER usernameOne AND CHANGE IT TO usernameTwo"(){
+    def editTheUserUsernameoneAndChangeItToUsernametwo(){
 
         String usernameTwo  = page.overview.getUsernameTwoForSecurity()
         String passwordTwo  = page.overview.getPasswordTwoForSecurity()
         String roleTwo      = page.overview.getRoleTwoForSecurity()
 
-                    // EDIT THE USER usernameOne AND CHANGE IT TO usernameTwo
-
+        // EDIT THE USER usernameOne AND CHANGE IT TO usernameTwo
         when:'Check Security Enabled'
         at AdminPage
         waitFor(waitTime) { page.overview.securityValue.isDisplayed() }
         then:
-        if(page.overview.securityValue.text().equals("Off"))
-        {
+        if(page.overview.securityValue.text().equals("Off")) {
             println("PASS")
         }
         else if (page.overview.securityValue.text().equals("On")) {
@@ -297,14 +275,12 @@ class AdminSecurityUserTest extends TestBase {
             page.overview.openEditUser()
             then: 'Edit User popup is displayed'
             //page.overview.checkSecurityEditOpen()
-
             try {
                 waitFor(waitTime) {
                     page.overview.userPopupUsernameField.isDisplayed()
                     page.overview.userPopupPasswordField.isDisplayed()
                     page.overview.userPopupSave.isDisplayed()
                 }
-
             } catch(geb.error.RequiredPageContentNotPresent e) {
 
             } catch(geb.waiting.WaitTimeoutException e) {
@@ -317,31 +293,22 @@ class AdminSecurityUserTest extends TestBase {
             if(overview.checkListForUsers(usernameTwo) == true) {
                 loopStatus = true
             }
-
-
             if (loopStatus == false) {
                 println("The username wasn't edited in " + numberOfTrials + " trials")
                 assert false
             }
         }
+    }
 
-
-
-
-}
-
-
-    def "DELETE THE USER" (){
+    def deleteTheUser() {
         String usernameTwo  = page.overview.getUsernameTwoForSecurity()
 
-                        // DELETE THE USER
-
+        // DELETE THE USER
         when:'Check Security Enabled'
         at AdminPage
         waitFor(waitTime) { page.overview.securityValue.isDisplayed() }
         then:
-        if(page.overview.securityValue.text().equals("Off"))
-        {
+        if(page.overview.securityValue.text().equals("Off")) {
             println("PASS")
         }
         else if (page.overview.securityValue.text().equals("On")) {
@@ -361,11 +328,5 @@ class AdminSecurityUserTest extends TestBase {
                 println("deletion successful")
             }
         }
-
-
-
     }
-
-
-
 }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -102,9 +102,7 @@ class Table {
      * zero. This allows longer running processes to complete
      * gracefully after a table has been removed from the catalog.
      */
-    void incrementRefcount() {
-        m_refcount += 1;
-    }
+    void incrementRefcount() { m_refcount += 1; }
 
     void decrementRefcount() {
         m_refcount -= 1;
@@ -125,7 +123,7 @@ class Table {
     virtual void deleteAllTuples(bool freeAllocatedStrings, bool fallible=true) = 0;
     // TODO: change meaningless bool return type to void (starting in class Table) and migrate callers.
     // -- Most callers should be using TempTable::insertTempTuple, anyway.
-    virtual bool insertTuple(TableTuple &tuple) = 0;
+    virtual bool insertTuple(TableTuple& tuple) = 0;
 
     // ------------------------------------------------------------------
     // TUPLES AND MEMORY USAGE
@@ -145,88 +143,75 @@ class Table {
      * Includes tuples that are pending any kind of delete.
      * Used by iterators to determine how many tuples to expect while scanning
      */
-    virtual int64_t activeTupleCount() const {
-        return m_tupleCount;
-    }
+    virtual int64_t activeTupleCount() const { return m_tupleCount; }
 
     virtual int64_t allocatedTupleMemory() const {
         return allocatedBlockCount() * m_tableAllocationSize;
     }
 
     // Only counts persistent table usage, currently
-    int64_t nonInlinedMemorySize() const {
-        return m_nonInlinedMemorySize;
-    }
+    int64_t nonInlinedMemorySize() const { return m_nonInlinedMemorySize; }
 
-    virtual int tupleLimit() const {
-        return INT_MIN;
-    }
+    virtual int tupleLimit() const { return INT_MIN; }
 
     // ------------------------------------------------------------------
     // COLUMNS
     // ------------------------------------------------------------------
-    int columnIndex(const std::string &name) const;
-    const std::vector<std::string>& getColumnNames() const {
-        return m_columnNames;
-    }
+    int columnIndex(std::string const& name) const;
 
-    inline const TupleSchema* schema() const {
-        return m_schema;
-    }
+    std::vector<std::string> const& getColumnNames() const { return m_columnNames; }
 
-    inline const std::string& columnName(int index) const {
-        return m_columnNames[index];
-    }
+    TupleSchema const* schema() const { return m_schema; }
 
-    inline int columnCount() const {
-        return m_columnCount;
-    }
+    std::string const& columnName(int index) const { return m_columnNames[index]; }
+
+    int columnCount() const { return m_columnCount; }
 
     // ------------------------------------------------------------------
     // UTILITY
     // ------------------------------------------------------------------
-    const std::string& name() const {
-        return m_name;
-    }
+    std::string const& name() const { return m_name; }
 
-    CatalogId databaseId() const {
-        return m_databaseId;
-    }
+    CatalogId databaseId() const { return m_databaseId; }
 
     virtual std::string tableType() const = 0;
+
     virtual std::string debug();
 
     // ------------------------------------------------------------------
     // SERIALIZATION
     // ------------------------------------------------------------------
-    int getApproximateSizeToSerialize() const;
-    size_t getColumnHeaderSizeToSerialize(bool includeTotalSize) const;
-    size_t getAccurateSizeToSerialize(bool includeTotalSize);
-    bool serializeTo(SerializeOutput &serialize_out);
-    bool serializeToWithoutTotalSize(SerializeOutput &serialize_io);
-    bool serializeColumnHeaderTo(SerializeOutput &serialize_io);
+    size_t getColumnHeaderSizeToSerialize() const;
+
+    size_t getAccurateSizeToSerialize();
+
+    void serializeTo(SerializeOutput& serialOutput);
+
+    void serializeToWithoutTotalSize(SerializeOutput& serialOutput);
+
+    void serializeColumnHeaderTo(SerializeOutput& serialOutput);
 
     /*
      * Serialize a single tuple as a table so it can be sent to Java.
      */
-    bool serializeTupleTo(SerializeOutput &serialize_out, TableTuple *tuples, int numTuples);
+    void serializeTupleTo(SerializeOutput& serialOutput, TableTuple* tuples, int numTuples);
 
     /**
      * Loads only tuple data and assumes there is no schema present.
      * Used for recovery where the schema is not sent.
      */
-    void loadTuplesFromNoHeader(SerializeInputBE &serialize_in,
-                                Pool *stringPool = NULL,
-                                ReferenceSerializeOutput *uniqueViolationOutput = NULL,
+    void loadTuplesFromNoHeader(SerializeInputBE& serialInput,
+                                Pool* stringPool = NULL,
+                                ReferenceSerializeOutput* uniqueViolationOutput = NULL,
                                 bool shouldDRStreamRows = false);
 
     /**
      * Loads only tuple data, not schema, from the serialized table.
      * Used for initial data loading and receiving dependencies.
      */
-    void loadTuplesFrom(SerializeInputBE &serialize_in,
-                        Pool *stringPool = NULL,
-                        ReferenceSerializeOutput *uniqueViolationOutput = NULL,
+    void loadTuplesFrom(SerializeInputBE& serialInput,
+                        Pool* stringPool = NULL,
+                        ReferenceSerializeOutput* uniqueViolationOutput = NULL,
                         bool shouldDRStreamRows = false);
 
 
@@ -247,7 +232,7 @@ class Table {
      * Get the current offset in bytes of the export stream for this Table
      * since startup (used for rejoin/recovery).
      */
-    virtual void getExportStreamPositions(int64_t &seqNo, size_t &streamBytesUsed) {
+    virtual void getExportStreamPositions(int64_t& seqNo, size_t& streamBytesUsed) {
         // this should be overidden by any table involved in an export
         assert(false);
     }
@@ -288,7 +273,7 @@ class Table {
         return m_tuplesPerBlock;
     }
 
-    virtual int64_t validatePartitioning(TheHashinator *hashinator, int32_t partitionId) {
+    virtual int64_t validatePartitioning(TheHashinator* hashinator, int32_t partitionId) {
         throwFatalException("Validate partitioning unsupported on this table type");
         return 0;
     }
@@ -298,25 +283,24 @@ protected:
      * Implemented by persistent table and called by Table::loadTuplesFrom
      * to do additional processing for views and Export
      */
-    virtual void processLoadedTuple(TableTuple &tuple,
-                                    ReferenceSerializeOutput *uniqueViolationOutput,
-                                    int32_t &serializedTupleCount,
-                                    size_t &tupleCountPosition,
-                                    bool shouldDRStreamRow) {
-    };
+    virtual void processLoadedTuple(TableTuple& tuple,
+                                    ReferenceSerializeOutput* uniqueViolationOutput,
+                                    int32_t& serializedTupleCount,
+                                    size_t& tupleCountPosition,
+                                    bool shouldDRStreamRow) { }
 
-    virtual void swapTuples(TableTuple &sourceTupleWithNewValues, TableTuple &destinationTuple) {
+    virtual void swapTuples(TableTuple& sourceTupleWithNewValues, TableTuple& destinationTuple) {
         throwFatalException("Unsupported operation");
     }
 
 public:
 
-    bool equals(voltdb::Table *other);
+    bool equals(voltdb::Table* other);
     virtual voltdb::TableStats* getTableStats() = 0;
 
 protected:
     // virtual block management functions
-    virtual void nextFreeTuple(TableTuple *tuple) = 0;
+    virtual void nextFreeTuple(TableTuple* tuple) = 0;
     virtual void freeLastScanedBlock(std::vector<TBPtr>::iterator nextBlockIterator) {
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                      "May not use freeLastScanedBlock with streamed tables or persistent tables.");
@@ -335,16 +319,23 @@ protected:
         if (m_tuplesPinnedByUndo != 0) {
             return false;
         }
-        return allocatedTupleCount() - activeTupleCount() > std::max(static_cast<int64_t>((m_tuplesPerBlock * 3)), (allocatedTupleCount() * (100 - m_compactionThreshold)) / 100);  /* using the integer percentage */
+
+        size_t unusedTupleCount = allocatedTupleCount() - activeTupleCount();
+        size_t blockThreshold = m_tuplesPerBlock * 3;
+        size_t percentBasedThreshold = (allocatedTupleCount() * (100 - m_compactionThreshold)) / 100;
+        size_t actualThreshold = std::max(blockThreshold, percentBasedThreshold);
+        return unusedTupleCount > actualThreshold;
     }
 
-    virtual void initializeWithColumns(TupleSchema *schema, const std::vector<std::string> &columnNames, bool ownsTupleSchema, int32_t compactionThreshold = 95);
+    virtual void initializeWithColumns(TupleSchema* schema,
+                                       std::vector<std::string> const& columnNames,
+                                       bool ownsTupleSchema,
+                                       int32_t compactionThreshold = 95);
 
+protected:
     // ------------------------------------------------------------------
     // DATA
     // ------------------------------------------------------------------
-
-  protected:
     TableTuple m_tempTuple;
     boost::scoped_array<char> m_tempTupleMemory;
 
@@ -352,7 +343,7 @@ protected:
 
     // schema as array of string names
     std::vector<std::string> m_columnNames;
-    char *m_columnHeaderData;
+    char* m_columnHeaderData;
     int32_t m_columnHeaderSize;
 
     uint32_t m_tupleCount;
@@ -369,11 +360,11 @@ protected:
     // If this table owns the TupleSchema it is responsible for deleting it in the destructor
     bool m_ownsTupleSchema;
 
-    const int m_tableAllocationTargetSize;
+    int const m_tableAllocationTargetSize;
     // This is one block size allocated for this table, equals = m_tuplesPerBlock * m_tupleLength
     int m_tableAllocationSize;
 
-  private:
+private:
     int32_t m_refcount;
     ThreadLocalPool m_tlPool;
     int m_compactionThreshold;

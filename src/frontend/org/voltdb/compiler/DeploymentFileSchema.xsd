@@ -37,7 +37,6 @@
       <xs:element name="cluster" minOccurs="1" maxOccurs="1" type="clusterType"/>
       <xs:element name="paths" minOccurs="0" maxOccurs="1" type="pathsType" />
       <xs:element name="partition-detection" minOccurs="0" type="partitionDetectionType"/>
-      <xs:element name="admin-mode" minOccurs="0" type="adminModeType"/>
       <xs:element name="heartbeat" minOccurs="0" maxOccurs="1" type="heartbeatType"/>
       <xs:element name="httpd" minOccurs="0" maxOccurs="1" type="httpdType"/>
       <xs:element name="snapshot" type="snapshotType" minOccurs="0" maxOccurs="1" />
@@ -50,6 +49,7 @@
       <xs:element name="dr" minOccurs='0' maxOccurs='1' type="drType" />
       <xs:element name="import" minOccurs="0" maxOccurs="1" type="importType"/>
       <xs:element name="consistency" minOccurs="0" type="consistencyType"/>
+      <xs:element name="snmp" minOccurs="0" type="snmpType"/>
     </xs:all>
   </xs:complexType>
 
@@ -84,6 +84,18 @@
       <xs:enumeration value="safe"/>
     </xs:restriction>
   </xs:simpleType>
+
+  <!-- <snmp> -->
+  <xs:complexType name="snmpType">
+    <xs:attribute name="enabled" type="xs:boolean" default="true"/>
+    <xs:attribute name="target" type="xs:string"/>
+    <xs:attribute name="community" type="xs:string" default="public"/>
+    <xs:attribute name="username" type="xs:string" />
+    <xs:attribute name="authprotocol" type="xs:string" default="SHA"/>
+    <xs:attribute name="authkey" type="xs:string" default="voltdbauthkey" />
+    <xs:attribute name="privacyprotocol" type="xs:string" default="AES" />
+    <xs:attribute name="privacykey" type="xs:string" default="voltdbprivacykey" />
+  </xs:complexType>
 
   <!-- <consistency> -->
   <xs:complexType name="consistencyType">
@@ -170,6 +182,7 @@
              <xs:complexType>
                 <xs:attribute name="name" type="featureNameType"/>
                 <xs:attribute name="size" type="xs:string"/>
+                <xs:attribute name="alert" type="xs:string"/>
              </xs:complexType>
           </xs:element>
       </xs:sequence>
@@ -180,6 +193,7 @@
         <xs:element name="memorylimit" minOccurs="0" maxOccurs="1">
             <xs:complexType>
                 <xs:attribute name="size" type="xs:string" default="80%"/>
+                <xs:attribute name="alert" type="xs:string" default="70%"/>
             </xs:complexType>
         </xs:element>
         <xs:element name="disklimit" type="diskLimitType"
@@ -220,12 +234,6 @@
   <xs:complexType name="securityType">
     <xs:attribute name="enabled" type="xs:boolean" default="false"/>
     <xs:attribute name="provider" type="SecurityProviderString" default="hash"/>
-  </xs:complexType>
-
-  <!-- <admin-mode> (always enabled.) -->
-  <xs:complexType name="adminModeType">
-    <xs:attribute name="port" type="xs:int" default="21211"/>
-    <xs:attribute name="adminstartup" type="xs:boolean" default="false"/>
   </xs:complexType>
 
   <!-- <command log> -->

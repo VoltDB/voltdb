@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -21,8 +21,8 @@ import java.net.URI;
 
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
-import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.SnapshotPathType;
+import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 
 /**
  * Encapsulate the parameters provided to @SnapshotSave needed to initiate a snapshot.
@@ -37,6 +37,7 @@ public class SnapshotInitiationInfo
     private String m_data;
     private boolean m_truncationRequest;
     private SnapshotPathType m_stype;
+    private Long m_terminus = null;
     public static final String MAGIC_NONCE_PREFIX = "MANUAL";
 
     /**
@@ -53,6 +54,16 @@ public class SnapshotInitiationInfo
         m_data = data;
         m_truncationRequest = false;
         m_stype = stype;
+        m_terminus = null;
+        if (data != null && !data.trim().isEmpty()) {
+            try {
+                JSONObject jo = new JSONObject(data);
+                if (jo.has(SnapshotUtil.JSON_TERMINUS)) {
+                    m_terminus = jo.getLong(SnapshotUtil.JSON_TERMINUS);
+                }
+            } catch (JSONException failedToFishForTerminus) {
+            }
+        }
     }
 
     /**
@@ -225,6 +236,8 @@ public class SnapshotInitiationInfo
 
         m_format = SnapshotFormat.NATIVE;
         String formatString = jsObj.optString(SnapshotUtil.JSON_FORMAT,SnapshotFormat.NATIVE.toString());
+
+        m_terminus = jsObj.has(SnapshotUtil.JSON_TERMINUS) ? jsObj.getLong(SnapshotUtil.JSON_TERMINUS) : null;
         /*
          * Try and be very flexible about what we will accept
          * as the type of the block parameter.
@@ -269,6 +282,11 @@ public class SnapshotInitiationInfo
         return m_data;
     }
 
+    public Long getTerminus()
+    {
+        return m_terminus;
+    }
+
     /**
      * When we write to ZK to request the snapshot, generate the JSON which will be written to the node's data.
      */
@@ -281,6 +299,7 @@ public class SnapshotInitiationInfo
         jsObj.put(SnapshotUtil.JSON_BLOCK, m_blocking);
         jsObj.put(SnapshotUtil.JSON_FORMAT, m_format.toString());
         jsObj.putOpt(SnapshotUtil.JSON_DATA, m_data);
+        jsObj.putOpt(SnapshotUtil.JSON_TERMINUS, m_terminus);
         return jsObj;
     }
 }

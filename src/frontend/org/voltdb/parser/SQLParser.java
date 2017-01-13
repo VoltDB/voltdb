@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -550,6 +550,16 @@ public class SQLParser extends SQLPatternFactory
             // Make everything that follows optional so that explainproc command
             // diagnostics can "own" any line starting with the word
             // explainproc.
+            "\\s*",              // extra spaces
+            Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
+    // Match queries that start with "explainview" (case insensitive).  We'll convert them to @ExplainView invocations.
+    private static final Pattern ExplainViewCallPreamble = Pattern.compile(
+            "^\\s*" +            // optional indent at start of line
+            "explainView" +      // required command, whitespace terminated
+            "(\\W|$)" +          // require an end to the keyword OR EOL (group 1)
+            // Make everything that follows optional so that explainproc command
+            // diagnostics can "own" any line starting with the word
+            // explainview.
             "\\s*",              // extra spaces
             Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
 
@@ -1831,6 +1841,24 @@ public class SQLParser extends SQLPatternFactory
         // from a more comprehensive regexp.
         // Clean up any extra spaces around the remainder of the line,
         // which should be a proc name.
+        return statement.substring(matcher.end()).trim();
+    }
+
+    /**
+     * Parse EXPLAINVIEW <view>
+     * @param statement  statement to parse
+     * @return           view name parameter string or NULL if statement wasn't recognized
+     */
+    public static String parseExplainViewCall(String statement)
+    {
+        Matcher matcher = ExplainViewCallPreamble.matcher(statement);
+        if ( ! matcher.lookingAt()) {
+            return null;
+        }
+        // This all could probably be done more elegantly via a group extracted
+        // from a more comprehensive regexp.
+        // Clean up any extra spaces around the remainder of the line,
+        // which should be a view name.
         return statement.substring(matcher.end()).trim();
     }
 

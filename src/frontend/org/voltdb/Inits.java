@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -56,6 +56,7 @@ import org.voltdb.iv2.UniqueIdGenerator;
 import org.voltdb.modular.ModuleManager;
 import org.voltdb.settings.DbSettings;
 import org.voltdb.settings.NodeSettings;
+import org.voltdb.snmp.SnmpTrapSender;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CatalogUtil.CatalogAndIds;
 import org.voltdb.utils.HTTPAdminListener;
@@ -402,7 +403,8 @@ public class Inits {
                         catalogJarHash,
                         // Our starter catalog has set the deployment stuff, just yoink it out for now
                         m_rvdb.m_catalogContext.getDeploymentBytes(),
-                        catalogStuff.version);
+                        catalogStuff.version,
+                        m_rvdb.m_messenger);
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB("Error agreeing on starting catalog version", true, e);
             }
@@ -466,6 +468,31 @@ public class Inits {
                     } catch (Exception e) {
                         VoltDB.crashLocalVoltDB("Unable to instantiate command log", true, e);
                     }
+                }
+            }
+        }
+    }
+
+    class SetupSNMP extends InitWork {
+        SetupSNMP() {
+        }
+
+        @Override
+        public void run() {
+            if (m_config.m_isEnterprise && m_deployment.getSnmp() != null && m_deployment.getSnmp().isEnabled()) {
+                try {
+                    Class<?> loggerClass = MiscUtils.loadProClass("org.voltdb.snmp.SnmpTrapSenderImpl",
+                                                               "SNMP Adapter", false);
+                    if (loggerClass != null) {
+                        final Constructor<?> constructor = loggerClass.getConstructor();
+                        m_rvdb.m_snmp = (SnmpTrapSender) constructor.newInstance();
+                        m_rvdb.m_snmp.initialize(
+                                m_deployment.getSnmp(),
+                                m_rvdb.getHostMessenger(),
+                                m_rvdb.getCatalogContext().cluster.getDrclusterid());
+                    }
+                } catch (Exception e) {
+                    VoltDB.crashLocalVoltDB("Unable to instantiate SNMP", true, e);
                 }
             }
         }
@@ -560,19 +587,6 @@ public class Inits {
         public void run() {
             int adminPort = VoltDB.DEFAULT_ADMIN_PORT;
 
-            // See if we should bring the server up in admin mode
-            if (m_deployment.getAdminMode() != null) {
-                // rejoining nodes figure out admin mode from other nodes
-                if (m_isRejoin == false) {
-                    if (m_deployment.getAdminMode().isAdminstartup()) {
-                        m_rvdb.setStartMode(OperationMode.PAUSED);
-                    }
-                }
-
-                // set the adminPort from the deployment file
-                adminPort = m_deployment.getAdminMode().getPort();
-            }
-
             // allow command line override
             if (m_config.m_adminPort > 0)
                 adminPort = m_config.m_adminPort;
@@ -594,8 +608,8 @@ public class Inits {
             try {
                 JSONStringer js = new JSONStringer();
                 js.object();
-                js.key("role").value(m_config.m_replicationRole.ordinal());
-                js.key("active").value(m_rvdb.getReplicationActive());
+                js.keySymbolValuePair("role", m_config.m_replicationRole.ordinal());
+                js.keySymbolValuePair("active", m_rvdb.getReplicationActive());
                 js.endObject();
 
                 ZooKeeper zk = m_rvdb.getHostMessenger().getZK();
@@ -773,10 +787,8 @@ public class Inits {
                     m_statusTracker.setNodeState(NodeState.RECOVERING);
                 }
                 // if the restore agent found a catalog, set the following info
-                // so the right node can send it out to the others. In case the
-                // restore agent chooses a terminus snapshot, it lets the restore
-                // snapshot restore and if required upgrade the snapshot catalog
-                if (catalog != null && !m_rvdb.m_restoreAgent.willRestoreShutdownSnaphot()) {
+                // so the right node can send it out to the others.
+                if (catalog != null) {
                     // Make sure the catalog corresponds to the current server version.
                     // Prevent automatic upgrades by rejecting mismatched versions.
                     int hostId = catalog.getFirst().intValue();
@@ -793,17 +805,26 @@ public class Inits {
                             String catalogVersion = buildInfo[0];
                             String serverVersion = m_rvdb.getVersionString();
                             if (!catalogVersion.equals(serverVersion)) {
-                                VoltDB.crashLocalVoltDB(String.format(
-                                        "Unable to load version %s catalog \"%s\" "
-                                        + "from snapshot into a version %s server.",
-                                        catalogVersion, catalogPath, serverVersion), false, null);
+                                if (!m_rvdb.m_restoreAgent.willRestoreShutdownSnaphot()) {
+                                    VoltDB.crashLocalVoltDB(String.format(
+                                            "Unable to load version %s catalog \"%s\" "
+                                                    + "from snapshot into a version %s server.",
+                                                    catalogVersion, catalogPath, serverVersion), false, null);
+                                    return;
+                                }
+                                // upgrade the catalog - the following will save the recpmpiled catalog
+                                // under voltdbroot/catalog-[serverVersion].jar
+                                CatalogUtil.loadAndUpgradeCatalogFromJar(catalogBytes);
+                                NodeSettings pathSettings = m_rvdb.m_nodeSettings;
+                                File recoverCatalogFH = new File(pathSettings.getVoltDBRoot(), "catalog-" + serverVersion + ".jar");
+                                catalogPath = recoverCatalogFH.getPath();
                             }
                         }
                         catch (IOException e) {
                             // Make it non-fatal with no check performed.
                             hostLog.warn(String.format(
                                     "Unable to load catalog for version check due to exception: %s.",
-                                    e.getMessage()));
+                                    e.getMessage()), e);
                         }
                     }
                     if (hostLog.isDebugEnabled()) {

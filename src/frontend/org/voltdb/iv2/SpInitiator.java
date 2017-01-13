@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -104,15 +104,14 @@ public class SpInitiator extends BaseInitiator implements Promotable
     public void configure(BackendTarget backend,
                           CatalogContext catalogContext,
                           String serializedCatalog,
-                          int kfactor, CatalogSpecificPlanner csp,
+                          CatalogSpecificPlanner csp,
                           int numberOfPartitions,
                           StartAction startAction,
                           StatsAgent agent,
                           MemoryStats memStats,
                           CommandLog cl,
-                          ProducerDRGateway nodeDRGateway,
-                          boolean createMpDRGateway,
-                          String coreBindIds)
+                          String coreBindIds,
+                          boolean hasMPDRGateway)
         throws KeeperException, InterruptedException, ExecutionException
     {
         try {
@@ -121,21 +120,9 @@ public class SpInitiator extends BaseInitiator implements Promotable
             VoltDB.crashLocalVoltDB("Unable to configure SpInitiator.", true, e);
         }
 
-        // configure DR
-        PartitionDRGateway drGateway =
-                PartitionDRGateway.getInstance(m_partitionId, nodeDRGateway,
-                        startAction);
-        ((SpScheduler) m_scheduler).setDRGateway(drGateway);
-
-        PartitionDRGateway mpPDRG = null;
-        if (createMpDRGateway) {
-            mpPDRG = PartitionDRGateway.getInstance(MpInitiator.MP_INIT_PID, nodeDRGateway, startAction);
-            setDurableUniqueIdListener(mpPDRG);
-        }
-
         super.configureCommon(backend, catalogContext, serializedCatalog,
                 csp, numberOfPartitions, startAction, agent, memStats, cl,
-                coreBindIds, drGateway, mpPDRG);
+                coreBindIds, hasMPDRGateway);
 
         m_tickProducer.start();
 
@@ -144,6 +131,30 @@ public class SpInitiator extends BaseInitiator implements Promotable
         LeaderElector.createParticipantNode(m_messenger.getZK(),
                 LeaderElector.electionDirForPartition(VoltZK.leaders_initiators, m_partitionId),
                 Long.toString(getInitiatorHSId()), null);
+    }
+
+    @Override
+    public void initDRGateway(StartAction startAction, ProducerDRGateway nodeDRGateway, boolean createMpDRGateway)
+    {
+        // configure DR
+        PartitionDRGateway drGateway = PartitionDRGateway.getInstance(m_partitionId, nodeDRGateway, startAction);
+        setDurableUniqueIdListener(drGateway);
+
+        final PartitionDRGateway mpPDRG;
+        if (createMpDRGateway) {
+            mpPDRG = PartitionDRGateway.getInstance(MpInitiator.MP_INIT_PID, nodeDRGateway, startAction);
+            setDurableUniqueIdListener(mpPDRG);
+        } else {
+            mpPDRG = null;
+        }
+
+        m_scheduler.getQueue().offer(new SiteTasker.SiteTaskerRunnable() {
+            @Override
+            void run()
+            {
+                m_executionSite.setDRGateway(drGateway, mpPDRG);
+            }
+        });
     }
 
     @Override

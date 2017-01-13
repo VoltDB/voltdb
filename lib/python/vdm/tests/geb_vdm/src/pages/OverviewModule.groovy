@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -175,21 +175,21 @@ class OverviewModule extends Module {
         maxJavaHeapText                 { $("#adminTbl > tbody > tr:nth-child(21) > td.configLabel") }
         maxJavaHeapField                { $(id:"txtMaxJavaHeap") }
 
-        heartbeatTimeoutText            { $("#adminTbl1 > tbody > tr:nth-child(14) > td.configLabel") }
+        heartbeatTimeoutText            { $("#adminTbl1 > tbody > tr:nth-child(22) > td.configLabel") }
         heartbeatTimeoutField           { $(id:"txtHeartbeatTimeout") }
 
-        queryTimeoutText                { $("#adminTbl1 > tbody > tr:nth-child(15) > td.configLabel") }
+        queryTimeoutText                { $("#adminTbl1 > tbody > tr:nth-child(23) > td.configLabel") }
         queryTimeoutField               { $(id:"txtQueryTimeout") }
 
-        maxTempTableMemoryText          { $("#adminTbl1 > tbody > tr:nth-child(16) > td.configLabel") }
+        maxTempTableMemoryText          { $("#adminTbl1 > tbody > tr:nth-child(24) > td.configLabel") }
         maxTempTableMemoryField         { $(id:"txtMaxTempTableMemory") }
 
-        snapshotPriorityText            { $("#adminTbl1 > tbody > tr:nth-child(17) > td.configLabel") }
+        snapshotPriorityText            { $("#adminTbl1 > tbody > tr:nth-child(25) > td.configLabel") }
         snapshotPriorityField           { $(id:"txtSnapshotPriority") }
 
 
 
-        memoryLimitText                 { $("#adminTbl1 > tbody > tr:nth-child(18) > td.configLabel") }
+        memoryLimitText                 { $("#adminTbl1 > tbody > tr:nth-child(26) > td.configLabel") }
         memoryLimitField                { $("#txtMemoryLimit") }
         memoryLimitType                 { $(id:"selMemoryLimitUnit") }
         memoryLimitOptionGB             { $("#selMemoryLimitUnit > option:nth-child(1)") }

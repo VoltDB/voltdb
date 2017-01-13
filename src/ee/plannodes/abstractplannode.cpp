@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -321,8 +321,22 @@ void AbstractPlanNode::loadIntArrayFromJSONObject(const char* label,
 {
     if (obj.hasNonNullKey(label)) {
         PlannerDomValue intArray = obj.valueForKey(label);
-        for (int i = 0; i < intArray.arrayLen(); i++) {
+        int len = intArray.arrayLen();
+        for (int i = 0; i < len; ++i) {
             result.push_back(intArray.valueAtIndex(i).asInt());
+        }
+    }
+}
+
+void AbstractPlanNode::loadStringArrayFromJSONObject(const char* label,
+                                                     PlannerDomValue obj,
+                                                     std::vector<std::string>& result)
+{
+    if (obj.hasNonNullKey(label)) {
+        PlannerDomValue stringArray = obj.valueForKey(label);
+        int len = stringArray.arrayLen();
+        for (int i = 0; i < len; ++i) {
+            result.push_back(stringArray.valueAtIndex(i).asStr());
         }
     }
 }

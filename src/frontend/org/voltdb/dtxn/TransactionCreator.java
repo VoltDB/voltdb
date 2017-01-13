@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -19,6 +19,7 @@ package org.voltdb.dtxn;
 
 import org.voltcore.network.Connection;
 import org.voltdb.ClientResponseImpl;
+import org.voltdb.InvocationDispatcher.OverrideCheck;
 import org.voltdb.StoredProcedureInvocation;
 
 /**
@@ -54,7 +55,7 @@ public interface TransactionCreator
     public ClientResponseImpl dispatch(
             StoredProcedureInvocation invocation,
             Connection connection,
-            boolean isAdmin);
+            boolean isAdmin, OverrideCheck bypass);
     /*
      * Only used in IV2. Send a marker for the position of a multi-part transaction in
      * a single part transaction stream for a partition. The sentinel is blocks

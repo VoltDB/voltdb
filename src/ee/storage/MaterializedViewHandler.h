@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -68,7 +68,7 @@ public:
     // This must be done outside of the constructor, since the
     // catching up executes a plan fragment which may throw an
     // exception.
-    void catchUpWithExistingData(VoltDBEngine* engine, bool fallible);
+    void catchUpWithExistingData(bool fallible);
 
     PersistentTable *destTable() const { return m_destTable; }
     /* A view handler becomes dirty (and needs to be recreated) when:

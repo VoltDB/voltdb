@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -108,8 +108,7 @@ public class QueryPlanner {
                         AbstractCostModel costModel,
                         ScalarValueHints[] paramHints,
                         String joinOrder,
-                        DeterminismMode detMode)
-    {
+                        DeterminismMode detMode) {
         assert(sql != null);
         assert(stmtName != null);
         assert(procName != null);
@@ -367,8 +366,7 @@ public class QueryPlanner {
         // Get a parsed statement from the xml
         // The callers of compilePlan are ready to catch any exceptions thrown here.
         AbstractParsedStmt parsedStmt = AbstractParsedStmt.parse(m_sql, xmlSQL, paramValues, m_db, m_joinOrder);
-        if (parsedStmt == null)
-        {
+        if (parsedStmt == null) {
             m_recentErrorMsg = "Failed to parse SQL statement: " + getOriginalSql();
             return null;
         }

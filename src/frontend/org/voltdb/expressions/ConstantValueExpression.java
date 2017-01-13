@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -43,14 +43,6 @@ public class ConstantValueExpression extends AbstractValueExpression {
 
     public ConstantValueExpression() {
         super(ExpressionType.VALUE_CONSTANT);
-    }
-
-    @Override
-    public Object clone() {
-        ConstantValueExpression clone = (ConstantValueExpression)super.clone();
-        clone.m_value = m_value;
-        clone.m_isNull = m_isNull;
-        return clone;
     }
 
     @Override
@@ -120,14 +112,12 @@ public class ConstantValueExpression extends AbstractValueExpression {
     @Override
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
-        stringer.key(Members.ISNULL.name());
-        stringer.value(m_isNull);
+        stringer.keySymbolValuePair(Members.ISNULL.name(), m_isNull);
         stringer.key(Members.VALUE.name());
-        if (m_isNull)
-        {
+        if (m_isNull) {
             stringer.value("NULL");
+            return;
         }
-        else
         {
             switch (m_valueType)
             {

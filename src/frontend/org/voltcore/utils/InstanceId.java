@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -78,8 +78,8 @@ public class InstanceId
     {
         JSONStringer stringer = new JSONStringer();
         stringer.object();
-        stringer.key("coord").value(m_coord);
-        stringer.key("timestamp").value(m_timestamp);
+        stringer.keySymbolValuePair("coord", m_coord);
+        stringer.keySymbolValuePair("timestamp", m_timestamp);
         stringer.endObject();
         return new JSONObject(stringer.toString());
     }

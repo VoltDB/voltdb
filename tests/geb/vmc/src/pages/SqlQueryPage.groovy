@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -465,7 +465,7 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
      * @param queryText - the text to be entered into the Query textarea.
      */
     def setQueryText(def queryText) {
-        queryInput.value(queryText)
+        queryInput.jquery.html(queryText)
     }
 
     /**
@@ -473,7 +473,7 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
      * @return the current contents of the Query textarea.
      */
     def String getQueryText() {
-        return queryInput.value()
+        return queryInput.text()
     }
 
     /**

@@ -12,7 +12,6 @@
 package com.google_voltpatches.common.cache;
 
 import com.google_voltpatches.common.annotations.GwtCompatible;
-
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;

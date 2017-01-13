@@ -1,6 +1,6 @@
 /*
  This file is part of VoltDB.
- Copyright (C) 2008-2016 VoltDB Inc.
+ Copyright (C) 2008-2017 VoltDB Inc.
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU Affero General Public License as
@@ -245,6 +245,7 @@ var IVoltDB = (function(){
                             '@AdHoc': { '1' : ['varchar'] }
                           , '@Explain': { '1' : ['varchar'] }
                           , '@ExplainProc': { '1' : ['varchar'] }
+                          , '@ExplainView': { '1' : ['varchar'] }
                           , '@Pause': { '0' : [] }
                           , '@Promote': { '0' : [] }
                           , '@Quiesce': { '0' : [] }
@@ -314,6 +315,7 @@ var IVoltDB = (function(){
                 connection.Metadata['sysprocs'] = {
                                                     '@Explain': { '1' : ['SQL (varchar)', 'Returns Table[]'] }
                                                   , '@ExplainProc': { '1' : ['Stored Procedure Name (varchar)', 'Returns Table[]'] }
+                                                  , '@ExplainView': { '1' : ['Materialized View Name (varchar)', 'Returns Table[]'] }
                                                   , '@Pause': { '0' : ['Returns bit'] }
                                                   , '@Quiesce': { '0' : ['Returns bit'] }
                                                   , '@Resume': { '0' : ['Returns bit'] }

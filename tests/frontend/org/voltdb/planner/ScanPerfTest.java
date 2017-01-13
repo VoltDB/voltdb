@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -23,12 +23,13 @@
 
 package org.voltdb.planner;
 
+import static org.junit.Assert.assertTrue;
+
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
-import junit.framework.TestCase;
-
+import org.junit.Test;
 import org.voltdb.BackendTarget;
 import org.voltdb.ReplicationRole;
 import org.voltdb.SQLStmt;
@@ -43,6 +44,7 @@ import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.regressionsuites.JUnit4LocalClusterTest;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.utils.MiscUtils;
 
@@ -50,7 +52,7 @@ import org.voltdb.utils.MiscUtils;
  * Used for manually testing ENG-4009 performance impact.
  * Eventually this kind of test should be part of a broader performance tracking framework.
  */
-public class ScanPerfTest extends TestCase {
+public class ScanPerfTest extends JUnit4LocalClusterTest {
 
     public static class ScanTable extends VoltProcedure {
         // count how many rows to scan
@@ -129,6 +131,7 @@ public class ScanPerfTest extends TestCase {
         }
     }
 
+    @Test
     public void testHaltLiveRejoinOnOverflow() throws Exception {
 
         LocalCluster cluster = null;

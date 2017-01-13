@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -445,14 +445,14 @@ public class ExportGeneration implements Generation {
                     final Map<String, ExportDataSource> partitionSources = m_dataSourcesByPartition.get(partition);
                     if (partitionSources == null) {
                         exportLog.error("Received an export ack for partition " + partition +
-                                " which does not exist on this node");
+                                " which does not exist on this node, partitions = " + m_dataSourcesByPartition);
                         return;
                     }
 
                     final ExportDataSource eds = partitionSources.get(signature);
                     if (eds == null) {
                         exportLog.warn("Received an export ack for partition " + partition +
-                                " source signature " + signature + " which does not exist on this node");
+                                " source signature " + signature + " which does not exist on this node, sources = " + partitionSources);
                         return;
                     }
 
@@ -775,7 +775,10 @@ public class ExportGeneration implements Generation {
                             source.getPartitionId());
                 }
                 else {
-                    tasks.add(source.truncateExportToTxnId(truncationPoint));
+                    //If this was drained and closed we may not have truncation point and we dont want to reopen PBDs
+                    if (!source.isClosed()) {
+                        tasks.add(source.truncateExportToTxnId(truncationPoint));
+                    }
                 }
             }
         }

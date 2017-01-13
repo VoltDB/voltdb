@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -650,17 +650,17 @@ public class MeshProber implements JoinAcceptor {
             jw.value(coordinator);
         }
         jw.endArray();
-        jw.key(ENTERPRISE).value(m_enterprise);
-        jw.key(START_ACTION).value(m_startAction.name());
-        jw.key(BARE).value(m_bare);
-        jw.key(CONFIG_HASH).value(m_configHash.toString());
-        jw.key(MESH_HASH).value(m_meshHash.toString());
-        jw.key(HOST_COUNT).value(m_hostCountSupplier.get());
-        jw.key(K_FACTOR).value(m_kFactor);
-        jw.key(PAUSED).value(m_paused);
-        jw.key(ADD_ALLOWED).value(m_addAllowed);
-        jw.key(SAFE_MODE).value(m_safeMode);
-        jw.key(TERMINUS_NONCE).value(m_terminusNonce);
+        jw.keySymbolValuePair(ENTERPRISE, m_enterprise);
+        jw.keySymbolValuePair(START_ACTION, m_startAction.name());
+        jw.keySymbolValuePair(BARE, m_bare);
+        jw.keySymbolValuePair(CONFIG_HASH, m_configHash.toString());
+        jw.keySymbolValuePair(MESH_HASH, m_meshHash.toString());
+        jw.keySymbolValuePair(HOST_COUNT, m_hostCountSupplier.get());
+        jw.keySymbolValuePair(K_FACTOR, m_kFactor);
+        jw.keySymbolValuePair(PAUSED, m_paused);
+        jw.keySymbolValuePair(ADD_ALLOWED, m_addAllowed);
+        jw.keySymbolValuePair(SAFE_MODE, m_safeMode);
+        jw.keySymbolValuePair(TERMINUS_NONCE, m_terminusNonce);
         jw.endObject();
     }
 

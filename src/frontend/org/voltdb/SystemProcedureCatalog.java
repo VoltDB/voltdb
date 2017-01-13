@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -178,6 +178,7 @@ public class SystemProcedureCatalog {
         builder.put("@StopNode",                new Config(null,                                           true,  false, false, 0,    VoltType.INVALID,   false, false, true,  true,      false,    false));
         builder.put("@Explain",                 new Config(null,                                           true,  true,  false, 0,    VoltType.INVALID,   false, false, true,  true,      false,    false));
         builder.put("@ExplainProc",             new Config(null,                                           true,  true,  false, 0,    VoltType.INVALID,   false, false, true,  true,      false,    false));
+        builder.put("@ExplainView",             new Config(null,                                           true,  true,  false, 0,    VoltType.INVALID,   false, false, true,  true,      false,    false));
         builder.put("@SendSentinel",            new Config(null,                                           true,  false, false, 0,    VoltType.INVALID,   true,  false, false, true,      false,    false));
         builder.put("@PrepareShutdown",         new Config("org.voltdb.sysprocs.PrepareShutdown",          false, false, false, 0,    VoltType.INVALID,   false, false, true,  true,      false,    true));
         builder.put("@Rebalance",               new Config(null,                                           true,  false, false, 0,    VoltType.INVALID,   false, false, true,  true,      false,    false));

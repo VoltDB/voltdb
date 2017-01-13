@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -148,7 +148,7 @@ public class SelectSubqueryExpression extends AbstractSubqueryExpression {
     }
 
     @Override
-    public Object clone() {
+    public SelectSubqueryExpression clone() {
         SelectSubqueryExpression clone = (SelectSubqueryExpression) super.clone();
         if (!m_allParameterIdxList.isEmpty()) {
             clone.m_allParameterIdxList = new ArrayList<Integer>();

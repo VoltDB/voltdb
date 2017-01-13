@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -70,10 +70,10 @@ public class BranchNode extends JoinNode {
         BranchNode newNode = new BranchNode(m_id, m_joinType, leftNode, rightNode);
 
         if (m_joinExpr != null) {
-            newNode.m_joinExpr = (AbstractExpression) m_joinExpr.clone();
+            newNode.m_joinExpr = m_joinExpr.clone();
         }
         if (m_whereExpr != null) {
-            newNode.m_whereExpr = (AbstractExpression) m_whereExpr.clone();
+            newNode.m_whereExpr = m_whereExpr.clone();
         }
         return newNode;
     }
@@ -108,8 +108,8 @@ public class BranchNode extends JoinNode {
         // At this moment all RIGHT joins are already converted to the LEFT ones
         assert (getJoinType() != JoinType.RIGHT);
 
-        ArrayList<AbstractExpression> joinList = new ArrayList<AbstractExpression>();
-        ArrayList<AbstractExpression> whereList = new ArrayList<AbstractExpression>();
+        ArrayList<AbstractExpression> joinList = new ArrayList<>();
+        ArrayList<AbstractExpression> whereList = new ArrayList<>();
 
         // Collect node's own join and where expressions
         joinList.addAll(ExpressionUtil.uncombineAny(getJoinExpression()));
@@ -448,5 +448,12 @@ public class BranchNode extends JoinNode {
         return m_joinType == JoinType.INNER &&
                (m_leftNode == null || m_leftNode.allInnerJoins()) &&
                (m_rightNode == null || m_rightNode.allInnerJoins());
+    }
+
+    @Override
+    public void gatherJoinExpressions(List<AbstractExpression> checkExpressions) {
+        super.gatherJoinExpressions(checkExpressions);
+        m_leftNode.gatherJoinExpressions(checkExpressions);
+        m_rightNode.gatherJoinExpressions(checkExpressions);
     }
 }

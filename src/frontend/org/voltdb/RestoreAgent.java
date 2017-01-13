@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -50,6 +50,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.InstanceId;
 import org.voltcore.utils.Pair;
+import org.voltdb.InvocationDispatcher.OverrideCheck;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.common.Constants;
 import org.voltdb.dtxn.TransactionCreator;
@@ -84,13 +85,24 @@ SnapshotCompletionInterest, Promotable
     // Implement this callback to get notified when restore finishes.
     public interface Callback {
         /**
-         * Callback function executed when restore finishes.
+         * Callback function executed when the snapshot restore finishes but
+         * before command log replay starts on recover.
+         *
+         * For nodes that finish the restore faster, this callback may be called
+         * sooner, but command log replay will not start until all nodes have
+         * called this callback.
+         */
+        public void onSnapshotRestoreCompletion();
+
+        /**
+         * Callback function executed when command log replay finishes but
+         * before the truncation snapshot is taken.
          *
          * @param txnId
          *            The txnId of the truncation snapshot at the end of the
          *            restore, or Long.MIN if there is none.
          */
-        public void onRestoreCompletion(long txnId, Map<Integer, Long> perPartitionTxnIds);
+        public void onReplayCompletion(long txnId, Map<Integer, Long> perPartitionTxnIds);
     }
 
     private final static VoltLogger LOG = new VoltLogger("HOST");
@@ -318,18 +330,18 @@ SnapshotCompletionInterest, Promotable
             JSONStringer stringer = new JSONStringer();
             try {
                 stringer.object();
-                stringer.key("txnId").value(txnId);
-                stringer.key("path").value(path);
-                stringer.key(SnapshotUtil.JSON_PATH_TYPE).value(pathType.name());
-                stringer.key("nonce").value(nonce);
-                stringer.key("partitionCount").value(partitionCount);
-                stringer.key("newPartitionCount").value(newPartitionCount);
-                stringer.key("catalogCrc").value(catalogCrc);
-                stringer.key("hostId").value(hostId);
+                stringer.keySymbolValuePair("txnId", txnId);
+                stringer.keySymbolValuePair("path", path);
+                stringer.keySymbolValuePair(SnapshotUtil.JSON_PATH_TYPE, pathType.name());
+                stringer.keySymbolValuePair("nonce", nonce);
+                stringer.keySymbolValuePair("partitionCount", partitionCount);
+                stringer.keySymbolValuePair("newPartitionCount", newPartitionCount);
+                stringer.keySymbolValuePair("catalogCrc", catalogCrc);
+                stringer.keySymbolValuePair("hostId", hostId);
                 stringer.key("tables").array();
                 for (Entry<String, Set<Integer>> p : partitions.entrySet()) {
                     stringer.object();
-                    stringer.key("name").value(p.getKey());
+                    stringer.keySymbolValuePair("name", p.getKey());
                     stringer.key("partitions").array();
                     for (int pid : p.getValue()) {
                         stringer.value(pid);
@@ -343,7 +355,7 @@ SnapshotCompletionInterest, Promotable
                     stringer.key(e.getKey().toString()).value(e.getValue());
                 }
                 stringer.endObject(); // partitionToTxnId
-                stringer.key("instanceId").value(instanceId.serializeToJSONObject());
+                stringer.key("instanceId").value( instanceId.serializeToJSONObject());
                 stringer.key("digestTables").array();
                 for (String digestTable : digestTables) {
                     stringer.value(digestTable);
@@ -571,6 +583,10 @@ SnapshotCompletionInterest, Promotable
             m_zk.delete(m_generatedRestoreBarrier2, -1);
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Unable to delete zk node " + m_generatedRestoreBarrier2, false, e);
+        }
+
+        if (m_callback != null) {
+            m_callback.onSnapshotRestoreCompletion();
         }
 
         LOG.debug("Waiting for all hosts to complete restore");
@@ -1215,10 +1231,10 @@ SnapshotCompletionInterest, Promotable
             stringer.object();
             // optional max value.
             if (max != null) {
-                stringer.key("max").value(max);
+                stringer.keySymbolValuePair("max", max);
             }
             // 1 means recover, 0 means to create new DB
-            stringer.key("action").value(m_action.ordinal());
+            stringer.keySymbolValuePair("action", m_action.ordinal());
             stringer.key("snapInfos").array();
             for (SnapshotInfo snapshot : snapshots) {
                 stringer.value(snapshot.toJSONObject());
@@ -1248,7 +1264,8 @@ SnapshotCompletionInterest, Promotable
             }
         });
         spi.setClientHandle(m_restoreAdapter.registerCallback(m_clientAdapterCallback));
-        ClientResponseImpl cr = m_initiator.dispatch(spi, m_restoreAdapter, true);
+        // admin mode invocation as per third parameter
+        ClientResponseImpl cr = m_initiator.dispatch(spi, m_restoreAdapter, true, OverrideCheck.INVOCATION);
         if (cr != null) {
             m_clientAdapterCallback.handleResponse(cr);
         }
@@ -1275,7 +1292,7 @@ SnapshotCompletionInterest, Promotable
         } else if (m_state == State.TRUNCATE) {
             m_snapshotMonitor.removeInterest(this);
             if (m_callback != null) {
-                m_callback.onRestoreCompletion(m_truncationSnapshot, m_truncationSnapshotPerPartition);
+                m_callback.onReplayCompletion(m_truncationSnapshot, m_truncationSnapshotPerPartition);
             }
 
             // Call balance partitions after enabling transactions on the node to shorten the recovery time

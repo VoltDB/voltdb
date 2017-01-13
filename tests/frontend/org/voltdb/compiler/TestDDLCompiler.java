@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -30,6 +30,8 @@ import java.io.IOException;
 import java.net.URL;
 import java.net.URLDecoder;
 
+import junit.framework.TestCase;
+
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.VoltXMLElement;
@@ -43,11 +45,8 @@ import org.voltdb.catalog.DatabaseConfiguration;
 import org.voltdb.catalog.IndexRef;
 import org.voltdb.catalog.MaterializedViewInfo;
 import org.voltdb.catalog.Table;
-import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.compilereport.TableAnnotation;
 import org.voltdb.utils.CatalogUtil;
-
-import junit.framework.TestCase;
 
 public class TestDDLCompiler extends TestCase {
 
@@ -176,24 +175,10 @@ public class TestDDLCompiler extends TestCase {
         // similar schema with not null and unique constraints (should have no warnings)
         String schema2 =  "create table t0 (id bigint not null, primary key (id));\n";
 
-        // boilerplate for making a project
-        final String simpleProject =
-                "<?xml version=\"1.0\"?>\n" +
-                "<project><database><schemas>" +
-                "<schema path='%s' />" +
-                "</schemas></database></project>";
-
         // RUN EXPECTING WARNINGS
-        File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema1);
-        String schemaPath = schemaFile.getPath();
-
-        File projectFile = VoltProjectBuilder.writeStringToTempFile(
-                String.format(simpleProject, schemaPath));
-        String projectPath = projectFile.getPath();
-
         // compile successfully (but with two warnings hopefully)
         VoltCompiler compiler = new VoltCompiler();
-        boolean success = compiler.compileWithProjectXML(projectPath, jarOut.getPath());
+        boolean success = compiler.compileDDLString(schema1, jarOut.getPath());
         assertTrue(success);
 
         // verify the warnings exist
@@ -214,18 +199,11 @@ public class TestDDLCompiler extends TestCase {
         jarOut.delete();
 
         // RUN EXPECTING NO WARNINGS
-        schemaFile = VoltProjectBuilder.writeStringToTempFile(schema2);
-        schemaPath = schemaFile.getPath();
-
-        projectFile = VoltProjectBuilder.writeStringToTempFile(
-                String.format(simpleProject, schemaPath));
-        projectPath = projectFile.getPath();
-
         // don't reinitialize the compiler to test that it can be re-called
         //compiler = new VoltCompiler();
 
         // compile successfully with no warnings
-        success = compiler.compileWithProjectXML(projectPath, jarOut.getPath());
+        success = compiler.compileDDLString(schema2, jarOut.getPath());
         assertTrue(success);
 
         // verify no warnings
@@ -246,14 +224,7 @@ public class TestDDLCompiler extends TestCase {
 
         // compile and fail on bad import
         VoltCompiler compiler = new VoltCompiler();
-        try {
-            return compiler.compileFromDDL(jarOut.getPath(), schemaFile.getPath());
-        }
-        catch (VoltCompilerException e) {
-            e.printStackTrace();
-            fail();
-            return false;
-        }
+        return compiler.compileFromDDL(jarOut.getPath(), schemaFile.getPath());
     }
 
     public void testExtraClasses() {
@@ -289,17 +260,9 @@ public class TestDDLCompiler extends TestCase {
 
         // compile and fail on bad import
         VoltCompiler compiler = new VoltCompiler();
-        try {
-            boolean rslt = compiler.compileFromDDL(jarOut.getPath(), schemaFile1.getPath(), schemaFile2.getPath());
-            assertTrue(checkWarn^compiler.m_warnings.isEmpty());
-            return rslt;
-        }
-        catch (VoltCompilerException e) {
-            e.printStackTrace();
-            fail();
-            assertTrue(checkWarn^compiler.m_warnings.isEmpty());
-            return false;
-        }
+        boolean rslt = compiler.compileFromDDL(jarOut.getPath(), schemaFile1.getPath(), schemaFile2.getPath());
+        assertTrue(checkWarn^compiler.m_warnings.isEmpty());
+        return rslt;
     }
 
     public void testExtraClassesFrom2Ddls() {
@@ -454,24 +417,11 @@ public class TestDDLCompiler extends TestCase {
                 "No index found to support UPDATE and DELETE on some of the min() / max() columns",
                 "No index found to support some of the join operations required to refresh the materialized view"
         };
-        // boilerplate for making a project
-        final String simpleProject =
-                "<?xml version=\"1.0\"?>\n" +
-                "<project><database><schemas>" +
-                "<schema path='%s' />" +
-                "</schemas></database></project>";
 
         VoltCompiler compiler = new VoltCompiler();
         for (int ii = 0; ii < schema.length; ++ii) {
-            File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema[ii]);
-            String schemaPath = schemaFile.getPath();
-
-            File projectFile = VoltProjectBuilder.writeStringToTempFile(
-                    String.format(simpleProject, schemaPath));
-            String projectPath = projectFile.getPath();
-
             // compile successfully (but with two warnings hopefully)
-            boolean success = compiler.compileWithProjectXML(projectPath, jarOut.getPath());
+            boolean success = compiler.compileDDLString(schema[ii], jarOut.getPath());
             assertTrue(success);
 
             // verify the warnings exist
@@ -510,12 +460,6 @@ public class TestDDLCompiler extends TestCase {
         File jarOut = new File("minMaxViewIndexSelection.jar");
         jarOut.deleteOnExit();
 
-        // boilerplate for making a project
-        final String simpleProject =
-                "<?xml version=\"1.0\"?>\n" +
-                "<project><database><schemas>" +
-                "<schema path='%s' />" +
-                "</schemas></database></project>";
         String schema =
 
                 "CREATE TABLE T (D1 INTEGER, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n" +
@@ -596,15 +540,8 @@ public class TestDDLCompiler extends TestCase {
                 "FROM T;";
 
         VoltCompiler compiler = new VoltCompiler();
-        File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema);
-        String schemaPath = schemaFile.getPath();
-
-        File projectFile = VoltProjectBuilder.writeStringToTempFile(
-                String.format(simpleProject, schemaPath));
-        String projectPath = projectFile.getPath();
-
         // compile successfully
-        boolean success = compiler.compileWithProjectXML(projectPath, jarOut.getPath());
+        boolean success = compiler.compileDDLString(schema, jarOut.getPath());
         assertTrue(success);
 
         CatalogMap<Table> tables = compiler.getCatalogDatabase().getTables();

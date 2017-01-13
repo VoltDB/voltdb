@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -44,7 +44,7 @@ public class AsyncCompilerAgentHelper
         m_licenseApi = licenseApi;
     }
 
-    public AsyncCompilerResult prepareApplicationCatalogDiff(CatalogChangeWork work) {
+    public CatalogChangeResult prepareApplicationCatalogDiff(CatalogChangeWork work) {
         // create the change result and set up all the boiler plate
         CatalogChangeResult retval = new CatalogChangeResult();
         retval.clientData = work.clientData;
@@ -213,9 +213,6 @@ public class AsyncCompilerAgentHelper
             //In non legacy mode discard the path element.
             if (!VoltDB.instance().isRunningWithOldVerbs()) {
                 dt.setPaths(null);
-                // set the admin-startup mode to false and fetch update the deployment string from
-                // updated deployment object
-                dt.getAdminMode().setAdminstartup(false);
             }
             //Always get deployment after its adjusted.
             retval.deploymentString = CatalogUtil.getDeployment(dt, true);

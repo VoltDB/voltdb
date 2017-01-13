@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -126,6 +126,7 @@ public class CommandLine extends VoltDB.Configuration
         cl.m_enableAdd = m_enableAdd;
         cl.m_voltdbRoot = m_voltdbRoot;
         cl.m_newCli = m_newCli;
+        cl.m_placementGroup = m_placementGroup;
         // deep copy the property map if it exists
         if (javaProperties != null) {
             cl.javaProperties = new TreeMap<String, String>();
@@ -774,6 +775,9 @@ public class CommandLine extends VoltDB.Configuration
             cmdline.add("voltdbroot"); cmdline.add(m_voltdbRoot.getPath());
         }
 
+        if (m_placementGroup != null) {
+            cmdline.add("placementgroup"); cmdline.add(m_placementGroup);
+        }
         return cmdline;
     }
 
@@ -1040,4 +1044,8 @@ public class CommandLine extends VoltDB.Configuration
     }
     public void setNewCli(boolean flag) { m_newCli = flag; };
 
+    String m_placementGroup = "";
+    public void setPlacementGroup(String placementGroup) {
+        m_placementGroup = placementGroup;
+    }
 }

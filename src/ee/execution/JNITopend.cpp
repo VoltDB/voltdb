@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -479,7 +479,7 @@ int64_t JNITopend::pushDRBuffer(int32_t partitionId, StreamBlock *block) {
 
 static boost::shared_array<char> serializeToDirectByteBuffer(JNIEnv *jniEngine, Table *table, jobject &byteBuffer) {
     if (table) {
-        size_t serializeSize = table->getAccurateSizeToSerialize(false);
+        size_t serializeSize = table->getAccurateSizeToSerialize();
         boost::shared_array<char> backingArray(new char[serializeSize]);
         ReferenceSerializeOutput conflictSerializeOutput(backingArray.get(), serializeSize);
         table->serializeToWithoutTotalSize(conflictSerializeOutput);

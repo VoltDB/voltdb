@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -23,6 +23,11 @@
 
 package org.voltdb;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
@@ -31,6 +36,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.commons.lang3.StringUtils;
+import org.junit.Test;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.client.ClientConfig;
@@ -162,6 +168,7 @@ public class TestAdhocProcedureRoles extends AdhocDDLTestBase {
         }
     }
 
+    @Test
     public void testGoodUserCall() throws Exception
     {
         Tester tester = new Tester();
@@ -193,6 +200,7 @@ public class TestAdhocProcedureRoles extends AdhocDDLTestBase {
         }
     }
 
+    @Test
     public void testBadUserCall() throws Exception
     {
         Tester tester = new Tester();
@@ -226,6 +234,7 @@ public class TestAdhocProcedureRoles extends AdhocDDLTestBase {
 
     // Not that interesting since the procedure is dropped to change its permissions.
     // When alter is supported it can become more interesting.
+    @Test
     public void testGoodAndBadUserCall() throws Exception
     {
         Tester tester = new Tester();

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -153,7 +153,8 @@ public class MaterializedViewFixInfo {
                 List<AbstractExpression> mvComplexGroupbyCols = null;
                 try {
                     mvComplexGroupbyCols = AbstractExpression.fromJSONArrayString(complexGroupbyJson, null);
-                } catch (JSONException e) {
+                }
+                catch (JSONException e) {
                     e.printStackTrace();
                 }
                 numOfGroupByColumns = mvComplexGroupbyCols.size();
@@ -178,13 +179,13 @@ public class MaterializedViewFixInfo {
             // We can't handle this in several places, so add the
             // count(*) column from the view to the scan columns.
             Column mvCol = mvColumnArray.get(0); // this is the "count(*)" column.
-            String colName = mvColumnArray.get(0).getName();
-            TupleValueExpression tve = new TupleValueExpression(mvTableName, mvTableAlias, colName, colName, 0);
-
-            tve.setTypeSizeBytes(mvCol.getType(), mvCol.getSize(), mvCol.getInbytes());
+            TupleValueExpression tve = new TupleValueExpression(
+                    mvTableName, mvTableAlias, mvCol, 0);
             tve.setOrigStmtId(mvTableScan.getStatementId());
 
-            SchemaColumn scol = new SchemaColumn(mvTableName, mvTableAlias, colName, colName, tve);
+            String colName = mvCol.getName();
+            SchemaColumn scol = new SchemaColumn(mvTableName, mvTableAlias,
+                    colName, colName, tve);
             scanColumns.add(scol);
         }
 
@@ -201,15 +202,14 @@ public class MaterializedViewFixInfo {
             Column mvCol = mvColumnArray.get(i);
             String colName = mvCol.getName();
 
-            TupleValueExpression tve = new TupleValueExpression(mvTableName, mvTableAlias, colName, colName, i);
-
-            tve.setTypeSizeBytes(mvCol.getType(), mvCol.getSize(), mvCol.getInbytes());
+            TupleValueExpression tve = new TupleValueExpression(
+                    mvTableName, mvTableAlias, mvCol, i);
             tve.setOrigStmtId(mvTableScan.getStatementId());
 
             mvDDLGroupbyColumnNames.add(colName);
 
-            SchemaColumn scol = new SchemaColumn(mvTableName, mvTableAlias, colName, colName, tve);
-
+            SchemaColumn scol = new SchemaColumn(mvTableName, mvTableAlias,
+                    colName, colName, tve);
             mvDDLGroupbyColumns.add(scol);
             if (!scanColumns.contains(scol)) {
                 scanColumns.add(scol);
@@ -232,8 +232,8 @@ public class MaterializedViewFixInfo {
         }
 
         assert (inlineProjSchema.size() > 0);
-        m_scanInlinedProjectionNode = new ProjectionPlanNode();
-        m_scanInlinedProjectionNode.setOutputSchema(inlineProjSchema);
+        m_scanInlinedProjectionNode =
+                new ProjectionPlanNode(inlineProjSchema);
 
         // (2) Construct the reAggregation Node.
 
@@ -248,7 +248,8 @@ public class MaterializedViewFixInfo {
             if (mvDDLGroupbyColumns.contains(scol)) {
                 // Add group by expression.
                 m_reAggNode.addGroupByExpression(scol.getExpression());
-            } else {
+            }
+            else {
                 ExpressionType reAggType = mvColumnReAggType.get(scol.getColumnName());
                 assert(reAggType != null);
                 AbstractExpression agg_input_expr = scol.getExpression();
@@ -268,13 +269,11 @@ public class MaterializedViewFixInfo {
         List<TupleValueExpression> needReAggTVEs = new ArrayList<>();
         List<AbstractExpression> aggPostExprs = new ArrayList<>();
 
-        for (int i=numOfGroupByColumns; i < mvColumnArray.size(); i++) {
+        for (int i = numOfGroupByColumns; i < mvColumnArray.size(); i++) {
             Column mvCol = mvColumnArray.get(i);
-            String colName = mvCol.getName();
 
-            TupleValueExpression tve = new TupleValueExpression(mvTableName, mvTableAlias, colName, colName);
-
-            tve.setTypeSizeBytes(mvCol.getType(), mvCol.getSize(), mvCol.getInbytes());
+            TupleValueExpression tve = new TupleValueExpression(
+                    mvTableName, mvTableAlias, mvCol, -1);
             tve.setOrigStmtId(mvTableScan.getStatementId());
 
             needReAggTVEs.add(tve);
@@ -395,7 +394,8 @@ public class MaterializedViewFixInfo {
                 scanNode.addInlinePlanNode(m_scanInlinedProjectionNode);
                 m_scanNode = scanNode;
                 return true;
-            } else {
+            }
+            else {
                 boolean replaced = processScanNodeWithReAggNode(child, reAggNode);
                 if (replaced) {
                     return true;
@@ -420,11 +420,10 @@ public class MaterializedViewFixInfo {
     }
 
 
-    private boolean fromMVTableOnly(List<AbstractExpression> tves) {
+    private boolean fromMVTableOnly(List<TupleValueExpression> tves) {
         String mvTableName = getMVTableName();
-        for (AbstractExpression tve: tves) {
-            assert(tve instanceof TupleValueExpression);
-            String tveTableName = ((TupleValueExpression)tve).getTableName();
+        for (TupleValueExpression tve: tves) {
+            String tveTableName = tve.getTableName();
             if (!mvTableName.equals(tveTableName)) {
                 return false;
             }
@@ -444,7 +443,8 @@ public class MaterializedViewFixInfo {
         List<AbstractExpression> exprs = ExpressionUtil.uncombinePredicate(filters);
 
         for (AbstractExpression expr: exprs) {
-            List<AbstractExpression> tves = expr.findAllTupleValueSubexpressions();
+            List<TupleValueExpression> tves =
+                    expr.findAllTupleValueSubexpressions();
 
             boolean canPushdown = true;
 
@@ -461,7 +461,8 @@ public class MaterializedViewFixInfo {
             }
             if (canPushdown) {
                 remaningExprs.add(expr);
-            } else {
+            }
+            else {
                 aggPostExprs.add(expr);
             }
         }

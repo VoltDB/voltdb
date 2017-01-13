@@ -18,7 +18,6 @@ package com.google_voltpatches.common.collect;
 
 import com.google_voltpatches.common.annotations.GwtCompatible;
 import com.google_voltpatches.common.collect.Multisets.UnmodifiableMultiset;
-
 import java.util.Comparator;
 import java.util.NavigableSet;
 

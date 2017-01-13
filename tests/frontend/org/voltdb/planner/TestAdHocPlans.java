@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -23,9 +23,16 @@
 
 package org.voltdb.planner;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.fail;
+import static org.mockito.Mockito.mock;
+
 import java.io.File;
 import java.io.IOException;
 
+import org.junit.Before;
+import org.junit.Test;
+import org.voltcore.messaging.HostMessenger;
 import org.voltdb.AdHocQueryTester;
 import org.voltdb.CatalogContext;
 import org.voltdb.VoltDB;
@@ -44,8 +51,8 @@ public class TestAdHocPlans extends AdHocQueryTester {
     private PlannerTool m_pt;
     private boolean m_debugging_set_this_to_retry_failures = false;
 
-    @Override
-    protected void setUp() throws Exception {
+    @Before
+    public void setUp() throws Exception {
         // For planner-only testing, we shouldn't care about IV2
         VoltDB.Configuration config = setUpSPDB();
         byte[] bytes = MiscUtils.fileToBytes(new File(config.m_pathToCatalog));
@@ -55,20 +62,17 @@ public class TestAdHocPlans extends AdHocQueryTester {
         DbSettings dbSettings = new DbSettings(
                 config.asClusterSettings().asSupplier(),
                 NodeSettings.create(config.asPathSettingsMap()));
-        CatalogContext context = new CatalogContext(0, 0, catalog, dbSettings, bytes, null, new byte[] {}, 0);
+        CatalogContext context = new CatalogContext(0, 0, catalog, dbSettings, bytes, null, new byte[] {}, 0, mock(HostMessenger.class));
         m_pt = new PlannerTool(context.cluster, context.database, context.getCatalogHash());
     }
 
-    @Override
-    protected void tearDown() throws Exception {
-        super.tearDown();
-    }
-
+    @Test
     public void testSP() throws Exception {
         //DB is empty so the hashable numbers don't really seem to matter
         runAllAdHocSPtests(0, 1, 2, 3);
     }
 
+    @Test
     public void testAdHocQueryForStackOverFlowCondition() throws NoConnectionsException, IOException, ProcCallException {
         // query with max predicates in where clause
         String sql = getQueryForLongQueryTable(300);

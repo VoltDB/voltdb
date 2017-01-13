@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -43,18 +43,18 @@ import org.voltdb.compiler.VoltProjectBuilder;
  *
  */
 @Deprecated
-public abstract class LocalSingleProcessServer implements VoltServerConfig {
+public abstract class LocalSingleProcessServer extends VoltServerConfig {
 
     public final String m_jarFileName;
     public int m_siteCount;
-    public final BackendTarget m_target;
 
     ServerThread m_server = null;
     boolean m_compiled = false;
     protected String m_pathToDeployment;
     private File m_pathToVoltRoot = null;
     private EEProcess m_siteProcess = null;
-    private int m_adminPort;
+    private int m_adminPort = -1;
+    private boolean m_paused = false;
 
     public LocalSingleProcessServer(String jarFileName, int siteCount,
                                     BackendTarget target)
@@ -107,8 +107,7 @@ public abstract class LocalSingleProcessServer implements VoltServerConfig {
     }
 
     @Override
-    public boolean compileWithAdminMode(VoltProjectBuilder builder,
-                                        int adminPort, boolean adminOnStartup)
+    public boolean compileWithAdminMode(VoltProjectBuilder builder, int adminPort, boolean adminOnStartup)
     {
         int hostCount = 1;
         int replication = 0;
@@ -117,8 +116,8 @@ public abstract class LocalSingleProcessServer implements VoltServerConfig {
             return true;
         }
         m_adminPort = adminPort;
-        m_compiled = builder.compile(m_jarFileName, m_siteCount, hostCount, replication,
-                                     adminPort, adminOnStartup, 0);
+        m_paused = adminOnStartup;
+        m_compiled = builder.compile(m_jarFileName, m_siteCount, hostCount, replication, 0);
         m_pathToDeployment = builder.getPathToDeployment();
         return m_compiled;
 
@@ -177,20 +176,15 @@ public abstract class LocalSingleProcessServer implements VoltServerConfig {
     @Override
     public void shutDown() throws InterruptedException {
         m_server.shutdown();
-        m_siteProcess.waitForShutdown();
-        if (m_target == BackendTarget.NATIVE_EE_VALGRIND_IPC) {
-            if (!EEProcess.m_valgrindErrors.isEmpty()) {
-                String failString = "";
-                for (final String error : EEProcess.m_valgrindErrors) {
-                    failString = failString + "\n" +  error;
-                }
-                org.junit.Assert.fail(failString);
-            }
-        }
+        File valgrindOutputFile = m_siteProcess.waitForShutdown();
+        LocalCluster.failIfValgrindErrors(valgrindOutputFile);
+        VoltServerConfig.removeInstance(this);
     }
 
     @Override
     public void startUp(boolean clearLocalDataDirectories) {
+        VoltServerConfig.addInstance(this);
+
         if (clearLocalDataDirectories) {
             File exportOverflow = new File( m_pathToVoltRoot, "export_overflow");
             if (exportOverflow.exists()) {
@@ -210,6 +204,10 @@ public abstract class LocalSingleProcessServer implements VoltServerConfig {
         config.m_pathToCatalog = m_jarFileName;
         config.m_pathToDeployment = m_pathToDeployment;
         config.m_startAction = StartAction.CREATE;
+        config.m_isPaused = m_paused;
+        if (m_adminPort != -1) {
+            config.m_adminPort = m_adminPort;
+        }
 
         m_siteProcess = new EEProcess(m_target, m_siteCount, "LocalSingleProcessServer.log");
         config.m_ipcPort = m_siteProcess.port();
