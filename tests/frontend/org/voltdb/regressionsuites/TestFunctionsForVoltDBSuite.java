@@ -2970,8 +2970,6 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         doTestIsValidTimestamp(201, true);
         doTestIsValidTimestamp(202, true);
 
-        System.out.println(client.callProcedure("@AdHoc", "select * From p2").getResults()[0]);
-
         // How these functions might typically be used:
         validateTableOfLongs(client,
                 "update p2 "
