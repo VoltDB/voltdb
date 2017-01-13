@@ -218,6 +218,20 @@ public abstract class CatalogUtil {
     {
         // Throws IOException on load failure.
         InMemoryJarfile jarfile = loadInMemoryJarFile(catalogBytes);
+
+        return loadAndUpgradeCatalogFromJar(jarfile);
+    }
+
+    /**
+     * Load a catalog from the InMemoryJarfile.
+     *
+     * @param jarfile
+     * @return Pair containing updated InMemoryJarFile and upgraded version (or null if it wasn't upgraded)
+     * @throws IOException if there is no version information in the catalog.
+     */
+    public static Pair<InMemoryJarfile, String> loadAndUpgradeCatalogFromJar(InMemoryJarfile jarfile)
+        throws IOException
+    {
         // Let VoltCompiler do a version check and upgrade the catalog on the fly.
         // I.e. jarfile may be modified.
         VoltCompiler compiler = new VoltCompiler();
@@ -289,9 +303,7 @@ public abstract class CatalogUtil {
         assert(catalogBytes != null);
 
         InMemoryJarfile jarfile = new InMemoryJarfile(catalogBytes);
-        byte[] serializedCatalogBytes = jarfile.get(CATALOG_FILENAME);
-
-        if (null == serializedCatalogBytes) {
+        if (!jarfile.containsKey(CATALOG_FILENAME)) {
             throw new IOException("Database catalog not found - please build your application using the current version of VoltDB.");
         }
 
