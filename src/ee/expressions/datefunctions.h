@@ -55,6 +55,18 @@ static inline void checkRangeOfEpochMicros(int64_t epochMicros) {
     }
 }
 
+static inline void checkRangeOfEpochMicrosOutput(const std::string& func, int64_t epochMicros) {
+    if (epochMicros < GREGORIAN_EPOCH || epochMicros > NYE9999) {
+        std::ostringstream oss;
+
+        oss << "SQL function " << func << " would produce a value outside of the supported range (years 1583 to 9999, inclusive).";
+
+        throw voltdb::SQLException(voltdb::SQLException::data_exception_numeric_value_out_of_range,
+                                   oss.str().c_str());
+    }
+
+}
+
 /** Convert from epoch_micros to date **/
 static inline void micros_to_date(int64_t epoch_micros_in, boost::gregorian::date& date_out) {
     checkRangeOfEpochMicros(epoch_micros_in);
@@ -316,6 +328,7 @@ template<> inline NValue NValue::callUnary<FUNC_SINCE_EPOCH_SECOND>() const {
     }
 
     int64_t epoch_micros = getTimestamp();
+    checkRangeOfEpochMicros(epoch_micros);
     int64_t epoch_seconds = epoch_micros / 1000000;
     return getBigIntValue(epoch_seconds);
 }
@@ -331,6 +344,7 @@ template<> inline NValue NValue::callUnary<FUNC_SINCE_EPOCH_MILLISECOND>() const
     }
 
     int64_t epoch_micros = getTimestamp();
+    checkRangeOfEpochMicros(epoch_micros);
     int64_t epoch_milliseconds = epoch_micros / 1000;
     return getBigIntValue(epoch_milliseconds);
 }
@@ -346,6 +360,7 @@ template<> inline NValue NValue::callUnary<FUNC_SINCE_EPOCH_MICROSECOND>() const
     }
 
     int64_t epoch_micros = getTimestamp();
+    checkRangeOfEpochMicros(epoch_micros);
     return getBigIntValue(epoch_micros);
 }
 
@@ -366,6 +381,7 @@ template<> inline NValue NValue::callUnary<FUNC_TO_TIMESTAMP_SECOND>() const {
     }
 
     int64_t epoch_micros = seconds * 1000000;
+    checkRangeOfEpochMicrosOutput("TO_TIMESTAMP", epoch_micros);
     return getTimestampValue(epoch_micros);
 }
 
@@ -386,6 +402,7 @@ template<> inline NValue NValue::callUnary<FUNC_TO_TIMESTAMP_MILLISECOND>() cons
     }
 
     int64_t epoch_micros = millis * 1000;
+    checkRangeOfEpochMicrosOutput("TO_TIMESTAMP", epoch_micros);
     return getTimestampValue(epoch_micros);
 }
 
@@ -396,6 +413,7 @@ template<> inline NValue NValue::callUnary<FUNC_TO_TIMESTAMP_MICROSECOND>() cons
     }
 
     int64_t epoch_micros = castAsBigIntAndGetValue();
+    checkRangeOfEpochMicrosOutput("TO_TIMESTAMP", epoch_micros);
     return getTimestampValue(epoch_micros);
 }
 
@@ -596,7 +614,9 @@ template<> inline NValue NValue::call<FUNC_VOLT_DATEADD_YEAR>(const std::vector<
     try {
         ts += boost::gregorian::years(static_cast<int>(interval));
         boost::posix_time::time_duration td = ts - EPOCH;
-        return getTimestampValue(td.total_microseconds());
+        int64_t epochMicros = td.total_microseconds();
+        checkRangeOfEpochMicrosOutput("DATEADD", epochMicros);
+        return getTimestampValue(epochMicros);
     } catch (std::out_of_range &e) {
         throw SQLException(SQLException::data_exception_numeric_value_out_of_range, "interval is too large for DATEADD function");
     }
@@ -624,7 +644,9 @@ template<> inline NValue NValue::call<FUNC_VOLT_DATEADD_QUARTER>(const std::vect
         throwCastSQLException(date.getValueType(), VALUE_TYPE_TIMESTAMP);
     }
 
-    return getTimestampValue(addMonths(date.getTimestamp(), 3 * interval));
+    int64_t epochMicros = addMonths(date.getTimestamp(), 3 * interval);
+    checkRangeOfEpochMicrosOutput("DATEADD", epochMicros);
+    return getTimestampValue(epochMicros);
 }
 
 template<> inline NValue NValue::call<FUNC_VOLT_DATEADD_MONTH>(const std::vector<NValue>& arguments) {
@@ -649,7 +671,9 @@ template<> inline NValue NValue::call<FUNC_VOLT_DATEADD_MONTH>(const std::vector
         throwCastSQLException(date.getValueType(), VALUE_TYPE_TIMESTAMP);
     }
 
-    return getTimestampValue(addMonths(date.getTimestamp(), interval));
+    int64_t epochMicros = addMonths(date.getTimestamp(), interval);
+    checkRangeOfEpochMicrosOutput("DATEADD", epochMicros);
+    return getTimestampValue(epochMicros);
 }
 
 template<> inline NValue NValue::call<FUNC_VOLT_DATEADD_DAY>(const std::vector<NValue>& arguments) {
@@ -680,7 +704,9 @@ template<> inline NValue NValue::call<FUNC_VOLT_DATEADD_DAY>(const std::vector<N
     try {
         ts += boost::gregorian::days(interval);
         boost::posix_time::time_duration td = ts - EPOCH;
-        return getTimestampValue(td.total_microseconds());
+        int64_t epochMicros = td.total_microseconds();
+        checkRangeOfEpochMicrosOutput("DATEADD", epochMicros);
+        return getTimestampValue(epochMicros);
     } catch (std::out_of_range &e) {
         throw SQLException(SQLException::data_exception_numeric_value_out_of_range, "interval is too large for DATEADD function");
     }
@@ -714,7 +740,9 @@ template<> inline NValue NValue::call<FUNC_VOLT_DATEADD_HOUR>(const std::vector<
     try {
         ts += boost::posix_time::hours(interval);
         boost::posix_time::time_duration td = ts - EPOCH;
-        return getTimestampValue(td.total_microseconds());
+        int64_t epochMicros = td.total_microseconds();
+        checkRangeOfEpochMicrosOutput("DATEADD", epochMicros);
+        return getTimestampValue(epochMicros);
     } catch (std::out_of_range &e) {
         throw SQLException(SQLException::data_exception_numeric_value_out_of_range, "interval is too large for DATEADD function");
     }
@@ -748,7 +776,9 @@ template<> inline NValue NValue::call<FUNC_VOLT_DATEADD_MINUTE>(const std::vecto
     try {
         ts += boost::posix_time::minutes(interval);
         boost::posix_time::time_duration td = ts - EPOCH;
-        return getTimestampValue(td.total_microseconds());
+        int64_t epochMicros = td.total_microseconds();
+        checkRangeOfEpochMicrosOutput("DATEADD", epochMicros);
+        return getTimestampValue(epochMicros);
     } catch (std::out_of_range &e) {
         throw SQLException(SQLException::data_exception_numeric_value_out_of_range, "interval is too large for DATEADD function");
     }
@@ -782,7 +812,9 @@ template<> inline NValue NValue::call<FUNC_VOLT_DATEADD_SECOND>(const std::vecto
     try {
         ts += boost::posix_time::seconds(interval);
         boost::posix_time::time_duration td = ts - EPOCH;
-        return getTimestampValue(td.total_microseconds());
+        int64_t epochMicros = td.total_microseconds();
+        checkRangeOfEpochMicrosOutput("DATEADD", epochMicros);
+        return getTimestampValue(epochMicros);
     } catch (std::out_of_range &e) {
         throw SQLException(SQLException::data_exception_numeric_value_out_of_range, "interval is too large in DATEADD function");
     }
@@ -816,7 +848,9 @@ template<> inline NValue NValue::call<FUNC_VOLT_DATEADD_MILLISECOND>(const std::
     try {
         ts += boost::posix_time::milliseconds(interval);
         boost::posix_time::time_duration td = ts - EPOCH;
-        return getTimestampValue(td.total_microseconds());
+        int64_t epochMicros = td.total_microseconds();
+        checkRangeOfEpochMicrosOutput("DATEADD", epochMicros);
+        return getTimestampValue(epochMicros);
     } catch (std::out_of_range &e) {
         throw SQLException(SQLException::data_exception_numeric_value_out_of_range, "interval is too large in DATEADD function");
     }
@@ -850,7 +884,9 @@ template<> inline NValue NValue::call<FUNC_VOLT_DATEADD_MICROSECOND>(const std::
     try {
         ts += boost::posix_time::microseconds(interval);
         boost::posix_time::time_duration td = ts - EPOCH;
-        return getTimestampValue(td.total_microseconds());
+        int64_t epochMicros = td.total_microseconds();
+        checkRangeOfEpochMicrosOutput("DATEADD", epochMicros);
+        return getTimestampValue(epochMicros);
     } catch (std::out_of_range &e) {
         throw SQLException(SQLException::data_exception_numeric_value_out_of_range, "interval is too large in DATEADD function");
     }
