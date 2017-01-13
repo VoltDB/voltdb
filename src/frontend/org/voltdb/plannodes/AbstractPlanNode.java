@@ -1151,6 +1151,75 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         }
     }
 
+    /**
+     * @param jobj
+     * @param key
+     * @return
+     * @throws JSONException
+     */
+    List<String> loadStringListMemberFromJSON(JSONObject jobj, String key)
+            throws JSONException {
+        if (jobj.isNull(key)) {
+            return null;
+        }
+        JSONArray jarray = jobj.getJSONArray(key);
+        int numElems = jarray.length();
+        List<String> result = new ArrayList<>(numElems);
+        for (int ii = 0; ii < numElems; ++ii) {
+            result.add(jarray.getString(ii));
+        }
+        return result;
+    }
+
+    /**
+     * @param stringer
+     * @param key
+     * @param stringList
+     * @throws JSONException
+     */
+    void toJSONStringArrayString(JSONStringer stringer, String key,
+            List<String> stringList) throws JSONException {
+        stringer.key(key).array();
+        for (String elem : stringList) {
+            stringer.value(elem);
+        }
+        stringer.endArray();
+    }
+
+    /**
+     * @param jobj
+     * @param key
+     * @return
+     * @throws JSONException
+     */
+    int[] loadIntArrayMemberFromJSON(JSONObject jobj, String key)
+            throws JSONException {
+        if (jobj.isNull(key)) {
+            return null;
+        }
+        JSONArray jarray = jobj.getJSONArray(key);
+        int numElems = jarray.length();
+        int[] result = new int[numElems];
+        for (int ii = 0; ii < numElems; ++ii) {
+            result[ii] = jarray.getInt(ii);
+        }
+        return result;
+    }
+
+    /**
+     * @param stringer
+     * @param key
+     * @param intArray
+     * @throws JSONException
+     */
+    void toJSONIntArrayString(JSONStringer stringer, String key, int[] intArray) throws JSONException {
+        stringer.key(key).array();
+        for (int i : intArray) {
+            stringer.value(i);
+        }
+        stringer.endArray();
+    }
+
     public boolean reattachFragment(AbstractPlanNode child) {
         for (AbstractPlanNode pn : m_children) {
             if (pn.reattachFragment(child)) {

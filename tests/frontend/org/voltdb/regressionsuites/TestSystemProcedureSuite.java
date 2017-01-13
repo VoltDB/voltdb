@@ -33,7 +33,6 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.NullCallback;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
@@ -41,19 +40,215 @@ import org.voltdb.utils.MiscUtils;
 import org.voltdb_testprocs.regressionsuites.malicious.GoSleep;
 
 public class TestSystemProcedureSuite extends RegressionSuite {
-
     private static int SITES = 3;
     private static int HOSTS = MiscUtils.isPro() ? 2 : 1;
     private static int KFACTOR = MiscUtils.isPro() ? 1 : 0;
-    private static boolean hasLocalServer = false;
+    private static boolean hasLocalServer = true; //// false;
 
-    static final Class<?>[] PROCEDURES =
-    {
-     GoSleep.class
+    static final String[] SWAPPY_PREFIX_PAIR = { "SWAP_THIS", "SWAP_THAT" };
+
+    // Entries in this array are three element arrays defining customizations
+    // to a base table whose name ends in _NORMAL without customization.
+    // The first element of the three is the root/suffix part of the table.
+    // The second element is a continuation of the definition line that starts
+    // "ID INTEGER " and can optionally contain elements such as
+    // column qualifiers for ID, a comma to separate the end of the column
+    // declaration from a constraint definition, and then the constraint
+    // definition.
+    // The third element is one or more table modifier statements to establish
+    // partitioning and/or external indexes.
+    private static final String[][] SWAPPY_TABLES = {
+            { "_NORMAL",
+                "",
+                "",
+            },
+            { "_WITH_PARTITIONING",
+                " NOT NULL",
+                " PARTITION TABLE %s_WITH_PARTITIONING ON COLUMN ID;",
+            },
+
+            { "_WITH_NAMED_TREE_PK",
+                ", CONSTRAINT %s_NAMED PRIMARY KEY (ID)\n",
+                "",
+            },
+            { "_WITH_ANONYMOUS_PK",
+                ", PRIMARY KEY (ID)\n",
+                "",
+            },
+            { "_WITH_INLINE_PK",
+                " PRIMARY KEY NOT NULL\n",
+                "",
+            },
+
+            { "_WITH_NAMED_UNIQUE",
+                ", CONSTRAINT %s_NAMED UNIQUE (ID)\n",
+                "",
+            },
+            { "_WITH_ANONYMOUS_UNIQUE",
+                ", UNIQUE (ID)\n",
+                "",
+            },
+            { "_WITH_INLINE_UNIQUE",
+                " UNIQUE NOT NULL\n",
+                "",
+            },
+            { "_WITH_EXTERNAL_UNIQUE",
+                "",
+                " CREATE UNIQUE INDEX %s_WITH_EXTERNAL_UNIQUE_INDEX ON %s_WITH_EXTERNAL_UNIQUE (ID);\n",
+            },
+
+            { "_WITH_NAMED_ASSUME_UNIQUE",
+                ", CONSTRAINT %s_NAMED ASSUMEUNIQUE (ID)\n",
+                " PARTITION TABLE %s_WITH_NAMED_ASSUME_UNIQUE ON COLUMN NAME;\n",
+            },
+            { "_WITH_ANONYMOUS_ASSUME_UNIQUE",
+                ", ASSUMEUNIQUE (ID)\n",
+                " PARTITION TABLE %s_WITH_ANONYMOUS_ASSUME_UNIQUE ON COLUMN NAME;\n",
+            },
+            { "_WITH_INLINE_ASSUME_UNIQUE",
+                " ASSUMEUNIQUE NOT NULL\n",
+                " PARTITION TABLE %s_WITH_INLINE_ASSUME_UNIQUE ON COLUMN NAME;\n",
+            },
+            { "_WITH_EXTERNAL_ASSUME_UNIQUE",
+                "",
+                " PARTITION TABLE %s_WITH_EXTERNAL_ASSUME_UNIQUE ON COLUMN NAME;\n" +
+                        " CREATE ASSUMEUNIQUE INDEX " +
+                        " %s_WITH_EXTERNAL_ASSUME_UNIQUE_ID " +
+                        " ON %s_WITH_EXTERNAL_ASSUME_UNIQUE (ID);\n",
+            },
+
+            { "_WITH_EXTERNAL_NONUNIQUE",
+                "",
+                " CREATE INDEX %s_WITH_EXTERNAL_NONUNIQUE ON %s_WITH_EXTERNAL_NONUNIQUE (ID);\n",
+            },
+
+            { "_WITH_NAMED_LIMIT_ROWS_100",
+                ", CONSTRAINT %s_NAMED LIMIT PARTITION ROWS 100\n",
+                "",
+            },
+            { "_WITH_ANONYMOUS_LIMIT_ROWS_100",
+                ", LIMIT PARTITION ROWS 100\n",
+                "",
+            },
+            { "_WITH_NAMED_LIMIT_ROWS_1000",
+                ", CONSTRAINT %s_NAMED LIMIT PARTITION ROWS 1000\n",
+                "",
+            },
+            { "_WITH_ANONYMOUS_LIMIT_ROWS_1000",
+                ", LIMIT PARTITION ROWS 1000\n",
+                "",
+            },
+    };
+
+    private static final String[][] NONSWAPPY_TABLES = {
+            { "NONSWAP_REORDERED",
+                " (\n" +
+                "  PRICE FLOAT," +
+                "  NAME VARCHAR(32 BYTES) NOT NULL," +
+                "  ID INTEGER " +
+                ");\n",
+            },
+            { "NONSWAP_SHORTENED",
+                " (\n" +
+                "  NAME VARCHAR(32 BYTES) NOT NULL,\n" +
+                "  PRICE FLOAT," +
+                ");\n",
+            },
+            { "NONSWAP_INSERTED",
+                " (\n" +
+                "  NAME VARCHAR(32 BYTES) NOT NULL,\n" +
+                "  PRICE FLOAT," +
+                "  LIST_PRICE FLOAT," +
+                "  ID INTEGER " +
+                ");\n",
+            },
+            { "NONSWAP_CHARS",
+                " (\n" +
+                "  NAME VARCHAR(32) NOT NULL,\n" +
+                "  PRICE FLOAT," +
+                "  ID INTEGER " +
+                ");\n",
+            },
+            { "NONSWAP_STRUNG_UP",
+                " (\n" +
+                "  NAME VARCHAR(128 BYTES) NOT NULL,\n" +
+                "  PRICE FLOAT," +
+                "  ID INTEGER " +
+                ");\n",
+            },
+            { "NONSWAP_BIGGER",
+                " (\n" +
+                "  NAME VARCHAR(32 BYTES) NOT NULL,\n" +
+                "  PRICE FLOAT," +
+                "  ID BIGINT " +
+                ");\n",
+            },
+            { "NONSWAP_VIEWED_1",
+                " (\n" +
+                "  NAME VARCHAR(32 BYTES) NOT NULL,\n" +
+                "  PRICE FLOAT," +
+                "  ID INTEGER " +
+                ");\n" +
+                "CREATE VIEW VIEWING_1 AS SELECT ID, COUNT(*), SUM(PRICE) FROM NONSWAP_VIEWED_1 GROUP BY ID;\n"
+            },
+            /*{ "NONSWAP_VIEWED_2",
+                " (\n" +
+                "  NAME VARCHAR(32 BYTES) NOT NULL,\n" +
+                "  PRICE FLOAT," +
+                "  ID INTEGER " +
+                ");\n" +
+                "CREATE TABLE JOINED_2 (DISCOUNT FLOAT, ID INTEGER);\n" +
+                "CREATE VIEW VIEWING_2 AS SELECT A.ID, COUNT(*), SUM(A.PRICE*B.DISCOUNT) \n" +
+                "FROM NONSWAP_VIEWED_2 A, JOINED_2 B WHERE A.ID = B.ID GROUP BY A.ID;\n"
+            },*/
+            { "NONSWAP_VIEWED_3",
+                " (\n" +
+                "  NAME VARCHAR(32 BYTES) NOT NULL,\n" +
+                "  PRICE FLOAT," +
+                "  ID INTEGER " +
+                ");\n" +
+                "CREATE TABLE JOINED_3 (DISCOUNT FLOAT, ID INTEGER);\n" +
+                "CREATE VIEW VIEWING_3A AS SELECT ID, COUNT(*), SUM(PRICE) FROM NONSWAP_VIEWED_3 GROUP BY ID;\n" +
+                "CREATE VIEW VIEWING_3B AS SELECT A.ID, COUNT(*), SUM(A.PRICE*B.DISCOUNT) \n" +
+                "FROM NONSWAP_VIEWED_3 A, JOINED_3 B WHERE A.ID = B.ID GROUP BY A.ID;\n",
+            },
     };
 
     public TestSystemProcedureSuite(String name) {
         super(name);
+    }
+
+    private static void addSwappyTables(String prefix, VoltProjectBuilder project)
+            throws Exception {
+        StringBuilder schema = new StringBuilder();
+        for (String[] tableDefPart : SWAPPY_TABLES) {
+            String tableName = prefix + tableDefPart[0];
+            String internalExtras = String.format(tableDefPart[1], tableName);
+            String externalExtras = String.format(tableDefPart[2], prefix, prefix, prefix);
+            schema.append("CREATE TABLE ").append(tableName)
+            .append(" (\n" +
+                    "  NAME VARCHAR(32 BYTES) NOT NULL,\n" +
+                    "  PRICE FLOAT," +
+                    "  ID INTEGER ").append(internalExtras)
+            .append(");\n")
+            .append(externalExtras);
+        }
+        //*enable to debug*/ System.out.println(schema.toString());
+        project.addLiteralSchema(schema.toString());
+    }
+
+    // Non-swappy tables are all incompatible for swapping with SWAP_THIS_NORMAL
+    // due to various column differences or for having views
+    private static void addNonSwappyTables(VoltProjectBuilder project)
+    throws Exception {
+        StringBuilder schema = new StringBuilder();
+        for (String[] tableDefPart : NONSWAPPY_TABLES) {
+            schema.append("CREATE TABLE ")
+            .append(tableDefPart[0])
+            .append(tableDefPart[1]);
+        }
+        //*enable to debug*/ System.out.println(schema.toString());
+        project.addLiteralSchema(schema.toString());
     }
 
     public void testPing() throws IOException, ProcCallException {
@@ -63,8 +258,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
     }
 
     private void checkProSysprocError(Client client, String name, int paramCount)
-            throws NoConnectionsException, IOException
-    {
+            throws Exception {
         // make some dummy params... real ones aren't needed for this test
         Object[] params = new Object[paramCount];
         for (int i = 0; i < paramCount; i++) {
@@ -73,15 +267,16 @@ public class TestSystemProcedureSuite extends RegressionSuite {
 
         try {
             client.callProcedure(name, params);
-            fail();
+            fail("ORLY " + name + " succeeded w/out pro?");
         }
-        catch (ProcCallException e) {
-            assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
-            if (!e.getClientResponse().getStatusString().contains("Enterprise Edition")) {
-                System.out.println("sup");
-                System.out.println("MESSAGE: " + e.getClientResponse().getStatusString());
+        catch (ProcCallException ex) {
+            ClientResponse response = ex.getClientResponse();
+            assertEquals(ClientResponse.GRACEFUL_FAILURE, response.getStatus());
+            String status = response.getStatusString();
+            if ( ! status.contains("Enterprise Edition")) {
+                System.out.println("sup w/ this status string: " + status);
             }
-            assertTrue(e.getClientResponse().getStatusString().contains("Enterprise"));
+            assertTrue(status.contains("Enterprise"));
         }
     }
 
@@ -90,6 +285,9 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         if (MiscUtils.isPro()) {
             return;
         }
+        /* ///// */ if ( ! MiscUtils.isPro()) {
+        /* ///// */     return;
+        /* ///// */ }
 
         Client client = getClient();
 
@@ -146,7 +344,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         Client client = getClient();
         try {
             client.callProcedure("@Promote");
-            fail();
+            fail("ORLY @Promote succeeded?");
         }
         catch (ProcCallException pce) {
             assertEquals(ClientResponse.GRACEFUL_FAILURE, pce.getClientResponse().getStatus());
@@ -170,8 +368,11 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         // should not be able to upsert to new_order since it has no primary key
         try {
             client.callProcedure("@LoadMultipartitionTable", "new_order",  upsertMode, null);
-            fail();
-        } catch (ProcCallException ex) {}
+            fail("ORLY @LoadMultipartitionTable new_order succeeded w/o primary key?");
+        }
+        catch (ProcCallException ex) {
+            assertTrue(ex.getMessage().contains("the table new_order does not have a primary key"));
+        }
     }
 
     public void testLoadMultipartitionTableAndIndexStatsAndValidatePartitioning() throws Exception {
@@ -179,9 +380,9 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         byte upsertMode = (byte) 0;
         Client client = getClient();
 
-        /*
-         * Load a little partitioned data for the mispartitioned check
-         */
+        //
+        // Load a little partitioned data for the mispartitioned check
+        //
         Random r = new Random(0);
         for (int ii = 0; ii < 50; ii++) {
             client.callProcedure(new NullCallback(), "@AdHoc",
@@ -191,8 +392,11 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         // try the failure case first
         try {
             client.callProcedure("@LoadMultipartitionTable", "DOES_NOT_EXIST", upsertMode, null);
-            fail();
-        } catch (ProcCallException ex) {}
+            fail("ORLY - @LoadMultipartitionTable DOES_NOT_EXIST succeeds");
+        }
+        catch (ProcCallException ex) {
+            assertTrue(ex.getMessage().contains("Table not present in catalog"));
+        }
 
         // make a TPCC warehouse table
         VoltTable partitioned_table = new VoltTable(
@@ -242,8 +446,12 @@ public class TestSystemProcedureSuite extends RegressionSuite {
             try {
                 client.callProcedure("@LoadMultipartitionTable", "WAREHOUSE",
                             upsertMode, partitioned_table);
-                fail();
-            } catch (ProcCallException e) {}
+                fail("ORLY - @LoadMultipartitionTable succeeds on partitioned WAREHOUSE table?");
+            }
+            catch (ProcCallException ex) {
+                assertTrue(ex.getMessage().contains(
+                        "LoadMultipartitionTable no longer supports loading partitioned tables"));
+            }
             client.callProcedure("@LoadMultipartitionTable", "ITEM",
                             upsertMode, replicated_table);
 
@@ -255,21 +463,19 @@ public class TestSystemProcedureSuite extends RegressionSuite {
                 results = client.callProcedure("@Statistics", "table", 0).getResults();
                 // Check that tables loaded correctly
                 while(results[0].advanceRow()) {
-                    if (results[0].getString("TABLE_NAME").equals("ITEM"))
-                    {
+                    if (results[0].getString("TABLE_NAME").equals("ITEM")) {
                         rowcount += results[0].getLong("TUPLE_COUNT");
                     }
                 }
             }
 
-            System.out.println(results[0]);
+            //*enable to debug*/ System.out.println(results[0]);
 
             // Check that tables loaded correctly
             int foundItem = 0;
             results = client.callProcedure("@Statistics", "table", 0).getResults();
             while(results[0].advanceRow()) {
-                if (results[0].getString("TABLE_NAME").equals("ITEM"))
-                {
+                if (results[0].getString("TABLE_NAME").equals("ITEM")) {
                     ++foundItem;
                     //Different values depending on local cluster vs. single process hence ||
                     assertEquals(20, results[0].getLong("TUPLE_COUNT"));
@@ -280,21 +486,21 @@ public class TestSystemProcedureSuite extends RegressionSuite {
             // Table finally loaded fully should mean that index is okay on first read.
             VoltTable indexStats =
                     client.callProcedure("@Statistics", "INDEX", 0).getResults()[0];
-            System.out.println(indexStats);
+            //*enable to debug*/ System.out.println(indexStats);
             long memorySum = 0;
             while (indexStats.advanceRow()) {
                 memorySum += indexStats.getLong("MEMORY_ESTIMATE");
             }
 
-            /*
-             * It takes about a minute to spin through this 1000 times.
-             * Should definitely give a 1 second tick time to fire
-             */
+            //
+            // It takes about a minute to spin through this 1000 times.
+            // Should definitely give a 1 second tick time to fire
+            //
             long indexMemorySum = 0;
             for (int ii = 0; ii < 1000; ii++) {
                 indexMemorySum = 0;
                 indexStats = client.callProcedure("@Statistics", "MEMORY", 0).getResults()[0];
-                System.out.println(indexStats);
+                //*enable to debug*/ System.out.println(indexStats);
                 while (indexStats.advanceRow()) {
                     indexMemorySum += indexStats.getLong("INDEXMEMORY");
                 }
@@ -310,10 +516,10 @@ public class TestSystemProcedureSuite extends RegressionSuite {
             assertTrue(indexMemorySum != 120);//That is a row count, not memory usage
             assertEquals(memorySum, indexMemorySum);
 
-            /*
-             * Test once using the current correct hash function,
-             * expect no mispartitioned rows
-             */
+            //
+            // Test once using the current correct hash function,
+            // expect no mispartitioned rows
+            //
             ClientResponse cr = client.callProcedure("@ValidatePartitioning", 0, null);
 
             VoltTable hashinatorMatches = cr.getResults()[1];
@@ -322,14 +528,14 @@ public class TestSystemProcedureSuite extends RegressionSuite {
             }
 
             VoltTable validateResult = cr.getResults()[0];
-            System.out.println(validateResult);
+            //*enable to debug*/ System.out.println(validateResult);
             while (validateResult.advanceRow()) {
                 assertEquals(0L, validateResult.getLong("MISPARTITIONED_ROWS"));
             }
 
-            /*
-             * Test again with a bad hash function, expect mispartitioned rows
-             */
+            //
+            // Test again with a bad hash function, expect mispartitioned rows
+            //
             cr = client.callProcedure("@ValidatePartitioning", 0, new byte[] { 0, 0, 0, 9 });
 
             hashinatorMatches = cr.getResults()[1];
@@ -338,15 +544,15 @@ public class TestSystemProcedureSuite extends RegressionSuite {
             }
 
             validateResult = cr.getResults()[0];
-            System.out.println(validateResult);
+            //*enable to debug*/ System.out.println(validateResult);
             while (validateResult.advanceRow()) {
                 if (validateResult.getString("TABLE").equals("NEW_ORDER")) {
                     assertTrue(validateResult.getLong("MISPARTITIONED_ROWS") > 0);
                 }
             }
         }
-        catch (Exception e) {
-            e.printStackTrace();
+        catch (Exception ex) {
+            ex.printStackTrace();
             fail();
         }
     }
@@ -429,29 +635,33 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         try {
             client.callProcedure("@AdHoc", "INSERT INTO pause_test_tbl values (20);");
             fail("AdHoc insert did not fail in pause mode");
-        } catch(ProcCallException e) {
-            assertEquals(ClientResponse.SERVER_UNAVAILABLE, e.getClientResponse().getStatus());
+        }
+        catch (ProcCallException ex) {
+            assertEquals(ClientResponse.SERVER_UNAVAILABLE, ex.getClientResponse().getStatus());
         }
         try {
             client.callProcedure("@AdHoc", "CREATE TABLE ddl_test1 (fld1 integer NOT NULL);");
             fail("AdHoc create did not fail in pause mode");
-        } catch(ProcCallException e) {
-            assertTrue(e.getMessage().contains("Server is paused"));
-            assertEquals(ClientResponse.SERVER_UNAVAILABLE, e.getClientResponse().getStatus());
+        }
+        catch (ProcCallException ex) {
+            assertTrue(ex.getMessage().contains("Server is paused"));
+            assertEquals(ClientResponse.SERVER_UNAVAILABLE, ex.getClientResponse().getStatus());
         }
         try {
             client.callProcedure("@AdHoc", "DROP TABLE pause_test_tbl;");
             fail("AdHoc drop did not fail in pause mode");
-        } catch(ProcCallException e) {
-            assertTrue(e.getMessage().contains("Server is paused"));
-            assertEquals(ClientResponse.SERVER_UNAVAILABLE, e.getClientResponse().getStatus());
+        }
+        catch (ProcCallException ex) {
+            assertTrue(ex.getMessage().contains("Server is paused"));
+            assertEquals(ClientResponse.SERVER_UNAVAILABLE, ex.getClientResponse().getStatus());
         }
         try {
             client.callProcedure("@AdHoc", "CREATE PROCEDURE pause_test_proc AS SELECT * FROM pause_test_tbl;");
             fail("AdHoc create proc did not fail in pause mode");
-        } catch(ProcCallException e) {
-            assertTrue(e.getMessage().contains("Server is paused"));
-            assertEquals(ClientResponse.SERVER_UNAVAILABLE, e.getClientResponse().getStatus());
+        }
+        catch (ProcCallException ex) {
+            assertTrue(ex.getMessage().contains("Server is paused"));
+            assertEquals(ClientResponse.SERVER_UNAVAILABLE, ex.getClientResponse().getStatus());
         }
 
         // admin should work fine
@@ -463,15 +673,17 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         try {
             resp = client.callProcedure("@UpdateLogging", m_loggingConfig);
             fail();
-        } catch(ProcCallException e) {
-            assertEquals(ClientResponse.SERVER_UNAVAILABLE, e.getClientResponse().getStatus());
+        }
+        catch (ProcCallException ex) {
+            assertEquals(ClientResponse.SERVER_UNAVAILABLE, ex.getClientResponse().getStatus());
         }
 
         try {
             resp = client.callProcedure("pauseTestInsert");
             fail();
-        } catch(ProcCallException e) {
-            assertEquals(ClientResponse.SERVER_UNAVAILABLE, e.getClientResponse().getStatus());
+        }
+        catch (ProcCallException ex) {
+            assertEquals(ClientResponse.SERVER_UNAVAILABLE, ex.getClientResponse().getStatus());
         }
 
         resp = client.callProcedure("@Ping");
@@ -493,75 +705,197 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         }
     }
 
+    public void testSwapTables() throws Exception {
+        Client client = getClient();
+
+        // Populate the tables with traceable rows.
+        // After each swap, confirm that both tables are populated, that
+        // the total number of rows is unchanged, and that the first table's
+        // column sum HAS changed.
+        for (String[] tableDefPart : SWAPPY_TABLES) {
+            String tableRoot = tableDefPart[0];
+
+            // One row for THIS table.
+            client.callProcedure(SWAPPY_PREFIX_PAIR[0] + tableRoot + ".insert",
+                    "1", 1.0, 1);
+
+            // Two rows for THAT table.
+            client.callProcedure(SWAPPY_PREFIX_PAIR[1] + tableRoot + ".insert",
+                    "2", 2.0, 2);
+            client.callProcedure(SWAPPY_PREFIX_PAIR[1] + tableRoot + ".insert",
+                    "3", 3.0, 3);
+        }
+
+        for (int ii = 0; ii < SWAPPY_TABLES.length; ++ii) {
+            String theTable = SWAPPY_PREFIX_PAIR[0] + SWAPPY_TABLES[ii][0];
+
+            for (int jj = 0; jj < SWAPPY_TABLES.length; ++jj) {
+                // Allow swapping only for identically defined tables
+                // or those with minor variations in syntax.
+                String otherTable = SWAPPY_PREFIX_PAIR[1] + SWAPPY_TABLES[jj][0];
+                if ((ii == jj) ||
+                        //(ii == 2 && jj == 4) || (ii == 4 && jj == 2) ||
+                        (ii == 2 && jj == 5) || (ii == 5 && jj == 2) ||
+                        (ii == 3 && jj == 4) || (ii == 4 && jj == 3) ||
+                        //(ii == 4 && jj == 5) || (ii == 5 && jj == 4) ||
+                        (ii == 6 && jj == 7) || (ii == 7 && jj == 6) ||
+                        (ii == 10 && jj == 11) || (ii == 11 && jj == 10) ||
+                        (ii == 14 && jj == 15) || (ii == 15 && jj == 14) ||
+                        (ii == 16 && jj == 17) || (ii == 17 && jj == 16)) {
+                    VoltTable[] results;
+
+                    results = client.callProcedure("@AdHoc",
+                            "SELECT COUNT(*) FROM " + theTable).getResults();
+                    long preCount = results[0].asScalarLong();
+
+                    results = client.callProcedure("@SwapTables",
+                            theTable, otherTable).getResults();
+                    //*enable to debug*/ System.out.println(results[0]);
+                    assertNotNull(results);
+                    assertEquals(1, results.length);
+                    assertEquals(3, results[0].asScalarLong());
+
+                    results = client.callProcedure("@AdHoc",
+                            "SELECT COUNT(*) FROM " + theTable).getResults();
+                    long postCount = results[0].asScalarLong();
+                    assertNotSame(preCount, postCount);
+
+                    results = client.callProcedure("@AdHoc",
+                            "SELECT COUNT(*) FROM " + otherTable).getResults();
+                    long totalCount = postCount + results[0].asScalarLong();
+                    assertEquals(3, totalCount);
+
+                    // Swap again to restore the baseline populations.
+                    results = client.callProcedure("@SwapTables",
+                            otherTable, theTable).getResults();
+                    //*enable to debug*/ System.out.println(results[0]);
+                    assertNotNull(results);
+                    assertEquals(1, results.length);
+                    assertEquals(3, results[0].asScalarLong());
+
+                    results = client.callProcedure("@AdHoc",
+                            "SELECT COUNT(*) FROM " + theTable).getResults();
+                    postCount = results[0].asScalarLong();
+                    assertEquals(preCount, postCount);
+
+                    results = client.callProcedure("@AdHoc",
+                            "SELECT COUNT(*) FROM " + otherTable).getResults();
+                    totalCount = postCount + results[0].asScalarLong();
+                    assertEquals(3, totalCount);
+
+                    continue;
+                }
+
+                try {
+                    client.callProcedure("@SwapTables",
+                            theTable, otherTable);
+                    fail("Swap should have conflicted on table definitions " +
+                            ii + " and " + jj + " : " +
+                            theTable + " with " + otherTable);
+                }
+                catch (ProcCallException ex) {
+                    if (! ex.getMessage().contains("Swapping")) {
+                        System.out.println("sup w/ incompatible tables " +
+                            ii + " and " + jj + ":" + ex);
+                    }
+                    assertTrue(ex.getMessage().contains("Swapping"));
+                }
+            }
+        }
+    }
+
+    public void testOneOffNegativeSwapTables() throws Exception {
+        Client client = getClient();
+
+        for (int ii = 0; ii < NONSWAPPY_TABLES.length; ++ii) {
+            try {
+                client.callProcedure("@SwapTables",
+                        SWAPPY_PREFIX_PAIR[0] + SWAPPY_TABLES[0][0],
+                        NONSWAPPY_TABLES[ii][0]);
+                fail("Swap should have conflicted on table definitions " +
+                        SWAPPY_PREFIX_PAIR[0] + SWAPPY_TABLES[0][0] +
+                        " and " + NONSWAPPY_TABLES[ii][0]);
+            }
+            catch (ProcCallException ex) {
+                if (! ex.getMessage().contains("Swapping")) {
+                    System.out.println("sup w/ these incompatible tables: " + ex);
+                }
+                assertTrue(ex.getMessage().contains("Swapping"));
+            }
+        }
+
+
+    }
     //
     // Build a list of the tests to be run. Use the regression suite
     // helpers to allow multiple backends.
     // JUnit magic that uses the regression suite helper classes.
     //
-    static public Test suite() throws IOException {
-        VoltServerConfig config = null;
-
-        MultiConfigSuiteBuilder builder =
-            new MultiConfigSuiteBuilder(TestSystemProcedureSuite.class);
-
-        // Not really using TPCC functionality but need a database.
+    static public Test suite() throws Exception {
+        // Not really using TPCC functionality but need a schema.
         // The testLoadMultipartitionTable procedure assumes partitioning
-        // on warehouse id.
+        // on warehouse id. testSwapTables needs lots of variations on the
+        // same table, including duplicates, to test compatibility
+        // criteria.
         VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addLiteralSchema(
-                        "CREATE TABLE WAREHOUSE (\n" +
-                        "  W_ID SMALLINT DEFAULT '0' NOT NULL,\n" +
-                        "  W_NAME VARCHAR(16) DEFAULT NULL,\n" +
-                        "  W_STREET_1 VARCHAR(32) DEFAULT NULL,\n" +
-                        "  W_STREET_2 VARCHAR(32) DEFAULT NULL,\n" +
-                        "  W_CITY VARCHAR(32) DEFAULT NULL,\n" +
-                        "  W_STATE VARCHAR(2) DEFAULT NULL,\n" +
-                        "  W_ZIP VARCHAR(9) DEFAULT NULL,\n" +
-                        "  W_TAX FLOAT DEFAULT NULL,\n" +
-                        "  W_YTD FLOAT DEFAULT NULL,\n" +
-                        "  CONSTRAINT W_PK_TREE PRIMARY KEY (W_ID)\n" +
-                        ");\n" +
-                        "CREATE TABLE ITEM (\n" +
-                        "  I_ID INTEGER DEFAULT '0' NOT NULL,\n" +
-                        "  I_IM_ID INTEGER DEFAULT NULL,\n" +
-                        "  I_NAME VARCHAR(32) DEFAULT NULL,\n" +
-                        "  I_PRICE FLOAT DEFAULT NULL,\n" +
-                        "  I_DATA VARCHAR(64) DEFAULT NULL,\n" +
-                        "  CONSTRAINT I_PK_TREE PRIMARY KEY (I_ID)\n" +
-                        ");\n" +
-                        "CREATE TABLE NEW_ORDER (\n" +
-                        "  NO_W_ID SMALLINT DEFAULT '0' NOT NULL\n" +
-                        ");\n" +
-                        "CREATE TABLE PAUSE_TEST_TBL (\n" +
-                        "  TEST_ID SMALLINT DEFAULT '0' NOT NULL\n" +
-                        ");\n");
+        String literalSchema =
+                "CREATE TABLE WAREHOUSE (\n" +
+                "  W_ID SMALLINT DEFAULT 0 NOT NULL,\n" +
+                "  W_NAME VARCHAR(16),\n" +
+                "  W_STREET_1 VARCHAR(32),\n" +
+                "  W_STREET_2 VARCHAR(32),\n" +
+                "  W_CITY VARCHAR(32),\n" +
+                "  W_STATE VARCHAR(2),\n" +
+                "  W_ZIP VARCHAR(9),\n" +
+                "  W_TAX FLOAT,\n" +
+                "  W_YTD FLOAT,\n" +
+                "  CONSTRAINT W_PK_TREE PRIMARY KEY (W_ID)\n" +
+                ");\n" +
+                "CREATE TABLE ITEM (\n" +
+                "  I_ID INTEGER DEFAULT 0 NOT NULL,\n" +
+                "  I_IM_ID INTEGER,\n" +
+                "  I_NAME VARCHAR(32),\n" +
+                "  I_PRICE FLOAT,\n" +
+                "  I_DATA VARCHAR(64),\n" +
+                "  CONSTRAINT I_PK_TREE PRIMARY KEY (I_ID)\n" +
+                ");\n" +
+                "CREATE TABLE NEW_ORDER (\n" +
+                "  NO_W_ID SMALLINT DEFAULT 0 NOT NULL\n" +
+                ");\n" +
+                "CREATE TABLE PAUSE_TEST_TBL (\n" +
+                "  TEST_ID SMALLINT DEFAULT 0 NOT NULL\n" +
+                ");\n" +
+                "";
+                project.addLiteralSchema(literalSchema);
+
+        for (String prefix : SWAPPY_PREFIX_PAIR) {
+            addSwappyTables(prefix, project);
+        }
+        addNonSwappyTables(project);
 
         project.setUseDDLSchema(true);
         project.addPartitionInfo("WAREHOUSE", "W_ID");
         project.addPartitionInfo("NEW_ORDER", "NO_W_ID");
-        project.addProcedures(PROCEDURES);
+        project.addProcedures(GoSleep.class);
         project.addStmtProcedure("pauseTestCount", "SELECT COUNT(*) FROM pause_test_tbl");
         project.addStmtProcedure("pauseTestInsert", "INSERT INTO pause_test_tbl VALUES (1)");
 
-        /*config = new LocalCluster("sysproc-twosites.jar", 2, 1, 0,
-                                  BackendTarget.NATIVE_EE_JNI);
-        ((LocalCluster) config).setHasLocalServer(false);
-        config.compile(project);
-        builder.addServerConfig(config);*/
+        MultiConfigSuiteBuilder builder =
+                new MultiConfigSuiteBuilder(TestSystemProcedureSuite.class);
+        LocalCluster config;
 
-        /*
-         * Add a cluster configuration for sysprocs too
-         */
-        config = new LocalCluster("sysproc-cluster.jar", TestSystemProcedureSuite.SITES, TestSystemProcedureSuite.HOSTS, TestSystemProcedureSuite.KFACTOR,
-                                  BackendTarget.NATIVE_EE_JNI);
-        ((LocalCluster) config).setHasLocalServer(hasLocalServer);
-        //boolean success = config.compile(project);
+        config = new LocalCluster("sysproc-cluster.jar", SITES, HOSTS, KFACTOR,
+               BackendTarget.NATIVE_EE_JNI);
+        if ( ! hasLocalServer ) {
+            config.setHasLocalServer(false);
+        }
+        // boolean success = config.compile(project);
         boolean success = config.compileWithAdminMode(project, -1, false);
         assertTrue(success);
         builder.addServerConfig(config);
-
         return builder;
     }
+
 }
 
 
