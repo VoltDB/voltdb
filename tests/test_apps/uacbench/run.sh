@@ -79,6 +79,7 @@ function server() {
 function prepare() {
 	#clean
     # we need to prepare a set of files for each type of benchmark
+    mkdir -p procedures/uac
     for tname in "ADD" "ADD_BATCH"; do
 
         rm -f ben.config
@@ -105,10 +106,6 @@ function init() {
 function client() {
     benchmark
 }
-
-#function catalog() {
-#    prepare
-#}
 
 function jars() {
     prepare
