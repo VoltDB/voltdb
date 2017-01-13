@@ -68,7 +68,7 @@ public interface ProducerDRGateway {
 
     public abstract void updateCatalog(final CatalogContext catalog, final int listenPort);
 
-    public abstract int getDRClusterId();
+    public abstract byte getDRClusterId();
 
     public void cacheSnapshotRestoreTruncationPoint(Map<Integer, Long> sequenceNumbers);
 
