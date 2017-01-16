@@ -216,12 +216,11 @@ public class SocketJoiner {
                     retryInterval = (Math.min(retryInterval * 2, TimeUnit.MINUTES.toSeconds(5)) +
                                      salt.nextInt(RETRY_INTERVAL_SALT));
 
-                    //Rejoining is processed one at a time. Later rejoining hosts may wait for (5 min + salt) seconds without sending
-                    //another rejoining request even through no rejoining is in progress in the cluster.
+                    //Over waiting may occur in some cases.
                     //For example, there are 4 rejoining nodes. Node 1 may take over 5 min to be completed.
-                    //Then node 2 to 4 detect that node 1 is still rejoining right before its rejoining is completed.
-                    //They then will wait 5 min + salt before sending another rejoining request. All the following rejoining requests are sent
-                    //after 5 min + salt.Reset waiting time to avoid over waiting.
+                    //Nodes 2 to 4 continue to wait after they detect that node 1 is still rejoining right before its rejoining is completed
+                    //They will wait 5 min + salt before sending another rejoining request. All the following rejoining requests are sent
+                    //after 5 min + salt. Reset waiting time to avoid over waiting.
                     if (retryInterval > TimeUnit.MINUTES.toSeconds(5)) {
                         retryInterval = RETRY_INTERVAL;
                     }
