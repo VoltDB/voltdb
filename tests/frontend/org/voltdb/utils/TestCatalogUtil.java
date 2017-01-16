@@ -791,16 +791,14 @@ public class TestCatalogUtil extends TestCase {
             "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
             "<deployment>" +
             "   <cluster hostcount='3' kfactor='1' sitesperhost='2'/>" +
-            "   <partition-detection enabled='true'>" +
-            "   </partition-detection>" +
+            "   <partition-detection enabled='true' />" +
             "</deployment>";
 
         final String ppdDisabledNoPrefix =
             "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
             "<deployment>" +
             "   <cluster hostcount='3' kfactor='1' sitesperhost='2'/>" +
-            "   <partition-detection enabled='false'>" +
-            "   </partition-detection>" +
+            "   <partition-detection enabled='false' />" +
             "</deployment>";
 
         final File tmpNoElement = VoltProjectBuilder.writeStringToTempFile(noElement);
