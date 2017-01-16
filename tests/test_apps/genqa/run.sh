@@ -73,13 +73,13 @@ function catalog() {
     srccompile
     #cmd="$VOLTDB compile --classpath obj -o $APPNAME_EXPORT.jar ddl-nocat.sql"
     #echo $cmd; $cmd
-    cmd="$VOLTDB compile --classpath obj -o $APPNAME.jar ddl.sql"
+    cmd="$VOLTDB legacycompile --classpath obj -o $APPNAME.jar ddl.sql"
     echo $cmd; $cmd
-    cmd="$VOLTDB compile --classpath obj -o $APPNAME2.jar ddl2.sql"
+    cmd="$VOLTDB legacycompile --classpath obj -o $APPNAME2.jar ddl2.sql"
     echo $cmd; $cmd
-    cmd="$VOLTDB compile --classpath obj -o $APPNAME3.jar ddl3.sql"
+    cmd="$VOLTDB legacycompile --classpath obj -o $APPNAME3.jar ddl3.sql"
     echo $cmd; $cmd
-    cmd="$VOLTDB compile --classpath obj -o $APPNAME4.jar ddl4.sql"
+    cmd="$VOLTDB legacycompile --classpath obj -o $APPNAME4.jar ddl4.sql"
     echo $cmd; $cmd
     #jar cvf sp.jar obj/*
 

@@ -120,8 +120,6 @@ class UploadConfiguration(Database):
             value = response.json()
 
             if value:
-                self.assertEqual(value['deployment']['admin-mode']['adminstartup'], False)
-                self.assertEqual(value['deployment']['admin-mode']['port'], 21211)
                 self.assertEqual(value['deployment']['dr']['id'], 6)
                 self.assertEqual(value['deployment']['dr']['listen'], True)
                 self.assertEqual(value['deployment']['dr']['port'], 12112)

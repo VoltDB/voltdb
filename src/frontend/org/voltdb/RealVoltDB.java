@@ -1333,16 +1333,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 VoltDB.crashLocalVoltDB("Failed to validate cluster build string", false, e);
             }
 
-            if (!isRejoin) {
-                if (m_joining) {
-                    // elastic join
-                    int expectedHosts = m_configuredReplicationFactor + 1;
-                    m_messenger.waitForJoiningHostsToBeReady(expectedHosts);
-                } else {
-                    // initial start or recover
-                    int expectedHosts = m_catalogContext.getClusterSettings().hostcount();
-                    m_messenger.waitForAllHostsToBeReady(expectedHosts);
-                }
+            //elastic join, make sure all the joining nodes are ready
+            //so that the secondary connections can be created.
+            if (m_joining) {
+                int expectedHosts = m_configuredReplicationFactor + 1;
+                m_messenger.waitForJoiningHostsToBeReady(expectedHosts, this.m_myHostId);
+            } else if (!isRejoin) {
+                // initial start or recover
+                int expectedHosts = m_catalogContext.getClusterSettings().hostcount();
+                m_messenger.waitForAllHostsToBeReady(expectedHosts);
             }
 
             // Create secondary connections within partition group
@@ -3534,6 +3533,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 if (m_rejoining) {
                     CoreZK.removeRejoinNodeIndicatorForHost(m_messenger.getZK(), m_myHostId);
                     m_rejoining = false;
+                }
+
+                if (m_joining) {
+                    CoreZK.removeJoinNodeIndicatorForHost(m_messenger.getZK(), m_myHostId);
                 }
 
                 String actionName = m_joining ? "join" : "rejoin";

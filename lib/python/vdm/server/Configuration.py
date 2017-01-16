@@ -500,10 +500,6 @@ def get_deployment(deployment, is_upload=False):
             result = set_export_import_field(deployment, field, new_deployment)
             if is_upload and 'success' not in result:
                 return handle_errors(field, result)
-        elif field == 'admin-mode':
-            result = set_admin_mode_filed(deployment, field, new_deployment)
-            if is_upload and 'success' not in result:
-                return handle_errors(field, result)
         elif field == 'cluster':
             result = set_cluster_field(deployment, field, new_deployment)
             if is_upload and 'success' not in result:
@@ -567,20 +563,6 @@ def set_export_import_field(deployment, field, new_deployment):
                     deployment[field]['configuration'], 'dict', 'export')
         else:
             new_deployment[field] = None
-    except Exception, err:
-        result = str(err)
-        print_errors(field, result)
-    finally:
-        return result
-
-
-def set_admin_mode_filed(deployment, field, new_deployment):
-    result = 'success'
-    try:
-        new_deployment[field] = {}
-        new_deployment[field]['adminstartup'] = parse_bool_string(deployment[field]
-                                                                  ['adminstartup'])
-        new_deployment[field]['port'] = int(deployment[field]['port'])
     except Exception, err:
         result = str(err)
         print_errors(field, result)
