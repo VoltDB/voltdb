@@ -750,8 +750,18 @@ static const NValue maxValidTimestamp = ValueFactory::getTimestampValue(NYE9999)
 static const NValue tooBigTimestamp = ValueFactory::getTimestampValue(NYE9999 + 1);
 static const NValue maxInt64 = ValueFactory::getTimestampValue(std::numeric_limits<int64_t>::max());
 
-static const std::string outOfRangeMessage = "Value out of range. Cannot convert dates prior to the year 1583 or after the year 9999";
-static const std::string outputOutOfRangeMessage = "would produce a value outside of the supported range";
+static std::string getInputOutOfRangeMessage(const std::string& func) {
+    std::ostringstream oss;
+    oss << "Input to SQL function " << func << " is outside of the supported range (years 1583 to 9999, inclusive).";
+    return oss.str();
+}
+
+static std::string getOutputOutOfRangeMessage(const std::string& func) {
+    std::ostringstream oss;
+    oss << "SQL function " << func << " would produce a value outside of the supported range (years 1583 to 9999, inclusive).";
+    return oss.str();
+}
+
 
 TEST_F(FunctionTest, DateFunctionsTruncate) {
     std::vector<int> funcs {
@@ -778,6 +788,7 @@ TEST_F(FunctionTest, DateFunctionsTruncate) {
         "9999-12-31 23:59:59.999999"  // microsecond
     };
 
+    const std::string outOfRangeMessage = getInputOutOfRangeMessage("TRUNCATE");
     int i = 0;
     BOOST_FOREACH(int func, funcs) {
         ASSERT_EQ(testUnary(func, nullTimestamp, nullTimestamp, true), 0);
@@ -818,6 +829,20 @@ TEST_F(FunctionTest, DateFunctionsExtract) {
         FUNC_EXTRACT_SECOND
     };
 
+    std::vector<string> funcNames {
+        "YEAR",
+        "MONTH",
+        "DAY",
+        "DAY_OF_WEEK",
+        "WEEKDAY",
+        "WEEK_OF_YEAR",
+        "DAY_OF_YEAR",
+        "QUARTER",
+        "HOUR",
+        "MINUTE",
+        "SECOND"
+    };
+
     std::vector<int> minExpected {
         1583, // year
         1,    // month
@@ -848,6 +873,7 @@ TEST_F(FunctionTest, DateFunctionsExtract) {
 
     int i = 0;
     BOOST_FOREACH(int func, funcs) {
+        const std::string outOfRangeMessage = getInputOutOfRangeMessage(funcNames[i]);
         ASSERT_EQ("success", testUnaryThrows(func, minInt64, outOfRangeMessage));
         ASSERT_EQ("success", testUnaryThrows(func, tooSmallTimestamp, outOfRangeMessage));
         ASSERT_EQ("success", testUnaryThrows(func, tooBigTimestamp, outOfRangeMessage));
@@ -908,6 +934,8 @@ TEST_F(FunctionTest, DateFunctionsAdd) {
         PTIME_MIN_MICROSECOND_INTERVAL
     };
 
+    const std::string outOfRangeMessage = getInputOutOfRangeMessage("DATEADD");
+    const std::string outputOutOfRangeMessage = getOutputOutOfRangeMessage("DATEADD");
     int i = 0;
     BOOST_FOREACH(int func, funcs) {
         // test null values
@@ -960,6 +988,7 @@ TEST_F(FunctionTest, DateFunctionsSinceEpoch) {
         1
     };
 
+    const std::string outOfRangeMessage = getInputOutOfRangeMessage("SINCE_EPOCH");
     int i = 0;
     BOOST_FOREACH(int func, funcs) {
         ASSERT_EQ(0, testUnary(func, nullTimestamp, nullTimestamp, true));
@@ -996,6 +1025,8 @@ TEST_F(FunctionTest, DateFunctionsToTimestamp) {
 
     const NValue nullBigint = NValue::getNullValue(VALUE_TYPE_NULL);
 
+    const std::string outOfRangeMessage = getInputOutOfRangeMessage("TO_TIMESTAMP");
+    const std::string outputOutOfRangeMessage = getOutputOutOfRangeMessage("TO_TIMESTAMP");
     int i = 0;
     BOOST_FOREACH(int func, funcs) {
         ASSERT_EQ(0, testUnary(func, nullBigint, nullTimestamp, true));
