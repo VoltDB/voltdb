@@ -29,7 +29,6 @@ import java.util.Set;
 import java.util.TreeMap;
 
 import org.voltdb.BackendTarget;
-import org.voltdb.ReplicationRole;
 import org.voltdb.StartAction;
 import org.voltdb.VoltDB;
 import org.voltdb.common.Constants;
@@ -88,7 +87,6 @@ public class CommandLine extends VoltDB.Configuration
         // final in baseclass: cl.m_isEnterprise = m_isEnterprise;
         cl.m_deadHostTimeoutMS = m_deadHostTimeoutMS;
         cl.m_startMode = m_startMode;
-        cl.m_replicationRole = m_replicationRole;
         cl.m_selectedRejoinInterface = m_selectedRejoinInterface;
         cl.m_quietAdhoc = m_quietAdhoc;
         // final in baseclass: cl.m_commitLogDir = new File("/tmp");
@@ -205,24 +203,6 @@ public class CommandLine extends VoltDB.Configuration
 
     public CommandLine rejoinTest(boolean rejoinTest) {
         m_isRejoinTest = rejoinTest;
-        return this;
-    }
-
-    public CommandLine isReplica(boolean isReplica)
-    {
-        if (isReplica)
-        {
-            m_replicationRole = ReplicationRole.REPLICA;
-        }
-        else
-        {
-            m_replicationRole = ReplicationRole.NONE;
-        }
-        return this;
-    }
-
-    public CommandLine replicaMode(ReplicationRole replicaMode) {
-        m_replicationRole = replicaMode;
         return this;
     }
 
@@ -688,13 +668,6 @@ public class CommandLine extends VoltDB.Configuration
             cmdline.add("deployment"); cmdline.add(pathToDeployment());
         }
 
-        // rejoin has no replication role
-        if (!m_startAction.doesRejoin()) {
-            if (m_replicationRole == ReplicationRole.REPLICA) {
-                cmdline.add("replica");
-            }
-        }
-
         if (includeTestOpts)
         {
             cmdline.add("timestampsalt"); cmdline.add(Long.toString(m_timestampTestingSalt));
@@ -796,6 +769,7 @@ public class CommandLine extends VoltDB.Configuration
         if (!m_startAction.isLegacy()) {
             cmdline.add("voltdbroot"); cmdline.add(m_voltdbRoot.getPath());
         }
+
         if (m_placementGroup != null) {
             cmdline.add("placementgroup"); cmdline.add(m_placementGroup);
         }

@@ -99,7 +99,6 @@ import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientAuthScheme;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltCompiler;
-import org.voltdb.compiler.deploymentfile.AdminModeType;
 import org.voltdb.compiler.deploymentfile.ClusterType;
 import org.voltdb.compiler.deploymentfile.CommandLogType;
 import org.voltdb.compiler.deploymentfile.CommandLogType.Frequency;
@@ -175,7 +174,6 @@ public abstract class CatalogUtil {
     final static Pattern JAR_EXTENSION_RE  = Pattern.compile("(?:.+)\\.jar/(?:.+)" ,Pattern.CASE_INSENSITIVE);
     public final static Pattern XML_COMMENT_RE = Pattern.compile("<!--.+?-->",Pattern.MULTILINE|Pattern.DOTALL);
     public final static Pattern HOSTCOUNT_RE = Pattern.compile("\\bhostcount\\s*=\\s*(?:\"\\s*\\d+\\s*\"|'\\s*\\d+\\s*')",Pattern.MULTILINE);
-    public final static Pattern ADMINMODE_RE = Pattern.compile("\\badminstartup\\s*=\\s*(?:\"\\s*\\w+\\s*\"|'\\s*\\w+\\s*')",Pattern.MULTILINE);
 
     public static final VoltTable.ColumnInfo DR_HIDDEN_COLUMN_INFO =
             new VoltTable.ColumnInfo(DR_HIDDEN_COLUMN_NAME, VoltType.BIGINT);
@@ -849,11 +847,6 @@ public abstract class CatalogUtil {
             PartitionDetectionType.Snapshot sshot = new PartitionDetectionType.Snapshot();
             pd.setSnapshot(sshot);
         }
-        //admin mode
-        if (deployment.getAdminMode() == null) {
-            AdminModeType amode = new AdminModeType();
-            deployment.setAdminMode(amode);
-        }
         //heartbeat
         if (deployment.getHeartbeat() == null) {
             HeartbeatType hb = new HeartbeatType();
@@ -979,7 +972,7 @@ public abstract class CatalogUtil {
     /**
      * Computes a MD5 digest (128 bits -> 2 longs -> UUID which is comprised of
      * two longs) of a deployment file stripped of all comments and its hostcount
-     * attribute set to 0, and adminstartup set to false
+     * attribute set to 0.
      *
      * @param deploymentBytes
      * @return MD5 digest for for configuration
@@ -990,8 +983,6 @@ public abstract class CatalogUtil {
         normalized = matcher.replaceAll("");
         matcher = HOSTCOUNT_RE.matcher(normalized);
         normalized = matcher.replaceFirst("hostcount=\"0\"");
-        matcher = ADMINMODE_RE.matcher(normalized);
-        normalized = matcher.replaceFirst("adminstartup=\"false\"");
         return Digester.md5AsUUID(normalized);
     }
 
@@ -1130,9 +1121,6 @@ public abstract class CatalogUtil {
         else {
             catCluster.setNetworkpartition(false);
         }
-
-        catCluster.setAdminport(deployment.getAdminMode().getPort());
-        catCluster.setAdminstartup(deployment.getAdminMode().isAdminstartup());
 
         setSystemSettings(deployment, catDeploy);
 
@@ -1988,6 +1976,7 @@ public abstract class CatalogUtil {
             ConnectionType drConnection = dr.getConnection();
             cluster.setDrproducerenabled(dr.isListen());
             cluster.setDrproducerport(dr.getPort());
+            cluster.setDrrole(dr.getRole().name().toLowerCase());
 
             // Backward compatibility to support cluster id in DR tag
             if (clusterType.getId() == null && dr.getId() != null) {
@@ -2595,7 +2584,6 @@ public abstract class CatalogUtil {
         DeploymentType clone = new DeploymentType();
 
         clone.setPartitionDetection(o.getPartitionDetection());
-        clone.setAdminMode(o.getAdminMode());
         clone.setHeartbeat(o.getHeartbeat());
         clone.setHttpd(o.getHttpd());
         clone.setSnapshot(o.getSnapshot());

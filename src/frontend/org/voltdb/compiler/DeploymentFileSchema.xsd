@@ -37,7 +37,6 @@
       <xs:element name="cluster" minOccurs="1" maxOccurs="1" type="clusterType"/>
       <xs:element name="paths" minOccurs="0" maxOccurs="1" type="pathsType" />
       <xs:element name="partition-detection" minOccurs="0" type="partitionDetectionType"/>
-      <xs:element name="admin-mode" minOccurs="0" type="adminModeType"/>
       <xs:element name="heartbeat" minOccurs="0" maxOccurs="1" type="heartbeatType"/>
       <xs:element name="ssl" minOccurs="0" maxOccurs="1" type="sslType"/>
       <xs:element name="httpd" minOccurs="0" maxOccurs="1" type="httpdType"/>
@@ -236,12 +235,6 @@
   <xs:complexType name="securityType">
     <xs:attribute name="enabled" type="xs:boolean" default="false"/>
     <xs:attribute name="provider" type="SecurityProviderString" default="hash"/>
-  </xs:complexType>
-
-  <!-- <admin-mode> (always enabled.) -->
-  <xs:complexType name="adminModeType">
-    <xs:attribute name="port" type="xs:int" default="21211"/>
-    <xs:attribute name="adminstartup" type="xs:boolean" default="false"/>
   </xs:complexType>
 
   <!-- <command log> -->
@@ -479,7 +472,16 @@
             </xs:restriction>
         </xs:simpleType>
     </xs:attribute>
+    <xs:attribute name="role" type="drRoleType" default="master" />
   </xs:complexType>
+
+  <!-- DR cluster role -->
+  <xs:simpleType name="drRoleType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="master"/>
+      <xs:enumeration value="replica"/>
+    </xs:restriction>
+  </xs:simpleType>
 
   <xs:complexType name="connectionType">
     <xs:attribute name="source" use="required">

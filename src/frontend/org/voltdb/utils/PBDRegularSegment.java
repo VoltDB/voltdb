@@ -75,9 +75,6 @@ public class PBDRegularSegment extends PBDSegment {
     public void reset()
     {
         m_syncedSinceLastEdit = false;
-        for (SegmentReader reader : m_readCursors.values()) {
-            reader.resetReader();
-        }
         if (m_tmpHeaderBuf != null) {
             m_tmpHeaderBuf.discard();
             m_tmpHeaderBuf = null;

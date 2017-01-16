@@ -688,19 +688,6 @@ public class Inits {
         public void run() {
             int adminPort = VoltDB.DEFAULT_ADMIN_PORT;
 
-            // See if we should bring the server up in admin mode
-            if (m_deployment.getAdminMode() != null) {
-                // rejoining nodes figure out admin mode from other nodes
-                if (m_isRejoin == false) {
-                    if (m_deployment.getAdminMode().isAdminstartup()) {
-                        m_rvdb.setStartMode(OperationMode.PAUSED);
-                    }
-                }
-
-                // set the adminPort from the deployment file
-                adminPort = m_deployment.getAdminMode().getPort();
-            }
-
             // allow command line override
             if (m_config.m_adminPort > 0)
                 adminPort = m_config.m_adminPort;
@@ -715,6 +702,7 @@ public class Inits {
 
     class SetupReplicationRole extends InitWork {
         SetupReplicationRole() {
+            dependsOn(LoadCatalog.class);
         }
 
         @Override
@@ -722,7 +710,6 @@ public class Inits {
             try {
                 JSONStringer js = new JSONStringer();
                 js.object();
-                js.keySymbolValuePair("role", m_config.m_replicationRole.ordinal());
                 js.keySymbolValuePair("active", m_rvdb.getReplicationActive());
                 js.endObject();
 
@@ -740,23 +727,11 @@ public class Inits {
                     String discoveredReplicationConfig =
                         new String(zk.getData(VoltZK.replicationconfig, false, null), "UTF-8");
                     JSONObject discoveredjsObj = new JSONObject(discoveredReplicationConfig);
-                    ReplicationRole discoveredRole = ReplicationRole.get((byte) discoveredjsObj.getLong("role"));
-                    if (!discoveredRole.equals(m_config.m_replicationRole)) {
-                        VoltDB.crashGlobalVoltDB("Discovered replication role " + discoveredRole +
-                                " doesn't match locally specified replication role " + m_config.m_replicationRole,
-                                true, null);
-                    }
-
-                    // See if we should bring the server up in WAN replication mode
-                    m_rvdb.setReplicationRole(discoveredRole);
                 } else {
                     String discoveredReplicationConfig =
                             new String(zk.getData(VoltZK.replicationconfig, false, null), "UTF-8");
                     JSONObject discoveredjsObj = new JSONObject(discoveredReplicationConfig);
-                    ReplicationRole discoveredRole = ReplicationRole.get((byte) discoveredjsObj.getLong("role"));
                     boolean replicationActive = discoveredjsObj.getBoolean("active");
-                    // See if we should bring the server up in WAN replication mode
-                    m_rvdb.setReplicationRole(discoveredRole);
                     m_rvdb.setReplicationActive(replicationActive);
                 }
             } catch (Exception e) {

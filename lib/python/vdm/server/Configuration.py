@@ -28,6 +28,7 @@ from logging.handlers import RotatingFileHandler
 import logging
 import ast
 import itertools
+from Validation import Validation
 
 
 def convert_xml_to_json(config_path):
@@ -499,10 +500,6 @@ def get_deployment(deployment, is_upload=False):
             result = set_export_import_field(deployment, field, new_deployment)
             if is_upload and 'success' not in result:
                 return handle_errors(field, result)
-        elif field == 'admin-mode':
-            result = set_admin_mode_filed(deployment, field, new_deployment)
-            if is_upload and 'success' not in result:
-                return handle_errors(field, result)
         elif field == 'cluster':
             result = set_cluster_field(deployment, field, new_deployment)
             if is_upload and 'success' not in result:
@@ -543,6 +540,10 @@ def get_deployment(deployment, is_upload=False):
             result = set_users_field(deployment, field, new_deployment)
             if is_upload and 'success' not in result:
                 return handle_errors(field, result)
+        elif field == 'snmp':
+            result = set_snmp_field(deployment, field, new_deployment)
+            if is_upload and 'success' not in result:
+                return handle_errors(field, result)
         else:
             new_deployment[field] = convert_field_required_format(deployment, field)
     return new_deployment
@@ -562,20 +563,6 @@ def set_export_import_field(deployment, field, new_deployment):
                     deployment[field]['configuration'], 'dict', 'export')
         else:
             new_deployment[field] = None
-    except Exception, err:
-        result = str(err)
-        print_errors(field, result)
-    finally:
-        return result
-
-
-def set_admin_mode_filed(deployment, field, new_deployment):
-    result = 'success'
-    try:
-        new_deployment[field] = {}
-        new_deployment[field]['adminstartup'] = parse_bool_string(deployment[field]
-                                                                  ['adminstartup'])
-        new_deployment[field]['port'] = int(deployment[field]['port'])
     except Exception, err:
         result = str(err)
         print_errors(field, result)
@@ -673,6 +660,25 @@ def set_security_field(deployment, field, new_deployment):
         new_deployment[field]['enabled'] = parse_bool_string(deployment[field]
                                                              ['enabled'])
         new_deployment[field]['provider'] = str(deployment[field]['provider'])
+    except Exception, err:
+        result = str(err)
+        print_errors(field, result)
+    finally:
+        return result
+
+
+def set_snmp_field(deployment, field, new_deployment):
+    result = 'success'
+    try:
+        new_deployment[field] = {}
+        new_deployment[field]['enabled'] = parse_bool_string(deployment[field]['enabled'])
+        new_deployment[field]['target'] = str(deployment[field]['target'])
+        new_deployment[field]['community'] = str(deployment[field]['community'])
+        new_deployment[field]['username'] = str(deployment[field]['username'])
+        new_deployment[field]['authprotocol'] = str(deployment[field]['authprotocol'])
+        new_deployment[field]['authkey'] = str(deployment[field]['authkey'])
+        new_deployment[field]['privacyprotocol'] = str(deployment[field]['privacyprotocol'])
+        new_deployment[field]['privacykey'] = str(deployment[field]['privacykey'])
     except Exception, err:
         result = str(err)
         print_errors(field, result)
@@ -1319,6 +1325,44 @@ def check_validation_deployment(req):
             result = check_export_property(configuration['type'], configuration['property'])
             if 'status' in result and result['status'] == 401:
                 return {'status': 401, 'statusString': 'Import: ' + result['statusString']}
+
+    if 'snmp' in req.json:
+        if not (not req.json['snmp'] or ('enabled' in req.json['snmp'] and req.json['snmp']['enabled'] is False)):
+            if 'target' in req.json['snmp']:
+                result = Validation.ip_port_validation(req.json['snmp']['target'])
+                if 'result' in result and result['result'] == 'error':
+                    return {'status': 401, 'statusString': 'SNMP: ' + result['status']}
+            else:
+                return {'status': 401, 'statusString': 'SNMP: Target is required field.'}
+
+            if 'username' in req.json['snmp'] and req.json['snmp']['username'] != '':
+                if 'authprotocol' in req.json['snmp'] and req.json['snmp']['authprotocol'] != 'NoAuth' \
+                        and ('authkey' not in req.json['snmp'] or ('authkey' in req.json['snmp'] and
+                        req.json['snmp']['authkey'] == '')):
+                        return {'status': 401, 'statusString': 'SNMP: Invalid or no authentication key.'}
+
+                if 'authprotocol' in req.json['snmp'] and req.json['snmp']['authprotocol'] != 'NoAuth' and \
+                                'authkey' in req.json['snmp'] and len(req.json['snmp']['authkey']) < 8:
+                    return {'status': 401, 'statusString': 'SNMP: Authkey must be of at least 8 characters.'}
+
+                if 'privacyprotocol' in req.json['snmp'] and req.json['snmp']['privacyprotocol'] != 'NoPriv' \
+                        and ('privacykey' not in req.json['snmp'] or ('privacykey' in req.json['snmp'] and
+                                                                              req.json['snmp']['privacykey'] == '')):
+                        return {'status': 401, 'statusString': 'SNMP: Invalid or no privacy key.'}
+
+                if 'privacyprotocol' in req.json['snmp'] and req.json['snmp']['privacyprotocol'] != 'NoPriv' and \
+                                'privacykey' in req.json['snmp'] and len(req.json['snmp']['privacykey']) < 8:
+                   return {'status': 401, 'statusString': 'SNMP: PrivacyKey must be of at least 8 characters.'}
+            else:
+                if 'authprotocol' in req.json['snmp'] and req.json['snmp']['authprotocol'] != 'NoAuth' \
+                        and ('authkey' not in req.json['snmp'] or ('authkey' in req.json['snmp'] and
+                                                                           req.json['snmp']['authkey'] == '')):
+                    return {'status': 401, 'statusString': 'SNMP: Invalid or no authentication key.'}
+
+                if 'privacyprotocol' in req.json['snmp'] and req.json['snmp']['privacyprotocol'] != 'NoPriv' \
+                        and ('privacykey' not in req.json['snmp'] or ('privacykey' in req.json['snmp'] and
+                                                                              req.json['snmp']['privacykey'] == '')):
+                    return {'status': 401, 'statusString': 'SNMP: Invalid or no privacy key.'}
 
     return {'status': 200, 'statusString': 'success'}
 

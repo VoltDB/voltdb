@@ -125,24 +125,24 @@ def dr_producer_stats(runner, partition_min_host, partition_min, partition_max):
             partition_min[pid] = partition_max[pid]
     if len(partition_data.tuples()) == 0:
         return
-    for r in partition_data.tuples():
-        pid = r[3]
-        hostname = str(r[2])
-        if str(r[8]) == 'None':
+    for row in partition_data.tuples():
+        pid = row[5]
+        hostname = str(row[2])
+        if str(row[10]) == 'None':
             last_queued = -1
         else:
-            last_queued = r[8]
-        if str(r[9]) == 'None':
+            last_queued = row[10]
+        if str(row[11]) == 'None':
             last_acked = -1
         else:
-            last_acked = r[9]
+            last_acked = row[11]
 
         # Initial state, no transactions are queued and acknowledged.
         if last_queued == -1 and last_acked == -1:
             continue
 
         # check TOTALBYTES
-        if r[5] > 0:
+        if row[7] > 0:
             # track the highest seen drId for each partition. use last queued to get the upper bound
             if pid in partition_max:
                 partition_max[pid] = max(last_queued, partition_max[pid])
@@ -296,17 +296,17 @@ def check_dr_consumer(runner):
         if len(resp.table(1).tuples()) == 0:
             return
         # DR consumer stats
-        # column 7: The timestamp of the last transaction received from the producer for the partition
-        # column 8: The timestamp of the last transaction successfully applied to this partition on the consumer
+        # column 8: The timestamp of the last transaction received from the producer for the partition
+        # column 9: The timestamp of the last transaction successfully applied to this partition on the consumer
         # If the two timestamps are the same, all the transactions have been applied for the partition.
         notifyInterval -= 1
         currentValidationParams = dict()
         for r in resp.table(1).tuples():
-            if r[7] <> r[8]:
+            if r[8] <> r[9]:
                 outstanding += 1
-                currentValidationParams[str(r[1]) + '-' +  str(r[4])] = "%s-%s" %(r[7], r[8])
+                currentValidationParams[str(r[1]) + '-' +  str(r[5])] = "%s-%s" %(r[8], r[9])
                 if notifyInterval == 0:
-                    runner.info('\tPartition %d on host %d has outstanding DR consumer transactions. last received: %s, last applied:%s' %(r[4], r[1], r[7], r[8]))
+                    runner.info('\tPartition %d on host %d has outstanding DR consumer transactions. last received: %s, last applied:%s' %(r[5], r[1], r[8], r[9]))
         if outstanding == 0:
             return
         if notifyInterval == 0:

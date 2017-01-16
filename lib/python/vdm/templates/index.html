@@ -304,219 +304,278 @@
                 <td class="onOff" id="txtJsonApi">On</td>
                 <td>&nbsp;</td>
               </tr>
-              </table>
-                 <div class="drWrapperAdmin" id="divDrWrapperAdmin" >
-                  <div class="headerAdminContent">
-                    <h1>
-                      <div class="headerAdminContainer">
-                        <div class="drAdminHeaderLeft">Database Replication (DR)</div>
-                        <div class="drAdminHeaderRight">
-                          <a class="btnUpdateSource" id="btnUpdateSource" href="javascript:void(0);" data-toggle="modal"  data-target="#connectionSource">
-                            <!--<span class="editIcon"></span></a>-->
-                            <div id="onOffIcon" class="icheckbox_square-blue hover active onIconDR"> <span class="onOffDR" id="chkDrOnOffVal"width="10%"> </span> </div>
-                          </a>
-                        </div>
-                        <div class="clear"></div>
+              <tr class="hasSubLabel parent" id="row-10">
+                  <td class="configLabel"><a href="javascript:void(0)" class=""><span class="fontFamily">Database Replication (DR)</span></a></td>
+                  <td align="right">
+                      <a id="btnUpdateSource" href="javascript:void(0);"  data-target="#connectionSource">
+                      <div id="onOffIcon" class="icheckbox_square-blue hover active onIconSNMP checked">
                       </div>
-                    </h1>
-                  </div>
-                  <div class="drContent">
-                    <table width="100%" border="0" cellspacing="0" cellpadding="0" class="adminTbl connectionSourceTbl">
-                      <tr id="row-DrId" class="rowDr clsDrType">
-                        <td class="configLabel" width="62%">ID</td>
-                        <td>&nbsp;</td>
+                       </a>
+                  </td>
+                  <td class="onOffSNMP" id="chkDrOnOffVal"width="10%">Off</td>
+                  <td>&nbsp;</td>
+              </tr>
+              <tr id="row-DrId" class="subLabelRow clsDrType">
+                        <td class="configLabel">ID</td>
                         <td align="right" id="lblDrId"></td>
                         <td>&nbsp;</td>
-                      </tr>
-                      <tr id="rowDrPort" class="rowDr clsDrType">
-                        <td class="configLabel" width="62%">Port</td>
                         <td>&nbsp;</td>
+                      </tr>
+                      <tr id="rowDrPort" class="subLabelRow clsDrType">
+                        <td class="configLabel" >Port</td>
                         <td align="right" id="lblDrPort"></td>
+                          <td>&nbsp;</td>
                         <td>&nbsp;</td>
                       </tr>
-                      <tr id="trConnectionSource" class="rowDr clsDrEnabled clsDrType" >
-                        <td class="configLabel" width="62%">Connection Source</td>
-                        <td colspan="2" align="right"><span id="master-cluster-name"></span></td>
-                         <td>&nbsp;</td>
+                      <tr id="trConnectionSource" class="subLabelRow clsDrType">
+                        <td class="configLabel">Connection Source</td>
+                        <td align="right"><span id="master-cluster-name"></span></td>
+                        <td>&nbsp;</td>
+                        <td>&nbsp;</td>
                       </tr>
-                    </table>
-                  </div>
-                </div>
+
+              </table>
             </div>
             <div class="mainTblRight">
             <table width="100%" border="0" cellspacing="0" cellpadding="0" id="adminTbl1" class="adminTbl">
-               <tr class="hasSubLabel parent" id="row-2">
-                <td class="configLabel"><a href="javascript:void(0)" class="glyphicon-triangle-right"><span class="fontFamily">Auto Snapshots</span></a></td>
-                <td align="right"><input tabindex="3" type="checkbox" id="chkAutoSnapshot" ></td>
-                <td class="onOff" id="txtAutoSnapshot">On</td>
-                <td>&nbsp;</td>
-              </tr>
-              <tr class="child-row-2 subLabelRow">
-                <td class="configLabel">File Prefix</td>
-                <td align="right">
-                    <form id="frmFilePrefix" action="" method="get" class="form-horizontal">
-                      <input id="txtFilePrefix" name="txtFilePrefix" type="text" value="" class="overviewInputText1">
-                    <label id="errorFilePrefix" for="txtFilePrefix" class="error ccErrorMsg" style="display: none;">This field is required</label>
-                    </form>
-                </td>
-                <td>&nbsp;</td>
-                <td>&nbsp;</td>
-              </tr>
-              <tr class="child-row-2 subLabelRow">
-                <td class="configLabel">Frequency </td>
-                <td align="right"><div id="frequencySpan">
-                  <form id="frmFrequency" action="" method="get" class="form-horizontal">
-                  <input id="txtFrequency" name="txtFrequency" type="text" value="" class="overviewInputText">
-                    <select id="selFreqUnit"><option value="1">Hrs</option><option value="2">Min</option><option value="3">Sec</option></select>
-                  <label id="errorFrequency" for="txtFrequency" class="error ccErrorMsg" style="display: none;">This field is required</label>
-                    </form>
-                </div>
-                 </td>
-                <td id="txtFrequencyUnit">&nbsp;</td>
-                <td>&nbsp;</td>
-              </tr>
-              <tr class="child-row-2 subLabelRow">
-                <td class="configLabel">Retained </td>
-                <td align="right">
-                  <form id="frmRetained" action="" method="get" class="form-horizontal">
-                  <input id="txtRetained" name="txtRetained" type="text" value="" class="overviewInputText">
-                <label id="errorRetained" for="txtRetained" class="error ccErrorMsg" style="display: none;">This field is required</label>
-                    </form>
-                </td>
-                <td>Copies </td>
-                <td>&nbsp;</td>
-              </tr>
-              <tr class="hasSubLabel parent" id="row-3">
-                <td class="configLabel"><a href="javascript:void(0)" class="glyphicon-triangle-right"><span class="fontFamily">Command Logging</span></a></td>
-                <td align="right"><input id="chkCommandLog" tabindex="4" type="checkbox" ></td>
-                <td class="onOff" id="txtCommandLog">Off</td>
-                <td>&nbsp;</td>
-              </tr>
-              <tr class="child-row-3 subLabelRow">
-                <td class="configLabel">Log Frequency Time </td>
-                <td id="commandlogfreqtime" align="right">
-                  <form id="frmLogFrequencyTime" action="" method="get" class="form-horizontal">
-                  <input id="txtLogFrequencyTime" name="txtLogFrequencyTime" type="text" value="" class="overviewInputText">
-                <label id="errorLogFrequencyTime" for="txtLogFrequencyTime" class="error ccErrorMsg" style="display: none;">This field is required</label>
-                    </form>
-                </td>
-                <td>ms</td>
-                <td>&nbsp;</td>
-              </tr>
-              <tr class="child-row-3 subLabelRow">
-                <td class="configLabel">Log Frequency Transactions </td>
-                <td id="commandlogfreqtxns" align="right">
-                  <form id="frmLogFreqTransaction" action="" method="get" class="form-horizontal">
-                  <input type="text" id="txtLogFreqTransaction" name="txtLogFreqTransaction" value="" class="overviewInputText1">
-                <label id="errorLogFreqTransaction" for="txtLogFreqTransaction" class="error ccErrorMsg" style="display: none;">This field is required</label>
-                    </form>
-                </td>
-                <td>&nbsp;</td>
-                <td>&nbsp;</td>
-            
-              </tr>
-              <tr class="child-row-3 subLabelRow">
-                <td class="configLabel">Log Segment Size</td>
-                <td align="right">
-                  <form id="frmLogSegmentSize" action="" method="get" class="form-horizontal">
-                  <input id="txtLogSegmentSize" name="txtLogSegmentSize" type="text" value="" class="overviewInputText">
-                <label id="errorLogSegmentSize" for="txtLogSegmentSize" class="error ccErrorMsg" style="display: none;">This field is required</label>
-                    </form>
-                </td>
-                <td>MB</td>
-                <td>&nbsp;</td>
-              </tr>
-              <tr class="hasSubLabel parent" id="row-4">
-                <td class="configLabel"><a href="javascript:void(0)" class="glyphicon-triangle-right"><span class="fontFamily">Export</span></a></td>
-                <td align="right">&nbsp;</td>
-                <td>&nbsp;</td>
-                <td><a id="btnAddExportProperty" href="javascript:void(0);"data-toggle="modal" data-target="#plusExport">
-                  <span class="plusIcon"></span></a></td>
-              </tr>
-              <tr class="hasSubLabel parent" id="row-7">
-                <td class="configLabel"><a href="javascript:void(0)" class="glyphicon-triangle-right"><span class="fontFamily">Import</span></a></td>
-                <td align="right">&nbsp;</td>
-                <td>&nbsp;</td>
-                <td>
-                  <a id="btnAddImportProperty" href="javascript:void(0);"data-toggle="modal" data-target="#plusImport">
-                    <span class="plusIcon"></span>
-                  </a>
-                </td>
-              </tr>
-              <tr class="hasSubLabel parent" id="row-5">
-                <td class="configLabel"><a href="javascript:void(0)" class="glyphicon-triangle-right"><span class="fontFamily">Advanced</span></a></td>
-                <td>&nbsp;</td>
-                <td>&nbsp;</td>
-                <td>&nbsp;</td>
-              </tr>
-              <tr class="child-row-5 subLabelRow">
-                <td class="configLabel">Heartbeat time out </td>
+                <tr class="hasSubLabel parent" id="row-2">
+                    <td width="44%" class="configLabel"><a href="javascript:void(0)" class="glyphicon-triangle-right"><span class="fontFamily">Auto Snapshots</span></a></td>
+                    <td width="40%" align="right"><input tabindex="3" type="checkbox" id="chkAutoSnapshot" ></td>
+                    <td width="8%" class="onOff" id="txtAutoSnapshot">On</td>
+                    <td width="8%">&nbsp;</td>
+                </tr>
+                <tr class="child-row-2 subLabelRow">
+                    <td class="configLabel">File Prefix</td>
+                    <td align="right">
+                        <form id="frmFilePrefix" action="" method="get" class="form-horizontal">
+                            <input id="txtFilePrefix" name="txtFilePrefix" type="text" value="" class="overviewInputText1">
+                            <label id="errorFilePrefix" for="txtFilePrefix" class="error ccErrorMsg" style="display: none;">This field is required</label>
+                        </form>
+                    </td>
+                    <td>&nbsp;</td>
+                    <td>&nbsp;</td>
+                </tr>
+                <tr class="child-row-2 subLabelRow">
+                    <td class="configLabel">Frequency </td>
+                    <td align="right"><div id="frequencySpan">
+                        <form id="frmFrequency" action="" method="get" class="form-horizontal">
+                            <input id="txtFrequency" name="txtFrequency" type="text" value="" class="overviewInputText">
+                            <select id="selFreqUnit"><option value="1">Hrs</option><option value="2">Min</option><option value="3">Sec</option></select>
+                            <label id="errorFrequency" for="txtFrequency" class="error ccErrorMsg" style="display: none;">This field is required</label>
+                        </form>
+                        </div>
+                    </td>
+                    <td id="txtFrequencyUnit">&nbsp;</td>
+                    <td>&nbsp;</td>
+                </tr>
+                <tr class="child-row-2 subLabelRow">
+                    <td class="configLabel">Retained </td>
+                    <td align="right">
+                        <form id="frmRetained" action="" method="get" class="form-horizontal">
+                            <input id="txtRetained" name="txtRetained" type="text" value="" class="overviewInputText">
+                            <label id="errorRetained" for="txtRetained" class="error ccErrorMsg" style="display: none;">This field is required</label>
+                        </form>
+                    </td>
+                    <td>Copies </td>
+                    <td>&nbsp;</td>
+                </tr>
+                <tr class="hasSubLabel parent" id="row-3">
+                    <td class="configLabel"><a href="javascript:void(0)" class="glyphicon-triangle-right"><span class="fontFamily">Command Logging</span></a></td>
+                    <td align="right"><input id="chkCommandLog" tabindex="4" type="checkbox" ></td>
+                    <td class="onOff" id="txtCommandLog">Off</td>
+                    <td>&nbsp;</td>
+                </tr>
+                <tr class="child-row-3 subLabelRow">
+                    <td class="configLabel">Log Frequency Time </td>
+                    <td id="commandlogfreqtime" align="right">
+                        <form id="frmLogFrequencyTime" action="" method="get" class="form-horizontal">
+                            <input id="txtLogFrequencyTime" name="txtLogFrequencyTime" type="text" value="" class="overviewInputText">
+                            <label id="errorLogFrequencyTime" for="txtLogFrequencyTime" class="error ccErrorMsg" style="display: none;">This field is required</label>
+                        </form>
+                    </td>
+                    <td>ms</td>
+                    <td>&nbsp;</td>
+                </tr>
+                <tr class="child-row-3 subLabelRow">
+                    <td class="configLabel">Log Frequency Transactions </td>
+                    <td id="commandlogfreqtxns" align="right">
+                        <form id="frmLogFreqTransaction" action="" method="get" class="form-horizontal">
+                            <input type="text" id="txtLogFreqTransaction" name="txtLogFreqTransaction" value="" class="overviewInputText1">
+                            <label id="errorLogFreqTransaction" for="txtLogFreqTransaction" class="error ccErrorMsg" style="display: none;">This field is required</label>
+                        </form>
+                    </td>
+                    <td>&nbsp;</td>
+                    <td>&nbsp;</td>
 
-                <td align="right" class="heartBeatTd">
-                  <form id="frmHeartBeatTimeout" action="" method="get" class="form-horizontal">
-                  <input id="txtHeartbeatTimeout" name="txtHeartbeatTimeout" type="text" value="" class="overviewInputText">
-                <label id="errorHeartbeatTimeout" for="txtHeartbeatTimeout" class="error ccErrorMsg" style="display: none;">This field is required</label>
-                    </form>
-                </td>
-                <td>s</td>
-                <td>&nbsp;</td>
-              </tr>
-              <tr class="child-row-5 subLabelRow">
-                <td class="configLabel">Query time out</td>
-                <td align="right" class="queryTimeOut">
-                  <form id="frmQueryTimeout" action="" method="get" class="form-horizontal">
-                  <input type="text" id="txtQueryTimeout" name="txtQueryTimeout" value="" class="overviewInputText">
-                <label id="errorQueryTimeout" for="txtQueryTimeout" class="error ccErrorMsg" style="display: none;">This field is required</label>
-                    </form>
-                </td>
-                <td>ms</td>
-                <td>&nbsp;</td>
-              </tr>
-              <tr class="child-row-5 subLabelRow">
-                <td class="configLabel">Max temp table memory</td>
-                <td  id="temptablesmaxsize" align="right">
-                  <form id="frmMaxTempTableMemory" action="" method="get" class="form-horizontal">
-                  <input id="txtMaxTempTableMemory" name="txtMaxTempTableMemory" type="text" value="" class="overviewInputText">
-                <label id="errortemptableMemory" for="txtMaxTempTableMemory" class="error ccErrorMsg" style="display: none;">This field is required</label>
-                    </form>
-                </td>
-                <td>MB</td>
-                <td>&nbsp;</td>
-              </tr>
-              <tr class="child-row-5 subLabelRow">
-                <td class="configLabel">Snapshot priority</td>
-                <td id="SnapshotPriority" align="right">
-                  <form id="frmSnapshotPriority" action="" method="get" class="form-horizontal">
-                  <input id="txtSnapshotPriority" name="txtSnapshotPriority" type="text" value="" class="overviewInputText">
-                <label id="errorSnapshotPriority" for="txtSnapshotPriority" class="error ccErrorMsg" style="display: none;">This field is required</label>
-                    </form>
-                </td>
-                <td>&nbsp;</td>
-                <td>&nbsp;</td>
-              </tr>
-              <tr class="child-row-5 subLabelRow">
-                <td class="configLabel">Memory Limit</td>
-                <td id="MemoryLimit" align="right">
-                  <form id="frmMemoryLimit" action="" method="get" class="form-horizontal">
-                  <input id="txtMemoryLimit" name="txtMemoryLimit" type="text" value="" class="overviewInputText">
-                <label id="errorMemoryLimit" for="txtMemoryLimit" class="error ccErrorMsg" style="display: none;">This field is required</label>
-                  </form>
-                </td>
-                <td><select id="selMemoryLimitUnit">
-                <option val="GB">GB</option>
-                <option val="%">%</option>
-                </select></td>
-                <td>&nbsp;</td>
-              </tr>
-              <tr class="child-row-5 subLabelRow diskLimitParentProp" id="row-51">
-               <td class="configLabel"><a href="javascript:void(0)" class="glyphicon-triangle-right"><span class="fontFamily">Disk Limit</span></a></td>
+                </tr>
+                <tr class="child-row-3 subLabelRow">
+                    <td class="configLabel">Log Segment Size</td>
+                    <td align="right">
+                        <form id="frmLogSegmentSize" action="" method="get" class="form-horizontal">
+                            <input id="txtLogSegmentSize" name="txtLogSegmentSize" type="text" value="" class="overviewInputText">
+                            <label id="errorLogSegmentSize" for="txtLogSegmentSize" class="error ccErrorMsg" style="display: none;">This field is required</label>
+                        </form>
+                    </td>
+                    <td>MB</td>
+                    <td>&nbsp;</td>
+                </tr>
+                <tr class="hasSubLabel parent" id="row-4">
+                    <td class="configLabel"><a href="javascript:void(0)" class="glyphicon-triangle-right"><span class="fontFamily">Export</span></a></td>
+                    <td align="right">&nbsp;</td>
+                    <td>
+                        <a id="btnAddExportProperty" href="javascript:void(0);"data-toggle="modal" data-target="#plusExport">
+                      <span class="plusIcon"></span></a>
+                    </td>
+                    <td>&nbsp;</td>
+                </tr>
+                <tr class="hasSubLabel parent" id="row-7">
+                    <td class="configLabel"><a href="javascript:void(0)" class="glyphicon-triangle-right"><span class="fontFamily">Import</span></a></td>
+                    <td align="right">&nbsp;</td>
+                    <td><a id="btnAddImportProperty" href="javascript:void(0);"data-toggle="modal" data-target="#plusImport">
+                            <span class="plusIcon"></span>
+                        </a></td>
+                    <td>&nbsp;</td>
+                </tr>
+                <tr class="hasSubLabel parent" id="row-8">
+                    <td class="configLabel"><a href="javascript:void(0)" class="glyphicon-triangle-right"><span class="fontFamily">SNMP</span></a></td>
+                    <td align="right">
+                        <a id="btnUpdateSNMP" href="javascript:void(0);"  data-target="#SNMPConfig">
+                            <div id="onOffIconSNMP" class="icheckbox_square-blue hover active onIconSNMP checked">
+                            </div>
+                        </a>
+                    </td>
+                    <td class="onOffSNMP" id="chkSNMPOnOffVal"width="10%">Off</td>
+                    <td>&nbsp;</td>
+                </tr>
+                <tr class="child-row-8 subLabelRow" style="display: table-row;">
+                    <td class="configLabel">Target</td>
+                    <td align="right" class="" id="tdTargetVal">
+                        192.168.2.102:8080
+                    </td>
+                    <td>&nbsp;</td>
+                    <td>&nbsp;</td>
+                </tr>
+                <tr class="child-row-8 subLabelRow" style="display: table-row;">
+                    <td class="configLabel">Community</td>
+                    <td align="right" class="" id="tdCommunityVal">
+                        Public
+                    </td>
+                    <td>&nbsp;</td>
+                    <td>&nbsp;</td>
+                  </tr>
+                <tr class="child-row-8 subLabelRow" style="display: table-row;">
+                    <td class="configLabel">Username</td>
+                    <td align="right" class="" id="tdUsernameVal">
+                        pmanandhar
+                    </td>
+                    <td>&nbsp;</td>
+                    <td>&nbsp;</td>
+                </tr>
+                <tr class="child-row-8 subLabelRow" style="display: table-row;">
+                    <td class="configLabel">Authentication Protocol</td>
+                    <td align="right" class=" " id="tdAuthProtocolVal">
+                        SHA
+                    </td>
+                    <td>&nbsp;</td>
+                    <td>&nbsp;</td>
+                </tr>
+                <tr class="child-row-8 subLabelRow" style="display: table-row;">
+                    <td class="configLabel">Authentication Key</td>
+                    <td align="right" class="" id="tdAuthKeyVal">
+                        sha1
+                    </td>
+                    <td>&nbsp;</td>
+                    <td>&nbsp;</td>
+                </tr>
+                <tr class="child-row-8 subLabelRow" style="display: table-row;">
+                    <td class="configLabel">Privacy Protocol</td>
+                    <td align="right" class="" id="tdPrivacyProtocolVal">
+                        DES
+                    </td>
+                    <td>&nbsp;</td>
+                    <td>&nbsp;</td>
+                </tr>
+                <tr class="child-row-8 subLabelRow" style="display: table-row;">
+                    <td class="configLabel">Privacy Key</td>
+                    <td align="right" class="" id="tdPrivacyKeyVal">
+                        des1
+                    </td>
+                    <td>&nbsp;</td>
+                    <td>&nbsp;</td>
+                </tr>
+                <tr class="hasSubLabel parent" id="row-5">
+                    <td class="configLabel"><a href="javascript:void(0)" class="glyphicon-triangle-right"><span class="fontFamily">Advanced</span></a></td>
+                    <td>&nbsp;</td>
+                    <td>&nbsp;</td>
+                    <td>&nbsp;</td>
+                </tr>
+                <tr class="child-row-5 subLabelRow">
+                    <td class="configLabel">Heartbeat time out </td>
+
+                    <td align="right" class="heartBeatTd">
+                        <form id="frmHeartBeatTimeout" action="" method="get" class="form-horizontal">
+                            <input id="txtHeartbeatTimeout" name="txtHeartbeatTimeout" type="text" value="" class="overviewInputText">
+                            <label id="errorHeartbeatTimeout" for="txtHeartbeatTimeout" class="error ccErrorMsg" style="display: none;">This field is required</label>
+                       </form>
+                    </td>
+                    <td>s</td>
+                    <td>&nbsp;</td>
+                </tr>
+                <tr class="child-row-5 subLabelRow">
+                    <td class="configLabel">Query time out</td>
+                    <td align="right" class="queryTimeOut">
+                        <form id="frmQueryTimeout" action="" method="get" class="form-horizontal">
+                            <input type="text" id="txtQueryTimeout" name="txtQueryTimeout" value="" class="overviewInputText">
+                            <label id="errorQueryTimeout" for="txtQueryTimeout" class="error ccErrorMsg" style="display: none;">This field is required</label>
+                        </form>
+                    </td>
+                    <td>ms</td>
+                    <td>&nbsp;</td>
+                </tr>
+                <tr class="child-row-5 subLabelRow">
+                    <td class="configLabel">Max temp table memory</td>
+                    <td  id="temptablesmaxsize" align="right">
+                        <form id="frmMaxTempTableMemory" action="" method="get" class="form-horizontal">
+                            <input id="txtMaxTempTableMemory" name="txtMaxTempTableMemory" type="text" value="" class="overviewInputText">
+                            <label id="errortemptableMemory" for="txtMaxTempTableMemory" class="error ccErrorMsg" style="display: none;">This field is required</label>
+                        </form>
+                    </td>
+                    <td>MB</td>
+                    <td>&nbsp;</td>
+                </tr>
+                <tr class="child-row-5 subLabelRow">
+                    <td class="configLabel">Snapshot priority</td>
+                    <td id="SnapshotPriority" align="right">
+                        <form id="frmSnapshotPriority" action="" method="get" class="form-horizontal">
+                            <input id="txtSnapshotPriority" name="txtSnapshotPriority" type="text" value="" class="overviewInputText">
+                            <label id="errorSnapshotPriority" for="txtSnapshotPriority" class="error ccErrorMsg" style="display: none;">This field is required</label>
+                        </form>
+                    </td>
+                    <td>&nbsp;</td>
+                    <td>&nbsp;</td>
+                </tr>
+                <tr class="child-row-5 subLabelRow">
+                    <td class="configLabel">Memory Limit</td>
+                    <td id="MemoryLimit" align="right">
+                        <form id="frmMemoryLimit" action="" method="get" class="form-horizontal">
+                            <input id="txtMemoryLimit" name="txtMemoryLimit" type="text" value="" class="overviewInputText">
+                            <label id="errorMemoryLimit" for="txtMemoryLimit" class="error ccErrorMsg" style="display: none;">This field is required</label>
+                        </form>
+                    </td>
+                    <td><select id="selMemoryLimitUnit">
+                        <option val="GB">GB</option>
+                        <option val="%">%</option>
+                    </select></td>
+                    <td>&nbsp;</td>
+                </tr>
+                <tr class="child-row-5 subLabelRow diskLimitParentProp" id="row-51">
+                    <td class="configLabel"><a href="javascript:void(0)" class="glyphicon-triangle-right"><span class="fontFamily">Disk Limit</span></a></td>
             
-                <td id="DiskLimit" align="right"> </td>
-                <td>&nbsp;</td>
-                <td><a data-target="#diskLimit" data-toggle="modal" href="javascript:void(0);" id="btnEditDiskLimit" class="">
-                  <span class="editIcon"></span></a></td>
-            
-              </tr>
+                    <td id="DiskLimit" align="right"> </td>
+                    <td>&nbsp;</td>
+                    <td><a data-target="#diskLimit" data-toggle="modal" href="javascript:void(0);" id="btnEditDiskLimit" class="">
+                    <span class="editIcon"></span></a></td>
+                </tr>
             </table>
             </div>
             
@@ -1323,6 +1382,99 @@ $("[rel=bottom]").tooltip({ placement: 'bottom'});
   </div>
 </div>
 <!-- Connection Source End -->
+
+<!-- SNMP table -->
+<div id="SNMPConfig" class="modal fade" role="dialog" data-id="">
+    <div class="modal-dialog modal-dialog-center connectionSourceModel">
+        <!-- Modal content-->
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal">&times;</button>
+                <h4 class="modal-title">SNMP Configuration</h4>
+                <div class="delete-connection" id="btnDeleteSNMP"><span class="icon-delete"></span>Delete this configuration</div>
+            </div>
+            <div class="modal-body">
+                <form id="frmSNMPConfig" method="get" action="" novalidate style="overflow:auto;">
+                    <div class="configWrapper-modal">
+                        <table width="100%" cellpadding="0" cellspacing="0" class="snmpTblPopUp">
+                            <tr>
+                                <td width="5%">Enabled<span class="redC">*</span></td>
+                                <td id="tdSNMP" width="10%"><input tabindex="3" type="checkbox" id="chkSNMP" name="chkSNMP" ><span id="onOffSnmp" class="onOff onOffSNMPPopup">On</span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td width="5%">Target<span class="redC">*</span></td>
+                                <td id="trTarget" width="10%" align="">
+                                    <input id="txtTarget" name="txtTarget" type="text" class="overviewInputTextSNMP">
+                                    <label id="errorTarget" for="txtTarget" class="error ccErrorMsg" style="display: none;"></label>
+                                </td>
+                            </tr>
+                            <tr id="trCommunity">
+                                <td>Community</td>
+                                <td id="tdCommunity" width="10%" align="">
+                                    <input id="txtCommunity" name="txtCommunity" type="text" class="overviewInputTextSNMP">
+                                    <label id="errorCommunity" for="txtCommunity" class="error ccErrorMsg" style="display: none;"></label>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>Username</td>
+                                <td id="tdUsername" width="10%">
+                                    <input type="text" id="txtUsername" name="txtUsername" value="" class="overviewInputTextSNMP">
+                                    <label id="errorUsername" for="txtUsername" class="error ccErrorMsg" style="display: none;"></label>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>Authentication Protocol</td>
+                                <td id="tdAuthProtocol">
+                                    <select id="selectAuthProtocol" class="snmpSelect">
+                                        <option val="SHA">SHA</option>
+                                        <option val="MD5">MD5</option>
+                                        <option val="NoAuth">NoAuth</option>
+                                    </select>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>Authentication Key</td>
+                                <td align="" width="10%">
+                                    <input type="text" id="txtAuthKey" name="txtAuthKey" value="" class="overviewInputTextSNMP">
+                                    <label id="errorAuthKey" for="txtAuthKey" class="error ccErrorMsg" style="display: none;"></label>
+                                </td>
+
+                            </tr>
+                            <tr>
+                                <td>Privacy Protocol</td>
+                                <td align="" width="10%">
+                                    <select id="selectPrivacyProtocol" class="snmpSelect">
+                                        <option val="AES">AES</option>
+                                        <option val="DES">DES</option>
+                                        <option val="NoPriv">NoPriv</option>
+                                        <option val="3DES">3DES</option>
+                                        <option val="AES192">AES192</option>
+                                        <option val="AES256">AES256</option>
+                                    </select>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>Privacy Key</td>
+                                <td align="" width="10%">
+                                    <input type="text" id="txtPrivacyKey" name="txtPrivacyKey" value="" class="overviewInputTextSNMP">
+                                    <label id="errorPrivacyKey" for="txtPrivacyKey" class="error ccErrorMsg" style="display: none;">This field is required</label>
+                                </td>
+                            </tr>
+                        </table>
+
+                  </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+            <button id="btnSaveSNMP" type="button" class="btn" data-dismiss="modal">Save</button>
+            <button type="button" class="btn btn-gray" data-dismiss="modal">Cancel</button>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- SNMP End -->
+
 <!-- Disk Limit -->
 <div id="diskLimit" class="modal fade" role="dialog" data-id="">
   <div class="modal-dialog modal-dialog-center">

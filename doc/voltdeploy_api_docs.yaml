@@ -985,13 +985,6 @@ definitions:
     description: Schema of object passed while updating the deployment.
     type: object
     properties:
-      admin-mode:
-        type: object
-        properties:
-          adminstartup:
-            type: boolean
-          port:
-            type: integer
       cluster:
         type: object
         properties:
@@ -1205,6 +1198,26 @@ definitions:
               maxsize:
                 type: integer
 
+      snmp:
+        type: object
+        properties:
+          enabled:
+            type: boolean
+          target:
+            type: string
+          community:
+            type: string
+          username:
+            type: string
+          authprotocol:
+            type: string
+          authkey:
+            type: string
+          privacyprotocol:
+            type: string
+          privacykey:
+            type: string
+
   deploymentResponse:
     description: Schema of deployment object contained in the response  of deployment API.
     type: object
@@ -1212,13 +1225,6 @@ definitions:
       deployment:
         type: object
         properties:
-          admin-mode:
-            type: object
-            properties:
-              adminstartup:
-                type: boolean
-              port:
-                type: integer
           cluster:
             type: object
             properties:
@@ -1446,6 +1452,26 @@ definitions:
                   maxsize:
                     type: integer
 
+          snmp:
+            type: object
+            properties:
+              enabled:
+                type: boolean
+              target:
+                type: string
+              community:
+                type: string
+              username:
+                type: string
+              authprotocol:
+                type: string
+              authkey:
+                type: string
+              privacyprotocol:
+                type: string
+              privacykey:
+                type: string
+
           users:
             type: object
             properties:
@@ -1514,13 +1540,6 @@ definitions:
             deployment:
               type: object
               properties:
-                admin-mode:
-                  type: object
-                  properties:
-                    adminstartup:
-                      type: boolean
-                    port:
-                      type: integer
                 cluster:
                   type: object
                   properties:
@@ -1716,7 +1735,7 @@ definitions:
                       properties:
                         timeout:
                           type: integer
-                
+
                     resourcemonitor:
                       type: object
                       properties:
@@ -1725,7 +1744,7 @@ definitions:
                           properties:
                             feature:
                               type: array
-                              items: 
+                              items:
                                 type: object
                                 properties:
                                   name:
@@ -1735,41 +1754,61 @@ definitions:
                         memorylimit:
                           type: object
                           properties:
-                            size: 
+                            size:
                               type: string
-                              
+
                     snapshot:
                       type: object
                       properties:
                         priority:
                           type: integer
-                    
+
                     temptables:
                       type: object
                       properties:
                         maxsize:
                           type: integer
-                          
+
+                snmp:
+                  type: object
+                  properties:
+                    enabled:
+                      type: boolean
+                    target:
+                      type: string
+                    community:
+                      type: string
+                    username:
+                      type: string
+                    authprotocol:
+                      type: string
+                    authkey:
+                      type: string
+                    privacyprotocol:
+                      type: string
+                    privacykey:
+                      type: string
+
                 users:
                   type: object
                   properties:
                     user:
                       type: array
-                      items: 
+                      items:
                         type: object
                         properties:
-                          name: 
+                          name:
                             type: string
                           plaintext:
                             type: string
-                          roles: 
-                            type: string  
+                          roles:
+                            type: string
       members:
         type: array
         items:
           type: object
           properties:
-            name: 
+            name:
               type: string
             hostname:
               type: string
@@ -1796,8 +1835,4 @@ definitions:
             replication-listener:
               type: string
             zookeeper-listener:
-              type: string                    
-        
-          
-        
-      
+              type: string

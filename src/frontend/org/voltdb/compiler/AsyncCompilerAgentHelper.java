@@ -30,6 +30,7 @@ import org.voltdb.common.Constants;
 import org.voltdb.compiler.ClassMatcher.ClassNameMatchStatus;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
+import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
@@ -203,6 +204,10 @@ public class AsyncCompilerAgentHelper
                 retval.errorMsg = "Unable to update deployment configuration: Error parsing deployment string";
                 return retval;
             }
+            if (work.isPromotion && work.onReplica) {
+                assert dt.getDr().getRole() == DrRoleType.REPLICA;
+                dt.getDr().setRole(DrRoleType.MASTER);
+            }
 
             result = CatalogUtil.compileDeployment(newCatalog, dt, false);
             if (result != null) {
@@ -213,9 +218,6 @@ public class AsyncCompilerAgentHelper
             //In non legacy mode discard the path element.
             if (!VoltDB.instance().isRunningWithOldVerbs()) {
                 dt.setPaths(null);
-                // set the admin-startup mode to false and fetch update the deployment string from
-                // updated deployment object
-                dt.getAdminMode().setAdminstartup(false);
             }
             //Always get deployment after its adjusted.
             retval.deploymentString = CatalogUtil.getDeployment(dt, true);

@@ -27,11 +27,7 @@ SERVERS="localhost"
 
 LOG4J="$VOLTDB_VOLTDB/log4j.xml"
 
-# CentOS/Red Hat have a very old python as the default
-# look for 2.6 or 2.7 explicitly
-PYTHON=$(which python2.7)
-test -z "$PYTHON" && PYTHON=python2.6
-GENERATE="$PYTHON scripts/generate.py"
+GENERATE="python scripts/generate.py"
 
 # remove build artifacts
 function clean() {
@@ -40,6 +36,7 @@ function clean() {
 
 # compile the source code for procedures and the client into jarfiles
 function jars() {
+    $GENERATE
     # compile java source
     javac -classpath $APPCLASSPATH src/$APPNAME/*.java
     # build procedure and client jars

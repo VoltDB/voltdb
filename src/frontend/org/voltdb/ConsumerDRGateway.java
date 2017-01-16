@@ -17,21 +17,41 @@
 
 package org.voltdb;
 
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ExecutionException;
+
+import org.voltdb.ProducerDRGateway.MeshMemberInfo;
+
 // Interface through which the outside world can interact with the consumer side
 // of DR. Currently, there's not much to do here, since the subsystem is
 // largely self-contained
 public interface ConsumerDRGateway extends Promotable {
 
-    void updateCatalog(CatalogContext catalog);
+    /**
+     * Notify the consumer of catalog updates.
+     * @param catalog             The new catalog.
+     * @param newConnectionSource The new connection source if changed, or null if not.
+     */
+    void updateCatalog(CatalogContext catalog, String newConnectionSource);
 
-    DRRoleStats.State getState();
+    Map<Byte, DRRoleStats.State> getStates();
 
-    void initialize(boolean resumeReplication);
+    void initialize(boolean resumeReplication, List<MeshMemberInfo> expectedClusterMembers);
 
-    void shutdown(boolean blocking) throws InterruptedException;
+    void shutdown(final boolean blocking) throws InterruptedException, ExecutionException;
 
-    void restart() throws InterruptedException;
+    void restart() throws InterruptedException, ExecutionException;
 
     DRConsumerMpCoordinator getDRConsumerMpCoordinator();
 
+    void clusterUnrecoverable(byte clusterId, Throwable t);
+
+    void queueStartCursors(final MeshMemberInfo newMeshMember);
+
+    void producerTopologyUpdated(final MeshMemberInfo existingCluster);
+
+    void startConsumerDispatcher(final MeshMemberInfo member, final boolean awaitProducerSnapshot);
+
+    void addLocallyLedPartition(int partitionId);
 }
