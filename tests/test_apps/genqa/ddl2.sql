@@ -69,6 +69,3 @@ CREATE STREAM export_done_table PARTITION ON COLUMN txnid
 CREATE PROCEDURE FROM CLASS genqa2.procedures.JiggleSkinnyExportSinglePartition;
 CREATE PROCEDURE FROM CLASS genqa2.procedures.JiggleExportSinglePartition;
 CREATE PROCEDURE FROM CLASS genqa2.procedures.JiggleExportDoneTable;
-
-PARTITION PROCEDURE JiggleSkinnyExportSinglePartition
-  ON TABLE export_skinny_partitioned_table2 COLUMN rowid;

@@ -109,6 +109,3 @@ CREATE PROCEDURE FROM CLASS genqa2.procedures.JiggleExportSinglePartition;
 CREATE PROCEDURE FROM CLASS genqa2.procedures.JiggleExportGroupSinglePartition;
 CREATE PROCEDURE FROM CLASS genqa2.procedures.JiggleExportDoneTable;
 CREATE PROCEDURE FROM CLASS genqa2.procedures.JiggleExportGroupDoneTable;
-
-PARTITION PROCEDURE JiggleSkinnyExportSinglePartition
-  ON TABLE export_skinny_partitioned_table2 COLUMN rowid;
