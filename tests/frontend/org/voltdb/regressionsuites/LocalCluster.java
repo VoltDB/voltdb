@@ -137,7 +137,7 @@ public class LocalCluster extends VoltServerConfig {
     }
 
     // Produce a (presumably) available IP port number.
-    public final PortGeneratorForTest portGenerator = new PortGeneratorForTest();
+    public static final PortGeneratorForTest portGenerator = new PortGeneratorForTest();
     private InternalPortGeneratorForTest internalPortGenerator;
     private int numberOfCoordinators = 1;
     private String m_voltdbroot = "";
