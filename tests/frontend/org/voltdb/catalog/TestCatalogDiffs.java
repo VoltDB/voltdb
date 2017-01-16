@@ -1176,19 +1176,6 @@ public class TestCatalogDiffs extends TestCase {
         verifyDiffIfEmptyTable(catOriginal, catUpdated);
     }
 
-//    public void testChangeTableReplicationSettingOfExportTable() throws IOException {
-//        String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
-//
-//        VoltProjectBuilder builder = new VoltProjectBuilder();
-//        builder.addLiteralSchema("\nCREATE STREAM A PARTITION ON COLUMN C1 (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
-//        builder.addStmtProcedure("the_requisite_procedure", "insert into A values (?, ?);");
-//        assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "elastic1a.jar"));
-//        Catalog catOriginal = catalogForJar(testDir +  File.separator + "elastic1a.jar");
-//
-//        assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "elastic2a.jar"));
-//        Catalog catUpdated = catalogForJar(testDir + File.separator + "elastic2a.jar");
-//        verifyDiffRejected(catOriginal, catUpdated);
-//    }
     public void testDRRoleChange() throws Exception {
         final String ddl = "CREATE TABLE A (C1 BIGINT NOT NULL); DR TABLE A;";
 
@@ -1248,9 +1235,6 @@ public class TestCatalogDiffs extends TestCase {
         jarPath.delete();
         return catalog;
     }
-
-    public void testChangeTableReplicationSettingOfExportTable() throws IOException {
-        String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
 
     public void testChangeCompatibleWithElasticNoChange() throws IOException {
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
