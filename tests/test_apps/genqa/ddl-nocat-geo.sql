@@ -197,9 +197,6 @@ CREATE PROCEDURE FROM CLASS genqa.procedures.WaitSinglePartition;
 CREATE PROCEDURE FROM CLASS genqa.procedures.WaitMultiPartition;
 CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleExportDoneTable;
 
-PARTITION PROCEDURE JiggleSkinnyExportSinglePartition
-  ON TABLE export_skinny_partitioned_table COLUMN rowid;
-
 -- CREATE PROCEDURE SelectwithLimit as select * from export_mirror_partitioned_table where rowid between ? and ? order by rowid limit ?;
 
 

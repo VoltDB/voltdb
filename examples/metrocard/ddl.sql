@@ -77,7 +77,7 @@ CREATE TABLE activity(
 );
 PARTITION TABLE activity ON COLUMN card_id;
 
-CREATE TABLE card_alert_export PARTITION ON COLUMN card_id EXPORT TO TARGET alertstream (
+CREATE STREAM card_alert_export PARTITION ON COLUMN card_id EXPORT TO TARGET alertstream (
   card_id               INTEGER        NOT NULL,
   export_time           BIGINT         NOT NULL,
   station_name          VARCHAR(25)    NOT NULL,
@@ -126,9 +126,8 @@ CREATE PROCEDURE FROM CLASS metrocard.GetBusiestStationInLastMinute;
 CREATE PROCEDURE FROM CLASS metrocard.GetSwipesPerSecond;
 
 
-CREATE PROCEDURE ReplenishCard AS
+CREATE PROCEDURE ReplenishCard PARTITION ON TABLE cards COLUMN card_id PARAMETER 1 AS
 UPDATE cards SET balance = balance + ?
 WHERE card_id = ? AND card_type = 0;
-PARTITION PROCEDURE ReplenishCard ON TABLE cards COLUMN card_id PARAMETER 1;
 
 END_OF_BATCH
