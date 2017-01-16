@@ -50,6 +50,7 @@ import org.voltdb.compiler.deploymentfile.ConnectionType;
 import org.voltdb.compiler.deploymentfile.ConsistencyType;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.DiskLimitType;
+import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.compiler.deploymentfile.DrType;
 import org.voltdb.compiler.deploymentfile.ExportConfigurationType;
 import org.voltdb.compiler.deploymentfile.ExportType;
@@ -316,6 +317,7 @@ public class VoltProjectBuilder {
 
     private String m_drMasterHost;
     private Boolean m_drProducerEnabled = null;
+    private DrRoleType m_drRole = DrRoleType.MASTER;
 
     public VoltProjectBuilder setQueryTimeout(int target) {
         m_queryTimeout = target;
@@ -737,6 +739,10 @@ public class VoltProjectBuilder {
     public void setDrProducerDisabled()
     {
         m_drProducerEnabled = false;
+    }
+
+    public void setDrReplica() {
+        m_drRole = DrRoleType.REPLICA;
     }
 
     /**
@@ -1226,6 +1232,7 @@ public class VoltProjectBuilder {
         DrType dr = factory.createDrType();
         deployment.setDr(dr);
         dr.setListen(m_drProducerEnabled);
+        dr.setRole(m_drRole);
         if (m_drMasterHost != null && !m_drMasterHost.isEmpty()) {
             ConnectionType conn = factory.createConnectionType();
             dr.setConnection(conn);

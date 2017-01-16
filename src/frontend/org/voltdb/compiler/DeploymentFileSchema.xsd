@@ -466,7 +466,16 @@
             </xs:restriction>
         </xs:simpleType>
     </xs:attribute>
+    <xs:attribute name="role" type="drRoleType" default="master" />
   </xs:complexType>
+
+  <!-- DR cluster role -->
+  <xs:simpleType name="drRoleType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="master"/>
+      <xs:enumeration value="replica"/>
+    </xs:restriction>
+  </xs:simpleType>
 
   <xs:complexType name="connectionType">
     <xs:attribute name="source" use="required">

@@ -35,7 +35,7 @@ server_list_help = ('{hostname-or-ip[,...]}, '
         VOLT.StringListOption('-H', '--host', 'server_list', server_list_help, default = ''),
         VOLT.IntegerOption('-c', '--count', 'hostcount', 'number of hosts in the cluster'),
         VOLT.StringOption('-D', '--dir', 'directory_spec', voltdbroot_help, default = None),
-        VOLT.BooleanOption('-r', '--replica', 'replica', 'start replica cluster', default = False),
+        VOLT.BooleanOption('-r', '--replica', 'replica', 'start replica cluster (deprecated, please use role="replica" in the deployment file)', default = False),
         VOLT.BooleanOption('-A', '--add', 'enableadd', 'allows the server to elastically expand the cluster if the cluster is already complete', default = False),
         VOLT.IntegerOption('-s', '--sitesperhost', 'sitesperhost', None),
     ),
