@@ -80,6 +80,9 @@ public class TestLeaderAppointer extends ZKTestBase {
     @Before
     public void setUp() throws Exception
     {
+        final VoltDBInterface mock = mock(VoltDBInterface.class);
+        when(mock.getReplicationRole()).thenReturn(ReplicationRole.NONE);
+        VoltDB.replaceVoltDBInstanceForTest(mock);
         VoltDB.ignoreCrash = false;
         VoltDB.wasCrashCalled = false;
         setUpZK(NUM_AGREEMENT_SITES);

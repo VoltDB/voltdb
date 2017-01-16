@@ -1955,6 +1955,7 @@ public abstract class CatalogUtil {
             ConnectionType drConnection = dr.getConnection();
             cluster.setDrproducerenabled(dr.isListen());
             cluster.setDrproducerport(dr.getPort());
+            cluster.setDrrole(dr.getRole().name().toLowerCase());
 
             // Backward compatibility to support cluster id in DR tag
             if (clusterType.getId() == null && dr.getId() != null) {

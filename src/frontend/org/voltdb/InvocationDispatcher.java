@@ -428,7 +428,7 @@ public final class InvocationDispatcher {
                 return null;
             }
             else if ("@Promote".equals(procName)) {
-                return dispatchPromote(catProc, task, handler, ccxn);
+                return dispatchPromote(task, handler, ccxn, user, useDdlSchema);
             }
             else if ("@SnapshotStatus".equals(procName)) {
                 // SnapshotStatus is really through @Statistics now, but preserve the
@@ -1011,7 +1011,8 @@ public final class InvocationDispatcher {
     }
 
     final void dispatchUpdateApplicationCatalog(StoredProcedureInvocation task,
-            boolean useDdlSchema, Connection ccxn, AuthSystem.AuthUser user, boolean isAdmin)
+            boolean useDdlSchema, boolean isPromotion,
+            Connection ccxn, AuthSystem.AuthUser user, boolean isAdmin)
     {
         ParameterSet params = task.getParams();
         final Object [] paramArray = params.toArray();
@@ -1044,7 +1045,7 @@ public final class InvocationDispatcher {
                     VoltDB.instance().getReplicationRole() == ReplicationRole.REPLICA,
                     useDdlSchema,
                     m_adhocCompletionHandler, user,
-                    null, -1L, -1L
+                    null, isPromotion, -1L, -1L
                     ));
 
         m_mailbox.send(m_plannerSiteId, work);
@@ -1054,14 +1055,14 @@ public final class InvocationDispatcher {
             InvocationClientHandler handler, Connection ccxn, AuthSystem.AuthUser user,
             boolean useDdlSchema)
     {
-        dispatchUpdateApplicationCatalog(task, useDdlSchema, ccxn, user, handler.isAdmin());
+        dispatchUpdateApplicationCatalog(task, useDdlSchema, false, ccxn, user, handler.isAdmin());
         return null;
     }
 
-    private final ClientResponseImpl dispatchPromote(Procedure sysProc,
-            StoredProcedureInvocation task,
-            InvocationClientHandler handler,
-            Connection ccxn)
+    private final ClientResponseImpl dispatchPromote(StoredProcedureInvocation task,
+                                                     InvocationClientHandler handler,
+                                                     Connection ccxn, AuthSystem.AuthUser user,
+                                                     boolean useDdlSchema)
     {
         if (VoltDB.instance().getReplicationRole() == ReplicationRole.NONE)
         {
@@ -1070,16 +1071,18 @@ public final class InvocationDispatcher {
                     task.clientHandle);
         }
 
-        // This only happens on one node so we don't need to pick a leader.
-        createTransaction(
-                handler.connectionId(),
-                task,
-                sysProc.getReadonly(),
-                sysProc.getSinglepartition(),
-                sysProc.getEverysite(),
-                0,//No partition needed for multi-part
-                task.getSerializedSize(),
-                System.nanoTime());
+        LocalObjectMessage work = new LocalObjectMessage(
+            new CatalogChangeWork(m_siteId,
+                                  task.clientHandle, ccxn.connectionId(), ccxn.getHostnameAndIPAndPort(),
+                                  handler.isAdmin(), ccxn, null, null,
+                                  "@UpdateApplicationCatalog",
+                                  VoltDB.instance().getReplicationRole() == ReplicationRole.REPLICA,
+                                  useDdlSchema,
+                                  m_adhocCompletionHandler, user,
+                                  null, true, -1L, -1L
+            ));
+
+        m_mailbox.send(m_plannerSiteId, work);
 
         return null;
     }
