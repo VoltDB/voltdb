@@ -791,25 +791,14 @@ public class TestCatalogUtil extends TestCase {
             "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
             "<deployment>" +
             "   <cluster hostcount='3' kfactor='1' sitesperhost='2'/>" +
-            "   <partition-detection enabled='true'>" +
-            "   </partition-detection>" +
-            "</deployment>";
-
-        final String ppdEnabledWithPrefix =
-            "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
-            "<deployment>" +
-            "   <cluster hostcount='3' kfactor='1' sitesperhost='2'/>" +
-            "   <partition-detection enabled='true'>" +
-            "      <snapshot prefix='testPrefix'/>" +
-            "   </partition-detection>" +
+            "   <partition-detection enabled='true' />" +
             "</deployment>";
 
         final String ppdDisabledNoPrefix =
             "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
             "<deployment>" +
             "   <cluster hostcount='3' kfactor='1' sitesperhost='2'/>" +
-            "   <partition-detection enabled='false'>" +
-            "   </partition-detection>" +
+            "   <partition-detection enabled='false' />" +
             "</deployment>";
 
         final File tmpNoElement = VoltProjectBuilder.writeStringToTempFile(noElement);
@@ -817,7 +806,6 @@ public class TestCatalogUtil extends TestCase {
         assertTrue("Deployment file failed to parse: " + msg, msg == null);
         Cluster cluster = catalog.getClusters().get("cluster");
         assertTrue(cluster.getNetworkpartition());
-        assertEquals("partition_detection", cluster.getFaultsnapshots().get("CLUSTER_PARTITION").getPrefix());
 
         setUp();
         final File tmpEnabledDefault = VoltProjectBuilder.writeStringToTempFile(ppdEnabledDefaultPrefix);
@@ -825,15 +813,6 @@ public class TestCatalogUtil extends TestCase {
         assertTrue("Deployment file failed to parse: " + msg, msg == null);
         cluster = catalog.getClusters().get("cluster");
         assertTrue(cluster.getNetworkpartition());
-        assertEquals("partition_detection", cluster.getFaultsnapshots().get("CLUSTER_PARTITION").getPrefix());
-
-        setUp();
-        final File tmpEnabledPrefix = VoltProjectBuilder.writeStringToTempFile(ppdEnabledWithPrefix);
-        msg = CatalogUtil.compileDeployment(catalog, tmpEnabledPrefix.getPath(), false);
-        assertTrue("Deployment file failed to parse: " + msg, msg == null);
-        cluster = catalog.getClusters().get("cluster");
-        assertTrue(cluster.getNetworkpartition());
-        assertEquals("testPrefix", cluster.getFaultsnapshots().get("CLUSTER_PARTITION").getPrefix());
 
         setUp();
         final File tmpDisabled = VoltProjectBuilder.writeStringToTempFile(ppdDisabledNoPrefix);
