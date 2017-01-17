@@ -990,6 +990,10 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         return m_purpose == FOR_GROUPING;
     }
 
+    public List<Boolean> getCompareNotDistinctFlags() {
+        return m_compareNotDistinct;
+    }
+
     public void setEliminatedPostFilters(List<AbstractExpression> exprs) {
         for (AbstractExpression expr : exprs) {
             m_eliminatedPostFilterExpressions.add(expr.clone());

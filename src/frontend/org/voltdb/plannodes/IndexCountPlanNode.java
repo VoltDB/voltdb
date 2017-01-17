@@ -155,6 +155,10 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         return m_skip_null_predicate != null;
     }
 
+    public List<Boolean> getCompareNotDistinctFlags() {
+        return m_compareNotDistinct;
+    }
+
     private void setSkipNullPredicate(boolean isReverseScan) {
         int nullExprIndex;
         if (isReverseScan) {
