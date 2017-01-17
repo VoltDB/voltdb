@@ -30,6 +30,8 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.NavigableSet;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -97,6 +99,8 @@ import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.base.Predicate;
 import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.common.base.Throwables;
+import com.google_voltpatches.common.collect.ImmutableSortedSet;
+import com.google_voltpatches.common.collect.Sets;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 
 /**
@@ -345,7 +349,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         }
                         sslEngine.setUseClientMode(false);
                         sslEngine.setNeedClientAuth(false);
-                        sslEngine.setEnabledCipherSuites(SSLConfiguration.ENABLED_CIPHERS);
+
+                        NavigableSet<String> available = ImmutableSortedSet.copyOf(sslEngine.getEnabledCipherSuites());
+                        Set<String> intersection = Sets.intersection(SSLConfiguration.PREFERRED_CIPHERS, available);
+                        if (intersection.isEmpty()) {
+                            hostLog.warn("Preferred cipher suites are not available");
+                            intersection = available;
+                        }
+                        sslEngine.setEnabledCipherSuites(intersection.toArray(new String[0]));
                         // blocking needs to be false for handshaking.
                         boolean handshakeStatus;
 

@@ -28,12 +28,15 @@ import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.security.UnrecoverableKeyException;
 import java.security.cert.CertificateException;
+import java.util.NavigableSet;
 
 import javax.net.ssl.KeyManager;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
+
+import com.google_voltpatches.common.collect.ImmutableSortedSet;
 
 /**
  * Code common to ServerSSLEngineFactory and ClientSSLEngineFactory.
@@ -45,22 +48,23 @@ public class SSLConfiguration {
     public static final String TRUSTSTORE_CONFIG_PROP = "trustStore";
     public static final String TRUSTSTORE_PASSWORD_CONFIG_PROP = "trustStorePassword";
 
-    public static final String [] ENABLED_CIPHERS = new String[] {
-            "TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384",
-            "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256",
-            "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384",
-            "TLS_RSA_WITH_AES_256_GCM_SHA384",
-            "TLS_ECDH_ECDSA_WITH_AES_256_GCM_SHA384",
-            "TLS_ECDH_RSA_WITH_AES_256_GCM_SHA384",
-            "TLS_DHE_RSA_WITH_AES_256_GCM_SHA384",
-            "TLS_DHE_DSS_WITH_AES_256_GCM_SHA384",
-            "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
-            "TLS_RSA_WITH_AES_128_GCM_SHA256",
-            "TLS_ECDH_ECDSA_WITH_AES_128_GCM_SHA256",
-            "TLS_ECDH_RSA_WITH_AES_128_GCM_SHA256",
-            "TLS_DHE_RSA_WITH_AES_128_GCM_SHA256",
-            "TLS_DHE_DSS_WITH_AES_128_GCM_SHA256"
-    };
+    public static NavigableSet<String> PREFERRED_CIPHERS = ImmutableSortedSet.<String>naturalOrder()
+            .add("TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384")
+            .add("TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256")
+            .add("TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384")
+            .add("TLS_RSA_WITH_AES_256_GCM_SHA384")
+            .add("TLS_ECDH_ECDSA_WITH_AES_256_GCM_SHA384")
+            .add("TLS_ECDH_RSA_WITH_AES_256_GCM_SHA384")
+            .add("TLS_DHE_RSA_WITH_AES_256_GCM_SHA384")
+            .add("TLS_DHE_DSS_WITH_AES_256_GCM_SHA384")
+            .add("TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256")
+            .add("TLS_RSA_WITH_AES_128_GCM_SHA256")
+            .add("TLS_ECDH_ECDSA_WITH_AES_128_GCM_SHA256")
+            .add("TLS_ECDH_RSA_WITH_AES_128_GCM_SHA256")
+            .add("TLS_DHE_RSA_WITH_AES_128_GCM_SHA256")
+            .add("TLS_DHE_DSS_WITH_AES_128_GCM_SHA256")
+            .build();
+
 
     // override the specified values using any provided system properties
     public static void applySystemProperties(SslConfig sslConfig) {
