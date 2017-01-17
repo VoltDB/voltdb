@@ -23,7 +23,6 @@ import java.util.List;
 import java.util.Map;
 
 import org.voltcore.utils.Pair;
-import org.voltdb.ProducerDRGateway.MeshMemberInfo;
 
 import com.google_voltpatches.common.net.HostAndPort;
 
