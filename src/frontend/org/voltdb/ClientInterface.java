@@ -350,11 +350,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         sslEngine.setUseClientMode(false);
                         sslEngine.setNeedClientAuth(false);
 
-                        NavigableSet<String> available = ImmutableSortedSet.copyOf(sslEngine.getEnabledCipherSuites());
-                        Set<String> intersection = Sets.intersection(SSLConfiguration.PREFERRED_CIPHERS, available);
+                        NavigableSet<String> supported = ImmutableSortedSet.copyOf(sslEngine.getSupportedCipherSuites());
+                        Set<String> intersection = Sets.intersection(SSLConfiguration.PREFERRED_CIPHERS, supported);
                         if (intersection.isEmpty()) {
                             hostLog.warn("Preferred cipher suites are not available");
-                            intersection = available;
+                            intersection = supported;
                         }
                         sslEngine.setEnabledCipherSuites(intersection.toArray(new String[0]));
                         // blocking needs to be false for handshaking.

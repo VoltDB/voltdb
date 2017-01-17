@@ -65,7 +65,6 @@ public class SSLConfiguration {
             .add("TLS_DHE_DSS_WITH_AES_128_GCM_SHA256")
             .build();
 
-
     // override the specified values using any provided system properties
     public static void applySystemProperties(SslConfig sslConfig) {
 
