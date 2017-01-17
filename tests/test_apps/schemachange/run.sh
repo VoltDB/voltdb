@@ -25,7 +25,7 @@ function srccompile() {
 # build an application catalog
 function catalog() {
     srccompile
-    $VOLTDB compile --classpath obj -o $APPNAME.jar ddl.sql
+    $VOLTDB legacycompile --classpath obj -o $APPNAME.jar ddl.sql
     # stop if compilation fails
     if [ $? != 0 ]; then exit 1; fi
 }

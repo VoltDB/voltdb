@@ -194,9 +194,6 @@ public class VoltDB {
         /** start mode: normal, paused*/
         public OperationMode m_startMode = OperationMode.RUNNING;
 
-        /** replication role. */
-        public ReplicationRole m_replicationRole = ReplicationRole.NONE;
-
         /**
          * At rejoin time an interface will be selected. It will be the
          * internal interface specified on the command line. If none is specified
@@ -530,10 +527,11 @@ public class VoltDB {
                     m_enableAdd = false;
                 } else if (arg.equals("enableadd")) {
                     m_enableAdd = true;
-                }else if (arg.equals("replica")) {
-                    m_replicationRole = ReplicationRole.REPLICA;
-                }
-                else if (arg.equals("dragentportstart")) {
+                } else if (arg.equals("replica")) {
+                    System.err.println("The \"replica\" command line argument is deprecated. Please use " +
+                                       "role=\"replica\" in the deployment file.");
+                    referToDocAndExit();
+                } else if (arg.equals("dragentportstart")) {
                     m_drAgentPortStart = Integer.parseInt(args[++i]);
                 }
 

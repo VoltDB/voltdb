@@ -28,6 +28,7 @@ public class DRProducerStatsBase {
 
     public static interface Columns {
         // column for both tables
+        public static final String CLUSTER_ID = "CLUSTERID";
         public static final String CONSUMER_CLUSTER_ID = "CONSUMERCLUSTERID";
 
         // columns for the node-level table
@@ -59,6 +60,7 @@ public class DRProducerStatsBase {
         @Override
         protected void populateColumnSchema(ArrayList<VoltTable.ColumnInfo> columns) {
             super.populateColumnSchema(columns);
+            columns.add(new ColumnInfo(Columns.CLUSTER_ID, VoltType.SMALLINT));
             columns.add(new ColumnInfo(Columns.CONSUMER_CLUSTER_ID, VoltType.SMALLINT));
             columns.add(new ColumnInfo(Columns.STATE, VoltType.STRING));
             columns.add(new ColumnInfo(Columns.SYNC_SNAPSHOT_STATE, VoltType.STRING));
@@ -82,6 +84,7 @@ public class DRProducerStatsBase {
         @Override
         protected void populateColumnSchema(ArrayList<VoltTable.ColumnInfo> columns) {
             super.populateColumnSchema(columns);
+            columns.add(new ColumnInfo(Columns.CLUSTER_ID, VoltType.SMALLINT));
             columns.add(new ColumnInfo(Columns.CONSUMER_CLUSTER_ID, VoltType.SMALLINT));
             columns.add(new ColumnInfo(VoltSystemProcedure.CNAME_PARTITION_ID, VoltType.INTEGER));
             columns.add(new ColumnInfo(Columns.STREAM_TYPE, VoltType.STRING));

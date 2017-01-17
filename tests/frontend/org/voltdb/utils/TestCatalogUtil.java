@@ -1112,6 +1112,59 @@ public class TestCatalogUtil extends TestCase {
         return containsTable;
     }
 
+    public void testDRRole() throws Exception {
+        final String defaultRole =
+            "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
+            + "<deployment>"
+            + "<cluster hostcount='3' kfactor='1' sitesperhost='2' id='1'/>"
+            + "    <dr id='1'>"
+            + "    </dr>"
+            + "</deployment>";
+        final String masterRole =
+            "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
+            + "<deployment>"
+            + "<cluster hostcount='3' kfactor='1' sitesperhost='2' id='1'/>"
+            + "    <dr id='1' role='master'>"
+            + "    </dr>"
+            + "</deployment>";
+        final String replicaRole =
+            "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
+            + "<deployment>"
+            + "<cluster hostcount='3' kfactor='1' sitesperhost='2' id='1'/>"
+            + "    <dr id='1' role='replica'>"
+            + "    </dr>"
+            + "</deployment>";
+        final String invalidRole =
+            "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
+            + "<deployment>"
+            + "<cluster hostcount='3' kfactor='1' sitesperhost='2' id='1'/>"
+            + "    <dr id='1' role='xdcr'>"
+            + "    </dr>"
+            + "</deployment>";
+
+
+        final File tmpDefault = VoltProjectBuilder.writeStringToTempFile(defaultRole);
+        DeploymentType defaultDeployment = CatalogUtil.getDeployment(new FileInputStream(tmpDefault));
+        CatalogUtil.compileDeployment(catalog, defaultDeployment, false);
+        assertEquals("master", catalog.getClusters().get("cluster").getDrrole());
+
+        setUp();
+        final File tmpMaster = VoltProjectBuilder.writeStringToTempFile(masterRole);
+        DeploymentType masterDeployment = CatalogUtil.getDeployment(new FileInputStream(tmpMaster));
+        CatalogUtil.compileDeployment(catalog, masterDeployment, false);
+        assertEquals("master", catalog.getClusters().get("cluster").getDrrole());
+
+        setUp();
+        final File tmpReplica = VoltProjectBuilder.writeStringToTempFile(replicaRole);
+        DeploymentType replicaDeployment = CatalogUtil.getDeployment(new FileInputStream(tmpReplica));
+        CatalogUtil.compileDeployment(catalog, replicaDeployment, false);
+        assertEquals("replica", catalog.getClusters().get("cluster").getDrrole());
+
+        setUp();
+        final File tmpInvalidRole = VoltProjectBuilder.writeStringToTempFile(invalidRole);
+        assertNull(CatalogUtil.getDeployment(new FileInputStream(tmpInvalidRole)));
+    }
+
     public void testDRConnection() throws Exception {
         final String multipleConnections =
                 "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"

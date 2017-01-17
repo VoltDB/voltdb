@@ -79,10 +79,15 @@ template<> inline NValue NValue::callUnary<FUNC_SPACE>() const {
 
     int32_t count = static_cast<int32_t>(castAsBigIntAndGetValue());
     if (count < 0) {
-        char msg[1024];
-        snprintf(msg, 1024, "data exception: substring error");
         throw SQLException(SQLException::data_exception_string_data_length_mismatch,
-            msg);
+                           "The argument to the SPACE function is negative");
+    } else if (ThreadLocalPool::POOLED_MAX_VALUE_LENGTH < count) {
+        std::ostringstream oss;
+        oss << "The argument to the SPACE function is larger than the maximum size allowed for strings ("
+            << ThreadLocalPool::POOLED_MAX_VALUE_LENGTH << " bytes). "
+            << "Reduce either the string size or repetition count.";
+        throw SQLException(SQLException::data_exception_string_data_length_mismatch,
+                           oss.str().c_str());
     }
 
     std::string spacesStr(count, ' ');
@@ -218,10 +223,8 @@ template<> inline NValue NValue::call<FUNC_LEFT>(const std::vector<NValue>& argu
     }
     int32_t count = static_cast<int32_t>(startArg.castAsBigIntAndGetValue());
     if (count < 0) {
-        char msg[1024];
-        snprintf(msg, 1024, "data exception: substring error");
         throw SQLException(SQLException::data_exception_string_data_length_mismatch,
-            msg);
+                           "The argument to the LEFT function is negative");
     }
     if (count == 0) {
         return getTempStringValue("", 0);
@@ -251,10 +254,8 @@ template<> inline NValue NValue::call<FUNC_RIGHT>(const std::vector<NValue>& arg
 
     int32_t count = static_cast<int32_t>(startArg.castAsBigIntAndGetValue());
     if (count < 0) {
-        char msg[1024];
-        snprintf(msg, 1024, "data exception: substring error");
         throw SQLException(SQLException::data_exception_string_data_length_mismatch,
-            msg);
+                           "The argument to the RIGHT function is negative.");
     }
     if (count == 0) {
         return getTempStringValue("", 0);
