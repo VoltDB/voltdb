@@ -1142,7 +1142,7 @@ private:
     }
 
     /**
-     * This funciton does not check NULL value.
+     * This function does not check NULL value.
      */
     double getNumberFromString() const
     {

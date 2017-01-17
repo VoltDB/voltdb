@@ -38,6 +38,7 @@ import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogChangeGroup.FieldChange;
 import org.voltdb.catalog.CatalogChangeGroup.TypeChanges;
 import org.voltdb.compiler.MaterializedViewProcessor;
+import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.utils.CatalogSizing;
 import org.voltdb.utils.CatalogUtil;
@@ -915,6 +916,17 @@ public class CatalogDiffEngine {
                 }
                 else {
                     return null;
+                }
+            } else if (field.equals("drRole")) {
+                final String prevRole = (String) prevType.getField("drRole");
+                final String newRole = (String) suspect.getField("drRole");
+                // Promote from replica to master
+                if (prevRole.equals(DrRoleType.REPLICA.value()) && newRole.equals(DrRoleType.MASTER.value())) {
+                    return null;
+                }
+                // Everything else is illegal
+                else {
+                    restrictionQualifier = " from " + prevRole + " to " + newRole;
                 }
             }
         }

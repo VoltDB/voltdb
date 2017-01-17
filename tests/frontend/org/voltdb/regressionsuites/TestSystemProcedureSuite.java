@@ -29,7 +29,6 @@ import java.util.Random;
 import junit.framework.Test;
 
 import org.voltdb.BackendTarget;
-import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
@@ -557,7 +556,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
                                   BackendTarget.NATIVE_EE_JNI);
         ((LocalCluster) config).setHasLocalServer(hasLocalServer);
         //boolean success = config.compile(project);
-        boolean success = config.compileWithAdminMode(project, VoltDB.DEFAULT_ADMIN_PORT, false);
+        boolean success = config.compileWithAdminMode(project, -1, false);
         assertTrue(success);
         builder.addServerConfig(config);
 

@@ -37,7 +37,6 @@ import java.util.Set;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.BackendTarget;
 import org.voltdb.EELibraryLoader;
-import org.voltdb.ReplicationRole;
 import org.voltdb.ServerThread;
 import org.voltdb.StartAction;
 import org.voltdb.VoltDB;
@@ -137,7 +136,7 @@ public class LocalCluster extends VoltServerConfig {
     }
 
     // Produce a (presumably) available IP port number.
-    public final PortGeneratorForTest portGenerator = new PortGeneratorForTest();
+    public static final PortGeneratorForTest portGenerator = new PortGeneratorForTest();
     private InternalPortGeneratorForTest internalPortGenerator;
     private int numberOfCoordinators = 1;
     private String m_voltdbroot = "";
@@ -433,16 +432,12 @@ public class LocalCluster extends VoltServerConfig {
     @Override
     public boolean compileWithAdminMode(VoltProjectBuilder builder, int adminPort, boolean adminOnStartup)
     {
-        // ATTN: LocalCluster does not support non-default admin ports.
-        // Need a way to correctly initializing the portGenerator
-        // and then resetting it after tests to the usual default.
-        if (adminPort != VoltDB.DEFAULT_ADMIN_PORT) {
-            return false;
+        if (adminOnStartup) {
+            setToStartPaused();
         }
 
         if (!m_compiled) {
-            m_compiled = builder.compile(templateCmdLine.jarFileName(), m_siteCount, m_hostCount, m_kfactor,
-                    adminPort, adminOnStartup, m_clusterId);
+            m_compiled = builder.compile(templateCmdLine.jarFileName(), m_siteCount, m_hostCount, m_kfactor, m_clusterId);
             templateCmdLine.pathToDeployment(builder.getPathToDeployment());
             m_voltdbroot = builder.getPathToVoltRoot().getAbsolutePath();
         }
@@ -454,15 +449,10 @@ public class LocalCluster extends VoltServerConfig {
         startUp(true);
     }
 
-    public void startUp(boolean clearLocalDataDirectories, ReplicationRole role) {
-        //if cleardirectory is true we dont skip init.
-        startUp(clearLocalDataDirectories, role, (clearLocalDataDirectories ? false : true));
-    }
-
     @Override
     public void startUp(boolean clearLocalDataDirectories) {
         //if cleardirectory is true we dont skip init.
-        startUp(clearLocalDataDirectories, ReplicationRole.NONE, (clearLocalDataDirectories ? false : true));
+        startUp(clearLocalDataDirectories, (clearLocalDataDirectories ? false : true));
     }
 
     public void setForceVoltdbCreate(boolean newVoltdb) {
@@ -683,7 +673,7 @@ public class LocalCluster extends VoltServerConfig {
         }
     }
 
-    public void startUp(boolean clearLocalDataDirectories, ReplicationRole role, boolean skipInit) {
+    public void startUp(boolean clearLocalDataDirectories, boolean skipInit) {
         VoltServerConfig.addInstance(this);
 
         assert (!m_running);
@@ -694,8 +684,6 @@ public class LocalCluster extends VoltServerConfig {
         // needs to be called before any call to pick a filename
         VoltDB.setDefaultTimezone();
 
-        // set 'replica' option -- known here for the first time.
-        templateCmdLine.replicaMode(role);
         if (m_isPaused) {
             // Set paused mode
             templateCmdLine.startPaused();
@@ -761,7 +749,7 @@ public class LocalCluster extends VoltServerConfig {
                     placementGroup = m_placementGroups[i];
                 }
 
-                startOne(i, clearLocalDataDirectories, role, StartAction.CREATE, true, placementGroup);
+                startOne(i, clearLocalDataDirectories, StartAction.CREATE, true, placementGroup);
                 //wait before next one
                 if (m_deplayBetweenNodeStartupMS > 0) {
                     try {
@@ -947,7 +935,7 @@ public class LocalCluster extends VoltServerConfig {
         m_hostRoots.put(hostIdStr, cmdln.voltdbRoot().getPath());
     }
 
-    private void startOne(int hostId, boolean clearLocalDataDirectories, ReplicationRole replicaMode,
+    private void startOne(int hostId, boolean clearLocalDataDirectories,
             StartAction startAction, boolean waitForReady, String placementGroup)
     throws IOException {
         PipeToFile ptf = null;
@@ -998,7 +986,6 @@ public class LocalCluster extends VoltServerConfig {
             cmdln.port(portGenerator.nextClient());
             cmdln.adminPort(portGenerator.nextAdmin());
             cmdln.httpPort(portGenerator.nextHttp());
-            cmdln.replicaMode(replicaMode);
             cmdln.timestampSalt(getRandomTimestampSalt());
             cmdln.setPlacementGroup(placementGroup);
             if (m_debug) {
@@ -1163,7 +1150,7 @@ public class LocalCluster extends VoltServerConfig {
             if (isNewCli && !m_hostRoots.containsKey(Integer.toString(hostId))) {
                 initLocalServer(hostId, true);
             }
-            startOne(hostId, true, ReplicationRole.NONE, StartAction.JOIN, true, null);
+            startOne(hostId, true, StartAction.JOIN, true, null);
         }
         catch (IOException ioe) {
             throw new RuntimeException(ioe);
@@ -1175,7 +1162,7 @@ public class LocalCluster extends VoltServerConfig {
             if (isNewCli && !m_hostRoots.containsKey(Integer.toString(hostId))) {
                 initLocalServer(hostId, true);
             }
-            startOne(hostId, true, ReplicationRole.NONE, StartAction.JOIN, true, placementGroup);
+            startOne(hostId, true, StartAction.JOIN, true, placementGroup);
         }
         catch (IOException ioe) {
             throw new RuntimeException(ioe);
@@ -1191,7 +1178,7 @@ public class LocalCluster extends VoltServerConfig {
                 if (isNewCli && !m_hostRoots.containsKey(Integer.toString(hostId))) {
                     initLocalServer(hostId, true);
                 }
-                startOne(hostId, true, ReplicationRole.NONE, StartAction.JOIN, false, null);
+                startOne(hostId, true, StartAction.JOIN, false, null);
             }
             catch (IOException ioe) {
                 throw new RuntimeException(ioe);
@@ -1210,7 +1197,7 @@ public class LocalCluster extends VoltServerConfig {
                 if (isNewCli && !m_hostRoots.containsKey(Integer.toString(entry.getKey()))) {
                     initLocalServer(entry.getKey(), true);
                 }
-                startOne(entry.getKey(), true, ReplicationRole.NONE, StartAction.JOIN, false, entry.getValue());
+                startOne(entry.getKey(), true, StartAction.JOIN, false, entry.getValue());
                 if (m_deplayBetweenNodeStartupMS > 0) {
                     try {
                         Thread.sleep(m_deplayBetweenNodeStartupMS);
@@ -1962,6 +1949,9 @@ public class LocalCluster extends VoltServerConfig {
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema(schemaDDL);
         builder.setDrProducerEnabled();
+        if (isReplica) {
+            builder.setDrReplica();
+        }
         if (remoteReplicationPort != 0) {
             builder.setDRMasterHost("localhost:" + remoteReplicationPort);
         }
@@ -1975,9 +1965,9 @@ public class LocalCluster extends VoltServerConfig {
         lc.overrideAnyRequestForValgrind();
         if (!lc.isNewCli()) {
             lc.setDeploymentAndVoltDBRoot(builder.getPathToDeployment(), pathToVoltDBRoot);
-            lc.startUp(false, isReplica ? ReplicationRole.REPLICA : ReplicationRole.NONE);
+            lc.startUp(false);
         } else {
-            lc.startUp(true, isReplica ? ReplicationRole.REPLICA : ReplicationRole.NONE);
+            lc.startUp(true);
         }
 
         for (int i = 0; i < hostCount; i++) {

@@ -744,6 +744,12 @@ public class DDLCompiler {
                         partitionInfo
                         );
 
+                // this command is now deprecated as of VoltDB 7.0
+                m_compiler.addWarn("The standalone \"PARTITION PROCEDURE ...\" statement is deprecated. " +
+                                   "Please use the combined statement \"CREATE PROCEDURE PARTITION ON ...\" " +
+                                   "instead. See the documentation of \"CREATE PROCEDURE\" for more information.",
+                                   ddlStatement.lineNo);
+
                 return true;
             }
             // can't get here as regex only matches for PROCEDURE or TABLE

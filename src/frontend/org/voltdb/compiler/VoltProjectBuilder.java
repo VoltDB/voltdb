@@ -44,13 +44,13 @@ import org.voltdb.Consistency;
 import org.voltdb.ProcInfoData;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.common.Constants;
-import org.voltdb.compiler.deploymentfile.AdminModeType;
 import org.voltdb.compiler.deploymentfile.ClusterType;
 import org.voltdb.compiler.deploymentfile.CommandLogType;
 import org.voltdb.compiler.deploymentfile.ConnectionType;
 import org.voltdb.compiler.deploymentfile.ConsistencyType;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.DiskLimitType;
+import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.compiler.deploymentfile.DrType;
 import org.voltdb.compiler.deploymentfile.ExportConfigurationType;
 import org.voltdb.compiler.deploymentfile.ExportType;
@@ -236,19 +236,12 @@ public class VoltProjectBuilder {
         final int hostCount;
         final int sitesPerHost;
         final int replication;
-        final boolean useCustomAdmin;
-        final int adminPort;
-        final boolean adminOnStartup;
         final int clusterId;
 
-        public DeploymentInfo(int hostCount, int sitesPerHost, int replication,
-                boolean useCustomAdmin, int adminPort, boolean adminOnStartup, int id) {
+        public DeploymentInfo(int hostCount, int sitesPerHost, int replication, int id) {
             this.hostCount = hostCount;
             this.sitesPerHost = sitesPerHost;
             this.replication = replication;
-            this.useCustomAdmin = useCustomAdmin;
-            this.adminPort = adminPort;
-            this.adminOnStartup = adminOnStartup;
             this.clusterId = id;
         }
     }
@@ -324,6 +317,7 @@ public class VoltProjectBuilder {
 
     private String m_drMasterHost;
     private Boolean m_drProducerEnabled = null;
+    private DrRoleType m_drRole = DrRoleType.MASTER;
 
     public VoltProjectBuilder setQueryTimeout(int target) {
         m_queryTimeout = target;
@@ -758,6 +752,10 @@ public class VoltProjectBuilder {
         m_drProducerEnabled = false;
     }
 
+    public void setDrReplica() {
+        m_drRole = DrRoleType.REPLICA;
+    }
+
     /**
      * Override the procedure annotation with the specified values for a
      * specified procedure.
@@ -790,6 +788,14 @@ public class VoltProjectBuilder {
                 replication, null, 0) != null;
     }
 
+    public boolean compile(final String jarPath,
+            final int sitesPerHost,
+            final int hostCount,
+            final int replication, final int clusterId) {
+        return compile(jarPath, sitesPerHost, hostCount,
+                replication, null, clusterId) != null;
+    }
+
     public Catalog compile(final String jarPath,
             final int sitesPerHost,
             final int hostCount,
@@ -806,7 +812,7 @@ public class VoltProjectBuilder {
             final int clusterId) {
         VoltCompiler compiler = new VoltCompiler();
         if (compile(compiler, jarPath, voltRoot,
-                       new DeploymentInfo(hostCount, sitesPerHost, replication, false, 0, false, clusterId),
+                       new DeploymentInfo(hostCount, sitesPerHost, replication, clusterId),
                        m_ppdEnabled, m_snapshotPath, m_ppdPrefix)) {
             return compiler.getCatalog();
         } else {
@@ -823,18 +829,8 @@ public class VoltProjectBuilder {
     {
         VoltCompiler compiler = new VoltCompiler();
         return compile(compiler, jarPath, voltRoot,
-                       new DeploymentInfo(hostCount, sitesPerHost, replication, false, 0, false, clusterId),
+                       new DeploymentInfo(hostCount, sitesPerHost, replication, clusterId),
                        ppdEnabled, snapshotPath, ppdPrefix);
-    }
-
-    public boolean compile(final String jarPath, final int sitesPerHost,
-            final int hostCount, final int replication,
-            final int adminPort, final boolean adminOnStartup, final int clusterId)
-    {
-        VoltCompiler compiler = new VoltCompiler();
-        return compile(compiler, jarPath, null,
-                       new DeploymentInfo(hostCount, sitesPerHost, replication, true, adminPort, adminOnStartup, clusterId),
-                       m_ppdEnabled,  m_snapshotPath, m_ppdPrefix);
     }
 
     public boolean compile(final VoltCompiler compiler,
@@ -918,10 +914,6 @@ public class VoltProjectBuilder {
                 System.out.println("ppdEnabled: " + ppdEnabled);
                 System.out.println("snapshotPath: " + snapshotPath);
                 System.out.println("ppdPrefix: " + ppdPrefix);
-                System.out.println("adminEnabled: " + deployment.useCustomAdmin);
-                System.out.println("adminPort: " + deployment.adminPort);
-                System.out.println("adminOnStartup: " + deployment.adminOnStartup);
-
                 // sufficient to escape and fail test cases?
                 throw new RuntimeException(e);
             }
@@ -1104,17 +1096,6 @@ public class VoltProjectBuilder {
             ct.setReadlevel(m_consistencyReadLevel.toReadLevelType());
         }
 
-        // <admin-mode>
-        // can't be disabled, but only write out the non-default config if
-        // requested by a test. otherwise, take the implied defaults (or
-        // whatever local cluster overrides on the command line).
-        if (dinfo.useCustomAdmin) {
-            AdminModeType admin = factory.createAdminModeType();
-            deployment.setAdminMode(admin);
-            admin.setPort(dinfo.adminPort);
-            admin.setAdminstartup(dinfo.adminOnStartup);
-        }
-
         deployment.setSystemsettings(createSystemSettingsType(factory));
 
         // <users>
@@ -1262,6 +1243,7 @@ public class VoltProjectBuilder {
         DrType dr = factory.createDrType();
         deployment.setDr(dr);
         dr.setListen(m_drProducerEnabled);
+        dr.setRole(m_drRole);
         if (m_drMasterHost != null && !m_drMasterHost.isEmpty()) {
             ConnectionType conn = factory.createConnectionType();
             dr.setConnection(conn);

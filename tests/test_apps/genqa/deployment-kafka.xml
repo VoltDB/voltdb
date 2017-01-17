@@ -4,7 +4,6 @@
     <partition-detection enabled="false">
         <snapshot prefix="voltdb_partition_detection"/>
     </partition-detection>
-    <admin-mode port="21211" adminstartup="false"/>
     <heartbeat timeout="15"/>
     <httpd port="8080">
         <jsonapi enabled="true"/>

@@ -318,8 +318,8 @@ label.ccErrorMsg {
 }
 .plusIcon {
 	width: 120px;
-	padding: 4px 0 7px 40px;
-	background-position: 0 -202px;
+	padding: 4px 0 7px 18px;
+	background-position: -8px -202px;
 	font-size: 16px;
 	cursor: pointer;
 }
@@ -792,6 +792,13 @@ ul.addServerList li:nth-child(1) {
 	width: 60px;
 	text-align: center;
 }
+.overviewInputTextSNMP {
+    height: 30px;
+    padding: 5px 10px;
+    line-height: 1.5;
+    width: 150px;
+    text-align: left;
+}
 .upDownBtn {
 	background: none repeat scroll 0 0 #CCCCCC;
 	cursor: pointer;
@@ -828,7 +835,7 @@ ul.addServerList li:nth-child(1) {
 	height: 53px;
 	position: relative;
 	background: #fbfbfb;
-	border: 1px solid #aaa;
+	border: 1px solid #ccc;
 	border-bottom:none;
 }
 .mainContent h1 {
@@ -969,7 +976,7 @@ ul.addServerList li:nth-child(1) {
 }
 .drWrapperAdmin {
 	padding: 20px 0 0 0;
-	border-top:1px solid #ccc;
+
 }
 .headerAdminContent {
 /*	height: 53px;*/
@@ -986,7 +993,7 @@ ul.addServerList li:nth-child(1) {
 .drAdminHeaderRight {
 	float: right;
 	/*width: 65px;*/
-	padding-right:46px;
+	padding-right:34px;
 }
 .replicaWrapper {
 	position: relative;
@@ -1625,16 +1632,16 @@ ul.server-lists li.checked-server {
 	padding-left: 105px;
 	font-weight: normal;
 }
-.connectionSourceTblPopup tr td {
+.connectionSourceTblPopup tr td, .snmpTblPopUp tr td {
 	padding: 7px 5px;
 }
-.connectionSourceTblPopup tr {
+.connectionSourceTblPopup tr, .snmpTblPopUp tr {
 	border-bottom: 1px solid #ccc;
 }
 .connectionSourceTblPopup tr:last-child {
 	border: none;
 }
-.connectionSourceTblPopup tr td h4 {
+.connectionSourceTblPopup tr td h4, .snmpTblPopUp tr td h4 {
 	font-weight: bold;
 	font-size: 14px;
 	padding-top: 20px;
@@ -1770,6 +1777,18 @@ color: grey;
 .serverHeadText {font-weight: bold; font-size: 16px; }
 .serverDB { float: left;cursor: pointer; margin-left:5px;}
 /******************* Database Configuration end ***************************/
+
+/******************SNMP*************************/
+
+
+.snmpSelect{ width:150px;}
+
+.onIconSNMP {}
+.onOffSNMP {}
+#chkDrOnOffVal, #chkSNMPOnOffVal { position:relative; top:3px;}
+
+.onOffSNMPPopup {left:5px;}
+
 /************Media Queries for mobile compatibility***************/
 @media (min-width: 768px) {
 .form-horizontal .control-label {
@@ -1917,7 +1936,7 @@ ul.drList {
 }
 @media (max-width: 980px) {
 	
-.mainTblLeft, .mainTblRight { float:none; width:100%; overflow:auto;}	
+.mainTblLeft, .mainTblRight { float:none; width:100%; overflow-x:auto; overflow-y:hidden}
 }
 @media (min-width: 768px) and (max-width: 980px) {
 .modal.custom .modifiedModalCreateDB {
