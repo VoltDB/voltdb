@@ -128,27 +128,6 @@ public class ZKUtil {
         return tempFile;
     }
 
-//    /*
-//     * Attempts to upload the files atomically and transactionally
-//     */
-//    public static void uploadFiles(
-//            ZooKeeper zk,
-//            String rootPath,
-//            List<String> zkNames,
-//            List<String> filePaths,
-//            boolean ephemeral) throws Exception {
-//        for (String filePath : filePaths) {
-//            File file = new VoltFile(filePath);
-//            if (!file.exists() || !file.canRead()) {
-//                throw new Exception("File " + file + " does not exist or isn't readable");
-//            }
-//        }
-//        for (int ii = 0; ii < filePaths.size(); ii++) {
-//            File file = new VoltFile(filePaths.get(ii));
-//            uploadFileAsChunks(zk, rootPath + "/" + zkNames.get(ii), file, ephemeral);
-//        }
-//    }
-
     public static boolean uploadFileAsChunks(ZooKeeper zk, String zkPath, File file, boolean ephemeral)
             throws Exception {
         FileInputStream fis = null;

@@ -34,7 +34,6 @@ import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.VoltDB;
-import org.voltdb.VoltDBInterface;
 import org.voltdb.VoltZK;
 import org.voltdb.messaging.BalanceSPIMessage;
 import org.voltdb.messaging.BalanceSPIResponseMessage;
@@ -46,9 +45,9 @@ import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.Iv2RepairLogRequestMessage;
 import org.voltdb.messaging.Iv2RepairLogResponseMessage;
 import org.voltdb.messaging.RejoinMessage;
+import org.voltdb.messaging.RepairLogTruncationMessage;
 
 import com.google_voltpatches.common.base.Supplier;
-import org.voltdb.messaging.RepairLogTruncationMessage;
 
 /**
  * InitiatorMailbox accepts initiator work and proxies it to the
@@ -320,10 +319,7 @@ public class InitiatorMailbox implements Mailbox
         }
         else if (message instanceof BalanceSPIMessage) {
             BalanceSPIMessage msg = (BalanceSPIMessage) message;
-
-            VoltDBInterface voltInstance = VoltDB.instance();
-            HostMessenger messenger = voltInstance.getHostMessenger();
-            ZooKeeper zk = messenger.getZK();
+            ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
 
             if (tmLog.isDebugEnabled()) {
                 tmLog.debug(VoltZK.debugLeadersInfo(zk));
@@ -335,12 +331,8 @@ public class InitiatorMailbox implements Mailbox
                 leaderAppointee.start(true);
                 String hsidStr = ZKUtil.suffixHSIdsWithBalanceSPIRequest(msg.getNewLeaderHSId());
                 leaderAppointee.put(msg.getParititionId(), hsidStr);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            } catch (ExecutionException e) {
-                e.printStackTrace();
-            } catch (KeeperException e) {
-                e.printStackTrace();
+            } catch (InterruptedException | ExecutionException | KeeperException e) {
+                tmLog.warn(String.format("Failed to migrate SPI for partition %d to hsid %d. %s", msg.getParititionId(), msg.getNewLeaderHSId(),e.getMessage()));
             } finally {
                 try {
                     leaderAppointee.shutdown();
@@ -431,11 +423,12 @@ public class InitiatorMailbox implements Mailbox
         List<Iv2RepairLogResponseMessage> logs = m_repairLog.contents(req.getRequestId(),
                 req.isMPIRequest());
 
-        tmLog.debug(""
-            + CoreUtils.hsIdToString(getHSId())
-            + " handling repair log request id " + req.getRequestId()
-            + " for " + CoreUtils.hsIdToString(message.m_sourceHSId) + ". ");
-
+        if (tmLog.isDebugEnabled()) {
+            tmLog.debug(""
+                    + CoreUtils.hsIdToString(getHSId())
+                    + " handling repair log request id " + req.getRequestId()
+                    + " for " + CoreUtils.hsIdToString(message.m_sourceHSId) + ". ");
+        }
         for (Iv2RepairLogResponseMessage log : logs) {
             send(message.m_sourceHSId, log);
         }

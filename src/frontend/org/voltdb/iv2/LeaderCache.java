@@ -39,6 +39,7 @@ import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.zk.ZKUtil;
 import org.voltcore.zk.ZKUtil.ByteArrayCallback;
+
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
@@ -48,10 +49,6 @@ import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
  * children. The children data objects must be JSONObjects.
  */
 public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
-
-    //
-    // API
-    //
 
     public static class LeaderCallBackInfo {
         Long m_HSID;
@@ -155,10 +152,6 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
         }
     }
 
-    //
-    // Implementation
-    //
-
     private final ZooKeeper m_zk;
     private final AtomicBoolean m_shutdown = new AtomicBoolean(false);
     private final Callback m_cb; // the callback when the cache changes
@@ -254,7 +247,8 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
     // example zkPath string: /db/iv2masters/1
     private static int getPartitionIdFromZKPath(String zkPath)
     {
-        return Integer.valueOf(zkPath.split("/")[zkPath.split("/").length - 1]);
+        String array[] = zkPath.split("/");
+        return Integer.valueOf(array[array.length - 1]);
     }
 
     /**

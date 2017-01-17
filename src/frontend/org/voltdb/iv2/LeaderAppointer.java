@@ -47,14 +47,13 @@ import org.voltcore.utils.Pair;
 import org.voltcore.zk.BabySitter;
 import org.voltcore.zk.LeaderElector;
 import org.voltcore.zk.ZKUtil;
-import org.voltdb.iv2.MpInitiator;
-import org.voltdb.iv2.LeaderCache.LeaderCallBackInfo;
 import org.voltdb.Promotable;
 import org.voltdb.ReplicationRole;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 import org.voltdb.catalog.SnapshotSchedule;
+import org.voltdb.iv2.LeaderCache.LeaderCallBackInfo;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
@@ -142,14 +141,15 @@ public class LeaderAppointer implements Promotable
             // compute previously unseen HSId set in the callback list
             Set<Long> newHSIds = new HashSet<Long>(updatedHSIds);
             newHSIds.removeAll(m_replicas);
-            tmLog.debug("Newly seen replicas: " + CoreUtils.hsIdCollectionToString(newHSIds));
             // compute previously seen but now vanished from the callback list HSId set
             Set<Long> missingHSIds = new HashSet<Long>(m_replicas);
             missingHSIds.removeAll(updatedHSIds);
-            tmLog.debug("Newly dead replicas: " + CoreUtils.hsIdCollectionToString(missingHSIds));
-
-            tmLog.debug("Handling babysitter callback for partition " + m_partitionId + ": children: " +
-                    CoreUtils.hsIdCollectionToString(updatedHSIds));
+            if (tmLog.isDebugEnabled()) {
+                tmLog.debug("Newly seen replicas: " + CoreUtils.hsIdCollectionToString(newHSIds));
+                tmLog.debug("Newly dead replicas: " + CoreUtils.hsIdCollectionToString(missingHSIds));
+                tmLog.debug("Handling babysitter callback for partition " + m_partitionId + ": children: " +
+                        CoreUtils.hsIdCollectionToString(updatedHSIds));
+            }
             if (m_state.get() == AppointerState.CLUSTER_START) {
                 // We can't yet tolerate a host failure during startup.  Crash it all
                 if (missingHSIds.size() > 0) {

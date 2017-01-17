@@ -140,11 +140,7 @@ public class VoltZK {
             if (isData) {
                 build.append("\n");
             }
-        } catch (KeeperException e) {
-            build.append(e.getMessage());
-        } catch (InterruptedException e) {
-            build.append(e.getMessage());
-        } catch (UnsupportedEncodingException e) {
+        } catch (KeeperException | InterruptedException | UnsupportedEncodingException e) {
             build.append(e.getMessage());
         }
         return build.toString();

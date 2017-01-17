@@ -67,24 +67,18 @@ public class SpInitiator extends BaseInitiator implements Promotable
         public void run(ImmutableMap<Integer, LeaderCallBackInfo> cache)
         {
             String hsidStr = CoreUtils.hsIdToString(m_initiatorMailbox.getHSId());
-
-            if (tmLog.isDebugEnabled()) {
-                if (cache != null) {
-                    tmLog.debug(hsidStr + " [SpInitiator] cache keys: " + Arrays.toString(cache.keySet().toArray()));
-                    tmLog.debug(hsidStr + " [SpInitiator] cache values: " + Arrays.toString(cache.values().toArray()));
-                }
+            if (cache != null && tmLog.isDebugEnabled()) {
+                tmLog.debug(hsidStr + " [SpInitiator] cache keys: " + Arrays.toString(cache.keySet().toArray()));
+                tmLog.debug(hsidStr + " [SpInitiator] cache values: " + Arrays.toString(cache.values().toArray()));
             }
 
             for (Entry<Integer, LeaderCallBackInfo> entry: cache.entrySet()) {
                 Long HSId = entry.getValue().m_HSID;
-                if (HSId != getInitiatorHSId()) {
-                    continue;
+                if (HSId == getInitiatorHSId()) {
+                    m_isBalanceSPIRequested = entry.getValue().m_isBalanceSPIRequested;
+                    acceptPromotion();
+                    break;
                 }
-                m_isBalanceSPIRequested = entry.getValue().m_isBalanceSPIRequested;
-
-                acceptPromotion();
-                break;
-
             }
         }
     };
