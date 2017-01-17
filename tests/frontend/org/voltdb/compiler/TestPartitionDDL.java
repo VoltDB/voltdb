@@ -129,7 +129,7 @@ public class TestPartitionDDL extends TestCase {
             String ddlPath = writeDDL(partitioned, items);
 
             // Compile the catalog.
-            final VoltCompiler compiler = new VoltCompiler();
+            final VoltCompiler compiler = new VoltCompiler(false);
             boolean success = compiler.compileFromDDL(testout_jar, ddlPath);
 
             // Check for expected compilation success or failure.

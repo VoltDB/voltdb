@@ -51,13 +51,13 @@ import org.voltdb.catalog.User;
 import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
+import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.compilereport.ProcedureAnnotation;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.licensetool.LicenseException;
 import org.voltdb.types.ConstraintType;
 
 import junit.framework.TestCase;
-import static junit.framework.TestCase.assertEquals;
 
 public class TestCatalogUtil extends TestCase {
 
@@ -573,7 +573,7 @@ public class TestCatalogUtil extends TestCase {
     }
 
     public void testCheckLicenseConstraint() {
-        catalog_db.setIsactiveactivedred(true);
+        catalog.getClusters().get("cluster").setDrrole(DrRoleType.XDCR.value());
 
         LicenseApi lapi = new LicenseApi() {
             @Override
@@ -824,7 +824,7 @@ public class TestCatalogUtil extends TestCase {
 
     public void testImportSettings() throws Exception {
 
-        File formatjar = CatalogUtil.createTemporaryEmptyCatalogJarFile();
+        File formatjar = CatalogUtil.createTemporaryEmptyCatalogJarFile(false);
         final String withBadImport1 =
                 "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
                 + "<deployment>"
@@ -852,7 +852,7 @@ public class TestCatalogUtil extends TestCase {
                 + "    </import>"
                 + "</deployment>";
         //Use catalog jar to point to a file to do dup test.
-        File catjar = CatalogUtil.createTemporaryEmptyCatalogJarFile();
+        File catjar = CatalogUtil.createTemporaryEmptyCatalogJarFile(false);
         final String withBadImport3 =
                 "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
                 + "<deployment>"
@@ -927,7 +927,7 @@ public class TestCatalogUtil extends TestCase {
         final File tmpBad = VoltProjectBuilder.writeStringToTempFile(withBadImport1);
         DeploymentType bad_deployment = CatalogUtil.getDeployment(new FileInputStream(tmpBad));
 
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         String x[] = {tmpDdl.getAbsolutePath()};
         Catalog cat = compiler.compileCatalogFromDDL(x);
 
@@ -938,7 +938,7 @@ public class TestCatalogUtil extends TestCase {
         final File tmpBad2 = VoltProjectBuilder.writeStringToTempFile(withBadImport2);
         DeploymentType bad_deployment2 = CatalogUtil.getDeployment(new FileInputStream(tmpBad2));
 
-        VoltCompiler compiler2 = new VoltCompiler();
+        VoltCompiler compiler2 = new VoltCompiler(false);
         String x2[] = {tmpDdl.getAbsolutePath()};
         Catalog cat2 = compiler2.compileCatalogFromDDL(x2);
 
@@ -949,7 +949,7 @@ public class TestCatalogUtil extends TestCase {
         final File tmpBad3 = VoltProjectBuilder.writeStringToTempFile(withBadImport3);
         DeploymentType bad_deployment3 = CatalogUtil.getDeployment(new FileInputStream(tmpBad3));
 
-        VoltCompiler compiler3 = new VoltCompiler();
+        VoltCompiler compiler3 = new VoltCompiler(false);
         String x3[] = {tmpDdl.getAbsolutePath()};
         Catalog cat3 = compiler3.compileCatalogFromDDL(x3);
 
@@ -960,7 +960,7 @@ public class TestCatalogUtil extends TestCase {
         final File tmpBad4 = VoltProjectBuilder.writeStringToTempFile(withGoodImport0);
         DeploymentType bad_deployment4 = CatalogUtil.getDeployment(new FileInputStream(tmpBad4));
 
-        VoltCompiler compiler4 = new VoltCompiler();
+        VoltCompiler compiler4 = new VoltCompiler(false);
         String x4[] = {tmpDdl.getAbsolutePath()};
         Catalog cat4 = compiler4.compileCatalogFromDDL(x4);
 
@@ -971,7 +971,7 @@ public class TestCatalogUtil extends TestCase {
         final File good1 = VoltProjectBuilder.writeStringToTempFile(goodImport1);
         DeploymentType good_deployment1 = CatalogUtil.getDeployment(new FileInputStream(good1));
 
-        VoltCompiler good_compiler1 = new VoltCompiler();
+        VoltCompiler good_compiler1 = new VoltCompiler(false);
         String x5[] = {tmpDdl.getAbsolutePath()};
         Catalog cat5 = good_compiler1.compileCatalogFromDDL(x5);
 
@@ -982,7 +982,7 @@ public class TestCatalogUtil extends TestCase {
         final File tmpBad5 = VoltProjectBuilder.writeStringToTempFile(withBadFormatter1);
         DeploymentType bad_deployment5 = CatalogUtil.getDeployment(new FileInputStream(tmpBad5));
 
-        VoltCompiler compiler6 = new VoltCompiler();
+        VoltCompiler compiler6 = new VoltCompiler(false);
         String x6[] = {tmpDdl.getAbsolutePath()};
         Catalog cat6 = compiler6.compileCatalogFromDDL(x6);
 
@@ -995,13 +995,13 @@ public class TestCatalogUtil extends TestCase {
      * The CRC of an empty catalog should always be the same.
      */
     public void testEmptyCatalogCRC() throws Exception {
-        File file1 = CatalogUtil.createTemporaryEmptyCatalogJarFile();
+        File file1 = CatalogUtil.createTemporaryEmptyCatalogJarFile(false);
         assertNotNull(file1);
         byte[] bytes1 = MiscUtils.fileToBytes(file1);
         InMemoryJarfile jar1 = new InMemoryJarfile(bytes1);
         long crc1 = jar1.getCRC();
         Thread.sleep(5000);
-        File file2 = CatalogUtil.createTemporaryEmptyCatalogJarFile();
+        File file2 = CatalogUtil.createTemporaryEmptyCatalogJarFile(false);
         assertNotNull(file2);
         byte[] bytes2 = MiscUtils.fileToBytes(file2);
         InMemoryJarfile jar2 = new InMemoryJarfile(bytes2);
@@ -1113,11 +1113,18 @@ public class TestCatalogUtil extends TestCase {
             + "    <dr id='1' role='replica'>"
             + "    </dr>"
             + "</deployment>";
-        final String invalidRole =
+        final String xdcrRole =
             "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
             + "<deployment>"
             + "<cluster hostcount='3' kfactor='1' sitesperhost='2' id='1'/>"
             + "    <dr id='1' role='xdcr'>"
+            + "    </dr>"
+            + "</deployment>";
+        final String invalidRole =
+            "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
+            + "<deployment>"
+            + "<cluster hostcount='3' kfactor='1' sitesperhost='2' id='1'/>"
+            + "    <dr id='1' role='nonsense'>"
             + "    </dr>"
             + "</deployment>";
 
@@ -1138,6 +1145,12 @@ public class TestCatalogUtil extends TestCase {
         DeploymentType replicaDeployment = CatalogUtil.getDeployment(new FileInputStream(tmpReplica));
         CatalogUtil.compileDeployment(catalog, replicaDeployment, false);
         assertEquals("replica", catalog.getClusters().get("cluster").getDrrole());
+
+        setUp();
+        final File tmpXDCR = VoltProjectBuilder.writeStringToTempFile(xdcrRole);
+        DeploymentType xdcrDeployment = CatalogUtil.getDeployment(new FileInputStream(tmpXDCR));
+        CatalogUtil.compileDeployment(catalog, xdcrDeployment, false);
+        assertEquals("xdcr", catalog.getClusters().get("cluster").getDrrole());
 
         setUp();
         final File tmpInvalidRole = VoltProjectBuilder.writeStringToTempFile(invalidRole);
@@ -1523,7 +1536,7 @@ public class TestCatalogUtil extends TestCase {
         DeploymentType deploymentWithDefault = CatalogUtil.getDeployment(new FileInputStream(tmpWithDefault));
 
         final File tmpDdl = VoltProjectBuilder.writeStringToTempFile(ddl);
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         String x[] = {tmpDdl.getAbsolutePath()};
         Catalog cat = compiler.compileCatalogFromDDL(x);
 
@@ -1553,7 +1566,7 @@ public class TestCatalogUtil extends TestCase {
         DeploymentType deploymentWithDefault = CatalogUtil.getDeployment(new FileInputStream(tmpWithDefault));
 
         final File tmpDdl = VoltProjectBuilder.writeStringToTempFile(ddl);
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         String x[] = {tmpDdl.getAbsolutePath()};
         Catalog cat = compiler.compileCatalogFromDDL(x);
 

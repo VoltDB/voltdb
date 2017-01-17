@@ -47,6 +47,7 @@ import org.voltdb.catalog.Catalog;
 import org.voltdb.common.Constants;
 import org.voltdb.common.NodeState;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
+import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.compiler.deploymentfile.HttpsType;
 import org.voltdb.export.ExportManager;
 import org.voltdb.importer.ImportManager;
@@ -288,7 +289,8 @@ public class Inits {
                     // If no catalog was supplied provide an empty one.
                     if (m_rvdb.m_pathToStartupCatalog == null) {
                         try {
-                            File emptyJarFile = CatalogUtil.createTemporaryEmptyCatalogJarFile();
+                            File emptyJarFile = CatalogUtil.createTemporaryEmptyCatalogJarFile(
+                                DrRoleType.XDCR.value().equals(m_rvdb.getCatalogContext().getCluster().getDrrole()));
                             if (emptyJarFile == null) {
                                 VoltDB.crashLocalVoltDB("Failed to generate empty catalog.");
                             }
@@ -362,7 +364,8 @@ public class Inits {
             byte[] catalogJarHash = null;
             try {
                 Pair<InMemoryJarfile, String> loadResults =
-                    CatalogUtil.loadAndUpgradeCatalogFromJar(catalogStuff.catalogBytes);
+                    CatalogUtil.loadAndUpgradeCatalogFromJar(catalogStuff.catalogBytes,
+                                                             DrRoleType.XDCR.value().equals(m_rvdb.getCatalogContext().getCluster().getDrrole()));
                 serializedCatalog =
                     CatalogUtil.getSerializedCatalogStringFromJar(loadResults.getFirst());
                 catalogJarBytes = loadResults.getFirst().getFullJarBytes();
@@ -802,7 +805,8 @@ public class Inits {
                                 }
                                 // upgrade the catalog - the following will save the recpmpiled catalog
                                 // under voltdbroot/catalog-[serverVersion].jar
-                                CatalogUtil.loadAndUpgradeCatalogFromJar(catalogBytes);
+                                CatalogUtil.loadAndUpgradeCatalogFromJar(catalogBytes,
+                                                                         DrRoleType.XDCR.value().equals(m_rvdb.getCatalogContext().getCluster().getDrrole()));
                                 NodeSettings pathSettings = m_rvdb.m_nodeSettings;
                                 File recoverCatalogFH = new File(pathSettings.getVoltDBRoot(), "catalog-" + serverVersion + ".jar");
                                 catalogPath = recoverCatalogFH.getPath();
