@@ -1793,6 +1793,12 @@ public class PlanAssembler {
      * Determine if an OrderByPlanNode is needed.  This may return false if the
      * statement has no ORDER BY clause, or if the subtree is already producing
      * rows in the correct order.
+     *
+     * Note that even if there is a window function, which may have its own
+     * order, we need to insert the order by node so that the microoptimization
+     * InlineOrderByIntoMergeReceive can remove it and replace it with a
+     * MergeReceivePlanNode.
+     *
      * @param parsedStmt    The statement whose plan may need an OrderByPlanNode
      * @param root          The subtree which may need its output tuples ordered
      * @return true if the plan needs an OrderByPlanNode, false otherwise
@@ -1815,38 +1821,8 @@ public class PlanAssembler {
         // However, this probably is not optimal if there are low cardinality results.
         // Again, we have to replace the TVEs for ORDER BY clause for these cases in planning.
 
-        // Look through the plan until we see either a WindowFunctionPlanNode
-        // which uses an index for sorting or else an IndexScanPlanNode or
-        // else an AbstractJoinPlanNode.
-        //   o If we see the scan or join node before the window function node there
-        //     are no window function nodes and the node's sort direction tells us
-        //     if we can use it for the order by.
-        //   o If we see a window function node it will either use the index itself
-        //     or else add its own order by node.  If the window function's order by
-        //     node provides an ordering which is compatible with the statement level
-        //     order by then we also don't need an order by node.  The window function
-        //     will know this and tell us.
-        //
-        while (nonAggPlan != null) {
-            if (nonAggPlan instanceof IndexScanPlanNode
-                    || nonAggPlan instanceof AbstractJoinPlanNode) {
-                break;
-            }
-            if (nonAggPlan instanceof WindowFunctionPlanNode) {
-                WindowFunctionPlanNode wfp = (WindowFunctionPlanNode)nonAggPlan;
-                if (!wfp.isCompatibleWithStmtOrderBy()) {
-                    return true;
-                }
-            }
-            nonAggPlan = (nonAggPlan.getChildCount() > 0) ? nonAggPlan.getChild(0) : null;
-        }
-
-        if (nonAggPlan == null) {
-            // If we got to here without seeing
-            // a plan node which provides sorting,
-            // then we need an order by node to do
-            // the sorting.
-            return true;
+        if (nonAggPlan.getPlanNodeType() == PlanNodeType.AGGREGATE) {
+            nonAggPlan = nonAggPlan.getChild(0);
         }
         if (nonAggPlan instanceof IndexScanPlanNode) {
             sortDirection = ((IndexScanPlanNode)nonAggPlan).getSortDirection();
@@ -2235,6 +2211,17 @@ public class PlanAssembler {
      * @return
      */
     private AbstractPlanNode handleWindowedOperators(AbstractPlanNode root) {
+        //
+        // Search the join tree to see if there is an
+        // index we can use.  The planner will have left
+        // an indication there if this is true.
+        AbstractPlanNode scanNode = findScanNodeInPlan(root);
+        int indexForWindowFunction = SubPlanAssembler.NO_INDEX_USE;
+        boolean statementLevelOrderByIsCompatible = false;
+        if (scanNode != null) {
+            indexForWindowFunction = scanNode.getWindowFunctionUsesIndex();
+            statementLevelOrderByIsCompatible = scanNode.isWindowFunctionCompatibleWithOrderBy();
+        }
         // Get the windowed expression.  We need to set its output
         // schema from the display list.
         WindowFunctionExpression winExpr = m_parsedSelect.getWindowFunctionExpressions().get(0);
@@ -2245,12 +2232,8 @@ public class PlanAssembler {
         // we will add the input columns.
         WindowFunctionPlanNode pnode = new WindowFunctionPlanNode();
         pnode.setWindowFunctionExpression(winExpr);
-        /*
-         * Search the join tree to see if there is an
-         * index we can use.  The planner will have left
-         * an indication there if this is true.
-         */
-        int indexForWindowFunction = findIndexForWindowFunction(root);
+        pnode.setWindowFunctionUsesIndex(indexForWindowFunction);
+        pnode.setWindowFunctionIsCompatibleWithOrderBy(statementLevelOrderByIsCompatible);
         // This is the next node.  It's either the root or
         // else an order by grafted onto the root.
         AbstractPlanNode cnode;
@@ -2258,12 +2241,14 @@ public class PlanAssembler {
         // window function, indexForWindowFunction will have the
         // window function number of the index we've scanned.
         // Until then, we just use 0.  If the statement level
-        // order by uses the index, this will be -1.  If nothing
-        // can use an index this will be -2.
+        // order by uses the index, this will be SubplanAssembler.STATEMENT_LEVEL_ORDER_BY_INDEX.
+        // If nothing can use an index this will be SubplanAssembler.NO_INDEX_USE.
         if (indexForWindowFunction == 0) {
             cnode = root;
         } else {
             OrderByPlanNode onode = new OrderByPlanNode();
+            onode.setWindowFunctionUsesIndex(indexForWindowFunction);
+            onode.setWindowFunctionIsCompatibleWithOrderBy(statementLevelOrderByIsCompatible);
             cnode = onode;
             // We need to extract more information from the windowed expression.
             // to construct the output schema.
@@ -2304,13 +2289,22 @@ public class PlanAssembler {
         return pnode;
     }
 
-    private int findIndexForWindowFunction(AbstractPlanNode root) {
-        while ((0 <= root.getChildCount())
+    /**
+     * Return the scan node for this plan.  Return null if there
+     * is no suitable scan node.  Since a WindowFunctionPlanNode
+     * has what we want we will stop there as well.
+     *
+     * @param root
+     * @return The scan node or null.
+     */
+    private AbstractPlanNode findScanNodeInPlan(AbstractPlanNode root) {
+        while ((root != null)
                 && ! ( ( root instanceof AbstractScanPlanNode )
-                        || ( root instanceof AbstractJoinPlanNode ) ) ) {
-            root = root.getChild(0);
+                        || ( root instanceof AbstractJoinPlanNode )
+                        || ( root instanceof WindowFunctionPlanNode ) )) {
+            root = (0 < root.getChildCount()) ? root.getChild(0) : null;
         }
-        return root.getWindowFunctionUsesIndex();
+        return root;
     }
 
     private AbstractPlanNode handleAggregationOperators(AbstractPlanNode root) {

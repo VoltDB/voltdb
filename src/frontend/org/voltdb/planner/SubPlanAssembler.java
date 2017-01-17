@@ -586,7 +586,7 @@ public abstract class SubPlanAssembler {
                 // Invalidate the provisional indexed ordering.
                 retval.sortDirection = SortDirectionType.INVALID;
                 retval.m_stmtOrderByIsCompatible = false;
-                retval.m_windowFunctionUsesIndex = -2;
+                retval.m_windowFunctionUsesIndex = NO_INDEX_USE;
                 bindingsForOrder.clear(); // suddenly irrelevant
             }
             else {
@@ -1170,6 +1170,12 @@ public abstract class SubPlanAssembler {
     }
 
     /**
+     * These are some constants for using indexes for window functions.
+     */
+    public final static int NO_INDEX_USE = -2;
+    public final static int STATEMENT_LEVEL_ORDER_BY_INDEX = -1;
+
+    /**
      * A WindowFunctionScore keeps track of the score of
      * a single window function or else the statement level
      * order by expressions.
@@ -1213,7 +1219,7 @@ public abstract class SubPlanAssembler {
                 m_unmatchedOrderByExprs.add(new ExpressionOrColumn(-1, pci.expression, sortDir));
             }
             // Statement level order by expressions are number -1.
-            m_windowFunctionNumber = -1;
+            m_windowFunctionNumber = STATEMENT_LEVEL_ORDER_BY_INDEX;
             m_isWindowFunction = false;
             m_sortDirection = SortDirectionType.INVALID;
         }
@@ -1236,7 +1242,7 @@ public abstract class SubPlanAssembler {
         // we will be working on.
         int m_unmatchedOrderByCursor = 0;
         // This is the number of the window function.  It is
-        // -1 for the statement level order by list.
+        // STATEMENT_LEVEL_ORDER_BY for the statement level order by list.
         int m_windowFunctionNumber;
         // This is true if we ever see an index
         // expression or column which we cannot
@@ -1448,7 +1454,7 @@ public abstract class SubPlanAssembler {
             WindowFunctionScore answer = null;
             // Fill in the failing return values as a fallback.
             retval.bindings.clear();
-            retval.m_windowFunctionUsesIndex = -2;
+            retval.m_windowFunctionUsesIndex = NO_INDEX_USE;
             retval.sortDirection = SortDirectionType.INVALID;
             int numOrderSpoilers = 0;
 
@@ -1472,16 +1478,17 @@ public abstract class SubPlanAssembler {
                     }
                 }
             }
-            if (m_numOrderByScores > 0) {
-                assert(m_numOrderByScores + m_numWinScores <= m_winFunctions.length);
-                WindowFunctionScore orderByScore = m_winFunctions[m_numOrderByScores + m_numWinScores - 1];
-                assert(orderByScore != null);
-                if (orderByScore.isDone()) {
-                    retval.m_stmtOrderByIsCompatible = true;
-                }
-            }
             if (answer != null) {
                 assert(answer.m_sortDirection != null);
+                if (m_numOrderByScores > 0) {
+                    assert(m_numOrderByScores + m_numWinScores <= m_winFunctions.length);
+                    WindowFunctionScore orderByScore = m_winFunctions[m_numOrderByScores + m_numWinScores - 1];
+                    assert(orderByScore != null);
+                    // If the order by score is done, this
+                    // index is usable there as well as for any
+                    // window functions.
+                    retval.m_stmtOrderByIsCompatible = orderByScore.isDone();
+                }
                 retval.sortDirection = answer.m_sortDirection;
                 if (answer.m_sortDirection != SortDirectionType.INVALID) {
 
