@@ -22,6 +22,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import org.voltcore.utils.Pair;
+import org.voltdb.ProducerDRGateway.MeshMemberInfo;
+
 import com.google_voltpatches.common.net.HostAndPort;
 
 public interface ProducerDRGateway {
@@ -100,9 +103,11 @@ public interface ProducerDRGateway {
      * Getter for collecting the set of conversations in the producer conversation file at
      * initialization time. If we have been initialized with clusters 5 and 8, and we connect
      * to cluster 5 but id does not know about cluster 8 we need to set a StartCursor immediately
-     * before we even subscribe
+     * before we even subscribe, if any conversation was the dataSource for this cluster, it
+     * will be assigned in Pair.first. If Pair.first is -1, it means that this cluster was the
+     * original leader and the data on this cluster was not derived from a sync snapshot
      */
-    public List<MeshMemberInfo> getInitialConversations();
+    public Pair<Byte, List<MeshMemberInfo>> getInitialConversations();
 
     /**
      * Start listening on the ports
