@@ -331,12 +331,12 @@ public class UpdateClassesBenchmark {
         // write stats to file
         //client.writeSummaryCSV(stats, config.statsfile);
 
-        fw.append(String.format("%s,%d,-1,%f,%f,%f,0,0,0,0,0,0,0\n",
+        // name, duration,invocations/tps,latmin,latmax,lat95,lat99
+        fw.append(String.format("%s,-1,%f,0,0,%f,%f,0,0,0,0,0,0\n",
                                 config.name,
-                                stats.getStartTimestamp(),
+                                avg/1000.0,
                                 toMillis(min),
-                                toMillis(max),
-                                avg/1000.0
+                                toMillis(max)
                                 ));
 
         fw.flush();
