@@ -23,10 +23,13 @@ import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.nio.ByteBuffer;
 import java.util.Iterator;
+import java.util.Map;
+import java.util.Map.Entry;
 
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.iv2.UniqueIdGenerator;
 
 import com.google_voltpatches.common.collect.BoundType;
@@ -384,5 +387,16 @@ public class DRConsumerDrIdTracker implements Serializable {
               .append(DRLogSegmentId.getDebugStringFromDRId(end(entry))).append("] ");
         }
         return sb.toString();
+    }
+
+    public static void debugTraceTracker(VoltLogger log, Map<Integer, Map<Integer, DRConsumerDrIdTracker>> trackers) {
+        if (log.isTraceEnabled()) {
+            for (Entry<Integer, Map<Integer, DRConsumerDrIdTracker>> e1 : trackers.entrySet()) {
+                for (Entry<Integer, DRConsumerDrIdTracker> e2 : e1.getValue().entrySet()) {
+                    log.trace("Tracker for Producer " + e1.getKey() + "'s PID " + e2.getKey() +
+                            " contains " + e2.getValue().toShortString());
+                }
+            }
+        }
     }
 }

@@ -37,7 +37,7 @@ public interface ConsumerDRGateway extends Promotable {
 
     Map<Byte, DRRoleStats.State> getStates();
 
-    void initialize(boolean resumeReplication, List<MeshMemberInfo> expectedClusterMembers);
+    void initialize(boolean resumeReplication, final byte dataSourceCluster, List<MeshMemberInfo> expectedClusterMembers);
 
     void shutdown(final boolean blocking) throws InterruptedException, ExecutionException;
 
