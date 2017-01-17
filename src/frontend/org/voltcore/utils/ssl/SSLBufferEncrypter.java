@@ -17,12 +17,16 @@
 
 package org.voltcore.utils.ssl;
 
-import org.voltcore.utils.DBBPool;
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.ReadOnlyBufferException;
 
 import javax.net.ssl.SSLEngine;
 import javax.net.ssl.SSLEngineResult;
-import java.io.IOException;
-import java.nio.ByteBuffer;
+import javax.net.ssl.SSLException;
+
+import org.voltcore.network.TLSException;
+import org.voltcore.utils.DBBPool;
 
 public class SSLBufferEncrypter {
 
@@ -34,6 +38,20 @@ public class SSLBufferEncrypter {
         this.m_sslEngine = sslEngine;
         this.m_applicationBufferSize = applicationBufferSize;
         this.m_packetBufferSize = packetBufferSize;
+    }
+
+    public SSLBufferEncrypter(SSLEngine sslEngine) {
+        this.m_sslEngine = sslEngine;
+        this.m_applicationBufferSize = applicationBufferSize();
+        this.m_packetBufferSize = packetBufferSize();
+    }
+
+    private int applicationBufferSize() {
+        return m_sslEngine.getSession().getApplicationBufferSize();
+    }
+
+    private int packetBufferSize() {
+        return m_sslEngine.getSession().getPacketBufferSize();
     }
 
     public DBBPool.BBContainer encryptBuffer(ByteBuffer src) throws IOException {
@@ -49,7 +67,12 @@ public class SSLBufferEncrypter {
                 if (src.remaining() > m_applicationBufferSize) {
                     src.limit(src.position() + m_applicationBufferSize);
                 }
-                SSLEngineResult result = m_sslEngine.wrap(src.slice(), dst.b().slice());
+                SSLEngineResult result = null;
+                try {
+                    result = m_sslEngine.wrap(src.slice(), dst.b().slice());
+                } catch (ReadOnlyBufferException|IllegalArgumentException|IllegalStateException e) {
+                    throw new IOException("ssl engine wrap fault", e);
+                }
                 switch (result.getStatus()) {
                     case OK:
                         src.position(src.position() + result.bytesConsumed());
@@ -73,4 +96,33 @@ public class SSLBufferEncrypter {
         dst.b().flip();
         return dst;
     }
+
+    public void tlswrap(ByteBuffer srcBuffer, ByteBuffer dstBuffer)  {
+        while (true) {
+            SSLEngineResult result = null;
+            try {
+                result = m_sslEngine.wrap(srcBuffer, dstBuffer.slice());
+            } catch (SSLException|ReadOnlyBufferException|IllegalArgumentException|IllegalStateException e) {
+                throw new TLSException("ssl engine wrap fault", e);
+            }
+            switch (result.getStatus()) {
+                case OK:
+                    // in m_dstBuffer, newly decrtyped data is between pos and lim
+                    if (result.bytesProduced() > 0) {
+                        dstBuffer.limit(dstBuffer.position() + result.bytesProduced());
+                        return;
+                        }
+                    else {
+                        continue;
+                    }
+                case BUFFER_OVERFLOW:
+                    throw new TLSException("SSL engine unexpectedly overflowed when enrypting");
+                case BUFFER_UNDERFLOW:
+                    throw new TLSException("SSL engine unexpectedly underflowed when encrypting");
+                case CLOSED:
+                    throw new TLSException("SSL engine is closed on ssl wrap of buffer.");
+            }
+        }
+    }
+
 }

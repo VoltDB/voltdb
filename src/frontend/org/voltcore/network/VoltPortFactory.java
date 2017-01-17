@@ -17,11 +17,10 @@
 
 package org.voltcore.network;
 
-import org.voltcore.utils.ssl.SSLEncryptionService;
-
-import javax.net.ssl.SSLEngine;
 import java.net.InetSocketAddress;
 import java.nio.channels.SocketChannel;
+
+import javax.net.ssl.SSLEngine;
 
 public class VoltPortFactory {
 
@@ -30,7 +29,7 @@ public class VoltPortFactory {
                                           final InputHandler handler,
                                           final InetSocketAddress remoteAddress,
                                           final NetworkDBBPool pool,
-                                          final SSLEncryptionService sslEncryptionService,
+                                          final CipherExecutor cipherExecutor,
                                           final SSLEngine sslEngine
                                           ) {
         if (sslEngine == null) {
@@ -40,13 +39,13 @@ public class VoltPortFactory {
                     (InetSocketAddress) channel.socket().getRemoteSocketAddress(),
                     pool);
         } else {
-            return new SSLVoltPort(
+            return new TLSVoltPort(
                     network,
                     handler,
                     (InetSocketAddress) channel.socket().getRemoteSocketAddress(),
                     pool,
-                    sslEncryptionService,
-                    sslEngine);
+                    sslEngine,
+                    cipherExecutor);
         }
     }
 }

@@ -56,6 +56,7 @@ import javax.security.auth.Subject;
 import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashMap;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
+import org.voltcore.network.CipherExecutor;
 import org.voltcore.network.Connection;
 import org.voltcore.network.QueueMonitor;
 import org.voltcore.network.VoltNetworkPool;
@@ -63,7 +64,6 @@ import org.voltcore.network.VoltNetworkPool.IOStatsIntf;
 import org.voltcore.network.VoltProtocolHandler;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
-import org.voltcore.utils.ssl.SSLEncryptionService;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
 import org.voltdb.client.ClientStatusListenerExt.DisconnectCause;
@@ -183,7 +183,7 @@ class Distributer {
     private final Subject m_subject;
 
     // executor service for ssl encryption/decryption, if ssl is enabled.
-    private SSLEncryptionService m_sslEncryptionService;
+    private CipherExecutor m_cipherService;
 
     /**
      * Handles topology updates for client affinity
@@ -933,10 +933,10 @@ class Distributer {
         m_useMultipleThreads = useMultipleThreads;
         m_sslContext = sslContext;
         if (m_sslContext != null) {
-            m_sslEncryptionService = new SSLEncryptionService(false);
-            m_sslEncryptionService.startup();
+            m_cipherService = CipherExecutor.CLIENT;
+            m_cipherService.startup();
         } else {
-            m_sslEncryptionService = null;
+            m_cipherService = null;
         }
         m_network = new VoltNetworkPool(
                 m_useMultipleThreads ? Math.max(1, CoreUtils.availableProcessors() / 4 ) : 1,
@@ -976,7 +976,7 @@ class Distributer {
         final int hostId = (int)instanceIdWhichIsTimestampAndLeaderIp[0];
 
         NodeConnection cxn = new NodeConnection(instanceIdWhichIsTimestampAndLeaderIp);
-        Connection c = m_network.registerChannel( aChannel, cxn, m_sslEncryptionService, sslEngine);
+        Connection c = m_network.registerChannel( aChannel, cxn, m_cipherService, sslEngine);
         cxn.m_connection = c;
 
         synchronized (this) {
@@ -1249,9 +1249,9 @@ class Distributer {
         }
 
         m_network.shutdown();
-        if (m_sslEncryptionService != null) {
-            m_sslEncryptionService.shutdown();
-            m_sslEncryptionService = null;
+        if (m_cipherService != null) {
+            m_cipherService.shutdown();
+            m_cipherService = null;
         }
     }
 

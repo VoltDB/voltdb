@@ -48,9 +48,14 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ReadableByteChannel;
 import java.util.ArrayDeque;
+import java.util.BitSet;
 import java.util.Deque;
+import java.util.Iterator;
+import java.util.List;
 
 import org.voltcore.utils.DBBPool.BBContainer;
+
+import com.google_voltpatches.common.collect.ImmutableList;
 
 /**
 Provides a non-blocking stream-like interface on top of the Java NIO ReadableByteChannel. It calls
@@ -109,6 +114,71 @@ public class NIOReadStream implements ReadStream {
                 m_readBBContainers.poll();
                 firstC.discard();
             }
+        }
+    }
+
+    public Slice getSlice(final int size) {
+        if (size < 0) {
+            throw new IllegalArgumentException("negative slice size: " + size);
+        }
+        if (m_totalAvailable < size) {
+            throw new IllegalStateException("Requested " + size + " bytes; only have "
+                    + m_totalAvailable + " bytes; call tryRead() first");
+        }
+
+        ImmutableList.Builder<ContainerSlice> slices = ImmutableList.builder();
+        int bytesSliced = 0;
+        while (bytesSliced < size) {
+            BBContainer firstC = m_readBBContainers.peekFirst();
+            if (firstC == null) {
+                // Steal the write buffer
+                m_poolBBContainer.b().flip();
+                m_readBBContainers.add(m_poolBBContainer);
+                firstC = m_poolBBContainer;
+                m_poolBBContainer = null;
+            }
+            ByteBuffer first = firstC.b();
+            assert first.remaining() > 0 : "no remaining bytes to read";
+
+            int bytesRemaining = first.remaining();
+            int bytesToCopy = size - bytesSliced;
+
+            if (bytesToCopy > bytesRemaining) {
+                bytesToCopy = bytesRemaining;
+            }
+            slices.add(new ContainerSlice(firstC, bytesToCopy));
+            first.position(first.position() + bytesToCopy);
+
+            bytesSliced += bytesToCopy;
+            m_totalAvailable -= bytesToCopy;
+            if (first.remaining() == 0) {
+                m_readBBContainers.poll();
+            }
+        }
+        return new Slice(slices.build());
+    }
+
+    public void peekBytes(byte [] output) {
+        if (m_totalAvailable < output.length) {
+            throw new IllegalStateException("Requested " + output.length + " bytes; only have "
+                    + m_totalAvailable + " bytes; call tryRead() first");
+        }
+        int bytesPeeked = 0;
+        Iterator<BBContainer> cntnritr = m_readBBContainers.iterator();
+        while (bytesPeeked < output.length) {
+            final ByteBuffer slice;
+            if (!cntnritr.hasNext()) {
+                slice = m_poolBBContainer.b().duplicate();
+                slice.flip();
+            } else {
+                slice = cntnritr.next().b().slice();
+            }
+            // Copy bytes from first into output
+            int bytesRemaining = slice.remaining();
+            int bytesToCopy = output.length - bytesPeeked;
+            if (bytesToCopy > bytesRemaining) bytesToCopy = bytesRemaining;
+            slice.get(output, bytesPeeked, bytesToCopy);
+            bytesPeeked += bytesToCopy;
         }
     }
 
@@ -198,4 +268,51 @@ public class NIOReadStream implements ReadStream {
         }
     }
 
+    private static final class ContainerSlice {
+        private final BBContainer bbc;
+        private final ByteBuffer bb;
+        private final boolean discard;
+        private final int size;
+        private ContainerSlice(BBContainer bbc, final int size) {
+            discard = size == bbc.b().remaining();
+            ByteBuffer slice = bbc.b().slice();
+            slice.limit(size);
+            bb = slice;
+            this.bbc = bbc;
+            this.size = size;
+        }
+    }
+
+    public static final class Slice {
+        private final List<ContainerSlice> m_slices;
+        public final io.netty.buffer.ByteBuf bb;
+        private final BitSet m_discarded;
+
+        private Slice(List<ContainerSlice> slices) {
+            ByteBuffer [] bbs = new ByteBuffer[slices.size()];
+            m_discarded = new BitSet(slices.size());
+            for (int i = 0; i < slices.size(); ++i) {
+                bbs[i] = slices.get(i).bb;
+            }
+            bb = io.netty.buffer.Unpooled.wrappedBuffer(bbs);
+            m_slices = slices;
+        }
+
+        public int discard() {
+            int discarded = 0;
+            int size = 0;
+            for (int i = 0; i < m_slices.size(); ++i) {
+                ContainerSlice slc = m_slices.get(i);
+                size += slc.size;
+                if (m_discarded.get(i)) continue;
+                if (slc.discard && bb.readerIndex() >= size) {
+                    slc.bbc.discard();
+                    m_discarded.set(i);
+                    discarded += 1;
+                }
+            }
+            return discarded;
+        }
+
+    }
 }

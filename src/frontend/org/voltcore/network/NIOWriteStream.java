@@ -48,7 +48,7 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
     /**
      * Reference to the port for changing interest ops
      */
-    private final VoltPort m_port;
+    protected final VoltPort m_port;
 
     private static final VoltLogger networkLog = new VoltLogger("NETWORK");
 

@@ -36,7 +36,7 @@ public class VoltPort implements Connection
 
     protected static final VoltLogger networkLog = new VoltLogger("NETWORK");
 
-    private static final int MAX_MESSAGE_LENGTH = 52428800;
+    static final int MAX_MESSAGE_LENGTH = 52428800;
 
     protected final NetworkDBBPool m_pool;
 
@@ -49,9 +49,9 @@ public class VoltPort implements Connection
     /** True when the port is executing  VoltNetwork dispatch */
     volatile boolean m_running = false;
 
-    private volatile boolean m_isDead = false;
+    protected volatile boolean m_isDead = false;
 
-    protected boolean m_isShuttingDown = false;
+    protected volatile boolean m_isShuttingDown = false;
 
     /** Used internally to make operation changes atomic.
      *  External writers (like a foreign host, for example),

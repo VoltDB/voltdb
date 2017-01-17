@@ -43,8 +43,8 @@ import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
+import org.voltcore.network.CipherExecutor;
 import org.voltcore.utils.Pair;
-import org.voltcore.utils.ssl.SSLEncryptionService;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.common.Constants;
 import org.voltdb.common.NodeState;
@@ -492,6 +492,7 @@ public class Inits {
                         m_config.m_sslContext = m_config.m_sslContextFactory.getSslContext();
                         hostLog.info("SSL enabled for admin and client port. Please enable SSL on client.");
                     }
+                    CipherExecutor.SERVER.startup();
                 } catch (Exception e) {
                     VoltDB.crashLocalVoltDB("Unable to configure SSL", true, e);
                 }

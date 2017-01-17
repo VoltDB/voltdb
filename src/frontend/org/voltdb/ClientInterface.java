@@ -45,6 +45,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLEngine;
+
 import org.HdrHistogram_voltpatches.AbstractHistogram;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONObject;
@@ -53,6 +56,7 @@ import org.voltcore.messaging.BinaryPayloadMessage;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
+import org.voltcore.network.CipherExecutor;
 import org.voltcore.network.Connection;
 import org.voltcore.network.QueueMonitor;
 import org.voltcore.network.ReadStream;
@@ -66,7 +70,7 @@ import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
 import org.voltcore.utils.ssl.MessagingChannel;
-import org.voltcore.utils.ssl.SSLEncryptionService;
+import org.voltcore.utils.ssl.SSLConfiguration;
 import org.voltdb.AuthSystem.AuthProvider;
 import org.voltdb.AuthSystem.AuthUser;
 import org.voltdb.CatalogContext.ProcedurePartitionInfo;
@@ -94,9 +98,6 @@ import com.google_voltpatches.common.base.Predicate;
 import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
-
-import javax.net.ssl.SSLContext;
-import javax.net.ssl.SSLEngine;
 
 /**
  * Represents VoltDB's connection to client libraries outside the cluster.
@@ -344,6 +345,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         }
                         sslEngine.setUseClientMode(false);
                         sslEngine.setNeedClientAuth(false);
+                        sslEngine.setEnabledCipherSuites(SSLConfiguration.ENABLED_CIPHERS);
                         // blocking needs to be false for handshaking.
                         boolean handshakeStatus;
 
@@ -420,7 +422,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                     handler,
                                     0,
                                     ReverseDNSPolicy.ASYNCHRONOUS,
-                                    SSLEncryptionService.serverInstance(),
+                                    CipherExecutor.SERVER,
                                     sslEngine);
                             /*
                              * If IV2 is enabled the logic initially enabling read is

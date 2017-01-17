@@ -34,11 +34,10 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 
+import javax.net.ssl.SSLEngine;
+
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
-import org.voltcore.utils.ssl.SSLEncryptionService;
-
-import javax.net.ssl.SSLEngine;
 
 public class VoltNetworkPool {
 
@@ -92,9 +91,9 @@ public class VoltNetworkPool {
     public Connection registerChannel(
             final SocketChannel channel,
             final InputHandler handler,
-            final SSLEncryptionService sslEncryptionService,
+            final CipherExecutor cipherService,
             final SSLEngine sslEngine) throws IOException {
-        return registerChannel( channel, handler, SelectionKey.OP_READ, ReverseDNSPolicy.ASYNCHRONOUS, sslEncryptionService, sslEngine);
+        return registerChannel( channel, handler, SelectionKey.OP_READ, ReverseDNSPolicy.ASYNCHRONOUS, cipherService, sslEngine);
     }
 
     public Connection registerChannel(
@@ -102,7 +101,7 @@ public class VoltNetworkPool {
             final InputHandler handler,
             final int interestOps,
             final ReverseDNSPolicy dns,
-            final SSLEncryptionService sslEncryptionService,
+            final CipherExecutor cipherService,
             final SSLEngine sslEngine) throws IOException {
         //Start with a round robin base policy
         VoltNetwork vn = m_networks[(int)(m_nextNetwork.getAndIncrement() % m_networks.length)];
@@ -113,7 +112,7 @@ public class VoltNetworkPool {
                 vn = m_networks[ii];
             }
         }
-        return vn.registerChannel(channel, handler, interestOps, dns, sslEncryptionService, sslEngine);
+        return vn.registerChannel(channel, handler, interestOps, dns, cipherService, sslEngine);
     }
 
     public List<Long> getThreadIds() {

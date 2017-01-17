@@ -72,6 +72,9 @@
     <fileset dir='${vendor.lib.dir}'>
         <include name='javaee-api-6.0.jar' />
     </fileset>
+    <fileset dir='${lib.dir}'>
+        <include name='netty-*.jar' />
+    </fileset>
     <pathelement path="${java.class.path}"/>
 </path>
 
@@ -111,6 +114,7 @@
                   org/voltcore/utils/Pair.java
                   org/voltcore/utils/RateLimitedLogger.java
                   org/voltcore/utils/Bits.java
+                  org/voltcore/utils/FlexibleSemaphore.java
                   org/voltcore/utils/LatencyWatchdog.java
                   org/voltcore/utils/CompressionStrategy.java
                   org/voltcore/utils/VoltTypeUtil.java
