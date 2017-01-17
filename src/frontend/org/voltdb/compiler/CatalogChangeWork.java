@@ -34,6 +34,7 @@ public class CatalogChangeWork extends AsyncCompilerWork {
     final String operationString;
     final String[] adhocDDLStmts;
     final byte[] replayHashOverride;
+    final boolean isPromotion;
     public final long replayTxnId;
     public final long replayUniqueId;
 
@@ -44,7 +45,7 @@ public class CatalogChangeWork extends AsyncCompilerWork {
             String invocationName, boolean onReplica, boolean useAdhocDDL,
             AsyncCompilerWorkCompletionHandler completionHandler,
             AuthSystem.AuthUser user, byte[] replayHashOverride,
-            long replayTxnId, long replayUniqeuId)
+            boolean isPromotion, long replayTxnId, long replayUniqeuId)
     {
         super(replySiteId, false, clientHandle, connectionId, hostname,
               adminConnection, clientData, invocationName,
@@ -59,6 +60,7 @@ public class CatalogChangeWork extends AsyncCompilerWork {
         this.operationString = operationString;
         adhocDDLStmts = null;
         this.replayHashOverride = replayHashOverride;
+        this.isPromotion = isPromotion;
         this.replayTxnId = replayTxnId;
         this.replayUniqueId = replayUniqeuId;
     }
@@ -88,6 +90,7 @@ public class CatalogChangeWork extends AsyncCompilerWork {
         this.operationString = null;
         this.adhocDDLStmts = adhocDDL.sqlStatements;
         this.replayHashOverride = null;
+        this.isPromotion = false;
         this.replayTxnId = -1L;
         this.replayUniqueId = -1L;
     }
