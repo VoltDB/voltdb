@@ -36,7 +36,6 @@ import org.voltdb.compiler.deploymentfile.ExportType;
 import org.voltdb.compiler.deploymentfile.HttpdType;
 import org.voltdb.compiler.deploymentfile.HttpdType.Jsonapi;
 import org.voltdb.compiler.deploymentfile.PartitionDetectionType;
-import org.voltdb.compiler.deploymentfile.PartitionDetectionType.Snapshot;
 import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.PathsType.Voltdbroot;
 import org.voltdb.compiler.deploymentfile.SchemaType;
@@ -97,7 +96,6 @@ public class DeploymentBuilder {
     private String m_voltRootPath = null;
 
     private boolean m_ppdEnabled = false;
-    private String m_ppdPrefix = "none";
 
     private String m_internalSnapshotPath;
     private String m_commandLogPath;
@@ -234,11 +232,10 @@ public class DeploymentBuilder {
         m_snapshotPath = path;
     }
 
-    public void setPartitionDetectionSettings(final String snapshotPath, final String ppdPrefix)
+    public void setPartitionDetectionSettings(final String snapshotPath)
     {
         m_ppdEnabled = true;
         m_snapshotPath = snapshotPath;
-        m_ppdPrefix = ppdPrefix;
     }
 
     public void addExport(boolean enabled) {
@@ -369,9 +366,6 @@ public class DeploymentBuilder {
         PartitionDetectionType ppd = factory.createPartitionDetectionType();
         deployment.setPartitionDetection(ppd);
         ppd.setEnabled(m_ppdEnabled);
-        Snapshot ppdsnapshot = factory.createPartitionDetectionTypeSnapshot();
-        ppd.setSnapshot(ppdsnapshot);
-        ppdsnapshot.setPrefix(m_ppdPrefix);
 
         // <systemsettings>
         SystemSettingsType systemSettingType = factory.createSystemSettingsType();

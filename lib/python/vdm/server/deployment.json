@@ -30,10 +30,6 @@
         }
     },
     "partition-detection": {
-        "snapshot": {
-            "prefix":
-                    "voltdb_partition_detection"
-        },
         "enabled": true
     },
     "heartbeat": {
