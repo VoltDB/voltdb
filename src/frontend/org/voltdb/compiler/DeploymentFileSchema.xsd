@@ -252,15 +252,8 @@
     <xs:attribute name="logsize" type="logSizeType" default="1024" />
   </xs:complexType>
 
-  <!-- <partition-detection>/<snapshot> -->
+  <!-- <partition-detection> -->
   <xs:complexType name="partitionDetectionType">
-      <xs:all>
-          <xs:element name="snapshot" minOccurs="0" maxOccurs="1">
-             <xs:complexType>
-                 <xs:attribute name="prefix" type="xs:string" use="optional" default="partition_detection" />
-             </xs:complexType>
-          </xs:element>
-      </xs:all>
       <xs:attribute name="enabled" type="xs:boolean" default="true"/>
    </xs:complexType>
 

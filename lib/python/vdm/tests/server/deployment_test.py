@@ -885,8 +885,7 @@ class UpdateDeployment(Deployment):
                           "exportoverflow":
                               {"path": "export_overflow"}, "commandlog": {"path": "command_log"},
                           "commandlogsnapshot": {"path": "command_log_snapshot"}},
-                "partition-detection": {"snapshot": {"prefix": "voltdb_partition_detection"},
-                                       "enabled": True},
+                "partition-detection": {"enabled": True},
                 "heartbeat": {"timeout": 90},
                 "httpd": {"jsonapi": {"enabled": True}, "port": 8080, "enabled": True},
                 "snapshot": {"frequency": "24h", "retain": 2,

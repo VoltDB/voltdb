@@ -627,8 +627,6 @@ def set_partition_detection_field(deployment, field, new_deployment):
         new_deployment[field] = {}
         new_deployment[field]['enabled'] = parse_bool_string(deployment[field]
                                                              ['enabled'])
-        new_deployment[field]['snapshot'] = {}
-        new_deployment[field]['snapshot']['prefix'] = deployment[field]['snapshot']['prefix']
     except Exception, err:
         result = str(err)
         print_errors(field, result)
