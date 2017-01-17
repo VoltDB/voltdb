@@ -750,7 +750,18 @@ static const NValue maxValidTimestamp = ValueFactory::getTimestampValue(NYE9999)
 static const NValue tooBigTimestamp = ValueFactory::getTimestampValue(NYE9999 + 1);
 static const NValue maxInt64 = ValueFactory::getTimestampValue(std::numeric_limits<int64_t>::max());
 
-static const std::string outOfRangeMessage = "Value out of range. Cannot convert dates prior to the year 1583 or after the year 9999";
+static std::string getInputOutOfRangeMessage(const std::string& func) {
+    std::ostringstream oss;
+    oss << "Input to SQL function " << func << " is outside of the supported range (years 1583 to 9999, inclusive).";
+    return oss.str();
+}
+
+static std::string getOutputOutOfRangeMessage(const std::string& func) {
+    std::ostringstream oss;
+    oss << "SQL function " << func << " would produce a value outside of the supported range (years 1583 to 9999, inclusive).";
+    return oss.str();
+}
+
 
 TEST_F(FunctionTest, DateFunctionsTruncate) {
     std::vector<int> funcs {
@@ -777,6 +788,7 @@ TEST_F(FunctionTest, DateFunctionsTruncate) {
         "9999-12-31 23:59:59.999999"  // microsecond
     };
 
+    const std::string outOfRangeMessage = getInputOutOfRangeMessage("TRUNCATE");
     int i = 0;
     BOOST_FOREACH(int func, funcs) {
         ASSERT_EQ(testUnary(func, nullTimestamp, nullTimestamp, true), 0);
@@ -817,6 +829,20 @@ TEST_F(FunctionTest, DateFunctionsExtract) {
         FUNC_EXTRACT_SECOND
     };
 
+    std::vector<string> funcNames {
+        "YEAR",
+        "MONTH",
+        "DAY",
+        "DAY_OF_WEEK",
+        "WEEKDAY",
+        "WEEK_OF_YEAR",
+        "DAY_OF_YEAR",
+        "QUARTER",
+        "HOUR",
+        "MINUTE",
+        "SECOND"
+    };
+
     std::vector<int> minExpected {
         1583, // year
         1,    // month
@@ -847,6 +873,7 @@ TEST_F(FunctionTest, DateFunctionsExtract) {
 
     int i = 0;
     BOOST_FOREACH(int func, funcs) {
+        const std::string outOfRangeMessage = getInputOutOfRangeMessage(funcNames[i]);
         ASSERT_EQ("success", testUnaryThrows(func, minInt64, outOfRangeMessage));
         ASSERT_EQ("success", testUnaryThrows(func, tooSmallTimestamp, outOfRangeMessage));
         ASSERT_EQ("success", testUnaryThrows(func, tooBigTimestamp, outOfRangeMessage));
@@ -907,6 +934,8 @@ TEST_F(FunctionTest, DateFunctionsAdd) {
         PTIME_MIN_MICROSECOND_INTERVAL
     };
 
+    const std::string outOfRangeMessage = getInputOutOfRangeMessage("DATEADD");
+    const std::string outputOutOfRangeMessage = getOutputOutOfRangeMessage("DATEADD");
     int i = 0;
     BOOST_FOREACH(int func, funcs) {
         // test null values
@@ -934,6 +963,10 @@ TEST_F(FunctionTest, DateFunctionsAdd) {
         // Likewise for subtracting a unit
         ASSERT_EQ(testBinary(func, -1, maxValidTimestamp, maxValidTimestamp), -1);
 
+        // DATEADD that would produce an out of range timestamp should throw
+        ASSERT_EQ("success", testBinaryThrows(func, -1, minValidTimestamp, outputOutOfRangeMessage));
+        ASSERT_EQ("success", testBinaryThrows(func, 1, maxValidTimestamp, outputOutOfRangeMessage));
+
         ++i;
     }
 }
@@ -955,6 +988,7 @@ TEST_F(FunctionTest, DateFunctionsSinceEpoch) {
         1
     };
 
+    const std::string outOfRangeMessage = getInputOutOfRangeMessage("SINCE_EPOCH");
     int i = 0;
     BOOST_FOREACH(int func, funcs) {
         ASSERT_EQ(0, testUnary(func, nullTimestamp, nullTimestamp, true));
@@ -963,12 +997,12 @@ TEST_F(FunctionTest, DateFunctionsSinceEpoch) {
         // by 1, 1000 or 1000000.  Therefore it doesn't throw an exception for
         // out of range values.
 
-        ASSERT_EQ(0, testUnary(func, minInt64, MIN_INT64 / scale[i]));
-        ASSERT_EQ(0, testUnary(func, tooSmallTimestamp, (GREGORIAN_EPOCH-1) / scale[i]));
+        ASSERT_EQ("success", testUnaryThrows(func, minInt64, outOfRangeMessage));
+        ASSERT_EQ("success", testUnaryThrows(func, tooSmallTimestamp, outOfRangeMessage));
         ASSERT_EQ(0, testUnary(func, minValidTimestamp, GREGORIAN_EPOCH / scale[i]));
         ASSERT_EQ(0, testUnary(func, maxValidTimestamp, NYE9999 / scale[i]));
-        ASSERT_EQ(0, testUnary(func, tooBigTimestamp, (NYE9999+1) / scale[i]));
-        ASSERT_EQ(0, testUnary(func, maxInt64, MAX_INT64 / scale[i]));
+        ASSERT_EQ("success", testUnaryThrows(func, tooBigTimestamp, outOfRangeMessage));
+        ASSERT_EQ("success", testUnaryThrows(func, maxInt64, outOfRangeMessage));
 
         ++i;
     }
@@ -991,6 +1025,8 @@ TEST_F(FunctionTest, DateFunctionsToTimestamp) {
 
     const NValue nullBigint = NValue::getNullValue(VALUE_TYPE_NULL);
 
+    const std::string outOfRangeMessage = getInputOutOfRangeMessage("TO_TIMESTAMP");
+    const std::string outputOutOfRangeMessage = getOutputOutOfRangeMessage("TO_TIMESTAMP");
     int i = 0;
     BOOST_FOREACH(int func, funcs) {
         ASSERT_EQ(0, testUnary(func, nullBigint, nullTimestamp, true));
@@ -1006,19 +1042,15 @@ TEST_F(FunctionTest, DateFunctionsToTimestamp) {
             ASSERT_EQ("success", testUnaryThrows(func, (MAX_INT64 / scale[i]) + 1, overflowMessage));
         }
 
-        const int64_t TRUNCATED_MIN_INT64 = (MIN_INT64 / scale[i]) * scale[i];
         const int64_t TRUNCATED_MIN_VALID_TS = (GREGORIAN_EPOCH / scale[i]) * scale[i];
         const int64_t TRUNCATED_MAX_VALID_TS = (NYE9999 / scale[i]) * scale[i];
-        const int64_t TRUNCATED_MAX_INT64 = (MAX_INT64 / scale[i]) * scale[i];
 
-        ASSERT_EQ(0, testUnary(func, MIN_INT64 / scale[i],
-                               ValueFactory::getTimestampValue(TRUNCATED_MIN_INT64)));
+        ASSERT_EQ("success", testUnaryThrows(func, MIN_INT64 / scale[i], outputOutOfRangeMessage));
         ASSERT_EQ(0, testUnary(func, GREGORIAN_EPOCH / scale[i],
                                ValueFactory::getTimestampValue(TRUNCATED_MIN_VALID_TS)));
         ASSERT_EQ(0, testUnary(func, NYE9999/ scale[i],
                                ValueFactory::getTimestampValue(TRUNCATED_MAX_VALID_TS)));
-        ASSERT_EQ(0, testUnary(func, MAX_INT64 / scale[i],
-                               ValueFactory::getTimestampValue(TRUNCATED_MAX_INT64)));
+        ASSERT_EQ("success", testUnaryThrows(func, MAX_INT64 / scale[i], outputOutOfRangeMessage));
 
         ++i;
     }
