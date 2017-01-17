@@ -380,9 +380,6 @@ class UpdateDatabaseDeployment(Deployment):
                         self.assertEqual(child.attrib['provider'], "HASH")
                     if child.tag == "partition-detection":
                         self.assertEqual(child.attrib['enabled'], "true")
-                        for subnode in child:
-                            self.assertEqual(subnode.attrib['prefix'], "voltdb_partition_detection")
-
 
 if __name__ == '__main__':
     unittest.main(testRunner=xmlrunner.XMLTestRunner(output='test-reports'))

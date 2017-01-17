@@ -205,11 +205,6 @@ def map_deployment(request, database_id):
     if 'partition-detection' in request.json and 'enabled' in request.json['partition-detection']:
         deployment['partition-detection']['enabled'] = request.json['partition-detection']['enabled']
 
-    if 'partition-detection' in request.json and 'snapshot' in request.json['partition-detection'] \
-            and 'prefix' in request.json['partition-detection']['snapshot']:
-        deployment['partition-detection']['snapshot']['prefix'] = \
-            request.json['partition-detection']['snapshot']['prefix']
-
     if 'paths' in request.json and 'commandlog' in request.json['paths'] and \
                     'path' in request.json['paths']['commandlog']:
         deployment['paths']['commandlog']['path'] = \

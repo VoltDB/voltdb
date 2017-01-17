@@ -278,6 +278,5 @@ class UpdateDeployment(Deployment):
             if child.tag == "partition-detection":
                 self.assertEqual(child.attrib['enabled'], "true")
 
-
 if __name__ == '__main__':
     unittest.main(testRunner=xmlrunner.XMLTestRunner(output='test-reports'))
