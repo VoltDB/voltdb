@@ -52,7 +52,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
     public enum Members {
         TARGET_INDEX_NAME,
         SEARCHKEY_EXPRESSIONS,
-        IGNORE_NULL_CANDIDATE,
+        COMPARE_NOTDISTINCT,
         ENDKEY_EXPRESSIONS,
         SKIP_NULL_PREDICATE,
         LOOKUP_TYPE,
@@ -74,7 +74,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
     protected List<AbstractExpression> m_searchkeyExpressions = new ArrayList<AbstractExpression>();
 
     // If the search key expression is actually a "not distinct" expression, we do not want the executor to skip null candidates.
-    protected List<Boolean> m_ignoreNullCandidate = new ArrayList<Boolean>();
+    protected List<Boolean> m_compareNotDistinct = new ArrayList<Boolean>();
 
     // The overall index lookup operation type
     protected IndexLookupType m_lookupType = IndexLookupType.EQ;
@@ -122,7 +122,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         if ( ! isp.isReverseScan()) {
             m_lookupType = isp.m_lookupType;
             m_searchkeyExpressions = isp.m_searchkeyExpressions;
-            m_ignoreNullCandidate = isp.m_ignoreNullCandidate;
+            m_compareNotDistinct = isp.m_compareNotDistinct;
 
             m_endType = endType;
             m_endkeyExpressions.addAll(endKeys);
@@ -135,11 +135,11 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
             assert(endType == IndexLookupType.EQ);
             m_lookupType = endType;     // must be EQ, but doesn't matter, since previous lookup type is not GT
             m_searchkeyExpressions.addAll(endKeys);
-            m_ignoreNullCandidate = isp.m_ignoreNullCandidate;
+            m_compareNotDistinct = isp.m_compareNotDistinct;
             // For this additional < / <= expression, we set ignoreNullCandidate = true.
             // This is because the endkey came from doubleBoundExpr (in getRelevantAccessPathForIndex()),
             // which has no way to be "IS NOT DISTINCT FROM". (ENG-11096)
-            m_ignoreNullCandidate.add(true);
+            m_compareNotDistinct.add(true);
             m_endType = isp.m_lookupType;
             m_endkeyExpressions = isp.getSearchKeyExpressions();
 
@@ -178,7 +178,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         }
         m_skip_null_predicate = IndexScanPlanNode.buildSkipNullPredicate(
                 nullExprIndex, m_catalogIndex, m_tableScan,
-                m_searchkeyExpressions, m_ignoreNullCandidate);
+                m_searchkeyExpressions, m_compareNotDistinct);
         if (m_skip_null_predicate != null) {
             m_skip_null_predicate.resolveForTable((Table)m_catalogIndex.getParent());
         }
@@ -398,8 +398,8 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         }
 
         stringer.key(Members.SEARCHKEY_EXPRESSIONS.name()).array(m_searchkeyExpressions);
-        stringer.key(Members.IGNORE_NULL_CANDIDATE.name()).array();
-        for (Boolean ignoreNullCandidateValue : m_ignoreNullCandidate) {
+        stringer.key(Members.COMPARE_NOTDISTINCT.name()).array();
+        for (Boolean ignoreNullCandidateValue : m_compareNotDistinct) {
             stringer.value(ignoreNullCandidateValue);
         }
         stringer.endArray();
@@ -423,12 +423,12 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         // load searchkey_expressions
         AbstractExpression.loadFromJSONArrayChild(m_searchkeyExpressions, jobj,
                 Members.SEARCHKEY_EXPRESSIONS.name(), m_tableScan);
-        // load ignore_null_candidate flag vector
-        if ( ! jobj.isNull(Members.IGNORE_NULL_CANDIDATE.name())) {
-            JSONArray jarray = jobj.getJSONArray(Members.IGNORE_NULL_CANDIDATE.name());
+        // load COMPARE_NOTDISTINCT flag vector
+        if ( ! jobj.isNull(Members.COMPARE_NOTDISTINCT.name())) {
+            JSONArray jarray = jobj.getJSONArray(Members.COMPARE_NOTDISTINCT.name());
             int numCols = jarray.length();
             for (int ii = 0; ii < numCols; ++ii) {
-                m_ignoreNullCandidate.add(jarray.getBoolean(ii));
+                m_compareNotDistinct.add(jarray.getBoolean(ii));
             }
         }
         // load skip_null_predicate
@@ -486,11 +486,11 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         // Explain the search keys that describe the boundaries of the index count, like
         // "(event_type = 1 AND event_start > x.start_time)"
         if (searchkeySize > 0) {
-            String start = explainKeys(asIndexed, m_searchkeyExpressions, m_targetTableName, m_lookupType, m_ignoreNullCandidate);
+            String start = explainKeys(asIndexed, m_searchkeyExpressions, m_targetTableName, m_lookupType, m_compareNotDistinct);
             usageInfo += "\n" + indent + " count matches from " + start;
         }
         if (endkeySize > 0) {
-            String end = explainKeys(asIndexed, m_endkeyExpressions, m_targetTableName, m_endType, m_ignoreNullCandidate);
+            String end = explainKeys(asIndexed, m_endkeyExpressions, m_targetTableName, m_endType, m_compareNotDistinct);
             usageInfo += "\n" + indent + " count matches to " + end;
         }
         if (m_skip_null_predicate != null) {

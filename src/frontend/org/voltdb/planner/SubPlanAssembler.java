@@ -1574,7 +1574,7 @@ public abstract class SubPlanAssembler {
         for (AbstractExpression expr : path.indexExprs) {
             if (path.lookupType == IndexLookupType.GEO_CONTAINS) {
                 scanNode.addSearchKeyExpression(expr);
-                scanNode.addIgnoreNullCandidateFlag(true);
+                scanNode.addCompareNotDistinctFlag(true);
                 continue;
             }
             AbstractExpression exprRightChild = expr.getRight();
@@ -1603,7 +1603,7 @@ public abstract class SubPlanAssembler {
             }
             scanNode.addSearchKeyExpression(exprRightChild);
             // If the index expression is an "IS NOT DISTINCT FROM" comaprison, let the NULL values go through. (ENG-11096)
-            scanNode.addIgnoreNullCandidateFlag(expr.getExpressionType() != ExpressionType.COMPARE_NOTDISTINCT);
+            scanNode.addCompareNotDistinctFlag(expr.getExpressionType() != ExpressionType.COMPARE_NOTDISTINCT);
         }
         // create the IndexScanNode with all its metadata
         scanNode.setLookupType(path.lookupType);

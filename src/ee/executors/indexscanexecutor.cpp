@@ -225,7 +225,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
         //   do early return optimization, our index comparator may not handle null comparison correctly.
         // However, if the search key expression is "IS NOT DISTINCT FROM", then NULL values cannot be skipped.
         // We will set the IgnoreNullCandidateFlags to false in the planner to mark this. (ENG-11096)
-        if (candidateValue.isNull() && m_node->getIgnoreNullCandidateFlags()[ctr]) {
+        if (candidateValue.isNull() && m_node->getCompareNotDistinctFlags()[ctr]) {
             earlyReturnForSearchKeyOutOfRange = true;
             break;
         }

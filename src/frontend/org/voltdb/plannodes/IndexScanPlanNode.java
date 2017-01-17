@@ -58,7 +58,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         TARGET_INDEX_NAME,
         END_EXPRESSION,
         SEARCHKEY_EXPRESSIONS,
-        IGNORE_NULL_CANDIDATE,
+        COMPARE_NOTDISTINCT,
         INITIAL_EXPRESSION,
         SKIP_NULL_PREDICATE,
         KEY_ITERATE,
@@ -87,7 +87,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     protected final List<AbstractExpression> m_searchkeyExpressions = new ArrayList<AbstractExpression>();
 
     // If the search key expression is actually a "not distinct" expression, we do not want the executor to skip null candidates.
-    protected final List<Boolean> m_ignoreNullCandidate = new ArrayList<Boolean>();
+    protected final List<Boolean> m_compareNotDistinct = new ArrayList<Boolean>();
 
     // for reverse scan LTE only.
     // The initial expression is needed to control a (short?) forward scan to adjust the start of a reverse
@@ -177,7 +177,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         assert(nullExprIndex >= 0);
 
         m_skip_null_predicate = buildSkipNullPredicate(nullExprIndex, m_catalogIndex, m_tableScan,
-                                                        m_searchkeyExpressions, m_ignoreNullCandidate);
+                                                        m_searchkeyExpressions, m_compareNotDistinct);
     }
 
     public static AbstractExpression buildSkipNullPredicate(
@@ -244,8 +244,8 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
                 AbstractExpression expr = new ComparisonExpression(exprType, idxExpr, searchkeyExpressions.get(i).clone());
                 exprs.add(expr);
             }
-            // If nullExprIndex fell out of the search key range (there will be no m_ignoreNullCandidate for it)
-            // or m_ignoreNullCandidate flag says it should ignore null values,
+            // If nullExprIndex fell out of the search key range (there will be no m_compareNotDistinct for it)
+            // or m_compareNotDistinct flag says it should ignore null values,
             // then we add "nullExpr IS NULL" to the expression for matching tuples to skip. (ENG-11096)
             if (ignoreNullCandidate == null
                     || nullExprIndex == searchkeyExpressions.size()
@@ -490,8 +490,8 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         }
     }
 
-    public void addIgnoreNullCandidateFlag(Boolean flag) {
-        m_ignoreNullCandidate.add(flag);
+    public void addCompareNotDistinctFlag(Boolean flag) {
+        m_compareNotDistinct.add(flag);
     }
 
     public void removeLastSearchKey()
@@ -744,8 +744,8 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         stringer.keySymbolValuePair(Members.TARGET_INDEX_NAME.name(), m_targetIndexName);
         if (m_searchkeyExpressions.size() > 0) {
             stringer.key(Members.SEARCHKEY_EXPRESSIONS.name()).array(m_searchkeyExpressions);
-            stringer.key(Members.IGNORE_NULL_CANDIDATE.name()).array();
-            for (Boolean ignoreNullCandidateValue : m_ignoreNullCandidate) {
+            stringer.key(Members.COMPARE_NOTDISTINCT.name()).array();
+            for (Boolean ignoreNullCandidateValue : m_compareNotDistinct) {
                 stringer.value(ignoreNullCandidateValue);
             }
             stringer.endArray();
@@ -780,12 +780,12 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         // load searchkey_expressions
         AbstractExpression.loadFromJSONArrayChild(m_searchkeyExpressions, jobj,
                 Members.SEARCHKEY_EXPRESSIONS.name(), m_tableScan);
-        // load ignore_null_candidate flag vector
-        if ( ! jobj.isNull(Members.IGNORE_NULL_CANDIDATE.name())) {
-            JSONArray jarray = jobj.getJSONArray(Members.IGNORE_NULL_CANDIDATE.name());
+        // load COMPARE_NOTDISTINCT flag vector
+        if ( ! jobj.isNull(Members.COMPARE_NOTDISTINCT.name())) {
+            JSONArray jarray = jobj.getJSONArray(Members.COMPARE_NOTDISTINCT.name());
             int numCols = jarray.length();
             for (int ii = 0; ii < numCols; ++ii) {
-                m_ignoreNullCandidate.add(jarray.getBoolean(ii));
+                m_compareNotDistinct.add(jarray.getBoolean(ii));
             }
         }
         // load skip_null_predicate
@@ -931,20 +931,20 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         String result = "(";
         int prefixSize = nCovered - 1;
         for (int ii = 0; ii < prefixSize; ++ii) {
-            result += conjunction + asIndexed[ii] + (m_ignoreNullCandidate.get(ii) ? " = " : " NOT DISTINCT ") +
+            result += conjunction + asIndexed[ii] + (m_compareNotDistinct.get(ii) ? " = " : " NOT DISTINCT ") +
                     m_searchkeyExpressions.get(ii).explain(getTableNameForExplain());
             conjunction = ") AND (";
         }
         // last element
         result += conjunction + asIndexed[prefixSize] + " ";
-        if (m_lookupType == IndexLookupType.EQ && m_ignoreNullCandidate.get(prefixSize) == false) {
+        if (m_lookupType == IndexLookupType.EQ && m_compareNotDistinct.get(prefixSize) == false) {
             result += "NOT DISTINCT";
         }
         else {
             result += m_lookupType.getSymbol();
         }
         result += " " + m_searchkeyExpressions.get(prefixSize).explain(getTableNameForExplain());
-        if (m_lookupType != IndexLookupType.EQ && m_ignoreNullCandidate.get(prefixSize) == false) {
+        if (m_lookupType != IndexLookupType.EQ && m_compareNotDistinct.get(prefixSize) == false) {
             result += ", including NULLs";
         }
         result += ")";

@@ -48,8 +48,8 @@ public:
     const std::vector<AbstractExpression*>& getSearchKeyExpressions() const
     { return m_searchkey_expressions; }
 
-    const std::vector<bool>& getIgnoreNullCandidateFlags() const
-    { return m_ignore_null_candidate; }
+    const std::vector<bool>& getCompareNotDistinctFlags() const
+    { return m_compare_not_distinct; }
 
     AbstractExpression* getSkipNullPredicate() const { return m_skip_null_predicate.get(); }
 
@@ -65,7 +65,7 @@ protected:
     // If the search key expression is actually a "not distinct" expression,
     //   we do not want the executor to skip null candidates.
     // This flag vector will instruct the executor the correct behavior for null skipping. (ENG-11096)
-    std::vector<bool> m_ignore_null_candidate;
+    std::vector<bool> m_compare_not_distinct;
 
     // TODO: Document
     OwningExpressionVector m_endkey_expressions;

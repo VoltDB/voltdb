@@ -319,7 +319,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
                 // However, if the search key expression is "IS NOT DISTINCT FROM", then NULL values cannot be skipped.
                 // We will set the IgnoreNullCandidateFlags to false in the planner to mark this. (ENG-11096)
                 NValue candidateValue = m_indexNode->getSearchKeyExpressions()[ctr]->eval(&outer_tuple, NULL);
-                if (candidateValue.isNull() && m_indexNode->getIgnoreNullCandidateFlags()[ctr]) {
+                if (candidateValue.isNull() && m_indexNode->getCompareNotDistinctFlags()[ctr]) {
                     keyException = true;
                     break;
                 }

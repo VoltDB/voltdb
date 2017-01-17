@@ -343,7 +343,7 @@ void AbstractPlanNode::loadStringArrayFromJSONObject(const char* label,
 
 // Load boolean array from JSON object.
 // In IndexScanPlanNode (indexscannode.h and indexscannode.cpp),
-//   we added a boolean vector "m_ignore_null_candidate"
+//   we added a boolean vector "m_compare_not_distinct"
 //   to indicate whether null values should be skipped for each search key column.
 // This function is used to deseralize that boolean vector. (ENG-11096)
 void AbstractPlanNode::loadBooleanArrayFromJSONObject(const char* label,
