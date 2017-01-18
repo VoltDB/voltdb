@@ -45,71 +45,76 @@ public class TestSystemProcedureSuite extends RegressionSuite {
     private static int KFACTOR = MiscUtils.isPro() ? 1 : 0;
     private static boolean hasLocalServer = true; //// false;
 
+    // Having 2 different table name prefixes simplifies the process of
+    // writing and maintaining positive @SwapTables test cases which require
+    // pairs of identical (or nearly so) tables.
     static final String[] SWAPPY_PREFIX_PAIR = { "SWAP_THIS", "SWAP_THAT" };
 
     // Entries in this array are three element arrays defining customizations
-    // to a base table whose name ends in _NORMAL without customization.
-    // The first element of the three is the root/suffix part of the table.
-    // The second element is a continuation of the definition line that starts
-    // "ID INTEGER " and can optionally contain elements such as
-    // column qualifiers for ID, a comma to separate the end of the column
-    // declaration from a constraint definition, and then the constraint
-    // definition.
+    // to a base table, each having a different name ending: e.g.
+    // "_NORMAL" for a base case with no customizations.
+    // The first element of each three element array is the root/suffix part
+    // of the table name.
+    // The second element is a continuation of the common table definition line
+    // that starts "ID INTEGER " and can optionally be extended with additional
+    // syntax to define column qualifiers for ID, and/or a comma to end the
+    // column declaration followed by a constraint definition.
     // The third element is one or more table modifier statements to establish
-    // partitioning and/or external indexes.
+    // partitioning and/or external indexes for that variant of the table
+    // after the table definition.
     private static final String[][] SWAPPY_TABLES = {
-            { "_NORMAL",
+            { "_NORMAL", // 0
                 "",
                 "",
             },
-            { "_WITH_PARTITIONING",
+            { "_WITH_PARTITIONING", // 1
                 " NOT NULL",
                 " PARTITION TABLE %s_WITH_PARTITIONING ON COLUMN ID;",
             },
 
-            { "_WITH_NAMED_TREE_PK",
+            { "_WITH_NAMED_TREE_PK", // 2
                 ", CONSTRAINT %s_NAMED PRIMARY KEY (ID)\n",
                 "",
             },
-            { "_WITH_ANONYMOUS_PK",
+            { "_WITH_ANONYMOUS_PK", // 3
                 ", PRIMARY KEY (ID)\n",
                 "",
             },
-            { "_WITH_INLINE_PK",
+            { "_WITH_INLINE_PK", // 4
                 " PRIMARY KEY NOT NULL\n",
                 "",
             },
 
-            { "_WITH_NAMED_UNIQUE",
+            { "_WITH_NAMED_UNIQUE", // 5
                 ", CONSTRAINT %s_NAMED UNIQUE (ID)\n",
                 "",
             },
-            { "_WITH_ANONYMOUS_UNIQUE",
+            { "_WITH_ANONYMOUS_UNIQUE", // 6
                 ", UNIQUE (ID)\n",
                 "",
             },
-            { "_WITH_INLINE_UNIQUE",
+            { "_WITH_INLINE_UNIQUE", // 7
                 " UNIQUE NOT NULL\n",
                 "",
             },
-            { "_WITH_EXTERNAL_UNIQUE",
+            { "_WITH_EXTERNAL_UNIQUE", // 8
                 "",
                 " CREATE UNIQUE INDEX %s_WITH_EXTERNAL_UNIQUE_INDEX ON %s_WITH_EXTERNAL_UNIQUE (ID);\n",
             },
 
-            { "_WITH_NAMED_ASSUME_UNIQUE",
+            { "_WITH_NAMED_ASSUME_UNIQUE", // 9
                 ", CONSTRAINT %s_NAMED ASSUMEUNIQUE (ID)\n",
                 " PARTITION TABLE %s_WITH_NAMED_ASSUME_UNIQUE ON COLUMN NAME;\n",
             },
-            { "_WITH_ANONYMOUS_ASSUME_UNIQUE",
+            { "_WITH_ANONYMOUS_ASSUME_UNIQUE", // 10
                 ", ASSUMEUNIQUE (ID)\n",
                 " PARTITION TABLE %s_WITH_ANONYMOUS_ASSUME_UNIQUE ON COLUMN NAME;\n",
             },
-            { "_WITH_INLINE_ASSUME_UNIQUE",
+            { "_WITH_INLINE_ASSUME_UNIQUE", // 11
                 " ASSUMEUNIQUE NOT NULL\n",
                 " PARTITION TABLE %s_WITH_INLINE_ASSUME_UNIQUE ON COLUMN NAME;\n",
             },
-            { "_WITH_EXTERNAL_ASSUME_UNIQUE",
+            { "_WITH_EXTERNAL_ASSUME_UNIQUE", // 12
                 "",
                 " PARTITION TABLE %s_WITH_EXTERNAL_ASSUME_UNIQUE ON COLUMN NAME;\n" +
                         " CREATE ASSUMEUNIQUE INDEX " +
@@ -117,34 +122,48 @@ public class TestSystemProcedureSuite extends RegressionSuite {
                         " ON %s_WITH_EXTERNAL_ASSUME_UNIQUE (ID);\n",
             },
 
-            { "_WITH_EXTERNAL_NONUNIQUE",
+            { "_WITH_EXTERNAL_NONUNIQUE", // 13
                 "",
                 " CREATE INDEX %s_WITH_EXTERNAL_NONUNIQUE ON %s_WITH_EXTERNAL_NONUNIQUE (ID);\n",
             },
 
-            { "_WITH_NAMED_LIMIT_ROWS_100",
+            { "_WITH_ANONYMOUS_ALTPK", // 14
+                ", PRIMARY KEY (NONID)\n",
+                "",
+            },
+
+            { "_WITH_NAMED_LIMIT_ROWS_100", // 15
                 ", CONSTRAINT %s_NAMED LIMIT PARTITION ROWS 100\n",
                 "",
             },
-            { "_WITH_ANONYMOUS_LIMIT_ROWS_100",
+            { "_WITH_ANONYMOUS_LIMIT_ROWS_100", // 16
                 ", LIMIT PARTITION ROWS 100\n",
                 "",
             },
-            { "_WITH_NAMED_LIMIT_ROWS_1000",
+            { "_WITH_NAMED_LIMIT_ROWS_1000", // 17
                 ", CONSTRAINT %s_NAMED LIMIT PARTITION ROWS 1000\n",
                 "",
             },
-            { "_WITH_ANONYMOUS_LIMIT_ROWS_1000",
+            { "_WITH_ANONYMOUS_LIMIT_ROWS_1000", // 18
                 ", LIMIT PARTITION ROWS 1000\n",
                 "",
             },
     };
 
+    // These template tables only need one instantiation each and are
+    // more complete than the SWAPPY_TABLES templates for more flexibility.
+    // Each entry is a two string vector. The first string is a complete table
+    // name and the second is a complete body of the definition for the table.
+    // The main motivation for breaking apart the table name and its
+    // definition rather than just using a big block of literal schema text
+    // is to allow iteration over just the table names when generating
+    // the fixed set of DML and query statements against each of them.
     private static final String[][] NONSWAPPY_TABLES = {
             { "NONSWAP_REORDERED",
                 " (\n" +
                 "  PRICE FLOAT," +
                 "  NAME VARCHAR(32 BYTES) NOT NULL," +
+                "  NONID INTEGER NOT NULL," +
                 "  ID INTEGER " +
                 ");\n",
             },
@@ -152,12 +171,14 @@ public class TestSystemProcedureSuite extends RegressionSuite {
                 " (\n" +
                 "  NAME VARCHAR(32 BYTES) NOT NULL,\n" +
                 "  PRICE FLOAT," +
+                "  NONID INTEGER NOT NULL," +
                 ");\n",
             },
             { "NONSWAP_INSERTED",
                 " (\n" +
                 "  NAME VARCHAR(32 BYTES) NOT NULL,\n" +
                 "  PRICE FLOAT," +
+                "  NONID INTEGER NOT NULL," +
                 "  LIST_PRICE FLOAT," +
                 "  ID INTEGER " +
                 ");\n",
@@ -166,6 +187,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
                 " (\n" +
                 "  NAME VARCHAR(32) NOT NULL,\n" +
                 "  PRICE FLOAT," +
+                "  NONID INTEGER NOT NULL," +
                 "  ID INTEGER " +
                 ");\n",
             },
@@ -173,6 +195,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
                 " (\n" +
                 "  NAME VARCHAR(128 BYTES) NOT NULL,\n" +
                 "  PRICE FLOAT," +
+                "  NONID INTEGER NOT NULL," +
                 "  ID INTEGER " +
                 ");\n",
             },
@@ -180,6 +203,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
                 " (\n" +
                 "  NAME VARCHAR(32 BYTES) NOT NULL,\n" +
                 "  PRICE FLOAT," +
+                "  NONID INTEGER NOT NULL," +
                 "  ID BIGINT " +
                 ");\n",
             },
@@ -187,14 +211,17 @@ public class TestSystemProcedureSuite extends RegressionSuite {
                 " (\n" +
                 "  NAME VARCHAR(32 BYTES) NOT NULL,\n" +
                 "  PRICE FLOAT," +
+                "  NONID INTEGER NOT NULL," +
                 "  ID INTEGER " +
                 ");\n" +
-                "CREATE VIEW VIEWING_1 AS SELECT ID, COUNT(*), SUM(PRICE) FROM NONSWAP_VIEWED_1 GROUP BY ID;\n"
+                "CREATE VIEW VIEWING_1 AS SELECT ID, COUNT(*), SUM(PRICE) \n" +
+                " FROM NONSWAP_VIEWED_1 GROUP BY ID;\n"
             },
             /*{ "NONSWAP_VIEWED_2",
                 " (\n" +
                 "  NAME VARCHAR(32 BYTES) NOT NULL,\n" +
                 "  PRICE FLOAT," +
+                "  NONID INTEGER NOT NULL," +
                 "  ID INTEGER " +
                 ");\n" +
                 "CREATE TABLE JOINED_2 (DISCOUNT FLOAT, ID INTEGER);\n" +
@@ -205,12 +232,14 @@ public class TestSystemProcedureSuite extends RegressionSuite {
                 " (\n" +
                 "  NAME VARCHAR(32 BYTES) NOT NULL,\n" +
                 "  PRICE FLOAT," +
+                "  NONID INTEGER NOT NULL," +
                 "  ID INTEGER " +
                 ");\n" +
                 "CREATE TABLE JOINED_3 (DISCOUNT FLOAT, ID INTEGER);\n" +
-                "CREATE VIEW VIEWING_3A AS SELECT ID, COUNT(*), SUM(PRICE) FROM NONSWAP_VIEWED_3 GROUP BY ID;\n" +
+                "CREATE VIEW VIEWING_3A AS SELECT ID, COUNT(*), SUM(PRICE) \n" +
+                " FROM NONSWAP_VIEWED_3 GROUP BY ID;\n" +
                 "CREATE VIEW VIEWING_3B AS SELECT A.ID, COUNT(*), SUM(A.PRICE*B.DISCOUNT) \n" +
-                "FROM NONSWAP_VIEWED_3 A, JOINED_3 B WHERE A.ID = B.ID GROUP BY A.ID;\n",
+                " FROM NONSWAP_VIEWED_3 A, JOINED_3 B WHERE A.ID = B.ID GROUP BY A.ID;\n",
             },
     };
 
@@ -229,6 +258,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
             .append(" (\n" +
                     "  NAME VARCHAR(32 BYTES) NOT NULL,\n" +
                     "  PRICE FLOAT," +
+                    "  NONID INTEGER NOT NULL," +
                     "  ID INTEGER ").append(internalExtras)
             .append(");\n")
             .append(externalExtras);
@@ -238,7 +268,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
     }
 
     // Non-swappy tables are all incompatible for swapping with SWAP_THIS_NORMAL
-    // due to various column differences or for having views
+    // due to various column differences or from their defined views.
     private static void addNonSwappyTables(VoltProjectBuilder project)
     throws Exception {
         StringBuilder schema = new StringBuilder();
@@ -267,7 +297,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
 
         try {
             client.callProcedure(name, params);
-            fail("ORLY " + name + " succeeded w/out pro?");
+            fail("ORLY " + name + " succeeded w/out pro enabled?");
         }
         catch (ProcCallException ex) {
             ClientResponse response = ex.getClientResponse();
@@ -285,9 +315,6 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         if (MiscUtils.isPro()) {
             return;
         }
-        /* ///// */ if ( ! MiscUtils.isPro()) {
-        /* ///// */     return;
-        /* ///// */ }
 
         Client client = getClient();
 
@@ -368,7 +395,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         // should not be able to upsert to new_order since it has no primary key
         try {
             client.callProcedure("@LoadMultipartitionTable", "new_order",  upsertMode, null);
-            fail("ORLY @LoadMultipartitionTable new_order succeeded w/o primary key?");
+            fail("ORLY @LoadMultipartitionTable new_order succeeded w/o a primary key?");
         }
         catch (ProcCallException ex) {
             assertTrue(ex.getMessage().contains("the table new_order does not have a primary key"));
@@ -380,9 +407,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         byte upsertMode = (byte) 0;
         Client client = getClient();
 
-        //
-        // Load a little partitioned data for the mispartitioned check
-        //
+        // Load a little partitioned data for the mispartitioned row check
         Random r = new Random(0);
         for (int ii = 0; ii < 50; ii++) {
             client.callProcedure(new NullCallback(), "@AdHoc",
@@ -717,13 +742,13 @@ public class TestSystemProcedureSuite extends RegressionSuite {
 
             // One row for THIS table.
             client.callProcedure(SWAPPY_PREFIX_PAIR[0] + tableRoot + ".insert",
-                    "1", 1.0, 1);
+                    "1", 1.0, 1, 1);
 
             // Two rows for THAT table.
             client.callProcedure(SWAPPY_PREFIX_PAIR[1] + tableRoot + ".insert",
-                    "2", 2.0, 2);
+                    "2", 2.0, 2, 2);
             client.callProcedure(SWAPPY_PREFIX_PAIR[1] + tableRoot + ".insert",
-                    "3", 3.0, 3);
+                    "3", 3.0, 3, 3);
         }
 
         for (int ii = 0; ii < SWAPPY_TABLES.length; ++ii) {
@@ -733,21 +758,30 @@ public class TestSystemProcedureSuite extends RegressionSuite {
                 // Allow swapping only for identically defined tables
                 // or those with minor variations in syntax.
                 String otherTable = SWAPPY_PREFIX_PAIR[1] + SWAPPY_TABLES[jj][0];
+
+                // These pairs of numbers are indexes into SWAPPY_TABLES that
+                // represent definitions that are "close enough" for swapping
+                // purposes. These were experimentally discovered and then
+                // verified for reasonableness.
                 if ((ii == jj) ||
-                        //(ii == 2 && jj == 4) || (ii == 4 && jj == 2) ||
-                        (ii == 2 && jj == 5) || (ii == 5 && jj == 2) ||
+                        (ii == 2 && jj == 3) || (ii == 3 && jj == 2) ||
+                        (ii == 2 && jj == 4) || (ii == 4 && jj == 2) ||
                         (ii == 3 && jj == 4) || (ii == 4 && jj == 3) ||
-                        //(ii == 4 && jj == 5) || (ii == 5 && jj == 4) ||
+                        (ii == 5 && jj == 6) || (ii == 6 && jj == 5) ||
+                        (ii == 5 && jj == 7) || (ii == 7 && jj == 5) ||
                         (ii == 6 && jj == 7) || (ii == 7 && jj == 6) ||
+                        (ii == 9 && jj == 10) || (ii == 10 && jj == 9) ||
+                        (ii == 9 && jj == 11) || (ii == 11 && jj == 9) ||
                         (ii == 10 && jj == 11) || (ii == 11 && jj == 10) ||
-                        (ii == 14 && jj == 15) || (ii == 15 && jj == 14) ||
-                        (ii == 16 && jj == 17) || (ii == 17 && jj == 16)) {
+                        (ii == 15 && jj == 16) || (ii == 16 && jj == 15) ||
+                        (ii == 17 && jj == 18) || (ii == 18 && jj == 17)) {
                     VoltTable[] results;
 
                     results = client.callProcedure("@AdHoc",
                             "SELECT COUNT(*) FROM " + theTable).getResults();
                     long preCount = results[0].asScalarLong();
 
+                    //*enable to debug*/ System.out.println("@SwapTables " + theTable + " " + otherTable);
                     results = client.callProcedure("@SwapTables",
                             theTable, otherTable).getResults();
                     //*enable to debug*/ System.out.println(results[0]);
@@ -823,9 +857,8 @@ public class TestSystemProcedureSuite extends RegressionSuite {
                 assertTrue(ex.getMessage().contains("Swapping"));
             }
         }
-
-
     }
+
     //
     // Build a list of the tests to be run. Use the regression suite
     // helpers to allow multiple backends.
@@ -834,9 +867,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
     static public Test suite() throws Exception {
         // Not really using TPCC functionality but need a schema.
         // The testLoadMultipartitionTable procedure assumes partitioning
-        // on warehouse id. testSwapTables needs lots of variations on the
-        // same table, including duplicates, to test compatibility
-        // criteria.
+        // on warehouse id.
         VoltProjectBuilder project = new VoltProjectBuilder();
         String literalSchema =
                 "CREATE TABLE WAREHOUSE (\n" +
@@ -866,8 +897,10 @@ public class TestSystemProcedureSuite extends RegressionSuite {
                 "  TEST_ID SMALLINT DEFAULT 0 NOT NULL\n" +
                 ");\n" +
                 "";
-                project.addLiteralSchema(literalSchema);
+        project.addLiteralSchema(literalSchema);
 
+        // testSwapTables needs lots of variations on the same table,
+        // including duplicates, to test compatibility criteria.
         for (String prefix : SWAPPY_PREFIX_PAIR) {
             addSwappyTables(prefix, project);
         }
