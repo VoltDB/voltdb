@@ -334,7 +334,7 @@ public class UpdateClassesBenchmark {
         // name, duration,invocations/tps,latmin,latmax,lat95,lat99
         fw.append(String.format("%s,-1,%f,0,0,%f,%f,0,0,0,0,0,0\n",
                                 config.name,
-                                avg/1000.0,
+                                avg,
                                 toMillis(min),
                                 toMillis(max)
                                 ));
