@@ -18,9 +18,11 @@
 package org.voltdb.plannodes;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map.Entry;
 
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -35,6 +37,7 @@ import org.voltdb.catalog.MaterializedViewHandlerInfo;
 import org.voltdb.catalog.MaterializedViewInfo;
 import org.voltdb.catalog.Table;
 import org.voltdb.planner.PlanningErrorException;
+import org.voltdb.types.ConstraintType;
 import org.voltdb.types.PlanNodeType;
 
 public class SwapTablesPlanNode extends AbstractOperationPlanNode {
@@ -110,7 +113,6 @@ public class SwapTablesPlanNode extends AbstractOperationPlanNode {
      * @param otherTable the catalog definition of the 2nd table swap argument
      * @throws PlnnerErrorException if one or more compatibility validations fail
      */
-
     public void initializeSwapTablesPlanNode(Table theTable, Table otherTable) {
         String theName = theTable.getTypeName();
         setTargetTableName(theName);
@@ -127,19 +129,25 @@ public class SwapTablesPlanNode extends AbstractOperationPlanNode {
         fbSeparator = validateColumnCompatibility(theName, otherName,
                 theTable, otherTable, feedback, fbSeparator);
 
-        // Maintain a set of indexes found on otherTable, and
-        // drop them as they are matched by indexes on theTable
-        // and added to the list of swappab;e indexes.
-        // This should result in an empty set.
+        // Maintain sets of indexes and index-supported (UNIQUE) constraints
+        // and the primary key index found on otherTable.
+        // Removing them as they are matched by indexes/constraints on theTable
+        // and added to the list of swappable indexes should leave the sets empty.
         HashSet<Index> candidateIndexSet = new HashSet<>();
+        // The constraint set is actually a HashMap to retain the
+        // defining constraint name for help with error messages.
+        HashMap<Index, String> candidateConstraintIndexSet = new HashMap<>();
+        // Track the primary key separately since it should match one-to-one.
+        Index otherPrimaryKeyIndex = null;
 
-        // Add user-defined (external) indexes.
+        // Collect the user-defined (external) indexes on otherTable.
         CatalogMap<Index> candidateIndexes = otherTable.getIndexes();
         for (Index otherIndex : candidateIndexes) {
             candidateIndexSet.add(otherIndex);
         }
 
-        // Add system-defined (internal) indexes supporting constraints.
+        // Collect the system-defined (internal) indexes supporting constraints
+        // and the primary key index if any.
         CatalogMap<Constraint> candidateConstraints = otherTable.getConstraints();
         for (Constraint otherConstraint : candidateConstraints) {
             Index otherIndex = otherConstraint.getIndex();
@@ -148,87 +156,51 @@ public class SwapTablesPlanNode extends AbstractOperationPlanNode {
                 // effect on the swap table plan.
                 continue;
             }
-            candidateIndexSet.add(otherIndex);
-        }
 
-        for (Index theIndex : theTable.getIndexes()) {
-            String theIndexName = theIndex.getTypeName();
-            String otherIndexName = theIndexName.replace(theName, otherName);
-            if (otherIndexName.equals(theIndexName)) {
-                feedback.append(fbSeparator)
-                .append("Swapping table ").append(theName)
-                .append(" requires that the index name \"").append(theIndexName )
-                .append("\" contain the table name \"").append(theName).append("\"");
-                fbSeparator = TRUE_FB_SEPARATOR;
+            // Set aside the one primary key index for special handling.
+            if (otherConstraint.getType() == ConstraintType.PRIMARY_KEY.getValue()) {
+                otherPrimaryKeyIndex = otherIndex;
                 continue;
             }
 
+            candidateConstraintIndexSet.put(otherIndex, otherConstraint.getTypeName());
+        }
+
+        // Try to cross-reference each user-defined index on the two tables.
+        for (Index theIndex : theTable.getIndexes()) {
+            boolean matched = false;
+            for (Index otherIndex : candidateIndexSet) {
+                if (indexesCanBeSwapped(theIndex, otherIndex, null, null)) {
+                    m_theIndexes.add(theIndex.getTypeName());
+                    m_otherIndexes.add(otherIndex.getTypeName());
+                    candidateIndexSet.remove(otherIndex);
+                    matched = true;
+                    break;
+                }
+            }
+            if (matched) {
+                continue;
+            }
+
+            // No match: look for a likely near-match based on naming
+            // convention for the most helpful error message.
+            // Otherwise, give a more generic error message.
+            String theIndexName = theIndex.getTypeName();
+            String otherIndexName = theIndexName.replace(theName, otherName);
             Index otherIndex = candidateIndexes.getIgnoreCase(otherIndexName);
             if (otherIndex == null) {
                 feedback.append(fbSeparator)
                 .append("Swapping requires the table ").append(otherName)
-                .append(" to define an index ").append(otherIndexName )
+                .append(" to define an index ").append(otherIndexName)
                 .append(" corresponding to the index ").append(theIndexName)
                 .append(" on table ").append(theName);
                 fbSeparator = TRUE_FB_SEPARATOR;
-                continue;
             }
-
-            addIndexPairing(theIndex, otherIndex, candidateIndexSet,
-                    feedback, fbSeparator);
-        }
-
-        for (Constraint theConstraint : theTable.getConstraints()) {
-            Index theIndex = theConstraint.getIndex();
-            if (theIndex == null) {
-                // Some kinds of constraints that are not index-based have no
-                // effect on the swap table plan.
-                continue;
-            }
-            String theIndexName = theIndex.getTypeName();
-
-            String theConstraintName = theConstraint.getTypeName();
-            if ( ! "".equals(theConstraintName)) {
-                Constraint otherConstraint =
-                        candidateConstraints.getIgnoreCase(theConstraintName);
-                if (otherConstraint != null) {
-                    Index otherIndex = otherConstraint.getIndex();
-                    if (otherIndex == null) {
-                        feedback.append(fbSeparator)
-                        .append("Swapping table ").append(theName)
-                        .append(" with table ").append(otherName)
-                        .append(" requires that their constraints named ")
-                        .append(theConstraintName)
-                        .append(" have the same definition");
-                        fbSeparator = TRUE_FB_SEPARATOR;
-                    }
-                    addIndexPairing(theIndex, otherIndex, candidateIndexSet,
-                            feedback, fbSeparator);
-                    continue;
-                }
-            }
-            String otherIndexName = theIndexName.replace(theName, otherName);
-            if (otherIndexName.equals(theIndexName)) {
-                feedback.append(fbSeparator)
-                .append("Swapping table ").append(theName)
-                .append(" requires that the index name \"").append(theIndexName )
-                .append("\" contain the table name \"").append(theName).append("\"");
+            else {
+                diagnoseIndexMismatch(theIndex, otherIndex, feedback);
                 fbSeparator = TRUE_FB_SEPARATOR;
+                candidateIndexSet.remove(otherIndex);
             }
-
-            Index otherIndex = candidateIndexes.getIgnoreCase(otherIndexName);
-            if (otherIndex == null) {
-                feedback.append(fbSeparator)
-                .append("Swapping requires the table ").append(otherName)
-                .append(" to define a constraint corresponding to the constraint ")
-                .append(theConstraintName)
-                .append(" on table ").append(theName);
-                fbSeparator = TRUE_FB_SEPARATOR;
-                continue;
-            }
-
-            addIndexPairing(theIndex, otherIndex, candidateIndexSet,
-                    feedback, fbSeparator);
         }
 
         // At this point, all of theTable's indexes are matched.
@@ -237,8 +209,8 @@ public class SwapTablesPlanNode extends AbstractOperationPlanNode {
         if ( ! candidateIndexSet.isEmpty()) {
             feedback.append(fbSeparator)
             .append("Swapping with table ").append(otherName)
-            .append(" requires that the table ").append(theName )
-            .append("\" define indexes or constraints corresponding to ")
+            .append(" requires that the table ").append(theName)
+            .append("\" define indexes corresponding to ")
             .append(" all of those defined on table ").append(otherName)
             .append("including those with the following index names: (");
             String separator = "";
@@ -250,8 +222,201 @@ public class SwapTablesPlanNode extends AbstractOperationPlanNode {
             fbSeparator = TRUE_FB_SEPARATOR;
         }
 
+
+        // Try to cross-reference each system-defined index supporting
+        // constraints on the two tables.
+        for (Constraint theConstraint : theTable.getConstraints()) {
+            Index theIndex = theConstraint.getIndex();
+            if (theIndex == null) {
+                // Some kinds of constraints that are not index-based have no
+                // effect on the swap table plan.
+                continue;
+            }
+
+            if (theConstraint.getType() == ConstraintType.PRIMARY_KEY.getValue()) {
+                if (otherPrimaryKeyIndex != null) {
+                    if (indexesCanBeSwapped(theIndex, otherPrimaryKeyIndex,
+                            feedback, fbSeparator)) {
+                        m_theIndexes.add(theIndex.getTypeName());
+                        m_otherIndexes.add(otherPrimaryKeyIndex.getTypeName());
+                    }
+                    else {
+                        diagnoseIndexMismatch(theIndex, otherPrimaryKeyIndex,
+                                feedback);
+                        fbSeparator = TRUE_FB_SEPARATOR;
+                    }
+                    // signal that otherTable's primary key was matched
+                    // (or mismatched).
+                    otherPrimaryKeyIndex = null;
+                }
+                else {
+                    feedback.append(fbSeparator)
+                    .append("Swapping table ").append(theName)
+                    .append(" with table ").append(otherName)
+                    .append(" requires that they have the same primary key")
+                    .append(" or that neither have one.");
+                    fbSeparator = TRUE_FB_SEPARATOR;
+                }
+                continue;
+            }
+
+            boolean matched = false;
+            for (Entry<Index, String> otherEntry : candidateConstraintIndexSet.entrySet()) {
+                Index otherIndex = otherEntry.getKey();
+                if (indexesCanBeSwapped(theIndex, otherIndex, null, null)) {
+                    m_theIndexes.add(theIndex.getTypeName());
+                    m_otherIndexes.add(otherIndex.getTypeName());
+                    candidateConstraintIndexSet.remove(otherIndex);
+                    matched = true;
+                    break;
+                }
+            }
+            if (matched) {
+                continue;
+            }
+
+            String theConstraintName = theConstraint.getTypeName();
+            String otherConstraintName = theConstraintName.replace(theName, otherName);
+            Constraint otherConstraint =
+                    candidateConstraints.getIgnoreCase(otherConstraintName);
+            if (otherConstraint == null) {
+                feedback.append(fbSeparator)
+                .append("Swapping table ").append(theName)
+                .append(" with table ").append(otherName)
+                .append(" requires that constraint ")
+                .append(theConstraintName)
+                .append(" match an equivalent constraint on table ")
+                .append(otherName);
+                fbSeparator = TRUE_FB_SEPARATOR;
+            }
+            else {
+                // A named constraint on theTable followed the same naming
+                // convention as one on otherTable but had a dissimilar definition.
+                feedback.append(fbSeparator)
+                .append("Swapping table ").append(theName)
+                .append(" with table ").append(otherName)
+                .append(" requires that constraints named ")
+                .append(theConstraintName).append(" and ")
+                .append(otherConstraint.getTypeName())
+                .append(" have the same definition:\n");
+                fbSeparator = TRUE_FB_SEPARATOR;
+
+                Index otherIndex = theConstraint.getIndex();
+                if (otherIndex != null) {
+                    diagnoseIndexMismatch(theIndex, otherIndex, feedback);
+                    fbSeparator = TRUE_FB_SEPARATOR;
+                    candidateConstraintIndexSet.remove(otherIndex);
+                }
+            }
+        }
+
+        if (otherPrimaryKeyIndex != null) {
+            // A primary key was found but not matched.
+            feedback.append(fbSeparator)
+            .append("Swapping table ").append(theName)
+            .append(" with table ").append(otherName)
+            .append(" requires that they have the same primary key")
+            .append(" or that neither have one.");
+            fbSeparator = TRUE_FB_SEPARATOR;
+        }
+
+        // At this point, all of theTable's index-based constraints are matched.
+        // All of otherTable's index-based constraints should also have been
+        // matched along the way.
+        if ( ! candidateConstraintIndexSet.isEmpty()) {
+            feedback.append(fbSeparator)
+            .append("Swapping with table ").append(otherName)
+            .append(" requires that the table ").append(theName)
+            .append("\" define constraints corresponding to ")
+            .append(" all of those defined on table ").append(otherName)
+            .append("including those with the following constraint or")
+            .append(" system internal index names: (");
+            String separator = "";
+            for (Entry<Index, String> remainder : candidateConstraintIndexSet.entrySet()) {
+                String constraintName = remainder.getValue();
+                String description =
+                        (constraintName != null && ! constraintName.equals("")) ?
+                                constraintName :
+                                    ("<anonymous with system internal index name: " +
+                                            remainder.getKey().getTypeName() + ">");
+                feedback.append(separator).append(description);
+                separator = ", ";
+            }
+            feedback.append(")");
+            fbSeparator = TRUE_FB_SEPARATOR;
+        }
+
+
         if (feedback.length() > 0) {
             throw new PlanningErrorException(feedback.toString());
+        }
+    }
+
+    private void diagnoseIndexMismatch(Index theIndex, Index otherIndex,
+            StringBuilder feedback) {
+        String diffSeparator = "";
+        // Pairs of matching indexes must agree on type (int hash, etc.).
+        if (theIndex.getType() != otherIndex.getType()) {
+            feedback.append(diffSeparator).append("index type");
+            diffSeparator = ", ";
+        }
+
+        // Pairs of matching indexes must agree whether they are (assume)unique.
+        if (theIndex.getUnique() != otherIndex.getUnique() ||
+                theIndex.getAssumeunique() != otherIndex.getAssumeunique()) {
+            feedback.append(diffSeparator).append("UNIQUE attribute");
+            diffSeparator = ", ";
+        }
+
+        // Pairs of matching indexes must agree whether they are partial
+        // and if so, agree on the predicate.
+        String thePredicateJSON = theIndex.getPredicatejson();
+        String otherPredicateJSON = otherIndex.getPredicatejson();
+        if (thePredicateJSON == null) {
+            if (otherPredicateJSON != null) {
+                feedback.append(diffSeparator).append("predicate");
+                diffSeparator = ", ";
+            }
+        }
+        else if ( ! thePredicateJSON.equals(otherPredicateJSON)) {
+            feedback.append(diffSeparator).append("predicate");
+            diffSeparator = ", ";
+        }
+
+        // Pairs of matching indexes must agree that they do or do not index
+        // expressions and, if so, agree on the expressions.
+        String theExprsJSON = theIndex.getExpressionsjson();
+        String otherExprsJSON = otherIndex.getExpressionsjson();
+        if (theExprsJSON == null) {
+            if (otherExprsJSON != null) {
+                feedback.append(diffSeparator).append("indexed expression");
+                return;
+            }
+        }
+        else if ( ! theExprsJSON.equals(otherExprsJSON)) {
+            feedback.append(diffSeparator).append("indexed expression");
+            return;
+        }
+
+        // Indexes must agree on the columns they are based on,
+        // identifiable by the columns' order in the table.
+        CatalogMap<ColumnRef> theColumns = theIndex.getColumns();
+        int theColumnCount = theColumns.size();
+        CatalogMap<ColumnRef> otherColumns = otherIndex.getColumns();
+        if (theColumnCount != otherColumns.size() ) {
+            feedback.append(diffSeparator).append("indexed expression");
+            return;
+        }
+
+        Iterator<ColumnRef> theColumnIterator = theColumns.iterator();
+        Iterator<ColumnRef> otherColumnIterator = otherColumns.iterator();
+        for (int ii = 0 ;ii < theColumnCount; ++ii) {
+            int theColIndex = theColumnIterator.next().getColumn().getIndex();
+            int otherColIndex = otherColumnIterator.next().getColumn().getIndex();
+            if (theColIndex != otherColIndex) {
+                feedback.append(diffSeparator).append("indexed expression");
+                return;
+            }
         }
     }
 
@@ -260,21 +425,18 @@ public class SwapTablesPlanNode extends AbstractOperationPlanNode {
      * @param otherIndex candidate match for theIndex on the other target table
      * @param candidateIndexSet set of otherTable indexes as yet unmatched
      */
-    private String addIndexPairing(Index theIndex, Index otherIndex,
-            HashSet<Index> candidateIndexSet,
+    private static boolean indexesCanBeSwapped(Index theIndex, Index otherIndex,
             StringBuilder feedback, String fbSeparator) {
         // Pairs of matching indexes must agree on type (int hash, etc.).
         if (theIndex.getType() != otherIndex.getType()) {
-            return failIndexPairing(theIndex, otherIndex, feedback, fbSeparator);
+            return false;
         }
-        // and if so, agree on the predicate.
 
         // Pairs of matching indexes must agree whether they are (assume)unique.
         if (theIndex.getUnique() != otherIndex.getUnique() ||
                 theIndex.getAssumeunique() != otherIndex.getAssumeunique()) {
-            return failIndexPairing(theIndex, otherIndex, feedback, fbSeparator);
+            return false;
         }
-        // and if so, agree on the predicate.
 
         // Pairs of matching indexes must agree whether they are partial
         // and if so, agree on the predicate.
@@ -282,11 +444,11 @@ public class SwapTablesPlanNode extends AbstractOperationPlanNode {
         String otherPredicateJSON = otherIndex.getPredicatejson();
         if (thePredicateJSON == null) {
             if (otherPredicateJSON != null) {
-                return failIndexPairing(theIndex, otherIndex, feedback, fbSeparator);
+                return false;
             }
         }
         else if ( ! thePredicateJSON.equals(otherPredicateJSON)) {
-            return failIndexPairing(theIndex, otherIndex, feedback, fbSeparator);
+            return false;
         }
 
 
@@ -296,11 +458,11 @@ public class SwapTablesPlanNode extends AbstractOperationPlanNode {
         String otherExprsJSON = otherIndex.getExpressionsjson();
         if (theExprsJSON == null) {
             if (otherExprsJSON != null) {
-                return failIndexPairing(theIndex, otherIndex, feedback, fbSeparator);
+                return false;
             }
         }
         else if ( ! theExprsJSON.equals(otherExprsJSON)) {
-            return failIndexPairing(theIndex, otherIndex, feedback, fbSeparator);
+            return false;
         }
 
         // Indexes must agree on the columns they are based on,
@@ -309,7 +471,7 @@ public class SwapTablesPlanNode extends AbstractOperationPlanNode {
         int theColumnCount = theColumns.size();
         CatalogMap<ColumnRef> otherColumns = otherIndex.getColumns();
         if (theColumnCount != otherColumns.size() ) {
-            return failIndexPairing(theIndex, otherIndex, feedback, fbSeparator);
+            return false;
         }
 
         Iterator<ColumnRef> theColumnIterator = theColumns.iterator();
@@ -318,29 +480,11 @@ public class SwapTablesPlanNode extends AbstractOperationPlanNode {
             int theColIndex = theColumnIterator.next().getColumn().getIndex();
             int otherColIndex = otherColumnIterator.next().getColumn().getIndex();
             if (theColIndex != otherColIndex) {
-                return failIndexPairing(theIndex, otherIndex, feedback, fbSeparator);
+                return false;
             }
         }
 
-        m_theIndexes.add(theIndex.getTypeName());
-        m_otherIndexes.add(otherIndex.getTypeName());
-        candidateIndexSet.remove(otherIndex);
-        return fbSeparator;
-    }
-
-    /**
-     * @param theIndex
-     * @param otherIndex
-     * @param feedback
-     * @param fbSeparator
-     * @return
-     */
-    private String failIndexPairing(Index theIndex, Index otherIndex, StringBuilder feedback, String fbSeparator) {
-        feedback.append(fbSeparator)
-        .append("paired indexes ").append(theIndex.getTypeName())
-        .append(" and ").append(otherIndex.getTypeName())
-        .append(" must have identical definitions");
-        return TRUE_FB_SEPARATOR;
+        return true;
     }
 
     /**
