@@ -55,7 +55,6 @@ import org.voltdb.catalog.Table;
 import org.voltdb.common.Constants;
 import org.voltdb.iv2.TxnEgo;
 import org.voltdb.messaging.LocalMailbox;
-import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableList;
@@ -63,6 +62,7 @@ import com.google_voltpatches.common.util.concurrent.Futures;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.MoreExecutors;
+import org.voltdb.utils.VoltFile;
 
 /**
  * Export data from a single catalog version and database instance.
@@ -744,6 +744,25 @@ public class ExportGeneration implements Generation {
         source.pushExportBuffer(uso, buffer, sync, endOfStream);
     }
 
+    private void cleanup(final HostMessenger messenger) {
+        shutdown = true;
+        for (Integer partition : m_dataSourcesByPartition.keySet()) {
+            final String partitionDN =  m_mailboxesZKPath + "/" + partition;
+            final String partitionNodeDN =  m_mailboxesZKPath + "/" + partition + "/" + m_mbox.getHSId();
+            try {
+                messenger.getZK().delete(partitionNodeDN, -1);
+                messenger.getZK().delete(partitionDN, -1);
+            } catch (InterruptedException | KeeperException ex) {
+                exportLog.warn("Failed to delete generation partition mailboxes from zookeeper.", ex);
+            }
+        }
+        if (m_mbox != null && messenger != null) {
+            messenger.removeMailbox(m_mbox);
+        }
+        m_dataSourcesByPartition.clear();
+        m_onAllSourcesDrained = null;
+    }
+
     public void closeAndDelete(final HostMessenger messenger) throws IOException {
         List<ListenableFuture<?>> tasks = new ArrayList<ListenableFuture<?>>();
         for (Map<String, ExportDataSource> map : m_dataSourcesByPartition.values()) {
@@ -756,13 +775,8 @@ public class ExportGeneration implements Generation {
         } catch (Exception e) {
             Throwables.propagateIfPossible(e, IOException.class);
         }
-        if (m_mbox != null && messenger != null) {
-            messenger.removeMailbox(m_mbox);
-        }
-        m_dataSourcesByPartition.clear();
-        shutdown = true;
+        cleanup(messenger);
         VoltFile.recursivelyDelete(m_directory);
-
     }
 
     /*
@@ -839,11 +853,9 @@ public class ExportGeneration implements Generation {
             //intentionally not failing if there is an issue with close
             exportLog.error("Error closing export data sources", e);
         }
-        if (m_mbox != null && messenger != null) {
-            messenger.removeMailbox(m_mbox);
-        }
-        m_dataSourcesByPartition.clear();
+        //Do this before so no watchers gets created.
         shutdown = true;
+        cleanup(messenger);
     }
 
     /**
