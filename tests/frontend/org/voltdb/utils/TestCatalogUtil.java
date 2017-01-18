@@ -791,25 +791,14 @@ public class TestCatalogUtil extends TestCase {
             "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
             "<deployment>" +
             "   <cluster hostcount='3' kfactor='1' sitesperhost='2'/>" +
-            "   <partition-detection enabled='true'>" +
-            "   </partition-detection>" +
-            "</deployment>";
-
-        final String ppdEnabledWithPrefix =
-            "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
-            "<deployment>" +
-            "   <cluster hostcount='3' kfactor='1' sitesperhost='2'/>" +
-            "   <partition-detection enabled='true'>" +
-            "      <snapshot prefix='testPrefix'/>" +
-            "   </partition-detection>" +
+            "   <partition-detection enabled='true' />" +
             "</deployment>";
 
         final String ppdDisabledNoPrefix =
             "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
             "<deployment>" +
             "   <cluster hostcount='3' kfactor='1' sitesperhost='2'/>" +
-            "   <partition-detection enabled='false'>" +
-            "   </partition-detection>" +
+            "   <partition-detection enabled='false' />" +
             "</deployment>";
 
         final File tmpNoElement = VoltProjectBuilder.writeStringToTempFile(noElement);
@@ -817,7 +806,6 @@ public class TestCatalogUtil extends TestCase {
         assertTrue("Deployment file failed to parse: " + msg, msg == null);
         Cluster cluster = catalog.getClusters().get("cluster");
         assertTrue(cluster.getNetworkpartition());
-        assertEquals("partition_detection", cluster.getFaultsnapshots().get("CLUSTER_PARTITION").getPrefix());
 
         setUp();
         final File tmpEnabledDefault = VoltProjectBuilder.writeStringToTempFile(ppdEnabledDefaultPrefix);
@@ -825,15 +813,6 @@ public class TestCatalogUtil extends TestCase {
         assertTrue("Deployment file failed to parse: " + msg, msg == null);
         cluster = catalog.getClusters().get("cluster");
         assertTrue(cluster.getNetworkpartition());
-        assertEquals("partition_detection", cluster.getFaultsnapshots().get("CLUSTER_PARTITION").getPrefix());
-
-        setUp();
-        final File tmpEnabledPrefix = VoltProjectBuilder.writeStringToTempFile(ppdEnabledWithPrefix);
-        msg = CatalogUtil.compileDeployment(catalog, tmpEnabledPrefix.getPath(), false);
-        assertTrue("Deployment file failed to parse: " + msg, msg == null);
-        cluster = catalog.getClusters().get("cluster");
-        assertTrue(cluster.getNetworkpartition());
-        assertEquals("testPrefix", cluster.getFaultsnapshots().get("CLUSTER_PARTITION").getPrefix());
 
         setUp();
         final File tmpDisabled = VoltProjectBuilder.writeStringToTempFile(ppdDisabledNoPrefix);
@@ -1110,6 +1089,59 @@ public class TestCatalogUtil extends TestCase {
             }
         }
         return containsTable;
+    }
+
+    public void testDRRole() throws Exception {
+        final String defaultRole =
+            "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
+            + "<deployment>"
+            + "<cluster hostcount='3' kfactor='1' sitesperhost='2' id='1'/>"
+            + "    <dr id='1'>"
+            + "    </dr>"
+            + "</deployment>";
+        final String masterRole =
+            "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
+            + "<deployment>"
+            + "<cluster hostcount='3' kfactor='1' sitesperhost='2' id='1'/>"
+            + "    <dr id='1' role='master'>"
+            + "    </dr>"
+            + "</deployment>";
+        final String replicaRole =
+            "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
+            + "<deployment>"
+            + "<cluster hostcount='3' kfactor='1' sitesperhost='2' id='1'/>"
+            + "    <dr id='1' role='replica'>"
+            + "    </dr>"
+            + "</deployment>";
+        final String invalidRole =
+            "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
+            + "<deployment>"
+            + "<cluster hostcount='3' kfactor='1' sitesperhost='2' id='1'/>"
+            + "    <dr id='1' role='xdcr'>"
+            + "    </dr>"
+            + "</deployment>";
+
+
+        final File tmpDefault = VoltProjectBuilder.writeStringToTempFile(defaultRole);
+        DeploymentType defaultDeployment = CatalogUtil.getDeployment(new FileInputStream(tmpDefault));
+        CatalogUtil.compileDeployment(catalog, defaultDeployment, false);
+        assertEquals("master", catalog.getClusters().get("cluster").getDrrole());
+
+        setUp();
+        final File tmpMaster = VoltProjectBuilder.writeStringToTempFile(masterRole);
+        DeploymentType masterDeployment = CatalogUtil.getDeployment(new FileInputStream(tmpMaster));
+        CatalogUtil.compileDeployment(catalog, masterDeployment, false);
+        assertEquals("master", catalog.getClusters().get("cluster").getDrrole());
+
+        setUp();
+        final File tmpReplica = VoltProjectBuilder.writeStringToTempFile(replicaRole);
+        DeploymentType replicaDeployment = CatalogUtil.getDeployment(new FileInputStream(tmpReplica));
+        CatalogUtil.compileDeployment(catalog, replicaDeployment, false);
+        assertEquals("replica", catalog.getClusters().get("cluster").getDrrole());
+
+        setUp();
+        final File tmpInvalidRole = VoltProjectBuilder.writeStringToTempFile(invalidRole);
+        assertNull(CatalogUtil.getDeployment(new FileInputStream(tmpInvalidRole)));
     }
 
     public void testDRConnection() throws Exception {

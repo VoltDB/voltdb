@@ -1089,11 +1089,6 @@ definitions:
         properties:
           enabled:
             type: boolean
-          snapshot:
-            type: object
-            properties:
-              prefix:
-                type: string
 
       paths:
         type: object
