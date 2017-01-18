@@ -533,39 +533,37 @@ public class SwapTablesPlanNode extends AbstractOperationPlanNode {
             fbSeparator = TRUE_FB_SEPARATOR;
         }
 
-        if (theTable.getMaterializer() != null) {
+        if (theTable.getMaterializer() != null ||
+                ! theTable.getMvhandlerinfo().isEmpty()) {
             feedback.append(fbSeparator)
             .append("Swapping the view ").append(theName)
             .append(" is not allowed.");
             fbSeparator = TRUE_FB_SEPARATOR;
         }
 
-        //
-        // TODO: This view detection logic is not quite right.
-        //
-
-        if (otherTable.getMaterializer() != null) {
+        if (otherTable.getMaterializer() != null ||
+                ! otherTable.getMvhandlerinfo().isEmpty()) {
             feedback.append(fbSeparator)
             .append("Swapping with the view ").append(otherName)
             .append(" is not allowed.");
             fbSeparator = TRUE_FB_SEPARATOR;
         }
 
-        if ( ! (theTable.getMvhandlerinfo().isEmpty() &&
-                theTable.getViews().isEmpty())) {
+        StringBuilder viewNames = new StringBuilder();
+        if (viewsDependOn(theTable, viewNames)) {
             feedback.append(fbSeparator)
             .append("Swapping table ").append(theName)
-            .append(" is not allowed because it is referenced in views ");
+            .append(" is not allowed because it is referenced in views ")
+            .append(viewNames);
             fbSeparator = TRUE_FB_SEPARATOR;
-
-            listViewNames(theTable, feedback);
         }
 
-        if ( ! (otherTable.getMvhandlerinfo().isEmpty() &&
-                otherTable.getViews().isEmpty())) {
+        viewNames.setLength(0);
+        if (viewsDependOn(otherTable, viewNames)) {
             feedback.append(fbSeparator)
             .append("Swapping with table ").append(otherName)
-            .append(" is not allowed because it is referenced in views ");
+            .append(" is not allowed because it is referenced in views ")
+            .append(viewNames);
             fbSeparator = TRUE_FB_SEPARATOR;
 
             listViewNames(otherTable, feedback);
@@ -586,6 +584,31 @@ public class SwapTablesPlanNode extends AbstractOperationPlanNode {
         }
 
         return fbSeparator;
+    }
+
+    /**
+     * @param theTable
+     * @return
+     */
+    private static boolean viewsDependOn(Table aTable, StringBuilder viewNames) {
+        String separator = "(";
+        for (MaterializedViewInfo anyView : aTable.getViews()) {
+            viewNames.append(separator).append(anyView.getTypeName());
+            separator = ", ";
+        }
+        for (Table anyTable : ((Database) aTable.getParent()).getTables()) {
+            for (MaterializedViewHandlerInfo anyView : anyTable.getMvhandlerinfo()) {
+                if (anyView.getSourcetables().getIgnoreCase(aTable.getTypeName()) != null) {
+                    viewNames.append(separator).append(anyView.getTypeName());
+                    separator = ", ";
+                }
+            }
+        }
+        if (", ".equals(separator)) {
+            viewNames.append(")");
+            return true;
+        }
+        return false;
     }
 
     /**

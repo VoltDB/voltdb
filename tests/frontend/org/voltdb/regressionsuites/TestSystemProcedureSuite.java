@@ -217,7 +217,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
                 "CREATE VIEW VIEWING_1 AS SELECT ID, COUNT(*), SUM(PRICE) \n" +
                 " FROM NONSWAP_VIEWED_1 GROUP BY ID;\n"
             },
-            /*{ "NONSWAP_VIEWED_2",
+            { "NONSWAP_VIEWED_2",
                 " (\n" +
                 "  NAME VARCHAR(32 BYTES) NOT NULL,\n" +
                 "  PRICE FLOAT," +
@@ -227,7 +227,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
                 "CREATE TABLE JOINED_2 (DISCOUNT FLOAT, ID INTEGER);\n" +
                 "CREATE VIEW VIEWING_2 AS SELECT A.ID, COUNT(*), SUM(A.PRICE*B.DISCOUNT) \n" +
                 "FROM NONSWAP_VIEWED_2 A, JOINED_2 B WHERE A.ID = B.ID GROUP BY A.ID;\n"
-            },*/
+            },
             { "NONSWAP_VIEWED_3",
                 " (\n" +
                 "  NAME VARCHAR(32 BYTES) NOT NULL,\n" +
@@ -593,10 +593,13 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         VoltTable vt = resp.getResults()[0];
         boolean foundResponse = false;
         while (vt.advanceRow()) {
-            if (!vt.getString("Result").equalsIgnoreCase("sampler_start")) {
-                fail();
+            String profCtlResult = vt.getString("Result");
+            if ("SAMPLER_START".equalsIgnoreCase(profCtlResult)) {
+                foundResponse = true;
             }
-            foundResponse = true;
+            else {
+                fail("Was not expecting @ProfCtl result: " + profCtlResult);
+            }
         }
         assertTrue(foundResponse);
 
@@ -607,11 +610,12 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         vt = resp.getResults()[0];
         foundResponse = false;
         while (vt.advanceRow()) {
-            if (vt.getString("Result").equalsIgnoreCase("GPERF_ENABLE")) {
+            String profCtlResult = vt.getString("Result");
+            if ("GPERF_ENABLE".equalsIgnoreCase(profCtlResult)) {
                 foundResponse = true;
             }
             else {
-                assertTrue(vt.getString("Result").equalsIgnoreCase("GPERF_NOOP"));
+                assertTrue("GPERF_NOOP".equalsIgnoreCase(profCtlResult));
             }
         }
         assertTrue(foundResponse);
@@ -623,11 +627,12 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         vt = resp.getResults()[0];
         foundResponse = false;
         while (vt.advanceRow()) {
-            if (vt.getString("Result").equalsIgnoreCase("gperf_disable")) {
+            String profCtlResult = vt.getString("Result");
+            if ("GPERF_DISABLE".equalsIgnoreCase(profCtlResult)) {
                 foundResponse = true;
             }
             else {
-                assertTrue(vt.getString("Result").equalsIgnoreCase("GPERF_NOOP"));
+                assertTrue("GPERF_NOOP".equalsIgnoreCase(profCtlResult));
             }
         }
         assertTrue(foundResponse);
@@ -637,7 +642,6 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         //
         resp = client.callProcedure("@ProfCtl", "MakeAPony");
         vt = resp.getResults()[0];
-        assertTrue(true);
     }
 
     public void testPause() throws Exception {
@@ -841,18 +845,32 @@ public class TestSystemProcedureSuite extends RegressionSuite {
     public void testOneOffNegativeSwapTables() throws Exception {
         Client client = getClient();
 
+        String tableA = SWAPPY_PREFIX_PAIR[0] + SWAPPY_TABLES[0][0];
         for (int ii = 0; ii < NONSWAPPY_TABLES.length; ++ii) {
+            String tableB = NONSWAPPY_TABLES[ii][0];
             try {
-                client.callProcedure("@SwapTables",
-                        SWAPPY_PREFIX_PAIR[0] + SWAPPY_TABLES[0][0],
-                        NONSWAPPY_TABLES[ii][0]);
+                client.callProcedure("@SwapTables", tableA, tableB);
                 fail("Swap should have conflicted on table definitions " +
-                        SWAPPY_PREFIX_PAIR[0] + SWAPPY_TABLES[0][0] +
-                        " and " + NONSWAPPY_TABLES[ii][0]);
+                        tableA + " and " + tableB);
             }
             catch (ProcCallException ex) {
                 if (! ex.getMessage().contains("Swapping")) {
-                    System.out.println("sup w/ these incompatible tables: " + ex);
+                    System.out.println("sup w/ these incompatible tables(" +
+                            tableA + " and " + tableB + "): " + ex);
+                }
+                assertTrue(ex.getMessage().contains("Swapping"));
+            }
+
+            // Try reversing the arguments. Incompatibility should be mutual.
+            try {
+                client.callProcedure("@SwapTables", tableB, tableA);
+                fail("Swap should have conflicted on table definitions " +
+                        tableB + " and " + tableA);
+            }
+            catch (ProcCallException ex) {
+                if (! ex.getMessage().contains("Swapping")) {
+                    System.out.println("sup w/ these incompatible tables(" +
+                            tableB + " and " + tableA + "): " + ex);
                 }
                 assertTrue(ex.getMessage().contains("Swapping"));
             }
