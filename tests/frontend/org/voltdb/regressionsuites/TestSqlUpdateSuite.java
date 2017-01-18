@@ -44,14 +44,18 @@ public class TestSqlUpdateSuite extends RegressionSuite {
 
     static final int ROWS = 10;
 
+    private void insertRows(Client client, String table, int count) throws IOException, ProcCallException {
+        for (int i = 0; i < count; ++i)
+        {
+            client.callProcedure("Insert", table, i, "desc", i, 14.5);
+        }
+    }
+
     private void executeAndTestUpdate(Client client, String table, String update,
                                       int expectedRowsChanged)
     throws IOException, ProcCallException
     {
-        for (int i = 0; i < ROWS; ++i)
-        {
-            client.callProcedure("Insert", table, i, "desc", i, 14.5);
-        }
+        insertRows(client, table, ROWS);
         VoltTable[] results = client.callProcedure("@AdHoc", update).getResults();
         // ADHOC update still returns number of modified rows * number of partitions
         // Comment this out until it's fixed; the select count should be good enough, though
@@ -172,6 +176,45 @@ public class TestSqlUpdateSuite extends RegressionSuite {
         System.out.println("testInvalidUpdate");
         verifyStmtFails(client, "UPDATE P1_VIEW SET NUM_SUM = 5",
                  "Illegal to modify a materialized view.");
+    }
+
+    public void testUpdateWithExpresionSubquery()  throws Exception {
+        Client client = getClient();
+        String tables[] = {"P1", "R1"};
+        // insert rows where ID is 0..3
+        insertRows(client, "R2", 4);
+
+        for (String table : tables) {
+            // insert rows where ID is 0 and num is 0..9
+            insertRows(client, table, 10);
+
+            // update rows where ID is IN 0..3
+            VoltTable vt = client.callProcedure("@AdHoc",
+                    "UPDATE " + table + " SET NUM = NUM + 20 WHERE ID IN (SELECT ID FROM R2)")
+                    .getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] { 4 });
+
+            String stmt = "SELECT NUM FROM " + table + " ORDER BY NUM";
+            validateTableOfScalarLongs(client, stmt, new long[] { 4, 5, 6, 7, 8, 9, 20, 21, 22, 23 });
+
+            vt = client.callProcedure("@AdHoc",
+                    "UPDATE " + table + " SET NUM = (SELECT NUM FROM R2 WHERE ID = 3)")
+                    .getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] { 10 });
+
+            stmt = "SELECT NUM FROM " + table + " ORDER BY NUM";
+            validateTableOfScalarLongs(client, stmt, new long[] { 3, 3, 3, 3, 3, 3, 3, 3, 3, 3 });
+
+            vt = client.callProcedure("@AdHoc",
+                    "UPDATE " + table + " SET NUM = 20 WHERE ID = (SELECT MAX(NUM) FROM R2)")
+                    .getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] { 1 });
+
+            stmt = "SELECT NUM FROM " + table + " WHERE ID = (SELECT MAX(NUM) FROM R2)";
+            validateTableOfScalarLongs(client, stmt, new long[] { 20 });
+
+        }
+
     }
 
     //
