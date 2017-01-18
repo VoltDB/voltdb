@@ -1374,7 +1374,7 @@ public class PlanAssembler {
         // Right now, the EE is going to use the original column names
         // and compare these to the persistent table column names in the
         // update executor in order to figure out which table columns get
-        // updated.  We'll associate the actual values with AbstractParsedStmt.TEMP_TABLE_NAME
+        // updated.  We'll associate the actual values with VOLT_TEMP_TABLE
         // to avoid any false schema/column matches with the actual table.
         for (Entry<Column, AbstractExpression> colEntry :
             m_parsedUpdate.columns.entrySet()) {
@@ -1793,12 +1793,6 @@ public class PlanAssembler {
      * Determine if an OrderByPlanNode is needed.  This may return false if the
      * statement has no ORDER BY clause, or if the subtree is already producing
      * rows in the correct order.
-     *
-     * Note that even if there is a window function, which may have its own
-     * order, we need to insert the order by node so that the microoptimization
-     * InlineOrderByIntoMergeReceive can remove it and replace it with a
-     * MergeReceivePlanNode.
-     *
      * @param parsedStmt    The statement whose plan may need an OrderByPlanNode
      * @param root          The subtree which may need its output tuples ordered
      * @return true if the plan needs an OrderByPlanNode, false otherwise
@@ -2211,17 +2205,6 @@ public class PlanAssembler {
      * @return
      */
     private AbstractPlanNode handleWindowedOperators(AbstractPlanNode root) {
-        //
-        // Search the join tree to see if there is an
-        // index we can use.  The planner will have left
-        // an indication there if this is true.
-        AbstractPlanNode scanNode = findScanNodeInPlan(root);
-        int indexForWindowFunction = SubPlanAssembler.NO_INDEX_USE;
-        boolean statementLevelOrderByIsCompatible = false;
-        if (scanNode != null) {
-            indexForWindowFunction = scanNode.getWindowFunctionUsesIndex();
-            statementLevelOrderByIsCompatible = scanNode.isWindowFunctionCompatibleWithOrderBy();
-        }
         // Get the windowed expression.  We need to set its output
         // schema from the display list.
         WindowFunctionExpression winExpr = m_parsedSelect.getWindowFunctionExpressions().get(0);
@@ -2232,79 +2215,43 @@ public class PlanAssembler {
         // we will add the input columns.
         WindowFunctionPlanNode pnode = new WindowFunctionPlanNode();
         pnode.setWindowFunctionExpression(winExpr);
-        pnode.setWindowFunctionUsesIndex(indexForWindowFunction);
-        pnode.setWindowFunctionIsCompatibleWithOrderBy(statementLevelOrderByIsCompatible);
-        // This is the next node.  It's either the root or
-        // else an order by grafted onto the root.
-        AbstractPlanNode cnode;
-        // When we support more than one
-        // window function, indexForWindowFunction will have the
-        // window function number of the index we've scanned.
-        // Until then, we just use 0.  If the statement level
-        // order by uses the index, this will be SubplanAssembler.STATEMENT_LEVEL_ORDER_BY_INDEX.
-        // If nothing can use an index this will be SubplanAssembler.NO_INDEX_USE.
-        if (indexForWindowFunction == 0) {
-            cnode = root;
-        } else {
-            OrderByPlanNode onode = new OrderByPlanNode();
-            onode.setWindowFunctionUsesIndex(indexForWindowFunction);
-            onode.setWindowFunctionIsCompatibleWithOrderBy(statementLevelOrderByIsCompatible);
-            cnode = onode;
-            // We need to extract more information from the windowed expression.
-            // to construct the output schema.
-            List<AbstractExpression> partitionByExpressions = winExpr.getPartitionByExpressions();
-            // If the order by expression list contains a partition by expression then
-            // we won't have to sort by it twice.  We sort by the partition by expressions
-            // first, and we don't care what order we sort by them.  So, find the
-            // sort direction in the order by list and use that in the partition by
-            // list, and then mark that it was deleted in the order by
-            // list.
-            //
-            // We choose to make this dontsort rather than dosort because the
-            // Java default value for boolean is false, and we want to sort by
-            // default.
-            boolean dontsort[] = new boolean[winExpr.getOrderbySize()];
-            List<AbstractExpression> orderByExpressions = winExpr.getOrderByExpressions();
-            List<SortDirectionType>  orderByDirections  = winExpr.getOrderByDirections();
-            for (int idx = 0; idx < winExpr.getPartitionbySize(); ++idx) {
-                SortDirectionType pdir = SortDirectionType.ASC;
-                AbstractExpression partitionByExpression = partitionByExpressions.get(idx);
-                int sidx = winExpr.getSortIndexOfOrderByExpression(partitionByExpression);
-                if (0 <= sidx) {
-                    pdir = orderByDirections.get(sidx);
-                    dontsort[sidx] = true;
-                }
-                onode.addSort(partitionByExpression, pdir);
+        OrderByPlanNode onode = new OrderByPlanNode();
+        // We need to extract more information from the windowed expression.
+        // to construct the output schema.
+        List<AbstractExpression> partitionByExpressions = winExpr.getPartitionByExpressions();
+        // If the order by expression list contains a partition by expression then
+        // we won't have to sort by it twice.  We sort by the partition by expressions
+        // first, and we don't care what order we sort by them.  So, find the
+        // sort direction in the order by list and use that in the partition by
+        // list, and then mark that it was deleted in the order by
+        // list.
+        //
+        // We choose to make this dontsort rather than dosort because the
+        // Java default value for boolean is false, and we want to sort by
+        // default.
+        boolean dontsort[] = new boolean[winExpr.getOrderbySize()];
+        List<AbstractExpression> orderByExpressions = winExpr.getOrderByExpressions();
+        List<SortDirectionType>  orderByDirections  = winExpr.getOrderByDirections();
+        for (int idx = 0; idx < winExpr.getPartitionbySize(); ++idx) {
+            SortDirectionType pdir = SortDirectionType.ASC;
+            AbstractExpression partitionByExpression = partitionByExpressions.get(idx);
+            int sidx = winExpr.getSortIndexOfOrderByExpression(partitionByExpression);
+            if (0 <= sidx) {
+                pdir = orderByDirections.get(sidx);
+                dontsort[sidx] = true;
             }
-            for (int idx = 0; idx < winExpr.getOrderbySize(); ++idx) {
-                if (!dontsort[idx]) {
-                    AbstractExpression orderByExpr = orderByExpressions.get(idx);
-                    SortDirectionType  orderByDir  = orderByDirections.get(idx);
-                    onode.addSort(orderByExpr, orderByDir);
-                }
-            }
-            onode.addAndLinkChild(root);
+            onode.addSort(partitionByExpression, pdir);
         }
-        pnode.addAndLinkChild(cnode);
+        for (int idx = 0; idx < winExpr.getOrderbySize(); ++idx) {
+            if (!dontsort[idx]) {
+                AbstractExpression orderByExpr = orderByExpressions.get(idx);
+                SortDirectionType  orderByDir  = orderByDirections.get(idx);
+                onode.addSort(orderByExpr, orderByDir);
+            }
+        }
+        onode.addAndLinkChild(root);
+        pnode.addAndLinkChild(onode);
         return pnode;
-    }
-
-    /**
-     * Return the scan node for this plan.  Return null if there
-     * is no suitable scan node.  Since a WindowFunctionPlanNode
-     * has what we want we will stop there as well.
-     *
-     * @param root
-     * @return The scan node or null.
-     */
-    private AbstractPlanNode findScanNodeInPlan(AbstractPlanNode root) {
-        while ((root != null)
-                && ! ( ( root instanceof AbstractScanPlanNode )
-                        || ( root instanceof AbstractJoinPlanNode )
-                        || ( root instanceof WindowFunctionPlanNode ) )) {
-            root = (0 < root.getChildCount()) ? root.getChild(0) : null;
-        }
-        return root;
     }
 
     private AbstractPlanNode handleAggregationOperators(AbstractPlanNode root) {

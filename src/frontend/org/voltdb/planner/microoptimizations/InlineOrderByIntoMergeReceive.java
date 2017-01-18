@@ -33,6 +33,8 @@ import org.voltdb.plannodes.HashAggregatePlanNode;
 import org.voltdb.plannodes.MergeReceivePlanNode;
 import org.voltdb.plannodes.OrderByPlanNode;
 import org.voltdb.plannodes.ReceivePlanNode;
+import org.voltdb.plannodes.SendPlanNode;
+import org.voltdb.plannodes.WindowFunctionPlanNode;
 import org.voltdb.types.PlanNodeType;
 
 public class InlineOrderByIntoMergeReceive extends MicroOptimization {
@@ -52,7 +54,7 @@ public class InlineOrderByIntoMergeReceive extends MicroOptimization {
             return planNode; // Do not apply the optimization.
         }
 
-        Queue<AbstractPlanNode> children = new LinkedList<AbstractPlanNode>();
+        Queue<AbstractPlanNode> children = new LinkedList<>();
         children.add(planNode);
 
         while(!children.isEmpty()) {
@@ -73,6 +75,14 @@ public class InlineOrderByIntoMergeReceive extends MicroOptimization {
                         return planNode; // Do not apply the optimization.
                     }
                 }
+            } else if (PlanNodeType.WINDOWFUNCTION == nodeType) {
+                assert(plan instanceof WindowFunctionPlanNode);
+                AbstractPlanNode newPlan = applyOptimization((WindowFunctionPlanNode)plan);
+                if (newPlan != plan) {
+                    return newPlan;
+                } else {
+                    return planNode;
+                }
             }
 
             for (int i = 0; i < plan.getChildCount(); i++) {
@@ -80,6 +90,43 @@ public class InlineOrderByIntoMergeReceive extends MicroOptimization {
             }
         }
         return planNode; // Do not apply the optimization.
+    }
+
+    /**
+     * Convert ReceivePlanNodes into MergeReceivePlanNodes.  We won't
+     * have any inline limits or aggregates here, so this is somewhat
+     * simpler than the order by case.
+     *
+     * @param plan
+     * @return
+     */
+    private AbstractPlanNode applyOptimization(WindowFunctionPlanNode plan) {
+        AbstractPlanNode child = (plan.getChildCount() > 0) ? plan.getChild(0) : null;
+        if (child == null) {
+            return plan;
+        }
+        if ( ! ( child instanceof OrderByPlanNode ) ) {
+            return plan;
+        }
+        OrderByPlanNode onode = (OrderByPlanNode)child;
+        child = onode.getChild(0);
+        if ( ! ( child instanceof ReceivePlanNode) ) {
+            return plan;
+        }
+        ReceivePlanNode receiveNode = (ReceivePlanNode)child;
+        // No inline nodes are expected in the window function plan node.
+        assert(plan.getChildCount() == 1);
+        // No inline nodes are expected in the Receive node.
+        assert(child.getChildCount() == 1);
+        AbstractPlanNode sendNode = child.getChild(0);
+        assert(sendNode instanceof SendPlanNode);
+        plan.clearChildren();
+        receiveNode.removeFromGraph();
+        MergeReceivePlanNode mrnode = new MergeReceivePlanNode();
+        mrnode.addInlinePlanNode(onode);
+        mrnode.addAndLinkChild(sendNode);
+        plan.addAndLinkChild(mrnode);
+        return plan;
     }
 
     /**
@@ -199,9 +246,9 @@ public class InlineOrderByIntoMergeReceive extends MicroOptimization {
     AbstractPlanNode convertToSerialAggregation(AbstractPlanNode aggregateNode, OrderByPlanNode orderbyNode) {
         assert(aggregateNode instanceof HashAggregatePlanNode);
         HashAggregatePlanNode hashAggr = (HashAggregatePlanNode) aggregateNode;
-        List<AbstractExpression> groupbys = new ArrayList<AbstractExpression>(hashAggr.getGroupByExpressions());
-        List<AbstractExpression> orderbys = new ArrayList<AbstractExpression>(orderbyNode.getSortExpressions());
-        Set<Integer> coveredGroupByColumns = new HashSet<Integer>();
+        List<AbstractExpression> groupbys = new ArrayList<>(hashAggr.getGroupByExpressions());
+        List<AbstractExpression> orderbys = new ArrayList<>(orderbyNode.getSortExpressions());
+        Set<Integer> coveredGroupByColumns = new HashSet<>();
 
         Iterator<AbstractExpression> orderbyIt = orderbys.iterator();
         while (orderbyIt.hasNext()) {
@@ -224,7 +271,7 @@ public class InlineOrderByIntoMergeReceive extends MicroOptimization {
         }
         if (orderbys.isEmpty() && !coveredGroupByColumns.isEmpty() ) {
             // Partial aggregation
-            List<Integer> coveredGroupByColumnList = new ArrayList<Integer>();
+            List<Integer> coveredGroupByColumnList = new ArrayList<>();
             coveredGroupByColumnList.addAll(coveredGroupByColumns);
             return AggregatePlanNode.convertToPartialAggregatePlanNode(hashAggr, coveredGroupByColumnList);
         }
