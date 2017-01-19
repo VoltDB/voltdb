@@ -157,4 +157,5 @@ CREATE STREAM JUMBO_ROW PARTITION ON COLUMN PKEY (
  STRING2       VARCHAR(1048564)
 );
 
+-- This table should be removed after issue ENG-11836 is addressed.
 CREATE table FOO (PKEY INTEGER NOT NULL, VAL INTEGER);
