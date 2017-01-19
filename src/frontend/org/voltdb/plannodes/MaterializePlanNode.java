@@ -53,7 +53,7 @@ public class MaterializePlanNode extends ProjectionPlanNode {
         // MaterializePlanNodes have no children
         assert(m_children.size() == 0);
         // MaterializePlanNode's output schema is pre-determined, don't touch
-        // except when in has a scalar expression as one of its values
+        // except when its output column(s) has a scalar expression
         // Generate the output schema for subqueries if any
         Collection<AbstractExpression> exprs = findAllSubquerySubexpressions();
         for (AbstractExpression expr: exprs) {
