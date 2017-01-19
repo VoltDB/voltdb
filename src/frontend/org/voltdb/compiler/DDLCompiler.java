@@ -1782,7 +1782,7 @@ public class DDLCompiler {
             // Get the final DDL for the table rebuilt from the catalog object
             // Don't need a real StringBuilder or export state to get the CREATE for a table
             annotation.ddl = CatalogSchemaTools.toSchema(new StringBuilder(),
-                    table, query, null);
+                    table, query, CatalogUtil.isTableExportOnly(db, table), null);
         }
     }
 

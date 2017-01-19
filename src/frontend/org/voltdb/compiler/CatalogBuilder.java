@@ -277,11 +277,6 @@ public class CatalogBuilder {
         transformer.append("PARTITION TABLE " + tableName + " ON COLUMN " + partitionColumnName + ";");
     }
 
-    public void setTableAsExportOnly(String name) {
-        assert(name != null);
-        transformer.append("Export TABLE " + name + ";");
-    }
-
     public void addExport(List<String> groups) {
         m_elAuthGroups = groups;
     }

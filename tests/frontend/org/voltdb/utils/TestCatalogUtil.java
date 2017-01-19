@@ -97,7 +97,7 @@ public class TestCatalogUtil extends TestCase {
         // Simple check to make sure things look ok...
         for (Table catalog_tbl : catalog_db.getTables()) {
             StringBuilder sb = new StringBuilder();
-            CatalogSchemaTools.toSchema(sb, catalog_tbl, null, null);
+            CatalogSchemaTools.toSchema(sb, catalog_tbl, null, false, null);
             String sql = sb.toString();
             assertTrue(sql.startsWith("CREATE TABLE " + catalog_tbl.getTypeName()));
 
