@@ -567,14 +567,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         @Override
         public Map<Integer, Map<Integer, DRConsumerDrIdTracker>> getDrAppliedTrackers()
         {
-            if (drLog.isTraceEnabled()) {
-                for (Entry<Integer, Map<Integer, DRConsumerDrIdTracker>> e1 : m_maxSeenDrLogsBySrcPartition.entrySet()) {
-                    for (Entry<Integer, DRConsumerDrIdTracker> e2 : e1.getValue().entrySet()) {
-                        drLog.trace("Tracker for Producer " + e1.getKey() + "'s PID " + e2.getKey() +
-                                " contains " + e2.getValue().toShortString());
-                    }
-                }
-            }
+            DRConsumerDrIdTracker.debugTraceTracker(drLog, m_maxSeenDrLogsBySrcPartition);
             return m_maxSeenDrLogsBySrcPartition;
         }
 

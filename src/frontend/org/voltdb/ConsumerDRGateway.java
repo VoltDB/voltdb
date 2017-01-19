@@ -18,6 +18,7 @@
 package org.voltdb;
 
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutionException;
 
 import org.voltdb.ProducerDRGateway.MeshMemberInfo;
@@ -34,9 +35,9 @@ public interface ConsumerDRGateway extends Promotable {
      */
     void updateCatalog(CatalogContext catalog, String newConnectionSource);
 
-    DRRoleStats.State getState();
+    Map<Byte, DRRoleStats.State> getStates();
 
-    void initialize(boolean resumeReplication, List<MeshMemberInfo> expectedClusterMembers);
+    void initialize(boolean resumeReplication, final byte dataSourceCluster, List<MeshMemberInfo> expectedClusterMembers);
 
     void shutdown(final boolean blocking) throws InterruptedException, ExecutionException;
 
@@ -53,6 +54,4 @@ public interface ConsumerDRGateway extends Promotable {
     void startConsumerDispatcher(final MeshMemberInfo member, final boolean awaitProducerSnapshot);
 
     void addLocallyLedPartition(int partitionId);
-
-    void populateEmptyTrackersIfNeeded(byte producerClusterId, int producerPartitionCount);
 }

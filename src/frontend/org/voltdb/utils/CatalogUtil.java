@@ -842,10 +842,6 @@ public abstract class CatalogUtil {
             pd = new PartitionDetectionType();
             deployment.setPartitionDetection(pd);
         }
-        if (pd.getSnapshot() == null) {
-            PartitionDetectionType.Snapshot sshot = new PartitionDetectionType.Snapshot();
-            pd.setSnapshot(sshot);
-        }
         //heartbeat
         if (deployment.getHeartbeat() == null) {
             HeartbeatType hb = new HeartbeatType();
@@ -1098,18 +1094,8 @@ public abstract class CatalogUtil {
         // copy the deployment info that is currently not recorded anywhere else
         Deployment catDeploy = catCluster.getDeployment().get("deployment");
         catDeploy.setKfactor(kFactor);
-        // copy partition detection configuration from xml to catalog
-        String defaultPPDPrefix = "partition_detection";
         if (deployment.getPartitionDetection().isEnabled()) {
             catCluster.setNetworkpartition(true);
-            CatalogMap<SnapshotSchedule> faultsnapshots = catCluster.getFaultsnapshots();
-            SnapshotSchedule sched = faultsnapshots.add("CLUSTER_PARTITION");
-            if (deployment.getPartitionDetection().getSnapshot() != null) {
-                sched.setPrefix(deployment.getPartitionDetection().getSnapshot().getPrefix());
-            }
-            else {
-                sched.setPrefix(defaultPPDPrefix);
-            }
         }
         else {
             catCluster.setNetworkpartition(false);
@@ -1969,6 +1955,7 @@ public abstract class CatalogUtil {
             ConnectionType drConnection = dr.getConnection();
             cluster.setDrproducerenabled(dr.isListen());
             cluster.setDrproducerport(dr.getPort());
+            cluster.setDrrole(dr.getRole().name().toLowerCase());
 
             // Backward compatibility to support cluster id in DR tag
             if (clusterType.getId() == null && dr.getId() != null) {

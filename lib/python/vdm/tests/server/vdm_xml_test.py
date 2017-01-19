@@ -222,8 +222,6 @@ class UpdateDatabase(DatabaseServer):
                         self.assertEqual(child.attrib['provider'], "hash")
                     if child.tag == "partition-detection":
                         self.assertEqual(child.attrib['enabled'], "true")
-                        for subnode in child:
-                            self.assertEqual(subnode.attrib['prefix'], "voltdb_partition_detection")
 
 
 class UpdateMember(DatabaseServer):
@@ -272,8 +270,7 @@ class Deployment(unittest.TestCase):
                       "exportoverflow":
                           {"path": "export_overflow"}, "commandlog": {"path": "command_logtest"},
                       "commandlogsnapshot": {"path": "command_log_snapshot"}},
-            "partition-detection": {"snapshot": {"prefix": "voltdb_partition_detection"},
-                                    "enabled": True},
+            "partition-detection": {"enabled": True},
             "heartbeat": {"timeout": 90},
             "httpd": {"jsonapi": {"enabled": True}, "port": 8080, "enabled": True},
             "snapshot": {"frequency": "1h", "retain": 1,
@@ -383,9 +380,6 @@ class UpdateDatabaseDeployment(Deployment):
                         self.assertEqual(child.attrib['provider'], "HASH")
                     if child.tag == "partition-detection":
                         self.assertEqual(child.attrib['enabled'], "true")
-                        for subnode in child:
-                            self.assertEqual(subnode.attrib['prefix'], "voltdb_partition_detection")
-
 
 if __name__ == '__main__':
     unittest.main(testRunner=xmlrunner.XMLTestRunner(output='test-reports'))

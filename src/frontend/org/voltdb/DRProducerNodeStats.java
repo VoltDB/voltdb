@@ -18,6 +18,11 @@
 package org.voltdb;
 
 public class DRProducerNodeStats {
+    public static final DRProducerNodeStats DISABLED_NODE_STATS =
+        new DRProducerNodeStats((byte) -1, (byte) -1, DRRoleStats.State.DISABLED, "NONE",
+                                -1, -1, 0);
+
+    public final short clusterId;
     public final short consumerClusterId;
     public final DRRoleStats.State state;
     public String syncSnapshotState;
@@ -25,13 +30,14 @@ public class DRProducerNodeStats {
     public final long rowsAckedForSyncSnapshot;
     public final long queueDepth;
 
-    public DRProducerNodeStats(
-                              short consumerClusterId,
-                              DRRoleStats.State state,
-                              String syncSnapshotState,
-                              long rowsInSyncSnapshot,
-                              long rowsAckedForSyncSnapshot,
-                              long queueDepth) {
+    public DRProducerNodeStats(short clusterId,
+                               short consumerClusterId,
+                               DRRoleStats.State state,
+                               String syncSnapshotState,
+                               long rowsInSyncSnapshot,
+                               long rowsAckedForSyncSnapshot,
+                               long queueDepth) {
+        this.clusterId = clusterId;
         this.consumerClusterId = consumerClusterId;
         this.state = state;
         this.syncSnapshotState = syncSnapshotState;
