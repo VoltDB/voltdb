@@ -465,6 +465,16 @@ function alertNodeClicked(obj) {
         };
         //
 
+        //pm
+        this.GetDrRoleInformation = function (onInformationLoaded) {
+            var drRoleInfo = {};
+            VoltDBService.GetDrRoleInformation(function (connection) {
+                getDrRoleDetails(connection, drRoleInfo);
+                onInformationLoaded(drRoleInfo);
+            });
+        };
+
+
         //Render DR Replication Graph
         this.GetDrReplicationInformation = function (onInformationLoaded) {
             var replicationData = {};
@@ -2226,6 +2236,22 @@ function alertNodeClicked(obj) {
             });
         };
         //
+
+        //PM
+        var getDrRoleDetails = function (connection, drRoleDetails) {
+            var hostName = "";
+            var drRoles = []
+
+            if (connection.Metadata['@Statistics_DRROLE'] == null || $.isEmptyObject(connection.Metadata['@Statistics_DRROLE'])) {
+                return;
+            }
+
+            connection.Metadata['@Statistics_DRROLE'].data.forEach(function (info) {
+                drRoles.push(info)
+            });
+
+            drRoleDetails['DRROLE'] =  drRoles;
+        };
 
         //Get DR Replication Data
         var getDrReplicationData = function (connection, replicationDetails) {
