@@ -317,9 +317,9 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
                 // When any part of the search key is NULL, the result is false when it compares to anything.
                 //   do early return optimization, our index comparator may not handle null comparison correctly.
                 // However, if the search key expression is "IS NOT DISTINCT FROM", then NULL values cannot be skipped.
-                // We will set the IgnoreNullCandidateFlags to false in the planner to mark this. (ENG-11096)
+                // We will set the CompareNotDistinctFlags to true in the planner to mark this. (ENG-11096)
                 NValue candidateValue = m_indexNode->getSearchKeyExpressions()[ctr]->eval(&outer_tuple, NULL);
-                if (candidateValue.isNull() && m_indexNode->getCompareNotDistinctFlags()[ctr]) {
+                if (candidateValue.isNull() && m_indexNode->getCompareNotDistinctFlags()[ctr] == false) {
                     keyException = true;
                     break;
                 }

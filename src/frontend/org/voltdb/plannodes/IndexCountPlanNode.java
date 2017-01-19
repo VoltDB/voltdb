@@ -136,10 +136,10 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
             m_lookupType = endType;     // must be EQ, but doesn't matter, since previous lookup type is not GT
             m_searchkeyExpressions.addAll(endKeys);
             m_compareNotDistinct = isp.m_compareNotDistinct;
-            // For this additional < / <= expression, we set ignoreNullCandidate = true.
+            // For this additional < / <= expression, we set CompareNotDistinctFlag = false.
             // This is because the endkey came from doubleBoundExpr (in getRelevantAccessPathForIndex()),
             // which has no way to be "IS NOT DISTINCT FROM". (ENG-11096)
-            m_compareNotDistinct.add(true);
+            m_compareNotDistinct.add(false);
             m_endType = isp.m_lookupType;
             m_endkeyExpressions = isp.getSearchKeyExpressions();
 
@@ -402,11 +402,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         }
 
         stringer.key(Members.SEARCHKEY_EXPRESSIONS.name()).array(m_searchkeyExpressions);
-        stringer.key(Members.COMPARE_NOTDISTINCT.name()).array();
-        for (Boolean ignoreNullCandidateValue : m_compareNotDistinct) {
-            stringer.value(ignoreNullCandidateValue);
-        }
-        stringer.endArray();
+        booleanArrayToJSONString(stringer, Members.COMPARE_NOTDISTINCT.name(), m_compareNotDistinct);
 
         if (m_skip_null_predicate != null) {
             stringer.key(Members.SKIP_NULL_PREDICATE.name()).value(m_skip_null_predicate);
@@ -428,13 +424,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         AbstractExpression.loadFromJSONArrayChild(m_searchkeyExpressions, jobj,
                 Members.SEARCHKEY_EXPRESSIONS.name(), m_tableScan);
         // load COMPARE_NOTDISTINCT flag vector
-        if ( ! jobj.isNull(Members.COMPARE_NOTDISTINCT.name())) {
-            JSONArray jarray = jobj.getJSONArray(Members.COMPARE_NOTDISTINCT.name());
-            int numCols = jarray.length();
-            for (int ii = 0; ii < numCols; ++ii) {
-                m_compareNotDistinct.add(jarray.getBoolean(ii));
-            }
-        }
+        loadBooleanArrayFromJSONObject(jobj, Members.COMPARE_NOTDISTINCT.name(), m_compareNotDistinct);
         // load skip_null_predicate
         m_skip_null_predicate = AbstractExpression.fromJSONChild(jobj, Members.SKIP_NULL_PREDICATE.name(), m_tableScan);
     }
@@ -519,26 +509,26 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
     }
 
     private static String explainKeys(String[] asIndexed, List<AbstractExpression> keyExpressions,
-            String targetTableName, IndexLookupType lookupType, List<Boolean> ignoreNullCandidate) {
+            String targetTableName, IndexLookupType lookupType, List<Boolean> compareNotDistinct) {
         String conjunction = "";
         String result = "(";
         int prefixSize = keyExpressions.size() - 1;
         for (int ii = 0; ii < prefixSize; ++ii) {
             result += conjunction + asIndexed[ii] +
-                (ignoreNullCandidate == null || ignoreNullCandidate.get(ii) ? " = " : " NOT DISTINCT ") +
+                (compareNotDistinct.get(ii) ? " NOT DISTINCT " : " = ") +
                 keyExpressions.get(ii).explain(targetTableName);
             conjunction = ") AND (";
         }
         // last element
         result += conjunction + asIndexed[prefixSize] + " ";
-        if (lookupType == IndexLookupType.EQ && ignoreNullCandidate.get(prefixSize) == false) {
+        if (lookupType == IndexLookupType.EQ && compareNotDistinct.get(prefixSize)) {
             result += "NOT DISTINCT";
         }
         else {
             result += lookupType.getSymbol();
         }
         result += " " + keyExpressions.get(prefixSize).explain(targetTableName);
-        if (lookupType != IndexLookupType.EQ && ignoreNullCandidate.get(prefixSize) == false) {
+        if (lookupType != IndexLookupType.EQ && compareNotDistinct.get(prefixSize)) {
             result += ", including NULLs";
         }
         result += ")";

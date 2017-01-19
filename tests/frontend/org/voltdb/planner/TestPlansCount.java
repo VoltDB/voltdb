@@ -404,7 +404,7 @@ public class TestPlansCount extends PlannerTestCase {
         List<AbstractPlanNode> pn = compileToFragments("SELECT count(*) from T3 WHERE T3_NUM1 =1 AND T3_NUM2 >= ?");
         checkIndexCounter(pn, true);
 
-        pn = compileToFragments("SELECT count(1) from T3 WHERE T3_NUM1 =1 AND T3_NUM2 >= ?");
+        pn = compileToFragments("SELECT count(1) from T3 WHERE T3_NUM1 = 1 AND T3_NUM2 >= ?");
         checkIndexCounter(pn, true);
     }
 
@@ -427,26 +427,26 @@ public class TestPlansCount extends PlannerTestCase {
         }
         assertNotNull(compareNotDistinctFlags);
         assertEquals(compareNotDistinctFlags.size(), expectedFlags.length);
-        for (int i=0; i<compareNotDistinctFlags.size(); i++) {
+        for (int i = 0; i < compareNotDistinctFlags.size(); i++) {
             assertEquals(expectedFlags[i], compareNotDistinctFlags.get(i));
         }
     }
 
-    // Index count with "IS NOT DISTINC T FROM"
+    // Index count with "IS NOT DISTINCT FROM"
     public void testCountStar33() {
         List<AbstractPlanNode> pn = compileToFragments("SELECT COUNT(*) FROM T_ENG_11096 WHERE a = 1 AND b IS NOT DISTINCT FROM CAST(NULL AS INT) AND c > 1");
         checkIndexCounter(pn, true);
-        checkCompareNotDistinctFlags(pn.get(0).getChild(0), true, false, true);
+        checkCompareNotDistinctFlags(pn.get(0).getChild(0), false, true, false);
 
         pn = compileToFragments("SELECT COUNT(1) FROM T_ENG_11096 WHERE a = 1 AND b IS NOT DISTINCT FROM CAST(NULL AS INT) AND c > 1");
         checkIndexCounter(pn, true);
-        checkCompareNotDistinctFlags(pn.get(0).getChild(0), true, false, true);
+        checkCompareNotDistinctFlags(pn.get(0).getChild(0), false, true, false);
 
         pn = compileToFragments("SELECT COUNT(*) FROM T_ENG_11096 WHERE a = 1 AND b IS NOT DISTINCT FROM CAST(NULL AS INT)");
         for ( AbstractPlanNode nd : pn)
             System.out.println("PlanNode Explain string:\n" + nd.toExplainPlanString());
         AbstractPlanNode p = pn.get(0).getChild(0);
-        checkCompareNotDistinctFlags(p, true, false);
+        checkCompareNotDistinctFlags(p, false, true);
         assertNotNull(p.getInlinePlanNode(PlanNodeType.AGGREGATE));
     }
 
