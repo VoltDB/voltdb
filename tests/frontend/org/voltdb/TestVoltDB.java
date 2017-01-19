@@ -281,7 +281,7 @@ final public class TestVoltDB {
         assertTrue("Project failed to compile", project.compile(catalogJar));
 
         byte[] bytes = MiscUtils.fileToBytes(new File(catalogJar));
-        String serializedCatalog = CatalogUtil.getSerializedCatalogStringFromJar(CatalogUtil.loadAndUpgradeCatalogFromJar(bytes).getFirst());
+        String serializedCatalog = CatalogUtil.getSerializedCatalogStringFromJar(CatalogUtil.loadAndUpgradeCatalogFromJar(bytes, false).getFirst());
         assertNotNull("Error loading catalog from jar", serializedCatalog);
 
         Catalog catalog = new Catalog();

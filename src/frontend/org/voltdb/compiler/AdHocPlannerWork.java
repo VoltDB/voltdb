@@ -22,6 +22,7 @@ import org.voltdb.AuthSystem;
 import org.voltdb.CatalogContext;
 import org.voltdb.ClientInterface.ExplainMode;
 import org.voltdb.client.BatchTimeoutOverrideType;
+import org.voltdb.compiler.deploymentfile.DrRoleType;
 
 
 public class AdHocPlannerWork extends AsyncCompilerWork {
@@ -41,18 +42,18 @@ public class AdHocPlannerWork extends AsyncCompilerWork {
     public final int m_batchTimeout;
 
     public AdHocPlannerWork(long replySiteId, long clientHandle, long connectionId,
-            boolean adminConnection, Connection clientConnection,
-            String sqlBatchText, String[] sqlStatements,
-            Object[] userParamSet, CatalogContext context, ExplainMode explainMode,
-            boolean inferPartitioning, Object[] userPartitionKey,
-            String invocationName, int batchTimeout,
-            boolean onReplica, boolean useAdhocDDL,
-            AsyncCompilerWorkCompletionHandler completionHandler, AuthSystem.AuthUser user)
+                            boolean adminConnection, Connection clientConnection,
+                            String sqlBatchText, String[] sqlStatements,
+                            Object[] userParamSet, CatalogContext context, ExplainMode explainMode,
+                            boolean inferPartitioning, Object[] userPartitionKey,
+                            String invocationName, int batchTimeout,
+                            DrRoleType drRole, boolean useAdhocDDL,
+                            AsyncCompilerWorkCompletionHandler completionHandler, AuthSystem.AuthUser user)
     {
         super(replySiteId, false, clientHandle, connectionId,
               clientConnection == null ? "" : clientConnection.getHostnameAndIPAndPort(),
               adminConnection, clientConnection, invocationName,
-              onReplica, useAdhocDDL,
+              drRole, useAdhocDDL,
               completionHandler, user);
         this.sqlBatchText = sqlBatchText;
         this.sqlStatements = sqlStatements;
@@ -84,7 +85,7 @@ public class AdHocPlannerWork extends AsyncCompilerWork {
                 orig.userPartitionKey,
                 orig.invocationName,
                 orig.m_batchTimeout,
-                orig.onReplica,
+                orig.drRole,
                 orig.useAdhocDDL,
                 completionHandler,
                 orig.user);
@@ -118,7 +119,7 @@ public class AdHocPlannerWork extends AsyncCompilerWork {
             // statement's constants or parameters.
             false, (singlePartition ? new Object[1] /*any vector element will do, even null*/ : null),
             "@AdHoc_RW_MP", BatchTimeoutOverrideType.NO_TIMEOUT,
-            false, false, // don't allow adhoc DDL in this path
+            DrRoleType.MASTER, false, // don't allow adhoc DDL in this path
             completionHandler, new AuthSystem.AuthDisabledUser());
     }
 
