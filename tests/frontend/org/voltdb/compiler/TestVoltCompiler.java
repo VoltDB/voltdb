@@ -3286,7 +3286,7 @@ public class TestVoltCompiler extends TestCase {
         db = goodDDLAgainstSimpleSchema(
                 "create stream e1 (id integer, f1 varchar(16));"
                 );
-        assertNotNull(getConnectorTableInfoFor(db, "e1", "default"));
+        assertNotNull(getConnectorTableInfoFor(db, "e1", Constants.DEFAULT_EXPORT_CONNECTOR_NAME));
 
         db = goodDDLAgainstSimpleSchema(
                 "create stream e1 (id integer, f1 varchar(16));",
@@ -3295,9 +3295,9 @@ public class TestVoltCompiler extends TestCase {
                 "create stream e4 partition on column id export to target bar (id integer not null, f1 varchar(16));",
                 "create stream e5 export to target bar partition on column id (id integer not null, f1 varchar(16));"
                 );
-        assertNotNull(getConnectorTableInfoFor(db, "e1", "default"));
+        assertNotNull(getConnectorTableInfoFor(db, "e1", Constants.DEFAULT_EXPORT_CONNECTOR_NAME));
         assertEquals(null, getPartitionColumnInfoFor(db,"e1"));
-        assertNotNull(getConnectorTableInfoFor(db, "e2", "default"));
+        assertNotNull(getConnectorTableInfoFor(db, "e2", Constants.DEFAULT_EXPORT_CONNECTOR_NAME));
         assertEquals("ID", getPartitionColumnInfoFor(db,"e2"));
         assertNotNull(getConnectorTableInfoFor(db, "e3", "bar"));
         assertEquals(null, getPartitionColumnInfoFor(db,"e3"));
