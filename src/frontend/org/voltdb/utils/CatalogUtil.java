@@ -600,19 +600,6 @@ public abstract class CatalogUtil {
         return true;
     }
 
-    public static String checkLicenseConstraint(Catalog catalog, LicenseApi licenseApi) {
-        String prefix = "Unable to use feature not included in license: ";
-        String errMsg = null;
-
-        if (DrRoleType.XDCR.value().equals(catalog.getClusters().get("cluster").getDrrole())) {
-            if (!licenseApi.isDrActiveActiveAllowed()) {
-                errMsg = prefix + "DR Active-Active replication";
-            }
-        }
-
-        return errMsg;
-    }
-
     public static String compileDeployment(Catalog catalog, String deploymentURL,
             boolean isPlaceHolderCatalog)
     {

@@ -382,16 +382,11 @@ public class Inits {
             catalog.execute(serializedCatalog);
             serializedCatalog = null;
 
-            String result = CatalogUtil.checkLicenseConstraint(catalog, m_rvdb.getLicenseApi());
-            if (result != null) {
-                VoltDB.crashLocalVoltDB(result);
-            }
-
             // note if this fails it will print an error first
             // This is where we compile real catalog and create runtime
             // catalog context. To validate deployment we compile and create
             // a starter context which uses a placeholder catalog.
-            result = CatalogUtil.compileDeployment(catalog, m_deployment, false);
+            String result = CatalogUtil.compileDeployment(catalog, m_deployment, false);
             if (result != null) {
                 VoltDB.crashLocalVoltDB(result);
             }
@@ -432,7 +427,7 @@ public class Inits {
 
                 if (!MiscUtils.validateLicense(m_rvdb.getLicenseApi(),
                                                m_rvdb.m_clusterSettings.get().hostcount(),
-                                               m_rvdb.getReplicationRole()))
+                                               DrRoleType.fromValue(m_rvdb.getCatalogContext().getCluster().getDrrole())))
                 {
                     // validateLicense logs. Exit call is here for testability.
                     VoltDB.crashGlobalVoltDB("VoltDB license constraints are not met.", false, null);

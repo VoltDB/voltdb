@@ -179,12 +179,6 @@ public class AsyncCompilerAgentHelper
             Catalog newCatalog = new Catalog();
             newCatalog.execute(newCatalogCommands);
 
-            String result = CatalogUtil.checkLicenseConstraint(newCatalog, m_licenseApi);
-            if (result != null) {
-                retval.errorMsg = result;
-                return retval;
-            }
-
             // Retrieve the original deployment string, if necessary
             if (deploymentString == null) {
                 // Go get the deployment string from the current catalog context
@@ -209,7 +203,7 @@ public class AsyncCompilerAgentHelper
                 dt.getDr().setRole(DrRoleType.MASTER);
             }
 
-            result = CatalogUtil.compileDeployment(newCatalog, dt, false);
+            String result = CatalogUtil.compileDeployment(newCatalog, dt, false);
             if (result != null) {
                 retval.errorMsg = "Unable to update deployment configuration: " + result;
                 return retval;
