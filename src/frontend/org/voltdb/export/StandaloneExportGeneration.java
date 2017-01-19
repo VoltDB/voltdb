@@ -167,7 +167,7 @@ public class StandaloneExportGeneration implements Generation {
      *
      */
     @Override
-    public void kickOffLeaderElection() {
+    public void kickOffLeaderElection(final HostMessenger ignored) {
         for (Map<String, ExportDataSource> sources : getDataSourceByPartition().values()) {
 
             for (final ExportDataSource source : sources.values()) {
@@ -305,7 +305,7 @@ public class StandaloneExportGeneration implements Generation {
     }
 
     @Override
-    public void close() {
+    public void close(final HostMessenger messenger) {
         List<ListenableFuture<?>> tasks = new ArrayList<ListenableFuture<?>>();
         for (Map<String, ExportDataSource> sources : m_dataSourcesByPartition.values()) {
             for (ExportDataSource source : sources.values()) {
