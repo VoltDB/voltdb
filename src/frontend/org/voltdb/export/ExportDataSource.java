@@ -315,12 +315,13 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
     private void releaseExportBytes(long releaseOffset) throws IOException {
         // if released offset is in an already-released past, just return success
-        if (!m_committedBuffers.isEmpty() && releaseOffset < m_committedBuffers.peek().uso()) {
+        if (!m_committedBuffers.isEmpty() && (m_committedBuffers.peek() != null)
+                && (releaseOffset < m_committedBuffers.peek().uso())) {
             return;
         }
 
         long lastUso = m_firstUnpolledUso;
-        while (!m_committedBuffers.isEmpty()
+        while (!m_committedBuffers.isEmpty() && m_committedBuffers.peek() != null
                 && releaseOffset >= m_committedBuffers.peek().uso()) {
             StreamBlock sb = m_committedBuffers.peek();
             if (releaseOffset >= sb.uso() + sb.totalUso()) {
