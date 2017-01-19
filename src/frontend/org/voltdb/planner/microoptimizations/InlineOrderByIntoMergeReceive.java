@@ -117,9 +117,16 @@ public class InlineOrderByIntoMergeReceive extends MicroOptimization {
         // No inline nodes are expected in the window function plan node.
         assert(plan.getChildCount() == 1);
         // No inline nodes are expected in the Receive node.
-        assert(child.getChildCount() == 1);
-        AbstractPlanNode sendNode = child.getChild(0);
-        assert(sendNode instanceof SendPlanNode);
+        assert(receiveNode.getChildCount() == 1);
+        child = receiveNode.getChild(0);
+        if (! ( child instanceof SendPlanNode) ) {
+            return plan;
+        }
+        SendPlanNode sendNode = (SendPlanNode)child;
+        child = sendNode.getChild(0);
+        if (child.getWindowFunctionUsesIndex() != 0) {
+            return plan;
+        }
         plan.clearChildren();
         receiveNode.removeFromGraph();
         MergeReceivePlanNode mrnode = new MergeReceivePlanNode();

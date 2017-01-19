@@ -18,12 +18,20 @@
 package org.voltdb.planner;
 
 import java.util.ArrayList;
+import java.util.List;
 
 import org.voltdb.catalog.Index;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.types.IndexLookupType;
 import org.voltdb.types.SortDirectionType;
 
+/**
+ * We may may have several ways to access data in tables.  We
+ * may use a simple table scan or an index scan.  Index scans may
+ * have sort orders.  There are also other data we may want to
+ * attach to a particular plan.  This is a convenient place to
+ * organize everything associated with accessing tables or indexes.
+ */
 public class AccessPath {
     Index index = null;
     IndexUseType use = IndexUseType.COVERING_UNIQUE_EQUALITY;
@@ -35,22 +43,23 @@ public class AccessPath {
     // The initial expression is needed to adjust (forward) the start of the reverse
     // iteration when it had to initially settle for starting at
     // "greater than a prefix key".
-    final ArrayList<AbstractExpression> initialExpr = new ArrayList<>();
-    final ArrayList<AbstractExpression> indexExprs = new ArrayList<>();
-    final ArrayList<AbstractExpression> endExprs = new ArrayList<>();
-    final ArrayList<AbstractExpression> otherExprs = new ArrayList<>();
-    final ArrayList<AbstractExpression> joinExprs = new ArrayList<>();
-    final ArrayList<AbstractExpression> bindings = new ArrayList<>();
-    final ArrayList<AbstractExpression> eliminatedPostExprs = new ArrayList<>();
+    final List<AbstractExpression> initialExpr = new ArrayList<>();
+    final List<AbstractExpression> indexExprs = new ArrayList<>();
+    final List<AbstractExpression> endExprs = new ArrayList<>();
+    final List<AbstractExpression> otherExprs = new ArrayList<>();
+    final List<AbstractExpression> joinExprs = new ArrayList<>();
+    final List<AbstractExpression> bindings = new ArrayList<>();
+    final List<AbstractExpression> eliminatedPostExprs = new ArrayList<>();
     //
     // If a window function uses the index, then this will be set
     // to the number of the window function which uses this index.
     // If it is set to -1 then no window function uses the index, but
     // the window function ordering is compatible with the statement
     // level ordering, and the statement level order does not need
-    // an order by node.  If it is set to -2, then nothing uses the
-    // index.
-    int m_windowFunctionUsesIndex = -2;
+    // an order by node.  If it is set to SubPlanAssembler.NO_INDEX_USE,
+    // then nothing uses the index.
+    //
+    int m_windowFunctionUsesIndex = SubPlanAssembler.NO_INDEX_USE;
     //
     // This is true iff there is a window function which
     // uses an index for order, but the statement level
@@ -58,6 +67,13 @@ public class AccessPath {
     // will not use any sorts at all.
     //
     boolean m_stmtOrderByIsCompatible = false;
+    //
+    // This is the final expression ordering.  We need this
+    // to remember the order an index imposes on a WindowFunction.
+    // Note that this will never be null, but may be empty
+    // if there is no index in this access path.
+    //
+    List<AbstractExpression> m_finalExpressionOrder = new ArrayList<>();
 
     @Override
     public String toString() {
@@ -102,10 +118,10 @@ public class AccessPath {
         if (0 <= m_windowFunctionUsesIndex) {
             return "Window function plan node " + m_windowFunctionUsesIndex;
         }
-        if (-1 == m_windowFunctionUsesIndex) {
+        if (SubPlanAssembler.STATEMENT_LEVEL_ORDER_BY_INDEX == m_windowFunctionUsesIndex) {
             return "Statement Level Order By";
         }
-        if (-2 == m_windowFunctionUsesIndex) {
+        if (SubPlanAssembler.NO_INDEX_USE == m_windowFunctionUsesIndex) {
             return "No Indexing Used";
         }
         /*

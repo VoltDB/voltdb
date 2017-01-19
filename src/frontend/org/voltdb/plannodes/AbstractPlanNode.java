@@ -133,7 +133,14 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     // -2, nothing uses this index.
     private int m_windowFunctionUsesIndex = -2;
     private boolean m_windowFunctionIsCompatibleWithOrderBy = false;
-
+    // If there is an index scan used for ordering,
+    // this is the final expression order.  This may
+    // be used for a window function or for the statement
+    // level order by or both.
+    private List<AbstractExpression> m_finalExpressionOrderFromIndexScan;
+    // Set the order direction for an index scan.  There
+    // is only one of these.
+    private SortDirectionType m_sortOrderFromIndexScan = SortDirectionType.INVALID;
     /**
      * Instantiates a new plan node.
      */
@@ -1070,6 +1077,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     }
 
     private boolean m_skipInitalIndentationForExplain = false;
+
     public void setSkipInitalIndentationForExplain(boolean skip) {
         m_skipInitalIndentationForExplain = skip;
     }
@@ -1206,5 +1214,25 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
 
     public void setWindowFunctionIsCompatibleWithOrderBy(boolean value) {
         m_windowFunctionIsCompatibleWithOrderBy = value;
+    }
+
+    /**
+     * If there is an index scan used for for this plan we propagate the
+     * final expression list here.
+     *
+     * @return
+     */
+    public List<AbstractExpression> getFinalExpressionOrderFromIndexScan() {
+        return m_finalExpressionOrderFromIndexScan;
+    }
+
+    public void setFinalExpressionOrderFromIndexScan(List<AbstractExpression> finalExpressionOrder) {
+        m_finalExpressionOrderFromIndexScan = finalExpressionOrder;
+    }
+    public final SortDirectionType getSortOrderFromIndexScan() {
+        return m_sortOrderFromIndexScan;
+    }
+    public final void setSortOrderFromIndexScan(SortDirectionType sortOrderFromIndexScan) {
+        m_sortOrderFromIndexScan = sortOrderFromIndexScan;
     }
 }

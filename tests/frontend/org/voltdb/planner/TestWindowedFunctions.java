@@ -545,7 +545,7 @@ public class TestWindowedFunctions extends PlannerTestCase {
         String windowedQuery = "SELECT RANK() OVER (PARTITION BY A ORDER BY B DESC) FROM AAA;";
         AbstractPlanNode plan = compile(windowedQuery);
         String explainPlanText = plan.toExplainPlanString();
-        String expected = "WindowFunctionPlanNode: ops: AGGREGATE_WINDOWED_RANK()";
+        String expected = "WINDOW FUNCTION AGGREGATION: ops: AGGREGATE_WINDOWED_RANK()";
         assertTrue("Expected to find \"" + expected + "\" in explain plan text, but did not:\n"
                 + explainPlanText, explainPlanText.contains(expected));
     }
@@ -569,6 +569,7 @@ public class TestWindowedFunctions extends PlannerTestCase {
                      SendPlanNode.class,
                      ProjectionPlanNode.class,
                      WindowFunctionPlanNode.class,
+                     OrderByPlanNode.class,
                      IndexScanPlanNode.class);
         validatePlan("SELECT COUNT(A) OVER ( PARTITION BY A, B ) FROM ITBL_ONLY_A",
                      SendPlanNode.class,
@@ -580,11 +581,13 @@ public class TestWindowedFunctions extends PlannerTestCase {
                      SendPlanNode.class,
                      ProjectionPlanNode.class,
                      WindowFunctionPlanNode.class,
+                     OrderByPlanNode.class,
                      IndexScanPlanNode.class);
         validatePlan("SELECT COUNT(A) OVER ( PARTITION BY A, A ORDER BY A, A ) FROM ITBL_ONLY_A",
                      SendPlanNode.class,
                      ProjectionPlanNode.class,
                      WindowFunctionPlanNode.class,
+                     OrderByPlanNode.class,
                      IndexScanPlanNode.class);
         validatePlan("SELECT A FROM AAA ORDER BY A",
                      SendPlanNode.class,

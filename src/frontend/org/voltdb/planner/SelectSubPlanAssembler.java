@@ -570,10 +570,11 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             AbstractPlanNode answer = getSelectSubPlanForJoin((BranchNode)joinNode,
                                                               outerScanPlan,
                                                               innerScanPlan);
-            // Propagate whether a window function
-            // uses an index scan.  This must come from
-            // the outer plan node.
+            // Propagate information used for order by clauses in window functions
+            // and the statement level order by clause.
             answer.setWindowFunctionUsesIndex(outerScanPlan.getWindowFunctionUsesIndex());
+            answer.setWindowFunctionIsCompatibleWithOrderBy(outerScanPlan.isWindowFunctionCompatibleWithOrderBy());
+            answer.setFinalExpressionOrderFromIndexScan(outerScanPlan.getFinalExpressionOrderFromIndexScan());
             return answer;
         }
 

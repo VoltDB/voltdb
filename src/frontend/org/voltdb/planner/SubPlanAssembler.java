@@ -428,9 +428,13 @@ public abstract class SubPlanAssembler {
         // provisional; it can be undone later in this function as new info comes to light.
         int orderSpoilers[] = new int[keyComponentCount];
         List<AbstractExpression> bindingsForOrder = new ArrayList<>();
-        int nSpoilers = determineIndexOrdering(tableScan, keyComponentCount,
-                                               indexedExprs, indexedColRefs,
-                                               retval, orderSpoilers, bindingsForOrder);
+        int nSpoilers = determineIndexOrdering(tableScan,
+                                               keyComponentCount,
+                                               indexedExprs,
+                                               indexedColRefs,
+                                               retval,
+                                               orderSpoilers,
+                                               bindingsForOrder);
 
         // Use as many covering indexed expressions as possible to optimize comparator expressions that can use them.
 
@@ -1233,7 +1237,7 @@ public abstract class SubPlanAssembler {
         // by list or else from the order by list.  At
         // the end this will be the concatenation of the
         // partition by list and the order by list.
-        List<ExpressionOrColumn> m_orderedMatchingExpressions = new ArrayList<>();
+        List<AbstractExpression> m_orderedMatchingExpressions = new ArrayList<>();
         // List of order by expressions, originally from the
         // WindowFunctionExpression.  These migrate to
         // m_orderedMatchingExpressions as they match.
@@ -1309,12 +1313,15 @@ public abstract class SubPlanAssembler {
                         // might match a column reference in
                         // indexEntry, or eorc may have parameters
                         // which need to match expressions in indexEntry.
-                        m_orderedMatchingExpressions.add(eorc);
+                        m_orderedMatchingExpressions.add(eorc.m_expr);
                         // If there are expressions later on in the
                         // m_partitionByExprs or m_unmatchedOrderByExprs
                         // which match this expression we need to
                         // delete them.  We can safely ignore them.
                         // But guard against an infinite loop here.
+                        // If there are more than one instances of
+                        // an expression, say with "PARTITION BY A, A",
+                        // we need to remove them all.
                         int idx;
                         for (idx = 0; m_partitionByExprs.remove(eorc) && idx < MAX_LIST_REMOVAL; idx += 1) {
                             ;
@@ -1365,7 +1372,7 @@ public abstract class SubPlanAssembler {
                 // the sort direction matched as well.  So
                 // add nextEOC to the order matching expressions
                 // list and add the bindings to the bindings list.
-                m_orderedMatchingExpressions.add(nextStatementEOC);
+                m_orderedMatchingExpressions.add(nextStatementEOC.m_expr);
                 m_bindings.addAll(moreBindings);
                 return;
             }
@@ -1450,7 +1457,9 @@ public abstract class SubPlanAssembler {
          *
          * @return The number of order spoilers in the candidate we choose.
          */
-        public int getResult(AccessPath retval, int orderSpoilers[], List<AbstractExpression> bindings) {
+        public int getResult(AccessPath retval,
+                             int orderSpoilers[],
+                             List<AbstractExpression> bindings) {
             WindowFunctionScore answer = null;
             // Fill in the failing return values as a fallback.
             retval.bindings.clear();
@@ -1504,6 +1513,8 @@ public abstract class SubPlanAssembler {
                     for (int idx = 0; idx < answer.m_orderSpoilers.size(); idx += 1) {
                         orderSpoilers[idx] = answer.m_orderSpoilers.get(idx);
                     }
+                    retval.m_finalExpressionOrder.addAll(answer.m_orderedMatchingExpressions);
+                    // We will return this.
                     numOrderSpoilers = answer.m_orderSpoilers.size();
                 }
             }
@@ -1528,13 +1539,23 @@ public abstract class SubPlanAssembler {
      * @param orderSpoilers      positions of key components which MAY invalidate the tentative
      *                           sortDirection
      * @param bindingsForOrder   restrictions on parameter settings that are prerequisite to the
-     *                           any ordering optimization determined here
+     *                           any ordering optimization determined here.
+     * @param finalExpressionOrder The final expression order this index
+     *                             will impose.  For Window Functions we may
+     *                             not know or care about the order of the
+     *                             partition by expressions.  For example, if we are
+     *                             given "PARTITION BY A, B ORDER BY C, D", we
+     *                             can use an index with "(A, B, C, D)" or "(B, A, C, D)",
+     *                             but not "(A, B, D, C)".
      * @return the number of discovered orderSpoilers that will need to be recovered from,
      *         to maintain the established sortDirection - always 0 if no sort order was determined.
      */
-    private int determineIndexOrdering(StmtTableScan tableScan, int keyComponentCount,
-            List<AbstractExpression> indexedExprs, List<ColumnRef> indexedColRefs,
-            AccessPath retval, int[] orderSpoilers,
+    private int determineIndexOrdering(StmtTableScan tableScan,
+            int keyComponentCount,
+            List<AbstractExpression> indexedExprs,
+            List<ColumnRef> indexedColRefs,
+            AccessPath retval,
+            int[] orderSpoilers,
             List<AbstractExpression> bindingsForOrder)
     {
         // Organize a little bit.
@@ -1629,24 +1650,16 @@ public abstract class SubPlanAssembler {
 
 
     /**
-     * Rummage around the partition by expressions looking for
-     * an expression which can be made to made an index entry
-     * expression.  The partition by expressions may have parameters,
-     * so we may need to match a parameter with an expression in the
-     * index entry expression.  The AbstractExpression class knows
-     * how to do this, so just use it.
+     * Match the indexEntry, which is from an index, with
+     * a statement expression or column.  The nextStatementEOC
+     * must be an expression, not a column reference.
      *
-     * @param partitionByExprs
-     * @param indexEntry
-     * @return If there are no matches, return null.  Otherwise
-     *         return the bindings and the matching sort direction.
+     * @param nextStatementEOC The expression or column in the SQL statement.
+     * @param indexEntry The expression or column in the index.
+     * @return A list of bindings for this match.  Return null if
+     *         there is no match.  If there are no bindings but the
+     *         expressions match, return an empty, non-null list.
      */
-    private List<AbstractExpression>
-        findBindingsForIndexedExpression(List<ExpressionOrColumn>   partitionByExprs,
-                                         ExpressionOrColumn         indexEntry) {
-        return null;
-    }
-
     private List<AbstractExpression>
         findBindingsForOneIndexedExpression(ExpressionOrColumn nextStatementEOC,
                                             ExpressionOrColumn indexEntry) {
@@ -2154,7 +2167,9 @@ public abstract class SubPlanAssembler {
         scanNode.setEndExpression(ExpressionUtil.combinePredicates(path.endExprs));
         scanNode.setPredicate(path.otherExprs);
         scanNode.setWindowFunctionUsesIndex(path.m_windowFunctionUsesIndex);
+        scanNode.setSortOrderFromIndexScan(path.sortDirection);
         scanNode.setWindowFunctionIsCompatibleWithOrderBy(path.m_stmtOrderByIsCompatible);
+        scanNode.setFinalExpressionOrderFromIndexScan(path.m_finalExpressionOrder);
         // The initial expression is needed to control a (short?) forward scan to adjust the start of a reverse
         // iteration after it had to initially settle for starting at "greater than a prefix key".
         scanNode.setInitialExpression(ExpressionUtil.combinePredicates(path.initialExpr));

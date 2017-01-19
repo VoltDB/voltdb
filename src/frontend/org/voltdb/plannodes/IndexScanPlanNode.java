@@ -102,7 +102,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     // this index scan is going to use
     protected Index m_catalogIndex = null;
 
-    private ArrayList<AbstractExpression> m_bindings = new ArrayList<>();
+    private List<AbstractExpression> m_bindings = new ArrayList<>();
 
     private static final int FOR_SCANNING_PERFORMANCE_OR_ORDERING = 1;
     private static final int FOR_GROUPING = 2;
@@ -911,11 +911,11 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         return " while " + m_endExpression.explain(getTableNameForExplain());
     }
 
-    public void setBindings(ArrayList<AbstractExpression> bindings) {
+    public void setBindings(List<AbstractExpression> bindings) {
         m_bindings  = bindings;
     }
 
-    public ArrayList<AbstractExpression> getBindings() {
+    public List<AbstractExpression> getBindings() {
         return m_bindings;
     }
 
