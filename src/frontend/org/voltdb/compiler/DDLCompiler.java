@@ -537,7 +537,7 @@ public class DDLCompiler {
             return false;
         }
 
-        // either PROCEDURE, REPLICATE, PARTITION, ROLE, EXPORT or DR
+        // either PROCEDURE, REPLICATE, PARTITION, ROLE, LOAD, IMPORT, EXPORT or DR
         String commandPrefix = statementMatcher.group(1).toUpperCase();
 
         // matches if it is CREATE PROCEDURE [ALLOW <role> ...] [PARTITION ON ...] FROM CLASS <class-name>;

@@ -20,6 +20,7 @@ package org.voltdb.compiler;
 import java.io.IOException;
 import java.util.Map.Entry;
 
+import org.hsqldb_voltpatches.HSQLInterface;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
 import org.voltdb.CatalogContext;
@@ -27,11 +28,13 @@ import org.voltdb.VoltDB;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogDiffEngine;
 import org.voltdb.common.Constants;
+import org.voltdb.compiler.CatalogChangeWork.CatalogChangeParameters;
 import org.voltdb.compiler.ClassMatcher.ClassNameMatchStatus;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.licensetool.LicenseApi;
+import org.voltdb.parser.SQLLexer;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.InMemoryJarfile;
@@ -40,9 +43,11 @@ public class AsyncCompilerAgentHelper
 {
     private static final VoltLogger compilerLog = new VoltLogger("COMPILER");
     private final LicenseApi m_licenseApi;
+    HSQLInterface m_hsql = null;
 
     public AsyncCompilerAgentHelper(LicenseApi licenseApi) {
         m_licenseApi = licenseApi;
+        m_hsql = HSQLInterface.loadHsqldb();
     }
 
     public CatalogChangeResult prepareApplicationCatalogDiff(CatalogChangeWork work) {
@@ -66,13 +71,14 @@ public class AsyncCompilerAgentHelper
             InMemoryJarfile newCatalogJar = null;
             InMemoryJarfile oldJar = context.getCatalogJar().deepCopy();
 
-            String deploymentString = work.operationString;
+            CatalogChangeParameters ccParam = work.ccParams;
+            String deploymentString = ccParam.operationString;
             if ("@UpdateApplicationCatalog".equals(work.invocationName)) {
                 // Grab the current catalog bytes if @UAC had a null catalog from deployment-only update
-                if (work.operationBytes == null) {
+                if (ccParam.operationBytes == null) {
                     newCatalogJar = oldJar;
                 } else {
-                    newCatalogJar = CatalogUtil.loadInMemoryJarFile(work.operationBytes);
+                    newCatalogJar = CatalogUtil.loadInMemoryJarFile(ccParam.operationBytes);
                 }
                 // If the deploymentString is null, we'll fill it in with current deployment later
                 // Otherwise, deploymentString has the right contents, don't need to touch it
@@ -80,12 +86,31 @@ public class AsyncCompilerAgentHelper
             else if ("@UpdateClasses".equals(work.invocationName)) {
                 // provided operationString is really a String with class patterns to delete,
                 // provided newCatalogJar is the jarfile with the new classes
-                if (work.operationBytes != null) {
-                    newCatalogJar = new InMemoryJarfile(work.operationBytes);
+                if (ccParam.operationBytes != null) {
+                    newCatalogJar = new InMemoryJarfile(ccParam.operationBytes);
                 }
                 try {
-                    newCatalogJar = modifyCatalogClasses(oldJar, work.operationString,
-                            newCatalogJar);
+                    newCatalogJar = handleUpdateClasses(context.catalog, oldJar,
+                            ccParam.ddlStmts, newCatalogJar, ccParam.operationString);
+                }
+                catch (IOException e) {
+                    retval.errorMsg = "Unexpected IO exception @UpdateClasses modifying classes " +
+                        "from catalog: " + e.getMessage();
+                    return retval;
+                }
+                // Real deploymentString should be the current deployment, just set it to null
+                // here and let it get filled in correctly later.
+                deploymentString = null;
+            }
+            else if ("@UpdateApplication".equals(work.invocationName)) {
+                // provided operationString is really a String with class patterns to delete,
+                // provided newCatalogJar is the jarfile with the new classes
+                if (ccParam.operationBytes != null) {
+                    newCatalogJar = new InMemoryJarfile(ccParam.operationBytes);
+                }
+                try {
+                    newCatalogJar = handleUpdateClasses(context.catalog, oldJar,
+                            ccParam.ddlStmts, newCatalogJar, ccParam.operationString);
                 }
                 catch (IOException e) {
                     retval.errorMsg = "Unexpected IO exception @UpdateClasses modifying classes " +
@@ -99,7 +124,7 @@ public class AsyncCompilerAgentHelper
             else if ("@AdHoc".equals(work.invocationName)) {
                 // work.adhocDDLStmts should be applied to the current catalog
                 try {
-                    newCatalogJar = addDDLToCatalog(context.catalog, oldJar, work.adhocDDLStmts);
+                    newCatalogJar = addDDLToCatalog(context.catalog, oldJar, ccParam.ddlStmts);
                 }
                 catch (VoltCompilerException vce) {
                     retval.errorMsg = vce.getMessage();
@@ -247,6 +272,16 @@ public class AsyncCompilerAgentHelper
         return retval;
     }
 
+    private static String combineStmts (String[] adhocDDLStmts, boolean log) {
+        StringBuilder sb = new StringBuilder();
+        for (String stmt : adhocDDLStmts) {
+            if (log) compilerLog.info("\t" + stmt);
+            sb.append(stmt);
+            sb.append(";\n");
+        }
+        return sb.toString();
+    }
+
     /**
      * Append the supplied adhoc DDL to the current catalog's DDL and recompile the
      * jarfile
@@ -255,26 +290,24 @@ public class AsyncCompilerAgentHelper
     private InMemoryJarfile addDDLToCatalog(Catalog oldCatalog, InMemoryJarfile jarfile, String[] adhocDDLStmts)
     throws IOException, VoltCompilerException
     {
-        StringBuilder sb = new StringBuilder();
         compilerLog.info("Applying the following DDL to cluster:");
-        for (String stmt : adhocDDLStmts) {
-            compilerLog.info("\t" + stmt);
-            sb.append(stmt);
-            sb.append(";\n");
-        }
-        String newDDL = sb.toString();
-        compilerLog.trace("Adhoc-modified DDL:\n" + newDDL);
+        String newDDL = combineStmts(adhocDDLStmts, true);
 
+        compilerLog.trace("Adhoc-modified DDL:\n" + newDDL);
         VoltCompiler compiler = new VoltCompiler();
         compiler.compileInMemoryJarfileWithNewDDL(jarfile, newDDL, oldCatalog);
         return jarfile;
     }
 
-    private InMemoryJarfile modifyCatalogClasses(InMemoryJarfile jarfile, String deletePatterns,
-            InMemoryJarfile newJarfile) throws IOException
-    {
-        // modify the old jar in place based on the @UpdateClasses inputs, and then
-        // recompile it if necessary
+    /**
+     * Given a new jar and classes delete pattern string, decide whether any class will be modified or not.
+     * @param jarfile
+     * @param deletePatterns
+     * @param newJarfile
+     * @return true if any class is changed, false when unchanged.
+     */
+    private boolean modifyInMemoryJarClasses(InMemoryJarfile jarfile, String deletePatterns,
+            InMemoryJarfile newJarfile) {
         boolean deletedClasses = false;
         if (deletePatterns != null) {
             String[] patterns = deletePatterns.split(",");
@@ -306,10 +339,34 @@ public class AsyncCompilerAgentHelper
                 jarfile.put(e.getKey(), e.getValue());
             }
         }
-        if (deletedClasses || foundClasses) {
-            compilerLog.info("Updating java classes available to stored procedures");
-            VoltCompiler compiler = new VoltCompiler();
-            compiler.compileInMemoryJarfile(jarfile);
+        return deletedClasses || foundClasses;
+    }
+
+    private InMemoryJarfile handleUpdateClasses(Catalog oldCatalog, InMemoryJarfile jarfile,
+            String[] stmts, InMemoryJarfile newJarfile, String deletePatterns)
+                    throws IOException, VoltCompilerException
+    {
+        // Create a new InMemoryJarfile based on the original catalog bytes,
+        // modify it in place based on the @UpdateClasses inputs, and then
+        // recompile it if necessary
+        boolean changed = modifyInMemoryJarClasses(jarfile, deletePatterns, newJarfile);
+        if (!changed) {
+            return jarfile;
+        }
+        compilerLog.info("Updating java classes available to stored procedures");
+        VoltCompiler compiler = new VoltCompiler();
+
+        if (stmts == null) {
+            compiler.compileJarForClassChangesOnly(jarfile);
+        } else {
+            String newDDL = combineStmts(stmts, false);
+            boolean isProcedureOnly = SQLLexer.procedureChangesOnly(stmts);
+            if (isProcedureOnly) {
+                // assume newDDl only contains procedure changes: create/drop, etc.
+                compiler.compileJarForClassChangesOnly(jarfile, newDDL, oldCatalog, m_hsql);
+            } else {
+                compiler.compileInMemoryJarfileWithNewDDL(jarfile, newDDL, oldCatalog);
+            }
         }
         return jarfile;
     }

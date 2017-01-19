@@ -298,7 +298,7 @@ public class AsyncCompilerAgent {
         // If we weren't provided operationBytes, it's a deployment-only change and okay to take
         // master and adhoc DDL method chosen
         if (w.invocationName.equals("@UpdateApplicationCatalog") &&
-            w.operationBytes != null && w.useAdhocDDL)
+            w.ccParams.operationBytes != null && w.useAdhocDDL)
         {
             AsyncCompilerResult errResult =
                 AsyncCompilerResult.makeErrorResult(w,

@@ -80,6 +80,7 @@ import org.voltdb.compiler.AsyncCompilerResult;
 import org.voltdb.compiler.AsyncCompilerWork.AsyncCompilerWorkCompletionHandler;
 import org.voltdb.compiler.CatalogChangeResult;
 import org.voltdb.compiler.CatalogChangeWork;
+import org.voltdb.compiler.CatalogChangeWork.CatalogChangeParameters;
 import org.voltdb.compilereport.ViewExplainer;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.Iv2Trace;
@@ -418,10 +419,13 @@ public final class InvocationDispatcher {
             }
             final boolean useDdlSchema = catalogContext.cluster.getUseddlschema();
             if ("@UpdateApplicationCatalog".equals(procName)) {
-                return dispatchUpdateApplicationCatalog(task, handler, ccxn, user, useDdlSchema);
+                return dispatchUpdateApplicationCatalog(task, useDdlSchema, false, ccxn, user, handler.isAdmin());
             }
             else if ("@UpdateClasses".equals(procName)) {
-                return dispatchUpdateApplicationCatalog(task, handler, ccxn, user, useDdlSchema);
+                return dispatchUpdateApplicationCatalog(task, useDdlSchema, false, ccxn, user, handler.isAdmin());
+            }
+            else if ("@UpdateApplication".equals(procName)) {
+                return dispatchUpdateApplicationCatalog(task, useDdlSchema, false, ccxn, user, handler.isAdmin());
             }
             else if ("@SnapshotSave".equals(procName)) {
                 m_snapshotDaemon.requestUserSnapshot(task, ccxn);
@@ -524,9 +528,9 @@ public final class InvocationDispatcher {
                 // is single or multi partition and read-only or read-write.
                 proc = "@AdHoc_RW_MP";
             }
-            else if ("@UpdateClasses".equals(procName)) {
-                // Icky.  Map @UpdateClasses to @UpdateApplicationCatalog.  We want the
-                // permissions and replication policy for @UAC, and we'll deal with the
+            else if ("@UpdateClasses".equals(procName) || "@UpdateApplication".equals(procName)) {
+                // Icky.  Map @UpdateClasses or UpdateApplication to @UpdateApplicationCatalog.
+                // We want the permissions and replication policy for @UAC, and we'll deal with the
                 // parameter validation stuff separately (the different name will
                 // skip the @UAC-specific policy)
                 proc = "@UpdateApplicationCatalog";
@@ -1010,52 +1014,39 @@ public final class InvocationDispatcher {
         return pCol.getType();
     }
 
-    final void dispatchUpdateApplicationCatalog(StoredProcedureInvocation task,
+    final ClientResponseImpl dispatchUpdateApplicationCatalog(StoredProcedureInvocation task,
             boolean useDdlSchema, boolean isPromotion,
             Connection ccxn, AuthSystem.AuthUser user, boolean isAdmin)
     {
-        ParameterSet params = task.getParams();
-        final Object [] paramArray = params.toArray();
-        // default catalogBytes to null, when passed along, will tell the
-        // catalog change planner that we want to use the current catalog.
-        byte[] catalogBytes = null;
-        Object catalogObj = paramArray[0];
-        if (catalogObj != null) {
-            if (catalogObj instanceof String) {
-                // treat an empty string as no catalog provided
-                String catalogString = (String) catalogObj;
-                if (!catalogString.isEmpty()) {
-                    catalogBytes = Encoder.hexDecode(catalogString);
-                }
-            } else if (catalogObj instanceof byte[]) {
-                // treat an empty array as no catalog provided
-                byte[] catalogArr = (byte[]) catalogObj;
-                if (catalogArr.length != 0) {
-                    catalogBytes = catalogArr;
-                }
-            }
+
+        String procName = task.getProcName();
+        CatalogChangeWork work = null;
+        final Object[] paramArray = task.getParams().toArray();
+
+        CatalogChangeWork.CatalogChangeParameters param =  CatalogChangeWork.fromParams(procName, paramArray);
+        if (param.errorMessage != null) {
+            return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
+                    new VoltTable[0], param.errorMessage, task.clientHandle);
         }
-        String deploymentString = (String) paramArray[1];
-        LocalObjectMessage work = new LocalObjectMessage(
-                new CatalogChangeWork(
-                    m_siteId,
-                    task.clientHandle, ccxn.connectionId(), ccxn.getHostnameAndIPAndPort(),
-                    isAdmin, ccxn, catalogBytes, deploymentString,
-                    task.getProcName(),
-                    VoltDB.instance().getReplicationRole() == ReplicationRole.REPLICA,
-                    useDdlSchema,
-                    m_adhocCompletionHandler, user,
-                    null, isPromotion, -1L, -1L
-                    ));
 
-        m_mailbox.send(m_plannerSiteId, work);
-    }
+        work = new CatalogChangeWork(
+                m_siteId,
+                task.clientHandle,
+                ccxn.connectionId(),
+                ccxn.getHostnameAndIPAndPort(),
+                isAdmin,
+                ccxn,
+                param,
+                task.getProcName(),
+                VoltDB.instance().getReplicationRole() == ReplicationRole.REPLICA,
+                useDdlSchema,
+                m_adhocCompletionHandler, user,
+                null, isPromotion, -1L, -1L
+                );
 
-    private final ClientResponseImpl dispatchUpdateApplicationCatalog(StoredProcedureInvocation task,
-            InvocationClientHandler handler, Connection ccxn, AuthSystem.AuthUser user,
-            boolean useDdlSchema)
-    {
-        dispatchUpdateApplicationCatalog(task, useDdlSchema, false, ccxn, user, handler.isAdmin());
+        m_mailbox.send(m_plannerSiteId, new LocalObjectMessage(work));
+
+        // null response on purpose
         return null;
     }
 
@@ -1074,7 +1065,8 @@ public final class InvocationDispatcher {
         LocalObjectMessage work = new LocalObjectMessage(
             new CatalogChangeWork(m_siteId,
                                   task.clientHandle, ccxn.connectionId(), ccxn.getHostnameAndIPAndPort(),
-                                  handler.isAdmin(), ccxn, null, null,
+                                  handler.isAdmin(), ccxn,
+                                  new CatalogChangeParameters(null, null, null, null),
                                   "@UpdateApplicationCatalog",
                                   VoltDB.instance().getReplicationRole() == ReplicationRole.REPLICA,
                                   useDdlSchema,
@@ -1392,14 +1384,13 @@ public final class InvocationDispatcher {
 
             VoltDB.instance().getClientInterface().bindAdapter(alternateAdapter, null);
 
-            dispatchUpdateApplicationCatalog(catalogUpdateTask, alternateHandler, alternateAdapter, user, false);
+            dispatchUpdateApplicationCatalog(catalogUpdateTask, false, false, alternateAdapter, user, alternateHandler.isAdmin());
 
         } catch (JSONException e) {
             return unexpectedFailureResponse("Unable to parse parameters.", task.clientHandle);
         }
         return null;
     }
-
 
     /*
      * Allow the async compiler thread to immediately process completed planning tasks

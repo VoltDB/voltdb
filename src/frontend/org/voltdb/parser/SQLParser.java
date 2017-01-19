@@ -23,7 +23,6 @@ import java.io.IOException;
 import java.io.StringReader;
 import java.math.BigDecimal;
 import java.math.BigInteger;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -563,9 +562,6 @@ public class SQLParser extends SQLPatternFactory
             "\\s*",              // extra spaces
             Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
 
-    private static final SimpleDateFormat FullDateParser = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
-    private static final SimpleDateFormat WholeSecondDateParser = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-    private static final SimpleDateFormat DayDateParser = new SimpleDateFormat("yyyy-MM-dd");
     private static final Pattern Unquote = Pattern.compile("^'|'$", Pattern.MULTILINE);
 
     private static final Map<String, String> FRIENDLY_TYPE_NAMES =
@@ -580,9 +576,9 @@ public class SQLParser extends SQLPatternFactory
     // through the trailing semicolon. It relies on post-parsing code to make sure
     // the argument is reasonable.
     // Capture group 1 for LOAD CLASSES is the jar file.
-    private static final SingleArgumentCommandParser loadClassesParser =
+    private static final SingleArgumentCommandParser LOAD_CLASSES_PARSER =
             new SingleArgumentCommandParser("load classes", "jar file");
-    private static final SingleArgumentCommandParser removeClassesParser =
+    private static final SingleArgumentCommandParser REMOVE_CLASSES_PARSER =
             new SingleArgumentCommandParser("remove classes", "class selector");
     private static final Pattern ClassSelectorToken = Pattern.compile(
             "^[\\w*.$]+$", Pattern.CASE_INSENSITIVE);
@@ -1873,20 +1869,33 @@ public class SQLParser extends SQLPatternFactory
     }
 
     /**
+     * @param statement
+     * @return jar file argument
+     * @throws SQLParser.Exception
+     */
+    public static String parseLoadClassesOnly(String statement) throws SQLParser.Exception
+    {
+        return LOAD_CLASSES_PARSER.parse(statement);
+    }
+
+    /**
      * @param statement  input statement
      * @return           jar file path argument, or null if statement is not "LOAD CLASSES"
      * @throws SQLParser.Exception if the LOAD CLASSES argument is not a valid file path.
      */
     public static String parseLoadClasses(String statement) throws SQLParser.Exception
     {
-        String arg = loadClassesParser.parse(statement);
-        if (arg == null) {
-            return null;
-        }
+        String arg = parseLoadClassesOnly(statement);
+
         if (! new File(arg).isFile()) {
             throw new SQLParser.Exception("Jar file not found: '" + arg + "'");
         }
         return arg;
+    }
+
+    public static String parseRemoveClassesOnly(String statement) throws SQLParser.Exception
+    {
+        return REMOVE_CLASSES_PARSER.parse(statement);
     }
 
     /**
@@ -1896,7 +1905,7 @@ public class SQLParser extends SQLPatternFactory
      */
     public static String parseRemoveClasses(String statement) throws SQLParser.Exception
     {
-        String arg = removeClassesParser.parse(statement);
+        String arg = REMOVE_CLASSES_PARSER.parse(statement);
         if (arg == null) {
             return null;
         }

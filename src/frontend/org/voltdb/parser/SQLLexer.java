@@ -445,6 +445,43 @@ public class SQLLexer extends SQLPatternFactory
         return PAT_SELECT_STATEMENT_PREAMBLE.matcher(statement).matches();
     }
 
+    /**
+     * Check if a list of statements contains procedure changes only
+     * Stmts only include "create procedure...", "drop procedure..."
+     * @param statements
+     * @return
+     */
+    public static boolean procedureChangesOnly(String [] statements)
+    {
+        Matcher statementMatcher;
+        for (String stmt: statements) {
+            if (stmt == null || stmt.trim().isEmpty()) continue;
+
+            statementMatcher = SQLParser.matchAllVoltDBStatementPreambles(stmt);
+            if ( ! statementMatcher.find()) {
+                return false;
+            }
+
+            statementMatcher = SQLParser.matchPartitionProcedure(stmt);
+            if (statementMatcher.matches()) continue;
+
+            statementMatcher = SQLParser.matchCreateProcedureAsSQL(stmt);
+            if (statementMatcher.matches()) continue;
+
+            statementMatcher = SQLParser.matchCreateProcedureAsScript(stmt);
+            if (statementMatcher.matches()) continue;
+
+            statementMatcher = SQLParser.matchCreateProcedureFromClass(stmt);
+            if (statementMatcher.matches()) continue;
+
+            statementMatcher = SQLParser.matchDropProcedure(stmt);
+            if (statementMatcher.matches()) continue;
+
+            return false;
+        }
+        return true;
+    }
+
     //========== Private ==========
 
     /**
