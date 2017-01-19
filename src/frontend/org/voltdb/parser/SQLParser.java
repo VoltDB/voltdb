@@ -346,7 +346,6 @@ public class SQLParser extends SQLPatternFactory
             "\\ADROP|" +
             "\\APARTITION|" +
             "\\AREPLICATE|" +
-            "\\AEXPORT|" +
             "\\AIMPORT|" +
             "\\ADR|" +
             "\\ASET" +
