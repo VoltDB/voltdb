@@ -3877,8 +3877,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 || !m_catalogContext.cluster.getDrconsumerenabled()) {
             return false;
         }
-        if (getReplicationRole() == ReplicationRole.REPLICA ||
-                 m_catalogContext.database.getIsactiveactivedred()) {
+        final String drRole = m_catalogContext.getCluster().getDrrole();
+        if (DrRoleType.REPLICA.value().equals(drRole) || DrRoleType.XDCR.value().equals(drRole)) {
             String drProducerHost = m_catalogContext.cluster.getDrmasterhost();
             byte drConsumerClusterId = (byte)m_catalogContext.cluster.getDrclusterid();
             final Pair<String, Integer> drIfAndPort = VoltZK.getDRInterfaceAndPortFromMetadata(m_localMetadata);
