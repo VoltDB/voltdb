@@ -132,7 +132,7 @@ CREATE STREAM export_done_table PARTITION ON COLUMN txnid
   txnid                     BIGINT        NOT NULL
 );
 
-CREATE TABLE export_done_table_foo PARTITION ON COLUMN txnid EXPORT TO TARGET foo
+CREATE STREAM export_done_table_foo PARTITION ON COLUMN txnid EXPORT TO TARGET foo
 (
   txnid                     BIGINT        NOT NULL
 );
