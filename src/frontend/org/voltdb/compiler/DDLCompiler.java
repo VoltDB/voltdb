@@ -318,9 +318,9 @@ public class DDLCompiler {
     }
 
     // Generate DDL to create or drop the DR conflict table
-    private String generateDDLForDRConflictsTable(Database currentDB, Database previousDBIfAny) {
+    private String generateDDLForDRConflictsTable(Database currentDB, Database previousDBIfAny, boolean isCurrentXDCR) {
         StringBuilder sb = new StringBuilder();
-        if (currentDB.getIsactiveactivedred()) {
+        if (isCurrentXDCR) {
             createDRConflictTables(sb, previousDBIfAny);
         } else {
             dropDRConflictTablesIfNeeded(sb);
@@ -338,12 +338,13 @@ public class DDLCompiler {
      * @param db  current database
      * @param previousDBIfAny  previous status of database, liveDDL needs it
      * @param whichProcs  which type(s) of procedures to load
+     * @param isCurrentXDCR Does the current catalog has XDCR enabled
      * @throws VoltCompilerException
      */
     void loadAutogenExportTableSchema(Database db, Database previousDBIfAny,
-            DdlProceduresToLoad whichProcs)
+            DdlProceduresToLoad whichProcs, boolean isCurrentXDCR)
             throws VoltCompilerException {
-        Reader reader = new VoltCompilerStringReader(null, generateDDLForDRConflictsTable(db, previousDBIfAny));
+        Reader reader = new VoltCompilerStringReader(null, generateDDLForDRConflictsTable(db, previousDBIfAny, isCurrentXDCR));
         loadSchema(reader, db, whichProcs);
     }
 
@@ -929,25 +930,9 @@ public class DDLCompiler {
         statementMatcher = SQLParser.matchSetGlobalParam(statement);
         if (statementMatcher.matches()) {
             String name = statementMatcher.group(1).toUpperCase();
-            String value = statementMatcher.group(2).toUpperCase();
             switch (name) {
                 case DatabaseConfiguration.DR_MODE_NAME:
-                    switch (value) {
-                        case DatabaseConfiguration.ACTIVE_ACTIVE: {
-                            db.setIsactiveactivedred(true);
-                        }
-                        break;
-                        case DatabaseConfiguration.ACTIVE_PASSIVE:
-                        case "DEFAULT": {
-                            db.setIsactiveactivedred(false);
-                        }
-                        break;
-                        default: {
-                            throw m_compiler.new VoltCompilerException(String.format(
-                                    "Invalid parameter value for %s. Candidate values are %s, %s/DEFAULT",
-                                    name, DatabaseConfiguration.ACTIVE_ACTIVE, DatabaseConfiguration.ACTIVE_PASSIVE));
-                        }
-                    }
+                    m_compiler.addWarn("Setting DR mode in the DDL is deprecated. Please use the role attribute of the <dr> tag in the deployment file.");
                     break;
                 default:
                     throw m_compiler.new VoltCompilerException(String.format(
@@ -1315,7 +1300,7 @@ public class DDLCompiler {
         return exportTableNames;
     }
 
-    void compileToCatalog(Database db) throws VoltCompilerException {
+    void compileToCatalog(Database db, boolean isXDCR) throws VoltCompilerException {
         // note this will need to be decompressed to be used
         String binDDL = Encoder.compressAndBase64Encode(m_fullDDL);
         db.setSchema(binDDL);
@@ -1327,7 +1312,7 @@ public class DDLCompiler {
         // build the local catalog from the xml catalog
         for (VoltXMLElement node : m_schema.children) {
             if (node.name.equals("table")) {
-                addTableToCatalog(db, node);
+                addTableToCatalog(db, node, isXDCR);
             }
         }
 
@@ -1628,7 +1613,7 @@ public class DDLCompiler {
         }
     }
 
-    private void addTableToCatalog(Database db, VoltXMLElement node)
+    private void addTableToCatalog(Database db, VoltXMLElement node, boolean isXDCR)
             throws VoltCompilerException {
         assert node.name.equals("table");
 
@@ -1717,7 +1702,7 @@ public class DDLCompiler {
         }
 
         // Warn user if DR table don't have any unique index.
-        if (db.getIsactiveactivedred() &&
+        if (isXDCR &&
                 node.attributes.get("drTable") != null &&
                 node.attributes.get("drTable").equalsIgnoreCase("ENABLE")) {
             boolean hasUniqueIndex = false;

@@ -32,6 +32,8 @@ import javax.xml.bind.Marshaller;
 import org.voltdb.compiler.deploymentfile.ClusterType;
 import org.voltdb.compiler.deploymentfile.CommandLogType;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
+import org.voltdb.compiler.deploymentfile.DrRoleType;
+import org.voltdb.compiler.deploymentfile.DrType;
 import org.voltdb.compiler.deploymentfile.ExportType;
 import org.voltdb.compiler.deploymentfile.HttpdType;
 import org.voltdb.compiler.deploymentfile.HttpdType.Jsonapi;
@@ -113,6 +115,8 @@ public class DeploymentBuilder {
 
     // whether to allow DDL over adhoc or use full catalog updates
     private boolean m_useDDLSchema = false;
+
+    private DrRoleType m_drRole = DrRoleType.NONE;
 
     public DeploymentBuilder() {
         this(1, 1, 0);
@@ -245,6 +249,10 @@ public class DeploymentBuilder {
     public void setMaxTempTableMemory(int max)
     {
         m_maxTempTableMemory = max;
+    }
+
+    public void setDrRole(DrRoleType role) {
+        m_drRole = role;
     }
 
     public void writeXML(String path) {
@@ -416,6 +424,14 @@ public class DeploymentBuilder {
         // <export>
         ExportType export = factory.createExportType();
         deployment.setExport(export);
+
+        // <dr>
+        if (m_drRole != DrRoleType.NONE) {
+            final DrType drType = factory.createDrType();
+            deployment.setDr(drType);
+            drType.setRole(m_drRole);
+            drType.setId(1);
+        }
 
         // Have some yummy boilerplate!
         String xml = null;

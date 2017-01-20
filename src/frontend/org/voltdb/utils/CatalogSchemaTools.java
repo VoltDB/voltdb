@@ -49,6 +49,7 @@ import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Table;
 import org.voltdb.common.Constants;
 import org.voltdb.common.Permission;
+import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.compilereport.ProcedureAnnotation;
 import org.voltdb.compilereport.TableAnnotation;
 import org.voltdb.expressions.AbstractExpression;
@@ -553,9 +554,6 @@ public abstract class CatalogSchemaTools {
 
         for (Cluster cluster : catalog.getClusters()) {
             for (Database db : cluster.getDatabases()) {
-                if (db.getIsactiveactivedred()) {
-                    sb.append(String.format("SET %s=%s;\n", DatabaseConfiguration.DR_MODE_NAME, DatabaseConfiguration.ACTIVE_ACTIVE));
-                }
                 toSchema(sb, importLines);
 
                 for (Group grp : db.getGroups()) {

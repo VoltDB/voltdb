@@ -84,7 +84,7 @@ public class TestCatalogDiffs extends TestCase {
 
     public static Catalog catalogForJar(String pathToJar) throws IOException {
         byte[] bytes = MiscUtils.fileToBytes(new File(pathToJar));
-        String serializedCatalog = CatalogUtil.getSerializedCatalogStringFromJar(CatalogUtil.loadAndUpgradeCatalogFromJar(bytes).getFirst());
+        String serializedCatalog = CatalogUtil.getSerializedCatalogStringFromJar(CatalogUtil.loadAndUpgradeCatalogFromJar(bytes, false).getFirst());
         assertNotNull(serializedCatalog);
         Catalog c = new Catalog();
         c.execute(serializedCatalog);
@@ -1288,24 +1288,6 @@ public class TestCatalogDiffs extends TestCase {
         Catalog catOriginal = catalogForJar(testDir +  File.separator + "dr1.jar");
 
         builder.addLiteralSchema("\nDR TABLE A;");
-        assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "dr2.jar"));
-        Catalog catUpdated = catalogForJar(testDir + File.separator + "dr2.jar");
-        verifyDiffIfEmptyTable(catOriginal, catUpdated);
-    }
-
-    public void testSetDRActiveActiveOnEmptyTable() throws IOException {
-        if (!MiscUtils.isPro()) { return; } // not supported in community
-
-        String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);" +
-                                 "\nPARTITION TABLE A ON COLUMN C1;" +
-                                 "\nDR TABLE A;");
-        assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "dr1.jar"));
-        Catalog catOriginal = catalogForJar(testDir +  File.separator + "dr1.jar");
-
-        builder.addLiteralSchema("\nSET " + DatabaseConfiguration.DR_MODE_NAME +
-                                 "=" + DatabaseConfiguration.ACTIVE_ACTIVE + ";");
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "dr2.jar"));
         Catalog catUpdated = catalogForJar(testDir + File.separator + "dr2.jar");
         verifyDiffIfEmptyTable(catOriginal, catUpdated);

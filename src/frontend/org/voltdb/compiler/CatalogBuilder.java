@@ -302,7 +302,7 @@ public class CatalogBuilder {
         try {
             File jarFile = File.createTempFile("catalogasbytes", ".jar");
 
-            if (!compile(new VoltCompiler(), jarFile.getAbsolutePath())) {
+            if (!compile(new VoltCompiler(false), jarFile.getAbsolutePath())) {
                 return null;
             }
             return MiscUtils.fileToBytes(jarFile);
@@ -313,7 +313,7 @@ public class CatalogBuilder {
     }
 
     public boolean compile(final String jarPath) {
-        return compile(new VoltCompiler(), jarPath);
+        return compile(new VoltCompiler(false), jarPath);
     }
 
     public boolean compile(final VoltCompiler compiler,
