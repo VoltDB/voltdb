@@ -37,8 +37,8 @@ import org.voltcore.utils.ssl.SSLBufferEncrypter;
 
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.CompositeByteBuf;
+import io.netty_voltpatches.buffer.ByteBuf;
+import io.netty_voltpatches.buffer.CompositeByteBuf;
 
 public class TLSNIOWriteStream extends NIOWriteStream {
 

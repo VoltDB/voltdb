@@ -34,9 +34,9 @@ import org.voltcore.utils.ssl.SSLBufferDecrypter;
 
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.CompositeByteBuf;
-import io.netty.buffer.Unpooled;
+import io.netty_voltpatches.buffer.ByteBuf;
+import io.netty_voltpatches.buffer.CompositeByteBuf;
+import io.netty_voltpatches.buffer.Unpooled;
 
 public class TLSVoltPort extends VoltPort  {
     public final static int TLS_HEADER_SIZE = 5;

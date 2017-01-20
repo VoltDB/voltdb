@@ -285,7 +285,7 @@ public class NIOReadStream implements ReadStream {
 
     public static final class Slice {
         private final List<ContainerSlice> m_slices;
-        public final io.netty.buffer.ByteBuf bb;
+        public final io.netty_voltpatches.buffer.ByteBuf bb;
         private final BitSet m_discarded;
 
         private Slice(List<ContainerSlice> slices) {
@@ -294,7 +294,7 @@ public class NIOReadStream implements ReadStream {
             for (int i = 0; i < slices.size(); ++i) {
                 bbs[i] = slices.get(i).bb;
             }
-            bb = io.netty.buffer.Unpooled.wrappedBuffer(bbs);
+            bb = io.netty_voltpatches.buffer.Unpooled.wrappedBuffer(bbs);
             m_slices = slices;
         }
 
