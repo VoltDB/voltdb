@@ -115,6 +115,7 @@ public class ExportGeneration implements Generation {
                         @Override
                         public void run() {
                             final HostMessenger messenger = ExportManager.instance().getHostMessenger();
+                            // We need this null check for tests which TestExportGeneration without messenger.
                             if (messenger != null) {
                                 for (Map.Entry<Integer, String> entry : m_partitionLeaderZKName.entrySet()) {
                                     messenger.getZK().delete(
@@ -746,6 +747,7 @@ public class ExportGeneration implements Generation {
 
     private void cleanup(final HostMessenger messenger) {
         shutdown = true;
+        //We need messenger NULL guard for tests.
         if (m_mbox != null && messenger != null) {
             for (Integer partition : m_dataSourcesByPartition.keySet()) {
                 final String partitionDN =  m_mailboxesZKPath + "/" + partition;
