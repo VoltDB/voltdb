@@ -27,7 +27,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -77,6 +76,7 @@ import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.VoltTable;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
+import org.voltdb.catalog.DRCatalogCommands;
 import org.voltdb.catalog.DRCatalogDiffEngine;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Deployment;
@@ -1497,9 +1497,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         m_ee.quiesce(m_lastCommittedSpHandle);
         m_ee.updateCatalog(m_context.m_uniqueId, diffCmds);
         if (DRCatalogChange) {
-            final Pair<Long, String> catalogCommands = DRCatalogDiffEngine.serializeCatalogCommandsForDr(m_context.catalog);
+            final DRCatalogCommands catalogCommands = DRCatalogDiffEngine.serializeCatalogCommandsForDr(m_context.catalog, -1);
             generateDREvent( EventType.CATALOG_UPDATE, uniqueId, m_lastCommittedSpHandle,
-                    spHandle, catalogCommands.getSecond().getBytes(Charsets.UTF_8));
+                    spHandle, catalogCommands.commands.getBytes(Charsets.UTF_8));
         }
 
         return true;
