@@ -51,7 +51,7 @@ public interface ConsumerDRGateway extends Promotable {
 
     void producerTopologyUpdated(final MeshMemberInfo existingCluster);
 
-    void startConsumerDispatcher(final MeshMemberInfo member, final boolean awaitProducerSnapshot);
+    void startConsumerDispatcher(final MeshMemberInfo member);
 
     void addLocallyLedPartition(int partitionId);
 }
