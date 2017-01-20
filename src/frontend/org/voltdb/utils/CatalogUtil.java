@@ -129,7 +129,6 @@ import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.importer.ImportDataProcessor;
 import org.voltdb.importer.formatter.AbstractFormatterFactory;
 import org.voltdb.importer.formatter.FormatterBuilder;
-import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.plannodes.AbstractPlanNode;
@@ -1942,12 +1941,17 @@ public abstract class CatalogUtil {
     private static void setDrInfo(Catalog catalog, DrType dr, ClusterType clusterType) {
         int clusterId;
         Cluster cluster = catalog.getClusters().get("cluster");
+        final Database db = cluster.getDatabases().get("database");
         assert cluster != null;
         if (dr != null) {
             ConnectionType drConnection = dr.getConnection();
             cluster.setDrproducerenabled(dr.isListen());
             cluster.setDrproducerport(dr.getPort());
             cluster.setDrrole(dr.getRole().name().toLowerCase());
+            if (dr.getRole() == DrRoleType.XDCR) {
+                // Setting this for compatibility mode only, don't use in new code
+                db.setIsactiveactivedred(true);
+            }
 
             // Backward compatibility to support cluster id in DR tag
             if (clusterType.getId() == null && dr.getId() != null) {

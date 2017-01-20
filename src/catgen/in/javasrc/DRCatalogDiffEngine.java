@@ -24,9 +24,9 @@ package org.voltdb.catalog;
 import java.util.List;
 
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
-import org.voltcore.utils.Pair;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
+import org.voltdb.dr2.DRProtocol;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 
@@ -42,11 +42,20 @@ public class DRCatalogDiffEngine extends CatalogDiffEngine {
         super(localCatalog, remoteCatalog);
     }
 
-    public static Pair<Long, String> serializeCatalogCommandsForDr(Catalog catalog) {
+    public static DRCatalogCommands serializeCatalogCommandsForDr(Catalog catalog, int protocolVersion) {
         Cluster cluster = catalog.getClusters().get("cluster");
         Database db = cluster.getDatabases().get("database");
         StringBuilder sb = new StringBuilder();
-        cluster.writeCommandForField(sb, "drRole", true);
+
+        if (protocolVersion == -1 || protocolVersion >= DRProtocol.MUTLICLUSTER_PROTOCOL_VERSION) {
+            cluster.writeCommandForField(sb, "drRole", true);
+        } else {
+            // The compatibility mode will not understand the new drRole field,
+            // so use the old field name. We'll remove this in v7.1 when the
+            // compatibility mode is deprecated.
+            db.writeCommandForField(sb, "isActiveActiveDRed", true);
+        }
+
         for (Table t : db.getTables()) {
             if (t.getIsdred() && t.getMaterializer() == null && !CatalogUtil.isTableExportOnly(db, t)) {
                 t.writeCreationCommand(sb);
@@ -57,15 +66,22 @@ public class DRCatalogDiffEngine extends CatalogDiffEngine {
         String catalogCommands = sb.toString();
         PureJavaCrc32 crc = new PureJavaCrc32();
         crc.update(catalogCommands.getBytes(Constants.UTF8ENCODING));
-        return Pair.of(crc.getValue(), Encoder.compressAndBase64Encode(catalogCommands));
+        return new DRCatalogCommands(protocolVersion, crc.getValue(), Encoder.compressAndBase64Encode(catalogCommands));
     }
 
     public static Catalog deserializeCatalogCommandsForDr(String encodedCatalogCommands) {
         String catalogCommands = Encoder.decodeBase64AndDecompress(encodedCatalogCommands);
         Catalog deserializedMasterCatalog = new Catalog();
         Cluster c = deserializedMasterCatalog.getClusters().add("cluster");
-        c.getDatabases().add("database");
+        Database db = c.getDatabases().add("database");
         deserializedMasterCatalog.execute(catalogCommands);
+
+        if (db.getIsactiveactivedred()) {
+            // The catalog came from an old version, set DR role here
+            // appropriately so that the diff engine can just look at the role.
+            c.setDrrole(DrRoleType.XDCR.value());
+        }
+
         return deserializedMasterCatalog;
     }
 
@@ -106,7 +122,8 @@ public class DRCatalogDiffEngine extends CatalogDiffEngine {
             }
         } else if (suspect instanceof Database) {
             if ("schema".equalsIgnoreCase(field) ||
-                "securityprovider".equalsIgnoreCase(field)) {
+                "securityprovider".equalsIgnoreCase(field) ||
+                "isActiveActiveDRed".equalsIgnoreCase(field)) {
                 return null;
             }
         } else if (suspect instanceof Column) {

@@ -755,7 +755,7 @@ public class TestDRCatalogDiffs {
                 "DR TABLE T1;";
         Catalog masterCatalog = createCatalog(masterSchema);
 
-        String commands = DRCatalogDiffEngine.serializeCatalogCommandsForDr(masterCatalog).getSecond();
+        String commands = DRCatalogDiffEngine.serializeCatalogCommandsForDr(masterCatalog, -1).commands;
         String decodedCommands = Encoder.decodeBase64AndDecompress(commands);
         decodedCommands = decodedCommands.replaceFirst("set \\$PREV isDRed true", "set \\$PREV isDRed true\nset \\$PREV isASquirrel false");
         boolean threw = false;
@@ -779,7 +779,7 @@ public class TestDRCatalogDiffs {
             replicaCatalog.getClusters().get("cluster").setDrrole(DrRoleType.XDCR.value());
         }
 
-        String commands = DRCatalogDiffEngine.serializeCatalogCommandsForDr(masterCatalog).getSecond();
+        String commands = DRCatalogDiffEngine.serializeCatalogCommandsForDr(masterCatalog, -1).commands;
         Catalog deserializedMasterCatalog = DRCatalogDiffEngine.deserializeCatalogCommandsForDr(commands);
         return new DRCatalogDiffEngine(replicaCatalog, deserializedMasterCatalog);
     }
