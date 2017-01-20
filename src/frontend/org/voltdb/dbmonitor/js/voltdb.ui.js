@@ -1220,21 +1220,38 @@ var loadPage = function (serverName, portid) {
         });
 
         //pm
-        voltDbRenderer.GetDrRoleInformation(function(drRoleDetail){
-            for(var i = 0; i < drRoleDetail['DRROLE'].length; i++){
+            voltDbRenderer.GetAdminDeploymentInformation(false, function (adminConfigValues, rawConfigValues) {
+                                voltDbRenderer.GetDrRoleInformation(function(drRoleDetail){
+
+            for(var i = 1; i <= drRoleDetail['DRROLE'].length ; i++){
+                debugger;
+                var showClass = "expandedDR";
+                var displayCss = "display:block";
+                if($("#dbPane_"+ i).find(".menu_head").hasClass("collapsedDR")){
+                    showClass = "collapsedDR";
+                    displayCss = "display:none";
+                }
+                $("#dbPane_"+ i).parent().remove();
+
                 var htmlContent = '<div class="containerMain" id="containerMain_'+ i + '">' +
                                   '    <div id="dbPane_' + i + '" class="menu_list dbPane">' +
                                   '        <!--Code for menu starts here-->' +
-                                  '        <div class="menu_head expandedDR drHead">' +
+                                  '        <div class="menu_head drHead '+ showClass +'">' +
                                   '            <span class="iconDRDatabase"></span>' +
                                   '            <h1 class="headText1 DRHeaderWrap">' +
-                                  '                <a href="#" id="showHideGraphBlock_' + i + '" class="showhideIcon expandedDR arrowAdjustDR">' +
-                                  '                    <span class="DRHeaderName" id="dRHeaderName_' + i + '">Database (1)</span>' +
+                                  '                <a href="#" id="showHideGraphBlock_' + i + '" class="showhideIcon arrowAdjustDR">' +
+                                  '                    <span class="DRHeaderName" id="dRHeaderName_' + i + '">Database ('+ rawConfigValues.dr.id +')</span>' +
                                   '                </a>' +
                                   '            </h1>' +
+                                  '<div class="DRMR"><div class="DRMRLeft"><span class="arrowDRDatabase">' +
+                                   '<p>XDCR</p></span></div>' +
+                                  '<div class="DRMRRight"><span class="iconDRDatabase"></span><div class="headText1 DRHeaderWrap">' +
+                                  '<a href="#" class="showhideIcon expandedDR arrowAdjustDR">' +
+                                  '<span class="DRHeaderName" id="dRHeaderName_' + i + '">Database ('+ drRoleDetail['DRROLE'][i - 1][2] +')</span>' +
+                                  '</a></div></div><div class="clear"></div></div>' +
                                   '            <div class="clear"></div>' +
                                   '        </div>' +
-                                  '        <div class="menu_body drBody" style="display: block;">' +
+                                  '        <div class="menu_body drBody" style='+displayCss+'>' +
                                   '            <div class="DRContantWrap">' +
                                   '                <div id="mainGraphBlock' + i + '">' +
                                   '                    <div class="errorMsgLocalStorageFull" style="display:none">' +
@@ -1355,7 +1372,10 @@ var loadPage = function (serverName, portid) {
                                   '    </div>' +
                                   '</div>';
 
+                $("#dr").append(htmlContent)
+
                 $("#dbPane_"+ i +" div.menu_head").click(function () {
+                    debugger;
                     var headerState = $("#dbPane_" + i + " div.menu_body").css('display');
                     if (headerState == 'none') {
                         $(this).removeClass('collapsedDR');
@@ -1368,6 +1388,8 @@ var loadPage = function (serverName, portid) {
                 });
             }
         });
+                        });
+
 
         voltDbRenderer.GetDeploymentInformation(function (deploymentDetails) {
                 if (deploymentDetails != undefined) {

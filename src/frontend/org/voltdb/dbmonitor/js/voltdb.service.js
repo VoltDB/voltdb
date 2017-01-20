@@ -1368,7 +1368,6 @@
 
                 } else {
                     VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
-                        debugger;
                         onConnectionAdded(connection, status);
 
                     });
