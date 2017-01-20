@@ -420,6 +420,189 @@ public class PlannerTestCase extends TestCase {
         assertTrue("Actual plan longer than expected", pn == null);
     }
 
+    /**
+     * Find a specific node in a plan tree following the left-most path,
+     * (child[0]), and asserting the expected class of each plan node along the
+     * way, inclusive of the start and end.
+     * @param expectedClasses a list of expected AbstractPlanNode classes
+     * @param actualPlan the top of a plan node tree expected to have instances
+     *                   of the expected classes along its left-most branch
+     *                   listed in top-down order.
+     * @return the child node matching the last expected class in the list.
+     *                   It need not be a leaf node.
+     */
+    protected static AbstractPlanNode followAssertedLeftChain(
+            AbstractPlanNode start,
+            PlanNodeType startType, PlanNodeType... nodeTypes) {
+        AbstractPlanNode result = start;
+        assertEquals(startType, result.getPlanNodeType());
+        for (PlanNodeType type : nodeTypes) {
+            assertTrue(result.getChildCount() > 0);
+            result = result.getChild(0);
+            assertEquals(type, result.getPlanNodeType());
+        }
+        return result;
+    }
+
+    /**
+     * Assert that a plan's left-most branch is made up of plan nodes of
+     * expected classes.
+     * @param expectedClasses a list of expected AbstractPlanNode classes
+     * @param actualPlan the top of a plan node tree expected to have instances
+     *                   of the expected classes along its left-most branch
+     *                   listed from top to bottom.
+     */
+    protected static void assertLeftChain(
+            AbstractPlanNode start, PlanNodeType... nodeTypes) {
+        AbstractPlanNode pn = start;
+        for (PlanNodeType type : nodeTypes) {
+            assertFalse("Child node(s) are missing from the actual plan chain.",
+                    pn == null);
+            if ( ! type.equals(pn.getPlanNodeType())) {
+                fail("Expecting plan node of type " + type + ", " +
+                        "instead found " + pn.getPlanNodeType() + ".");
+            }
+            pn = (pn.getChildCount() > 0) ? pn.getChild(0) : null;
+        }
+        assertTrue("Actual plan chain was longer than expected",
+                pn == null);
+    }
+
+    /**
+     * Assert that a two-fragment plan's coordinator fragment does a simple
+     * projection.
+     **/
+    protected static void assertProjectingCoordinator(
+            List<AbstractPlanNode> lpn) {
+        AbstractPlanNode pn;
+        pn = lpn.get(0);
+        assertTopDownTree(pn, PlanNodeType.SEND,
+                PlanNodeType.PROJECTION,
+                PlanNodeType.RECEIVE);
+    }
+
+    /**
+     * Assert that a two-fragment plan's coordinator fragment does a left join
+     * with a specific replicated table on its outer side.
+     **/
+    protected static void assertReplicatedLeftJoinCoordinator(
+            List<AbstractPlanNode> lpn, String replicatedTable) {
+        AbstractPlanNode pn;
+        AbstractPlanNode node;
+        NestLoopPlanNode nlj;
+        SeqScanPlanNode seqScan;
+        pn = lpn.get(0);
+        assertTopDownTree(pn, PlanNodeType.SEND,
+                PlanNodeType.PROJECTION,
+                PlanNodeType.NESTLOOP,
+                PlanNodeType.SEQSCAN,
+                PlanNodeType.RECEIVE);
+        node = followAssertedLeftChain(pn, PlanNodeType.SEND,
+                PlanNodeType.PROJECTION,
+                PlanNodeType.NESTLOOP);
+        nlj = (NestLoopPlanNode) node;
+        assertEquals(JoinType.LEFT, nlj.getJoinType());
+        assertEquals(2, nlj.getChildCount());
+        seqScan = (SeqScanPlanNode) nlj.getChild(0);
+        assertEquals(replicatedTable, seqScan.getTargetTableName().toUpperCase());
+    }
+
+    /**
+     * Assert that an expression tree contains the expected types of expressions
+     * in the order listed, assuming a top-down left-to-right depth-first
+     * traversal through left, right, and args children.
+     * A null expression type in the list will match any expression
+     * node or tree at the corresponding position.
+     **/
+    protected static void assertExprTopDownTree(AbstractExpression start,
+            ExpressionType... exprTypes) {
+        assertNotNull(start);
+        Stack<AbstractExpression> stack = new Stack<>();
+        stack.push(start);
+        for (ExpressionType type : exprTypes) {
+            // Process each node before its children or later siblings.
+            AbstractExpression parent;
+            try {
+                parent = stack.pop();
+            }
+            catch (EmptyStackException ese) {
+                fail("No expression was found in the tree to match type " + type);
+                return; // This dead code hushes warnings.
+            }
+            List<AbstractExpression> args = parent.getArgs();
+            AbstractExpression rightExpr = parent.getRight();
+            AbstractExpression leftExpr = parent.getLeft();
+            int argCount = (args == null) ? 0 : args.size();
+            int childCount = argCount +
+                    (rightExpr == null ? 0 : 1) +
+                    (leftExpr == null ? 0 : 1);
+            if (type == null) {
+                // A null type wildcard matches any child TREE or NODE.
+                System.out.println("DEBUG: Suggestion -- expect " +
+                        parent.getExpressionType() +
+                        " with " + childCount + " direct children.");
+                continue;
+            }
+            assertEquals(type, parent.getExpressionType());
+            // Iterate from the last child to the first.
+            while (argCount > 0) {
+                // Push each child to be processed before its parent's
+                // or its own later siblings (already pushed).
+                stack.push(parent.getArgs().get(--argCount));
+            }
+            if (rightExpr != null) {
+                stack.push(rightExpr);
+            }
+            if (leftExpr != null) {
+                stack.push(leftExpr);
+            }
+        }
+        assertTrue("Extra expression node(s) (" + stack.size() +
+                ") were found in the tree with no expression type to match",
+                stack.isEmpty());
+    }
+
+    /**
+     * Assert that a plan node tree contains the expected types of plan nodes
+     * in the order listed, assuming a top-down left-to-right depth-first
+     * traversal through the child vector. A null plan node type in the list
+     * will match any plan node or subtree at the corresponding position.
+     **/
+    protected static void assertTopDownTree(AbstractPlanNode start,
+            PlanNodeType... nodeTypes) {
+        Stack<AbstractPlanNode> stack = new Stack<>();
+        stack.push(start);
+        for (PlanNodeType type : nodeTypes) {
+            // Process each node before its children or later siblings.
+            AbstractPlanNode parent;
+            try {
+                parent = stack.pop();
+            }
+            catch (EmptyStackException ese) {
+                fail("No node was found in the tree to match node type " + type);
+                return; // This dead code hushes warnings.
+            }
+            int childCount = parent.getChildCount();
+            if (type == null) {
+                // A null type wildcard matches any child TREE or NODE.
+                System.out.println("DEBUG: Suggestion -- expect " +
+                        parent.getPlanNodeType() +
+                        " with " + childCount + " direct children.");
+                continue;
+            }
+            assertEquals(type, parent.getPlanNodeType());
+            // Iterate from the last child to the first.
+            while (childCount > 0) {
+                // Push each child to be processed before its parent's
+                // or its own later (already pushed) siblings.
+                stack.push(parent.getChild(--childCount));
+            }
+        }
+        assertTrue("Extra plan node(s) (" + stack.size() +
+                ") were found in the tree with no node type to match",
+                stack.isEmpty());
+    }
+
     /*
      * Everything below this is for generating EE Unit tests from
      * java.  We start with a newline because the licensescheck.py
@@ -860,189 +1043,6 @@ public class PlannerTestCase extends TestCase {
             template = template.replace(pattern, value);
         }
         writeFile(new File(String.format("tests/ee/%s/%s.cpp", testFolder, testClassName)), template);
-    }
-
-    /**
-     * Find a specific node in a plan tree following the left-most path,
-     * (child[0]), and asserting the expected class of each plan node along the
-     * way, inclusive of the start and end.
-     * @param expectedClasses a list of expected AbstractPlanNode classes
-     * @param actualPlan the top of a plan node tree expected to have instances
-     *                   of the expected classes along its left-most branch
-     *                   listed in top-down order.
-     * @return the child node matching the last expected class in the list.
-     *                   It need not be a leaf node.
-     */
-    protected static AbstractPlanNode followAssertedLeftChain(
-            AbstractPlanNode start,
-            PlanNodeType startType, PlanNodeType... nodeTypes) {
-        AbstractPlanNode result = start;
-        assertEquals(startType, result.getPlanNodeType());
-        for (PlanNodeType type : nodeTypes) {
-            assertTrue(result.getChildCount() > 0);
-            result = result.getChild(0);
-            assertEquals(type, result.getPlanNodeType());
-        }
-        return result;
-    }
-
-    /**
-     * Assert that a plan's left-most branch is made up of plan nodes of
-     * expected classes.
-     * @param expectedClasses a list of expected AbstractPlanNode classes
-     * @param actualPlan the top of a plan node tree expected to have instances
-     *                   of the expected classes along its left-most branch
-     *                   listed from top to bottom.
-     */
-    protected static void assertLeftChain(
-            AbstractPlanNode start, PlanNodeType... nodeTypes) {
-        AbstractPlanNode pn = start;
-        for (PlanNodeType type : nodeTypes) {
-            assertFalse("Child node(s) are missing from the actual plan chain.",
-                    pn == null);
-            if ( ! type.equals(pn.getPlanNodeType())) {
-                fail("Expecting plan node of type " + type + ", " +
-                        "instead found " + pn.getPlanNodeType() + ".");
-            }
-            pn = (pn.getChildCount() > 0) ? pn.getChild(0) : null;
-        }
-        assertTrue("Actual plan chain was longer than expected",
-                pn == null);
-    }
-
-    /**
-     * Assert that a two-fragment plan's coordinator fragment does a simple
-     * projection.
-     **/
-    protected static void assertProjectingCoordinator(
-            List<AbstractPlanNode> lpn) {
-        AbstractPlanNode pn;
-        pn = lpn.get(0);
-        assertTopDownTree(pn, PlanNodeType.SEND,
-                PlanNodeType.PROJECTION,
-                PlanNodeType.RECEIVE);
-    }
-
-    /**
-     * Assert that a two-fragment plan's coordinator fragment does a left join
-     * with a specific replicated table on its outer side.
-     **/
-    protected static void assertReplicatedLeftJoinCoordinator(
-            List<AbstractPlanNode> lpn, String replicatedTable) {
-        AbstractPlanNode pn;
-        AbstractPlanNode node;
-        NestLoopPlanNode nlj;
-        SeqScanPlanNode seqScan;
-        pn = lpn.get(0);
-        assertTopDownTree(pn, PlanNodeType.SEND,
-                PlanNodeType.PROJECTION,
-                PlanNodeType.NESTLOOP,
-                PlanNodeType.SEQSCAN,
-                PlanNodeType.RECEIVE);
-        node = followAssertedLeftChain(pn, PlanNodeType.SEND,
-                PlanNodeType.PROJECTION,
-                PlanNodeType.NESTLOOP);
-        nlj = (NestLoopPlanNode) node;
-        assertEquals(JoinType.LEFT, nlj.getJoinType());
-        assertEquals(2, nlj.getChildCount());
-        seqScan = (SeqScanPlanNode) nlj.getChild(0);
-        assertEquals(replicatedTable, seqScan.getTargetTableName().toUpperCase());
-    }
-
-    /**
-     * Assert that an expression tree contains the expected types of expressions
-     * in the order listed, assuming a top-down left-to-right depth-first
-     * traversal through left, right, and args children.
-     * A null expression type in the list will match any expression
-     * node or tree at the corresponding position.
-     **/
-    protected static void assertExprTopDownTree(AbstractExpression start,
-            ExpressionType... exprTypes) {
-        assertNotNull(start);
-        Stack<AbstractExpression> stack = new Stack<>();
-        stack.push(start);
-        for (ExpressionType type : exprTypes) {
-            // Process each node before its children or later siblings.
-            AbstractExpression parent;
-            try {
-                parent = stack.pop();
-            }
-            catch (EmptyStackException ese) {
-                fail("No expression was found in the tree to match type " + type);
-                return; // This dead code hushes warnings.
-            }
-            List<AbstractExpression> args = parent.getArgs();
-            AbstractExpression rightExpr = parent.getRight();
-            AbstractExpression leftExpr = parent.getLeft();
-            int argCount = (args == null) ? 0 : args.size();
-            int childCount = argCount +
-                    (rightExpr == null ? 0 : 1) +
-                    (leftExpr == null ? 0 : 1);
-            if (type == null) {
-                // A null type wildcard matches any child TREE or NODE.
-                System.out.println("DEBUG: Suggestion -- expect " +
-                        parent.getExpressionType() +
-                        " with " + childCount + " direct children.");
-                continue;
-            }
-            assertEquals(type, parent.getExpressionType());
-            // Iterate from the last child to the first.
-            while (argCount > 0) {
-                // Push each child to be processed before its parent's
-                // or its own later siblings (already pushed).
-                stack.push(parent.getArgs().get(--argCount));
-            }
-            if (rightExpr != null) {
-                stack.push(rightExpr);
-            }
-            if (leftExpr != null) {
-                stack.push(leftExpr);
-            }
-        }
-        assertTrue("Extra expression node(s) (" + stack.size() +
-                ") were found in the tree with no expression type to match",
-                stack.isEmpty());
-    }
-
-    /**
-     * Assert that a plan node tree contains the expected types of plan nodes
-     * in the order listed, assuming a top-down left-to-right depth-first
-     * traversal through the child vector. A null plan node type in the list
-     * will match any plan node or subtree at the corresponding position.
-     **/
-    protected static void assertTopDownTree(AbstractPlanNode start,
-            PlanNodeType... nodeTypes) {
-        Stack<AbstractPlanNode> stack = new Stack<>();
-        stack.push(start);
-        for (PlanNodeType type : nodeTypes) {
-            // Process each node before its children or later siblings.
-            AbstractPlanNode parent;
-            try {
-                parent = stack.pop();
-            }
-            catch (EmptyStackException ese) {
-                fail("No node was found in the tree to match node type " + type);
-                return; // This dead code hushes warnings.
-            }
-            int childCount = parent.getChildCount();
-            if (type == null) {
-                // A null type wildcard matches any child TREE or NODE.
-                System.out.println("DEBUG: Suggestion -- expect " +
-                        parent.getPlanNodeType() +
-                        " with " + childCount + " direct children.");
-                continue;
-            }
-            assertEquals(type, parent.getPlanNodeType());
-            // Iterate from the last child to the first.
-            while (childCount > 0) {
-                // Push each child to be processed before its parent's
-                // or its own later (already pushed) siblings.
-                stack.push(parent.getChild(--childCount));
-            }
-        }
-        assertTrue("Extra plan node(s) (" + stack.size() +
-                ") were found in the tree with no node type to match",
-                stack.isEmpty());
     }
 
 }
