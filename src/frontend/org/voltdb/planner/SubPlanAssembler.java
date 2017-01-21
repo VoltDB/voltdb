@@ -1497,8 +1497,11 @@ public abstract class SubPlanAssembler {
                     // index is usable there as well as for any
                     // window functions.
                     retval.m_stmtOrderByIsCompatible = orderByScore.isDone();
+                    // If this index can provide the order by ordering,
+                    // then record the sort direction.  If it can't, then
+                    // don't record it here.
+                    retval.sortDirection = retval.m_stmtOrderByIsCompatible ? answer.m_sortDirection : SortDirectionType.INVALID;
                 }
-                retval.sortDirection = answer.m_sortDirection;
                 if (answer.m_sortDirection != SortDirectionType.INVALID) {
 
                     // Mark how we are using this index.
