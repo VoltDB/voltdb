@@ -40,7 +40,6 @@ import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.BinaryPayloadMessage;
 import org.voltcore.messaging.Mailbox;
-import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
@@ -62,6 +61,7 @@ import com.google_voltpatches.common.util.concurrent.Futures;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
+import org.voltcore.utils.CoreUtils;
 
 /**
  *  Allows an ExportDataProcessor to access underlying table queues
@@ -93,6 +93,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private final AtomicReference<Pair<Mailbox, ImmutableList<Long>>> m_ackMailboxRefs =
             new AtomicReference<Pair<Mailbox,ImmutableList<Long>>>(Pair.of((Mailbox)null, ImmutableList.<Long>builder().build()));
     private final Semaphore m_bufferPushPermits = new Semaphore(16);
+    private final Semaphore m_onMastershipPermit = new Semaphore(0);
 
     private final int m_nullArrayLength;
     private long m_lastReleaseOffset = 0;
@@ -931,6 +932,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
      * executor service
      */
     public synchronized void acceptMastership() {
+        try {
+            m_onMastershipPermit.acquire();
+        } catch (InterruptedException ex) {
+            exportLog.error("Error in accepting mastership", ex);
+        }
         Preconditions.checkNotNull(m_onMastership, "mastership runnable is not yet set");
         if (m_mastershipAccepted) {
             exportLog.info("Export generation " + getGeneration() + " Table " + getTableName() + " mastership already accepted for partition " + getPartitionId());
@@ -961,6 +967,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     public void setOnMastership(Runnable toBeRunOnMastership) {
         Preconditions.checkNotNull(toBeRunOnMastership, "mastership runnable is null");
         m_onMastership = toBeRunOnMastership;
+        m_onMastershipPermit.release();
     }
 
     public ExportFormat getExportFormat() {

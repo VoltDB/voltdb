@@ -741,6 +741,10 @@ public class VoltProjectBuilder {
         m_drProducerEnabled = false;
     }
 
+    public void setDrNone() {
+        m_drRole = DrRoleType.NONE;
+    }
+
     public void setDrReplica() {
         m_drRole = DrRoleType.REPLICA;
     }
