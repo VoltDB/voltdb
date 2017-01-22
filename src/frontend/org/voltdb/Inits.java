@@ -47,6 +47,7 @@ import org.voltdb.catalog.Catalog;
 import org.voltdb.common.Constants;
 import org.voltdb.common.NodeState;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
+import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.compiler.deploymentfile.HttpsType;
 import org.voltdb.export.ExportManager;
 import org.voltdb.importer.ImportManager;
@@ -288,7 +289,8 @@ public class Inits {
                     // If no catalog was supplied provide an empty one.
                     if (m_rvdb.m_pathToStartupCatalog == null) {
                         try {
-                            File emptyJarFile = CatalogUtil.createTemporaryEmptyCatalogJarFile();
+                            File emptyJarFile = CatalogUtil.createTemporaryEmptyCatalogJarFile(
+                                DrRoleType.XDCR.value().equals(m_rvdb.getCatalogContext().getCluster().getDrrole()));
                             if (emptyJarFile == null) {
                                 VoltDB.crashLocalVoltDB("Failed to generate empty catalog.");
                             }
@@ -362,7 +364,8 @@ public class Inits {
             byte[] catalogJarHash = null;
             try {
                 Pair<InMemoryJarfile, String> loadResults =
-                    CatalogUtil.loadAndUpgradeCatalogFromJar(catalogStuff.catalogBytes);
+                    CatalogUtil.loadAndUpgradeCatalogFromJar(catalogStuff.catalogBytes,
+                                                             DrRoleType.XDCR.value().equals(m_rvdb.getCatalogContext().getCluster().getDrrole()));
                 serializedCatalog =
                     CatalogUtil.getSerializedCatalogStringFromJar(loadResults.getFirst());
                 catalogJarBytes = loadResults.getFirst().getFullJarBytes();
@@ -379,16 +382,11 @@ public class Inits {
             catalog.execute(serializedCatalog);
             serializedCatalog = null;
 
-            String result = CatalogUtil.checkLicenseConstraint(catalog, m_rvdb.getLicenseApi());
-            if (result != null) {
-                VoltDB.crashLocalVoltDB(result);
-            }
-
             // note if this fails it will print an error first
             // This is where we compile real catalog and create runtime
             // catalog context. To validate deployment we compile and create
             // a starter context which uses a placeholder catalog.
-            result = CatalogUtil.compileDeployment(catalog, m_deployment, false);
+            String result = CatalogUtil.compileDeployment(catalog, m_deployment, false);
             if (result != null) {
                 VoltDB.crashLocalVoltDB(result);
             }
@@ -429,7 +427,7 @@ public class Inits {
 
                 if (!MiscUtils.validateLicense(m_rvdb.getLicenseApi(),
                                                m_rvdb.m_clusterSettings.get().hostcount(),
-                                               m_rvdb.getReplicationRole()))
+                                               DrRoleType.fromValue(m_rvdb.getCatalogContext().getCluster().getDrrole())))
                 {
                     // validateLicense logs. Exit call is here for testability.
                     VoltDB.crashGlobalVoltDB("VoltDB license constraints are not met.", false, null);
@@ -601,6 +599,7 @@ public class Inits {
 
     class SetupReplicationRole extends InitWork {
         SetupReplicationRole() {
+            dependsOn(LoadCatalog.class);
         }
 
         @Override
@@ -608,7 +607,6 @@ public class Inits {
             try {
                 JSONStringer js = new JSONStringer();
                 js.object();
-                js.keySymbolValuePair("role", m_config.m_replicationRole.ordinal());
                 js.keySymbolValuePair("active", m_rvdb.getReplicationActive());
                 js.endObject();
 
@@ -626,23 +624,11 @@ public class Inits {
                     String discoveredReplicationConfig =
                         new String(zk.getData(VoltZK.replicationconfig, false, null), "UTF-8");
                     JSONObject discoveredjsObj = new JSONObject(discoveredReplicationConfig);
-                    ReplicationRole discoveredRole = ReplicationRole.get((byte) discoveredjsObj.getLong("role"));
-                    if (!discoveredRole.equals(m_config.m_replicationRole)) {
-                        VoltDB.crashGlobalVoltDB("Discovered replication role " + discoveredRole +
-                                " doesn't match locally specified replication role " + m_config.m_replicationRole,
-                                true, null);
-                    }
-
-                    // See if we should bring the server up in WAN replication mode
-                    m_rvdb.setReplicationRole(discoveredRole);
                 } else {
                     String discoveredReplicationConfig =
                             new String(zk.getData(VoltZK.replicationconfig, false, null), "UTF-8");
                     JSONObject discoveredjsObj = new JSONObject(discoveredReplicationConfig);
-                    ReplicationRole discoveredRole = ReplicationRole.get((byte) discoveredjsObj.getLong("role"));
                     boolean replicationActive = discoveredjsObj.getBoolean("active");
-                    // See if we should bring the server up in WAN replication mode
-                    m_rvdb.setReplicationRole(discoveredRole);
                     m_rvdb.setReplicationActive(replicationActive);
                 }
             } catch (Exception e) {
@@ -814,7 +800,8 @@ public class Inits {
                                 }
                                 // upgrade the catalog - the following will save the recpmpiled catalog
                                 // under voltdbroot/catalog-[serverVersion].jar
-                                CatalogUtil.loadAndUpgradeCatalogFromJar(catalogBytes);
+                                CatalogUtil.loadAndUpgradeCatalogFromJar(catalogBytes,
+                                                                         DrRoleType.XDCR.value().equals(m_rvdb.getCatalogContext().getCluster().getDrrole()));
                                 NodeSettings pathSettings = m_rvdb.m_nodeSettings;
                                 File recoverCatalogFH = new File(pathSettings.getVoltDBRoot(), "catalog-" + serverVersion + ".jar");
                                 catalogPath = recoverCatalogFH.getPath();

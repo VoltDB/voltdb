@@ -139,6 +139,7 @@ public class ParsedColInfo implements Cloneable {
                     (child.name.equals("win_aggregation") == false) &&
                     (child.name.equals("function") == false) &&
                     (child.name.equals("rank") == false) &&
+                    (child.name.equals("value") == false) &&
                     (child.name.equals("columnref") == false)) {
                throw new RuntimeException(
                        "ORDER BY parsed with strange child node type: " +

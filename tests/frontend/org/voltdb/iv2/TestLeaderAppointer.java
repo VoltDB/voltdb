@@ -44,7 +44,6 @@ import org.voltcore.zk.LeaderElector;
 import org.voltcore.zk.ZKTestBase;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.AbstractTopology;
-import org.voltdb.MockVoltDB;
 import org.voltdb.ReplicationRole;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
@@ -81,6 +80,9 @@ public class TestLeaderAppointer extends ZKTestBase {
     @Before
     public void setUp() throws Exception
     {
+        final VoltDBInterface mock = mock(VoltDBInterface.class);
+        when(mock.getReplicationRole()).thenReturn(ReplicationRole.NONE);
+        VoltDB.replaceVoltDBInstanceForTest(mock);
         VoltDB.ignoreCrash = false;
         VoltDB.wasCrashCalled = false;
         setUpZK(NUM_AGREEMENT_SITES);
@@ -136,7 +138,7 @@ public class TestLeaderAppointer extends ZKTestBase {
         KSafetyStats stats = new KSafetyStats();
         m_dut = new LeaderAppointer(m_hm, m_topo.getPartitionCount(),
                 m_kfactor,
-                null, m_topo.topologyToJSON(), m_mpi, stats, false);
+                m_topo.topologyToJSON(), m_mpi, stats, false);
         m_dut.onReplayCompletion();
     }
 
@@ -284,7 +286,6 @@ public class TestLeaderAppointer extends ZKTestBase {
         m_dut = new LeaderAppointer(m_hm,
                                     m_topo.getPartitionCount(),
                                     m_kfactor,
-                                    null,
                                     m_topo.topologyToJSON(),
                                     m_mpi,
                                     new KSafetyStats(),
@@ -535,7 +536,6 @@ public class TestLeaderAppointer extends ZKTestBase {
         m_dut = new LeaderAppointer(m_hm,
                                     m_topo.getPartitionCount(),
                                     m_kfactor,
-                                    null,
                                     m_topo.topologyToJSON(),
                                     m_mpi,
                                     new KSafetyStats(),

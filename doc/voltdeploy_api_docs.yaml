@@ -985,13 +985,6 @@ definitions:
     description: Schema of object passed while updating the deployment.
     type: object
     properties:
-      admin-mode:
-        type: object
-        properties:
-          adminstartup:
-            type: boolean
-          port:
-            type: integer
       cluster:
         type: object
         properties:
@@ -1096,11 +1089,6 @@ definitions:
         properties:
           enabled:
             type: boolean
-          snapshot:
-            type: object
-            properties:
-              prefix:
-                type: string
 
       paths:
         type: object
@@ -1232,13 +1220,6 @@ definitions:
       deployment:
         type: object
         properties:
-          admin-mode:
-            type: object
-            properties:
-              adminstartup:
-                type: boolean
-              port:
-                type: integer
           cluster:
             type: object
             properties:
@@ -1554,13 +1535,6 @@ definitions:
             deployment:
               type: object
               properties:
-                admin-mode:
-                  type: object
-                  properties:
-                    adminstartup:
-                      type: boolean
-                    port:
-                      type: integer
                 cluster:
                   type: object
                   properties:

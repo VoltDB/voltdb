@@ -323,36 +323,8 @@ schema = {
             "id": "partitionDetection",
             "type": "object",
             "properties": {
-                "snapshot": {
-                    "id": "snapshot",
-                    "type": "object",
-                    "properties": {
-                        "prefix": {
-                            "id": "prefix",
-                            "type": "string"
-                        }
-                    },
-                    "additionalProperties": False
-                },
                 "enabled": {
                     "id": "enabled",
-                    "type": "boolean"
-                }
-            },
-            "additionalProperties": False
-        },
-        "admin-mode": {
-            "id": "admin-mode",
-            "type": "object",
-            "properties": {
-                "port": {
-                    "id": "port",
-                    "type": "integer",
-                    "minimum": 1,
-                    "maximum": 65536
-                },
-                "adminstartup": {
-                    "id": "adminstartup",
                     "type": "boolean"
                 }
             },

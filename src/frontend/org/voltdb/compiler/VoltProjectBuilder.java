@@ -50,6 +50,7 @@ import org.voltdb.compiler.deploymentfile.ConnectionType;
 import org.voltdb.compiler.deploymentfile.ConsistencyType;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.DiskLimitType;
+import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.compiler.deploymentfile.DrType;
 import org.voltdb.compiler.deploymentfile.ExportConfigurationType;
 import org.voltdb.compiler.deploymentfile.ExportType;
@@ -316,6 +317,7 @@ public class VoltProjectBuilder {
 
     private String m_drMasterHost;
     private Boolean m_drProducerEnabled = null;
+    private DrRoleType m_drRole = DrRoleType.MASTER;
 
     public VoltProjectBuilder setQueryTimeout(int target) {
         m_queryTimeout = target;
@@ -750,6 +752,18 @@ public class VoltProjectBuilder {
         m_drProducerEnabled = false;
     }
 
+    public void setDrNone() {
+        m_drRole = DrRoleType.NONE;
+    }
+
+    public void setDrReplica() {
+        m_drRole = DrRoleType.REPLICA;
+    }
+
+    public void setXDCR() {
+        m_drRole = DrRoleType.XDCR;
+    }
+
     /**
      * Override the procedure annotation with the specified values for a
      * specified procedure.
@@ -804,7 +818,7 @@ public class VoltProjectBuilder {
             final int replication,
             final String voltRoot,
             final int clusterId) {
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         if (compile(compiler, jarPath, voltRoot,
                        new DeploymentInfo(hostCount, sitesPerHost, replication, clusterId),
                        m_ppdEnabled, m_snapshotPath, m_ppdPrefix)) {
@@ -821,7 +835,7 @@ public class VoltProjectBuilder {
             final boolean ppdEnabled, final String snapshotPath,
             final String ppdPrefix)
     {
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         return compile(compiler, jarPath, voltRoot,
                        new DeploymentInfo(hostCount, sitesPerHost, replication, clusterId),
                        ppdEnabled, snapshotPath, ppdPrefix);
@@ -924,7 +938,7 @@ public class VoltProjectBuilder {
      * @return true if successful
      */
     public boolean compileWithDefaultDeployment(final String jarPath) {
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         return compile(compiler, jarPath, null, null, m_ppdEnabled, m_snapshotPath, m_ppdPrefix);
     }
 
@@ -1237,6 +1251,7 @@ public class VoltProjectBuilder {
         DrType dr = factory.createDrType();
         deployment.setDr(dr);
         dr.setListen(m_drProducerEnabled);
+        dr.setRole(m_drRole);
         if (m_drMasterHost != null && !m_drMasterHost.isEmpty()) {
             ConnectionType conn = factory.createConnectionType();
             dr.setConnection(conn);

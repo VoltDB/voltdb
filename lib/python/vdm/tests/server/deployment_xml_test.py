@@ -127,9 +127,6 @@ class XML(Database):
                     if subnode.tag == "resourcemonitor":
                         for supersubnode in subnode:
                             self.assertEqual(supersubnode.attrib['size'], "80%")
-            if child.tag == "admin-mode":
-                self.assertEqual(child.attrib['adminstartup'], "false")
-                self.assertEqual(child.attrib['port'], "21211")
             if child.tag == "cluster":
                 self.assertEqual(child.attrib['elastic'], "enabled")
                 self.assertEqual(child.attrib['hostcount'], "0")
@@ -146,8 +143,6 @@ class XML(Database):
                 self.assertEqual(child.attrib['provider'], "hash")
             if child.tag == "partition-detection":
                 self.assertEqual(child.attrib['enabled'], "true")
-                for subnode in child:
-                    self.assertEqual(subnode.attrib['prefix'], "voltdb_partition_detection")
 
 
 class Deployment(unittest.TestCase):
@@ -175,9 +170,8 @@ class Deployment(unittest.TestCase):
                       "exportoverflow":
                           {"path": "export_overflow"}, "commandlog": {"path": "command_logtest"},
                       "commandlogsnapshot": {"path": "command_log_snapshot"}},
-            "partition-detection": {"snapshot": {"prefix": "voltdb_partition_detection"},
-                                    "enabled": True},
-            "admin-mode": {"port": 21211, "adminstartup": False}, "heartbeat": {"timeout": 90},
+            "partition-detection": {"enabled": True},
+            "heartbeat": {"timeout": 90},
             "httpd": {"jsonapi": {"enabled": True}, "port": 8080, "enabled": True},
             "snapshot": {"frequency": "1h", "retain": 1,
                          "prefix": "AUTOSNAP", "enabled": False},
@@ -273,9 +267,6 @@ class UpdateDeployment(Deployment):
                         for supersubnode in subnode:
                             if supersubnode == "memorylimit":
                                 self.assertEqual(supersubnode.attrib['size'], "1")
-            if child.tag == "admin-mode":
-                self.assertEqual(child.attrib['adminstartup'], "false")
-                self.assertEqual(child.attrib['port'], "21211")
             if child.tag == "cluster":
                 self.assertEqual(child.attrib['elastic'], "enabled")
                 self.assertEqual(child.attrib['kfactor'], "0")
@@ -286,9 +277,6 @@ class UpdateDeployment(Deployment):
                 self.assertEqual(child.attrib['provider'], "HASH")
             if child.tag == "partition-detection":
                 self.assertEqual(child.attrib['enabled'], "true")
-                for subnode in child:
-                    self.assertEqual(subnode.attrib['prefix'], "voltdb_partition_detection")
-
 
 if __name__ == '__main__':
     unittest.main(testRunner=xmlrunner.XMLTestRunner(output='test-reports'))
