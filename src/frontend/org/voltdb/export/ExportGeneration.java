@@ -749,17 +749,8 @@ public class ExportGeneration implements Generation {
         shutdown = true;
         //We need messenger NULL guard for tests.
         if (m_mbox != null && messenger != null) {
-            for (Integer partition : m_dataSourcesByPartition.keySet()) {
-                final String partitionDN =  m_mailboxesZKPath + "/" + partition;
-                try {
-                    ZKUtil.deleteRecursively(messenger.getZK(), partitionDN);
-                } catch (InterruptedException | KeeperException ex) {
-                    exportLog.warn("Failed to delete generation partition mailboxes from zookeeper.", ex);
-                }
-            }
             messenger.removeMailbox(m_mbox);
         }
-        m_dataSourcesByPartition.clear();
         m_onAllSourcesDrained = null;
     }
 
