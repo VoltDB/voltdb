@@ -655,6 +655,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             public void run() {
                 try {
                     m_committedBuffers.closeAndDelete();
+                    m_ackMailboxRefs.set(null);
                 } catch(IOException e) {
                     exportLog.rateLimitedLog(60, Level.WARN, e, "Error closing commit buffers");
                 } finally {
@@ -674,6 +675,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             public void run() {
                 try {
                     m_committedBuffers.close();
+                    m_ackMailboxRefs.set(null);
                 } catch (IOException e) {
                     exportLog.error(e);
                 } finally {
