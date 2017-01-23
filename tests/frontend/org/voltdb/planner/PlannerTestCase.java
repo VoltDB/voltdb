@@ -507,6 +507,18 @@ public class PlannerTestCase extends TestCase {
         assertEquals(replicatedTable, seqScan.getTargetTableName().toUpperCase());
     }
 
+    // Print a tree of plan nodes by type.
+    protected void printPlanNodes(String sql, AbstractPlanNode root, int fragmentNumber) {
+        System.out.printf("Plan for fragment %d of <%s>\n", fragmentNumber, sql);
+        for (;root != null;
+                root = (root.getChildCount() > 0) ? root.getChild(0) : null) {
+            System.out.printf("  Node type %s\n", root.getPlanNodeType());
+            for (int idx = 1; idx < root.getChildCount(); idx += 1) {
+                System.out.printf("    Child %d: %s\n", idx, root.getChild(idx).getPlanNodeType());
+            }
+        }
+    }
+
     /**
      * Assert that an expression tree contains the expected types of expressions
      * in the order listed, assuming a top-down left-to-right depth-first

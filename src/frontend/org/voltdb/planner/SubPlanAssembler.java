@@ -1362,7 +1362,6 @@ public abstract class SubPlanAssembler {
                 m_isDead = true;
                 return;
             }
-            m_unmatchedOrderByCursor += 1;
             // NOTABENE: This is really the important part of
             //           this function.
             List<AbstractExpression> moreBindings
@@ -1374,6 +1373,9 @@ public abstract class SubPlanAssembler {
                 // list and add the bindings to the bindings list.
                 m_orderedMatchingExpressions.add(nextStatementEOC.m_expr);
                 m_bindings.addAll(moreBindings);
+                // Look at the next expression, since we matched
+                // this one.
+                m_unmatchedOrderByCursor += 1;
                 return;
             }
             // No Bindings were found.  Mark this as a
@@ -1669,10 +1671,10 @@ public abstract class SubPlanAssembler {
         assert(nextStatementEOC.m_expr != null);
         AbstractExpression nextStatementExpr = nextStatementEOC.m_expr;
         if (indexEntry.m_colRef != null) {
-            ColumnRef nextColRef = indexEntry.m_colRef;
+            ColumnRef indexColRef = indexEntry.m_colRef;
             // This is a column.  So try to match it
             // with the expression in nextStatementEOC.
-            if (matchExpressionAndColumnRef(nextStatementExpr, nextColRef, indexEntry.m_tableScan)) {
+            if (matchExpressionAndColumnRef(nextStatementExpr, indexColRef, indexEntry.m_tableScan)) {
                 return m_emptyBindings;
             }
             return null;
@@ -1687,12 +1689,12 @@ public abstract class SubPlanAssembler {
     }
 
     private boolean matchExpressionAndColumnRef(AbstractExpression statementExpr,
-                                                ColumnRef          colRef,
+                                                ColumnRef          indexColRef,
                                                 StmtTableScan      tableScan) {
         if (statementExpr instanceof TupleValueExpression) {
             TupleValueExpression tve = (TupleValueExpression)statementExpr;
             if (tve.getTableAlias().equals(tableScan.getTableAlias()) &&
-                    tve.getColumnName().equals(colRef.getColumn().getTypeName())) {
+                    tve.getColumnName().equals(indexColRef.getColumn().getTypeName())) {
                 // NB: m_emptyBindings is a null list.  That means
                 //     we matched, but with no bindings.
                 return true;

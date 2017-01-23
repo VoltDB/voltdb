@@ -551,71 +551,101 @@ public class TestWindowedFunctions extends PlannerTestCase {
     }
 
     /**
-     * Validate a plan.  Just look at plan node types of the first
-     * children.
+     * Validate a plan, ignoring inline nodes.  This is kind of like
+     * PlannerTestCase.compileToTopDownTree.  The differences are
+     * <ol>
+     *   <li>We only look out out-of-line nodes, and</li>
+     *   <li>We can compile MP plans.</li>
+     * </ol>
      *
      * @param SQL
      * @param numberOutputSchemaColumns
      * @param types
      */
     public void validatePlan(String SQL,
-                             int numberOutputSchemaColumns, // Not Used.
+                             int numberOfFragments,
                              PlanNodeType ...types) {
-        AbstractPlanNode plan = compile(SQL);
-        int nchildren = types.length;
-        for (int idx = 0; idx < nchildren; idx += 1) {
-            assertEquals(types[idx], plan.getPlanNodeType());
-            if (plan.getChildCount() > 0) {
+        // compileToTopDownTree(SQL, numberOutputSchemaColumns, types);
+        List<AbstractPlanNode> fragments = compileToFragments(SQL);
+        assertEquals(String.format("Expected %d fragments, not %d",
+                                   numberOfFragments,
+                                   fragments.size()),
+                     numberOfFragments,
+                     fragments.size());
+        int idx = -1;
+        int fragment = 0;
+        // The index of the last PlanNodeType in types.
+        int nchildren = types.length - 1;
+        for (AbstractPlanNode plan : fragments) {
+            printPlanNodes(SQL, plan, fragment);
+            for (idx += 1; plan.getChildCount() > 0; idx += 1) {
+                assertEquals(types[idx], plan.getPlanNodeType());
                 plan = plan.getChild(0);
-            } else {
-                break;
             }
         }
+        assertEquals(nchildren, idx);
     }
 
     // These two are to disable tests which are
     // not currently working.
     private static boolean INDEX_FIXED = false;
-    private static boolean FIX15 = true;
     // These two can be used to disable particular tests.
     // Change "if (IS_ENABLED) { ... }" to "if (ISNOT_ENABLED) { ... }"
     // below.
-    private static boolean IS_ENABLED = false;
+    private static boolean IS_ENABLED = true;
     private static boolean ISNOT_ENABLED = false;
 
+    /**
+     * There is some theory here.  There are four ranges of variation
+     * in these tests.  They are:
+     * <ol>
+     *   <li>Does the statement have a Statement Level Order By, or SLOB?</li>
+     *   <li>Does the statement have a window function, or WF?</li>
+     *   <li>Is the statement MP or SP?</li>
+     *   <li>Can the statement use an index?  This can have some variation
+     *       itself:
+     *       <ol>
+     *         <li>Can the statement use an index at all?</li>
+     *         <li>Can the statement use an index for a WF but not an SLOB,
+     *             or for an SLOB but not a WF or for both?
+     *         <li>Is there an index which can be used, say for a filter, but
+     *             but not for an SLOB or a WF?
+     *       </ol>
+     *   </li>
+     * </ol>
+     */
     public void testWindowFunctionWithIndex() {
         // echo  1: No SLOB, No WF, SP Query, noindex
         // echo     Expect SeqScan
         // explain select * from vanilla;
         if (IS_ENABLED) {
-            compileToTopDownTree(
-                                 "select * from vanilla",
-                                 3,
-                                 PlanNodeType.SEND,
-                                 PlanNodeType.SEQSCAN
-                                 );
+            validatePlan("select * from vanilla",
+                         1,
+                         PlanNodeType.SEND,
+                         PlanNodeType.SEQSCAN
+                         );
         }
         // echo  2: No SLOB, No WF, MP Query, noindex
         // echo     Expect RECV -> SEND -> SeqScan
         // explain select * from vanilla_pa;
         if (IS_ENABLED) {
-            compileToTopDownTree("select * from vanilla_pa",
-                                 3,
-                                 PlanNodeType.SEND,
-                                 PlanNodeType.PROJECTION,
-                                 PlanNodeType.RECEIVE,
-                                 PlanNodeType.SEND,
-                                 PlanNodeType.SEQSCAN);
+            validatePlan("select * from vanilla_pa",
+                         2,
+                         PlanNodeType.SEND,
+                         PlanNodeType.PROJECTION,
+                         PlanNodeType.RECEIVE,
+                         PlanNodeType.SEND,
+                         PlanNodeType.SEQSCAN);
         }
 
         // echo  3: No SLOB, No WF, SP Query, index(NONEIndex)
         // echo     Expect IndxScan
         // explain select * from vanilla_idx where a = 1;
         if (IS_ENABLED) {
-            compileToTopDownTree("select * from vanilla_idx where a = 1",
-                                 3,
-                                 PlanNodeType.SEND,
-                                 PlanNodeType.INDEXSCAN);
+            validatePlan("select * from vanilla_idx where a = 1",
+                         1,
+                         PlanNodeType.SEND,
+                         PlanNodeType.INDEXSCAN);
         }
 
         // -- Force us to use the index on column vanilla_pb_idx.a
@@ -624,377 +654,378 @@ public class TestWindowedFunctions extends PlannerTestCase {
         // echo     Expect RECV -> SEND -> IndxScan
         // explain select * from vanilla_pb_idx where a = 1;
         if (IS_ENABLED) {
-            compileToTopDownTree("select * from vanilla_pb_idx where a = 1",
-                                 3,
-                                 PlanNodeType.SEND,
-                                 PlanNodeType.PROJECTION,
-                                 PlanNodeType.RECEIVE,
-                                 PlanNodeType.SEND,
-                                 PlanNodeType.INDEXSCAN);
+            validatePlan("select * from vanilla_pb_idx where a = 1",
+                         2,
+                         PlanNodeType.SEND,
+                         PlanNodeType.PROJECTION,
+                         PlanNodeType.RECEIVE,
+                         PlanNodeType.SEND,
+                         PlanNodeType.INDEXSCAN);
         }
         // echo  5: No SLOB, One WF, SP Query, noindex
         // echo     Expect WinFun -> OrderBy -> SeqScan
         // explain select a, b, max(b) over ( partition by a ) from vanilla;
         if (IS_ENABLED) {
-            compileToTopDownTree("select a, b, max(b) over ( partition by a ) from vanilla;",
-                                 3,
-                                 PlanNodeType.SEND,
-                                 PlanNodeType.PROJECTION,
-                                 PlanNodeType.WINDOWFUNCTION,
-                                 PlanNodeType.ORDERBY,
-                                 PlanNodeType.SEQSCAN);
+            validatePlan("select a, b, max(b) over ( partition by a ) from vanilla;",
+                         1,
+                         PlanNodeType.SEND,
+                         PlanNodeType.PROJECTION,
+                         PlanNodeType.WINDOWFUNCTION,
+                         PlanNodeType.ORDERBY,
+                         PlanNodeType.SEQSCAN);
         }
         // echo  6: No SLOB, One WF, MP Query, noindex
         // echo     Expect WinFun -> OrderBy -> RECV -> SEND -> SeqScan
         // explain select a, b, max(b) over ( partition by a ) from vanilla_pa;
         if (IS_ENABLED) {
-            compileToTopDownTree("select a, b, max(b) over ( partition by a ) from vanilla_pa;",
-                                 3,
-                                 PlanNodeType.SEND,
-                                 PlanNodeType.PROJECTION,
-                                 PlanNodeType.WINDOWFUNCTION,
-                                 PlanNodeType.ORDERBY,
-                                 PlanNodeType.RECEIVE,
-                                 PlanNodeType.SEND,
-                                 PlanNodeType.SEQSCAN);
+            validatePlan("select a, b, max(b) over ( partition by a ) from vanilla_pa;",
+                         2,
+                         PlanNodeType.SEND,
+                         PlanNodeType.PROJECTION,
+                         PlanNodeType.WINDOWFUNCTION,
+                         PlanNodeType.ORDERBY,
+                         PlanNodeType.RECEIVE,
+                         PlanNodeType.SEND,
+                         PlanNodeType.SEQSCAN);
         }
         // echo  7: No SLOB, one WF, SP Query, index (Can order the WF)
         // echo     Expect WinFun -> IndxScan
         // explain select a, b, max(b) over ( partition by a ) from vanilla_idx where a = 1;
         if (INDEX_FIXED) {
-            compileToTopDownTree("select a, b, max(b) over ( partition by a ) from vanilla_idx where a = 1;",
-                                 3,
-                                 PlanNodeType.SEND,
-                                 PlanNodeType.PROJECTION,
-                                 PlanNodeType.WINDOWFUNCTION,
-                                 PlanNodeType.INDEXSCAN);
+            validatePlan("select a, b, max(b) over ( partition by a ) from vanilla_idx where a = 1;",
+                         1,
+                         PlanNodeType.SEND,
+                         PlanNodeType.PROJECTION,
+                         PlanNodeType.WINDOWFUNCTION,
+                         PlanNodeType.INDEXSCAN);
         }
         // echo  7a: No SLOB, one WF, SP Query, index (Only to order the WF)
         // echo     Expect WinFun -> IndxScan
         // explain select a, b, max(b) over ( partition by a ) from vanilla_idx;
         if (INDEX_FIXED) {
-            compileToTopDownTree("select a, b, max(b) over ( partition by a ) from vanilla_idx;",
-                                 3,
-                                 PlanNodeType.SEND,
-                                 PlanNodeType.PROJECTION,
-                                 PlanNodeType.WINDOWFUNCTION,
-                                 PlanNodeType.INDEXSCAN);
+            validatePlan("select a, b, max(b) over ( partition by a ) from vanilla_idx;",
+                         1,
+                         PlanNodeType.SEND,
+                         PlanNodeType.PROJECTION,
+                         PlanNodeType.WINDOWFUNCTION,
+                         PlanNodeType.INDEXSCAN);
         }
         // echo  8: No SLOB, one WF, MP Query, index (Can order the WF)
         // echo     Expect WinFun -> MrgRecv(WF) -> SEND -> IndxScan
         // explain select a, b, max(b) over ( partition by a ) from vanilla_pb_idx where a = 1;
         if (IS_ENABLED) {
-            compileToTopDownTree("select a, b, max(b) over ( partition by a ) from vanilla_pb_idx where a = 1;",
-                                 3,
-                                 PlanNodeType.SEND,
-                                 PlanNodeType.PROJECTION,
-                                 PlanNodeType.WINDOWFUNCTION,
-                                 PlanNodeType.MERGERECEIVE, // (WF),
-                                 PlanNodeType.SEND,
-                                 PlanNodeType.INDEXSCAN);
+            validatePlan("select a, b, max(b) over ( partition by a ) from vanilla_pb_idx where a = 1;",
+                         2,
+                         PlanNodeType.SEND,
+                         PlanNodeType.PROJECTION,
+                         PlanNodeType.WINDOWFUNCTION,
+                         PlanNodeType.MERGERECEIVE, // (WF),
+                         PlanNodeType.SEND,
+                         PlanNodeType.INDEXSCAN);
         }
         // echo  8a: No SLOB, one WF, MP Query, index (Only to order the WF)
         // echo     Expect WinFun -> MrgRecv(WF) -> SEND -> IndxScan
         // explain select a, b, max(b) over ( partition by a ) from vanilla_pb_idx;
-        if (IS_ENABLED) {
-            compileToTopDownTree("select a, b, max(b) over ( partition by a ) from vanilla_pb_idx;",
-                                 3,
-                                 PlanNodeType.SEND,
-                                 PlanNodeType.PROJECTION,
-                                 PlanNodeType.WINDOWFUNCTION,
-                                 PlanNodeType.MERGERECEIVE, // WF
-                                 PlanNodeType.SEND,
-                                 PlanNodeType.INDEXSCAN);
+        if (INDEX_FIXED) {
+            validatePlan("select a, b, max(b) over ( partition by a ) from vanilla_pb_idx;",
+                         2,
+                         PlanNodeType.SEND,
+                         PlanNodeType.PROJECTION,
+                         PlanNodeType.WINDOWFUNCTION,
+                         PlanNodeType.MERGERECEIVE, // WF
+                         PlanNodeType.SEND,
+                         PlanNodeType.INDEXSCAN);
         }
         // echo  9: No SLOB, one WF, SP Query, index (not for the WF)
         // echo     Expect WinFun -> OrderBy -> IndxScan
         // explain select a, b, max(b) over ( partition by b ) from vanilla_idx where a = 1;
         if (IS_ENABLED) {
-            compileToTopDownTree("select a, b, max(b) over ( partition by b ) from vanilla_idx where a = 1;",
-                                 3,
-                                 PlanNodeType.SEND,
-                                 PlanNodeType.PROJECTION,
-                                 PlanNodeType.WINDOWFUNCTION,
-                                 PlanNodeType.ORDERBY,
-                                 PlanNodeType.INDEXSCAN);
+            validatePlan("select a, b, max(b) over ( partition by b ) from vanilla_idx where a = 1;",
+                         1,
+                         PlanNodeType.SEND,
+                         PlanNodeType.PROJECTION,
+                         PlanNodeType.WINDOWFUNCTION,
+                         PlanNodeType.ORDERBY,
+                         PlanNodeType.INDEXSCAN);
         }
         // echo 10: No SLOB, one WF, MP Query, index (not for the WF)
         // echo     Expect WinFun -> OrderBy -> RECV -> SEND -> IndxScan
         // explain select a, b, max(b) over ( partition by b ) from vanilla_pb_idx where a = 1;
         if (IS_ENABLED) {
-            compileToTopDownTree("select a, b, max(b) over ( partition by b ) from vanilla_pb_idx where a = 1;",
-                                 3,
-                                 PlanNodeType.SEND,
-                                 PlanNodeType.PROJECTION,
-                                 PlanNodeType.WINDOWFUNCTION,
-                                 PlanNodeType.ORDERBY,
-                                 PlanNodeType.RECEIVE,
-                                 PlanNodeType.SEND,
-                                 PlanNodeType.INDEXSCAN);
+            validatePlan("select a, b, max(b) over ( partition by b ) from vanilla_pb_idx where a = 1;",
+                         2,
+                         PlanNodeType.SEND,
+                         PlanNodeType.PROJECTION,
+                         PlanNodeType.WINDOWFUNCTION,
+                         PlanNodeType.ORDERBY,
+                         PlanNodeType.RECEIVE,
+                         PlanNodeType.SEND,
+                         PlanNodeType.INDEXSCAN);
         }
         // echo 11: SLOB, No WF, SP Query, noindex
         // echo     Expect OrderBy(SLOB) -> SeqScan
         // explain select * from vanilla order by a;
         if (IS_ENABLED) {
-            compileToTopDownTree("select * from vanilla order by a;",
-                                 3,
-                                 PlanNodeType.SEND,
-                                 PlanNodeType.PROJECTION,
-                                 PlanNodeType.ORDERBY, // (SLOB)
-                                 PlanNodeType.SEQSCAN);
+            validatePlan("select * from vanilla order by a;",
+                         1,
+                         PlanNodeType.SEND,
+                         PlanNodeType.PROJECTION,
+                         PlanNodeType.ORDERBY, // (SLOB)
+                         PlanNodeType.SEQSCAN);
         }
         // echo 12: SLOB, No WF, MP Query, noindex
         // echo     Expect OrderBy(SLOB) -> RECV -> SEND -> SeqScan
         // explain select * from vanilla_pa order by b;
         if (IS_ENABLED) {
-            compileToTopDownTree("select * from vanilla_pa order by b;",
-                                 3,
-                                 PlanNodeType.SEND,
-                                 PlanNodeType.PROJECTION,
-                                 PlanNodeType.ORDERBY, // (SLOB),
-                                 PlanNodeType.RECEIVE,
-                                 PlanNodeType.SEND,
-                                 PlanNodeType.SEQSCAN);
+            validatePlan("select * from vanilla_pa order by b;",
+                         2,
+                         PlanNodeType.SEND,
+                         PlanNodeType.PROJECTION,
+                         PlanNodeType.ORDERBY, // (SLOB),
+                         PlanNodeType.RECEIVE,
+                         PlanNodeType.SEND,
+                         PlanNodeType.SEQSCAN);
         }
         // echo 13: SLOB, No WF, SP Query, index (Can order the SLOB)
         // echo     Expect PlanNodeType.INDEXSCAN
         // explain explain select * from vanilla_idx where a = 1 order by a;
         if (IS_ENABLED) {
-            compileToTopDownTree("select * from vanilla_idx where a = 1 order by a;",
-                                 3,
-                                 PlanNodeType.SEND,
-                                 PlanNodeType.INDEXSCAN);
+            validatePlan("select * from vanilla_idx where a = 1 order by a;",
+                         1,
+                         PlanNodeType.SEND,
+                         PlanNodeType.INDEXSCAN);
         }
         // echo 13a: SLOB, No WF, SP Query, index (only to order the SLOB)
         // echo     Expect PlanNodeType.INDEXSCAN
         // explain explain select * from vanilla_idx order by a;
         if (IS_ENABLED) {
-            compileToTopDownTree("select * from vanilla_idx order by a;",
-                                 3,
-                                 PlanNodeType.SEND,
-                                 PlanNodeType.INDEXSCAN);
+            validatePlan("select * from vanilla_idx order by a;",
+                         1,
+                         PlanNodeType.SEND,
+                         PlanNodeType.INDEXSCAN);
         }
         // echo 14: SLOB, No WF, MP Query, index (Can order the SLOB)
         // echo     Expect MrgRecv(SLOB) -> SEND -> IndxScan
         // explain select * from vanilla_pb_idx order by a;
         if (IS_ENABLED) {
-            compileToTopDownTree("select * from vanilla_pb_idx order by a;",
-                                 3,
-                                 PlanNodeType.SEND,
-                                 PlanNodeType.PROJECTION,
-                                 PlanNodeType.MERGERECEIVE, // SLOB
-                                 PlanNodeType.SEND,
-                                 PlanNodeType.INDEXSCAN);
+            validatePlan("select * from vanilla_pb_idx order by a;",
+                         2,
+                         PlanNodeType.SEND,
+                         PlanNodeType.PROJECTION,
+                         PlanNodeType.MERGERECEIVE, // SLOB
+                         PlanNodeType.SEND,
+                         PlanNodeType.INDEXSCAN);
         }
         // echo 14a: SLOB, No WF, MP Query, index (Only to order the SLOB)
         // echo     Expect MrgRecv(SLOB) -> SEND -> IndxScan
         // explain select * from vanilla_pb_idx where a = 1 order by a;
         if (IS_ENABLED) {
-            compileToTopDownTree("select * from vanilla_pb_idx where a = 1 order by a;",
-                                 3,
-                                 PlanNodeType.SEND,
-                                 PlanNodeType.PROJECTION,
-                                 PlanNodeType.MERGERECEIVE, // SLOB
-                                 PlanNodeType.SEND,
-                                 PlanNodeType.INDEXSCAN);
+            validatePlan("select * from vanilla_pb_idx where a = 1 order by a;",
+                         2,
+                         PlanNodeType.SEND,
+                         PlanNodeType.PROJECTION,
+                         PlanNodeType.MERGERECEIVE, // SLOB
+                         PlanNodeType.SEND,
+                         PlanNodeType.INDEXSCAN);
         }
         // echo 15: SLOB, No WF, SP Query, index (Cannot order the SLOB)
         // echo     Expect OrderBy(SLOB) -> IndxScan
         // explain select * from vanilla_idx where a = 1 order by b;
-        if (FIX15) {
-            compileToTopDownTree("select * from vanilla_idx where a = 1 order by b;",
-                                 3,
-                                 PlanNodeType.SEND,
-                                 PlanNodeType.ORDERBY, // (SLOB),
-                                 PlanNodeType.INDEXSCAN);
+        if (IS_ENABLED) {
+            validatePlan("select * from vanilla_idx where a = 1 order by b;",
+                         1,
+                         PlanNodeType.SEND,
+                         PlanNodeType.PROJECTION,
+                         PlanNodeType.ORDERBY, // (SLOB),
+                         PlanNodeType.INDEXSCAN);
         }
         // echo 16: SLOB, No WF, MP Query, index (Cannot order the SLOB)
         // echo     Expect OrderBy(SLOB) -> RECV -> SEND -> IndxScan
         // explain select * from vanilla_pb_idx where a = 1 order by b;
         if (IS_ENABLED) {
-            compileToTopDownTree("select * from vanilla_pb_idx where a = 1 order by b;",
-                                 3,
-                                 PlanNodeType.SEND,
-                                 PlanNodeType.PROJECTION,
-                                 PlanNodeType.ORDERBY, // (SLOB),
-                                 PlanNodeType.RECEIVE,
-                                 PlanNodeType.SEND,
-                                 PlanNodeType.INDEXSCAN);
+            validatePlan("select * from vanilla_pb_idx where a = 1 order by b;",
+                         2,
+                         PlanNodeType.SEND,
+                         PlanNodeType.PROJECTION,
+                         PlanNodeType.ORDERBY, // (SLOB),
+                         PlanNodeType.RECEIVE,
+                         PlanNodeType.SEND,
+                         PlanNodeType.INDEXSCAN);
         }
         // echo 17: SLOB, One WF, SP Query, index (Cannot order SLOB or WF)
         // echo     Expect OrderBy(SLOB) -> WinFun -> OrderBy(WF) -> IndxScan
         // explain select a, b, max(b) over (partition by b) from vanilla_idx where a = 1 order by c;
         if (IS_ENABLED) {
-            compileToTopDownTree("select a, b, max(b) over (partition by b) from vanilla_idx where a = 1 order by c;",
-                                 3,
-                                 PlanNodeType.SEND,
-                                 PlanNodeType.PROJECTION,
-                                 PlanNodeType.ORDERBY, // (SLOB),
-                                 PlanNodeType.WINDOWFUNCTION,
-                                 PlanNodeType.ORDERBY, // (WF),
-                                 PlanNodeType.INDEXSCAN);
+            validatePlan("select a, b, max(b) over (partition by b) from vanilla_idx where a = 1 order by c;",
+                         1,
+                         PlanNodeType.SEND,
+                         PlanNodeType.PROJECTION,
+                         PlanNodeType.ORDERBY, // (SLOB),
+                         PlanNodeType.WINDOWFUNCTION,
+                         PlanNodeType.ORDERBY, // (WF),
+                         PlanNodeType.INDEXSCAN);
         }
         // echo 18: SLOB, One WF, MP Query, index (Cannot order SLOB or WF)
         // echo     Expect OrderBy(SLOB) -> WinFun -> OrderBy(WF) -> RECV -> SEND -> IndxScan
         // explain select a, b, max(b) over ( partition by c ) from vanilla_pb_idx where a = 1 order by b;
         if (IS_ENABLED) {
-            compileToTopDownTree("select a, b, max(b) over ( partition by c ) from vanilla_pb_idx where a = 1 order by b;",
-                                 3,
-                                 PlanNodeType.SEND,
-                                 PlanNodeType.PROJECTION,
-                                 PlanNodeType.ORDERBY, // (SLOB),
-                                 PlanNodeType.WINDOWFUNCTION,
-                                 PlanNodeType.ORDERBY, // (WF),
-                                 PlanNodeType.RECEIVE,
-                                 PlanNodeType.SEND,
-                                 PlanNodeType.INDEXSCAN);
+            validatePlan("select a, b, max(b) over ( partition by c ) from vanilla_pb_idx where a = 1 order by b;",
+                         2,
+                         PlanNodeType.SEND,
+                         PlanNodeType.PROJECTION,
+                         PlanNodeType.ORDERBY, // (SLOB),
+                         PlanNodeType.WINDOWFUNCTION,
+                         PlanNodeType.ORDERBY, // (WF),
+                         PlanNodeType.RECEIVE,
+                         PlanNodeType.SEND,
+                         PlanNodeType.INDEXSCAN);
         }
         // echo 19: SLOB, one WF, SP Query, index (Can order the WF, Cannot order the SLOB)
         // echo     Expect OrderBy(SLOB) -> WinFun -> IndxScan
         // explain select a, b, max(b) over ( partition by a ) from vanilla_idx where a = 1 order by b;
         if (INDEX_FIXED) {
-            compileToTopDownTree("select a, b, max(b) over ( partition by a ) from vanilla_idx where a = 1 order by b;",
-                                 3,
-                                 PlanNodeType.SEND,
-                                 PlanNodeType.PROJECTION,
-                                 PlanNodeType.ORDERBY, // (SLOB),
-                                 PlanNodeType.WINDOWFUNCTION,
-                                 PlanNodeType.INDEXSCAN);
+            validatePlan("select a, b, max(b) over ( partition by a ) from vanilla_idx where a = 1 order by b;",
+                         1,
+                         PlanNodeType.SEND,
+                         PlanNodeType.PROJECTION,
+                         PlanNodeType.ORDERBY, // (SLOB),
+                         PlanNodeType.WINDOWFUNCTION,
+                         PlanNodeType.INDEXSCAN);
         }
         // echo 19a: SLOB, one WF, SP Query, index (Only to order the WF, not SLOB)
         // echo     Expect OrderBy(SLOB) -> WinFun -> IndxScan
         // explain select a, b, max(b) over ( partition by a ) from vanilla_idx order by b;
         if (INDEX_FIXED) {
-            compileToTopDownTree("select a, b, max(b) over ( partition by a ) from vanilla_idx order by b;",
-                                 3,
-                                 PlanNodeType.SEND,
-                                 PlanNodeType.PROJECTION,
-                                 PlanNodeType.ORDERBY, // (SLOB),
-                                 PlanNodeType.WINDOWFUNCTION,
-                                 PlanNodeType.INDEXSCAN);
+            validatePlan("select a, b, max(b) over ( partition by a ) from vanilla_idx order by b;",
+                         1,
+                         PlanNodeType.SEND,
+                         PlanNodeType.PROJECTION,
+                         PlanNodeType.ORDERBY, // (SLOB),
+                         PlanNodeType.WINDOWFUNCTION,
+                         PlanNodeType.INDEXSCAN);
         }
         // echo 20: SLOB, one WF, MP Query, index (Can order the WF, not SLOB)
         // echo     Expect OrderBy(SLOB) -> WinFun -> MrgRecv(WF) -> SEND -> IndxScan
         // explain select a, b, max(b) over ( partition by a ) from vanilla_pb_idx where a = 1 order by b;
         if (IS_ENABLED) {
-            compileToTopDownTree("select a, b, max(b) over ( partition by a ) from vanilla_pb_idx where a = 1 order by b;",
-                                 3,
-                                 PlanNodeType.SEND,
-                                 PlanNodeType.PROJECTION,
-                                 PlanNodeType.ORDERBY, // (SLOB),
-                                 PlanNodeType.WINDOWFUNCTION,
-                                 PlanNodeType.MERGERECEIVE, // WF
-                                 PlanNodeType.SEND,
-                                 PlanNodeType.INDEXSCAN);
+            validatePlan("select a, b, max(b) over ( partition by a ) from vanilla_pb_idx where a = 1 order by b;",
+                         2,
+                         PlanNodeType.SEND,
+                         PlanNodeType.PROJECTION,
+                         PlanNodeType.ORDERBY, // (SLOB),
+                         PlanNodeType.WINDOWFUNCTION,
+                         PlanNodeType.MERGERECEIVE, // WF
+                         PlanNodeType.SEND,
+                         PlanNodeType.INDEXSCAN);
         }
         // echo 20a: SLOB, one WF, MP Query, index (Can order the WF, not SLOB)
         // echo     Expect OrderBy(SLOB) -> WinFun -> MrgRecv(WF) -> SEND -> IndxScan
         // explain select a, b, max(b) over ( partition by a ) from vanilla_pb_idx order by b;
-        if (IS_ENABLED) {
-            compileToTopDownTree("select a, b, max(b) over ( partition by a ) from vanilla_pb_idx order by b;",
-                                 3,
-                                 PlanNodeType.SEND,
-                                 PlanNodeType.PROJECTION,
-                                 PlanNodeType.ORDERBY, // (SLOB),
-                                 PlanNodeType.WINDOWFUNCTION,
-                                 PlanNodeType.MERGERECEIVE, // WF
-                                 PlanNodeType.SEND,
-                                 PlanNodeType.INDEXSCAN);
+        if (INDEX_FIXED) {
+            validatePlan("select a, b, max(b) over ( partition by a ) from vanilla_pb_idx order by b;",
+                         2,
+                         PlanNodeType.SEND,
+                         PlanNodeType.PROJECTION,
+                         PlanNodeType.ORDERBY, // (SLOB),
+                         PlanNodeType.WINDOWFUNCTION,
+                         PlanNodeType.MERGERECEIVE, // WF
+                         PlanNodeType.SEND,
+                         PlanNodeType.INDEXSCAN);
         }
         // echo 21: SLOB, one WF, SP Query, index (Can order the SLOB, not WF)
         // echo     This is impossible, but this plan should be:
         // echo     Expect OrderBy(SLOB) -> WinFun -> OrderBy(WF) -> IndxScan
         // explain select a, b, max(b) over ( partition by b ) from vanilla_idx where a = 1 order by a;
         if (IS_ENABLED) {
-            compileToTopDownTree("select a, b, max(b) over ( partition by b ) from vanilla_idx where a = 1 order by a;",
-                                 3,
-                                 PlanNodeType.SEND,
-                                 PlanNodeType.PROJECTION,
-                                 PlanNodeType.ORDERBY, // (SLOB),
-                                 PlanNodeType.WINDOWFUNCTION,
-                                 PlanNodeType.ORDERBY, // (WF),
-                                 PlanNodeType.INDEXSCAN);
+            validatePlan("select a, b, max(b) over ( partition by b ) from vanilla_idx where a = 1 order by a;",
+                         1,
+                         PlanNodeType.SEND,
+                         PlanNodeType.PROJECTION,
+                         PlanNodeType.ORDERBY, // (SLOB),
+                         PlanNodeType.WINDOWFUNCTION,
+                         PlanNodeType.ORDERBY, // (WF),
+                         PlanNodeType.INDEXSCAN);
         }
         // echo 21a: SLOB, one WF, SP Query, index (Only to order the SLOB, not WF)
         // echo     This is impossible, but this plan should be:
         // echo     Expect OrderBy(SLOB) -> WinFun -> OrderBy(WF) -> IndxScan
         // explain select a, b, max(b) over ( partition by b ) from vanilla_idx order by a;
         if (IS_ENABLED) {
-            compileToTopDownTree("select a, b, max(b) over ( partition by b ) from vanilla_idx order by a;",
-                                 3,
-                                 PlanNodeType.SEND,
-                                 PlanNodeType.PROJECTION,
-                                 PlanNodeType.ORDERBY, // (SLOB),
-                                 PlanNodeType.WINDOWFUNCTION,
-                                 PlanNodeType.ORDERBY, // (WF),
-                                 PlanNodeType.INDEXSCAN);
+            validatePlan("select a, b, max(b) over ( partition by b ) from vanilla_idx order by a;",
+                         1,
+                         PlanNodeType.SEND,
+                         PlanNodeType.PROJECTION,
+                         PlanNodeType.ORDERBY, // (SLOB),
+                         PlanNodeType.WINDOWFUNCTION,
+                         PlanNodeType.ORDERBY, // (WF),
+                         PlanNodeType.INDEXSCAN);
         }
         // echo 22: SLOB, one WF, MP Query, noindex (Can order the SLOB, not WF)
         // echo     This is impossible, but this plan should be:
         // echo     Expect OrderBy(SLOB) -> WinFun -> OrderBy(WF) -> RECV -> SEND -> IndxScan
         // explain select a, b, max(b) over ( partition by b ) from vanilla_pb_idx where a = 1 order by a;
         if (IS_ENABLED) {
-            compileToTopDownTree("select a, b, max(b) over ( partition by b ) from vanilla_pb_idx where a = 1 order by a;",
-                                 3,
-                                 PlanNodeType.SEND,
-                                 PlanNodeType.PROJECTION,
-                                 PlanNodeType.ORDERBY, // (SLOB),
-                                 PlanNodeType.WINDOWFUNCTION,
-                                 PlanNodeType.ORDERBY, // (WF),
-                                 PlanNodeType.RECEIVE,
-                                 PlanNodeType.SEND,
-                                 PlanNodeType.INDEXSCAN);
+            validatePlan("select a, b, max(b) over ( partition by b ) from vanilla_pb_idx where a = 1 order by a;",
+                         2,
+                         PlanNodeType.SEND,
+                         PlanNodeType.PROJECTION,
+                         PlanNodeType.ORDERBY, // (SLOB),
+                         PlanNodeType.WINDOWFUNCTION,
+                         PlanNodeType.ORDERBY, // (WF),
+                         PlanNodeType.RECEIVE,
+                         PlanNodeType.SEND,
+                         PlanNodeType.INDEXSCAN);
         }
         // echo 22a: SLOB, one WF, MP Query, noindex (Only to order the SLOB, not WF)
         // echo     This is impossible, but this plan should be:
         // echo     Expect OrderBy(SLOB) -> WinFun -> OrderBy(WF) -> RECV -> SEND -> IndxScan
         // explain select a, b, max(b) over ( partition by b ) from vanilla_pb_idx order by a;
         if (IS_ENABLED) {
-            compileToTopDownTree("select a, b, max(b) over ( partition by b ) from vanilla_pb_idx order by a;",
-                                 3,
-                                 PlanNodeType.SEND,
-                                 PlanNodeType.PROJECTION,
-                                 PlanNodeType.ORDERBY, // (SLOB),
-                                 PlanNodeType.WINDOWFUNCTION,
-                                 PlanNodeType.ORDERBY, // (WF),
-                                 PlanNodeType.RECEIVE,
-                                 PlanNodeType.SEND,
-                                 PlanNodeType.INDEXSCAN);
+            validatePlan("select a, b, max(b) over ( partition by b ) from vanilla_pb_idx order by a;",
+                         2,
+                         PlanNodeType.SEND,
+                         PlanNodeType.PROJECTION,
+                         PlanNodeType.ORDERBY, // (SLOB),
+                         PlanNodeType.WINDOWFUNCTION,
+                         PlanNodeType.ORDERBY, // (WF),
+                         PlanNodeType.RECEIVE,
+                         PlanNodeType.SEND,
+                         PlanNodeType.INDEXSCAN);
         }
         // echo 23: SLOB, one WF, SP Query, index (Can order the WF and SLOB both)
         // echo     Expect WinFun -> IndxScan
         // explain select a, b, max(b) over ( partition by a ) from vanilla_idx where a = 1 order by a;
         if (INDEX_FIXED) {
-            compileToTopDownTree("select a, b, max(b) over ( partition by a ) from vanilla_idx where a = 1 order by a;",
-                                 3,
-                                 PlanNodeType.SEND,
-                                 PlanNodeType.PROJECTION,
-                                 PlanNodeType.WINDOWFUNCTION,
-                                 PlanNodeType.INDEXSCAN);
+            validatePlan("select a, b, max(b) over ( partition by a ) from vanilla_idx where a = 1 order by a;",
+                         1,
+                         PlanNodeType.SEND,
+                         PlanNodeType.PROJECTION,
+                         PlanNodeType.WINDOWFUNCTION,
+                         PlanNodeType.INDEXSCAN);
         }
         // echo 23a: SLOB, one WF, SP Query, index (Can order the WF and SLOB both)
         // echo     Expect WinFun -> IndxScan
         // explain select a, b, max(b) over ( partition by a ) from vanilla_idx order by a;
         if (INDEX_FIXED) {
-            compileToTopDownTree("select max(b) over ( partition by a ) from vanilla_idx order by a;",
-                                 3,
-                                 PlanNodeType.SEND,
-                                 PlanNodeType.PROJECTION,
-                                 PlanNodeType.WINDOWFUNCTION,
-                                 PlanNodeType.INDEXSCAN);
+            validatePlan("select max(b) over ( partition by a ) from vanilla_idx order by a;",
+                         1,
+                         PlanNodeType.SEND,
+                         PlanNodeType.PROJECTION,
+                         PlanNodeType.WINDOWFUNCTION,
+                         PlanNodeType.INDEXSCAN);
         }
         // echo 24: SLOB, one WF, MP Query, index (For the WF and SLOB both)
         // echo     Expect WinFun -> MrgRecv(SLOB or WF) -> SEND -> IndxScan
         // explain select max(b) over ( partition by a ) from vanilla_pb_idx where a = 1 order by a;
         if (INDEX_FIXED) {
-            compileToTopDownTree("select max(b) over ( partition by a ) from vanilla_pb_idx where a = 1 order by a;",
-                                 3,
-                                 PlanNodeType.SEND,
-                                 PlanNodeType.PROJECTION,
-                                 PlanNodeType.WINDOWFUNCTION,
-                                 PlanNodeType.MERGERECEIVE, // (SLOB or WF),
-                                 PlanNodeType.SEND,
-                                 PlanNodeType.INDEXSCAN);
+            validatePlan("select max(b) over ( partition by a ) from vanilla_pb_idx where a = 1 order by a;",
+                         2,
+                         PlanNodeType.SEND,
+                         PlanNodeType.PROJECTION,
+                         PlanNodeType.WINDOWFUNCTION,
+                         PlanNodeType.MERGERECEIVE, // (SLOB or WF),
+                         PlanNodeType.SEND,
+                         PlanNodeType.INDEXSCAN);
         }
     }
 
