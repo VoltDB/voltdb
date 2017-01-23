@@ -138,7 +138,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
                 = "create table mytable  (pkey integer, column2_integer integer);\n"
                 + "alter table mytable add column newcol varchar(50);\n";
 
-        final VoltCompiler compiler = new VoltCompiler();
+        final VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compiler.compileDDLString(simpleSchema1, testout_jar);
         assertTrue(success);
         verifyTableColumnType(compiler, "mytable", "newcol", VoltType.STRING);
@@ -151,7 +151,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
                 + "alter table mytable add column newcol varchar(50);\n"
                 + myproc;
 
-        final VoltCompiler compiler = new VoltCompiler();
+        final VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compiler.compileDDLString(simpleSchema1, testout_jar);
         assertTrue(success);
         verifyTableColumnType(compiler, "mytable", "newcol", VoltType.STRING);
@@ -164,7 +164,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
                 + "alter table mytable drop column column2_integer;\n"
                 + myproc;
 
-        final VoltCompiler compiler = new VoltCompiler();
+        final VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compiler.compileDDLString(simpleSchema1, testout_jar);
         assertFalse(success);
         //Failed to plan for statement
@@ -183,7 +183,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
                 + "alter table mytable drop column pkey;\n"
                 + myproc;
 
-        final VoltCompiler compiler = new VoltCompiler();
+        final VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compiler.compileDDLString(simpleSchema1, testout_jar);
         assertTrue(success);
         verifyTableColumnGone(compiler, "mytable", "pkey");
@@ -205,7 +205,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
                 + ";"
                 + "alter table v_mytable drop column column2_integer;\n";
 
-        final VoltCompiler compiler = new VoltCompiler();
+        final VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compiler.compileDDLString(simpleSchema1, testout_jar);
         assertFalse(success);
         //user lacks privilege or object not found: V_MYTABLE
@@ -234,7 +234,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
                 + ";"
                 + "alter table mytable drop column column2_integer;\n";
 
-        final VoltCompiler compiler = new VoltCompiler();
+        final VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compiler.compileDDLString(simpleSchema1, testout_jar);
         assertTrue(success);
         verifyTableColumnGone(compiler, "mytable", "column2_integer");
@@ -256,7 +256,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
                 + ";"
                 + "alter table mytable drop column pkey;\n";
 
-        final VoltCompiler compiler = new VoltCompiler();
+        final VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compiler.compileDDLString(simpleSchema1, testout_jar);
         assertFalse(success);
         //column is referenced in: PUBLIC.V_MYTABLE
@@ -285,7 +285,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
                 + ";"
                 + "alter table mytable drop column pkey cascade;\n";
 
-        final VoltCompiler compiler = new VoltCompiler();
+        final VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compiler.compileDDLString(simpleSchema1, testout_jar);
         assertTrue(success);
         verifyTableColumnGone(compiler, "mytable", "pkey");
@@ -307,7 +307,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
                 + ";"
                 + "alter table mytable alter column pkey VARCHAR(20);\n";
 
-        final VoltCompiler compiler = new VoltCompiler();
+        final VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compiler.compileDDLString(simpleSchema1, testout_jar);
         assertFalse(success);
         //dependent objects exist
@@ -336,7 +336,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
                 + ";"
                 + "alter table mytable alter column pkey VARCHAR(20);\n";
 
-        final VoltCompiler compiler = new VoltCompiler();
+        final VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compiler.compileDDLString(simpleSchema1, testout_jar);
         assertFalse(success);
         //dependent objects exist
@@ -365,7 +365,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
                 + ";"
                 + "alter table mytable alter column pkey smallint;\n";
 
-        final VoltCompiler compiler = new VoltCompiler();
+        final VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compiler.compileDDLString(simpleSchema1, testout_jar);
         assertFalse(success);
         //dependent objects exist - This should technically be ok as int to smallint with count should work....
@@ -385,7 +385,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
                 + "create unique index pkey_idx on mytable(pkey);\n"
                 + "alter table mytable drop column column2_integer;\n";
 
-        final VoltCompiler compiler = new VoltCompiler();
+        final VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compiler.compileDDLString(simpleSchema1, testout_jar);
         assertTrue(success);
         verifyTableColumnGone(compiler, "mytable", "column2_integer");
@@ -399,7 +399,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
                 + "alter table mytable drop column pkey;\n"
                 + "alter table mytable add column pkey integer;\n";
 
-        final VoltCompiler compiler = new VoltCompiler();
+        final VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compiler.compileDDLString(simpleSchema1, testout_jar);
         assertTrue(success);
         verifyTableColumnExists(compiler, "mytable", "pkey");
@@ -413,7 +413,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
                 + "create unique index pkey_idxx on mytable(column2_integer);\n" //This index should remain
                 + "alter table mytable drop column pkey;\n";
 
-        final VoltCompiler compiler = new VoltCompiler();
+        final VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compiler.compileDDLString(simpleSchema1, testout_jar);
         assertTrue(success);
         verifyTableColumnGone(compiler, "mytable", "pkey");
@@ -426,7 +426,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
                 = "create table mytable  (pkey integer, column2_integer integer);\n"
                 + "alter table mytable add column newcol varchar(0);\n";
 
-        final VoltCompiler compiler = new VoltCompiler();
+        final VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compiler.compileDDLString(simpleSchema1, testout_jar);
         assertFalse(success);
         //precision or scale out of range
@@ -444,7 +444,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
                 = "create table mytable  (pkey varchar(50), column2_integer integer);\n"
                 + "alter table mytable alter column pkey varchar(50) NOT NULL;\n";
 
-        final VoltCompiler compiler = new VoltCompiler();
+        final VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compiler.compileDDLString(simpleSchema1, testout_jar);
         assertTrue(success);
         // Check that constraint is now valid.
@@ -456,7 +456,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
                 = "create table mytable  (pkey varchar(50) NOT NULL, column2_integer integer);\n"
                 + "alter table mytable alter column pkey varchar(50) NOT NULL;\n";
 
-        final VoltCompiler compiler = new VoltCompiler();
+        final VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compiler.compileDDLString(simpleSchema1, testout_jar);
         assertTrue(success);
         // Check that constraint is still valid.
@@ -468,7 +468,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
                 = "create table mytable  (pkey integer, column2_integer integer);\n"
                 + "alter table mytable add column newcol varchar(" + String.valueOf(VoltType.MAX_VALUE_LENGTH + 1) + ");\n";
 
-        final VoltCompiler compiler = new VoltCompiler();
+        final VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compiler.compileDDLString(simpleSchema1, testout_jar);
         assertFalse(success);
         //> 1048576 char maximum.
@@ -486,7 +486,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
                 = "create table mytable  (pkey integer, column2 varchar(50));\n"
                 + "alter table mytable alter column column2 varchar(" + String.valueOf(VoltType.MAX_VALUE_LENGTH + 1) + ");\n";
 
-        final VoltCompiler compiler = new VoltCompiler();
+        final VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compiler.compileDDLString(simpleSchema1, testout_jar);
         assertFalse(success);
         //> 1048576 char maximum.
@@ -513,7 +513,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
         br.close();
         ddl1.append("alter table JUST_ENOUGH_WIDE_COLUMNS add column COL01022 INTEGER DEFAULT '0' NOT NULL;");
 
-        final VoltCompiler compiler = new VoltCompiler();
+        final VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compiler.compileDDLString(ddl1.toString(), testout_jar);
         assertFalse(success);
         //(max is 1024)
@@ -540,7 +540,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
         br.close();
         ddl1.append("alter table MANY_COLUMNS drop column COL01022;");
 
-        final VoltCompiler compiler = new VoltCompiler();
+        final VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compiler.compileDDLString(ddl1.toString(), testout_jar);
         assertTrue(success);
         verifyTableColumnGone(compiler, "MANY_COLUMNS", "COL01022");
@@ -549,14 +549,14 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
     public void testAlterTableRowLimit() throws IOException {
         //Just enough big row one byte over and we will fail to compile.
         String simpleSchema1 = "create table mytable (val1 varchar(1048572), val2 varchar(1048572));\n";
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         boolean success = compiler.compileDDLString(simpleSchema1, testout_jar);
         assertTrue(success);
 
         //Still over after alter
         simpleSchema1 = "create table mytable (val1 varchar(1048576), val2 varchar(1048576));"
                 + "alter table mytable alter column val1 varchar(1048572);\n";
-        compiler = new VoltCompiler();
+        compiler = new VoltCompiler(false);
         success = compiler.compileDDLString(simpleSchema1, testout_jar);
         assertFalse(success);
 
@@ -564,7 +564,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
         simpleSchema1 = "create table mytable (val1 varchar(1048576), val2 varchar(1048576));"
                 + "alter table mytable alter column val1 varchar(1048572);\n"
                 + "alter table mytable alter column val2 varchar(1048572);\n";
-        compiler = new VoltCompiler();
+        compiler = new VoltCompiler(false);
         success = compiler.compileDDLString(simpleSchema1, testout_jar);
         assertTrue(success);
 
@@ -573,7 +573,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
                 + "alter table mytable alter column val1 varchar(1048572);\n"
                 + "alter table mytable alter column val2 varchar(1048572);\n"
                 + "alter table mytable alter column val1 varchar(1048576);\n";
-        compiler = new VoltCompiler();
+        compiler = new VoltCompiler(false);
         success = compiler.compileDDLString(simpleSchema1, testout_jar);
         assertFalse(success);
     }
@@ -585,7 +585,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
                 + "create table ftable  (pkey integer, column2_integer integer UNIQUE);\n"
                 + "ALTER TABLE mytable ADD FOREIGN KEY (column2_integer) REFERENCES ftable(column2_integer);\n";
 
-        final VoltCompiler compiler = new VoltCompiler();
+        final VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compiler.compileDDLString(simpleSchema1, testout_jar);
         assertTrue(success);
         verifyTableColumnType(compiler, "mytable", "pkey", VoltType.INTEGER);
@@ -606,7 +606,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
                 = "create table mytable  (pkey integer, column2_integer integer);\n"
                 + "alter table mytablenonexistent add column newcol varchar(50);\n";
 
-        final VoltCompiler compiler = new VoltCompiler();
+        final VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compiler.compileDDLString(simpleSchema1, testout_jar);
         assertFalse(success);
         //type not found or user lacks privilege:
@@ -625,7 +625,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
                 + "drop table mytable;\n"
                 + "alter table mytable add column newcol varchar(50);\n";
 
-        final VoltCompiler compiler = new VoltCompiler();
+        final VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compiler.compileDDLString(simpleSchema1, testout_jar);
         assertFalse(success);
         //type not found or user lacks privilege:
@@ -645,7 +645,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
                 + "create table mytable  (pkey integer, column2_integer integer);\n"
                 + "alter table mytable add column newcol varchar(50);\n";
 
-        final VoltCompiler compiler = new VoltCompiler();
+        final VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compiler.compileDDLString(simpleSchema1, testout_jar);
         assertTrue(success);
         verifyTableColumnType(compiler, "mytable", "pkey", VoltType.INTEGER);
@@ -657,7 +657,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
                 + "PARTITION TABLE mytable ON COLUMN pkey;"
                 + "alter table mytable alter column pkey NULL;\n";
 
-        final VoltCompiler compiler = new VoltCompiler();
+        final VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compiler.compileDDLString(simpleSchema1, testout_jar);
         assertFalse(success);
         //type not found or user lacks privilege:
@@ -676,7 +676,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
                 + "PARTITION TABLE mytable ON COLUMN pkey;"
                 + "alter table mytable drop column pkey;\n";
 
-        final VoltCompiler compiler = new VoltCompiler();
+        final VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compiler.compileDDLString(simpleSchema1, testout_jar);
         assertTrue(success);
     }
@@ -687,7 +687,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
                 + "PARTITION TABLE mytable ON COLUMN pkey;"
                 + "alter table mytable alter column pkey varchar(50);\n";
 
-        final VoltCompiler compiler = new VoltCompiler();
+        final VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compiler.compileDDLString(simpleSchema1, testout_jar);
         assertFalse(success);
         //Partition columns must be constrained "NOT NULL"
@@ -706,7 +706,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
                 + "PARTITION TABLE mytable ON COLUMN pkey;"
                 + "alter table mytable alter column pkey varchar(50) NOT NULL;\n";
 
-        final VoltCompiler compiler = new VoltCompiler();
+        final VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compiler.compileDDLString(simpleSchema1, testout_jar);
         assertTrue(success);
         // Check that constraint is still valid.
@@ -719,7 +719,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
                 + "PARTITION TABLE mytable ON COLUMN pkey;"
                 + "alter table mytable alter column pkey set data type varchar(50);\n";
 
-        final VoltCompiler compiler = new VoltCompiler();
+        final VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compiler.compileDDLString(simpleSchema1, testout_jar);
         assertTrue(success);
         // Check that constraint is still valid.
@@ -732,7 +732,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
                 + "alter table mytable add column pkey2 varchar(500);\n"
                 + "PARTITION TABLE mytable ON COLUMN pkey2;\n";
 
-        final VoltCompiler compiler = new VoltCompiler();
+        final VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compiler.compileDDLString(simpleSchema1, testout_jar);
         assertFalse(success);
         //Partition columns must be constrained
@@ -752,7 +752,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
                 + "alter table mytable add column pkey2 varchar(500) NOT NULL;\n"
                 + "PARTITION TABLE mytable ON COLUMN pkey2;\n";
 
-        final VoltCompiler compiler = new VoltCompiler();
+        final VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compiler.compileDDLString(simpleSchema1, testout_jar);
         assertTrue(success);
         verifyTableColumnSize(compiler, "mytable", "pkey2", 500);
@@ -766,7 +766,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
                 + "alter table mytable alter column pkey varchar(20) NOT NULL;\n"
                 + "PARTITION TABLE mytable ON COLUMN pkey;\n";
 
-        final VoltCompiler compiler = new VoltCompiler();
+        final VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compiler.compileDDLString(simpleSchema1, testout_jar);
         assertTrue(success);
         // Check that constraint is valid.
@@ -779,7 +779,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
                 + "alter table mytable alter column pkey set NOT NULL;\n"
                 + "PARTITION TABLE mytable ON COLUMN pkey;\n";
 
-        final VoltCompiler compiler = new VoltCompiler();
+        final VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compiler.compileDDLString(simpleSchema1, testout_jar);
         assertTrue(success);
         // Check that constraint is valid.
@@ -792,7 +792,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
                 + "alter table mytable alter column pkey set NOT NULL;\n"
                 + "PARTITION TABLE mytable ON COLUMN pkey;\n";
 
-        final VoltCompiler compiler = new VoltCompiler();
+        final VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compiler.compileDDLString(simpleSchema1, testout_jar);
         assertTrue(success);
         // Check that constraint is valid.
@@ -805,7 +805,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
                 + "alter table mytable alter column pkey varchar(20);\n"
                 + "PARTITION TABLE mytable ON COLUMN pkey;\n";
 
-        final VoltCompiler compiler = new VoltCompiler();
+        final VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compiler.compileDDLString(simpleSchema1, testout_jar);
         assertFalse(success);
         int foundNullPartitionColError = 0;
@@ -822,7 +822,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
                 = "create table mytable  (pkey varchar(20) NOT NULL, column2_integer integer);\n"
                 + "alter table mytable add column pkey varchar(20);\n";
 
-        final VoltCompiler compiler = new VoltCompiler();
+        final VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compiler.compileDDLString(simpleSchema1, testout_jar);
         assertFalse(success);
         int foundAlreadyExistsError = 0;
@@ -840,7 +840,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
                 = "create table mytable  (pkey integer, column2_integer integer);\n"
                 + "drop table mytable;\n";
 
-        final VoltCompiler compiler = new VoltCompiler();
+        final VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compiler.compileDDLString(simpleSchema1, testout_jar);
         assertTrue(success);
         verifyTableGone(compiler, "mytable");
@@ -851,7 +851,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
                 = "create table mytable  (pkey integer, column2_integer integer);\n"
                 + "drop table mytablefoo;\n";
 
-        final VoltCompiler compiler = new VoltCompiler();
+        final VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compiler.compileDDLString(simpleSchema1, testout_jar);
         assertFalse(success);
     }
@@ -861,7 +861,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
                 = "create table mytable  (pkey integer, column2_integer integer);\n"
                 + "drop table mytablenonexistant if exists;\n";
 
-        final VoltCompiler compiler = new VoltCompiler();
+        final VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compiler.compileDDLString(simpleSchema1, testout_jar);
         assertTrue(success);
         verifyTableColumnType(compiler, "mytable", "pkey", VoltType.INTEGER);
@@ -873,7 +873,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
                 + "create unique index pkey_idx on mytable(pkey);\n"
                 + "drop table mytable;\n";
 
-        final VoltCompiler compiler = new VoltCompiler();
+        final VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compiler.compileDDLString(simpleSchema1, testout_jar);
         assertTrue(success);
         verifyTableGone(compiler, "mytable");
@@ -887,7 +887,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
                 + "drop table mytable;\n"
                 + "create table mytable  (pkey integer, column2_integer integer);\n";
 
-        final VoltCompiler compiler = new VoltCompiler();
+        final VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compiler.compileDDLString(simpleSchema1, testout_jar);
         assertTrue(success);
         verifyTableExists(compiler, "mytable");
@@ -901,7 +901,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
                 + "drop table mytable;\n"
                 + myproc;
 
-        final VoltCompiler compiler = new VoltCompiler();
+        final VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compiler.compileDDLString(simpleSchema1, testout_jar);
         assertFalse(success);
     }

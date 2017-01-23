@@ -86,7 +86,7 @@ public class TestAdhocCreateDropJavaProc extends AdhocDDLTestBase {
             assertFalse(findProcedureInSystemCatalog("testImportProc"));
 
             InMemoryJarfile jarfile = new InMemoryJarfile();
-            VoltCompiler comp = new VoltCompiler();
+            VoltCompiler comp = new VoltCompiler(false);
             comp.addClassToJar(jarfile, org.voltdb_testprocs.updateclasses.testImportProc.class);
 
             resp = m_client.callProcedure("@UpdateClasses", jarfile.getFullJarBytes(), null);
@@ -115,7 +115,7 @@ public class TestAdhocCreateDropJavaProc extends AdhocDDLTestBase {
 
             // Okay, add the missing dependency
             jarfile = new InMemoryJarfile();
-            comp = new VoltCompiler();
+            comp = new VoltCompiler(false);
             comp.addClassToJar(jarfile, org.voltdb_testprocs.updateclasses.NoMeaningClass.class);
             resp = m_client.callProcedure("@UpdateClasses", jarfile.getFullJarBytes(), null);
             // now we should be able to call it
@@ -204,7 +204,7 @@ public class TestAdhocCreateDropJavaProc extends AdhocDDLTestBase {
 
             // Now load the procedure requiring the already-resident dependency
             InMemoryJarfile jarfile = new InMemoryJarfile();
-            VoltCompiler comp = new VoltCompiler();
+            VoltCompiler comp = new VoltCompiler(false);
             comp.addClassToJar(jarfile, org.voltdb_testprocs.updateclasses.testImportProc.class);
 
             try {

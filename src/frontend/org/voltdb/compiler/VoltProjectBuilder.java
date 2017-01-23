@@ -752,8 +752,16 @@ public class VoltProjectBuilder {
         m_drProducerEnabled = false;
     }
 
+    public void setDrNone() {
+        m_drRole = DrRoleType.NONE;
+    }
+
     public void setDrReplica() {
         m_drRole = DrRoleType.REPLICA;
+    }
+
+    public void setXDCR() {
+        m_drRole = DrRoleType.XDCR;
     }
 
     /**
@@ -810,7 +818,7 @@ public class VoltProjectBuilder {
             final int replication,
             final String voltRoot,
             final int clusterId) {
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         if (compile(compiler, jarPath, voltRoot,
                        new DeploymentInfo(hostCount, sitesPerHost, replication, clusterId),
                        m_ppdEnabled, m_snapshotPath, m_ppdPrefix)) {
@@ -827,7 +835,7 @@ public class VoltProjectBuilder {
             final boolean ppdEnabled, final String snapshotPath,
             final String ppdPrefix)
     {
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         return compile(compiler, jarPath, voltRoot,
                        new DeploymentInfo(hostCount, sitesPerHost, replication, clusterId),
                        ppdEnabled, snapshotPath, ppdPrefix);
@@ -930,7 +938,7 @@ public class VoltProjectBuilder {
      * @return true if successful
      */
     public boolean compileWithDefaultDeployment(final String jarPath) {
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         return compile(compiler, jarPath, null, null, m_ppdEnabled, m_snapshotPath, m_ppdPrefix);
     }
 

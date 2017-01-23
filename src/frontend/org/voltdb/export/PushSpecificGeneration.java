@@ -98,7 +98,7 @@ public class PushSpecificGeneration {
         } catch (Exception ex) {
             ex.printStackTrace();
         } finally {
-            StandaloneExportManager.instance().shutdown();
+            StandaloneExportManager.instance().shutdown(null);
         }
     }
 

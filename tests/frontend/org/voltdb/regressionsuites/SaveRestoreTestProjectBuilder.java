@@ -121,7 +121,7 @@ public class SaveRestoreTestProjectBuilder extends VoltProjectBuilder
 
         // read in the catalog
         byte[] bytes = MiscUtils.fileToBytes(new File(catalogJar));
-        String serializedCatalog = CatalogUtil.getSerializedCatalogStringFromJar(CatalogUtil.loadAndUpgradeCatalogFromJar(bytes).getFirst());
+        String serializedCatalog = CatalogUtil.getSerializedCatalogStringFromJar(CatalogUtil.loadAndUpgradeCatalogFromJar(bytes, false).getFirst());
         assert(serializedCatalog != null);
 
         // create the catalog (that will be passed to the ClientInterface
