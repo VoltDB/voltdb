@@ -30,7 +30,6 @@ import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.Database;
-import org.voltdb.catalog.DatabaseConfiguration;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.ProcParameter;
 import org.voltdb.catalog.Procedure;
@@ -240,10 +239,6 @@ public class JdbcDatabaseMetaDataGenerator
         else if (selector.equalsIgnoreCase("CLASSES"))
         {
             result = getClasses();
-        }
-        else if (selector.equalsIgnoreCase("CONFIG"))
-        {
-            result = getConfigs();
         }
         return result;
     }
@@ -791,15 +786,6 @@ public class JdbcDatabaseMetaDataGenerator
                 // exist.  Other checks when we actually load the classes should
                 // ensure that we don't end up in this state.
             }
-        }
-        return results;
-    }
-
-    VoltTable getConfigs()
-    {
-        VoltTable results = new VoltTable(CONFIG_SCHEMA);
-        for (DatabaseConfiguration conf : DatabaseConfiguration.configurationList) {
-            results.addRow(conf.getName(), conf.getValue(m_database), conf.getDescription());
         }
         return results;
     }

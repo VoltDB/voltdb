@@ -45,9 +45,7 @@
 </configuration>
 </import>
 <security enabled="true" provider="hash"/>
-<partition-detection enabled="true">
-    <snapshot prefix="voltdb_partition_detection"/>
-</partition-detection>
+<partition-detection enabled="true"/>
 <dr id="6" listen="true" port="12112">
 <connection source="uuuu"/>
 </dr>

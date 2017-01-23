@@ -526,13 +526,6 @@ public class SystemInformation extends VoltSystemProcedure
         if (cluster.getNetworkpartition())
         {
             partition_detect_enabled = "true";
-            String partition_detect_snapshot_path = VoltDB.instance().getSnapshotPath();
-            String partition_detect_snapshot_prefix =
-                cluster.getFaultsnapshots().get("CLUSTER_PARTITION").getPrefix();
-            results.addRow("snapshotpath",
-                           partition_detect_snapshot_path);
-            results.addRow("partitiondetectionsnapshotprefix",
-                           partition_detect_snapshot_prefix);
         }
         results.addRow("partitiondetection", partition_detect_enabled);
 

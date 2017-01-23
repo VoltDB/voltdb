@@ -85,7 +85,7 @@ public class AsyncCompilerAgentHelper
                 }
                 try {
                     newCatalogJar = modifyCatalogClasses(oldJar, work.operationString,
-                            newCatalogJar);
+                            newCatalogJar, work.drRole == DrRoleType.XDCR);
                 }
                 catch (IOException e) {
                     retval.errorMsg = "Unexpected IO exception @UpdateClasses modifying classes " +
@@ -99,7 +99,8 @@ public class AsyncCompilerAgentHelper
             else if ("@AdHoc".equals(work.invocationName)) {
                 // work.adhocDDLStmts should be applied to the current catalog
                 try {
-                    newCatalogJar = addDDLToCatalog(context.catalog, oldJar, work.adhocDDLStmts);
+                    newCatalogJar = addDDLToCatalog(context.catalog, oldJar,
+                            work.adhocDDLStmts, work.drRole == DrRoleType.XDCR);
                 }
                 catch (VoltCompilerException vce) {
                     retval.errorMsg = vce.getMessage();
@@ -138,7 +139,7 @@ public class AsyncCompilerAgentHelper
             // try to get the new catalog from the params
             Pair<InMemoryJarfile, String> loadResults = null;
             try {
-                loadResults = CatalogUtil.loadAndUpgradeCatalogFromJar(newCatalogJar);
+                loadResults = CatalogUtil.loadAndUpgradeCatalogFromJar(newCatalogJar, work.drRole == DrRoleType.XDCR);
             }
             catch (IOException ioe) {
                 // Preserve a nicer message from the jarfile loading rather than
@@ -165,12 +166,6 @@ public class AsyncCompilerAgentHelper
             Catalog newCatalog = new Catalog();
             newCatalog.execute(newCatalogCommands);
 
-            String result = CatalogUtil.checkLicenseConstraint(newCatalog, m_licenseApi);
-            if (result != null) {
-                retval.errorMsg = result;
-                return retval;
-            }
-
             // Retrieve the original deployment string, if necessary
             if (deploymentString == null) {
                 // Go get the deployment string from the current catalog context
@@ -190,12 +185,12 @@ public class AsyncCompilerAgentHelper
                 retval.errorMsg = "Unable to update deployment configuration: Error parsing deployment string";
                 return retval;
             }
-            if (work.isPromotion && work.onReplica) {
+            if (work.isPromotion && work.drRole == DrRoleType.REPLICA) {
                 assert dt.getDr().getRole() == DrRoleType.REPLICA;
                 dt.getDr().setRole(DrRoleType.MASTER);
             }
 
-            result = CatalogUtil.compileDeployment(newCatalog, dt, false);
+            String result = CatalogUtil.compileDeployment(newCatalog, dt, false);
             if (result != null) {
                 retval.errorMsg = "Unable to update deployment configuration: " + result;
                 return retval;
@@ -252,7 +247,7 @@ public class AsyncCompilerAgentHelper
      * jarfile
      * @throws VoltCompilerException
      */
-    private InMemoryJarfile addDDLToCatalog(Catalog oldCatalog, InMemoryJarfile jarfile, String[] adhocDDLStmts)
+    private InMemoryJarfile addDDLToCatalog(Catalog oldCatalog, InMemoryJarfile jarfile, String[] adhocDDLStmts, boolean isXDCR)
     throws IOException, VoltCompilerException
     {
         StringBuilder sb = new StringBuilder();
@@ -265,13 +260,13 @@ public class AsyncCompilerAgentHelper
         String newDDL = sb.toString();
         compilerLog.trace("Adhoc-modified DDL:\n" + newDDL);
 
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(isXDCR);
         compiler.compileInMemoryJarfileWithNewDDL(jarfile, newDDL, oldCatalog);
         return jarfile;
     }
 
     private InMemoryJarfile modifyCatalogClasses(InMemoryJarfile jarfile, String deletePatterns,
-            InMemoryJarfile newJarfile) throws IOException
+            InMemoryJarfile newJarfile, boolean isXDCR) throws IOException
     {
         // modify the old jar in place based on the @UpdateClasses inputs, and then
         // recompile it if necessary
@@ -308,7 +303,7 @@ public class AsyncCompilerAgentHelper
         }
         if (deletedClasses || foundClasses) {
             compilerLog.info("Updating java classes available to stored procedures");
-            VoltCompiler compiler = new VoltCompiler();
+            VoltCompiler compiler = new VoltCompiler(isXDCR);
             compiler.compileInMemoryJarfile(jarfile);
         }
         return jarfile;
