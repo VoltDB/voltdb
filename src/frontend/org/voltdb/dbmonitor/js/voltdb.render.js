@@ -2328,6 +2328,8 @@ function alertNodeClicked(obj) {
             var partition_max = drDetails["DrProducer"]["partition_max"];
             var partition_min = drDetails["DrProducer"]["partition_min"];
             var partition_min_host = drDetails["DrProducer"]["partition_min_host"];
+            var colIndex = {};
+            var counter = 0;
 
             $.each(partition_min, function(key, value){
                 // reset all min values to find the new min
@@ -2337,23 +2339,35 @@ function alertNodeClicked(obj) {
                 }
             });
 
+            connection.Metadata['@Statistics_DRPRODUCER_completeData'][0].schema.forEach(function (columnInfo) {
+                if (columnInfo["name"] == "PARTITION_ID" || columnInfo["name"] == "HOSTNAME" || columnInfo["name"] == "LASTQUEUEDDRID"
+                || columnInfo["name"] == "LASTACKDRID" || columnInfo["name"] == "STREAMTYPE" || columnInfo["name"] == "TOTALBYTES"
+                ){
+                    colIndex[columnInfo["name"]] = counter;
+                }
+                counter++;
+            });
+
             connection.Metadata['@Statistics_DRPRODUCER_completeData'][0].data.forEach(function (info) {
                 var partition_min_key = Object.keys(partition_min);
                 var partition_max_key = Object.keys(partition_max);
 
-                var pid = info[3];
-                var hostname = info[2].toString();
+                var pid = info[colIndex['PARTITION_ID']];
+                var hostname = info[colIndex['HOSTNAME']].toString();
                 var last_queued = -1
                 var last_acked = -1
 
-                if(info[8].toString() != 'None')
-                    last_queued = info[8]
+                if(info[colIndex['LASTQUEUEDDRID']].toString() != 'None')
+                    last_queued = info[colIndex['LASTQUEUEDDRID']]
 
-                if(info[9].toString() != 'None')
-                    last_acked = info[9]
+                if(info[colIndex['LASTACKDRID']].toString() != 'None')
+                    last_acked = info[colIndex['LASTACKDRID']]
+
+                if(last_queued == -1 && last_acked == -1)
+                    return true;
 
                 // check TOTALBYTES
-                if (info[5] > 0){
+                if (info[colIndex['TOTALBYTES']] > 0){
                     // track the highest seen drId for each partition. use last queued to get the upper bound
                     if($.inArray(pid, partition_max_key) != -1)
                         partition_max[pid] = Math.max(last_queued, partition_max[pid])
