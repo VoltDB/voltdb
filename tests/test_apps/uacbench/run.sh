@@ -80,7 +80,7 @@ function prepare() {
 	#clean
     # we need to prepare a set of files for each type of benchmark
     mkdir -p procedures/uac
-    for tname in "ADD" "ADD_BATCH"; do
+    for tname in "ADD" "ADD_BATCH" "DEL" "DEL_BATCH"; do
 
         rm -f ben.config
 	    touch ben.config
