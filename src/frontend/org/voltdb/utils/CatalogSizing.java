@@ -388,12 +388,13 @@ public abstract class CatalogSizing {
     /**
      * Produce a sizing of all significant database objects.
      * @param dbCatalog  database catalog
+     * @param isXDCR Is XDCR enabled
      * @return  database size result object tree
      */
-    public static DatabaseSizes getCatalogSizes(Database dbCatalog) {
+    public static DatabaseSizes getCatalogSizes(Database dbCatalog, boolean isXDCR) {
         DatabaseSizes dbSizes = new DatabaseSizes();
         for (Table table: dbCatalog.getTables()) {
-            dbSizes.addTable(getTableSize(table, dbCatalog.getIsactiveactivedred()));
+            dbSizes.addTable(getTableSize(table, isXDCR));
         }
         return dbSizes;
     }

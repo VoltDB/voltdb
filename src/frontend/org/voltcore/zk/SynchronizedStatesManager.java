@@ -1540,6 +1540,7 @@ public class SynchronizedStatesManager {
                 checkForBarrierResultsChanges();
             }
             else {
+                m_pendingProposal = null;
                 try {
                     // Since we don't care about the outcome remove ourself from the participant list
                     m_zk.delete(m_myParticipantPath, -1);

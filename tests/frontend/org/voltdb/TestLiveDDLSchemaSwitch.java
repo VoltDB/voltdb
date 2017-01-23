@@ -190,7 +190,7 @@ public class TestLiveDDLSchemaSwitch extends AdhocDDLTestBase {
         threw = false;
         try {
             InMemoryJarfile jarfile = new InMemoryJarfile();
-            VoltCompiler comp = new VoltCompiler();
+            VoltCompiler comp = new VoltCompiler(false);
             comp.addClassToJar(jarfile, org.voltdb_testprocs.fullddlfeatures.testImportProc.class);
             m_client.callProcedure("@UpdateClasses", jarfile.getFullJarBytes(), null);
         }
@@ -255,7 +255,7 @@ public class TestLiveDDLSchemaSwitch extends AdhocDDLTestBase {
         if (!findClassInSystemCatalog("org.voltdb_testprocs.fullddlfeatures.testImportProc")) {
             // Also, @UpdateClasses should only work with adhoc DDL
             InMemoryJarfile jarfile = new InMemoryJarfile();
-            VoltCompiler comp = new VoltCompiler();
+            VoltCompiler comp = new VoltCompiler(false);
             comp.addClassToJar(jarfile, org.voltdb_testprocs.fullddlfeatures.testImportProc.class);
             try {
                 m_client.callProcedure("@UpdateClasses", jarfile.getFullJarBytes(), null);
@@ -340,7 +340,7 @@ public class TestLiveDDLSchemaSwitch extends AdhocDDLTestBase {
             threw = false;
             try {
                 InMemoryJarfile jarfile = new InMemoryJarfile();
-                VoltCompiler comp = new VoltCompiler();
+                VoltCompiler comp = new VoltCompiler(false);
                 comp.addClassToJar(jarfile, org.voltdb_testprocs.fullddlfeatures.testImportProc.class);
                 m_client.callProcedure("@UpdateClasses", jarfile.getFullJarBytes(), null);
             }
@@ -424,7 +424,7 @@ public class TestLiveDDLSchemaSwitch extends AdhocDDLTestBase {
             threw = false;
             try {
                 InMemoryJarfile jarfile = new InMemoryJarfile();
-                VoltCompiler comp = new VoltCompiler();
+                VoltCompiler comp = new VoltCompiler(false);
                 comp.addClassToJar(jarfile, org.voltdb_testprocs.fullddlfeatures.testImportProc.class);
                 m_client.callProcedure("@UpdateClasses", jarfile.getFullJarBytes(), null);
             }

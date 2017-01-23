@@ -41,7 +41,7 @@ public class TestReportMaker extends TestCase {
 
     private static final int MAX_OVERHEAD = 4;
 
-    private static String compileAndGenerateCatalogReport(String ddl) throws IOException {
+    private static String compileAndGenerateCatalogReport(String ddl, boolean isXDCR) throws IOException {
         // Let's try not to "drool" files into the current directory.
         // Generate random temporary names for the .jar and DDL files,
         // and delete them before we exit this method.  We will still
@@ -56,7 +56,7 @@ public class TestReportMaker extends TestCase {
             ddlWriter = new PrintWriter(ddlName);
             ddlWriter.println(ddl);
             ddlWriter.close();
-            VoltCompiler vc = new VoltCompiler(true); // trick it into behaving like standalone
+            VoltCompiler vc = new VoltCompiler(true, isXDCR); // trick it into behaving like standalone
             boolean success = vc.compileFromDDL(jarName, ddlName);
             assertTrue("Catalog compilation failed!", success);
             report = new String(Files.readAllBytes(Paths.get("catalog-report.html")), Charsets.UTF_8);
@@ -192,7 +192,7 @@ public class TestReportMaker extends TestCase {
                 "GROUP BY vc; " +
                 "CREATE PROCEDURE NeedsEscape AS " +
                 "SELECT i FROM FUNKYDEFAULTS WHERE i<? AND i>?;";
-        String report = compileAndGenerateCatalogReport(ddl);
+        String report = compileAndGenerateCatalogReport(ddl, false);
 
         // Lock down all the places in ReportMaker
         // where we insert escape sequences for HTML entities:
@@ -237,9 +237,8 @@ public class TestReportMaker extends TestCase {
                 "t2 BIGINT, " +
                 "t3 VARCHAR(32) " +
                 "); " +
-                "DR TABLE " + tableName + "; " +
-                "SET DR=ACTIVE;";
-        String report = compileAndGenerateCatalogReport(ddl);
+                "DR TABLE " + tableName + "; ";
+        String report = compileAndGenerateCatalogReport(ddl, true);
 
         assertTrue(report.contains("Table " + tableName + " doesn't have any unique index, it will cause full table scans to update/delete DR record and may become slower as table grow."));
     }
@@ -262,7 +261,7 @@ public class TestReportMaker extends TestCase {
             "CREATE VIEW VIEW_IDXPLAN (GROUPBY1, CNT, MINIDX, SUMCOL, MAXPLAN, COUNTCOL) AS" +
             "    SELECT GROUPBY1, COUNT(*), MIN(MINCOL), SUM(SUMCOL), MAX(MAXCOL), COUNT(COUNTCOL)" +
             "    FROM VIEW_SOURCE GROUP BY GROUPBY1;";
-        String report = compileAndGenerateCatalogReport(ddl);
+        String report = compileAndGenerateCatalogReport(ddl, false);
         assertTrue(report.contains("<thead><tr><th>View Task</th><th>Execution Plan</th></tr>"));
         assertTrue(report.contains("<tr class='primaryrow2'><td>Refresh MIN column \"MINIDX\"</td><td>Built-in&nbsp;index&nbsp;scan&nbsp;&quot;IDXG1&quot;.</td></tr>"));
         assertTrue(report.contains("<tr class='primaryrow2'><td>Refresh MAX column \"MAXPLAN\"</td><td>RETURN&nbsp;RESULTS&nbsp;TO&nbsp;STORED&nbsp;PROCEDURE<br/>&nbsp;INDEX&nbsp;SCAN&nbsp;of&nbsp;&quot;VIEW_SOURCE&quot;&nbsp;using&nbsp;&quot;IDXG1&quot;<br/>&nbsp;range-scan&nbsp;on&nbsp;1&nbsp;of&nbsp;2&nbsp;cols&nbsp;from&nbsp;(GROUPBY1&nbsp;&gt;=&nbsp;?0)&nbsp;while&nbsp;(GROUPBY1&nbsp;=&nbsp;?0),&nbsp;filter&nbsp;by&nbsp;(MAXCOL&nbsp;&lt;=&nbsp;?1)<br/>&nbsp;&nbsp;inline&nbsp;Serial&nbsp;AGGREGATION&nbsp;ops:&nbsp;MAX(VIEW_SOURCE.MAXCOL)<br/></td></tr>"));
@@ -281,9 +280,8 @@ public class TestReportMaker extends TestCase {
                 "p3 VARCHAR(32) " +
                 ");" +
                 "CREATE INDEX tableIndex ON table_with_index ( p1 ); " +
-                "DR TABLE " + tableName + ";" +
-                "SET DR=ACTIVE;";
-        String report = compileAndGenerateCatalogReport(nonUniqueIndexDDL);
+                "DR TABLE " + tableName + ";";
+        String report = compileAndGenerateCatalogReport(nonUniqueIndexDDL, true);
         assertTrue(report.contains("Table " + tableName + " doesn't have any unique index, it will cause full table scans to update/delete DR record and may become slower as table grow."));
 
         final String uniqueIndexDDL =
@@ -293,9 +291,8 @@ public class TestReportMaker extends TestCase {
                 "p3 VARCHAR(32) " +
                 ");" +
                 "CREATE UNIQUE INDEX tableIndex ON table_with_index ( p1 ); " +
-                "DR TABLE " + tableName + ";" +
-                "SET DR=ACTIVE;";
-        report = compileAndGenerateCatalogReport(uniqueIndexDDL);
+                "DR TABLE " + tableName + ";";
+        report = compileAndGenerateCatalogReport(uniqueIndexDDL, true);
         assertFalse(report.contains("Table " + tableName + " doesn't have any unique index, it will cause full table scans to update/delete DR record and may become slower as table grow."));
 
         final String primayKeyDDL =
@@ -305,9 +302,8 @@ public class TestReportMaker extends TestCase {
                 "p3 VARCHAR(32), " +
                 "PRIMARY KEY ( p1 )" +
                 ");" +
-                "DR TABLE " + tableName + ";" +
-                "SET DR=ACTIVE;";
-        report = compileAndGenerateCatalogReport(primayKeyDDL);
+                "DR TABLE " + tableName + ";";
+        report = compileAndGenerateCatalogReport(primayKeyDDL, true);
         assertFalse(report.contains("Table " + tableName + " doesn't have any unique index, it will cause full table scans to update/delete DR record and may become slower as table grow."));
 
         final String constaintDDL =
@@ -317,9 +313,8 @@ public class TestReportMaker extends TestCase {
                 "p3 VARCHAR(32), " +
                 "CONSTRAINT pkey PRIMARY KEY (p1) " +
                 ");" +
-                "DR TABLE " + tableName + ";" +
-                "SET DR=ACTIVE;";
-        report = compileAndGenerateCatalogReport(constaintDDL);
+                "DR TABLE " + tableName + ";";
+        report = compileAndGenerateCatalogReport(constaintDDL, true);
         assertFalse(report.contains("Table " + tableName + " doesn't have any unique index, it will cause full table scans to update/delete DR record and may become slower as table grow."));
 
         final String uniqueDDL =
@@ -328,9 +323,8 @@ public class TestReportMaker extends TestCase {
                 "p2 TIMESTAMP UNIQUE, " +
                 "p3 VARCHAR(32) " +
                 ");" +
-                "DR TABLE " + tableName + ";" +
-                "SET DR=ACTIVE;";
-        report = compileAndGenerateCatalogReport(uniqueDDL);
+                "DR TABLE " + tableName + ";";
+        report = compileAndGenerateCatalogReport(uniqueDDL, true);
         assertFalse(report.contains("Table " + tableName + " doesn't have any unique index, it will cause full table scans to update/delete DR record and may become slower as table grow."));
 
         final String assumeUniqueDDL =
@@ -339,9 +333,8 @@ public class TestReportMaker extends TestCase {
                 "p2 TIMESTAMP, " +
                 "p3 VARCHAR(32) " +
                 ");" +
-                "DR TABLE " + tableName + ";" +
-                "SET DR=ACTIVE;";
-        report = compileAndGenerateCatalogReport(assumeUniqueDDL);
+                "DR TABLE " + tableName + ";";
+        report = compileAndGenerateCatalogReport(assumeUniqueDDL, true);
         assertFalse(report.contains("Table " + tableName + " doesn't have any unique index, it will cause full table scans to update/delete DR record and may become slower as table grow."));
     }
 }

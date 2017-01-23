@@ -63,7 +63,7 @@ public class TestPlannerTool extends TestCase {
         }*/
 
         byte[] bytes = MiscUtils.fileToBytes(new File("tpcc-oop.jar"));
-        String serializedCatalog = CatalogUtil.getSerializedCatalogStringFromJar(CatalogUtil.loadAndUpgradeCatalogFromJar(bytes).getFirst());
+        String serializedCatalog = CatalogUtil.getSerializedCatalogStringFromJar(CatalogUtil.loadAndUpgradeCatalogFromJar(bytes, false).getFirst());
         Catalog catalog = new Catalog();
         catalog.execute(serializedCatalog);
         DbSettings settings = new DbSettings(ClusterSettings.create().asSupplier(),NodeSettings.create());
@@ -158,7 +158,7 @@ public class TestPlannerTool extends TestCase {
         jar.deleteOnExit();
         builder.compile("testbadddl-oop.jar");
         byte[] bytes = MiscUtils.fileToBytes(new File("testbadddl-oop.jar"));
-        String serializedCatalog = CatalogUtil.getSerializedCatalogStringFromJar(CatalogUtil.loadAndUpgradeCatalogFromJar(bytes).getFirst());
+        String serializedCatalog = CatalogUtil.getSerializedCatalogStringFromJar(CatalogUtil.loadAndUpgradeCatalogFromJar(bytes, false).getFirst());
         assertNotNull(serializedCatalog);
         Catalog c = new Catalog();
         c.execute(serializedCatalog);

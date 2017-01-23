@@ -53,6 +53,7 @@ import org.voltcore.utils.Pair;
 import org.voltdb.InvocationDispatcher.OverrideCheck;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.common.Constants;
+import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.dtxn.TransactionCreator;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.sysprocs.saverestore.SnapshotPathType;
@@ -1326,8 +1327,7 @@ SnapshotCompletionInterest, Promotable
         // be reset and cleared as they are no longer valid.
         if (m_isLeader && m_action.doesRecover()) {
             VoltDBInterface instance = VoltDB.instance();
-            if (!instance.getCatalogContext().database.getIsactiveactivedred() &&
-                instance.getReplicationRole() == ReplicationRole.NONE) {
+            if (DrRoleType.MASTER.value().equals(instance.getCatalogContext().getCluster().getDrrole())) {
                 ByteBuffer params = ByteBuffer.allocate(4);
                 params.putInt(ExecutionEngine.TaskType.RESET_DR_APPLIED_TRACKER.ordinal());
                 try {
