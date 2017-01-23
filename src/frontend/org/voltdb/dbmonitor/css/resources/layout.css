@@ -2053,12 +2053,14 @@ h3.ui-state-active {
 .DRHeaderName { position:relative;top:5px; font-size:14px;}
 .iconDRDatabase {float: left; width: 20px; margin: 0 0 0 12px; position: relative;top: 5px;}
 .DRHeaderWrap {float:left;}
-.DRMR { float:left; }
-.DRMRLeft { float:left; position: relative; }
-.DRMRLeft span p { position:absolute; top:-10px; font-size: 14px; }
-.arrowDRDatabase { background-image: url(images/arrow_double.png); width:137px; height:22px;
+.drRelation { float:left; }
+.drRelationLeft { float:left; position: relative; }
+.drRelationLeft span p { position:absolute; top:-10px; font-size: 14px; }
+.arrowDouble { background-image: url(images/arrow_double.png); width:137px; height:22px;
 display:block; position: relative; top:8px; margin:0 10px;  }
-.DRMRRight { float:left; }
+.arrowSingle { background-image: url(images/arrow.png); width:137px; height:22px;
+display:block; position: relative; top:8px; margin:0 10px;  }
+.drRelationRight { float:left; }
 
 /*********************jquery ui class override*********************/
 #accordionProcedures .ui-state-default, #accordionTable .ui-state-default,#accordionStreamedTable .ui-state-default,

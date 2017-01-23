@@ -423,8 +423,8 @@
 
                 ChartDrReplicationRate.margin({ left: 100 });
                 ChartDrReplicationRate.lines.forceY([0, 1]);
-
-                d3.select('#visualizationDrReplicationRate')
+                debugger;
+                d3.select('#visualizationDrReplicationRate_1')
                     .datum(dataDrReplicationRate)
                     .transition().duration(500)
                     .call(ChartDrReplicationRate);
@@ -787,7 +787,8 @@
             if (partitionChart.is(":visible"))
                 ChartPartitionIdleTime.update();
 
-            if (drReplicationChart.is(":visible"))                ChartDrReplicationRate.update();
+            if (drReplicationChart.is(":visible"))
+                ChartDrReplicationRate.update();
 
             if (cmdLogChart.is(":visible"))
                 ChartCommandlog.update();
@@ -1851,7 +1852,7 @@
                     dataDrReplicationRate[0]["values"] = drData;
                 }
                 if (currentTab == NavigationTabs.DR && currentView == graphView && drReplicationChart.is(":visible")) {
-                    d3.select('#visualizationDrReplicationRate')
+                    d3.select('#visualizationDrReplicationRate_1')
                         .datum(dataDrReplicationRate)
                         .transition().duration(500)
                         .call(ChartDrReplicationRate);
