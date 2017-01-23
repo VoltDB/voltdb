@@ -29,7 +29,7 @@ public class DRConsumerStatsBase {
     public static interface Columns {
         // shared columns
         public static final String CLUSTER_ID = "CLUSTER_ID";
-        public static final String PRODUCER_CLUSTER_ID = "PRODUCER_CLUSTER_ID";
+        public static final String REMOTE_CLUSTER_ID = "REMOTE_CLUSTER_ID";
 
         // columns for the node-level table
         public static final String STATE = "STATE";
@@ -54,7 +54,7 @@ public class DRConsumerStatsBase {
         protected void populateColumnSchema(ArrayList<VoltTable.ColumnInfo> columns) {
             super.populateColumnSchema(columns);
             columns.add(new ColumnInfo(Columns.CLUSTER_ID, VoltType.INTEGER));
-            columns.add(new ColumnInfo(Columns.PRODUCER_CLUSTER_ID, VoltType.INTEGER));
+            columns.add(new ColumnInfo(Columns.REMOTE_CLUSTER_ID, VoltType.INTEGER));
             columns.add(new ColumnInfo(Columns.STATE, VoltType.STRING));
             columns.add(new ColumnInfo(Columns.REPLICATION_RATE_1M, VoltType.BIGINT));
             columns.add(new ColumnInfo(Columns.REPLICATION_RATE_5M, VoltType.BIGINT));
@@ -76,7 +76,7 @@ public class DRConsumerStatsBase {
         protected void populateColumnSchema(ArrayList<VoltTable.ColumnInfo> columns) {
             super.populateColumnSchema(columns);
             columns.add(new ColumnInfo(Columns.CLUSTER_ID, VoltType.INTEGER));
-            columns.add(new ColumnInfo(Columns.PRODUCER_CLUSTER_ID, VoltType.INTEGER));
+            columns.add(new ColumnInfo(Columns.REMOTE_CLUSTER_ID, VoltType.INTEGER));
             columns.add(new ColumnInfo(VoltSystemProcedure.CNAME_PARTITION_ID, VoltType.INTEGER));
             columns.add(new ColumnInfo(Columns.IS_COVERED, VoltType.STRING));
             columns.add(new ColumnInfo(Columns.COVERING_HOST, VoltType.STRING));

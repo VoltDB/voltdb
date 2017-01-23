@@ -701,16 +701,18 @@
                         } else {
                             updatedData.systemsettings.resourcemonitor.memorylimit.size = encodeURIComponent(parseInt(updatedData.systemsettings.resourcemonitor.memorylimit.size));
                         }
-                    }
-                    if ('alert' in updatedData.systemsettings.resourcemonitor.memorylimit) {
-                        var memoryAlert = "";
-                        if (updatedData.systemsettings.resourcemonitor.memorylimit.alert.indexOf("%")>-1) {
-                            memoryAlert = parseInt(updatedData.systemsettings.resourcemonitor.memorylimit.alert.replace("%", ""));
-                            updatedData.systemsettings.resourcemonitor.memorylimit.alert = memoryAlert + encodeURIComponent("%");
-                        } else {
-                            updatedData.systemsettings.resourcemonitor.memorylimit.alert = encodeURIComponent(parseInt(updatedData.systemsettings.resourcemonitor.memorylimit.alert));
+
+                        if ('alert' in updatedData.systemsettings.resourcemonitor.memorylimit) {
+                            var memoryAlert = "";
+                            if (updatedData.systemsettings.resourcemonitor.memorylimit.alert.indexOf("%")>-1) {
+                                memoryAlert = parseInt(updatedData.systemsettings.resourcemonitor.memorylimit.alert.replace("%", ""));
+                                updatedData.systemsettings.resourcemonitor.memorylimit.alert = memoryAlert + encodeURIComponent("%");
+                            } else {
+                                updatedData.systemsettings.resourcemonitor.memorylimit.alert = encodeURIComponent(parseInt(updatedData.systemsettings.resourcemonitor.memorylimit.alert));
+                            }
                         }
                     }
+
                 }
 
                 var features = [];

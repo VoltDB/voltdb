@@ -611,9 +611,9 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
-    public void setReplicationRole(ReplicationRole role)
+    public void promoteToMaster()
     {
-        m_replicationRole = role;
+        m_replicationRole = ReplicationRole.NONE;
     }
 
     @Override

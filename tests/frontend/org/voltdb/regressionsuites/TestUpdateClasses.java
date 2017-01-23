@@ -83,11 +83,11 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
         // This is maybe cheating a little bit?
         InMemoryJarfile jarfile = new InMemoryJarfile();
         for (Class<?> clazz : PROC_CLASSES) {
-            VoltCompiler comp = new VoltCompiler();
+            VoltCompiler comp = new VoltCompiler(false);
             comp.addClassToJar(jarfile, clazz);
         }
         for (Class<?> clazz : EXTRA_CLASSES) {
-            VoltCompiler comp = new VoltCompiler();
+            VoltCompiler comp = new VoltCompiler(false);
             comp.addClassToJar(jarfile, clazz);
         }
         // Add a deployment file just to have something other than classes in the jar
@@ -203,11 +203,11 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
         // This is maybe cheating a little bit?
         InMemoryJarfile jarfile = new InMemoryJarfile();
         for (Class<?> clazz : PROC_CLASSES) {
-            VoltCompiler comp = new VoltCompiler();
+            VoltCompiler comp = new VoltCompiler(false);
             comp.addClassToJar(jarfile, clazz);
         }
         for (Class<?> clazz : EXTRA_CLASSES) {
-            VoltCompiler comp = new VoltCompiler();
+            VoltCompiler comp = new VoltCompiler(false);
             comp.addClassToJar(jarfile, clazz);
         }
 
@@ -298,11 +298,11 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
         // This is maybe cheating a little bit?
         InMemoryJarfile jarfile = new InMemoryJarfile();
         for (Class<?> clazz : PROC_CLASSES) {
-            VoltCompiler comp = new VoltCompiler();
+            VoltCompiler comp = new VoltCompiler(false);
             comp.addClassToJar(jarfile, clazz);
         }
         for (Class<?> clazz : EXTRA_CLASSES) {
-            VoltCompiler comp = new VoltCompiler();
+            VoltCompiler comp = new VoltCompiler(false);
             comp.addClassToJar(jarfile, clazz);
         }
 
@@ -353,7 +353,7 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
             // now, let's collide identically simpleName'd classes
             InMemoryJarfile boom = new InMemoryJarfile();
             for (Class<?> clazz : COLLIDING_CLASSES) {
-                VoltCompiler comp = new VoltCompiler();
+                VoltCompiler comp = new VoltCompiler(false);
                 comp.addClassToJar(boom, clazz);
             }
             resp = m_client.callProcedure("@UpdateClasses", boom.getFullJarBytes(), null);
@@ -435,7 +435,7 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
             // Something sane ought to work
             ClientResponse resp;
             InMemoryJarfile boom = new InMemoryJarfile();
-            VoltCompiler comp = new VoltCompiler();
+            VoltCompiler comp = new VoltCompiler(false);
             comp.addClassToJar(boom, org.voltdb_testprocs.updateclasses.InnerClassesTestProc.class);
             try {
                 resp = m_client.callProcedure("@UpdateClasses", boom.getFullJarBytes(), null);
@@ -449,7 +449,7 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
             // Error in non-visible inner class static initializer?
             boolean threw = false;
             boom = new InMemoryJarfile();
-            comp = new VoltCompiler();
+            comp = new VoltCompiler(false);
             comp.addClassToJar(boom, org.voltdb_testprocs.updateclasses.BadInnerClassesTestProc.class);
             try {
                 resp = m_client.callProcedure("@UpdateClasses", boom.getFullJarBytes(), null);
@@ -487,7 +487,7 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
 
             ClientResponse resp;
             InMemoryJarfile boom = new InMemoryJarfile();
-            VoltCompiler comp = new VoltCompiler();
+            VoltCompiler comp = new VoltCompiler(false);
             comp.addClassToJar(boom, org.voltdb_testprocs.updateclasses.testBadInitializerProc.class);
             boolean threw = false;
             try {
@@ -502,7 +502,7 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
 
             threw = false;
             boom = new InMemoryJarfile();
-            comp = new VoltCompiler();
+            comp = new VoltCompiler(false);
             comp.addClassToJar(boom, org.voltdb_testprocs.updateclasses.BadClassLoadClass.class);
             try {
                 resp = m_client.callProcedure("@UpdateClasses", boom.getFullJarBytes(), null);
@@ -542,15 +542,15 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
         // This is maybe cheating a little bit?
         InMemoryJarfile jarfile = new InMemoryJarfile();
         for (Class<?> clazz : PROC_CLASSES) {
-            VoltCompiler comp = new VoltCompiler();
+            VoltCompiler comp = new VoltCompiler(false);
             comp.addClassToJar(jarfile, clazz);
         }
         for (Class<?> clazz : EXTRA_CLASSES) {
-            VoltCompiler comp = new VoltCompiler();
+            VoltCompiler comp = new VoltCompiler(false);
             comp.addClassToJar(jarfile, clazz);
         }
         for (Class<?> clazz : COLLIDING_CLASSES) {
-            VoltCompiler comp = new VoltCompiler();
+            VoltCompiler comp = new VoltCompiler(false);
             comp.addClassToJar(jarfile, clazz);
         }
 
@@ -611,11 +611,11 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
             // make a jar without the extra
             InMemoryJarfile jarfile2 = new InMemoryJarfile();
             for (Class<?> clazz : PROC_CLASSES) {
-                VoltCompiler comp = new VoltCompiler();
+                VoltCompiler comp = new VoltCompiler(false);
                 comp.addClassToJar(jarfile2, clazz);
             }
             for (Class<?> clazz : COLLIDING_CLASSES) {
-                VoltCompiler comp = new VoltCompiler();
+                VoltCompiler comp = new VoltCompiler(false);
                 comp.addClassToJar(jarfile2, clazz);
             }
 
@@ -634,7 +634,7 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
 
             // now add a class with inner classes
             InMemoryJarfile inner = new InMemoryJarfile();
-            VoltCompiler comp = new VoltCompiler();
+            VoltCompiler comp = new VoltCompiler(false);
             comp.addClassToJar(inner, org.voltdb_testprocs.updateclasses.InnerClassesTestProc.class);
             resp = m_client.callProcedure("@UpdateClasses", inner.getFullJarBytes(), null);
             // old stuff should have survived

@@ -40,6 +40,7 @@ import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.MiscUtils;
 
 import junit.framework.TestCase;
+import org.voltdb.utils.VoltFile;
 
 public class TestCatalogDiffs extends TestCase {
     static final String m_dir = "/tmp" + File.separator + System.getProperty("user.name");
@@ -83,7 +84,7 @@ public class TestCatalogDiffs extends TestCase {
 
     public static Catalog catalogForJar(String pathToJar) throws IOException {
         byte[] bytes = MiscUtils.fileToBytes(new File(pathToJar));
-        String serializedCatalog = CatalogUtil.getSerializedCatalogStringFromJar(CatalogUtil.loadAndUpgradeCatalogFromJar(bytes).getFirst());
+        String serializedCatalog = CatalogUtil.getSerializedCatalogStringFromJar(CatalogUtil.loadAndUpgradeCatalogFromJar(bytes, false).getFirst());
         assertNotNull(serializedCatalog);
         Catalog c = new Catalog();
         c.execute(serializedCatalog);
@@ -1186,6 +1187,66 @@ public class TestCatalogDiffs extends TestCase {
         verifyDiffIfEmptyTable(catOriginal, catUpdated);
     }
 
+    public void testDRRoleChange() throws Exception {
+        final String ddl = "CREATE TABLE A (C1 BIGINT NOT NULL); DR TABLE A;";
+
+        String noneDepXml =
+        "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
+        + "<deployment>"
+        + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
+        + "  <dr id=\"1\" listen=\"false\"></dr>"
+        + "</deployment>";
+
+        String defaultDepXml =
+        "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
+        + "<deployment>"
+        + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
+        + "  <dr id=\"1\"></dr>"
+        + "</deployment>";
+
+        String masterDepXml =
+        "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
+        + "<deployment>"
+        + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
+        + "  <dr id=\"1\" role=\"master\"></dr>"
+        + "</deployment>";
+
+        String replicaDepXml =
+        "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
+        + "<deployment>"
+        + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
+        + "  <dr id=\"1\" role=\"replica\"></dr>"
+        + "</deployment>";
+
+        Catalog noneCatalog = generateCatalogWithDeployment(ddl, noneDepXml);
+        Catalog defaultCatalog = generateCatalogWithDeployment(ddl, defaultDepXml);
+        Catalog masterCatalog = generateCatalogWithDeployment(ddl, masterDepXml);
+        Catalog replicaCatalog = generateCatalogWithDeployment(ddl, replicaDepXml);
+
+        // Making a deep copy to the original catalog so that it doesn't apply
+        // the changes to the catalogs.
+        verifyDiff(noneCatalog.deepCopy(), defaultCatalog);
+        assertTrue(verifyDiff(defaultCatalog.deepCopy(), masterCatalog).contains("No changes detected"));
+        verifyDiff(replicaCatalog.deepCopy(), masterCatalog);
+        verifyDiff(replicaCatalog.deepCopy(), defaultCatalog);
+        assertTrue(verifyDiff(masterCatalog.deepCopy(), defaultCatalog).contains("No changes detected"));
+        verifyDiffRejected(defaultCatalog.deepCopy(), replicaCatalog);
+        verifyDiffRejected(masterCatalog.deepCopy(), replicaCatalog);
+    }
+
+    private static Catalog generateCatalogWithDeployment(String ddl, String defaultDepXml) throws IOException {
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema(ddl);
+        final File jarPath = VoltFile.createTempFile("drrole", "jar");
+        builder.compile(jarPath.getAbsolutePath());
+        Catalog catalog = catalogForJar(jarPath.getAbsolutePath());
+        File file = VoltProjectBuilder.writeStringToTempFile(defaultDepXml);
+        DeploymentType deployment = CatalogUtil.getDeployment(new FileInputStream(file));
+        CatalogUtil.compileDeployment(catalog, deployment, false);
+        jarPath.delete();
+        return catalog;
+    }
+
     public void testChangeTableReplicationSettingOfExportTable() throws IOException {
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
 
@@ -1254,24 +1315,6 @@ public class TestCatalogDiffs extends TestCase {
         Catalog catOriginal = catalogForJar(testDir +  File.separator + "dr1.jar");
 
         builder.addLiteralSchema("\nDR TABLE A;");
-        assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "dr2.jar"));
-        Catalog catUpdated = catalogForJar(testDir + File.separator + "dr2.jar");
-        verifyDiffIfEmptyTable(catOriginal, catUpdated);
-    }
-
-    public void testSetDRActiveActiveOnEmptyTable() throws IOException {
-        if (!MiscUtils.isPro()) { return; } // not supported in community
-
-        String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);" +
-                                 "\nPARTITION TABLE A ON COLUMN C1;" +
-                                 "\nDR TABLE A;");
-        assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "dr1.jar"));
-        Catalog catOriginal = catalogForJar(testDir +  File.separator + "dr1.jar");
-
-        builder.addLiteralSchema("\nSET " + DatabaseConfiguration.DR_MODE_NAME +
-                                 "=" + DatabaseConfiguration.ACTIVE_ACTIVE + ";");
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "dr2.jar"));
         Catalog catUpdated = catalogForJar(testDir + File.separator + "dr2.jar");
         verifyDiffIfEmptyTable(catOriginal, catUpdated);
