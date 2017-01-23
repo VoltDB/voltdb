@@ -364,7 +364,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         }
 
         InMemoryJarfile jarfile = new InMemoryJarfile();
-        VoltCompiler comp = new VoltCompiler();
+        VoltCompiler comp = new VoltCompiler(false);
         comp.addClassToJar(jarfile, TestProc.class);
 
         try {
