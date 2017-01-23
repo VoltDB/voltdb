@@ -31,11 +31,6 @@ public class DRRoleStats extends StatsSource {
     public static final String CN_STATE = "STATE";
     public static final String CN_REMOTE_CLUSTER_ID = "REMOTE_CLUSTER_ID";
 
-    // This will be replaced by the deployment file role once ENG-11457 and ENG-11459
-    public enum Role {
-        NONE, MASTER, REPLICA, XDCR
-    }
-
     public enum State {
         DISABLED, // Feature is completely disabled
         ACTIVE,   // Actively exchanging data with remote cluster
@@ -84,9 +79,9 @@ public class DRRoleStats extends StatsSource {
     protected void updateStatsRow(Object rowKey, Object[] rowValues)
     {
         @SuppressWarnings("unchecked") Map.Entry<Byte, State> state = (Map.Entry<Byte, State>) rowKey;
-        final Role role = getRole(state.getValue());
+        final String role = getRole();
 
-        rowValues[columnNameToIndex.get(CN_ROLE)] = role.name();
+        rowValues[columnNameToIndex.get(CN_ROLE)] = role;
         rowValues[columnNameToIndex.get(CN_STATE)] = state.getValue().name();
         rowValues[columnNameToIndex.get(CN_REMOTE_CLUSTER_ID)] = state.getKey();
     }
@@ -128,19 +123,9 @@ public class DRRoleStats extends StatsSource {
         };
     }
 
-    private Role getRole(State state)
+    private String getRole()
     {
-        if (m_vdb.getReplicationRole() == ReplicationRole.REPLICA) {
-            return Role.REPLICA;
-        } else if (state != State.DISABLED) {
-            if (m_vdb.getConsumerDRGateway() == null) {
-                return Role.MASTER;
-            } else {
-                return Role.XDCR;
-            }
-        } else {
-            return Role.NONE;
-        }
+        return m_vdb.getCatalogContext().cluster.getDrrole().toUpperCase();
     }
 
     private static Map<Byte, State> mergeProducerConsumerStates(Map<Byte, DRProducerNodeStats> producerStats,
@@ -188,14 +173,14 @@ public class DRRoleStats extends StatsSource {
             return stats;
         }
 
-        Role role = null;
+        String role = null;
         Map<Byte, State> states = new TreeMap<>();
         while (stats.advanceRow()) {
             final byte clusterId = (byte) stats.getLong(CN_REMOTE_CLUSTER_ID);
-            final Role curRole = Role.valueOf(stats.getString(CN_ROLE));
+            final String curRole = stats.getString(CN_ROLE);
             if (role == null) {
                 role = curRole;
-            } else if (curRole != role) {
+            } else if (!role.equals(curRole)) {
                 throw new IllegalArgumentException("Inconsistent DR role across cluster nodes: " + stats.toFormattedString(false));
             }
 
@@ -206,7 +191,7 @@ public class DRRoleStats extends StatsSource {
         assert role != null;
         stats.clearRowData();
         for (Map.Entry<Byte, State> e : states.entrySet()) {
-            stats.addRow(role.name(), e.getValue().name(), e.getKey());
+            stats.addRow(role, e.getValue().name(), e.getKey());
         }
         return stats;
     }
