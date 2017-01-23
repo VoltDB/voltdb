@@ -104,6 +104,7 @@ import org.voltdb.compiler.deploymentfile.CommandLogType;
 import org.voltdb.compiler.deploymentfile.CommandLogType.Frequency;
 import org.voltdb.compiler.deploymentfile.ConnectionType;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
+import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.compiler.deploymentfile.DrType;
 import org.voltdb.compiler.deploymentfile.ExportConfigurationType;
 import org.voltdb.compiler.deploymentfile.ExportType;
@@ -128,7 +129,6 @@ import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.importer.ImportDataProcessor;
 import org.voltdb.importer.formatter.AbstractFormatterFactory;
 import org.voltdb.importer.formatter.FormatterBuilder;
-import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.plannodes.AbstractPlanNode;
@@ -206,19 +206,20 @@ public abstract class CatalogUtil {
      * Load a catalog from the jar bytes.
      *
      * @param catalogBytes
+     * @param isXDCR
      * @return Pair containing updated InMemoryJarFile and upgraded version (or null if it wasn't upgraded)
      * @throws IOException
      *             If the catalog cannot be loaded because it's incompatible, or
      *             if there is no version information in the catalog.
      */
-    public static Pair<InMemoryJarfile, String> loadAndUpgradeCatalogFromJar(byte[] catalogBytes)
+    public static Pair<InMemoryJarfile, String> loadAndUpgradeCatalogFromJar(byte[] catalogBytes, boolean isXDCR)
         throws IOException
     {
         // Throws IOException on load failure.
         InMemoryJarfile jarfile = loadInMemoryJarFile(catalogBytes);
         // Let VoltCompiler do a version check and upgrade the catalog on the fly.
         // I.e. jarfile may be modified.
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(isXDCR);
         String upgradedFromVersion = compiler.upgradeCatalogAsNeeded(jarfile);
         return new Pair<>(jarfile, upgradedFromVersion);
     }
@@ -598,19 +599,6 @@ public abstract class CatalogUtil {
         return true;
     }
 
-    public static String checkLicenseConstraint(Catalog catalog, LicenseApi licenseApi) {
-        String prefix = "Unable to use feature not included in license: ";
-        String errMsg = null;
-
-        if (catalog.getClusters().get("cluster").getDatabases().get("database").getIsactiveactivedred()) {
-            if (!licenseApi.isDrActiveActiveAllowed()) {
-                errMsg = prefix + "DR Active-Active replication";
-            }
-        }
-
-        return errMsg;
-    }
-
     public static String compileDeployment(Catalog catalog, String deploymentURL,
             boolean isPlaceHolderCatalog)
     {
@@ -670,6 +658,8 @@ public abstract class CatalogUtil {
             // set the HTTPD info
             setHTTPDInfo(catalog, deployment.getHttpd());
 
+            setDrInfo(catalog, deployment.getDr(), deployment.getCluster());
+
             if (!isPlaceHolderCatalog) {
                 setExportInfo(catalog, deployment.getExport());
                 setImportInfo(catalog, deployment.getImport());
@@ -677,7 +667,6 @@ public abstract class CatalogUtil {
             }
 
             setCommandLogInfo( catalog, deployment.getCommandlog());
-            setDrInfo(catalog, deployment.getDr(), deployment.getCluster());
             //This is here so we can update our local list of paths.
             //I would not have needed this if validateResourceMonitorInfo didnt exist here.
             VoltDB.instance().loadLegacyPathProperties(deployment);
@@ -1405,8 +1394,9 @@ public abstract class CatalogUtil {
      * @param exportsType A reference to the <exports> element of the deployment.xml file.
      */
     private static void setExportInfo(Catalog catalog, ExportType exportType) {
-        Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
-        if (db.getIsactiveactivedred()) {
+        final Cluster cluster = catalog.getClusters().get("cluster");
+        Database db = cluster.getDatabases().get("database");
+        if (DrRoleType.XDCR.value().equals(cluster.getDrrole())) {
             // add default export configuration to DR conflict table
             exportType = addExportConfigToDRConflictsTable(catalog, exportType);
         }
@@ -1951,11 +1941,17 @@ public abstract class CatalogUtil {
     private static void setDrInfo(Catalog catalog, DrType dr, ClusterType clusterType) {
         int clusterId;
         Cluster cluster = catalog.getClusters().get("cluster");
+        final Database db = cluster.getDatabases().get("database");
+        assert cluster != null;
         if (dr != null) {
             ConnectionType drConnection = dr.getConnection();
             cluster.setDrproducerenabled(dr.isListen());
             cluster.setDrproducerport(dr.getPort());
             cluster.setDrrole(dr.getRole().name().toLowerCase());
+            if (dr.getRole() == DrRoleType.XDCR) {
+                // Setting this for compatibility mode only, don't use in new code
+                db.setIsactiveactivedred(true);
+            }
 
             // Backward compatibility to support cluster id in DR tag
             if (clusterType.getId() == null && dr.getId() != null) {
@@ -1980,6 +1976,7 @@ public abstract class CatalogUtil {
                 hostLog.info("Configured connection for DR replica role to host " + drSource);
             }
         } else {
+            cluster.setDrrole(DrRoleType.NONE.value());
             if (clusterType.getId() != null) {
                 clusterId = clusterType.getId();
             } else {
@@ -2360,11 +2357,12 @@ public abstract class CatalogUtil {
      * Build an empty catalog jar file.
      * @return jar file or null (on failure)
      * @throws IOException on failure to create temporary jar file
+     * @param isXDCR
      */
-    public static File createTemporaryEmptyCatalogJarFile() throws IOException {
+    public static File createTemporaryEmptyCatalogJarFile(boolean isXDCR) throws IOException {
         File emptyJarFile = File.createTempFile("catalog-empty", ".jar");
         emptyJarFile.deleteOnExit();
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(isXDCR);
         if (!compiler.compileEmptyCatalog(emptyJarFile.getAbsolutePath())) {
             return null;
         }

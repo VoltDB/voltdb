@@ -14,6 +14,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
 
+import os
+
 voltdbroot_help = ('Specifies the root directory for the database. The default '
                    'is voltdbroot under the current working directory.')
 server_list_help = ('{hostname-or-ip[,...]}, '
@@ -43,7 +45,8 @@ server_list_help = ('{hostname-or-ip[,...]}, '
 )
 def start(runner):
     if runner.opts.directory_spec:
-        runner.args.extend(['voltdbroot', runner.opts.directory_spec])
+        upath = os.path.expanduser(runner.opts.directory_spec)
+        runner.args.extend(['voltdbroot', upath])
     if not runner.opts.server_list:
         runner.abort_with_help('You must specify the --host option.')
     runner.args.extend(['mesh', ','.join(runner.opts.server_list)])
