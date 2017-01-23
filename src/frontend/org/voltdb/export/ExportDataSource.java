@@ -61,6 +61,7 @@ import com.google_voltpatches.common.util.concurrent.Futures;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.voltcore.utils.CoreUtils;
 
 /**
@@ -93,7 +94,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private final AtomicReference<Pair<Mailbox, ImmutableList<Long>>> m_ackMailboxRefs =
             new AtomicReference<Pair<Mailbox,ImmutableList<Long>>>(Pair.of((Mailbox)null, ImmutableList.<Long>builder().build()));
     private final Semaphore m_bufferPushPermits = new Semaphore(16);
-    private final Semaphore m_onMastershipPermit = new Semaphore(0);
 
     private final int m_nullArrayLength;
     private long m_lastReleaseOffset = 0;
@@ -107,7 +107,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     //This is released when all mailboxes are set.
     private final Semaphore m_allowAcceptingMastership = new Semaphore(0);
     private volatile boolean m_closed = false;
-    private volatile boolean m_mastershipAccepted = false;
+    private volatile AtomicBoolean m_mastershipAccepted = new AtomicBoolean(false);
+    private volatile boolean m_replicaMastershipRequested = false;
     private volatile ListeningExecutorService m_executor;
     private final Integer m_executorLock = new Integer(0);
     private final LinkedTransferQueue<RunnableWithES> m_queuedActions = new LinkedTransferQueue<>();
@@ -864,11 +865,14 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         if (m_runEveryWhere && !m_isMaster && runEveryWhere) {
             //These are single threaded so no need to lock.
             m_lastAckUSO = uso;
+            m_replicaMastershipRequested = true;
             if (!m_replicaRunning) {
-                exportLog.info("Export generation " + getGeneration() + " accepting mastership for " + getTableName() + " partition " + getPartitionId() + " as replica");
-                m_replicaRunning = true;
                 m_isMaster = false;
-                acceptMastership();
+                m_replicaRunning = acceptMastership();
+                //If we didnt accept mastership we will depend on next ack to accept.
+                if (m_replicaRunning) {
+                    exportLog.info("Export generation " + getGeneration() + " accepting mastership for " + getTableName() + " partition " + getPartitionId() + " as replica");
+                }
             }
             return;
         }
@@ -931,26 +935,27 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
      * Trigger an execution of the mastership runnable by the associated
      * executor service
      */
-    public synchronized void acceptMastership() {
-        try {
-            m_onMastershipPermit.acquire();
-        } catch (InterruptedException ex) {
-            exportLog.error("Error in accepting mastership", ex);
+    public synchronized boolean acceptMastership() {
+        if (m_onMastership == null) {
+            exportLog.info("Mastership Runnable not yet set " + getGeneration() + " Table " + getTableName() + " partition " + getPartitionId());
+            return false;
         }
-        Preconditions.checkNotNull(m_onMastership, "mastership runnable is not yet set");
-        if (m_mastershipAccepted) {
+        if (m_mastershipAccepted.get()) {
             exportLog.info("Export generation " + getGeneration() + " Table " + getTableName() + " mastership already accepted for partition " + getPartitionId());
-            return;
+            return true;
         }
         exportLog.info("Accepting mastership for export generation " + getGeneration() + " Table " + getTableName() + " partition " + getPartitionId());
-        m_mastershipAccepted = true;
         RunnableWithES runnable = new RunnableWithES("acceptMastership") {
             @Override
             public void run() {
                 try {
                     if (!getLocalExecutorService().isShutdown() || !m_closed) {
                         exportLog.info("Export generation " + getGeneration() + " Table " + getTableName() + " accepting mastership for partition " + getPartitionId());
-                        m_onMastership.run();
+                        if (m_onMastership != null) {
+                            if (m_mastershipAccepted.compareAndSet(false, true)) {
+                                m_onMastership.run();
+                            }
+                        }
                     }
                 } catch (Exception e) {
                     exportLog.error("Error in accepting mastership", e);
@@ -958,6 +963,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             }
         };
         stashOrSubmitTask(runnable, true, false);
+        return m_mastershipAccepted.get();
     }
 
     /**
@@ -967,7 +973,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     public void setOnMastership(Runnable toBeRunOnMastership) {
         Preconditions.checkNotNull(toBeRunOnMastership, "mastership runnable is null");
         m_onMastership = toBeRunOnMastership;
-        m_onMastershipPermit.release();
+        if (m_replicaMastershipRequested) {
+            acceptMastership();
+        }
     }
 
     public ExportFormat getExportFormat() {
