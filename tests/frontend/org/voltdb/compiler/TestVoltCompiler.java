@@ -248,7 +248,7 @@ public class TestVoltCompiler extends TestCase {
     }
 
     private ArrayList<Feedback> checkPartitionParam(String ddl, String table) {
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compileDDL(ddl, compiler);
         assertFalse(success);
         return compiler.m_errors;
@@ -259,7 +259,7 @@ public class TestVoltCompiler extends TestCase {
                 "PARTITION TABLE PKEY_BIGINT ON COLUMN PKEY;" +
                 "create procedure myTestProc as select num from PKEY_BIGINT where pkey = ? order by 1;";
 
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compileDDL(ddl, compiler);
         assertTrue(success);
 
@@ -464,7 +464,7 @@ public class TestVoltCompiler extends TestCase {
     }
 
     public void testBadPath() {
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compiler.compileFromDDL(nothing_jar, "invalidnonsense");
         assertFalse(success);
     }
@@ -474,7 +474,7 @@ public class TestVoltCompiler extends TestCase {
             "create table books (cash integer default 23, title varchar(3) default 'foo', PRIMARY KEY(cash));\n"
                     + "create procedure from class org.voltdb.compiler.procedures.AddBookBoxed;";
 
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compileDDL(schema, compiler);
         assertFalse(success);
     }
@@ -485,7 +485,7 @@ public class TestVoltCompiler extends TestCase {
         String schema1 =
             "create table books (cash integer default 23, title varchar default 'foo', PRIMARY KEY(cash));";
 
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
 
         final boolean success = compileDDL(schema1, compiler);
         assertTrue(success);
@@ -497,7 +497,7 @@ public class TestVoltCompiler extends TestCase {
             "create table books (cash integer default 23, " +
             "title varchar("+length+") default 'foo', PRIMARY KEY(cash));";
 
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compileDDL(schema1, compiler);
         assertTrue(success);
 
@@ -537,7 +537,7 @@ public class TestVoltCompiler extends TestCase {
             "create table books (cash integer default 23, title varchar(3) default 'foo', PRIMARY KEY(cash));" +
             "partition table books on column cash;";
 
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compileDDL(schema, compiler);
         assertFalse(success);
 
@@ -560,7 +560,7 @@ public class TestVoltCompiler extends TestCase {
             System.exit(-1);
         }
 
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compiler.compileFromDDL(testout_jar, schemaPath);
         assertTrue(success);
     }
@@ -576,7 +576,7 @@ public class TestVoltCompiler extends TestCase {
             System.exit(-1);
         }
 
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compiler.compileFromDDL(testout_jar, schemaPath);
         assertFalse(success);
 
@@ -599,7 +599,7 @@ public class TestVoltCompiler extends TestCase {
             System.exit(-1);
         }
 
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compiler.compileFromDDL(testout_jar, schemaPath);
         assertTrue(success);
 
@@ -623,7 +623,7 @@ public class TestVoltCompiler extends TestCase {
         Map<String, ProcInfoData> overrideMap = new HashMap<String, ProcInfoData>();
         overrideMap.put("AddBook", info);
 
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         compiler.setProcInfoOverrides(overrideMap);
         final boolean success = compileDDL(schema, compiler);
         assertTrue(success);
@@ -644,7 +644,7 @@ public class TestVoltCompiler extends TestCase {
             "partition table books on column cash;\n" +
             "create procedure @Foo as select * from books;";
 
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compileDDL(schema, compiler);
         assertFalse(success);
     }
@@ -655,7 +655,7 @@ public class TestVoltCompiler extends TestCase {
             "create procedure Foo as select * from books;\n" +
             "PARTITION TABLE books ON COLUMN cash;";
 
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compileDDL(schema, compiler);
         assertTrue(success);
     }
@@ -670,14 +670,14 @@ public class TestVoltCompiler extends TestCase {
             "CREATE PROCEDURE Foo AS select * from books where cash = ?;" +
             "PARTITION PROCEDURE Foo ON TABLE BOOKS COLUMN CASH PARAMETER 0;";
 
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compileDDL(schema, compiler);
         assertTrue(success);
     }
 
     public void testCreateProcedureWithPartition() throws IOException {
         class Tester {
-            VoltCompiler compiler = new VoltCompiler();
+            VoltCompiler compiler = new VoltCompiler(false);
             String baseDDL =
                 "create table books (cash integer default 23 not null, "
                                   + "title varchar(3) default 'foo', "
@@ -782,7 +782,7 @@ public class TestVoltCompiler extends TestCase {
             "create procedure from class org.voltdb_testprocs.regressionsuites.fixedsql.TestENG2423$InnerProc;";
         File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema);
         String schemaPath = schemaFile.getPath();
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         assertTrue(compiler.compileFromDDL(testout_jar, schemaPath));
     }
 
@@ -794,7 +794,7 @@ public class TestVoltCompiler extends TestCase {
             "create view matt (title, cash, num, foo) as select title, cash, count(*), sum(cash) from books group by title, cash;\n" +
             "create view matt2 (title, cash, num, foo) as select books.title, books.cash, count(*), sum(books.cash) from books join foo on books.cash = foo.cash group by books.title, books.cash;";
 
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compileDDL(schema, compiler);
         assertTrue(success);
         Catalog c1 = compiler.getCatalog();
@@ -821,7 +821,7 @@ public class TestVoltCompiler extends TestCase {
             "  delete from books where title = ? and cash = ?;" +
             "partition procedure d1 on table books column cash parameter 1;";
 
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compileDDL(schema, compiler);
         assertTrue(success);
         Catalog c1 = compiler.getCatalog();
@@ -844,7 +844,7 @@ public class TestVoltCompiler extends TestCase {
     private VoltCompiler compileSchemaForDDLTest(String schema, boolean expectSuccess) {
         String schemaPath = getPathForSchema(schema);
 
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compiler.compileFromDDL(testout_jar, schemaPath);
         assertEquals(expectSuccess, success);
         return compiler;
@@ -1564,7 +1564,7 @@ public class TestVoltCompiler extends TestCase {
     }
 
     private void checkDDLErrorMessage(String ddl, String errorMsg) {
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         boolean success = compileDDL(ddl, compiler);
         checkCompilerErrorMessages(errorMsg, compiler, success);
     }
@@ -1701,7 +1701,7 @@ public class TestVoltCompiler extends TestCase {
     public void testDDLCompilerMatView() {
         // Test MatView.
         String ddl;
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
 
         // Subquery is replaced with a simple select
         ddl = "create table t(id integer not null, num integer, wage integer);\n" +
@@ -1937,7 +1937,7 @@ public class TestVoltCompiler extends TestCase {
 
     void compileLimitDeleteStmtAndCheckCatalog(String ddl, String expectedMessage, String tblName,
             int expectedLimit, String expectedStmt) {
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         boolean success = compileDDL(ddl, compiler);
         checkCompilerErrorMessages(expectedMessage, compiler, success);
 
@@ -2279,7 +2279,7 @@ public class TestVoltCompiler extends TestCase {
             "create table books (cash float default 0.0 NOT NULL, title varchar(10) default 'foo', PRIMARY KEY(cash));\n"
                 + "partition table books on column cash;";
 
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compileDDL(schema, compiler);
         assertFalse(success);
     }
@@ -2327,7 +2327,7 @@ public class TestVoltCompiler extends TestCase {
             " from books\n" +
             " group by id;";
 
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compileDDL(schema, compiler);
         assertFalse(success);
         for (Feedback error: compiler.m_errors) {
@@ -2930,7 +2930,7 @@ public class TestVoltCompiler extends TestCase {
     }
 
     private ArrayList<Feedback> checkInvalidProcedureDDL(String ddl) {
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compileDDL(ddl, compiler);
         assertFalse(success);
         return compiler.m_errors;
@@ -2945,7 +2945,7 @@ public class TestVoltCompiler extends TestCase {
                 "PARTITION TABLE books ON COLUMN cash;" +
                 "creAte PrOcEdUrE FrOm CLasS org.voltdb.compiler.procedures.AddBook;";
 
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compileDDL(schema, compiler);
         assertTrue(success);
 
@@ -2969,7 +2969,7 @@ public class TestVoltCompiler extends TestCase {
                 "create procedure from class org.voltdb.compiler.procedures.NotAnnotatedAddBook;" +
                 "paRtItiOn prOcEdure NotAnnotatedAddBook On taBLe   books coLUmN cash   ParaMETer  0;";
 
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compileDDL(schema, compiler);
         assertTrue(success);
 
@@ -3007,7 +3007,7 @@ public class TestVoltCompiler extends TestCase {
     }
 
     private void checkRoleDDL(String ddl, String errorRegex, TestRole... roles) throws Exception {
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compileDDL(ddl, compiler);
 
         String error = (success || compiler.m_errors.size() == 0
@@ -3100,7 +3100,7 @@ public class TestVoltCompiler extends TestCase {
             givenSchema +
             StringUtils.join(ddl, " ");
 
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         boolean success;
         String error;
         try {
@@ -3613,7 +3613,7 @@ public class TestVoltCompiler extends TestCase {
                 "  group by column2_integer\n;\n";
         File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema1);
         String schemaPath = schemaFile.getPath();
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
 
         boolean success = compiler.compileFromDDL(testout_jar, schemaPath);
         assertTrue(success);
@@ -3631,7 +3631,7 @@ public class TestVoltCompiler extends TestCase {
             "create procedure a.Foo as select * from books;"
         }, "\n"));
 
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         assertFalse("Compile with dotted proc name should fail",
                     compiler.compileFromDDL(testout_jar, ddlFile.getPath()));
         assertTrue("Compile with dotted proc name did not have the expected error message",

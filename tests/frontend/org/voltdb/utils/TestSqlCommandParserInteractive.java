@@ -494,7 +494,7 @@ public class TestSqlCommandParserInteractive extends TestCase {
     {
         CommandStuff cmd = new CommandStuff();
         Future<List<String>> result = cmd.openQuery();
-        String set = "set " + DatabaseConfiguration.DR_MODE_NAME + "=" + DatabaseConfiguration.ACTIVE_ACTIVE;
+        String set = "set DR=ACTIVE";
         cmd.submitText(set + ";\n");
         cmd.waitOnResult();
         System.out.println("RESULT: " + result.get());

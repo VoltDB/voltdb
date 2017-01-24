@@ -3237,7 +3237,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                         callback.repairCompleted(pid, m_cartographer.getHSIdForMaster(pid));
                     }
                     // Even though we are active-active, we must be a joiner so our conversation file must be empty
-                    m_consumerDRGateway.initialize(false, new ArrayList<>());
+                    m_consumerDRGateway.initialize(false, (byte)-1, new ArrayList<>());
                 } else if (m_consumerDRGateway != null) {
                     // 6.2. If we are a DR replica and the consumer was created
                     // before the catalog update, we may care about a deployment
@@ -3850,14 +3850,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     private void prepareReplication() {
         try {
             if (m_consumerDRGateway != null) {
-                List<MeshMemberInfo> expectedClusterMembers;
+                Pair<Byte, List<MeshMemberInfo>> expectedClusterMembers;
                 if (m_producerDRGateway != null) {
                     expectedClusterMembers = m_producerDRGateway.getInitialConversations();
                 }
                 else {
-                    expectedClusterMembers = new ArrayList<>();
+                    expectedClusterMembers = Pair.of((byte)-1, new ArrayList<>());
                 }
-                m_consumerDRGateway.initialize(m_config.m_startAction != StartAction.CREATE, expectedClusterMembers);
+                m_consumerDRGateway.initialize(m_config.m_startAction != StartAction.CREATE,
+                        expectedClusterMembers.getFirst(), expectedClusterMembers.getSecond());
             }
             if (m_producerDRGateway != null) {
                 m_producerDRGateway.startListening(m_catalogContext.cluster.getDrproducerenabled(),
@@ -3882,8 +3883,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 || !m_catalogContext.cluster.getDrconsumerenabled()) {
             return false;
         }
-        if (getReplicationRole() == ReplicationRole.REPLICA ||
-                 m_catalogContext.database.getIsactiveactivedred()) {
+        final String drRole = m_catalogContext.getCluster().getDrrole();
+        if (DrRoleType.REPLICA.value().equals(drRole) || DrRoleType.XDCR.value().equals(drRole)) {
             String drProducerHost = m_catalogContext.cluster.getDrmasterhost();
             byte drConsumerClusterId = (byte)m_catalogContext.cluster.getDrclusterid();
             final Pair<String, Integer> drIfAndPort = VoltZK.getDRInterfaceAndPortFromMetadata(m_localMetadata);

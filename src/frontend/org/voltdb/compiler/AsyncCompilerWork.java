@@ -20,6 +20,7 @@ package org.voltdb.compiler;
 import java.io.Serializable;
 
 import org.voltdb.AuthSystem;
+import org.voltdb.compiler.deploymentfile.DrRoleType;
 
 public class AsyncCompilerWork implements Serializable {
 
@@ -39,7 +40,7 @@ public class AsyncCompilerWork implements Serializable {
     final transient public Object clientData;
     final public String invocationName;
     // We don't use onReplica with DRv2 but we will almost certainly need this in the future
-    final boolean onReplica;
+    final DrRoleType drRole;
     final boolean useAdhocDDL;
     public final AuthSystem.AuthUser user;
 
@@ -48,7 +49,7 @@ public class AsyncCompilerWork implements Serializable {
     public AsyncCompilerWork(long replySiteId, boolean shouldShutdown, long clientHandle,
             long connectionId, String hostname, boolean adminConnection,
             Object clientData, String invocationName,
-            boolean onReplica, boolean useAdhocDDL,
+            DrRoleType drRole, boolean useAdhocDDL,
             AsyncCompilerWorkCompletionHandler completionHandler,
             AuthSystem.AuthUser user)
     {
@@ -61,7 +62,7 @@ public class AsyncCompilerWork implements Serializable {
         this.clientData = clientData;
         this.completionHandler = completionHandler;
         this.invocationName = invocationName;
-        this.onReplica = onReplica;
+        this.drRole = drRole;
         this.useAdhocDDL = useAdhocDDL;
         this.user = user;
         if (completionHandler == null) {
