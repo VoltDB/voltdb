@@ -317,7 +317,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private void releaseExportBytes(long releaseOffset) throws IOException {
         if (m_committedBuffers.isEmpty()) return;
         // if released offset is in an already-released past, just return success
-        if (!m_committedBuffers.isEmpty() && (releaseOffset < m_committedBuffers.peek().uso())) {
+        if (releaseOffset < m_committedBuffers.peek().uso()) {
             return;
         }
 
