@@ -65,7 +65,8 @@ class TableCatalogDelegate {
     void deleteCommand();
 
     void init(catalog::Database const &catalogDatabase,
-            catalog::Table const &catalogTable);
+              catalog::Table const &catalogTable,
+              bool isXDCR);
     PersistentTable *createDeltaTable(catalog::Database const &catalogDatabase,
             catalog::Table const &catalogTable);
     void evaluateExport(catalog::Database const &catalogDatabase,
@@ -73,10 +74,11 @@ class TableCatalogDelegate {
 
     void processSchemaChanges(catalog::Database const &catalogDatabase,
                              catalog::Table const &catalogTable,
-                             std::map<std::string, TableCatalogDelegate*> const &tablesByName);
+                              std::map<std::string, TableCatalogDelegate*> const &tablesByName,
+                              bool isXDCR);
 
-    static TupleSchema *createTupleSchema(catalog::Database const &catalogDatabase,
-                                          catalog::Table const &catalogTable);
+    static TupleSchema *createTupleSchema(catalog::Table const &catalogTable,
+                                          bool isXDCR);
 
     static bool getIndexScheme(catalog::Table const &catalogTable,
                                catalog::Index const &catalogIndex,
@@ -132,6 +134,7 @@ class TableCatalogDelegate {
   private:
     Table *constructTableFromCatalog(catalog::Database const &catalogDatabase,
                                      catalog::Table const &catalogTable,
+                                     bool isXDCR,
                                      int tableAllocationTargetSize = 0);
 
     voltdb::Table *m_table;
