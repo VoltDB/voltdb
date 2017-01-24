@@ -699,7 +699,9 @@ public class PersistentBinaryDeque implements BinaryDeque {
             return;
         }
         ReadCursor reader = m_readCursors.remove(cursorId);
-        if (reader != null && reader.m_segment != null) {
+        // If we never did a poll from this segment for this cursor,
+        // there is no reader initialized for this cursor.
+        if (reader != null && reader.m_segment != null && reader.m_segment.getReader(cursorId) != null) {
             try {
                 reader.m_segment.getReader(cursorId).close();
             }

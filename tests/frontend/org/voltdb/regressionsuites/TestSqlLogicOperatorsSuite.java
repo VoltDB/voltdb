@@ -187,6 +187,15 @@ public class TestSqlLogicOperatorsSuite extends RegressionSuite {
         assertEquals(10, results[0].asScalarLong());
     }
 
+    public void testInvalidRightOperand() throws IOException, ProcCallException
+    {
+        // ENG-11172
+        Client client = getClient();
+        String sql = "SELECT * FROM T_ENG_11172 WHERE NOT NOW <> TIME %s CONCAT ('B') = 'K%%X';";
+        verifyStmtFails(client, String.format(sql, "AND"), "unexpected token: \\)");
+        verifyStmtFails(client, String.format(sql, "OR"), "unexpected token: \\)");
+    }
+
     //
     // JUnit / RegressionSuite boilerplate
     //

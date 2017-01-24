@@ -80,6 +80,7 @@ import org.voltdb.compiler.AsyncCompilerResult;
 import org.voltdb.compiler.AsyncCompilerWork.AsyncCompilerWorkCompletionHandler;
 import org.voltdb.compiler.CatalogChangeResult;
 import org.voltdb.compiler.CatalogChangeWork;
+import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.compilereport.ViewExplainer;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.Iv2Trace;
@@ -1058,7 +1059,7 @@ public final class InvocationDispatcher {
                     task.clientHandle, ccxn.connectionId(), ccxn.getHostnameAndIPAndPort(),
                     isAdmin, ccxn, catalogBytes, deploymentString,
                     task.getProcName(),
-                    VoltDB.instance().getReplicationRole() == ReplicationRole.REPLICA,
+                    DrRoleType.fromValue(VoltDB.instance().getCatalogContext().getCluster().getDrrole()),
                     useDdlSchema,
                     m_adhocCompletionHandler, user,
                     null, isPromotion, -1L, -1L
@@ -1083,7 +1084,7 @@ public final class InvocationDispatcher {
         if (VoltDB.instance().getReplicationRole() == ReplicationRole.NONE)
         {
             return gracefulFailureResponse(
-                    "@Promote issued on master cluster. No action taken.",
+                    "@Promote issued on non-replica cluster. No action taken.",
                     task.clientHandle);
         }
 
@@ -1092,7 +1093,7 @@ public final class InvocationDispatcher {
                                   task.clientHandle, ccxn.connectionId(), ccxn.getHostnameAndIPAndPort(),
                                   handler.isAdmin(), ccxn, null, null,
                                   "@UpdateApplicationCatalog",
-                                  VoltDB.instance().getReplicationRole() == ReplicationRole.REPLICA,
+                                  DrRoleType.fromValue(VoltDB.instance().getCatalogContext().getCluster().getDrrole()),
                                   useDdlSchema,
                                   m_adhocCompletionHandler, user,
                                   null, true, -1L, -1L
@@ -1442,7 +1443,7 @@ public final class InvocationDispatcher {
                 userPartitionKey == null, userPartitionKey,
                 task.getProcName(),
                 task.getBatchTimeout(),
-                VoltDB.instance().getReplicationRole() == ReplicationRole.REPLICA,
+                DrRoleType.fromValue(VoltDB.instance().getCatalogContext().getCluster().getDrrole()),
                 VoltDB.instance().getCatalogContext().cluster.getUseddlschema(),
                 m_adhocCompletionHandler, user);
         LocalObjectMessage work = new LocalObjectMessage( ahpw );

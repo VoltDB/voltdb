@@ -389,7 +389,7 @@ template<class T> static inline PersistentTable* constructEmptyDestTable(
         catalog::Table* catalogViewTable,
         T* viewHandler) {
     TableCatalogDelegate* destTcd = engine->getTableDelegate(destTable->name());
-    destTcd->init(*engine->getDatabase(), *catalogViewTable);
+    destTcd->init(*engine->getDatabase(), *catalogViewTable, engine->getIsActiveActiveDREnabled());
     PersistentTable* destEmptyTable = destTcd->getPersistentTable();
     assert(destEmptyTable);
     return destEmptyTable;
@@ -473,7 +473,7 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
     assert(tcd);
 
     catalog::Table* catalogTable = engine->getCatalogTable(m_name);
-    tcd->init(*engine->getDatabase(), *catalogTable);
+    tcd->init(*engine->getDatabase(), *catalogTable, engine->getIsActiveActiveDREnabled());
 
     PersistentTable* emptyTable = tcd->getPersistentTable();
     assert(emptyTable);
