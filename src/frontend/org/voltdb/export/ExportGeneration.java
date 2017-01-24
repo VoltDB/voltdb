@@ -557,6 +557,7 @@ public class ExportGeneration implements Generation {
     }
 
     private void handleChildUpdate(final WatchedEvent event, final HostMessenger messenger) {
+        if (shutdown || m_drainedSources.get() == m_numSources) return;
         messenger.getZK().getChildren(event.getPath(), constructMailboxChildWatcher(messenger), constructChildRetrievalCallback(), null);
     }
 
@@ -749,6 +750,17 @@ public class ExportGeneration implements Generation {
         shutdown = true;
         //We need messenger NULL guard for tests.
         if (m_mbox != null && messenger != null) {
+            for (Integer partition : m_dataSourcesByPartition.keySet()) {
+                final String partitionDN =  m_mailboxesZKPath + "/" + partition;
+                String path = partitionDN + "/" + m_mbox.getHSId();
+                try {
+                    messenger.getZK().delete(path, 0);
+                } catch (InterruptedException ex) {
+                    ;
+                } catch (KeeperException ex) {
+                    ;
+                }
+            }
             messenger.removeMailbox(m_mbox);
         }
         m_onAllSourcesDrained = null;
