@@ -17,13 +17,14 @@
 
 package org.voltdb.client;
 
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.channels.SocketChannel;
+
 import javax.net.ssl.SSLEngine;
 import javax.net.ssl.SSLEngineResult;
 import javax.net.ssl.SSLException;
 import javax.net.ssl.SSLSession;
-import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.channels.SocketChannel;
 
 /**
  * Code to perform an SSL handshake.  Will be used by both client and server code.
@@ -151,6 +152,8 @@ public class SSLHandshaker {
                 break;
             case BUFFER_OVERFLOW:
                 m_clear = ByteBuffer.allocate(m_clear.capacity() << 1);
+                System.err.println("***!STEBUG!*** handshake unwrap overflowed");
+
                 break;
             case BUFFER_UNDERFLOW:
                 // During handshake, this indicates that there's not yet data to read.  We'll stay

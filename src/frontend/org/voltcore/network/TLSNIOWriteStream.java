@@ -29,6 +29,7 @@ import java.util.concurrent.TimeUnit;
 
 import javax.net.ssl.SSLEngine;
 
+import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.FlexibleSemaphore;
@@ -50,6 +51,7 @@ public class TLSNIOWriteStream extends NIOWriteStream {
     private final SSLEngine m_sslEngine;
     private final SSLBufferEncrypter m_encrypter;
     private final EncryptionGateway m_ecryptgw = new EncryptionGateway();
+    private int m_ledger = 0;
 
     public TLSNIOWriteStream(VoltPort port, Runnable offBackPressureCallback,
             Runnable onBackPressureCallback, QueueMonitor monitor,
@@ -69,17 +71,16 @@ public class TLSNIOWriteStream extends NIOWriteStream {
         return m_sslEngine.getSession().getPacketBufferSize();
     }
 
-
     @Override
     int serializeQueuedWrites(NetworkDBBPool pool) throws IOException {
         checkForGatewayExceptions();
 
-        final int frameMax = applicationBufferSize();
+        final int frameMax = Math.min(CipherExecutor.PAGE_SIZE, applicationBufferSize());
         int processedWrites = 0;
         final Deque<DeferredSerialization> oldlist = getQueuedWrites();
         if (oldlist.isEmpty()) return 0;
 
-        ByteBuf accum = m_ce.allocator().buffer(applicationBufferSize());
+        ByteBuf accum = m_ce.allocator().buffer(frameMax).clear();
 
         DeferredSerialization ds = null;
         int bytesQueued = 0;
@@ -94,7 +95,7 @@ public class TLSNIOWriteStream extends NIOWriteStream {
                 if (accum.writerIndex() > 0) {
                     m_ecryptgw.offer(new EncryptFrame(accum));
                     bytesQueued += accum.writerIndex();
-                    accum = m_ce.allocator().buffer(frameMax);
+                    accum = m_ce.allocator().buffer(frameMax).clear();
                 }
                 ByteBuf big = m_ce.allocator().buffer(serializedSize).writerIndex(serializedSize);
                 ByteBuffer jbb = big.nioBuffer();
@@ -106,13 +107,13 @@ public class TLSNIOWriteStream extends NIOWriteStream {
             } else if (accum.writerIndex() + serializedSize > frameMax) {
                 m_ecryptgw.offer(new EncryptFrame(accum));
                 bytesQueued += accum.writerIndex();
-                accum = m_ce.allocator().buffer(frameMax);
+                accum = m_ce.allocator().buffer(frameMax).clear();
             }
             ByteBuf packet = accum.slice(accum.writerIndex(), serializedSize);
             ByteBuffer jbb = packet.nioBuffer();
             ds.serialize(jbb);
             checkSloppySerialization(jbb, ds);
-            accum.writerIndex(accum.writerIndex()+jbb.position());
+            accum.writerIndex(accum.writerIndex()+serializedSize);
         }
         if (accum.writerIndex() > 0) {
             m_ecryptgw.offer(new EncryptFrame(accum));
@@ -124,20 +125,35 @@ public class TLSNIOWriteStream extends NIOWriteStream {
         return processedWrites;
     }
 
+    @Override
+    public void updateQueued(int queued, boolean noBackpressureSignal) {
+        super.updateQueued(queued, noBackpressureSignal);
+        m_ledger += queued;
+    }
+
     void waitForPendingEncrypts() throws IOException {
-        boolean acquired = false;
-        while (!acquired) {
+        boolean acquired;
+        if (!m_ce.isActive()) {
+            while (!m_ecryptgw.isEmpty()) {
+                m_ecryptgw.run();
+            }
+            checkForGatewayExceptions();
+        }
+        do {
             int waitFor = 1 - m_inFlight.availablePermits();
+            acquired = waitFor == 0;
             for (int i = 0; i < waitFor && !acquired; ++i) {
                 checkForGatewayExceptions();
                 try {
                     acquired = m_inFlight.tryAcquire(1, TimeUnit.SECONDS);
+                    if (acquired) {
+                        m_inFlight.release();
+                    }
                 } catch (InterruptedException e) {
                     throw new IOException("interrupted while waiting for pending encrypts", e);
                 }
             }
-        }
-        m_inFlight.release();
+        } while (!acquired);
     }
 
     private final List<EncryptFrame> m_partial = new ArrayList<>();
@@ -228,6 +244,9 @@ public class TLSNIOWriteStream extends NIOWriteStream {
 
             } while (rc > 0);
         } finally {
+            if (m_outbuf.numComponents() <= 1 && m_hadBackPressure && m_queuedWrites.size() <= m_maxQueuedWritesBeforeBackpressure) {
+                backpressureEnded();
+            }
             if (bytesWritten > 0 && !isEmpty()) {
                 m_lastPendingWriteTime = EstTime.currentTimeMillis();
             } else {
@@ -239,6 +258,17 @@ public class TLSNIOWriteStream extends NIOWriteStream {
             }
         }
         return bytesWritten;
+    }
+
+    String dumpState() {
+        return new StringBuilder(256).append("TLSNIOWriteStream[")
+                .append("isEmpty()=").append(isEmpty())
+                .append(", encrypted.isEmpty()=").append(m_encrypted.isEmpty())
+                .append(", exceptions.isEmpty()=").append(m_exceptions.isEmpty())
+                .append(", gateway=").append(m_ecryptgw.dumpState())
+                .append(", inFligth=").append(m_inFlight.availablePermits())
+                .append(", outbuf.readableBytes()=").append(m_outbuf.readableBytes())
+                .append("]").toString();
     }
 
     @Override
@@ -258,29 +288,36 @@ public class TLSNIOWriteStream extends NIOWriteStream {
                 ds.cancel();
             }
 
-            m_ecryptgw.die();
+            int waitFor = 1 - m_inFlight.availablePermits();
+            for (int i = 0; i < waitFor; ++i) {
+                try {
+                    if (m_inFlight.tryAcquire(1, TimeUnit.SECONDS)) {
+                        m_inFlight.release();
+                        break;
+                    }
+                } catch (InterruptedException e) {
+                    break;
+                }
+            }
 
-            int delta = 0;
-            int discarded = 0;
+            m_ecryptgw.die();
 
             EncryptFrame frame = null;
             while ((frame = m_encrypted.poll()) != null) {
-                delta += frame.delta;
-                discarded += frame.frame.readableBytes();
                 frame.frame.release();
             }
 
             for (EncryptFrame ef: m_partial) {
-                delta += ef.delta;
-                discarded += ef.frame.readableBytes();
                 ef.frame.release();
             }
             m_partial.clear();
 
-            discarded += m_outbuf.readableBytes();
             m_outbuf.release();
 
-            updateQueued(delta-discarded, false);
+            // we have to use ledger because we have no idea how much encrypt delta
+            // corresponds to what is left in the output buffer
+            final int unqueue = -m_ledger;
+            updateQueued(unqueue, false);
         } finally {
             m_inFlight.drainPermits();
             m_inFlight.release();
@@ -304,26 +341,33 @@ public class TLSNIOWriteStream extends NIOWriteStream {
             m_inFlight.reducePermits(chunks.size());
             if (wasEmpty) {
                 ListenableFuture<?> fut = m_ce.getES().submit(this);
-                fut.addListener(new ExceptionListener(fut), m_ce.getES());
+                fut.addListener(new ExceptionListener(fut), CoreUtils.SAMETHREADEXECUTOR);
             }
         }
 
-        synchronized void die() {
+        synchronized int die() {
             int toUnqueue = 0;
             EncryptFrame ef = null;
-            while (( ef = m_q.poll()) != null) {
+            while ((ef = m_q.poll()) != null) {
                 toUnqueue += ef.frame.readableBytes();
                 if (ef.isLast()) {
                     ef.bb.release();
                 }
             }
-            updateQueued(-toUnqueue, false);
+            return toUnqueue;
         }
 
         private void enableWriteSelection() {
             synchronized(TLSNIOWriteStream.this) {
                 ((VoltPort)m_port).enableWriteSelection();
             }
+        }
+
+        String dumpState() {
+            return new StringBuilder(256).append("EncryptionGateway[")
+                    .append("q.isEmpty()=").append(m_q.isEmpty())
+                    .append(", partialSize=").append(m_partialSize)
+                    .append("]").toString();
         }
 
         @Override
@@ -360,6 +404,10 @@ public class TLSNIOWriteStream extends NIOWriteStream {
                 if (frame.isLast()) {
                     enableWriteSelection();
                 }
+            } else {
+                m_inFlight.release();
+                encr.release();
+                return;
             }
             synchronized(this) {
                 m_q.poll();
@@ -367,9 +415,9 @@ public class TLSNIOWriteStream extends NIOWriteStream {
                     frame.bb.release();
                 }
                 m_inFlight.release();
-                if (m_q.peek() != null && !m_isShutdown) {
+                if (m_q.peek() != null && !m_isShutdown && m_ce.isActive()) {
                     ListenableFuture<?> fut = m_ce.getES().submit(this);
-                    fut.addListener(new ExceptionListener(fut), m_ce.getES());
+                    fut.addListener(new ExceptionListener(fut), CoreUtils.SAMETHREADEXECUTOR);
                 }
             }
         }
@@ -391,6 +439,7 @@ public class TLSNIOWriteStream extends NIOWriteStream {
                 m_fut.get();
             } catch (InterruptedException notPossible) {
             } catch (ExecutionException e) {
+                m_inFlight.release();
                 m_exceptions.offer(e);
             }
         }

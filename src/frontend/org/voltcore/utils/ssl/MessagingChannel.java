@@ -35,7 +35,7 @@ public class MessagingChannel {
         if (sslEngine == null) {
             return new MessagingChannel(socketChannel);
         }
-        return new SSLMessagingChannel(socketChannel, sslEngine);
+        return new TLSMessagingChannel(socketChannel, sslEngine);
     }
 
     protected final SocketChannel m_socketChannel;
@@ -77,5 +77,5 @@ public class MessagingChannel {
         return bytesWritten;
     }
 
-    public void shutdown() {}
+    public void cleanUp() {}
 }

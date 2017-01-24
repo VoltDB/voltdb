@@ -28,6 +28,7 @@ import java.util.concurrent.TimeUnit;
 
 import javax.net.ssl.SSLEngine;
 
+import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.FlexibleSemaphore;
 import org.voltcore.utils.ssl.SSLBufferDecrypter;
 
@@ -38,7 +39,7 @@ import io.netty.buffer.CompositeByteBuf;
 import io.netty.buffer.Unpooled;
 
 public class TLSVoltPort extends VoltPort  {
-    private final static int TLS_HEADER_SIZE = 5;
+    public final static int TLS_HEADER_SIZE = 5;
 
     private final SSLEngine m_sslEngine;
     private final SSLBufferDecrypter m_decrypter;
@@ -80,6 +81,19 @@ public class TLSVoltPort extends VoltPort  {
     void die() {
         super.die();
         m_dcryptgw.die();
+
+        int waitFor = 1 - m_inFlight.availablePermits();
+        for (int i = 0; i < waitFor; ++i) {
+            try {
+                if (m_inFlight.tryAcquire(1, TimeUnit.SECONDS)) {
+                    m_inFlight.release();
+                    break;
+                }
+            } catch (InterruptedException e) {
+                break;
+            }
+        }
+
         m_inFlight.drainPermits();
         m_inFlight.release();
     }
@@ -96,19 +110,37 @@ public class TLSVoltPort extends VoltPort  {
     }
 
     private void waitForPendingDecrypts() throws IOException {
-        boolean acquired = false;
-        while (!acquired) {
+        if (!m_ce.isActive()) {
+            while (!m_dcryptgw.isEmpty()) {
+                m_dcryptgw.run();
+            }
+        }
+        boolean acquired;
+        do {
             int waitFor = 1 - m_inFlight.availablePermits();
+            acquired = waitFor == 0;
             for (int i = 0; i < waitFor && !acquired; ++i) {
                 checkForGatewayExceptions();
                 try {
                     acquired = m_inFlight.tryAcquire(1, TimeUnit.SECONDS);
+                    if (acquired) {
+                        m_inFlight.release();
+                    }
                 } catch (InterruptedException e) {
                     throw new IOException("interrupted while waiting for pending decrypts", e);
                 }
             }
-        }
-        m_inFlight.release();
+        } while (!acquired);
+    }
+
+    String dumpState() {
+        return new StringBuilder(256).append("TLSVoltPort[")
+                .append("availableBytes=").append(readStream().dataAvailable())
+                .append(", gateway=").append(m_dcryptgw.dumpState())
+                .append(", decrypted.isEmpty()= ").append(m_decrypted.isEmpty())
+                .append(", exceptions.isEmpty()= ").append(m_exceptions.isEmpty())
+                .append(", inFlight=").append(m_inFlight.availablePermits())
+                .append("]").toString();
     }
 
     private void waitForPendingEncrypts() throws IOException {
@@ -127,11 +159,11 @@ public class TLSVoltPort extends VoltPort  {
                 if (maxRead > 0) {
                     int read = fillReadStream(maxRead);
                     if (read > 0) {
-                        byte [] frameHeader = new byte[TLS_HEADER_SIZE];
-                        while (readStream().dataAvailable() >= frameHeader.length) {
+                        ByteBuf frameHeader = Unpooled.wrappedBuffer(new byte[TLS_HEADER_SIZE]);
+                        while (readStream().dataAvailable() >= TLS_HEADER_SIZE) {
                             NIOReadStream rdstrm = (NIOReadStream)readStream();
-                            rdstrm.peekBytes(frameHeader);
-                            int framesz = ByteBuffer.wrap(frameHeader,3,2).getShort() + frameHeader.length;
+                            rdstrm.peekBytes(frameHeader.array());
+                            int framesz = frameHeader.getShort(3) + TLS_HEADER_SIZE;
                             if (rdstrm.dataAvailable() < framesz) break;
                             m_dcryptgw.offer(rdstrm.getSlice(framesz));
                         }
@@ -230,6 +262,11 @@ public class TLSVoltPort extends VoltPort  {
         boolean done() {
             return m_pieces <= 0;
         }
+
+        void die() {
+            m_pieces = -1;
+            m_bb.release();
+        }
     }
 
     /**
@@ -270,6 +307,7 @@ public class TLSVoltPort extends VoltPort  {
                 m_fut.get();
             } catch (InterruptedException notPossible) {
             } catch (ExecutionException e) {
+                m_inFlight.release();
                 m_exceptions.offer(e);
             }
         }
@@ -298,7 +336,7 @@ public class TLSVoltPort extends VoltPort  {
             m_q.offer(slice);
             if (wasEmpty) {
                 ListenableFuture<?> fut = m_ce.getES().submit(this);
-                fut.addListener(new ExceptionListener(fut), m_ce.getES());
+                fut.addListener(new ExceptionListener(fut), CoreUtils.SAMETHREADEXECUTOR);
             }
             m_inFlight.reducePermits(1);
         }
@@ -309,6 +347,21 @@ public class TLSVoltPort extends VoltPort  {
                 slice.bb.readerIndex(slice.bb.writerIndex());
                 slice.discard();
             }
+            if (m_assembler != null) {
+                m_assembler.die();
+            }
+        }
+
+        synchronized boolean isEmpty() {
+            return m_q.isEmpty();
+        }
+
+        String dumpState() {
+            Assembler asm = m_assembler;
+            return new StringBuilder(256).append("DecryptionGateway[isEmpty()=").append(isEmpty())
+              .append(", isDead()=").append(isDead())
+              .append(", accum=").append(asm != null ? Integer.toString(asm.m_pieces) : "(null)")
+              .append("]").toString();
         }
 
         @Override
@@ -358,6 +411,7 @@ public class TLSVoltPort extends VoltPort  {
                     while (dest.isReadable()) {
                         msgsz = dest.readInt();
                         ByteBuffer bb = ByteBuffer.allocate(msgsz);
+                        assert dest.readableBytes() >= msgsz : "decrypted frame did not contain whole messages";
                         dest.readBytes(bb);
                         bb.flip();
                         if (!isDead()) {
@@ -382,9 +436,9 @@ public class TLSVoltPort extends VoltPort  {
                 src.readerIndex(src.writerIndex());
                 slice.discard();
                 m_inFlight.release();
-                if (m_q.peek() != null) {
+                if (m_q.peek() != null && m_ce.isActive()) {
                     ListenableFuture<?> fut = m_ce.getES().submit(this);
-                    fut.addListener(new ExceptionListener(fut), m_ce.getES());
+                    fut.addListener(new ExceptionListener(fut), CoreUtils.SAMETHREADEXECUTOR);
                 }
             }
         }

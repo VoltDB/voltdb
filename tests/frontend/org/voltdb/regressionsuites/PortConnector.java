@@ -45,7 +45,7 @@ import org.voltcore.utils.ssl.SSLBufferDecrypter;
 import org.voltcore.utils.ssl.SSLBufferEncrypter;
 import org.voltcore.utils.ssl.SSLConfiguration;
 import org.voltdb.Inits;
-import org.voltdb.client.SSLHandshaker;
+import org.voltdb.client.TLSHandshaker;
 
 public class PortConnector {
 
@@ -111,7 +111,7 @@ public class PortConnector {
             }
             SSLEngine sslEngine = sslContext.createSSLEngine("client", m_port);
             sslEngine.setUseClientMode(true);
-            SSLHandshaker handshaker = new SSLHandshaker(m_socket, sslEngine);
+            TLSHandshaker handshaker = new TLSHandshaker(m_socket, sslEngine);
             boolean shookHands = false;
             try {
                 shookHands = handshaker.handshake();

@@ -22,6 +22,8 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import javax.net.ssl.SSLEngine;
+
 import org.voltcore.utils.CoreUtils;
 
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
@@ -80,6 +82,10 @@ public enum CipherExecutor {
         }
     }
 
+    public boolean isActive() {
+        return m_active.get();
+    }
+
     public void shutdown() {
         if (m_active.compareAndSet(true, false)) {
             synchronized (this) {
@@ -96,6 +102,9 @@ public enum CipherExecutor {
     }
 
     public io.netty.buffer.PooledByteBufAllocator allocator() {
+        if (!m_active.get()) {
+            throw new IllegalStateException(name() + " cipher is not active");
+        }
         switch (this) {
         case CLIENT:
             return ClientPoolHolder.INSTANCE;
@@ -136,5 +145,9 @@ public enum CipherExecutor {
                         io.netty.buffer.PooledByteBufAllocator.defaultTinyCacheSize(),
                         io.netty.buffer.PooledByteBufAllocator.defaultSmallCacheSize(),
                         512);
+    }
+
+    public static CipherExecutor valueOf(SSLEngine engn) {
+        return engn.getUseClientMode() ? CLIENT : SERVER;
     }
 }

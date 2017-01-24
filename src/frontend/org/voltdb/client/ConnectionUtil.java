@@ -48,6 +48,7 @@ import org.voltcore.network.ReverseDNSCache;
 import org.voltcore.utils.ssl.MessagingChannel;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.common.Constants;
+import org.voltdb.utils.Digester;
 import org.voltdb.utils.SerializationHelper;
 
 import com.google_voltpatches.common.base.Function;
@@ -194,10 +195,13 @@ public class ConnectionUtil {
             throw new IOException("Failed to open host " + ReverseDNSCache.hostnameOrAddress(addr.getAddress()));
         }
 
-        aChannel.configureBlocking(false);
+        synchronized(aChannel.blockingLock()) {
+            aChannel.configureBlocking(false);
+            aChannel.socket().setTcpNoDelay(true);
+        }
 
         if (sslEngine != null) {
-            SSLHandshaker handshaker = new SSLHandshaker(aChannel, sslEngine);
+            TLSHandshaker handshaker = new TLSHandshaker(aChannel, sslEngine);
             boolean shookHands = false;
             try {
                 shookHands = handshaker.handshake();
@@ -218,8 +222,10 @@ public class ConnectionUtil {
             /*
              * Send login info
              */
-            aChannel.configureBlocking(true);
-            aChannel.socket().setTcpNoDelay(true);
+            synchronized(aChannel.blockingLock()) {
+                aChannel.configureBlocking(true);
+                aChannel.socket().setTcpNoDelay(true);
+            }
 
             // encode strings
             byte[] serviceBytes = service == null ? null : service.getBytes(Constants.UTF8ENCODING);
@@ -246,9 +252,9 @@ public class ConnectionUtil {
 
             // TODO: do the retry here... ( 1 to 4 )
 
-
             try {
                 messagingChannel.writeMessage(b);
+                System.err.println("***!STEBUG!*** clientauth - sent login message (01) " + Digester.md5AsUUID(b.array()));
             } catch (IOException e) {
                 throw new IOException("Failed to write authentication message to server.", e);
             }
@@ -259,6 +265,7 @@ public class ConnectionUtil {
             ByteBuffer loginResponse;
             try {
                 loginResponse = messagingChannel.readMessage();
+                System.err.println("***!STEBUG!*** clientauth - read login response (01)");
             } catch (IOException e) {
                 throw new IOException("Authentication rejected", e);
             }
@@ -308,11 +315,13 @@ public class ConnectionUtil {
             loginResponse.get(buildStringBytes);
             returnArray[2] = new String(buildStringBytes, Constants.UTF8ENCODING);
 
-            aChannel.configureBlocking(false);
-            aChannel.socket().setKeepAlive(true);
+            synchronized(aChannel.blockingLock()) {
+                aChannel.configureBlocking(false);
+                aChannel.socket().setKeepAlive(true);
+            }
             success = true;
         } finally {
-            messagingChannel.shutdown();
+            messagingChannel.cleanUp();
             if (!success) {
                 aChannel.close();
             }

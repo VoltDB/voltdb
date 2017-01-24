@@ -28,7 +28,7 @@ import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.security.UnrecoverableKeyException;
 import java.security.cert.CertificateException;
-import java.util.NavigableSet;
+import java.util.Set;
 
 import javax.net.ssl.KeyManager;
 import javax.net.ssl.KeyManagerFactory;
@@ -36,7 +36,7 @@ import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
 
-import com.google_voltpatches.common.collect.ImmutableSortedSet;
+import com.google_voltpatches.common.collect.ImmutableSet;
 
 /**
  * Code common to ServerSSLEngineFactory and ClientSSLEngineFactory.
@@ -48,7 +48,7 @@ public class SSLConfiguration {
     public static final String TRUSTSTORE_CONFIG_PROP = "trustStore";
     public static final String TRUSTSTORE_PASSWORD_CONFIG_PROP = "trustStorePassword";
 
-    public static NavigableSet<String> PREFERRED_CIPHERS = ImmutableSortedSet.<String>naturalOrder()
+    public static Set<String> PREFERRED_CIPHERS = ImmutableSet.<String>builder()
             .add("TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384")
             .add("TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256")
             .add("TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384")

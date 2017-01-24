@@ -78,7 +78,7 @@ public class SSLMessagingChannel extends MessagingChannel {
         return super.writeMessage(wrapped);
     }
 
-    public void shutdown() {
+    public void cleanUp() {
         m_encCont.discard();
         m_dstCont.discard();
     }

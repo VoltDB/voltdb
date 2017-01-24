@@ -82,7 +82,7 @@ import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.client.ClientAuthScheme;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.client.SSLHandshaker;
+import org.voltdb.client.TLSHandshaker;
 import org.voltdb.common.Constants;
 import org.voltdb.dtxn.InitiatorStats.InvocationInfo;
 import org.voltdb.iv2.Cartographer;
@@ -93,6 +93,7 @@ import org.voltdb.messaging.Iv2EndOfLogMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.LocalMailbox;
 import org.voltdb.security.AuthenticationRequest;
+import org.voltdb.utils.Digester;
 import org.voltdb.utils.MiscUtils;
 
 import com.google_voltpatches.common.base.Charsets;
@@ -339,6 +340,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 if (m_socket != null) {
 
                     SSLEngine sslEngine = null;
+                    ByteBuffer remnant = ByteBuffer.wrap(new byte[0]);
+
                     if (m_sslContext != null) {
                         try {
                             sslEngine = m_sslContext.createSSLEngine();
@@ -350,27 +353,30 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         sslEngine.setUseClientMode(false);
                         sslEngine.setNeedClientAuth(false);
 
-                        NavigableSet<String> supported = ImmutableSortedSet.copyOf(sslEngine.getSupportedCipherSuites());
-                        Set<String> intersection = Sets.intersection(SSLConfiguration.PREFERRED_CIPHERS, supported);
+                        NavigableSet<String> enabled = ImmutableSortedSet.copyOf(sslEngine.getEnabledCipherSuites());
+                        Set<String> intersection = Sets.intersection(SSLConfiguration.PREFERRED_CIPHERS, enabled);
                         if (intersection.isEmpty()) {
                             hostLog.warn("Preferred cipher suites are not available");
-                            intersection = supported;
+                            intersection = enabled;
                         }
                         sslEngine.setEnabledCipherSuites(intersection.toArray(new String[0]));
                         // blocking needs to be false for handshaking.
                         boolean handshakeStatus;
 
                         try {
-                            m_socket.configureBlocking(false);
-                            SSLHandshaker handshaker = new SSLHandshaker(m_socket, sslEngine);
+                            // m_socket.configureBlocking(false);
+                            m_socket.socket().setTcpNoDelay(true);
+                            TLSHandshaker handshaker = new TLSHandshaker(m_socket, sslEngine);
                             handshakeStatus = handshaker.handshake();
+                            remnant = handshaker.getRemnant();
+
                         } catch (IOException e) {
                             try {
                                 m_socket.close();
                             } catch (IOException e1) {
-                                e1.printStackTrace();
+                                hostLog.warn("failed to close channel",e1);
                             }
-                            networkLog.warn("Rejected accepting new connection, SSL handshake failed: " + e.getMessage());
+                            networkLog.warn("Rejected accepting new connection, SSL handshake failed: " + e.getMessage(), e);
                             return;
                         }
                         if (!handshakeStatus) {
@@ -404,7 +410,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                 ByteBuffer b = ByteBuffer.allocate(1);
                                 b.put(MAX_CONNECTIONS_LIMIT_ERROR);
                                 b.flip();
-                                m_socket.configureBlocking(true);
+                                synchronized(m_socket.blockingLock()) {
+                                    m_socket.configureBlocking(true);
+                                }
                                 for (int ii = 0; ii < 4 && b.hasRemaining(); ii++) {
                                     messagingChannel.writeMessage(b);
                                 }
@@ -422,11 +430,13 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
                         //Populated on timeout
                         timeoutRef = new AtomicReference<String>();
-                        final ClientInputHandler handler = authenticate(m_socket, messagingChannel, timeoutRef);
+                        final ClientInputHandler handler = authenticate(m_socket, messagingChannel, timeoutRef, remnant);
                         if (handler != null) {
-                            m_socket.configureBlocking(false);
-                            m_socket.socket().setTcpNoDelay(true);
-                            m_socket.socket().setKeepAlive(true);
+                            synchronized(m_socket.blockingLock()) {
+                                m_socket.configureBlocking(false);
+                                m_socket.socket().setTcpNoDelay(true);
+                                m_socket.socket().setKeepAlive(true);
+                            }
 
                             m_network.registerChannel(
                                     m_socket,
@@ -456,7 +466,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             }
                         }
                     } finally {
-                        messagingChannel.shutdown();
+                        messagingChannel.cleanUp();
                         if (!success) {
                             m_numConnections.decrementAndGet();
                         }
@@ -531,7 +541,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
          * @throws IOException
          */
         private ClientInputHandler
-        authenticate(final SocketChannel socket, MessagingChannel messagingChannel, final AtomicReference<String> timeoutRef) throws IOException
+        authenticate(final SocketChannel socket, MessagingChannel messagingChannel, final AtomicReference<String> timeoutRef, ByteBuffer remnant) throws IOException
         {
             ByteBuffer responseBuffer = ByteBuffer.allocate(6);
             byte version = (byte)0;
@@ -542,8 +552,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
              * The login message is a length preceded name string followed by a length preceded
              * SHA-1 single hash of the password.
              */
-            socket.configureBlocking(true);
-            socket.socket().setTcpNoDelay(true);//Greatly speeds up requests hitting the wire
+            synchronized (socket.blockingLock()) {
+                socket.configureBlocking(true);
+                socket.socket().setTcpNoDelay(true);//Greatly speeds up requests hitting the wire
+            }
+
+            if (remnant.hasRemaining() && remnant.remaining() <= 4 && remnant.getInt() < remnant.remaining()) {
+                throw new IOException("SSL Handshake remnant is not a valit VoltDB message: " + remnant);
+            }
 
             /*
              * Schedule a timeout to close the socket in case there is no response for the timeout
@@ -569,16 +585,32 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         }
                     }, AUTH_TIMEOUT_MS, 0, TimeUnit.MILLISECONDS);
 
-            ByteBuffer message = null;
+            ByteBuffer message = remnant.hasRemaining() ? remnant : null;
+            if (message != null) {
+                byte [] todigest = new byte[message.limit()];
+                message.position(0);
+                message.get(todigest).position(4);
+                System.err.println("***!STEBUG!*** serverauth - reading login message: " + Digester.md5AsUUID(todigest));
+            }
+            long beforeRead = 0;
             try {
                 while (message == null) {
+                    beforeRead = EstTime.currentTimeMillis();
                     message = messagingChannel.readMessage();
                 }
+                System.err.println("***!STEBUG!*** serverauth - reading login message (01)");
             } catch (IOException e) {
-                // Possibly timeout firing
+                long opduration = EstTime.currentTimeMillis() - beforeRead;
+                if (opduration > (AUTH_TIMEOUT_MS - (AUTH_TIMEOUT_MS/20))) {
+                    System.err.println("***!STEBUG!*** we have a timeout close");
+                    e = null;
+                }
                 try {
                     socket.close();
                 } catch (IOException e1) {
+                }
+                if (e != null) {
+                    throw e;
                 }
                 return null;
             }
@@ -588,6 +620,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
              * If cancellation fails then the socket is dead and the connection lost
              */
             if (!timeoutFuture.cancel(false)) {
+                System.err.println("***!STEBUG!*** serverauth - TIMEOUT reading login message (01)");
                 return null;
             }
 
@@ -629,6 +662,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             try {
                 ap = AuthProvider.fromService(service);
             } catch (IllegalArgumentException unkownProvider) {
+                System.err.println("***!STEBUG!*** serverauth - FAIL getting auth provider (01)");
                 // handle it bellow
             }
 
@@ -712,6 +746,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             responseBuffer.putInt(buildString.length);
             responseBuffer.put(buildString).flip();
             messagingChannel.writeMessage(responseBuffer);
+            System.err.println("***!STEBUG!*** serverauth - wrote login response (" + handler.connectionId() + ")");
             return handler;
         }
     }

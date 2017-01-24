@@ -50,7 +50,7 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
      */
     protected final VoltPort m_port;
 
-    private static final VoltLogger networkLog = new VoltLogger("NETWORK");
+    protected static final VoltLogger networkLog = new VoltLogger("NETWORK");
 
     /**
      * Contains messages waiting to be serialized and written to the socket
