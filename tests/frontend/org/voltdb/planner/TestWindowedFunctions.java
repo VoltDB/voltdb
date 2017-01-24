@@ -573,11 +573,13 @@ public class TestWindowedFunctions extends PlannerTestCase {
                      numberOfFragments,
                      fragments.size());
         int idx = -1;
-        int fragment = 0;
+        int fragment = 1;
         // The index of the last PlanNodeType in types.
         int nchildren = types.length - 1;
+        System.out.printf("Plan for <%s>\n", SQL);
         for (AbstractPlanNode plan : fragments) {
-            printPlanNodes(SQL, plan, fragment);
+            printPlanNodes(plan, fragment, numberOfFragments);
+            fragment += 1;
             for (idx += 1; plan.getChildCount() > 0; idx += 1) {
                 assertEquals(types[idx], plan.getPlanNodeType());
                 plan = plan.getChild(0);
@@ -588,7 +590,7 @@ public class TestWindowedFunctions extends PlannerTestCase {
 
     // These two are to disable tests which are
     // not currently working.
-    private static boolean INDEX_FIXED = false;
+    private static boolean INDEX_FIXED = true;
     // These two can be used to disable particular tests.
     // Change "if (IS_ENABLED) { ... }" to "if (ISNOT_ENABLED) { ... }"
     // below.
@@ -691,7 +693,7 @@ public class TestWindowedFunctions extends PlannerTestCase {
         // echo  7: No SLOB, one WF, SP Query, index (Can order the WF)
         // echo     Expect WinFun -> IndxScan
         // explain select a, b, max(b) over ( partition by a ) from vanilla_idx where a = 1;
-        if (INDEX_FIXED) {
+        if (IS_ENABLED) {
             validatePlan("select a, b, max(b) over ( partition by a ) from vanilla_idx where a = 1;",
                          1,
                          PlanNodeType.SEND,

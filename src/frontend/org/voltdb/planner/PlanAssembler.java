@@ -1807,16 +1807,26 @@ public class PlanAssembler {
         // Skip the explicit ORDER BY plan step if an IndexScan is already providing the equivalent ordering.
         // Note that even tree index scans that produce values in their own "key order" only report
         // their sort direction != SortDirectionType.INVALID
-        // when they enforce an ordering equivalent to the one requested in the ORDER BY clause.
-        // Even an intervening non-hash aggregate will not interfere in this optimization.
-        AbstractPlanNode nonAggPlan = root;
+        // when they enforce an ordering equivalent to the one requested in the ORDER BY
+        // or window function clause.  Even an intervening non-hash aggregate will not interfere
+        // in this optimization.
+        AbstractPlanNode nonAggPlan;
 
         // EE keeps the insertion ORDER so that ORDER BY could apply before DISTINCT.
         // However, this probably is not optimal if there are low cardinality results.
         // Again, we have to replace the TVEs for ORDER BY clause for these cases in planning.
-
-        if (nonAggPlan.getPlanNodeType() == PlanNodeType.AGGREGATE) {
-            nonAggPlan = nonAggPlan.getChild(0);
+        AbstractPlanNode probe;
+        for (probe = root;
+                ! ((probe instanceof AbstractJoinPlanNode)
+                    || (probe instanceof AbstractScanPlanNode))
+                && (probe != null);
+            probe = probe.getChild(0)) {
+        }
+        if (probe != null) {
+            nonAggPlan = probe;
+        } else {
+            // No idea what happened here.
+            nonAggPlan = root;
         }
         if (nonAggPlan instanceof IndexScanPlanNode) {
             sortDirection = ((IndexScanPlanNode)nonAggPlan).getSortDirection();
@@ -1825,6 +1835,10 @@ public class PlanAssembler {
         // Skip the explicit ORDER BY plan step if NestLoopIndex is providing the equivalent ordering
         else if (nonAggPlan instanceof AbstractJoinPlanNode) {
             sortDirection = ((AbstractJoinPlanNode)nonAggPlan).getSortDirection();
+        }
+
+        if ( ! nonAggPlan.isWindowFunctionCompatibleWithOrderBy()) {
+            return true;
         }
 
         if (sortDirection != SortDirectionType.INVALID) {
@@ -2218,13 +2232,17 @@ public class PlanAssembler {
         // We always need an order by plan node, even if the sort
         // is optimized away by an index.  This may be turned
         // into an inline order by in a MergeReceivePlanNode.
-        OrderByPlanNode onode = new OrderByPlanNode();
         AbstractPlanNode scanNode = findScanNodeForWindowFunction(root);
+        AbstractPlanNode cnode = null;
         int winfunc = (scanNode == null) ? SubPlanAssembler.NO_INDEX_USE : scanNode.getWindowFunctionUsesIndex();
-        if (SubPlanAssembler.STATEMENT_LEVEL_ORDER_BY_INDEX == winfunc) {
-            // I don't think this can happen.
-            throw new RuntimeException("Statement level order by index with a window function.");
-        } else if (SubPlanAssembler.NO_INDEX_USE == winfunc) {
+        // If we have an index which is compatible with the statement
+        // level order by, and we have a window function which can't
+        // use the index we have to ignore the statement level order by
+        // index use.  We will need to order the input according to the
+        // window function first, and that will in general invalidate the
+        // statement level order by ordering.
+        if ((SubPlanAssembler.STATEMENT_LEVEL_ORDER_BY_INDEX == winfunc)
+                || (SubPlanAssembler.NO_INDEX_USE == winfunc)) {
             // No index.  Calculate the expression order here and stuff it into
             // the order by node.  Note that if we support more than one window
             // function this would be the case when scanNode.getWindowFunctionUsesIndex()
@@ -2244,6 +2262,7 @@ public class PlanAssembler {
             boolean dontsort[] = new boolean[winExpr.getOrderbySize()];
             List<AbstractExpression> orderByExpressions = winExpr.getOrderByExpressions();
             List<SortDirectionType>  orderByDirections  = winExpr.getOrderByDirections();
+            OrderByPlanNode onode = new OrderByPlanNode();
             for (int idx = 0; idx < winExpr.getPartitionbySize(); ++idx) {
                 SortDirectionType pdir = SortDirectionType.ASC;
                 AbstractExpression partitionByExpression = partitionByExpressions.get(idx);
@@ -2261,31 +2280,44 @@ public class PlanAssembler {
                     onode.addSort(orderByExpr, orderByDir);
                 }
             }
+            onode.addAndLinkChild(root);
+            cnode = onode;
         } else {
             assert(scanNode != null);
             // This means the index is good for this window function.
-            // We still need to generate the order by node, because we
-            // may need to turn this into an inline order by node.
+            // If this is an MP statement we still need to generate the
+            // order by node, because we may need to turn it into an
+            // inline order by node of a MergeReceive node.
             assert( 0 == scanNode.getWindowFunctionUsesIndex() );
-            SortDirectionType dir = scanNode.getSortOrderFromIndexScan();
-            assert(dir != SortDirectionType.INVALID);
-            List<AbstractExpression> orderExprs = scanNode.getFinalExpressionOrderFromIndexScan();
-            for (AbstractExpression ae : orderExprs) {
-                onode.addSort(ae, dir);
+            if (m_partitioning.requiresTwoFragments()) {
+                OrderByPlanNode onode = new OrderByPlanNode();
+                SortDirectionType dir = scanNode.getSortOrderFromIndexScan();
+                assert(dir != SortDirectionType.INVALID);
+                // This was created when the index was determined.
+                // We cached it in the scan node.
+                List<AbstractExpression> orderExprs = scanNode.getFinalExpressionOrderFromIndexScan();
+                for (AbstractExpression ae : orderExprs) {
+                    onode.addSort(ae, dir);
+                }
+                // Link in the OrderByNode.
+                onode.addAndLinkChild(root);
+                cnode = onode;
+            } else {
+                // Don't create and link in the order by node.
+                cnode = root;
             }
         }
-        onode.addAndLinkChild(root);
-        pnode.addAndLinkChild(onode);
+        pnode.addAndLinkChild(cnode);
         return pnode;
     }
 
     private AbstractPlanNode findScanNodeForWindowFunction(AbstractPlanNode root) {
         while (root != null
                 && ( ! (( root instanceof AbstractJoinPlanNode )
-                        && (root instanceof AbstractScanPlanNode )))) {
+                        || (root instanceof AbstractScanPlanNode )))) {
             root = (root.getChildCount() == 0) ? null : root.getChild(0);
         }
-        return null;
+        return root;
     }
 
     private AbstractPlanNode handleAggregationOperators(AbstractPlanNode root) {
