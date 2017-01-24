@@ -229,7 +229,7 @@ while end_time > time.time():
         c_svrs = 0.0
         mbin = 0.0
         mbout = 0.0
-        if (incr_millis > 0 and avgnanos > 0):
+        if (incr_millis > 0):
             tps = incr_invs *1000 / incr_millis
             exec_millis = float(avgnanos) * incr_invs / 1000000
             c_svrs = exec_millis / incr_millis
@@ -239,7 +239,7 @@ while end_time > time.time():
 
         new_values = (incr_invs, tps, exec_millis, c_svrs, mbin, mbout)
 
-        if incr_invs > 0:
+        if (incr_invs > 0 and exec_millis > 0):
             if (procname, partition_id) in partition_proc_stats:
                 pass # do nothing
             else:
