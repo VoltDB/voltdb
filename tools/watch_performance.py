@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 # This file is part of VoltDB.
-# Copyright (C) 2008-2017 VoltDB Inc.
+# Copyright (C) 2008-2016 VoltDB Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -121,7 +121,7 @@ def get_cpu():
     return cpu_perc
 
 def get_latencies():
-    response = proc_stats.call(["INITIATOR",1])
+    response = proc_stats.call(["INITIATOR",0])
     check_response(response)
     table = response.tables[0]
     latencies = dict()
@@ -180,7 +180,7 @@ partition_stats = dict()
 procedure_stats = dict()
 partition_count = get_partition_count()
 
-print "    time                                procedure label exec_pct invocations txn/sec    exec_ms  svr_ms     c cpu partitions   skew   inMB/s  outMB/s"
+print "    time                                procedure label exec_pct invocations txn/sec    exec_ms  lat_ms     c cpu partitions   skew   inMB/s  outMB/s"
 print "-------- ---------------------------------------- ----- -------- ----------- ------- ---------- ------- ----- --- ---------- ------ -------- --------"
 
 # begin monitoring every (frequency) seconds for (duration) minutes
@@ -229,7 +229,7 @@ while end_time > time.time():
         c_svrs = 0.0
         mbin = 0.0
         mbout = 0.0
-        if (incr_millis > 0):
+        if (incr_millis > 0 and avgnanos > 0):
             tps = incr_invs *1000 / incr_millis
             exec_millis = float(avgnanos) * incr_invs / 1000000
             c_svrs = exec_millis / incr_millis
