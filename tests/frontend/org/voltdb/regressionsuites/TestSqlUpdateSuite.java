@@ -64,7 +64,7 @@ public class TestSqlUpdateSuite extends RegressionSuite {
 
     }
 
-    public void notestUpdate()
+    public void testUpdate()
     throws IOException, ProcCallException
     {
         Client client = getClient();
@@ -224,14 +224,14 @@ public class TestSqlUpdateSuite extends RegressionSuite {
         if (!config.compile(project)) fail();
         builder.addServerConfig(config);
 
-//        config = new LocalCluster("sqlupdate-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
-//        if (!config.compile(project)) fail();
-//        builder.addServerConfig(config);
-//
-//        // Cluster
-//        config = new LocalCluster("sqlupdate-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
-//        if (!config.compile(project)) fail();
-//        builder.addServerConfig(config);
+        config = new LocalCluster("sqlupdate-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
+        if (!config.compile(project)) fail();
+        builder.addServerConfig(config);
+
+        // Cluster
+        config = new LocalCluster("sqlupdate-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
+        if (!config.compile(project)) fail();
+        builder.addServerConfig(config);
 
         return builder;
     }
