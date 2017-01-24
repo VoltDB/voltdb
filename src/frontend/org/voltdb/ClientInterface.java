@@ -93,7 +93,6 @@ import org.voltdb.messaging.Iv2EndOfLogMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.LocalMailbox;
 import org.voltdb.security.AuthenticationRequest;
-import org.voltdb.utils.Digester;
 import org.voltdb.utils.MiscUtils;
 
 import com.google_voltpatches.common.base.Charsets;
@@ -590,7 +589,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 byte [] todigest = new byte[message.limit()];
                 message.position(0);
                 message.get(todigest).position(4);
-                System.err.println("***!STEBUG!*** serverauth - reading login message: " + Digester.md5AsUUID(todigest));
             }
             long beforeRead = 0;
             try {
@@ -598,11 +596,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     beforeRead = EstTime.currentTimeMillis();
                     message = messagingChannel.readMessage();
                 }
-                System.err.println("***!STEBUG!*** serverauth - reading login message (01)");
             } catch (IOException e) {
                 long opduration = EstTime.currentTimeMillis() - beforeRead;
                 if (opduration > (AUTH_TIMEOUT_MS - (AUTH_TIMEOUT_MS/20))) {
-                    System.err.println("***!STEBUG!*** we have a timeout close");
                     e = null;
                 }
                 try {
@@ -620,7 +616,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
              * If cancellation fails then the socket is dead and the connection lost
              */
             if (!timeoutFuture.cancel(false)) {
-                System.err.println("***!STEBUG!*** serverauth - TIMEOUT reading login message (01)");
                 return null;
             }
 
@@ -662,7 +657,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             try {
                 ap = AuthProvider.fromService(service);
             } catch (IllegalArgumentException unkownProvider) {
-                System.err.println("***!STEBUG!*** serverauth - FAIL getting auth provider (01)");
                 // handle it bellow
             }
 
@@ -746,7 +740,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             responseBuffer.putInt(buildString.length);
             responseBuffer.put(buildString).flip();
             messagingChannel.writeMessage(responseBuffer);
-            System.err.println("***!STEBUG!*** serverauth - wrote login response (" + handler.connectionId() + ")");
             return handler;
         }
     }

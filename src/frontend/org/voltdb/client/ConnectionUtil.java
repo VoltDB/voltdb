@@ -48,7 +48,6 @@ import org.voltcore.network.ReverseDNSCache;
 import org.voltcore.utils.ssl.MessagingChannel;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.common.Constants;
-import org.voltdb.utils.Digester;
 import org.voltdb.utils.SerializationHelper;
 
 import com.google_voltpatches.common.base.Function;
@@ -254,7 +253,6 @@ public class ConnectionUtil {
 
             try {
                 messagingChannel.writeMessage(b);
-                System.err.println("***!STEBUG!*** clientauth - sent login message (01) " + Digester.md5AsUUID(b.array()));
             } catch (IOException e) {
                 throw new IOException("Failed to write authentication message to server.", e);
             }
@@ -265,7 +263,6 @@ public class ConnectionUtil {
             ByteBuffer loginResponse;
             try {
                 loginResponse = messagingChannel.readMessage();
-                System.err.println("***!STEBUG!*** clientauth - read login response (01)");
             } catch (IOException e) {
                 throw new IOException("Authentication rejected", e);
             }
