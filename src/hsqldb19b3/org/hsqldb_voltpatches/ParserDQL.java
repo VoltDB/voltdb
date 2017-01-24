@@ -2655,6 +2655,9 @@ public class ParserDQL extends ParserBase {
                 Expression a = e;
 
                 e = XreadBooleanTermOrNull();
+                if (e == null) {
+                    throw Error.error(ErrorCode.X_42568);
+                }
                 e = new ExpressionLogical(type, a, e);
             }
 
@@ -2691,6 +2694,9 @@ public class ParserDQL extends ParserBase {
             Expression a = e;
 
             e = XreadBooleanFactorOrNull();
+            if (e == null) {
+                throw Error.error(ErrorCode.X_42568);
+            }
             e = new ExpressionLogical(type, a, e);
         }
 
