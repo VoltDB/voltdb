@@ -47,6 +47,7 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.licensetool.LicenseException;
 
@@ -308,7 +309,7 @@ public class MiscUtils {
      * @return true if the licensing constraints are met
      */
     public static boolean validateLicense(LicenseApi licenseApi,
-            int numberOfNodes, ReplicationRole replicationRole)
+                                          int numberOfNodes, DrRoleType replicationRole)
     {
         // Delay the handling of an invalid license file until here so
         // that the leader can terminate the full cluster.
@@ -350,9 +351,14 @@ public class MiscUtils {
         }
 
         // enforce DR replication constraint
-        if (replicationRole == ReplicationRole.REPLICA) {
-            if (licenseApi.isDrReplicationAllowed() == false) {
+        if (licenseApi.isDrReplicationAllowed() == false) {
+            if (replicationRole != DrRoleType.NONE) {
                 hostLog.fatal("Warning, VoltDB license does not allow use of DR replication.");
+                return false;
+            }
+        } else if (licenseApi.isDrActiveActiveAllowed() == false) {
+            if (replicationRole == DrRoleType.XDCR) {
+                hostLog.fatal("Warning, VoltDB license does not allow use of XDCR.");
                 return false;
             }
         }

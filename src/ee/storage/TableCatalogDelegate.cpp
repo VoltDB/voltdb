@@ -72,13 +72,13 @@ Table* TableCatalogDelegate::getTable() const {
     return m_table;
 }
 
-TupleSchema* TableCatalogDelegate::createTupleSchema(catalog::Database const& catalogDatabase,
-                                                     catalog::Table const& catalogTable) {
+TupleSchema* TableCatalogDelegate::createTupleSchema(catalog::Table const& catalogTable,
+                                                     bool isXDCR) {
     // Columns:
     // Column is stored as map<std::string, Column*> in Catalog. We have to
     // sort it by Column index to preserve column order.
     auto numColumns = catalogTable.columns().size();
-    bool needsDRTimestamp = catalogDatabase.isActiveActiveDRed() && catalogTable.isDRed();
+    bool needsDRTimestamp = isXDCR && catalogTable.isDRed();
     TupleSchemaBuilder schemaBuilder(numColumns,
                                      needsDRTimestamp ? 1 : 0); // number of hidden columns
 
@@ -262,6 +262,7 @@ TableCatalogDelegate::getIndexIdString(const TableIndexScheme& indexScheme) {
 
 Table* TableCatalogDelegate::constructTableFromCatalog(catalog::Database const& catalogDatabase,
                                                        catalog::Table const& catalogTable,
+                                                       bool isXDCR,
                                                        int tableAllocationTargetSize) {
     // Create a persistent table for this table in our catalog
     int32_t tableId = catalogTable.relativeIndex();
@@ -278,7 +279,7 @@ Table* TableCatalogDelegate::constructTableFromCatalog(catalog::Database const& 
     }
 
     // get the schema for the table
-    TupleSchema* schema = createTupleSchema(catalogDatabase, catalogTable);
+    TupleSchema* schema = createTupleSchema(catalogTable, isXDCR);
 
     // Indexes
     std::map<std::string, TableIndexScheme> index_map;
@@ -421,9 +422,11 @@ Table* TableCatalogDelegate::constructTableFromCatalog(catalog::Database const& 
 }
 
 void TableCatalogDelegate::init(catalog::Database const& catalogDatabase,
-        catalog::Table const& catalogTable) {
+                                catalog::Table const& catalogTable,
+                                bool isXDCR) {
     m_table = constructTableFromCatalog(catalogDatabase,
-                                        catalogTable);
+                                        catalogTable,
+                                        isXDCR);
     if ( ! m_table) {
         return;
     }
@@ -443,7 +446,7 @@ PersistentTable* TableCatalogDelegate::createDeltaTable(catalog::Database const&
     // Delta table will only have one row (currently).
     // Set the table block size to 64KB to achieve better space efficiency.
     // FYI: maximum column count = 1024, largest fixed length data type is short varchars (64 bytes)
-    Table* deltaTable = constructTableFromCatalog(catalogDatabase, catalogTable, 1024 * 64);
+    Table* deltaTable = constructTableFromCatalog(catalogDatabase, catalogTable, false, 1024 * 64);
     deltaTable->incrementRefcount();
     // We have the restriction that view on joined table cannot have non-persistent table source.
     // So here we could use static_cast. But if we in the future want to lift this limitation,
@@ -682,7 +685,8 @@ static void migrateExportViews(catalog::CatalogMap<catalog::MaterializedViewInfo
 void
 TableCatalogDelegate::processSchemaChanges(catalog::Database const& catalogDatabase,
                                            catalog::Table const& catalogTable,
-                                           std::map<std::string, TableCatalogDelegate*> const& delegatesByName) {
+                                           std::map<std::string, TableCatalogDelegate*> const& delegatesByName,
+                                           bool isXDCR) {
     DRTupleStreamDisableGuard guard(ExecutorContext::getExecutorContext());
 
     ///////////////////////////////////////////////
@@ -693,7 +697,7 @@ TableCatalogDelegate::processSchemaChanges(catalog::Database const& catalogDatab
     ///////////////////////////////////////////////
 
     Table* existingTable = m_table;
-    m_table = constructTableFromCatalog(catalogDatabase, catalogTable);
+    m_table = constructTableFromCatalog(catalogDatabase, catalogTable, isXDCR);
     assert(m_table);
     m_table->incrementRefcount();
     PersistentTable* newPersistentTable = dynamic_cast<PersistentTable*>(m_table);
