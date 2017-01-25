@@ -557,6 +557,7 @@ public class ExportGeneration implements Generation {
     }
 
     private void handleChildUpdate(final WatchedEvent event, final HostMessenger messenger) {
+        if (shutdown || m_drainedSources.get() == m_numSources) return;
         messenger.getZK().getChildren(event.getPath(), constructMailboxChildWatcher(messenger), constructChildRetrievalCallback(), null);
     }
 
@@ -574,7 +575,13 @@ public class ExportGeneration implements Generation {
                         try {
                             if (shutdown) return;
                             KeeperException.Code code = KeeperException.Code.get(rc);
-                            if (code != KeeperException.Code.OK) {
+                            //Other node must have drained so ignore.
+                            if (code == KeeperException.Code.NONODE) {
+                                if (exportLog.isDebugEnabled()) {
+                                    exportLog.debug("Path not found generation drain most likely finished on other node: " + path);
+                                }
+                                //Fallthrough to rebuild the mailboxes.
+                            } else if (code != KeeperException.Code.OK) {
                                 throw KeeperException.create(code);
                             }
 
@@ -749,6 +756,17 @@ public class ExportGeneration implements Generation {
         shutdown = true;
         //We need messenger NULL guard for tests.
         if (m_mbox != null && messenger != null) {
+            for (Integer partition : m_dataSourcesByPartition.keySet()) {
+                final String partitionDN =  m_mailboxesZKPath + "/" + partition;
+                String path = partitionDN + "/" + m_mbox.getHSId();
+                try {
+                    messenger.getZK().delete(path, 0);
+                } catch (InterruptedException ex) {
+                    ;
+                } catch (KeeperException ex) {
+                    ;
+                }
+            }
             messenger.removeMailbox(m_mbox);
         }
         m_onAllSourcesDrained = null;
