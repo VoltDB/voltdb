@@ -43,6 +43,8 @@
 
 #include "boost/scoped_ptr.hpp"
 
+#define _unused(x) ((void)(x))
+
 using voltdb::ExecutorContext;
 using voltdb::NValue;
 using voltdb::PersistentTable;
@@ -362,6 +364,7 @@ TEST_F(PersistentTableTest, TruncateTableTest) {
     const int tuplesToInsert = 10;
     added = tableutil::addRandomTuples(table, tuplesToInsert);
     assert(added);
+    _unused(added);
     commit();
 
     size_t blockCount = table->allocatedBlockCount();
@@ -372,6 +375,7 @@ TEST_F(PersistentTableTest, TruncateTableTest) {
     beginWork();
     added = tableutil::addRandomTuples(table, tuplesToInsert);
     assert(added);
+    _unused(added);
     table->truncateTable(engine);
     commit();
 
@@ -439,6 +443,7 @@ TEST_F(PersistentTableTest, SwapTablesTest) {
 
     added = tableutil::addRandomTuples(table, tuplesToInsert);
     assert(added);
+    _unused(added);
 
     // Validate the pre-swap state of tables and indexes.
     validateCounts(1, table, dupTable, tuplesToInsert, 0);

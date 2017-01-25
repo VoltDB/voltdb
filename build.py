@@ -71,8 +71,8 @@ if CTX.compilerName() == 'gcc':
         # Do we want -Wno-conversion?
         if (CTX.compilerMinorVersion() == 8):
             CTX.CPPFLAGS += " -Wno-conversion"
-    # GCC 5 warning disablement options
-    if (CTX.compilerMajorVersion() == 5):
+    # GCC 5/6 warning disablement options
+    if (CTX.compilerMajorVersion() >= 5):
         CTX.CPPFLAGS += " -Wno-unused-local-typedefs"
 
 if (CTX.compilerName() == 'clang') and (CTX.compilerMajorVersion() == 3 and CTX.compilerMinorVersion() >= 4):
@@ -81,7 +81,7 @@ if (CTX.compilerName() == 'clang') and (CTX.compilerMajorVersion() == 3 and CTX.
 if (CTX.compilerName() == 'clang') and (CTX.compilerMajorVersion() >= 7):
     CTX.CPPFLAGS += " -Wno-unused-local-typedefs -Wno-absolute-value"
 
-if (CTX.compilerName() != 'gcc') or (CTX.compilerMajorVersion() == 4 and CTX.compilerMinorVersion() >= 3) or (CTX.compilerMajorVersion() == 5):
+if (CTX.compilerName() != 'gcc') or (CTX.compilerMajorVersion() == 4 and CTX.compilerMinorVersion() >= 3) or (CTX.compilerMajorVersion() >= 5):
     CTX.CPPFLAGS += " -Wno-ignored-qualifiers -fno-strict-aliasing"
 
 
@@ -113,6 +113,7 @@ if CTX.compilerName() == 'gcc':
                % (CTX.compilerMajorVersion(),
                   CTX.compilerMinorVersion(),
                   CTX.compilerPatchLevel()))
+	CTX.CXX_VERSION_FLAG = "c++11"
 elif CTX.compilerName() == 'clang':
     CTX.CXX_VERSION_FLAG="c++11"
 else:
