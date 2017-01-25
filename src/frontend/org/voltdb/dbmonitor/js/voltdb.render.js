@@ -2174,7 +2174,7 @@ function alertNodeClicked(obj) {
 
 
             connection.Metadata['@Statistics_DR_completeData'][0].schema.forEach(function (columnInfo) {
-                if (columnInfo["name"] == "PARTITION_ID" || columnInfo["name"] == "TOTALBUFFERS" || columnInfo["name"] == "TIMESTAMP" || columnInfo["name"] == "TOTALBYTES" || columnInfo["name"] == "MODE" || columnInfo["name"] == "LASTQUEUEDDRID" || columnInfo["name"] == "LASTACKDRID" || columnInfo["name"] == "LASTQUEUEDTIMESTAMP" || columnInfo["name"] == "LASTACKTIMESTAMP")
+                if (columnInfo["name"] == "PARTITION_ID" || columnInfo["name"] == "TOTALBUFFERS" || columnInfo["name"] == "TIMESTAMP" || columnInfo["name"] == "TOTALBYTES" || columnInfo["name"] == "MODE" || columnInfo["name"] == "LASTQUEUEDDRID" || columnInfo["name"] == "LASTACKDRID" || columnInfo["name"] == "LASTQUEUEDTIMESTAMP" || columnInfo["name"] == "LASTACKTIMESTAMP" || columnInfo["name"] == "CLUSTERID"|| columnInfo["name"] == "CONSUMERCLUSTERID")
                     colIndex[columnInfo["name"]] = counter;
                 counter++;
             });
@@ -2188,7 +2188,6 @@ function alertNodeClicked(obj) {
                     if (!drDetails.hasOwnProperty(partitionId)) {
                         drDetails[partitionId] = [];
                     }
-
                     var partitionDetails = {};
                     partitionDetails["TOTALBUFFERS"] = info[colIndex["TOTALBUFFERS"]];
                     partitionDetails["TOTALBYTES"] = info[colIndex["TOTALBYTES"]];
@@ -2197,6 +2196,8 @@ function alertNodeClicked(obj) {
                     partitionDetails["LASTACKDRID"] = info[colIndex["LASTACKDRID"]];
                     partitionDetails["LASTQUEUEDTIMESTAMP"] = info[colIndex["LASTQUEUEDTIMESTAMP"]];
                     partitionDetails["LASTACKTIMESTAMP"] = info[colIndex["LASTACKTIMESTAMP"]];
+                    partitionDetails["CLUSTERID"] = info[colIndex["CLUSTERID"]];
+                    partitionDetails["CONSUMERCLUSTERID"] = info[colIndex["CONSUMERCLUSTERID"]];
                     drDetails[partitionId].push(partitionDetails);
                 }
             });

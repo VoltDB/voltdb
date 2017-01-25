@@ -2096,7 +2096,7 @@ border:1px solid #FFF;
 
 .disableCloserTab { opacity:0.5;}
 #queryError span.error{ color: #c70000; font-size:13px; }
-.lalencyDR{float: left;padding: 9px 0 0 20px;font-size: 16px;}
+.latencyDR{float: left;padding: 9px 0 0 20px;font-size: 16px;}
 
 /*********************jquery ui class override ends*********************/
 
