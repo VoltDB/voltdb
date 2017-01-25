@@ -479,10 +479,6 @@ public class PlanAssembler {
         // Get the best plans for the expression subqueries ( IN/EXISTS (SELECT...) )
         Set<AbstractExpression> subqueryExprs = parsedStmt.findSubquerySubexpressions();
         if ( ! subqueryExprs.isEmpty() ) {
-            if (parsedStmt instanceof ParsedSelectStmt == false) {
-                m_recentErrorMsg = "Subquery expressions are only supported in SELECT statements";
-                return null;
-            }
 
             // guards against IN/EXISTS/Scalar subqueries
             if ( ! m_partitioning.wasSpecifiedAsSingle() ) {
