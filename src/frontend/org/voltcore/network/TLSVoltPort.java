@@ -283,6 +283,7 @@ public class TLSVoltPort extends VoltPort  {
                 slice.bb.readerIndex(slice.bb.writerIndex());
                 slice.discard();
             }
+            m_msgbb.release();
         }
 
         synchronized boolean isEmpty() {
