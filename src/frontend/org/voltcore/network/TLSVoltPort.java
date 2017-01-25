@@ -229,6 +229,16 @@ public class TLSVoltPort extends VoltPort  {
         }
     }
 
+    @Override
+    void unregistered() {
+        try {
+            waitForPendingEncrypts();
+        } catch (IOException e) {
+            networkLog.warn("unregistered port had an encryption task drain fault", e);
+        }
+        super.unregistered();
+    }
+
     class ExceptionListener implements Runnable {
         private final ListenableFuture<?> m_fut;
         private ExceptionListener(ListenableFuture<?> fut) {
@@ -394,7 +404,6 @@ public class TLSVoltPort extends VoltPort  {
         private int getNeededBytes() {
             return m_needed == NOT_AVAILABLE ? 4 : m_needed;
         }
-
     }
 
     /** The distinct exception class allows better logging of these unexpected errors. */

@@ -289,7 +289,7 @@ public class TLSNIOWriteStream extends NIOWriteStream {
                 ds.cancel();
             }
 
-            int waitFor = 1 - m_inFlight.availablePermits();
+            int waitFor = 1 - Math.min(m_inFlight.availablePermits(), -4);
             for (int i = 0; i < waitFor; ++i) {
                 try {
                     if (m_inFlight.tryAcquire(1, TimeUnit.SECONDS)) {
@@ -376,7 +376,7 @@ public class TLSNIOWriteStream extends NIOWriteStream {
         @Override
         public void run() {
             EncryptFrame frame = m_q.peek();
-            if (frame == null) return;
+            if (frame == null || m_isShutdown) return;
 
             ByteBuffer src = frame.frame.nioBuffer();
             ByteBuf encr = m_ce.allocator().ioBuffer(packetBufferSize()).writerIndex(packetBufferSize());
@@ -409,7 +409,6 @@ public class TLSNIOWriteStream extends NIOWriteStream {
                     enableWriteSelection();
                 }
             } else {
-                m_inFlight.release();
                 encr.release();
                 return;
             }
