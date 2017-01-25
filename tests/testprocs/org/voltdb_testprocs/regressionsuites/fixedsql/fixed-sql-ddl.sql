@@ -250,14 +250,12 @@ CREATE TABLE transaction(
 );
 PARTITION TABLE transaction ON COLUMN acc_no;
 
-CREATE TABLE offers_given_exp(
+CREATE STREAM offers_given_exp PARTITION ON COLUMN acc_no (
   acc_no BIGINT NOT NULL,
   vendor_id INTEGER,
   offer_ts TIMESTAMP NOT NULL,
   offer_text VARCHAR(200)
 );
-PARTITION TABLE offers_given_exp ON COLUMN acc_no;
-EXPORT TABLE offers_given_exp;
 
 CREATE VIEW acct_vendor_totals AS
 SELECT

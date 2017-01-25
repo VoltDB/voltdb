@@ -60,7 +60,7 @@ function catalog() {
     echo
     echo "voltdb compile --classpath obj -o $APPNAME.jar ddl.sql"
     echo
-    $VOLTDB compile --classpath obj -o $APPNAME.jar ddl.sql
+    $VOLTDB legacycompile --classpath obj -o $APPNAME.jar ddl.sql
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
 }
@@ -85,7 +85,7 @@ function server() {
     # run the server
     echo "Starting the VoltDB server."
     echo "To perform this action manually, use the command line: "
-    echo 
+    echo
     echo "VOLTDB_OPTS=\"${VOLTDB_OPTS}\" ${VOLTDB} create -d deployment.xml -l ${LICENSE} -H ${HOST} ${APPNAME}.jar"
     echo
     VOLTDB_OPTS="${VOLTDB_OPTS}" ${VOLTDB} create -d deployment.xml -l ${LICENSE} -H ${HOST} ${APPNAME}.jar

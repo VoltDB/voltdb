@@ -49,6 +49,7 @@ import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Table;
 import org.voltdb.common.Constants;
 import org.voltdb.common.Permission;
+import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.compilereport.ProcedureAnnotation;
 import org.voltdb.compilereport.TableAnnotation;
 import org.voltdb.expressions.AbstractExpression;
@@ -92,7 +93,7 @@ public abstract class CatalogSchemaTools {
      * @param isExportTableWithTarget - true if this Table is an Export Table
      * @return SQL Schema text representing the CREATE TABLE statement to generate the table
      */
-    public static String toSchema(StringBuilder sb, Table catalog_tbl, String viewQuery, String isExportTableWithTarget) {
+    public static String toSchema(StringBuilder sb, Table catalog_tbl, String viewQuery, boolean isExportOnly, String isExportTableWithTarget) {
         assert(!catalog_tbl.getColumns().isEmpty());
         boolean tableIsView = (viewQuery != null);
 
@@ -108,7 +109,7 @@ public abstract class CatalogSchemaTools {
         }
         else {
             table_sb.append("CREATE " +
-                    ((isExportTableWithTarget != null) ? "STREAM " : "TABLE ") +
+                    (isExportOnly ? "STREAM " : "TABLE ") +
                     catalog_tbl.getTypeName());
             if (isExportTableWithTarget != null) {
                 if (catalog_tbl.getPartitioncolumn() != null && viewQuery == null) {
@@ -553,9 +554,6 @@ public abstract class CatalogSchemaTools {
 
         for (Cluster cluster : catalog.getClusters()) {
             for (Database db : cluster.getDatabases()) {
-                if (db.getIsactiveactivedred()) {
-                    sb.append(String.format("SET %s=%s;\n", DatabaseConfiguration.DR_MODE_NAME, DatabaseConfiguration.ACTIVE_ACTIVE));
-                }
                 toSchema(sb, importLines);
 
                 for (Group grp : db.getGroups()) {
@@ -575,12 +573,12 @@ public abstract class CatalogSchemaTools {
                             viewList.add(table);
                             continue;
                         }
-                        toSchema(sb, table, null, CatalogUtil.getExportTargetIfExportTableOrNullOtherwise(db, table));
+                        toSchema(sb, table, null, CatalogUtil.isTableExportOnly(db, table), CatalogUtil.getExportTargetIfExportTableOrNullOtherwise(db, table));
                     }
                     // A View cannot precede a table that it depends on in the DDL
                     for (Table table : viewList) {
                         String viewQuery = ((TableAnnotation) table.getAnnotation()).ddl;
-                        toSchema(sb, table, viewQuery, CatalogUtil.getExportTargetIfExportTableOrNullOtherwise(db, table));
+                        toSchema(sb, table, viewQuery, CatalogUtil.isTableExportOnly(db, table), CatalogUtil.getExportTargetIfExportTableOrNullOtherwise(db, table));
                     }
                 }
 

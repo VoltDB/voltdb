@@ -121,7 +121,7 @@ def get_cpu():
     return cpu_perc
 
 def get_latencies():
-    response = proc_stats.call(["INITIATOR",1])
+    response = proc_stats.call(["INITIATOR",0])
     check_response(response)
     table = response.tables[0]
     latencies = dict()
@@ -180,7 +180,7 @@ partition_stats = dict()
 procedure_stats = dict()
 partition_count = get_partition_count()
 
-print "    time                                procedure label exec_pct invocations txn/sec    exec_ms  svr_ms     c cpu partitions   skew   inMB/s  outMB/s"
+print "    time                                procedure label exec_pct invocations txn/sec    exec_ms  lat_ms     c cpu partitions   skew   inMB/s  outMB/s"
 print "-------- ---------------------------------------- ----- -------- ----------- ------- ---------- ------- ----- --- ---------- ------ -------- --------"
 
 # begin monitoring every (frequency) seconds for (duration) minutes
@@ -239,7 +239,7 @@ while end_time > time.time():
 
         new_values = (incr_invs, tps, exec_millis, c_svrs, mbin, mbout)
 
-        if incr_invs > 0:
+        if (incr_invs > 0 and exec_millis > 0):
             if (procname, partition_id) in partition_proc_stats:
                 pass # do nothing
             else:

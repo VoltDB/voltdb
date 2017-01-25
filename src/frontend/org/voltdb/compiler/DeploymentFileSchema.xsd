@@ -251,15 +251,8 @@
     <xs:attribute name="logsize" type="logSizeType" default="1024" />
   </xs:complexType>
 
-  <!-- <partition-detection>/<snapshot> -->
+  <!-- <partition-detection> -->
   <xs:complexType name="partitionDetectionType">
-      <xs:all>
-          <xs:element name="snapshot" minOccurs="0" maxOccurs="1">
-             <xs:complexType>
-                 <xs:attribute name="prefix" type="xs:string" use="optional" default="partition_detection" />
-             </xs:complexType>
-          </xs:element>
-      </xs:all>
       <xs:attribute name="enabled" type="xs:boolean" default="true"/>
    </xs:complexType>
 
@@ -356,18 +349,13 @@
     <xs:sequence>
       <xs:element name="configuration" type="ExportConfigurationType" minOccurs="0" maxOccurs="unbounded"/>
     </xs:sequence>
-    <xs:attribute name="enabled" type="xs:boolean"/>
-    <xs:attribute name="target" type="ServerExportEnum"/>
-    <xs:attribute name="exportconnectorclass" type="xs:string"/>
   </xs:complexType>
 
   <xs:complexType name="ExportConfigurationType">
     <xs:sequence>
       <xs:element name="property" type="PropertyType" minOccurs="0" maxOccurs="unbounded"/>
     </xs:sequence>
-    <xs:attribute name="target" type="xs:string" />
-    <!-- stream is deprecated. Use target instead. -->
-    <xs:attribute name="stream" type="xs:string" />
+    <xs:attribute name="target" type="xs:string" use="required" />
     <xs:attribute name="enabled" type="xs:boolean" default="true"/>
     <xs:attribute name="type" type="ServerExportEnum" default="file"/>
     <xs:attribute name="exportconnectorclass" type="xs:string" default=""/>
@@ -471,7 +459,18 @@
             </xs:restriction>
         </xs:simpleType>
     </xs:attribute>
+    <xs:attribute name="role" type="drRoleType" default="master" />
   </xs:complexType>
+
+  <!-- DR cluster role -->
+  <xs:simpleType name="drRoleType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="master"/>
+      <xs:enumeration value="replica"/>
+      <xs:enumeration value="xdcr"/>
+      <xs:enumeration value="none"/>
+    </xs:restriction>
+  </xs:simpleType>
 
   <xs:complexType name="connectionType">
     <xs:attribute name="source" use="required">

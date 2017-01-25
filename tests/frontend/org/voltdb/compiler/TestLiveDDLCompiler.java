@@ -49,12 +49,12 @@ public class TestLiveDDLCompiler extends TestCase {
         File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema);
         String schemaPath = schemaFile.getPath();
 
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         boolean success = compiler.compileFromDDL(jarOut.getPath(), schemaPath);
         assertTrue("Compilation failed unexpectedly", success);
 
         Catalog catalog = new Catalog();
-        catalog.execute(CatalogUtil.getSerializedCatalogStringFromJar(CatalogUtil.loadAndUpgradeCatalogFromJar(MiscUtils.fileToBytes(new File(jarOut.getPath()))).getFirst()));
+        catalog.execute(CatalogUtil.getSerializedCatalogStringFromJar(CatalogUtil.loadAndUpgradeCatalogFromJar(MiscUtils.fileToBytes(new File(jarOut.getPath())), false).getFirst()));
 
         Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
         Table t = db.getTables().get("T");
@@ -73,12 +73,12 @@ public class TestLiveDDLCompiler extends TestCase {
         File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema);
         String schemaPath = schemaFile.getPath();
 
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         boolean success = compiler.compileFromDDL(jarOut.getPath(), schemaPath);
         assertTrue("Compilation failed unexpectedly", success);
 
         Catalog catalog = new Catalog();
-        catalog.execute(CatalogUtil.getSerializedCatalogStringFromJar(CatalogUtil.loadAndUpgradeCatalogFromJar(MiscUtils.fileToBytes(new File(jarOut.getPath()))).getFirst()));
+        catalog.execute(CatalogUtil.getSerializedCatalogStringFromJar(CatalogUtil.loadAndUpgradeCatalogFromJar(MiscUtils.fileToBytes(new File(jarOut.getPath())), false).getFirst()));
 
         Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
         Table t = db.getTables().get("T");
@@ -91,18 +91,17 @@ public class TestLiveDDLCompiler extends TestCase {
         jarOut.deleteOnExit();
 
         String schema =
-            "CREATE TABLE T (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL, C3 INTEGER NOT NULL);\n" +
-            "EXPORT TABLE T;\n" +
-            "DROP TABLE T;\n";
+            "CREATE STREAM T (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL, C3 INTEGER NOT NULL);\n" +
+            "DROP STREAM T;\n";
         File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema);
         String schemaPath = schemaFile.getPath();
 
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         boolean success = compiler.compileFromDDL(jarOut.getPath(), schemaPath);
         assertTrue("Compilation failed unexpectedly", success);
 
         Catalog catalog = new Catalog();
-        catalog.execute(CatalogUtil.getSerializedCatalogStringFromJar(CatalogUtil.loadAndUpgradeCatalogFromJar(MiscUtils.fileToBytes(new File(jarOut.getPath()))).getFirst()));
+        catalog.execute(CatalogUtil.getSerializedCatalogStringFromJar(CatalogUtil.loadAndUpgradeCatalogFromJar(MiscUtils.fileToBytes(new File(jarOut.getPath())), false).getFirst()));
 
         Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
         Table t = db.getTables().get("T");

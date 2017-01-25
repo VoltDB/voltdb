@@ -46,6 +46,7 @@ import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.StmtParameter;
 import org.voltdb.catalog.Table;
 import org.voltdb.compiler.VoltCompiler.Feedback;
+import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.IndexType;
@@ -1070,7 +1071,7 @@ public class ReportMaker {
         String schemaData = generateSchemaTable(db);
         contents = contents.replace("##SCHEMA##", schemaData);
 
-        DatabaseSizes sizes = CatalogSizing.getCatalogSizes(db);
+        DatabaseSizes sizes = CatalogSizing.getCatalogSizes(db, DrRoleType.XDCR.value().equals(cluster.getDrrole()));
 
         String sizeData = generateSizeTable(sizes);
         contents = contents.replace("##SIZES##", sizeData);

@@ -1355,11 +1355,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         return InvocationDispatcher.getProcedureFromName(procName, catalogContext);
     }
 
-    public void dispatchUpdateApplicationCatalog(StoredProcedureInvocation task,
-            boolean useDdlSchema, Connection ccxn, AuthSystem.AuthUser user, boolean isAdmin) {
-        m_dispatcher.dispatchUpdateApplicationCatalog(task, useDdlSchema, ccxn, user, isAdmin);
-    }
-
     private ScheduledFuture<?> m_deadConnectionFuture;
     private ScheduledFuture<?> m_topologyCheckFuture;
     public void schedulePeriodicWorks() {

@@ -30,15 +30,7 @@
         }
     },
     "partition-detection": {
-        "snapshot": {
-            "prefix":
-                    "voltdb_partition_detection"
-        },
         "enabled": true
-    },
-    "admin-mode": {
-        "port": 21211,
-        "adminstartup": false
     },
     "heartbeat": {
         "timeout": 90

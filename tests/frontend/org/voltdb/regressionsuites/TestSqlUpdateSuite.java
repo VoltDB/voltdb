@@ -212,9 +212,36 @@ public class TestSqlUpdateSuite extends RegressionSuite {
 
             stmt = "SELECT NUM FROM " + table + " WHERE ID = (SELECT MAX(NUM) FROM R2)";
             validateTableOfScalarLongs(client, stmt, new long[] { 20 });
-
         }
+    }
 
+    public void testUpdateWithCaseWhen() throws Exception {
+        Client client = getClient();
+
+        client.callProcedure("P1.Insert", 0, "", 150, 0.0);
+        client.callProcedure("P1.Insert", 1, "", 75, 0.0);
+        client.callProcedure("P1.Insert", 2, "", 30, 0.0);
+        client.callProcedure("P1.Insert", 3, "", 15, 0.0);
+        client.callProcedure("P1.Insert", 4, "", null, 0.0);
+
+        client.callProcedure("@AdHoc", "update p1 set "
+                + "num = case "
+                + "when num > 100 then 100 "
+                + "when num > 50 then 50 "
+                + "when num > 25 then 25 "
+                + "else num end;");
+
+        validateTableOfScalarLongs(client, "select num from p1 order by id asc",
+                new long[] {100, 50, 25, 15, Long.MIN_VALUE});
+
+        client.callProcedure("@AdHoc", "update p1 set "
+                + "num = case num "
+                + "when 100 then 101 "
+                + "when 50 then 52 "
+                + "when 25 then 27 "
+                + "else num end");
+        validateTableOfScalarLongs(client, "select num from p1 order by id asc",
+                new long[] {101, 52, 27, 15, Long.MIN_VALUE});
     }
 
     //

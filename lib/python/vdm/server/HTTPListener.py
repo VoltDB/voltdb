@@ -168,12 +168,6 @@ def map_deployment(request, database_id):
     if 'cluster' in request.json and 'kfactor' in request.json['cluster']:
         deployment['cluster']['kfactor'] = request.json['cluster']['kfactor']
 
-    if 'admin-mode' in request.json and 'adminstartup' in request.json['admin-mode']:
-        deployment['admin-mode']['adminstartup'] = request.json['admin-mode']['adminstartup']
-
-    if 'admin-mode' in request.json and 'port' in request.json['admin-mode']:
-        deployment['admin-mode']['port'] = request.json['admin-mode']['port']
-
     if 'commandlog' in request.json and 'adminstartup' in request.json['commandlog']:
         deployment['commandlog']['adminstartup'] = request.json['commandlog']['adminstartup']
 
@@ -210,11 +204,6 @@ def map_deployment(request, database_id):
 
     if 'partition-detection' in request.json and 'enabled' in request.json['partition-detection']:
         deployment['partition-detection']['enabled'] = request.json['partition-detection']['enabled']
-
-    if 'partition-detection' in request.json and 'snapshot' in request.json['partition-detection'] \
-            and 'prefix' in request.json['partition-detection']['snapshot']:
-        deployment['partition-detection']['snapshot']['prefix'] = \
-            request.json['partition-detection']['snapshot']['prefix']
 
     if 'paths' in request.json and 'commandlog' in request.json['paths'] and \
                     'path' in request.json['paths']['commandlog']:

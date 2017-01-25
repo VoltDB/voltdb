@@ -67,7 +67,7 @@ public class TestInMemoryJarfile extends TestCase {
         final File schema2File = VoltProjectBuilder.writeStringToTempFile(schema2);
         final String schema2Path = schema2File.getPath();
 
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         assertTrue(compiler.compileFromDDL(jarFileName, schemaPath, schema2Path));
         return compiler.getCatalog();
     }
@@ -161,7 +161,7 @@ public class TestInMemoryJarfile extends TestCase {
         InMemoryJarfile dut = new InMemoryJarfile();
         // Add a class file that we know has inner classes
         // Someday this seems like it should be an operation directly on InMemoryJarfile
-        VoltCompiler comp = new VoltCompiler();
+        VoltCompiler comp = new VoltCompiler(false);
         // This will pull in all the inner classes (currently 4 of them), but check anyway
         comp.addClassToJar(dut, org.voltdb_testprocs.updateclasses.InnerClassesTestProc.class);
         JarLoader loader = dut.getLoader();
