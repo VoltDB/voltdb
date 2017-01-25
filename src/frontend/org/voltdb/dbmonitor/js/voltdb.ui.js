@@ -1224,20 +1224,27 @@ var loadPage = function (serverName, portid) {
                     var role = drRoleDetail['DRROLE'][0][0];
                     var producerDbId = rawConfigValues.dr.id;
                     var consumerDbId = drRoleDetail['DRROLE'][0][2];
-
                  voltDbRenderer.GetDrDetails(function (drDetails) {
                     var response = drDetails;
                     var replicaLatency = [];
 
                     for (var key in response) {
-                        for (var i = 0; i <= response[key].length - 1; i++) {
-                            replicaLatency.push(response[key][i].LASTQUEUEDTIMESTAMP - response[key][i].LASTACKTIMESTAMP);
+                        if(key != undefined){
+                            for (var i = 0; i <= response[key].length - 1; i++) {
+                                replicaLatency.push(response[key][i].LASTQUEUEDTIMESTAMP - response[key][i].LASTACKTIMESTAMP);
+                            }
                         }
 
                     }
 
-                    $('#latencyDR').html('');
-                    $('#latencyDR').html(max(replicaLatency))
+                    $('.latencyDR').html('');
+                    if(replicaLatency.length != 0){
+                        $('.latencyDR').html("<p>Latency <span id='latencyDR'>" + max(replicaLatency) + " </span> sec</p>")
+                    }
+                    else{
+                        $('.latencyDR').html('');
+                    }
+
                     $("#dRProducerName").html('Database ('+ producerDbId +')');
                     $("#dRConsumerName").html('Database ('+ consumerDbId +')');
                     if(role == "MASTER"){
@@ -1251,6 +1258,15 @@ var loadPage = function (serverName, portid) {
                     else{
                         $(".drRelationLeft").find('p').html(role);
                         $("#drArrow").addClass("arrowDouble");
+                    }
+                    $(".drPending").html('')
+
+                    if(drRoleDetail['DRROLE'][0][1] == "PENDING"){
+                        $(".drPending").html("<span class='DRHeaderName drPending'> ( DR Pending )</span>")
+                        $("#drRelation").hide()
+                    }else{
+                        $("#drRelation").hide()
+                        $(".drPending").remove()
                     }
 
                     if(drRoleDetail['DRROLE'].length > 1){

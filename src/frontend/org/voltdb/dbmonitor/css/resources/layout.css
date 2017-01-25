@@ -2051,6 +2051,7 @@ h3.ui-state-active {
 .drHead { background-color:#fff; padding:5px 20px 20px 37px; border:none;  }
 .drBody { padding:0;}
 .DRHeaderName { position:relative;top:5px; font-size:16px;}
+.drPending { color: #ea151d;}
 .iconDRDatabase {float: left; width: 20px; margin: 0 0 0 12px; position: relative;top: 3px;}
 .DRHeaderWrap {float:left;}
 .drRelation { float:left; }
@@ -2058,7 +2059,7 @@ h3.ui-state-active {
 .drRelationLeft span p { position:relative; top:-10px; font-size: 12px; text-align:center; }
 .arrowDouble { background-image: url(images/arrow_double.png); width:190px; height:20px;
 display:block; position: relative; top:8px; margin:0 10px;  }
-.arrowSingle { background-image: url(images/arrow.png); width:137px; height:22px;
+.arrowSingle { background-image: url(images/arrow.png); width:190px; height:22px;
 display:block; position: relative; top:8px; margin:0 10px;  }
 .drRelationRight { float:left; }
 

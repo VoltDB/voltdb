@@ -1119,7 +1119,8 @@
                             <span class="iconDRDatabase"></span>
                             <h1 class="headText1 DRHeaderWrap">
                                <a href="#" id="showHideGraphBlock1" class="showhideIcon expandedDR arrowAdjustDR">
-                                   <span class="DRHeaderName" id="dRProducerName">Database (1)</span>
+                                   <span class="DRHeaderName" id="dRProducerName">Database (1)</span>&nbsp;&nbsp;
+                                   <span class="DRHeaderName drPending"></span>
                                </a>
                            </h1>
                             <div class="drRelation">
@@ -1136,7 +1137,6 @@
                                            </a>
                                        </div>
                                        <div class="latencyDR">
-                                            <p>Latency <span id="latencyDR">2.5</span> sec</p>
                                        </div>
                                    </div>
                                    <div class="clear">
@@ -1157,7 +1157,7 @@
                                         <div class="clear"></div>
                                     </div>
                                     <div class="graphChart" id="graphChart1">
-                                        <div id="ChartDrReplicationRate" class="chart chartDR" style="display: block">
+                                        <div id="ChartDrReplicationRate" class="chart chartDR" style="display: none">
                                             <div class="chartHeader">
                                                 <h1>Database Replication (DR)
                                                     <a href="#" class="downloadBtnChart" onclick='downloadCSV(event, { filename: "DrReplication-data" }, "dataReplication");'> <img class="downloadCls" src="css/resources/images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>
@@ -1168,7 +1168,7 @@
                                         </div>
                                     </div>
                                 </div>
-                                <div class="drWrapper" id="divDrReplication" style="display:block">
+                                <div class="drWrapper" id="divDrReplication" style="display:none">
                                     <div class="content drHeader" id="drHeader">
                                         <div class="leftShowhide">
                                             <div class="dr">
