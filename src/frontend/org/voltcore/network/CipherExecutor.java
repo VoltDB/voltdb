@@ -29,6 +29,8 @@ import org.voltcore.utils.CoreUtils;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.MoreExecutors;
 
+import io.netty_voltpatches.buffer.PooledByteBufAllocator;
+
 public enum CipherExecutor {
 
     SERVER(getWishedThreadCount()),
@@ -101,10 +103,7 @@ public enum CipherExecutor {
         }
     }
 
-    public io.netty_voltpatches.buffer.PooledByteBufAllocator allocator() {
-        if (!m_active.get()) {
-            throw new IllegalStateException(name() + " cipher is not active");
-        }
+    public PooledByteBufAllocator allocator() {
         switch (this) {
         case CLIENT:
             return ClientPoolHolder.INSTANCE;
@@ -122,28 +121,28 @@ public enum CipherExecutor {
     }
 
     private static class ClientPoolHolder {
-        static final io.netty_voltpatches.buffer.PooledByteBufAllocator INSTANCE =
-                new io.netty_voltpatches.buffer.PooledByteBufAllocator(
+        static final PooledByteBufAllocator INSTANCE =
+                new PooledByteBufAllocator(
                         true,
-                        io.netty_voltpatches.buffer.PooledByteBufAllocator.defaultNumHeapArena(),
-                        io.netty_voltpatches.buffer.PooledByteBufAllocator.defaultNumDirectArena(),
+                        PooledByteBufAllocator.defaultNumHeapArena(),
+                        PooledByteBufAllocator.defaultNumDirectArena(),
                         PAGE_SIZE, /* page size */
-                        io.netty_voltpatches.buffer.PooledByteBufAllocator.defaultMaxOrder(),
-                        io.netty_voltpatches.buffer.PooledByteBufAllocator.defaultTinyCacheSize(),
-                        io.netty_voltpatches.buffer.PooledByteBufAllocator.defaultSmallCacheSize(),
-                        io.netty_voltpatches.buffer.PooledByteBufAllocator.defaultNormalCacheSize());
+                        PooledByteBufAllocator.defaultMaxOrder(),
+                        PooledByteBufAllocator.defaultTinyCacheSize(),
+                        PooledByteBufAllocator.defaultSmallCacheSize(),
+                        PooledByteBufAllocator.defaultNormalCacheSize());
     }
 
     private static class ServerPoolHolder {
-        static final io.netty_voltpatches.buffer.PooledByteBufAllocator INSTANCE =
-                new io.netty_voltpatches.buffer.PooledByteBufAllocator(
+        static final PooledByteBufAllocator INSTANCE =
+                new PooledByteBufAllocator(
                         true,
-                        io.netty_voltpatches.buffer.PooledByteBufAllocator.defaultNumHeapArena(),
-                        io.netty_voltpatches.buffer.PooledByteBufAllocator.defaultNumDirectArena(),
+                        PooledByteBufAllocator.defaultNumHeapArena(),
+                        PooledByteBufAllocator.defaultNumDirectArena(),
                         PAGE_SIZE, /* page size */
-                        io.netty_voltpatches.buffer.PooledByteBufAllocator.defaultMaxOrder(),
-                        io.netty_voltpatches.buffer.PooledByteBufAllocator.defaultTinyCacheSize(),
-                        io.netty_voltpatches.buffer.PooledByteBufAllocator.defaultSmallCacheSize(),
+                        PooledByteBufAllocator.defaultMaxOrder(),
+                        PooledByteBufAllocator.defaultTinyCacheSize(),
+                        PooledByteBufAllocator.defaultSmallCacheSize(),
                         512);
     }
 

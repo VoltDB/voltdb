@@ -150,7 +150,7 @@ public class TLSMessagingChannel extends MessagingChannel {
             return 0;
         }
 
-        CompositeByteBuf outbuf = m_ce.allocator().compositeBuffer();
+        CompositeByteBuf outbuf = Unpooled.compositeBuffer();
         ByteBuf msg = Unpooled.wrappedBuffer(message);
         final int needed = CipherExecutor.framesFor(msg.readableBytes());
         for (int have = 0; have < needed; ++have) {

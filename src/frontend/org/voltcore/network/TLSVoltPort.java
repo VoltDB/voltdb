@@ -48,7 +48,7 @@ public class TLSVoltPort extends VoltPort  {
     private final ConcurrentLinkedDeque<ByteBuffer> m_decrypted = new ConcurrentLinkedDeque<>();
     private final FlexibleSemaphore m_inFlight = new FlexibleSemaphore(1);
     private final CipherExecutor m_ce;
-    private final DecryptionGateway m_dcryptgw = new DecryptionGateway();
+    private final DecryptionGateway m_dcryptgw;
 
     public TLSVoltPort(VoltNetwork network, InputHandler handler,
             InetSocketAddress remoteAddress, NetworkDBBPool pool,
@@ -57,6 +57,7 @@ public class TLSVoltPort extends VoltPort  {
         m_ce = cipherExecutor;
         m_sslEngine = sslEngine;
         m_decrypter = new SSLBufferDecrypter(sslEngine);
+        m_dcryptgw = new DecryptionGateway();
     }
 
     private int applicationBufferSize() {
@@ -228,73 +229,6 @@ public class TLSVoltPort extends VoltPort  {
         }
     }
 
-    abstract class Assembler {
-
-        protected final CompositeByteBuf m_bb;
-        protected volatile int m_pieces;
-
-        protected Assembler(int pieces) {
-            assert pieces > 1 : "gatherer must have gather 2 or more pieces";
-            m_pieces = pieces;
-            m_bb = m_ce.allocator().compositeBuffer(m_pieces);
-        }
-
-        abstract void complete();
-
-        Assembler add(ByteBuf bb) {
-            final int remaining = --m_pieces;
-            if (isDead()) {
-                m_pieces = -1;
-                m_bb.release();
-                return this;
-            }
-            if (remaining < 0) {
-                throw new IllegalStateException("gatherer alredy got all its pieces");
-            }
-            m_bb.addComponent(true, bb);
-            if (remaining == 0) {
-                assert m_bb.readerIndex() == 0 : "operating on an already consumed decrypted buffer";
-                complete();
-            }
-            return this;
-        }
-
-        boolean done() {
-            return m_pieces <= 0;
-        }
-
-        void die() {
-            m_pieces = -1;
-            m_bb.release();
-        }
-    }
-
-    /**
-     * Class used to gather decrypted tls frames that comprise one large volt message
-     * It operates on the assumption that a frame contains one or more whole volt messages
-     * or it contains a fragment of one message. A volt message cannot contain whole messages
-     * and fragments of another message
-     */
-    class InAssembler extends Assembler {
-
-        private InAssembler(int pieces) {
-            super(pieces);
-        }
-
-        @Override
-        void complete() {
-            try {
-                ByteBuffer jbb = ByteBuffer.allocate(m_bb.writerIndex());
-                m_bb.readBytes(jbb);
-                jbb.flip();
-                m_decrypted.offer(jbb);
-                enableWriteSelection();
-            } finally {
-                m_bb.release();
-            }
-        }
-    }
-
     class ExceptionListener implements Runnable {
         private final ListenableFuture<?> m_fut;
         private ExceptionListener(ListenableFuture<?> fut) {
@@ -308,6 +242,7 @@ public class TLSVoltPort extends VoltPort  {
             } catch (InterruptedException notPossible) {
             } catch (ExecutionException e) {
                 m_inFlight.release();
+                networkLog.error("unexpect fault occurred in decrypt task", e.getCause());
                 m_exceptions.offer(e);
             }
         }
@@ -324,7 +259,8 @@ public class TLSVoltPort extends VoltPort  {
 
         private final byte [] m_overlap = new byte[CipherExecutor.PAGE_SIZE + 2048];
         private final ConcurrentLinkedDeque<NIOReadStream.Slice> m_q = new ConcurrentLinkedDeque<>();
-        private volatile Assembler m_assembler = null;
+        private final CompositeByteBuf m_msgbb = Unpooled.compositeBuffer();
+        private volatile int m_needed = NOT_AVAILABLE;
 
         synchronized void offer(NIOReadStream.Slice slice) {
             if (isDead()) {
@@ -347,9 +283,6 @@ public class TLSVoltPort extends VoltPort  {
                 slice.bb.readerIndex(slice.bb.writerIndex());
                 slice.discard();
             }
-            if (m_assembler != null) {
-                m_assembler.die();
-            }
         }
 
         synchronized boolean isEmpty() {
@@ -357,10 +290,9 @@ public class TLSVoltPort extends VoltPort  {
         }
 
         String dumpState() {
-            Assembler asm = m_assembler;
             return new StringBuilder(256).append("DecryptionGateway[isEmpty()=").append(isEmpty())
               .append(", isDead()=").append(isDead())
-              .append(", accum=").append(asm != null ? Integer.toString(asm.m_pieces) : "(null)")
+              .append(", msgbb=").append(m_msgbb)
               .append("]").toString();
         }
 
@@ -385,15 +317,17 @@ public class TLSVoltPort extends VoltPort  {
                 slice.bb.readBytes(src, slice.bb.readableBytes());
                 slicebbarr[0] = src.nioBuffer();
             }
+
             final int appBuffSz = applicationBufferSize();
             ByteBuf dest = m_ce.allocator().buffer(appBuffSz).writerIndex(appBuffSz);
             ByteBuffer destjbb = dest.nioBuffer();
+
             try {
                 m_decrypter.tlsunwrap(slicebbarr[0], destjbb);
             } catch (TLSException e) {
-                m_inFlight.release();
-                dest.release();
+                m_inFlight.release(); dest.release(); m_msgbb.release();
                 m_exceptions.offer(new ExecutionException("fragment decrypt task failed", e));
+                networkLog.error("fragment decrypt task failed", e);
                 enableWriteSelection();
                 return;
             }
@@ -401,35 +335,44 @@ public class TLSVoltPort extends VoltPort  {
 
             // src buffer is wholly consumed
             dest.writerIndex(destjbb.limit());
-            if (m_assembler == null) {
-                int msgsz = dest.getInt(0);
-                final int frames = CipherExecutor.framesFor(msgsz);
-                // frames may contain only one or more whole messages, or only
-                // partial parts of one message. a message may not contain whole
-                // messages and an incomplete partial fragment of one
-                if (frames == 1) {
-                    while (dest.isReadable()) {
-                        msgsz = dest.readInt();
-                        ByteBuffer bb = ByteBuffer.allocate(msgsz);
-                        assert dest.readableBytes() >= msgsz : "decrypted frame did not contain whole messages";
-                        dest.readBytes(bb);
-                        bb.flip();
-                        if (!isDead()) {
-                            m_decrypted.offer(bb);
-                        }
+            m_msgbb.addComponent(true, dest);
+
+            int read = 0;
+            while (m_msgbb.readableBytes() >= getNeededBytes()) {
+                if (m_needed == NOT_AVAILABLE) {
+                    IOException ioe = null;
+                    m_needed = m_msgbb.readInt();
+                    if (m_needed < 1) {
+                        ioe = new BadMessageLength(
+                                "Next message length is " + m_needed + " which is less than 1 and is nonsense");
                     }
-                    dest.release();
-                    if (!isDead()) {
+                    if (m_needed > MAX_MESSAGE_LENGTH) {
+                        ioe = new BadMessageLength(
+                                "Next message length is " + m_needed + " which is greater then the hard coded " +
+                                "max of " + MAX_MESSAGE_LENGTH + ". Break up the work into smaller chunks (2 megabytes is reasonable) " +
+                                "and send as multiple messages or stored procedure invocations");
+                    }
+                    assert m_needed > 1 : "invalid negative or zero message length header value";
+                    if (ioe != null) {
+                        m_inFlight.release(); m_msgbb.release();
+                        m_exceptions.offer(new ExecutionException("failed message length check", ioe));
+                        networkLog.error("failed message length check", ioe);
                         enableWriteSelection();
                     }
-                } else {
-                    dest.readInt();
-                    m_assembler = new InAssembler(frames).add(dest);
+                    continue;
                 }
-            } else {
-                if (m_assembler.add(dest).done()) {
-                    m_assembler = null;
+                ByteBuffer bb = ByteBuffer.allocate(m_needed);
+                m_msgbb.readBytes(bb);
+                bb.flip();
+                if (!isDead()) {
+                    m_decrypted.offer(bb);
                 }
+                ++read;
+                m_needed = NOT_AVAILABLE;
+            }
+            if (read > 0) {
+                m_msgbb.discardReadComponents();
+                enableWriteSelection();
             }
             synchronized(this) {
                 m_q.poll();
@@ -441,6 +384,21 @@ public class TLSVoltPort extends VoltPort  {
                     fut.addListener(new ExceptionListener(fut), CoreUtils.SAMETHREADEXECUTOR);
                 }
             }
+        }
+
+        private final static int NOT_AVAILABLE = -1;
+
+        private int getNeededBytes() {
+            return m_needed == NOT_AVAILABLE ? 4 : m_needed;
+        }
+
+    }
+
+    /** The distinct exception class allows better logging of these unexpected errors. */
+    static class BadMessageLength extends IOException {
+        private static final long serialVersionUID = 8547352379044459911L;
+        public BadMessageLength(String string) {
+            super(string);
         }
     }
 }

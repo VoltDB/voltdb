@@ -37,7 +37,7 @@ import org.voltcore.utils.RateLimitedLogger;
 * is queuing writes which have different locking and backpressure policies
 */
 public abstract class NIOWriteStreamBase {
-    private static final VoltLogger networkLog = new VoltLogger("NETWORK");
+    protected static final VoltLogger networkLog = new VoltLogger("NETWORK");
 
     protected boolean m_isShutdown = false;
 

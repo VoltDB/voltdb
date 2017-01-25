@@ -39,6 +39,7 @@ import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 
 import io.netty_voltpatches.buffer.ByteBuf;
 import io.netty_voltpatches.buffer.CompositeByteBuf;
+import io.netty_voltpatches.buffer.Unpooled;
 
 public class TLSNIOWriteStream extends NIOWriteStream {
 
@@ -59,7 +60,7 @@ public class TLSNIOWriteStream extends NIOWriteStream {
         super(port, offBackPressureCallback, onBackPressureCallback, monitor);
         m_sslEngine = engine;
         m_ce = cipherExecutor;
-        m_outbuf = m_ce.allocator().compositeBuffer();
+        m_outbuf = Unpooled.compositeBuffer();
         m_encrypter = new SSLBufferEncrypter(engine);
     }
 
@@ -385,6 +386,7 @@ public class TLSNIOWriteStream extends NIOWriteStream {
                 m_inFlight.release();
                 encr.release();
                 m_exceptions.offer(new ExecutionException("failed to encrypt frame", e));
+                networkLog.error("failed to encrypt frame", e);
                 enableWriteSelection();
                 return;
             }
@@ -440,6 +442,7 @@ public class TLSNIOWriteStream extends NIOWriteStream {
             } catch (InterruptedException notPossible) {
             } catch (ExecutionException e) {
                 m_inFlight.release();
+                networkLog.error("unexpect fault occurred in encrypt task", e.getCause());
                 m_exceptions.offer(e);
             }
         }

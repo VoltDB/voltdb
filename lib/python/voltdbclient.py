@@ -136,7 +136,7 @@ class FastSerializer:
         'keyfile': None,
         'certfile': None,
         'cert_reqs': ssl.CERT_NONE,
-        'ssl_version': ssl.PROTOCOL_TLSv1,
+        'ssl_version': ssl.PROTOCOL_TLSv1_2,
         'ca_certs': None,
         'do_handshake_on_connect': True
     }
@@ -324,6 +324,10 @@ class FastSerializer:
         elif 'cacerts' in jks_config and jks_config['cacerts']:
             self.ssl_config['ca_certs'] = jks_config['cacerts']
             self.ssl_config['cert_reqs'] = ssl.CERT_REQUIRED
+
+        # extract ssl_version
+        if 'ssl_version' in jks_config and jks_config['ssl_version']:
+            self.ssl_config['ca_certs'] = jks_config['ssl_version']
 
         return ssl.wrap_socket(ss, self.ssl_config['keyfile'],
                                self.ssl_config['certfile'], False,
