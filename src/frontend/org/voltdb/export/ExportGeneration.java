@@ -577,7 +577,9 @@ public class ExportGeneration implements Generation {
                             KeeperException.Code code = KeeperException.Code.get(rc);
                             //Other node must have drained so ignore.
                             if (code == KeeperException.Code.NONODE) {
-                                exportLog.info("Path not found generation drain most likely finished on other node: " + path);
+                                if (exportLog.isDebugEnabled()) {
+                                    exportLog.debug("Path not found generation drain most likely finished on other node: " + path);
+                                }
                                 //Fallthrough to rebuild the mailboxes.
                             } else if (code != KeeperException.Code.OK) {
                                 throw KeeperException.create(code);
