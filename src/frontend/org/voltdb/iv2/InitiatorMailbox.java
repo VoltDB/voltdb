@@ -319,30 +319,33 @@ public class InitiatorMailbox implements Mailbox
         }
         else if (message instanceof BalanceSPIMessage) {
             BalanceSPIMessage msg = (BalanceSPIMessage) message;
-            ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
-
-            if (tmLog.isDebugEnabled()) {
-                tmLog.debug(VoltZK.debugLeadersInfo(zk));
-                tmLog.debug("[InitiatorMailbox.deliverInternal] start to change appointee...pid:" +
-                        msg.getParititionId() + ", hsid:" + msg.getNewLeaderHSId());
-            }
-            LeaderCache leaderAppointee = new LeaderCache(zk, VoltZK.iv2appointees);
-            try {
-                leaderAppointee.start(true);
-                String hsidStr = ZKUtil.suffixHSIdsWithBalanceSPIRequest(msg.getNewLeaderHSId());
-                leaderAppointee.put(msg.getParititionId(), hsidStr);
-            } catch (InterruptedException | ExecutionException | KeeperException e) {
-                tmLog.warn(String.format("Failed to migrate SPI for partition %d to hsid %d. %s", msg.getParititionId(), msg.getNewLeaderHSId(),e.getMessage()));
-            } finally {
-                try {
-                    leaderAppointee.shutdown();
-                } catch (InterruptedException e) {
+            if (this.m_hsId == msg.getNewLeaderHSId()) {
+                ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
+                if (tmLog.isDebugEnabled()) {
+                    tmLog.debug(VoltZK.debugLeadersInfo(zk));
+                    tmLog.debug("[InitiatorMailbox.deliverInternal] start to change appointee...pid:" +
+                            msg.getParititionId() + ", to hsid:" + CoreUtils.hsIdToString(msg.getNewLeaderHSId()));
                 }
+                LeaderCache leaderAppointee = new LeaderCache(zk, VoltZK.iv2appointees);
+                try {
+                    leaderAppointee.start(true);
+                    String hsidStr = ZKUtil.suffixHSIdsWithBalanceSPIRequest(msg.getNewLeaderHSId());
+                    leaderAppointee.put(msg.getParititionId(), hsidStr);
+                } catch (InterruptedException | ExecutionException | KeeperException e) {
+                    tmLog.warn(String.format("Failed to migrate SPI for partition %d to hsid %d. %s", msg.getParititionId(), msg.getNewLeaderHSId(),e.getMessage()));
+                } finally {
+                    try {
+                        leaderAppointee.shutdown();
+                    } catch (InterruptedException e) {
+                    }
+                }
+                if (tmLog.isDebugEnabled()) {
+                    tmLog.debug(VoltZK.debugLeadersInfo(zk));
+                }
+            } else {
+                m_scheduler.m_spiBalanceRequested = true;
+                m_scheduler.m_newBalancedLeaderHSID = msg.getNewLeaderHSId();
             }
-            if (tmLog.isDebugEnabled()) {
-                tmLog.debug(VoltZK.debugLeadersInfo(zk));
-            }
-
             return;
         }
         else if (message instanceof BalanceSPIResponseMessage) {
@@ -353,6 +356,7 @@ public class InitiatorMailbox implements Mailbox
             // TODO: set the leader state back, theoretically return status of the BalanceSPI invocation,
             // restart the miss-routed transactions, etc.
             m_scheduler.setLeaderState(false);
+            m_scheduler.m_spiBalanceRequested = false;
             return;
         }
 

@@ -32,6 +32,7 @@ import java.util.TreeMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 
+import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
@@ -42,12 +43,12 @@ import org.voltdb.CommandLog;
 import org.voltdb.CommandLog.DurabilityListener;
 import org.voltdb.Consistency;
 import org.voltdb.Consistency.ReadLevel;
-import org.voltdb.PartitionDRGateway;
 import org.voltdb.SnapshotCompletionInterest;
 import org.voltdb.SnapshotCompletionMonitor;
 import org.voltdb.SystemProcedureCatalog;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltZK;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.iv2.SiteTasker.SiteTaskerRunnable;
@@ -192,10 +193,25 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         m_snapMonitor.addInterest(this);
     }
 
+    //@Override
     @Override
     public void setMaxSeenTxnId(long maxSeenTxnId)
     {
-        super.setMaxSeenTxnId(maxSeenTxnId);
+        //super.setMaxSeenTxnId(maxSeenTxnId);
+        //Saw transactions before. The master site may become a replica.
+        if(m_txnEgo.getTxnId() > 0 && maxSeenTxnId == Long.MIN_VALUE) {
+            return;
+        }
+        final TxnEgo ego = new TxnEgo(maxSeenTxnId);
+        if (m_txnEgo.getPartitionId() != ego.getPartitionId()) {
+
+            VoltDB.crashLocalVoltDB(
+                    "Received a transaction id at partition " + m_txnEgo.getPartitionId() +
+                    " for partition " + ego.getPartitionId() + ". The partition ids should match.", true, null);
+        }
+        if (m_txnEgo.getTxnId() < ego.getTxnId()) {
+            m_txnEgo = ego;
+        }
         writeIv2ViableReplayEntry();
     }
 
@@ -430,6 +446,33 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                     "should never receive multi-partition initiations.");
         }
 
+        // If this is supposed to be the new leader but has not done promotion yet,
+        // send the message back to former leader.
+        if (message.getSPIBalanceLoopBackHSid() != Long.MIN_VALUE && !m_isLeader) {
+            long loopbackHSId = message.getSPIBalanceLoopBackHSid();
+            message.setSPIBalanceLoopBackHSid(Long.MIN_VALUE);
+            m_mailbox.send(loopbackHSId, message);
+            return;
+        }
+
+        // If this is the former partition master but has not been demoted yet,
+        // route the request to the supposed new leader. The message could be looped back if
+        // the supposed new leader is not in place.
+        if (m_spiBalanceRequested && m_newBalancedLeaderHSID != Long.MIN_VALUE) {
+            message.setSPIBalanceLoopBackHSid(m_mailbox.getHSId());
+            message.setForwaredFromFormerMaster(true);
+            m_mailbox.send(m_newBalancedLeaderHSID, message);
+            return;
+        }
+
+        // Not a leader anymore, send message back to the new leader if the message is originally sent to
+        // the former leader
+        if (!m_isLeader && message.isForwaredFromFormerMaster()) {
+            message.setSPIBalanceLoopBackHSid(m_mailbox.getHSId());
+            message.setForwaredFromFormerMaster(true);
+            m_mailbox.send(m_newBalancedLeaderHSID, message);
+        }
+
         final String procedureName = message.getStoredProcedureName();
         long newSpHandle;
         long uniqueId = Long.MIN_VALUE;
@@ -445,12 +488,25 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 int pid = Integer.parseInt(params[1].toString());
                 int hostId = Integer.parseInt(params[2].toString());
                 int siteId = Integer.parseInt(params[3].toString());
+                long destinations[] = new long[2];
                 long newLeaderHSId = CoreUtils.getHSIdFromHostAndSite(hostId, siteId);
+                ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
+                LeaderCache leaderAppointee = new LeaderCache(zk, VoltZK.iv2appointees);
+                try {
+                    leaderAppointee.start(true);
+                    destinations[0] = leaderAppointee.get(pid);
+                } catch (InterruptedException | ExecutionException e) {
+                    tmLog.warn(String.format("Failed to migrate SPI for partition %d", pid));
+                } finally {
+                    try {
+                        leaderAppointee.shutdown();
+                    } catch (InterruptedException e) {
+                    }
+                }
 
+                destinations[1] = newLeaderHSId;
                 BalanceSPIMessage balanceSpiMsg = new BalanceSPIMessage(pid, newLeaderHSId);
-                m_mailbox.send(newLeaderHSId, balanceSpiMsg);
-
-                // TODO: add a spi migration boolean flag to disable running new transactions from now on
+                m_mailbox.send(destinations, balanceSpiMsg);
             } catch(NumberFormatException e) {
                 tmLog.error(e.getMessage());
                 throw e;

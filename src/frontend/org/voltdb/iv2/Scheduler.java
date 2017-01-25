@@ -81,6 +81,8 @@ abstract public class Scheduler implements InitiatorMessageHandler
 
     // helper class to put command log work in order
     protected final ReplaySequencer m_replaySequencer = new ReplaySequencer();
+    boolean m_spiBalanceRequested = false;
+    long m_newBalancedLeaderHSID = Long.MIN_VALUE;
 
     /*
      * This lock is extremely dangerous to use without known the pattern.

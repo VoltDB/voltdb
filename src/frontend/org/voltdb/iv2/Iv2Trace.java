@@ -174,11 +174,13 @@ public class Iv2Trace
             String logmsg = "rxInitMsg %s from %s ciHandle %s txnId %s spHandle %s trunc %s";
             if (itask.getTxnId() != Long.MIN_VALUE && itask.getTxnId() != txnid) {
                 iv2log.error("Iv2InitiateTaskMessage TXN ID conflict.  Message: " + itask.getTxnId() +
-                        ", locally held: " + txnid);
+                        ", locally held: " + txnid + " local: " + CoreUtils.hsIdToString(localHSId) +
+                        ", source:" +  CoreUtils.hsIdToString(itask.m_sourceHSId));
             }
             if (itask.getSpHandle() != Long.MIN_VALUE && itask.getSpHandle() != spHandle) {
                 iv2log.error("Iv2InitiateTaskMessage SP HANDLE conflict.  Message: " + itask.getSpHandle() +
-                        ", locally held: " + spHandle);
+                        ", locally held: " + spHandle +  " local: " + CoreUtils.hsIdToString(localHSId) +
+                        ", source:" +  CoreUtils.hsIdToString(itask.m_sourceHSId));
             }
             iv2log.trace(String.format(logmsg, CoreUtils.hsIdToString(localHSId),
                         CoreUtils.hsIdToString(itask.m_sourceHSId),
