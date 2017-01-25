@@ -36,8 +36,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Stack;
 
-import junit.framework.TestCase;
-
 import org.apache.commons.lang3.StringUtils;
 import org.json_voltpatches.JSONException;
 import org.voltdb.catalog.Database;
@@ -52,6 +50,8 @@ import org.voltdb.types.ExpressionType;
 import org.voltdb.types.JoinType;
 import org.voltdb.types.PlanNodeType;
 import org.voltdb.types.SortDirectionType;
+
+import junit.framework.TestCase;
 
 public class PlannerTestCase extends TestCase {
 
@@ -615,6 +615,56 @@ public class PlannerTestCase extends TestCase {
         assertTrue("Extra plan node(s) (" + stack.size() +
                 ") were found in the tree with no node type to match",
                 stack.isEmpty());
+    }
+
+        /**
+     * Validate a plan, ignoring inline nodes.  This is kind of like
+     * PlannerTestCase.compileToTopDownTree.  The differences are
+     * <ol>
+     *   <li>We only look out out-of-line nodes,</li>
+     *   <li>We can compile MP plans and SP plans, and</li>
+     *   <li>The boundaries between fragments in MP plans
+     *       are marked with PlanNodeType.INVALID.</li>
+     * </ol>
+     * See TestWindowFunctions.testWindowFunctionWithIndex for examples
+     * of the use of this function.
+     *
+     * @param SQL The statement text.
+     * @param numberOfFragments The number of expected fragments.
+     * @param types The plan node types of the out-of-line nodes.
+     */
+    protected void validatePlan(String SQL,
+                                int numberOfFragments,
+                                PlanNodeType ...types) {
+        // compileToTopDownTree(SQL, numberOutputSchemaColumns, types);
+        List<AbstractPlanNode> fragments = compileToFragments(SQL);
+        assertEquals(String.format("Expected %d fragments, not %d",
+                                   numberOfFragments,
+                                   fragments.size()),
+                     numberOfFragments,
+                     fragments.size());
+        int idx = 0;
+        int fragment = 1;
+        // The index of the last PlanNodeType in types.
+        int nchildren = types.length;
+        System.out.printf("Plan for <%s>\n", SQL);
+        for (AbstractPlanNode plan : fragments) {
+            printPlanNodes(plan, fragment, numberOfFragments);
+            // The boundaries between fragments are
+            // marked with PlanNodeType.INVALID.
+            if (fragment > 1) {
+                assertEquals("Expected a fragment to start here",
+                             PlanNodeType.INVALID,
+                             types[idx]);
+                idx += 1;
+            }
+            fragment += 1;
+            for (;plan != null; idx += 1) {
+                assertEquals(types[idx], plan.getPlanNodeType());
+                plan = (plan.getChildCount() > 0) ? plan.getChild(0) : null;
+            }
+        }
+        assertEquals(nchildren, idx);
     }
 
     /*

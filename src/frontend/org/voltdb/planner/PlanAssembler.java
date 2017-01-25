@@ -1797,7 +1797,7 @@ public class PlanAssembler {
      * @param root          The subtree which may need its output tuples ordered
      * @return true if the plan needs an OrderByPlanNode, false otherwise
      */
-    private static boolean isOrderByNodeRequired(AbstractParsedStmt parsedStmt, AbstractPlanNode root) {
+    private boolean isOrderByNodeRequired(AbstractParsedStmt parsedStmt, AbstractPlanNode root) {
         // Only sort when the statement has an ORDER BY.
         if ( ! parsedStmt.hasOrderByColumns()) {
             return false;
@@ -1820,12 +1820,14 @@ public class PlanAssembler {
                 ! ((probe instanceof AbstractJoinPlanNode)
                     || (probe instanceof AbstractScanPlanNode))
                 && (probe != null);
-            probe = probe.getChild(0)) {
+            probe = (probe.getChildCount() > 0) ? probe.getChild(0) : null) {
         }
         if (probe != null) {
             nonAggPlan = probe;
         } else {
-            // No idea what happened here.
+            // No idea what happened here.  We can't find a
+            // scan or join node at all.  This seems unlikely
+            // to be right.
             nonAggPlan = root;
         }
         if (nonAggPlan instanceof IndexScanPlanNode) {
@@ -1837,12 +1839,23 @@ public class PlanAssembler {
             sortDirection = ((AbstractJoinPlanNode)nonAggPlan).getSortDirection();
         }
 
-        if ( ! nonAggPlan.isWindowFunctionCompatibleWithOrderBy()) {
+        if ( ! nonAggPlan.isWindowFunctionCompatibleWithOrderBy() ) {
             return true;
         }
 
         if (sortDirection != SortDirectionType.INVALID) {
-            return false;
+            // We know now that there is an index ordering which
+            // will satisfy this order by.  If this is a two fragment
+            // plan, we will want to convert the RECEIVE node to
+            // be a MERGERECEIVE node and lop off the order by
+            // node.  But we can't to that here, so generate the
+            // order by node in this case and let the microoptimization
+            // do the transformation.
+            if (m_partitioning.requiresTwoFragments()) {
+                return true;
+            } else {
+                return false;
+            }
         }
 
         return true;
@@ -1854,7 +1867,7 @@ public class PlanAssembler {
      * @param root        The root of the plan needing ordering
      * @return new orderByNode (the new root) or the original root if no orderByNode was required.
      */
-    private static AbstractPlanNode handleOrderBy(AbstractParsedStmt parsedStmt, AbstractPlanNode root) {
+    private AbstractPlanNode handleOrderBy(AbstractParsedStmt parsedStmt, AbstractPlanNode root) {
         assert (parsedStmt instanceof ParsedSelectStmt || parsedStmt instanceof ParsedUnionStmt ||
                 parsedStmt instanceof ParsedDeleteStmt);
 

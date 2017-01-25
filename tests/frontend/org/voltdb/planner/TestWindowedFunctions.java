@@ -550,47 +550,6 @@ public class TestWindowedFunctions extends PlannerTestCase {
                 + explainPlanText, explainPlanText.contains(expected));
     }
 
-    /**
-     * Validate a plan, ignoring inline nodes.  This is kind of like
-     * PlannerTestCase.compileToTopDownTree.  The differences are
-     * <ol>
-     *   <li>We only look out out-of-line nodes, and</li>
-     *   <li>We can compile MP plans.</li>
-     * </ol>
-     *
-     * @param SQL
-     * @param numberOutputSchemaColumns
-     * @param types
-     */
-    public void validatePlan(String SQL,
-                             int numberOfFragments,
-                             PlanNodeType ...types) {
-        // compileToTopDownTree(SQL, numberOutputSchemaColumns, types);
-        List<AbstractPlanNode> fragments = compileToFragments(SQL);
-        assertEquals(String.format("Expected %d fragments, not %d",
-                                   numberOfFragments,
-                                   fragments.size()),
-                     numberOfFragments,
-                     fragments.size());
-        int idx = -1;
-        int fragment = 1;
-        // The index of the last PlanNodeType in types.
-        int nchildren = types.length - 1;
-        System.out.printf("Plan for <%s>\n", SQL);
-        for (AbstractPlanNode plan : fragments) {
-            printPlanNodes(plan, fragment, numberOfFragments);
-            fragment += 1;
-            for (idx += 1; plan.getChildCount() > 0; idx += 1) {
-                assertEquals(types[idx], plan.getPlanNodeType());
-                plan = plan.getChild(0);
-            }
-        }
-        assertEquals(nchildren, idx);
-    }
-
-    // These two are to disable tests which are
-    // not currently working.
-    private static boolean INDEX_FIXED = true;
     // These two can be used to disable particular tests.
     // Change "if (IS_ENABLED) { ... }" to "if (ISNOT_ENABLED) { ... }"
     // below.
@@ -636,6 +595,7 @@ public class TestWindowedFunctions extends PlannerTestCase {
                          PlanNodeType.SEND,
                          PlanNodeType.PROJECTION,
                          PlanNodeType.RECEIVE,
+                         PlanNodeType.INVALID, // fragment marker.
                          PlanNodeType.SEND,
                          PlanNodeType.SEQSCAN);
         }
@@ -661,6 +621,7 @@ public class TestWindowedFunctions extends PlannerTestCase {
                          PlanNodeType.SEND,
                          PlanNodeType.PROJECTION,
                          PlanNodeType.RECEIVE,
+                         PlanNodeType.INVALID, // Fragment Marker.
                          PlanNodeType.SEND,
                          PlanNodeType.INDEXSCAN);
         }
@@ -687,6 +648,7 @@ public class TestWindowedFunctions extends PlannerTestCase {
                          PlanNodeType.WINDOWFUNCTION,
                          PlanNodeType.ORDERBY,
                          PlanNodeType.RECEIVE,
+                         PlanNodeType.INVALID, // Fragment Marker.
                          PlanNodeType.SEND,
                          PlanNodeType.SEQSCAN);
         }
@@ -704,7 +666,7 @@ public class TestWindowedFunctions extends PlannerTestCase {
         // echo  7a: No SLOB, one WF, SP Query, index (Only to order the WF)
         // echo     Expect WinFun -> IndxScan
         // explain select a, b, max(b) over ( partition by a ) from vanilla_idx;
-        if (INDEX_FIXED) {
+        if (IS_ENABLED) {
             validatePlan("select a, b, max(b) over ( partition by a ) from vanilla_idx;",
                          1,
                          PlanNodeType.SEND,
@@ -722,19 +684,21 @@ public class TestWindowedFunctions extends PlannerTestCase {
                          PlanNodeType.PROJECTION,
                          PlanNodeType.WINDOWFUNCTION,
                          PlanNodeType.MERGERECEIVE, // (WF),
+                         PlanNodeType.INVALID, // Fragment Marker.
                          PlanNodeType.SEND,
                          PlanNodeType.INDEXSCAN);
         }
         // echo  8a: No SLOB, one WF, MP Query, index (Only to order the WF)
         // echo     Expect WinFun -> MrgRecv(WF) -> SEND -> IndxScan
         // explain select a, b, max(b) over ( partition by a ) from vanilla_pb_idx;
-        if (INDEX_FIXED) {
+        if (IS_ENABLED) {
             validatePlan("select a, b, max(b) over ( partition by a ) from vanilla_pb_idx;",
                          2,
                          PlanNodeType.SEND,
                          PlanNodeType.PROJECTION,
                          PlanNodeType.WINDOWFUNCTION,
                          PlanNodeType.MERGERECEIVE, // WF
+                         PlanNodeType.INVALID, // Fragment Marker.
                          PlanNodeType.SEND,
                          PlanNodeType.INDEXSCAN);
         }
@@ -761,6 +725,7 @@ public class TestWindowedFunctions extends PlannerTestCase {
                          PlanNodeType.WINDOWFUNCTION,
                          PlanNodeType.ORDERBY,
                          PlanNodeType.RECEIVE,
+                         PlanNodeType.INVALID, // Fragment Marker.
                          PlanNodeType.SEND,
                          PlanNodeType.INDEXSCAN);
         }
@@ -785,6 +750,7 @@ public class TestWindowedFunctions extends PlannerTestCase {
                          PlanNodeType.PROJECTION,
                          PlanNodeType.ORDERBY, // (SLOB),
                          PlanNodeType.RECEIVE,
+                         PlanNodeType.INVALID, // Fragment Marker.
                          PlanNodeType.SEND,
                          PlanNodeType.SEQSCAN);
         }
@@ -815,6 +781,7 @@ public class TestWindowedFunctions extends PlannerTestCase {
                          PlanNodeType.SEND,
                          PlanNodeType.PROJECTION,
                          PlanNodeType.MERGERECEIVE, // SLOB
+                         PlanNodeType.INVALID, // Fragment Marker.
                          PlanNodeType.SEND,
                          PlanNodeType.INDEXSCAN);
         }
@@ -827,6 +794,7 @@ public class TestWindowedFunctions extends PlannerTestCase {
                          PlanNodeType.SEND,
                          PlanNodeType.PROJECTION,
                          PlanNodeType.MERGERECEIVE, // SLOB
+                         PlanNodeType.INVALID, // Fragment Marker.
                          PlanNodeType.SEND,
                          PlanNodeType.INDEXSCAN);
         }
@@ -851,6 +819,7 @@ public class TestWindowedFunctions extends PlannerTestCase {
                          PlanNodeType.PROJECTION,
                          PlanNodeType.ORDERBY, // (SLOB),
                          PlanNodeType.RECEIVE,
+                         PlanNodeType.INVALID, // Fragment Marker.
                          PlanNodeType.SEND,
                          PlanNodeType.INDEXSCAN);
         }
@@ -879,13 +848,14 @@ public class TestWindowedFunctions extends PlannerTestCase {
                          PlanNodeType.WINDOWFUNCTION,
                          PlanNodeType.ORDERBY, // (WF),
                          PlanNodeType.RECEIVE,
+                         PlanNodeType.INVALID, // Fragment Marker.
                          PlanNodeType.SEND,
                          PlanNodeType.INDEXSCAN);
         }
         // echo 19: SLOB, one WF, SP Query, index (Can order the WF, Cannot order the SLOB)
         // echo     Expect OrderBy(SLOB) -> WinFun -> IndxScan
         // explain select a, b, max(b) over ( partition by a ) from vanilla_idx where a = 1 order by b;
-        if (INDEX_FIXED) {
+        if (IS_ENABLED) {
             validatePlan("select a, b, max(b) over ( partition by a ) from vanilla_idx where a = 1 order by b;",
                          1,
                          PlanNodeType.SEND,
@@ -897,7 +867,7 @@ public class TestWindowedFunctions extends PlannerTestCase {
         // echo 19a: SLOB, one WF, SP Query, index (Only to order the WF, not SLOB)
         // echo     Expect OrderBy(SLOB) -> WinFun -> IndxScan
         // explain select a, b, max(b) over ( partition by a ) from vanilla_idx order by b;
-        if (INDEX_FIXED) {
+        if (IS_ENABLED) {
             validatePlan("select a, b, max(b) over ( partition by a ) from vanilla_idx order by b;",
                          1,
                          PlanNodeType.SEND,
@@ -917,13 +887,14 @@ public class TestWindowedFunctions extends PlannerTestCase {
                          PlanNodeType.ORDERBY, // (SLOB),
                          PlanNodeType.WINDOWFUNCTION,
                          PlanNodeType.MERGERECEIVE, // WF
+                         PlanNodeType.INVALID, // Fragment Marker.
                          PlanNodeType.SEND,
                          PlanNodeType.INDEXSCAN);
         }
         // echo 20a: SLOB, one WF, MP Query, index (Can order the WF, not SLOB)
         // echo     Expect OrderBy(SLOB) -> WinFun -> MrgRecv(WF) -> SEND -> IndxScan
         // explain select a, b, max(b) over ( partition by a ) from vanilla_pb_idx order by b;
-        if (INDEX_FIXED) {
+        if (IS_ENABLED) {
             validatePlan("select a, b, max(b) over ( partition by a ) from vanilla_pb_idx order by b;",
                          2,
                          PlanNodeType.SEND,
@@ -931,11 +902,12 @@ public class TestWindowedFunctions extends PlannerTestCase {
                          PlanNodeType.ORDERBY, // (SLOB),
                          PlanNodeType.WINDOWFUNCTION,
                          PlanNodeType.MERGERECEIVE, // WF
+                         PlanNodeType.INVALID, // Fragment Marker.
                          PlanNodeType.SEND,
                          PlanNodeType.INDEXSCAN);
         }
         // echo 21: SLOB, one WF, SP Query, index (Can order the SLOB, not WF)
-        // echo     This is impossible, but this plan should be:
+        // echo     The index is not usable for the SLOB, since the WF invalidates the order.
         // echo     Expect OrderBy(SLOB) -> WinFun -> OrderBy(WF) -> IndxScan
         // explain select a, b, max(b) over ( partition by b ) from vanilla_idx where a = 1 order by a;
         if (IS_ENABLED) {
@@ -943,13 +915,13 @@ public class TestWindowedFunctions extends PlannerTestCase {
                          1,
                          PlanNodeType.SEND,
                          PlanNodeType.PROJECTION,
-                         PlanNodeType.ORDERBY, // (SLOB),
+                         PlanNodeType.ORDERBY, // (SLOB, can't use index),
                          PlanNodeType.WINDOWFUNCTION,
                          PlanNodeType.ORDERBY, // (WF),
                          PlanNodeType.INDEXSCAN);
         }
-        // echo 21a: SLOB, one WF, SP Query, index (Only to order the SLOB, not WF)
-        // echo     This is impossible, but this plan should be:
+        // echo 21a: SLOB, one WF, SP Query, index (Can order the SLOB, not WF)
+        // echo     The index is unusable for the SLOB, since the WF invalidates the order.
         // echo     Expect OrderBy(SLOB) -> WinFun -> OrderBy(WF) -> IndxScan
         // explain select a, b, max(b) over ( partition by b ) from vanilla_idx order by a;
         if (IS_ENABLED) {
@@ -957,13 +929,13 @@ public class TestWindowedFunctions extends PlannerTestCase {
                          1,
                          PlanNodeType.SEND,
                          PlanNodeType.PROJECTION,
-                         PlanNodeType.ORDERBY, // (SLOB),
+                         PlanNodeType.ORDERBY, // (SLOB, can't use index),
                          PlanNodeType.WINDOWFUNCTION,
                          PlanNodeType.ORDERBY, // (WF),
                          PlanNodeType.INDEXSCAN);
         }
-        // echo 22: SLOB, one WF, MP Query, noindex (Can order the SLOB, not WF)
-        // echo     This is impossible, but this plan should be:
+        // echo 22: SLOB, one WF, MP Query, index (Can order the SLOB, not WF)
+        // echo     The index is unusable by the SLOB since the WF invalidates it.
         // echo     Expect OrderBy(SLOB) -> WinFun -> OrderBy(WF) -> RECV -> SEND -> IndxScan
         // explain select a, b, max(b) over ( partition by b ) from vanilla_pb_idx where a = 1 order by a;
         if (IS_ENABLED) {
@@ -975,11 +947,12 @@ public class TestWindowedFunctions extends PlannerTestCase {
                          PlanNodeType.WINDOWFUNCTION,
                          PlanNodeType.ORDERBY, // (WF),
                          PlanNodeType.RECEIVE,
+                         PlanNodeType.INVALID, // Fragment Marker.
                          PlanNodeType.SEND,
                          PlanNodeType.INDEXSCAN);
         }
-        // echo 22a: SLOB, one WF, MP Query, noindex (Only to order the SLOB, not WF)
-        // echo     This is impossible, but this plan should be:
+        // echo 22a: SLOB, one WF, MP Query, index (Can order the SLOB, not WF)
+        // echo     The index is unusable by the SLOB since the WF invalidates it.
         // echo     Expect OrderBy(SLOB) -> WinFun -> OrderBy(WF) -> RECV -> SEND -> IndxScan
         // explain select a, b, max(b) over ( partition by b ) from vanilla_pb_idx order by a;
         if (IS_ENABLED) {
@@ -991,13 +964,14 @@ public class TestWindowedFunctions extends PlannerTestCase {
                          PlanNodeType.WINDOWFUNCTION,
                          PlanNodeType.ORDERBY, // (WF),
                          PlanNodeType.RECEIVE,
+                         PlanNodeType.INVALID, // Fragment Marker.
                          PlanNodeType.SEND,
                          PlanNodeType.INDEXSCAN);
         }
         // echo 23: SLOB, one WF, SP Query, index (Can order the WF and SLOB both)
         // echo     Expect WinFun -> IndxScan
         // explain select a, b, max(b) over ( partition by a ) from vanilla_idx where a = 1 order by a;
-        if (INDEX_FIXED) {
+        if (IS_ENABLED) {
             validatePlan("select a, b, max(b) over ( partition by a ) from vanilla_idx where a = 1 order by a;",
                          1,
                          PlanNodeType.SEND,
@@ -1008,7 +982,7 @@ public class TestWindowedFunctions extends PlannerTestCase {
         // echo 23a: SLOB, one WF, SP Query, index (Can order the WF and SLOB both)
         // echo     Expect WinFun -> IndxScan
         // explain select a, b, max(b) over ( partition by a ) from vanilla_idx order by a;
-        if (INDEX_FIXED) {
+        if (IS_ENABLED) {
             validatePlan("select max(b) over ( partition by a ) from vanilla_idx order by a;",
                          1,
                          PlanNodeType.SEND,
@@ -1019,13 +993,14 @@ public class TestWindowedFunctions extends PlannerTestCase {
         // echo 24: SLOB, one WF, MP Query, index (For the WF and SLOB both)
         // echo     Expect WinFun -> MrgRecv(SLOB or WF) -> SEND -> IndxScan
         // explain select max(b) over ( partition by a ) from vanilla_pb_idx where a = 1 order by a;
-        if (INDEX_FIXED) {
+        if (IS_ENABLED) {
             validatePlan("select max(b) over ( partition by a ) from vanilla_pb_idx where a = 1 order by a;",
                          2,
                          PlanNodeType.SEND,
                          PlanNodeType.PROJECTION,
                          PlanNodeType.WINDOWFUNCTION,
                          PlanNodeType.MERGERECEIVE, // (SLOB or WF),
+                         PlanNodeType.INVALID, // Fragment Marker.
                          PlanNodeType.SEND,
                          PlanNodeType.INDEXSCAN);
         }

@@ -105,11 +105,16 @@ public class InlineOrderByIntoMergeReceive extends MicroOptimization {
         if (child == null) {
             return plan;
         }
+        // SP Plans which have an index which can provide
+        // the window function ordering don't create
+        // an order by node.
         if ( ! ( child instanceof OrderByPlanNode ) ) {
             return plan;
         }
         OrderByPlanNode onode = (OrderByPlanNode)child;
         child = onode.getChild(0);
+        // The order by node needs to be followed by a
+        // Receive node.
         if ( ! ( child instanceof ReceivePlanNode) ) {
             return plan;
         }
@@ -119,14 +124,22 @@ public class InlineOrderByIntoMergeReceive extends MicroOptimization {
         // No inline nodes are expected in the Receive node.
         assert(receiveNode.getChildCount() == 1);
         child = receiveNode.getChild(0);
+        // The Receive node must be followed by a Send node.
+        // Maybe this should be an assert.
         if (! ( child instanceof SendPlanNode) ) {
             return plan;
         }
         SendPlanNode sendNode = (SendPlanNode)child;
         child = sendNode.getChild(0);
+        // If this window function does not use the
+        // index then this optimization is not possible.
         if (child.getWindowFunctionUsesIndex() != 0) {
             return plan;
         }
+        // Remove the Receive node and the Order by node
+        // and replace them with a MergeReceive node.  Leave
+        // the order by node inline in the MergeReceive node,
+        // since we need it to calculate the merge.
         plan.clearChildren();
         receiveNode.removeFromGraph();
         MergeReceivePlanNode mrnode = new MergeReceivePlanNode();

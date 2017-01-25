@@ -1222,7 +1222,7 @@ public abstract class SubPlanAssembler {
                 SortDirectionType sortDir = pci.ascending ? SortDirectionType.ASC : SortDirectionType.DESC;
                 m_unmatchedOrderByExprs.add(new ExpressionOrColumn(-1, pci.expression, sortDir));
             }
-            // Statement level order by expressions are number -1.
+            // Statement level order by expressions are number STATEMENT_LEVEL_ORDER_BY_INDEX.
             m_windowFunctionNumber = STATEMENT_LEVEL_ORDER_BY_INDEX;
             m_isWindowFunction = false;
             m_sortDirection = SortDirectionType.INVALID;
@@ -1466,6 +1466,7 @@ public abstract class SubPlanAssembler {
             // Fill in the failing return values as a fallback.
             retval.bindings.clear();
             retval.m_windowFunctionUsesIndex = NO_INDEX_USE;
+            retval.m_stmtOrderByIsCompatible = false;
             retval.sortDirection = SortDirectionType.INVALID;
             int numOrderSpoilers = 0;
 
@@ -1496,7 +1497,7 @@ public abstract class SubPlanAssembler {
                     WindowFunctionScore orderByScore = m_winFunctions[m_numOrderByScores + m_numWinScores - 1];
                     assert(orderByScore != null);
                     // If the order by score is done, this
-                    // index is usable there as well as for any
+                    // index may be usable there as well as for any
                     // window functions.
                     retval.m_stmtOrderByIsCompatible = orderByScore.isDone();
                }
@@ -1504,6 +1505,26 @@ public abstract class SubPlanAssembler {
 
                     // Mark how we are using this index.
                     retval.m_windowFunctionUsesIndex = answer.m_windowFunctionNumber;
+                    // <ol>
+                    //   <li>If we have an index for the Statement Level
+                    //       Order By clause but there is a window function
+                    //       that can't use the index,
+                    //       then we can't use the index.</li>
+                    //   <li>If there is more than one window function we
+                    //       can't use the index for the statement level
+                    //       order by.  We are assuming here that each
+                    //       window function object in the parsed select
+                    //       statement has a different ordering.</li>
+                    // </ol>
+                    if ((retval.m_windowFunctionUsesIndex == STATEMENT_LEVEL_ORDER_BY_INDEX)
+                            && (0 < m_numWinScores)) {
+                        retval.m_stmtOrderByIsCompatible = false;
+                        retval.m_windowFunctionUsesIndex = NO_INDEX_USE;
+                    }
+                    if (retval.m_stmtOrderByIsCompatible
+                            && (1 < m_numWinScores)) {
+                        retval.m_stmtOrderByIsCompatible = false;
+                    }
 
                     // Add the bindings.
                     assert(answer.m_bindings != null);
