@@ -111,11 +111,6 @@ public class TLSVoltPort extends VoltPort  {
     }
 
     private void waitForPendingDecrypts() throws IOException {
-        if (!m_ce.isActive()) {
-            while (!m_dcryptgw.isEmpty()) {
-                m_dcryptgw.run();
-            }
-        }
         boolean acquired;
         do {
             int waitFor = 1 - m_inFlight.availablePermits();
@@ -126,6 +121,11 @@ public class TLSVoltPort extends VoltPort  {
                     acquired = m_inFlight.tryAcquire(1, TimeUnit.SECONDS);
                     if (acquired) {
                         m_inFlight.release();
+                    } else if (!m_ce.isActive()) {
+                        while (!m_dcryptgw.isEmpty()) {
+                            m_dcryptgw.run();
+                            checkForGatewayExceptions();
+                        }
                     }
                 } catch (InterruptedException e) {
                     throw new IOException("interrupted while waiting for pending decrypts", e);
@@ -270,9 +270,11 @@ public class TLSVoltPort extends VoltPort  {
             }
             final boolean wasEmpty = m_q.isEmpty();
             m_q.offer(slice);
-            if (wasEmpty) {
+            if (wasEmpty && m_ce.isActive()) {
                 ListenableFuture<?> fut = m_ce.getES().submit(this);
                 fut.addListener(new ExceptionListener(fut), CoreUtils.SAMETHREADEXECUTOR);
+            } else if (wasEmpty && !m_ce.isActive()) {
+                run();
             }
             m_inFlight.reducePermits(1);
         }

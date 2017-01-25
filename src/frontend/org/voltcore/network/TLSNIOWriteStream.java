@@ -134,12 +134,7 @@ public class TLSNIOWriteStream extends NIOWriteStream {
 
     void waitForPendingEncrypts() throws IOException {
         boolean acquired;
-        if (!m_ce.isActive()) {
-            while (!m_ecryptgw.isEmpty()) {
-                m_ecryptgw.run();
-            }
-            checkForGatewayExceptions();
-        }
+
         do {
             int waitFor = 1 - m_inFlight.availablePermits();
             acquired = waitFor == 0;
@@ -149,6 +144,11 @@ public class TLSNIOWriteStream extends NIOWriteStream {
                     acquired = m_inFlight.tryAcquire(1, TimeUnit.SECONDS);
                     if (acquired) {
                         m_inFlight.release();
+                    } else if (!m_ce.isActive()) {
+                        while (!m_ecryptgw.isEmpty()) {
+                            m_ecryptgw.run();
+                            checkForGatewayExceptions();
+                        }
                     }
                 } catch (InterruptedException e) {
                     throw new IOException("interrupted while waiting for pending encrypts", e);
@@ -340,9 +340,11 @@ public class TLSNIOWriteStream extends NIOWriteStream {
             List<EncryptFrame> chunks = frame.chunked(Math.min(CipherExecutor.PAGE_SIZE, applicationBufferSize()));
             m_q.addAll(chunks);
             m_inFlight.reducePermits(chunks.size());
-            if (wasEmpty) {
+            if (wasEmpty && m_ce.isActive()) {
                 ListenableFuture<?> fut = m_ce.getES().submit(this);
                 fut.addListener(new ExceptionListener(fut), CoreUtils.SAMETHREADEXECUTOR);
+            } else if (wasEmpty && !m_ce.isActive()) {
+                run();
             }
         }
 
