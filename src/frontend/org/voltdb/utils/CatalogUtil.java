@@ -782,32 +782,6 @@ public abstract class CatalogUtil {
             JAXBElement<DeploymentType> result =
                 (JAXBElement<DeploymentType>) unmarshaller.unmarshal(deployIS);
             DeploymentType deployment = result.getValue();
-            // move any deprecated standalone export elements to the default target
-            ExportType export = deployment.getExport();
-            if (export != null && export.getTarget() != null) {
-                if (export.getConfiguration().size() > 1) {
-                    hostLog.error("Invalid schema, cannot use deprecated export syntax with multiple configuration tags.");
-                    return null;
-                }
-                //OLD syntax use target as type.
-                if (export.getConfiguration().isEmpty()) {
-                    // this code is for RestRoundtripTest
-                    export.getConfiguration().add(new ExportConfigurationType());
-                }
-                ExportConfigurationType exportConfig = export.getConfiguration().get(0);
-                if (export.isEnabled() != null) {
-                    exportConfig.setEnabled(export.isEnabled());
-                }
-                if (export.getTarget() != null) {
-                    exportConfig.setType(export.getTarget());
-                }
-                if (export.getExportconnectorclass() != null) {
-                    exportConfig.setExportconnectorclass(export.getExportconnectorclass());
-                }
-                //Set target to default name.
-                exportConfig.setTarget(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
-            }
-
             populateDefaultDeployment(deployment);
             return deployment;
         } catch (JAXBException e) {
@@ -1404,45 +1378,32 @@ public abstract class CatalogUtil {
         if (exportType == null) {
             return;
         }
-        List<String> streamList = new ArrayList<>();
+        List<String> targetList = new ArrayList<>();
 
         for (ExportConfigurationType exportConfiguration : exportType.getConfiguration()) {
 
             boolean connectorEnabled = exportConfiguration.isEnabled();
-            String targetName = getExportTarget(exportConfiguration);
-            if (targetName == null || targetName.trim().isEmpty()) {
-                    throw new RuntimeException("Target must be specified along with type in export configuration.");
-            }
-
+            String targetName = exportConfiguration.getTarget();
             if (connectorEnabled) {
                 m_exportEnabled = true;
-                if (streamList.contains(targetName)) {
+                if (targetList.contains(targetName)) {
                     throw new RuntimeException("Multiple connectors can not be assigned to single export target: " +
                             targetName + ".");
                 }
                 else {
-                    streamList.add(targetName);
+                    targetList.add(targetName);
                 }
             }
-            boolean defaultConnector = targetName.equals(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
 
             Properties processorProperties = checkExportProcessorConfiguration(exportConfiguration);
             org.voltdb.catalog.Connector catconn = db.getConnectors().get(targetName);
             if (catconn == null) {
                 if (connectorEnabled) {
-                    if (defaultConnector) {
-                        hostLog.info("Export configuration enabled and provided for the default export " +
-                                     "target in deployment file, however, no export " +
-                                     "tables are assigned to the default target. " +
-                                     "Export target will be disabled.");
-                    }
-                    else {
-                        hostLog.info("Export configuration enabled and provided for export target " +
-                                     targetName +
-                                     " in deployment file however no export " +
-                                     "tables are assigned to the this target. " +
-                                     "Export target " + targetName + " will be disabled.");
-                    }
+                    hostLog.info("Export configuration enabled and provided for export target " +
+                                 targetName +
+                                 " in deployment file however no export " +
+                                 "tables are assigned to the this target. " +
+                                 "Export target " + targetName + " will be disabled.");
                 }
                 continue;
             }
@@ -1457,20 +1418,11 @@ public abstract class CatalogUtil {
                         rowLength += catColumn.getSize();
                     }
                     if (rowLength > rowLengthLimit) {
-                        if (defaultConnector) {
-                            hostLog.error("Export configuration for the default export target has " +
-                                    "configured to has row length limit " + rowLengthLimit +
-                                    ". But the export table " + tableref.getTypeName() +
-                                    " has estimated row length " + rowLength +
-                                    ".");
-                        }
-                        else {
-                            hostLog.error("Export configuration for export target " + targetName + " has" +
-                                    "configured to has row length limit " + rowLengthLimit +
-                                    ". But the export table " + tableref.getTypeName() +
-                                    " has estimated row length " + rowLength +
-                                    ".");
-                        }
+                        hostLog.error("Export configuration for export target " + targetName + " has" +
+                                "configured to has row length limit " + rowLengthLimit +
+                                ". But the export table " + tableref.getTypeName() +
+                                " has estimated row length " + rowLength +
+                                ".");
                         throw new RuntimeException("Export table " + tableref.getTypeName() + " row length is " + rowLength +
                                 ", exceeding configurated limitation " + rowLengthLimit + ".");
                     }
@@ -1489,28 +1441,12 @@ public abstract class CatalogUtil {
             catconn.setEnabled(connectorEnabled);
 
             if (!connectorEnabled) {
-                if (defaultConnector) {
-                    hostLog.info("Export configuration for the default export target is present and is " +
-                            "configured to be disabled. The default export target will be disabled.");
-                }
-                else {
-                    hostLog.info("Export configuration for export target " + targetName + " is present and is " +
-                                 "configured to be disabled. Export target " + targetName + " will be disabled.");
-                }
+                hostLog.info("Export configuration for export target " + targetName + " is present and is " +
+                             "configured to be disabled. Export target " + targetName + " will be disabled.");
             } else {
-                if (defaultConnector) {
-                    hostLog.info("Default export target is configured and enabled with type=" + exportConfiguration.getType());
-                }
-                else {
-                    hostLog.info("Export target " + targetName + " is configured and enabled with type=" + exportConfiguration.getType());
-                }
+                hostLog.info("Export target " + targetName + " is configured and enabled with type=" + exportConfiguration.getType());
                 if (exportConfiguration.getProperty() != null) {
-                    if (defaultConnector) {
-                        hostLog.info("Default export target configuration properties are: ");
-                    }
-                    else {
-                        hostLog.info("Export target " + targetName + " configuration properties are: ");
-                    }
+                    hostLog.info("Export target " + targetName + " configuration properties are: ");
                     for (PropertyType configProp : exportConfiguration.getProperty()) {
                         if (!configProp.getName().toLowerCase().contains("password")) {
                             hostLog.info("Export Configuration Property NAME=" + configProp.getName() + " VALUE=" + configProp.getValue());
@@ -1519,29 +1455,6 @@ public abstract class CatalogUtil {
                 }
             }
         }
-    }
-
-    // Utility method to get target from 'target' attribute or deprecated 'stream' attribute
-    // and handle error cases.
-    private static String getExportTarget(ExportConfigurationType exportConfiguration) {
-        // Get the target name from the xml attribute "target"
-        String targetName = exportConfiguration.getTarget();
-        targetName = (StringUtils.isBlank(targetName)) ? null : targetName.trim();
-        String streamName = exportConfiguration.getStream();
-        streamName = (StringUtils.isBlank(streamName)) ? null : streamName.trim();
-        // If both are specified, they must be equal
-        if (targetName!=null && streamName!=null && !targetName.equals(streamName)) {
-            throw new RuntimeException("Only one of 'target' or 'stream' attribute must be specified");
-        }
-        // handle old deployment files, which will only have 'stream' specified
-        if (targetName==null) {
-            targetName = streamName;
-        }
-        if (targetName == null) {
-            throw new RuntimeException("Target must be specified along with type in export configuration.");
-        }
-
-        return targetName;
     }
 
     /**

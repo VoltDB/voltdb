@@ -49,7 +49,7 @@ public class TestTableHelper extends TestCase {
         assertEquals(12, t.getColumnMaxSize(2));
         assertEquals(-1, t.m_extraMetadata.partitionColIndex);
 
-        System.out.println(TableHelper.ddlForTable(t));
+        System.out.println(TableHelper.ddlForTable(t, false));
 
         // try the same thing, but partitioned
         t = TableHelper.quickTable("FOO (BIGINT-N, BAR:TINYINT, A:VARCHAR12-U/'foo') P(A) PK(2,BAR)");
@@ -90,7 +90,7 @@ public class TestTableHelper extends TestCase {
         assertEquals(255, t.getColumnMaxSize(2));
         assertEquals(-1, t.m_extraMetadata.partitionColIndex);
 
-        System.out.println(TableHelper.ddlForTable(t));
+        System.out.println(TableHelper.ddlForTable(t, false));
 
         // try the same thing, but partitioned
         t = TableHelper.quickTable("Ryan (likes:smallint, TINYINT/'8', A:VARBINARY/'ABCD') P(0)");
@@ -112,7 +112,7 @@ public class TestTableHelper extends TestCase {
         assertEquals(255, t.getColumnMaxSize(2));
         assertEquals(0, t.m_extraMetadata.partitionColIndex);
 
-        System.out.println(TableHelper.ddlForTable(t));
+        System.out.println(TableHelper.ddlForTable(t, false));
     }
 
     /**

@@ -305,22 +305,6 @@ public class SQLParser extends SQLPatternFactory
             ";\\z"                      // semicolon at end of statement
             );
 
-    /**
-     * EXPORT TABLE statement regex
-     * NB supports only unquoted table names
-     * Capture groups are tagged as (1) in comments below.
-     */
-    private static final Pattern PAT_EXPORT_TABLE = Pattern.compile(
-            "(?i)" +                            // (ignore case)
-            "\\A"  +                            // start statement
-            "EXPORT\\s+TABLE\\s+"  +            // EXPORT TABLE
-            "([\\w.$]+)" +                      // (group 1) <table name>
-            "(?:\\s+TO\\s+STREAM\\s+" +         // begin optional TO STREAM <export target> clause
-            "([\\w.$]+)" +                      // (group 2) <export target>
-            ")?" +                              // end optional TO STREAM <export target> clause
-            "\\s*;\\z"                          // (end statement)
-            );
-
     /*
      * CREATE STREAM statement regex
      *
@@ -362,7 +346,6 @@ public class SQLParser extends SQLPatternFactory
             "\\ADROP|" +
             "\\APARTITION|" +
             "\\AREPLICATE|" +
-            "\\AEXPORT|" +
             "\\AIMPORT|" +
             "\\ADR|" +
             "\\ASET" +
@@ -641,16 +624,6 @@ public class SQLParser extends SQLPatternFactory
     public static Matcher matchDropStream(String statement)
     {
         return PAT_DROP_STREAM.matcher(statement);
-    }
-
-    /**
-     * Match statement against export table pattern
-     * @param statement  statement to match against
-     * @return           pattern matcher object
-     */
-    public static Matcher matchExportTable(String statement)
-    {
-        return PAT_EXPORT_TABLE.matcher(statement);
     }
 
     /**
