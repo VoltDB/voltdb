@@ -101,7 +101,7 @@ public enum CipherExecutor {
         }
     }
 
-    public io.netty.buffer.PooledByteBufAllocator allocator() {
+    public io.netty_voltpatches.buffer.PooledByteBufAllocator allocator() {
         if (!m_active.get()) {
             throw new IllegalStateException(name() + " cipher is not active");
         }
@@ -122,28 +122,28 @@ public enum CipherExecutor {
     }
 
     private static class ClientPoolHolder {
-        static final io.netty.buffer.PooledByteBufAllocator INSTANCE =
-                new io.netty.buffer.PooledByteBufAllocator(
+        static final io.netty_voltpatches.buffer.PooledByteBufAllocator INSTANCE =
+                new io.netty_voltpatches.buffer.PooledByteBufAllocator(
                         true,
-                        io.netty.buffer.PooledByteBufAllocator.defaultNumHeapArena(),
-                        io.netty.buffer.PooledByteBufAllocator.defaultNumDirectArena(),
+                        io.netty_voltpatches.buffer.PooledByteBufAllocator.defaultNumHeapArena(),
+                        io.netty_voltpatches.buffer.PooledByteBufAllocator.defaultNumDirectArena(),
                         PAGE_SIZE, /* page size */
-                        io.netty.buffer.PooledByteBufAllocator.defaultMaxOrder(),
-                        io.netty.buffer.PooledByteBufAllocator.defaultTinyCacheSize(),
-                        io.netty.buffer.PooledByteBufAllocator.defaultSmallCacheSize(),
-                        io.netty.buffer.PooledByteBufAllocator.defaultNormalCacheSize());
+                        io.netty_voltpatches.buffer.PooledByteBufAllocator.defaultMaxOrder(),
+                        io.netty_voltpatches.buffer.PooledByteBufAllocator.defaultTinyCacheSize(),
+                        io.netty_voltpatches.buffer.PooledByteBufAllocator.defaultSmallCacheSize(),
+                        io.netty_voltpatches.buffer.PooledByteBufAllocator.defaultNormalCacheSize());
     }
 
     private static class ServerPoolHolder {
-        static final io.netty.buffer.PooledByteBufAllocator INSTANCE =
-                new io.netty.buffer.PooledByteBufAllocator(
+        static final io.netty_voltpatches.buffer.PooledByteBufAllocator INSTANCE =
+                new io.netty_voltpatches.buffer.PooledByteBufAllocator(
                         true,
-                        io.netty.buffer.PooledByteBufAllocator.defaultNumHeapArena(),
-                        io.netty.buffer.PooledByteBufAllocator.defaultNumDirectArena(),
+                        io.netty_voltpatches.buffer.PooledByteBufAllocator.defaultNumHeapArena(),
+                        io.netty_voltpatches.buffer.PooledByteBufAllocator.defaultNumDirectArena(),
                         PAGE_SIZE, /* page size */
-                        io.netty.buffer.PooledByteBufAllocator.defaultMaxOrder(),
-                        io.netty.buffer.PooledByteBufAllocator.defaultTinyCacheSize(),
-                        io.netty.buffer.PooledByteBufAllocator.defaultSmallCacheSize(),
+                        io.netty_voltpatches.buffer.PooledByteBufAllocator.defaultMaxOrder(),
+                        io.netty_voltpatches.buffer.PooledByteBufAllocator.defaultTinyCacheSize(),
+                        io.netty_voltpatches.buffer.PooledByteBufAllocator.defaultSmallCacheSize(),
                         512);
     }
 
