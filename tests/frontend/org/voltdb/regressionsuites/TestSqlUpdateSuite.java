@@ -172,6 +172,7 @@ public class TestSqlUpdateSuite extends RegressionSuite {
         System.out.println("testInvalidUpdate");
         verifyStmtFails(client, "UPDATE P1_VIEW SET NUM_SUM = 5",
                  "Illegal to modify a materialized view.");
+        verifyStmtFails(client, "UPDATE P1 SET NUM = 1 WHERE COUNT(*) IS NULL", "invalid WHERE expression");
     }
 
     public void testUpdateWithCaseWhen() throws Exception {
