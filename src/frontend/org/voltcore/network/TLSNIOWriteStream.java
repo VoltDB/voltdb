@@ -277,7 +277,7 @@ public class TLSNIOWriteStream extends NIOWriteStream {
         return m_encrypted.size()
              + m_queuedWrites.size()
              + m_partialSize
-             + m_outbuf.numComponents() - 1;
+             + m_outbuf.numComponents(); // > 1 ? m_outbuf.numComponents() - 1 : 0;
     }
 
     @Override
