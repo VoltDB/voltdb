@@ -1320,10 +1320,11 @@ public abstract class SubPlanAssembler {
                         // m_partitionByExprs or m_unmatchedOrderByExprs
                         // which match this expression we need to
                         // delete them.  We can safely ignore them.
-                        // But guard against an infinite loop here.
+                        //
                         // If there are more than one instances of
                         // an expression, say with "PARTITION BY A, A",
-                        // we need to remove them all.
+                        // we need to remove them all.  But guard against
+                        // an infinite loop here;
                         int idx;
                         for (idx = 0; m_partitionByExprs.remove(eorc) && idx < MAX_LIST_REMOVAL; idx += 1) {
                             ;
@@ -1337,14 +1338,9 @@ public abstract class SubPlanAssembler {
                         return;
                     }
                 }
-                // If we get to here with no matches,
-                // this might be an order spoiler.
-                if (moreBindings == null) {
-                    assert(0 <= indexEntry.m_indexEntryNumber);
-                    m_orderSpoilers.add(indexEntry.m_indexEntryNumber);
-                }
-                // We have either matched or spoiled the order.
-                // That's all we the damage we can do.
+                // Mark this as dead.  We are not going
+                // to manage order spoilers with window functions.
+                m_isDead = true;
                 return;
             }
             // If there are no partition by expressions,
@@ -1381,9 +1377,16 @@ public abstract class SubPlanAssembler {
                 return;
             }
             // No Bindings were found.  Mark this as a
-            // potential order spoiler.
+            // potential order spoiler if it's in a
+            // statement level order by.  The index entry
+            // number is in the ordinal number of the
+            // expression or column reference in the index.
             assert(0 <= indexEntry.m_indexEntryNumber);
-            m_orderSpoilers.add(indexEntry.m_indexEntryNumber);
+            if (m_isWindowFunction) {
+                m_isDead = true;
+            } else {
+                m_orderSpoilers.add(indexEntry.m_indexEntryNumber);
+            }
         }
 
         public boolean isWindowFunction() {
@@ -1498,10 +1501,18 @@ public abstract class SubPlanAssembler {
                     assert(m_numOrderByScores + m_numWinScores <= m_winFunctions.length);
                     WindowFunctionScore orderByScore = m_winFunctions[m_numOrderByScores + m_numWinScores - 1];
                     assert(orderByScore != null);
-                    // If the order by score is done, this
-                    // index may be usable there as well as for any
+                    // If the order by score is done, and the
+                    // sort directions match and there are no
+                    // order by order spoilers then
+                    // index may be usable for the order by as well as for any
                     // window functions.
-                    retval.m_stmtOrderByIsCompatible = orderByScore.isDone();
+                    if ((orderByScore.m_sortDirection == answer.m_sortDirection)
+                            && orderByScore.m_orderSpoilers.size() == 0
+                            && orderByScore.isDone()) {
+                        retval.m_stmtOrderByIsCompatible = true;
+                    } else {
+                        retval.m_stmtOrderByIsCompatible = false;
+                    }
                }
                 if (answer.m_sortDirection != SortDirectionType.INVALID) {
 
@@ -1511,21 +1522,13 @@ public abstract class SubPlanAssembler {
                     //   <li>If we have an index for the Statement Level
                     //       Order By clause but there is a window function
                     //       that can't use the index,
-                    //       then we can't use the index.</li>
-                    //   <li>If there is more than one window function we
-                    //       can't use the index for the statement level
-                    //       order by.  We are assuming here that each
-                    //       window function object in the parsed select
-                    //       statement has a different ordering.</li>
+                    //       then we can't use the index at all.</li>
                     // </ol>
                     if ((retval.m_windowFunctionUsesIndex == STATEMENT_LEVEL_ORDER_BY_INDEX)
                             && (0 < m_numWinScores)) {
                         retval.m_stmtOrderByIsCompatible = false;
                         retval.m_windowFunctionUsesIndex = NO_INDEX_USE;
-                    }
-                    if (retval.m_stmtOrderByIsCompatible
-                            && (1 < m_numWinScores)) {
-                        retval.m_stmtOrderByIsCompatible = false;
+                        return 0;
                     }
 
                     // Add the bindings.
@@ -1533,7 +1536,11 @@ public abstract class SubPlanAssembler {
                     retval.bindings.addAll(answer.m_bindings);
 
                     // Mark the sort direction.
-                    retval.sortDirection = answer.m_sortDirection;
+                    if (retval.m_windowFunctionUsesIndex == NO_INDEX_USE) {
+                        retval.sortDirection = SortDirectionType.INVALID;
+                    } else {
+                        retval.sortDirection = answer.m_sortDirection;
+                    }
 
                     // Add the order spoilers.
                     assert(answer.m_orderSpoilers.size() <= orderSpoilers.length);
@@ -1598,6 +1605,10 @@ public abstract class SubPlanAssembler {
         // return 0.
         //
         if (! hasOrderBy && ! hasWindowFunctions) {
+            return 0;
+        }
+        // Ignore partial predicates for a while.
+        if (retval.index.getPredicatejson().length() > 0) {
             return 0;
         }
         //

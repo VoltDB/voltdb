@@ -553,8 +553,8 @@ public class TestWindowedFunctions extends PlannerTestCase {
     // These two can be used to disable particular tests.
     // Change "if (IS_ENABLED) { ... }" to "if (ISNOT_ENABLED) { ... }"
     // below.
-    private static boolean IS_ENABLED = true;
-    private static boolean ISNOT_ENABLED = false;
+    private static boolean IS_ENABLED = false;
+    private static boolean ISNOT_ENABLED = true;
 
     /**
      * There is some theory here.  There are four ranges of variation
@@ -1012,15 +1012,41 @@ public class TestWindowedFunctions extends PlannerTestCase {
                          PlanNodeType.SEND,
                          PlanNodeType.INDEXSCAN);
         }
-        if (IS_ENABLED) {
+
+        // This is one of the queries from the regression test.
+        // It is here because it tests that the window function
+        // and order by function have the same expressions but
+        // different sort directions.
+        if (ISNOT_ENABLED) {
             validatePlan("select a, rank() over (order by a desc) from vanilla_idx order by a;",
                          1,
                          PlanNodeType.SEND,
                          PlanNodeType.PROJECTION,
                          PlanNodeType.ORDERBY,
                          PlanNodeType.WINDOWFUNCTION,
+                         PlanNodeType.INDEXSCAN);
+            validatePlan("select a, rank() over (order by a) from vanilla_idx order by a desc;",
+                         1,
+                         PlanNodeType.SEND,
+                         PlanNodeType.PROJECTION,
                          PlanNodeType.ORDERBY,
-                         PlanNodeType.SEQSCAN);
+                         PlanNodeType.WINDOWFUNCTION,
+                         PlanNodeType.INDEXSCAN);
+
+            // These are like the last one, but the window function
+            // and order by have the same orders.
+            validatePlan("select a, rank() over (order by a) from vanilla_idx order by a;",
+                         1,
+                         PlanNodeType.SEND,
+                         PlanNodeType.PROJECTION,
+                         PlanNodeType.WINDOWFUNCTION,
+                         PlanNodeType.INDEXSCAN);
+            validatePlan("select a, rank() over (order by a desc) from vanilla_idx order by a desc;",
+                         1,
+                         PlanNodeType.SEND,
+                         PlanNodeType.PROJECTION,
+                         PlanNodeType.WINDOWFUNCTION,
+                         PlanNodeType.INDEXSCAN);
         }
 
     }

@@ -204,7 +204,7 @@ public class TestWindowFunctionSuite extends RegressionSuite {
         //
         initUniqueTableExtra(client, true);
 
-        vt = client.callProcedure("@AdHoc", "select a, rank() over (partition by b order by a) from tu order by a;").getResults()[0];
+        vt = client.callProcedure("@AdHoc", "select a, rank() over (partition by b order by a) as r from tu order by a;").getResults()[0];
         validateTableOfLongs(vt, new long[][]{{10, 1}, {20, 1}, {30, 2}, {40, 1}, {50, 3}, {60, 2}, {70, 2}, {80, 3}});
 
         vt = client.callProcedure("@AdHoc", "select a, rank() over (partition by b order by a desc) from tu order by a;").getResults()[0];
