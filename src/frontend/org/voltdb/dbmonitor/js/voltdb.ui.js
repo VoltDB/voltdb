@@ -1253,20 +1253,23 @@ var loadPage = function (serverName, portid) {
                     }
                     else if (role == "REPLICA"){
                         $(".drRelationLeft").find('p').html(role + '/ MASTER');
+                        $("#drArrow").removeClass("arrowDouble");
                         $("#drArrow").addClass("arrowSingle");
                     }
                     else{
                         $(".drRelationLeft").find('p').html(role);
+                        $("#drArrow").removeClass("arrowSingle");
                         $("#drArrow").addClass("arrowDouble");
                     }
-                    $(".drPending").html('')
+                    $("#drPending_1").html('')
 
                     if(drRoleDetail['DRROLE'][0][1] == "PENDING"){
-                        $(".drPending").html("<span class='DRHeaderName drPending'> ( DR Pending )</span>")
-                        $("#drRelation").hide()
+                        $("#drPending_1").html("( No Active Connections )")
+                        $("#drPending_1").show();
+                        $("#drRelation_1").hide();
                     }else{
-                        $("#drRelation").hide()
-                        $(".drPending").remove()
+                        $("#drRelation_1").show();
+                        $("#drPending_1").hide();
                     }
 
                     if(drRoleDetail['DRROLE'].length > 1){
@@ -1305,9 +1308,10 @@ var loadPage = function (serverName, portid) {
                                               '            <h1 class="headText1 DRHeaderWrap">' +
                                               '                <a href="#" id="showHideGraphBlock_' + i + '" class="showhideIcon arrowAdjustDR">' +
                                               '                    <span class="DRHeaderName" id="dRHeaderName_' + i + '">Database ('+ rawConfigValues.dr.id +')</span>' +
+                                              '<span class="DRHeaderName drPending" id="drPending_'+ i +'"></span>' +
                                               '                </a>' +
                                               '            </h1>' +
-                                              '<div class="drRelation"><div class="drRelationLeft"><span class="'+ displayArrow +'">' +
+                                              '<div class="drRelation" id="drRelation_'+ i +'"><div class="drRelationLeft"><span class="'+ displayArrow +'">' +
                                                '<p>'+drRoleDetail['DRROLE'][i - 1][0]+'</p></span></div>' +
                                               '<div class="drRelationRight"><span class="iconDRDatabase"></span><div class="headText1 DRHeaderWrap">' +
                                               '<a href="#" class="showhideIcon expandedDR arrowAdjustDR">' +
@@ -1443,7 +1447,18 @@ var loadPage = function (serverName, portid) {
                                               '    </div>' +
                                               '</div>';
 
+
                             $("#dr").append(htmlContent + htmlGraph)
+
+                            $("#drPending_" + i).html('');
+                            if(drRoleDetail['DRROLE'][i - 1][1] == "PENDING"){
+                                $("#drPending_" + i).html("( No Active Connections )")
+                                $("#drPending_" + i).show();
+                                $("#drRelation_" + i).hide();
+                            }else{
+                                $("#drRelation_" + i).show();
+                                $("#drPending_" + i).hide();
+                            }
 
                             $("#dbPane_2 div.menu_head").click(function () {
                                 var headerState = $("#dbPane_2 div.menu_body").css('display');
