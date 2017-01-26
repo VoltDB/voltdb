@@ -455,7 +455,7 @@ public class NIOServerCnxn implements Watcher, ServerCnxn {
             }
 
         } catch(Exception e) {
-            LOG.warn("Unexpected Exception: " + e.getMessage());
+            LOG.error("NIOServerCnxn Unexpected Exception: " + e.getMessage());
         }
     }
 
