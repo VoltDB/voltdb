@@ -1264,7 +1264,7 @@ var loadPage = function (serverName, portid) {
                     $("#drPending_1").html('')
 
                     if(drRoleDetail['DRROLE'][0][1] == "PENDING"){
-                        $("#drPending_1").html("( No Active Connections )")
+                        $("#drPending_1").html("( No active connection )")
                         $("#drPending_1").show();
                         $("#drRelation_1").hide();
                     }else{
@@ -1452,7 +1452,7 @@ var loadPage = function (serverName, portid) {
 
                             $("#drPending_" + i).html('');
                             if(drRoleDetail['DRROLE'][i - 1][1] == "PENDING"){
-                                $("#drPending_" + i).html("( No Active Connections )")
+                                $("#drPending_" + i).html("( No active connection )")
                                 $("#drPending_" + i).show();
                                 $("#drRelation_" + i).hide();
                             }else{
