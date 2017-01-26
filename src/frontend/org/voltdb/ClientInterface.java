@@ -603,7 +603,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             //SHA1 is deprecated log it.
             if (hashScheme == ClientAuthScheme.HASH_SHA1) {
                 m_rateLimitedLogger.log(EstTime.currentTimeMillis(), Level.WARN, null,
-                        "Authentication with SHA1 is deprecaed please use SHA2, Client IP: %s", socket.socket().getRemoteSocketAddress());
+                        "Client connected using deprecated SHA1 hashing. SHA2 is strongly recommended for all client connections. Client IP: %s", socket.socket().getRemoteSocketAddress().toString());
             }
             FastDeserializer fds = new FastDeserializer(message);
             final String service = fds.readString();
