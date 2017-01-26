@@ -319,6 +319,7 @@ public class InitiatorMailbox implements Mailbox
         }
         else if (message instanceof BalanceSPIMessage) {
             BalanceSPIMessage msg = (BalanceSPIMessage) message;
+            // new master
             if (this.m_hsId == msg.getNewLeaderHSId()) {
                 ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
                 if (tmLog.isDebugEnabled()) {
@@ -343,18 +344,16 @@ public class InitiatorMailbox implements Mailbox
                     tmLog.debug(VoltZK.debugLeadersInfo(zk));
                 }
             } else {
+                // current master to be changed.
                 m_scheduler.m_spiBalanceRequested = true;
                 m_scheduler.m_newBalancedLeaderHSID = msg.getNewLeaderHSId();
             }
             return;
-        }
-        else if (message instanceof BalanceSPIResponseMessage) {
+        } else if (message instanceof BalanceSPIResponseMessage) {
             if (tmLog.isDebugEnabled()) {
-                hostLog.debug("[InitiatorMailbox:deliverInternal] receive BalanceSPIRepairSurvivorsMessage,"
+                tmLog.debug("[InitiatorMailbox:deliverInternal] receive BalanceSPIRepairSurvivorsMessage,"
                         + " current is_leader:" + m_scheduler.isLeader());
             }
-            // TODO: set the leader state back, theoretically return status of the BalanceSPI invocation,
-            // restart the miss-routed transactions, etc.
             m_scheduler.setLeaderState(false);
             m_scheduler.m_spiBalanceRequested = false;
             return;

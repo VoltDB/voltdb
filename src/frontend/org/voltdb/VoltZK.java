@@ -33,6 +33,7 @@ import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltcore.zk.CoreZK;
 import org.voltcore.zk.ZKUtil;
@@ -103,11 +104,10 @@ public class VoltZK {
     public static final String lastKnownLiveNodes = "/db/lastKnownLiveNodes";
 
     public static final String debugLeadersInfo(ZooKeeper zk) {
-        StringBuilder build = new StringBuilder();
+        StringBuilder build = new StringBuilder("ZooKeeper:\n");
         build.append(printZKDir(zk, iv2masters));
         build.append(printZKDir(zk, iv2appointees));
         build.append(printZKDir(zk, iv2mpi));
-        build.append(printZKDir(zk, leaders));
         build.append(printZKDir(zk, leaders_initiators));
         build.append(printZKDir(zk, leaders_globalservice));
         build.append(printZKDir(zk, lastKnownLiveNodes));
@@ -116,21 +116,24 @@ public class VoltZK {
     }
 
     private static final String printZKDir(ZooKeeper zk, String dir) {
-        StringBuilder build = new StringBuilder();
-        build.append("zookeeper ").append(dir).append(": ");
+        StringBuilder build = new StringBuilder("\t");
+        build.append(dir).append(": ");
         try {
             List<String> keys = zk.getChildren(dir, null);
-            boolean isData = true;
+            boolean isData = false;
             for (String key: keys) {
                 String path = ZKUtil.joinZKPath(dir, key);
                 byte[] arr = zk.getData(path, null, null);
 
                 if (arr != null) {
                     String data = new String(arr, "UTF-8");
+                    if ((iv2masters.equals(dir) || iv2appointees.equals(dir)) && !ZKUtil.isHSIdFromBalanceSPIRequest(data)) {
+                        data = CoreUtils.hsIdToString(Long.parseLong(data));
+                    }
+                    isData = true;
                     build.append(key).append(" -> ").append(data).append(",");
                 } else {
                     // path may be a dir instead
-                    isData = false;
                     List<String> children = zk.getChildren(path, null);
                     if (children != null) {
                         build.append("\n").append(printZKDir(zk, path));

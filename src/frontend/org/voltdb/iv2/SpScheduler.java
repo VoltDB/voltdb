@@ -197,21 +197,11 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     @Override
     public void setMaxSeenTxnId(long maxSeenTxnId)
     {
-        //super.setMaxSeenTxnId(maxSeenTxnId);
         //Saw transactions before. The master site may become a replica.
         if(m_txnEgo.getTxnId() > 0 && maxSeenTxnId == Long.MIN_VALUE) {
             return;
         }
-        final TxnEgo ego = new TxnEgo(maxSeenTxnId);
-        if (m_txnEgo.getPartitionId() != ego.getPartitionId()) {
-
-            VoltDB.crashLocalVoltDB(
-                    "Received a transaction id at partition " + m_txnEgo.getPartitionId() +
-                    " for partition " + ego.getPartitionId() + ". The partition ids should match.", true, null);
-        }
-        if (m_txnEgo.getTxnId() < ego.getTxnId()) {
-            m_txnEgo = ego;
-        }
+        super.setMaxSeenTxnId(maxSeenTxnId);
         writeIv2ViableReplayEntry();
     }
 

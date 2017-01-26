@@ -155,10 +155,6 @@ public class SpInitiator extends BaseInitiator implements Promotable
     public void acceptPromotion()
     {
         try {
-            if (tmLog.isDebugEnabled()) {
-                tmLog.debug("[SpInitiator:acceptPromotion()]...");
-            }
-
             long startTime = System.currentTimeMillis();
             Boolean success = false;
             m_term = createTerm(m_messenger.getZK(),
@@ -205,6 +201,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
 
                         BalanceSPIResponseMessage msg = new BalanceSPIResponseMessage();
                         m_initiatorMailbox.send(com.google_voltpatches.common.primitives.Longs.toArray(survivors), msg);
+                        m_isBalanceSPIRequested = false;
                     }
 
                     // THIS IS where map cache should be updated, not
