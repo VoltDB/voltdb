@@ -92,6 +92,8 @@ import com.google_voltpatches.common.base.Predicate;
 import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
+import org.voltcore.logging.Level;
+import org.voltcore.utils.RateLimitedLogger;
 
 /**
  * Represents VoltDB's connection to client libraries outside the cluster.
@@ -143,8 +145,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     private static final VoltLogger authLog = new VoltLogger("AUTH");
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final VoltLogger networkLog = new VoltLogger("NETWORK");
-    @SuppressWarnings("unused")
-    private static final VoltLogger consoleLog = new VoltLogger("CONSOLE");
+    private static final RateLimitedLogger m_rateLimitedLogger =  new RateLimitedLogger(TimeUnit.MINUTES.toMillis(60), authLog, Level.WARN);
 
 
     /** Ad hoc async work is either regular planning, ad hoc explain, or default proc explain. */
@@ -598,6 +599,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     socket.close();
                     return null;
                 }
+            }
+            //SHA1 is deprecated log it.
+            if (hashScheme == ClientAuthScheme.HASH_SHA1) {
+                m_rateLimitedLogger.log(EstTime.currentTimeMillis(), Level.WARN, null,
+                        "Authentication with SHA1 is deprecaed please use SHA2, Client IP: %s", socket.socket().getRemoteSocketAddress());
             }
             FastDeserializer fds = new FastDeserializer(message);
             final String service = fds.readString();
