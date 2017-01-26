@@ -575,6 +575,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             answer.setWindowFunctionUsesIndex(outerScanPlan.getWindowFunctionUsesIndex());
             answer.setWindowFunctionIsCompatibleWithOrderBy(outerScanPlan.isWindowFunctionCompatibleWithOrderBy());
             answer.setFinalExpressionOrderFromIndexScan(outerScanPlan.getFinalExpressionOrderFromIndexScan());
+            answer.setSortOrderFromIndexScan(outerScanPlan.getSortOrderFromIndexScan());
             return answer;
         }
 

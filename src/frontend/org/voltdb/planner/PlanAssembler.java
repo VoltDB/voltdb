@@ -1803,7 +1803,6 @@ public class PlanAssembler {
             return false;
         }
 
-        SortDirectionType sortDirection = SortDirectionType.INVALID;
         // Skip the explicit ORDER BY plan step if an IndexScan is already providing the equivalent ordering.
         // Note that even tree index scans that produce values in their own "key order" only report
         // their sort direction != SortDirectionType.INVALID
@@ -1812,53 +1811,108 @@ public class PlanAssembler {
         // in this optimization.
         AbstractPlanNode nonAggPlan;
 
+        // Is there a window function between the root and the
+        // scan or join nodes?  Also, does this window function
+        // use the index.
+        int numberWindowFunctions = 0;
+        int numberReceiveNodes = 0;
         // EE keeps the insertion ORDER so that ORDER BY could apply before DISTINCT.
         // However, this probably is not optimal if there are low cardinality results.
         // Again, we have to replace the TVEs for ORDER BY clause for these cases in planning.
+        //
+        // Find the scan or join node.
         AbstractPlanNode probe;
         for (probe = root;
                 ! ((probe instanceof AbstractJoinPlanNode)
                     || (probe instanceof AbstractScanPlanNode))
                 && (probe != null);
             probe = (probe.getChildCount() > 0) ? probe.getChild(0) : null) {
+            // Count the number of window functions between the
+            // root and the join/scan node.  Note that we know we
+            // have a statement level order by (SLOB) here.  If the SLOB
+            // can use the index for ordering the scan or join node
+            // will know it.
+            if (probe.getPlanNodeType() == PlanNodeType.WINDOWFUNCTION) {
+                numberWindowFunctions += 1;
+            }
+            if (probe.getPlanNodeType() == PlanNodeType.RECEIVE) {
+                numberReceiveNodes += 1;
+            }
         }
         if (probe != null) {
             nonAggPlan = probe;
         } else {
             // No idea what happened here.  We can't find a
             // scan or join node at all.  This seems unlikely
-            // to be right.
+            // to be right.  Maybe this should be an assert?
             nonAggPlan = root;
-        }
-        if (nonAggPlan instanceof IndexScanPlanNode) {
-            sortDirection = ((IndexScanPlanNode)nonAggPlan).getSortDirection();
-        }
-        // Optimization for NestLoopIndex on IN list, possibly other cases of ordered join results.
-        // Skip the explicit ORDER BY plan step if NestLoopIndex is providing the equivalent ordering
-        else if (nonAggPlan instanceof AbstractJoinPlanNode) {
-            sortDirection = ((AbstractJoinPlanNode)nonAggPlan).getSortDirection();
-        }
-
-        if ( ! nonAggPlan.isWindowFunctionCompatibleWithOrderBy() ) {
             return true;
         }
-
-        if (sortDirection != SortDirectionType.INVALID) {
-            // We know now that there is an index ordering which
-            // will satisfy this order by.  If this is a two fragment
-            // plan, we will want to convert the RECEIVE node to
-            // be a MERGERECEIVE node and lop off the order by
-            // node.  But we can't to that here, so generate the
-            // order by node in this case and let the microoptimization
-            // do the transformation.
-            if (m_partitioning.requiresTwoFragments()) {
-                return true;
-            } else {
-                return false;
-            }
+        //
+        //   o If the SLOB cannot use the index, then we
+        //     need an order by node always.
+        //   o If there are zero window functions, then
+        //     - If the SLOB cannot use the index than we
+        //       need an order by node.
+        //     - If the SLOB can use the index, then
+        //       = If the statement is a single fragment
+        //         statement then we don't need an order by
+        //         node.
+        //       = If the statement is a two fragment
+        //         statement then we need an order by node.
+        //         This is because we will convert the RECEIVE
+        //         node into a MERGERECEIVE node in the
+        //         microoptimizer, and the MERGERECEIVE
+        //         node needs an inline order by node to do
+        //         the merge.
+        //   o If there is only one window function, then
+        //     - If the window function does not use the index
+        //       then we always need an order by node.
+        //     - If the window function can use the index but
+        //       the SLOB can't use the index, then we need an
+        //       order by node.
+        //     - If both the SLOB and the window function can
+        //       use the index, then we don't need an order
+        //       by, no matter how many fragments this statement
+        //       has.  This is because any RECEIVE node will be
+        //       a descendent of the window function node.  So
+        //       the RECEIVE to MERGERECEIVE conversion happens
+        //       in the window function and not the order by.
+        //   o If there is more than one window function then
+        //     we always need an order by node.  The second
+        //     window function will invalidate the ordering of
+        //     the first one.  (Actually, if the SLOB order is
+        //     compatible with the last window function then
+        //     the situation is like the one-window function
+        //     below.)
+        //
+        if (nonAggPlan.getSortOrderFromIndexScan() == SortDirectionType.INVALID) {
+            return true;
         }
-
-        return true;
+        if ( numberWindowFunctions == 0 ) {
+            if ( nonAggPlan.getWindowFunctionUsesIndex() == SubPlanAssembler.NO_INDEX_USE ) {
+                return true;
+            }
+            assert( nonAggPlan.getWindowFunctionUsesIndex() == SubPlanAssembler.STATEMENT_LEVEL_ORDER_BY_INDEX );
+            // Return true for MP (numberReceiveNodes > 0) and
+            // false for SP (numberReceiveNodes == 0);
+            return numberReceiveNodes > 0;
+        } else if (numberWindowFunctions == 1) {
+            // If the WF uses the index then getWindowFunctionUsesIndex()
+            // will return 0.
+            if ( ( nonAggPlan.getWindowFunctionUsesIndex() != 0 )
+                    || ( ! nonAggPlan.isWindowFunctionCompatibleWithOrderBy() ) ) {
+                return true;
+            }
+            // Both the WF and the SLOB can use the index.  Since the
+            // window function will have the order by node, the SLOB
+            // does not need one.  So this is a false.
+            return false;
+        } else {
+            // This can actually never happen now,
+            // because we only support one window function.
+            return true;
+        }
     }
 
     /**

@@ -575,7 +575,7 @@ public class TestWindowedFunctions extends PlannerTestCase {
      *   </li>
      * </ol>
      */
-    public void testWindowFunctionWithIndex() {
+    public void testWindowFunctionsWithIndexes() {
         // echo  1: No SLOB, No WF, SP Query, noindex
         // echo     Expect SeqScan
         // explain select * from vanilla;
@@ -990,6 +990,14 @@ public class TestWindowedFunctions extends PlannerTestCase {
                          PlanNodeType.WINDOWFUNCTION,
                          PlanNodeType.INDEXSCAN);
         }
+        if (IS_ENABLED) {
+            validatePlan("SELECT * FROM O3 WHERE PK1 = 0 ORDER BY PK2 DESC;",
+                         1,
+                         PlanNodeType.SEND,
+                         PlanNodeType.PROJECTION,
+                         PlanNodeType.ORDERBY,
+                         PlanNodeType.INDEXSCAN);
+        }
         // echo 24: SLOB, one WF, MP Query, index (For the WF and SLOB both)
         // echo     Expect WinFun -> MrgRecv(SLOB or WF) -> SEND -> IndxScan
         // explain select max(b) over ( partition by a ) from vanilla_pb_idx where a = 1 order by a;
@@ -1004,6 +1012,17 @@ public class TestWindowedFunctions extends PlannerTestCase {
                          PlanNodeType.SEND,
                          PlanNodeType.INDEXSCAN);
         }
+        if (IS_ENABLED) {
+            validatePlan("select a, rank() over (order by a desc) from vanilla_idx order by a;",
+                         1,
+                         PlanNodeType.SEND,
+                         PlanNodeType.PROJECTION,
+                         PlanNodeType.ORDERBY,
+                         PlanNodeType.WINDOWFUNCTION,
+                         PlanNodeType.ORDERBY,
+                         PlanNodeType.SEQSCAN);
+        }
+
     }
 
     @Override

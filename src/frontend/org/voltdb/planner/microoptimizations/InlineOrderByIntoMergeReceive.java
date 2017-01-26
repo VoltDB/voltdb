@@ -61,12 +61,17 @@ public class InlineOrderByIntoMergeReceive extends MicroOptimization {
             AbstractPlanNode plan = children.remove();
             PlanNodeType nodeType = plan.getPlanNodeType();
             if (PlanNodeType.RECEIVE == nodeType) {
-                // continue. We are after the coordinator ORDER BY node.
+                // continue. We are after the coordinator ORDER BY or WINDOWFUNCTION node.
                 return planNode;
             }
             if (PlanNodeType.ORDERBY == nodeType) {
                 assert(plan instanceof OrderByPlanNode);
                 AbstractPlanNode newPlan = applyOptimization((OrderByPlanNode)plan);
+                // (*) If we have changed plan to newPlan, then the
+                //     new nodes are inside the tree unless plan is the top.
+                //     So, return the original argument, planNode, unless
+                //     we actually changed the top plan node.  Then return
+                //     the new plan node.
                 if (newPlan != plan) {
                     // Only one coordinator ORDER BY node is possible
                     if (plan == planNode) {
@@ -78,6 +83,7 @@ public class InlineOrderByIntoMergeReceive extends MicroOptimization {
             } else if (PlanNodeType.WINDOWFUNCTION == nodeType) {
                 assert(plan instanceof WindowFunctionPlanNode);
                 AbstractPlanNode newPlan = applyOptimization((WindowFunctionPlanNode)plan);
+                // See above for why this is the way it is.
                 if (newPlan != plan) {
                     return newPlan;
                 } else {

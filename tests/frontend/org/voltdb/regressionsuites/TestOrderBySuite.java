@@ -1086,22 +1086,22 @@ public class TestOrderBySuite extends RegressionSuite {
      * everything but do_subtestOrderByMP to false.  Then only
      * subtestOrderByMP will run.
      */
-    private static boolean do_subtestOrderBySingleColumnAscending = true;
+    private static boolean do_subtestOrderBySingleColumnAscending = false;
     private static boolean do_subtestOrderBySingleColumnDescending = true;
-    private static boolean do_subtestMultiColumnOrderBy = true;
-    private static boolean do_subtestOrderByUseIndex = true;
-    private static boolean do_subtestAggOrderByGroupBy = true;
-    private static boolean do_subtestOrderByCountStarAlias = true;
-    private static boolean do_subtestOrderByCountStarCardinal = true;
-    private static boolean do_subtestOrderByCountStarWithLimit = true;
-    private static boolean do_subtestOrderByWithNewExpression = true;
-    private static boolean do_subtestEng1133 = true;
-    private static boolean do_subtestEng4676 = true;
-    private static boolean do_subtestEng5021 = true;
-    private static boolean do_subtestPartialIndex = true;
-    private static boolean do_subtestOrderByMP = true;
-    private static boolean do_subtestOrderByMP_Agg = true;
-    private static boolean do_subtestOrderByMP_Subquery = true;
+    private static boolean do_subtestMultiColumnOrderBy = false;
+    private static boolean do_subtestOrderByUseIndex = false;
+    private static boolean do_subtestAggOrderByGroupBy = false;
+    private static boolean do_subtestOrderByCountStarAlias = false;
+    private static boolean do_subtestOrderByCountStarCardinal = false;
+    private static boolean do_subtestOrderByCountStarWithLimit = false;
+    private static boolean do_subtestOrderByWithNewExpression = false;
+    private static boolean do_subtestEng1133 = false;
+    private static boolean do_subtestEng4676 = false;
+    private static boolean do_subtestEng5021 = false;
+    private static boolean do_subtestPartialIndex = false;
+    private static boolean do_subtestOrderByMP = false;
+    private static boolean do_subtestOrderByMP_Agg = false;
+    private static boolean do_subtestOrderByMP_Subquery = false;
 
     public void testAll()
     throws Exception

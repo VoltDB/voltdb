@@ -953,8 +953,10 @@ public abstract class SubPlanAssembler {
     }
 
     /*
-     * Try to use the index scan's inherent ordering to implement some ORDER BY clause.
-     * These ORDER BY clauses can be statement level ORDER BY clauses or else
+     * Try to use the index scan's inherent ordering to implement some ORDER BY
+     * or WINDOW FUNCTION clauses.
+     *
+     * These clauses can be statement level ORDER BY clauses or else
      * window function PARTITION BY and ORDER BY specifications.
      * For example, if a table has a tree index on columns "(A, B, C)", then
      * "ORDER BY A", "ORDER BY A, B" and "ORDER BY A, B, C" are considered a match
