@@ -455,7 +455,7 @@ public class NIOServerCnxn implements Watcher, ServerCnxn {
             }
 
         } catch(Exception e) {
-            LOG.error("Unexpected Exception: ", e);
+            LOG.warn("Unexpected Exception, server probably doing graceful shutdown: " + e.getMessage());
         }
     }
 
