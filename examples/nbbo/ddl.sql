@@ -31,7 +31,7 @@
 ---------------------------------------------------------------------------------
 file -inlinebatch END_BATCH
 
-CREATE TABLE ticks (
+CREATE STREAM ticks PARTITION ON COLUMN symbol (
   symbol                    VARCHAR(16) NOT NULL,
   time                      TIMESTAMP NOT NULL,
   seq                       BIGINT NOT NULL,
@@ -41,8 +41,6 @@ CREATE TABLE ticks (
   ask                       INTEGER,
   ask_size                  INTEGER
 );
-PARTITION TABLE ticks ON COLUMN symbol;
-EXPORT TABLE ticks;
 
 CREATE TABLE last_ticks (
   symbol                    VARCHAR(16) NOT NULL,

@@ -70,7 +70,7 @@ public class Constants
     public static final String QUOTED_CSV_NULL = "\"\\N\"";
 
     // default export group to use when no group name is provided
-    public static final String DEFAULT_EXPORT_CONNECTOR_NAME = "default";
+    public static final String DEFAULT_EXPORT_CONNECTOR_NAME = "__default__";
 
     // Special HTTP port values to disable or trigger auto-scan.
     public static final int UNDEFINED = -1;

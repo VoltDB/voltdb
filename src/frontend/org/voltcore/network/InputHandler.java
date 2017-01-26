@@ -41,8 +41,8 @@ public interface InputHandler {
     /**
      * Handle the incoming message produced by retrieve next message
      *
-     * @param message
-     * @param channelFacade
+     * @param message ByteBuffer containing the message data
+     * @param c connection
      * @throws IOException
      */
     void handleMessage(ByteBuffer message, Connection c) throws IOException;

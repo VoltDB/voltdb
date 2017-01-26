@@ -350,18 +350,13 @@
     <xs:sequence>
       <xs:element name="configuration" type="ExportConfigurationType" minOccurs="0" maxOccurs="unbounded"/>
     </xs:sequence>
-    <xs:attribute name="enabled" type="xs:boolean"/>
-    <xs:attribute name="target" type="ServerExportEnum"/>
-    <xs:attribute name="exportconnectorclass" type="xs:string"/>
   </xs:complexType>
 
   <xs:complexType name="ExportConfigurationType">
     <xs:sequence>
       <xs:element name="property" type="PropertyType" minOccurs="0" maxOccurs="unbounded"/>
     </xs:sequence>
-    <xs:attribute name="target" type="xs:string" />
-    <!-- stream is deprecated. Use target instead. -->
-    <xs:attribute name="stream" type="xs:string" />
+    <xs:attribute name="target" type="xs:string" use="required" />
     <xs:attribute name="enabled" type="xs:boolean" default="true"/>
     <xs:attribute name="type" type="ServerExportEnum" default="file"/>
     <xs:attribute name="exportconnectorclass" type="xs:string" default=""/>
