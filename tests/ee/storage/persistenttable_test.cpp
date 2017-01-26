@@ -43,6 +43,8 @@
 
 #include "boost/scoped_ptr.hpp"
 
+#include "common/FixUnusedAssertHack.h"
+
 using voltdb::ExecutorContext;
 using voltdb::NValue;
 using voltdb::PersistentTable;

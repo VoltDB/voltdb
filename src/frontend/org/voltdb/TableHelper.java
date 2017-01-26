@@ -260,8 +260,8 @@ public class TableHelper {
         public VoltTable table;
         public ArrayList<IndexRep> indexes = new ArrayList<IndexRep>();
 
-        public String ddl() {
-            String ddl = TableHelper.ddlForTable(table) + "\n";
+        public String ddl(boolean isStream) {
+            String ddl = TableHelper.ddlForTable(table, isStream) + "\n";
             for (int i = 0; i < indexes.size(); i++) {
                 ddl += indexes.get(i).ddl("IDX" + String.valueOf(i)) + "\n";
             }
@@ -992,7 +992,7 @@ public class TableHelper {
      * Get the DDL for a table.
      * Only works with tables created with TableHelper.quickTable(..) above.
      */
-    public static String ddlForTable(VoltTable table) {
+    public static String ddlForTable(VoltTable table, boolean isStream) {
         assert(table.m_extraMetadata != null);
 
         // for each column, one line
@@ -1001,7 +1001,16 @@ public class TableHelper {
             colLines[i] = getDDLColumnDefinition(table, table.m_extraMetadata.originalColumnInfos[i]);
         }
 
-        String s = "CREATE TABLE " + table.m_extraMetadata.name + " (\n  ";
+        String s = (isStream ? "CREATE STREAM " : "CREATE TABLE ") + table.m_extraMetadata.name;
+        if (isStream) {
+            // partition this table if need be
+            if (table.m_extraMetadata.partitionColIndex != -1) {
+                s += String.format("PARTITION ON COLUMN %s",
+                        table.m_extraMetadata.name,
+                        table.m_extraMetadata.originalColumnInfos[table.m_extraMetadata.partitionColIndex].name);
+            }
+        }
+        s += " (\n  ";
         s += StringUtils.join(colLines, ",\n  ");
 
         // pkey line
@@ -1018,11 +1027,13 @@ public class TableHelper {
 
         s += "\n);";
 
-        // partition this table if need be
-        if (table.m_extraMetadata.partitionColIndex != -1) {
-            s += String.format("\nPARTITION TABLE %s ON COLUMN %s;",
-                    table.m_extraMetadata.name,
-                    table.m_extraMetadata.originalColumnInfos[table.m_extraMetadata.partitionColIndex].name);
+        if (!isStream) {
+            // partition this table if need be
+            if (table.m_extraMetadata.partitionColIndex != -1) {
+                s += String.format("\nPARTITION TABLE %s ON COLUMN %s;",
+                        table.m_extraMetadata.name,
+                        table.m_extraMetadata.originalColumnInfos[table.m_extraMetadata.partitionColIndex].name);
+            }
         }
 
         return s;
