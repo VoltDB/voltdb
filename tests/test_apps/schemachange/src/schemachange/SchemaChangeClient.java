@@ -490,7 +490,7 @@ public class SchemaChangeClient {
                 }
 
                 // create version table
-                batch.add(TableHelper.ddlForTable(this.versionT));
+                batch.add(TableHelper.ddlForTable(this.versionT, false));
 
                 /*
                  * Create or mutate test table (A or B).
@@ -500,7 +500,7 @@ public class SchemaChangeClient {
                  */
                 switch (changeType) {
                     case CREATE:
-                        batch.add(TableHelper.ddlForTable(this.newSchema.table));
+                        batch.add(TableHelper.ddlForTable(this.newSchema.table, false));
                         this.count = 0;
                         break;
 

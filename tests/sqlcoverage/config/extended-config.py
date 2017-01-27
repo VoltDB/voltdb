@@ -83,7 +83,7 @@
                          "ddl": "DDL.sql",
                          "template": "numeric-decimals.sql",
                          "normalizer": "normalizer.py",
-                         "precision": "9"},
+                         "precision": "8"},
     "numeric-ints": {"schema": "int-schema.py",
                      "ddl": "int-DDL.sql",
                      "template": "numeric-ints.sql",

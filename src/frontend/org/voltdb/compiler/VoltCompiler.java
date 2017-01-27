@@ -950,7 +950,8 @@ public class VoltCompiler {
         // Actually parse and handle all the DDL
         // DDLCompiler also provides partition descriptors for DDL PARTITION
         // and REPLICATE statements.
-        final DDLCompiler ddlcompiler = new DDLCompiler(this, hsql, voltDdlTracker, m_classLoader);
+        final DDLCompiler ddlcompiler;
+        ddlcompiler = new DDLCompiler(this, hsql, voltDdlTracker, m_classLoader);
 
         if (cannonicalDDLIfAny != null) {
             // add the file object's path to the list of files for the jar

@@ -76,10 +76,8 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
             "create table Table2 (Column1 integer);" +
             "create view View1 (Column1, num) as select Column1, count(*) from Table1 group by Column1;" +
             "create view View2 (Column2, num) as select Column2, count(*) from Table1 group by Column2;" +
-            "create table Export1 (Column1 integer);" +
-            "export table Export1;" +
-            "create table Export2 (Column1 integer);" +
-            "export table Export2 to stream foo;" +
+            "create stream Export1 (Column1 integer);" +
+            "create stream Export2 export to target foo (Column1 integer);" +
             "create procedure sample as select * from Table1;";
         VoltCompiler c = compileForDDLTest2(schema);
         System.out.println(c.getCatalog().serialize());
