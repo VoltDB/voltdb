@@ -46,6 +46,7 @@ import org.voltdb.expressions.AbstractSubqueryExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.PlanStatistics;
 import org.voltdb.planner.StatsField;
+import org.voltdb.planner.SubPlanAssembler;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.types.PlanNodeType;
@@ -128,19 +129,34 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
 
     // If a window function uses an index, we
     // mark which window function it is here.
-    // If this is -1, the statement level order by
-    // function uses this index.  If this is
-    // -2, nothing uses this index.
-    private int m_windowFunctionUsesIndex = -2;
+    // If this is SubPlanAssembler.STATEMENT_LEVEL_ORDER_BY_INDEX,
+    // the statement level order by function uses this index.
+    // If this is SubPlanAssembler.NO_INDEX_USE, then nothing
+    // uses this index.
+    //
+    // This will be propagated into a scan plan from the access
+    // path and up the outer branch of a join.
+    private int m_windowFunctionUsesIndex = SubPlanAssembler.NO_INDEX_USE;
+    // If m_windowFunctionUsesIndex is non-negative, so that
+    // the index is used to order a window function, but the
+    //
+    // This will be propagated into a scan plan from the access
+    // path and up the outer branch of a join.
     private boolean m_windowFunctionIsCompatibleWithOrderBy = false;
     // If there is an index scan used for ordering,
     // this is the final expression order.  This may
     // be used for a window function or for the statement
     // level order by or both.
+    //
+    // This will be propagated into a scan plan from the access
+    // path and up the outer branch of a join.
     private List<AbstractExpression> m_finalExpressionOrderFromIndexScan;
     // Set the order direction for an index scan.  There
     // is only one of these.
-    private SortDirectionType m_sortOrderFromIndexScan = SortDirectionType.INVALID;
+    //
+    // This will be propagated into a scan plan from the access
+    // path and up the outer branch of a join.
+    private SortDirectionType m_sortDirectionFromIndexScan = SortDirectionType.INVALID;
     /**
      * Instantiates a new plan node.
      */
@@ -1230,9 +1246,9 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         m_finalExpressionOrderFromIndexScan = finalExpressionOrder;
     }
     public final SortDirectionType getSortOrderFromIndexScan() {
-        return m_sortOrderFromIndexScan;
+        return m_sortDirectionFromIndexScan;
     }
     public final void setSortOrderFromIndexScan(SortDirectionType sortOrderFromIndexScan) {
-        m_sortOrderFromIndexScan = sortOrderFromIndexScan;
+        m_sortDirectionFromIndexScan = sortOrderFromIndexScan;
     }
 }

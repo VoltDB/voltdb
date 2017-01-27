@@ -572,10 +572,12 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                                                               innerScanPlan);
             // Propagate information used for order by clauses in window functions
             // and the statement level order by clause.
-            answer.setWindowFunctionUsesIndex(outerScanPlan.getWindowFunctionUsesIndex());
-            answer.setWindowFunctionIsCompatibleWithOrderBy(outerScanPlan.isWindowFunctionCompatibleWithOrderBy());
-            answer.setFinalExpressionOrderFromIndexScan(outerScanPlan.getFinalExpressionOrderFromIndexScan());
-            answer.setSortOrderFromIndexScan(outerScanPlan.getSortOrderFromIndexScan());
+            if (answer != null) {
+                answer.setWindowFunctionUsesIndex(outerScanPlan.getWindowFunctionUsesIndex());
+                answer.setWindowFunctionIsCompatibleWithOrderBy(outerScanPlan.isWindowFunctionCompatibleWithOrderBy());
+                answer.setFinalExpressionOrderFromIndexScan(outerScanPlan.getFinalExpressionOrderFromIndexScan());
+                answer.setSortOrderFromIndexScan(outerScanPlan.getSortOrderFromIndexScan());
+            }
             return answer;
         }
 

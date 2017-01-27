@@ -64,13 +64,14 @@ public class AccessPath {
     // This is true iff there is a window function which
     // uses an index for order, but the statement level
     // order by can use the same index.  In this case we
-    // will not use any sorts at all.
+    // may not use any sorts at all.
     //
     boolean m_stmtOrderByIsCompatible = false;
     //
     // This is the final expression ordering.  We need this
-    // to remember the order an index imposes on a WindowFunction.
-    // Note that this will never be null, but may be empty
+    // to remember the order an index imposes on a WindowFunction,
+    // since the partition by expressions are not ordered among
+    // themselves.  Note that this will never be null, but may be empty
     // if there is no index in this access path.
     //
     List<AbstractExpression> m_finalExpressionOrder = new ArrayList<>();
