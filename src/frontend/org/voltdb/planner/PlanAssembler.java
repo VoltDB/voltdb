@@ -2363,6 +2363,7 @@ public class PlanAssembler {
                 // This was created when the index was determined.
                 // We cached it in the scan node.
                 List<AbstractExpression> orderExprs = scanNode.getFinalExpressionOrderFromIndexScan();
+                assert(orderExprs != null);
                 for (AbstractExpression ae : orderExprs) {
                     onode.addSort(ae, dir);
                 }

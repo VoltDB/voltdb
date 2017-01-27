@@ -554,25 +554,28 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
     private AbstractPlanNode getSelectSubPlanForJoinNode(JoinNode joinNode) {
         assert(joinNode != null);
         if (joinNode instanceof BranchNode) {
+            BranchNode branchJoinNode = (BranchNode)joinNode;
             // Outer node
             AbstractPlanNode outerScanPlan =
-                    getSelectSubPlanForJoinNode(((BranchNode)joinNode).getLeftNode());
+                    getSelectSubPlanForJoinNode(branchJoinNode.getLeftNode());
             if (outerScanPlan == null) {
                 return null;
             }
             // Inner Node.
             AbstractPlanNode innerScanPlan =
-                    getSelectSubPlanForJoinNode(((BranchNode)joinNode).getRightNode());
+                    getSelectSubPlanForJoinNode((branchJoinNode).getRightNode());
             if (innerScanPlan == null) {
                 return null;
             }
             // Join Node
-            AbstractPlanNode answer = getSelectSubPlanForJoin((BranchNode)joinNode,
+            AbstractPlanNode answer = getSelectSubPlanForJoin(branchJoinNode,
                                                               outerScanPlan,
                                                               innerScanPlan);
             // Propagate information used for order by clauses in window functions
-            // and the statement level order by clause.
-            if (answer != null) {
+            // and the statement level order by clause.  This is only if the
+            // branch node is an inner join.
+            if ((answer != null)
+                    && (branchJoinNode.getJoinType() == JoinType.INNER)) {
                 answer.setWindowFunctionUsesIndex(outerScanPlan.getWindowFunctionUsesIndex());
                 answer.setWindowFunctionIsCompatibleWithOrderBy(outerScanPlan.isWindowFunctionCompatibleWithOrderBy());
                 answer.setFinalExpressionOrderFromIndexScan(outerScanPlan.getFinalExpressionOrderFromIndexScan());

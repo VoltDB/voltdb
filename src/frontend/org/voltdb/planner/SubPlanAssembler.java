@@ -1607,10 +1607,6 @@ public abstract class SubPlanAssembler {
         if (! hasOrderBy && ! hasWindowFunctions) {
             return 0;
         }
-        // Ignore partial predicates for a while.
-        if (retval.index.getPredicatejson().length() > 0) {
-            return 0;
-        }
         //
         // We make a definition.  Let S1 and S2 be sequences of expressions,
         // and OS be an increasing sequence of indices into S2.  Let erase(S2, OS) be
