@@ -215,6 +215,8 @@ public class TestSqlUpdateSuite extends RegressionSuite {
         }
     }
 
+    }
+
     public void testUpdateWithCaseWhen() throws Exception {
         Client client = getClient();
 

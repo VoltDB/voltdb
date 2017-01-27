@@ -214,6 +214,7 @@ public class TestUnion extends PlannerTestCase {
         // nonsense syntax in place of union ops (trying various internal symbol names meaning n/a)
         failToCompile("select A from T1 NOUNION select B from T2");
         failToCompile("select A from T1 TERM select B from T2");
+        // invalid syntax - the WHERE clause is illegal
         failToCompile("(select A from T1 UNION select B from T2) where A in (select A from T2)");
 
         // Union with a child having an invalid subquery expression (T1 is distributed)
