@@ -64,8 +64,13 @@ public class TestSqlUpdateSuite extends RegressionSuite {
 
     }
 
-    public void testUpdate()
-    throws IOException, ProcCallException
+    public void testUpdate() throws Exception {
+        subtestUpdateBasic();
+        subtestENG11918();
+    }
+
+
+    private void subtestUpdateBasic() throws IOException, ProcCallException
     {
         Client client = getClient();
         String[] tables = {"P1", "R1"};
@@ -172,6 +177,20 @@ public class TestSqlUpdateSuite extends RegressionSuite {
         System.out.println("testInvalidUpdate");
         verifyStmtFails(client, "UPDATE P1_VIEW SET NUM_SUM = 5",
                  "Illegal to modify a materialized view.");
+    }
+
+    private void subtestENG11918() throws Exception {
+        System.out.println("testENG11918 (invalid timestamp cast)");
+
+        if (isHSQL()) {
+            // This regression test covers VoltDB-specific error behavior
+            return;
+        }
+
+        Client client = getClient();
+        client.callProcedure("@AdHoc", "INSERT INTO ENG_11918 (id, int, time) VALUES (101, 12, '1382-01-26 17:04:59');");
+        verifyStmtFails(client, "UPDATE ENG_11918 SET VCHAR = TIME WHERE INT != -0.539;",
+                "Input to SQL function CAST is outside of the supported range");
     }
 
     //
