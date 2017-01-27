@@ -465,6 +465,16 @@ function alertNodeClicked(obj) {
         };
         //
 
+        //pm
+        this.GetDrRoleInformation = function (onInformationLoaded) {
+            var drRoleInfo = {};
+            VoltDBService.GetDrRoleInformation(function (connection) {
+                getDrRoleDetails(connection, drRoleInfo);
+                onInformationLoaded(drRoleInfo);
+            });
+        };
+
+
         //Render DR Replication Graph
         this.GetDrReplicationInformation = function (onInformationLoaded) {
             var replicationData = {};
@@ -2164,7 +2174,7 @@ function alertNodeClicked(obj) {
 
 
             connection.Metadata['@Statistics_DR_completeData'][0].schema.forEach(function (columnInfo) {
-                if (columnInfo["name"] == "PARTITION_ID" || columnInfo["name"] == "TOTALBUFFERS" || columnInfo["name"] == "TIMESTAMP" || columnInfo["name"] == "TOTALBYTES" || columnInfo["name"] == "MODE" || columnInfo["name"] == "LASTQUEUEDDRID" || columnInfo["name"] == "LASTACKDRID" || columnInfo["name"] == "LASTQUEUEDTIMESTAMP" || columnInfo["name"] == "LASTACKTIMESTAMP")
+                if (columnInfo["name"] == "PARTITION_ID" || columnInfo["name"] == "TOTALBUFFERS" || columnInfo["name"] == "TIMESTAMP" || columnInfo["name"] == "TOTALBYTES" || columnInfo["name"] == "MODE" || columnInfo["name"] == "LASTQUEUEDDRID" || columnInfo["name"] == "LASTACKDRID" || columnInfo["name"] == "LASTQUEUEDTIMESTAMP" || columnInfo["name"] == "LASTACKTIMESTAMP" || columnInfo["name"] == "CLUSTERID"|| columnInfo["name"] == "CONSUMERCLUSTERID")
                     colIndex[columnInfo["name"]] = counter;
                 counter++;
             });
@@ -2178,7 +2188,6 @@ function alertNodeClicked(obj) {
                     if (!drDetails.hasOwnProperty(partitionId)) {
                         drDetails[partitionId] = [];
                     }
-
                     var partitionDetails = {};
                     partitionDetails["TOTALBUFFERS"] = info[colIndex["TOTALBUFFERS"]];
                     partitionDetails["TOTALBYTES"] = info[colIndex["TOTALBYTES"]];
@@ -2187,6 +2196,8 @@ function alertNodeClicked(obj) {
                     partitionDetails["LASTACKDRID"] = info[colIndex["LASTACKDRID"]];
                     partitionDetails["LASTQUEUEDTIMESTAMP"] = info[colIndex["LASTQUEUEDTIMESTAMP"]];
                     partitionDetails["LASTACKTIMESTAMP"] = info[colIndex["LASTACKTIMESTAMP"]];
+                    partitionDetails["CLUSTERID"] = info[colIndex["CLUSTERID"]];
+                    partitionDetails["CONSUMERCLUSTERID"] = info[colIndex["CONSUMERCLUSTERID"]];
                     drDetails[partitionId].push(partitionDetails);
                 }
             });
@@ -2226,6 +2237,22 @@ function alertNodeClicked(obj) {
             });
         };
         //
+
+        //PM
+        var getDrRoleDetails = function (connection, drRoleDetails) {
+            var hostName = "";
+            var drRoles = []
+
+            if (connection.Metadata['@Statistics_DRROLE'] == null || $.isEmptyObject(connection.Metadata['@Statistics_DRROLE'])) {
+                return;
+            }
+
+            connection.Metadata['@Statistics_DRROLE'].data.forEach(function (info) {
+                drRoles.push(info)
+            });
+
+            drRoleDetails['DRROLE'] =  drRoles;
+        };
 
         //Get DR Replication Data
         var getDrReplicationData = function (connection, replicationDetails) {
