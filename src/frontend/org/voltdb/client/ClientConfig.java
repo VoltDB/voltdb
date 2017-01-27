@@ -20,6 +20,7 @@ package org.voltdb.client;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.math.RoundingMode;
 import java.security.KeyManagementException;
 import java.security.KeyStoreException;
@@ -282,9 +283,19 @@ public class ClientConfig {
         //For testing
         if (ENABLE_SSL_FOR_TEST) {
             m_enableSSL = true;
-            m_sslPropsFile = this.getClass().getResource(DEFAULT_SSL_PROPS_FILE).getFile();
-        }
-        if (m_enableSSL) {
+            try (InputStream is = this.getClass().getResourceAsStream(DEFAULT_SSL_PROPS_FILE)) {
+                Properties sslProperties = new Properties();
+                sslProperties.load(is);
+                m_sslConfig = new SSLConfiguration.SslConfig(
+                        sslProperties.getProperty(SSLConfiguration.KEYSTORE_CONFIG_PROP),
+                        sslProperties.getProperty(SSLConfiguration.KEYSTORE_PASSWORD_CONFIG_PROP),
+                        sslProperties.getProperty(SSLConfiguration.TRUSTSTORE_CONFIG_PROP),
+                        sslProperties.getProperty(SSLConfiguration.TRUSTSTORE_PASSWORD_CONFIG_PROP));
+                SSLConfiguration.applySystemProperties(m_sslConfig);
+            } catch (IOException e) {
+                throw new IllegalArgumentException("Unable to access SSL configuration.", e);
+            }
+        } else if (m_enableSSL) {
             if (m_enableSSL && (m_sslPropsFile == null || m_sslPropsFile.trim().length() == 0) ) {
                 m_sslConfig = new SSLConfiguration.SslConfig(null, null, null, null);
                 SSLConfiguration.applySystemProperties(m_sslConfig);

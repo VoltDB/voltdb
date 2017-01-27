@@ -335,7 +335,7 @@ public class TLSNIOWriteStream extends NIOWriteStream {
     class EncryptionGateway implements Runnable {
         private final ConcurrentLinkedDeque<EncryptFrame> m_q = new ConcurrentLinkedDeque<>();
 
-        synchronized void offer(EncryptFrame frame) {
+        synchronized void offer(EncryptFrame frame) throws IOException {
             final boolean wasEmpty = m_q.isEmpty();
             List<EncryptFrame> chunks = frame.chunked(Math.min(CipherExecutor.PAGE_SIZE, applicationBufferSize()));
             m_q.addAll(chunks);
@@ -344,7 +344,10 @@ public class TLSNIOWriteStream extends NIOWriteStream {
                 ListenableFuture<?> fut = m_ce.getES().submit(this);
                 fut.addListener(new ExceptionListener(fut), CoreUtils.SAMETHREADEXECUTOR);
             } else if (wasEmpty && !m_ce.isActive()) {
-                run();
+                while (!isEmpty()) {
+                    run();
+                    checkForGatewayExceptions();
+                }
             }
         }
 
