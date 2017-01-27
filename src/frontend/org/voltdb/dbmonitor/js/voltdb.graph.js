@@ -423,7 +423,6 @@
 
                 ChartDrReplicationRate.margin({ left: 100 });
                 ChartDrReplicationRate.lines.forceY([0, 1]);
-                debugger;
                 d3.select('#visualizationDrReplicationRate_1')
                     .datum(dataDrReplicationRate)
                     .transition().duration(500)
