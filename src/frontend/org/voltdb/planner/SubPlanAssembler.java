@@ -1404,7 +1404,7 @@ public abstract class SubPlanAssembler {
     class WindowFunctionScoreboard {
         public WindowFunctionScoreboard(ParsedSelectStmt pss, StmtTableScan tableScan) {
             m_numWinScores = (pss != null) ? pss.getWindowFunctionExpressions().size() : 0;
-            m_numOrderByScores = (pss.hasOrderByColumns() ? 1 : 0);
+            m_numOrderByScores = ((pss != null) && pss.hasOrderByColumns() ? 1 : 0);
             m_winFunctions = new WindowFunctionScore[m_numWinScores + m_numOrderByScores];
             for (int idx = 0; idx < m_numWinScores; idx += 1) {
                 m_winFunctions[idx] = new WindowFunctionScore(pss.getWindowFunctionExpressions().get(idx),
