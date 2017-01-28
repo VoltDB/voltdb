@@ -22,6 +22,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.GatheringByteChannel;
 import java.util.ArrayList;
 import java.util.Deque;
+import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ExecutionException;
@@ -35,6 +36,7 @@ import org.voltcore.utils.EstTime;
 import org.voltcore.utils.FlexibleSemaphore;
 import org.voltcore.utils.ssl.SSLBufferEncrypter;
 
+import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 
 import io.netty_voltpatches.buffer.ByteBuf;
@@ -85,6 +87,7 @@ public class TLSNIOWriteStream extends NIOWriteStream {
 
         DeferredSerialization ds = null;
         int bytesQueued = 0;
+        int frameMsgs = 0;
         while ((ds = oldlist.poll()) != null) {
             ++processedWrites;
             final int serializedSize = ds.getSerializedSize();
@@ -94,7 +97,8 @@ public class TLSNIOWriteStream extends NIOWriteStream {
                 // partial parts of one message. a message may not contain whole
                 // messages and an incomplete partial fragment of one
                 if (accum.writerIndex() > 0) {
-                    m_ecryptgw.offer(new EncryptFrame(accum));
+                    m_ecryptgw.offer(new EncryptFrame(accum, frameMsgs));
+                    frameMsgs = 0;
                     bytesQueued += accum.writerIndex();
                     accum = m_ce.allocator().buffer(frameMax).clear();
                 }
@@ -103,10 +107,12 @@ public class TLSNIOWriteStream extends NIOWriteStream {
                 ds.serialize(jbb);
                 checkSloppySerialization(jbb, ds);
                 bytesQueued += big.writerIndex();
-                m_ecryptgw.offer(new EncryptFrame(big));
+                m_ecryptgw.offer(new EncryptFrame(big, 1));
+                frameMsgs = 0;
                 continue;
             } else if (accum.writerIndex() + serializedSize > frameMax) {
-                m_ecryptgw.offer(new EncryptFrame(accum));
+                m_ecryptgw.offer(new EncryptFrame(accum, frameMsgs));
+                frameMsgs = 0;
                 bytesQueued += accum.writerIndex();
                 accum = m_ce.allocator().buffer(frameMax).clear();
             }
@@ -115,9 +121,10 @@ public class TLSNIOWriteStream extends NIOWriteStream {
             ds.serialize(jbb);
             checkSloppySerialization(jbb, ds);
             accum.writerIndex(accum.writerIndex()+serializedSize);
+            ++frameMsgs;
         }
         if (accum.writerIndex() > 0) {
-            m_ecryptgw.offer(new EncryptFrame(accum));
+            m_ecryptgw.offer(new EncryptFrame(accum, frameMsgs));
             bytesQueued += accum.writerIndex();
         } else {
             accum.release();
@@ -191,6 +198,7 @@ public class TLSNIOWriteStream extends NIOWriteStream {
             }
             delta += frame.delta;
             m_outbuf.addComponent(true, frame.frame);
+            m_messagesInOutBuf += frame.msgs;
             added = true;
         }
 
@@ -217,6 +225,8 @@ public class TLSNIOWriteStream extends NIOWriteStream {
         }
     }
 
+    private int m_messagesInOutBuf = 0;
+
     @Override
     int drainTo(final GatheringByteChannel channel) throws IOException {
         int bytesWritten = 0;
@@ -239,8 +249,9 @@ public class TLSNIOWriteStream extends NIOWriteStream {
                     if (!m_hadBackPressure) {
                         backpressureStarted();
                     }
-                } else {
-                    m_messagesWritten++;
+                } else if (rc > 0) {
+                    m_messagesWritten += m_messagesInOutBuf;
+                    m_messagesInOutBuf = 0;
                 }
 
             } while (rc > 0);
@@ -334,12 +345,16 @@ public class TLSNIOWriteStream extends NIOWriteStream {
      */
     class EncryptionGateway implements Runnable {
         private final ConcurrentLinkedDeque<EncryptFrame> m_q = new ConcurrentLinkedDeque<>();
+        private long m_offered = 0L;
 
         synchronized void offer(EncryptFrame frame) throws IOException {
             final boolean wasEmpty = m_q.isEmpty();
             List<EncryptFrame> chunks = frame.chunked(Math.min(CipherExecutor.PAGE_SIZE, applicationBufferSize()));
+
             m_q.addAll(chunks);
+            ++m_offered;
             m_inFlight.reducePermits(chunks.size());
+
             if (wasEmpty && m_ce.isActive()) {
                 ListenableFuture<?> fut = m_ce.getES().submit(this);
                 fut.addListener(new ExceptionListener(fut), CoreUtils.SAMETHREADEXECUTOR);
@@ -349,6 +364,11 @@ public class TLSNIOWriteStream extends NIOWriteStream {
                     checkForGatewayExceptions();
                 }
             }
+        }
+
+        void runTaskSynchronously() throws IOException {
+            run();
+            checkForGatewayExceptions();
         }
 
         synchronized int die() {
@@ -373,13 +393,18 @@ public class TLSNIOWriteStream extends NIOWriteStream {
             return new StringBuilder(256).append("EncryptionGateway[")
                     .append("q.isEmpty()=").append(m_q.isEmpty())
                     .append(", partialSize=").append(m_partialSize)
+                    .append(", offered=").append(m_offered)
                     .append("]").toString();
+        }
+
+        public Iterator<EncryptFrame> iterator() {
+            return ImmutableList.copyOf(m_q).iterator();
         }
 
         @Override
         public void run() {
             EncryptFrame frame = m_q.peek();
-            if (frame == null || m_isShutdown) return;
+            if (frame == null) return;
 
             ByteBuffer src = frame.frame.nioBuffer();
             ByteBuf encr = m_ce.allocator().ioBuffer(packetBufferSize()).writerIndex(packetBufferSize());

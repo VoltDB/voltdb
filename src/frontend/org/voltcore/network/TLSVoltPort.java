@@ -148,6 +148,17 @@ public class TLSVoltPort extends VoltPort  {
         ((TLSNIOWriteStream)m_writeStream).waitForPendingEncrypts();
     }
 
+    private final static int MAX_READ = CipherExecutor.PAGE_SIZE << 1;
+    private final static int NOT_AVAILABLE = -1;
+
+    private int m_needed = NOT_AVAILABLE;
+
+    private final int getMaxRead() {
+        return m_handler.getMaxRead() == 0 ? 0 // in back pressure
+                : m_needed == NOT_AVAILABLE ? MAX_READ :
+                    readStream().dataAvailable() > m_needed ? 0 : m_needed - readStream().dataAvailable();
+    }
+
     @Override
     public void run() throws IOException {
         try {
@@ -156,7 +167,7 @@ public class TLSVoltPort extends VoltPort  {
              * Have the read stream fill from the network
              */
             if (readyForRead()) {
-                final int maxRead = m_handler.getMaxRead();
+                final int maxRead = getMaxRead();
                 if (maxRead > 0) {
                     int read = fillReadStream(maxRead);
                     if (read > 0) {
@@ -164,20 +175,22 @@ public class TLSVoltPort extends VoltPort  {
                         while (readStream().dataAvailable() >= TLS_HEADER_SIZE) {
                             NIOReadStream rdstrm = (NIOReadStream)readStream();
                             rdstrm.peekBytes(frameHeader.array());
-                            int framesz = frameHeader.getShort(3) + TLS_HEADER_SIZE;
-                            if (rdstrm.dataAvailable() < framesz) break;
-                            m_dcryptgw.offer(rdstrm.getSlice(framesz));
+                            m_needed = frameHeader.getShort(3) + TLS_HEADER_SIZE;
+                            if (rdstrm.dataAvailable() < m_needed) break;
+                            m_dcryptgw.offer(rdstrm.getSlice(m_needed));
+                            m_needed = NOT_AVAILABLE;
                         }
                     }
                 }
             }
 
-            if (m_network.isStopping()) {
+            if (m_network.isStopping() || m_isShuttingDown) {
                 waitForPendingDecrypts();
             }
 
             ByteBuffer message = null;
             while ((message = m_decrypted.poll()) != null) {
+                ++m_messagesRead;
                 m_handler.handleMessage(message, this);
             }
 
@@ -232,6 +245,11 @@ public class TLSVoltPort extends VoltPort  {
     @Override
     void unregistered() {
         try {
+            waitForPendingDecrypts();
+        } catch (IOException e) {
+            networkLog.warn("unregistered port had an decryption task drain fault", e);
+        }
+        try {
             waitForPendingEncrypts();
         } catch (IOException e) {
             networkLog.warn("unregistered port had an encryption task drain fault", e);
@@ -272,10 +290,9 @@ public class TLSVoltPort extends VoltPort  {
         private final CompositeByteBuf m_msgbb = Unpooled.compositeBuffer();
         private volatile int m_needed = NOT_AVAILABLE;
 
-        synchronized void offer(NIOReadStream.Slice slice) {
+        synchronized void offer(NIOReadStream.Slice slice) throws IOException {
             if (isDead()) {
-                slice.bb.readerIndex(slice.bb.writerIndex());
-                slice.discard();
+                slice.markConsumed().discard();
                 return;
             }
             final boolean wasEmpty = m_q.isEmpty();
@@ -285,6 +302,7 @@ public class TLSVoltPort extends VoltPort  {
                 fut.addListener(new ExceptionListener(fut), CoreUtils.SAMETHREADEXECUTOR);
             } else if (wasEmpty && !m_ce.isActive()) {
                 run();
+                checkForGatewayExceptions();
             }
             m_inFlight.reducePermits(1);
         }
@@ -292,8 +310,7 @@ public class TLSVoltPort extends VoltPort  {
         synchronized void die() {
             NIOReadStream.Slice slice = null;
             while ((slice=m_q.poll()) != null) {
-                slice.bb.readerIndex(slice.bb.writerIndex());
-                slice.discard();
+                slice.markConsumed().discard();
             }
             m_msgbb.release();
         }
@@ -309,6 +326,22 @@ public class TLSVoltPort extends VoltPort  {
               .append("]").toString();
         }
 
+        private final IOException validateMessageLength(int msgLength) {
+            IOException ioe = null;
+            if (msgLength < 1) {
+                ioe = new BadMessageLength(
+                        "Next message length is " + msgLength + " which is less than 1 and is nonsense");
+            }
+            if (msgLength > MAX_MESSAGE_LENGTH) {
+                ioe = new BadMessageLength(
+                        "Next message length is " + msgLength + " which is greater then the hard coded " +
+                        "max of " + MAX_MESSAGE_LENGTH + ". Break up the work into smaller chunks (2 megabytes is reasonable) " +
+                        "and send as multiple messages or stored procedure invocations");
+            }
+            assert msgLength > 1 : "invalid negative or zero message length header value";
+            return ioe;
+        }
+
         @Override
         public void run() {
             final NIOReadStream.Slice slice = m_q.peek();
@@ -316,9 +349,9 @@ public class TLSVoltPort extends VoltPort  {
 
             ByteBuf src = slice.bb;
 
-            if (isDead()) {
-                slice.bb.readerIndex(slice.bb.writerIndex());
-                slice.discard();
+            if (isDead()) synchronized(this) {
+                slice.markConsumed().discard();
+                m_q.poll();
                 return;
             }
 
@@ -338,7 +371,7 @@ public class TLSVoltPort extends VoltPort  {
             try {
                 m_decrypter.tlsunwrap(slicebbarr[0], destjbb);
             } catch (TLSException e) {
-                m_inFlight.release(); dest.release(); m_msgbb.release();
+                m_inFlight.release(); dest.release();
                 m_exceptions.offer(new ExecutionException("fragment decrypt task failed", e));
                 networkLog.error("fragment decrypt task failed", e);
                 enableWriteSelection();
@@ -353,21 +386,10 @@ public class TLSVoltPort extends VoltPort  {
             int read = 0;
             while (m_msgbb.readableBytes() >= getNeededBytes()) {
                 if (m_needed == NOT_AVAILABLE) {
-                    IOException ioe = null;
                     m_needed = m_msgbb.readInt();
-                    if (m_needed < 1) {
-                        ioe = new BadMessageLength(
-                                "Next message length is " + m_needed + " which is less than 1 and is nonsense");
-                    }
-                    if (m_needed > MAX_MESSAGE_LENGTH) {
-                        ioe = new BadMessageLength(
-                                "Next message length is " + m_needed + " which is greater then the hard coded " +
-                                "max of " + MAX_MESSAGE_LENGTH + ". Break up the work into smaller chunks (2 megabytes is reasonable) " +
-                                "and send as multiple messages or stored procedure invocations");
-                    }
-                    assert m_needed > 1 : "invalid negative or zero message length header value";
+                    IOException ioe = validateMessageLength(m_needed);
                     if (ioe != null) {
-                        m_inFlight.release(); m_msgbb.release();
+                        m_inFlight.release();
                         m_exceptions.offer(new ExecutionException("failed message length check", ioe));
                         networkLog.error("failed message length check", ioe);
                         enableWriteSelection();
@@ -389,8 +411,7 @@ public class TLSVoltPort extends VoltPort  {
             }
             synchronized(this) {
                 m_q.poll();
-                src.readerIndex(src.writerIndex());
-                slice.discard();
+                slice.markConsumed().discard();
                 m_inFlight.release();
                 if (m_q.peek() != null && m_ce.isActive()) {
                     ListenableFuture<?> fut = m_ce.getES().submit(this);
@@ -398,8 +419,6 @@ public class TLSVoltPort extends VoltPort  {
                 }
             }
         }
-
-        private final static int NOT_AVAILABLE = -1;
 
         private int getNeededBytes() {
             return m_needed == NOT_AVAILABLE ? 4 : m_needed;

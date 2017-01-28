@@ -31,10 +31,11 @@ class EncryptFrame {
     final int delta;
     final ByteBuf frame;
     final ByteBuf bb;
+    final int msgs;
 
 
-    EncryptFrame(ByteBuf source) {
-        this(1, 1, UNCHUNKED_SIGIL, source, source);
+    EncryptFrame(ByteBuf source, int msgs) {
+        this(1, 1, UNCHUNKED_SIGIL, msgs, source, source);
     }
 
     public boolean isChunked() {
@@ -54,34 +55,35 @@ class EncryptFrame {
             return ImmutableList.of();
         }
         if (bb.readableBytes() <= frameMax) {
-            return ImmutableList.of(new EncryptFrame(1, 1, 0, bb, bb));
+            return ImmutableList.of(new EncryptFrame(1, 1, 0, 1, bb, bb));
         }
         int frames = bb.writerIndex() / frameMax;
         frames = bb.writerIndex() % frameMax == 0 ? frames : frames+1;
         ImmutableList.Builder<EncryptFrame> lbld = ImmutableList.builder();
         for (int chunk = 1; chunk <= frames; ++chunk) {
             int sliceSz = Math.min(frameMax, bb.readableBytes());
-            EncryptFrame piece = new EncryptFrame(chunk, frames, 0, bb.readSlice(sliceSz), bb);
+            EncryptFrame piece = new EncryptFrame(chunk, frames, 0, msgs, bb.readSlice(sliceSz), bb);
             lbld.add(piece);
         }
         return lbld.build();
     }
 
     EncryptFrame encrypted(int delta, ByteBuf encrypted) {
-        return new EncryptFrame(chunkno, chunks, delta, encrypted, null);
+        return new EncryptFrame(chunkno, chunks, delta, msgs, encrypted, null);
     }
 
-    private EncryptFrame(int chunkno, int chunks, int delta, ByteBuf frame, ByteBuf sliceSource) {
+    private EncryptFrame(int chunkno, int chunks, int delta, int msgs, ByteBuf frame, ByteBuf sliceSource) {
         this.chunkno = chunkno;
         this.chunks = chunks;
         this.delta = delta;
         this.frame = frame;
         this.bb = sliceSource;
+        this.msgs = msgs;
     }
 
     @Override
     public String toString() {
         return "EncryptFrame [chunkno=" + chunkno + ", chunks=" + chunks
-                + ", delta=" + delta + ", slice=" + frame + "]";
+                + ", msgs=" + msgs + ", delta=" + delta + ", slice=" + frame + "]";
     }
 }

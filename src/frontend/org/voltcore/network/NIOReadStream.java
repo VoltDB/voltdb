@@ -298,6 +298,13 @@ public class NIOReadStream implements ReadStream {
             m_slices = slices;
         }
 
+        public Slice markConsumed() {
+            if (bb.isReadable()) {
+                bb.readerIndex(bb.writerIndex());
+            }
+            return this;
+        }
+
         public int discard() {
             int discarded = 0;
             int size = 0;
