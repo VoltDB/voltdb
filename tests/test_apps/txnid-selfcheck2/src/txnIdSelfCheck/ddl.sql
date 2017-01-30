@@ -140,7 +140,7 @@ CREATE TABLE forDroppedProcedure
 PARTITION TABLE forDroppedProcedure ON COLUMN p;
 
 -- export tables
-CREATE STREAM partitioned_export PARTITION ON COLUMN cid
+CREATE STREAM partitioned_export PARTITION ON COLUMN cid export to target default
 (
   txnid      bigint             NOT NULL
 , prevtxnid  bigint             NOT NULL
@@ -178,7 +178,7 @@ CREATE TABLE ex_partview_shadow (
 );
 PARTITION TABLE ex_partview_shadow ON COLUMN cid;
 
-CREATE STREAM replicated_export
+CREATE STREAM replicated_export export to target default
 (
   txnid      bigint             NOT NULL
 , prevtxnid  bigint             NOT NULL

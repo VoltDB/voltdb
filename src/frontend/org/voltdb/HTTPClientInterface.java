@@ -132,7 +132,7 @@ public class HTTPClientInterface {
             } catch (IllegalStateException e) {
                 // Thrown when we shut down the server via the JSON/HTTP (web studio) API
                 // Essentially we're closing everything down from underneath the HTTP request.
-                 m_log.warn("JSON request completion exception: ", e);
+                 m_log.warn("JSON request cannot be completed. The server is shutting down. " + e.getMessage());
             }
         }
 
