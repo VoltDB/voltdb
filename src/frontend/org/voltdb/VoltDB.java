@@ -22,6 +22,9 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.lang.management.ManagementFactory;
+import java.lang.management.ThreadInfo;
+import java.lang.management.ThreadMXBean;
 import java.lang.reflect.InvocationTargetException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayDeque;
@@ -35,6 +38,8 @@ import java.util.NavigableSet;
 import java.util.Queue;
 import java.util.TimeZone;
 import java.util.UUID;
+
+import javax.management.MBeanServer;
 
 import org.voltcore.logging.VoltLog4jLogger;
 import org.voltcore.logging.VoltLogger;
@@ -62,6 +67,7 @@ import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
 import com.google_voltpatches.common.net.HostAndPort;
+import com.sun.management.HotSpotDiagnosticMXBean;
 
 /**
  * VoltDB provides main() for the VoltDB server
@@ -1036,6 +1042,76 @@ public class VoltDB {
             }
         }
         return true;
+    }
+
+    public static String GenerateThreadDump() {
+        final StringBuilder dump = new StringBuilder(4096);
+        final ThreadMXBean threadMXBean = ManagementFactory.getThreadMXBean();
+        final ThreadInfo[] threadInfos = threadMXBean.getThreadInfo(threadMXBean.getAllThreadIds(), 100);
+        for (ThreadInfo threadInfo : threadInfos) {
+            String threadName = threadInfo.getThreadName();
+            if (threadName.startsWith("SP ") || threadName.startsWith("MP ") ||
+                    threadName.startsWith("MpInitiator") || threadName.startsWith("Volt Server Network")) {
+                dump.append('"');
+                dump.append(threadInfo.getThreadName());
+                dump.append("\" ");
+                final Thread.State state = threadInfo.getThreadState();
+                dump.append("\n   java.lang.Thread.State: ");
+                dump.append(state);
+                final StackTraceElement[] stackTraceElements = threadInfo.getStackTrace();
+                for (final StackTraceElement stackTraceElement : stackTraceElements) {
+                    dump.append("\n        at ");
+                    dump.append(stackTraceElement);
+                }
+                dump.append("\n\n");
+            }
+        }
+        return dump.toString();
+    }
+
+    /*
+     * WARNING: Use with care this may take a long time and generate a GC. It could even cause a DEAD HOST Timeout.
+     */
+    public static void GenerateHeapDump() {
+        final VoltLogger log = new VoltLogger("HOST");
+        final String jvmName = ManagementFactory.getRuntimeMXBean().getName();
+        final int index = jvmName.indexOf('@');
+        // By default include time in millis to the heap dump name
+        String uniquifier = Long.toString(System.currentTimeMillis());
+        if (index >= 0) {
+            try {
+                // Use PID in heap dump name if available (because it is shorter)
+                uniquifier = Long.toString(Long.parseLong(jvmName.substring(0, index)));
+            } catch (NumberFormatException e) {
+                // ignore
+            }
+        }
+
+        HotSpotDiagnosticMXBean hotspotMBean = null;
+        synchronized (VoltDB.class) {
+            try {
+                MBeanServer server = ManagementFactory.getPlatformMBeanServer();
+                hotspotMBean = ManagementFactory.newPlatformMXBeanProxy(server,
+                            "com.sun.management:type=HotSpotDiagnostic",
+                            HotSpotDiagnosticMXBean.class);
+            } catch (RuntimeException re) {
+            } catch (Exception exp) {
+            }
+        }
+        if (hotspotMBean != null) {
+            String dumpPath = instance().getVoltDBRootPath() + "/heapdump_" + uniquifier + ".hprof";
+            log.warn("Initiating Java Heap Dump to: " + dumpPath);
+            try {
+                hotspotMBean.dumpHeap(dumpPath, true);
+            }
+            catch (IOException e) {
+                log.warn("java Heap Dump failed due to IOException:", e);
+            }
+            log.info("Java Heap Dump completed");
+        }
+        else {
+            log.info("Java Heap Dump could not be initiated");
+        }
     }
 
     /**
