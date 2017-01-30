@@ -323,8 +323,18 @@ public class StreamBlockQueue {
 
     @Override
     public void finalize() {
-        if (!m_memoryDeque.isEmpty()) {
-            exportLog.error("Finalized StreamBlockQueue with items in the memory deque");
+        try {
+            if (!m_memoryDeque.isEmpty()) {
+                m_memoryDeque.stream().filter((block) -> (!block.isPersisted())).forEachOrdered((_item) -> {
+                    exportLog.error("Finalized StreamBlockQueue with items in the memory deque that are not persisted.");
+                });
+            }
+        } finally {
+            try {
+                super.finalize();
+            } catch (Throwable ex) {
+               ;
+            }
         }
     }
 }
