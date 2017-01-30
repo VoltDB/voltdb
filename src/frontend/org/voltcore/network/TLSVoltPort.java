@@ -25,6 +25,7 @@ import java.nio.channels.SocketChannel;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import javax.net.ssl.SSLEngine;
 
@@ -162,43 +163,50 @@ public class TLSVoltPort extends VoltPort  {
     @Override
     public void run() throws IOException {
         try {
-            checkForGatewayExceptions();
-            /*
-             * Have the read stream fill from the network
-             */
-            if (readyForRead()) {
-                final int maxRead = getMaxRead();
-                if (maxRead > 0) {
-                    int read = fillReadStream(maxRead);
-                    if (read > 0) {
-                        ByteBuf frameHeader = Unpooled.wrappedBuffer(new byte[TLS_HEADER_SIZE]);
-                        while (readStream().dataAvailable() >= TLS_HEADER_SIZE) {
-                            NIOReadStream rdstrm = (NIOReadStream)readStream();
-                            rdstrm.peekBytes(frameHeader.array());
-                            m_needed = frameHeader.getShort(3) + TLS_HEADER_SIZE;
-                            if (rdstrm.dataAvailable() < m_needed) break;
-                            m_dcryptgw.offer(rdstrm.getSlice(m_needed));
-                            m_needed = NOT_AVAILABLE;
+            do {
+                checkForGatewayExceptions();
+                /*
+                 * Have the read stream fill from the network
+                 */
+                if (readyForRead()) {
+                    final int maxRead = getMaxRead();
+                    if (maxRead > 0) {
+                        int read = fillReadStream(maxRead);
+                        if (read > 0) {
+                            ByteBuf frameHeader = Unpooled.wrappedBuffer(new byte[TLS_HEADER_SIZE]);
+                            while (readStream().dataAvailable() >= TLS_HEADER_SIZE) {
+                                NIOReadStream rdstrm = (NIOReadStream)readStream();
+                                rdstrm.peekBytes(frameHeader.array());
+                                m_needed = frameHeader.getShort(3) + TLS_HEADER_SIZE;
+                                if (rdstrm.dataAvailable() < m_needed) break;
+                                m_dcryptgw.offer(rdstrm.getSlice(m_needed));
+                                m_needed = NOT_AVAILABLE;
+                            }
                         }
                     }
                 }
-            }
 
-            if (m_network.isStopping() || m_isShuttingDown) {
-                waitForPendingDecrypts();
-            }
+                if (m_network.isStopping() || m_isShuttingDown) {
+                    waitForPendingDecrypts();
+                }
 
-            ByteBuffer message = null;
-            while ((message = m_decrypted.poll()) != null) {
-                ++m_messagesRead;
-                m_handler.handleMessage(message, this);
-            }
+                ByteBuffer message = null;
+                while ((message = m_decrypted.poll()) != null) {
+                    ++m_messagesRead;
+                    m_handler.handleMessage(message, this);
+                }
 
-            /*
-             * On readiness selection, optimistically assume that write will succeed,
-             * in the common case it will
-             */
-            drainEncryptedStream();
+                /*
+                 * On readiness selection, optimistically assume that write will succeed,
+                 * in the common case it will
+                 */
+                drainEncryptedStream();
+                /*
+                 * some encrypt or decrypt task may have finished while this port is running
+                 * so enabling write interst would have been muted. Singal is there to
+                 * reconsider finished decrypt or encrypt tasks.
+                 */
+            } while (m_signal.compareAndSet(true, false));
         } finally {
             synchronized(m_lock) {
                 assert(m_running == true);
@@ -227,7 +235,7 @@ public class TLSVoltPort extends VoltPort  {
             }
         }
     }
-
+    private final AtomicBoolean m_signal = new AtomicBoolean(false);
     /*
      * All interactions with write stream must be protected
      * with a lock to ensure that interests ops are consistent with
@@ -238,6 +246,7 @@ public class TLSVoltPort extends VoltPort  {
     @Override
     protected void enableWriteSelection() {
         synchronized (m_writeStream) {
+            m_signal.set(true);
             super.enableWriteSelection();
         }
     }

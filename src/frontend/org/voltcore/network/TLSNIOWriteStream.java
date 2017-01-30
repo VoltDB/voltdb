@@ -383,12 +383,6 @@ public class TLSNIOWriteStream extends NIOWriteStream {
             return toUnqueue;
         }
 
-        private void enableWriteSelection() {
-            synchronized(TLSNIOWriteStream.this) {
-                ((VoltPort)m_port).enableWriteSelection();
-            }
-        }
-
         String dumpState() {
             return new StringBuilder(256).append("EncryptionGateway[")
                     .append("q.isEmpty()=").append(m_q.isEmpty())
@@ -417,7 +411,7 @@ public class TLSNIOWriteStream extends NIOWriteStream {
                 encr.release();
                 m_exceptions.offer(new ExecutionException("failed to encrypt frame", e));
                 networkLog.error("failed to encrypt frame", e);
-                enableWriteSelection();
+                m_port.enableWriteSelection();
                 return;
             }
             assert !src.hasRemaining() : "encryption wrap did not consume the whole source buffer";
@@ -434,7 +428,7 @@ public class TLSNIOWriteStream extends NIOWriteStream {
                  * but the write interest op is not set.
                  */
                 if (frame.isLast()) {
-                    enableWriteSelection();
+                    m_port.enableWriteSelection();
                 }
             } else {
                 encr.release();
