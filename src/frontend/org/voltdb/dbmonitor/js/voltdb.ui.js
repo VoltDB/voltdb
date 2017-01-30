@@ -1068,7 +1068,6 @@ var loadPage = function (serverName, portid) {
 
         voltDbRenderer.GetClusterReplicaInformation(function (replicaDetail) {
             if (getCurrentServer() != undefined) {
-//                $('#dRHeaderName').html(getCurrentServer())
                 var isReplicaDataVisible = false;
                 var isMasterDataVisible = false;
                 var isDrGraphVisible = false;
@@ -1224,6 +1223,7 @@ var loadPage = function (serverName, portid) {
                     var role = drRoleDetail['DRROLE'][0][0];
                     var producerDbId = rawConfigValues.dr.id;
                     var consumerDbId = drRoleDetail['DRROLE'][0][2];
+
                  voltDbRenderer.GetDrDetails(function (drDetails) {
                     var response = drDetails;
                     var replicaLatency = [];
@@ -1231,7 +1231,7 @@ var loadPage = function (serverName, portid) {
                     for (var key in response) {
                         if(key != undefined){
                             for (var i = 0; i <= response[key].length - 1; i++) {
-                                replicaLatency.push(response[key][i].LASTQUEUEDTIMESTAMP - response[key][i].LASTACKTIMESTAMP);
+                                replicaLatency.push((response[key][i].LASTQUEUEDTIMESTAMP - response[key][i].LASTACKTIMESTAMP)/1000000);
                             }
                         }
 
@@ -1248,13 +1248,13 @@ var loadPage = function (serverName, portid) {
                     $("#dRProducerName").html('Database ('+ producerDbId +')');
                     $("#dRConsumerName").html('Database ('+ consumerDbId +')');
                     if(role == "MASTER"){
-                        $(".drRelationLeft").find('p').html(role + '/ REPLICA');
+                        $(".drRelationLeft").find('p').html(role + ' / REPLICA');
                         $("#drArrow").addClass("arrowSingle");
                     }
                     else if (role == "REPLICA"){
-                        $(".drRelationLeft").find('p').html(role + '/ MASTER');
+                        $(".drRelationLeft").find('p').html(role + ' / MASTER');
                         $("#drArrow").removeClass("arrowDouble");
-                        $("#drArrow").addClass("arrowSingle");
+                        $("#drArrow").addClass("arrowSingleLeft");
                     }
                     else{
                         $(".drRelationLeft").find('p').html(role);
@@ -1279,7 +1279,7 @@ var loadPage = function (serverName, portid) {
                             for (var key in response) {
                                 for (var i = 0; i <= response[key].length - 1; i++) {
                                     if(response[key][i].CONSUMERCLUSTERID == consumerDbId){
-                                        replicaLatency.push(response[key][i].LASTQUEUEDTIMESTAMP - response[key][i].LASTACKTIMESTAMP);
+                                        replicaLatency.push((response[key][i].LASTQUEUEDTIMESTAMP - response[key][i].LASTACKTIMESTAMP) / 1000000);
                                     }
                                 }
                             }
