@@ -501,6 +501,10 @@ void NValue::castAndSortAndDedupArrayForInList(const ValueType outputType, std::
 void NValue::streamTimestamp(std::stringstream& value) const
 {
     int64_t epoch_micros = getTimestamp();
+    if (epochMicrosOutOfRange(epoch_micros)) {
+        throwOutOfRangeTimestampInput("CAST");
+    }
+
     boost::gregorian::date as_date;
     boost::posix_time::time_duration as_time;
     micros_to_date_and_time(epoch_micros, as_date, as_time);

@@ -111,7 +111,6 @@ CREATE STREAM export_mirror_partitioned_table PARTITION ON COLUMN rowid
 --, type_not_null_point       GEOGRAPHY_POINT NOT NULL
 --, type_null_polygon         GEOGRAPHY
 --, type_not_null_polygon     GEOGRAPHY       NOT NULL
-, PRIMARY KEY (rowid)
 );
 
 CREATE STREAM export_done_table PARTITION ON COLUMN txnid
