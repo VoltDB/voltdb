@@ -41,7 +41,6 @@ import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.ConstraintRef;
 import org.voltdb.catalog.Database;
-import org.voltdb.catalog.DatabaseConfiguration;
 import org.voltdb.catalog.Group;
 import org.voltdb.catalog.GroupRef;
 import org.voltdb.catalog.Index;
@@ -49,7 +48,6 @@ import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Table;
 import org.voltdb.common.Constants;
 import org.voltdb.common.Permission;
-import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.compilereport.ProcedureAnnotation;
 import org.voltdb.compilereport.TableAnnotation;
 import org.voltdb.expressions.AbstractExpression;
@@ -90,10 +88,12 @@ public abstract class CatalogSchemaTools {
      * @param sb - the schema being built
      * @param catalog_tbl - object to be analyzed
      * @param viewQuery - the Query if this Table is a View
-     * @param isExportTableWithTarget - true if this Table is an Export Table
+     * @param isExportOnly Is this a export table.
+     * @param streamPartitionColumn stream partition column
+     * @param streamTarget - true if this Table is an Export Table
      * @return SQL Schema text representing the CREATE TABLE statement to generate the table
      */
-    public static String toSchema(StringBuilder sb, Table catalog_tbl, String viewQuery, boolean isExportOnly, String isExportTableWithTarget) {
+    public static String toSchema(StringBuilder sb, Table catalog_tbl, String viewQuery, boolean isExportOnly, String streamPartitionColumn, String streamTarget) {
         assert(!catalog_tbl.getColumns().isEmpty());
         boolean tableIsView = (viewQuery != null);
 
@@ -108,16 +108,17 @@ public abstract class CatalogSchemaTools {
             table_sb.append("CREATE VIEW " + catalog_tbl.getTypeName() + " (");
         }
         else {
-            table_sb.append("CREATE " +
-                    (isExportOnly ? "STREAM " : "TABLE ") +
-                    catalog_tbl.getTypeName());
-            if (isExportTableWithTarget != null) {
-                if (catalog_tbl.getPartitioncolumn() != null && viewQuery == null) {
-                    table_sb.append(" PARTITION ON COLUMN " + catalog_tbl.getPartitioncolumn().getTypeName());
+            if (isExportOnly) {
+                table_sb.append("CREATE STREAM " + catalog_tbl.getTypeName());
+                if (streamPartitionColumn != null && viewQuery == null) {
+                    table_sb.append(" PARTITION ON COLUMN " + streamPartitionColumn);
                 }
-                if (!isExportTableWithTarget.equalsIgnoreCase(Constants.DEFAULT_EXPORT_CONNECTOR_NAME)) {
-                    table_sb.append(" EXPORT TO TARGET " + isExportTableWithTarget);
+                //Default target means no target.
+                if (streamTarget != null && !streamTarget.equalsIgnoreCase(Constants.DEFAULT_EXPORT_CONNECTOR_NAME)) {
+                    table_sb.append(" EXPORT TO TARGET " + streamTarget);
                 }
+            } else {
+                table_sb.append("CREATE TABLE " + catalog_tbl.getTypeName());
             }
             table_sb.append(" (");
         }
@@ -327,7 +328,7 @@ public abstract class CatalogSchemaTools {
         sb.append(table_sb.toString());
 
         // Partition Table for regular tables (non-streams)
-        if (catalog_tbl.getPartitioncolumn() != null && viewQuery == null && isExportTableWithTarget == null) {
+        if (catalog_tbl.getPartitioncolumn() != null && viewQuery == null && !isExportOnly) {
             sb.append("PARTITION TABLE " + catalog_tbl.getTypeName() + " ON COLUMN " +
                     catalog_tbl.getPartitioncolumn().getTypeName() + ";\n" );
         }
@@ -573,12 +574,13 @@ public abstract class CatalogSchemaTools {
                             viewList.add(table);
                             continue;
                         }
-                        toSchema(sb, table, null, CatalogUtil.isTableExportOnly(db, table), CatalogUtil.getExportTargetIfExportTableOrNullOtherwise(db, table));
+                        toSchema(sb, table, null, CatalogUtil.isTableExportOnly(db, table),
+                                (table.getPartitioncolumn() != null ? table.getPartitioncolumn().getName() : null), CatalogUtil.getExportTargetIfExportTableOrNullOtherwise(db, table));
                     }
                     // A View cannot precede a table that it depends on in the DDL
                     for (Table table : viewList) {
                         String viewQuery = ((TableAnnotation) table.getAnnotation()).ddl;
-                        toSchema(sb, table, viewQuery, CatalogUtil.isTableExportOnly(db, table), CatalogUtil.getExportTargetIfExportTableOrNullOtherwise(db, table));
+                        toSchema(sb, table, viewQuery, false, null, null);
                     }
                 }
 

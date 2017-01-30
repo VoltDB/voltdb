@@ -26,7 +26,6 @@ package org.voltdb.utils;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.util.Calendar;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -51,10 +50,7 @@ import org.voltdb.catalog.User;
 import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
-import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.compilereport.ProcedureAnnotation;
-import org.voltdb.licensetool.LicenseApi;
-import org.voltdb.licensetool.LicenseException;
 import org.voltdb.types.ConstraintType;
 
 import junit.framework.TestCase;
@@ -97,7 +93,7 @@ public class TestCatalogUtil extends TestCase {
         // Simple check to make sure things look ok...
         for (Table catalog_tbl : catalog_db.getTables()) {
             StringBuilder sb = new StringBuilder();
-            CatalogSchemaTools.toSchema(sb, catalog_tbl, null, false, null);
+            CatalogSchemaTools.toSchema(sb, catalog_tbl, null, false, null, null);
             String sql = sb.toString();
             assertTrue(sql.startsWith("CREATE TABLE " + catalog_tbl.getTypeName()));
 
