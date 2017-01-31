@@ -35,7 +35,7 @@
 --  FROM example_of_types
 --  GROUP BY type;
 --
--- CREATE PROCEDURE PARTITION UpsertSymbol ON TABLE symbols COLUMN symbol [PARAMETER 0]
+-- CREATE PROCEDURE PARTITION ON TABLE symbols COLUMN symbol [PARAMETER 0]
 --  FROM CLASS procedures.UpsertSymbol;
 ---------------------------------------------------------------------------------
 
@@ -173,7 +173,8 @@ ORDER BY utc_min DESC OFFSET 1 LIMIT 30;
 
 CREATE PROCEDURE FROM CLASS adperformance.InitializeCreatives;
 
-CREATE PROCEDURE PARTITION ON TABLE event_data COLUMN creative_id PARAMETER 3 FROM CLASS adperformance.TrackEvent;
+CREATE PROCEDURE PARTITION ON TABLE event_data COLUMN creative_id PARAMETER 3
+  FROM CLASS adperformance.TrackEvent;
 
 -- CREATE PROCEDURE ad_campaign_minutely_rates AS
 -- SELECT campaign_id, utc_min, clicks/impressions as ctr, conversions/clicks as cr

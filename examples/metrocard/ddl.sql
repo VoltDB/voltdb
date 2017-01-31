@@ -35,7 +35,7 @@
 --  FROM example_of_types
 --  GROUP BY type;
 --
--- CREATE PROCEDURE PARTITION UpsertSymbol ON TABLE symbols COLUMN symbol [PARAMETER 0]
+-- CREATE PROCEDURE PARTITION ON TABLE symbols COLUMN symbol [PARAMETER 0]
 --  FROM CLASS procedures.UpsertSymbol;
 ---------------------------------------------------------------------------------
 

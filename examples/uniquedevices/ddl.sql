@@ -32,9 +32,14 @@ LOAD CLASSES uniquedevices-procs.jar;
 
 -- stored procedures
 
-CREATE PROCEDURE PARTITION ON TABLE estimates COLUMN appid FROM CLASS uniquedevices.CountDeviceEstimate;
-CREATE PROCEDURE PARTITION ON TABLE estimates COLUMN appid FROM CLASS uniquedevices.CountDeviceExact;
-CREATE PROCEDURE PARTITION ON TABLE estimates COLUMN appid FROM CLASS uniquedevices.CountDeviceHybrid;
+CREATE PROCEDURE PARTITION ON TABLE estimates COLUMN appid
+  FROM CLASS uniquedevices.CountDeviceEstimate;
+
+CREATE PROCEDURE PARTITION ON TABLE estimates COLUMN appid
+  FROM CLASS uniquedevices.CountDeviceExact;
+
+CREATE PROCEDURE PARTITION ON TABLE estimates COLUMN appid
+  FROM CLASS uniquedevices.CountDeviceHybrid;
 
 CREATE PROCEDURE GetCardEstForApp
     PARTITION ON TABLE estimates COLUMN appid

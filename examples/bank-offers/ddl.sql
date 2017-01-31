@@ -20,7 +20,7 @@
 --  GROUP BY type;
 --
 -- CREATE PROCEDURE foo AS SELECT * FROM foo;
--- CREATE PROCEDURE PARTITION UpsertSymbol ON TABLE symbols COLUMN symbol [PARAMETER 0]
+-- CREATE PROCEDURE PARTITION ON TABLE symbols COLUMN symbol [PARAMETER 0]
 --  FROM CLASS procedures.UpsertSymbol;
 ---------------------------------------------------------------------------------
 
@@ -118,7 +118,8 @@ GROUP BY TRUNCATE(SECOND,offer_ts);
 CREATE PROCEDURE recent_offer_totals AS
 SELECT * FROM total_offers ORDER BY offer_ts DESC LIMIT 60;
 
-CREATE PROCEDURE PARTITION CheckForOffers ON TABLE activity COLUMN acc_no PARAMETER 1 FROM CLASS bankoffers.CheckForOffers;
+CREATE PROCEDURE PARTITION CheckForOffers ON TABLE activity COLUMN acc_no PARAMETER 1
+  FROM CLASS bankoffers.CheckForOffers;
 
 CREATE PROCEDURE RecentOffersList AS
 SELECT og.offer_ts, c.cust_first_name, c.cust_last_name, og.offer_text, avt.acc_no, avt.vendor_id, avt.total_visits, avt.total_spend
