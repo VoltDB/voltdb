@@ -1792,7 +1792,10 @@ public class PlanAssembler {
     /**
      * Determine if an OrderByPlanNode is needed.  This may return false if the
      * statement has no ORDER BY clause, or if the subtree is already producing
-     * rows in the correct order.
+     * rows in the correct order.  Note that a hash aggregate node will cause this
+     * to return true, and a serial or partial aggregate node may cause this
+     * to return true.
+     *
      * @param parsedStmt    The statement whose plan may need an OrderByPlanNode
      * @param root          The subtree which may need its output tuples ordered
      * @return true if the plan needs an OrderByPlanNode, false otherwise
