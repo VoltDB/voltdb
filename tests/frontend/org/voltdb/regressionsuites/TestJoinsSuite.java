@@ -377,6 +377,7 @@ public class TestJoinsSuite extends RegressionSuite {
             validateRowCount(client, query, 3);
         }
         else {
+            // "IS NOT DISTINCT FROM" in the end expression, but not in the search expression (range scan).
             validateRowCount(client, query, 11);
         }
 

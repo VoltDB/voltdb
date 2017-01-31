@@ -464,7 +464,9 @@ public abstract class SubPlanAssembler {
             // Equality filters get first priority.
             boolean allowIndexedJoinFilters = (inListExpr == null);
             IndexableExpression eqExpr = getIndexableExpressionFromFilters(
-                ExpressionType.COMPARE_EQUAL, ExpressionType.COMPARE_EQUAL,
+                // NOT DISTINCT can be also considered as an equality comparison.
+                // The only difference is that NULL is not distinct from NULL, but NULL != NULL. (ENG-11096)
+                ExpressionType.COMPARE_EQUAL, ExpressionType.COMPARE_NOTDISTINCT,
                 coveringExpr, coveringColId, tableScan, filtersToCover,
                 allowIndexedJoinFilters, EXCLUDE_FROM_POST_FILTERS);
 
@@ -1066,9 +1068,12 @@ public abstract class SubPlanAssembler {
             List<AbstractExpression> bindingsForOrder)
     {
         if (!m_parsedStmt.hasOrderByColumns()
-                || m_parsedStmt.orderByColumns().isEmpty()) {
+                || m_parsedStmt.orderByColumns().isEmpty()
+                // There need to be enough indexed expressions to provide full sort coverage.
+                || m_parsedStmt.orderByColumns().size() > keyComponentCount) {
             return 0;
-        } else if (m_parsedStmt instanceof ParsedSelectStmt) {
+        }
+        if (m_parsedStmt instanceof ParsedSelectStmt) {
             // If this parsed select statement has a windowed expression,
             // we don't want to consider the order by at all.
             // Note that this is the content of ENG-10474.
@@ -1078,60 +1083,56 @@ public abstract class SubPlanAssembler {
             }
         }
         int nSpoilers = 0;
-        int countOrderBys = m_parsedStmt.orderByColumns().size();
-        // There need to be enough indexed expressions to provide full sort coverage.
-        if (countOrderBys > 0 && countOrderBys <= keyComponentCount) {
-            boolean ascending = m_parsedStmt.orderByColumns().get(0).ascending;
-            retval.sortDirection = ascending ? SortDirectionType.ASC : SortDirectionType.DESC;
-            int jj = 0;
-            for (ParsedColInfo colInfo : m_parsedStmt.orderByColumns()) {
-                // This retry loop allows catching special cases that don't perfectly match the
-                // ORDER BY columns but may still be usable for ordering.
-                for ( ; jj < keyComponentCount; ++jj) {
-                    if (colInfo.ascending == ascending) {
-                        // Explicitly advance to the each indexed expression/column
-                        // to match them with the query's "ORDER BY" expressions.
-                        if (indexedExprs == null) {
-                            ColumnRef nextColRef = indexedColRefs.get(jj);
-                            if (colInfo.expression instanceof TupleValueExpression &&
-                                colInfo.tableAlias.equals(tableScan.getTableAlias()) &&
-                                colInfo.columnName.equals(nextColRef.getColumn().getTypeName())) {
-                                break;
-                            }
-                        } else {
-                            assert(jj < indexedExprs.size());
-                            AbstractExpression nextExpr = indexedExprs.get(jj);
-                            List<AbstractExpression> moreBindings =
-                                colInfo.expression.bindingToIndexedExpression(nextExpr);
-                            // Non-null bindings (even an empty list) denotes a match.
-                            if (moreBindings != null) {
-                                bindingsForOrder.addAll(moreBindings);
-                                break;
-                            }
+        boolean ascending = m_parsedStmt.orderByColumns().get(0).ascending;
+        retval.sortDirection = ascending ? SortDirectionType.ASC : SortDirectionType.DESC;
+        int jj = 0;
+        for (ParsedColInfo colInfo : m_parsedStmt.orderByColumns()) {
+            // This retry loop allows catching special cases that don't perfectly match the
+            // ORDER BY columns but may still be usable for ordering.
+            for ( ; jj < keyComponentCount; ++jj) {
+                if (colInfo.ascending == ascending) {
+                    // Explicitly advance to the each indexed expression/column
+                    // to match them with the query's "ORDER BY" expressions.
+                    if (indexedExprs == null) {
+                        ColumnRef nextColRef = indexedColRefs.get(jj);
+                        if (colInfo.expression instanceof TupleValueExpression &&
+                            colInfo.tableAlias.equals(tableScan.getTableAlias()) &&
+                            colInfo.columnName.equals(nextColRef.getColumn().getTypeName())) {
+                            break;
+                        }
+                    } else {
+                        assert(jj < indexedExprs.size());
+                        AbstractExpression nextExpr = indexedExprs.get(jj);
+                        List<AbstractExpression> moreBindings =
+                            colInfo.expression.bindingToIndexedExpression(nextExpr);
+                        // Non-null bindings (even an empty list) denotes a match.
+                        if (moreBindings != null) {
+                            bindingsForOrder.addAll(moreBindings);
+                            break;
                         }
                     }
-                    // The ORDER BY column did not match the established ascending/descending
-                    // pattern OR did not match the next index key component.
-                    // The only hope for the sort being preserved is that
-                    // (A) the ORDER BY column matches a later index key component
-                    // -- so keep searching -- AND
-                    // (B) the current (and each intervening) index key component is constrained
-                    // to a single value, i.e. it is equality-filtered.
-                    // -- so note the current component's position (jj).
-                    orderSpoilers[nSpoilers++] = jj;
                 }
-                if (jj < keyComponentCount) {
-                    // The loop exited prematurely.
-                    // That means the current ORDER BY column matched the current key component,
-                    // so move on to the next key component (to match the next ORDER BY column).
-                    ++jj;
-                } else {
-                    // The current ORDER BY column ran out of key components to try to match.
-                    // This is an outright failure case.
-                    retval.sortDirection = SortDirectionType.INVALID;
-                    bindingsForOrder.clear(); // suddenly irrelevant
-                    return 0;  // Any orderSpoilers are also suddenly irrelevant.
-                }
+                // The ORDER BY column did not match the established ascending/descending
+                // pattern OR did not match the next index key component.
+                // The only hope for the sort being preserved is that
+                // (A) the ORDER BY column matches a later index key component
+                // -- so keep searching -- AND
+                // (B) the current (and each intervening) index key component is constrained
+                // to a single value, i.e. it is equality-filtered.
+                // -- so note the current component's position (jj).
+                orderSpoilers[nSpoilers++] = jj;
+            }
+            if (jj < keyComponentCount) {
+                // The loop exited prematurely.
+                // That means the current ORDER BY column matched the current key component,
+                // so move on to the next key component (to match the next ORDER BY column).
+                ++jj;
+            } else {
+                // The current ORDER BY column ran out of key components to try to match.
+                // This is an outright failure case.
+                retval.sortDirection = SortDirectionType.INVALID;
+                bindingsForOrder.clear(); // suddenly irrelevant
+                return 0;  // Any orderSpoilers are also suddenly irrelevant.
             }
         }
         return nSpoilers;
@@ -1573,24 +1574,25 @@ public abstract class SubPlanAssembler {
         for (AbstractExpression expr : path.indexExprs) {
             if (path.lookupType == IndexLookupType.GEO_CONTAINS) {
                 scanNode.addSearchKeyExpression(expr);
+                scanNode.addCompareNotDistinctFlag(false);
                 continue;
             }
-            AbstractExpression expr2 = expr.getRight();
-            assert(expr2 != null);
+            AbstractExpression exprRightChild = expr.getRight();
+            assert(exprRightChild != null);
             if (expr.getExpressionType() == ExpressionType.COMPARE_IN) {
                 // Replace this method's result with an injected NLIJ.
-                resultNode = injectIndexedJoinWithMaterializedScan(expr2, scanNode);
+                resultNode = injectIndexedJoinWithMaterializedScan(exprRightChild, scanNode);
                 // Extract a TVE from the LHS MaterializedScan for use by the IndexScan in its new role.
                 MaterializedScanPlanNode matscan = (MaterializedScanPlanNode)resultNode.getChild(0);
                 AbstractExpression elemExpr = matscan.getOutputExpression();
                 assert(elemExpr != null);
                 // Replace the IN LIST condition in the end expression referencing all the list elements
                 // with a more efficient equality filter referencing the TVE for each element in turn.
-                replaceInListFilterWithEqualityFilter(path.endExprs, expr2, elemExpr);
+                replaceInListFilterWithEqualityFilter(path.endExprs, exprRightChild, elemExpr);
                 // Set up the similar VectorValue --> TVE replacement of the search key expression.
-                expr2 = elemExpr;
+                exprRightChild = elemExpr;
             }
-            if (expr2 instanceof AbstractSubqueryExpression) {
+            if (exprRightChild instanceof AbstractSubqueryExpression) {
                 // The AbstractSubqueryExpression must be wrapped up into a
                 // ScalarValueExpression which extracts the actual row/column from
                 // the subquery
@@ -1599,7 +1601,9 @@ public abstract class SubPlanAssembler {
                 // DEAD CODE with the guards on index: ENG-8203
                 assert(false);
             }
-            scanNode.addSearchKeyExpression(expr2);
+            scanNode.addSearchKeyExpression(exprRightChild);
+            // If the index expression is an "IS NOT DISTINCT FROM" comparison, let the NULL values go through. (ENG-11096)
+            scanNode.addCompareNotDistinctFlag(expr.getExpressionType() == ExpressionType.COMPARE_NOTDISTINCT);
         }
         // create the IndexScanNode with all its metadata
         scanNode.setLookupType(path.lookupType);
