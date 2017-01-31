@@ -1614,10 +1614,10 @@ public class DDLCompiler {
         HashMap<String, Column> columnMap = new HashMap<String, Column>();
         HashMap<String, Index> indexMap = new HashMap<String, Index>();
 
-        String name = node.attributes.get("name");
+        final String name = node.attributes.get("name");
 
         // create a table node in the catalog
-        Table table = db.getTables().add(name);
+        final Table table = db.getTables().add(name);
         // set max value before return for view table
         table.setTuplelimit(Integer.MAX_VALUE);
 
@@ -1626,21 +1626,21 @@ public class DDLCompiler {
         table.setAnnotation(annotation);
 
         // handle the case where this is a materialized view
-        String query = node.attributes.get("query");
+        final String query = node.attributes.get("query");
         if (query != null) {
             assert(query.length() > 0);
             m_matViewMap.put(table, query);
         }
-        boolean isStream = (node.attributes.get("stream") != null);
-        String streamTarget = node.attributes.get("export");
-        String streamPartitionColumn = node.attributes.get("partitioncolumn");
+        final boolean isStream = (node.attributes.get("stream") != null);
+        final String streamTarget = node.attributes.get("export");
+        final String streamPartitionColumn = node.attributes.get("partitioncolumn");
         // all tables start replicated
         // if a partition is found in the project file later,
         //  then this is reversed
         table.setIsreplicated(true);
 
         // map of index replacements for later constraint fixup
-        Map<String, String> indexReplacementMap = new TreeMap<String, String>();
+        final Map<String, String> indexReplacementMap = new TreeMap<String, String>();
 
         // Need the columnTypes sorted by column index.
         SortedMap<Integer, VoltType> columnTypes = new TreeMap<Integer, VoltType>();
