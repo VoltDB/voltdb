@@ -1036,38 +1036,31 @@ public class DDLCompiler {
                     }
                 }
             }
-
+            VoltXMLElement tableXML = m_schema.findChild("table", tableName.toUpperCase());
+            if (tableXML != null) {
+                tableXML.attributes.put("stream", "true");
+            } else {
+                throw m_compiler.new VoltCompilerException(String.format(
+                        "Invalid STREAM statement: table %s does not exist", tableName));
+            }
             // process partition if specified
             if (columnName != null) {
-                VoltXMLElement tableXML = m_schema.findChild("table", tableName.toUpperCase());
-                if (tableXML != null) {
-                    tableXML.attributes.put("partitioncolumn", columnName.toUpperCase());
-                    // Column validity check done by VoltCompiler in post-processing
+                tableXML.attributes.put("partitioncolumn", columnName.toUpperCase());
+                // Column validity check done by VoltCompiler in post-processing
 
-                    // mark the table as dirty for the purposes of caching sql statements
-                    m_compiler.markTableAsDirty(tableName);
-                }
-                else {
-                    throw m_compiler.new VoltCompilerException(String.format(
-                            "Invalid PARTITION statement: table %s does not exist", tableName));
-                }
+                // mark the table as dirty for the purposes of caching sql statements
+                m_compiler.markTableAsDirty(tableName);
             }
 
             // process export
             targetName = (targetName != null) ? checkIdentifierStart(
                     targetName, statement) : Constants.DEFAULT_EXPORT_CONNECTOR_NAME;
 
-            VoltXMLElement tableXML = m_schema.findChild("table", tableName.toUpperCase());
-            if (tableXML != null) {
-                if (tableXML.attributes.containsKey("drTable") && tableXML.attributes.get("drTable").equals("ENABLE")) {
-                    throw m_compiler.new VoltCompilerException(String.format(
-                            "Invalid CREATE STREAM statement: table %s is a DR table.", tableName));
-                } else {
-                    tableXML.attributes.put("export", targetName);
-                }
-            } else {
+            if (tableXML.attributes.containsKey("drTable") && "ENABLE".equals(tableXML.attributes.get("drTable"))) {
                 throw m_compiler.new VoltCompilerException(String.format(
-                        "Invalid CREATE STREAM statement: table %s was not present in the catalog.", tableName));
+                        "Invalid CREATE STREAM statement: table %s is a DR table.", tableName));
+            } else {
+                tableXML.attributes.put("export", targetName);
             }
         } else {
             throw m_compiler.new VoltCompilerException(String.format("Invalid CREATE STREAM statement: \"%s\", "
@@ -1621,10 +1614,10 @@ public class DDLCompiler {
         HashMap<String, Column> columnMap = new HashMap<String, Column>();
         HashMap<String, Index> indexMap = new HashMap<String, Index>();
 
-        String name = node.attributes.get("name");
+        final String name = node.attributes.get("name");
 
         // create a table node in the catalog
-        Table table = db.getTables().add(name);
+        final Table table = db.getTables().add(name);
         // set max value before return for view table
         table.setTuplelimit(Integer.MAX_VALUE);
 
@@ -1633,19 +1626,21 @@ public class DDLCompiler {
         table.setAnnotation(annotation);
 
         // handle the case where this is a materialized view
-        String query = node.attributes.get("query");
+        final String query = node.attributes.get("query");
         if (query != null) {
             assert(query.length() > 0);
             m_matViewMap.put(table, query);
         }
-
+        final boolean isStream = (node.attributes.get("stream") != null);
+        final String streamTarget = node.attributes.get("export");
+        final String streamPartitionColumn = node.attributes.get("partitioncolumn");
         // all tables start replicated
         // if a partition is found in the project file later,
         //  then this is reversed
         table.setIsreplicated(true);
 
         // map of index replacements for later constraint fixup
-        Map<String, String> indexReplacementMap = new TreeMap<String, String>();
+        final Map<String, String> indexReplacementMap = new TreeMap<String, String>();
 
         // Need the columnTypes sorted by column index.
         SortedMap<Integer, VoltType> columnTypes = new TreeMap<Integer, VoltType>();
@@ -1766,8 +1761,7 @@ public class DDLCompiler {
         } else {
             // Get the final DDL for the table rebuilt from the catalog object
             // Don't need a real StringBuilder or export state to get the CREATE for a table
-            annotation.ddl = CatalogSchemaTools.toSchema(new StringBuilder(),
-                    table, query, CatalogUtil.isTableExportOnly(db, table), null);
+            annotation.ddl = CatalogSchemaTools.toSchema(new StringBuilder(), table, query, isStream, streamPartitionColumn, streamTarget);
         }
     }
 
