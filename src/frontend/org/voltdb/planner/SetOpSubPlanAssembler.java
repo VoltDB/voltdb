@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -91,7 +91,7 @@ class SetOpSubPlanAssembler extends SubPlanAssembler {
 
         m_setOpPrtitioning = null;
         for (AbstractParsedStmt parsedChildStmt : parsedSetOpStmt.m_children) {
-            StatementPartitioning partitioning = (StatementPartitioning) m_partitioning.clone();
+            StatementPartitioning partitioning = m_partitioning.clone();
             PlanSelector planSelector = (PlanSelector) m_planSelector.clone();
             planSelector.m_planId = planId;
             PlanAssembler assembler = new PlanAssembler(

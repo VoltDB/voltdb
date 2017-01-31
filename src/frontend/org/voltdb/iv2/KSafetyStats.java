@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -20,6 +20,7 @@ package org.voltdb.iv2;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.NavigableSet;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.voltdb.StatsSource;
 import org.voltdb.VoltTable.ColumnInfo;
@@ -29,11 +30,12 @@ import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
 
 public class KSafetyStats extends StatsSource {
-    private volatile NavigableSet<StatsPoint> m_kSafetySet;
+    private final AtomicReference<NavigableSet<StatsPoint>> m_kSafetySet;
 
     public KSafetyStats() {
         super(false);
-        m_kSafetySet = ImmutableSortedSet.<StatsPoint>of();
+        NavigableSet<StatsPoint> empty = ImmutableSortedSet.<StatsPoint>of();
+        m_kSafetySet = new AtomicReference<>(empty);
     }
 
     public static interface Constants {
@@ -43,12 +45,13 @@ public class KSafetyStats extends StatsSource {
     }
 
     NavigableSet<StatsPoint> getSafetySet() {
-        return m_kSafetySet;
+        return m_kSafetySet.get();
     }
 
-    void setSafetySet(NavigableSet<StatsPoint> kSafetySet) {
+    boolean setSafetySet(NavigableSet<StatsPoint> kSafetySet) {
         Preconditions.checkArgument(kSafetySet != null, "specified null map");
-        this.m_kSafetySet = kSafetySet;
+        final NavigableSet<StatsPoint> expect = m_kSafetySet.get();
+        return m_kSafetySet.compareAndSet(expect, kSafetySet);
     }
 
     @Override
@@ -70,7 +73,7 @@ public class KSafetyStats extends StatsSource {
     @SuppressWarnings("unchecked")
     protected Iterator<Object> getStatsRowKeyIterator(boolean interval) {
         @SuppressWarnings("rawtypes")
-        Iterator iter = m_kSafetySet.iterator();
+        Iterator iter = m_kSafetySet.get().iterator();
         return (Iterator<Object>)iter;
     }
 
@@ -85,15 +88,15 @@ public class KSafetyStats extends StatsSource {
             this.missingCount = missingCount;
         }
 
-        long getTimestamp() {
+        public long getTimestamp() {
             return timestamp;
         }
 
-        int getPartitionId() {
+        public int getPartitionId() {
             return partitionId;
         }
 
-        int getMissingCount() {
+        public int getMissingCount() {
             return missingCount;
         }
 

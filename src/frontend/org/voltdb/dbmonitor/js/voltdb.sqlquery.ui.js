@@ -10,13 +10,14 @@ var isMobile = false; //initiate as false
 // device detection
 if(/(android|bb\d+|meego).+mobile|avantgo|bada\/|blackberry|blazer|compal|elaine|fennec|hiptop|iemobile|ip(hone|od)|iris|kindle|Android|Silk|lge |maemo|midp|mmp|netfront|opera m(ob|in)i|palm( os)?|phone|p(ixi|re)\/|plucker|pocket|psp|series(4|6)0|symbian|treo|up\.(browser|link)|vodafone|wap|windows (ce|phone)|xda|xiino/i.test(navigator.userAgent)
     || /1207|6310|6590|3gso|4thp|50[1-6]i|770s|802s|a wa|abac|ac(er|oo|s\-)|ai(ko|rn)|al(av|ca|co)|amoi|an(ex|ny|yw)|aptu|ar(ch|go)|as(te|us)|attw|au(di|\-m|r |s )|avan|be(ck|ll|nq)|bi(lb|rd)|bl(ac|az)|br(e|v)w|bumb|bw\-(n|u)|c55\/|capi|ccwa|cdm\-|cell|chtm|cldc|cmd\-|co(mp|nd)|craw|da(it|ll|ng)|dbte|dc\-s|devi|dica|dmob|do(c|p)o|ds(12|\-d)|el(49|ai)|em(l2|ul)|er(ic|k0)|esl8|ez([4-7]0|os|wa|ze)|fetc|fly(\-|_)|g1 u|g560|gene|gf\-5|g\-mo|go(\.w|od)|gr(ad|un)|haie|hcit|hd\-(m|p|t)|hei\-|hi(pt|ta)|hp( i|ip)|hs\-c|ht(c(\-| |_|a|g|p|s|t)|tp)|hu(aw|tc)|i\-(20|go|ma)|i230|iac( |\-|\/)|ibro|idea|ig01|ikom|im1k|inno|ipaq|iris|ja(t|v)a|jbro|jemu|jigs|kddi|keji|kgt( |\/)|klon|kpt |kwc\-|kyo(c|k)|le(no|xi)|lg( g|\/(k|l|u)|50|54|\-[a-w])|libw|lynx|m1\-w|m3ga|m50\/|ma(te|ui|xo)|mc(01|21|ca)|m\-cr|me(rc|ri)|mi(o8|oa|ts)|mmef|mo(01|02|bi|de|do|t(\-| |o|v)|zz)|mt(50|p1|v )|mwbp|mywa|n10[0-2]|n20[2-3]|n30(0|2)|n50(0|2|5)|n7(0(0|1)|10)|ne((c|m)\-|on|tf|wf|wg|wt)|nok(6|i)|nzph|o2im|op(ti|wv)|oran|owg1|p800|pan(a|d|t)|pdxg|pg(13|\-([1-8]|c))|phil|pire|pl(ay|uc)|pn\-2|po(ck|rt|se)|prox|psio|pt\-g|qa\-a|qc(07|12|21|32|60|\-[2-7]|i\-)|qtek|r380|r600|raks|rim9|ro(ve|zo)|s55\/|sa(ge|ma|mm|ms|ny|va)|sc(01|h\-|oo|p\-)|sdk\/|se(c(\-|0|1)|47|mc|nd|ri)|sgh\-|shar|sie(\-|m)|sk\-0|sl(45|id)|sm(al|ar|b3|it|t5)|so(ft|ny)|sp(01|h\-|v\-|v )|sy(01|mb)|t2(18|50)|t6(00|10|18)|ta(gt|lk)|tcl\-|tdg\-|tel(i|m)|tim\-|t\-mo|to(pl|sh)|ts(70|m\-|m3|m5)|tx\-9|up(\.b|g1|si)|utst|v400|v750|veri|vi(rg|te)|vk(40|5[0-3]|\-v)|vm40|voda|vulc|vx(52|53|60|61|70|80|81|83|85|98)|w3c(\-| )|webc|whit|wi(g |nc|nw)|wmlb|wonu|x700|yas\-|your|zeto|zte\-/i.test(navigator.userAgent.substr(0,4))) isMobile = true;
+    var is_iPad = navigator.userAgent.match(/iPad/i) != null;
 $(document).ready(function () {
 
     function CheckBrowser() {
         if ('localStorage' in window && window['localStorage'] !== null) {
             return true;
         } else {
-             return false;
+            return false;
         }
     }
     CheckBrowser();
@@ -43,7 +44,6 @@ $(document).ready(function () {
         } else {
             $("#inputQuery").width("100%")
         }
-
     }
 
     var addEvent = function(object, type, callback) {
@@ -60,23 +60,23 @@ $(document).ready(function () {
     var lock;
     addEvent(window, "resize", function() {
         fixWidth()
-         clearTimeout(lock);
-      lock = setTimeout(refreshSplit, 100);
+        clearTimeout(lock);
+        lock = setTimeout(refreshSplit, 100);
     });
 
     fixWidth()
 
-     var refreshSplit = function() {
-      var mousedown = new CustomEvent('mousedown');
-      var mousemove = new CustomEvent('mousemove', {bubbles: true});
-      var mouseup = new CustomEvent('mouseup', {bubbles: true});
-      var gutter = document.querySelector('.gutter-horizontal');
+    var refreshSplit = function() {
+        var mousedown = new CustomEvent('mousedown');
+        var mousemove = new CustomEvent('mousemove', {bubbles: true});
+        var mouseup = new CustomEvent('mouseup', {bubbles: true});
+        var gutter = document.querySelector('.gutter-horizontal');
 
-      mousemove.clientX = gutter.getBoundingClientRect().left;
+        mousemove.clientX = gutter.getBoundingClientRect().left;
 
-      gutter.dispatchEvent(mousedown);
-      gutter.dispatchEvent(mousemove);
-      gutter.dispatchEvent(mouseup);
+        gutter.dispatchEvent(mousedown);
+        gutter.dispatchEvent(mousemove);
+        gutter.dispatchEvent(mouseup);
     };
     
     $("#bntTimeoutSetting").popup({
@@ -104,7 +104,7 @@ $(document).ready(function () {
                 var timeoutTime = $("#txtQueryTimeoutConfig").val();
                 if(timeoutTime == ""){
                     SQLQueryRender.removeCookie("timeoutTime")
-                }else{
+                } else {
                     SQLQueryRender.SaveQueryTimeout(timeoutTime);
                 }
                 displayQueryTimeout();
@@ -145,7 +145,6 @@ $(document).ready(function () {
             return;
         }
     });
-
 
     $('#btnSaveQueryConfirmation').popup({
         open: function (event, ui, ele) {
@@ -257,12 +256,12 @@ $(document).ready(function () {
     }
 
     var saveQueryTabToLocalStorage = function(orderedData, orgQueryData, newTabName, oldTabName, element_id){
-        try{
+        try {
             localStorage.queries = JSON.stringify(orderedData)
             $('#qTab-' + element_id).find('a').html(newTabName)
             $('#qTab-' + element_id).data('isold', true)
             deleteQueryFromGlobal(oldTabName)
-        } catch(e){
+        } catch(e) {
             errorMsg = "Cannot save the current tab." + (e.message != undefined ? ' \nError: "' + e.message + '".' : '')
             if(navigator.userAgent.indexOf('Mozilla') != -1 && navigator.userAgent.indexOf('Firefox') != -1){
                 if(e.code != undefined && e.code == '1014'){
@@ -448,8 +447,6 @@ $(document).ready(function () {
         return false;
     });
 
-
-
     // Table Accordion	
     $('#accordionTable').accordion({
         collapsible: true,
@@ -582,7 +579,6 @@ $(document).ready(function () {
     else
         SQLQueryRender.loadSavedQueries();
 
-
     $('#worktabs').tabs({ activate: function(event ,ui){
         var counter = ui.newTab.attr('id').split('-')[1];
 
@@ -596,11 +592,7 @@ $(document).ready(function () {
                 })
             }
         }
-
-
-    }
-
-    });
+    }});
 });
 
 (function (window) {
@@ -655,7 +647,6 @@ $(document).ready(function () {
                 queryData = SQLQueryRender.getOrderedData(unOrderedData)
             }
 
-
             $.each( queryData, function( key, value ) {
                 SQLQueryRender.createQueryTab(key.split('_')[1], value)
             });
@@ -708,8 +699,7 @@ $(document).ready(function () {
                     '" href="#closeTabConfirmation" title="Close Tab">Close</div></li>'
             }
 
-
-           var html_body = '<div class="verticalWrapper"><div id="querybox-'+tab_counter+'" class="querybox-'+tab_counter+' querybox split split-vertical" contenteditable></div>'
+            var html_body = '<div class="verticalWrapper"><div id="querybox-'+tab_counter+'" class="querybox-'+tab_counter+' querybox split split-vertical" contenteditable></div>'
             var html_query = '<div class="blockWrapper split split-vertical" id="blockContainer'+tab_counter+'">' +
                              '   <div class="exportType">' +
                              '<form name="" id="queryResult-'+tab_counter+'">' +
@@ -722,10 +712,9 @@ $(document).ready(function () {
                              '</div>';
 
             if(!isMobile){
-            html_query = html_query + '<h1 class="theHeading"><span class="icon-queryResult"></span><span class="queryResultStyle">Query Result</span><div id="queryResults-'+tab_counter+'" class="queryStatus"></div><div class="clear"></div></h1>';
-            }
-            else{
-            html_query = html_query + '<h1 class="theHeading"><span class="icon-queryResult"></span><span class="queryResultStyle">Query Result</span></h1>';
+                html_query = html_query + '<h1 class="theHeading"><span class="icon-queryResult"></span><span class="queryResultStyle">Query Result</span><div id="queryResults-'+tab_counter+'" class="queryStatus"></div><div class="clear"></div></h1>';
+            } else {
+                html_query = html_query + '<h1 class="theHeading"><span class="icon-queryResult"></span><span class="queryResultStyle">Query Result</span></h1>';
             }
 
             html_query = html_query + '<div id="queryWrapper-'+tab_counter+'" class="queryWrapper">' +
@@ -737,9 +726,8 @@ $(document).ready(function () {
                  '</div>' +
                  '</div>';
 
-
             if(isMobile){
-            html_query = html_query + '<div id="queryResults-'+tab_counter+'" class="queryStatus"></div><div class="clear"></div>';
+                html_query = html_query + '<div id="queryResults-'+tab_counter+'" class="queryStatus"></div><div class="clear"></div>';
             }
 
             html_query = html_query + '</div></div>';
@@ -749,7 +737,6 @@ $(document).ready(function () {
             $('#worktabs').append('<div id="q-'+tab_counter+'" >' + html_body + html_query + '</div>')
             $('#querybox-'+tab_counter).text(tabQuery == undefined ? '' : tabQuery)
             SQLQueryRender.addQueryBtn(tab_counter)
-
 
 
             $('#exportType-' + tab_counter).change(function () {
@@ -770,6 +757,7 @@ $(document).ready(function () {
                     $('#resultCsv-'+ tab_id).css('display', 'none');
                 }
             });
+
             $('#resultHtml-'+ tab_counter).css('display', 'block');
             $('#resultCsv-'+ tab_counter).css('display', 'none');
             $('#resultMonospace-'+ tab_counter).css('display', 'none');
@@ -777,21 +765,23 @@ $(document).ready(function () {
             $("#new-query").unbind('click')
             $("#new-query").on('click', function() {
                 SQLQueryRender.createQueryTab()
-
                 tab_counter = tab_counter - 1
-                 if($("#querybox-" + tab_counter).parent().find(".gutter").length == 0){
-                     if(isMobile == false){
-                         Split(['#querybox-' + tab_counter, '#blockContainer'+ tab_counter], {
-                                direction: 'vertical',
-                                sizes: [30, 70],
-                                gutterSize: 15,
-                                minSize: [120, 150]
-                            })
-                        }
+
+                if($("#querybox-" + tab_counter).parent().find(".gutter").length != 0){
+                    $("#querybox-" + tab_counter).parent().find(".gutter").remove()
+                }
+
+                if($("#querybox-" + tab_counter).parent().find(".gutter").length == 0){
+                    if(isMobile == false){
+                        VoltDbUI.vars['gutterInstanceVer' + tab_counter] = Split(['#querybox-' + tab_counter, '#blockContainer'+ tab_counter], {
+                            direction: 'vertical',
+                            sizes: [30, 70],
+                            gutterSize: 15,
+                            minSize: [120, 150]
+                        })
                     }
-
+                }
             });
-
 
             $('#close-tab-' + tab_counter).unbind('click')
             $('#close-tab-' + tab_counter).click(function() {
@@ -803,21 +793,19 @@ $(document).ready(function () {
             $tabs.tabs( "refresh");
             $tabs.tabs( "option", "active", $('#worktabs ul li').length - 2);
             $tabs.tabs({
-              activate: function( event, ui ) {
-                tab_id = ui.newTab.attr('id').split('-')[1]
-                SQLQueryRender.ShowQueryBtnById(tab_id)
-              }
+                activate: function( event, ui ) {
+                    tab_id = ui.newTab.attr('id').split('-')[1]
+                    SQLQueryRender.ShowQueryBtnById(tab_id)
+                }
             });
+
             if(tabName == undefined){
                 SQLQueryRender.queryNameList.push(tabName == undefined ? 'Query' + tab_counter : tabName)
             }
 
-
-
             tab_counter++
             this.showHideNewTab()
             SQLQueryRender.enableDisableCrossTab()
-
         }
 
         this.addQueryBtn = function(tab_id){
@@ -842,7 +830,6 @@ $(document).ready(function () {
                     var queryUI = new QueryUI($($('#worktabs div.ui-tabs-panel')[$tabs.tabs('option','active')]))
                     queryUI.execute();
                 }
-
             });
 
             $('#clearQuery-' + tab_id).unbind('click')
@@ -883,7 +870,6 @@ $(document).ready(function () {
                 $('#liNewQuery').show()
         }
 
-
         this.saveConnectionKey = function (useAdminPort) {
             var server = SQLQueryRender.server == null ? VoltDBConfig.GetDefaultServerNameForKey() : $.trim(SQLQueryRender.server);
             var user = SQLQueryRender.userName == '' ? null : SQLQueryRender.userName;
@@ -906,9 +892,7 @@ $(document).ready(function () {
                 var procedureColumns = procedureColumnsData['procedureColumns'];
                 var sysProcedure = sysProcedureData['sysProcedures'];
                 populateStoredProcedure(procedures, procedureColumns, sysProcedure);
-
                 toggleSpinner(false);
-
             });
             voltDbRenderer.GetTableInformationClientPort();
         };
@@ -1028,9 +1012,7 @@ $(document).ready(function () {
                     src += '<li class="returnValue">Return Table[]</li>';
                     src += '</ul>';
                     src += '</div>';
-
                 }
-
             }
             var defSrcHeader = "";
             defSrcHeader += '<h3 class="systemHeader">Default Stored Procedures</h3>';
@@ -1045,7 +1027,6 @@ $(document).ready(function () {
             var userSrc = userProcHeader + (src != '' ? src : '<div style="font-size:12px">No user defined stored procedures found.</div>') + userProcFooter;
 
             $('#accordionProcedures').html(sysScr + defSrc + userSrc);
-            
             $('#accordionProcedures').accordion("refresh");
             $('#systemProcedure').accordion({
                 collapsible: true,
@@ -1134,7 +1115,6 @@ $(document).ready(function () {
                     return false; // Cancels the default action
                 }
             });
-
         };
 
         var populateStreamedTablesData = function (tables) {
@@ -1176,9 +1156,7 @@ $(document).ready(function () {
                 $("#tabScroller").css("height", "");
                 $(".slimScrollBar").css('z-index', '-9999');
                 $("#sqlQueryOverlay").show();
-
             }
-
         };
 
         this.SaveQueryTimeout = function(timeoutTime){
@@ -1213,7 +1191,6 @@ function loadSQLQueryPage(serverName, portid, userName) {
             SQLQueryRender.useAdminPortCancelled = false;
         },
         afterOpen: function () {
-
             var popup = $(this)[0];
             $("#btnQueryDatabasePausedErrorOk").unbind("click");
             $("#btnQueryDatabasePausedErrorOk").on("click", function () {
@@ -1416,9 +1393,7 @@ function loadSQLQueryPage(serverName, portid, userName) {
                 src += '<li class="returnValue">Return Table[]</li>';
                 src += '</ul>';
                 src += '</div>';
-
             }
-
         }
         var defSrcHeader = "";
         defSrcHeader += '<h3 class="systemHeader">Default Stored Procedures</h3>';
@@ -1485,7 +1460,6 @@ function loadSQLQueryPage(serverName, portid, userName) {
                 return false; // Cancels the default action
             }
         });
-
     };
 
     var populateTablesAndViews = function () {
@@ -1503,9 +1477,6 @@ function loadSQLQueryPage(serverName, portid, userName) {
         });
     };
     populateTablesAndViews();
-
-
-
     $("#overlay").hide();
 }
 

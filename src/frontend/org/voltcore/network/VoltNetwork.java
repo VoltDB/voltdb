@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -43,7 +43,7 @@
  */
 
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -61,6 +61,7 @@
 
 package org.voltcore.network;
 
+import com.google_voltpatches.common.util.concurrent.SettableFuture;
 import io.netty_voltpatches.NinjaKeySet;
 
 import java.io.IOException;
@@ -548,9 +549,15 @@ class VoltNetwork implements Runnable, IOStatsIntf
         return m_numPorts.get();
     }
 
-    public Set<Connection> getConnections() {
-        Set<Connection> conns = new HashSet<>();
-        conns.addAll(m_ports);
-        return conns;
+    public Future<Set<Connection>> getConnections() {
+        final SettableFuture<Set<Connection>> connectionsFuture = SettableFuture.create();
+        queueTask(new Runnable() {
+            @Override
+            public void run() {
+                // Make a copy of m_ports to avoid concurrent modification
+                connectionsFuture.set(new HashSet<Connection>(m_ports));
+            }
+        });
+        return connectionsFuture;
     }
 }

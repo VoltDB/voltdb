@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -86,6 +86,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         if (m_tableScan != null) {
             if (m_tableScan instanceof StmtTargetTableScan) {
                 tablesRead.put(m_targetTableName, (StmtTargetTableScan)m_tableScan);
+                getTablesAndIndexesFromSubqueries(tablesRead, indexes);
             } else {
                 assert(m_tableScan instanceof StmtSubqueryScan);
                 getChild(0).getTablesAndIndexes(tablesRead, indexes);

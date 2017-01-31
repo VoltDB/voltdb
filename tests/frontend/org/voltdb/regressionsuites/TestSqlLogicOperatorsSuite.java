@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -185,6 +185,15 @@ public class TestSqlLogicOperatorsSuite extends RegressionSuite {
         results =
             client.callProcedure("@AdHoc", "select count(*) from p2 where (id > 9 and num = 1) or (id < 10 and num = 0)").getResults();
         assertEquals(10, results[0].asScalarLong());
+    }
+
+    public void testInvalidRightOperand() throws IOException, ProcCallException
+    {
+        // ENG-11172
+        Client client = getClient();
+        String sql = "SELECT * FROM T_ENG_11172 WHERE NOT NOW <> TIME %s CONCAT ('B') = 'K%%X';";
+        verifyStmtFails(client, String.format(sql, "AND"), "unexpected token: \\)");
+        verifyStmtFails(client, String.format(sql, "OR"), "unexpected token: \\)");
     }
 
     //

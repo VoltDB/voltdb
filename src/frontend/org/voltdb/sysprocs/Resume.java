@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -34,6 +34,7 @@ import org.voltdb.VoltDBInterface;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltZK;
+import org.voltdb.snmp.SnmpTrapSender;
 
 @ProcInfo(singlePartition = false)
 
@@ -88,7 +89,11 @@ public class Resume extends VoltSystemProcedure {
 
                 voltdb.getHostMessenger().unpause();
                 voltdb.setMode(RUNNING);
-
+                // for snmp
+                SnmpTrapSender snmp = voltdb.getSnmpTrapSender();
+                if (snmp != null) {
+                    snmp.resume("Cluster resumed.");
+                }
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }

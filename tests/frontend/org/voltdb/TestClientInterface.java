@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -225,7 +225,7 @@ public class TestClientInterface {
 
         byte[] bytes = MiscUtils.fileToBytes(cat);
         String serializedCat =
-            CatalogUtil.getSerializedCatalogStringFromJar(CatalogUtil.loadAndUpgradeCatalogFromJar(bytes).getFirst());
+            CatalogUtil.getSerializedCatalogStringFromJar(CatalogUtil.loadAndUpgradeCatalogFromJar(bytes, false).getFirst());
         assertNotNull(serializedCat);
         Catalog catalog = new Catalog();
         catalog.execute(serializedCat);
@@ -233,7 +233,7 @@ public class TestClientInterface {
         String deploymentPath = builder.getPathToDeployment();
         CatalogUtil.compileDeployment(catalog, deploymentPath, false);
         DbSettings dbSettings = CatalogUtil.asDbSettings(deploymentPath);
-        m_context = new CatalogContext(0, 0, catalog, dbSettings, bytes, null, new byte[] {}, 0);
+        m_context = new CatalogContext(0, 0, catalog, dbSettings, bytes, null, new byte[] {}, 0, mock(HostMessenger.class));
         TheHashinator.initialize(TheHashinator.getConfiguredHashinatorClass(), TheHashinator.getConfigureBytes(3));
     }
 

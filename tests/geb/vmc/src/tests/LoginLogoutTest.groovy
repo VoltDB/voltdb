@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -31,7 +31,7 @@ import geb.Page;
 
 class LoginLogoutTest extends TestBase {
 
-    def "Login Test Valid Username and Password"() {
+    def verifyLoginWithValidUsernameAndPassword() {
         int count = 0
         boolean status = false
         setup: 'Open VMC page'
@@ -48,45 +48,37 @@ class LoginLogoutTest extends TestBase {
         waitFor(waitTime) { page.overview.securityValue.isDisplayed() }
         String security = page.overview.securityValue.text();
         then:
-        if(page.overview.securityValue.text().equals("Off"))
-        {
+        if(page.overview.securityValue.text().equals("Off")) {
             println("PASS")
         }
-
-
-
-       if(security=="On")
-       {
-           while(count<numberOfTrials) {
-               count++
-               try {
-                   when:
-                   waitFor(waitTime) {
-                       page.header.logout.click()
-                       page.header.logoutPopupOkButton.isDisplayed()
-                   }
-
-                   waitFor(waitTime) {
-                       page.header.logoutPopupOkButton.click()
-                       !page.header.logoutPopupOkButton.isDisplayed()
-                   }
-
-                   page.loginValid()
-
-                   then:
-                   at VoltDBManagementCenterPage
-                   status = true
-                   break
-               } catch(geb.waiting.WaitTimeoutException e) {
-                   to VoltDBManagementCenterPage
-                   println("Wait Timeout Exception: Retrying")
-                   status = false
-               } catch(org.openqa.selenium.StaleElementReferenceException e) {
-                   to VoltDBManagementCenterPage
-                   println("Stale Element Exception: Retrying")
-                   status = false
-               }
-           }
+        if(security=="On") {
+            while(count<numberOfTrials) {
+                count++
+                try {
+                    when:
+                    waitFor(waitTime) {
+                        page.header.logout.click()
+                        page.header.logoutPopupOkButton.isDisplayed()
+                    }
+                    waitFor(waitTime) {
+                        page.header.logoutPopupOkButton.click()
+                        !page.header.logoutPopupOkButton.isDisplayed()
+                    }
+                    page.loginValid()
+                    then:
+                    at VoltDBManagementCenterPage
+                    status = true
+                    break
+                } catch(geb.waiting.WaitTimeoutException e) {
+                    to VoltDBManagementCenterPage
+                    println("Wait Timeout Exception: Retrying")
+                    status = false
+                } catch(org.openqa.selenium.StaleElementReferenceException e) {
+                    to VoltDBManagementCenterPage
+                    println("Stale Element Exception: Retrying")
+                    status = false
+                }
+            }
 
            if(status == true) {
                println("Login Test Valid Username and Password:PASS")
@@ -106,11 +98,9 @@ class LoginLogoutTest extends TestBase {
 //        to VoltDBManagementCenterPage
 //        expect: 'to be on VMC page'
 //        at VoltDBManagementCenterPage
-
-
     }
 
-    def "Login Test Invalid Username and Password"() {
+    def verityLoginWithInvalidUsernameAndPassword() {
         int count = 0
         boolean status = false
 
@@ -128,15 +118,11 @@ class LoginLogoutTest extends TestBase {
         waitFor(waitTime) { page.overview.securityValue.isDisplayed() }
         String security = page.overview.securityValue.text();
         then:
-        if(page.overview.securityValue.text().equals("Off"))
-        {
+        if(page.overview.securityValue.text().equals("Off")) {
             println("PASS")
         }
 
-
-
-        if(security=="On")
-        {
+        if(security=="On") {
             while(count<numberOfTrials) {
                 count++
                 try {
@@ -184,7 +170,7 @@ class LoginLogoutTest extends TestBase {
         }
     }
 
-    def "Login Test Blank Username and Password"() {
+    def verifyLoginWithBlankUsernameAndPassword() {
         int count = 0
         boolean status = false
 
@@ -202,15 +188,11 @@ class LoginLogoutTest extends TestBase {
         waitFor(waitTime) { page.overview.securityValue.isDisplayed() }
         String security = page.overview.securityValue.text();
         then:
-        if(page.overview.securityValue.text().equals("Off"))
-        {
+        if(page.overview.securityValue.text().equals("Off")) {
             println("PASS")
         }
 
-
-
-        if(security=="On")
-        {
+        if(security=="On") {
             while(count<numberOfTrials) {
                 count++
                 try {
@@ -256,8 +238,5 @@ class LoginLogoutTest extends TestBase {
                 assert false
             }
         }
-
-
     }
-
 }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -56,7 +56,7 @@ class AdminExportTest extends TestBase {
         }
     }
 
-    def "Check export Click and check its value"() {
+    def checkExportClickAndCheckItsValue() {
         when:
         waitFor(waitTime) { page.exportbtn.isDisplayed() }
         page.exportbtn.click()
@@ -70,7 +70,7 @@ class AdminExportTest extends TestBase {
         page.exportbtn.click()
     }
 
-    def VerifyErrormessagesofAddConfigurationforFILE() {
+    def verifyErrormessagesofAddConfigurationforFILE() {
         when:
         if (page.overview.addconfig.isDisplayed()) {
             when: 'Open Add ConfigurationPopup'
@@ -106,7 +106,7 @@ class AdminExportTest extends TestBase {
             println("passed")
     }
 
-    def VerifyErrorMessagesofAddConfigurationforJDBC() {
+    def verifyErrorMessagesofAddConfigurationforJDBC() {
         when:
         if (page.overview.addconfig.isDisplayed()) {
             when: 'Open Add ConfigurationPopup'
@@ -139,7 +139,7 @@ class AdminExportTest extends TestBase {
         println("passed")
     }
 
-    def VerifyErrormessagesofAddConfigurationforKAFKA() {
+    def verifyErrormessagesofAddConfigurationforKAFKA() {
         when:
         if (page.overview.addconfig.isDisplayed()) {
             when: 'Open Add ConfigurationPopup'
@@ -170,7 +170,7 @@ class AdminExportTest extends TestBase {
     }
 
 
-    def VerifyErrormessagesofAddConfigurationforHTTP() {
+    def verifyErrormessagesofAddConfigurationforHTTP() {
         when:
         if (page.overview.addconfig.isDisplayed()) {
             when: 'Open Add ConfigurationPopup'
@@ -200,7 +200,7 @@ class AdminExportTest extends TestBase {
         println("passed")
     }
 
-    def VerifyErrormessagesofAddConfigurationforRABBITMQ() {
+    def verifyErrormessagesofAddConfigurationforRABBITMQ() {
         when:
         if (page.overview.addconfig.isDisplayed()) {
             when: 'Open Add ConfigurationPopup'
@@ -226,7 +226,7 @@ class AdminExportTest extends TestBase {
         println("passed")
     }
 
-    def VerifyErrormessagesofAddConfigurationforRABBITMQamqpuri() {
+    def verifyErrormessagesofAddConfigurationforRABBITMQamqpuri() {
         when:
         if (page.overview.addconfig.isDisplayed()) {
             when: 'Open Add ConfigurationPopup'
@@ -255,7 +255,7 @@ class AdminExportTest extends TestBase {
         println("passed")
     }
 
-    def VerifyErrormessagesofAddConfigurationforCUSTOM() {
+    def verifyErrormessagesofAddConfigurationforCUSTOM() {
         when:
         if (page.overview.addconfig.isDisplayed()) {
             when: 'Open Add ConfigurationPopup'
@@ -280,7 +280,7 @@ class AdminExportTest extends TestBase {
         println("passed")
     }
 
-    def VerifyErrormessagesofAddConfigurationforELASTICSEARCH() {
+    def verifyErrormessagesofAddConfigurationforELASTICSEARCH() {
         when:
         if (page.overview.addconfig.isDisplayed()) {
             when: 'Open Add ConfigurationPopup'
@@ -307,7 +307,7 @@ class AdminExportTest extends TestBase {
     }
 
 
-    def VerifyAddConfigurationforFilecreated() {
+    def verifyAddConfigurationforFilecreated() {
         // String fileTestName     = page.overview.getFileTestName()
         //String fileValueOne     = page.overview.getFileValueOne()
         //String fileValueTwo     = page.overview.getFileValueTwo()
@@ -431,7 +431,7 @@ class AdminExportTest extends TestBase {
         println("passed")
     }
 
-    def VerifyAddConfigurationforJdbcCreated() {
+    def verifyAddConfigurationforJdbcCreated() {
         boolean isPro = false
         String jdbcTestName = page.overview.getJdbcTestName()
         String jdbcValueOne = page.overview.getJdbcValueOne()
@@ -544,7 +544,7 @@ class AdminExportTest extends TestBase {
         println("passed")
     }
 
-    def VerifyAddConfigurationforKafkaCreated() {
+    def verifyAddConfigurationforKafkaCreated() {
 //        when:
 //        if (waitFor(10){page.overview.addconfig.isDisplayed()}) {
 
@@ -655,7 +655,7 @@ class AdminExportTest extends TestBase {
         println("passed")
     }
 
-    def VerifyAddConfigurationforHttpCreated() {
+    def verifyAddConfigurationforHttpCreated() {
         boolean isPro = false
         String httpTestName = page.overview.getHttpTestName()
         String endValue = page.overview.getEndValue()
@@ -763,7 +763,7 @@ class AdminExportTest extends TestBase {
         println("passed")
     }
 
-    def VerifyAddConfigurationforRABBITMQbrokerhostcreated() {
+    def verifyAddConfigurationforRABBITMQbrokerhostcreated() {
         boolean isPro = false
         String rabbitmqBrokerTestName = page.overview.getRabbitmqBrokerTestName()
         String brokerValue = page.overview.getBrokerValue()
@@ -870,7 +870,7 @@ class AdminExportTest extends TestBase {
 
     }
 
-    def VerifyAddConfigurationforRABBITMQamqpuricreated() {
+    def verifyAddConfigurationforRABBITMQamqpuricreated() {
         boolean isPro = false
         String rabbitmqAmqpTestName = page.overview.getRabbitmqAmqpTestName()
         String amqpValue = page.overview.getAmqpValue()
@@ -982,7 +982,7 @@ class AdminExportTest extends TestBase {
         println("passed")
     }
 
-    def VerifyAddConfigurationforCUSTOMcreated() {
+    def verifyAddConfigurationforCUSTOMcreated() {
         boolean isPro = false
         String customTestName = page.overview.getCustomTestName()
         String customConnectorClass = page.overview.getCustomConnectorClass()
@@ -1089,7 +1089,7 @@ class AdminExportTest extends TestBase {
         println("passed")
     }
 
-    def VerifyAddConfigurationforELASTICSEARCHcreated() {
+    def verifyAddConfigurationforELASTICSEARCHcreated() {
         boolean isPro = false
         String elasticSearchTestName     = page.overview.getElasticSearchTestName()
         String elasticSearchValueOne     = page.overview.getElasticSearchValueOne()
@@ -1195,7 +1195,7 @@ class AdminExportTest extends TestBase {
         println("passed")
     }
 
-    def "Verify Add Property in Export Configuration"(){
+    def verifyAddPropertyInExportConfiguration(){
         when:
         if (page.overview.addconfig.isDisplayed()) {
             when: 'Open Add ConfigurationPopup'
@@ -1255,7 +1255,7 @@ class AdminExportTest extends TestBase {
         println("passed")
     }
 
-    def "Verify Error messages of Add Property in Export Configuration"() {
+    def verifyErrorMessagesOfAddPropertyInExportConfiguration() {
         when:
         if (page.overview.addconfig.isDisplayed()) {
             when: 'Open Add ConfigurationPopup'

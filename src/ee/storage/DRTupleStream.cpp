@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -597,7 +597,8 @@ void DRTupleStream::generateDREvent(DREventType type, int64_t lastCommittedSpHan
     }
 
     switch (type) {
-    case CATALOG_UPDATE: {
+    case CATALOG_UPDATE:
+    case DR_STREAM_START: {
         // Make sure current block is empty
         extendBufferChain(0);
         ExportSerializeOutput io(m_currBlock->mutableDataPtr(), m_currBlock->remaining());

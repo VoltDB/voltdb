@@ -16,6 +16,7 @@
 
 package com.google_voltpatches.common.collect;
 
+import com.google_voltpatches.common.annotations.GwtIncompatible;
 import java.util.Collection;
 import java.util.concurrent.BlockingDeque;
 import java.util.concurrent.TimeUnit;
@@ -31,6 +32,10 @@ import java.util.concurrent.TimeUnit;
  * behaviour. In this case, you should override {@code offer} as well, either providing your own
  * implementation, or delegating to the provided {@code standardOffer} method.
  *
+ * <p><b>{@code default} method warning:</b> This class does <i>not</i> forward calls to {@code
+ * default} methods. Instead, it inherits their default implementations. When those implementations
+ * invoke methods, they invoke methods on the {@code ForwardingBlockingDeque}.
+ *
  * <p>
  * The {@code standard} methods are not guaranteed to be thread-safe, even when all of the methods
  * that they depend on are thread-safe.
@@ -38,6 +43,7 @@ import java.util.concurrent.TimeUnit;
  * @author Emily Soldal
  * @since 14.0
  */
+@GwtIncompatible
 public abstract class ForwardingBlockingDeque<E> extends ForwardingDeque<E>
     implements BlockingDeque<E> {
 

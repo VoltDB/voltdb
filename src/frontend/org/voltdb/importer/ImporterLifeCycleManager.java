@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,11 +17,14 @@
 
 package org.voltdb.importer;
 
+import static com.google_voltpatches.common.base.Predicates.not;
+
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -81,9 +84,11 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
      */
     public final void configure(Properties props, FormatterBuilder formatterBuilder)
     {
-        ImmutableMap.Builder<URI, ImporterConfig> builder = new ImmutableMap.Builder<URI, ImporterConfig>().putAll(m_configs);
-        builder.putAll(m_factory.createImporterConfigurations(props, formatterBuilder));
-        m_configs = builder.build();
+        Map<URI, ImporterConfig> configs = m_factory.createImporterConfigurations(props, formatterBuilder);
+        m_configs = new ImmutableMap.Builder<URI, ImporterConfig>()
+                .putAll(configs)
+                .putAll(Maps.filterKeys(m_configs, not(in(configs.keySet()))))
+                .build();
     }
 
     public final int getConfigsCount() {
@@ -304,4 +309,14 @@ public class ImporterLifeCycleManager implements ChannelChangeCallback
             }
         };
     }
+
+    public final static <T> Predicate<T> in(final Set<T> set) {
+        return new Predicate<T>() {
+            @Override
+            public boolean apply(T m) {
+                return set.contains(m);
+            }
+        };
+    }
+
 }

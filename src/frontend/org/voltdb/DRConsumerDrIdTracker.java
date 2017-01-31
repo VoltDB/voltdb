@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -23,10 +23,13 @@ import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.nio.ByteBuffer;
 import java.util.Iterator;
+import java.util.Map;
+import java.util.Map.Entry;
 
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.iv2.UniqueIdGenerator;
 
 import com.google_voltpatches.common.collect.BoundType;
@@ -45,10 +48,10 @@ import com.google_voltpatches.common.collect.TreeRangeSet;
 public class DRConsumerDrIdTracker implements Serializable {
     private static final long serialVersionUID = -4057397384030151271L;
 
-    private transient RangeSet<Long> m_map;
+    private RangeSet<Long> m_map;
     private long m_lastSpUniqueId;
     private long m_lastMpUniqueId;
-    private transient int m_producerPartitionId;
+    private int m_producerPartitionId;
 
     /**
      * Returns a canonical range that can be added to the internal range
@@ -189,6 +192,7 @@ public class DRConsumerDrIdTracker implements Serializable {
     private void writeObject(ObjectOutputStream out) throws IOException {
         out.writeLong(m_lastSpUniqueId);
         out.writeLong(m_lastMpUniqueId);
+        out.writeShort(m_producerPartitionId);
         out.writeInt(m_map.asRanges().size());
         for(Range<Long> entry : m_map.asRanges()) {
             out.writeLong(start(entry));
@@ -200,6 +204,7 @@ public class DRConsumerDrIdTracker implements Serializable {
         m_map = TreeRangeSet.create();
         m_lastSpUniqueId = in.readLong();
         m_lastMpUniqueId = in.readLong();
+        m_producerPartitionId = in.readShort();
         int mapSize = in.readInt();
         for (int ii = 0; ii < mapSize; ii++) {
             m_map.add(range(in.readLong(), in.readLong()));
@@ -382,5 +387,16 @@ public class DRConsumerDrIdTracker implements Serializable {
               .append(DRLogSegmentId.getDebugStringFromDRId(end(entry))).append("] ");
         }
         return sb.toString();
+    }
+
+    public static void debugTraceTracker(VoltLogger log, Map<Integer, Map<Integer, DRConsumerDrIdTracker>> trackers) {
+        if (log.isTraceEnabled()) {
+            for (Entry<Integer, Map<Integer, DRConsumerDrIdTracker>> e1 : trackers.entrySet()) {
+                for (Entry<Integer, DRConsumerDrIdTracker> e2 : e1.getValue().entrySet()) {
+                    log.trace("Tracker for Producer " + e1.getKey() + "'s PID " + e2.getKey() +
+                            " contains " + e2.getValue().toShortString());
+                }
+            }
+        }
     }
 }

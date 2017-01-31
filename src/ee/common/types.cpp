@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -415,6 +415,9 @@ string planNodeToString(PlanNodeType type)
     case PLAN_NODE_TYPE_DELETE: {
         return "DELETE";
     }
+    case PLAN_NODE_TYPE_SWAPTABLES: {
+        return "SWAPTABLES";
+    }
     case PLAN_NODE_TYPE_SEND: {
         return "SEND";
     }
@@ -457,8 +460,8 @@ string planNodeToString(PlanNodeType type)
     case PLAN_NODE_TYPE_TUPLESCAN: {
         return "TUPLESCAN";
     }
-    case PLAN_NODE_TYPE_PARTITIONBY: {
-        return "PARTITIONBY";
+    case PLAN_NODE_TYPE_WINDOWFUNCTION: {
+        return "WINDOWFUNCTION";
     }
     } // END OF SWITCH
     return "UNDEFINED";
@@ -486,6 +489,8 @@ PlanNodeType stringToPlanNode(string str )
         return PLAN_NODE_TYPE_INSERT;
     } else if (str == "DELETE") {
         return PLAN_NODE_TYPE_DELETE;
+    } else if (str == "SWAPTABLES") {
+        return PLAN_NODE_TYPE_SWAPTABLES;
     } else if (str == "SEND") {
         return PLAN_NODE_TYPE_SEND;
     } else if (str == "RECEIVE") {
@@ -514,8 +519,8 @@ PlanNodeType stringToPlanNode(string str )
         return PLAN_NODE_TYPE_MATERIALIZEDSCAN;
     } else if (str == "TUPLESCAN") {
         return PLAN_NODE_TYPE_TUPLESCAN;
-    } else if (str == "PARTITIONBY") {
-        return PLAN_NODE_TYPE_PARTITIONBY;
+    } else if (str == "WINDOWFUNCTION") {
+        return PLAN_NODE_TYPE_WINDOWFUNCTION;
     }
     return PLAN_NODE_TYPE_INVALID;
 }
@@ -628,6 +633,18 @@ string expressionToString(ExpressionType type)
     case EXPRESSION_TYPE_AGGREGATE_WINDOWED_DENSE_RANK: {
         return "EXPRESSION_TYPE_AGGREGATE_WINDOWED_RANK";
     }
+    case EXPRESSION_TYPE_AGGREGATE_WINDOWED_COUNT: {
+        return "EXPRESSION_TYPE_AGGREGATE_WINDOWED_COUNT";
+    }
+    case EXPRESSION_TYPE_AGGREGATE_WINDOWED_MAX: {
+        return "EXPRESSION_TYPE_AGGREGATE_WINDOWED_MAX";
+    }
+    case EXPRESSION_TYPE_AGGREGATE_WINDOWED_MIN: {
+        return "EXPRESSION_TYPE_AGGREGATE_WINDOWED_MIN";
+    }
+    case EXPRESSION_TYPE_AGGREGATE_WINDOWED_SUM: {
+        return "EXPRESSION_TYPE_AGGREGATE_WINDOWED_SUM";
+    }
     case EXPRESSION_TYPE_AGGREGATE_SUM: {
         return "AGGREGATE_SUM";
     }
@@ -737,6 +754,14 @@ ExpressionType stringToExpression(string str )
         return EXPRESSION_TYPE_AGGREGATE_WINDOWED_RANK;
     } else if (str == "AGGREGATE_WINDOWED_DENSE_RANK") {
         return EXPRESSION_TYPE_AGGREGATE_WINDOWED_DENSE_RANK;
+    } else if (str == "AGGREGATE_WINDOWED_COUNT") {
+        return EXPRESSION_TYPE_AGGREGATE_WINDOWED_COUNT;
+    } else if (str == "AGGREGATE_WINDOWED_MAX") {
+        return EXPRESSION_TYPE_AGGREGATE_WINDOWED_MAX;
+    } else if (str == "AGGREGATE_WINDOWED_MIN") {
+        return EXPRESSION_TYPE_AGGREGATE_WINDOWED_MIN;
+    } else if (str == "AGGREGATE_WINDOWED_SUM") {
+        return EXPRESSION_TYPE_AGGREGATE_WINDOWED_SUM;
     } else if (str == "AGGREGATE_SUM") {
         return EXPRESSION_TYPE_AGGREGATE_SUM;
     } else if (str == "AGGREGATE_MIN") {

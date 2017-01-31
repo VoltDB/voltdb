@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -494,7 +494,7 @@ public class TestSqlCommandParserInteractive extends TestCase {
     {
         CommandStuff cmd = new CommandStuff();
         Future<List<String>> result = cmd.openQuery();
-        String set = "set " + DatabaseConfiguration.DR_MODE_NAME + "=" + DatabaseConfiguration.ACTIVE_ACTIVE;
+        String set = "set DR=ACTIVE";
         cmd.submitText(set + ";\n");
         cmd.waitOnResult();
         System.out.println("RESULT: " + result.get());

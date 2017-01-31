@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -107,7 +107,7 @@ public class PlanSelector implements Cloneable {
      * @return deep copy of self
      */
     @Override
-    public Object clone() {
+    public PlanSelector clone() {
         return new PlanSelector(m_cluster, m_db, m_estimates, m_stmtName, m_procName, m_sql,
                 m_costModel, m_paramHints, m_detMode, m_quietPlanner);
     }

@@ -18,10 +18,8 @@ import static com.google_voltpatches.common.base.Preconditions.checkNotNull;
 
 import com.google_voltpatches.common.annotations.GwtCompatible;
 import com.google_voltpatches.common.primitives.Booleans;
-
 import java.io.Serializable;
 import java.util.NoSuchElementException;
-
 import javax.annotation_voltpatches.Nullable;
 
 /**

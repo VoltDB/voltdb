@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -31,7 +31,6 @@ import junit.framework.TestCase;
 
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.json_voltpatches.JSONObject;
-import org.voltdb.catalog.DatabaseConfiguration;
 import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.types.VoltDecimalHelper;
@@ -44,7 +43,7 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
 
     private VoltCompiler compileForDDLTest2(String ddl) throws Exception {
         String ddlPath = getPathForSchema(ddl);
-        final VoltCompiler compiler = new VoltCompiler();
+        final VoltCompiler compiler = new VoltCompiler(false);
         boolean success = compiler.compileFromDDL(testout_jar, ddlPath);
         assertTrue("Catalog compile failed!", success);
         return compiler;
@@ -77,10 +76,8 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
             "create table Table2 (Column1 integer);" +
             "create view View1 (Column1, num) as select Column1, count(*) from Table1 group by Column1;" +
             "create view View2 (Column2, num) as select Column2, count(*) from Table1 group by Column2;" +
-            "create table Export1 (Column1 integer);" +
-            "export table Export1;" +
-            "create table Export2 (Column1 integer);" +
-            "export table Export2 to stream foo;" +
+            "create stream Export1 (Column1 integer);" +
+            "create stream Export2 export to target foo (Column1 integer);" +
             "create procedure sample as select * from Table1;";
         VoltCompiler c = compileForDDLTest2(schema);
         System.out.println(c.getCatalog().serialize());
@@ -534,29 +531,5 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
         assertTrue(VoltTableTestHelpers.moveToMatchingRow(classes, "CLASS_NAME", "org.voltdb_testprocs.fullddlfeatures.NoMeaningClass"));
         assertEquals(0, classes.get("VOLT_PROCEDURE", VoltType.INTEGER));
         assertEquals(0, classes.get("ACTIVE_PROC", VoltType.INTEGER));
-    }
-
-    public void testGetConfig() throws Exception
-    {
-        String schema =
-            "create table Table1 (Column1 varchar(200) not null, Column2 integer);";
-        VoltCompiler c = compileForDDLTest2(schema);
-        JdbcDatabaseMetaDataGenerator dut =
-            new JdbcDatabaseMetaDataGenerator(c.getCatalog(), null, new InMemoryJarfile(testout_jar));
-        VoltTable config = dut.getMetaData("config");
-        System.out.println(config);
-        assertTrue(VoltTableTestHelpers.moveToMatchingRow(config, "CONFIG_NAME", DatabaseConfiguration.DR_MODE_NAME));
-        assertEquals(DatabaseConfiguration.ACTIVE_PASSIVE, config.get("CONFIG_VALUE", VoltType.STRING));
-
-       schema =
-            "set " + DatabaseConfiguration.DR_MODE_NAME + "=" + DatabaseConfiguration.ACTIVE_ACTIVE + ";" +
-            "create table Table1 (Column1 varchar(200) not null, Column2 integer);";
-        c = compileForDDLTest2(schema);
-        dut =
-            new JdbcDatabaseMetaDataGenerator(c.getCatalog(), null, new InMemoryJarfile(testout_jar));
-        config = dut.getMetaData("config");
-        System.out.println(config);
-        assertTrue(VoltTableTestHelpers.moveToMatchingRow(config, "CONFIG_NAME", DatabaseConfiguration.DR_MODE_NAME));
-        assertEquals(DatabaseConfiguration.ACTIVE_ACTIVE, config.get("CONFIG_VALUE", VoltType.STRING));
     }
 }

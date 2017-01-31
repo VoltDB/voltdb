@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -133,7 +133,6 @@ public class TPCCProjectBuilder extends VoltProjectBuilder {
         // setTableAsExportOnly("NEW_ORDER");     // 1 insert per new order; 10 deletes per delivery (4%)
         // setTableAsExportOnly("ORDER_LINE");    // 10 inserts per new order */
 
-        setTableAsExportOnly("HISTORY");
     }
 
     @Override

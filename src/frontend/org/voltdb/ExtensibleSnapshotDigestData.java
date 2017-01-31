@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -210,8 +210,10 @@ public class ExtensibleSnapshotDigestData {
                 addEntry = true;
             }
             else if (partitionStateInfo.drId != existingStateInfo.getLong("sequenceNumber")) {
-                addEntry = true;
-                log.error("Found a mismatch in dr sequence numbers for partition " + partitionId +
+                if (partitionStateInfo.drId > existingStateInfo.getLong("sequenceNumber")) {
+                    addEntry = true;
+                }
+                log.debug("Found a mismatch in dr sequence numbers for partition " + partitionId +
                         " the DRId should be the same at all replicas, but one node had " +
                         DRLogSegmentId.getDebugStringFromDRId(existingStateInfo.getLong("sequenceNumber")) +
                         " and the local node reported " + DRLogSegmentId.getDebugStringFromDRId(partitionStateInfo.drId));

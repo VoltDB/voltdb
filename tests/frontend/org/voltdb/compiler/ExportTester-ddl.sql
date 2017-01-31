@@ -1,34 +1,34 @@
-CREATE TABLE A (
+CREATE STREAM A PARTITION ON COLUMN A_ID (
   A_CLIENT INTEGER NOT NULL,
   A_ID INTEGER DEFAULT '0' NOT NULL,
   A_VAL INTEGER
 );
 
-CREATE TABLE B (
+CREATE STREAM B PARTITION ON COLUMN B_ID (
   B_CLIENT INTEGER NOT NULL,
   B_ID INTEGER DEFAULT '0' NOT NULL,
   B_VAL INTEGER
 );
 
-CREATE TABLE C (
+CREATE STREAM C PARTITION ON COLUMN C_ID (
   C_CLIENT INTEGER NOT NULL,
   C_ID INTEGER DEFAULT '0' NOT NULL,
   C_VAL INTEGER
 );
 
-CREATE TABLE D (
+CREATE STREAM D PARTITION ON COLUMN D_ID (
   D_CLIENT INTEGER NOT NULL,
   D_ID INTEGER DEFAULT '0' NOT NULL,
   D_VAL INTEGER
 );
 
-create table e (
+create STREAM e PARTITION ON COLUMN e_id (
   e_client integer not null,
   e_id integer default '0' not null,
   e_val integer
 );
 
-create table f (
+create STREAM f PARTITION ON COLUMN F_ID (
   f_client integer not null,
   f_id integer default '0' not null,
   f_val integer

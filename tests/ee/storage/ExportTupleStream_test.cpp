@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -58,8 +58,7 @@ const int BUFFER_SIZE = 1024;
 class ExportTupleStreamTest : public Test {
 public:
     ExportTupleStreamTest()
-      : m_context(new ExecutorContext(1, 1, NULL, &m_topend, &m_pool,
-                                      (NValueArray*)NULL, (VoltDBEngine*)NULL,
+      : m_context(new ExecutorContext(1, 1, NULL, &m_topend, &m_pool, (VoltDBEngine*)NULL,
                                     "localhost", 2, NULL, NULL, 0))
     {
         srand(0);

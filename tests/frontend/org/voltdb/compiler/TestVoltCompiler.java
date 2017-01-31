@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -60,15 +60,12 @@ import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Table;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltCompiler.Feedback;
-import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.types.GeographyValue;
 import org.voltdb.types.IndexType;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.MiscUtils;
-
-import com.google_voltpatches.common.collect.Maps;
 
 public class TestVoltCompiler extends TestCase {
     private String nothing_jar;
@@ -140,15 +137,11 @@ public class TestVoltCompiler extends TestCase {
         String expectedError;
         ArrayList<Feedback> fbs;
 
-        fbs = checkPartitionParam("CREATE TABLE PKEY_BIGINT ( PKEY BIGINT NOT NULL, PRIMARY KEY (PKEY) );" +
-                "PARTITION TABLE PKEY_BIGINT ON COLUMN PKEY;" +
-                "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.PartitionParamBigint;",
-                "PKEY_BIGINT");
-        expectedError =
-                "Type mismatch between partition column and partition parameter for procedure " +
-                "org.voltdb.compiler.procedures.PartitionParamBigint may cause overflow or loss of precision.\n" +
-                "Partition column is type VoltType.BIGINT and partition parameter is type VoltType.STRING";
-        assertTrue(isFeedbackPresent(expectedError, fbs));
+        /**
+         * FIXME:
+         * It is hard to figure out the differences between test cases.
+         * Better with using common variable to check out the diffs.
+         */
 
         fbs = checkPartitionParam("CREATE TABLE PKEY_BIGINT ( PKEY BIGINT NOT NULL, PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_BIGINT ON COLUMN PKEY;" +
@@ -255,24 +248,9 @@ public class TestVoltCompiler extends TestCase {
     }
 
     private ArrayList<Feedback> checkPartitionParam(String ddl, String table) {
-        File schemaFile = VoltProjectBuilder.writeStringToTempFile(ddl);
-        String schemaPath = schemaFile.getPath();
-
-        String simpleProject =
-            "<?xml version=\"1.0\"?>\n" +
-            "<project>" +
-            "<database name='database'>" +
-            "<schemas>" +
-            "<schema path='" + schemaPath + "' />" +
-            "</schemas>" +
-            "<procedures/>" +
-            "</database>" +
-            "</project>";
-
-        File projectFile = VoltProjectBuilder.writeStringToTempFile(simpleProject);
-        String projectPath = projectFile.getPath();
-        VoltCompiler compiler = new VoltCompiler();
-        assertFalse(compiler.compileWithProjectXML(projectPath, testout_jar));
+        VoltCompiler compiler = new VoltCompiler(false);
+        final boolean success = compileDDL(ddl, compiler);
+        assertFalse(success);
         return compiler.m_errors;
     }
 
@@ -281,23 +259,9 @@ public class TestVoltCompiler extends TestCase {
                 "PARTITION TABLE PKEY_BIGINT ON COLUMN PKEY;" +
                 "create procedure myTestProc as select num from PKEY_BIGINT where pkey = ? order by 1;";
 
-        File schemaFile = VoltProjectBuilder.writeStringToTempFile(ddl);
-        String schemaPath = schemaFile.getPath();
-
-        String simpleProject =
-            "<?xml version=\"1.0\"?>\n" +
-            "<project>" +
-            "<database name='database'>" +
-            "<schemas>" +
-            "<schema path='" + schemaPath + "' />" +
-            "</schemas>" +
-            "</database>" +
-            "</project>";
-
-        File projectFile = VoltProjectBuilder.writeStringToTempFile(simpleProject);
-        String projectPath = projectFile.getPath();
-        VoltCompiler compiler = new VoltCompiler();
-        assertTrue(compiler.compileWithProjectXML(projectPath, testout_jar));
+        VoltCompiler compiler = new VoltCompiler(false);
+        final boolean success = compileDDL(ddl, compiler);
+        assertTrue(success);
 
         String expectedWarning =
                 "This procedure myTestProc would benefit from being partitioned, by adding a " +
@@ -357,8 +321,6 @@ public class TestVoltCompiler extends TestCase {
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(getClass().getResource("ExportTester-ddl.sql"));
         project.addExport(false /* disabled */);
-        project.setTableAsExportOnly("A");
-        project.setTableAsExportOnly("B");
         try {
             assertTrue(project.compile("/tmp/exportsettingstest.jar"));
             String catalogContents =
@@ -387,15 +349,7 @@ public class TestVoltCompiler extends TestCase {
         project.addSchema(TestVoltCompiler.class.getResource("ExportTester-ddl.sql"));
         project.addStmtProcedure("Dummy", "insert into a values (?, ?, ?);",
                                 "a.a_id: 0");
-        project.addPartitionInfo("A", "A_ID");
-        project.addPartitionInfo("B", "B_ID");
-        project.addPartitionInfo("e", "e_id");
-        project.addPartitionInfo("f", "f_id");
         project.addExport(true /* enabled */);
-        project.setTableAsExportOnly("A"); // uppercase DDL, uppercase export
-        project.setTableAsExportOnly("b"); // uppercase DDL, lowercase export
-        project.setTableAsExportOnly("E"); // lowercase DDL, uppercase export
-        project.setTableAsExportOnly("f"); // lowercase DDL, lowercase export
         try {
             assertTrue(project.compile("/tmp/exportsettingstest.jar"));
             String catalogContents =
@@ -418,30 +372,9 @@ public class TestVoltCompiler extends TestCase {
         }
     }
 
-    // test that the source table for a view is not export only
-    public void testViewSourceNotExportOnly() throws IOException {
+    public void testViewSourceExportOnlyValid() throws IOException {
         VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addSchema(TestVoltCompiler.class.getResource("ExportTesterWithView-ddl.sql"));
-        project.addStmtProcedure("Dummy", "select * from v_table1r_el_only");
-        project.addExport(true /* enabled */);
-        project.setTableAsExportOnly("table1r_el_only");
-        try {
-            assertFalse(project.compile("/tmp/exporttestview.jar"));
-        }
-        finally {
-            File jar = new File("/tmp/exporttestview.jar");
-            jar.delete();
-        }
-    }
-
-    public void testViewSourceExportOnly() throws IOException {
-        VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addSchema(TestVoltCompiler.class.getResource("ExportTesterWithView-ddl.sql"));
-        project.addStmtProcedure("Dummy", "select * from v_table2r_el_only");
-        project.addExport(true /* enabled */);
-        project.setTableAsExportOnly("table2r_el_only");
-        project.addPartitionInfo("table2r_el_only", "column1_bigint");
-
+        project.addSchema(TestVoltCompiler.class.getResource("ExportTesterWithView-good-ddl.sql"));
         try {
             assertTrue(project.compile("/tmp/exporttestview.jar"));
         }
@@ -453,10 +386,7 @@ public class TestVoltCompiler extends TestCase {
 
     public void testViewSourceExportOnlyInvalidNoPartitionColumn() throws IOException {
         VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addSchema(TestVoltCompiler.class.getResource("ExportTesterWithView-ddl.sql"));
-        project.addStmtProcedure("Dummy", "select * from v_table3r_el_only");
-        project.addExport(true /* enabled */);
-        project.setTableAsExportOnly("table3r_el_only");
+        project.addSchema(TestVoltCompiler.class.getResource("ExportTesterWithView-bad2-ddl.sql"));
         try {
             assertFalse(project.compile("/tmp/exporttestview.jar"));
         }
@@ -468,28 +398,7 @@ public class TestVoltCompiler extends TestCase {
 
     public void testViewSourceExportOnlyInvalidPartitionColumnNotInView() throws IOException {
         VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addSchema(TestVoltCompiler.class.getResource("ExportTesterWithView-ddl.sql"));
-        project.addStmtProcedure("Dummy", "select * from v_table4r_el_only");
-        project.addExport(true /* enabled */);
-        project.setTableAsExportOnly("table4r_el_only");
-        project.addPartitionInfo("table4r_el_only", "column1_bigint");
-
-        try {
-            assertFalse(project.compile("/tmp/exporttestview.jar"));
-        }
-        finally {
-            File jar = new File("/tmp/exporttestview.jar");
-            jar.delete();
-        }
-    }
-
-    // test that a view is not export only
-    public void testViewNotExportOnly() throws IOException {
-        VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addSchema(TestVoltCompiler.class.getResource("ExportTesterWithView-ddl.sql"));
-        project.addStmtProcedure("Dummy", "select * from table1r_el_only");
-        project.addExport(true /* enabled */);
-        project.setTableAsExportOnly("v_table1r_el_only");
+        project.addSchema(TestVoltCompiler.class.getResource("ExportTesterWithView-bad1-ddl.sql"));
         try {
             assertFalse(project.compile("/tmp/exporttestview.jar"));
         }
@@ -500,227 +409,19 @@ public class TestVoltCompiler extends TestCase {
     }
 
     public void testBadPath() {
-        VoltCompiler compiler = new VoltCompiler();
-        assertFalse(compiler.compileWithProjectXML("invalidnonsense", nothing_jar));
-    }
-
-    public void testXSDSchemaOrdering() throws IOException {
-        File schemaFile = VoltProjectBuilder.writeStringToTempFile("create table T(ID INTEGER);");
-        String schemaPath = schemaFile.getPath();
-        String project = "<?xml version=\"1.0\"?>\n" +
-            "<project>" +
-            "<database>" +
-                "<schemas>" +
-                "<schema path='" +  schemaPath  + "'/>" +
-                "</schemas>" +
-                "<procedures>" +
-                "<procedure class='proc'><sql>select * from T</sql></procedure>" +
-                "</procedures>" +
-            "</database>" +
-            "</project>";
-        File xmlFile = VoltProjectBuilder.writeStringToTempFile(project);
-        String projectPath = xmlFile.getPath();
-        VoltCompiler compiler = new VoltCompiler();
-        assertTrue(compiler.compileWithProjectXML(projectPath, nothing_jar));
-    }
-
-    public void testXMLFileWithDeprecatedElements() {
-        File schemaFile = VoltProjectBuilder.writeStringToTempFile("create table T(ID INTEGER);");
-        String schemaPath = schemaFile.getPath();
-        String project = "<?xml version=\"1.0\"?>\n" +
-            "<project>" +
-            "<database>" +
-                "<schemas>" +
-                "<schema path='" +  schemaPath  + "'/>" +
-                "</schemas>" +
-                "<procedures>" +
-                "<procedure class='proc'><sql>select * from T</sql></procedure>" +
-                "</procedures>" +
-            "</database>" +
-            "<security enabled='true'/>" +
-            "</project>";
-        File xmlFile = VoltProjectBuilder.writeStringToTempFile(project);
-        String path = xmlFile.getPath();
-        VoltCompiler compiler = new VoltCompiler();
-        assertFalse(compiler.compileWithProjectXML(path, nothing_jar));
-        assertTrue(
-                isFeedbackPresent("Found deprecated XML element \"security\"",
-                compiler.m_errors)
-                );
-    }
-
-    public void testXMLFileWithInvalidSchemaReference() {
-        String simpleXML =
-            "<?xml version=\"1.0\"?>\n" +
-            "<project>" +
-            "<database name='database'>" +
-            "<schemas><schema path='my schema file.sql' /></schemas>" +
-            "<procedures><procedure class='procedures/procs.jar' /></procedures>" +
-            "</database>" +
-            "</project>";
-
-        File xmlFile = VoltProjectBuilder.writeStringToTempFile(simpleXML);
-        String projectPath = xmlFile.getPath();
-        VoltCompiler compiler = new VoltCompiler();
-        assertFalse(compiler.compileWithProjectXML(projectPath, nothing_jar));
-    }
-
-    public void testXMLFileWithSchemaError() {
-        File schemaFile = VoltProjectBuilder.writeStringToTempFile("create table T(ID INTEGER);");
-        String simpleXML =
-            "<?xml version=\"1.0\"?>\n" +
-            "<project>" +
-            "<database name='baddbname'>" +
-            "<schemas>" +
-            "<schema path='" +  schemaFile.getAbsolutePath()  + "'/>" +
-            "</schemas>" +
-            // invalid project file: no procedures
-            // "<procedures>" +
-            // "<procedure class='proc'><sql>select * from T</sql></procedure>" +
-            //"</procedures>" +
-            "</database>" +
-            "</project>";
-        File xmlFile = VoltProjectBuilder.writeStringToTempFile(simpleXML);
-        String projectPath = xmlFile.getPath();
-        VoltCompiler compiler = new VoltCompiler();
-        assertFalse(compiler.compileWithProjectXML(projectPath, nothing_jar));
-    }
-
-    public void testXMLFileWithWrongDBName() {
-        File schemaFile = VoltProjectBuilder.writeStringToTempFile("create table T(ID INTEGER);");
-        String simpleXML =
-            "<?xml version=\"1.0\"?>\n" +
-            "<project>" +
-            "<database name='baddbname'>" +
-            "<schemas>" +
-            "<schema path='" +  schemaFile.getAbsolutePath()  + "'/>" +
-            "</schemas>" +
-            "<procedures>" +
-            "<procedure class='proc'><sql>select * from T</sql></procedure>" +
-            "</procedures>" +
-            "</database>" +
-            "</project>";
-        File xmlFile = VoltProjectBuilder.writeStringToTempFile(simpleXML);
-        String projectPath = xmlFile.getPath();
-        VoltCompiler compiler = new VoltCompiler();
-        assertFalse(compiler.compileWithProjectXML(projectPath, nothing_jar));
-    }
-
-
-    public void testXMLFileWithDefaultDBName() {
-        File schemaFile = VoltProjectBuilder.writeStringToTempFile("create table T(ID INTEGER);");
-        String simpleXML =
-            "<?xml version=\"1.0\"?>\n" +
-            "<project>" +
-            "<database>" +
-            "<schemas>" +
-            "<schema path='" +  schemaFile.getAbsolutePath()  + "'/>" +
-            "</schemas>" +
-            "<procedures>" +
-            "<procedure class='proc'><sql>select * from T</sql></procedure>" +
-            "</procedures>" +
-            "</database>" +
-            "</project>";
-        File xmlFile = VoltProjectBuilder.writeStringToTempFile(simpleXML);
-        String path = xmlFile.getPath();
-        VoltCompiler compiler = new VoltCompiler();
-        assertTrue(compiler.compileWithProjectXML(path, nothing_jar));
-        assertTrue(compiler.m_catalog.getClusters().get("cluster").getDatabases().get("database") != null);
-    }
-
-    public void testBadClusterConfig() throws IOException {
-        // check no hosts
-        Map<Integer, Integer> emptySphMap = Maps.newHashMap();
-        ClusterConfig cluster_config = new ClusterConfig(0, emptySphMap, 0);
-        assertFalse(cluster_config.validate());
-
-        // check no sites-per-hosts
-        Map<Integer, Integer> zeroSphMap = Maps.newHashMap();
-        zeroSphMap.put(0, 0);
-        cluster_config = new ClusterConfig(1, zeroSphMap, 0);
-        assertFalse(cluster_config.validate());
-    }
-
-    public void testXMLFileWithDDL() throws IOException {
-        String schema1 =
-            "create table books (cash integer default 23 NOT NULL, title varchar(3) default 'foo', PRIMARY KEY(cash)); " +
-            "PARTITION TABLE books ON COLUMN cash;";
-        // newline inserted to test catalog friendliness
-        String schema2 =
-            "create table books2\n (cash integer default 23 NOT NULL, title varchar(3) default 'foo', PRIMARY KEY(cash));";
-
-        File schemaFile1 = VoltProjectBuilder.writeStringToTempFile(schema1);
-        String schemaPath1 = schemaFile1.getPath();
-        File schemaFile2 = VoltProjectBuilder.writeStringToTempFile(schema2);
-        String schemaPath2 = schemaFile2.getPath();
-
-        String simpleProject =
-            "<?xml version=\"1.0\"?>\n" +
-            "<project>" +
-            "<!-- xml comment check -->" +
-            "<database name='database'>" +
-            "<!-- xml comment check -->" +
-            "<schemas>" +
-            "<!-- xml comment check -->" +
-            "<schema path='" + schemaPath1 + "' />" +
-            "<schema path='" + schemaPath2 + "' />" +
-            "<!-- xml comment check -->" +
-            "</schemas>" +
-            "<!-- xml comment check -->" +
-            "<procedures>" +
-            "<!-- xml comment check -->" +
-            "<procedure class='org.voltdb.compiler.procedures.AddBook' />" +
-            "<procedure class='Foo'>" +
-            "<sql>select * from books;</sql>" +
-            "</procedure>" +
-            "</procedures>" +
-            "<!-- xml comment check -->" +
-            "</database>" +
-            "<!-- xml comment check -->" +
-            "</project>";
-
-        File projectFile = VoltProjectBuilder.writeStringToTempFile(simpleProject);
-        String projectPath = projectFile.getPath();
-
-        VoltCompiler compiler = new VoltCompiler();
-
-        assertTrue(compiler.compileWithProjectXML(projectPath, testout_jar));
-
-        Catalog c1 = compiler.getCatalog();
-
-        String catalogContents = VoltCompilerUtils.readFileFromJarfile(testout_jar, "catalog.txt");
-
-        Catalog c2 = new Catalog();
-        c2.execute(catalogContents);
-
-        assertTrue(c2.serialize().equals(c1.serialize()));
+        VoltCompiler compiler = new VoltCompiler(false);
+        final boolean success = compiler.compileFromDDL(nothing_jar, "invalidnonsense");
+        assertFalse(success);
     }
 
     public void testProcWithBoxedParam() throws IOException {
         String schema =
-            "create table books (cash integer default 23, title varchar(3) default 'foo', PRIMARY KEY(cash));";
+            "create table books (cash integer default 23, title varchar(3) default 'foo', PRIMARY KEY(cash));\n"
+                    + "create procedure from class org.voltdb.compiler.procedures.AddBookBoxed;";
 
-        File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema);
-        String schemaPath = schemaFile.getPath();
-
-        String simpleProject =
-            "<?xml version=\"1.0\"?>\n" +
-            "<project>" +
-            "<database name='database'>" +
-            "<schemas>" +
-            "<schema path='" + schemaPath + "' />" +
-            "</schemas>" +
-            "<procedures>" +
-            "<procedure class='org.voltdb.compiler.procedures.AddBookBoxed' />" +
-            "</procedures>" +
-            "</database>" +
-            "</project>";
-
-        File projectFile = VoltProjectBuilder.writeStringToTempFile(simpleProject);
-        String projectPath = projectFile.getPath();
-
-        VoltCompiler compiler = new VoltCompiler();
-        assertFalse(compiler.compileWithProjectXML(projectPath, testout_jar));
+        VoltCompiler compiler = new VoltCompiler(false);
+        final boolean success = compileDDL(schema, compiler);
+        assertFalse(success);
     }
 
     public void testDDLWithNoLengthString() throws IOException {
@@ -729,31 +430,10 @@ public class TestVoltCompiler extends TestCase {
         String schema1 =
             "create table books (cash integer default 23, title varchar default 'foo', PRIMARY KEY(cash));";
 
-        File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema1);
-        String schemaPath = schemaFile.getPath();
+        VoltCompiler compiler = new VoltCompiler(false);
 
-        String simpleProject =
-            "<?xml version=\"1.0\"?>\n" +
-            "<project>" +
-            "<database name='database'>" +
-            "<schemas>" +
-            "<schema path='" + schemaPath + "' />" +
-            "</schemas>" +
-            "<procedures>" +
-            "<procedure class='org.voltdb.compiler.procedures.AddBook' />" +
-            "<procedure class='Foo'>" +
-            "<sql>select * from books;</sql>" +
-            "</procedure>" +
-            "</procedures>" +
-            "</database>" +
-            "</project>";
-
-        File projectFile = VoltProjectBuilder.writeStringToTempFile(simpleProject);
-        String projectPath = projectFile.getPath();
-
-        VoltCompiler compiler = new VoltCompiler();
-
-        assertFalse(compiler.compileWithProjectXML(projectPath, testout_jar));
+        final boolean success = compileDDL(schema1, compiler);
+        assertTrue(success);
     }
 
     public void testDDLWithLongStringInCharacters() throws IOException {
@@ -762,23 +442,9 @@ public class TestVoltCompiler extends TestCase {
             "create table books (cash integer default 23, " +
             "title varchar("+length+") default 'foo', PRIMARY KEY(cash));";
 
-        File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema1);
-        String schemaPath = schemaFile.getPath();
-
-        String simpleProject =
-            "<?xml version=\"1.0\"?>\n" +
-            "<project>" +
-            "<database name='database'>" +
-            "<schemas>" +
-            "<schema path='" + schemaPath + "' />" +
-            "</schemas>" +
-            "</database>" +
-            "</project>";
-
-        File projectFile = VoltProjectBuilder.writeStringToTempFile(simpleProject);
-        String projectPath = projectFile.getPath();
-        VoltCompiler compiler = new VoltCompiler();
-        assertTrue(compiler.compileWithProjectXML(projectPath, testout_jar));
+        VoltCompiler compiler = new VoltCompiler(false);
+        final boolean success = compileDDL(schema1, compiler);
+        assertTrue(success);
 
         // Check warnings
         assertEquals(1, compiler.m_warnings.size());
@@ -816,24 +482,9 @@ public class TestVoltCompiler extends TestCase {
             "create table books (cash integer default 23, title varchar(3) default 'foo', PRIMARY KEY(cash));" +
             "partition table books on column cash;";
 
-        File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema);
-        String schemaPath = schemaFile.getPath();
-
-        String simpleProject =
-            "<?xml version=\"1.0\"?>\n" +
-            "<project>" +
-            "<database name='database'>" +
-            "<schemas><schema path='" + schemaPath + "' /></schemas>" +
-            "<procedures><procedure class='org.voltdb.compiler.procedures.AddBook'/></procedures>" +
-            "</database>" +
-            "</project>";
-
-        File projectFile = VoltProjectBuilder.writeStringToTempFile(simpleProject);
-        String projectPath = projectFile.getPath();
-
-        VoltCompiler compiler = new VoltCompiler();
-
-        assertFalse(compiler.compileWithProjectXML(projectPath, testout_jar));
+        VoltCompiler compiler = new VoltCompiler(false);
+        final boolean success = compileDDL(schema, compiler);
+        assertFalse(success);
 
         boolean found = false;
         for (VoltCompiler.Feedback fb : compiler.m_errors) {
@@ -841,30 +492,6 @@ public class TestVoltCompiler extends TestCase {
                 found = true;
         }
         assertTrue(found);
-    }
-
-    public void testXMLFileWithBadDDL() throws IOException {
-        String schema =
-            "create table books (id integer default 0, strval varchar(33000) default '', PRIMARY KEY(id));";
-
-        File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema);
-        String schemaPath = schemaFile.getPath();
-
-        String simpleProject =
-            "<?xml version=\"1.0\"?>\n" +
-            "<project>" +
-            "<database name='database'>" +
-            "<schemas><schema path='" + schemaPath + "' /></schemas>" +
-            "<procedures><procedure class='org.voltdb.compiler.procedures.AddBook' /></procedures>" +
-            "</database>" +
-            "</project>";
-
-        File projectFile = VoltProjectBuilder.writeStringToTempFile(simpleProject);
-        String projectPath = projectFile.getPath();
-
-        VoltCompiler compiler = new VoltCompiler();
-
-        assertFalse(compiler.compileWithProjectXML(projectPath, testout_jar));
     }
 
     // NOTE: TPCCTest proc also tests whitespaces regressions in SQL literals
@@ -878,82 +505,9 @@ public class TestVoltCompiler extends TestCase {
             System.exit(-1);
         }
 
-        String simpleProject =
-            "<?xml version=\"1.0\"?>\n" +
-            "<project>" +
-            "<database name='database'>" +
-            "<schemas><schema path='" + schemaPath + "' /></schemas>" +
-            "<procedures><procedure class='org.voltdb.compiler.procedures.TPCCTestProc' /></procedures>" +
-            "</database>" +
-            "</project>";
-
-        //System.out.println(simpleProject);
-
-        File projectFile = VoltProjectBuilder.writeStringToTempFile(simpleProject);
-        String projectPath = projectFile.getPath();
-
-        VoltCompiler compiler = new VoltCompiler();
-        assertTrue(compiler.compileWithProjectXML(projectPath, testout_jar));
-    }
-
-    public void testSeparateCatalogCompilation() throws IOException {
-        String schemaPath = "";
-        try {
-            URL url = TPCCProjectBuilder.class.getResource("tpcc-ddl.sql");
-            schemaPath = URLDecoder.decode(url.getPath(), "UTF-8");
-        } catch (UnsupportedEncodingException e) {
-            e.printStackTrace();
-            System.exit(-1);
-        }
-
-        String simpleProject =
-            "<?xml version=\"1.0\"?>\n" +
-            "<project>" +
-            "<database name='database'>" +
-            "<schemas><schema path='" + schemaPath + "' /></schemas>" +
-            "<procedures><procedure class='org.voltdb.compiler.procedures.TPCCTestProc' /></procedures>" +
-            "</database>" +
-            "</project>";
-
-        //System.out.println(simpleProject);
-
-        File projectFile = VoltProjectBuilder.writeStringToTempFile(simpleProject);
-        String projectPath = projectFile.getPath();
-
-        VoltCompiler compiler1 = new VoltCompiler();
-        VoltCompiler compiler2 = new VoltCompiler();
-        Catalog catalog = compileCatalogFromProject(compiler1, projectPath);
-        String cat1 = catalog.serialize();
-        assertTrue(compiler2.compileWithProjectXML(projectPath, testout_jar));
-        String cat2 = VoltCompilerUtils.readFileFromJarfile(testout_jar, "catalog.txt");
-        assertEquals(cat1, cat2);
-    }
-
-    private Catalog compileCatalogFromProject(
-            VoltCompiler compiler,
-            String projectPath) {
-        try {
-            return compiler.compileCatalogFromProject(projectPath);
-        }
-        catch (VoltCompilerException e) {
-            e.printStackTrace();
-            fail();
-            return null;
-        }
-    }
-
-    private boolean compileFromDDL(
-            VoltCompiler compiler,
-            String jarPath,
-            String... schemaPaths) {
-        try {
-            return compiler.compileFromDDL(jarPath, schemaPaths);
-        }
-        catch (VoltCompilerException e) {
-            e.printStackTrace();
-            fail();
-            return false;
-        }
+        VoltCompiler compiler = new VoltCompiler(false);
+        final boolean success = compiler.compileFromDDL(testout_jar, schemaPath);
+        assertTrue(success);
     }
 
     public void testDDLTableTooManyColumns() throws IOException {
@@ -967,23 +521,9 @@ public class TestVoltCompiler extends TestCase {
             System.exit(-1);
         }
 
-        String simpleProject =
-            "<?xml version=\"1.0\"?>\n" +
-            "<project>" +
-            "<database name='database'>" +
-            "<schemas><schema path='" + schemaPath + "' /></schemas>" +
-            "<procedures><procedure class='org.voltdb.compiler.procedures.TPCCTestProc' /></procedures>" +
-            "</database>" +
-            "</project>";
-
-        //System.out.println(simpleProject);
-
-        File projectFile = VoltProjectBuilder.writeStringToTempFile(simpleProject);
-        String projectPath = projectFile.getPath();
-
-        VoltCompiler compiler = new VoltCompiler();
-
-        assertFalse(compiler.compileWithProjectXML(projectPath, testout_jar));
+        VoltCompiler compiler = new VoltCompiler(false);
+        final boolean success = compiler.compileFromDDL(testout_jar, schemaPath);
+        assertFalse(success);
 
         for (VoltCompiler.Feedback fb : compiler.m_errors) {
             if (fb.message.startsWith("Table MANY_COLUMNS has")) {
@@ -1004,105 +544,12 @@ public class TestVoltCompiler extends TestCase {
             System.exit(-1);
         }
 
-        String simpleProject =
-            "<?xml version=\"1.0\"?>\n" +
-            "<project>" +
-            "<database name='database'>" +
-            "<schemas><schema path='" + schemaPath + "' /></schemas>" +
-            "<procedures><procedure class='org.voltdb.compiler.procedures.TPCCTestProc' /></procedures>" +
-            "</database>" +
-            "</project>";
-
-        //System.out.println(simpleProject);
-
-        File projectFile = VoltProjectBuilder.writeStringToTempFile(simpleProject);
-        String projectPath = projectFile.getPath();
-
-        VoltCompiler compiler = new VoltCompiler();
-
-        assertTrue(compiler.compileWithProjectXML(projectPath, testout_jar));
+        VoltCompiler compiler = new VoltCompiler(false);
+        final boolean success = compiler.compileFromDDL(testout_jar, schemaPath);
+        assertTrue(success);
 
         String sql = VoltCompilerUtils.readFileFromJarfile(testout_jar, VoltCompiler.AUTOGEN_DDL_FILE_NAME);
         assertNotNull(sql);
-    }
-
-    public void testXMLFileWithELEnabled() throws IOException {
-        String schema =
-            "create table books (cash integer default 23 NOT NULL, title varchar(3) default 'foo');";
-
-        File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema);
-        String schemaPath = schemaFile.getPath();
-
-        String simpleProject =
-            "<?xml version=\"1.0\"?>\n" +
-            "<project>" +
-            " <database name='database'>" +
-            "  <partitions><partition table='books' column='cash'/></partitions> " +
-            "  <schemas><schema path='" + schemaPath + "' /></schemas>" +
-            "  <procedures><procedure class='org.voltdb.compiler.procedures.AddBook' /></procedures>" +
-            "  <export>" +
-            "    <tables><table name='books'/></tables>" +
-            "  </export>" +
-            " </database>" +
-            "</project>";
-
-        File projectFile = VoltProjectBuilder.writeStringToTempFile(simpleProject);
-        String projectPath = projectFile.getPath();
-
-        VoltCompiler compiler = new VoltCompiler();
-
-        assertTrue(compiler.compileWithProjectXML(projectPath, testout_jar));
-
-        Catalog c1 = compiler.getCatalog();
-        //System.out.println("PRINTING Catalog 1");
-        //System.out.println(c1.serialize());
-
-        String catalogContents = VoltCompilerUtils.readFileFromJarfile(testout_jar, "catalog.txt");
-
-        Catalog c2 = new Catalog();
-        c2.execute(catalogContents);
-
-        assertTrue(c2.serialize().equals(c1.serialize()));
-    }
-
-    public void testOverrideProcInfo() throws IOException {
-        String schema =
-            "create table books (cash integer default 23 not null, title varchar(3) default 'foo', PRIMARY KEY(cash));" +
-            "PARTITION TABLE books ON COLUMN cash;";
-
-        File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema);
-        String schemaPath = schemaFile.getPath();
-
-        String simpleProject =
-            "<?xml version=\"1.0\"?>\n" +
-            "<project>" +
-            "<database name='database'>" +
-            "<schemas><schema path='" + schemaPath + "' /></schemas>" +
-            "<procedures><procedure class='org.voltdb.compiler.procedures.AddBook' /></procedures>" +
-            "</database>" +
-            "</project>";
-
-        File projectFile = VoltProjectBuilder.writeStringToTempFile(simpleProject);
-        String projectPath = projectFile.getPath();
-
-        ProcInfoData info = new ProcInfoData();
-        info.singlePartition = true;
-        info.partitionInfo = "BOOKS.CASH: 0";
-        Map<String, ProcInfoData> overrideMap = new HashMap<String, ProcInfoData>();
-        overrideMap.put("AddBook", info);
-
-        VoltCompiler compiler = new VoltCompiler();
-        compiler.setProcInfoOverrides(overrideMap);
-        assertTrue(compiler.compileWithProjectXML(projectPath, testout_jar));
-
-        String catalogContents = VoltCompilerUtils.readFileFromJarfile(testout_jar, "catalog.txt");
-
-        Catalog c2 = new Catalog();
-        c2.execute(catalogContents);
-
-        Database db = c2.getClusters().get("cluster").getDatabases().get("database");
-        Procedure addBook = db.getProcedures().get("AddBook");
-        assertTrue(addBook.getSinglepartition());
     }
 
     public void testOverrideNonAnnotatedProcInfo() throws IOException {
@@ -1114,7 +561,6 @@ public class TestVoltCompiler extends TestCase {
             "PARTITION TABLE books ON COLUMN cash;" +
             "create procedure from class org.voltdb.compiler.procedures.AddBook;" +
             "partition procedure AddBook ON TABLE books COLUMN cash;";
-        String projectPath = schemaToProjectPath(schema);
 
         ProcInfoData info = new ProcInfoData();
         info.singlePartition = true;
@@ -1122,9 +568,10 @@ public class TestVoltCompiler extends TestCase {
         Map<String, ProcInfoData> overrideMap = new HashMap<String, ProcInfoData>();
         overrideMap.put("AddBook", info);
 
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         compiler.setProcInfoOverrides(overrideMap);
-        assertTrue(compiler.compileWithProjectXML(projectPath, testout_jar));
+        final boolean success = compileDDL(schema, compiler);
+        assertTrue(success);
 
         String catalogContents = VoltCompilerUtils.readFileFromJarfile(testout_jar, "catalog.txt");
 
@@ -1136,76 +583,26 @@ public class TestVoltCompiler extends TestCase {
         assertTrue(addBook.getSinglepartition());
     }
 
-    public void testBadStmtProcName() throws IOException {
-        String schema =
-            "create table books (cash integer default 23 not null, title varchar(10) default 'foo', PRIMARY KEY(cash));";
-
-        File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema);
-        String schemaPath = schemaFile.getPath();
-
-        String simpleProject =
-            "<?xml version=\"1.0\"?>\n" +
-            "<project>" +
-            "<database name='database'>" +
-            "<schemas><schema path='" + schemaPath + "' /></schemas>" +
-            "<procedures><procedure class='@Foo'><sql>select * from books;</sql></procedure></procedures>" +
-            "<partitions><partition table='BOOKS' column='CASH' /></partitions>" +
-            "</database>" +
-            "</project>";
-
-        File projectFile = VoltProjectBuilder.writeStringToTempFile(simpleProject);
-        String projectPath = projectFile.getPath();
-
-        VoltCompiler compiler = new VoltCompiler();
-        assertFalse(compiler.compileWithProjectXML(projectPath, testout_jar));
-    }
-
     public void testBadDdlStmtProcName() throws IOException {
         String schema =
             "create table books (cash integer default 23 not null, title varchar(10) default 'foo', PRIMARY KEY(cash));" +
+            "partition table books on column cash;\n" +
             "create procedure @Foo as select * from books;";
 
-        File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema);
-        String schemaPath = schemaFile.getPath();
-
-        String simpleProject =
-            "<?xml version=\"1.0\"?>\n" +
-            "<project>" +
-            "<database name='database'>" +
-            "<schemas><schema path='" + schemaPath + "' /></schemas>" +
-            "<procedures/>" +
-            "<partitions><partition table='BOOKS' column='CASH' /></partitions>" +
-            "</database>" +
-            "</project>";
-
-        File projectFile = VoltProjectBuilder.writeStringToTempFile(simpleProject);
-        String projectPath = projectFile.getPath();
-
-        VoltCompiler compiler = new VoltCompiler();
-        assertFalse(compiler.compileWithProjectXML(projectPath, testout_jar));
+        VoltCompiler compiler = new VoltCompiler(false);
+        final boolean success = compileDDL(schema, compiler);
+        assertFalse(success);
     }
 
     public void testGoodStmtProcName() throws IOException {
         String schema =
             "create table books (cash integer default 23 not null, title varchar(3) default 'foo', PRIMARY KEY(cash));" +
+            "create procedure Foo as select * from books;\n" +
             "PARTITION TABLE books ON COLUMN cash;";
 
-        File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema);
-        String schemaPath = schemaFile.getPath();
-
-        String simpleProject =
-            "<?xml version=\"1.0\"?>\n" +
-            "<project>" +
-            "<database name='database'>" +
-            "<schemas><schema path='" + schemaPath + "' /></schemas>" +
-            "<procedures><procedure class='Foo'><sql>select * from books;</sql></procedure></procedures>" +
-            "</database>" +
-            "</project>";
-
-        File projectFile = VoltProjectBuilder.writeStringToTempFile(simpleProject);
-        String projectPath = projectFile.getPath();
-        VoltCompiler compiler = new VoltCompiler();
-        assertTrue(compiler.compileWithProjectXML(projectPath, testout_jar));
+        VoltCompiler compiler = new VoltCompiler(false);
+        final boolean success = compileDDL(schema, compiler);
+        assertTrue(success);
     }
 
     public void testGoodDdlStmtProcName() throws IOException {
@@ -1217,14 +614,15 @@ public class TestVoltCompiler extends TestCase {
             "PARTITION TABLE books ON COLUMN cash;" +
             "CREATE PROCEDURE Foo AS select * from books where cash = ?;" +
             "PARTITION PROCEDURE Foo ON TABLE BOOKS COLUMN CASH PARAMETER 0;";
-        String projectPath = schemaToProjectPath(schema);
-        VoltCompiler compiler = new VoltCompiler();
-        assertTrue(compiler.compileWithProjectXML(projectPath, testout_jar));
+
+        VoltCompiler compiler = new VoltCompiler(false);
+        final boolean success = compileDDL(schema, compiler);
+        assertTrue(success);
     }
 
     public void testCreateProcedureWithPartition() throws IOException {
         class Tester {
-            VoltCompiler compiler = new VoltCompiler();
+            VoltCompiler compiler = new VoltCompiler(false);
             String baseDDL =
                 "create table books (cash integer default 23 not null, "
                                   + "title varchar(3) default 'foo', "
@@ -1329,7 +727,7 @@ public class TestVoltCompiler extends TestCase {
             "create procedure from class org.voltdb_testprocs.regressionsuites.fixedsql.TestENG2423$InnerProc;";
         File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema);
         String schemaPath = schemaFile.getPath();
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         assertTrue(compiler.compileFromDDL(testout_jar, schemaPath));
     }
 
@@ -1341,65 +739,15 @@ public class TestVoltCompiler extends TestCase {
             "create view matt (title, cash, num, foo) as select title, cash, count(*), sum(cash) from books group by title, cash;\n" +
             "create view matt2 (title, cash, num, foo) as select books.title, books.cash, count(*), sum(books.cash) from books join foo on books.cash = foo.cash group by books.title, books.cash;";
 
-
-        File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema);
-        String schemaPath = schemaFile.getPath();
-
-        String simpleProject =
-            "<?xml version=\"1.0\"?>\n" +
-            "<project>" +
-            "<database name='database'>" +
-            "<schemas><schema path='" + schemaPath + "' /></schemas>" +
-            "<procedures><procedure class='org.voltdb.compiler.procedures.AddBook' /></procedures>" +
-            "</database>" +
-            "</project>";
-
-        File projectFile = VoltProjectBuilder.writeStringToTempFile(simpleProject);
-        String projectPath = projectFile.getPath();
-        VoltCompiler compiler = new VoltCompiler();
-        assertTrue(compiler.compileWithProjectXML(projectPath, testout_jar));
+        VoltCompiler compiler = new VoltCompiler(false);
+        final boolean success = compileDDL(schema, compiler);
+        assertTrue(success);
         Catalog c1 = compiler.getCatalog();
         String catalogContents = VoltCompilerUtils.readFileFromJarfile(testout_jar, "catalog.txt");
         Catalog c2 = new Catalog();
         c2.execute(catalogContents);
         assertTrue(c2.serialize().equals(c1.serialize()));
     }
-
-
-    public void testVarbinary() throws IOException {
-        String schema =
-            "create table books (cash integer default 23 NOT NULL, title varbinary(10) default NULL, PRIMARY KEY(cash));" +
-            "partition table books on column cash;";
-
-        File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema);
-        String schemaPath = schemaFile.getPath();
-
-        String simpleProject =
-            "<?xml version=\"1.0\"?>\n" +
-            "<project>" +
-            "<database name='database'>" +
-            "<schemas><schema path='" + schemaPath + "' /></schemas>" +
-            "<procedures>" +
-            "<procedure class='get'><sql>select * from books;</sql></procedure>" +
-            "<procedure class='i1'><sql>insert into books values(5, 'AA');</sql></procedure>" +
-            "<procedure class='i2'><sql>insert into books values(5, ?);</sql></procedure>" +
-            "<procedure class='s1'><sql>update books set title = 'bb';</sql></procedure>" +
-            "</procedures>" +
-            //"<procedures><procedure class='org.voltdb.compiler.procedures.AddBook' /></procedures>" +
-            "</database>" +
-            "</project>";
-
-        File projectFile = VoltProjectBuilder.writeStringToTempFile(simpleProject);
-        String projectPath = projectFile.getPath();
-        VoltCompiler compiler = new VoltCompiler();
-        assertTrue(compiler.compileWithProjectXML(projectPath, testout_jar));
-        Catalog c1 = compiler.getCatalog();
-        String catalogContents = VoltCompilerUtils.readFileFromJarfile(testout_jar, "catalog.txt");
-        Catalog c2 = new Catalog();
-        c2.execute(catalogContents);
-        assertTrue(c2.serialize().equals(c1.serialize()));
-    }
-
 
     public void testDdlProcVarbinary() throws IOException {
         String schema =
@@ -1417,30 +765,15 @@ public class TestVoltCompiler extends TestCase {
             "create procedure d1 as" +
             "  delete from books where title = ? and cash = ?;" +
             "partition procedure d1 on table books column cash parameter 1;";
-        String projectPath = schemaToProjectPath(schema);
-        VoltCompiler compiler = new VoltCompiler();
-        assertTrue(compiler.compileWithProjectXML(projectPath, testout_jar));
+
+        VoltCompiler compiler = new VoltCompiler(false);
+        final boolean success = compileDDL(schema, compiler);
+        assertTrue(success);
         Catalog c1 = compiler.getCatalog();
         String catalogContents = VoltCompilerUtils.readFileFromJarfile(testout_jar, "catalog.txt");
         Catalog c2 = new Catalog();
         c2.execute(catalogContents);
         assertTrue(c2.serialize().equals(c1.serialize()));
-    }
-
-    private String schemaToProjectPath(String schema) {
-        File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema);
-        String schemaPath = schemaFile.getPath();
-        String simpleProject =
-            "<?xml version=\"1.0\"?>\n" +
-            "<project>" +
-            "<database name='database'>" +
-            "<schemas><schema path='" + schemaPath + "' /></schemas>" +
-            "<procedures/>" +
-            "</database>" +
-            "</project>";
-
-        File projectFile = VoltProjectBuilder.writeStringToTempFile(simpleProject);
-        return projectFile.getPath();
     }
 
     //
@@ -1455,20 +788,10 @@ public class TestVoltCompiler extends TestCase {
 
     private VoltCompiler compileSchemaForDDLTest(String schema, boolean expectSuccess) {
         String schemaPath = getPathForSchema(schema);
-        String simpleProject =
-            "<?xml version=\"1.0\"?>\n" +
-            "<project>" +
-            "<database name='database'>" +
-            "<schemas><schema path='" + schemaPath + "' /></schemas>" +
-            "<procedures><procedure class='sample'><sql>select * from t</sql></procedure></procedures>" +
-            "</database>" +
-            "</project>";
 
-        File projectFile = VoltProjectBuilder.writeStringToTempFile(simpleProject);
-        projectFile.deleteOnExit();
-        String projectPath = projectFile.getPath();
-        VoltCompiler compiler = new VoltCompiler();
-        assertEquals(expectSuccess, compiler.compileWithProjectXML(projectPath, testout_jar));
+        VoltCompiler compiler = new VoltCompiler(false);
+        final boolean success = compiler.compileFromDDL(testout_jar, schemaPath);
+        assertEquals(expectSuccess, success);
         return compiler;
     }
 
@@ -2171,21 +1494,7 @@ public class TestVoltCompiler extends TestCase {
         File schemaFile = VoltProjectBuilder.writeStringToTempFile(ddl);
         String schemaPath = schemaFile.getPath();
 
-        String simpleProject =
-            "<?xml version=\"1.0\"?>\n" +
-            "<project>" +
-            "<database name='database'>" +
-            "<schemas>" +
-            "<schema path='" + schemaPath + "' />" +
-            "</schemas>" +
-            "<procedures/>" +
-            "</database>" +
-            "</project>";
-
-        File projectFile = VoltProjectBuilder.writeStringToTempFile(simpleProject);
-        String projectPath = projectFile.getPath();
-
-        return compiler.compileWithProjectXML(projectPath, testout_jar);
+        return compiler.compileFromDDL(testout_jar, schemaPath);
     }
 
     private void checkCompilerErrorMessages(String expectedError, VoltCompiler compiler, boolean success) {
@@ -2200,7 +1509,7 @@ public class TestVoltCompiler extends TestCase {
     }
 
     private void checkDDLErrorMessage(String ddl, String errorMsg) {
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         boolean success = compileDDL(ddl, compiler);
         checkCompilerErrorMessages(errorMsg, compiler, success);
     }
@@ -2328,16 +1637,16 @@ public class TestVoltCompiler extends TestCase {
         checkDDLErrorMessage(tableDDL+viewDDL, "This query is not plannable.  The planner cannot guarantee that all rows would be in a single partition.");
 
         // 6. Test view defined on joined tables where some source tables are streamed table.
-        viewDDL = "EXPORT TABLE T2;\n" +
+        viewDDL = "CREATE STREAM T3x PARTITION ON COLUMN a (a INTEGER NOT NULL, b INTEGER NOT NULL);\n" +
                   "CREATE VIEW V (aint, cnt, sumint) AS \n" +
-                  "SELECT T1.a, count(*), sum(T2.b) FROM T1 JOIN T2 ON T1.a=T2.a GROUP BY T1.a;";
-        checkDDLErrorMessage(tableDDL+viewDDL, "A materialized view (V) on joined tables cannot have streamed table (T2) as its source.");
+                  "SELECT T1.a, count(*), sum(T3x.b) FROM T1 JOIN T3x ON T1.a=T3x.a GROUP BY T1.a;";
+        checkDDLErrorMessage(tableDDL+viewDDL, "A materialized view (V) on joined tables cannot have streamed table (T3X) as its source.");
     }
 
     public void testDDLCompilerMatView() {
         // Test MatView.
         String ddl;
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
 
         // Subquery is replaced with a simple select
         ddl = "create table t(id integer not null, num integer, wage integer);\n" +
@@ -2573,7 +1882,7 @@ public class TestVoltCompiler extends TestCase {
 
     void compileLimitDeleteStmtAndCheckCatalog(String ddl, String expectedMessage, String tblName,
             int expectedLimit, String expectedStmt) {
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         boolean success = compileDDL(ddl, compiler);
         checkCompilerErrorMessages(expectedMessage, compiler, success);
 
@@ -2912,47 +2221,13 @@ public class TestVoltCompiler extends TestCase {
 
     public void testPartitionOnBadType() {
         String schema =
-            "create table books (cash float default 0.0 NOT NULL, title varchar(10) default 'foo', PRIMARY KEY(cash));";
+            "create table books (cash float default 0.0 NOT NULL, title varchar(10) default 'foo', PRIMARY KEY(cash));\n"
+                + "partition table books on column cash;";
 
-        File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema);
-        String schemaPath = schemaFile.getPath();
-
-        String simpleProject =
-            "<?xml version=\"1.0\"?>\n" +
-            "<project>" +
-            "<database>" +
-            "<schemas><schema path='" + schemaPath + "' /></schemas>" +
-            "<partitions><partition table='books' column='cash'/></partitions> " +
-            "<procedures><procedure class='org.voltdb.compiler.procedures.AddBook' /></procedures>" +
-            "</database>" +
-            "</project>";
-
-        File projectFile = VoltProjectBuilder.writeStringToTempFile(simpleProject);
-        String projectPath = projectFile.getPath();
-        VoltCompiler compiler = new VoltCompiler();
-        assertFalse(compiler.compileWithProjectXML(projectPath, testout_jar));
+        VoltCompiler compiler = new VoltCompiler(false);
+        final boolean success = compileDDL(schema, compiler);
+        assertFalse(success);
     }
-
-    public void testOmittedProcedureList() {
-        String schema =
-                "create table books (cash float default 0.0 NOT NULL, title varchar(10) default 'foo', PRIMARY KEY(cash));";
-
-            File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema);
-            String schemaPath = schemaFile.getPath();
-
-            String simpleProject =
-                "<?xml version=\"1.0\"?>\n" +
-                "<project>" +
-                "<database>" +
-                "<schemas><schema path='" + schemaPath + "' /></schemas>" +
-                "</database>" +
-                "</project>";
-
-            File projectFile = VoltProjectBuilder.writeStringToTempFile(simpleProject);
-            String projectPath = projectFile.getPath();
-            VoltCompiler compiler = new VoltCompiler();
-            assertTrue(compiler.compileWithProjectXML(projectPath, testout_jar));
-        }
 
     public void test3324MPPlan() throws IOException {
         String schema =
@@ -2996,27 +2271,14 @@ public class TestVoltCompiler extends TestCase {
             "select id, COUNT(*), SUM(cnt)\n" +
             " from books\n" +
             " group by id;";
-        File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema);
-        String schemaPath = schemaFile.getPath();
 
-        String project =
-            "<?xml version=\"1.0\"?>\n" +
-            "<project>" +
-            "<database name='database'>" +
-            "<schemas><schema path='" + schemaPath + "' /></schemas>" +
-            "<procedures><procedure class='org.voltdb.compiler.procedures.AddBook' /></procedures>" +
-            "</database>" +
-            "</project>";
-
-        File projectFile = VoltProjectBuilder.writeStringToTempFile(project);
-        String projectPath = projectFile.getPath();
-        VoltCompiler compiler = new VoltCompiler();
-        assertFalse(compiler.compileWithProjectXML(projectPath, testout_jar));
+        VoltCompiler compiler = new VoltCompiler(false);
+        final boolean success = compileDDL(schema, compiler);
+        assertFalse(success);
         for (Feedback error: compiler.m_errors) {
             assertEquals(9, error.lineNo);
         }
     }
-
 
     public void testInvalidCreateProcedureDDL() throws Exception {
         ArrayList<Feedback> fbs;
@@ -3613,24 +2875,9 @@ public class TestVoltCompiler extends TestCase {
     }
 
     private ArrayList<Feedback> checkInvalidProcedureDDL(String ddl) {
-        File schemaFile = VoltProjectBuilder.writeStringToTempFile(ddl);
-        String schemaPath = schemaFile.getPath();
-
-        String simpleProject =
-            "<?xml version=\"1.0\"?>\n" +
-            "<project>" +
-            "<database name='database'>" +
-            "<schemas>" +
-            "<schema path='" + schemaPath + "' />" +
-            "</schemas>" +
-            "<procedures/>" +
-            "</database>" +
-            "</project>";
-
-        File projectFile = VoltProjectBuilder.writeStringToTempFile(simpleProject);
-        String projectPath = projectFile.getPath();
-        VoltCompiler compiler = new VoltCompiler();
-        assertFalse(compiler.compileWithProjectXML(projectPath, testout_jar));
+        VoltCompiler compiler = new VoltCompiler(false);
+        final boolean success = compileDDL(ddl, compiler);
+        assertFalse(success);
         return compiler.m_errors;
     }
 
@@ -3642,9 +2889,10 @@ public class TestVoltCompiler extends TestCase {
                 " PRIMARY KEY(cash));" +
                 "PARTITION TABLE books ON COLUMN cash;" +
                 "creAte PrOcEdUrE FrOm CLasS org.voltdb.compiler.procedures.AddBook;";
-        String projectPath = schemaToProjectPath(schema);
-        VoltCompiler compiler = new VoltCompiler();
-        assertTrue(compiler.compileWithProjectXML(projectPath, testout_jar));
+
+        VoltCompiler compiler = new VoltCompiler(false);
+        final boolean success = compileDDL(schema, compiler);
+        assertTrue(success);
 
         String catalogContents = VoltCompilerUtils.readFileFromJarfile(testout_jar, "catalog.txt");
 
@@ -3665,9 +2913,10 @@ public class TestVoltCompiler extends TestCase {
                 "PARTITION TABLE books ON COLUMN cash;" +
                 "create procedure from class org.voltdb.compiler.procedures.NotAnnotatedAddBook;" +
                 "paRtItiOn prOcEdure NotAnnotatedAddBook On taBLe   books coLUmN cash   ParaMETer  0;";
-        String projectPath = schemaToProjectPath(schema);
-        VoltCompiler compiler = new VoltCompiler();
-        assertTrue(compiler.compileWithProjectXML(projectPath, testout_jar));
+
+        VoltCompiler compiler = new VoltCompiler(false);
+        final boolean success = compileDDL(schema, compiler);
+        assertTrue(success);
 
         String catalogContents = VoltCompilerUtils.readFileFromJarfile(testout_jar, "catalog.txt");
         Catalog c2 = new Catalog();
@@ -3702,34 +2951,15 @@ public class TestVoltCompiler extends TestCase {
         }
     }
 
-    private void checkRoleXMLAndDDL(String rolesElem, String ddl, String errorRegex, TestRole... roles) throws Exception {
-        File schemaFile = VoltProjectBuilder.writeStringToTempFile(ddl != null ? ddl : "");
-        String schemaPath = schemaFile.getPath();
-        String rolesBlock = (rolesElem != null ? String.format("<roles>%s</roles>", rolesElem) : "");
+    private void checkRoleDDL(String ddl, String errorRegex, TestRole... roles) throws Exception {
+        VoltCompiler compiler = new VoltCompiler(false);
+        final boolean success = compileDDL(ddl, compiler);
 
-        String simpleProject =
-            "<?xml version=\"1.0\"?>\n" +
-            "<project>" +
-            "<database name='database'>" +
-            "<schemas>" +
-            "<schema path='" + schemaPath + "' />" +
-            "</schemas>" +
-            rolesBlock +
-            "<procedures/>" +
-            "</database>" +
-            "</project>";
-
-        File projectFile = VoltProjectBuilder.writeStringToTempFile(simpleProject);
-        String projectPath = projectFile.getPath();
-
-        VoltCompiler compiler = new VoltCompiler();
-
-        boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
         String error = (success || compiler.m_errors.size() == 0
                             ? ""
                             : compiler.m_errors.get(compiler.m_errors.size()-1).message);
         if (errorRegex == null) {
-            assertTrue(String.format("Expected success\nXML: %s\nDDL: %s\nERR: %s", rolesElem, ddl, error), success);
+            assertTrue(String.format("Expected success\nDDL: %s\nERR: %s", ddl, error), success);
 
             Database db = compiler.getCatalog().getClusters().get("cluster").getDatabases().get("database");
             CatalogMap<Group> groups = db.getGroups();
@@ -3753,7 +2983,7 @@ public class TestVoltCompiler extends TestCase {
             }
         }
         else {
-            assertFalse(String.format("Expected error (\"%s\")\nXML: %s\nDDL: %s", errorRegex, rolesElem, ddl), success);
+            assertFalse(String.format("Expected error (\"%s\")\n\nDDL: %s", errorRegex, ddl), success);
             assertFalse("Expected at least one error message.", error.isEmpty());
             Matcher m = Pattern.compile(errorRegex).matcher(error);
             assertTrue(String.format("%s\nEXPECTED: %s", error, errorRegex), m.matches());
@@ -3761,20 +2991,11 @@ public class TestVoltCompiler extends TestCase {
     }
 
     private void goodRoleDDL(String ddl, TestRole... roles) throws Exception {
-        checkRoleXMLAndDDL(null, ddl, null, roles);
+        checkRoleDDL(ddl, null, roles);
     }
 
     private void badRoleDDL(String ddl, String errorRegex) throws Exception {
-        checkRoleXMLAndDDL(null, ddl, errorRegex);
-    }
-
-    public void testRoleXML() throws Exception {
-        checkRoleXMLAndDDL("<role name='r1'/>", null, null, new TestRole("r1"));
-    }
-
-    public void testBadRoleXML() throws Exception {
-        checkRoleXMLAndDDL("<rolex name='r1'/>", null, ".*rolex.*[{]role[}].*expected.*");
-        checkRoleXMLAndDDL("<role name='r1'/>", "create role r1;", ".*already exists.*");
+        checkRoleDDL(ddl, errorRegex);
     }
 
     public void testRoleDDL() throws Exception {
@@ -3824,25 +3045,11 @@ public class TestVoltCompiler extends TestCase {
             givenSchema +
             StringUtils.join(ddl, " ");
 
-        File schemaFile = VoltProjectBuilder.writeStringToTempFile(schemaDDL.toString());
-        String schemaPath = schemaFile.getPath();
-
-        String projectXML =
-            "<?xml version=\"1.0\"?>\n" +
-            "<project>" +
-            "<database name='database'>" +
-            "<schemas><schema path='" + schemaPath + "' /></schemas>" +
-            "</database>" +
-            "</project>";
-
-        File projectFile = VoltProjectBuilder.writeStringToTempFile(projectXML);
-        String projectPath = projectFile.getPath();
-
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         boolean success;
         String error;
         try {
-            success = compiler.compileWithProjectXML(projectPath, testout_jar);
+            success = compileDDL(schemaDDL, compiler);
             error = (success || compiler.m_errors.size() == 0
                 ? ""
                 : compiler.m_errors.get(compiler.m_errors.size()-1).message);
@@ -4031,11 +3238,6 @@ public class TestVoltCompiler extends TestCase {
         return connector.getTableinfo().getIgnoreCase(tableName);
     }
 
-    private ConnectorTableInfo getConnectorTableInfoFor(Database db,
-            String tableName) {
-        return getConnectorTableInfoFor(db, tableName, Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
-    }
-
     private String getPartitionColumnInfoFor(Database db, String tableName) {
         Table table = db.getTables().getIgnoreCase(tableName);
         if (table == null) {
@@ -4066,69 +3268,16 @@ public class TestVoltCompiler extends TestCase {
         Database db;
 
         db = goodDDLAgainstSimpleSchema(
-                "create table e1 (id integer, f1 varchar(16));",
-                "export table e1;"
+                "create stream e1 export to target e1 (id integer, f1 varchar(16));"
                 );
-        assertNotNull(getConnectorTableInfoFor(db, "e1"));
+        assertNotNull(getConnectorTableInfoFor(db, "e1", "e1"));
 
         db = goodDDLAgainstSimpleSchema(
-                "create table e1 (id integer, f1 varchar(16));",
-                "create table e2 (id integer, f1 varchar(16));",
-                "export table e1;",
-                "eXpOrt TABle E2;"
+                "create stream e1 export to target e1 (id integer, f1 varchar(16));",
+                "create stream e2 export to target E2 (id integer, f1 varchar(16));"
                 );
-        assertNotNull(getConnectorTableInfoFor(db, "e1"));
-        assertNotNull(getConnectorTableInfoFor(db, "e2"));
-    }
-
-    public void testBadExportTable() throws Exception {
-
-        badDDLAgainstSimpleSchema(".+\\sEXPORT statement: table non_existant was not present in the catalog.*",
-                "export table non_existant;"
-                );
-
-        badDDLAgainstSimpleSchema(".+contains invalid identifier \"1table_name_not_valid\".*",
-                "export table 1table_name_not_valid;"
-                );
-
-        badDDLAgainstSimpleSchema(".+Invalid EXPORT TABLE statement.*",
-                "export table one, two, three;"
-                );
-
-        badDDLAgainstSimpleSchema(".+Invalid EXPORT TABLE statement.*",
-                "export export table one;"
-                );
-
-        badDDLAgainstSimpleSchema(".+Invalid EXPORT TABLE statement.*",
-                "export table table one;"
-                );
-
-        badDDLAgainstSimpleSchema("Streams cannot be configured with indexes.*",
-                "export table books;"
-                );
-
-        badDDLAgainstSimpleSchema("Stream configured with materialized view.*",
-                "create table view_source( id integer, f1 varchar(16), f2 varchar(12));",
-                "create view my_view as select f2, count(*) as f2cnt from view_source group by f2;",
-                "export table view_source;"
-                );
-
-        badDDLAgainstSimpleSchema("Stream configured with materialized view.*",
-                "create stream view_source (id integer, f1 varchar(16), f2 varchar(12));",
-                "create view my_view as select f2, count(*) as f2cnt from view_source group by f2;"
-                );
-
-        badDDLAgainstSimpleSchema("View configured as export source.*",
-                "create table view_source( id integer, f1 varchar(16), f2 varchar(12));",
-                "create view my_view as select f2, count(*) as f2cnt from view_source group by f2;",
-                "export table my_view;"
-                );
-
-        badDDLAgainstSimpleSchema("View configured as export source.*",
-                "create stream view_source (id integer, f1 varchar(16), f2 varchar(12));",
-                "create view my_view as select f2, count(*) as f2cnt from view_source group by f2;",
-                "export table my_view;"
-                );
+        assertNotNull(getConnectorTableInfoFor(db, "e1", "e1"));
+        assertNotNull(getConnectorTableInfoFor(db, "e2", "e2"));
     }
 
     public void testGoodCreateStream() throws Exception {
@@ -4137,7 +3286,7 @@ public class TestVoltCompiler extends TestCase {
         db = goodDDLAgainstSimpleSchema(
                 "create stream e1 (id integer, f1 varchar(16));"
                 );
-        assertNotNull(getConnectorTableInfoFor(db, "e1"));
+        assertNotNull(getConnectorTableInfoFor(db, "e1", Constants.DEFAULT_EXPORT_CONNECTOR_NAME));
 
         db = goodDDLAgainstSimpleSchema(
                 "create stream e1 (id integer, f1 varchar(16));",
@@ -4146,9 +3295,9 @@ public class TestVoltCompiler extends TestCase {
                 "create stream e4 partition on column id export to target bar (id integer not null, f1 varchar(16));",
                 "create stream e5 export to target bar partition on column id (id integer not null, f1 varchar(16));"
                 );
-        assertNotNull(getConnectorTableInfoFor(db, "e1"));
+        assertNotNull(getConnectorTableInfoFor(db, "e1", Constants.DEFAULT_EXPORT_CONNECTOR_NAME));
         assertEquals(null, getPartitionColumnInfoFor(db,"e1"));
-        assertNotNull(getConnectorTableInfoFor(db, "e2"));
+        assertNotNull(getConnectorTableInfoFor(db, "e2", Constants.DEFAULT_EXPORT_CONNECTOR_NAME));
         assertEquals("ID", getPartitionColumnInfoFor(db,"e2"));
         assertNotNull(getConnectorTableInfoFor(db, "e3", "bar"));
         assertEquals(null, getPartitionColumnInfoFor(db,"e3"));
@@ -4191,10 +3340,9 @@ public class TestVoltCompiler extends TestCase {
                 "create stream foo export to target bar (id integer, primary key(id));"
                 );
 
-        badDDLAgainstSimpleSchema("View configured as export source.*",
+        badDDLAgainstSimpleSchema("Stream configured with materialized view without partitioned.*",
                 "create stream view_source partition on column id (id integer not null, f1 varchar(16), f2 varchar(12));",
-                "create view my_view as select f2, count(*) as f2cnt from view_source group by f2;",
-                "export table my_view;"
+                "create view my_view as select f2, count(*) as f2cnt from view_source group by f2;"
                 );
     }
 
@@ -4351,11 +3499,16 @@ public class TestVoltCompiler extends TestCase {
                 "  group by column2_integer\n;\n";
         File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema1);
         String schemaPath = schemaFile.getPath();
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
 
-        assertTrue(compileFromDDL(compiler, testout_jar, schemaPath));
-        assertFalse(compileFromDDL(compiler, testout_jar, schemaPath + "???"));
-        assertFalse(compileFromDDL(compiler, testout_jar));
+        boolean success = compiler.compileFromDDL(testout_jar, schemaPath);
+        assertTrue(success);
+
+        success = compiler.compileFromDDL(testout_jar, schemaPath + "???");
+        assertFalse(success);
+
+        success = compiler.compileFromDDL(testout_jar);
+        assertFalse(success);
     }
 
     public void testDDLStmtProcNameWithDots() throws Exception {
@@ -4364,7 +3517,7 @@ public class TestVoltCompiler extends TestCase {
             "create procedure a.Foo as select * from books;"
         }, "\n"));
 
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         assertFalse("Compile with dotted proc name should fail",
                     compiler.compileFromDDL(testout_jar, ddlFile.getPath()));
         assertTrue("Compile with dotted proc name did not have the expected error message",

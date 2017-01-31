@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -46,6 +46,8 @@
 
 #include "execution/VoltDBEngine.h"
 #include "common/ValueFactory.hpp"
+#include "common/SerializableEEException.h"
+
 #include "test_utils/LoadTableFrom.hpp"
 #include "test_utils/plan_testing_config.h"
 
@@ -134,7 +136,7 @@ public:
                              m_exception_buffer.get(), 4096);
         m_engine->resetReusedResultOutputBuffer();
         int partitionCount = 3;
-        ASSERT_TRUE(m_engine->initialize(this->m_cluster_id, this->m_site_id, 0, 0, "", 0, 1024, voltdb::DEFAULT_TEMP_TABLE_MEMORY, false));
+        m_engine->initialize(m_cluster_id, m_site_id, 0, 0, "", 0, 1024, voltdb::DEFAULT_TEMP_TABLE_MEMORY, false);
         m_engine->updateHashinator(voltdb::HASHINATOR_LEGACY, (char*)&partitionCount, NULL, 0);
         ASSERT_TRUE(m_engine->loadCatalog( -2, m_catalog_string));
 
@@ -168,7 +170,7 @@ public:
         if (id != NULL) {
             *id = tbl->relativeIndex();
         }
-        return dynamic_cast<voltdb::PersistentTable *>(m_engine->getTable(name));
+        return dynamic_cast<voltdb::PersistentTable *>(m_engine->getTableByName(name));
     }
 
     void initTable(voltdb::PersistentTable       **table,
@@ -236,7 +238,11 @@ public:
             // Execute the plan.  You'd think this would be more
             // impressive.
             //
-            m_engine->executePlanFragments(1, &fragmentId, NULL, emptyParams, 1000, 1000, 1000, 1000, 1);
+            try {
+                m_engine->executePlanFragments(1, &fragmentId, NULL, emptyParams, 1000, 1000, 1000, 1000, 1);
+            } catch (voltdb::SerializableEEException &ex) {
+                throw;
+            }
     }
 
     /**
@@ -265,8 +271,8 @@ public:
             ASSERT_TRUE(iter.next(tuple));
             for (int32_t col = 0; col < nCols; col += 1) {
                 int32_t expected = answer[row * nCols + col];
-                int32_t v1 = voltdb::ValuePeeker::peekAsInteger(tuple.getNValue(col));
-                VOLT_TRACE("Row %02d, col %02d: expected %04d, got %04d (%s)",
+                int64_t v1 = voltdb::ValuePeeker::peekAsBigInt(tuple.getNValue(col));
+                VOLT_TRACE("Row %02d, col %02d: expected %04d, got %04ld (%s)",
                            row, col,
                            expected, v1,
                            (expected != v1) ? "failed" : "ok");

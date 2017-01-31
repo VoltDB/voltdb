@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -76,12 +76,11 @@ class AdminAdvancedTest extends TestBase {
         }
     }
 
-    def "check Advanced"() {
+    def checkAdvanced() {
         int count = 0
         testStatus = false
 
         expect: 'at Admin Page'
-
         while(count<numberOfTrials) {
             count ++
             try {
@@ -111,7 +110,7 @@ class AdminAdvancedTest extends TestBase {
 
     // overview: advanced expansion-Edits
 
-    def "Check click Heart Timeout edit and Cancel"() {
+    def checkClickHeartTimeoutEditAndCancel() {
         when:
         page.advanced.click()
         then:
@@ -136,7 +135,7 @@ class AdminAdvancedTest extends TestBase {
         }
     }
 
-    def "Check click Heart Timeout edit and click Ok and then Cancel"() {
+    def checkClickHeartTimeoutEditAndClickOkAndThenCancel() {
         when:
         page.advanced.click()
         then:
@@ -184,7 +183,7 @@ class AdminAdvancedTest extends TestBase {
         }
     }
 
-    def "Check click Heart Timeout edit and click Ok and then Ok"() {
+    def checkClickHeartTimeoutEditAndClickOkAndThenOk() {
         when:
         String heartTimeout = 20
         page.advanced.click()
@@ -233,7 +232,7 @@ class AdminAdvancedTest extends TestBase {
         }
     }
 
-    def "Heartbeat timeout> check error msg if empty data"() {
+    def heartbeatTimeoutCheckErrorMessageIfEmptyData() {
         when:
         String heartTimeout = ""
         page.advanced.click()
@@ -262,7 +261,7 @@ class AdminAdvancedTest extends TestBase {
 
     }
 
-    def "Heartbeat timeout > check error msg is value less then 1"() {
+    def heartbeatTimeoutCheckErrorMessageIsValueLessThenOne() {
         when:
         String heartTimeout = "0"
         page.advanced.click()
@@ -293,7 +292,7 @@ class AdminAdvancedTest extends TestBase {
 
     // query timeout
 
-    def "Check click Query Timeout edit and Cancel"() {
+    def checkClickQueryTimeoutEditAndCancel() {
         when:
         page.advanced.click()
         then:
@@ -318,7 +317,7 @@ class AdminAdvancedTest extends TestBase {
         }
     }
 
-    def "Check click Query Timeout edit and click Ok and then Cancel"() {
+    def checkClickQueryTimeoutEditAndClickOkAndThenCancel() {
         when:
         page.advanced.click()
         then:
@@ -367,7 +366,7 @@ class AdminAdvancedTest extends TestBase {
         }
     }
 
-    def "Check click Query Timeout edit and click Ok and then Ok"() {
+    def checkClickQueryTimeoutEditAndClickOkAndThenOk() {
         when:
         String queryTimeout = 20
         page.advanced.click()
@@ -400,8 +399,6 @@ class AdminAdvancedTest extends TestBase {
             page.overview.queryTimeoutPopupOk.isDisplayed()
             page.overview.queryTimeoutPopupCancel.isDisplayed()
         }
-
-
         waitFor(waitTime) {
             try {
                 page.overview.queryTimeoutPopupOk.click()
@@ -416,7 +413,7 @@ class AdminAdvancedTest extends TestBase {
         }
     }
 
-    def "Query timeout> check error msg if empty data"() {
+    def queryTimeoutCheckErrorMessageIfEmptyData() {
         when:
         String queryTimeout = ""
         page.advanced.click()
@@ -442,11 +439,10 @@ class AdminAdvancedTest extends TestBase {
             page.overview.errorQuery.isDisplayed()
             page.overview.errorQuery.text().equals("Please enter a valid positive number.")
         }
-
     }
 
     //Memory Limit
-    def "Check the memory limit edit button and then Cancel button"() {
+    def checkTheMemoryLimitEditButtonAndThenCancelButton() {
         when:
         page.advanced.click()
         then:
@@ -473,7 +469,7 @@ class AdminAdvancedTest extends TestBase {
         }
     }
 
-    def "Check memory limit edit and then click Ok and Cancel"() {
+    def checkMemoryLimitEditAndThenClickOkAndCancel() {
         when:
         page.advanced.click()
         then:
@@ -499,7 +495,6 @@ class AdminAdvancedTest extends TestBase {
             page.overview.memoryLimitPopupOk.isDisplayed()
             page.overview.memoryLimitPopupCancel.isDisplayed()
         }
-
         int count = 0
         while(count<numberOfTrials) {
             count++
@@ -522,7 +517,7 @@ class AdminAdvancedTest extends TestBase {
         }
     }
 
-    def "Check memory limit edit and then click Ok and confirm Ok(Using GB)"() {
+    def checkMemoryLimitEditAndThenClickOkAndConfirmOkUsingGB() {
         when:
         String memoryLimit = 20
         String memoryLimitUnit = "GB"
@@ -533,7 +528,6 @@ class AdminAdvancedTest extends TestBase {
         initialMemoryLimit = page.overview.memoryLimitValue.text()
         println("Initial value of memory limit "+ initialMemoryLimit)
         revertMemorySize = true
-
         then:
         waitFor(waitTime) { page.overview.memoryLimitEdit.isDisplayed() }
 
@@ -558,7 +552,6 @@ class AdminAdvancedTest extends TestBase {
             page.overview.memoryLimitPopupOk.isDisplayed()
             page.overview.memoryLimitPopupCancel.isDisplayed()
         }
-
         waitFor(waitTime) {
             try {
                 page.overview.memoryLimitPopupOk.click()
@@ -573,7 +566,7 @@ class AdminAdvancedTest extends TestBase {
         }
     }
 
-    def "Check memory limit edit and then click Ok and confirm Ok(Using %)"() {
+    def checkMemoryLimitEditAndThenClickOkAndConfirmOkUsingPercentage() {
         when:
         String memoryLimit = 50
         String memoryLimitUnit = "%"
@@ -625,7 +618,7 @@ class AdminAdvancedTest extends TestBase {
         }
     }
 
-    def "Verify empty entry is not accepted in Memory Limit"(){
+    def verifyEmptyEntryIsNotAcceptedInMemoryLimit() {
         int count = 0
         println("Test Start: Verify empty entry is not accepted in Memory Limit")
 
@@ -705,7 +698,7 @@ class AdminAdvancedTest extends TestBase {
 //        !page.overview.memoryLimitError.isDisplayed()
 //    }
 
-    def "Check the error message for memory limit when value is less than 0"() {
+    def checkTheErrorMessageForMemoryLimitWhenValueIsLessThanZero() {
         when:
         String invalidMemoryLimit = "-1"
         String validMemoryLimit = "1"
@@ -738,7 +731,7 @@ class AdminAdvancedTest extends TestBase {
         !page.overview.memoryLimitError.isDisplayed()
     }
 
-    def "Check memory limit, maximum limit validation when unit is %"(){
+    def checkMemoryLimitMaximumLimitValidationWhenUnitIsPercentage(){
         when:
         String invalidMemoryLimitInPer = "100"
         String validMemoryLimitInPer = "99"
@@ -775,7 +768,7 @@ class AdminAdvancedTest extends TestBase {
 
    // Disk Limit
 
-    def "Check Disk Limit Click and check its value"() {
+    def checkDiskLimitClickAndCheckItsValue() {
         when:"Open Advanced"
         page.advanced.click()
         then:
@@ -792,13 +785,13 @@ class AdminAdvancedTest extends TestBase {
         page.overview.diskLimit.click()
     }
 
-    def VerifyAddDiskLimitForSNAPSHOTFeature(){
+    def verifyAddDiskLimitForSNAPSHOTFeature(){
         when:"Open Advanced"
         page.advanced.click()
         then:"Check if DiskLimit is displayed"
          waitFor(10){page.overview.diskLimit.isDisplayed()}
-        when:"Open Edit Disk Limit"
 
+        when:"Open Edit Disk Limit"
         println("Opening Disk Limit Popup")
         waitFor(30) { page.overview.diskLimitEdit.isDisplayed() }
         page.overview.diskLimitEdit.click()
@@ -816,11 +809,9 @@ class AdminAdvancedTest extends TestBase {
         page.overview.featureName1.value("SNAPSHOTS")
         page.overview.featureValue1.value("13")
         page.overview.featureUnit1.value("GB")
-
         then:"Save New Feature"
         page.overview.btnAddDiskLimitSave.isDisplayed()
         page.overview.btnAddDiskLimitSave.click()
-
         waitFor(30){page.overview.btnSaveDiskLimitOk.isDisplayed()}
         page.overview.btnSaveDiskLimitOk.click()
 
@@ -833,13 +824,11 @@ class AdminAdvancedTest extends TestBase {
 
         when:"Open Edit Disk Limit"
         page.overview.openEditDiskLimitPopup()
-
         then:"check elements"
         waitFor(30){page.overview.deleteFirstFeature.isDisplayed()}
 
         when:"Delete Feature"
         page.overview.deleteFirstFeature.click()
-
         then:"Save New Feature"
         page.overview.btnAddDiskLimitSave.isDisplayed()
         page.overview.btnAddDiskLimitSave.click()
@@ -852,20 +841,21 @@ class AdminAdvancedTest extends TestBase {
 //        //waitFor(waitTime){ page.overview.expandDiskLimit()}
 //        then:
 //        snapShotName.isDisplayed()
-
     }
 
-    def VerifyAddDiskLimitforCOMMANDLOGfeature(){
+    def verifyAddDiskLimitforCOMMANDLOGfeature(){
         when:"Open Advanced"
         page.advanced.click()
         then:"Check if DiskLimit is displayed"
         waitFor(10){page.overview.diskLimit.isDisplayed()}
+
         when:"Open Edit Disk Limit"
         waitFor(30) { page.overview.diskLimitEdit.isDisplayed() }
         page.overview.diskLimitEdit.click()
         waitFor(30) { page.overview.addDiskLimitHeader.isDisplayed() }
         then:"check elements"
         page.overview.lnkAddNewFeature.isDisplayed()
+
         when:"Add SNAPSHOT feature"
         page.overview.lnkAddNewFeature.click()
         then:"check elements"
@@ -877,7 +867,6 @@ class AdminAdvancedTest extends TestBase {
         page.overview.featureName1.value("COMMANDLOG")
         page.overview.featureValue1.value("13")
         page.overview.featureUnit1.value("GB")
-
         then:"Save New Feature"
         page.overview.btnAddDiskLimitSave.isDisplayed()
         page.overview.btnAddDiskLimitSave.click()
@@ -894,17 +883,14 @@ class AdminAdvancedTest extends TestBase {
 
         when:"Open Edit Disk Limit"
         page.overview.openEditDiskLimitPopup()
-
         then:"check elements"
         waitFor(30){page.overview.deleteFirstFeature.isDisplayed()}
 
         when:"Delete Feature"
         page.overview.deleteFirstFeature.click()
-
         then:"Save New Feature"
         page.overview.btnAddDiskLimitSave.isDisplayed()
         page.overview.btnAddDiskLimitSave.click()
-
         page.overview.btnSaveDiskLimitOk.isDisplayed()
         page.overview.btnSaveDiskLimitOk.click()
 
@@ -913,20 +899,21 @@ class AdminAdvancedTest extends TestBase {
 //        //waitFor(waitTime){ page.overview.expandDiskLimit()}
 //        then:
 //        snapShotName.isDisplayed()
-
     }
 
-    def "Verify Add Disk Limit for EXPORTOVERFLOW feature"(){
+    def verifyAddDiskLimitForExportOverflowFeature(){
         when:"Open Advanced"
         page.advanced.click()
         then:"Check if DiskLimit is displayed"
-        waitFor(10){page.overview.diskLimit.isDisplayed()}
+        waitFor(10) { page.overview.diskLimit.isDisplayed() }
+
         when:"Open Edit Disk Limit"
         waitFor(30) { page.overview.diskLimitEdit.isDisplayed() }
         page.overview.diskLimitEdit.click()
         waitFor(30) { page.overview.addDiskLimitHeader.isDisplayed() }
         then:"check elements"
         page.overview.lnkAddNewFeature.isDisplayed()
+
         when:"Add SNAPSHOT feature"
         page.overview.lnkAddNewFeature.click()
         then:"check elements"
@@ -938,16 +925,15 @@ class AdminAdvancedTest extends TestBase {
         page.overview.featureName1.value("EXPORTOVERFLOW")
         page.overview.featureValue1.value("13")
         page.overview.featureUnit1.value("GB")
-
         then:"Save New Feature"
         page.overview.btnAddDiskLimitSave.isDisplayed()
         page.overview.btnAddDiskLimitSave.click()
 
-        waitFor(30){page.overview.btnSaveDiskLimitOk.isDisplayed()}
+        waitFor(30) { page.overview.btnSaveDiskLimitOk.isDisplayed() }
         page.overview.btnSaveDiskLimitOk.click()
 
         when: "expand Disk Limit"
-        waitFor(30){diskLimitExpanded.click()}
+        waitFor(30) { diskLimitExpanded.click() }
         //waitFor(waitTime){ page.overview.expandDiskLimit()}
         then:
         println("Add succeeded")
@@ -955,39 +941,36 @@ class AdminAdvancedTest extends TestBase {
 
         when:"Open Edit Disk Limit"
         page.overview.openEditDiskLimitPopup()
-
         then:"check elements"
         waitFor(30){page.overview.deleteFirstFeature.isDisplayed()}
 
         when:"Delete Feature"
         page.overview.deleteFirstFeature.click()
-
         then:"Save New Feature"
         page.overview.btnAddDiskLimitSave.isDisplayed()
         page.overview.btnAddDiskLimitSave.click()
-
         page.overview.btnSaveDiskLimitOk.isDisplayed()
         page.overview.btnSaveDiskLimitOk.click()
-
 //        when: "expand Disk Limit"
 //        diskLimitExpanded.click()
 //        //waitFor(waitTime){ page.overview.expandDiskLimit()}
 //        then:
 //        snapShotName.isDisplayed()
-
     }
 
-    def "Verify Add Disk Limit for DROVERFLOW feature"(){
+    def verifyAddDiskLimitForDroverflowFeature() {
         when:"Open Advanced"
         page.advanced.click()
         then:"Check if DiskLimit is displayed"
-        waitFor(10){page.overview.diskLimit.isDisplayed()}
+        waitFor(10) { page.overview.diskLimit.isDisplayed() }
+
         when:"Open Edit Disk Limit"
         waitFor(30) { page.overview.diskLimitEdit.isDisplayed() }
         page.overview.diskLimitEdit.click()
         waitFor(30) { page.overview.addDiskLimitHeader.isDisplayed() }
         then:"check elements"
         page.overview.lnkAddNewFeature.isDisplayed()
+
         when:"Add SNAPSHOT feature"
         page.overview.lnkAddNewFeature.click()
         then:"check elements"
@@ -999,12 +982,10 @@ class AdminAdvancedTest extends TestBase {
         page.overview.featureName1.value("DROVERFLOW")
         page.overview.featureValue1.value("13")
         page.overview.featureUnit1.value("GB")
-
         then:"Save New Feature"
         page.overview.btnAddDiskLimitSave.isDisplayed()
         page.overview.btnAddDiskLimitSave.click()
-
-        waitFor(30){page.overview.btnSaveDiskLimitOk.isDisplayed()}
+        waitFor(30) { page.overview.btnSaveDiskLimitOk.isDisplayed() }
         page.overview.btnSaveDiskLimitOk.click()
 
         when: "expand Disk Limit"
@@ -1016,39 +997,36 @@ class AdminAdvancedTest extends TestBase {
 
         when:"Open Edit Disk Limit"
         page.overview.openEditDiskLimitPopup()
-
         then:"check elements"
         waitFor(30){page.overview.deleteFirstFeature.isDisplayed()}
 
         when:"Delete Feature"
         page.overview.deleteFirstFeature.click()
-
         then:"Save New Feature"
         page.overview.btnAddDiskLimitSave.isDisplayed()
         page.overview.btnAddDiskLimitSave.click()
-
         page.overview.btnSaveDiskLimitOk.isDisplayed()
         page.overview.btnSaveDiskLimitOk.click()
-
 //        when: "expand Disk Limit"
 //        diskLimitExpanded.click()
 //        //waitFor(waitTime){ page.overview.expandDiskLimit()}
 //        then:
 //        snapShotName.isDisplayed()
-
     }
 
-    def "Verify Add Disk Limit for COMMANDLOGSNAPSHOT feature"(){
+    def verifyAddDiskLimitForCommandLogSnapshopFeature() {
         when:"Open Advanced"
         page.advanced.click()
         then:"Check if DiskLimit is displayed"
         waitFor(10){page.overview.diskLimit.isDisplayed()}
+
         when:"Open Edit Disk Limit"
         waitFor(30) { page.overview.diskLimitEdit.isDisplayed() }
         page.overview.diskLimitEdit.click()
         waitFor(30) { page.overview.addDiskLimitHeader.isDisplayed() }
         then:"check elements"
         page.overview.lnkAddNewFeature.isDisplayed()
+
         when:"Add SNAPSHOT feature"
         page.overview.lnkAddNewFeature.click()
         then:"check elements"
@@ -1060,11 +1038,9 @@ class AdminAdvancedTest extends TestBase {
         page.overview.featureName1.value("COMMANDLOGSNAPSHOT")
         page.overview.featureValue1.value("13")
         page.overview.featureUnit1.value("GB")
-
         then:"Save New Feature"
         page.overview.btnAddDiskLimitSave.isDisplayed()
         page.overview.btnAddDiskLimitSave.click()
-
         waitFor(30){page.overview.btnSaveDiskLimitOk.isDisplayed()}
         page.overview.btnSaveDiskLimitOk.click()
 
@@ -1077,41 +1053,36 @@ class AdminAdvancedTest extends TestBase {
 
         when:"Open Edit Disk Limit"
         page.overview.openEditDiskLimitPopup()
-
         then:"check elements"
         waitFor(30){page.overview.deleteFirstFeature.isDisplayed()}
 
         when:"Delete Feature"
         page.overview.deleteFirstFeature.click()
-
         then:"Save New Feature"
         page.overview.btnAddDiskLimitSave.isDisplayed()
         page.overview.btnAddDiskLimitSave.click()
-
         page.overview.btnSaveDiskLimitOk.isDisplayed()
         page.overview.btnSaveDiskLimitOk.click()
-
 //        when: "expand Disk Limit"
 //        diskLimitExpanded.click()
 //        //waitFor(waitTime){ page.overview.expandDiskLimit()}
 //        then:
 //        snapShotName.isDisplayed()
-
     }
 
-
-
-    def "Verify Error message for  Duplicate Features"(){
+    def verifyErrorMessageForDuplicateFeatures() {
         when:"Open Advanced"
         page.advanced.click()
         then:"Check if DiskLimit is displayed"
-        waitFor(10){page.overview.diskLimit.isDisplayed()}
+        waitFor(10) { page.overview.diskLimit.isDisplayed() }
+
         when:"Open Edit Disk Limit"
         waitFor(30) { page.overview.diskLimitEdit.isDisplayed() }
         page.overview.diskLimitEdit.click()
         waitFor(30) { page.overview.addDiskLimitHeader.isDisplayed() }
         then:"check elements"
         page.overview.lnkAddNewFeature.isDisplayed()
+
         when:"Add SNAPSHOT feature"
         page.overview.lnkAddNewFeature.click()
         then:"check elements and add values"
@@ -1124,7 +1095,6 @@ class AdminAdvancedTest extends TestBase {
 
         when:"Add SNAPSHOT feature"
         page.overview.lnkAddNewFeature.click()
-
         then:"Add another SNAPSHOT feature"
         page.overview.featureName2.isDisplayed()
         page.overview.featureValue2.isDisplayed()
@@ -1136,23 +1106,24 @@ class AdminAdvancedTest extends TestBase {
         when:"Save New Feature"
         page.overview.btnAddDiskLimitSave.isDisplayed()
         page.overview.btnAddDiskLimitSave.click()
-
         then: "Check for validation"
         page.overview.errortxtName1.isDisplayed()
         page.overview.errortxtName2.isDisplayed()
     }
 
-    def "Verify Error Message for Features size"(){
+    def verifyErrorMessageForFeaturesSize() {
         when:"Open Advanced"
         page.advanced.click()
         then:"Check if DiskLimit is displayed"
-        waitFor(10){page.overview.diskLimit.isDisplayed()}
+        waitFor(10) { page.overview.diskLimit.isDisplayed() }
+
         when:"Open Edit Disk Limit"
         waitFor(30) { page.overview.diskLimitEdit.isDisplayed() }
         page.overview.diskLimitEdit.click()
         waitFor(30) { page.overview.addDiskLimitHeader.isDisplayed() }
         then:"check elements"
         page.overview.lnkAddNewFeature.isDisplayed()
+
         when:"Add SNAPSHOT feature"
         page.overview.lnkAddNewFeature.click()
         then:"check elements"
@@ -1163,23 +1134,24 @@ class AdminAdvancedTest extends TestBase {
         when:"Save New Feature"
         page.overview.btnAddDiskLimitSave.isDisplayed()
         page.overview.btnAddDiskLimitSave.click()
-
         then: "Check for validation"
         page.overview.errorValue1.isDisplayed()
         page.overview.errorValue1.text().equals("This field is required")
     }
 
-    def "Verify Error Message for Features unit"(){
+    def verifyErrorMessageForFeaturesUnit() {
         when:"Open Advanced"
         page.advanced.click()
         then:"Check if DiskLimit is displayed"
-        waitFor(10){page.overview.diskLimit.isDisplayed()}
+        waitFor(10) { page.overview.diskLimit.isDisplayed() }
+
         when:"Open Edit Disk Limit"
         waitFor(30) { page.overview.diskLimitEdit.isDisplayed() }
         page.overview.diskLimitEdit.click()
         waitFor(30) { page.overview.addDiskLimitHeader.isDisplayed() }
         then:"check elements"
         page.overview.lnkAddNewFeature.isDisplayed()
+
         when:"Add SNAPSHOT feature"
         page.overview.lnkAddNewFeature.click()
         then:"check elements and add values"
@@ -1190,27 +1162,27 @@ class AdminAdvancedTest extends TestBase {
         page.overview.featureValue1.value("130")
         page.overview.featureUnit1.value("%")
 
-
         when:"Save New Feature"
         page.overview.btnAddDiskLimitSave.isDisplayed()
         page.overview.btnAddDiskLimitSave.click()
-
         then: "Check for validation"
         page.overview.errorValue1.isDisplayed()
         page.overview.errorValue1.text().equals("Maximum value of percentage cannot be greater than 99.")
     }
 
-    def "Verify Error Message for Feature's invalid Decimal value"(){
+    def verifyErrorMessageForFeatureInvalidDecimalValue() {
         when:"Open Advanced"
         page.advanced.click()
         then:"Check if DiskLimit is displayed"
         waitFor(10){page.overview.diskLimit.isDisplayed()}
+
         when:"Open Edit Disk Limit"
         waitFor(30) { page.overview.diskLimitEdit.isDisplayed() }
         page.overview.diskLimitEdit.click()
         waitFor(30) { page.overview.addDiskLimitHeader.isDisplayed() }
         then:"check elements"
         page.overview.lnkAddNewFeature.isDisplayed()
+
         when:"Add SNAPSHOT feature"
         page.overview.lnkAddNewFeature.click()
         then:"check elements and add values"
@@ -1221,28 +1193,27 @@ class AdminAdvancedTest extends TestBase {
         page.overview.featureValue1.value("13.33")
         page.overview.featureUnit1.value("%")
 
-
         when:"Save New Feature"
         page.overview.btnAddDiskLimitSave.isDisplayed()
         page.overview.btnAddDiskLimitSave.click()
-
         then: "Check for validation"
         page.overview.errorValue1.isDisplayed()
         page.overview.errorValue1.text().equals("Please enter a positive number without any decimal.")
-
     }
 
-    def "Verify Add Disk Limit Cancel"(){
+    def verifyAddDiskLimitCancel() {
         when:"Open Advanced"
         page.advanced.click()
         then:"Check if DiskLimit is displayed"
-        waitFor(10){page.overview.diskLimit.isDisplayed()}
+        waitFor(10) { page.overview.diskLimit.isDisplayed() }
+
         when:"Open Edit Disk Limit"
         waitFor(30) { page.overview.diskLimitEdit.isDisplayed() }
         page.overview.diskLimitEdit.click()
         waitFor(30) { page.overview.addDiskLimitHeader.isDisplayed() }
         then:"check elements"
         page.overview.lnkAddNewFeature.isDisplayed()
+
         when:"Add SNAPSHOT feature"
         page.overview.lnkAddNewFeature.click()
         then:"check elements and add values"
@@ -1253,19 +1224,16 @@ class AdminAdvancedTest extends TestBase {
         page.overview.featureValue1.value("13")
         page.overview.featureUnit1.value("%")
 
-
         when:"Save New Feature"
         page.overview.btnAddDiskLimitSave.isDisplayed()
         page.overview.btnAddDiskLimitSave.click()
-
         page.overview.btnSaveDiskLimitCancel.isDisplayed()
         page.overview.btnSaveDiskLimitCancel.click()
-
         then: "Cancelled"
-       println("Confirmation popup has been cancelled")
+        println("Confirmation popup has been cancelled")
     }
 
-    def "Advanced Expand:Check Text"() {
+    def advancedExpandCheckText() {
         when:
         page.overview.advanced.click()
         then:

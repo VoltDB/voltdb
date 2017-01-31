@@ -1,17 +1,15 @@
 /*
  * Copyright (C) 2007 The Guava Authors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
+ * in compliance with the License. You may obtain a copy of the License at
  *
  * http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software distributed under the License
+ * is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
+ * or implied. See the License for the specific language governing permissions and limitations under
+ * the License.
  */
 
 package com.google_voltpatches.common.base;
@@ -21,8 +19,10 @@ import static java.util.Arrays.asList;
 import static java.util.Collections.unmodifiableList;
 
 import com.google_voltpatches.common.annotations.Beta;
+import com.google_voltpatches.common.annotations.GwtCompatible;
+import com.google_voltpatches.common.annotations.GwtIncompatible;
 import com.google_voltpatches.common.annotations.VisibleForTesting;
-
+import com.google_voltpatches.errorprone.annotations.CanIgnoreReturnValue;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.lang.reflect.InvocationTargetException;
@@ -31,82 +31,153 @@ import java.util.AbstractList;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-
-import javax.annotation_voltpatches.CheckReturnValue;
 import javax.annotation_voltpatches.Nullable;
 
 /**
  * Static utility methods pertaining to instances of {@link Throwable}.
  *
- * <p>See the Guava User Guide entry on <a href=
- * "https://github.com/google/guava/wiki/ThrowablesExplained">Throwables</a>.
+ * <p>See the Guava User Guide entry on
+ * <a href="https://github.com/google/guava/wiki/ThrowablesExplained">Throwables</a>.
  *
  * @author Kevin Bourrillion
  * @author Ben Yu
  * @since 1.0
  */
+@GwtCompatible(emulated = true)
 public final class Throwables {
   private Throwables() {}
 
   /**
-   * Propagates {@code throwable} exactly as-is, if and only if it is an instance of {@code
-   * declaredType}.  Example usage:
+   * Throws {@code throwable} if it is an instance of {@code declaredType}. Example usage:
+   *
    * <pre>
+   * for (Foo foo : foos) {
    *   try {
-   *     someMethodThatCouldThrowAnything();
-   *   } catch (IKnowWhatToDoWithThisException e) {
-   *     handle(e);
-   *   } catch (Throwable t) {
-   *     Throwables.propagateIfInstanceOf(t, IOException.class);
-   *     Throwables.propagateIfInstanceOf(t, SQLException.class);
-   *     throw Throwables.propagate(t);
+   *     foo.bar();
+   *   } catch (BarException | RuntimeException | Error t) {
+   *     failure = t;
    *   }
+   * }
+   * if (failure != null) {
+   *   throwIfInstanceOf(failure, BarException.class);
+   *   throwIfUnchecked(failure);
+   *   throw new AssertionError(failure);
+   * }
    * </pre>
+   *
+   * @since 20.0
    */
-  public static <X extends Throwable> void propagateIfInstanceOf(
-      @Nullable Throwable throwable, Class<X> declaredType) throws X {
-    // Check for null is needed to avoid frequent JNI calls to isInstance().
-    if (throwable != null && declaredType.isInstance(throwable)) {
+  @GwtIncompatible // Class.cast, Class.isInstance
+  public static <X extends Throwable> void throwIfInstanceOf(
+      Throwable throwable, Class<X> declaredType) throws X {
+    checkNotNull(throwable);
+    if (declaredType.isInstance(throwable)) {
       throw declaredType.cast(throwable);
     }
   }
 
   /**
-   * Propagates {@code throwable} exactly as-is, if and only if it is an instance of {@link
-   * RuntimeException} or {@link Error}.  Example usage:
+   * Propagates {@code throwable} exactly as-is, if and only if it is an instance of {@code
+   * declaredType}. Example usage:
+   *
    * <pre>
-   *   try {
-   *     someMethodThatCouldThrowAnything();
-   *   } catch (IKnowWhatToDoWithThisException e) {
-   *     handle(e);
-   *   } catch (Throwable t) {
-   *     Throwables.propagateIfPossible(t);
-   *     throw new RuntimeException("unexpected", t);
-   *   }
+   * try {
+   *   someMethodThatCouldThrowAnything();
+   * } catch (IKnowWhatToDoWithThisException e) {
+   *   handle(e);
+   * } catch (Throwable t) {
+   *   Throwables.propagateIfInstanceOf(t, IOException.class);
+   *   Throwables.propagateIfInstanceOf(t, SQLException.class);
+   *   throw Throwables.propagate(t);
+   * }
    * </pre>
+   *
+   * @deprecated Use {@link #throwIfInstanceOf}, which has the same behavior
+   *     but rejects {@code null}. This method is scheduled to be removed in July 2018.
    */
-  public static void propagateIfPossible(@Nullable Throwable throwable) {
-    propagateIfInstanceOf(throwable, Error.class);
-    propagateIfInstanceOf(throwable, RuntimeException.class);
+  @Deprecated
+  @GwtIncompatible // throwIfInstanceOf
+  public static <X extends Throwable> void propagateIfInstanceOf(
+      @Nullable Throwable throwable, Class<X> declaredType) throws X {
+    if (throwable != null) {
+      throwIfInstanceOf(throwable, declaredType);
+    }
   }
 
   /**
-   * Propagates {@code throwable} exactly as-is, if and only if it is an instance of {@link
-   * RuntimeException}, {@link Error}, or {@code declaredType}. Example usage:
+   * Throws {@code throwable} if it is a {@link RuntimeException} or {@link Error}. Example usage:
+   *
    * <pre>
+   * for (Foo foo : foos) {
    *   try {
-   *     someMethodThatCouldThrowAnything();
-   *   } catch (IKnowWhatToDoWithThisException e) {
-   *     handle(e);
-   *   } catch (Throwable t) {
-   *     Throwables.propagateIfPossible(t, OtherException.class);
-   *     throw new RuntimeException("unexpected", t);
+   *     foo.bar();
+   *   } catch (RuntimeException | Error t) {
+   *     failure = t;
    *   }
+   * }
+   * if (failure != null) {
+   *   throwIfUnchecked(failure);
+   *   throw new AssertionError(failure);
+   * }
+   * </pre>
+   *
+   * @since 20.0
+   */
+  public static void throwIfUnchecked(Throwable throwable) {
+    checkNotNull(throwable);
+    if (throwable instanceof RuntimeException) {
+      throw (RuntimeException) throwable;
+    }
+    if (throwable instanceof Error) {
+      throw (Error) throwable;
+    }
+  }
+
+  /**
+   * Propagates {@code throwable} exactly as-is, if and only if it is an instance of
+   * {@link RuntimeException} or {@link Error}. Example usage:
+   *
+   * <pre>
+   * try {
+   *   someMethodThatCouldThrowAnything();
+   * } catch (IKnowWhatToDoWithThisException e) {
+   *   handle(e);
+   * } catch (Throwable t) {
+   *   Throwables.propagateIfPossible(t);
+   *   throw new RuntimeException("unexpected", t);
+   * }
+   * </pre>
+   *
+   * @deprecated Use {@link #throwIfUnchecked}, which has the same behavior but rejects
+   *     {@code null}. This method is scheduled to be removed in July 2018.
+   */
+  @Deprecated
+  @GwtIncompatible
+  public static void propagateIfPossible(@Nullable Throwable throwable) {
+    if (throwable != null) {
+      throwIfUnchecked(throwable);
+    }
+  }
+
+  /**
+   * Propagates {@code throwable} exactly as-is, if and only if it is an instance of
+   * {@link RuntimeException}, {@link Error}, or {@code declaredType}. Example usage:
+   *
+   * <pre>
+   * try {
+   *   someMethodThatCouldThrowAnything();
+   * } catch (IKnowWhatToDoWithThisException e) {
+   *   handle(e);
+   * } catch (Throwable t) {
+   *   Throwables.propagateIfPossible(t, OtherException.class);
+   *   throw new RuntimeException("unexpected", t);
+   * }
    * </pre>
    *
    * @param throwable the Throwable to possibly propagate
    * @param declaredType the single checked exception type declared by the calling method
    */
+  @GwtIncompatible // propagateIfInstanceOf
   public static <X extends Throwable> void propagateIfPossible(
       @Nullable Throwable throwable, Class<X> declaredType) throws X {
     propagateIfInstanceOf(throwable, declaredType);
@@ -114,16 +185,17 @@ public final class Throwables {
   }
 
   /**
-   * Propagates {@code throwable} exactly as-is, if and only if it is an instance of {@link
-   * RuntimeException}, {@link Error}, {@code declaredType1}, or {@code declaredType2}. In the
-   * unlikely case that you have three or more declared checked exception types, you can handle them
-   * all by invoking these methods repeatedly. See usage example in {@link
-   * #propagateIfPossible(Throwable, Class)}.
+   * Propagates {@code throwable} exactly as-is, if and only if it is an instance of
+   * {@link RuntimeException}, {@link Error}, {@code declaredType1}, or {@code declaredType2}. In
+   * the unlikely case that you have three or more declared checked exception types, you can handle
+   * them all by invoking these methods repeatedly. See usage example in
+   * {@link #propagateIfPossible(Throwable, Class)}.
    *
    * @param throwable the Throwable to possibly propagate
    * @param declaredType1 any checked exception type declared by the calling method
    * @param declaredType2 any other checked exception type declared by the calling method
    */
+  @GwtIncompatible // propagateIfInstanceOf
   public static <X1 extends Throwable, X2 extends Throwable> void propagateIfPossible(
       @Nullable Throwable throwable, Class<X1> declaredType1, Class<X2> declaredType2)
       throws X1, X2 {
@@ -133,42 +205,49 @@ public final class Throwables {
   }
 
   /**
-   * Propagates {@code throwable} as-is if it is an instance of {@link RuntimeException} or {@link
-   * Error}, or else as a last resort, wraps it in a {@code RuntimeException} and then propagates.
-   * <p>
-   * This method always throws an exception. The {@code RuntimeException} return type is only for
-   * client code to make Java type system happy in case a return value is required by the enclosing
-   * method. Example usage:
+   * <p>Propagates {@code throwable} as-is if it is an instance of {@link RuntimeException} or
+   * {@link Error}, or else as a last resort, wraps it in a {@code RuntimeException} and then
+   * propagates.
+   *
+   * <p>This method always throws an exception. The {@code RuntimeException} return type allows
+   * client code to signal to the compiler that statements after the call are unreachable. Example
+   * usage:
+   *
    * <pre>
-   *   T doSomething() {
-   *     try {
-   *       return someMethodThatCouldThrowAnything();
-   *     } catch (IKnowWhatToDoWithThisException e) {
-   *       return handle(e);
-   *     } catch (Throwable t) {
-   *       throw Throwables.propagate(t);
-   *     }
+   * T doSomething() {
+   *   try {
+   *     return someMethodThatCouldThrowAnything();
+   *   } catch (IKnowWhatToDoWithThisException e) {
+   *     return handle(e);
+   *   } catch (Throwable t) {
+   *     throw Throwables.propagate(t);
    *   }
+   * }
    * </pre>
    *
    * @param throwable the Throwable to propagate
    * @return nothing will ever be returned; this return type is only for your convenience, as
    *     illustrated in the example above
+   * @deprecated Use {@code throw e} or {@code throw new RuntimeException(e)} directly, or use a
+   *     combination of {@link #throwIfUnchecked} and {@code throw new RuntimeException(e)}. This
+   *     method is scheduled to be removed in July 2018.
    */
+  @CanIgnoreReturnValue
+  @GwtIncompatible
+  @Deprecated
   public static RuntimeException propagate(Throwable throwable) {
-    propagateIfPossible(checkNotNull(throwable));
+    throwIfUnchecked(throwable);
     throw new RuntimeException(throwable);
   }
 
   /**
-   * Returns the innermost cause of {@code throwable}. The first throwable in a
-   * chain provides context from when the error or exception was initially
-   * detected. Example usage:
+   * Returns the innermost cause of {@code throwable}. The first throwable in a chain provides
+   * context from when the error or exception was initially detected. Example usage:
+   *
    * <pre>
-   *   assertEquals("Unable to assign a customer id", Throwables.getRootCause(e).getMessage());
+   * assertEquals("Unable to assign a customer id", Throwables.getRootCause(e).getMessage());
    * </pre>
    */
-  @CheckReturnValue
   public static Throwable getRootCause(Throwable throwable) {
     Throwable cause;
     while ((cause = throwable.getCause()) != null) {
@@ -178,9 +257,9 @@ public final class Throwables {
   }
 
   /**
-   * Gets a {@code Throwable} cause chain as a list.  The first entry in the list will be {@code
-   * throwable} followed by its cause hierarchy.  Note that this is a snapshot of the cause chain
-   * and will not reflect any subsequent changes to the cause chain.
+   * Gets a {@code Throwable} cause chain as a list. The first entry in the list will be {@code
+   * throwable} followed by its cause hierarchy. Note that this is a snapshot of the cause chain and
+   * will not reflect any subsequent changes to the cause chain.
    *
    * <p>Here's an example of how it can be used to find specific types of exceptions in the cause
    * chain:
@@ -193,7 +272,6 @@ public final class Throwables {
    * @return an unmodifiable list containing the cause chain starting with {@code throwable}
    */
   @Beta // TODO(kevinb): decide best return type
-  @CheckReturnValue
   public static List<Throwable> getCausalChain(Throwable throwable) {
     checkNotNull(throwable);
     List<Throwable> causes = new ArrayList<Throwable>(4);
@@ -210,7 +288,7 @@ public final class Throwables {
    * parsing the resulting string; if you need programmatic access to the stack frames, you can call
    * {@link Throwable#getStackTrace()}.
    */
-  @CheckReturnValue
+  @GwtIncompatible // java.io.PrintWriter, java.io.StringWriter
   public static String getStackTraceAsString(Throwable throwable) {
     StringWriter stringWriter = new StringWriter();
     throwable.printStackTrace(new PrintWriter(stringWriter));
@@ -245,7 +323,8 @@ public final class Throwables {
    */
   // TODO(cpovirk): Say something about the possibility that List access could fail at runtime?
   @Beta
-  @CheckReturnValue
+  @GwtIncompatible // lazyStackTraceIsLazy, jlaStackTrace
+  // TODO(cpovirk): Consider making this available under GWT (slow implementation only).
   public static List<StackTraceElement> lazyStackTrace(Throwable throwable) {
     return lazyStackTraceIsLazy()
         ? jlaStackTrace(throwable)
@@ -259,11 +338,12 @@ public final class Throwables {
    * @since 19.0
    */
   @Beta
-  @CheckReturnValue
+  @GwtIncompatible // getStackTraceElementMethod
   public static boolean lazyStackTraceIsLazy() {
     return getStackTraceElementMethod != null & getStackTraceDepthMethod != null;
   }
 
+  @GwtIncompatible // invokeAccessibleNonThrowingMethod
   private static List<StackTraceElement> jlaStackTrace(final Throwable t) {
     checkNotNull(t);
     /*
@@ -286,6 +366,7 @@ public final class Throwables {
     };
   }
 
+  @GwtIncompatible // java.lang.reflect
   private static Object invokeAccessibleNonThrowingMethod(
       Method method, Object receiver, Object... params) {
     try {
@@ -298,18 +379,24 @@ public final class Throwables {
   }
 
   /** JavaLangAccess class name to load using reflection */
+  @GwtIncompatible // not used by GWT emulation
   private static final String JAVA_LANG_ACCESS_CLASSNAME = "sun.misc.JavaLangAccess";
 
   /** SharedSecrets class name to load using reflection */
-  @VisibleForTesting static final String SHARED_SECRETS_CLASSNAME = "sun.misc.SharedSecrets";
+  @GwtIncompatible // not used by GWT emulation
+  @VisibleForTesting
+  static final String SHARED_SECRETS_CLASSNAME = "sun.misc.SharedSecrets";
 
   /** Access to some fancy internal JVM internals. */
-  @Nullable private static final Object jla = getJLA();
+  @GwtIncompatible // java.lang.reflect
+  @Nullable
+  private static final Object jla = getJLA();
 
   /**
    * The "getStackTraceElementMethod" method, only available on some JDKs so we use reflection to
    * find it when available. When this is null, use the slow way.
    */
+  @GwtIncompatible // java.lang.reflect
   @Nullable
   private static final Method getStackTraceElementMethod = (jla == null) ? null : getGetMethod();
 
@@ -317,6 +404,7 @@ public final class Throwables {
    * The "getStackTraceDepth" method, only available on some JDKs so we use reflection to find it
    * when available. When this is null, use the slow way.
    */
+  @GwtIncompatible // java.lang.reflect
   @Nullable
   private static final Method getStackTraceDepthMethod = (jla == null) ? null : getSizeMethod();
 
@@ -324,6 +412,7 @@ public final class Throwables {
    * Returns the JavaLangAccess class that is present in all Sun JDKs. It is not whitelisted for
    * AppEngine, and not present in non-Sun JDKs.
    */
+  @GwtIncompatible // java.lang.reflect
   @Nullable
   private static Object getJLA() {
     try {
@@ -349,6 +438,7 @@ public final class Throwables {
    * Returns the Method that can be used to resolve an individual StackTraceElement, or null if that
    * method cannot be found (it is only to be found in fairly recent JDKs).
    */
+  @GwtIncompatible // java.lang.reflect
   @Nullable
   private static Method getGetMethod() {
     return getJlaMethod("getStackTraceElement", Throwable.class, int.class);
@@ -358,11 +448,13 @@ public final class Throwables {
    * Returns the Method that can be used to return the size of a stack, or null if that method
    * cannot be found (it is only to be found in fairly recent JDKs).
    */
+  @GwtIncompatible // java.lang.reflect
   @Nullable
   private static Method getSizeMethod() {
     return getJlaMethod("getStackTraceDepth", Throwable.class);
   }
 
+  @GwtIncompatible // java.lang.reflect
   @Nullable
   private static Method getJlaMethod(String name, Class<?>... parameterTypes) throws ThreadDeath {
     try {

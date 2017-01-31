@@ -31,12 +31,8 @@
 
 package org.hsqldb_voltpatches;
 
-import org.hsqldb_voltpatches.types.Type;
-// A VoltDB extension to allow X'..' as numeric literals
-import org.hsqldb_voltpatches.store.ValuePool;
 import org.hsqldb_voltpatches.types.BinaryData;
-
-import java.math.BigInteger;
+import org.hsqldb_voltpatches.types.Type;
 // End VoltDB extension
 /**
  * Implementation of value access operations.
@@ -60,6 +56,7 @@ public class ExpressionValue extends Expression {
         valueData = o;
     }
 
+    @Override
     public String getSQL() {
 
         switch (opType) {
@@ -76,6 +73,7 @@ public class ExpressionValue extends Expression {
         }
     }
 
+    @Override
     protected String describe(Session session, int blanks) {
 
         StringBuffer sb = new StringBuffer(64);
@@ -99,6 +97,7 @@ public class ExpressionValue extends Expression {
         }
     }
 
+    @Override
     public Object getValue(Session session) {
         return valueData;
     }
@@ -115,7 +114,9 @@ public class ExpressionValue extends Expression {
      * @return true for a successful conversion and false otherwise.
      */
     public static boolean voltMutateToBigintType(Expression maybeConstantNode, Expression parent, int childIndex) {
-        if (maybeConstantNode.opType == OpTypes.VALUE && maybeConstantNode.dataType.isBinaryType()) {
+        if (maybeConstantNode.opType == OpTypes.VALUE
+                && maybeConstantNode.dataType != null
+                && maybeConstantNode.dataType.isBinaryType()) {
             ExpressionValue exprVal = (ExpressionValue)maybeConstantNode;
             if (exprVal.valueData == null) {
                 return false;

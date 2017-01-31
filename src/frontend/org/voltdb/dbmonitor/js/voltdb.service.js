@@ -701,7 +701,18 @@
                         } else {
                             updatedData.systemsettings.resourcemonitor.memorylimit.size = encodeURIComponent(parseInt(updatedData.systemsettings.resourcemonitor.memorylimit.size));
                         }
+
+                        if ('alert' in updatedData.systemsettings.resourcemonitor.memorylimit) {
+                            var memoryAlert = "";
+                            if (updatedData.systemsettings.resourcemonitor.memorylimit.alert.indexOf("%")>-1) {
+                                memoryAlert = parseInt(updatedData.systemsettings.resourcemonitor.memorylimit.alert.replace("%", ""));
+                                updatedData.systemsettings.resourcemonitor.memorylimit.alert = memoryAlert + encodeURIComponent("%");
+                            } else {
+                                updatedData.systemsettings.resourcemonitor.memorylimit.alert = encodeURIComponent(parseInt(updatedData.systemsettings.resourcemonitor.memorylimit.alert));
+                            }
+                        }
                     }
+
                 }
 
                 var features = [];
@@ -721,6 +732,19 @@
                                 name: updatedData.systemsettings.resourcemonitor.disklimit.feature[i].name,
                                 size: updatedData.systemsettings.resourcemonitor.disklimit.feature[i].size
                             });
+
+                            if ('alert' in updatedData.systemsettings.resourcemonitor.disklimit.feature[i]) {
+                              var diskAlert = "";
+                              if (updatedData.systemsettings.resourcemonitor.disklimit.feature[i].alert.indexOf("%")>-1) {
+                                diskAlert = parseInt(updatedData.systemsettings.resourcemonitor.disklimit.feature[i].alert.replace("%", ""));
+                                updatedData.systemsettings.resourcemonitor.disklimit.feature[i].alert = diskAlert + encodeURIComponent("%");
+                              } else {
+                                updatedData.systemsettings.resourcemonitor.disklimit.feature[i].alert = encodeURIComponent(parseInt(updatedData.systemsettings.resourcemonitor.disklimit.feature[i].alert));
+                              }
+                              features.push({
+                                alert: updatedData.systemsettings.resourcemonitor.disklimit.feature[i].alert});
+                            }
+
                         }
                         updatedData.systemsettings.resourcemonitor.disklimit.feature = features;
                     }
@@ -1104,7 +1128,6 @@
                 console.log(e.message);
             }
 
-
         };
 
         this.SaveSnapShot = function (snapshotDir, snapshotFileName, onConnectionAdded) {
@@ -1325,6 +1348,38 @@
         };
         //
 
+        //pm
+        this.GetDrRoleInformation = function (onConnectionAdded) {
+            try {
+                var processName = "DR_ROLES";
+                var procedureNames = ['@Statistics'];
+                var parameters = ["DRROLE"];
+                var values = ['0'];
+                _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
+                if (_connection == null) {
+                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
+                        if (result == true) {
+                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
+                                onConnectionAdded(connection, status);
+                            });
+                        }
+
+                    });
+
+                } else {
+                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
+                        onConnectionAdded(connection, status);
+
+                    });
+
+                }
+
+            } catch (e) {
+                console.log(e.message);
+            }
+
+        };
+
         //Get datas for DR Replication Graph
         this.GetDrReplicationInformation = function (onConnectionAdded) {
             try {
@@ -1463,8 +1518,6 @@
             }
         };
     });
-
-
 
     window.VoltDBService = VoltDBService = new iVoltDbService();
 

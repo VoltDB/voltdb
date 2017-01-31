@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -21,30 +21,35 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <vector>
-#include <string>
-
-#include "boost/scoped_ptr.hpp"
+//#define STUPIDUNIT_ASSERT_BREAKPOINT 1
 
 #include "harness.h"
 #include "test_utils/ScopedTupleSchema.hpp"
 
 #include "common/tabletuple.h"
-#include "common/types.h"
 #include "common/TupleSchemaBuilder.h"
+#include "common/types.h"
 #include "common/ValueFactory.hpp"
+
 #include "execution/VoltDBEngine.h"
-#include "storage/table.h"
+
+#include "indexes/tableindex.h"
+
 #include "storage/persistenttable.h"
+#include "storage/table.h"
+#include "storage/TableCatalogDelegate.hpp"
 #include "storage/tablefactory.h"
 #include "storage/tableutil.h"
+
+#include "boost/scoped_ptr.hpp"
+
+#include "common/FixUnusedAssertHack.h"
 
 using voltdb::ExecutorContext;
 using voltdb::NValue;
 using voltdb::PersistentTable;
 using voltdb::Table;
 using voltdb::TableFactory;
-using voltdb::TableIterator;
 using voltdb::TableTuple;
 using voltdb::TupleSchemaBuilder;
 using voltdb::VALUE_TYPE_BIGINT;
@@ -110,9 +115,9 @@ protected:
         static const std::string payload(
             "add / clusters cluster\n"
             "set /clusters#cluster localepoch 1199145600\n"
+            "set /clusters#cluster drRole \"xdcr\"\n"
             "add /clusters#cluster databases database\n"
             "set /clusters#cluster/databases#database schema \"eJwDAAAAAAE=\"\n"
-            "set $PREV isActiveActiveDRed true\n"
             ""
             "set /clusters#cluster/databases#database schema \"eJwlTDkCgDAI230NDSWUtdX/f8mgAzkBeoLBkZMBEw6C59cwrDRumLJiap5O07L9rStkqd0M8ZGa36ehHXZL52rGcng4USjf1wuc0Rgz\"\n"
             "add /clusters#cluster/databases#database tables T\n"
@@ -162,8 +167,72 @@ protected:
             "set $PREV oncommit \"\"\n"
             "set $PREV index /clusters#cluster/databases#database/tables#T/indexes#VOLTDB_AUTOGEN_IDX_PK_T_PK\n"
             "set $PREV foreignkeytable null\n"
+
+            "add /clusters#cluster/databases#database tables X\n"
+            "set /clusters#cluster/databases#database/tables#X isreplicated true\n"
+            "set $PREV partitioncolumn null\n"
+            "set $PREV estimatedtuplecount 0\n"
+            "set $PREV materializer null\n"
+            "set $PREV signature \"X|bv\"\n"
+            "set $PREV tuplelimit 2147483647\n"
+            "set $PREV isDRed true\n"
+            "add /clusters#cluster/databases#database/tables#X columns DATA\n"
+            "set /clusters#cluster/databases#database/tables#X/columns#DATA index 1\n"
+            "set $PREV type 9\n"
+            "set $PREV size 256\n"
+            "set $PREV nullable true\n"
+            "set $PREV name \"DATA\"\n"
+            "set $PREV defaultvalue null\n"
+            "set $PREV defaulttype 0\n"
+            "set $PREV matview null\n"
+            "set $PREV aggregatetype 0\n"
+            "set $PREV matviewsource null\n"
+            "set $PREV inbytes false\n"
+            "add /clusters#cluster/databases#database/tables#X columns PK\n"
+            "set /clusters#cluster/databases#database/tables#X/columns#PK index 0\n"
+            "set $PREV type 6\n"
+            "set $PREV size 8\n"
+            "set $PREV nullable false\n"
+            "set $PREV name \"PK\"\n"
+            "set $PREV defaultvalue null\n"
+            "set $PREV defaulttype 0\n"
+            "set $PREV matview null\n"
+            "set $PREV aggregatetype 0\n"
+            "set $PREV matviewsource null\n"
+            "set $PREV inbytes false\n"
+            "add /clusters#cluster/databases#database/tables#X indexes VOLTDB_AUTOGEN_IDX_PK_X_PK\n"
+            "set /clusters#cluster/databases#database/tables#X/indexes#VOLTDB_AUTOGEN_IDX_PK_X_PK unique true\n"
+            "set $PREV assumeUnique false\n"
+            "set $PREV countable true\n"
+            "set $PREV type 1\n"
+            "set $PREV expressionsjson \"\"\n"
+            "set $PREV predicatejson \"\"\n"
+            "add /clusters#cluster/databases#database/tables#X/indexes#VOLTDB_AUTOGEN_IDX_PK_X_PK columns PK\n"
+            "set /clusters#cluster/databases#database/tables#X/indexes#VOLTDB_AUTOGEN_IDX_PK_X_PK/columns#PK index 0\n"
+            "set $PREV column /clusters#cluster/databases#database/tables#X/columns#PK\n"
+            "add /clusters#cluster/databases#database/tables#X constraints VOLTDB_AUTOGEN_IDX_PK_X_PK\n"
+            "set /clusters#cluster/databases#database/tables#X/constraints#VOLTDB_AUTOGEN_IDX_PK_X_PK type 4\n"
+            "set $PREV oncommit \"\"\n"
+            "set $PREV index /clusters#cluster/databases#database/tables#X/indexes#VOLTDB_AUTOGEN_IDX_PK_X_PK\n"
+            "set $PREV foreignkeytable null\n"
             "");
         return payload;
+    }
+
+    void validateCounts(size_t nIndexes, PersistentTable* table, PersistentTable* dupTable,
+                        size_t nTuples, size_t nDupTuples) {
+        validateCounts(table, nTuples, nIndexes);
+        validateCounts(dupTable, nDupTuples, nIndexes);
+    }
+
+    void validateCounts(PersistentTable* table, size_t nTuples, size_t nIndexes) {
+        auto iterator = table->iterator();
+        ASSERT_EQ(nTuples > 0, iterator.hasNext());
+        ASSERT_EQ(nTuples, table->activeTupleCount());
+        ASSERT_EQ(nIndexes, table->indexCount());
+        BOOST_FOREACH (auto index, table->allIndexes()) {
+            ASSERT_EQ(nTuples, index->getSize());
+        }
     }
 
 private:
@@ -176,9 +245,10 @@ TEST_F(PersistentTableTest, DRTimestampColumn) {
 
     // Load a catalog where active/active DR is turned on for the database,
     // And we have a table "T" which is being DRed.
-    getEngine()->loadCatalog(0, catalogPayload());
-    PersistentTable *table = dynamic_cast<PersistentTable*>(
-        getEngine()->getTable("T"));
+    VoltDBEngine* engine = getEngine();
+    engine->loadCatalog(0, catalogPayload());
+    PersistentTable* table =
+            engine->getTableDelegate("T")->getPersistentTable();
     ASSERT_NE(NULL, table);
     ASSERT_EQ(true, table->hasDRTimestampColumn());
     ASSERT_EQ(0, table->getDRTimestampColumnIndex());
@@ -217,7 +287,7 @@ TEST_F(PersistentTableTest, DRTimestampColumn) {
     NValue drTimestampValueOrig = ValueFactory::getBigIntValue(drTimestampOrig);
 
     TableTuple tuple(schema);
-    TableIterator iterator = table->iteratorDeletingAsWeGo();
+    auto iterator = table->iteratorDeletingAsWeGo();
     int i = 0;
     const int timestampColIndex = table->getDRTimestampColumnIndex();
     while (iterator.next(tuple)) {
@@ -283,33 +353,436 @@ TEST_F(PersistentTableTest, DRTimestampColumn) {
 }
 
 TEST_F(PersistentTableTest, TruncateTableTest) {
+    bool added;
     VoltDBEngine* engine = getEngine();
     engine->loadCatalog(0, catalogPayload());
-    PersistentTable *table = dynamic_cast<PersistentTable*>(engine->getTable("T"));
+    PersistentTable *table = dynamic_cast<PersistentTable*>(engine->getTableByName("T"));
     ASSERT_NE(NULL, table);
     ASSERT_EQ(1, table->allocatedBlockCount());
 
     beginWork();
     const int tuplesToInsert = 10;
-    (void) tuplesToInsert;  // to make compiler happy
-    assert(tableutil::addRandomTuples(table, tuplesToInsert));
+    added = tableutil::addRandomTuples(table, tuplesToInsert);
+    assert(added);
     commit();
 
     size_t blockCount = table->allocatedBlockCount();
-    table = dynamic_cast<PersistentTable*>(engine->getTable("T"));
+    table = dynamic_cast<PersistentTable*>(engine->getTableByName("T"));
     ASSERT_NE(NULL, table);
     ASSERT_EQ(blockCount, table->allocatedBlockCount());
 
     beginWork();
-    assert(tableutil::addRandomTuples(table, tuplesToInsert));
+    added = tableutil::addRandomTuples(table, tuplesToInsert);
+    assert(added);
     table->truncateTable(engine);
     commit();
 
     // refresh table pointer by fetching the table from catalog as in truncate old table
     // gets replaced with new cloned empty table
-    table = dynamic_cast<PersistentTable*>(engine->getTable("T"));
+    table = dynamic_cast<PersistentTable*>(engine->getTableByName("T"));
     ASSERT_NE(NULL, table);
     ASSERT_EQ(1, table->allocatedBlockCount());
+}
+
+TEST_F(PersistentTableTest, SwapTablesTest) {
+    bool added;
+    PersistentTable* namedTable;
+    VoltDBEngine* engine = getEngine();
+    engine->loadCatalog(0, catalogPayload());
+
+    PersistentTable* table;
+    PersistentTable* dupTable;
+
+    std::vector<std::string> tableIndexes;
+    tableIndexes.push_back("VOLTDB_AUTOGEN_IDX_PK_T_PK");
+    std::vector<std::string> dupIndexes;
+    dupIndexes.push_back("VOLTDB_AUTOGEN_IDX_PK_X_PK");
+
+
+    //
+    // Swap empty tables.
+    //
+
+    beginWork();
+    table = engine->getTableDelegate("T")->getPersistentTable();
+    ASSERT_NE(NULL, table);
+    dupTable = engine->getTableDelegate("X")->getPersistentTable();
+    ASSERT_NE(NULL, dupTable);
+
+    table->swapTable(dupTable, tableIndexes, dupIndexes);
+    namedTable = engine->getTableDelegate("T")->getPersistentTable();
+    ASSERT_EQ(namedTable, dupTable);
+    namedTable = engine->getTableDelegate("X")->getPersistentTable();
+    ASSERT_EQ(namedTable, table);
+    // Refresh the local pointers to reflect the updated table name associations.
+    table = dupTable;
+    dupTable = namedTable;
+
+    // Validate the post-swap state of tables and indexes.
+    validateCounts(1, table, dupTable, 0, 0);
+
+    commit();
+
+    // After the commit, re-assert the same counts.
+    validateCounts(1, table, dupTable, 0, 0);
+
+
+    //
+    // Swap a table with an empty table.
+    //
+
+    const int tuplesToInsert = 10;
+
+    beginWork();
+    table = engine->getTableDelegate("T")->getPersistentTable();
+    ASSERT_NE(NULL, table);
+    dupTable = engine->getTableDelegate("X")->getPersistentTable();
+    ASSERT_NE(NULL, dupTable);
+
+    added = tableutil::addRandomTuples(table, tuplesToInsert);
+    assert(added);
+
+    // Validate the pre-swap state of tables and indexes.
+    validateCounts(1, table, dupTable, tuplesToInsert, 0);
+
+    table->swapTable(dupTable, tableIndexes, dupIndexes);
+    namedTable = engine->getTableDelegate("T")->getPersistentTable();
+    ASSERT_EQ(namedTable, dupTable);
+    namedTable = engine->getTableDelegate("X")->getPersistentTable();
+    ASSERT_EQ(namedTable, table);
+    // Refresh the local pointers to reflect the updated table name associations.
+    table = dupTable;
+    dupTable = namedTable;
+
+    // Validate the post-swap state of tables and indexes.
+
+    // After the swap, the first table should be empty.
+    // After the swap, the second table should be populated.
+    validateCounts(1, table, dupTable, 0, tuplesToInsert);
+
+    commit();
+
+    // After the commit, re-assert the same counts.
+    validateCounts(1, table, dupTable, 0, tuplesToInsert);
+
+    //
+    // Swap with data in both tables.
+    //
+
+    beginWork();
+    table = engine->getTableDelegate("T")->getPersistentTable();
+    ASSERT_NE(NULL, table);
+    dupTable = engine->getTableDelegate("X")->getPersistentTable();
+    ASSERT_NE(NULL, dupTable);
+
+    // Populate the empty table currently swapped to table
+    added = tableutil::addRandomTuples(table, tuplesToInsert*3);
+    assert(added);
+
+    // Validate the pre-swap state of tables and indexes.
+    validateCounts(1, table, dupTable, tuplesToInsert*3, tuplesToInsert);
+
+    table->swapTable(dupTable, tableIndexes, dupIndexes);
+    namedTable = engine->getTableDelegate("T")->getPersistentTable();
+    ASSERT_EQ(namedTable, dupTable);
+    namedTable = engine->getTableDelegate("X")->getPersistentTable();
+    ASSERT_EQ(namedTable, table);
+    // Refresh the local pointers to reflect the updated table name associations.
+    table = dupTable;
+    dupTable = namedTable;
+
+    // Validate the post-swap state of tables and indexes.
+
+    // After the swap, the first table should contain the original population.
+    // After the swap, the second table should contain the second population.
+    validateCounts(1, table, dupTable, tuplesToInsert, tuplesToInsert*3);
+
+    commit();
+
+    // After the commit, re-assert the same counts.
+    validateCounts(1, table, dupTable, tuplesToInsert, tuplesToInsert*3);
+
+    // swap and then undo to swap back.
+    beginWork();
+    table = engine->getTableDelegate("T")->getPersistentTable();
+    ASSERT_NE(NULL, table);
+    dupTable = engine->getTableDelegate("X")->getPersistentTable();
+    ASSERT_NE(NULL, dupTable);
+
+    table->swapTable(dupTable, tableIndexes, dupIndexes);
+    namedTable = engine->getTableDelegate("T")->getPersistentTable();
+    ASSERT_EQ(namedTable, dupTable);
+    namedTable = engine->getTableDelegate("X")->getPersistentTable();
+    ASSERT_EQ(namedTable, table);
+    // Refresh the local pointers to reflect the updated table name associations.
+    table = dupTable;
+    dupTable = namedTable;
+
+    // Validate the post-swap state of tables and indexes.
+
+    // After the swap, the first table should contain the second population.
+    // After the swap, the second table should contain the original population.
+    validateCounts(1, table, dupTable, tuplesToInsert*3, tuplesToInsert);
+
+    rollback();
+
+    beginWork();
+
+    namedTable = engine->getTableDelegate("T")->getPersistentTable();
+    ASSERT_EQ(namedTable, dupTable);
+    namedTable = engine->getTableDelegate("X")->getPersistentTable();
+    ASSERT_EQ(namedTable, table);
+    // Refresh the local pointers to reflect the updated table name associations.
+    table = dupTable;
+    dupTable = namedTable;
+
+    // Validate the pre-swap state of the rolled back tables and indexes.
+    // After the rollback, the first table should contain the original population.
+    // After the rollback, the second table should contain the second population.
+    validateCounts(1, table, dupTable, tuplesToInsert, tuplesToInsert*3);
+
+    // Test explicit do and undo within the same eventually aborted transaction.
+    table->swapTable(dupTable, tableIndexes, dupIndexes);
+    namedTable = engine->getTableDelegate("T")->getPersistentTable();
+    ASSERT_EQ(namedTable, dupTable);
+    namedTable = engine->getTableDelegate("X")->getPersistentTable();
+    ASSERT_EQ(namedTable, table);
+    // Refresh the local pointers to reflect the updated table name associations.
+    table = dupTable;
+    dupTable = namedTable;
+
+    dupTable->swapTable(table, dupIndexes, tableIndexes);
+    namedTable = engine->getTableDelegate("T")->getPersistentTable();
+    ASSERT_EQ(namedTable, dupTable);
+    namedTable = engine->getTableDelegate("X")->getPersistentTable();
+    ASSERT_EQ(namedTable, table);
+    // Refresh the local pointers to reflect the updated table name associations.
+    table = dupTable;
+    dupTable = namedTable;
+
+    // Validate the pre-swap state of the twice-swapped tables and indexes.
+    // After the do+undo, the first table should contain the original population.
+    // After the do+undo, the second table should contain the second population.
+    validateCounts(1, table, dupTable, tuplesToInsert, tuplesToInsert*3);
+
+    rollback();
+
+    beginWork();
+    table = engine->getTableDelegate("T")->getPersistentTable();
+    ASSERT_NE(NULL, table);
+    dupTable = engine->getTableDelegate("X")->getPersistentTable();
+    ASSERT_NE(NULL, dupTable);
+
+    // Validate the pre-swap state of the rolled back tables and indexes.
+    // After the rollback, the first table should contain the original population.
+    // After the rollback, the second table should contain the second population.
+    validateCounts(1, table, dupTable, tuplesToInsert, tuplesToInsert*3);
+
+    // Test explicit do and undo within the same eventually committed transaction.
+
+    table->swapTable(dupTable, tableIndexes, dupIndexes);
+    namedTable = engine->getTableDelegate("T")->getPersistentTable();
+    ASSERT_EQ(namedTable, dupTable);
+    namedTable = engine->getTableDelegate("X")->getPersistentTable();
+    ASSERT_EQ(namedTable, table);
+    // Refresh the local pointers to reflect the updated table name associations.
+    table = dupTable;
+    dupTable = namedTable;
+
+    dupTable->swapTable(table, dupIndexes, tableIndexes);
+    namedTable = engine->getTableDelegate("T")->getPersistentTable();
+    ASSERT_EQ(namedTable, dupTable);
+    namedTable = engine->getTableDelegate("X")->getPersistentTable();
+    ASSERT_EQ(namedTable, table);
+    // Refresh the local pointers to reflect the updated table name associations.
+    table = dupTable;
+    dupTable = namedTable;
+
+    // Validate the pre-swap state of the rolled back tables and indexes.
+    // After the do+undo, the first table should contain the original population.
+    // After the do+undo, the second table should contain the second population.
+    validateCounts(1, table, dupTable, tuplesToInsert, tuplesToInsert*3);
+
+    commit();
+
+    // After the commit, re-assert the same counts.
+    validateCounts(1, table, dupTable, tuplesToInsert, tuplesToInsert*3);
+
+
+    //
+    // Test TRUNCATE and swap in the same committed transaction.
+    //
+
+    beginWork();
+    table = engine->getTableDelegate("T")->getPersistentTable();
+    ASSERT_NE(NULL, table);
+    dupTable = engine->getTableDelegate("X")->getPersistentTable();
+    ASSERT_NE(NULL, dupTable);
+
+    validateCounts(1, table, dupTable, tuplesToInsert, tuplesToInsert*3);
+
+    dupTable->truncateTable(engine);
+    dupTable = engine->getTableDelegate("X")->getPersistentTable();
+
+    ASSERT_NE(NULL, dupTable);
+
+    ////W-hy T-he F-ailure? validateCounts(1, table, dupTable, tuplesToInsert, 0);
+    //// XXX: Junit testing validates that truncate table causes a later "table count"
+    //// query to correctly return 0. In contrast, this validation was still finding
+    //// a non-zero active tuple count on the truncated table. There must be something
+    //// subtly different/missing in how we're validating table counts here prior to
+    //// commit -- but WHAT?
+
+    table->swapTable(dupTable, tableIndexes, dupIndexes);
+    namedTable = engine->getTableDelegate("T")->getPersistentTable();
+    ASSERT_EQ(namedTable, dupTable);
+    namedTable = engine->getTableDelegate("X")->getPersistentTable();
+    ASSERT_EQ(namedTable, table);
+    // Refresh the local pointers to reflect the updated table name associations.
+    table = dupTable;
+    dupTable = namedTable;
+
+    ////W-hy T-he F-ailure? validateCounts(1, table, dupTable, 0, tuplesToInsert);
+
+    commit();
+
+    // After the commit, re-assert the same counts.
+    validateCounts(1, table, dupTable, 0, tuplesToInsert);
+
+
+    //
+    // Test TRUNCATE and swap in the same aborted transaction.
+    //
+
+    beginWork();
+    table = engine->getTableDelegate("T")->getPersistentTable();
+    ASSERT_NE(NULL, table);
+    dupTable = engine->getTableDelegate("X")->getPersistentTable();
+    ASSERT_NE(NULL, dupTable);
+
+    validateCounts(1, table, dupTable, 0, tuplesToInsert);
+
+    dupTable->truncateTable(engine);
+    dupTable = engine->getTableDelegate("X")->getPersistentTable();
+    ASSERT_NE(NULL, dupTable);
+
+    ////W-hy T-he F-ailure? validateCounts(1, table, dupTable, 0, 0);
+
+    table->swapTable(dupTable, tableIndexes, dupIndexes);
+    namedTable = engine->getTableDelegate("T")->getPersistentTable();
+    ASSERT_EQ(namedTable, dupTable);
+    namedTable = engine->getTableDelegate("X")->getPersistentTable();
+    ASSERT_EQ(namedTable, table);
+    // Refresh the local pointers to reflect the updated table name associations.
+    table = dupTable;
+    dupTable = namedTable;
+
+    ////W-hy T-he F-ailure? validateCounts(1, table, dupTable, 0, 0);
+
+    rollback();
+
+
+    //
+    // Test WRITES and swaps in the same aborted transaction.
+    //
+
+    beginWork();
+    table = engine->getTableDelegate("T")->getPersistentTable();
+    ASSERT_NE(NULL, table);
+    dupTable = engine->getTableDelegate("X")->getPersistentTable();
+    ASSERT_NE(NULL, dupTable);
+
+    validateCounts(1, table, dupTable, 0, tuplesToInsert);
+
+    // Test writes and swaps in the same aborted transaction.
+
+    added = tableutil::addRandomTuples(table, tuplesToInsert*2);
+    assert(added);
+
+    // Validate the pre-swap state of tables and indexes.
+    validateCounts(1, table, dupTable, tuplesToInsert*2, tuplesToInsert);
+
+    table->swapTable(dupTable, tableIndexes, dupIndexes);
+    namedTable = engine->getTableDelegate("T")->getPersistentTable();
+    ASSERT_EQ(namedTable, dupTable);
+    namedTable = engine->getTableDelegate("X")->getPersistentTable();
+    ASSERT_EQ(namedTable, table);
+    // Refresh the local pointers to reflect the updated table name associations.
+    table = dupTable;
+    dupTable = namedTable;
+
+    validateCounts(1, table, dupTable, tuplesToInsert, tuplesToInsert*2);
+
+    added = tableutil::addRandomTuples(table, tuplesToInsert*4);
+    assert(added);
+
+    // Validate the pre-swap state of tables and indexes.
+    validateCounts(1, table, dupTable, tuplesToInsert*5, tuplesToInsert*2);
+
+    rollback();
+
+
+    //
+    // Test WRITES and swaps in the same committed transaction.
+    //
+
+    beginWork();
+    table = engine->getTableDelegate("T")->getPersistentTable();
+    ASSERT_NE(NULL, table);
+    dupTable = engine->getTableDelegate("X")->getPersistentTable();
+    ASSERT_NE(NULL, dupTable);
+
+    validateCounts(1, table, dupTable, 0, tuplesToInsert);
+
+    added = tableutil::addRandomTuples(table, tuplesToInsert*2);
+    assert(added);
+
+    // Validate the pre-swap state of tables and indexes.
+    validateCounts(1, table, dupTable, tuplesToInsert*2, tuplesToInsert);
+
+    table->swapTable(dupTable, tableIndexes, dupIndexes);
+    namedTable = engine->getTableDelegate("T")->getPersistentTable();
+    ASSERT_EQ(namedTable, dupTable);
+    namedTable = engine->getTableDelegate("X")->getPersistentTable();
+    ASSERT_EQ(namedTable, table);
+    // Refresh the local pointers to reflect the updated table name associations.
+    table = dupTable;
+    dupTable = namedTable;
+
+    validateCounts(1, table, dupTable, tuplesToInsert, tuplesToInsert*2);
+
+    added = tableutil::addRandomTuples(table, tuplesToInsert*4);
+    assert(added);
+
+    // Validate the pre-swap state of tables and indexes.
+    validateCounts(1, table, dupTable, tuplesToInsert*5, tuplesToInsert*2);
+
+    table->swapTable(dupTable, tableIndexes, dupIndexes);
+    namedTable = engine->getTableDelegate("T")->getPersistentTable();
+    ASSERT_EQ(namedTable, dupTable);
+    namedTable = engine->getTableDelegate("X")->getPersistentTable();
+    ASSERT_EQ(namedTable, table);
+    // Refresh the local pointers to reflect the updated table name associations.
+    table = dupTable;
+    dupTable = namedTable;
+
+    // Validate the post-swap state of tables and indexes.
+    validateCounts(1, table, dupTable, tuplesToInsert*2, tuplesToInsert*5);
+
+    commit();
+
+    // After the commit, re-assert the same counts.
+    validateCounts(1, table, dupTable, tuplesToInsert*2, tuplesToInsert*5);
+
+    beginWork();
+    table = engine->getTableDelegate("T")->getPersistentTable();
+    ASSERT_NE(NULL, table);
+    dupTable = engine->getTableDelegate("X")->getPersistentTable();
+    ASSERT_NE(NULL, dupTable);
+
+    validateCounts(1, table, dupTable, tuplesToInsert*2, tuplesToInsert*5);
+
+    rollback();
 }
 
 int main() {

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -93,6 +93,15 @@ public class OperatorExpression extends AbstractExpression {
         if (! needsRightExpression()) {
             return;
         }
+
+        if (getExpressionType() == ExpressionType.OPERATOR_CASE_WHEN) {
+            assert(m_right.getExpressionType() == ExpressionType.OPERATOR_ALTERNATIVE);
+            m_right.refineValueType(neededType, neededSize);
+            m_valueType = m_right.getValueType();
+            m_valueSize = m_right.getValueSize();
+            return;
+        }
+
         // The intent here is to allow operands to have the maximum flexibility given the
         // desired result type. The interesting cases are basically integer, decimal, and
         // float. If any of the lhs, rhs, or target result type are float, then any ambiguity

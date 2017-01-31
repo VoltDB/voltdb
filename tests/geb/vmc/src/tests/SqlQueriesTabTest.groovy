@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -91,11 +91,4 @@ class SqlQueriesTabTest extends SqlQueriesTestBase {
         then: 'Assert that the second tab is deleted'
         $(id:page.getIdOfDeleteTab(1)).isDisplayed()
     }
-
-    /*def () {
-        when:
-
-        then:
-
-    }*/
 }

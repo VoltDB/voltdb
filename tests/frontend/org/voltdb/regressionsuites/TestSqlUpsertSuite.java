@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -365,19 +365,16 @@ public class TestSqlUpsertSuite extends RegressionSuite {
                 "DEPT INTEGER);" +
                 "PARTITION TABLE UP2 ON COLUMN ID;" +
 
-                // Export table
-                "CREATE TABLE UR3 ( " +
+                // Stream table
+                "CREATE STREAM UR3 ( " +
                 "ID INTEGER NOT NULL, " +
                 "WAGE INTEGER DEFAULT 1, " +
                 "DEPT INTEGER);" +
-                "EXPORT TABLE UR3;" +
 
-                "CREATE TABLE UP3 ( " +
+                "CREATE STREAM UP3 PARTITION ON COLUMN ID ( " +
                 "ID INTEGER NOT NULL, " +
                 "WAGE INTEGER DEFAULT 1, " +
                 "DEPT INTEGER);" +
-                "PARTITION TABLE UP3 ON COLUMN ID;" +
-                "EXPORT TABLE UP3;" +
 
                 ""
                 ;

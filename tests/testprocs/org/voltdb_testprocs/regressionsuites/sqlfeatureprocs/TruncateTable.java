@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -33,20 +33,33 @@ import org.voltdb.VoltTable;
 )
 public class TruncateTable extends VoltProcedure {
 
-    public final SQLStmt truncateRTable = new SQLStmt("DELETE from RTABLE;");
-    public final SQLStmt truncatePTable = new SQLStmt("DELETE from PTABLE;");
+    public final SQLStmt truncateRTable = new SQLStmt("DELETE FROM RTABLE;");
+    public final SQLStmt checkRTable = new SQLStmt("SELECT COUNT(*) FROM RTABLE;");
+    public final SQLStmt truncatePTable = new SQLStmt("DELETE FROM PTABLE;");
+    public final SQLStmt checkPTable = new SQLStmt("SELECT COUNT(*) FROM PTABLE;");
 
     public final SQLStmt insertRTable = new SQLStmt("INSERT INTO RTABLE VALUES(6,  30,  1.1, 'Jedi',  'Winchester');");
 
-    public VoltTable[] run() {
+    public long run() {
 
         voltQueueSQL(truncateRTable);
+        voltQueueSQL(checkRTable);
         voltQueueSQL(truncatePTable);
+        voltQueueSQL(checkPTable);
 
+        VoltTable[] results = voltExecuteSQL();
+        if (results.length != 4 ||
+                results[1].asScalarLong() != 0 ||
+                results[3].asScalarLong() != 0) {
+            throw new VoltAbortException(
+                    "A table truncation behaved unexpectedly PRIOR to the intentional violation.");
+        }
+
+        // Force a rollback after a constraint violation
         voltQueueSQL(insertRTable);
         voltQueueSQL(insertRTable);
-
-        return voltExecuteSQL();
+        voltExecuteSQL();
+        return 0;
     }
 
 }

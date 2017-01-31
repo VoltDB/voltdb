@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -25,17 +25,20 @@ package org.voltdb;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
+import java.util.Deque;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+import java.util.TreeMap;
+import java.util.concurrent.CountDownLatch;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
-
-import junit.framework.TestCase;
 
 import org.json_voltpatches.JSONException;
 import org.voltdb.AbstractTopology.HAGroup;
@@ -44,6 +47,11 @@ import org.voltdb.AbstractTopology.HostDescription;
 import org.voltdb.AbstractTopology.KSafetyViolationException;
 import org.voltdb.AbstractTopology.Partition;
 import org.voltdb.AbstractTopology.PartitionDescription;
+
+import com.google_voltpatches.common.collect.Lists;
+import com.google_voltpatches.common.collect.Maps;
+
+import junit.framework.TestCase;
 
 public class TestAbstractTopology extends TestCase {
 
@@ -334,6 +342,54 @@ public class TestAbstractTopology extends TestCase {
         }
         catch (Exception e) {
             assertTrue(e.getMessage().contains("must contain unique and unused hostid"));
+        }
+    }
+
+    public void testSortByDistance() {
+        Map<Integer, String> hostGroups = new HashMap<Integer, String>();
+        hostGroups.put(0, "rack1.node1");
+        hostGroups.put(1, "rack1.node2");
+        hostGroups.put(2, "rack1.node3");
+        hostGroups.put(3, "rack2.node1");
+        hostGroups.put(4, "rack2.node2");
+        hostGroups.put(5, "rack2.node3");
+        hostGroups.put(6, "rack1.node1.blade1");
+        hostGroups.put(7, "rack1.node1.blade2");
+
+        // Remember some prior knowledge
+        Map<Integer, List<Integer>> distanceVector = Maps.newHashMap();
+        distanceVector.put(0, new ArrayList<Integer>(Arrays.asList(0, 2, 2, 4, 4, 4, 1, 1)));
+        distanceVector.put(1, new ArrayList<Integer>(Arrays.asList(2, 0, 2, 4, 4, 4, 3, 3)));
+        distanceVector.put(2, new ArrayList<Integer>(Arrays.asList(2, 2, 0, 4, 4, 4, 3, 3)));
+        distanceVector.put(3, new ArrayList<Integer>(Arrays.asList(4, 4, 4, 0, 2, 2, 5, 5)));
+        distanceVector.put(4, new ArrayList<Integer>(Arrays.asList(4, 4, 4, 2, 0, 2, 5, 5)));
+        distanceVector.put(5, new ArrayList<Integer>(Arrays.asList(4, 4, 4, 2, 2, 0, 5, 5)));
+        distanceVector.put(6, new ArrayList<Integer>(Arrays.asList(1, 3, 3, 5, 5, 5, 0, 2)));
+        distanceVector.put(7, new ArrayList<Integer>(Arrays.asList(1, 3, 3, 5, 5, 5, 2, 0)));
+        // Verify the order is correct
+        for (int i = 0; i < hostGroups.size(); i++) {
+            List<Collection<Integer>> sortedList = AbstractTopology.sortHostIdByHGDistance(i, hostGroups);
+            TreeMap<Integer, List<Integer>> sortedMap = Maps.newTreeMap();
+            int index = -1;
+            for (Integer distance : distanceVector.get(i)) {
+                index++;
+                if (distance == 0) continue;
+                List<Integer> hids = sortedMap.get(distance);
+                if (hids == null) {
+                    hids = com.google_voltpatches.common.collect.Lists.newArrayList();
+                    sortedMap.put(distance, hids);
+                }
+                hids.add(index);
+            }
+            assertTrue(sortedList.size() == sortedMap.size());
+            Deque<Integer> zippedList = Lists.newLinkedList();
+            sortedList.forEach(l -> zippedList.addAll(l));
+            Map.Entry<Integer, List<Integer>> entry;
+            while ((entry = sortedMap.pollLastEntry()) != null) {
+                for (Integer host : entry.getValue()) {
+                    assertEquals(host, zippedList.pollFirst());
+                }
+            }
         }
     }
 
@@ -636,6 +692,79 @@ public class TestAbstractTopology extends TestCase {
             topo = AbstractTopology.mutateAddHosts(topo, td2.hosts);
             topo = AbstractTopology.mutateAddPartitionsToEmptyHosts(topo, td2.partitions);
             validate(topo);
+        }
+    }
+
+    /**
+     * generate topology multiple times and validate the same topology
+     * @throws InterruptedException
+     */
+    public void testTopologyStatibility() throws InterruptedException {
+        Map<Integer, String> hostGroups = new HashMap<>();
+        hostGroups.put(0, "g0");
+        hostGroups.put(1, "g0");
+        hostGroups.put(2, "g0");
+        hostGroups.put(3, "g0");
+        Map<Integer, Integer> sitesPerHostMap = new HashMap<>();
+        sitesPerHostMap.put(0, 6);
+        sitesPerHostMap.put(1, 6);
+        sitesPerHostMap.put(2, 6);
+        sitesPerHostMap.put(3, 6);
+        //test 1
+        doStabilityTest(hostGroups, sitesPerHostMap, 2);
+
+        hostGroups.put(4, "g1");
+        hostGroups.put(5, "g1");
+        hostGroups.put(6, "g1");
+        hostGroups.put(7, "g1");
+
+        sitesPerHostMap.put(4, 6);
+        sitesPerHostMap.put(5, 6);
+        sitesPerHostMap.put(6, 6);
+        sitesPerHostMap.put(7, 6);
+        //test 2
+        doStabilityTest(hostGroups, sitesPerHostMap, 3);
+    }
+
+    private void doStabilityTest( Map<Integer, String> hostGroups,
+            Map<Integer, Integer> sitesPerHostMap, int kfactor) throws InterruptedException {
+        int count = 200;
+        CountDownLatch latch = new CountDownLatch(count);
+        Set<String> topos = new HashSet<>();
+        List<StabilityTestTask> tasks = new ArrayList<> ();
+        while (count > 0) {
+            tasks.add(new StabilityTestTask(latch, topos,sitesPerHostMap, hostGroups, kfactor));
+            count--;
+        }
+        for (StabilityTestTask task :tasks) {
+            task.run();
+        }
+        latch.await();
+        assertEquals(1, topos.size());
+    }
+    class StabilityTestTask implements Runnable {
+        final CountDownLatch latch;
+        Set<String> topos;
+        final Map<Integer, Integer>  sitesPerHostMap;
+        final Map<Integer, String> hostGroups;
+        final int kfactor;
+        public StabilityTestTask (CountDownLatch latch, Set<String> topos,
+                Map<Integer, Integer>  sitesPerHostMap, Map<Integer, String> hostGroups, int kfactor) {
+            this.latch = latch;
+            this.topos = topos;
+            this.hostGroups = hostGroups;
+            this.kfactor = kfactor;
+            this.sitesPerHostMap = sitesPerHostMap;
+        }
+        @Override
+        public void run() {
+            AbstractTopology topology = AbstractTopology.getTopology(sitesPerHostMap, hostGroups, kfactor);
+            try {
+                topos.add(topology.topologyToJSON().toString());
+            } catch (JSONException e) {
+                e.printStackTrace();
+            }
+            latch.countDown();
         }
     }
 }

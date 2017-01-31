@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -70,7 +70,7 @@ NValue SubqueryExpression::eval(const TableTuple *tuple1, const TableTuple *tupl
 
     bool hasPriorResult = (context != NULL) && context->hasValidResult();
     bool paramsChanged = false;
-    NValueArray& parameterContainer = *(exeContext->getParameterContainer());
+    NValueArray& parameterContainer = exeContext->getParameterContainer();
     VOLT_TRACE ("Running subquery: %d", m_subqueryId);
 
     // Substitute parameters.

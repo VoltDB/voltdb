@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -86,8 +86,7 @@ public:
     ExecutorContext * getExecutorContextForTest(Pool* testPool)
     {
         m_testPool.reset(testPool);
-        ExecutorContext *newExec = new ExecutorContext(0, 0, NULL, NULL, testPool,
-                                                       (NValueArray*)NULL, (VoltDBEngine*)NULL,
+        ExecutorContext *newExec = new ExecutorContext(0, 0, NULL, NULL, testPool, (VoltDBEngine*)NULL,
                                                        "", 0, NULL, NULL, 0);
         m_executorContext.reset(newExec);
         return m_executorContext.get();

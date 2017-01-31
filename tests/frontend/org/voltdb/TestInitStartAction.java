@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -209,7 +209,7 @@ final public class TestInitStartAction {
         assertTrue(VoltDB.crashMessage.contains("Cannot use legacy start action"));
 
         // this test which action should be considered legacy
-        EnumSet<StartAction> legacyOnes = EnumSet.complementOf(EnumSet.of(StartAction.INITIALIZE,StartAction.PROBE));
+        EnumSet<StartAction> legacyOnes = EnumSet.complementOf(EnumSet.of(StartAction.INITIALIZE,StartAction.PROBE, StartAction.GET));
         assertTrue(legacyOnes.stream().allMatch(StartAction::isLegacy));
     }
 }

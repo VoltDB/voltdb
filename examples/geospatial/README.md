@@ -6,19 +6,31 @@ More on this application can be found later in this readme file.
 
 Quickstart
 ---------------------------
-VoltDB examples come with a run.sh script that sets up some environment and saves some of the typing needed to work with Java clients. It is very readable and when executed, shows what is precisely being run to accomplish a given task.
+Make sure "bin" inside the VoltDB kit is in your PATH.  Then open a shell and go to the examples/geospatial directory, then execute the following commands to start the database:
 
-1. Make sure "bin" inside the VoltDB kit is in your path.
-2. Type "voltdb create -f" to start an empty, single-node VoltDB server.
-3. Open a new shell in the same directory and type "sqlcmd < ddl.sql" to load the schema and the jarfile of procedures into VoltDB.
-4. Type "./run.sh client" to run the client code.
+    voltdb init
+    voltdb start
 
-You can stop the server or running client at any time with `ctrl-c` or `SIGINT`.
+Wait until you see "Server completed initialization."
+Open a new shell in the same directory and run the following to load the schema:
+
+    sqlcmd < ddl.sql
+
+In the same shell, run the following script to preload some data:
+
+    csvloader -f advertisers.csv advertisers
+
+Then run the demo client application:
+
+    ./run.sh client
+
+You can stop the server or running client at any time with `Ctrl-c` or `SIGINT`.  Of course VoltDB can also run in the background using the -B option, in which case you can stop it with the `voltadmin shutdown` command.
 
 Note that the downloaded VoltDB kits include pre-compiled stored procedures and client code as jarfiles. To run the example from a source build, it may be necessary to compile the Java source code by typing "run.sh jars" before step 3 above. Note that this step requires a full Java JDK.
 
-Other run.sh Actions
+Using the run.sh script
 ---------------------------
+VoltDB examples come with a run.sh shell script that simplifies compiling and running the example client application and other parts of the examples.
 - *run.sh* : start the server
 - *run.sh server* : start the server
 - *run.sh init* : compile stored procedures and load the schema and stored procedures
@@ -86,7 +98,7 @@ Nibble Deletion
 ---------------------------
 As time passes, old bids will no longer be active, because their end timestamp is in the past. Rows in the `bids` table should therefore be purged to make room for new bids.
 
-Likewise, the oldest rows in the `ad_requests` table should be periodically aged out, once historical data has completed its useful lifetime.  We arbitrarily choose this time to be 6 seconds, to allow time for statistics to be displayed.  In a real application, this data might be written to an export table before being deleted.
+Likewise, the oldest rows in the `ad_requests` table should be periodically aged out, once historical data has completed its useful lifetime.  We arbitrarily choose this time to be 6 seconds, to allow time for statistics to be displayed.  In a real application, this data might be written to a stream table before being deleted.
 
 To achieve the deletion of unneeded data, we define a class called `NibbleDeleter` that gets rid of unneeded rows once every second.  Deleting large numbers of rows can impact performance, so we chose to do the delete small numbers of rows relatively frequently to minimize this impact.  This is sometimes called the "nibble" pattern and is common in VoltDB applications.  For more info on aging out data in VoltDB, see this blog post:
 

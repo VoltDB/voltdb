@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -59,6 +59,14 @@ public class TestPlansSetOp extends PlannerTestCase {
         assertTrue(unionPN.getSetOpType() == SetOpType.UNION);
         assertTrue(unionPN.getChildCount() == 3);
    }
+
+    public void testUnionWithExpressionSubquery() {
+        AbstractPlanNode pn = compile("select B from T2 union select A from T1 where A in (select B from T2 where T1.A > B)");
+        assertTrue(pn.getChild(0) instanceof SetOpPlanNode);
+        SetOpPlanNode unionPN = (SetOpPlanNode) pn.getChild(0);
+        assertTrue(unionPN.getSetOpType() == SetOpType.UNION);
+        assertTrue(unionPN.getChildCount() == 2);
+    }
 
     public void testPartitioningMixes() {
         // Sides are identically single-partitioned.
@@ -201,6 +209,11 @@ public class TestPlansSetOp extends PlannerTestCase {
 
         // 1. one SP and two compatible MP - fail
         // one SP plus MP select with Partkey = 4 - fail
+        // invalid syntax - the WHERE clause is illegal
+        failToCompile("(select A from T1 UNION select B from T2) where A in (select A from T2)");
+
+        // Union with a child having an invalid subquery expression (T1 is distributed)
+        failToCompile("select B from T2 where B in (select A from T1 where T1.A > T2.B) UNION select B from T2", PlanAssembler.IN_EXISTS_SCALAR_ERROR_MESSAGE);
     }
 
     public void testSelfUnion() {

@@ -19,6 +19,7 @@ package com.google_voltpatches.common.collect;
 import static com.google_voltpatches.common.base.Preconditions.checkState;
 
 import com.google_voltpatches.common.annotations.GwtCompatible;
+import com.google_voltpatches.errorprone.annotations.CanIgnoreReturnValue;
 
 /**
  * Precondition checks useful in collection implementations.
@@ -34,6 +35,7 @@ final class CollectPreconditions {
     }
   }
 
+  @CanIgnoreReturnValue
   static int checkNonnegative(int value, String name) {
     if (value < 0) {
       throw new IllegalArgumentException(name + " cannot be negative but was: " + value);

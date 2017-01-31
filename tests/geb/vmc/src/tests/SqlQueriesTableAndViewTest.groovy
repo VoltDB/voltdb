@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -43,7 +43,7 @@ class SqlQueriesTableAndViewTest extends SqlQueriesTestBase {
         at SqlQueryPage
     }
 
-    def "Check created table by refreshing in SQL QUERY tab and Schema tab"() {
+    def checkCreatedTableByRefreshingInSqlQueryTabAndSchemaTab() {
         when: 'click the SQL Query link (if needed)'
         openSqlQueryPage()
         then: 'should be on SQL Query page'
@@ -157,7 +157,7 @@ class SqlQueriesTableAndViewTest extends SqlQueriesTestBase {
         println("refresh button clicked and created table deleted in schema page of Size and worksheet tab")
     }
 
-    def "Check created views by refreshing in SQL QUERY tab and Schema tab"() {
+    def checkCreatedViewsByRefreshingInSqlQueryTabAndSchemaTab() {
         when: 'click the SQL Query link (if needed)'
         openSqlQueryPage()
         then: 'should be on SQL Query page'
@@ -277,6 +277,5 @@ class SqlQueriesTableAndViewTest extends SqlQueriesTestBase {
         waitFor(waitTime){page.refreshtableworksheet.isDisplayed()}
         page.refreshtableworksheet.click()
         println("refresh button clicked and created views deleted in schema page of Size and worksheet tab")
-
     }
 }

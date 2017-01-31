@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -41,8 +41,8 @@ public interface InputHandler {
     /**
      * Handle the incoming message produced by retrieve next message
      *
-     * @param message
-     * @param channelFacade
+     * @param message ByteBuffer containing the message data
+     * @param c connection
      * @throws IOException
      */
     void handleMessage(ByteBuffer message, Connection c) throws IOException;

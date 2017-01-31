@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -53,6 +53,7 @@ import org.voltcore.utils.Pair;
 import org.voltdb.InvocationDispatcher.OverrideCheck;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.common.Constants;
+import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.dtxn.TransactionCreator;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.sysprocs.saverestore.SnapshotPathType;
@@ -85,13 +86,24 @@ SnapshotCompletionInterest, Promotable
     // Implement this callback to get notified when restore finishes.
     public interface Callback {
         /**
-         * Callback function executed when restore finishes.
+         * Callback function executed when the snapshot restore finishes but
+         * before command log replay starts on recover.
+         *
+         * For nodes that finish the restore faster, this callback may be called
+         * sooner, but command log replay will not start until all nodes have
+         * called this callback.
+         */
+        public void onSnapshotRestoreCompletion();
+
+        /**
+         * Callback function executed when command log replay finishes but
+         * before the truncation snapshot is taken.
          *
          * @param txnId
          *            The txnId of the truncation snapshot at the end of the
          *            restore, or Long.MIN if there is none.
          */
-        public void onRestoreCompletion(long txnId, Map<Integer, Long> perPartitionTxnIds);
+        public void onReplayCompletion(long txnId, Map<Integer, Long> perPartitionTxnIds);
     }
 
     private final static VoltLogger LOG = new VoltLogger("HOST");
@@ -572,6 +584,10 @@ SnapshotCompletionInterest, Promotable
             m_zk.delete(m_generatedRestoreBarrier2, -1);
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Unable to delete zk node " + m_generatedRestoreBarrier2, false, e);
+        }
+
+        if (m_callback != null) {
+            m_callback.onSnapshotRestoreCompletion();
         }
 
         LOG.debug("Waiting for all hosts to complete restore");
@@ -1277,7 +1293,7 @@ SnapshotCompletionInterest, Promotable
         } else if (m_state == State.TRUNCATE) {
             m_snapshotMonitor.removeInterest(this);
             if (m_callback != null) {
-                m_callback.onRestoreCompletion(m_truncationSnapshot, m_truncationSnapshotPerPartition);
+                m_callback.onReplayCompletion(m_truncationSnapshot, m_truncationSnapshotPerPartition);
             }
 
             // Call balance partitions after enabling transactions on the node to shorten the recovery time
@@ -1311,8 +1327,7 @@ SnapshotCompletionInterest, Promotable
         // be reset and cleared as they are no longer valid.
         if (m_isLeader && m_action.doesRecover()) {
             VoltDBInterface instance = VoltDB.instance();
-            if (!instance.getCatalogContext().database.getIsactiveactivedred() &&
-                instance.getReplicationRole() == ReplicationRole.NONE) {
+            if (DrRoleType.MASTER.value().equals(instance.getCatalogContext().getCluster().getDrrole())) {
                 ByteBuffer params = ByteBuffer.allocate(4);
                 params.putInt(ExecutionEngine.TaskType.RESET_DR_APPLIED_TRACKER.ordinal());
                 try {

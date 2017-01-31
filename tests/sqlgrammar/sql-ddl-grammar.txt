@@ -1,0 +1,127 @@
+################################################################################
+#
+# This file defines the grammar for DDL (SQL) statements of various types, so
+# it is similar to the sql-grammar.txt file, but applied to DDL (data definition
+# language), rather than "regular" (non-DDL) SQL statements. Although most
+# definitions here are independent, a few depend on those defined in
+# sql-grammar.txt, which should therefore be regarded as a prerequisite, though
+# some definitions there may be overridden here.
+#
+################################################################################
+
+# TODO: eventually add missing DDL statements (but OK, for now):
+#   DR TABLE, SET DR; CREATE ROLE, DROP ROLE;
+#   CREATE STREAM, DROP STREAM; CREATE PROCEDURE FROM CLASS
+
+################################################################################
+# Grammar rules for any (SQL) DDL statement:
+ddl-statement           ::= {create-statement} | {alter-table-statement} | \
+                            {drop-statement}   | {partition-statement}
+
+create-statement        ::= {create-table-statement} | {create-view-statement} | \
+                            {create-index-statement} | {create-proc-as-statement}
+
+################################################################################
+# Define names & types needed in the DDL definitions below:
+small-digit             ::= 1 | 2 | 3 | 4 | 5 | 6
+
+table-name              ::= T{small-digit}
+view-name               ::= V{small-digit}
+index-name              ::= IDX{small-digit}
+procedure-name          ::= PROC{small-digit}
+constraint-name         ::= CNSTR{small-digit}
+column-name             ::= COL{small-digit}
+table-or-view-name      ::= {table-name} 2| {view-name}
+
+column-type             ::= TINYINT | SMALLINT | BIGINT | FLOAT | DECIMAL | \
+                            {varchar} 3| VARBINARY({non-negative-int-value}) | \
+                            TIMESTAMP | GEOGRAPHY_POINT | {geography}
+varchar                 ::= VARCHAR | VARCHAR({non-negative-int-value}) | \
+                            VARCHAR({non-negative-int-value} BYTES)
+geography               ::= GEOGRAPHY | GEOGRAPHY({non-negative-int-value})
+
+################################################################################
+# Grammar rules for CREATE TABLE statements:
+################################################################################
+create-table-statement  ::= CREATE TABLE {table-name} ({column-defn-list} [, {constraint-defn-list}])
+
+column-defn-list        ::= {column-definition} [, {column-defn-list}] [, {column-defn-list}]
+column-definition       ::= {column-name} {column-type} [[DEFAULT {random-type-value}]] [NOT NULL] [[{index-type}]]
+
+constraint-defn-list    ::= {constraint-definition} [, {constraint-defn-list}]
+constraint-definition   ::= [CONSTRAINT {constraint-name}] {index-or-limit-defn}
+
+index-type              ::= PRIMARY KEY | UNIQUE | ASSUMEUNIQUE
+index-definition        ::= {index-type} ({column-list})
+limit-definition        ::= LIMIT PARTITION ROWS {non-negative-int-value} [EXECUTE {delete-statement}]
+index-or-limit-defn     ::= {index-definition} | {limit-definition}
+
+################################################################################
+# Grammar rules for CREATE VIEW statements:
+################################################################################
+create-view-statement   ::= CREATE VIEW {view-name} ({column-name-list}) AS \
+                            SELECT {column-expression} [[AS] {column-alias}] \
+                            FROM {table-name} \
+                            [{where-clause}]  \
+                            [GROUP BY {column-expression}]
+
+column-name-list        ::= {column-name} [, {column-name-list}] [, {column-name-list}]
+
+################################################################################
+# Grammar rules for CREATE INDEX statements:
+################################################################################
+create-index-statement  ::= CREATE [{unique-or-assume-unique}] INDEX {index-name} \
+                            ON {table-or-view-name} ({column-name-list}) \
+                            [{where-clause}]
+
+unique-or-assume-unique ::= UNIQUE | ASSUMEUNIQUE
+
+################################################################################
+# Grammar rules for CREATE PROCEDURE AS statements:
+#
+# TODO: eventually uncomment the ALLOW {role-name-list} clause (after defining
+# role-name-list, and dealing with roles generally)
+################################################################################
+create-proc-as-statement::= CREATE PROCEDURE {procedure-name} \
+                            [PARTITION ON TABLE {table-name} COLUMN {column-name} [PARAMETER {digit}]] \
+#                           [[[ALLOW {role-name-list}]]] \
+                            AS {sql-statement}
+
+################################################################################
+# Grammar rules for ALTER TABLE statements:
+################################################################################
+alter-table-statement   ::= {alter-table-add} | {alter-table-alter} | {alter-table-drop}
+
+alter-table-add         ::= ALTER TABLE {table-name} ADD {column-or-constraint}
+column-or-constraint    ::= [COLUMN] {column-definition} [BEFORE {column-name}] | \
+                            {constraint-definition}
+
+alter-table-alter       ::= ALTER TABLE {table-name} ALTER [COLUMN] {column-default-or-null}
+column-default-or-null  ::= {column-definition} | {column-name} SET {default-or-null}
+default-or-null         ::= DEFAULT {random-type-value} | [NOT] NULL
+
+alter-table-drop        ::= ALTER TABLE {table-name} DROP {column-constraint-or-key}
+column-constraint-or-key::= COLUMN {column-name} [CASCADE] | \
+                            CONSTRAINT {constraint-name} | \
+                            PRIMARY KEY | LIMIT PARTITION ROWS
+
+################################################################################
+# Grammar rules for all PARTITION statements, i.e., PARTITION TABLE and
+# PARTITION PROCEDURE statements:
+################################################################################
+partition-statement     ::= {partition-table-statemnt} | {partition-proc-statement}
+
+partition-table-statemnt::= PARTITION TABLE {table-name} ON COLUMN {column-name}
+partition-proc-statement::= PARTITION PROCEDURE {procedure-name} ON TABLE {table-name} \
+                            COLUMN {column-name} [PARAMETER {digit}]
+
+################################################################################
+# Grammar rules for all DROP statements, i.e., DROP TABLE, DROP VIEW,
+# DROP INDEX, and DROP PROCEDURE statements:
+################################################################################
+drop-statement          ::= {drop-table-statement} | {drop-view-statement} | \
+                            {drop-index-statement} | {drop-procedure-statement}
+drop-table-statement    ::= DROP TABLE     {table-name}    [[IF EXISTS]] [[CASCADE]]
+drop-view-statement     ::= DROP VIEW      {view-name}      [IF EXISTS]
+drop-index-statement    ::= DROP INDEX     {index-name}     [IF EXISTS]
+drop-procedure-statement::= DROP PROCEDURE {procedure-name} [IF EXISTS]

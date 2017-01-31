@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -62,7 +62,7 @@ public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase {
     private String getFirstCanonicalDDL() throws Exception {
         String pathToCatalog = Configuration.getPathToCatalogForTest("fullDDL.jar");
 
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         final URL url = TestDDLFeatures.class.getResource("fullDDL.sql");
         String pathToSchema = URLDecoder.decode(url.getPath(), "UTF-8");
         boolean success = compiler.compileFromDDL(pathToCatalog, pathToSchema);
@@ -74,7 +74,7 @@ public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase {
         String pathToCatalog = Configuration.getPathToCatalogForTest("emptyDDL.jar");
         String pathToDeployment = Configuration.getPathToCatalogForTest("emptyDDL.xml");
 
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         VoltProjectBuilder builder = new VoltProjectBuilder();
 
         builder.setUseDDLSchema(true);

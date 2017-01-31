@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -95,8 +95,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
     }
 
     private IndexCountPlanNode(IndexScanPlanNode isp, AggregatePlanNode apn,
-                               IndexLookupType endType, List<AbstractExpression> endKeys)
-    {
+            IndexLookupType endType, List<AbstractExpression> endKeys) {
         super(isp.m_targetTableName, isp.m_targetTableAlias);
 
         m_catalogIndex = isp.m_catalogIndex;
@@ -115,7 +114,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         m_outputSchema = apn.getOutputSchema().clone();
         m_hasSignificantOutputSchema = true;
 
-        if (!isp.isReverseScan()) {
+        if ( ! isp.isReverseScan()) {
             m_lookupType = isp.m_lookupType;
             m_searchkeyExpressions = isp.m_searchkeyExpressions;
 
@@ -123,7 +122,8 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
             m_endkeyExpressions.addAll(endKeys);
 
             setSkipNullPredicate(false);
-        } else {
+        }
+        else {
             // for reverse scan, swap everything of searchkey and endkey
             // because we added the last < / <= to searchkey but not endExpr
             assert(endType == IndexLookupType.EQ);
@@ -136,65 +136,88 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         }
     }
 
+    public boolean hasTargetIndexName(String indexName) {
+        return m_targetIndexName.equals(indexName);
+    }
+
+    public boolean hasSkipNullPredicate() {
+        return m_skip_null_predicate != null;
+    }
+
     private void setSkipNullPredicate(boolean isReverseScan) {
-
-        int nextKeyIndex = -1;
-
+        int nextKeyIndex;
         if (isReverseScan) {
-            if (m_searchkeyExpressions.size() < m_endkeyExpressions.size()) {
-                assert(m_endType == IndexLookupType.LT || m_endType == IndexLookupType.LTE);
-                assert( m_endkeyExpressions.size() - m_searchkeyExpressions.size() == 1);
-                nextKeyIndex = m_searchkeyExpressions.size();
-            }
-        } else {
-            // useful for underflow case to eliminate nulls
             if (m_searchkeyExpressions.size() >= m_endkeyExpressions.size()) {
-                if (m_lookupType == IndexLookupType.GT || m_lookupType == IndexLookupType.GTE) {
-                    assert(m_searchkeyExpressions.size() > 0);
-                    nextKeyIndex = m_searchkeyExpressions.size() - 1;
-                }
+                return;
             }
+
+            assert(m_endType == IndexLookupType.LT || m_endType == IndexLookupType.LTE);
+            assert(m_endkeyExpressions.size() - m_searchkeyExpressions.size() == 1);
+            nextKeyIndex = m_searchkeyExpressions.size();
         }
-        if (nextKeyIndex < 0) {
-            return ;
+        else {
+            // useful for underflow case to eliminate nulls
+            if (m_searchkeyExpressions.size() < m_endkeyExpressions.size() ||
+                    (m_lookupType != IndexLookupType.GT && m_lookupType != IndexLookupType.GTE)) {
+                return;
+            }
+
+            assert(m_searchkeyExpressions.size() > 0);
+            nextKeyIndex = m_searchkeyExpressions.size() - 1;
         }
-        m_skip_null_predicate = IndexScanPlanNode.buildSkipNullPredicate(nextKeyIndex, m_catalogIndex, m_tableScan, m_searchkeyExpressions);
+        m_skip_null_predicate = IndexScanPlanNode.buildSkipNullPredicate(
+                nextKeyIndex, m_catalogIndex, m_tableScan, m_searchkeyExpressions);
         if (m_skip_null_predicate != null) {
             m_skip_null_predicate.resolveForTable((Table)m_catalogIndex.getParent());
         }
     }
 
-    // Create an IndexCountPlanNode that replaces the parent aggregate and chile indexscan
-    // UNLESS the indexscan's end expressions aren't a form that can be modeled with an end key.
+    // Create an IndexCountPlanNode that replaces the parent aggregate and child
+    // indexscan IF the indexscan's end expressions are a form that can be
+    // modeled with an end key.
     // The supported forms for end expression are:
     //   - null
-    //   - one filter expression per index key component (ANDed together) as "combined" for the IndexScan.
-    //   - fewer filter expressions than index key components with one of them (the last) being a LT comparison.
-    //   - 1 fewer filter expressions than index key components, but all ANDed equality filters
-    // The LT restriction comes because when index key prefixes are identical to the prefix-only end key,
-    // the entire index key sorts greater than the prefix-only end-key, because it is always longer.
-    // These prefix-equal cases would be missed in an EQ or LTE filter, causing undercounts.
-    // A prefix-only LT filter is intended to discard prefix-equal cases, so it is allowed.
+    //   - one filter expression per index key component (ANDed together)
+    //     as "combined" for the IndexScan.
+    //   - fewer filter expressions than index key components with one of the
+    //     (the last) being a LT comparison.
+    //   - 1 fewer filter expressions than index key components,
+    //     but all ANDed equality filters
+    // The LT restriction comes because when index key prefixes are identical
+    // to the prefix-only end key, the entire index key sorts greater than the
+    // prefix-only end-key, because it is always longer.
+    // These prefix-equal cases would be missed in an EQ or LTE filter,
+    // causing undercounts.
+    // A prefix-only LT filter discards prefix-equal cases, so it is allowed.
     // @return the IndexCountPlanNode or null if one is not possible.
-    public static IndexCountPlanNode createOrNull(IndexScanPlanNode isp, AggregatePlanNode apn)
-    {
+    public static IndexCountPlanNode createOrNull(
+            IndexScanPlanNode isp, AggregatePlanNode apn) {
         // add support for reverse scan
-        // for ASC scan, check endExpression; for DESC scan, need to check searchkeys
+        // for ASC scan, check endExpression;
+        // for DESC scan (isReverseScan()), check the searchkeys
         List<AbstractExpression> endKeys = new ArrayList<AbstractExpression>();
-        // Initially assume that there will be an equality filter on all key components.
+
+        // Translate the index scan's end condition into a list of end key
+        // expressions and note the comparison operand of the last one.
+
+        // Initially assume it to be an equality filter.
         IndexLookupType endType = IndexLookupType.EQ;
-        List<AbstractExpression> endComparisons = ExpressionUtil.uncombinePredicate(isp.getEndExpression());
+        List<AbstractExpression> endComparisons =
+                ExpressionUtil.uncombinePredicate(isp.getEndExpression());
         for (AbstractExpression ae: endComparisons) {
-            // There should be no more end expressions after an LT or LTE has reset the end type.
+            // There should be no more end expressions after the
+            // LT or LTE expression that resets the end type.
             assert(endType == IndexLookupType.EQ);
 
-            if (ae.getExpressionType() == ExpressionType.COMPARE_LESSTHAN) {
+            ExpressionType exprType = ae.getExpressionType();
+            if (exprType == ExpressionType.COMPARE_LESSTHAN) {
                 endType = IndexLookupType.LT;
             }
-            else if (ae.getExpressionType() == ExpressionType.COMPARE_LESSTHANOREQUALTO) {
+            else if (exprType == ExpressionType.COMPARE_LESSTHANOREQUALTO) {
                 endType = IndexLookupType.LTE;
-            } else {
-                assert(ae.getExpressionType() == ExpressionType.COMPARE_EQUAL);
+            }
+            else {
+                assert(exprType == ExpressionType.COMPARE_EQUAL);
             }
 
             // PlanNodes all need private deep copies of expressions
@@ -210,78 +233,85 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         if (jsonstring.isEmpty()) {
             indexedColRefs = CatalogUtil.getSortedCatalogItems(isp.getCatalogIndex().getColumns(), "index");
             indexSize = indexedColRefs.size();
-        } else {
+        }
+        else {
             try {
                 indexedExprs = AbstractExpression.fromJSONArrayString(jsonstring, isp.getTableScan());
                 indexSize = indexedExprs.size();
-            } catch (JSONException e) {
+            }
+            catch (JSONException e) {
                 // TODO Auto-generated catch block
                 e.printStackTrace();
             }
         }
 
-        // decide whether to pad last endKey to solve
-        // SELECT COUNT(*) FROM T WHERE C1 = ? AND C2 > / >= ?
-        if (!isp.isReverseScan() &&
-                endType == IndexLookupType.EQ &&
-                endKeys.size() > 0 &&
-                endKeys.size() == indexSize - 1 &&
-                isp.getSearchKeyExpressions().size() == indexSize) {
+        int searchKeySize = isp.getSearchKeyExpressions().size();
+        int endKeySize = endKeys.size();
 
-            VoltType missingKeyType = VoltType.INVALID;
-            boolean canPadding = true;
+        if ( ! isp.isReverseScan() &&
+                endType != IndexLookupType.LT &&
+                endKeySize > 0 &&
+                endKeySize < indexSize) {
 
-            // need to check the filter we are missing is the last indexable expr
-            // and find out the missing key
-            if (jsonstring.isEmpty()) {
-                int lastIndex = indexedColRefs.get(indexSize - 1).getColumn().getIndex();
-                for (AbstractExpression expr : endComparisons) {
-                    if (((TupleValueExpression)(expr.getLeft())).getColumnIndex() == lastIndex) {
-                        canPadding = false;
-                        break;
-                    }
-                }
-                if (canPadding) {
-                    missingKeyType = VoltType.get((byte)(indexedColRefs.get(indexSize - 1).getColumn().getType()));
-                }
-            } else {
-                AbstractExpression lastIndexableExpr = indexedExprs.get(indexSize - 1);
-                for (AbstractExpression expr : endComparisons) {
-                    if (expr.getLeft().bindingToIndexedExpression(lastIndexableExpr) != null) {
-                        canPadding = false;
-                        break;
-                    }
-                }
-                if (canPadding) {
-                    missingKeyType = lastIndexableExpr.getValueType();
-                }
-            }
-            if (canPadding && missingKeyType.isMaxValuePaddable()) {
-                ConstantValueExpression missingKey = new ConstantValueExpression();
-                missingKey.setValueType(missingKeyType);
-                missingKey.setValue(String.valueOf(missingKeyType.getMaxValueForKeyPadding()));
-                missingKey.setValueSize(missingKeyType.getLengthInBytesForFixedTypes());
-                endType = IndexLookupType.LTE;
-                endKeys.add(missingKey);
-            } else {
+            // Decide whether to pad last endKey to solve
+            // SELECT COUNT(*) FROM T WHERE C1 = ? AND C2 >[=] ?;
+            // Avoid the cases that would cause undercounts for prefix matches.
+            // That is, when a prefix-only key exists and does not use LT.
+            if (endType != IndexLookupType.EQ ||
+                    searchKeySize != indexSize ||
+                    endKeySize < indexSize - 1) {
                 return null;
             }
-        }
 
-        // check endkey for ASC or searchkey for DESC case separately
+            // To use an index count for an equality search of da compound key,
+            // both the search key and end key must have a component for each
+            // index component.
+            // If the search key is long enough but the end key is one component
+            // short, it can be patched with a type-appropriate max key value
+            // (if one exists for the type), but the end key comparison needs to
+            // change from EQ to LTE to compensate.
+            VoltType missingEndKeyType;
 
-        // Avoid the cases that would cause undercounts for prefix matches.
-        // A prefix-only key exists and does not use LT.
-        if (!isp.isReverseScan() &&
-            (endType != IndexLookupType.LT) &&
-            (endKeys.size() > 0) &&
-            (endKeys.size() < indexSize)) {
-            return null;
+            // Check that the missing filter is on the last key component
+            // and get the missing key component's indexed expression.
+            if (jsonstring.isEmpty()) {
+                int lastIndex = indexedColRefs.get(endKeySize).getColumn().getIndex();
+                for (AbstractExpression expr : endComparisons) {
+                    if (((TupleValueExpression)(expr.getLeft())).getColumnIndex() == lastIndex) {
+                        return null;
+                    }
+                }
+                int catalogTypeCode = indexedColRefs.get(endKeySize).getColumn().getType();
+                missingEndKeyType = VoltType.get((byte)catalogTypeCode);
+            }
+            else {
+                AbstractExpression lastIndexedExpr = indexedExprs.get(endKeySize);
+                for (AbstractExpression expr : endComparisons) {
+                    if (expr.getLeft().bindingToIndexedExpression(lastIndexedExpr) != null) {
+                        return null;
+                    }
+                }
+                missingEndKeyType = lastIndexedExpr.getValueType();
+            }
+
+            String maxValueForType = missingEndKeyType.getMaxValueForKeyPadding();
+
+            // The last end key's type must have a canonical maximum value
+            // for which all legal values are less than or equal to it.
+            if (maxValueForType == null) {
+                return null;
+            }
+
+            ConstantValueExpression maxKey = new ConstantValueExpression();
+            maxKey.setValueType(missingEndKeyType);
+            maxKey.setValue(maxValueForType);
+            maxKey.setValueSize(missingEndKeyType.getLengthInBytesForFixedTypes());
+            endType = IndexLookupType.LTE;
+            endKeys.add(maxKey);
         }
 
         // DESC case
-        if ((isp.getSearchKeyExpressions().size() > 0) &&
-                (isp.getSearchKeyExpressions().size() < indexSize)) {
+        if (searchKeySize > 0 && searchKeySize < indexSize) {
             return null;
         }
         return new IndexCountPlanNode(isp, apn, endType, endKeys);
@@ -289,8 +319,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
 
     @Override
     public void getTablesAndIndexes(Map<String, StmtTargetTableScan> tablesRead,
-            Collection<String> indexes)
-    {
+            Collection<String> indexes) {
         super.getTablesAndIndexes(tablesRead, indexes);
         if (indexes != null) {
             assert(m_targetIndexName.length() > 0);
@@ -421,7 +450,8 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
                 for (AbstractExpression ae : indexExpressions) {
                     asIndexed[ii++] = ae.explain(m_targetTableName);
                 }
-            } catch (JSONException e) {
+            }
+            catch (JSONException e) {
                 // If something unexpected went wrong,
                 // just fall back on the positional key labels.
             }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -145,7 +145,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     private final Map<Long, Queue<TransactionTask>> m_mpsPendingDurability =
         new HashMap<Long, Queue<TransactionTask>>();
     private CommandLog m_cl;
-    private PartitionDRGateway m_drGateway = new PartitionDRGateway();
     private final SnapshotCompletionMonitor m_snapMonitor;
     // used to decide if we should shortcut reads
     private Consistency.ReadLevel m_defaultConsistencyReadLevel;
@@ -207,12 +206,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 m_durabilityListener.setUniqueIdListener(listener);
             }
         });
-    }
-
-    public void setDRGateway(PartitionDRGateway gateway)
-    {
-        m_drGateway = gateway;
-        setDurableUniqueIdListener(gateway);
     }
 
     @Override
@@ -575,7 +568,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         final boolean shortcutRead = msg.isReadOnly() && (m_defaultConsistencyReadLevel == ReadLevel.FAST);
         final String procedureName = msg.getStoredProcedureName();
         final SpProcedureTask task =
-            new SpProcedureTask(m_mailbox, procedureName, m_pendingTasks, msg, m_drGateway);
+            new SpProcedureTask(m_mailbox, procedureName, m_pendingTasks, msg);
         if (!shortcutRead) {
             ListenableFuture<Object> durabilityBackpressureFuture =
                     m_cl.log(msg, msg.getSpHandle(), null, m_durabilityListener, task);
@@ -1055,7 +1048,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
             Iv2Trace.logCompleteTransactionMessage(msg, m_mailbox.getHSId());
             final CompleteTransactionTask task =
-                new CompleteTransactionTask(m_mailbox, txn, m_pendingTasks, msg, m_drGateway);
+                new CompleteTransactionTask(m_mailbox, txn, m_pendingTasks, msg);
             queueOrOfferMPTask(task);
         } else {
             // Generate a dummy response message when this site has not seen previous FragmentTaskMessage,
@@ -1152,19 +1145,19 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     {
         String who = CoreUtils.hsIdToString(m_mailbox.getHSId());
         hostLog.warn("State dump for site: " + who);
-        hostLog.warn("" + who + ": partition: " + m_partitionId + ", isLeader: " + m_isLeader);
+        hostLog.warn(who + ": partition: " + m_partitionId + ", isLeader: " + m_isLeader);
         if (m_isLeader) {
-            hostLog.warn("" + who + ": replicas: " + CoreUtils.hsIdCollectionToString(m_replicaHSIds));
+            hostLog.warn(who + ": replicas: " + CoreUtils.hsIdCollectionToString(m_replicaHSIds));
             if (m_sendToHSIds.length > 0) {
                 m_mailbox.send(m_sendToHSIds, new DumpMessage());
             }
         }
-        hostLog.warn("" + who + ": most recent SP handle: " + TxnEgo.txnIdToString(getCurrentTxnId()));
-        hostLog.warn("" + who + ": outstanding txns: " + m_outstandingTxns.keySet() + " " +
+        hostLog.warn(who + ": most recent SP handle: " + TxnEgo.txnIdToString(getCurrentTxnId()));
+        hostLog.warn(who + ": outstanding txns: " + m_outstandingTxns.keySet() + " " +
                 TxnEgo.txnIdCollectionToString(m_outstandingTxns.keySet()));
-        hostLog.warn("" + who + ": TransactionTaskQueue: " + m_pendingTasks.toString());
+        hostLog.warn(who + ": TransactionTaskQueue: " + m_pendingTasks.toString());
         if (m_duplicateCounters.size() > 0) {
-            hostLog.warn("" + who + ": duplicate counters: ");
+            hostLog.warn(who + ": duplicate counters: ");
             for (Entry<DuplicateCounterKey, DuplicateCounter> e : m_duplicateCounters.entrySet()) {
                 hostLog.warn("\t" + who + ": " + e.getKey().toString() + ": " + e.getValue().toString());
             }

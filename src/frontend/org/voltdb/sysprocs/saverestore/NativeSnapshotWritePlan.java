@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -42,6 +42,7 @@ import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.catalog.Table;
+import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.export.ExportManager;
 import org.voltdb.sysprocs.SnapshotRegistry;
@@ -231,10 +232,10 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                 SnapshotDataTarget target = m_createdTargets.get(task.m_table.getRelativeIndex());
                 if (target == null) {
                     target = createDataTargetForTable(file_path, file_nonce, task.m_table, txnId,
-                            context.getHostId(), context.getCluster().getTypeName(),
-                            context.getDatabase().getTypeName(), context.getNumberOfPartitions(),
-                            context.getDatabase().getIsactiveactivedred(),
-                            tracker, timestamp, numTables, snapshotRecord);
+                                                      context.getHostId(), context.getCluster().getTypeName(),
+                                                      context.getDatabase().getTypeName(), context.getNumberOfPartitions(),
+                                                      DrRoleType.XDCR.value().equals(context.getCluster().getDrrole()),
+                                                      tracker, timestamp, numTables, snapshotRecord);
                     m_createdTargets.put(task.m_table.getRelativeIndex(), target);
                 }
                 return target;

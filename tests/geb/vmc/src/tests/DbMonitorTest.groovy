@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -48,8 +48,6 @@ class DbMonitorTest extends TestBase {
                 browser.driver.executeScript("localStorage.removeItem('user-preferences_8080')")
                 then: 'should be on DB Monitor page'
                 at DbMonitorPage
-
-
                 ///Check all unchecked UserPreferences
 
 //                expect: 'Display Preference button exists'
@@ -82,8 +80,6 @@ class DbMonitorTest extends TestBase {
 //                page.savePreferences()
 //                then: 'no Stored Procedures displayed'
 //                page.storedProceduresDisplayed()
-
-
                 break
             } catch (org.openqa.selenium.ElementNotVisibleException e) {
                 println("ElementNotVisibleException: Unable to Start the test")
@@ -250,28 +246,28 @@ class DbMonitorTest extends TestBase {
 
     //HEADER TESTS
 
-    def "header banner exists" () {
+    def headerBannerExists() {
         when:
         at DbMonitorPage
         then:
         waitFor(waitTime) { header.banner.isDisplayed() }
     }
 
-    def "header image exists" () {
+    def headerImageExists() {
         when:
         at DbMonitorPage
         then:
         waitFor(waitTime) { header.image.isDisplayed() }
     }
 
-    def "header username exists" () {
+    def headerUsernameExists() {
         when:
         at DbMonitorPage
         then:
         waitFor(waitTime) { header.usernameInHeader.isDisplayed() }
     }
 
-    def "header logout exists" () {
+    def headerLogoutExists() {
         when: 'click the Admin link (if needed)'
         page.openAdminPage()
         then: 'should be on Admin page'
@@ -316,7 +312,7 @@ class DbMonitorTest extends TestBase {
 
     //HEADER TAB TESTS
 
-    def "header tab dbmonitor exists" () {
+    def headerTabDbmonitorExists() {
         when:
         at DbMonitorPage
         then:
@@ -326,7 +322,7 @@ class DbMonitorTest extends TestBase {
         }
     }
 
-    def "header tab admin exists" () {
+    def headerTabAdminExists() {
         when:
         at DbMonitorPage
         then:
@@ -336,18 +332,17 @@ class DbMonitorTest extends TestBase {
         }
     }
 
-    def "header tab schema exists" () {
+    def headerTabSchemaExists() {
         when:
         at DbMonitorPage
         then:
         waitFor(30) {
             header.tabSchema.isDisplayed()
             header.tabSchema.text().toLowerCase().equals("Schema".toLowerCase())
-
         }
     }
 
-    def "header tab sql query exists" () {
+    def headerTabSqlQueryExists() {
         when:
         at DbMonitorPage
         then:
@@ -356,7 +351,7 @@ class DbMonitorTest extends TestBase {
         }
     }
 
-    def "header username check" () {
+    def headerUsernameCheck() {
         when: 'click the Admin link (if needed)'
         page.openAdminPage()
         then: 'should be on Admin page'
@@ -366,10 +361,10 @@ class DbMonitorTest extends TestBase {
         waitFor(waitTime) { page.overview.securityValue.isDisplayed() }
         String security = page.overview.securityValue.text();
         then:
-        if(page.overview.securityValue.text().equals("Off"))
-        {
+        if(page.overview.securityValue.text().equals("Off")) {
             println("PASS")
         }
+
         when: 'click the DB Monitor link (if needed)'
         page.openDbMonitorPage()
         then:
@@ -381,7 +376,7 @@ class DbMonitorTest extends TestBase {
         }
     }
 
-    def "header username click and close" () {
+    def headerUsernameClickAndClose() {
         when:
         at DbMonitorPage
         then:
@@ -395,7 +390,7 @@ class DbMonitorTest extends TestBase {
         header.popupClose.click()
     }
 
-    def "header username click and cancel" () {
+    def headerUsernameClickAndCancel() {
         when:
         at DbMonitorPage
         then:
@@ -411,7 +406,7 @@ class DbMonitorTest extends TestBase {
 
     // LOGOUT TEST
 
-    def "logout button test close" ()  {
+    def logoutButtonTestClose()  {
         when: 'click the Admin link (if needed)'
         page.openAdminPage()
         then: 'should be on Admin page'
@@ -421,8 +416,7 @@ class DbMonitorTest extends TestBase {
         waitFor(waitTime) { page.overview.securityValue.isDisplayed() }
         String security = page.overview.securityValue.text();
         then:
-        if(page.overview.securityValue.text().equals("Off"))
-        {
+        if(page.overview.securityValue.text().equals("Off")) {
             println("PASS")
         }
         when: 'click the DB Monitor link (if needed)'
@@ -442,7 +436,7 @@ class DbMonitorTest extends TestBase {
         }
     }
 
-    def "logout button test cancel" ()  {
+    def logoutButtonTestCancel()  {
         when: 'click the Admin link (if needed)'
         page.openAdminPage()
         then: 'should be on Admin page'
@@ -452,10 +446,10 @@ class DbMonitorTest extends TestBase {
         waitFor(waitTime) { page.overview.securityValue.isDisplayed() }
         String security = page.overview.securityValue.text();
         then:
-        if(page.overview.securityValue.text().equals("Off"))
-        {
+        if(page.overview.securityValue.text().equals("Off")) {
             println("PASS")
         }
+
         when: 'click the DB Monitor link (if needed)'
         page.openDbMonitorPage()
         then:
@@ -475,7 +469,7 @@ class DbMonitorTest extends TestBase {
 
     //HELP POPUP TEST
 
-    def "help popup existance" () {
+    def helpPopupExistance() {
         when:
         at DbMonitorPage
         then:
@@ -503,7 +497,7 @@ class DbMonitorTest extends TestBase {
 
     //FOOTER TESTS
 
-    def "footer exists" () {
+    def footerExists() {
         when:
         at DbMonitorPage
         then:
@@ -517,7 +511,7 @@ class DbMonitorTest extends TestBase {
         waitFor(30) {
             footer.banner.isDisplayed()
             footer.text.isDisplayed()
-            footer.text.text().toLowerCase().contains("Copyright (C) 2008-2016 VoltDB Inc. All rights reserved.".toLowerCase())
+            footer.text.text().toLowerCase().contains("Copyright (C) 2008-2017 VoltDB Inc. All rights reserved.".toLowerCase())
         }
     }
 
@@ -531,7 +525,6 @@ class DbMonitorTest extends TestBase {
         println(deleteQuery)
         then:
         println(tablename)
-
 
         when: 'sql query tab is clicked'
         page.gotoSqlQuery()
@@ -553,8 +546,6 @@ class DbMonitorTest extends TestBase {
 
         when:
         if(page.dataTablesDisplayed()) {
-
-
             when:
             page.searchDatabaseTable(tablename)
             then:
@@ -569,6 +560,7 @@ class DbMonitorTest extends TestBase {
                 println("Table not found after creation")
                 assert false
             }
+
             when: 'sql query tab is clicked'
             page.gotoSqlQuery()
             then: 'at sql query'
@@ -608,10 +600,8 @@ class DbMonitorTest extends TestBase {
         String before = ""
         String after  = ""
 
-
         when:
         if(page.dataTablesDisplayed()) {
-
             when: 'click row count'
             page.clickRowcount()
             then: 'check if row count is in ascending'
@@ -630,7 +620,6 @@ class DbMonitorTest extends TestBase {
 
             if (before.equals("ascending") && after.equals("descending"))
                 assert true
-
         }
         then:
         println("passed")
@@ -665,14 +654,12 @@ class DbMonitorTest extends TestBase {
         println("passed")
     }
 
-    def "check if Min Rows is clickable"() {
+    def checkIfMinRowsIsClickable() {
         String before = ""
         String after  = ""
 
         when:
         if(page.dataTablesDisplayed()) {
-
-
             when: 'click min rows'
             page.clickMinRows()
             then: 'check if min rows is in ascending'
@@ -691,13 +678,12 @@ class DbMonitorTest extends TestBase {
 
             if (before.equals("ascending") && after.equals("descending"))
                 assert true
-
         }
         then:
         println("passed")
     }
 
-    def "check if Avg Rows is clickable"() {
+    def checkIfAvgRowsIsClickable() {
         String before = ""
         String after  = ""
 
@@ -721,13 +707,12 @@ class DbMonitorTest extends TestBase {
 
             if (before.equals("ascending") && after.equals("descending"))
                 assert true
-
         }
         then:
         println("passed")
     }
 
-    def "check if Type is clickable"() {
+    def checkIfTypeIsClickable() {
         String before = ""
         String after  = ""
 
@@ -751,7 +736,6 @@ class DbMonitorTest extends TestBase {
 
             if (before.equals("ascending") && after.equals("descending"))
                 assert true
-
         }
         then:
         println("passed")
@@ -759,7 +743,7 @@ class DbMonitorTest extends TestBase {
 
     // stored procedure ascending descending
 
-    def CheckIfStoredProcedureIsClickable() {
+    def checkIfStoredProcedureIsClickable() {
         String before = ""
         String after  = ""
 
@@ -836,7 +820,7 @@ class DbMonitorTest extends TestBase {
         println("passed")
     }
 
-    def CheckDataInStoredProcedures() {
+    def checkDataInStoredProcedures() {
         expect: 'Display Preference button exists'
         page.displayPreferenceDisplayed()
 
@@ -878,7 +862,7 @@ class DbMonitorTest extends TestBase {
         println("passed")
     }
 
-    def CheckDataInDatabaseTables() {
+    def checkDataInDatabaseTables() {
         when:
         if(page.dataTablesDisplayed()) {
 
@@ -906,7 +890,7 @@ class DbMonitorTest extends TestBase {
 
     // ALERT
 
-    def "set alert and replace trigger alert"() {
+    def setAlertAndReplaceTriggerAlert() {
         int count = 0
 
         when: 'set alert threshold to zero'
@@ -945,14 +929,14 @@ class DbMonitorTest extends TestBase {
     }
 
     // server search
-    def "check server search on dbmonitor matched"(){
+    def checkServerSearchOnDbmonitorMatched() {
         when:'clicked server button'
         at DbMonitorPage
         String serverNamevalid = page.getValidPath()  // taking local server valid name from serversearch.txt file ("/src/resources/serversearch.txt")
         page.clusterserverbutton.click()
-        waitFor(5){page.serversearch.value(serverNamevalid)
+        waitFor(5) {
+            page.serversearch.value(serverNamevalid)
         }
-
         then:
         at DbMonitorPage
         waitFor(5){page.clusterserverbutton.isDisplayed()}
@@ -960,15 +944,12 @@ class DbMonitorTest extends TestBase {
         println("server searched matched")
     }
 
-    def "check server search on dbmonitor not matched"(){
-
+    def checkServerSearchOnDbmonitorNotBatched() {
         when:'clicked server button'
         at DbMonitorPage
         String serverNameinvalid = page.getInvalidPath() // taking local server invalid name from serversearch.txt file ("/src/resources/serversearch.txt")
         page.clusterserverbutton.click()
         waitFor(5){page.serversearch.value(serverNameinvalid)}
-
-
         then:
         at DbMonitorPage
         waitFor(5){page.clusterserverbutton.isDisplayed()}
@@ -976,7 +957,7 @@ class DbMonitorTest extends TestBase {
         println("server searched unmatched")
     }
 
-    def "check server title on dbmonitor"(){
+    def checkServerTitleOnDbmonitor() {
         when:
         at DbMonitorPage
         waitFor(5){page.clusterserverbutton.isDisplayed()}
@@ -1502,7 +1483,7 @@ class DbMonitorTest extends TestBase {
         }
     }*/
 
-    def "check min value in server ram seconds"(){
+    def checkMinValueInServerRamSeconds() {
         int count = 0
 
         when:
@@ -1545,7 +1526,7 @@ class DbMonitorTest extends TestBase {
         }
     }
 
-    def "check max value in server ram seconds"(){
+    def checkMaxValueInServerRamSeconds() {
         int count = 0
 
         when:
@@ -1592,7 +1573,7 @@ class DbMonitorTest extends TestBase {
 
     //Test Case relating to Graph
     //cluster latency
-    def "check min value in cluster latency days"(){
+    def checkMinValueInClusterLatencyDays() {
         int count = 0
 
 //        when: "Check if Cluster Latency Graph is displayed"
@@ -1737,7 +1718,7 @@ class DbMonitorTest extends TestBase {
         }
     }
 
-    def "check min value in cluster latency minutes"(){
+    def checkMinValueInClusterLatencyMinutes() {
         int count = 0
         when:
         // This loop is used to gain time.
@@ -1779,7 +1760,7 @@ class DbMonitorTest extends TestBase {
         }
     }
 
-    def "check max value in cluster latency minutes"(){
+    def checkMaxValueInClusterLatencyMinutes() {
         int count = 0
         when:
         // This loop is used to gain time.
@@ -1821,7 +1802,7 @@ class DbMonitorTest extends TestBase {
         }
     }
 
-    def "check min value in cluster latency seconds"(){
+    def checkMinValueInClusterLatencySeconds() {
         int count = 0
 
         when:
@@ -1864,7 +1845,7 @@ class DbMonitorTest extends TestBase {
         }
     }
 
-    def "check max value in cluster latency seconds"(){
+    def checkMaxValueInClusterLatencySeconds() {
         int count = 0
 
         when:
@@ -1908,7 +1889,7 @@ class DbMonitorTest extends TestBase {
     }
 
     //cluster transaction
-    def "check min value in cluster transaction days"(){
+    def checkMinValueInClusterTransactionDays() {
         int count = 0
 
         when:
@@ -1979,7 +1960,7 @@ class DbMonitorTest extends TestBase {
         }
     }
 
-    def "check max value in cluster transaction days"(){
+    def checkMaxValueInClusterTransactionDays() {
         int count = 0
         int smallCount = 0
         when:
@@ -2052,7 +2033,7 @@ class DbMonitorTest extends TestBase {
         }
     }
 
-    def "check min value in cluster transaction minutes"(){
+    def checkMinValueInClusterTransactionMinutes() {
         int count = 0
 
         when:
@@ -2103,7 +2084,7 @@ class DbMonitorTest extends TestBase {
         }
     }
 
-    def "check max value in cluster transaction minutes"(){
+    def checkMaxValueInClusterTransactionMinutes() {
         int count = 0
 
         when:
@@ -2155,7 +2136,7 @@ class DbMonitorTest extends TestBase {
         }
     }
 
-    def "check min value in cluster transaction seconds"(){
+    def checkMinValueInClusterTransactionSeconds() {
         int count = 0
 
         when:
@@ -2200,7 +2181,7 @@ class DbMonitorTest extends TestBase {
         }
     }
 
-    def "check max value in cluster transaction seconds"(){
+    def checkMaxValueInClusterTransactionSeconds() {
         int count = 0
 
         when:
@@ -2286,16 +2267,6 @@ class DbMonitorTest extends TestBase {
         when: "Open Partition Graph if not open"
         if (!partitiongraphmin.isDisplayed())
             page.openPartitionIdleGraph()
-        report "hello"
-        /*and:
-        // This loop is used to gain time.
-        while(count<numberOfTrials) {
-            count++
-            page.chooseGraphView("Seconds")
-            if(graphView.text().equals("")) {
-                break
-            }
-        }*/
         count = 0
         then:
         String stringMax
@@ -2374,7 +2345,6 @@ class DbMonitorTest extends TestBase {
             println("FAIL: It is not in minutes")
             assert false
         }
-
         page.closePartitionIdleGraph()
     }
 
@@ -2786,7 +2756,7 @@ class DbMonitorTest extends TestBase {
         println("passed")
     }
 
-    def CheckIfTimeOfExecutionIsClickable() {
+    def checkIfTimeOfExecutionIsClickable() {
         String before = ""
         String after  = ""
 
@@ -2883,19 +2853,14 @@ class DbMonitorTest extends TestBase {
             }
         }
         then: 'display'
-
-
         DateFormat dateFormat = new SimpleDateFormat("HH:mm:ss");
         Date date = new Date();
         String stringTwo = dateFormat.format(date)
 
         String stringOne = timeOne.text()
         int hourOne = page.changeToHour(stringOne)
-
-
         int hourTwo = page.changeToHour(stringTwo)
         int minuteTwo = page.changeToHour(stringTwo)
-
         int hourDiff = hourTwo - hourOne
 
         if ( hourDiff == 1 ) {
@@ -2934,7 +2899,7 @@ class DbMonitorTest extends TestBase {
         }
     }
 
-    def "click display preferences and close"() {
+    def clickDisplayPreferencesAndClose() {
         expect: 'Display Preference button exists'
         page.displayPreferenceDisplayed()
 
@@ -3198,7 +3163,6 @@ class DbMonitorTest extends TestBase {
 
         when:
         if(!page.storedProceduresCheckboxDisplayed()) {
-
             when: 'Stored Procedures checkbox is displayed'
             page.storedProceduresCheckboxDisplayed()
             then: 'Remove Stored Procedures'
@@ -3236,7 +3200,6 @@ class DbMonitorTest extends TestBase {
             page.partitionIdleTimeDisplayed()
             page.storedProceduresDisplayed()
             page.dataTablesDisplayed()
-
         }
         then:
             println("passed")
@@ -3260,9 +3223,7 @@ class DbMonitorTest extends TestBase {
 
         when: 'click close button'
         page.savePreferences()
-
         if(!page.dataTablesDisplayed()) {
-
             then: 'no Data Tables displayed'
             page.serverCpuDisplayed()
             page.serverRamDisplayed()
@@ -3299,7 +3260,7 @@ class DbMonitorTest extends TestBase {
         println("passed")
     }
 
-    def 'confirm Graph area and Data area open initially'() {
+    def confirmGraphAreaAndDataAreaOpenInitially() {
         expect: 'Graph area open initially'
         page.isGraphAreaOpen()
 

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -364,7 +364,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         }
 
         InMemoryJarfile jarfile = new InMemoryJarfile();
-        VoltCompiler comp = new VoltCompiler();
+        VoltCompiler comp = new VoltCompiler(false);
         comp.addClassToJar(jarfile, TestProc.class);
 
         try {

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -547,6 +547,15 @@ public class MaterializedViewProcessor {
             checkExpressions.add(where);
         }
 
+        /*
+         * Gather up all the join expressions.  The ParsedSelectStatement
+         * has not been analyzed yet, so it's not clear where these are.  But
+         * the stmt knows.
+         */
+        stmt.gatherJoinExpressions(checkExpressions);
+        if (stmt.getHavingPredicate() != null) {
+            checkExpressions.add(stmt.getHavingPredicate());
+        }
         // Check all the subexpressions we gathered up.
         if (!AbstractExpression.validateExprsForIndexesAndMVs(checkExpressions, msg)) {
             // The error message will be in the StringBuffer msg.
@@ -909,8 +918,13 @@ public class MaterializedViewProcessor {
                     assert(false);
                     return null;
                 }
-                if (! SubPlanAssembler.isPartialIndexPredicateCovered(tableScan, coveringExprs, index, exactMatchCoveringExprs)) {
-                    // partial index does not match MatView where clause, give up this index
+                String predicatejson = index.getPredicatejson();
+                if ( ! predicatejson.isEmpty() &&
+                        ! SubPlanAssembler.isPartialIndexPredicateCovered(
+                                tableScan, coveringExprs,
+                                predicatejson, exactMatchCoveringExprs)) {
+                    // the partial index predicate does not match the MatView's
+                    // where clause -- give up on this index
                     continue;
                 }
             }

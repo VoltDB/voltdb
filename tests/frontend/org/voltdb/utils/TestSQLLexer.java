@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -69,14 +69,6 @@ public class TestSQLLexer {
         checkDDL("altertable pants", null);
         checkDDL("-- alter table pants", null);
         checkDDL("altar table pants", null);
-
-        checkDDL("export table pants", "export");
-        checkDDL("EXPORT table pants", "export");
-        checkDDL("ExPoRt table pants", "export");
-        checkDDL("   export table pants    ", "export");
-        checkDDL("exporttable pants", null);
-        checkDDL("-- export table pants", null);
-        checkDDL("exprot table pants", null);
 
         checkDDL("dr table pants", "dr");
         checkDDL("DR table pants", "dr");

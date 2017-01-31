@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -68,14 +68,10 @@
 #include "executors/seqscanexecutor.h"
 #include "executors/setopexecutor.h"
 #include "executors/setopreceiveexecutor.h"
+#include "executors/swaptablesexecutor.h"
 #include "executors/tuplescanexecutor.h"
 #include "executors/updateexecutor.h"
-#include "executors/partitionbyexecutor.h"
-
-#include "plannodes/abstractplannode.h"
-
-
-#include <cassert>
+#include "executors/windowfunctionexecutor.h"
 
 namespace voltdb {
 
@@ -106,10 +102,11 @@ AbstractExecutor* getNewExecutor(VoltDBEngine *engine,
     case PLAN_NODE_TYPE_SEQSCAN: return new SeqScanExecutor(engine, abstract_node);
     case PLAN_NODE_TYPE_SETOP: return new SetOpExecutor(engine, abstract_node);
     case PLAN_NODE_TYPE_SETOPRECEIVE: return new SetOpReceiveExecutor(engine, abstract_node);
+    case PLAN_NODE_TYPE_SWAPTABLES: return new SwapTablesExecutor(engine, abstract_node);
     case PLAN_NODE_TYPE_TABLECOUNT: return new TableCountExecutor(engine, abstract_node);
     case PLAN_NODE_TYPE_TUPLESCAN: return new TupleScanExecutor(engine, abstract_node);
     case PLAN_NODE_TYPE_UPDATE: return new UpdateExecutor(engine, abstract_node);
-    case PLAN_NODE_TYPE_PARTITIONBY: return new PartitionByExecutor(engine, abstract_node);
+    case PLAN_NODE_TYPE_WINDOWFUNCTION: return new WindowFunctionExecutor(engine, abstract_node);
     // default: Don't provide a default, let the compiler enforce complete coverage.
     }
     VOLT_ERROR("Undefined plan node type %d", (int) type);

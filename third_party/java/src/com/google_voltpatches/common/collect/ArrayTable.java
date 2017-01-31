@@ -25,8 +25,8 @@ import com.google_voltpatches.common.annotations.GwtCompatible;
 import com.google_voltpatches.common.annotations.GwtIncompatible;
 import com.google_voltpatches.common.base.Objects;
 import com.google_voltpatches.common.collect.Maps.IteratorBasedAbstractMap;
+import com.google_voltpatches.errorprone.annotations.CanIgnoreReturnValue;
 import com.google_voltpatches.j2objc.annotations.WeakOuter;
-
 import java.io.Serializable;
 import java.lang.reflect.Array;
 import java.util.Arrays;
@@ -35,7 +35,6 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
-
 import javax.annotation_voltpatches.Nullable;
 
 /**
@@ -333,6 +332,7 @@ public final class ArrayTable<R, C, V> extends AbstractTable<R, C, V> implements
    *     or {@code columnIndex} is greater then or equal to the number of
    *     allowed column keys
    */
+  @CanIgnoreReturnValue
   public V set(int rowIndex, int columnIndex, @Nullable V value) {
     // In GWT array access never throws IndexOutOfBoundsException.
     checkElementIndex(rowIndex, rowList.size());
@@ -352,12 +352,10 @@ public final class ArrayTable<R, C, V> extends AbstractTable<R, C, V> implements
    *
    * @param valueClass class of values stored in the returned array
    */
-  @GwtIncompatible("reflection")
+  @GwtIncompatible // reflection
   public V[][] toArray(Class<V> valueClass) {
-    // Can change to use varargs in JDK 1.6 if we want
     @SuppressWarnings("unchecked") // TODO: safe?
-    V[][] copy =
-        (V[][]) Array.newInstance(valueClass, new int[] {rowList.size(), columnList.size()});
+    V[][] copy = (V[][]) Array.newInstance(valueClass, rowList.size(), columnList.size());
     for (int i = 0; i < rowList.size(); i++) {
       System.arraycopy(array[i], 0, copy[i], 0, array[i].length);
     }
@@ -446,6 +444,7 @@ public final class ArrayTable<R, C, V> extends AbstractTable<R, C, V> implements
    * @throws IllegalArgumentException if {@code rowKey} is not in {@link
    *     #rowKeySet()} or {@code columnKey} is not in {@link #columnKeySet()}.
    */
+  @CanIgnoreReturnValue
   @Override
   public V put(R rowKey, C columnKey, @Nullable V value) {
     checkNotNull(rowKey);
@@ -484,6 +483,7 @@ public final class ArrayTable<R, C, V> extends AbstractTable<R, C, V> implements
    * @throws UnsupportedOperationException always
    * @deprecated Use {@link #erase}
    */
+  @CanIgnoreReturnValue
   @Override
   @Deprecated
   public V remove(Object rowKey, Object columnKey) {
@@ -503,6 +503,7 @@ public final class ArrayTable<R, C, V> extends AbstractTable<R, C, V> implements
    * @return the value previously associated with the keys, or {@code null} if
    *     no mapping existed for the keys
    */
+  @CanIgnoreReturnValue
   public V erase(@Nullable Object rowKey, @Nullable Object columnKey) {
     Integer rowIndex = rowKeyToIndex.get(rowKey);
     Integer columnIndex = columnKeyToIndex.get(columnKey);

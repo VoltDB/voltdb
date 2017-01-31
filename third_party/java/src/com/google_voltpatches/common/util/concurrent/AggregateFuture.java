@@ -1,37 +1,31 @@
 /*
  * Copyright (C) 2006 The Guava Authors
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
+ * in compliance with the License. You may obtain a copy of the License at
  *
  * http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software distributed under the License
+ * is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
+ * or implied. See the License for the specific language governing permissions and limitations under
+ * the License.
  */
 
 package com.google_voltpatches.common.util.concurrent;
 
 import static com.google_voltpatches.common.base.Preconditions.checkNotNull;
 import static com.google_voltpatches.common.base.Preconditions.checkState;
+import static com.google_voltpatches.common.util.concurrent.Futures.getDone;
 import static com.google_voltpatches.common.util.concurrent.MoreExecutors.directExecutor;
-import static com.google_voltpatches.common.util.concurrent.Uninterruptibles.getUninterruptibly;
 
 import com.google_voltpatches.common.annotations.GwtCompatible;
-import com.google_voltpatches.common.annotations.GwtIncompatible;
 import com.google_voltpatches.common.collect.ImmutableCollection;
-import com.google_voltpatches.j2objc.annotations.WeakOuter;
-
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-
 import javax.annotation_voltpatches.Nullable;
 
 /**
@@ -42,40 +36,34 @@ import javax.annotation_voltpatches.Nullable;
  */
 @GwtCompatible
 abstract class AggregateFuture<InputT, OutputT> extends AbstractFuture.TrustedFuture<OutputT> {
-  private static final Logger logger =
-      Logger.getLogger(AggregateFuture.class.getName());
+  private static final Logger logger = Logger.getLogger(AggregateFuture.class.getName());
 
+  /*
+   * In certain circumstances, this field might theoretically not be visible to an afterDone() call
+   * triggered by cancel(). For details, see the comments on the fields of TimeoutFuture.
+   */
   private RunningState runningState;
 
-  @Override final void done() {
-    super.done();
-
-    // Let go of the memory held by the running state
-    this.runningState = null;
-  }
-
-  // TODO(cpovirk): Use maybePropagateCancellation() if the performance is OK and the code is clean.
-  @Override public final boolean cancel(boolean mayInterruptIfRunning) {
-    // Must get a reference to the futures before we cancel, as they'll be cleared out.
-    RunningState localRunningState = runningState;
-    ImmutableCollection<? extends ListenableFuture<? extends InputT>> futures =
-        (localRunningState != null) ? localRunningState.futures : null;
-    // Cancel all the component futures.
-    boolean cancelled = super.cancel(mayInterruptIfRunning);
-    // & is faster than the branch required for &&
-    if (cancelled & futures != null) {
-      for (ListenableFuture<?> future : futures) {
-        future.cancel(mayInterruptIfRunning);
-      }
-    }
-    return cancelled;
-  }
-
-  @GwtIncompatible("Interruption not supported")
-  @Override protected final void interruptTask() {
+  @Override
+  protected final void afterDone() {
+    super.afterDone();
     RunningState localRunningState = runningState;
     if (localRunningState != null) {
-      localRunningState.interruptTask();
+      // Let go of the memory held by the running state
+      this.runningState = null;
+      ImmutableCollection<? extends ListenableFuture<? extends InputT>> futures =
+          localRunningState.futures;
+      boolean wasInterrupted = wasInterrupted();
+
+      if (wasInterrupted()) {
+        localRunningState.interruptTask();
+      }
+
+      if (isCancelled() & futures != null) {
+        for (ListenableFuture<?> future : futures) {
+          future.cancel(wasInterrupted);
+        }
+      }
     }
   }
 
@@ -87,14 +75,15 @@ abstract class AggregateFuture<InputT, OutputT> extends AbstractFuture.TrustedFu
     runningState.init();
   }
 
-  @WeakOuter
   abstract class RunningState extends AggregateFutureState implements Runnable {
     private ImmutableCollection<? extends ListenableFuture<? extends InputT>> futures;
     private final boolean allMustSucceed;
     private final boolean collectsValues;
 
-    RunningState(ImmutableCollection<? extends ListenableFuture<? extends InputT>> futures,
-        boolean allMustSucceed, boolean collectsValues) {
+    RunningState(
+        ImmutableCollection<? extends ListenableFuture<? extends InputT>> futures,
+        boolean allMustSucceed,
+        boolean collectsValues) {
       super(futures.size());
       this.futures = checkNotNull(futures);
       this.allMustSucceed = allMustSucceed;
@@ -102,15 +91,16 @@ abstract class AggregateFuture<InputT, OutputT> extends AbstractFuture.TrustedFu
     }
 
     /* Used in the !allMustSucceed case so we don't have to instantiate a listener. */
-    @Override public final void run() {
+    @Override
+    public final void run() {
       decrementCountAndMaybeComplete();
     }
 
     /**
      * The "real" initialization; we can't put this in the constructor because, in the case where
-     * futures are already complete, we would not initialize the subclass before calling
-     * {@link #handleOneInputDone}. As this is called after the subclass is constructed, we're
-     * guaranteed to have properly initialized the subclass.
+     * futures are already complete, we would not initialize the subclass before calling {@link
+     * #handleOneInputDone}. As this is called after the subclass is constructed, we're guaranteed
+     * to have properly initialized the subclass.
      */
     private void init() {
       // Corner case: List is empty.
@@ -119,34 +109,34 @@ abstract class AggregateFuture<InputT, OutputT> extends AbstractFuture.TrustedFu
         return;
       }
 
-      // NOTE: If we ever want to use a custom executor here, have a look at
-      // CombinedFuture as we'll need to handle RejectedExecutionException
+      // NOTE: If we ever want to use a custom executor here, have a look at CombinedFuture as we'll
+      // need to handle RejectedExecutionException
 
       if (allMustSucceed) {
         // We need fail fast, so we have to keep track of which future failed so we can propagate
         // the exception immediately
 
-        // Register a listener on each Future in the list to update
-        // the state of this future.
-        // Note that if all the futures on the list are done prior to completing
-        // this loop, the last call to addListener() will callback to
-        // setOneValue(), transitively call our cleanup listener, and set
-        // this.futures to null.
-        // This is not actually a problem, since the foreach only needs
-        // this.futures to be non-null at the beginning of the loop.
+        // Register a listener on each Future in the list to update the state of this future.
+        // Note that if all the futures on the list are done prior to completing this loop, the last
+        // call to addListener() will callback to setOneValue(), transitively call our cleanup
+        // listener, and set this.futures to null.
+        // This is not actually a problem, since the foreach only needs this.futures to be non-null
+        // at the beginning of the loop.
         int i = 0;
         for (final ListenableFuture<? extends InputT> listenable : futures) {
           final int index = i++;
-          listenable.addListener(new Runnable() {
-            @Override
-            public void run() {
-              try {
-                handleOneInputDone(index, listenable);
-              } finally {
-                decrementCountAndMaybeComplete();
-              }
-            }
-          }, directExecutor());
+          listenable.addListener(
+              new Runnable() {
+                @Override
+                public void run() {
+                  try {
+                    handleOneInputDone(index, listenable);
+                  } finally {
+                    decrementCountAndMaybeComplete();
+                  }
+                }
+              },
+              directExecutor());
         }
       } else {
         // We'll only call the callback when all futures complete, regardless of whether some failed
@@ -158,10 +148,10 @@ abstract class AggregateFuture<InputT, OutputT> extends AbstractFuture.TrustedFu
     }
 
     /**
-     * Fails this future with the given Throwable if {@link #allMustSucceed} is
-     * true. Also, logs the throwable if it is an {@link Error} or if
-     * {@link #allMustSucceed} is {@code true}, the throwable did not cause
-     * this future to fail, and it is the first time we've seen that particular Throwable.
+     * Fails this future with the given Throwable if {@link #allMustSucceed} is true. Also, logs the
+     * throwable if it is an {@link Error} or if {@link #allMustSucceed} is {@code true}, the
+     * throwable did not cause this future to fail, and it is the first time we've seen that
+     * particular Throwable.
      */
     private void handleException(Throwable throwable) {
       checkNotNull(throwable);
@@ -175,8 +165,8 @@ abstract class AggregateFuture<InputT, OutputT> extends AbstractFuture.TrustedFu
         if (completedWithFailure) {
           releaseResourcesAfterFailure();
         } else {
-          // Go up the causal chain to see if we've already seen this cause; if we have,
-          // even if it's wrapped by a different exception, don't log it.
+          // Go up the causal chain to see if we've already seen this cause; if we have, even if
+          // it's wrapped by a different exception, don't log it.
           firstTimeSeeingThisException = addCausalChain(getOrInitSeenExceptions(), throwable);
         }
       }
@@ -195,7 +185,8 @@ abstract class AggregateFuture<InputT, OutputT> extends AbstractFuture.TrustedFu
     @Override
     final void addInitialException(Set<Throwable> seen) {
       if (!isCancelled()) {
-        addCausalChain(seen, trustedGetException());
+        // TODO(cpovirk): Think about whether we could/should use Verify to check this.
+        boolean unused = addCausalChain(seen, trustedGetException());
       }
     }
 
@@ -203,30 +194,29 @@ abstract class AggregateFuture<InputT, OutputT> extends AbstractFuture.TrustedFu
      * Handles the input at the given index completing.
      */
     private void handleOneInputDone(int index, Future<? extends InputT> future) {
-      // The only cases in which this Future should already be done are (a) if
-      // it was cancelled or (b) if an input failed and we propagated that
-      // immediately because of allMustSucceed.
-      checkState(allMustSucceed || !isDone() || isCancelled(),
+      // The only cases in which this Future should already be done are (a) if it was cancelled or
+      // (b) if an input failed and we propagated that immediately because of allMustSucceed.
+      checkState(
+          allMustSucceed || !isDone() || isCancelled(),
           "Future was done before all dependencies completed");
 
       try {
-        checkState(future.isDone(),
-            "Tried to set value from future which is not done");
+        checkState(future.isDone(), "Tried to set value from future which is not done");
         if (allMustSucceed) {
           if (future.isCancelled()) {
-            // this.cancel propagates the cancellation to children; we use super.cancel
-            // to set our own state but let the input futures keep running
-            // as some of them may be used elsewhere.
-            AggregateFuture.super.cancel(false);
+            // clear running state prior to cancelling children, this sets our own state but lets
+            // the input futures keep running as some of them may be used elsewhere.
+            runningState = null;
+            cancel(false);
           } else {
             // We always get the result so that we can have fail-fast, even if we don't collect
-            InputT result = getUninterruptibly(future);
+            InputT result = getDone(future);
             if (collectsValues) {
               collectOneValue(allMustSucceed, index, result);
             }
           }
         } else if (collectsValues && !future.isCancelled()) {
-          collectOneValue(allMustSucceed, index, getUninterruptibly(future));
+          collectOneValue(allMustSucceed, index, getDone(future));
         }
       } catch (ExecutionException e) {
         handleException(e.getCause());
@@ -256,11 +246,11 @@ abstract class AggregateFuture<InputT, OutputT> extends AbstractFuture.TrustedFu
     }
 
     /**
-     * Listeners implicitly keep a reference to {@link RunningState} as they're inner classes,
-     * so we free resources here as well for the allMustSucceed=true case (i.e. when a future fails,
-     * we immediately release resources we no longer need); additionally, the future will release
-     * its reference to {@link RunningState}, which should free all associated memory when all the
-     * futures complete & the listeners are released.
+     * Listeners implicitly keep a reference to {@link RunningState} as they're inner classes, so we
+     * free resources here as well for the allMustSucceed=true case (i.e. when a future fails, we
+     * immediately release resources we no longer need); additionally, the future will release its
+     * reference to {@link RunningState}, which should free all associated memory when all the
+     * futures complete and the listeners are released.
      *
      * TODO(user): Write tests for memory retention
      */
@@ -271,8 +261,8 @@ abstract class AggregateFuture<InputT, OutputT> extends AbstractFuture.TrustedFu
     /**
      * Called only if {@code collectsValues} is true.
      *
-     * <p>If {@code allMustSucceed} is true, called as each future completes; otherwise,
-     * called for each future when all futures complete.
+     * <p>If {@code allMustSucceed} is true, called as each future completes; otherwise, called for
+     * each future when all futures complete.
      */
     abstract void collectOneValue(boolean allMustSucceed, int index, @Nullable InputT returnValue);
 

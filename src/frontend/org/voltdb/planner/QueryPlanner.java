@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -394,11 +394,12 @@ public class QueryPlanner {
         }
 
         m_planSelector.outputParsedStatement(parsedStmt);
-
-        // Init Assembler. Each plan assembler requires a new instance of the PlanSelector
-        // to keep track of the best plan
-        PlanAssembler assembler = new PlanAssembler(m_cluster, m_db, m_partitioning,
-                (PlanSelector) m_planSelector.clone());
+        // Each plan assembler requires a new instance of the PlanSelector
+        // to keep track of the best plan.
+        PlanSelector planSelector = m_planSelector.clone();
+        // Init Assembler.
+        PlanAssembler assembler = new PlanAssembler(m_cluster, m_db,
+                m_partitioning, planSelector);
         // find the plan with minimal cost
         CompiledPlan bestPlan = assembler.getBestCostPlan(parsedStmt);
 

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -63,29 +63,6 @@ public class TestPlansSubQueries extends PlannerTestCase {
     @Override
     protected void setUp() throws Exception {
         setupSchema(TestPlansSubQueries.class.getResource("testplans-subqueries-ddl.sql"), "ddl", false);
-    }
-
-    public void testSelectOnlyGuard() {
-        // Can only have expression subqueries in SELECT statements
-
-        failToCompile("INSERT INTO R1 (A, C, D) VALUES ((SELECT MAX(A) FROM R1), 32, 32)",
-                "Subquery expressions are only supported in SELECT statements");
-
-        failToCompile("INSERT INTO R1 (A, C, D) SELECT (SELECT MAX(A) FROM R1), 32, 32 FROM R1",
-                "Subquery expressions are only supported in SELECT statements");
-
-        failToCompile("UPDATE R1 SET A = (SELECT MAX(A) FROM R1)",
-                "Subquery expressions are only supported in SELECT statements");
-
-        failToCompile("UPDATE R1 SET A = 37 WHERE A = (SELECT MAX(A) FROM R1)",
-                "Subquery expressions are only supported in SELECT statements");
-
-        failToCompile("DELETE FROM R1 WHERE A IN (SELECT A A1 FROM R1 WHERE A>1)",
-                "Subquery expressions are only supported in SELECT statements");
-
-        failToCompile("SELECT * FROM R1 WHERE A IN (32, 33) "
-                + "UNION SELECT * FROM R1 WHERE A = (SELECT MAX(A) FROM R1)",
-                "Subquery expressions are only supported in SELECT statements");
     }
 
     private void checkOutputSchema(AbstractPlanNode planNode, String... columns) {

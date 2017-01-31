@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -16,6 +16,7 @@
  */
 package org.voltdb;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 
@@ -81,7 +82,7 @@ public interface SnapshotCompletionInterest {
                 long clusterCreateTime) {
             return new SnapshotCompletionEvent(
                     path, stype, nonce, multipartTxnId, partitionTxnIds, truncationSnapshot,
-                    true, "", null, null, null, drVersion, clusterCreateTime);
+                    true, "", null, null, new HashMap<>(), drVersion, clusterCreateTime);
         }
     }
 

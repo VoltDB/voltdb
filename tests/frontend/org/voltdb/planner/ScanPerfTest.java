@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -31,7 +31,6 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import org.junit.Test;
 import org.voltdb.BackendTarget;
-import org.voltdb.ReplicationRole;
 import org.voltdb.SQLStmt;
 import org.voltdb.TableHelper;
 import org.voltdb.VoltProcedure;
@@ -142,7 +141,7 @@ public class ScanPerfTest extends JUnit4LocalClusterTest {
         // build and compile a catalog
         System.out.println("Compiling catalog.");
         VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema(TableHelper.ddlForTable(pTable));
+        builder.addLiteralSchema(TableHelper.ddlForTable(pTable, false));
         builder.addLiteralSchema("PARTITION TABLE P ON COLUMN ID;\n" +
                 "CREATE PROCEDURE FROM CLASS org.voltdb.planner.ScanPerfTest$ScanTable;\n" +
                 "PARTITION PROCEDURE ScanPerfTest$ScanTable ON TABLE P COLUMN ID;\n");
@@ -156,7 +155,7 @@ public class ScanPerfTest extends JUnit4LocalClusterTest {
         System.out.println("Starting cluster.");
         cluster.setHasLocalServer(false);
         cluster.overrideAnyRequestForValgrind();
-        cluster.startUp(true, ReplicationRole.NONE);
+        cluster.startUp(true);
 
         System.out.println("Getting client connected.");
         ClientConfig clientConfig = new ClientConfig();

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -46,7 +46,7 @@ import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.SelectSubqueryExpression;
 import org.voltdb.expressions.TupleAddressExpression;
 import org.voltdb.expressions.TupleValueExpression;
-import org.voltdb.expressions.WindowedExpression;
+import org.voltdb.expressions.WindowFunctionExpression;
 import org.voltdb.planner.microoptimizations.MicroOptimizationRunner;
 import org.voltdb.planner.parseinfo.BranchNode;
 import org.voltdb.planner.parseinfo.JoinNode;
@@ -68,13 +68,13 @@ import org.voltdb.plannodes.NestLoopPlanNode;
 import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.plannodes.OrderByPlanNode;
 import org.voltdb.plannodes.PartialAggregatePlanNode;
-import org.voltdb.plannodes.PartitionByPlanNode;
 import org.voltdb.plannodes.ProjectionPlanNode;
 import org.voltdb.plannodes.ReceivePlanNode;
 import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.plannodes.SendPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.plannodes.UpdatePlanNode;
+import org.voltdb.plannodes.WindowFunctionPlanNode;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.IndexType;
@@ -479,10 +479,6 @@ public class PlanAssembler {
         // Get the best plans for the expression subqueries ( IN/EXISTS (SELECT...) )
         Set<AbstractExpression> subqueryExprs = parsedStmt.findSubquerySubexpressions();
         if ( ! subqueryExprs.isEmpty() ) {
-            if (parsedStmt instanceof ParsedSelectStmt == false) {
-                m_recentErrorMsg = "Subquery expressions are only supported in SELECT statements";
-                return null;
-            }
 
             // guards against IN/EXISTS/Scalar subqueries
             if ( ! m_partitioning.wasSpecifiedAsSingle() ) {
@@ -750,9 +746,9 @@ public class PlanAssembler {
     private int planForParsedSubquery(StmtSubqueryScan subqueryScan, int planId) {
         AbstractParsedStmt subQuery = subqueryScan.getSubqueryStmt();
         assert(subQuery != null);
-        PlanSelector planSelector = (PlanSelector) m_planSelector.clone();
+        PlanSelector planSelector = m_planSelector.clone();
         planSelector.m_planId = planId;
-        StatementPartitioning currentPartitioning = (StatementPartitioning)m_partitioning.clone();
+        StatementPartitioning currentPartitioning = m_partitioning.clone();
         PlanAssembler assembler = new PlanAssembler(
                 m_catalogCluster, m_catalogDb, currentPartitioning, planSelector);
         CompiledPlan compiledPlan = assembler.getBestCostPlan(subQuery);
@@ -998,7 +994,7 @@ public class PlanAssembler {
 
         // If we have a windowed expression in the display list we want to
         // add a PartitionByPlanNode here.
-        if (m_parsedSelect.hasWindowedExpression()) {
+        if (m_parsedSelect.hasWindowFunctionExpression()) {
             root = handleWindowedOperators(root);
         }
 
@@ -2110,14 +2106,14 @@ public class PlanAssembler {
     private AbstractPlanNode handleWindowedOperators(AbstractPlanNode root) {
         // Get the windowed expression.  We need to set its output
         // schema from the display list.
-        WindowedExpression winExpr = m_parsedSelect.getWindowedExpressions().get(0);
+        WindowFunctionExpression winExpr = m_parsedSelect.getWindowFunctionExpressions().get(0);
         assert(winExpr != null);
 
         // This will set the output schema to contain the
         // windowed schema column only.  In generateOutputSchema
         // we will add the input columns.
-        PartitionByPlanNode pnode = new PartitionByPlanNode();
-        pnode.setWindowedExpression(winExpr);
+        WindowFunctionPlanNode pnode = new WindowFunctionPlanNode();
+        pnode.setWindowFunctionExpression(winExpr);
         OrderByPlanNode onode = new OrderByPlanNode();
         // We need to extract more information from the windowed expression.
         // to construct the output schema.

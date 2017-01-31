@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -67,7 +67,14 @@ public class TruncatePeople extends VoltProcedure {
             int leaveTruncated = repeats - restores;
             for (int ii = 0; ii < repeats; ++ii) {
                 voltQueueSQL(truncatebase0); // ("TRUNCATE TABLE PEOPLE;");
-                voltExecuteSQL();
+                voltQueueSQL(validatebase0); // ("SELECT COUNT(*) FROM PEOPLE;");
+                VoltTable validated = voltExecuteSQL()[1];
+
+                throwVoltAbortExceptionIf(
+                        "Rolling back unexpectedly after truncate misbehavior.",
+                        ( ! validated.advanceRow()) || validated.getLong(0) != 0,
+                        null, null);
+
                 // Optionally leave the table truncated between early truncates,
                 // but always restore the rows towards the end of the iterations.
                 if (leaveTruncated-- <= 0) {

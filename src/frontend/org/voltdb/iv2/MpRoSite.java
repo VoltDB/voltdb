@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -35,6 +35,7 @@ import org.voltdb.HsqlBackend;
 import org.voltdb.LoadedProcedureSet;
 import org.voltdb.NonVoltDBBackend;
 import org.voltdb.ParameterSet;
+import org.voltdb.PartitionDRGateway;
 import org.voltdb.PostGISBackend;
 import org.voltdb.PostgreSQLBackend;
 import org.voltdb.ProcedureRunner;
@@ -287,6 +288,11 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         }
 
         @Override
+        public void initDRAppliedTracker(Map<Byte, Integer> clusterIdToPartitionCountMap) {
+            throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+        }
+
+        @Override
         public Map<Integer, Map<Integer, DRConsumerDrIdTracker>> getDrAppliedTrackers()
         {
             throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
@@ -422,6 +428,12 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     public int getCorrespondingClusterId()
     {
         return m_context.cluster.getDrclusterid();
+    }
+
+    @Override
+    public PartitionDRGateway getDRGateway()
+    {
+        throw new UnsupportedOperationException("RO MP Site doesn't have DR gateway");
     }
 
     @Override
@@ -645,6 +657,12 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
 
     @Override
     public void setDRProtocolVersion(int drVersion) {
+        throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+    }
+
+    @Override
+    public void setDRProtocolVersion(int drVersion, long spHandle, long uniqueId)
+    {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
     }
 }

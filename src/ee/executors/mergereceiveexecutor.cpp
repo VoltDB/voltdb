@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -236,7 +236,7 @@ bool MergeReceiveExecutor::p_execute(const NValueArray &params) {
     std::vector<TableTuple> xs;
     xs.reserve(m_tmpInputTable->activeTupleCount());
 
-    ProgressMonitorProxy pmp(m_engine, this);
+    ProgressMonitorProxy pmp(m_engine->getExecutorContext(), this);
 
     //
     // OPTIMIZATION: NESTED LIMIT

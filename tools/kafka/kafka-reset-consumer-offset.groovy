@@ -2,7 +2,7 @@
 
 /*
  * This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -35,6 +35,7 @@
 
 import com.google.common.net.HostAndPort
 import static com.google.common.base.Throwables.getStackTraceAsString as stackTraceFor
+import groovy.json.JsonSlurper
 
 import kafka.api.ConsumerMetadataRequest
 import kafka.api.FetchRequest
@@ -87,12 +88,13 @@ cli.with {
     t(longOpt: 'topic', 'kafka topic', required:true, args:1)
     h(longOpt: 'help', 'usage information', required: false)
     l(longOpt: 'latest', 'reset commit point to lastest')
+    r(longOpt: 'restore', 'restore offsets recorded in [file-name]', args:1)
 }
 
 def opts = cli.parse(args)
 if (!opts) return
 
-if (opts.h) {
+if (opts.h || (opts.l && opts.r)) {
    cli.usage()
    return
 }
@@ -149,6 +151,14 @@ ofstldr = new Attempter(brokers).attempt {
     chnl.connect()
     chnl
 }
+jsn = [:]
+if (opts.r) {
+    jprsr = new JsonSlurper()
+    jsn = jprsr.parse(new File(opts.r))
+    if (jsn.topic != topic || jsn.offsets.size() != prtldrs.size()) {
+        throw new IllegalArgumentException(opts.r + " does not match topic or number of offsets")
+    }
+}
 
 printf("%-36s %4s %16s %16s %16s\n",'TOPIC','PRTN','EARLIEST','LATEST','COMMITTED')
 
@@ -180,8 +190,13 @@ prtldrs.each { int p, Broker b ->
 
     short version = 1
     long now = System.currentTimeMillis()
+
+    long restore = jsn ? jsn.offsets[p] : opts.l ? latest : earliest
+    restore = jsn ? (restore <= earliest) ? earliest :
+        (restore >= latest) ? latest : restore : restore
+
     ocrq = new OffsetCommitRequest(
-        group, [(tnp): new OffsetAndMetadata(opts.l ? latest : earliest, "commit", now)],
+        group, [(tnp): new OffsetAndMetadata(restore, "commit", now)],
         p, clientid, version)
     ofstldr.send(ocrq.underlying())
     ocrsp = OffsetCommitResponse.readFrom(ofstldr.receive().buffer())

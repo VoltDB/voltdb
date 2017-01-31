@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -139,26 +139,6 @@ final public class TestVoltDB {
 
         // XXX don't test what happens if port is invalid, because the code
         // doesn't handle that
-
-        String args23[] = { "create", "replica" };
-        VoltDB.Configuration cfg23 = new VoltDB.Configuration(args23);
-        assertEquals(StartAction.CREATE, cfg23.m_startAction);
-        assertEquals(ReplicationRole.REPLICA, cfg23.m_replicationRole);
-
-        String args24[] = { "recover", "replica" };
-        VoltDB.Configuration cfg24 = new VoltDB.Configuration(args24);
-        assertEquals(StartAction.RECOVER, cfg24.m_startAction);
-        assertEquals(ReplicationRole.REPLICA, cfg24.m_replicationRole);
-
-        String args25[] = { "rejoin", "replica" };
-        VoltDB.Configuration cfg25 = new VoltDB.Configuration(args25);
-        assertEquals(StartAction.REJOIN, cfg25.m_startAction);
-        assertEquals(ReplicationRole.REPLICA, cfg25.m_replicationRole);
-
-        String args26[] = { "live rejoin", "replica" };
-        VoltDB.Configuration cfg26 = new VoltDB.Configuration(args26);
-        assertEquals(StartAction.LIVE_REJOIN, cfg26.m_startAction);
-        assertEquals(ReplicationRole.REPLICA, cfg26.m_replicationRole);
     }
 
     @Test
@@ -189,15 +169,8 @@ final public class TestVoltDB {
         config = new VoltDB.Configuration(args6);
         assertFalse(config.validate());
 
-        if (config.m_isEnterprise) {
-            // replica with explicit recover
-            String[] args7 = {"host", "hola", "replica", "recover"};
-            config = new VoltDB.Configuration(args7);
-            assertTrue(config.validate());
-        }
-
         // replica with explicit create
-        String[] args8 = {"host", "hola", "deployment", "teststring4", "catalog", "catalog.jar", "replica", "create"};
+        String[] args8 = {"host", "hola", "deployment", "teststring4", "catalog", "catalog.jar", "create"};
         config = new VoltDB.Configuration(args8);
         assertTrue(config.validate());
 
@@ -227,7 +200,7 @@ final public class TestVoltDB {
         assertEquals(config.validate(), MiscUtils.isPro());
 
         // valid rejoin config
-        String[] args300 = {"live", "rejoin", "host", "localhost", "replica"};
+        String[] args300 = {"live", "rejoin", "host", "localhost"};
         config = new VoltDB.Configuration(args300);
         assertEquals(MiscUtils.isPro(), config.validate());
         assertEquals(StartAction.LIVE_REJOIN, config.m_startAction);
@@ -308,7 +281,7 @@ final public class TestVoltDB {
         assertTrue("Project failed to compile", project.compile(catalogJar));
 
         byte[] bytes = MiscUtils.fileToBytes(new File(catalogJar));
-        String serializedCatalog = CatalogUtil.getSerializedCatalogStringFromJar(CatalogUtil.loadAndUpgradeCatalogFromJar(bytes).getFirst());
+        String serializedCatalog = CatalogUtil.getSerializedCatalogStringFromJar(CatalogUtil.loadAndUpgradeCatalogFromJar(bytes, false).getFirst());
         assertNotNull("Error loading catalog from jar", serializedCatalog);
 
         Catalog catalog = new Catalog();

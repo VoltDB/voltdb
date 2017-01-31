@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -37,7 +37,7 @@ import org.voltdb.expressions.SelectSubqueryExpression;
 import org.voltdb.expressions.TupleAddressExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.expressions.VectorValueExpression;
-import org.voltdb.expressions.WindowedExpression;
+import org.voltdb.expressions.WindowFunctionExpression;
 
 /**
  *
@@ -125,19 +125,23 @@ public enum ExpressionType {
     // somewhat differently than the non-windowed
     // aggregates.  For example, AGGREGATE_MAX is a
     // different kind of thing from AGGREGATE_WINDOWED_MAX.
-    // For one thing, windowed aggregates have class WindowedExpression.class,
+    // For one thing, windowed aggregates have class WindowFunctionExpression.class,
     // and non-windowed aggregates have class AggregateExpression.class.
     //
     // We only support RANK and DENSE_RANK now.  But when we support different
     // aggregate functions we will want to keep them as
     // separate ExpressionType enumerals.
     // ----------------------------
-    AGGREGATE_WINDOWED_RANK       (WindowedExpression.class,  70, "RANK"),
-    AGGREGATE_WINDOWED_DENSE_RANK (WindowedExpression.class,  71, "DENSE_RANK"),
+    AGGREGATE_WINDOWED_RANK       (WindowFunctionExpression.class,  70, "RANK"),
+    AGGREGATE_WINDOWED_DENSE_RANK (WindowFunctionExpression.class,  71, "DENSE_RANK"),
+    AGGREGATE_WINDOWED_COUNT      (WindowFunctionExpression.class,  72, "COUNT"),
+    AGGREGATE_WINDOWED_MAX        (WindowFunctionExpression.class,  73, "MAX"),
+    AGGREGATE_WINDOWED_MIN        (WindowFunctionExpression.class,  74, "MIN"),
+    AGGREGATE_WINDOWED_SUM        (WindowFunctionExpression.class,  75, "SUM"),
     // No support for PERCENT_RANK yet.
-    // AGGREGATE_WINDOWED_PERCENT_RANK(WindowedExpression.class, 72, "PERCENT_RANK"),
+    // AGGREGATE_WINDOWED_PERCENT_RANK(WindowFunctionExpression.class, 73, "PERCENT_RANK"),
     // No support for CUME_DIST yet.
-    // AGGREGATE_WINDOWED_CUME_DIST  (WindowedExpression.class,  73, "CUME_DIST"),
+    // AGGREGATE_WINDOWED_CUME_DIST  (WindowFunctionExpression.class,  74, "CUME_DIST"),
 
     // ----------------------------
     // Function
@@ -251,7 +255,7 @@ public enum ExpressionType {
      * column's value.  This is true when the expression is an aggregate
      * or a windowed aggregate.  We can't just make the windowed aggregate
      * operations have class AggregateExpression.class because we will need
-     * the class to create WindowedExpression objects, and these have a
+     * the class to create WindowFunctionExpression objects, and these have a
      * different representation than other aggregate expression objects.
      * For example, they have a PartitionBy list and an OrderBy list.
      *
@@ -259,13 +263,11 @@ public enum ExpressionType {
      */
     public boolean isGeneratedAggregateExpression() {
         return (getExpressionClass() == AggregateExpression.class)
-                || (getExpressionClass() == WindowedExpression.class);
+                || (getExpressionClass() == WindowFunctionExpression.class);
     }
 
     public boolean isNullary() {
-        return this == ExpressionType.AGGREGATE_COUNT_STAR
-                || this == ExpressionType.AGGREGATE_WINDOWED_RANK
-                || this == ExpressionType.AGGREGATE_WINDOWED_DENSE_RANK;
+        return this == ExpressionType.AGGREGATE_COUNT_STAR;
     }
 
     private static Map<ExpressionType, String> m_windowedAggName;
@@ -274,5 +276,9 @@ public enum ExpressionType {
         m_windowedAggName = new HashMap<>();
         m_windowedAggName.put(ExpressionType.AGGREGATE_WINDOWED_RANK, "RANK");
         m_windowedAggName.put(ExpressionType.AGGREGATE_WINDOWED_DENSE_RANK, "DENSE_RANK");
+        m_windowedAggName.put(ExpressionType.AGGREGATE_WINDOWED_COUNT, "COUNT");
+        m_windowedAggName.put(ExpressionType.AGGREGATE_MAX, "MAX");
+        m_windowedAggName.put(ExpressionType.AGGREGATE_MIN, "MIN");
+        m_windowedAggName.put(ExpressionType.AGGREGATE_SUM, "SUM");
     }
 }

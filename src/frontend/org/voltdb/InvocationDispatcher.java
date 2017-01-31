@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -48,7 +48,6 @@ import org.apache.zookeeper_voltpatches.data.Stat;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
-import org.json_voltpatches.JSONWriter;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.ForeignHost;
@@ -81,6 +80,7 @@ import org.voltdb.compiler.AsyncCompilerResult;
 import org.voltdb.compiler.AsyncCompilerWork.AsyncCompilerWorkCompletionHandler;
 import org.voltdb.compiler.CatalogChangeResult;
 import org.voltdb.compiler.CatalogChangeWork;
+import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.compilereport.ViewExplainer;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.Iv2Trace;
@@ -253,8 +253,8 @@ public final class InvocationDispatcher {
      * Populate the map in the background and it will be used to route
      * requests to local replicas once the info is available
      */
-    public void asynchronouslyDetermineLocalReplicas() {
-        VoltDB.instance().getSES(false).submit(new Runnable() {
+    public Future<?> asynchronouslyDetermineLocalReplicas() {
+        return VoltDB.instance().getSES(false).submit(new Runnable() {
 
             @Override
             public void run() {
@@ -429,7 +429,7 @@ public final class InvocationDispatcher {
                 return null;
             }
             else if ("@Promote".equals(procName)) {
-                return dispatchPromote(catProc, task, handler, ccxn);
+                return dispatchPromote(task, handler, ccxn, user, useDdlSchema);
             }
             else if ("@SnapshotStatus".equals(procName)) {
                 // SnapshotStatus is really through @Statistics now, but preserve the
@@ -1012,7 +1012,8 @@ public final class InvocationDispatcher {
     }
 
     final void dispatchUpdateApplicationCatalog(StoredProcedureInvocation task,
-            boolean useDdlSchema, Connection ccxn, AuthSystem.AuthUser user, boolean isAdmin)
+            boolean useDdlSchema, boolean isPromotion,
+            Connection ccxn, AuthSystem.AuthUser user, boolean isAdmin)
     {
         ParameterSet params = task.getParams();
         final Object [] paramArray = params.toArray();
@@ -1042,10 +1043,10 @@ public final class InvocationDispatcher {
                     task.clientHandle, ccxn.connectionId(), ccxn.getHostnameAndIPAndPort(),
                     isAdmin, ccxn, catalogBytes, deploymentString,
                     task.getProcName(),
-                    VoltDB.instance().getReplicationRole() == ReplicationRole.REPLICA,
+                    DrRoleType.fromValue(VoltDB.instance().getCatalogContext().getCluster().getDrrole()),
                     useDdlSchema,
                     m_adhocCompletionHandler, user,
-                    null, -1L, -1L
+                    null, isPromotion, -1L, -1L
                     ));
 
         m_mailbox.send(m_plannerSiteId, work);
@@ -1055,32 +1056,34 @@ public final class InvocationDispatcher {
             InvocationClientHandler handler, Connection ccxn, AuthSystem.AuthUser user,
             boolean useDdlSchema)
     {
-        dispatchUpdateApplicationCatalog(task, useDdlSchema, ccxn, user, handler.isAdmin());
+        dispatchUpdateApplicationCatalog(task, useDdlSchema, false, ccxn, user, handler.isAdmin());
         return null;
     }
 
-    private final ClientResponseImpl dispatchPromote(Procedure sysProc,
-            StoredProcedureInvocation task,
-            InvocationClientHandler handler,
-            Connection ccxn)
+    private final ClientResponseImpl dispatchPromote(StoredProcedureInvocation task,
+                                                     InvocationClientHandler handler,
+                                                     Connection ccxn, AuthSystem.AuthUser user,
+                                                     boolean useDdlSchema)
     {
         if (VoltDB.instance().getReplicationRole() == ReplicationRole.NONE)
         {
             return gracefulFailureResponse(
-                    "@Promote issued on master cluster. No action taken.",
+                    "@Promote issued on non-replica cluster. No action taken.",
                     task.clientHandle);
         }
 
-        // This only happens on one node so we don't need to pick a leader.
-        createTransaction(
-                handler.connectionId(),
-                task,
-                sysProc.getReadonly(),
-                sysProc.getSinglepartition(),
-                sysProc.getEverysite(),
-                0,//No partition needed for multi-part
-                task.getSerializedSize(),
-                System.nanoTime());
+        LocalObjectMessage work = new LocalObjectMessage(
+            new CatalogChangeWork(m_siteId,
+                                  task.clientHandle, ccxn.connectionId(), ccxn.getHostnameAndIPAndPort(),
+                                  handler.isAdmin(), ccxn, null, null,
+                                  "@UpdateApplicationCatalog",
+                                  DrRoleType.fromValue(VoltDB.instance().getCatalogContext().getCluster().getDrrole()),
+                                  useDdlSchema,
+                                  m_adhocCompletionHandler, user,
+                                  null, true, -1L, -1L
+            ));
+
+        m_mailbox.send(m_plannerSiteId, work);
 
         return null;
     }
@@ -1168,29 +1171,21 @@ public final class InvocationDispatcher {
         }
 
         NodeSettings paths = m_catalogContext.get().getNodeSettings();
-        String snapshotJson = null;
+        String data;
+
         try {
-            JSONWriter jss = new JSONStringer()
+            data = new JSONStringer()
                     .object()
-                    .keySymbolValuePair(SnapshotUtil.JSON_URIPATH, "file://" + paths.resolve(paths.getSnapshoth()).getPath())
-                    .keySymbolValuePair(SnapshotUtil.JSON_NONCE, SnapshotUtil.getShutdownSaveNonce(zkTxnId))
                     .keySymbolValuePair(SnapshotUtil.JSON_TERMINUS, zkTxnId)
-                    .keySymbolValuePair(SnapshotUtil.JSON_BLOCK, true)
-                    .keySymbolValuePair(SnapshotUtil.JSON_PATH_TYPE, SnapshotPathType.SNAP_AUTO.toString())
-                    .keySymbolValuePair(SnapshotUtil.JSON_FORMAT, SnapshotFormat.NATIVE.toString())
-                    .endObject();
-            snapshotJson = jss.toString();
+                    .endObject()
+                    .toString();
         } catch (JSONException e) {
             VoltDB.crashLocalVoltDB("Failed to create startup snapshot save command", true, e);
             return null;
         }
-        log.info("Invoking startup snapshot save: " + snapshotJson);
+        log.info("Saving startup snapshot");
         consoleLog.info("Taking snapshot to save database contents");
 
-        final StoredProcedureInvocation saveSnapshotTask = new StoredProcedureInvocation();
-
-        saveSnapshotTask.setProcName("@SnapshotSave");
-        saveSnapshotTask.setParams(snapshotJson);
 
         final SimpleClientResponseAdapter alternateAdapter = new SimpleClientResponseAdapter(
                 ClientInterface.SHUTDONW_SAVE_CID, "Blocking Startup Snapshot Save"
@@ -1207,59 +1202,36 @@ public final class InvocationDispatcher {
         };
 
         final long sourceHandle = task.clientHandle;
-        SimpleClientResponseAdapter.SyncCallback shutdownCallback =
-                new SimpleClientResponseAdapter.SyncCallback()
-                ;
-        final ListenableFuture<ClientResponse> onShutdownComplete =
-                shutdownCallback.getResponseFuture()
-                ;
-        onShutdownComplete.addListener(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    onShutdownComplete.get();
-                } catch (ExecutionException|InterruptedException e) {
-                    VoltDB.crashLocalVoltDB("Should never happen", true, e);
-                    return;
-                }
-                // no need to transmit response as we are shutting down
-            }
-        },
-        CoreUtils.SAMETHREADEXECUTOR);
-        task.setClientHandle(alternateAdapter.registerCallback(shutdownCallback));
 
-        SimpleClientResponseAdapter.SyncCallback saveCallback =
-                new SimpleClientResponseAdapter.SyncCallback()
-                ;
-        final ListenableFuture<ClientResponse> onSaveComplete =
-                saveCallback.getResponseFuture()
-                ;
-        onSaveComplete.addListener(new Runnable() {
+        task.setClientHandle(alternateAdapter.registerCallback(SimpleClientResponseAdapter.NULL_CALLBACK));
+
+        SnapshotUtil.SnapshotResponseHandler savCallback = new SnapshotUtil.SnapshotResponseHandler() {
+
             @Override
-            public void run() {
-                ClientResponse r;
-                try {
-                    r = onSaveComplete.get();
-                } catch (ExecutionException|InterruptedException e) {
-                    VoltDB.crashLocalVoltDB("Should never happen", true, e);
-                    return;
+            public void handleResponse(ClientResponse r) {
+                if (r == null) {
+                    String msg = "Snapshot save failed. The database is paused and the shutdown has been cancelled";
+                    transmitResponseMessage(gracefulFailureResponse(msg, sourceHandle), ccxn, sourceHandle);
                 }
                 if (r.getStatus() != ClientResponse.SUCCESS) {
-                    transmitResponseMessage(r, ccxn, sourceHandle);
-                    log.error("Received error response for saving shutdown shapshot " + r.getStatusString());
-                    return;
+                    String msg = "Snapshot save failed: "
+                               + r.getStatusString()
+                               + ". The database is paused and the shutdown has been cancelled";
+                    ClientResponseImpl resp = new ClientResponseImpl(
+                            ClientResponse.GRACEFUL_FAILURE,
+                            r.getResults(),
+                            msg,
+                            sourceHandle);
+                    transmitResponseMessage(resp, ccxn, sourceHandle);
                 }
-                // remove parameter so it does not recurse infinitely
                 consoleLog.info("Snapshot taken successfully");
                 task.setParams();
                 dispatch(task, alternateHandler, alternateAdapter, user, bypass);
             }
-        },
-        CoreUtils.SAMETHREADEXECUTOR);
-        saveSnapshotTask.setClientHandle(alternateAdapter.registerCallback(saveCallback));
+        };
 
         // network threads are blocked from making zookeeper calls
-        final byte [] guardContent = snapshotJson.getBytes(StandardCharsets.UTF_8);
+        final byte [] guardContent = data.getBytes(StandardCharsets.UTF_8);
         Future<Boolean> guardFuture = voltdb.getSES(true).submit(new Callable<Boolean>() {
             @Override
             public Boolean call() throws Exception {
@@ -1288,7 +1260,19 @@ public final class InvocationDispatcher {
         }
 
         voltdb.getClientInterface().bindAdapter(alternateAdapter, null);
-        return dispatch(saveSnapshotTask, alternateHandler, alternateAdapter, user, bypass);
+        SnapshotUtil.requestSnapshot(
+                sourceHandle,
+                paths.resolve(paths.getSnapshoth()).toPath().toUri().toString(),
+                SnapshotUtil.getShutdownSaveNonce(zkTxnId),
+                true,
+                SnapshotFormat.NATIVE,
+                SnapshotPathType.SNAP_AUTO,
+                data,
+                savCallback,
+                true
+                );
+
+        return null;
     }
 
     private final File getSnapshotCatalogFile(JSONObject snapJo) throws JSONException {
@@ -1443,7 +1427,7 @@ public final class InvocationDispatcher {
                 userPartitionKey == null, userPartitionKey,
                 task.getProcName(),
                 task.getBatchTimeout(),
-                VoltDB.instance().getReplicationRole() == ReplicationRole.REPLICA,
+                DrRoleType.fromValue(VoltDB.instance().getCatalogContext().getCluster().getDrrole()),
                 VoltDB.instance().getCatalogContext().cluster.getUseddlschema(),
                 m_adhocCompletionHandler, user);
         LocalObjectMessage work = new LocalObjectMessage( ahpw );
@@ -1841,7 +1825,8 @@ public final class InvocationDispatcher {
         assert(!isSinglePartition || (partition >= 0));
         final ClientInterfaceHandleManager cihm = m_cihm.get(connectionId);
         if (cihm == null) {
-            hostLog.warn("InvocationDispatcher.createTransaction request rejected. "
+            hostLog.rateLimitedLog(60, Level.WARN, null,
+                    "InvocationDispatcher.createTransaction request rejected. "
                     + "This is likely due to VoltDB ceasing client communication as it "
                     + "shuts down.");
             return false;
@@ -1859,25 +1844,25 @@ public final class InvocationDispatcher {
          */
         if (isSinglePartition && !isEveryPartition) {
             if (isReadOnly && (m_defaultConsistencyReadLevel == ReadLevel.FAST)) {
-                isShortCircuitRead = true;
                 initiatorHSId = m_localReplicas.get().get(partition);
+            }
+            if (initiatorHSId != null) {
+                isShortCircuitRead = true;
             } else {
                 initiatorHSId = m_cartographer.getHSIdForSinglePartitionMaster(partition);
             }
-        }
-        else {
+        } else {
             // Multi-part transactions go to the multi-part coordinator
             initiatorHSId = m_cartographer.getHSIdForMultiPartitionInitiator();
+
             // Treat all MP reads as short-circuit since they can run out-of-order
             // from their arrival order due to the MP Read-only execution pool
             if (isReadOnly) {
                 isShortCircuitRead = true;
             }
         }
-
         if (initiatorHSId == null) {
-            hostLog.error("Failed to find master initiator for partition: "
-                    + Integer.toString(partition) + ". Transaction not initiated.");
+            hostLog.error("Failed to find master initiator for partition: " + partition + ". Transaction not initiated.");
             return false;
         }
 

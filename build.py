@@ -71,8 +71,8 @@ if CTX.compilerName() == 'gcc':
         # Do we want -Wno-conversion?
         if (CTX.compilerMinorVersion() == 8):
             CTX.CPPFLAGS += " -Wno-conversion"
-    # GCC 5 warning disablement options
-    if (CTX.compilerMajorVersion() == 5):
+    # GCC 5/6 warning disablement options
+    if (CTX.compilerMajorVersion() >= 5):
         CTX.CPPFLAGS += " -Wno-unused-local-typedefs"
 
 if (CTX.compilerName() == 'clang') and (CTX.compilerMajorVersion() == 3 and CTX.compilerMinorVersion() >= 4):
@@ -81,7 +81,7 @@ if (CTX.compilerName() == 'clang') and (CTX.compilerMajorVersion() == 3 and CTX.
 if (CTX.compilerName() == 'clang') and (CTX.compilerMajorVersion() >= 7):
     CTX.CPPFLAGS += " -Wno-unused-local-typedefs -Wno-absolute-value"
 
-if (CTX.compilerName() != 'gcc') or (CTX.compilerMajorVersion() == 4 and CTX.compilerMinorVersion() >= 3) or (CTX.compilerMajorVersion() == 5):
+if (CTX.compilerName() != 'gcc') or (CTX.compilerMajorVersion() == 4 and CTX.compilerMinorVersion() >= 3) or (CTX.compilerMajorVersion() >= 5):
     CTX.CPPFLAGS += " -Wno-ignored-qualifiers -fno-strict-aliasing"
 
 
@@ -113,6 +113,7 @@ if CTX.compilerName() == 'gcc':
                % (CTX.compilerMajorVersion(),
                   CTX.compilerMinorVersion(),
                   CTX.compilerPatchLevel()))
+	CTX.CXX_VERSION_FLAG = "c++11"
 elif CTX.compilerName() == 'clang':
     CTX.CXX_VERSION_FLAG="c++11"
 else:
@@ -161,16 +162,17 @@ if "VOLT_LOG_LEVEL" in os.environ:
 else:
     LOG_LEVEL = "500"
 
+CTX.LOG_LEVEL = LOG_LEVEL
 if CTX.LEVEL == "MEMCHECK":
-    CTX.CPPFLAGS += " -g3 -DDEBUG -DMEMCHECK -DVOLT_LOG_LEVEL=%s" % LOG_LEVEL
+    CTX.CPPFLAGS += " -g3 -DDEBUG -DMEMCHECK -DVOLT_LOG_LEVEL=${VOLT_LOG_LEVEL}"
     CTX.OUTPUT_PREFIX = "obj/memcheck"
 
 if CTX.LEVEL == "DEBUG":
-    CTX.CPPFLAGS += " -g3 -DDEBUG -DVOLT_LOG_LEVEL=%s" % LOG_LEVEL
+    CTX.CPPFLAGS += " -g3 -DDEBUG -DVOLT_LOG_LEVEL=${VOLT_LOG_LEVEL}"
     CTX.OUTPUT_PREFIX = "obj/debug"
 
 if CTX.LEVEL == "RELEASE":
-    CTX.CPPFLAGS += " -g3 -O3 -mmmx -msse -msse2 -msse3 -DNDEBUG -DVOLT_LOG_LEVEL=%s" % LOG_LEVEL
+    CTX.CPPFLAGS += " -g3 -O3 -mmmx -msse -msse2 -msse3 -DNDEBUG -DVOLT_LOG_LEVEL=${VOLT_LOG_LEVEL}"
     CTX.OUTPUT_PREFIX = "obj/release"
 
 # build in parallel directory instead of subdir so that relative paths work
@@ -296,14 +298,15 @@ CTX.INPUT['executors'] = """
  nestloopexecutor.cpp
  nestloopindexexecutor.cpp
  orderbyexecutor.cpp
- partitionbyexecutor.cpp
+ windowfunctionexecutor.cpp
  projectionexecutor.cpp
  receiveexecutor.cpp
  sendexecutor.cpp
  seqscanexecutor.cpp
  setopexecutor.cpp
- setopreceiveexecutor.cpp
  setoperator.cpp
+ setopreceiveexecutor.cpp
+ swaptablesexecutor.cpp
  tablecountexecutor.cpp
  tuplescanexecutor.cpp
  updateexecutor.cpp
@@ -343,7 +346,7 @@ CTX.INPUT['plannodes'] = """
  orderbynode.cpp
  plannodefragment.cpp
  plannodeutil.cpp
- partitionbynode.cpp
+ windowfunctionnode.cpp
  projectionnode.cpp
  receivenode.cpp
  SchemaColumn.cpp
@@ -351,6 +354,7 @@ CTX.INPUT['plannodes'] = """
  seqscannode.cpp
  setopnode.cpp
  setopreceivenode.cpp
+ swaptablesnode.cpp
  tuplescannode.cpp
  updatenode.cpp
 """
@@ -498,9 +502,13 @@ if whichtests in ("${eetestsuite}", "executors"):
     CTX.TESTS['executors'] = """
     OptimizedProjectorTest
     MergeReceiveExecutorTest
-    PartitionByExecutorTest
     SetOpExecutorTest
     TestGeneratedPlans
+    TestWindowedRank
+    TestWindowedCount
+    TestWindowedMin
+    TestWindowedMax
+    TestWindowedSum
     """
 
 if whichtests in ("${eetestsuite}", "expressions"):
@@ -551,7 +559,7 @@ if whichtests in ("${eetestsuite}", "structures"):
 
 if whichtests in ("${eetestsuite}", "plannodes"):
     CTX.TESTS['plannodes'] = """
-     PartitionByPlanNodeTest
+     WindowFunctionPlanNodeTest
      PlanNodeFragmentTest
     """
 

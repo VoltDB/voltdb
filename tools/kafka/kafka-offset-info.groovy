@@ -2,7 +2,7 @@
 
 /*
  * This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -35,6 +35,7 @@
 
 import com.google.common.net.HostAndPort
 import static com.google.common.base.Throwables.getStackTraceAsString as stackTraceFor
+import groovy.json.JsonOutput
 
 import kafka.api.ConsumerMetadataRequest
 import kafka.api.FetchRequest
@@ -86,6 +87,7 @@ cli.with {
     g(longOpt: 'group', 'consumenr group', required:true, args:1)
     t(longOpt: 'topic', 'kafka topic', required:true, args:1)
     h(longOpt: 'help', 'usage information', required: false)
+    s(longOpt: 'save', 'save offsets to [file-name]', args:1)
 }
 
 def opts = cli.parse(args)
@@ -151,6 +153,7 @@ ofstldr = new Attempter(brokers).attempt {
 
 printf("%-36s %4s %16s %16s %16s %12s\n",'TOPIC','PRTN','EARLIEST','LATEST','COMMITTED','LAG')
 
+prtoffs = []
 prtldrs.each { int p, Broker b ->
     cnsmr = new SimpleConsumer(b.host(), b.port(), SO_TIMEOUT, SO_BUFFSIZE, clientid)
     tnp = new TopicAndPartition(topic,p)
@@ -193,7 +196,15 @@ prtldrs.each { int p, Broker b ->
     long lag = (committed <= 0 || committed < earliest) ? (latest-earliest) :
         (committed > latest) ? 0L : (latest-committed)
 
+    long offset = (committed <= 0 || committed < earliest) ? earliest :
+        (committed > latest) ? lastest : committed
+    prtoffs[p] = offset
     printf("%-36s %4d %,16d %,16d %,16d %,12d\n",topic,p,earliest,latest,committed,lag)
 }
 
 ofstldr.disconnect()
+
+if (opts.s) {
+    json = JsonOutput.toJson([topic:topic,offsets:prtoffs])
+    new File(opts.s).text = JsonOutput.prettyPrint(json)
+}

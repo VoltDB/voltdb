@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -139,6 +139,7 @@ public class ParsedColInfo implements Cloneable {
                     (child.name.equals("win_aggregation") == false) &&
                     (child.name.equals("function") == false) &&
                     (child.name.equals("rank") == false) &&
+                    (child.name.equals("value") == false) &&
                     (child.name.equals("columnref") == false)) {
                throw new RuntimeException(
                        "ORDER BY parsed with strange child node type: " +

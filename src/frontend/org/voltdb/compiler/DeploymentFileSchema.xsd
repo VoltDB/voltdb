@@ -37,7 +37,6 @@
       <xs:element name="cluster" minOccurs="1" maxOccurs="1" type="clusterType"/>
       <xs:element name="paths" minOccurs="0" maxOccurs="1" type="pathsType" />
       <xs:element name="partition-detection" minOccurs="0" type="partitionDetectionType"/>
-      <xs:element name="admin-mode" minOccurs="0" type="adminModeType"/>
       <xs:element name="heartbeat" minOccurs="0" maxOccurs="1" type="heartbeatType"/>
       <xs:element name="httpd" minOccurs="0" maxOccurs="1" type="httpdType"/>
       <xs:element name="snapshot" type="snapshotType" minOccurs="0" maxOccurs="1" />
@@ -50,6 +49,7 @@
       <xs:element name="dr" minOccurs='0' maxOccurs='1' type="drType" />
       <xs:element name="import" minOccurs="0" maxOccurs="1" type="importType"/>
       <xs:element name="consistency" minOccurs="0" type="consistencyType"/>
+      <xs:element name="snmp" minOccurs="0" type="snmpType"/>
     </xs:all>
   </xs:complexType>
 
@@ -84,6 +84,18 @@
       <xs:enumeration value="safe"/>
     </xs:restriction>
   </xs:simpleType>
+
+  <!-- <snmp> -->
+  <xs:complexType name="snmpType">
+    <xs:attribute name="enabled" type="xs:boolean" default="true"/>
+    <xs:attribute name="target" type="xs:string"/>
+    <xs:attribute name="community" type="xs:string" default="public"/>
+    <xs:attribute name="username" type="xs:string" />
+    <xs:attribute name="authprotocol" type="xs:string" default="SHA"/>
+    <xs:attribute name="authkey" type="xs:string" default="voltdbauthkey" />
+    <xs:attribute name="privacyprotocol" type="xs:string" default="AES" />
+    <xs:attribute name="privacykey" type="xs:string" default="voltdbprivacykey" />
+  </xs:complexType>
 
   <!-- <consistency> -->
   <xs:complexType name="consistencyType">
@@ -170,6 +182,7 @@
              <xs:complexType>
                 <xs:attribute name="name" type="featureNameType"/>
                 <xs:attribute name="size" type="xs:string"/>
+                <xs:attribute name="alert" type="xs:string"/>
              </xs:complexType>
           </xs:element>
       </xs:sequence>
@@ -180,6 +193,7 @@
         <xs:element name="memorylimit" minOccurs="0" maxOccurs="1">
             <xs:complexType>
                 <xs:attribute name="size" type="xs:string" default="80%"/>
+                <xs:attribute name="alert" type="xs:string" default="70%"/>
             </xs:complexType>
         </xs:element>
         <xs:element name="disklimit" type="diskLimitType"
@@ -222,12 +236,6 @@
     <xs:attribute name="provider" type="SecurityProviderString" default="hash"/>
   </xs:complexType>
 
-  <!-- <admin-mode> (always enabled.) -->
-  <xs:complexType name="adminModeType">
-    <xs:attribute name="port" type="xs:int" default="21211"/>
-    <xs:attribute name="adminstartup" type="xs:boolean" default="false"/>
-  </xs:complexType>
-
   <!-- <command log> -->
   <xs:complexType name="commandLogType">
     <xs:all>
@@ -243,15 +251,8 @@
     <xs:attribute name="logsize" type="logSizeType" default="1024" />
   </xs:complexType>
 
-  <!-- <partition-detection>/<snapshot> -->
+  <!-- <partition-detection> -->
   <xs:complexType name="partitionDetectionType">
-      <xs:all>
-          <xs:element name="snapshot" minOccurs="0" maxOccurs="1">
-             <xs:complexType>
-                 <xs:attribute name="prefix" type="xs:string" use="optional" default="partition_detection" />
-             </xs:complexType>
-          </xs:element>
-      </xs:all>
       <xs:attribute name="enabled" type="xs:boolean" default="true"/>
    </xs:complexType>
 
@@ -348,18 +349,13 @@
     <xs:sequence>
       <xs:element name="configuration" type="ExportConfigurationType" minOccurs="0" maxOccurs="unbounded"/>
     </xs:sequence>
-    <xs:attribute name="enabled" type="xs:boolean"/>
-    <xs:attribute name="target" type="ServerExportEnum"/>
-    <xs:attribute name="exportconnectorclass" type="xs:string"/>
   </xs:complexType>
 
   <xs:complexType name="ExportConfigurationType">
     <xs:sequence>
       <xs:element name="property" type="PropertyType" minOccurs="0" maxOccurs="unbounded"/>
     </xs:sequence>
-    <xs:attribute name="target" type="xs:string" />
-    <!-- stream is deprecated. Use target instead. -->
-    <xs:attribute name="stream" type="xs:string" />
+    <xs:attribute name="target" type="xs:string" use="required" />
     <xs:attribute name="enabled" type="xs:boolean" default="true"/>
     <xs:attribute name="type" type="ServerExportEnum" default="file"/>
     <xs:attribute name="exportconnectorclass" type="xs:string" default=""/>
@@ -463,7 +459,18 @@
             </xs:restriction>
         </xs:simpleType>
     </xs:attribute>
+    <xs:attribute name="role" type="drRoleType" default="master" />
   </xs:complexType>
+
+  <!-- DR cluster role -->
+  <xs:simpleType name="drRoleType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="master"/>
+      <xs:enumeration value="replica"/>
+      <xs:enumeration value="xdcr"/>
+      <xs:enumeration value="none"/>
+    </xs:restriction>
+  </xs:simpleType>
 
   <xs:complexType name="connectionType">
     <xs:attribute name="source" use="required">

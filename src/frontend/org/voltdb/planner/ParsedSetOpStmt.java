@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -20,10 +20,8 @@ package org.voltdb.planner;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.catalog.Database;
@@ -353,15 +351,6 @@ public class ParsedSetOpStmt extends AbstractParsedStmt {
     @Override
     public boolean hasOrderByColumns() {
         return ! m_orderColumns.isEmpty();
-    }
-
-    @Override
-    public Set<AbstractExpression> findAllSubexpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
-        Set<AbstractExpression> exprs = new HashSet<AbstractExpression>();
-        for (AbstractParsedStmt childStmt : m_children) {
-            exprs.addAll(childStmt.findAllSubexpressionsOfClass(aeClass));
-        }
-        return exprs;
     }
 
     /**
