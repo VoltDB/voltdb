@@ -23,12 +23,10 @@
 
 package org.voltdb.regressionsuites;
 
-import java.io.IOException;
-
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
-import org.voltdb.client.ProcCallException;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb_testprocs.regressionsuites.fixedsql.Insert;
 
@@ -65,7 +63,6 @@ public class TestSqlUpdateSuite extends RegressionSuite {
         subtestUpdateWithSubquery();
         subtestUpdateWithCaseWhen();
     }
-
 
     private void subtestUpdateBasic() throws Exception {
         Client client = getClient();
@@ -206,6 +203,9 @@ public class TestSqlUpdateSuite extends RegressionSuite {
     private void subtestUpdateWithCaseWhen() throws Exception {
         System.out.println("testUpdateWithCaseWhen");
         Client client = getClient();
+
+        ClientResponse cr = client.callProcedure("@AdHoc", "truncate table p1;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
         client.callProcedure("P1.Insert", 0, "", 150, 0.0);
         client.callProcedure("P1.Insert", 1, "", 75, 0.0);
