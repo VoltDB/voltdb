@@ -22,9 +22,8 @@
  */
 package org.voltdb.regressionsuites;
 
-import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
@@ -40,7 +39,7 @@ import java.util.logging.Logger;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLEngine;
 
-import org.voltcore.utils.DBBPool;
+import org.voltcore.network.CipherExecutor;
 import org.voltcore.utils.ssl.SSLBufferDecrypter;
 import org.voltcore.utils.ssl.SSLBufferEncrypter;
 import org.voltcore.utils.ssl.SSLConfiguration;
@@ -60,7 +59,8 @@ public class PortConnector {
     int m_packetBufferSize;
 
     //For unit testing.
-    private static final boolean ENABLE_SSL_FOR_TEST = Boolean.valueOf(System.getenv("ENABLE_SSL") == null ? Boolean.toString(Boolean.getBoolean("ENABLE_SSL")) : System.getenv("ENABLE_SSL"));
+    private static final boolean ENABLE_SSL_FOR_TEST = Boolean.valueOf(System.getenv("ENABLE_SSL") == null ?
+            Boolean.toString(Boolean.getBoolean("ENABLE_SSL")) : System.getenv("ENABLE_SSL"));
     private static final String DEFAULT_SSL_PROPS_FILE = "ssl-config";
 
     public PortConnector(String host, int port) {
@@ -83,31 +83,24 @@ public class PortConnector {
         m_socket.socket().setTcpNoDelay(true);
         if (m_enableSSL) {
             SSLConfiguration.SslConfig sslConfig;
-            String sslPropsFile = Inits.class.getResource(DEFAULT_SSL_PROPS_FILE).getFile();
-
-            if ((sslPropsFile == null || sslPropsFile.trim().length() == 0) ) {
-                sslConfig = new SSLConfiguration.SslConfig(null, null, null, null);
-                SSLConfiguration.applySystemProperties(sslConfig);
-            } else {
-                File configFile = new File(sslPropsFile);
+            try (InputStream is = Inits.class.getResourceAsStream(DEFAULT_SSL_PROPS_FILE)) {
                 Properties sslProperties = new Properties();
-                try ( FileInputStream configFis = new FileInputStream(configFile) ) {
-                    sslProperties.load(configFis);
-                    sslConfig = new SSLConfiguration.SslConfig(
-                            sslProperties.getProperty(SSLConfiguration.KEYSTORE_CONFIG_PROP),
-                            sslProperties.getProperty(SSLConfiguration.KEYSTORE_PASSWORD_CONFIG_PROP),
-                            sslProperties.getProperty(SSLConfiguration.TRUSTSTORE_CONFIG_PROP),
-                            sslProperties.getProperty(SSLConfiguration.TRUSTSTORE_PASSWORD_CONFIG_PROP));
-                    SSLConfiguration.applySystemProperties(sslConfig);
-                } catch (IOException ioe) {
-                    throw new IllegalArgumentException("Unable to access SSL configuration.", ioe);
-                }
+                sslProperties.load(is);
+                sslConfig = new SSLConfiguration.SslConfig(
+                        sslProperties.getProperty(SSLConfiguration.KEYSTORE_CONFIG_PROP),
+                        sslProperties.getProperty(SSLConfiguration.KEYSTORE_PASSWORD_CONFIG_PROP),
+                        sslProperties.getProperty(SSLConfiguration.TRUSTSTORE_CONFIG_PROP),
+                        sslProperties.getProperty(SSLConfiguration.TRUSTSTORE_PASSWORD_CONFIG_PROP));
+                SSLConfiguration.applySystemProperties(sslConfig);
+
+            } catch (IOException ioe) {
+                throw new IllegalArgumentException("Unable to access SSL configuration.", ioe);
             }
             SSLContext sslContext;
             try {
                 sslContext = SSLConfiguration.initializeSslContext(sslConfig);
             } catch (NoSuchAlgorithmException | KeyStoreException | IOException | CertificateException | UnrecoverableKeyException | KeyManagementException ex) {
-                throw new IllegalArgumentException(ex.getMessage());
+                throw new IllegalArgumentException(ex.getMessage(), ex);
             }
             SSLEngine sslEngine = sslContext.createSSLEngine("client", m_port);
             sslEngine.setUseClientMode(true);
@@ -125,44 +118,66 @@ public class PortConnector {
             m_packetBufferSize = sslEngine.getSession().getPacketBufferSize();
             m_enc = new SSLBufferEncrypter(sslEngine, appBufferSize, m_packetBufferSize);
             m_dec = new SSLBufferDecrypter(sslEngine);
+            m_tlsFrame = null;
         }
     }
 
     public long write(ByteBuffer buf) throws IOException {
-        DBBPool.BBContainer bb = null;
         if (m_enc != null) {
-            bb = m_enc.encryptBuffer(buf);
-            buf = bb.b();
+            ByteBuffer frame = (ByteBuffer)ByteBuffer.allocate(m_packetBufferSize).clear();
+            m_enc.tlswrap(buf, frame);
+            buf = frame;
         }
         long wrote = 0;
         while (buf.hasRemaining()) {
             wrote += m_socket.write(buf);
         }
-        if (bb != null) {
-            bb.discard();
-        }
         return wrote;
     }
 
-    public void read(ByteBuffer buf, long sz) throws IOException {
+    private ByteBuffer m_tlsFrame = null;
 
-        while (buf.hasRemaining() && sz > 0) {
-            int r = m_socket.read(buf);
-            if (r == -1) {
-                throw new IOException("Closed");
-            }
-            sz -= r;
+    ByteBuffer readTlsFrame() throws IOException {
+        if (m_tlsFrame != null && m_tlsFrame.hasRemaining()) {
+            return m_tlsFrame;
         }
+        ByteBuffer header = (ByteBuffer)ByteBuffer.allocate(5).clear();
+        while (header.hasRemaining()) {
+            if (m_socket.read(header) < 0) {
+                throw new IOException("Closed");
+            };
+        }
+        ByteBuffer frame = (ByteBuffer)ByteBuffer.allocate(header.getShort(3) + header.capacity()).clear();
+        frame.put((ByteBuffer)header.flip());
+        while (frame.hasRemaining()) {
+            if (m_socket.read(frame) < 0) {
+                throw new IOException("Closed");
+            };
+        }
+        int allocsz = Math.min(CipherExecutor.PAGE_SIZE, Integer.highestOneBit((frame.capacity()<<1) + 128));
+        m_tlsFrame = (ByteBuffer)ByteBuffer.allocate(allocsz).clear();
+        m_dec.tlsunwrap((ByteBuffer)frame.flip(), m_tlsFrame);
+        return m_tlsFrame;
+    }
+
+    public void read(ByteBuffer buf, int sz) throws IOException {
         if (m_dec != null) {
-            DBBPool.BBContainer m_dstBufferCont = DBBPool.allocateDirect(m_packetBufferSize);
-            try {
-                ByteBuffer m_dstBuffer = m_dstBufferCont.b();
-                m_dec.unwrap(buf, m_dstBuffer);
-                buf.limit(m_dstBuffer.remaining());
-                buf.put(m_dstBuffer);
-                buf.flip();
-            } finally {
-                m_dstBufferCont.discard();
+            ByteBuffer clear = readTlsFrame();
+
+            if (clear.remaining() < sz) {
+                throw new IllegalStateException("failed to match unencrypted frame with expected read size");
+            }
+            int olim = clear.limit();
+            clear.limit(clear.position()+sz);
+            buf.put(clear);
+            clear.limit(olim);
+        } else {
+            while (buf.hasRemaining() && sz > 0) {
+                int r = m_socket.read(buf);
+                if (r == -1) {
+                    throw new IOException("Closed");
+                }
+                sz -= r;
             }
         }
     }
@@ -177,6 +192,7 @@ public class PortConnector {
         }
         m_enc = null;
         m_dec = null;
+        m_tlsFrame = null;
         return 0;
     }
 }
