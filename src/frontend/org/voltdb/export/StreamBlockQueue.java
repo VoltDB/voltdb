@@ -323,8 +323,18 @@ public class StreamBlockQueue {
 
     @Override
     public void finalize() {
-        if (!m_memoryDeque.isEmpty()) {
-            exportLog.error("Finalized StreamBlockQueue with items in the memory deque");
+        try {
+            int nonEmptyCnt = 0;
+            nonEmptyCnt = m_memoryDeque.stream().filter((block) -> (!block.isPersisted())).map((_item) -> 1).reduce(nonEmptyCnt, Integer::sum);
+            if (nonEmptyCnt > 0) {
+                exportLog.error("Finalized StreamBlockQueue with " + nonEmptyCnt + " items in the memory deque that are not persisted.");
+            }
+        } finally {
+            try {
+                super.finalize();
+            } catch (Throwable ex) {
+               ;
+            }
         }
     }
 }
