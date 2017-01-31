@@ -1316,7 +1316,7 @@ var loadPage = function (serverName, portid) {
                                               '            <span class="iconDRDatabase"></span>' +
                                               '            <h1 class="headText1 DRHeaderWrap">' +
                                               '                <a href="#" id="showHideGraphBlock_' + i + '" class="showhideIcon arrowAdjustDR">' +
-                                              '                    <span class="DRHeaderName" id="dRHeaderName_' + i + '">Database ('+ rawConfigValues.dr.id +')</span>' +
+                                              '                    <span class="DRHeaderName" id="dRHeaderName_' + i + '">Database ('+ producerDbId +')</span>' +
                                               '<span class="DRHeaderName drPending" id="drPending_'+ i +'"></span>' +
                                               '                </a>' +
                                               '            </h1>' +
