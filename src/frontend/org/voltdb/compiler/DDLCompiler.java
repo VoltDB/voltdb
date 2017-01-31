@@ -1056,7 +1056,7 @@ public class DDLCompiler {
             targetName = (targetName != null) ? checkIdentifierStart(
                     targetName, statement) : Constants.DEFAULT_EXPORT_CONNECTOR_NAME;
 
-            if (tableXML.attributes.containsKey("drTable") && tableXML.attributes.get("drTable").equals("ENABLE")) {
+            if (tableXML.attributes.containsKey("drTable") && "ENABLE".equals(tableXML.attributes.get("drTable"))) {
                 throw m_compiler.new VoltCompilerException(String.format(
                         "Invalid CREATE STREAM statement: table %s is a DR table.", tableName));
             } else {
