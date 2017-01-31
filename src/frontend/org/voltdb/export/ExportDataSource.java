@@ -47,12 +47,10 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
-import org.voltdb.common.Constants;
 import org.voltdb.export.AdvertisedDataSource.ExportFormat;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.VoltFile;
 
-import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableList;
@@ -61,6 +59,7 @@ import com.google_voltpatches.common.util.concurrent.Futures;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
+import java.nio.charset.StandardCharsets;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
 import org.voltcore.utils.CoreUtils;
@@ -151,7 +150,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         m_database = db;
         m_tableName = tableName;
         m_signature = signature;
-        m_signatureBytes = m_signature.getBytes(Constants.UTF8ENCODING);
+        m_signatureBytes = m_signature.getBytes(StandardCharsets.UTF_8);
 
         PureJavaCrc32 crc = new PureJavaCrc32();
         crc.update(m_signatureBytes);
@@ -211,7 +210,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             writeAdvertisementTo(stringer);
             stringer.endObject();
             JSONObject jsObj = new JSONObject(stringer.toString());
-            jsonBytes = jsObj.toString(4).getBytes(Charsets.UTF_8);
+            jsonBytes = jsObj.toString(4).getBytes(StandardCharsets.UTF_8);
         } catch (JSONException e) {
             exportLog.error("Failed to Write ad file for " + nonce);
             Throwables.propagate(e);
@@ -252,7 +251,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         byte data[] = Files.toByteArray(adFile);
         long hsid = -1;
         try {
-            JSONObject jsObj = new JSONObject(new String(data, Charsets.UTF_8));
+            JSONObject jsObj = new JSONObject(new String(data, StandardCharsets.UTF_8));
 
             long version = jsObj.getLong("adVersion");
             if (version != 0) {
@@ -268,7 +267,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             m_generation = jsObj.getLong("generation");
             m_partitionId = jsObj.getInt("partitionId");
             m_signature = jsObj.getString("signature");
-            m_signatureBytes = m_signature.getBytes(Constants.UTF8ENCODING);
+            m_signatureBytes = m_signature.getBytes(StandardCharsets.UTF_8);
             m_tableName = jsObj.getString("tableName");
             JSONArray columns = jsObj.getJSONArray("columns");
             for (int ii = 0; ii < columns.length(); ii++) {
