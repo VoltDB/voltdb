@@ -306,8 +306,10 @@ public class TestIndexCountSuite extends RegressionSuite {
 
         // test with 2,6
         callAdHocFilterWithExpectedCount(client,"TU4", "UNAME = 'xin' AND SEX = 0 AND POINTS < 6", 2);
-
         callAdHocFilterWithExpectedCount(client,"TU4", "UNAME = 'xin' AND SEX = 0 AND POINTS >= 2 AND POINTS < 6", 1);
+
+        callAdHocFilterWithExpectedCount(client,"TU4", "UNAME = 'xin' AND SEX = 0 AND POINTS IS NOT DISTINCT FROM CAST(NULL AS INT)", 1);
+        callAdHocFilterWithExpectedCount(client,"TU4", "UNAME IS NOT DISTINCT FROM 'xin' AND SEX = 0 AND POINTS IS NOT DISTINCT FROM CAST(NULL AS INT)", 1);
     }
 
     public void testOneColumnMultiIndex() throws Exception {
@@ -413,6 +415,20 @@ public class TestIndexCountSuite extends RegressionSuite {
         callAdHocFilterWithExpectedCount(client,"TM2", "UNAME = 'xin' AND POINTS > 2 AND POINTS < 6", 4);
         callAdHocFilterWithExpectedCount(client,"TM2", "UNAME = 'xin' AND POINTS > 3 AND POINTS <= 6", 3);
         callAdHocFilterWithExpectedCount(client,"TM2", "UNAME = 'xin' AND POINTS > 3 AND POINTS < 6", 1);
+    }
+
+    // Test index count with "is not distinct from"
+    public void testIndexCountNotDistinct() throws Exception {
+        Client client = getClient();
+
+        client.callProcedure("@AdHoc", "INSERT INTO T_ENG_11096 VALUES (1, 2, 3, 4);");
+        client.callProcedure("@AdHoc", "INSERT INTO T_ENG_11096 VALUES (1, NULL, 3, 4);");
+        client.callProcedure("@AdHoc", "INSERT INTO T_ENG_11096 VALUES (1, NULL, 9, 0);");
+        client.callProcedure("@AdHoc", "INSERT INTO T_ENG_11096 VALUES (1, NULL, 0, 6);");
+        client.callProcedure("@AdHoc", "INSERT INTO T_ENG_11096 VALUES (3, NULL, 9, 5);");
+        client.callProcedure("@AdHoc", "INSERT INTO T_ENG_11096 VALUES (3, 14, 3, 7);");
+        callAdHocFilterWithExpectedCount(client, "T_ENG_11096", "a = 1 AND b IS NOT DISTINCT FROM CAST(NULL AS INT) AND c > 1;", 2);
+        callAdHocFilterWithExpectedCount(client, "T_ENG_11096", "a = 1 AND b IS NOT DISTINCT FROM CAST(NULL AS INT);", 3);
     }
 
     void testENG4959Float() throws Exception {

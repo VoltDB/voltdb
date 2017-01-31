@@ -1132,6 +1132,24 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     abstract protected void loadFromJSONObject(JSONObject obj, Database db)
             throws JSONException;
 
+    protected static void loadBooleanArrayFromJSONObject(JSONObject jobj, String key, List<Boolean> target) throws JSONException {
+        if ( ! jobj.isNull(key)) {
+            JSONArray jarray = jobj.getJSONArray(key);
+            int numCols = jarray.length();
+            for (int ii = 0; ii < numCols; ++ii) {
+                target.add(jarray.getBoolean(ii));
+            }
+        }
+    }
+
+    protected static void booleanArrayToJSONString(JSONStringer stringer, String key, List<Boolean> array) throws JSONException {
+        stringer.key(key).array();
+        for (Boolean arrayElement : array) {
+            stringer.value(arrayElement);
+        }
+        stringer.endArray();
+    }
+
     protected static NodeSchema loadSchemaFromJSONObject(JSONObject jobj,
             String jsonKey) throws JSONException {
         NodeSchema nodeSchema = new NodeSchema();

@@ -27,6 +27,7 @@ import java.util.Set;
 
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.lib.StringUtil;
+import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
@@ -57,6 +58,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         TARGET_INDEX_NAME,
         END_EXPRESSION,
         SEARCHKEY_EXPRESSIONS,
+        COMPARE_NOTDISTINCT,
         INITIAL_EXPRESSION,
         SKIP_NULL_PREDICATE,
         KEY_ITERATE,
@@ -84,12 +86,19 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     // at runtime in the lookup on the index
     protected final List<AbstractExpression> m_searchkeyExpressions = new ArrayList<AbstractExpression>();
 
+    // If the search key expression is actually a "not distinct" expression, we do not want the executor to skip null candidates.
+    protected final List<Boolean> m_compareNotDistinct = new ArrayList<Boolean>();
+
     // for reverse scan LTE only.
     // The initial expression is needed to control a (short?) forward scan to adjust the start of a reverse
     // iteration after it had to initially settle for starting at "greater than a prefix key".
     private AbstractExpression m_initialExpression;
 
     // The predicate for underflow case using the index
+    // When the executor scans the index, for each scanned tuple, if the evaluation result of this expression is true,
+    // that tuple will be skipped.
+    // You will only have this predicate when the index lookup type is not EQ and the scan is not reversed.
+    // (see setSkipNullPredicate() beblow).
     private AbstractExpression m_skip_null_predicate;
 
     // The overall index lookup operation type
@@ -150,29 +159,30 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         }
         int searchKeySize = m_searchkeyExpressions.size();
 
-        int nextKeyIndex;
+        int nullExprIndex;
         if (m_endExpression != null &&
                 searchKeySize < ExpressionUtil.uncombinePredicate(m_endExpression).size()) {
-            nextKeyIndex = searchKeySize;
+            nullExprIndex = searchKeySize;
         } else if (searchKeySize == 0) {
             m_skip_null_predicate = null;
             return;
         } else {
-            nextKeyIndex = searchKeySize - 1;
+            nullExprIndex = searchKeySize - 1;
         }
 
-        setSkipNullPredicate(nextKeyIndex);
+        setSkipNullPredicate(nullExprIndex);
     }
 
-    public void setSkipNullPredicate(int nextKeyIndex) {
-        assert(nextKeyIndex >= 0);
+    public void setSkipNullPredicate(int nullExprIndex) {
+        assert(nullExprIndex >= 0);
 
-        m_skip_null_predicate = buildSkipNullPredicate(nextKeyIndex, m_catalogIndex, m_tableScan, m_searchkeyExpressions);
+        m_skip_null_predicate = buildSkipNullPredicate(nullExprIndex, m_catalogIndex, m_tableScan,
+                                                        m_searchkeyExpressions, m_compareNotDistinct);
     }
 
     public static AbstractExpression buildSkipNullPredicate(
-            int nextKeyIndex, Index catalogIndex, StmtTableScan tableScan,
-            List<AbstractExpression> searchkeyExpressions) {
+            int nullExprIndex, Index catalogIndex, StmtTableScan tableScan,
+            List<AbstractExpression> searchkeyExpressions, List<Boolean> compareNotDistinct) {
 
         String exprsjson = catalogIndex.getExpressionsjson();
         List<AbstractExpression> indexedExprs = null;
@@ -180,8 +190,8 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             indexedExprs = new ArrayList<AbstractExpression>();
 
             List<ColumnRef> indexedColRefs = CatalogUtil.getSortedCatalogItems(catalogIndex.getColumns(), "index");
-            assert(nextKeyIndex < indexedColRefs.size());
-            for (int i = 0; i <= nextKeyIndex; i++) {
+            assert(nullExprIndex < indexedColRefs.size());
+            for (int i = 0; i <= nullExprIndex; i++) {
                 ColumnRef colRef = indexedColRefs.get(i);
                 Column col = colRef.getColumn();
                 TupleValueExpression tve = new TupleValueExpression(
@@ -193,7 +203,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         } else {
             try {
                 indexedExprs = AbstractExpression.fromJSONArrayString(exprsjson, tableScan);
-                assert(nextKeyIndex < indexedExprs.size());
+                assert(nullExprIndex < indexedExprs.size());
             } catch (JSONException e) {
                 e.printStackTrace();
                 assert(false);
@@ -219,19 +229,31 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             }
         }
 
-        AbstractExpression nullExpr = indexedExprs.get(nextKeyIndex);
+        AbstractExpression nullExpr = indexedExprs.get(nullExprIndex);
         AbstractExpression skipNullPredicate = null;
         if (notNullTves == null || !notNullTves.contains(nullExpr)) {
             List<AbstractExpression> exprs = new ArrayList<AbstractExpression>();
-            for (int i = 0; i < nextKeyIndex; i++) {
+            for (int i = 0; i < nullExprIndex; i++) {
                 AbstractExpression idxExpr = indexedExprs.get(i);
-                AbstractExpression expr = new ComparisonExpression(ExpressionType.COMPARE_EQUAL,
-                        idxExpr, searchkeyExpressions.get(i).clone());
+                ExpressionType exprType = ExpressionType.COMPARE_EQUAL;
+                if (i < compareNotDistinct.size()
+                        && compareNotDistinct.get(i)) {
+                    exprType = ExpressionType.COMPARE_NOTDISTINCT;
+                }
+                AbstractExpression expr = new ComparisonExpression(exprType, idxExpr, searchkeyExpressions.get(i).clone());
                 exprs.add(expr);
             }
-            AbstractExpression expr = new OperatorExpression(ExpressionType.OPERATOR_IS_NULL, nullExpr, null);
-            exprs.add(expr);
-
+            // If nullExprIndex fell out of the search key range (there will be no m_compareNotDistinct for it)
+            // or m_compareNotDistinct flag says it should ignore null values,
+            // then we add "nullExpr IS NULL" to the expression for matching tuples to skip. (ENG-11096)
+            if (nullExprIndex == searchkeyExpressions.size()
+                    || compareNotDistinct.get(nullExprIndex) == false) { // nullExprIndex == m_searchkeyExpressions.size() - 1
+                AbstractExpression expr = new OperatorExpression(ExpressionType.OPERATOR_IS_NULL, nullExpr, null);
+                exprs.add(expr);
+            }
+            else {
+                return null;
+            }
             skipNullPredicate = ExpressionUtil.combinePredicates(exprs);
             skipNullPredicate.finalizeValueTypes();
         }
@@ -464,6 +486,10 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             // don't get bashed by other nodes or subsequent planner runs
             m_searchkeyExpressions.add(expr.clone());
         }
+    }
+
+    public void addCompareNotDistinctFlag(Boolean flag) {
+        m_compareNotDistinct.add(flag);
     }
 
     public void removeLastSearchKey()
@@ -716,6 +742,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         stringer.keySymbolValuePair(Members.TARGET_INDEX_NAME.name(), m_targetIndexName);
         if (m_searchkeyExpressions.size() > 0) {
             stringer.key(Members.SEARCHKEY_EXPRESSIONS.name()).array(m_searchkeyExpressions);
+            booleanArrayToJSONString(stringer, Members.COMPARE_NOTDISTINCT.name(), m_compareNotDistinct);
         }
         if (m_endExpression != null) {
             stringer.key(Members.END_EXPRESSION.name());
@@ -740,13 +767,16 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
                 jobj.getInt(Members.PURPOSE.name()) : FOR_SCANNING_PERFORMANCE_OR_ORDERING;
         m_targetIndexName = jobj.getString(Members.TARGET_INDEX_NAME.name());
         m_catalogIndex = db.getTables().get(super.m_targetTableName).getIndexes().get(m_targetIndexName);
-        //load end_expression
+        // load end_expression
         m_endExpression = AbstractExpression.fromJSONChild(jobj, Members.END_EXPRESSION.name(), m_tableScan);
         // load initial_expression
         m_initialExpression = AbstractExpression.fromJSONChild(jobj, Members.INITIAL_EXPRESSION.name(), m_tableScan);
-        //load searchkey_expressions
+        // load searchkey_expressions
         AbstractExpression.loadFromJSONArrayChild(m_searchkeyExpressions, jobj,
                 Members.SEARCHKEY_EXPRESSIONS.name(), m_tableScan);
+        // load COMPARE_NOTDISTINCT flag vector
+        loadBooleanArrayFromJSONObject(jobj, Members.COMPARE_NOTDISTINCT.name(), m_compareNotDistinct);
+        // load skip_null_predicate
         m_skip_null_predicate = AbstractExpression.fromJSONChild(jobj, Members.SKIP_NULL_PREDICATE.name(), m_tableScan);
     }
 
@@ -889,14 +919,23 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         String result = "(";
         int prefixSize = nCovered - 1;
         for (int ii = 0; ii < prefixSize; ++ii) {
-            result += conjunction + asIndexed[ii] + " = " +
+            result += conjunction + asIndexed[ii] + (m_compareNotDistinct.get(ii) ? " NOT DISTINCT " : " = ") +
                     m_searchkeyExpressions.get(ii).explain(getTableNameForExplain());
             conjunction = ") AND (";
         }
         // last element
-        result += conjunction +
-                asIndexed[prefixSize] + " " + m_lookupType.getSymbol() + " " +
-                m_searchkeyExpressions.get(prefixSize).explain(getTableNameForExplain()) + ")";
+        result += conjunction + asIndexed[prefixSize] + " ";
+        if (m_lookupType == IndexLookupType.EQ && m_compareNotDistinct.get(prefixSize)) {
+            result += "NOT DISTINCT";
+        }
+        else {
+            result += m_lookupType.getSymbol();
+        }
+        result += " " + m_searchkeyExpressions.get(prefixSize).explain(getTableNameForExplain());
+        if (m_lookupType != IndexLookupType.EQ && m_compareNotDistinct.get(prefixSize)) {
+            result += ", including NULLs";
+        }
+        result += ")";
         return result;
     }
 
@@ -937,6 +976,10 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
 
     public boolean isForGroupingOnly() {
         return m_purpose == FOR_GROUPING;
+    }
+
+    public List<Boolean> getCompareNotDistinctFlags() {
+        return m_compareNotDistinct;
     }
 
     public void setEliminatedPostFilters(List<AbstractExpression> exprs) {
