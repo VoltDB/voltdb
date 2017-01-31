@@ -62,6 +62,7 @@ import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
+import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
 import org.voltcore.utils.CoreUtils;
 
 /**
@@ -149,8 +150,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         };
         m_database = db;
         m_tableName = tableName;
+        m_signature = signature;
+        m_signatureBytes = m_signature.getBytes(Constants.UTF8ENCODING);
 
-        String nonce = signature + "_" + partitionId;
+        PureJavaCrc32 crc = new PureJavaCrc32();
+        crc.update(m_signatureBytes);
+        String nonce = m_tableName + "_" + crc.getValue() + "_" + partitionId;
 
         m_committedBuffers = new StreamBlockQueue(overflowPath, nonce);
 
@@ -159,8 +164,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
          * a catalog version and a table id so that it is constant across
          * catalog updates that add or drop tables.
          */
-        m_signature = signature;
-        m_signatureBytes = m_signature.getBytes(Constants.UTF8ENCODING);
         m_partitionId = partitionId;
 
         // Add the Export meta-data columns to the schema followed by the
@@ -292,10 +295,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
 
         String nonce;
+        PureJavaCrc32 crc = new PureJavaCrc32();
+        crc.update(m_signatureBytes);
         if (hsid == -1) {
-            nonce = m_signature + "_" + m_partitionId;
+            nonce = m_tableName + "_" + crc.getValue() + "_" + m_partitionId;
         } else {
-            nonce = m_signature + "_" + hsid + "_" + m_partitionId;
+            nonce = m_tableName + "_" + crc.getValue() + "_" + hsid + "_" + m_partitionId;
         }
         //If on disk generation matches catalog generation we dont do end of stream as it will be appended to.
         m_endOfStream = !isContinueingGeneration;
