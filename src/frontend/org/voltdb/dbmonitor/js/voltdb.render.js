@@ -2174,7 +2174,7 @@ function alertNodeClicked(obj) {
 
 
             connection.Metadata['@Statistics_DR_completeData'][0].schema.forEach(function (columnInfo) {
-                if (columnInfo["name"] == "PARTITION_ID" || columnInfo["name"] == "TOTALBUFFERS" || columnInfo["name"] == "TIMESTAMP" || columnInfo["name"] == "TOTALBYTES" || columnInfo["name"] == "MODE" || columnInfo["name"] == "LASTQUEUEDDRID" || columnInfo["name"] == "LASTACKDRID" || columnInfo["name"] == "LASTQUEUEDTIMESTAMP" || columnInfo["name"] == "LASTACKTIMESTAMP" || columnInfo["name"] == "CLUSTERID"|| columnInfo["name"] == "CONSUMERCLUSTERID")
+                if (columnInfo["name"] == "PARTITION_ID" || columnInfo["name"] == "TOTALBUFFERS" || columnInfo["name"] == "TIMESTAMP" || columnInfo["name"] == "TOTALBYTES" || columnInfo["name"] == "MODE" || columnInfo["name"] == "LASTQUEUEDDRID" || columnInfo["name"] == "LASTACKDRID" || columnInfo["name"] == "LASTQUEUEDTIMESTAMP" || columnInfo["name"] == "LASTACKTIMESTAMP" || columnInfo["name"] == "CLUSTER_ID"|| columnInfo["name"] == "REMOTE_CLUSTER_ID")
                     colIndex[columnInfo["name"]] = counter;
                 counter++;
             });
@@ -2196,8 +2196,8 @@ function alertNodeClicked(obj) {
                     partitionDetails["LASTACKDRID"] = info[colIndex["LASTACKDRID"]];
                     partitionDetails["LASTQUEUEDTIMESTAMP"] = info[colIndex["LASTQUEUEDTIMESTAMP"]];
                     partitionDetails["LASTACKTIMESTAMP"] = info[colIndex["LASTACKTIMESTAMP"]];
-                    partitionDetails["CLUSTERID"] = info[colIndex["CLUSTERID"]];
-                    partitionDetails["CONSUMERCLUSTERID"] = info[colIndex["CONSUMERCLUSTERID"]];
+                    partitionDetails["CLUSTERID"] = info[colIndex["CLUSTER_ID"]];
+                    partitionDetails["CONSUMERCLUSTERID"] = info[colIndex["REMOTE_CLUSTER_ID"]];
                     drDetails[partitionId].push(partitionDetails);
                 }
             });
