@@ -26,14 +26,17 @@ import org.voltcore.messaging.VoltMessage;
  * Sent from SPIs to one replica when @BalanceSPI is called.
  */
 public class BalanceSPIMessage extends VoltMessage {
+
     protected int m_partitionId;
     protected long m_newLeaderHSId;
+    protected long m_formerLeaderHSId;
 
     public BalanceSPIMessage() {}
 
-    public BalanceSPIMessage(int pid, long hsid) {
+    public BalanceSPIMessage(int pid, long hsid, long formerLeaderHSId) {
         m_partitionId = pid;
         m_newLeaderHSId = hsid;
+        m_formerLeaderHSId = formerLeaderHSId;
     }
 
     public int getParititionId() {
@@ -44,11 +47,14 @@ public class BalanceSPIMessage extends VoltMessage {
         return m_newLeaderHSId;
     }
 
+    public long getFormerLeaderHSId() {
+        return m_formerLeaderHSId;
+    }
 
     @Override
     public int getSerializedSize()
     {
-        return super.getSerializedSize() + 4 + 8;
+        return super.getSerializedSize() + 4 + 8 + 8;
     }
 
     @Override
@@ -56,6 +62,7 @@ public class BalanceSPIMessage extends VoltMessage {
     {
         m_partitionId = buf.getInt();
         m_newLeaderHSId = buf.getLong();
+        m_formerLeaderHSId = buf.getLong();
         assert(buf.capacity() == buf.position());
     }
 
@@ -65,6 +72,7 @@ public class BalanceSPIMessage extends VoltMessage {
         buf.put(VoltDbMessageFactory.BalanceSPI_ID);
         buf.putInt(m_partitionId);
         buf.putLong(m_newLeaderHSId);
+        buf.putLong(m_formerLeaderHSId);
         assert(buf.capacity() == buf.position());
         buf.limit(buf.position());
     }

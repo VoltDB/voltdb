@@ -52,6 +52,7 @@ import org.voltdb.VoltType;
 import org.voltdb.VoltZK;
 import org.voltdb.VoltZK.MailboxType;
 import org.voltdb.iv2.LeaderCache.LeaderCallBackInfo;
+import org.voltdb.utils.TopologyZKUtils;
 
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.collect.ArrayListMultimap;
@@ -350,25 +351,7 @@ public class Cartographer extends StatsSource
      * Given a partition ID, return a list of HSIDs of all the sites with copies of that partition
      */
     public List<Long> getReplicasForPartition(int partition) {
-        String zkpath = LeaderElector.electionDirForPartition(VoltZK.leaders_initiators, partition);
-        List<Long> retval = new ArrayList<Long>();
-        try {
-            List<String> children = m_zk.getChildren(zkpath, null);
-            for (String child : children) {
-                retval.add(Long.valueOf(child.split("_")[0]));
-            }
-        }
-        catch (KeeperException.NoNodeException e) {
-            //Can happen when partitions are being removed
-        } catch (KeeperException ke) {
-            org.voltdb.VoltDB.crashLocalVoltDB("KeeperException getting replicas for partition: " + partition,
-                    true, ke);
-        }
-        catch (InterruptedException ie) {
-            org.voltdb.VoltDB.crashLocalVoltDB("InterruptedException getting replicas for partition: " +
-                    partition, true, ie);
-        }
-        return retval;
+        return TopologyZKUtils.getReplicasForPartition(m_zk, partition);
     }
 
     /**

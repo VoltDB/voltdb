@@ -52,10 +52,6 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
     // not serialized.
     AtomicBoolean m_isDurable;
 
-    //if this is valid, forward it back if needed
-    long m_spiBalanceLoopBackHSId = Long.MIN_VALUE;
-    boolean m_isForwaredFromFormerMaster = false;
-
     /** Empty constructor for de-serialization */
     Iv2InitiateTaskMessage() {
         super();
@@ -238,21 +234,5 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
 
     public ByteBuffer getSerializedParams() {
         return m_invocation.getSerializedParams();
-    }
-
-    public void setSPIBalanceLoopBackHSid(long loopbackHSId) {
-        m_spiBalanceLoopBackHSId = loopbackHSId;
-    }
-
-    public long getSPIBalanceLoopBackHSid() {
-        return m_spiBalanceLoopBackHSId;
-    }
-
-    public void setForwaredFromFormerMaster (boolean forwaredFromFormerMaster) {
-        m_isForwaredFromFormerMaster = forwaredFromFormerMaster;
-    }
-
-    public boolean isForwaredFromFormerMaster() {
-        return m_isForwaredFromFormerMaster;
     }
 }

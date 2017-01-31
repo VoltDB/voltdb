@@ -66,6 +66,7 @@ import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.Iv2LogFaultMessage;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
 import org.voltdb.messaging.RepairLogTruncationMessage;
+import org.voltdb.utils.TopologyZKUtils;
 
 import com.google_voltpatches.common.primitives.Ints;
 import com.google_voltpatches.common.primitives.Longs;
@@ -436,72 +437,17 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                     "should never receive multi-partition initiations.");
         }
 
-        // If this is supposed to be the new leader but has not done promotion yet,
-        // send the message back to former leader.
-        if (message.getSPIBalanceLoopBackHSid() != Long.MIN_VALUE && !m_isLeader) {
-            long loopbackHSId = message.getSPIBalanceLoopBackHSid();
-            message.setSPIBalanceLoopBackHSid(Long.MIN_VALUE);
-            m_mailbox.send(loopbackHSId, message);
+        // mastership changed?
+        if (routeTransactionIfNeeded(message)) {
             return;
         }
 
-        // If this is the former partition master but has not been demoted yet,
-        // route the request to the supposed new leader. The message could be looped back if
-        // the supposed new leader is not in place.
-        if (m_spiBalanceRequested && m_newBalancedLeaderHSID != Long.MIN_VALUE) {
-            message.setSPIBalanceLoopBackHSid(m_mailbox.getHSId());
-            message.setForwaredFromFormerMaster(true);
-            m_mailbox.send(m_newBalancedLeaderHSID, message);
-            return;
-        }
-
-        // Not a leader anymore, send message back to the new leader if the message is originally sent to
-        // the former leader
-        if (!m_isLeader && message.isForwaredFromFormerMaster()) {
-            message.setSPIBalanceLoopBackHSid(m_mailbox.getHSId());
-            message.setForwaredFromFormerMaster(true);
-            m_mailbox.send(m_newBalancedLeaderHSID, message);
-        }
+        //start SPI balance operation if so requested.
+        startSPIMigrationIfRequested(message);
 
         final String procedureName = message.getStoredProcedureName();
         long newSpHandle;
         long uniqueId = Long.MIN_VALUE;
-
-        if ("@BalanceSPI".equals(procedureName)) {
-            // this is a @BalanceSPI system procedure that will reset the max transaction id on new leader
-            if (tmLog.isDebugEnabled()) {
-                tmLog.debug("[SpScheduler] Receive @BalanceSPI invocation...");
-            }
-
-            final Object[] params = message.getParameters();
-            try {
-                int pid = Integer.parseInt(params[1].toString());
-                int hostId = Integer.parseInt(params[2].toString());
-                int siteId = Integer.parseInt(params[3].toString());
-                long destinations[] = new long[2];
-                long newLeaderHSId = CoreUtils.getHSIdFromHostAndSite(hostId, siteId);
-                ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
-                LeaderCache leaderAppointee = new LeaderCache(zk, VoltZK.iv2appointees);
-                try {
-                    leaderAppointee.start(true);
-                    destinations[0] = leaderAppointee.get(pid);
-                } catch (InterruptedException | ExecutionException e) {
-                    tmLog.warn(String.format("Failed to migrate SPI for partition %d", pid));
-                } finally {
-                    try {
-                        leaderAppointee.shutdown();
-                    } catch (InterruptedException e) {
-                    }
-                }
-
-                destinations[1] = newLeaderHSId;
-                BalanceSPIMessage balanceSpiMsg = new BalanceSPIMessage(pid, newLeaderHSId);
-                m_mailbox.send(destinations, balanceSpiMsg);
-            } catch(NumberFormatException e) {
-                tmLog.error(e.getMessage());
-                throw e;
-            }
-        }
 
         Iv2InitiateTaskMessage msg = message;
         if (m_isLeader || message.isReadOnly()) {
@@ -629,7 +575,116 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
         Iv2Trace.logIv2InitiateTaskMessage(message, m_mailbox.getHSId(), msg.getTxnId(), newSpHandle);
         doLocalInitiateOffer(msg);
-        return;
+    }
+
+    private boolean startSPIMigrationIfRequested(Iv2InitiateTaskMessage message) {
+
+        final String procedureName = message.getStoredProcedureName();
+        if (!"@BalanceSPI".equals(procedureName)) {
+            return false;
+        }
+        if (tmLog.isDebugEnabled()) {
+            tmLog.debug("[SpScheduler] Receive @BalanceSPI invocation...");
+        }
+
+        final Object[] params = message.getParameters();
+        int pid, hostId, siteId;
+        try {
+            assert(params.length > 2);
+            pid = Integer.parseInt(params[1].toString());
+            hostId = Integer.parseInt(params[2].toString());
+            siteId = Integer.parseInt(params[3].toString());
+        } catch(NumberFormatException e) {
+            tmLog.error("Input parameters for @BalanceSPI must be possitive integer." + e.getMessage());
+            return false;
+        }
+
+        Long newLeaderHSId = CoreUtils.getHSIdFromHostAndSite(hostId, siteId);
+        Long formerLeaderHSId = null;
+
+        ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
+        List<Long> replicas = TopologyZKUtils.getReplicasForPartition(zk, pid);
+        if (replicas.isEmpty() || !replicas.contains(newLeaderHSId)) {
+            tmLog.error(String.format("Failed to find the replica for %d on host %d, site %d. Transaction not initiated.", pid, hostId, siteId));
+            return false;
+        }
+
+        LeaderCache leaderAppointee = new LeaderCache(zk, VoltZK.iv2appointees);
+        try {
+            leaderAppointee.start(true);
+            formerLeaderHSId = leaderAppointee.get(pid);
+        } catch (InterruptedException | ExecutionException e) {
+            tmLog.warn(String.format("Failed to migrate SPI for partition %d", pid));
+        } finally {
+            try {
+                leaderAppointee.shutdown();
+            } catch (InterruptedException e) {
+            }
+        }
+        if (formerLeaderHSId == null) {
+            tmLog.error("Failed to find master initiator for partition: " + pid + ". Transaction not initiated.");
+            return false;
+        }
+
+        if (formerLeaderHSId == newLeaderHSId) {
+            tmLog.error(String.format("Can not migrate SPI from %d to %d. Transaction not initiated.", formerLeaderHSId, newLeaderHSId));
+            return false;
+        }
+
+        //send the request to current leader
+        m_mailbox.send(formerLeaderHSId, new BalanceSPIMessage(pid, newLeaderHSId, formerLeaderHSId));
+        return true;
+    }
+
+    static int count=0;
+    static int reroute=0;
+    private boolean routeTransactionIfNeeded(Iv2InitiateTaskMessage msg) {
+
+        // This is the current leader but a spi balance is requested
+        if (m_spiBalanceStatus == SpiBalanceStatus.REQUESTED ){
+            if ( msg.getCoordinatorHSId() == m_mailbox.getHSId()){
+                m_mailbox.send(msg.getInitiatorHSId(),msg);
+//                m_mailbox.send(msg.getInitiatorHSId(),
+//                        new Iv2InitiateTaskMessage(
+//                                msg.getInitiatorHSId(),
+//                                m_newBalancedLeaderHSID,
+//                                Iv2InitiateTaskMessage.UNUSED_TRUNC_HANDLE,
+//                                msg.getTxnId(),
+//                                msg.getUniqueId(),
+//                                msg.isReadOnly(),
+//                                msg.isSinglePartition(),
+//                                msg.getStoredProcedureInvocation(),
+//                                msg.getClientInterfaceHandle(),
+//                                msg.getConnectionId(),
+//                                msg.isForReplay()));
+                System.out.println("@@@@@@@@@@@@@@@@@@@@    " + count);
+                count++;
+                return true;
+            }
+        }
+
+        // This is still a replica, to be promoted but not done yet
+        // send it back
+//        if (m_formerBalanceLeaderHSID > 0 && !isLeader()) {
+//            //m_mailbox.send(m_formerBalanceLeaderHSID, message);
+//            m_mailbox.send(m_formerBalanceLeaderHSID,
+//                    new Iv2InitiateTaskMessage(
+//                            msg.getInitiatorHSId(),
+//                            m_formerBalanceLeaderHSID,
+//                            Iv2InitiateTaskMessage.UNUSED_TRUNC_HANDLE,
+//                            msg.getTxnId(),
+//                            msg.getUniqueId(),
+//                            msg.isReadOnly(),
+//                            msg.isSinglePartition(),
+//                            msg.getStoredProcedureInvocation(),
+//                            msg.getClientInterfaceHandle(),
+//                            msg.getConnectionId(),
+//                            msg.isForReplay()));
+//            System.out.println("@@@@@@@@@@@@@@@@@@@@ reroute    " + reroute);
+//            reroute++;
+//            return true;
+//        }
+        return false;
     }
 
     /**

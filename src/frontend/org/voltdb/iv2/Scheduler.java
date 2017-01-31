@@ -69,6 +69,11 @@ abstract public class Scheduler implements InitiatorMessageHandler
         }
     };
 
+    protected static enum SpiBalanceStatus {
+        NONE,
+        REQUESTED
+    };
+
     // The queue which the Site's runloop is going to poll for new work.  This
     // is fronted here by the TransactionTaskQueue and should not be directly
     // offered work.
@@ -81,8 +86,9 @@ abstract public class Scheduler implements InitiatorMessageHandler
 
     // helper class to put command log work in order
     protected final ReplaySequencer m_replaySequencer = new ReplaySequencer();
-    boolean m_spiBalanceRequested = false;
-    long m_newBalancedLeaderHSID = Long.MIN_VALUE;
+
+    //used for SPI balance
+    SpiBalanceStatus m_spiBalanceStatus = SpiBalanceStatus.NONE;
 
     /*
      * This lock is extremely dangerous to use without known the pattern.
@@ -144,6 +150,7 @@ abstract public class Scheduler implements InitiatorMessageHandler
     public void setLeaderState(boolean isLeader)
     {
         m_isLeader = isLeader;
+        m_spiBalanceStatus = SpiBalanceStatus.NONE;
     }
 
     public boolean isLeader() {

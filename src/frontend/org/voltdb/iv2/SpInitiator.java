@@ -17,10 +17,9 @@
 
 package org.voltdb.iv2;
 
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.List;
 import java.util.Map.Entry;
+import java.util.Set;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 
@@ -46,9 +45,9 @@ import org.voltdb.export.ExportManager;
 import org.voltdb.iv2.LeaderCache.LeaderCallBackInfo;
 import org.voltdb.iv2.RepairAlgo.RepairResult;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
-import org.voltdb.messaging.BalanceSPIResponseMessage;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
+import com.google_voltpatches.common.collect.Sets;
 
 /**
  * Subclass of Initiator to manage single-partition operations.
@@ -72,12 +71,22 @@ public class SpInitiator extends BaseInitiator implements Promotable
                 tmLog.debug(hsidStr + " [SpInitiator] cache values: " + Arrays.toString(cache.values().toArray()));
             }
 
+            Set<Long> leaders = Sets.newHashSet();
             for (Entry<Integer, LeaderCallBackInfo> entry: cache.entrySet()) {
                 Long HSId = entry.getValue().m_HSID;
+                leaders.add(HSId);
                 if (HSId == getInitiatorHSId()) {
                     m_isBalanceSPIRequested = entry.getValue().m_isBalanceSPIRequested;
                     acceptPromotion();
                     break;
+                }
+            }
+
+            //This was the leader but SPI has been migrated, so demote it.
+            if (m_scheduler.isLeader() && !leaders.contains(getInitiatorHSId())) {
+                m_scheduler.setLeaderState(false);
+                if (tmLog.isDebugEnabled()) {
+                    tmLog.debug("Site: " + CoreUtils.hsIdToString(getInitiatorHSId()) + " has been demoted.");
                 }
             }
         }
@@ -191,19 +200,6 @@ public class SpInitiator extends BaseInitiator implements Promotable
                     tmLog.info(m_whoami
                              + "finished leader promotion. Took "
                              + (System.currentTimeMillis() - startTime) + " ms.");
-                    if (m_isBalanceSPIRequested) {
-                        List<Long> survivors = new ArrayList<Long>(m_term.getInterestingHSIds().get());
-                        survivors.remove(m_initiatorMailbox.getHSId());
-                        if (tmLog.isDebugEnabled()) {
-                            tmLog.debug("[acceptPromotion] repair survivors to change original leader state:" +
-                                    Arrays.toString(survivors.toArray()));
-                        }
-
-                        BalanceSPIResponseMessage msg = new BalanceSPIResponseMessage();
-                        m_initiatorMailbox.send(com.google_voltpatches.common.primitives.Longs.toArray(survivors), msg);
-                        m_isBalanceSPIRequested = false;
-                    }
-
                     // THIS IS where map cache should be updated, not
                     // in the promotion algorithm.
                     LeaderCacheWriter iv2masters = new LeaderCache(m_messenger.getZK(),
@@ -222,7 +218,10 @@ public class SpInitiator extends BaseInitiator implements Promotable
                 }
             }
             // Tag along and become the export master too
-            ExportManager.instance().acceptMastership(m_partitionId);
+            //leave the export on the former leader, now a replica
+            if (!m_isBalanceSPIRequested) {
+                ExportManager.instance().acceptMastership(m_partitionId);
+            }
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Terminally failed leader promotion.", true, e);
         }

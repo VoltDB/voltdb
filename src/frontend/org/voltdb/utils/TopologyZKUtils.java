@@ -17,12 +17,16 @@
 
 package org.voltdb.utils;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.data.Stat;
 import org.json_voltpatches.JSONException;
+import org.voltcore.zk.LeaderElector;
 import org.voltdb.AbstractTopology;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
@@ -68,5 +72,27 @@ public abstract class TopologyZKUtils {
         } catch (KeeperException | InterruptedException | JSONException e) {
             VoltDB.crashLocalVoltDB("Unable to update topology to ZK, dying", true, e);
         }
+    }
+
+    /**
+     * Given a partition ID, return a list of HSIDs of all the sites with copies of that partition
+     */
+    public static List<Long> getReplicasForPartition(ZooKeeper zk, int partition) {
+        String zkpath = LeaderElector.electionDirForPartition(VoltZK.leaders_initiators, partition);
+        List<Long> retval = new ArrayList<Long>();
+        try {
+            List<String> children = zk.getChildren(zkpath, null);
+            for (String child : children) {
+                retval.add(Long.valueOf(child.split("_")[0]));
+            }
+        }
+        catch (KeeperException.NoNodeException e) {
+            //Can happen when partitions are being removed
+        } catch (KeeperException | InterruptedException e) {
+            org.voltdb.VoltDB.crashLocalVoltDB("Exception getting replicas for partition: " + partition,
+                    true, e);
+        }
+
+        return retval;
     }
 }

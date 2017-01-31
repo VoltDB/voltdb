@@ -36,7 +36,6 @@ import org.voltcore.zk.ZKUtil;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 import org.voltdb.messaging.BalanceSPIMessage;
-import org.voltdb.messaging.BalanceSPIResponseMessage;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.DummyTransactionTaskMessage;
 import org.voltdb.messaging.DumpMessage;
@@ -319,13 +318,24 @@ public class InitiatorMailbox implements Mailbox
         }
         else if (message instanceof BalanceSPIMessage) {
             BalanceSPIMessage msg = (BalanceSPIMessage) message;
-            // new master
+
+            // current master is notified to be demoted.
+            if (m_hsId == msg.getFormerLeaderHSId()) {
+                m_scheduler.m_spiBalanceStatus = Scheduler.SpiBalanceStatus.REQUESTED;
+
+                //mark it as not a leader. All the leader transactions will be resent to original senders
+                //start accepting replica transactions
+                m_scheduler.m_isLeader = false;
+
+                //notify new leader to accept the promotion and take responsibility.
+                send(msg.getNewLeaderHSId(), message);
+            }
+
+            // new master, message comes after former leader has been notified.
             if (this.m_hsId == msg.getNewLeaderHSId()) {
                 ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
                 if (tmLog.isDebugEnabled()) {
                     tmLog.debug(VoltZK.debugLeadersInfo(zk));
-                    tmLog.debug("[InitiatorMailbox.deliverInternal] start to change appointee...pid:" +
-                            msg.getParititionId() + ", to hsid:" + CoreUtils.hsIdToString(msg.getNewLeaderHSId()));
                 }
                 LeaderCache leaderAppointee = new LeaderCache(zk, VoltZK.iv2appointees);
                 try {
@@ -343,22 +353,9 @@ public class InitiatorMailbox implements Mailbox
                 if (tmLog.isDebugEnabled()) {
                     tmLog.debug(VoltZK.debugLeadersInfo(zk));
                 }
-            } else {
-                // current master to be changed.
-                m_scheduler.m_spiBalanceRequested = true;
-                m_scheduler.m_newBalancedLeaderHSID = msg.getNewLeaderHSId();
             }
-            return;
-        } else if (message instanceof BalanceSPIResponseMessage) {
-            if (tmLog.isDebugEnabled()) {
-                tmLog.debug("[InitiatorMailbox:deliverInternal] receive BalanceSPIRepairSurvivorsMessage,"
-                        + " current is_leader:" + m_scheduler.isLeader());
-            }
-            m_scheduler.setLeaderState(false);
-            m_scheduler.m_spiBalanceRequested = false;
             return;
         }
-
         m_repairLog.deliver(message);
         if (canDeliver) {
             m_scheduler.deliver(message);
