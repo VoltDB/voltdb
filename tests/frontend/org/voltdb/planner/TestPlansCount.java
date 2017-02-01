@@ -399,6 +399,15 @@ public class TestPlansCount extends PlannerTestCase {
         checkIndexCounter(pn, false);
     }
 
+    // Padding maximum value case.
+    public void testCountStar31() {
+        List<AbstractPlanNode> pn = compileToFragments("SELECT count(*) from T3 WHERE T3_NUM1 =1 AND T3_NUM2 >= ?");
+        checkIndexCounter(pn, true);
+
+        pn = compileToFragments("SELECT count(1) from T3 WHERE T3_NUM1 = 1 AND T3_NUM2 >= ?");
+        checkIndexCounter(pn, true);
+    }
+
     // Not padding maximum value case.
     public void testCountStar32() {
         List<AbstractPlanNode> pn = compileToFragments("SELECT COUNT(*) FROM T2 WHERE ID = 1 AND USERNAME > ?");
@@ -408,13 +417,37 @@ public class TestPlansCount extends PlannerTestCase {
         checkIndexCounter(pn, false);
     }
 
-    // Padding maximum value case.
-    public void testCountStar31() {
-        List<AbstractPlanNode> pn = compileToFragments("SELECT count(*) from T3 WHERE T3_NUM1 =1 AND T3_NUM2 >= ?");
-        checkIndexCounter(pn, true);
+    private void checkCompareNotDistinctFlags(AbstractPlanNode apn, Boolean... expectedFlags) {
+        List<Boolean> compareNotDistinctFlags = null;
+        if (apn instanceof IndexScanPlanNode) {
+            compareNotDistinctFlags = ((IndexScanPlanNode)apn).getCompareNotDistinctFlags();
+        }
+        else if (apn instanceof IndexCountPlanNode) {
+            compareNotDistinctFlags = ((IndexCountPlanNode)apn).getCompareNotDistinctFlags();
+        }
+        assertNotNull(compareNotDistinctFlags);
+        assertEquals(compareNotDistinctFlags.size(), expectedFlags.length);
+        for (int i = 0; i < compareNotDistinctFlags.size(); i++) {
+            assertEquals(expectedFlags[i], compareNotDistinctFlags.get(i));
+        }
+    }
 
-        pn = compileToFragments("SELECT count(1) from T3 WHERE T3_NUM1 =1 AND T3_NUM2 >= ?");
+    // Index count with "IS NOT DISTINCT FROM"
+    public void testCountStar33() {
+        List<AbstractPlanNode> pn = compileToFragments("SELECT COUNT(*) FROM T_ENG_11096 WHERE a = 1 AND b IS NOT DISTINCT FROM CAST(NULL AS INT) AND c > 1");
         checkIndexCounter(pn, true);
+        checkCompareNotDistinctFlags(pn.get(0).getChild(0), false, true, false);
+
+        pn = compileToFragments("SELECT COUNT(1) FROM T_ENG_11096 WHERE a = 1 AND b IS NOT DISTINCT FROM CAST(NULL AS INT) AND c > 1");
+        checkIndexCounter(pn, true);
+        checkCompareNotDistinctFlags(pn.get(0).getChild(0), false, true, false);
+
+        pn = compileToFragments("SELECT COUNT(*) FROM T_ENG_11096 WHERE a = 1 AND b IS NOT DISTINCT FROM CAST(NULL AS INT)");
+        for ( AbstractPlanNode nd : pn)
+            System.out.println("PlanNode Explain string:\n" + nd.toExplainPlanString());
+        AbstractPlanNode p = pn.get(0).getChild(0);
+        checkCompareNotDistinctFlags(p, false, true);
+        assertNotNull(p.getInlinePlanNode(PlanNodeType.AGGREGATE));
     }
 
     // Testing the count(<non-nullable column>) on a partitioned table.
