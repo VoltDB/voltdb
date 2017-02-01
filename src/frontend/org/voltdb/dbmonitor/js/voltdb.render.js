@@ -2264,7 +2264,8 @@ function alertNodeClicked(obj) {
                 return;
             }
             connection.Metadata['@Statistics_DRCONSUMER'].schema.forEach(function (columnInfo) {
-                if (columnInfo["name"] == "HOSTNAME" || columnInfo["name"] == "TIMESTAMP" || columnInfo["name"] == "REPLICATION_RATE_1M" || columnInfo["name"] == "HOST_ID" || columnInfo["name"] == "STATE" || columnInfo["name"] == "REPLICATION_RATE_5M" || columnInfo["name"] == "CLUSTER_ID" || columnInfo["name"] == "REMOTE_CLUSTER_ID")
+                if (columnInfo["name"] == "HOSTNAME" || columnInfo["name"] == "TIMESTAMP" || columnInfo["name"] == "REPLICATION_RATE_1M" || columnInfo["name"] == "HOST_ID" ||
+                columnInfo["name"] == "STATE" || columnInfo["name"] == "REPLICATION_RATE_5M" || columnInfo["name"] == "CLUSTER_ID" || columnInfo["name"] == "REMOTE_CLUSTER_ID")
                     colIndex[columnInfo["name"]] = counter;
                 counter++;
             });
@@ -2277,13 +2278,19 @@ function alertNodeClicked(obj) {
             });
 
             connection.Metadata['@Statistics_DRCONSUMER'].data.forEach(function (info) {
+                var cluster_id = info[colIndex["CLUSTER_ID"]]
+                var producer_cluster_id = info[colIndex["REMOTE_CLUSTER_ID"]]
+
                 if (!replicationDetails.hasOwnProperty("DR_GRAPH")) {
                     replicationDetails["DR_GRAPH"] = {};
                     replicationDetails["DR_GRAPH"]["REPLICATION_DATA"] = [];
+                    replicationDetails["DR_GRAPH"][cluster_id + '_' + producer_cluster_id] = {}
+                    replicationDetails["DR_GRAPH"][cluster_id + '_' + producer_cluster_id]['REPLICATION_RATE_1M'] = 0
                 }
 
-                replicationRate1M += (info[colIndex["REPLICATION_RATE_1M"]] == null || info[colIndex["REPLICATION_RATE_1M"]] < 0) ? 0 : info[colIndex["REPLICATION_RATE_1M"]];
-
+                replicationRate1M = (info[colIndex["REPLICATION_RATE_1M"]] == null || info[colIndex["REPLICATION_RATE_1M"]] < 0) ? 0 : info[colIndex["REPLICATION_RATE_1M"]] / 1000;
+                replicationDetails["DR_GRAPH"][cluster_id + '_' + producer_cluster_id]['REPLICATION_RATE_1M'] += replicationRate1M;
+                replicationDetails["DR_GRAPH"][cluster_id + '_' + producer_cluster_id]["TIMESTAMP"] = info[colIndex["TIMESTAMP"]];
                 var repData = {};
                 repData["TIMESTAMP"] = info[colIndex["TIMESTAMP"]];
                 replicationDetails["DR_GRAPH"]["TIMESTAMP"] = info[colIndex["TIMESTAMP"]];
@@ -2299,7 +2306,6 @@ function alertNodeClicked(obj) {
             });
 
             replicationDetails["DR_GRAPH"]['WARNING_COUNT'] = getReplicationNotCovered(connection.Metadata['@Statistics_DRCONSUMER_completeData'][1], colIndex2['IS_COVERED']);
-            replicationDetails["DR_GRAPH"]["REPLICATION_RATE_1M"] = replicationRate1M / 1000;
         };
 
         var getDrConsumerData = function(connection, drConsumerDetails) {

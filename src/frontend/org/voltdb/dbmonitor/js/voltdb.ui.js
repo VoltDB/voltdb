@@ -1077,6 +1077,18 @@ var loadPage = function (serverName, portid) {
                 }
             }
 
+            var role = drRoleDetail['DRROLE'][0][0];
+
+            if(role == "MASTER" || role == "XDCR"){
+                voltDbRenderer.GetDrDetails(function (drDetails) {
+                    populateDRGraphandTable(drRoleDetail, drDetails)
+                });
+            } else if (role == "REPLICA"){
+                 voltDbRenderer.GetDrReplicationInformation(function (replicationData) {
+                        populateDRGraphandTable(drRoleDetail, replicationData["DR_GRAPH"])
+                 });
+            }
+
             if(isDisabled == false){
                 voltDbRenderer.GetClusterReplicaInformation(function (replicaDetail) {
                 if (getCurrentServer() != undefined) {
@@ -1229,18 +1241,7 @@ var loadPage = function (serverName, portid) {
                 }
             });
 
-                var role = drRoleDetail['DRROLE'][0][0];
 
-                if(role == "MASTER" || role == "XDCR"){
-                    voltDbRenderer.GetDrDetails(function (drDetails) {
-                        populateDRGraphandTable(drRoleDetail, drDetails)
-                    });
-                }
-                else if (role == "REPLICA"){
-                     voltDbRenderer.GetDrReplicationInformation(function (replicationData) {
-                            populateDRGraphandTable(drRoleDetail, replicationData["DR_GRAPH"])
-                     });
-                }
             }
         });
 
@@ -1307,14 +1308,15 @@ var loadPage = function (serverName, portid) {
                     $("#drPending_1").hide();
                 }
 
-                if(drRoleDetail['DRROLE'].length > 1){
-                    for(var i = 2; i <= drRoleDetail['DRROLE'].length ; i++){
-                        consumerDbId = drRoleDetail['DRROLE'][i - 1][2];
+                if(drRoleDetail['DRROLE'].length > 0){
+                    for(var i = 0; i < drRoleDetail['DRROLE'].length ; i++){
+                        var combinedId = producerDbId + '_' + drRoleDetail['DRROLE'][i][2]
+                        consumerDbId = drRoleDetail['DRROLE'][i][2];
                         replicaLatency = [];
                         for (var key in response) {
-                            for (var i = 0; i <= response[key].length - 1; i++) {
-                                if(response[key][i].CONSUMERCLUSTERID == consumerDbId){
-                                    replicaLatency.push((response[key][i].LASTQUEUEDTIMESTAMP - response[key][i].LASTACKTIMESTAMP) / 1000000);
+                            for (var j = 0; j <= response[key].length - 1; j++) {
+                                if(response[key][j].CONSUMERCLUSTERID == consumerDbId){
+                                    replicaLatency.push((response[key][j].LASTQUEUEDTIMESTAMP - response[key][j].LASTACKTIMESTAMP) / 1000000);
                                 }
                             }
                         }
@@ -1328,7 +1330,7 @@ var loadPage = function (serverName, portid) {
                         }
                         $("#dbPane_"+ i).parent().remove();
 
-                        if(drRoleDetail['DRROLE'][i - 1][0] == "XDCR"){
+                        if(drRoleDetail['DRROLE'][i][0] == "XDCR"){
                             displayArrow = "arrowDouble";
                         }
                         else{
@@ -1347,10 +1349,10 @@ var loadPage = function (serverName, portid) {
                                           '                </a>' +
                                           '            </h1>' +
                                           '<div class="drRelation" id="drRelation_'+ i +'"><div class="drRelationLeft"><span class="'+ displayArrow +'">' +
-                                           '<p>'+drRoleDetail['DRROLE'][i - 1][0]+'</p></span></div>' +
+                                           '<p>'+drRoleDetail['DRROLE'][i][0]+'</p></span></div>' +
                                           '<div class="drRelationRight"><span class="iconDRDatabase"></span><div class="headText1 DRHeaderWrap">' +
                                           '<a href="#" class="showhideIcon expandedDR arrowAdjustDR">' +
-                                          '<span class="DRHeaderName" id="dRHeaderName_' + i + '">Database ('+ drRoleDetail['DRROLE'][i - 1][2] +')</span>' +
+                                          '<span class="DRHeaderName" id="dRHeaderName_' + i + '">Database ('+ drRoleDetail['DRROLE'][i][2] +')</span>' +
                                           '</a></div>  <div class="latencyDR"><p>Latency '+ max(replicaLatency) +' sec</p></div></div><div class="clear"></div></div>' +
                                           '            <div class="clear"></div>' +
                                           '        </div>'
@@ -1359,30 +1361,28 @@ var loadPage = function (serverName, portid) {
                         var htmlGraph =   '        <div class="menu_body drBody" style="'+ displayCss +'">' +
 
                                           '            <div class="DRContantWrap">' +
-                                          '<h1>No Data Available</h1>' +
-//                                          '                <div id="mainGraphBlock' + i + '">' +
-//                                          '                    <div class="errorMsgLocalStorageFull" style="display:none">' +
-//                                          '                        <div class="errorMsgLocalWrapper">' +
-//                                          '                            <img src="css/resources/images/alert.png" alt="Alert"/>' +
-//                                          '                        </div>' +
-//                                          '                        <div class="textMsgLocalWrapper">' +
-//                                          '                            <p>Local storage is full. Please delete some saved queries from SQL Query tab or minimize the retained time interval using the above sliding window.</p>' +
-//                                          '                        </div>' +
-//                                          '                        <div class="clear"></div>' +
-//                                          '                    </div>' +
-//                                          '                    <div class="graphChart" id="graphChart_' + i + '">' +
-//                                          '<h1>No Data Available</h1>' +
-////                                          '                        <div id="ChartDrReplicationRate_' + i + '" class="chart chartDR" style="display: block">' +
-////                                          '                            <div class="chartHeader">' +
-////                                          '                                <h1>Database Replication (DR)' +
-////                                          '                                    <a href="#" class="downloadBtnChart" onclick=' +
-////                                          '                                         downloadCSV(event, { filename: "DrReplication-data" }, "dataReplication");' +
-////                                          '                                     > <img class="downloadCls" src="css/resources/images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>' +
-////                                          '                                    <div class="clear"></div>' +
-////                                          '                                </h1>' +
-////                                          '                            </div>' +
-////                                          '                            <svg id="visualizationDrReplicationRate_' + i + '" width="100%" height="400"></svg>' +
-//                                          '                        </div>' +
+                                          '                <div id="mainGraphBlock_' + combinedId + '">' +
+                                          '                    <div class="errorMsgLocalStorageFull" style="display:none">' +
+                                          '                        <div class="errorMsgLocalWrapper">' +
+                                          '                            <img src="css/resources/images/alert.png" alt="Alert"/>' +
+                                          '                        </div>' +
+                                          '                        <div class="textMsgLocalWrapper">' +
+                                          '                            <p>Local storage is full. Please delete some saved queries from SQL Query tab or minimize the retained time interval using the above sliding window.</p>' +
+                                          '                        </div>' +
+                                          '                        <div class="clear"></div>' +
+                                          '                    </div>' +
+                                          '                    <div class="graphChart" id="graphChart_' + combinedId + '">' +
+                                          '                        <div id="ChartDrReplicationRate_' + combinedId + '" class="chart chartDR" style="display: block">' +
+                                          '                            <div class="chartHeader">' +
+                                          '                                <h1>Database Replication (DR)' +
+                                          '                                    <a href="#" class="downloadBtnChart" onclick=' +
+                                          '                                         downloadCSV(event, { filename: "DrReplication-data" }, "dataReplication");' +
+                                          '                                     > <img class="downloadCls" src="css/resources/images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>' +
+                                          '                                    <div class="clear"></div>' +
+                                          '                                </h1>' +
+                                          '                            </div>' +
+                                          '                            <svg id="visualizationDrReplicationRate_' + combinedId + '" width="100%" height="400"></svg>' +
+                                          '                        </div>' +
                                           '                    </div>' +
                                           '                </div>'
 
@@ -1484,9 +1484,9 @@ var loadPage = function (serverName, portid) {
 
 
                         $("#dr").append(htmlContent + htmlGraph)
-
+                        VoltDbUI.drChartList.push(combinedId)
                         $("#drPending_" + i).html('');
-                        if(drRoleDetail['DRROLE'][i - 1][1] == "PENDING"){
+                        if(drRoleDetail['DRROLE'][i][1] == "PENDING"){
                             $("#drPending_" + i).html("( No active connection )")
                             $("#drPending_" + i).show();
                             $("#drRelation_" + i).hide();
@@ -1507,6 +1507,13 @@ var loadPage = function (serverName, portid) {
                             $(this).next("div.menu_body").slideToggle(300).siblings("div.menu_body").slideUp("slow");
                         });
                  }
+                 MonitorGraphUI.InitializeDrData();
+                 MonitorGraphUI.InitializeDRGraph();
+                 MonitorGraphUI.AddDrGraph("Seconds");
+                 voltDbRenderer.GetDrReplicationInformation(function (replicationData) {
+                    MonitorGraphUI.RefreshDrReplicationGraph(replicationData, getCurrentServer(), "Seconds", getCurrentTab());
+                 });
+
               }
         }
 
@@ -2044,7 +2051,7 @@ var loadPage = function (serverName, portid) {
             $('#clusterId').show();
             $('#clusterId').html(" (ID: " + replicationData["DR_GRAPH"]["CLUSTER_ID"] + ")");
 
-            MonitorGraphUI.RefreshDrReplicationGraph(replicationData, getCurrentServer(), graphView, currentTab);
+            //MonitorGraphUI.RefreshDrReplicationGraph(replicationData, getCurrentServer(), graphView, currentTab);
             replicationWarning(replicationData["DR_GRAPH"]['WARNING_COUNT']);
 
             var response = replicationData["DR_GRAPH"]["REPLICATION_DATA"];
