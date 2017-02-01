@@ -44,6 +44,7 @@ public enum CipherExecutor {
 
     public final static int PAGE_SHIFT = 14; // 16384 (max TLS fragment)
     public final static int PAGE_SIZE = 1 << PAGE_SHIFT;
+
     private final static BigInteger LSB_MASK = new BigInteger(new byte[] {
             (byte) 255,
             (byte) 255,
@@ -85,9 +86,7 @@ public enum CipherExecutor {
                     ThreadFactory thrdfct = CoreUtils.getThreadFactory(
                             name () + " SSL cipher service", CoreUtils.MEDIUM_STACK_SIZE);
                     m_es = MoreExecutors.listeningDecorator(
-                            Executors.newFixedThreadPool(
-                                    m_threadCount,
-                                    thrdfct));
+                            Executors.newFixedThreadPool(m_threadCount, thrdfct));
                 }
             }
         }
@@ -205,9 +204,9 @@ public enum CipherExecutor {
         md.reset();
         ByteBuffer bb = null;
         if (!buf.hasRemaining() && buf.limit() > 0) {
-            bb = ((ByteBuffer)buf.duplicate().flip()).asReadOnlyBuffer();
+            bb = ((ByteBuffer)buf.duplicate().flip());
         } else {
-            bb = buf.slice().asReadOnlyBuffer();
+            bb = buf.slice();
         }
         if (bb.remaining() <= offset) {
             return null;
