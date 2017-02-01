@@ -4,6 +4,11 @@
     <httpd enabled="true">
         <jsonapi enabled="true" />
     </httpd>
+ 
+    <ssl enabled="true" external="true">
+        <keystore password="password" path="./apprunner-keystore" />
+        <truststore password="password" path="./apprunner-keystore" />
+    </ssl>
 
     <export>
         <configuration enabled="true" type="file" target="partstream">

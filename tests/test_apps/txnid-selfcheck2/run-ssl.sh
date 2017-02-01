@@ -60,7 +60,7 @@ function jars-ifneeded() {
 function server() {
     jars-ifneeded
     # run the server
-    $VOLTDB init -C deployment.xml
+    $VOLTDB init -C deployment-ssl.xml -f
     $VOLTDB start -l $LICENSE -H $HOST
 }
 
@@ -93,10 +93,10 @@ function async-benchmark() {
         --partfillerrowmb=128 \
         --progresstimeout=20 \
         --usecompression=false \
+        --sslfile=./keystore.props \
         --allowinprocadhoc=false
         # --disabledthreads=ddlt,partBiglt,replBiglt,partCappedlt,replCappedlt,replLoadlt,partLoadlt,adHocMayhemThread,idpt,partTrunclt,replTrunclt
 #ddlt,clients,partBiglt,replBiglt,partCappedlt,replCappedlt,replLoadlt,partLoadlt,adHocMayhemThread,idpt,readThread,partTrunclt,replTrunclt
-        # --sslfile=./keystore.props
 }
 
 function init() {
