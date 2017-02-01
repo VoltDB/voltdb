@@ -26,6 +26,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 
 import javax.net.ssl.SSLEngine;
@@ -356,8 +357,13 @@ public class TLSNIOWriteStream extends NIOWriteStream {
             m_inFlight.reducePermits(chunks.size());
 
             if (wasEmpty && m_ce.isActive()) {
-                ListenableFuture<?> fut = m_ce.getES().submit(this);
-                fut.addListener(new ExceptionListener(fut), CoreUtils.SAMETHREADEXECUTOR);
+                try {
+                    ListenableFuture<?> fut = m_ce.getES().submit(this);
+                    fut.addListener(new ExceptionListener(fut), CoreUtils.SAMETHREADEXECUTOR);
+                } catch (RejectedExecutionException executorIsShuttingDown) {
+                    run();
+                    checkForGatewayExceptions();
+                }
             } else if (wasEmpty && !m_ce.isActive()) {
                 while (!isEmpty()) {
                     run();

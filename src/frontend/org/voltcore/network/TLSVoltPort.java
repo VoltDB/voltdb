@@ -24,6 +24,7 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -38,6 +39,7 @@ import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import io.netty_voltpatches.buffer.ByteBuf;
 import io.netty_voltpatches.buffer.CompositeByteBuf;
 import io.netty_voltpatches.buffer.Unpooled;
+import io.netty_voltpatches.util.IllegalReferenceCountException;
 
 public class TLSVoltPort extends VoltPort  {
     public final static int TLS_HEADER_SIZE = 5;
@@ -307,8 +309,13 @@ public class TLSVoltPort extends VoltPort  {
             final boolean wasEmpty = m_q.isEmpty();
             m_q.offer(slice);
             if (wasEmpty && m_ce.isActive()) {
-                ListenableFuture<?> fut = m_ce.getES().submit(this);
-                fut.addListener(new ExceptionListener(fut), CoreUtils.SAMETHREADEXECUTOR);
+                try {
+                    ListenableFuture<?> fut = m_ce.getES().submit(this);
+                    fut.addListener(new ExceptionListener(fut), CoreUtils.SAMETHREADEXECUTOR);
+                } catch (RejectedExecutionException executorIsShuttingDown) {
+                    run();
+                    checkForGatewayExceptions();
+                }
             } else if (wasEmpty && !m_ce.isActive()) {
                 run();
                 checkForGatewayExceptions();
@@ -321,7 +328,10 @@ public class TLSVoltPort extends VoltPort  {
             while ((slice=m_q.poll()) != null) {
                 slice.markConsumed().discard();
             }
-            m_msgbb.release();
+            if (m_msgbb.refCnt() > 0) try {
+                m_msgbb.release();
+            } catch (IllegalReferenceCountException ignoreIt) {
+            }
         }
 
         synchronized boolean isEmpty() {
