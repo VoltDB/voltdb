@@ -52,9 +52,33 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
     // not serialized.
     AtomicBoolean m_isDurable;
 
+    boolean m_isForReplica = false;
+
     /** Empty constructor for de-serialization */
     Iv2InitiateTaskMessage() {
         super();
+    }
+
+    // SpScheduler creates messages with truncation handles.
+    public Iv2InitiateTaskMessage(long initiatorHSId,
+                        long coordinatorHSId,
+                        long truncationHandle,
+                        long txnId,
+                        long uniqueId,
+                        boolean isReadOnly,
+                        boolean isSinglePartition,
+                        StoredProcedureInvocation invocation,
+                        long clientInterfaceHandle,
+                        long connectionId,
+                        boolean isForReplay,
+                        boolean isForReplica) {
+        super(initiatorHSId, coordinatorHSId, txnId, uniqueId, isReadOnly, isForReplay);
+        setTruncationHandle(truncationHandle);
+        m_isSinglePartition = isSinglePartition;
+        m_invocation = invocation;
+        m_clientInterfaceHandle = clientInterfaceHandle;
+        m_connectionId = connectionId;
+        m_isForReplica = isForReplica;
     }
 
     // SpScheduler creates messages with truncation handles.
@@ -151,6 +175,7 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
         msgsize += 8; // m_clientInterfaceHandle
         msgsize += 8; // m_connectionId
         msgsize += 1; // is single partition flag
+        msgsize += 1; // is FromClientInterface flag
         msgsize += 1; // should generate a response
         msgsize += m_invocation.getSerializedSize();
         return msgsize;
@@ -164,6 +189,7 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
         buf.putLong(m_clientInterfaceHandle);
         buf.putLong(m_connectionId);
         buf.put(m_isSinglePartition ? (byte) 1 : (byte) 0);
+        buf.put(m_isForReplica ? (byte) 1 : (byte) 0);
         buf.put((byte)0);//Should never generate a response if we have to forward to a replica
         m_invocation.flattenToBuffer(buf);
 
@@ -177,6 +203,7 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
         m_clientInterfaceHandle = buf.getLong();
         m_connectionId = buf.getLong();
         m_isSinglePartition = buf.get() == 1;
+        m_isForReplica = buf.get() == 1;
         m_shouldReturnResultTables = buf.get() != 0;
         m_invocation = new StoredProcedureInvocation();
         m_invocation.initFromBuffer(buf);
@@ -234,5 +261,9 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
 
     public ByteBuffer getSerializedParams() {
         return m_invocation.getSerializedParams();
+    }
+
+    public boolean isForReplica() {
+        return m_isForReplica;
     }
 }

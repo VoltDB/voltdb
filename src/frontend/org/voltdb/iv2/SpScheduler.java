@@ -46,6 +46,7 @@ import org.voltdb.Consistency.ReadLevel;
 import org.voltdb.SnapshotCompletionInterest;
 import org.voltdb.SnapshotCompletionMonitor;
 import org.voltdb.SystemProcedureCatalog;
+import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltZK;
@@ -438,12 +439,21 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
 
         // mastership changed?
-        if (routeTransactionIfNeeded(message)) {
+        if (m_spiBalanceStatus == SpiBalanceStatus.REQUESTED && !message.isForReplica()){
+            if (tmLog.isDebugEnabled()) {
+                tmLog.debug("mis-routed to: " + CoreUtils.hsIdToString(m_mailbox.getHSId()) +
+                        ". " + message.getStoredProcedureInvocation().toString());
+            }
+            InitiateResponseMessage response = new InitiateResponseMessage(message);
+            response.setMispartitioned(true, message.getStoredProcedureInvocation(),
+                    TheHashinator.getCurrentVersionedConfig());
+            response.m_sourceHSId = m_mailbox.getHSId();
+            m_mailbox.send(message.getInitiatorHSId(), response);
             return;
         }
 
         //start SPI balance operation if so requested.
-        startSPIMigrationIfRequested(message);
+        initiateSPIMigrationProcess(message);
 
         final String procedureName = message.getStoredProcedureName();
         long newSpHandle;
@@ -550,7 +560,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                             msg.getStoredProcedureInvocation(),
                             msg.getClientInterfaceHandle(),
                             msg.getConnectionId(),
-                            msg.isForReplay());
+                            msg.isForReplay(),
+                            true);
                 // Update the handle in the copy since the constructor doesn't set it
                 replmsg.setSpHandle(newSpHandle);
                 m_mailbox.send(m_sendToHSIds, replmsg);
@@ -577,7 +588,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         doLocalInitiateOffer(msg);
     }
 
-    private boolean startSPIMigrationIfRequested(Iv2InitiateTaskMessage message) {
+    private boolean initiateSPIMigrationProcess(Iv2InitiateTaskMessage message) {
 
         final String procedureName = message.getStoredProcedureName();
         if (!"@BalanceSPI".equals(procedureName)) {
@@ -634,57 +645,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         //send the request to current leader
         m_mailbox.send(formerLeaderHSId, new BalanceSPIMessage(pid, newLeaderHSId, formerLeaderHSId));
         return true;
-    }
-
-    static int count=0;
-    static int reroute=0;
-    private boolean routeTransactionIfNeeded(Iv2InitiateTaskMessage msg) {
-
-        // This is the current leader but a spi balance is requested
-        if (m_spiBalanceStatus == SpiBalanceStatus.REQUESTED ){
-            if ( msg.getCoordinatorHSId() == m_mailbox.getHSId()){
-                m_mailbox.send(msg.getInitiatorHSId(),msg);
-//                m_mailbox.send(msg.getInitiatorHSId(),
-//                        new Iv2InitiateTaskMessage(
-//                                msg.getInitiatorHSId(),
-//                                m_newBalancedLeaderHSID,
-//                                Iv2InitiateTaskMessage.UNUSED_TRUNC_HANDLE,
-//                                msg.getTxnId(),
-//                                msg.getUniqueId(),
-//                                msg.isReadOnly(),
-//                                msg.isSinglePartition(),
-//                                msg.getStoredProcedureInvocation(),
-//                                msg.getClientInterfaceHandle(),
-//                                msg.getConnectionId(),
-//                                msg.isForReplay()));
-                System.out.println("@@@@@@@@@@@@@@@@@@@@    " + count);
-                count++;
-                return true;
-            }
-        }
-
-        // This is still a replica, to be promoted but not done yet
-        // send it back
-//        if (m_formerBalanceLeaderHSID > 0 && !isLeader()) {
-//            //m_mailbox.send(m_formerBalanceLeaderHSID, message);
-//            m_mailbox.send(m_formerBalanceLeaderHSID,
-//                    new Iv2InitiateTaskMessage(
-//                            msg.getInitiatorHSId(),
-//                            m_formerBalanceLeaderHSID,
-//                            Iv2InitiateTaskMessage.UNUSED_TRUNC_HANDLE,
-//                            msg.getTxnId(),
-//                            msg.getUniqueId(),
-//                            msg.isReadOnly(),
-//                            msg.isSinglePartition(),
-//                            msg.getStoredProcedureInvocation(),
-//                            msg.getClientInterfaceHandle(),
-//                            msg.getConnectionId(),
-//                            msg.isForReplay()));
-//            System.out.println("@@@@@@@@@@@@@@@@@@@@ reroute    " + reroute);
-//            reroute++;
-//            return true;
-//        }
-        return false;
     }
 
     /**

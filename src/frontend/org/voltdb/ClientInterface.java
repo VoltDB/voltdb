@@ -143,6 +143,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     private static final VoltLogger authLog = new VoltLogger("AUTH");
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final VoltLogger networkLog = new VoltLogger("NETWORK");
+    static final VoltLogger tmLog = new VoltLogger("TM");
+
     @SuppressWarnings("unused")
     private static final VoltLogger consoleLog = new VoltLogger("CONSOLE");
 
@@ -949,7 +951,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         private boolean restartTransaction(int messageSize, long nowNanos)
         {
             if (response.isMispartitioned()) {
-                // Restart a mis-partitioned transaction
+                // Restart a mis-partitioned or mis-routed transaction
                 assert response.getInvocation() != null;
                 assert response.getCurrentHashinatorConfig() != null;
                 assert(catProc != null);
@@ -968,11 +970,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 }
 
                 boolean isReadonly = catProc.getReadonly();
-
                 try {
                     ProcedurePartitionInfo ppi = (ProcedurePartitionInfo)catProc.getAttachment();
                     int partition = InvocationDispatcher.getPartitionForProcedure(ppi.index,
                             ppi.type, response.getInvocation());
+
+                   if (tmLog.isDebugEnabled()){
+                       tmLog.debug("Restart transaction:" + response.getInvocation().toString());
+                   }
                     createTransaction(cihm.connection.connectionId(),
                             response.getInvocation(),
                             isReadonly,
