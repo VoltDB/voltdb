@@ -179,6 +179,10 @@ public class Benchmark {
         @Option(desc = "Enable topology awareness")
         boolean topologyaware = false;
 
+        @Option(desc = "File with SSL properties")
+        String sslfile = "";
+
+
         @Override
         public void validate() {
             if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
@@ -353,7 +357,22 @@ public class Benchmark {
         log.info(config.getConfigDumpString());
 
         StatusListener statusListener = new StatusListener();
-        ClientConfig clientConfig = new ClientConfig("", "", statusListener);
+
+        ClientConfig clientConfig = null;
+        if (config.sslfile.length() > 0) {
+            try {
+                clientConfig = new ClientConfig("", "", statusListener, true, config.sslfile);
+                clientConfig.enableSSL();
+            } catch (Exception e) {
+                System.err.println("Failed to configure ssl, exiting");
+                e.printStackTrace();
+                System.exit(-1);
+            }
+        } else
+            clientConfig = new ClientConfig("", "", statusListener);
+
+
+        // ClientConfig clientConfig = new ClientConfig("", "", statusListener);
         if (config.topologyaware) {
             clientConfig.setTopologyChangeAware(true);
         }
