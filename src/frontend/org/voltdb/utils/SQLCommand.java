@@ -1204,6 +1204,7 @@ public class SQLCommand
     // Application entry point
     public static void main(String args[])
     {
+        System.setProperty("voltdb_client_app", "true");
         TimeZone.setDefault(TimeZone.getTimeZone("GMT+0"));
         // Initialize parameter defaults
         String serverList = "localhost";
