@@ -1819,6 +1819,7 @@ public class PlanAssembler {
         // use the index.
         int numberWindowFunctions = 0;
         int numberReceiveNodes = 0;
+        int numberHashAggregates = 0;
         // EE keeps the insertion ORDER so that ORDER BY could apply before DISTINCT.
         // However, this probably is not optimal if there are low cardinality results.
         // Again, we have to replace the TVEs for ORDER BY clause for these cases in planning.
@@ -1838,8 +1839,19 @@ public class PlanAssembler {
             if (probe.getPlanNodeType() == PlanNodeType.WINDOWFUNCTION) {
                 numberWindowFunctions += 1;
             }
+            // Also, see if there are receive nodes.  We need to
+            // generate an ORDERBY node if there are RECEIVE nodes,
+            // because the RECEIVE->MERGERECEIVE microoptimization
+            // needs them.
             if (probe.getPlanNodeType() == PlanNodeType.RECEIVE) {
                 numberReceiveNodes += 1;
+            }
+            // Finally, count the number of non-serial aggregate
+            // nodes.  A hash or partial aggregate operation invalidates
+            // the ordering, but a serial aggregation does not.
+            if ((probe.getPlanNodeType() == PlanNodeType.HASHAGGREGATE)
+                    || (probe.getPlanNodeType() == PlanNodeType.PARTIALAGGREGATE)) {
+                numberHashAggregates += 1;
             }
         }
         if (probe != null) {
@@ -1890,6 +1902,12 @@ public class PlanAssembler {
         //     below.)
         //
         if (nonAggPlan.getSortOrderFromIndexScan() == SortDirectionType.INVALID) {
+            return true;
+        }
+        // Hash aggregates and partial aggregates
+        // invalidate the index ordering.  So, we will need
+        // an ORDERBY node.
+        if (numberHashAggregates > 0) {
             return true;
         }
         if ( numberWindowFunctions == 0 ) {
