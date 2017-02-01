@@ -48,7 +48,6 @@ import org.voltcore.utils.EstTimeUpdater;
 import org.voltcore.utils.OnDemandBinaryLogger;
 import org.voltcore.utils.PortGenerator;
 import org.voltcore.utils.ShutdownHooks;
-import org.voltcore.utils.ssl.SSLEncryptionService;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.common.Constants;
 import org.voltdb.probe.MeshProber;
@@ -378,7 +377,7 @@ public class VoltDB {
                     String portStr = args[++i];
                     if (portStr.indexOf(':') != -1) {
                         HostAndPort hap = MiscUtils.getHostAndPortFromHostnameColonPort(portStr, m_port);
-                        m_clientInterface = hap.getHostText();
+                        m_clientInterface = hap.getHost();
                         m_port = hap.getPort();
                     } else {
                         m_port = Integer.parseInt(portStr);
@@ -387,7 +386,7 @@ public class VoltDB {
                     String portStr = args[++i];
                     if (portStr.indexOf(':') != -1) {
                         HostAndPort hap = MiscUtils.getHostAndPortFromHostnameColonPort(portStr, VoltDB.DEFAULT_ADMIN_PORT);
-                        m_adminInterface = hap.getHostText();
+                        m_adminInterface = hap.getHost();
                         m_adminPort = hap.getPort();
                     } else {
                         m_adminPort = Integer.parseInt(portStr);
@@ -396,7 +395,7 @@ public class VoltDB {
                     String portStr = args[++i];
                     if (portStr.indexOf(':') != -1) {
                         HostAndPort hap = MiscUtils.getHostAndPortFromHostnameColonPort(portStr, m_internalPort);
-                        m_internalInterface = hap.getHostText();
+                        m_internalInterface = hap.getHost();
                         m_internalPort = hap.getPort();
                     } else {
                         m_internalPort = Integer.parseInt(portStr);
@@ -405,7 +404,7 @@ public class VoltDB {
                     String portStr = args[++i];
                     if (portStr.indexOf(':') != -1) {
                         HostAndPort hap = MiscUtils.getHostAndPortFromHostnameColonPort(portStr, VoltDB.DEFAULT_DR_PORT);
-                        m_drInterface = hap.getHostText();
+                        m_drInterface = hap.getHost();
                         m_drAgentPortStart = hap.getPort();
                     } else {
                         m_drAgentPortStart = Integer.parseInt(portStr);
@@ -414,7 +413,7 @@ public class VoltDB {
                     String portStr = args[++i];
                     if (portStr.indexOf(':') != -1) {
                         HostAndPort hap = MiscUtils.getHostAndPortFromHostnameColonPort(portStr, VoltDB.DEFAULT_HTTP_PORT);
-                        m_httpPortInterface = hap.getHostText();
+                        m_httpPortInterface = hap.getHost();
                         m_httpPort = hap.getPort();
                     } else {
                         m_httpPort = Integer.parseInt(portStr);
@@ -424,7 +423,7 @@ public class VoltDB {
                     String portStr = args[++i];
                     if (portStr.indexOf(':') != -1) {
                         HostAndPort hap = MiscUtils.getHostAndPortFromHostnameColonPort(portStr, org.voltcore.common.Constants.DEFAULT_ZK_PORT);
-                        m_zkInterface = hap.getHostText() + ":" + hap.getPort();
+                        m_zkInterface = hap.getHost() + ":" + hap.getPort();
                     } else {
                         m_zkInterface = "127.0.0.1:" + portStr.trim();
                     }

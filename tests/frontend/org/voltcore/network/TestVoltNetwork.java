@@ -23,9 +23,6 @@
 
 package org.voltcore.network;
 
-import org.voltcore.utils.ssl.SSLConfiguration;
-import org.voltcore.utils.ssl.SSLEncryptionService;
-
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -40,9 +37,10 @@ import java.util.Set;
 
 import javax.net.ssl.SSLEngine;
 
-import junit.framework.TestCase;
+import org.voltcore.utils.ssl.SSLConfiguration;
 
 import jsr166y.ThreadLocalRandom;
+import junit.framework.TestCase;
 
 public class TestVoltNetwork extends TestCase {
 
@@ -58,9 +56,9 @@ public class TestVoltNetwork extends TestCase {
         }
     }
 
-    private static class MockSSLVoltPort extends SSLVoltPort {
-        MockSSLVoltPort(VoltNetwork vn, InputHandler handler, SSLEncryptionService encryptSrvc, SSLEngine engine) throws UnknownHostException {
-            super (vn, handler, new InetSocketAddress(InetAddress.getByName("127.0.0.1"), 21212), vn.m_pool, encryptSrvc, engine);
+    private static class MockSSLVoltPort extends TLSVoltPort {
+        MockSSLVoltPort(VoltNetwork vn, InputHandler handler, CipherExecutor encryptSrvc, SSLEngine engine) throws UnknownHostException {
+            super (vn, handler, new InetSocketAddress(InetAddress.getByName("127.0.0.1"), 21212), vn.m_pool, engine, encryptSrvc);
         }
 
         @Override
@@ -284,10 +282,9 @@ public class TestVoltNetwork extends TestCase {
 
     public void testInstallInterestsSSLMode() throws Exception {
         SSLEngine sslEngine = SSLConfiguration.initializeSslContext(null).createSSLEngine("client", 21212);
-        SSLEncryptionService encryptionSrvc = new SSLEncryptionService(false);
 
         VoltNetwork voltNetwork = new VoltNetwork( 0, null, "Test");
-        MockSSLVoltPort sslVoltPort = new MockSSLVoltPort(voltNetwork, new MockInputHandler(), encryptionSrvc, sslEngine);
+        MockSSLVoltPort sslVoltPort = new MockSSLVoltPort(voltNetwork, new MockInputHandler(), CipherExecutor.CLIENT, sslEngine);
         runInstallInterests(voltNetwork, sslVoltPort);
     }
 
@@ -325,11 +322,10 @@ public class TestVoltNetwork extends TestCase {
 
     public void testInvokeCallbacksSSL() throws Exception {
         SSLEngine sslEngine = SSLConfiguration.initializeSslContext(null).createSSLEngine("client", 21212);
-        SSLEncryptionService encryptionSrvc = new SSLEncryptionService(false);
 
         MockSelector selector = new MockSelector();
         VoltNetwork vn = new VoltNetwork(selector);
-        MockSSLVoltPort vp = new MockSSLVoltPort(vn, new MockInputHandler(), encryptionSrvc, sslEngine);
+        MockSSLVoltPort vp = new MockSSLVoltPort(vn, new MockInputHandler(), CipherExecutor.CLIENT, sslEngine);
         runInvokeCallbacks(selector, vn, vp);
     }
 

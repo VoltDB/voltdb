@@ -17,7 +17,6 @@
 
 package org.voltcore.utils.ssl;
 
-import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ReadOnlyBufferException;
 
@@ -33,34 +32,6 @@ public class SSLBufferDecrypter {
 
     public SSLBufferDecrypter(SSLEngine sslEngine) {
         this.m_sslEngine = sslEngine;
-    }
-
-    public void unwrap(ByteBuffer srcBuffer, ByteBuffer dstBuffer) throws IOException {
-        while (true) {
-            SSLEngineResult result = null;
-            try {
-                result = m_sslEngine.unwrap(srcBuffer, dstBuffer.slice());
-            } catch (ReadOnlyBufferException|IllegalArgumentException|IllegalStateException e) {
-                throw new IOException("ssl engine unwrap fault", e);
-            }
-            switch (result.getStatus()) {
-                case OK:
-                    // in m_dstBuffer, newly decrtyped data is between pos and lim
-                    if (result.bytesProduced() > 0) {
-                        dstBuffer.limit(dstBuffer.position() + result.bytesProduced());
-                        return;
-                        }
-                    else {
-                        continue;
-                    }
-                case BUFFER_OVERFLOW:
-                    throw new SSLException("SSL engine unexpectedly overflowed when decrypting");
-                case BUFFER_UNDERFLOW:
-                    throw new SSLException("SSL engine unexpectedly underflowed when decrypting");
-                case CLOSED:
-                    throw new SSLException("SSL engine is closed on ssl unwrap of buffer.");
-            }
-        }
     }
 
     public void tlsunwrap(ByteBuffer srcBuffer, ByteBuffer dstBuffer) {
