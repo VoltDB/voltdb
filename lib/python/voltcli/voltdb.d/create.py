@@ -30,7 +30,7 @@
                            'start replica cluster (deprecated, please use role="replica" in the deployment file)',
                            default = False),
     ),
-    description = 'Start a new, empty database.'
+    description = 'WARNING: The start is deprecated. Please use INIT and START. Start a new, empty database.'
 )
 def create(runner):
     runner.go()
