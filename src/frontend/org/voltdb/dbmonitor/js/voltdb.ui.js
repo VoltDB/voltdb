@@ -1260,17 +1260,17 @@ var loadPage = function (serverName, portid) {
                 }
 
 
-
-                if(response["LASTQUEUEDTIMESTAMP"] != undefined){
-                    for (var key in response) {
-                        if(key != undefined){
-                            for (var i = 0; i <= response[key].length - 1; i++) {
+                for (var key in response) {
+                    if(key != undefined){
+                        for (var i = 0; i <= response[key].length - 1; i++) {
+                            if(response[key][i].LASTQUEUEDTIMESTAMP != undefined){
                                 replicaLatency.push((response[key][i].LASTQUEUEDTIMESTAMP - response[key][i].LASTACKTIMESTAMP)/1000000);
                             }
                         }
-
                     }
+
                 }
+
 
                 $('.latencyDR').html('');
                 if(replicaLatency.length != 0){
