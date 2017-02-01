@@ -1230,13 +1230,38 @@ var loadPage = function (serverName, portid) {
             });
 
                 var role = drRoleDetail['DRROLE'][0][0];
-                var consumerDbId = drRoleDetail['DRROLE'][0][2];
 
-                voltDbRenderer.GetDrDetails(function (drDetails) {
+                if(role == "MASTER" || role == "XDCR"){
+                    voltDbRenderer.GetDrDetails(function (drDetails) {
+                        populateDRGraphandTable(drRoleDetail, drDetails)
+                    });
+                }
+                else if (role == "REPLICA"){
+                     voltDbRenderer.GetDrReplicationInformation(function (replicationData) {
+                            populateDRGraphandTable(drRoleDetail, replicationData["DR_GRAPH"])
+                     });
+                }
+            }
+        });
 
-                    var response = drDetails;
-                    var replicaLatency = [];
-                    var producerDbId = drDetails[0][0]["CLUSTERID"];
+
+        var populateDRGraphandTable = function(drRoleDetail, drDetails){
+                var response = drDetails;
+                var replicaLatency = [];
+                var role = drRoleDetail['DRROLE'][0][0];
+
+                if (role == "REPLICA"){
+                    var producerDbId = drDetails["CLUSTER_ID"];
+                    var consumerDbId = drDetails["REMOTE_CLUSTER_ID"];
+                }
+                else if(role == "MASTER" || role == "XDCR"){
+                     var producerDbId = drDetails[0][0]["CLUSTER_ID"];
+                    var consumerDbId = drDetails[0][0]["REMOTE_CLUSTER_ID"];
+                }
+
+
+
+                if(response["LASTQUEUEDTIMESTAMP"] != undefined){
                     for (var key in response) {
                         if(key != undefined){
                             for (var i = 0; i <= response[key].length - 1; i++) {
@@ -1245,247 +1270,245 @@ var loadPage = function (serverName, portid) {
                         }
 
                     }
+                }
 
+                $('.latencyDR').html('');
+                if(replicaLatency.length != 0){
+                    $('.latencyDR').html("<p>Latency <span id='latencyDR'>" + max(replicaLatency) + " </span> sec</p>")
+                }
+                else{
                     $('.latencyDR').html('');
-                    if(replicaLatency.length != 0){
-                        $('.latencyDR').html("<p>Latency <span id='latencyDR'>" + max(replicaLatency) + " </span> sec</p>")
-                    }
-                    else{
-                        $('.latencyDR').html('');
-                    }
+                }
 
-                    $("#dRProducerName").html('Database ('+ producerDbId +')');
-                    $("#dRConsumerName").html('Database ('+ consumerDbId +')');
-                    if(role == "MASTER"){
-                        $(".drRelationLeft").find('p').html(role + ' / REPLICA');
-                        $("#drArrow").addClass("arrowSingle");
-                    }
-                    else if (role == "REPLICA"){
-                        $(".drRelationLeft").find('p').html(role + ' / MASTER');
-                        $("#drArrow").removeClass("arrowDouble");
-                        $("#drArrow").addClass("arrowSingleLeft");
-                    }
-                    else{
-                        $(".drRelationLeft").find('p').html(role);
-                        $("#drArrow").removeClass("arrowSingle");
-                        $("#drArrow").addClass("arrowDouble");
-                    }
-                    $("#drPending_1").html('')
+                $("#dRProducerName").html('Database ('+ producerDbId +')');
+                $("#dRConsumerName").html('Database ('+ consumerDbId +')');
+                if(role == "MASTER"){
+                    $(".drRelationLeft").find('p').html(role + ' / REPLICA');
+                    $("#drArrow").addClass("arrowSingle");
+                }
+                else if (role == "REPLICA"){
+                    $(".drRelationLeft").find('p').html(role + ' / MASTER');
+                    $("#drArrow").removeClass("arrowDouble");
+                    $("#drArrow").addClass("arrowSingleLeft");
+                }
+                else if (role == "XDCR"){
+                    $(".drRelationLeft").find('p').html(role);
+                    $("#drArrow").removeClass("arrowSingle");
+                    $("#drArrow").addClass("arrowDouble");
+                }
+                $("#drPending_1").html('')
 
-                    if(drRoleDetail['DRROLE'][0][1] == "PENDING"){
-                        $("#drPending_1").html("( No active connection )")
-                        $("#drPending_1").show();
-                        $("#drRelation_1").hide();
-                    }else{
-                        $("#drRelation_1").show();
-                        $("#drPending_1").hide();
-                    }
+                if(drRoleDetail['DRROLE'][0][1] == "PENDING"){
+                    $("#drPending_1").html("( No active connection )")
+                    $("#drPending_1").show();
+                    $("#drRelation_1").hide();
+                }else{
+                    $("#drRelation_1").show();
+                    $("#drPending_1").hide();
+                }
 
-                    if(drRoleDetail['DRROLE'].length > 1){
-                        for(var i = 2; i <= drRoleDetail['DRROLE'].length ; i++){
-                            consumerDbId = drRoleDetail['DRROLE'][i - 1][2];
-                            replicaLatency = [];
-                            for (var key in response) {
-                                for (var i = 0; i <= response[key].length - 1; i++) {
-                                    if(response[key][i].CONSUMERCLUSTERID == consumerDbId){
-                                        replicaLatency.push((response[key][i].LASTQUEUEDTIMESTAMP - response[key][i].LASTACKTIMESTAMP) / 1000000);
-                                    }
+                if(drRoleDetail['DRROLE'].length > 1){
+                    for(var i = 2; i <= drRoleDetail['DRROLE'].length ; i++){
+                        consumerDbId = drRoleDetail['DRROLE'][i - 1][2];
+                        replicaLatency = [];
+                        for (var key in response) {
+                            for (var i = 0; i <= response[key].length - 1; i++) {
+                                if(response[key][i].CONSUMERCLUSTERID == consumerDbId){
+                                    replicaLatency.push((response[key][i].LASTQUEUEDTIMESTAMP - response[key][i].LASTACKTIMESTAMP) / 1000000);
                                 }
                             }
+                        }
 
-                            var showClass = "expandedDR";
-                            var displayCss = "display:block";
-                            var displayArrow = "arrowSingle";
-                            if($("#dbPane_"+ i).find(".menu_head").hasClass("collapsedDR")){
-                                showClass = "collapsedDR";
-                                displayCss = "display:none";
+                        var showClass = "expandedDR";
+                        var displayCss = "display:block";
+                        var displayArrow = "arrowSingle";
+                        if($("#dbPane_"+ i).find(".menu_head").hasClass("collapsedDR")){
+                            showClass = "collapsedDR";
+                            displayCss = "display:none";
+                        }
+                        $("#dbPane_"+ i).parent().remove();
+
+                        if(drRoleDetail['DRROLE'][i - 1][0] == "XDCR"){
+                            displayArrow = "arrowDouble";
+                        }
+                        else{
+                            displayArrow = "arrowSingle";
+                        }
+
+                        var htmlContent = '<div class="containerMain1" id="containerMain_'+ i + '">' +
+                                          '    <div id="dbPane_' + i + '" class="menu_list dbPane">' +
+                                          '        <!--Code for menu starts here-->' +
+                                          '        <div class="menu_head drHead '+ showClass +'">' +
+                                          '            <span class="iconDRDatabase"></span>' +
+                                          '            <h1 class="headText1 DRHeaderWrap">' +
+                                          '                <a href="#" id="showHideGraphBlock_' + i + '" class="showhideIcon arrowAdjustDR">' +
+                                          '                    <span class="DRHeaderName" id="dRHeaderName_' + i + '">Database ('+ producerDbId +')</span>' +
+                                          '<span class="DRHeaderName drPending" id="drPending_'+ i +'"></span>' +
+                                          '                </a>' +
+                                          '            </h1>' +
+                                          '<div class="drRelation" id="drRelation_'+ i +'"><div class="drRelationLeft"><span class="'+ displayArrow +'">' +
+                                           '<p>'+drRoleDetail['DRROLE'][i - 1][0]+'</p></span></div>' +
+                                          '<div class="drRelationRight"><span class="iconDRDatabase"></span><div class="headText1 DRHeaderWrap">' +
+                                          '<a href="#" class="showhideIcon expandedDR arrowAdjustDR">' +
+                                          '<span class="DRHeaderName" id="dRHeaderName_' + i + '">Database ('+ drRoleDetail['DRROLE'][i - 1][2] +')</span>' +
+                                          '</a></div>  <div class="latencyDR"><p>Latency '+ max(replicaLatency) +' sec</p></div></div><div class="clear"></div></div>' +
+                                          '            <div class="clear"></div>' +
+                                          '        </div>'
+
+
+                        var htmlGraph =   '        <div class="menu_body drBody" style="'+ displayCss +'">' +
+
+                                          '            <div class="DRContantWrap">' +
+                                          '<h1>No Data Available</h1>' +
+//                                          '                <div id="mainGraphBlock' + i + '">' +
+//                                          '                    <div class="errorMsgLocalStorageFull" style="display:none">' +
+//                                          '                        <div class="errorMsgLocalWrapper">' +
+//                                          '                            <img src="css/resources/images/alert.png" alt="Alert"/>' +
+//                                          '                        </div>' +
+//                                          '                        <div class="textMsgLocalWrapper">' +
+//                                          '                            <p>Local storage is full. Please delete some saved queries from SQL Query tab or minimize the retained time interval using the above sliding window.</p>' +
+//                                          '                        </div>' +
+//                                          '                        <div class="clear"></div>' +
+//                                          '                    </div>' +
+//                                          '                    <div class="graphChart" id="graphChart_' + i + '">' +
+//                                          '<h1>No Data Available</h1>' +
+////                                          '                        <div id="ChartDrReplicationRate_' + i + '" class="chart chartDR" style="display: block">' +
+////                                          '                            <div class="chartHeader">' +
+////                                          '                                <h1>Database Replication (DR)' +
+////                                          '                                    <a href="#" class="downloadBtnChart" onclick=' +
+////                                          '                                         downloadCSV(event, { filename: "DrReplication-data" }, "dataReplication");' +
+////                                          '                                     > <img class="downloadCls" src="css/resources/images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>' +
+////                                          '                                    <div class="clear"></div>' +
+////                                          '                                </h1>' +
+////                                          '                            </div>' +
+////                                          '                            <svg id="visualizationDrReplicationRate_' + i + '" width="100%" height="400"></svg>' +
+//                                          '                        </div>' +
+                                          '                    </div>' +
+                                          '                </div>'
+
+
+                        var htmlDrTable = '                <div class="drWrapper" id="divDrReplication' + i + '" style="display:block">' +
+                                          '                    <div class="content drHeader" id="drHeader'+ i + '">' +
+                                          '                        <div class="leftShowhide">' +
+                                          '                            <div class="dr">' +
+                                          '                                <h1 class="headText1">' +
+                                          '                                    <a href="javascript:void(0);" id="showHideDrBlock_' + i + '" class="showhideIcon collapsed arrowAdjust">Show/Hide Database Replication (DR)</a>' +
+                                          '                                </h1>' +
+                                          '                            </div>' +
+                                          '                        </div>' +
+                                          '                        <div class="rightShowhide">' +
+                                          '                            <ul class="drList">' +
+                                          '                                <li>Mode</li>' +
+                                          '                                <li id="dbDrMode_' + i + '" class="drArrow">Master</li>' +
+                                          '                            </ul>' +
+                                          '                            <ul class="drList">' +
+                                          '                                <li class="alertIcon warningDr" id="drAlertWarning_' + i + '" style="display: none">' +
+                                          '                                    <a id="drWarning_' + i + '" href="#drPartitionWarning" class="drWarning">' +
+                                          '                                        <span style="margin:0 0 0 24px">Warning</span>' +
+                                          '                                    </a>' +
+                                          '                                </li>' +
+                                          '                            </ul>' +
+                                          '                            <div class="clear"></div>' +
+                                          '                        </div>' +
+                                          '                        <div class="clear"></div>' +
+                                          '                    </div>' +
+                                          '                    <div id="drSection_' + i + '" class="drShowHide" style="display:none;">' +
+                                          '                        <div id="drMasterSection_' + i + '" class="masterWrapper" style="display:block;">' +
+                                          '                            <div id="tblMAster_wrapper_' + i + '" class="dataTables_wrapper no-footer">' +
+                                          '                                <div class="tabs-filter-wrapperDR">' +
+                                          '                                    <div class="drTitle icon-master" id="drMasterTitle_' + i + '">Master</div>' +
+                                          '                                    <div class="filter">' +
+                                          '                                        <input name="filter" id="filterPartitionId_' + i + '" type="text" class="search-box" onBlur="" placeholder="Search Partition ID"><a id="searchDrMasterData" href="javascript:void(0)" class="icon-search drIcon" title="Search">search</a>' +
+                                          '                                    </div>' +
+                                          '                                    <div class="clear"></div>' +
+                                          '                                </div>' +
+                                          '                                <div class="clear"></div>' +
+                                          '                                <div class="dataTables_paginate paging_extStyleLF paginationDefault" id="tblDrMAster_paginate_'+ i +'">' +
+                                          '                                    <span class="paginate_disabled_previous paginate_button" title="Previous Page">Prev</span>' +
+                                          '                                    <div class="navigationLabel">Page <span class="pageIndex"> 0 </span> of <span class="totalPages">0</span></div>' +
+                                          '                                    <span class="paginate_enabled_next paginate_button" title="Next Page">Next</span>' +
+                                          '                                </div>' +
+                                          '                                <div class="drMasterContainer">' +
+                                          '                                    <table width="100%" border="0" cellspacing="0" id="tblDrMAster_' + i + '" cellpadding="0" class="storeTbl drTbl no-footer dataTable" aria-describedby="tblDrMAster_info" role="grid">' +
+                                          '                                        <thead>' +
+                                          '                                            <tr role="row">' +
+                                          '                                                <th id="Th1" width="25%" data-name="none" class="" tabindex="0" aria-controls="tblDrMAster" rowspan="1" colspan="1" aria-sort="ascending" aria-label="Partition ID: activate to sort column descending">Partition ID</th>' +
+                                          '                                                <th id="Th2" width="20%" data-name="none" class="sorting" tabindex="0" aria-controls="tblDrMAster" rowspan="1" colspan="1" aria-label="Status: activate to sort column ascending">Status</th>' +
+                                          '                                                <th id="Th3" width="10%" data-name="none" class="sorting" tabindex="0" aria-controls="tblDrMAster" rowspan="1" colspan="1" aria-label="Total Buffer: activate to sort column ascending">Total Buffer</th>' +
+                                          '                                                <th id="Th4" width="10%" data-name="none" class="sorting" tabindex="0" aria-controls="tblDrMAster" rowspan="1" colspan="1" aria-label="Buffer on disk: activate to sort column ascending">Buffer on disk</th>' +
+                                          '                                                <th id="Th5" width="15%" data-name="none" class="sorting" tabindex="0" aria-controls="tblDrMAster" rowspan="1" colspan="1" aria-label="Replica Latency (ms): activate to sort column ascending">Replica Latency (ms)</th>' +
+                                          '                                                <th id="Th6" width="20%" data-name="none" class="sorting" tabindex="0" aria-controls="tblDrMAster" rowspan="1" colspan="1" aria-label="Replica latency (in transactions): activate to sort column ascending">Replica latency (in transactions)</th>' +
+                                          '                                            </tr>' +
+                                          '                                        </thead>' +
+                                          '                                        <tbody><tr><td colspan="6"> No data to be displayed</td></tr></tbody>' +
+                                          '                                    </table>' +
+                                          '                                </div>' +
+                                          '                            </div>' +
+                                          '                        </div>' +
+                                          '                        <div id="drReplicaSection_' + i + '" class="replicaWrapper" style="display:block">' +
+                                          '                            <div id="tblReplica_wrapper_' + i +'" class="dataTables_wrapper no-footer">' +
+                                          '                                <div class="tabs-filter-wrapperDR">' +
+                                          '                                    <div class="drTitle icon-replica" id="drReplicaTitle_' + i + '">Replica</div>' +
+                                          '                                    <div class="filter">' +
+                                          '                                        <input name="filter" id="filterHostID_' + i + '" type="text" class="search-box" onBlur="" placeholder="Search Server"><a id="searchDrMasterData" href="javascript:void(0)" class="icon-search drIcon" title="Search">search</a>' +
+                                          '                                    </div>' +
+                                          '                                    <div class="clear"></div>' +
+                                          '                                </div>' +
+                                          '                                <div class="clear"></div>' +
+                                          '                                <div class="dataTables_paginate paging_extStyleLF paginationDefault" id="tblDrReplica_paginate_' + i + '">' +
+                                          '                                    <span class="paginate_disabled_previous paginate_button" title="Previous Page">Prev</span>' +
+                                          '                                    <div class="navigationLabel">Page <span class="pageIndex"> 0 </span> of <span class="totalPages">0</span></div>' +
+                                          '                                    <span class="paginate_enabled_next paginate_button" title="Next Page">Next</span>' +
+                                          '                                </div>' +
+                                          '                                <div class="drReplicaContainer">' +
+                                          '                                    <table width="100%" border="0" cellspacing="0" id="tblDrReplica_' + i + '" cellpadding="0" class="storeTbl drTbl no-footer dataTable" aria-describedby="tblDrReplica_info" role="grid">' +
+                                          '                                        <thead>' +
+                                          '                                            <tr>' +
+                                          '                                                <th id="Th7" width="25%" data-name="none">Server</th>' +
+                                          '                                                <th id="Th8" width="25%" data-name="none">Status</th>' +
+                                          '                                                <th id="Th9" width="25%" data-name="none">Replication rate (last 1 minute)</th>' +
+                                          '                                                <th id="Th10" width="25%" data-name="none">Replication rate (last 5 minutes)</th>' +
+                                          '                                            </tr>' +
+                                          '                                        </thead>' +
+                                          '                                        <tbody><tr><td colspan="6"> No data to be displayed</td></tr></tbody>' +
+                                          '                                    </table>' +
+                                          '                                </div>' +
+                                          '                            </div>' +
+                                          '                        </div>' +
+                                          '                    </div>' +
+                                          '                </div>' +
+                                          '            </div>' +
+                                          '        </div>' +
+                                          '    </div>' +
+                                          '</div>';
+
+
+                        $("#dr").append(htmlContent + htmlGraph)
+
+                        $("#drPending_" + i).html('');
+                        if(drRoleDetail['DRROLE'][i - 1][1] == "PENDING"){
+                            $("#drPending_" + i).html("( No active connection )")
+                            $("#drPending_" + i).show();
+                            $("#drRelation_" + i).hide();
+                        }else{
+                            $("#drRelation_" + i).show();
+                            $("#drPending_" + i).hide();
+                        }
+
+                        $("#dbPane_2 div.menu_head").click(function () {
+                            var headerState = $("#dbPane_2 div.menu_body").css('display');
+                            if (headerState == 'none') {
+                                $(this).removeClass('collapsedDR');
+                                $(this).addClass('expandedDR');
+                            } else {
+                                $(this).removeClass('expandedDR');
+                                $(this).addClass('collapsedDR');
                             }
-                            $("#dbPane_"+ i).parent().remove();
-
-                            if(drRoleDetail['DRROLE'][i - 1][0] == "XDCR"){
-                                displayArrow = "arrowDouble";
-                            }
-                            else{
-                                displayArrow = "arrowSingle";
-                            }
-
-                            var htmlContent = '<div class="containerMain1" id="containerMain_'+ i + '">' +
-                                              '    <div id="dbPane_' + i + '" class="menu_list dbPane">' +
-                                              '        <!--Code for menu starts here-->' +
-                                              '        <div class="menu_head drHead '+ showClass +'">' +
-                                              '            <span class="iconDRDatabase"></span>' +
-                                              '            <h1 class="headText1 DRHeaderWrap">' +
-                                              '                <a href="#" id="showHideGraphBlock_' + i + '" class="showhideIcon arrowAdjustDR">' +
-                                              '                    <span class="DRHeaderName" id="dRHeaderName_' + i + '">Database ('+ producerDbId +')</span>' +
-                                              '<span class="DRHeaderName drPending" id="drPending_'+ i +'"></span>' +
-                                              '                </a>' +
-                                              '            </h1>' +
-                                              '<div class="drRelation" id="drRelation_'+ i +'"><div class="drRelationLeft"><span class="'+ displayArrow +'">' +
-                                               '<p>'+drRoleDetail['DRROLE'][i - 1][0]+'</p></span></div>' +
-                                              '<div class="drRelationRight"><span class="iconDRDatabase"></span><div class="headText1 DRHeaderWrap">' +
-                                              '<a href="#" class="showhideIcon expandedDR arrowAdjustDR">' +
-                                              '<span class="DRHeaderName" id="dRHeaderName_' + i + '">Database ('+ drRoleDetail['DRROLE'][i - 1][2] +')</span>' +
-                                              '</a></div>  <div class="latencyDR"><p>Latency '+ max(replicaLatency) +' sec</p></div></div><div class="clear"></div></div>' +
-                                              '            <div class="clear"></div>' +
-                                              '        </div>'
-
-
-                            var htmlGraph =   '        <div class="menu_body drBody" style="'+ displayCss +'">' +
-
-                                              '            <div class="DRContantWrap">' +
-                                              '<h1>No Data Available</h1>' +
-    //                                          '                <div id="mainGraphBlock' + i + '">' +
-    //                                          '                    <div class="errorMsgLocalStorageFull" style="display:none">' +
-    //                                          '                        <div class="errorMsgLocalWrapper">' +
-    //                                          '                            <img src="css/resources/images/alert.png" alt="Alert"/>' +
-    //                                          '                        </div>' +
-    //                                          '                        <div class="textMsgLocalWrapper">' +
-    //                                          '                            <p>Local storage is full. Please delete some saved queries from SQL Query tab or minimize the retained time interval using the above sliding window.</p>' +
-    //                                          '                        </div>' +
-    //                                          '                        <div class="clear"></div>' +
-    //                                          '                    </div>' +
-    //                                          '                    <div class="graphChart" id="graphChart_' + i + '">' +
-    //                                          '<h1>No Data Available</h1>' +
-    ////                                          '                        <div id="ChartDrReplicationRate_' + i + '" class="chart chartDR" style="display: block">' +
-    ////                                          '                            <div class="chartHeader">' +
-    ////                                          '                                <h1>Database Replication (DR)' +
-    ////                                          '                                    <a href="#" class="downloadBtnChart" onclick=' +
-    ////                                          '                                         downloadCSV(event, { filename: "DrReplication-data" }, "dataReplication");' +
-    ////                                          '                                     > <img class="downloadCls" src="css/resources/images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>' +
-    ////                                          '                                    <div class="clear"></div>' +
-    ////                                          '                                </h1>' +
-    ////                                          '                            </div>' +
-    ////                                          '                            <svg id="visualizationDrReplicationRate_' + i + '" width="100%" height="400"></svg>' +
-    //                                          '                        </div>' +
-                                              '                    </div>' +
-                                              '                </div>'
-
-
-                            var htmlDrTable = '                <div class="drWrapper" id="divDrReplication' + i + '" style="display:block">' +
-                                              '                    <div class="content drHeader" id="drHeader'+ i + '">' +
-                                              '                        <div class="leftShowhide">' +
-                                              '                            <div class="dr">' +
-                                              '                                <h1 class="headText1">' +
-                                              '                                    <a href="javascript:void(0);" id="showHideDrBlock_' + i + '" class="showhideIcon collapsed arrowAdjust">Show/Hide Database Replication (DR)</a>' +
-                                              '                                </h1>' +
-                                              '                            </div>' +
-                                              '                        </div>' +
-                                              '                        <div class="rightShowhide">' +
-                                              '                            <ul class="drList">' +
-                                              '                                <li>Mode</li>' +
-                                              '                                <li id="dbDrMode_' + i + '" class="drArrow">Master</li>' +
-                                              '                            </ul>' +
-                                              '                            <ul class="drList">' +
-                                              '                                <li class="alertIcon warningDr" id="drAlertWarning_' + i + '" style="display: none">' +
-                                              '                                    <a id="drWarning_' + i + '" href="#drPartitionWarning" class="drWarning">' +
-                                              '                                        <span style="margin:0 0 0 24px">Warning</span>' +
-                                              '                                    </a>' +
-                                              '                                </li>' +
-                                              '                            </ul>' +
-                                              '                            <div class="clear"></div>' +
-                                              '                        </div>' +
-                                              '                        <div class="clear"></div>' +
-                                              '                    </div>' +
-                                              '                    <div id="drSection_' + i + '" class="drShowHide" style="display:none;">' +
-                                              '                        <div id="drMasterSection_' + i + '" class="masterWrapper" style="display:block;">' +
-                                              '                            <div id="tblMAster_wrapper_' + i + '" class="dataTables_wrapper no-footer">' +
-                                              '                                <div class="tabs-filter-wrapperDR">' +
-                                              '                                    <div class="drTitle icon-master" id="drMasterTitle_' + i + '">Master</div>' +
-                                              '                                    <div class="filter">' +
-                                              '                                        <input name="filter" id="filterPartitionId_' + i + '" type="text" class="search-box" onBlur="" placeholder="Search Partition ID"><a id="searchDrMasterData" href="javascript:void(0)" class="icon-search drIcon" title="Search">search</a>' +
-                                              '                                    </div>' +
-                                              '                                    <div class="clear"></div>' +
-                                              '                                </div>' +
-                                              '                                <div class="clear"></div>' +
-                                              '                                <div class="dataTables_paginate paging_extStyleLF paginationDefault" id="tblDrMAster_paginate_'+ i +'">' +
-                                              '                                    <span class="paginate_disabled_previous paginate_button" title="Previous Page">Prev</span>' +
-                                              '                                    <div class="navigationLabel">Page <span class="pageIndex"> 0 </span> of <span class="totalPages">0</span></div>' +
-                                              '                                    <span class="paginate_enabled_next paginate_button" title="Next Page">Next</span>' +
-                                              '                                </div>' +
-                                              '                                <div class="drMasterContainer">' +
-                                              '                                    <table width="100%" border="0" cellspacing="0" id="tblDrMAster_' + i + '" cellpadding="0" class="storeTbl drTbl no-footer dataTable" aria-describedby="tblDrMAster_info" role="grid">' +
-                                              '                                        <thead>' +
-                                              '                                            <tr role="row">' +
-                                              '                                                <th id="Th1" width="25%" data-name="none" class="" tabindex="0" aria-controls="tblDrMAster" rowspan="1" colspan="1" aria-sort="ascending" aria-label="Partition ID: activate to sort column descending">Partition ID</th>' +
-                                              '                                                <th id="Th2" width="20%" data-name="none" class="sorting" tabindex="0" aria-controls="tblDrMAster" rowspan="1" colspan="1" aria-label="Status: activate to sort column ascending">Status</th>' +
-                                              '                                                <th id="Th3" width="10%" data-name="none" class="sorting" tabindex="0" aria-controls="tblDrMAster" rowspan="1" colspan="1" aria-label="Total Buffer: activate to sort column ascending">Total Buffer</th>' +
-                                              '                                                <th id="Th4" width="10%" data-name="none" class="sorting" tabindex="0" aria-controls="tblDrMAster" rowspan="1" colspan="1" aria-label="Buffer on disk: activate to sort column ascending">Buffer on disk</th>' +
-                                              '                                                <th id="Th5" width="15%" data-name="none" class="sorting" tabindex="0" aria-controls="tblDrMAster" rowspan="1" colspan="1" aria-label="Replica Latency (ms): activate to sort column ascending">Replica Latency (ms)</th>' +
-                                              '                                                <th id="Th6" width="20%" data-name="none" class="sorting" tabindex="0" aria-controls="tblDrMAster" rowspan="1" colspan="1" aria-label="Replica latency (in transactions): activate to sort column ascending">Replica latency (in transactions)</th>' +
-                                              '                                            </tr>' +
-                                              '                                        </thead>' +
-                                              '                                        <tbody><tr><td colspan="6"> No data to be displayed</td></tr></tbody>' +
-                                              '                                    </table>' +
-                                              '                                </div>' +
-                                              '                            </div>' +
-                                              '                        </div>' +
-                                              '                        <div id="drReplicaSection_' + i + '" class="replicaWrapper" style="display:block">' +
-                                              '                            <div id="tblReplica_wrapper_' + i +'" class="dataTables_wrapper no-footer">' +
-                                              '                                <div class="tabs-filter-wrapperDR">' +
-                                              '                                    <div class="drTitle icon-replica" id="drReplicaTitle_' + i + '">Replica</div>' +
-                                              '                                    <div class="filter">' +
-                                              '                                        <input name="filter" id="filterHostID_' + i + '" type="text" class="search-box" onBlur="" placeholder="Search Server"><a id="searchDrMasterData" href="javascript:void(0)" class="icon-search drIcon" title="Search">search</a>' +
-                                              '                                    </div>' +
-                                              '                                    <div class="clear"></div>' +
-                                              '                                </div>' +
-                                              '                                <div class="clear"></div>' +
-                                              '                                <div class="dataTables_paginate paging_extStyleLF paginationDefault" id="tblDrReplica_paginate_' + i + '">' +
-                                              '                                    <span class="paginate_disabled_previous paginate_button" title="Previous Page">Prev</span>' +
-                                              '                                    <div class="navigationLabel">Page <span class="pageIndex"> 0 </span> of <span class="totalPages">0</span></div>' +
-                                              '                                    <span class="paginate_enabled_next paginate_button" title="Next Page">Next</span>' +
-                                              '                                </div>' +
-                                              '                                <div class="drReplicaContainer">' +
-                                              '                                    <table width="100%" border="0" cellspacing="0" id="tblDrReplica_' + i + '" cellpadding="0" class="storeTbl drTbl no-footer dataTable" aria-describedby="tblDrReplica_info" role="grid">' +
-                                              '                                        <thead>' +
-                                              '                                            <tr>' +
-                                              '                                                <th id="Th7" width="25%" data-name="none">Server</th>' +
-                                              '                                                <th id="Th8" width="25%" data-name="none">Status</th>' +
-                                              '                                                <th id="Th9" width="25%" data-name="none">Replication rate (last 1 minute)</th>' +
-                                              '                                                <th id="Th10" width="25%" data-name="none">Replication rate (last 5 minutes)</th>' +
-                                              '                                            </tr>' +
-                                              '                                        </thead>' +
-                                              '                                        <tbody><tr><td colspan="6"> No data to be displayed</td></tr></tbody>' +
-                                              '                                    </table>' +
-                                              '                                </div>' +
-                                              '                            </div>' +
-                                              '                        </div>' +
-                                              '                    </div>' +
-                                              '                </div>' +
-                                              '            </div>' +
-                                              '        </div>' +
-                                              '    </div>' +
-                                              '</div>';
-
-
-                            $("#dr").append(htmlContent + htmlGraph)
-
-                            $("#drPending_" + i).html('');
-                            if(drRoleDetail['DRROLE'][i - 1][1] == "PENDING"){
-                                $("#drPending_" + i).html("( No active connection )")
-                                $("#drPending_" + i).show();
-                                $("#drRelation_" + i).hide();
-                            }else{
-                                $("#drRelation_" + i).show();
-                                $("#drPending_" + i).hide();
-                            }
-
-                            $("#dbPane_2 div.menu_head").click(function () {
-                                var headerState = $("#dbPane_2 div.menu_body").css('display');
-                                if (headerState == 'none') {
-                                    $(this).removeClass('collapsedDR');
-                                    $(this).addClass('expandedDR');
-                                } else {
-                                    $(this).removeClass('expandedDR');
-                                    $(this).addClass('collapsedDR');
-                                }
-                                $(this).next("div.menu_body").slideToggle(300).siblings("div.menu_body").slideUp("slow");
-                            });
-                     }
-                  }
-            });
-            }
-        });
-
+                            $(this).next("div.menu_body").slideToggle(300).siblings("div.menu_body").slideUp("slow");
+                        });
+                 }
+              }
+        }
 
         voltDbRenderer.GetDeploymentInformation(function (deploymentDetails) {
                 if (deploymentDetails != undefined) {
