@@ -138,7 +138,7 @@ public class AsyncBenchmark {
         String password = "";
 
         @Option(desc = "Enable SSL, Optionally provide configuration file.")
-        String ssl = "";
+        String sslfile = "";
 
         @Option(desc = "Enable topology awareness")
         boolean topologyaware = false;
@@ -177,9 +177,18 @@ public class AsyncBenchmark {
     public AsyncBenchmark(VoterConfig config) {
         this.config = config;
 
-        ClientConfig clientConfig = new ClientConfig(config.user, config.password, new StatusListener(),
-                (config.ssl != null && config.ssl.length() > 0), config.ssl);
-        clientConfig.setMaxTransactionsPerSecond(config.ratelimit);
+        ClientConfig clientConfig = null;
+        if (config.sslfile.length() > 0) {
+            try {
+                clientConfig = new ClientConfig(config.user, config.password, new StatusListener(), true, config.sslfile);
+                clientConfig.enableSSL();
+            } catch (Exception e) {
+                System.err.println("Failed to configure ssl, exiting");
+                e.printStackTrace();
+                System.exit(-1);
+            }
+        } else
+            clientConfig = new ClientConfig(config.user, config.password, new StatusListener());
 
         if (config.topologyaware) {
             clientConfig.setTopologyChangeAware(true);

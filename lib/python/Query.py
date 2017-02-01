@@ -43,7 +43,7 @@ class VoltQueryClient(cmd.Cmd):
                         lambda x: datetime.fromtimestamp(x)}
 
     def __init__(self, host, port, username = "", password = "",
-                 dump_file = None, usessl=False, ssl_config_file=""):
+                 dump_file = None, client_ssl=False, ssl_config_file=""):
         cmd.Cmd.__init__(self)
 
         self.__quiet = False
@@ -51,12 +51,12 @@ class VoltQueryClient(cmd.Cmd):
         # self.__usessl = ssl
         # self.__ssl_config_file = ssl_config_file
 
-        self.__initialize(host, port, username, password, dump_file, usessl, ssl_config_file)
+        self.__initialize(host, port, username, password, dump_file, client_ssl, ssl_config_file)
 
-    def __initialize(self, host, port, username, password, dump_file, usessl, ssl_config_file):
+    def __initialize(self, host, port, username, password, dump_file, client_ssl, ssl_config_file):
         self.fs = FastSerializer(host=host, port=port,
                     username=username, password=password,
-                    dump_file_path=dump_file, usessl=usessl,
+                    dump_file_path=dump_file, client_ssl=client_ssl,
                     ssl_config_file=ssl_config_file)
 
         self.adhoc = VoltProcedure(self.fs, "@AdHoc",
