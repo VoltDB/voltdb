@@ -136,7 +136,6 @@ class FastSerializer:
         'keyfile': None,
         'certfile': None,
         'cert_reqs': ssl.CERT_NONE,
-        'ssl_version': ssl.PROTOCOL_TLSv1_2,
         'ca_certs': None,
         'do_handshake_on_connect': True
     }
@@ -328,11 +327,16 @@ class FastSerializer:
         # extract ssl_version
         if 'ssl_version' in jks_config and jks_config['ssl_version']:
             self.ssl_config['ca_certs'] = jks_config['ssl_version']
-
+        tlsv12 = None
+        try:
+            tlsv12 = ssl.PROTOCOL_TLSv1_2
+        except AttributeError, e:
+            raise RuntimeError("This version of python does not support TLSV1.2, upgrade to one that does")
+        
         return ssl.wrap_socket(ss, self.ssl_config['keyfile'],
                                self.ssl_config['certfile'], False,
                                cert_reqs=self.ssl_config['cert_reqs'],
-                               ssl_version=self.ssl_config['ssl_version'],
+                               ssl_version=tlsv12,
                                ca_certs=self.ssl_config['ca_certs'])
 
     def __compileStructs(self):
