@@ -1245,7 +1245,7 @@ var loadPage = function (serverName, portid) {
             }
         });
 
-        var getDrHtmlContent = function(i, showClass, producerDbId, displayArrow, drRoleDetail, replicaLatency, displayCss, combinedId){
+        var getDrHtmlContent = function(i, showClass, producerDbId, displayArrow, drRoleDetail, displayCss, combinedId){
             var htmlContent = '<div class="containerMain1" id="containerMain_'+ i + '">' +
                               '    <div id="dbPane_' + i + '" class="menu_list dbPane">' +
                               '        <!--Code for menu starts here-->' +
@@ -1262,7 +1262,7 @@ var loadPage = function (serverName, portid) {
                               '<div class="drRelationRight"><span class="iconDRDatabase"></span><div class="headText1 DRHeaderWrap">' +
                               '<a href="#" class="showhideIcon expandedDR arrowAdjustDR">' +
                               '<span class="DRHeaderName" id="dRHeaderName_' + i + '">Database ('+ drRoleDetail['DRROLE'][i][2] +')</span>' +
-                              '</a></div>  <div class="latencyDR"><p>Latency '+ max(replicaLatency) +' sec</p></div></div><div class="clear"></div></div>' +
+                              '</a></div>  <div class="latencyDR"></div></div><div class="clear"></div></div>' +
                               '            <div class="clear"></div>' +
                               '        </div>'
 
@@ -1456,7 +1456,7 @@ var loadPage = function (serverName, portid) {
                     replicaLatency = [];
                     for (var key in response) {
                         for (var j = 0; j <= response[key].length - 1; j++) {
-                            if(response[key][j].CONSUMERCLUSTERID == consumerDbId){
+                            if(response[key][i].LASTQUEUEDTIMESTAMP != undefined){
                                 replicaLatency.push((response[key][j].LASTQUEUEDTIMESTAMP - response[key][j].LASTACKTIMESTAMP) / 1000000);
                             }
                         }
@@ -1471,15 +1471,29 @@ var loadPage = function (serverName, portid) {
                     }
                     $("#dbPane_"+ i).parent().remove();
 
-                    if(drRoleDetail['DRROLE'][i][0] == "XDCR"){
+                    var role = drRoleDetail['DRROLE'][i][0];
+                    if(role == "XDCR"){
                         displayArrow = "arrowDouble";
-                    } else {
+                    }
+                    else if (role == "MASTER"){
                         displayArrow = "arrowSingle";
                     }
+                    else if (role == "REPLICA"){
+                        displayArrow = "arrowSingleLeft";
+                    }
 
-                    var htmlContent = getDrHtmlContent(i, showClass, producerDbId, displayArrow, drRoleDetail, replicaLatency, displayCss, combinedId);
+                    var htmlContent = getDrHtmlContent(i, showClass, producerDbId, displayArrow, drRoleDetail, displayCss, combinedId);
 
-                    $("#dr").append(htmlContent)
+                    $("#dr").append(htmlContent);
+
+                    $('.latencyDR').html('');
+                    if(replicaLatency.length != 0){
+                        $('.latencyDR').html("<p>Latency <span id='latencyDR'>" + max(replicaLatency) + " </span> sec</p>")
+                    }
+                    else{
+                        $('.latencyDR').html('');
+                    }
+
                     VoltDbUI.drChartList.push(combinedId)
                     $("#drPending_" + i).html('');
                     if(drRoleDetail['DRROLE'][i][1] == "PENDING"){
