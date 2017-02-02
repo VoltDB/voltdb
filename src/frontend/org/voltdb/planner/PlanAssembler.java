@@ -717,35 +717,37 @@ public class PlanAssembler {
         }
 
         m_bestAndOnlyPlanWasGenerated = true;
+        CompiledPlan retval = new CompiledPlan();
+
         // Simply return a setop plan node with a corresponding type set
         AbstractPlanNode rootNode = m_subAssembler.nextPlan();
         if (rootNode != null) {
             // reset the partitioning from the common partitioning for all setop children
             m_partitioning = ((SetOpSubPlanAssembler)m_subAssembler).getSetOpPartitioning();
             assert(m_partitioning != null);
+
+            // order by
+            if (m_parsedSetop.hasOrderByColumns()) {
+                rootNode = handleOrderBy(m_parsedSetop, rootNode);
+            }
+
+            // limit/offset
+            if (m_parsedSetop.hasLimitOrOffset()) {
+                rootNode = handleSetopLimitOperator(rootNode);
+            }
+            retval.rootPlanGraph = rootNode;
+            retval.setReadOnly(true);
+            retval.sql = m_planSelector.m_sql;
+            boolean orderIsDeterministic = m_parsedSetop.isOrderDeterministic();
+            boolean hasLimitOrOffset = m_parsedSetop.hasLimitOrOffset();
+            String isContentDeterministic = ((SetOpSubPlanAssembler)m_subAssembler).getIsContentDeterministic();
+            retval.statementGuaranteesDeterminism(hasLimitOrOffset, orderIsDeterministic, isContentDeterministic);
+
         } else {
             // Failed to produce a valid Set Op plan
             m_recentErrorMsg = m_subAssembler.m_recentErrorMsg;
+            retval.rootPlanGraph = null;
         }
-
-        // order by
-        if (m_parsedSetop.hasOrderByColumns()) {
-            rootNode = handleOrderBy(m_parsedSetop, rootNode);
-        }
-
-        // limit/offset
-        if (m_parsedSetop.hasLimitOrOffset()) {
-            rootNode = handleSetopLimitOperator(rootNode);
-        }
-
-        CompiledPlan retval = new CompiledPlan();
-        retval.rootPlanGraph = rootNode;
-        retval.setReadOnly(true);
-        retval.sql = m_planSelector.m_sql;
-        boolean orderIsDeterministic = m_parsedSetop.isOrderDeterministic();
-        boolean hasLimitOrOffset = m_parsedSetop.hasLimitOrOffset();
-        String isContentDeterministic = ((SetOpSubPlanAssembler)m_subAssembler).getIsContentDeterministic();
-        retval.statementGuaranteesDeterminism(hasLimitOrOffset, orderIsDeterministic, isContentDeterministic);
         return retval;
     }
 
