@@ -1,7 +1,7 @@
 IMPORT CLASS genqa2.procedures.SampleRecord;
 
 -- Export Table for Partitioned Data Table deletions
-CREATE STREAM export_partitioned_table2 PARTITION ON COLUMN rowid
+CREATE STREAM export_partitioned_table2 PARTITION ON COLUMN rowid export to target default
 (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
@@ -56,13 +56,13 @@ CREATE TABLE export_mirror_partitioned_table2
 );
 PARTITION TABLE export_mirror_partitioned_table2 ON COLUMN rowid;
 
-CREATE STREAM export_skinny_partitioned_table2 PARTITION ON COLUMN rowid
+CREATE STREAM export_skinny_partitioned_table2 PARTITION ON COLUMN rowid export to target default
 (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
 );
 
-CREATE STREAM export_done_table PARTITION ON COLUMN txnid
+CREATE STREAM export_done_table PARTITION ON COLUMN txnid export to target default
 (
   txnid                     BIGINT        NOT NULL
 );
