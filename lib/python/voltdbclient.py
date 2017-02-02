@@ -332,7 +332,7 @@ class FastSerializer:
             tlsv12 = ssl.PROTOCOL_TLSv1_2
         except AttributeError, e:
             raise RuntimeError("This version of python does not support TLSV1.2, upgrade to one that does")
-        
+
         return ssl.wrap_socket(ss, self.ssl_config['keyfile'],
                                self.ssl_config['certfile'], False,
                                cert_reqs=self.ssl_config['cert_reqs'],
