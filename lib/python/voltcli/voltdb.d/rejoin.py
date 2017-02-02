@@ -23,7 +23,8 @@
                                 supports_daemon=True,
                                 supports_multiple_daemons=True,
                                 check_environment_config=True),
-    description = 'Rejoin the current node to a VoltDB cluster.'
+    description = 'WARNING: The rejoin is deprecated. Please use INIT and START. Rejoin the current node to a VoltDB cluster.',
+    hideverb=True
 )
 def rejoin(runner):
     runner.go()
