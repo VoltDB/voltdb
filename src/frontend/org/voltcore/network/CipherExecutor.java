@@ -108,7 +108,8 @@ public enum CipherExecutor {
     public void shutdown() {
         if (m_active.compareAndSet(true, false)) {
             ListeningExecutorService es = m_es.get();
-            if (m_es.compareAndSet(es, CoreUtils.LISTENINGSAMETHREADEXECUTOR)) {
+            if (es != CoreUtils.LISTENINGSAMETHREADEXECUTOR
+                && m_es.compareAndSet(es, CoreUtils.LISTENINGSAMETHREADEXECUTOR)) {
                 try {
                     Thread.sleep(1);
                     es.shutdown();
