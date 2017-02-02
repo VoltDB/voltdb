@@ -719,8 +719,14 @@ public class PlanAssembler {
         m_bestAndOnlyPlanWasGenerated = true;
         // Simply return a setop plan node with a corresponding type set
         AbstractPlanNode rootNode = m_subAssembler.nextPlan();
-        // reset the partitioning from the common partitioning for all setop children
-        m_partitioning = ((SetOpSubPlanAssembler)m_subAssembler).getSetOpPartitioning();
+        if (rootNode != null) {
+            // reset the partitioning from the common partitioning for all setop children
+            m_partitioning = ((SetOpSubPlanAssembler)m_subAssembler).getSetOpPartitioning();
+            assert(m_partitioning != null);
+        } else {
+            // Failed to produce a valid Set Op plan
+            m_recentErrorMsg = m_subAssembler.m_recentErrorMsg;
+        }
 
         // order by
         if (m_parsedSetop.hasOrderByColumns()) {
