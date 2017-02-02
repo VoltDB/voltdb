@@ -233,10 +233,7 @@
             "color": "rgb(27, 135, 200)"
         }];
 
-        //pm
         var dataDrReplication = {}
-
-
 
         var dataCommandLog = [{
             "key": "Command Log Statistics",
@@ -410,37 +407,6 @@
             callback: function () {
                 ChartPartitionIdleTime.useInteractiveGuideline(true);
                 return ChartPartitionIdleTime;
-            }
-        });
-
-        nv.addGraph({
-            generate:function() {
-                ChartDrReplicationRate.xAxis
-                    .tickFormat(function (d) {
-                       return d3.time.format('%X')(new Date(d));
-                    });
-
-                ChartDrReplicationRate.xAxis.rotateLabels(-20);
-
-                ChartDrReplicationRate.yAxis
-                    .tickFormat(d3.format(',.2f'));
-
-                ChartDrReplicationRate.yAxis
-                    .axisLabel('(KBps)')
-                    .axisLabelDistance(10);
-
-                ChartDrReplicationRate.margin({ left: 100 });
-                ChartDrReplicationRate.lines.forceY([0, 1]);
-                d3.select('#visualizationDrReplicationRate_1')
-                    .datum(dataDrReplicationRate)
-                    .transition().duration(500)
-                    .call(ChartDrReplicationRate);
-
-                nv.utils.windowResize(ChartDrReplicationRate.update);
-            },
-            callback: function() {
-                ChartDrReplicationRate.useInteractiveGuideline(true);
-                return ChartDrReplicationRate;
             }
         });
 
@@ -722,16 +688,11 @@
                 'partitionDataDay': getEmptyDataForPartitionForDay(),
                 'partitionFirstData': true,
                 'partitionMaxTimeStamp':null,
-                'drReplicationData': getEmptyDataOptimized(),
-                'drReplicationDataMin': getEmptyDataForMinutesOptimized(),
-                'drReplicationDataDay': getEmptyDataForDaysOptimized(),
-                'drMaxTimeStamp': null,
                 'cmdLogData': getEmptyDataOptimized(),
                 'cmdLogDataMin': getEmptyDataForMinutesOptimized(),
                 'cmdLogDataDay': getEmptyDataForDaysOptimized(),
                 'cmdLogFirstData': true,
                 'cmdLogMaxTimeStamp': null,
-                'drFirstData': true,
                 'lastTimedTransactionCount': -1,
                 'lastTimerTick': -1
             };
@@ -741,12 +702,10 @@
             dataLatency[0]["values"] = getEmptyDataForView(view);
             dataTransactions[0]["values"] = getEmptyDataForView(view);
             dataPartitionIdleTime = getEmptyDataForPartitionView(view);
-            dataDrReplicationRate[0]["values"] = getEmptyDataForView(view);
             dataCommandLog[0]["values"] = getEmptyDataForView(view);
             changeAxisTimeFormat(view);
         };
 
-        //pm
         this.InitializeDrData = function(){
             var chartList = VoltDbUI.drChartList;
             if(chartList != undefined && chartList.length > 0){
@@ -762,7 +721,6 @@
             }
         }
 
-        //pm
         this.AddDrGraph = function(view){
             currentViewDr = view;
             var chartList = VoltDbUI.drChartList;
@@ -790,7 +748,6 @@
                 dataRam[0]["values"] = Monitors.memDataDay;
                 dataLatency[0]["values"] = Monitors.latDataDay;
                 dataPartitionIdleTime = Monitors.partitionDataDay;
-                dataDrReplicationRate[0]["values"] = Monitors.drReplicationDataDay;
                 dataCommandLog[0]["values"] = Monitors.cmdLogDataDay;
             } else if (view == 'Minutes') {
                 dataCpu[0]["values"] = Monitors.cpuDataMin;
@@ -798,7 +755,6 @@
                 dataRam[0]["values"] = Monitors.memDataMin;
                 dataLatency[0]["values"] = Monitors.latDataMin;
                 dataPartitionIdleTime = Monitors.partitionDataMin;
-                dataDrReplicationRate[0]["values"] = Monitors.drReplicationDataMin;
                 dataCommandLog[0]["values"] = Monitors.cmdLogDataMin;
             } else {
                 dataCpu[0]["values"] = Monitors.cpuData;
@@ -806,7 +762,6 @@
                 dataRam[0]["values"] = Monitors.memData;
                 dataLatency[0]["values"] = Monitors.latData;
                 dataPartitionIdleTime = Monitors.partitionData;
-                dataDrReplicationRate[0]["values"] = Monitors.drReplicationData;
                 dataCommandLog[0]["values"] = Monitors.cmdLogData;
             }
 
@@ -814,7 +769,6 @@
             changeAxisTimeFormat(view);
         };
 
-        //pm
         this.RefreshDrGraph = function (view) {
             currentViewDr = view;
             var chartList = VoltDbUI.drChartList;
@@ -849,14 +803,10 @@
             if (partitionChart.is(":visible"))
                 ChartPartitionIdleTime.update();
 
-            if (drReplicationChart.is(":visible"))
-                ChartDrReplicationRate.update();
-
             if (cmdLogChart.is(":visible"))
                 ChartCommandlog.update();
         };
 
-        //pm
         this.UpdateDrCharts = function () {
             var chartList = VoltDbUI.drChartList;
             if(chartList != undefined && chartList.length > 0 && !$.isEmptyObject(drReplicationCharts)){
@@ -939,10 +889,6 @@
                 .tickFormat(function (d) {
                     return d3.time.format(dateFormat)(new Date(d));
                 });
-            ChartDrReplicationRate.xAxis
-                .tickFormat(function (d) {
-                    return d3.time.format(dateFormat)(new Date(d));
-                });
             ChartCommandlog.xAxis
                 .tickFormat(function(d) {
                     return d3.time.format(dateFormat)(new Date(d));
@@ -950,7 +896,6 @@
 
         };
 
-        //pm
         var changeDrAxisTimeFormat = function (view) {
             var dateFormat = '%X';
             if (view == 'Days')
@@ -1997,7 +1942,7 @@
                         }
                         if (currentTab == NavigationTabs.DR && currentViewDr == graphView) {
                             d3.select("#visualizationDrReplicationRate_" + chartList[i])
-                                .datum(dataDrReplicationRate['dataDrReplication_' + chartList[i]])
+                                .datum(dataDrReplication['dataDrReplication_' + chartList[i]])
                                 .transition().duration(500)
                                 .call(drChartList["ChartDrReplicationRate_" + chartList[i]]);
                         }
