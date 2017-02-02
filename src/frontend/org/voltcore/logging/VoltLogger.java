@@ -331,21 +331,19 @@ public class VoltLogger {
      * @param classname The id of the logger.
      */
     public VoltLogger(String classname) {
-        boolean isClientApp = "true".equals(System.getProperty("voltdb_client_app"));
         CoreVoltLogger tempLogger = null;
         // try to load the Log4j logger without importing it
         // any exception thrown will just keep going
-        if (!isClientApp) {
-            try {
-                Class<?> loggerClz = Class.forName("org.voltcore.logging.VoltLog4jLogger");
-                assert(loggerClz != null);
+        try {
+            Class<?> loggerClz = Class.forName("org.voltcore.logging.VoltLog4jLogger");
+            assert(loggerClz != null);
 
-                Constructor<?> constructor = loggerClz.getConstructor(String.class);
-                tempLogger = (CoreVoltLogger) constructor.newInstance(classname);
-            }
-            catch (Exception e) {}
-            catch (LinkageError e) {}
+            Constructor<?> constructor = loggerClz.getConstructor(String.class);
+            tempLogger = (CoreVoltLogger) constructor.newInstance(classname);
         }
+        catch (Exception e) {}
+        catch (LinkageError e) {}
+
         // if unable to load Log4j, use java.util.logging
         if (tempLogger == null) {
             tempLogger = new VoltUtilLoggingLogger(classname);
