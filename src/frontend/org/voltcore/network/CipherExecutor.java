@@ -22,15 +22,19 @@ import java.nio.ByteBuffer;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.UUID;
+import java.util.concurrent.Callable;
 import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 import javax.net.ssl.SSLEngine;
 
 import org.voltcore.utils.CoreUtils;
 
+import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.MoreExecutors;
 
@@ -56,13 +60,13 @@ public enum CipherExecutor {
             (byte) 255 });
 
 
-    volatile ListeningExecutorService m_es = null;
+    final AtomicReference<ListeningExecutorService> m_es;
     AtomicBoolean m_active = new AtomicBoolean(false);
     final int m_threadCount;
 
     private CipherExecutor(int nthreads) {
         m_threadCount = nthreads;
-        m_es = null;
+        m_es = new AtomicReference<>(CoreUtils.LISTENINGSAMETHREADEXECUTOR);
     }
 
     private static final int getWishedThreadCount() {
@@ -76,44 +80,43 @@ public enum CipherExecutor {
         return Math.max(2, coreCount/2);
     }
 
-    public ListeningExecutorService getES() {
-        if (m_es == null) {
-            synchronized (this) {
-                if (!m_active.get()) {
-                    throw new IllegalStateException(name() + " cipher is not active");
-                }
-                if (m_es == null) {
-                    ThreadFactory thrdfct = CoreUtils.getThreadFactory(
-                            name () + " SSL cipher service", CoreUtils.MEDIUM_STACK_SIZE);
-                    m_es = MoreExecutors.listeningDecorator(
-                            Executors.newFixedThreadPool(m_threadCount, thrdfct));
-                }
-            }
+    public ListenableFuture<?> submit(Runnable r) {
+        try {
+            return m_es.get().submit(r);
+        } catch (RejectedExecutionException e) {
+            return CoreUtils.LISTENINGSAMETHREADEXECUTOR.submit(r);
         }
-        return m_es;
+    }
+
+    public <T> ListenableFuture<T> submit(Callable<T> c) {
+        try {
+            return m_es.get().submit(c);
+        } catch (RejectedExecutionException e) {
+            return CoreUtils.LISTENINGSAMETHREADEXECUTOR.submit(c);
+        }
     }
 
     public void startup() {
         if (m_active.compareAndSet(false, true)) {
-            getES();
+            ThreadFactory thrdfct = CoreUtils.getThreadFactory(
+                    name () + " SSL cipher service", CoreUtils.MEDIUM_STACK_SIZE);
+            m_es.compareAndSet(CoreUtils.LISTENINGSAMETHREADEXECUTOR, MoreExecutors.listeningDecorator(
+                    Executors.newFixedThreadPool(m_threadCount, thrdfct)));
         }
-    }
-
-    public boolean isActive() {
-        return m_active.get();
     }
 
     public void shutdown() {
         if (m_active.compareAndSet(true, false)) {
-            synchronized (this) {
-                m_es.shutdown();
+            ListeningExecutorService es = m_es.get();
+            if (m_es.compareAndSet(es, CoreUtils.LISTENINGSAMETHREADEXECUTOR)) {
                 try {
-                    m_es.awaitTermination(365, TimeUnit.DAYS);
+                    Thread.sleep(1);
+                    es.shutdown();
+                    es.awaitTermination(365, TimeUnit.DAYS);
                 } catch (InterruptedException e) {
                     throw new RuntimeException(
                             "Interruped while waiting for " + name() + " cipher service shutdown",e);
                 }
-                m_es = null;
             }
         }
     }

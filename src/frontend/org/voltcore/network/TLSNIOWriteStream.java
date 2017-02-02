@@ -26,7 +26,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 
 import javax.net.ssl.SSLEngine;
@@ -152,11 +151,6 @@ public class TLSNIOWriteStream extends NIOWriteStream {
                     acquired = m_inFlight.tryAcquire(1, TimeUnit.SECONDS);
                     if (acquired) {
                         m_inFlight.release();
-                    } else if (!m_ce.isActive()) {
-                        while (!m_ecryptgw.isEmpty()) {
-                            m_ecryptgw.run();
-                            checkForGatewayExceptions();
-                        }
                     }
                 } catch (InterruptedException e) {
                     throw new IOException("interrupted while waiting for pending encrypts", e);
@@ -356,25 +350,9 @@ public class TLSNIOWriteStream extends NIOWriteStream {
             ++m_offered;
             m_inFlight.reducePermits(chunks.size());
 
-            if (wasEmpty && m_ce.isActive()) {
-                try {
-                    ListenableFuture<?> fut = m_ce.getES().submit(this);
-                    fut.addListener(new ExceptionListener(fut), CoreUtils.SAMETHREADEXECUTOR);
-                } catch (RejectedExecutionException executorIsShuttingDown) {
-                    run();
-                    checkForGatewayExceptions();
-                }
-            } else if (wasEmpty && !m_ce.isActive()) {
-                while (!isEmpty()) {
-                    run();
-                    checkForGatewayExceptions();
-                }
+            if (wasEmpty) {
+                submitSelf();
             }
-        }
-
-        void runTaskSynchronously() throws IOException {
-            run();
-            checkForGatewayExceptions();
         }
 
         synchronized int die() {
@@ -446,15 +424,19 @@ public class TLSNIOWriteStream extends NIOWriteStream {
                     frame.bb.release();
                 }
                 m_inFlight.release();
-                if (m_q.peek() != null && !m_isShutdown && m_ce.isActive()) {
-                    ListenableFuture<?> fut = m_ce.getES().submit(this);
-                    fut.addListener(new ExceptionListener(fut), CoreUtils.SAMETHREADEXECUTOR);
+                if (m_q.peek() != null && !m_isShutdown) {
+                    submitSelf();
                 }
             }
         }
 
         boolean isEmpty() {
             return m_q.isEmpty();
+        }
+
+        void submitSelf() {
+            ListenableFuture<?> fut = m_ce.submit(this);
+            fut.addListener(new ExceptionListener(fut), CoreUtils.LISTENINGSAMETHREADEXECUTOR);
         }
     }
 

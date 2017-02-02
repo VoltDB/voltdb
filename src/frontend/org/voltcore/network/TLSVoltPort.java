@@ -24,7 +24,6 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -124,11 +123,6 @@ public class TLSVoltPort extends VoltPort  {
                     acquired = m_inFlight.tryAcquire(1, TimeUnit.SECONDS);
                     if (acquired) {
                         m_inFlight.release();
-                    } else if (!m_ce.isActive()) {
-                        while (!m_dcryptgw.isEmpty()) {
-                            m_dcryptgw.run();
-                            checkForGatewayExceptions();
-                        }
                     }
                 } catch (InterruptedException e) {
                     throw new IOException("interrupted while waiting for pending decrypts", e);
@@ -265,6 +259,7 @@ public class TLSVoltPort extends VoltPort  {
         } catch (IOException e) {
             networkLog.warn("unregistered port had an encryption task drain fault", e);
         }
+        m_dcryptgw.releaseDecryptedBuffer();
         super.unregistered();
     }
 
@@ -308,17 +303,8 @@ public class TLSVoltPort extends VoltPort  {
             }
             final boolean wasEmpty = m_q.isEmpty();
             m_q.offer(slice);
-            if (wasEmpty && m_ce.isActive()) {
-                try {
-                    ListenableFuture<?> fut = m_ce.getES().submit(this);
-                    fut.addListener(new ExceptionListener(fut), CoreUtils.SAMETHREADEXECUTOR);
-                } catch (RejectedExecutionException executorIsShuttingDown) {
-                    run();
-                    checkForGatewayExceptions();
-                }
-            } else if (wasEmpty && !m_ce.isActive()) {
-                run();
-                checkForGatewayExceptions();
+            if (wasEmpty) {
+                submitSelf();
             }
             m_inFlight.reducePermits(1);
         }
@@ -328,10 +314,7 @@ public class TLSVoltPort extends VoltPort  {
             while ((slice=m_q.poll()) != null) {
                 slice.markConsumed().discard();
             }
-            if (m_msgbb.refCnt() > 0) try {
-                m_msgbb.release();
-            } catch (IllegalReferenceCountException ignoreIt) {
-            }
+            releaseDecryptedBuffer();
         }
 
         synchronized boolean isEmpty() {
@@ -361,6 +344,13 @@ public class TLSVoltPort extends VoltPort  {
             return ioe;
         }
 
+        void releaseDecryptedBuffer() {
+            if (m_msgbb.refCnt() > 0) try {
+                m_msgbb.release();
+            } catch (IllegalReferenceCountException ignoreIt) {
+            }
+        }
+
         @Override
         public void run() {
             final NIOReadStream.Slice slice = m_q.peek();
@@ -371,6 +361,7 @@ public class TLSVoltPort extends VoltPort  {
             if (isDead()) synchronized(this) {
                 slice.markConsumed().discard();
                 m_q.poll();
+                releaseDecryptedBuffer();
                 return;
             }
 
@@ -400,43 +391,50 @@ public class TLSVoltPort extends VoltPort  {
 
             // src buffer is wholly consumed
             dest.writerIndex(destjbb.limit());
-            m_msgbb.addComponent(true, dest);
+            if (!isDead()) {
+                m_msgbb.addComponent(true, dest);
 
-            int read = 0;
-            while (m_msgbb.readableBytes() >= getNeededBytes()) {
-                if (m_needed == NOT_AVAILABLE) {
-                    m_needed = m_msgbb.readInt();
-                    IOException ioe = validateMessageLength(m_needed);
-                    if (ioe != null) {
-                        m_inFlight.release();
-                        m_exceptions.offer(new ExecutionException("failed message length check", ioe));
-                        networkLog.error("failed message length check", ioe);
-                        enableWriteSelection();
+                int read = 0;
+                while (m_msgbb.readableBytes() >= getNeededBytes()) {
+                    if (m_needed == NOT_AVAILABLE) {
+                        m_needed = m_msgbb.readInt();
+                        IOException ioe = validateMessageLength(m_needed);
+                        if (ioe != null) {
+                            m_inFlight.release(); m_msgbb.release();
+                            m_exceptions.offer(new ExecutionException("failed message length check", ioe));
+                            networkLog.error("failed message length check", ioe);
+                            enableWriteSelection();
+                        }
+                        continue;
                     }
-                    continue;
+                    ByteBuffer bb = ByteBuffer.allocate(m_needed);
+                    m_msgbb.readBytes(bb);
+                    m_msgbb.discardReadComponents();
+                    m_decrypted.offer((ByteBuffer)bb.flip());
+
+                    ++read;
+                    m_needed = NOT_AVAILABLE;
                 }
-                ByteBuffer bb = ByteBuffer.allocate(m_needed);
-                m_msgbb.readBytes(bb);
-                bb.flip();
-                if (!isDead()) {
-                    m_decrypted.offer(bb);
+                if (read > 0) {
+                    enableWriteSelection();
                 }
-                ++read;
-                m_needed = NOT_AVAILABLE;
-            }
-            if (read > 0) {
-                m_msgbb.discardReadComponents();
-                enableWriteSelection();
+            } else {
+                dest.release();
+                releaseDecryptedBuffer();
             }
             synchronized(this) {
                 m_q.poll();
                 slice.markConsumed().discard();
                 m_inFlight.release();
-                if (m_q.peek() != null && m_ce.isActive()) {
-                    ListenableFuture<?> fut = m_ce.getES().submit(this);
-                    fut.addListener(new ExceptionListener(fut), CoreUtils.SAMETHREADEXECUTOR);
+                if (m_q.peek() != null) {
+                    submitSelf();
                 }
             }
+        }
+
+        void submitSelf() {
+            ListenableFuture<?> fut = m_ce.submit(this);
+            fut.addListener(new ExceptionListener(fut), CoreUtils.LISTENINGSAMETHREADEXECUTOR);
         }
 
         private int getNeededBytes() {
