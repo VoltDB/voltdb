@@ -48,6 +48,7 @@ import org.voltdb.client.ClientAuthScheme;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientConfigForTest;
 import org.voltdb.client.ClientFactory;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ConnectionUtil;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
@@ -1202,6 +1203,20 @@ public class RegressionSuite extends TestCase {
         client.callProcedure("@AdHoc", "Truncate table " + tb);
         validateTableOfScalarLongs(client, "select count(*) from " + tb, new long[]{0});
     }
+
+    protected static void truncateAllTables(Client client) throws Exception {
+        ClientResponse cr;
+        cr = client.callProcedure("@SystemCatalog", "TABLES");
+        assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
+        VoltTable vt = cr.getResults()[0];
+        String allTables[] = new String[vt.getRowCount()];
+        int idx = 0;
+        while (vt.advanceRow()) {
+            allTables[idx++] = vt.getString("TABLE_NAME");
+        }
+        truncateTables(client, allTables);
+    }
+
 
     /**
      * A convenience method to build a Properties object initialized with an

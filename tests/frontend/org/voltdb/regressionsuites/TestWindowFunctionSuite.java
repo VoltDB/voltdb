@@ -185,8 +185,70 @@ public class TestWindowFunctionSuite extends RegressionSuite {
         client.callProcedure("tu.insert", 70, 3);
         client.callProcedure("tu.insert", 80, 2);
     }
+    private static final boolean IS_ENABLED = true;
+    private static final boolean ISNOT_ENABLED = false;
 
-    public void testRank_UNIQUE() throws NoConnectionsException, IOException, ProcCallException {
+    public void testAll() throws Exception {
+        Client client = getClient();
+        if (IS_ENABLED) {
+            truncateAllTables(client);
+            subtestRank_UNIQUE();
+        }
+        if (IS_ENABLED) {
+            truncateAllTables(client);
+            subtestRank_NON_UNIQUE();
+        }
+        if (IS_ENABLED) {
+            truncateAllTables(client);
+            subtestRankWithString();
+        }
+        if (IS_ENABLED) {
+            truncateAllTables(client);
+            subtestRankWithTimestamp();
+        }
+        if (IS_ENABLED) {
+            truncateAllTables(client);
+            subtestRankPartitionedTable();
+        }
+        if (IS_ENABLED) {
+            truncateAllTables(client);
+            subtestRank();
+        }
+        if (IS_ENABLED) {
+            truncateAllTables(client);
+            subtestRankMultPartitionBys();
+        }
+        if (IS_ENABLED) {
+            truncateAllTables(client);
+            subtestRankWithEmptyTable();
+        }
+        if (IS_ENABLED) {
+            truncateAllTables(client);
+            subtestRankOrderbyExpressions();
+        }
+        if (IS_ENABLED) {
+            truncateAllTables(client);
+            subtestSubqueryWindowFunctionExpressions();
+        }
+        if (IS_ENABLED) {
+            truncateAllTables(client);
+            subtestExplainPlan();
+        }
+        if (IS_ENABLED) {
+            truncateAllTables(client);
+            subtestEng10972();
+        }
+        if (IS_ENABLED) {
+            truncateAllTables(client);
+            subtestEng11029();
+        }
+        if (IS_ENABLED) {
+            truncateAllTables(client);
+            subtestCount();
+        }
+    }
+
+    private void subtestRank_UNIQUE() throws NoConnectionsException, IOException, ProcCallException {
         Client client = getClient();
         VoltTable vt = null;
 
@@ -215,7 +277,7 @@ public class TestWindowFunctionSuite extends RegressionSuite {
     //
     // NON-UNIQUE RANK SCAN TEST
     //
-    public void testRank_NON_UNIQUE() throws NoConnectionsException, IOException, ProcCallException {
+    private void subtestRank_NON_UNIQUE() throws NoConnectionsException, IOException, ProcCallException {
         Client client = getClient();
         VoltTable vt = null;
 
@@ -290,7 +352,7 @@ public class TestWindowFunctionSuite extends RegressionSuite {
     final int colR_AA       = 5;
     final int colR_dense    = 6;
 
-    public void testRankWithString() throws Exception {
+    private void subtestRankWithString() throws Exception {
         Client client = getClient();
 
         long input[][] = expected.clone();
@@ -331,7 +393,7 @@ public class TestWindowFunctionSuite extends RegressionSuite {
     }
 
 
-    public void testRankWithTimestamp() throws Exception {
+    private void subtestRankWithTimestamp() throws Exception {
         Client client = getClient();
 
         long baseTime = TimestampType.millisFromJDBCformat("1953-06-10 00:00:00");
@@ -357,7 +419,7 @@ public class TestWindowFunctionSuite extends RegressionSuite {
         }
     }
 
-    public void testRankPartitionedTable() throws Exception {
+    private void subtestRankPartitionedTable() throws Exception {
         Client client = getClient();
 
         long input[][] = expected.clone();
@@ -466,13 +528,13 @@ public class TestWindowFunctionSuite extends RegressionSuite {
         }
     }
 
-    public void testRank() throws Exception {
+    private void subtestRank() throws Exception {
         validateRankFunction("select A, B, C, dense_rank() over (partition by A order by B) as R from T ORDER BY A, B, C, R;",
                              colR_dense);
         validateRankFunction("select A, B, C, rank() over (partition by A order by B) as R from T ORDER BY A, B, C, R;",
                               colR_A);
     }
-    public void testRankMultPartitionBys() throws Exception {
+    private void subtestRankMultPartitionBys() throws Exception {
         Client client = getClient();
 
         long input[][] = expected.clone();
@@ -496,7 +558,7 @@ public class TestWindowFunctionSuite extends RegressionSuite {
         }
     }
 
-    public void testRankWithEmptyTable() throws Exception {
+    private void subtestRankWithEmptyTable() throws Exception {
         Client client = getClient();
 
         ClientResponse cr;
@@ -506,7 +568,7 @@ public class TestWindowFunctionSuite extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         // That's it.  If the EE does not crash we are happy.
     }
-    public void testRankOrderbyExpressions() throws Exception {
+    private void subtestRankOrderbyExpressions() throws Exception {
         Client client = getClient();
 
         long input[][] = expected.clone();
@@ -538,7 +600,7 @@ public class TestWindowFunctionSuite extends RegressionSuite {
      *
      * @throws Exception
      */
-    public void testSubqueryWindowFunctionExpressions() throws Exception {
+    private void subtestSubqueryWindowFunctionExpressions() throws Exception {
         Client client = getClient();
 
         client.callProcedure("P2.insert", 0, 2, null, -67);
@@ -585,7 +647,7 @@ public class TestWindowFunctionSuite extends RegressionSuite {
      * the same as the original plan.  We don't serialize sort orders
      * for windowed aggregates.
      */
-    public void testExplainPlan() throws Exception {
+    private void subtestExplainPlan() throws Exception {
         Client client = getClient();
         String sql = "select rank() over ( partition by A, B order by C ) from T;";
 
@@ -604,7 +666,7 @@ public class TestWindowFunctionSuite extends RegressionSuite {
         }
     }
 
-    public void testEng10972() throws Exception {
+    private void subtestEng10972() throws Exception {
         // reproducer for ENG-10972 and ENG-10973, found by sqlcoverage
         Client client = getClient();
         VoltTable vt;
@@ -631,7 +693,7 @@ public class TestWindowFunctionSuite extends RegressionSuite {
             {2.0, 1}}, vt);
     }
 
-    public void testEng11029() throws Exception {
+    private void subtestEng11029() throws Exception {
         // Regression test for ENG-11029
         Client client = getClient();
 
@@ -700,7 +762,7 @@ public class TestWindowFunctionSuite extends RegressionSuite {
         validateTableOfLongs(vt, expected);
     }
 
-    public void testCount() throws Exception {
+    private void subtestCount() throws Exception {
         Client client = getClient();
         initUniqueTable(client);
 
