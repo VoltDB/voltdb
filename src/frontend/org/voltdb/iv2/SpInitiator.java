@@ -83,10 +83,11 @@ public class SpInitiator extends BaseInitiator implements Promotable
             }
 
             //This was the leader but SPI has been migrated, so demote it.
-            if (m_scheduler.isLeader() && !leaders.contains(getInitiatorHSId())) {
+            if (m_scheduler.m_spiBalanceStatus == Scheduler.SpiBalanceStatus.REQUESTED
+                    && !leaders.contains(getInitiatorHSId())) {
                 m_scheduler.setLeaderState(false);
                 if (tmLog.isDebugEnabled()) {
-                    tmLog.debug("Site: " + CoreUtils.hsIdToString(getInitiatorHSId()) + " has been demoted.");
+                    tmLog.debug(CoreUtils.hsIdToString(getInitiatorHSId()) + " is not a leader anymore. It has been demoted!");
                 }
             }
         }
@@ -222,6 +223,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
             if (!m_isBalanceSPIRequested) {
                 ExportManager.instance().acceptMastership(m_partitionId);
             }
+            m_scheduler.m_spiBalanceStatus = Scheduler.SpiBalanceStatus.NONE;
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Terminally failed leader promotion.", true, e);
         }

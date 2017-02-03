@@ -321,13 +321,16 @@ public class InitiatorMailbox implements Mailbox
 
             // current master is notified to be demoted.
             if (m_hsId == msg.getFormerLeaderHSId()) {
+                if (tmLog.isDebugEnabled()) {
+                    tmLog.debug("SPI balance requested on this site!");
+                }
                 m_scheduler.m_spiBalanceStatus = Scheduler.SpiBalanceStatus.REQUESTED;
 
                 //mark it as not a leader. All the leader transactions will be resent to original senders
                 //start accepting replica transactions
-                m_scheduler.m_isLeader = false;
+               // m_scheduler.m_isLeader = false;
 
-                //notify new leader to accept the promotion and take responsibility.
+                //notify new leader to accept the promotion and take the leadership responsibility.
                 send(msg.getNewLeaderHSId(), message);
             }
 

@@ -175,7 +175,7 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
         msgsize += 8; // m_clientInterfaceHandle
         msgsize += 8; // m_connectionId
         msgsize += 1; // is single partition flag
-        msgsize += 1; // is FromClientInterface flag
+        msgsize += 1; // is isForReplica flag
         msgsize += 1; // should generate a response
         msgsize += m_invocation.getSerializedSize();
         return msgsize;

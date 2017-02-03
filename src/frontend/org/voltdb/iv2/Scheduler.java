@@ -150,7 +150,6 @@ abstract public class Scheduler implements InitiatorMessageHandler
     public void setLeaderState(boolean isLeader)
     {
         m_isLeader = isLeader;
-        m_spiBalanceStatus = SpiBalanceStatus.NONE;
     }
 
     public boolean isLeader() {

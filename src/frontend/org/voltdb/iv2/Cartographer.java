@@ -139,19 +139,20 @@ public class Cartographer extends StatsSource
             }
             // send the messages indicating promotion from here for each new master
             for (LeaderCallBackInfo newMasterInfo : newMasters) {
+                hostLog.info("[Cartographer]Master updates. new masters:" + newMasters.toString());
                 Long newMaster = newMasterInfo.m_HSID;
-                if (newMasterInfo.m_isBalanceSPIRequested) {
-                    Integer partitionId = hsIdToPart.get(newMaster);
-                    hostLog.info("SPI migration requested for partition:"  + partitionId + " to new hsid: " + newMaster);
-                } else {
-                    sendLeaderChangeNotify(newMaster, hsIdToPart.get(newMaster));
-                }
+                sendLeaderChangeNotify(newMaster, hsIdToPart.get(newMaster));
             }
 
             m_currentSPMasters.clear();
             for (LeaderCallBackInfo leader: cache.values()) {
                 m_currentSPMasters.add(leader.m_HSID);
             }
+            Set<String> masters = Sets.newHashSet();
+            m_currentSPMasters.forEach((k) -> {
+                masters.add(CoreUtils.hsIdToString(k));
+            });
+            hostLog.info("[Cartographer]Current masters:" + masters.toString());
         }
     };
 

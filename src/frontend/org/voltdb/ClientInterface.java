@@ -975,9 +975,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     int partition = InvocationDispatcher.getPartitionForProcedure(ppi.index,
                             ppi.type, response.getInvocation());
 
-                   if (tmLog.isDebugEnabled()){
-                       tmLog.debug("Restart transaction:" + response.getInvocation().toString());
-                   }
+                    //TO BE REMOVED
+                    System.out.println("Restart txn: " + response.getTxnId() + ". " + response.getInvocation().toString());
+
                     createTransaction(cihm.connection.connectionId(),
                             response.getInvocation(),
                             isReadonly,

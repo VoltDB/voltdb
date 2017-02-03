@@ -440,10 +440,12 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
         // mastership changed?
         if (m_spiBalanceStatus == SpiBalanceStatus.REQUESTED && !message.isForReplica()){
-            if (tmLog.isDebugEnabled()) {
-                tmLog.debug("mis-routed to: " + CoreUtils.hsIdToString(m_mailbox.getHSId()) +
-                        ". " + message.getStoredProcedureInvocation().toString());
-            }
+
+            //TO BE REMOVED
+           System.out.println("misrouted to: " + CoreUtils.hsIdToString(m_mailbox.getHSId()) +
+                        "txn:" + message.getTxnId() +
+                        " " + message.getStoredProcedureInvocation().toString());
+
             InitiateResponseMessage response = new InitiateResponseMessage(message);
             response.setMispartitioned(true, message.getStoredProcedureInvocation(),
                     TheHashinator.getCurrentVersionedConfig());
@@ -451,6 +453,11 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             m_mailbox.send(message.getInitiatorHSId(), response);
             return;
         }
+
+        //TO BE REMOVED
+        System.out.println("processing: " + CoreUtils.hsIdToString(m_mailbox.getHSId()) +
+                "txn:" + message.getTxnId() +
+                " " + message.getStoredProcedureInvocation().toString());
 
         //start SPI balance operation if so requested.
         initiateSPIMigrationProcess(message);
