@@ -409,13 +409,13 @@ public class TLSVoltPort extends VoltPort  {
                     }
                     ByteBuffer bb = ByteBuffer.allocate(m_needed);
                     m_msgbb.readBytes(bb);
-                    m_msgbb.discardReadComponents();
                     m_decrypted.offer((ByteBuffer)bb.flip());
 
                     ++read;
                     m_needed = NOT_AVAILABLE;
                 }
                 if (read > 0) {
+                    m_msgbb.discardReadComponents();
                     enableWriteSelection();
                 }
             } else {
