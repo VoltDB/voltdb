@@ -1435,16 +1435,19 @@ public abstract class SubPlanAssembler {
      * match.
      */
     class WindowFunctionScoreboard {
-        public WindowFunctionScoreboard(ParsedSelectStmt pss, StmtTableScan tableScan) {
-            m_numWinScores = (pss != null) ? pss.getWindowFunctionExpressions().size() : 0;
-            m_numOrderByScores = ((pss != null) && pss.hasOrderByColumns() ? 1 : 0);
+        public WindowFunctionScoreboard(AbstractParsedStmt stmt, StmtTableScan tableScan) {
+            m_numWinScores = stmt.getWindowFunctionExpressionCount();
+            m_numOrderByScores = stmt.hasOrderByColumns() ? 1 : 0;
             m_winFunctions = new WindowFunctionScore[m_numWinScores + m_numOrderByScores];
             for (int idx = 0; idx < m_numWinScores; idx += 1) {
+                // stmt has to be a ParsedSelectStmt if 0 < m_numWinScores.
+                // So this cast will be ok.
+                ParsedSelectStmt pss = (ParsedSelectStmt)stmt;
                 m_winFunctions[idx] = new WindowFunctionScore(pss.getWindowFunctionExpressions().get(idx),
                                                               idx);
             }
             if (m_numOrderByScores > 0) {
-                m_winFunctions[m_numWinScores] = new WindowFunctionScore(pss.orderByColumns());
+                m_winFunctions[m_numWinScores] = new WindowFunctionScore(stmt.orderByColumns());
             }
         }
 
@@ -1705,7 +1708,7 @@ public abstract class SubPlanAssembler {
         // We keep a scoreboard which keeps track of everything.  All the window
         // functions and statement level order by functions are kept in the scoreboard.
         //
-        WindowFunctionScoreboard windowFunctionScores = new WindowFunctionScoreboard(pss, tableScan);
+        WindowFunctionScoreboard windowFunctionScores = new WindowFunctionScoreboard(m_parsedStmt, tableScan);
         // indexCtr is an index into the index expressions or columns.
         for (int indexCtr = 0; !windowFunctionScores.isDone() && indexCtr < keyComponentCount; indexCtr += 1) {
             // Figure out what to do with index expression or column at indexCtr.

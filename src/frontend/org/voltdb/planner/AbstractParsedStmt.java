@@ -1975,6 +1975,13 @@ public abstract class AbstractParsedStmt {
         return null;
     }
 
+    /**
+     * Return the number of window function expressions.  This
+     * is non-zero for ParsedSelectStmt only.
+     */
+    public int getWindowFunctionExpressionCount() {
+        return 0;
+    }
     /*
      *  Extract all subexpressions of a given expression class from this statement
      */
