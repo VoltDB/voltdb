@@ -512,11 +512,17 @@ public class PlannerTestCase extends TestCase {
         System.out.printf("  Plan for fragment %d of %d\n",
                           fragmentNumber,
                           numberOfFragments);
+        String lines[] = root.toExplainPlanString().split("\n");
+        System.out.printf("    Explain:\n");
+        for (String line : lines) {
+            System.out.printf("      %s\n", line);
+        }
+        System.out.printf("    Nodes:\n");
         for (;root != null;
                 root = (root.getChildCount() > 0) ? root.getChild(0) : null) {
-            System.out.printf("    Node type %s\n", root.getPlanNodeType());
+            System.out.printf("      Node type %s\n", root.getPlanNodeType());
             for (int idx = 1; idx < root.getChildCount(); idx += 1) {
-                System.out.printf("      Child %d: %s\n", idx, root.getChild(idx).getPlanNodeType());
+                System.out.printf("        Child %d: %s\n", idx, root.getChild(idx).getPlanNodeType());
             }
         }
     }

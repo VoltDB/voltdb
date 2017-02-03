@@ -1302,7 +1302,7 @@ public abstract class SubPlanAssembler {
                 return true;
             }
             if (m_partitionByExprs.isEmpty() && 0 == m_unmatchedOrderByExprs.size()) {
-                m_isDone = true;
+                markDone();
                 // Settle on a sort direction.
                 if (m_sortDirection == SortDirectionType.INVALID) {
                     m_sortDirection = SortDirectionType.ASC;
@@ -1356,7 +1356,7 @@ public abstract class SubPlanAssembler {
                 }
                 // Mark this as dead.  We are not going
                 // to manage order spoilers with window functions.
-                m_isDead = true;
+                markDead();
                 return MatchResults.DONE_OR_DEAD;
             }
             // If there are no partition by expressions,
@@ -1373,7 +1373,7 @@ public abstract class SubPlanAssembler {
                 // If the sort directions are not all
                 // equal we can't use this index for this
                 // candidate.  So just declare it dead.
-                m_isDead = true;
+                markDead();
                 return MatchResults.DONE_OR_DEAD;
             }
             // NOTABENE: This is really the important part of
@@ -1402,7 +1402,7 @@ public abstract class SubPlanAssembler {
             // expression or column reference in the index.
             assert(0 <= indexEntry.m_indexEntryNumber);
             if (m_isWindowFunction) {
-                m_isDead = true;
+                markDead();
                 return MatchResults.DONE_OR_DEAD;
             } else {
                 return MatchResults.POSSIBLE_ORDER_SPOILER;
@@ -1411,6 +1411,16 @@ public abstract class SubPlanAssembler {
 
         public boolean isWindowFunction() {
             return m_isWindowFunction;
+        }
+
+        public void markDone() {
+            m_isDone = true;
+            m_isDead = false;
+        }
+
+        public void markDead() {
+            m_isDead = true;
+            m_isDone = false;
         }
     };
 
@@ -1471,19 +1481,27 @@ public abstract class SubPlanAssembler {
             // Match this expression against all the scores.
             // If all are order spoilers this is a possible
             // order spoiler.  Remember this.
-            for (WindowFunctionScore score : m_winFunctions) {
+            List<Integer> nomatches = new ArrayList<>();
+            for (int idx = 0; idx < m_winFunctions.length; idx += 1) {
+                WindowFunctionScore score = m_winFunctions[idx];
                 MatchResults result = score.matchIndexEntry(indexEntry);
                 switch (result) {
                 case DONE_OR_DEAD:
                 case POSSIBLE_ORDER_SPOILER:
+                    nomatches.add(idx);
                     break;
                 case MATCHED:
                     allOrderSpoilers = false;
                     break;
                 }
             }
+            // TODO: This is not right.
             if (allOrderSpoilers) {
                 m_orderSpoilers.add(indexEntry.m_indexEntryNumber);
+            } else {
+                for (Integer idx : nomatches) {
+                    m_winFunctions[idx].markDead();
+                }
             }
         }
 
@@ -1583,7 +1601,7 @@ public abstract class SubPlanAssembler {
                     assert(m_orderSpoilers.size() <= orderSpoilers.length);
                     int idx = 0;
                     for (Integer spoiler : m_orderSpoilers) {
-                        orderSpoilers[idx] = spoiler;
+                        orderSpoilers[idx++] = spoiler;
                     }
                     retval.m_finalExpressionOrder.addAll(answer.m_orderedMatchingExpressions);
                     // We will return this.

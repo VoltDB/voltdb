@@ -91,6 +91,7 @@ public class TestIndexCoveringPlans extends PlannerTestCase {
         pn = pn.getChild(0);
         if (pn != null) {
             System.out.println(pn.toJSONString());
+            System.out.println(pn.toExplainPlanString());
         }
         assertTrue(pn instanceof IndexScanPlanNode);
         IndexScanPlanNode ispn = (IndexScanPlanNode)pn;
