@@ -1402,6 +1402,7 @@ public abstract class SubPlanAssembler {
             // expression or column reference in the index.
             assert(0 <= indexEntry.m_indexEntryNumber);
             if (m_isWindowFunction) {
+                // No order spoilers with window functions.
                 markDead();
                 return MatchResults.DONE_OR_DEAD;
             } else {
@@ -1477,30 +1478,15 @@ public abstract class SubPlanAssembler {
         }
 
         public void matchIndexEntry(ExpressionOrColumn indexEntry) {
-            boolean allOrderSpoilers = true;
-            // Match this expression against all the scores.
-            // If all are order spoilers this is a possible
-            // order spoiler.  Remember this.
             List<Integer> nomatches = new ArrayList<>();
             for (int idx = 0; idx < m_winFunctions.length; idx += 1) {
                 WindowFunctionScore score = m_winFunctions[idx];
                 MatchResults result = score.matchIndexEntry(indexEntry);
-                switch (result) {
-                case DONE_OR_DEAD:
-                case POSSIBLE_ORDER_SPOILER:
-                    nomatches.add(idx);
-                    break;
-                case MATCHED:
-                    allOrderSpoilers = false;
-                    break;
-                }
-            }
-            // TODO: This is not right.
-            if (allOrderSpoilers) {
-                m_orderSpoilers.add(indexEntry.m_indexEntryNumber);
-            } else {
-                for (Integer idx : nomatches) {
-                    m_winFunctions[idx].markDead();
+                // This can only happen with a statement level order by
+                // clause.  We don't return POSSIBLE_ORDER_SPOILER for
+                // window functions.
+                if (result == MatchResults.POSSIBLE_ORDER_SPOILER) {
+                    m_orderSpoilers.add(idx);
                 }
             }
         }
@@ -1573,16 +1559,17 @@ public abstract class SubPlanAssembler {
 
                     // Mark how we are using this index.
                     retval.m_windowFunctionUsesIndex = answer.m_windowFunctionNumber;
-                    // <ol>
-                    //   <li>If we have an index for the Statement Level
-                    //       Order By clause but there is a window function
-                    //       that can't use the index,
-                    //       then we can't use the index at all.</li>
-                    // </ol>
+                    // If we have an index for the Statement Level
+                    // Order By clause but there is a window function
+                    // that can't use the index, then we can't use the
+                    // index at all. for ordering.  The window function
+                    // will invalidate the ordering for the statment level
+                    // order by clause.
                     if ((retval.m_windowFunctionUsesIndex == STATEMENT_LEVEL_ORDER_BY_INDEX)
                             && (0 < m_numWinScores)) {
                         retval.m_stmtOrderByIsCompatible = false;
                         retval.m_windowFunctionUsesIndex = NO_INDEX_USE;
+                        retval.sortDirection = SortDirectionType.INVALID;
                         return 0;
                     }
 
@@ -1597,15 +1584,20 @@ public abstract class SubPlanAssembler {
                         retval.sortDirection = answer.m_sortDirection;
                     }
 
-                    // Add the order spoilers.
-                    assert(m_orderSpoilers.size() <= orderSpoilers.length);
-                    int idx = 0;
-                    for (Integer spoiler : m_orderSpoilers) {
-                        orderSpoilers[idx++] = spoiler;
+                    // Add the order spoilers if the index is
+                    // compatible with the statement level
+                    // order by clause.
+                    if (retval.m_stmtOrderByIsCompatible) {
+                        assert(m_orderSpoilers.size() <= orderSpoilers.length);
+                        int idx = 0;
+                        for (Integer spoiler : m_orderSpoilers) {
+                            orderSpoilers[idx++] = spoiler;
+                        }
+                        retval.m_finalExpressionOrder.addAll(answer.m_orderedMatchingExpressions);
+                        // We will return this.
+                        numOrderSpoilers = m_orderSpoilers.size();
                     }
-                    retval.m_finalExpressionOrder.addAll(answer.m_orderedMatchingExpressions);
-                    // We will return this.
-                    numOrderSpoilers = m_orderSpoilers.size();
+                    // else numOrderSpoilers is already zero.
                 }
             }
             return numOrderSpoilers;

@@ -1051,13 +1051,6 @@ public class TestWindowedFunctions extends PlannerTestCase {
 
     }
 
-    public void testFromWindowFunctionSuite() {
-        /*
-        validatePlan("select a, rank() over (partition by b order by a) as r from tu order by a",
-                     1,
-                     PlanNodeType.INVALID);
-         */
-    }
     @Override
     protected void setUp() throws Exception {
         setupSchema(true, TestWindowedFunctions.class.getResource("testplans-windowingfunctions-ddl.sql"), "testwindowfunctions");
