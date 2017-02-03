@@ -2040,7 +2040,7 @@ h3.ui-state-active {
     background-image: url(images/icon_query_result.jpg);
     background-repeat: no-repeat; width:25px; height:25px; margin:0 5px 0 0;}
 /***********************************DR page*******************************/
-#containerMain1 { background:#fff; padding:10px;}
+.containerMain1 { background:#fff; padding:10px;margin-bottom: 20px;border: 1px solid #ccc;}
 .DRContantWrap {background:#ccc; padding:10px; display:block;}
 .contentDR {
     margin: 0 0 20px 0;
@@ -2050,9 +2050,18 @@ h3.ui-state-active {
 }
 .drHead { background-color:#fff; padding:5px 20px 20px 37px; border:none;  }
 .drBody { padding:0;}
-.DRHeaderName { position:relative;top:5px;}
-.iconDRDatabase {float: left; width: 20px; margin: 0 0 0 12px; position: relative;top: 5px;}
+.DRHeaderName { position:relative;top:5px; font-size:16px;}
+.drPending { color: #ea151d;}
+.iconDRDatabase {float: left; width: 20px; margin: 0 0 0 12px; position: relative;top: 3px;}
 .DRHeaderWrap {float:left;}
+.drRelation { float:left; }
+.drRelationLeft { float:left;  }
+.drRelationLeft span p { position:relative; top:-10px; font-size: 12px; text-align:center; }
+.arrowDouble { background-image: url(images/arrow_double.png); width:190px; height:20px;
+display:block; position: relative; top:8px; margin:0 10px;  }
+.arrowSingle { background-image: url(images/arrow.png); width:190px; height:22px;
+display:block; position: relative; top:8px; margin:0 10px;  }
+.drRelationRight { float:left; }
 
 /*********************jquery ui class override*********************/
 #accordionProcedures .ui-state-default, #accordionTable .ui-state-default,#accordionStreamedTable .ui-state-default,
@@ -2088,6 +2097,7 @@ border:1px solid #FFF;
 
 .disableCloserTab { opacity:0.5;}
 #queryError span.error{ color: #c70000; font-size:13px; }
+.latencyDR{float: left;padding: 9px 0 0 20px;font-size: 16px;}
 
 /*********************jquery ui class override ends*********************/
 
@@ -4205,6 +4215,8 @@ ul#shutdownMsg li{ font-size:13px; line-height:20px; }
 
 
 @media (max-width: 699px) {
+    .arrowDRDatabase {background-image: url(images/arrow_small.png); width:60px; height:16px;
+    display:block; position: relative; top:8px; margin:0 10px; }
     .logHeight {height: 364px;}
 
     ul.topRightList li.responsiveMenuPlaceHolder {

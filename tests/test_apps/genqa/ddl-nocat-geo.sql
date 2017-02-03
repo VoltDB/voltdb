@@ -75,7 +75,7 @@ CREATE STREAM export_partitioned_table PARTITION ON COLUMN rowid EXPORT TO TARGE
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 );
 
-CREATE TABLE  export_mirror_partitioned_table
+CREATE TABLE export_mirror_partitioned_table
 (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
@@ -198,9 +198,6 @@ CREATE PROCEDURE FROM CLASS genqa.procedures.WaitSinglePartition;
 CREATE PROCEDURE FROM CLASS genqa.procedures.WaitMultiPartition;
 CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleExportDoneTable;
 
-PARTITION PROCEDURE JiggleSkinnyExportSinglePartition
-  ON TABLE export_skinny_partitioned_table COLUMN rowid;
-
 -- CREATE PROCEDURE SelectwithLimit as select * from export_mirror_partitioned_table where rowid between ? and ? order by rowid limit ?;
 
 
@@ -239,7 +236,7 @@ CREATE STREAM export_geo_partitioned_table PARTITION ON COLUMN rowid EXPORT TO T
 
 -- should be an exact copy of the stream. Used for verifiing
 -- export stream contents.
-CREATE TABLE  export_geo_mirror_partitioned_table
+CREATE TABLE export_geo_mirror_partitioned_table
 (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
@@ -268,8 +265,6 @@ CREATE TABLE  export_geo_mirror_partitioned_table
 , type_not_null_geography   GEOGRAPHY(1024)   NOT NULL
 , type_null_geography_point GEOGRAPHY_POINT
 , type_not_null_geography_point GEOGRAPHY_POINT NOT NULL
-
-, PRIMARY KEY (rowid)
 );
 PARTITION TABLE export_geo_mirror_partitioned_table ON COLUMN rowid;
 

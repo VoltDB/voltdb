@@ -29,7 +29,8 @@
     options = (
         VOLT.BooleanOption('-r', '--replica', 'replica', 'recover replica cluster', default = False),
     ),
-    description = 'Start the database and recover the previous state.'
+    description = 'WARNING: The recover is deprecated. Please use INIT and START. Start the database and recover the previous state.',
+    hideverb=True
 )
 def recover(runner):
     runner.go()
