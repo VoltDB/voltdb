@@ -1366,23 +1366,23 @@ var loadPage = function (serverName, portid) {
                               '                </div>'
 
 
-            var htmlDrTable = '                <div class="drWrapper" id="divDrReplication' + i + '" style="display:block">' +
-                              '                    <div class="content drHeader" id="drHeader'+ i + '">' +
+            var htmlDrTable = '                <div class="drWrapper" id="divDrReplication' + combinedId + '" style="display:block">' +
+                              '                    <div class="content drHeader" id="drHeader'+ combinedId + '">' +
                               '                        <div class="leftShowhide">' +
                               '                            <div class="dr">' +
                               '                                <h1 class="headText1">' +
-                              '                                    <a href="javascript:void(0);" id="showHideDrBlock_' + i + '" class="showhideIcon collapsed arrowAdjust">Show/Hide Database Replication (DR)</a>' +
+                              '                                    <a href="javascript:void(0);" id="showHideDrBlock_' + combinedId + '" class="showhideIcon collapsed arrowAdjust">Show/Hide Database Replication (DR)</a>' +
                               '                                </h1>' +
                               '                            </div>' +
                               '                        </div>' +
                               '                        <div class="rightShowhide">' +
                               '                            <ul class="drList">' +
                               '                                <li>Mode</li>' +
-                              '                                <li id="dbDrMode_' + i + '" class="drArrow">Master</li>' +
+                              '                                <li id="dbDrMode_' + combinedId + '" class="drArrow">Master</li>' +
                               '                            </ul>' +
                               '                            <ul class="drList">' +
-                              '                                <li class="alertIcon warningDr" id="drAlertWarning_' + i + '" style="display: none">' +
-                              '                                    <a id="drWarning_' + i + '" href="#drPartitionWarning" class="drWarning">' +
+                              '                                <li class="alertIcon warningDr" id="drAlertWarning_' + combinedId + '" style="display: none">' +
+                              '                                    <a id="drWarning_' + combinedId + '" href="#drPartitionWarning" class="drWarning">' +
                               '                                        <span style="margin:0 0 0 24px">Warning</span>' +
                               '                                    </a>' +
                               '                                </li>' +
@@ -1391,24 +1391,24 @@ var loadPage = function (serverName, portid) {
                               '                        </div>' +
                               '                        <div class="clear"></div>' +
                               '                    </div>' +
-                              '                    <div id="drSection_' + i + '" class="drShowHide" style="display:none;">' +
-                              '                        <div id="drMasterSection_' + i + '" class="masterWrapper" style="display:block;">' +
-                              '                            <div id="tblMAster_wrapper_' + i + '" class="dataTables_wrapper no-footer">' +
+                              '                    <div id="drSection_' + combinedId + '" class="drShowHide" style="display:none;">' +
+                              '                        <div id="drMasterSection_' + combinedId + '" class="masterWrapper" style="display:block;">' +
+                              '                            <div id="tblMAster_wrapper_' + combinedId + '" class="dataTables_wrapper no-footer">' +
                               '                                <div class="tabs-filter-wrapperDR">' +
-                              '                                    <div class="drTitle icon-master" id="drMasterTitle_' + i + '">Master</div>' +
+                              '                                    <div class="drTitle icon-master" id="drMasterTitle_' + combinedId + '">Master</div>' +
                               '                                    <div class="filter">' +
-                              '                                        <input name="filter" id="filterPartitionId_' + i + '" type="text" class="search-box" onBlur="" placeholder="Search Partition ID"><a id="searchDrMasterData" href="javascript:void(0)" class="icon-search drIcon" title="Search">search</a>' +
+                              '                                        <input name="filter" id="filterPartitionId_' + combinedId + '" type="text" class="search-box" onBlur="" placeholder="Search Partition ID"><a id="searchDrMasterData" href="javascript:void(0)" class="icon-search drIcon" title="Search">search</a>' +
                               '                                    </div>' +
                               '                                    <div class="clear"></div>' +
                               '                                </div>' +
                               '                                <div class="clear"></div>' +
-                              '                                <div class="dataTables_paginate paging_extStyleLF paginationDefault" id="tblDrMAster_paginate_'+ i +'">' +
+                              '                                <div class="dataTables_paginate paging_extStyleLF paginationDefault" id="tblDrMAster_paginate_'+ combinedId +'">' +
                               '                                    <span class="paginate_disabled_previous paginate_button" title="Previous Page">Prev</span>' +
                               '                                    <div class="navigationLabel">Page <span class="pageIndex"> 0 </span> of <span class="totalPages">0</span></div>' +
                               '                                    <span class="paginate_enabled_next paginate_button" title="Next Page">Next</span>' +
                               '                                </div>' +
                               '                                <div class="drMasterContainer">' +
-                              '                                    <table width="100%" border="0" cellspacing="0" id="tblDrMAster_' + i + '" cellpadding="0" class="storeTbl drTbl no-footer dataTable" aria-describedby="tblDrMAster_info" role="grid">' +
+                              '                                    <table width="100%" border="0" cellspacing="0" id="tblDrMAster_' + combinedId + '" cellpadding="0" class="storeTbl drTbl no-footer dataTable" aria-describedby="tblDrMAster_info" role="grid">' +
                               '                                        <thead>' +
                               '                                            <tr role="row">' +
                               '                                                <th id="Th1" width="25%" data-name="none" class="" tabindex="0" aria-controls="tblDrMAster" rowspan="1" colspan="1" aria-sort="ascending" aria-label="Partition ID: activate to sort column descending">Partition ID</th>' +
@@ -1424,23 +1424,23 @@ var loadPage = function (serverName, portid) {
                               '                                </div>' +
                               '                            </div>' +
                               '                        </div>' +
-                              '                        <div id="drReplicaSection_' + i + '" class="replicaWrapper" style="display:block">' +
-                              '                            <div id="tblReplica_wrapper_' + i +'" class="dataTables_wrapper no-footer">' +
+                              '                        <div id="drReplicaSection_' + combinedId + '" class="replicaWrapper" style="display:block">' +
+                              '                            <div id="tblReplica_wrapper_' + combinedId +'" class="dataTables_wrapper no-footer">' +
                               '                                <div class="tabs-filter-wrapperDR">' +
-                              '                                    <div class="drTitle icon-replica" id="drReplicaTitle_' + i + '">Replica</div>' +
+                              '                                    <div class="drTitle icon-replica" id="drReplicaTitle_' + combinedId + '">Replica</div>' +
                               '                                    <div class="filter">' +
-                              '                                        <input name="filter" id="filterHostID_' + i + '" type="text" class="search-box" onBlur="" placeholder="Search Server"><a id="searchDrMasterData" href="javascript:void(0)" class="icon-search drIcon" title="Search">search</a>' +
+                              '                                        <input name="filter" id="filterHostID_' + combinedId + '" type="text" class="search-box" onBlur="" placeholder="Search Server"><a id="searchDrMasterData" href="javascript:void(0)" class="icon-search drIcon" title="Search">search</a>' +
                               '                                    </div>' +
                               '                                    <div class="clear"></div>' +
                               '                                </div>' +
                               '                                <div class="clear"></div>' +
-                              '                                <div class="dataTables_paginate paging_extStyleLF paginationDefault" id="tblDrReplica_paginate_' + i + '">' +
+                              '                                <div class="dataTables_paginate paging_extStyleLF paginationDefault" id="tblDrReplica_paginate_' + combinedId + '">' +
                               '                                    <span class="paginate_disabled_previous paginate_button" title="Previous Page">Prev</span>' +
                               '                                    <div class="navigationLabel">Page <span class="pageIndex"> 0 </span> of <span class="totalPages">0</span></div>' +
                               '                                    <span class="paginate_enabled_next paginate_button" title="Next Page">Next</span>' +
                               '                                </div>' +
                               '                                <div class="drReplicaContainer">' +
-                              '                                    <table width="100%" border="0" cellspacing="0" id="tblDrReplica_' + i + '" cellpadding="0" class="storeTbl drTbl no-footer dataTable" aria-describedby="tblDrReplica_info" role="grid">' +
+                              '                                    <table width="100%" border="0" cellspacing="0" id="tblDrReplica_' + combinedId + '" cellpadding="0" class="storeTbl drTbl no-footer dataTable" aria-describedby="tblDrReplica_info" role="grid">' +
                               '                                        <thead>' +
                               '                                            <tr>' +
                               '                                                <th id="Th7" width="25%" data-name="none">Server</th>' +
@@ -1461,7 +1461,7 @@ var loadPage = function (serverName, portid) {
                               '    </div>' +
                               '</div>';
 
-            $("#dr").append(htmlContent + htmlGraph);
+            $("#dr").append(htmlContent + htmlGraph + htmlDrTable);
 
             VoltDbUI.drChartList.push(combinedId);
 
@@ -1494,6 +1494,20 @@ var loadPage = function (serverName, portid) {
                     $(this).addClass('collapsedDR');
                 }
                 $(this).next("div.menu_body").slideToggle(300).siblings("div.menu_body").slideUp("slow");
+            });
+
+            $("#showHideDrBlock_" + combinedId).click(function (e) {
+                e.preventDefault();
+                debugger;
+                var headerState = $("#drSection_"+ combinedId).css('display');
+                if (headerState == 'none') {
+                    $(this).removeClass('collapsed');
+                    $(this).addClass('expanded');
+                } else {
+                    $(this).removeClass('expanded');
+                    $(this).addClass('collapsed');
+                }
+                $("#drSection_"+ combinedId).slideToggle(300);
             });
 
             $(".downloadBtnChart").on("click", function(e){
@@ -2049,88 +2063,114 @@ var loadPage = function (serverName, portid) {
 
     var replicaTable = '';
 
-    var refreshDrReplicaSection = function (currentTab) {
+    var refreshDrReplicaSection = function (graphView, currentTab) {
         voltDbRenderer.GetDrReplicationInformation(function (replicationData) {
-            var drGraphView = $("#drGraphView").val()
             $('#clusterId').show();
             $('#clusterId').html(" (ID: " + replicationData["DR_GRAPH"]["CLUSTER_ID"] + ")");
-            MonitorGraphUI.RefreshDrReplicationGraph(replicationData, getCurrentServer(), drGraphView, currentTab);
-            replicationWarning(replicationData["DR_GRAPH"]['WARNING_COUNT']);
 
-            var response = replicationData["DR_GRAPH"]["REPLICATION_DATA"];
-            var htmlcontent = "";
+            MonitorGraphUI.RefreshDrReplicationGraph(replicationData, getCurrentServer(), graphView, currentTab);
 
-            for (var key in response) {
-                htmlcontent = htmlcontent + "<tr>";
-                htmlcontent = htmlcontent + "<td>" + response[key].HOSTNAME + "</td>" +
-                    "<td>" + response[key].STATE + "</td>" +
-                    "<td>" + response[key].REPLICATION_RATE_1M + "</td >" +
-                    "<td>" + response[key].REPLICATION_RATE_5M + "</td >";
-                htmlcontent = htmlcontent + "</tr>";
-            }
+            var chartList = VoltDbUI.drChartList;
+            if(chartList != undefined && chartList.length > 0){
+                for(var i = 0; i < chartList.length; i++){
+                    replicationWarning(replicationData["DR_GRAPH"].WARNING_COUNT);
 
-            var leftScroll = $("#tblDrReplica_wrapper").find(".tblScroll").scrollLeft();
-            if ($.fn.dataTable.isDataTable('#tblDrReplica')) {
-                $("#tblDrReplica").DataTable().destroy();
-            }
-            var content = " <table width='100%' border='0' cellspacing='0' id='tblDrReplica' cellpadding='0' class='storeTbl drTbl no-footer dataTable'><thead><tr><th id='replicaServer' width='25%' data-name='none'>Server</th><th id='replicaStatus' width='25%' data-name='none'>Status</th><th id='replicationRate1' width='25%' data-name='none'>Replication rate (last 1 minute)</th>" +
-                                               "<th id='replicationRate5' width='25%' data-name='none'>Replication rate (last 5 minutes)</th></tr></thead>" +
-                                        "<tbody>";
-            $("#drReplicaSection").find(".drReplicaContainer").html(content + htmlcontent + "</tbody></table>");
+                    var response = replicationData["DR_GRAPH"][chartList[i]].REPLICATION_DATA;
+                    var htmlcontent = "";
 
-            replicaTable = $("#tblDrReplica").DataTable({
-                stateSave: true,
-                pageLength: 5,
-                "sPaginationType": "extStyleLF",
-                "bAutoWidth": false,
-                "language": {
-                    "zeroRecords": "No data to be displayed"
-                },
-                "fnDrawCallback": function () {
+                    for (var key in response) {
+                        htmlcontent = htmlcontent + "<tr>";
+                        htmlcontent = htmlcontent + "<td>" + response[key].HOSTNAME + "</td>" +
+                            "<td>" + response[key].STATE + "</td>" +
+                            "<td>" + response[key].REPLICATION_RATE_1M + "</td >" +
+                            "<td>" + response[key].REPLICATION_RATE_5M + "</td >";
+                        htmlcontent = htmlcontent + "</tr>";
+                    }
 
-                    if ($("#tblDrReplica").find("tbody tr td").first().html() == "No data to be displayed") {
-                        $(this).parent().parent().find(".dataTables_paginate .navigationLabel .pageIndex").text("0");
+                    var leftScroll = $("#tblDrReplica_wrapper_" + chartList[i]).find(".tblScroll").scrollLeft();
+                    if ($.fn.dataTable.isDataTable('#tblDrReplica_'+ chartList[i])) {
+                        $("#tblDrReplica_"+ chartList[i]).DataTable().destroy();
+                    }
+                    var content = " <table width='100%' border='0' cellspacing='0' id='tblDrReplica' cellpadding='0' class='storeTbl drTbl no-footer dataTable'><thead><tr><th id='replicaServer' width='25%' data-name='none'>Server</th><th id='replicaStatus' width='25%' data-name='none'>Status</th><th id='replicationRate1' width='25%' data-name='none'>Replication rate (last 1 minute)</th>" +
+                                                       "<th id='replicationRate5' width='25%' data-name='none'>Replication rate (last 5 minutes)</th></tr></thead>" +
+                                                "<tbody>";
+                    $("#drReplicaSection_"+ chartList[i]).find(".drReplicaContainer").html(content + htmlcontent + "</tbody></table>");
+
+                    replicaTable = $("#tblDrReplica_" + chartList[i]).DataTable({
+                        stateSave: true,
+                        pageLength: 5,
+                        "sPaginationType": "extStyleLF",
+                        "bAutoWidth": false,
+                        "language": {
+                            "zeroRecords": "No data to be displayed"
+                        },
+                        "fnDrawCallback": function () {
+
+                            if ($("#tblDrReplica_" + chartList[i]).find("tbody tr td").first().html() == "No data to be displayed") {
+                                $(this).parent().parent().find(".dataTables_paginate .navigationLabel .pageIndex").text("0");
+                            } else {
+                                $(this).parent().parent().find(".dataTables_paginate .navigationLabel .pageIndex").text(" " + this.fnPagingInfo().iPage + " ");
+                            }
+
+
+                            $(this).parent().parent().find(".dataTables_paginate .navigationLabel .totalPages").text(this.fnPagingInfo().iTotalPages);
+                            var length = $("#tblDrReplica_" + chartList[i] +" tr").length - 1;
+                            if (length >= 5) {
+                                $("#drReplicaSection_" + chartList[i]).css("min-height", "280px");
+                            } else if (length == 4) {
+                                $("#drReplicaSection_" + chartList[i]).css("min-height", "250px");
+                            } else if (length == 3) {
+                                $("#drReplicaSection_" + chartList[i]).css("min-height", "230px");
+                            } else if (length == 2) {
+                                $("#drReplicaSection_" + chartList[i]).css("min-height", "200px");
+                            } else if (length == 1 || length == 0) {
+                                $("#drReplicaSection_" + chartList[i]).css("min-height", "170px");
+                            }
+                        },
+                        "sDom": 'p<"tblScroll drScroll"t>',
+                        "aoColumns": [
+                            null,
+                            { "bSearchable": false },
+                            { "bSearchable": false },
+                            { "bSearchable": false }
+                        ]
+                    });
+
+                    $("#tblDrReplica_wrapper_" + chartList[i]).find(".tblScroll").scrollLeft(leftScroll);
+                    $("#tblReplica_wrapper_" + chartList[i]).find(".paginationDefault").remove();
+
+                    //  Customizing DataTables to make it as existing pagination
+                    $(".paginate_disabled_previous").html("Prev");
+                    $(".paginate_enabled_next").html("Next");
+                    $(".paginate_disabled_next").html("Next");
+                    $(".paginate_enabled_previous").html("Prev");
+                    $(".paginate_disabled_previous").attr("title", "Previous Page");
+                    $(".paginate_enabled_next").attr("title", "Next Page");
+                    $(".paginate_disabled_next").attr("title", "Next Page");
+                    $(".paginate_enabled_previous").attr("title", "Previous Page");
+                    $(".paginate_enabled_previous").attr("title", "Previous Page");
+
+                       //to show DR Mode and DR tables
+                    if (VoltDbUI.drMasterState.toUpperCase() == 'ACTIVE') {
+
+                        $("#dbDrMode_" + chartList[i]).text("Both");
+                        $('#drMasterSection_'+ chartList[i]).css('display', 'block');
+                        isMasterDataVisible = true;
+                        refreshDrMasterSection();
+                        $(".replicaWrapper").css('top', '-27px');
                     } else {
-                        $(this).parent().parent().find(".dataTables_paginate .navigationLabel .pageIndex").text(" " + this.fnPagingInfo().iPage + " ");
+                        $("#dbDrMode_" + chartList[i]).text("Replica");
+                        $(".replicaWrapper").css('top', '0px');
+                        $('#drMasterSection_'+ chartList[i]).css('display', 'none');
+                        isMasterDataVisible = false;
                     }
 
+                }
 
-                    $(this).parent().parent().find(".dataTables_paginate .navigationLabel .totalPages").text(this.fnPagingInfo().iTotalPages);
-                    var length = $("#tblDrReplica tr").length - 1;
-                    if (length >= 5) {
-                        $("#drReplicaSection").css("min-height", "280px");
-                    } else if (length == 4) {
-                        $("#drReplicaSection").css("min-height", "250px");
-                    } else if (length == 3) {
-                        $("#drReplicaSection").css("min-height", "230px");
-                    } else if (length == 2) {
-                        $("#drReplicaSection").css("min-height", "200px");
-                    } else if (length == 1 || length == 0) {
-                        $("#drReplicaSection").css("min-height", "170px");
-                    }
-                },
-                "sDom": 'p<"tblScroll drScroll"t>',
-                "aoColumns": [
-                    null,
-                    { "bSearchable": false },
-                    { "bSearchable": false },
-                    { "bSearchable": false }
-                ]
-            });
 
-            $("#tblDrReplica_wrapper").find(".tblScroll").scrollLeft(leftScroll);
-            $("#tblReplica_wrapper").find(".paginationDefault").remove();
+            }
 
-            //  Customizing DataTables to make it as existing pagination
-            $(".paginate_disabled_previous").html("Prev");
-            $(".paginate_enabled_next").html("Next");
-            $(".paginate_disabled_next").html("Next");
-            $(".paginate_enabled_previous").html("Prev");
-            $(".paginate_disabled_previous").attr("title", "Previous Page");
-            $(".paginate_enabled_next").attr("title", "Next Page");
-            $(".paginate_disabled_next").attr("title", "Next Page");
-            $(".paginate_enabled_previous").attr("title", "Previous Page");
-            $(".paginate_enabled_previous").attr("title", "Previous Page");
+
         });
 
         $('#filterHostID').on('keyup', function () {

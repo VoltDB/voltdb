@@ -2283,8 +2283,8 @@ function alertNodeClicked(obj) {
 
                 if (!replicationDetails.hasOwnProperty("DR_GRAPH")) {
                     replicationDetails["DR_GRAPH"] = {};
-                    replicationDetails["DR_GRAPH"]["REPLICATION_DATA"] = [];
                     replicationDetails["DR_GRAPH"][cluster_id + '_' + producer_cluster_id] = {}
+                    replicationDetails["DR_GRAPH"][cluster_id + '_' + producer_cluster_id]["REPLICATION_DATA"] = [];
                     replicationDetails["DR_GRAPH"][cluster_id + '_' + producer_cluster_id]['REPLICATION_RATE_1M'] = 0
                 }
 
@@ -2301,7 +2301,8 @@ function alertNodeClicked(obj) {
                 repData["REPLICATION_RATE_5M"] = info[colIndex["REPLICATION_RATE_5M"]] / 1000;
                 repData["REPLICATION_RATE_1M"] = info[colIndex["REPLICATION_RATE_1M"]] / 1000;
                 replicationDetails["DR_GRAPH"]["REMOTE_CLUSTER_ID"] = info[colIndex["REMOTE_CLUSTER_ID"]];
-                replicationDetails["DR_GRAPH"]["REPLICATION_DATA"].push(repData);
+                replicationDetails["DR_GRAPH"]["REMOTE_CLUSTER_ID"] = info[colIndex["REMOTE_CLUSTER_ID"]];
+                replicationDetails["DR_GRAPH"][cluster_id + '_' + producer_cluster_id]["REPLICATION_DATA"].push(repData);
 
             });
 
