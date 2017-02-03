@@ -97,7 +97,7 @@ public enum CipherExecutor {
     }
 
     public void startup() {
-        if (m_active.compareAndSet(false, true)) {
+        if (m_active.compareAndSet(false, true)) synchronized(this) {
             ThreadFactory thrdfct = CoreUtils.getThreadFactory(
                     name () + " SSL cipher service", CoreUtils.MEDIUM_STACK_SIZE);
             m_es.compareAndSet(CoreUtils.LISTENINGSAMETHREADEXECUTOR, MoreExecutors.listeningDecorator(
@@ -106,13 +106,12 @@ public enum CipherExecutor {
     }
 
     public void shutdown() {
-        if (m_active.compareAndSet(true, false)) {
+        if (m_active.compareAndSet(true, false)) synchronized(this) {
             ListeningExecutorService es = m_es.get();
             if (es != CoreUtils.LISTENINGSAMETHREADEXECUTOR
                 && m_es.compareAndSet(es, CoreUtils.LISTENINGSAMETHREADEXECUTOR)) {
+                es.shutdown();
                 try {
-                    Thread.sleep(1);
-                    es.shutdown();
                     es.awaitTermination(365, TimeUnit.DAYS);
                 } catch (InterruptedException e) {
                     throw new RuntimeException(
