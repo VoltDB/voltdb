@@ -101,6 +101,9 @@ $(document).ready(function () {
             if (json["GraphView"] != undefined && json["GraphView"] != "")
                 saveInLocalStorage("graph-view", json["GraphView"]);
 
+            if (json["DrGraphView"] != undefined && json["DrGraphView"] != "")
+                saveInLocalStorage("dr-graph-view", json["DrGraphView"]);
+
             if (json["CurrentServer"] != undefined && json["CurrentServer"] != "")
                 saveCurrentServer(json["CurrentServer"]);
 
@@ -445,7 +448,7 @@ function convertArrayOfObjectsToCSV(args) {
     return result;
 }
 
-function downloadCSV(event,args,whichChart) {
+function downloadCSV(event,args,whichChart, chartId) {
     if (navigator.userAgent.indexOf('Safari') != -1 && navigator.userAgent.indexOf('Chrome') == -1 ||
     navigator.userAgent.indexOf('MSIE') > 0 || navigator.userAgent.indexOf('Trident/') > 0 ) {
         event.preventDefault()
@@ -455,6 +458,7 @@ function downloadCSV(event,args,whichChart) {
 
     var data, filename, link;
     var graphView = $("#graphView").val()
+    var drGraphVIew = $("#drGraphView").val()
     var chartData = {}
 
     if (whichChart == "cpu"){
@@ -517,14 +521,14 @@ function downloadCSV(event,args,whichChart) {
 
     }
     else if (whichChart == "dataReplication"){
-        if (graphView == "Seconds"){
-            chartData = JSON.parse(localStorage.drDetails)
+        if (drGraphVIew == "Seconds"){
+            chartData = JSON.parse(localStorage["drDetails_" + chartId])
         }
-        else if (graphView == "Minutes"){
-            chartData = JSON.parse(localStorage.drDetailsMin)
+        else if (drGraphVIew == "Minutes"){
+            chartData = JSON.parse(localStorage["drDetailsMin_" + chartId])
         }
-        else if (graphView == "Days"){
-            chartData = JSON.parse(localStorage.drDetailsDay)
+        else if (drGraphVIew == "Days"){
+            chartData = JSON.parse(localStorage["drDetailsDay_" + chartId])
         }
     }
     else if (whichChart == "commandLog"){
@@ -545,7 +549,11 @@ function downloadCSV(event,args,whichChart) {
     });
     if (csv == null) return;
 
-    filename = args.filename + "-" + graphView + ".csv";
+    if(whichChart == "dataReplication")
+        filename = args.filename + "-" + drGraphVIew + ".csv";
+    else
+        filename = args.filename + "-" + graphView + ".csv";
+
     data = encodeURI(csv);
 
     var blob = new Blob([csv], {type: "text/csv;"});
@@ -828,6 +836,7 @@ var loadPage = function (serverName, portid) {
                 var data = {
                     CurrentServer: clickedServer,
                     GraphView: VoltDbUI.getFromLocalStorage("graph-view"),
+                    DrGraphView: VoltDbUI.getFromLocalStorage("dr-graph-view"),
                     DisplayPreferences: VoltDbUI.getFromLocalStorage("user-preferences"),
                     AlertThreshold: VoltDbUI.getFromLocalStorage("alert-threshold"),
                     username: VoltDbUI.getCookie("username"),
@@ -866,6 +875,7 @@ var loadPage = function (serverName, portid) {
                 var data = {
                     CurrentServer: clickedServer,
                     GraphView: VoltDbUI.getFromLocalStorage("graph-view"),
+                    DrGraphView: VoltDbUI.getFromLocalStorage("dr-graph-view"),
                     DisplayPreferences: VoltDbUI.getFromLocalStorage("user-preferences"),
                     AlertThreshold: VoltDbUI.getFromLocalStorage("alert-threshold"),
                     username: VoltDbUI.getCookie("username"),
@@ -1068,6 +1078,7 @@ var loadPage = function (serverName, portid) {
 
         voltDbRenderer.GetDrRoleInformation(function(drRoleDetail){
             var role = drRoleDetail['DRROLE'][0][0];
+            $("#drModeName").html(drRoleDetail['DRROLE'][0][0])
             if(role == "MASTER" || role == "XDCR"){
                 voltDbRenderer.GetDrDetails(function (drDetails) {
                     populateDRGraphandTable(drRoleDetail, drDetails)
@@ -1092,7 +1103,7 @@ var loadPage = function (serverName, portid) {
                 var producerDbId = drDetails[0][0]["CLUSTER_ID"];
                 var consumerDbId = drDetails[0][0]["REMOTE_CLUSTER_ID"];
             }
-
+            $("#drCLusterId").html(" (ID: " + producerDbId + ")");
             if(drRoleDetail['DRROLE'].length > 0){
                 if(JSON.stringify(VoltDbUI.prevDrRoleDetail) != JSON.stringify(drRoleDetail)) {
                     VoltDbUI.prevDrRoleDetail = drRoleDetail;
@@ -1164,7 +1175,7 @@ var loadPage = function (serverName, portid) {
                                                             isReplicaDataVisible = false;
                                                             isDrGraphVisible = false;
                                                         }
-                                                        refreshDrReplicaSection(graphView, currentTab);
+                                                        refreshDrReplicaSection(currentTab);
                                                         //to show DR Mode and DR tables
                                                         if (VoltDbUI.drMasterState.toUpperCase() == 'ACTIVE') {
                                                             $("#dbDrMode").text("Both");
@@ -1203,7 +1214,7 @@ var loadPage = function (serverName, portid) {
                                                             MonitorGraphUI.refreshGraphDR();
                                                             $('#drReplicaSection').css('display', 'block');
                                                             isReplicaDataVisible = true;
-                                                            refreshDrReplicaSection(graphView, currentTab);
+                                                            refreshDrReplicaSection(currentTab);
                                                         } else {
                                                             showHideDrGraph(false);
                                                             isDrGraphVisible = false;
@@ -1233,7 +1244,7 @@ var loadPage = function (serverName, portid) {
                                                         showHideDrGraph(true)
                                                         isDrGraphVisible = true;
                                                         MonitorGraphUI.refreshGraphDR();
-                                                        refreshDrReplicaSection(graphView, currentTab);
+                                                        refreshDrReplicaSection(currentTab);
                                                     } else {
                                                         $("#divDrReplication").hide();
                                                         $('#drReplicaSection').css('display', 'none');
@@ -1344,8 +1355,7 @@ var loadPage = function (serverName, portid) {
                               '                        <div id="ChartDrReplicationRate_' + combinedId + '" class="chart chartDR" style="display: block">' +
                               '                            <div class="chartHeader">' +
                               '                                <h1>Database Replication (DR)' +
-                              '                                    <a href="#" class="downloadBtnChart" onclick=' +
-                              '                                         downloadCSV(event, { filename: "DrReplication-data" }, "dataReplication");' +
+                              '                                    <a href="#" class="downloadBtnChart" ' +
                               '                                     > <img class="downloadCls" src="css/resources/images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>' +
                               '                                    <div class="clear"></div>' +
                               '                                </h1>' +
@@ -1484,6 +1494,13 @@ var loadPage = function (serverName, portid) {
                     $(this).addClass('collapsedDR');
                 }
                 $(this).next("div.menu_body").slideToggle(300).siblings("div.menu_body").slideUp("slow");
+            });
+
+            $(".downloadBtnChart").on("click", function(e){
+                var divChartNameSplit = $(this).closest(".chartDR")[0].id.split("_");
+                var chartId = divChartNameSplit[1] + "_" + divChartNameSplit[2];
+                var args = {"filename": "dr-chart-data"}
+                downloadCSV(e, args, "dataReplication", chartId);
             });
 
         }
@@ -2032,12 +2049,12 @@ var loadPage = function (serverName, portid) {
 
     var replicaTable = '';
 
-    var refreshDrReplicaSection = function (graphView, currentTab) {
+    var refreshDrReplicaSection = function (currentTab) {
         voltDbRenderer.GetDrReplicationInformation(function (replicationData) {
+            var drGraphView = $("#drGraphView").val()
             $('#clusterId').show();
             $('#clusterId').html(" (ID: " + replicationData["DR_GRAPH"]["CLUSTER_ID"] + ")");
-
-            MonitorGraphUI.RefreshDrReplicationGraph(replicationData, getCurrentServer(), graphView, currentTab);
+            MonitorGraphUI.RefreshDrReplicationGraph(replicationData, getCurrentServer(), drGraphView, currentTab);
             replicationWarning(replicationData["DR_GRAPH"]['WARNING_COUNT']);
 
             var response = replicationData["DR_GRAPH"]["REPLICATION_DATA"];
@@ -2270,7 +2287,11 @@ var loadPage = function (serverName, portid) {
     if (VoltDbUI.getFromLocalStorage("graph-view") == undefined || VoltDbUI.getFromLocalStorage("graph-view") == null)
         saveInLocalStorage("graph-view", $("#graphView").val());
 
+    if (VoltDbUI.getFromLocalStorage("dr-graph-view") == undefined || VoltDbUI.getFromLocalStorage("graph-view") == null)
+        saveInLocalStorage("dr-graph-view", $("#drGraphView").val());
+
     $("#graphView").val(VoltDbUI.getFromLocalStorage("graph-view"));
+    $("#drGraphView").val(VoltDbUI.getFromLocalStorage("dr-graph-view") != undefined ? VoltDbUI.getFromLocalStorage("dr-graph-view"): "Seconds");
     MonitorGraphUI.AddGraph(VoltDbUI.getFromLocalStorage("graph-view"), $('#chartServerCPU'), $('#chartServerRAM'), $('#chartClusterLatency'), $('#chartClusterTransactions'), $('#chartPartitionIdleTime'), $('#ChartDrReplicationRate'), $('#chartCommandLogging'));
 
     $('#PROCEDURE,#INVOCATIONS,#MIN_LATENCY,#MAX_LATENCY,#AVG_LATENCY,#AVG_LATENCY,#PERC_EXECUTION').unbind('click');
@@ -2474,6 +2495,13 @@ var loadPage = function (serverName, portid) {
         saveInLocalStorage("graph-view", graphView);
         MonitorGraphUI.RefreshGraph(graphView);
         MonitorGraphUI.UpdateCharts();
+    });
+
+    $("#drGraphView").on("change", function () {
+        var drGraphView = $("#drGraphView").val();
+        saveInLocalStorage("dr-graph-view", drGraphView);
+        MonitorGraphUI.RefreshDrGraph(drGraphView);
+        MonitorGraphUI.UpdateDrCharts();
     });
 
     //slides the element with class "menu_body" when paragraph with class "menu_head" is clicked

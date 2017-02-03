@@ -775,11 +775,11 @@
             if(chartList != undefined && chartList.length > 0){
                 for(var i = 0; i < chartList.length; i++){
                     if (view == 'Days') {
-                        dataDrReplication['dataDrReplication_' + chartList[i]][0]["values"] = Monitor['drReplicationDataDay_' + chartList[i]]
+                        dataDrReplication['dataDrReplication_' + chartList[i]][0]["values"] = Monitors['drReplicationDataDay_' + chartList[i]]
                     } else if (view == 'Minutes') {
-                        dataDrReplication['dataDrReplication_' + chartList[i]][0]["values"] = Monitor['drReplicationData_' + chartList[i]]
+                        dataDrReplication['dataDrReplication_' + chartList[i]][0]["values"] = Monitors['drReplicationDataMin_' + chartList[i]]
                     } else {
-                        dataDrReplication['dataDrReplication_' + chartList[i]][0]["values"] = Monitor['drReplicationDataMin_' + chartList[i]]
+                        dataDrReplication['dataDrReplication_' + chartList[i]][0]["values"] = Monitors['drReplicationData_' + chartList[i]]
                     }
                 }
             }
@@ -810,7 +810,6 @@
         this.UpdateDrCharts = function () {
             var chartList = VoltDbUI.drChartList;
             if(chartList != undefined && chartList.length > 0 && !$.isEmptyObject(drReplicationCharts)){
-                debugger;
                 for(var i = 0; i < chartList.length; i++){
                     if(drReplicationCharts["ChartDrReplicationRate_" + chartList[i]].is(":visible")) {
                         drChartList['ChartDrReplicationRate_' + chartList[i]].update();
@@ -1818,7 +1817,6 @@
         };
 
         this.RefreshDrReplicationGraph = function (drDetails, currentServer, graphView, currentTab) {
-            debugger;
             var monitor = Monitors;
             var chartList = VoltDbUI.drChartList;
             if(chartList != undefined && chartList.length > 0){

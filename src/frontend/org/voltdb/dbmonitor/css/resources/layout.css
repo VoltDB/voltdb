@@ -86,7 +86,7 @@ input.icon-search,
 a.save-search,
 a.icon-search,
 ul.clusterStat, li.activeServerName,.timeOutCross,
-a.showServers, a.hideServers, .popup_close, .icon-document, .icon-tables, .icon-procedures, .pref-storedProc, .pref-tables, .pref-graph, .icon-server, #toggleMenu, .iconDeleteAddConfig, .drArrow, .icon-master, .icon-replica, .icon-command {
+a.showServers, a.hideServers, .popup_close, .icon-document, .icon-tables, .icon-procedures, .pref-storedProc, .pref-tables, .pref-graph, .icon-server, #toggleMenu, .iconDeleteAddConfig, .drArrow, .icon-master, .icon-replica, .icon-command, .drIconHead {
     background-image: url(images/voltdb-icon-sprite.png) !important;
     background-repeat: no-repeat;
 }
@@ -109,6 +109,11 @@ a.showServers, a.hideServers, .popup_close, .icon-document, .icon-tables, .icon-
 }
 
 .clusterIcon {
+    background-position: left top;
+    height: 25px;
+    line-height: 25px;
+}
+.drIconHead {
     background-position: left top;
     height: 25px;
     line-height: 25px;
@@ -2065,6 +2070,15 @@ display:block; position: relative; top:8px; margin:0 10px;  }
 display:block; position: relative; top:8px; margin:0 10px;  }
 .drRelationRight { float:left; }
 
+ul.drShowhideList { margin: 0;padding: 0;float: left;}
+ul.drShowhideList li { margin: 0; float: left; padding: 0px 0 0 10px; }
+ul.drShowhideList li > a.btn { top: 5px;position: relative; }
+.drSelectLeft { float:left;}
+.drModeRight {float:right;}
+ul.drHeadList { margin:0;padding: 0; float: left;height: 28px;line-height: 30px;}
+ul.drHeadList li { margin: 0 0 0 10px;padding: 0;float: left;font-size: 14px;}
+ul.drHeadList li.drArrow { background-position: left -456px; color: #76bd1d;padding-left: 15px;}
+
 /*********************jquery ui class override*********************/
 #accordionProcedures .ui-state-default, #accordionTable .ui-state-default,#accordionStreamedTable .ui-state-default,
 #accordionViews .ui-state-default,.ui-widget-content .ui-state-default, .ui-widget-header .ui-state-default {
@@ -3576,6 +3590,17 @@ tr.drSubSection td {
     position: relative;
     top: -6px;
 }
+
+.DRHeaderWrapper {
+    margin: 0 0 20px 0;
+    padding: 10px 20px;
+    background: #FFFFFF;
+    -webkit-box-shadow: 0px 6px 7px -5px #ccc;
+    -moz-box-shadow: 0px 6px 7px -5px #ccc;
+    box-shadow: 0px 6px 7px -5px #ccc;
+}
+.DRHeaderLeft{ float:left;}
+.DRHeaderRight{ float:right;}
 
 .icon-master {
     background-position: left -1604px;
