@@ -13,6 +13,7 @@ Things will not go well if this test is not starting with an empty class list.
 
 create procedure from class sqlcmdtest.Trivial;
 --- System Procedures --------------------------------------
+@BalanceSPI               	int, int, int, int
 @Explain                  	varchar
 @ExplainProc              	varchar
 @ExplainView              	varchar
@@ -58,6 +59,7 @@ Command succeeded.
  sqlcmdtest.Breakable1$NestedGetsKilled
 
 --- System Procedures --------------------------------------
+@BalanceSPI               	int, int, int, int
 @Explain                  	varchar
 @ExplainProc              	varchar
 @ExplainView              	varchar
@@ -90,6 +92,7 @@ Command succeeded.
 create procedure from class sqlcmdtest.Trivial;
 Command succeeded.
 --- System Procedures --------------------------------------
+@BalanceSPI               	int, int, int, int
 @Explain                  	varchar
 @ExplainProc              	varchar
 @ExplainView              	varchar
@@ -162,6 +165,7 @@ Command succeeded.
 
 create procedure from class sqlcmdtest.Trivial;
 --- System Procedures --------------------------------------
+@BalanceSPI               	int, int, int, int
 @Explain                  	varchar
 @ExplainProc              	varchar
 @ExplainView              	varchar
@@ -212,6 +216,7 @@ Command succeeded.
 create procedure from class sqlcmdtest.Breakable0;
 Command succeeded.
 --- System Procedures --------------------------------------
+@BalanceSPI               	int, int, int, int
 @Explain                  	varchar
 @ExplainProc              	varchar
 @ExplainView              	varchar
@@ -270,6 +275,7 @@ Command succeeded.
 drop procedure Breakable0;
 Command succeeded.
 --- System Procedures --------------------------------------
+@BalanceSPI               	int, int, int, int
 @Explain                  	varchar
 @ExplainProc              	varchar
 @ExplainView              	varchar
@@ -329,6 +335,7 @@ Command succeeded.
 create procedure from class sqlcmdtest.Breakable0;
 Command succeeded.
 --- System Procedures --------------------------------------
+@BalanceSPI               	int, int, int, int
 @Explain                  	varchar
 @ExplainProc              	varchar
 @ExplainView              	varchar
@@ -387,6 +394,7 @@ Command succeeded.
 drop procedure Breakable0;
 Command succeeded.
 --- System Procedures --------------------------------------
+@BalanceSPI               	int, int, int, int
 @Explain                  	varchar
 @ExplainProc              	varchar
 @ExplainView              	varchar
