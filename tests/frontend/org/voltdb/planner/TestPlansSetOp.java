@@ -213,7 +213,13 @@ public class TestPlansSetOp extends PlannerTestCase {
         failToCompile("(select A from T1 UNION select B from T2) where A in (select A from T2)");
 
         // Union with a child having an invalid subquery expression (T1 is distributed)
-        failToCompile("select B from T2 where B in (select A from T1 where T1.A > T2.B) UNION select B from T2", PlanAssembler.IN_EXISTS_SCALAR_ERROR_MESSAGE);
+        failToCompile("(select B from T2 where B in (select A from T1 where T1.A > T2.B) UNION select B from T2) limit 1", PlanAssembler.IN_EXISTS_SCALAR_ERROR_MESSAGE);
+
+        // Union with a child having multiple partitioned tables (T1 and T4) not joined on partitioning columns
+        // T1.A and T4.D are partitioning columns
+        failToCompile("(select T1.F, T4.D from T1, T4 where T4.D = T1.F UNION select F, A from T1) order by 1",
+                "The planner cannot guarantee that all rows would be in a single partition.");
+
     }
 
     public void testSelfUnion() {
