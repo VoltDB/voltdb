@@ -22,6 +22,7 @@
 buildstring.txt
 host*+0000.txt
 license.xml
+deployment.xml
 voltdb_crash*
 bundles/
 obj/
