@@ -2295,6 +2295,14 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         doTestMVFailedCase(sql, "cannot include the function NOW or CURRENT_TIMESTAMP");
     }
 
+    public void testENG11935() throws Exception {
+        // All the statements will not crash the server.
+        Client client = getClient();
+        client.callProcedure("ENG11935.insert", "0", "abc", 1486148453, "def", "ghi", "jkl", "mno0", 35094, 30847, 27285, 36335, 59247, 50750, "0");
+        client.callProcedure("ENG11935.insert", "0", "abc", 1486148453, "def", "ghi", "jkl", "mno1", 35094, 30847, 27285, 36335, 59247, 50750, "1");
+        client.callProcedure("@AdHoc", "DELETE FROM ENG11935 WHERE VAR1=0 AND PRIMKEY=1;");
+    }
+
     /**
      * Build a list of the tests that will be run when TestTPCCSuite gets run by JUnit.
      * Use helper classes that are part of the RegressionSuite framework.
