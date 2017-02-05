@@ -42,8 +42,10 @@ public class DuplicateCounter
 
     protected static final VoltLogger tmLog = new VoltLogger("TM");
 
+    static final int[] ZERO_HASHES = new int[] { 0, 0, 0 };
+
     final long m_destinationId;
-    Long m_responseHash = null;
+    int[] m_responseHashes = null;
     protected VoltMessage m_lastResponse = null;
     protected VoltTable m_lastResultTables[] = null;
     final List<Long> m_expectedHSIds;
@@ -85,20 +87,20 @@ public class DuplicateCounter
         }
     }
 
-    protected int checkCommon(long hash, boolean rejoining, VoltTable resultTables[], VoltMessage message)
+    protected int checkCommon(int[] hashes, boolean rejoining, VoltTable resultTables[], VoltMessage message)
     {
         if (!rejoining) {
-            if (m_responseHash == null) {
-                m_responseHash = Long.valueOf(hash);
+            if (m_responseHashes == null) {
+                m_responseHashes = hashes;
             }
-            else if (!m_responseHash.equals(hash)) {
+            else if (!DeterminismHash.compareHashes(m_responseHashes, hashes)) {
                 tmLog.fatal("Stored procedure " + getStoredProcedureName()
                         + " generated different SQL queries at different partitions."
                         + " Shutting down to preserve data integrity.");
                 String msg = String.format("HASH MISMATCH COMPARING: %d to %d\n"
                         + "PREV MESSAGE: %s\n"
                         + "CURR MESSAGE: %s\n",
-                        hash, m_responseHash,
+                        hashes[0], m_responseHashes[0],
                         m_lastResponse.toString(), message.toString());
                 tmLog.error(msg);
                 return MISMATCH;
@@ -144,17 +146,16 @@ public class DuplicateCounter
     {
         ClientResponseImpl r = message.getClientResponseData();
         // get the hash of sql run
-        long hash = 0;
-        Integer sqlHash = r.getHash();
-        if (sqlHash != null) {
-            hash = sqlHash.intValue();
+        int[] hashes = r.getHashes();
+        if (hashes == null) {
+            hashes = ZERO_HASHES;
         }
-        return checkCommon(hash, message.isRecovering(), r.getResults(), message);
+        return checkCommon(hashes, message.isRecovering(), r.getResults(), message);
     }
 
     int offer(FragmentResponseMessage message)
     {
-        return checkCommon(0, message.isRecovering(), null, message);
+        return checkCommon(null, message.isRecovering(), null, message);
     }
 
     VoltMessage getLastResponse()
