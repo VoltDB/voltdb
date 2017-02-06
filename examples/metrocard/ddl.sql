@@ -35,8 +35,8 @@
 --  FROM example_of_types
 --  GROUP BY type;
 --
--- CREATE PROCEDURE FROM CLASS procedures.UpsertSymbol;
--- PARTITION PROCEDURE UpsertSymbol ON TABLE symbols COLUMN symbol PARAMETER 0;
+-- CREATE PROCEDURE PARTITION ON TABLE symbols COLUMN symbol [PARAMETER 0]
+--  FROM CLASS procedures.UpsertSymbol;
 ---------------------------------------------------------------------------------
 
 -- Update classes from jar to that server will know about classes but not procedures yet.
