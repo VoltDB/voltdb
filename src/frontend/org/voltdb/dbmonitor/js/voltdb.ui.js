@@ -1285,7 +1285,7 @@ var loadPage = function (serverName, portid) {
             }
         }
 
-        var getDrHtmlContent = function(i, producerDbId, drRoleDetail, response){
+       var getDrHtmlContent = function(i, producerDbId, drRoleDetail, response){
             var combinedId = producerDbId + '_' + drRoleDetail['DRROLE'][i][2]
             var consumerDbId = drRoleDetail['DRROLE'][i][2];
             replicaLatency = [];
@@ -1299,7 +1299,6 @@ var loadPage = function (serverName, portid) {
 
             var showClass = "expandedDR";
             var displayCss = "display:block";
-            var displayArrow = "arrowSingle";
             if($("#dbPane_"+ i).find(".menu_head").hasClass("collapsedDR")){
                 showClass = "collapsedDR";
                 displayCss = "display:none";
@@ -1307,16 +1306,6 @@ var loadPage = function (serverName, portid) {
             $("#dbPane_"+ i).parent().remove();
 
             var role = drRoleDetail['DRROLE'][i][0];
-            if(role == "XDCR"){
-                displayArrow = "arrowDouble";
-            }
-            else if (role == "MASTER"){
-                displayArrow = "arrowSingle";
-            }
-            else if (role == "REPLICA"){
-                displayArrow = "arrowSingleLeft";
-            }
-
             var htmlContent = '<div class="containerMain1" id="containerMain_'+ i + '">' +
                               '    <div id="dbPane_' + i + '" class="menu_list dbPane">' +
                               '        <!--Code for menu starts here-->' +
@@ -1328,8 +1317,8 @@ var loadPage = function (serverName, portid) {
                               '<span class="DRHeaderName drPending" id="drPending_'+ i +'"></span>' +
                               '                </a>' +
                               '            </h1>' +
-                              '<div class="drRelation" id="drRelation_'+ i +'"><div class="drRelationLeft"><span class="'+ displayArrow +'">' +
-                               '<p>'+drRoleDetail['DRROLE'][i][0]+'</p></span></div>' +
+                              '<div class="drRelation" id="drRelation_'+ i +'"><div class="drRelationLeft"><span id="drArrow_' + i + '">' +
+                               '<p></p></span></div>' +
                               '<div class="drRelationRight"><span class="iconDRDatabase"></span><div class="headText1 DRHeaderWrap">' +
                               '<a href="#" class="showhideIcon expandedDR arrowAdjustDR">' +
                               '<span class="DRHeaderName" id="dRHeaderName_' + i + '">Database ('+ drRoleDetail['DRROLE'][i][2] +')</span>' +
@@ -1462,6 +1451,23 @@ var loadPage = function (serverName, portid) {
                               '</div>';
 
             $("#dr").append(htmlContent + htmlGraph + htmlDrTable);
+            debugger;
+             if(role == "MASTER"){
+                debugger;
+                $("#drRelation_" + i).find('p').html(role + ' / REPLICA');
+                $("#drArrow_" + i).addClass("arrowSingle");
+            }
+            else if (role == "REPLICA"){
+                $("#drRelation_" + i).find('p').html(role + ' / MASTER');
+                $("#drArrow_" + i).removeClass("arrowDouble");
+                $("#drArrow_" + i).addClass("arrowSingleLeft");
+            }
+            else if (role == "XDCR"){
+                $("#drRelation_" + i).find('p').html(role);
+                $("#drArrow_" + i).removeClass("arrowSingle");
+                $("#drArrow_" + i).addClass("arrowDouble");
+            }
+
 
             VoltDbUI.drChartList.push(combinedId);
 
@@ -1482,6 +1488,7 @@ var loadPage = function (serverName, portid) {
                 $("#drRelation_" + i).show();
                 $("#drPending_" + i).hide();
             }
+
 
             $("#dbPane_" + i + " div.menu_head").click(function (e) {
                 e.preventDefault();
@@ -1519,18 +1526,19 @@ var loadPage = function (serverName, portid) {
 
         }
 
+
         var showHideDrGraph = function(status){
             var chartList =  VoltDbUI.drChartList;
             if(chartList != undefined && chartList.length > 0){
                 for(var i = 0; i < chartList.length; i++){
                     if(status){
                         $('#ChartDrReplicationRate_' + chartList[i]).show();
+                        $('#divDrView').show();
                     } else {
                         $('#ChartDrReplicationRate_' + chartList[i]).hide();
+                        $('#divDrView').hide();
                     }
                 }
-
-
             }
         }
 
