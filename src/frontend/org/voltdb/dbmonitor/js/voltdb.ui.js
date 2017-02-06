@@ -1533,12 +1533,12 @@ var loadPage = function (serverName, portid) {
                 for(var i = 0; i < chartList.length; i++){
                     if(status){
                         $('#ChartDrReplicationRate_' + chartList[i]).show();
+                        $('#divDrView').show();
                     } else {
                         $('#ChartDrReplicationRate_' + chartList[i]).hide();
+                        $('#divDrView').hide();
                     }
                 }
-
-
             }
         }
 
