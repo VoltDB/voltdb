@@ -250,17 +250,17 @@ class __attribute__((visibility("default"))) VoltDBEngine {
                        bool shouldDRStream);
 
         /**
-         * Reset the result buffer (use the final one by default in case the first is still in use)
+         * Reset the result buffer (use the nextResultBuffer by default)
          */
-        void resetReusedResultOutputBuffer(const size_t headerSize = 0, const int bufferHint = 1) {
-            if (bufferHint == 0) {
+        void resetReusedResultOutputBuffer(const size_t headerSize = 0, const int batchIndex = 1) {
+            if (batchIndex == 0) {
                 m_resultOutput.initializeWithPosition(m_firstReusedResultBuffer,
                                                       m_firstReusedResultCapacity,
                                                       headerSize);
             }
             else {
-                m_resultOutput.initializeWithPosition(m_finalReusedResultBuffer,
-                                                      m_finalReusedResultCapacity,
+                m_resultOutput.initializeWithPosition(m_nextReusedResultBuffer,
+                                                      m_nextReusedResultCapacity,
                                                       headerSize);
             }
             m_exceptionOutput.initializeWithPosition(m_exceptionBuffer,
@@ -294,7 +294,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         void setBuffers(char *parameter_buffer, int m_parameterBuffercapacity,
                 char* perFragmentStatsBuffer, int perFragmentStatsBufferCapacity,
                 char *firstResultBuffer, int firstResultBufferCapacity,
-                char *finalResultBuffer, int finalResultBufferCapacity,
+                char *nextResultBuffer, int nextResultBufferCapacity,
                 char *exceptionBuffer, int exceptionBufferCapacity);
 
         const char* getParameterBuffer() const { return m_parameterBuffer; }
@@ -313,10 +313,10 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         int getResultsSize() const;
 
         /** Returns the buffer for receiving result tables from EE. */
-        char* getReusedResultBuffer() const { return m_finalReusedResultBuffer; }
+        char* getReusedResultBuffer() const { return m_nextReusedResultBuffer; }
 
         /** Returns the size of buffer for receiving result tables from EE. */
-        int getReusedResultBufferCapacity() const { return m_finalReusedResultCapacity; }
+        int getReusedResultBufferCapacity() const { return m_nextReusedResultCapacity; }
 
         int getPerFragmentStatsSize() const;
         char* getPerFragmentStatsBuffer() const { return m_perFragmentStatsBuffer; }
@@ -640,10 +640,10 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         int m_firstReusedResultCapacity;
 
         /** buffer object to receive final result tables from EE. */
-        char* m_finalReusedResultBuffer;
+        char* m_nextReusedResultBuffer;
 
         /** size of m_finalReusedResultBuffer. */
-        int m_finalReusedResultCapacity;
+        int m_nextReusedResultCapacity;
 
         // arrays to hold fragment ids and dep ids from java
         // n.b. these are 8k each, should be boost shared arrays?

@@ -659,7 +659,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             }
 
             int bufferHint = Math.min(m_currentBatchIndex,1);
-            FastDeserializer results = coreExecutePlanFragments(bufferHint, numFragmentIds, planFragmentIds,
+            FastDeserializer results = coreExecutePlanFragments(m_currentBatchIndex, numFragmentIds, planFragmentIds,
                     inputDepIds, parameterSets, isWriteFrag, writeCRC, txnId, spHandle, lastCommittedSpHandle,
                     uniqueId, undoQuantumToken, traceOn);
 
@@ -687,7 +687,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     }
 
     protected abstract FastDeserializer coreExecutePlanFragments(
-            int bufferHint,
+            int batchIndex,
             int numFragmentIds,
             long[] planFragmentIds,
             long[] inputDepIds,
@@ -953,7 +953,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      */
     protected native int nativeExecutePlanFragments(
             long pointer,
-            int bufferHint,
+            int batchIndex,
             int numFragments,
             long[] planFragmentIds,
             long[] inputDepIds,

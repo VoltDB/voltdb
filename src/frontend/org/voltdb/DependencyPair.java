@@ -19,6 +19,14 @@ package org.voltdb;
 
 import java.nio.ByteBuffer;
 
+/*
+ * DependencyPairs represent a relationship between the steps of an MP System Procedure we are
+ * currently on and the Table result that is associated with that step. In some cases these dependencies
+ * are passed around between processes on the same host in which case they are actual Tables, but in
+ * other cases they are received over the network, in which case they are serialized into arrays.
+ * It is often convenient to leave them in whatever form they were created in and defer the conversion
+ * until it is actually necessary.
+ */
 public abstract class DependencyPair {
 
     public final int depId;
@@ -31,6 +39,10 @@ public abstract class DependencyPair {
 
     public abstract VoltTable getTableDependency();
 
+    /*
+     * Concrete class for a DependencyPair that is created from a VoltTable but may
+     * need to be serialized into a ByteArray.
+     */
     public static class TableDependencyPair extends DependencyPair {
         private final VoltTable dependencyTable;
 
@@ -53,6 +65,10 @@ public abstract class DependencyPair {
         }
     }
 
+    /*
+     * Concrete class for a DependencyPair that is created from a ByteArray (typically
+     * from the network) that may need to be represented as a VoltTable.
+     */
     public static class BufferDependencyPair extends DependencyPair {
         private final byte[] dependencyByteArray;
         private final int startPosition;
@@ -71,14 +87,6 @@ public abstract class DependencyPair {
 
         public ByteBuffer getBufferDependency() {
             return ByteBuffer.wrap(dependencyByteArray, startPosition, totalLen);
-        }
-
-        private static int byteArrayToInt(byte[] b, int position)
-        {
-            return   b[position+3] & 0xFF |
-                    (b[position+2] & 0xFF) << 8 |
-                    (b[position+1] & 0xFF) << 16 |
-                    (b[position] & 0xFF) << 24;
         }
 
         public VoltTable getTableDependency() {
