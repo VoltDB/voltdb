@@ -2283,6 +2283,10 @@ function alertNodeClicked(obj) {
 
                 if (!replicationDetails.hasOwnProperty("DR_GRAPH")) {
                     replicationDetails["DR_GRAPH"] = {};
+
+                }
+
+                if(!replicationDetails["DR_GRAPH"].hasOwnProperty("cluster_id + '_' + producer_cluster_id")){
                     replicationDetails["DR_GRAPH"][cluster_id + '_' + producer_cluster_id] = {}
                     replicationDetails["DR_GRAPH"][cluster_id + '_' + producer_cluster_id]["REPLICATION_DATA"] = [];
                     replicationDetails["DR_GRAPH"][cluster_id + '_' + producer_cluster_id]['REPLICATION_RATE_1M'] = 0
