@@ -17,8 +17,10 @@
 
 package org.voltcore.utils.ssl;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ReadOnlyBufferException;
+import java.nio.channels.ScatteringByteChannel;
 
 import javax.net.ssl.SSLEngine;
 import javax.net.ssl.SSLEngineResult;
@@ -26,7 +28,10 @@ import javax.net.ssl.SSLException;
 
 import org.voltcore.network.TLSException;
 
+import io.netty_voltpatches.buffer.ByteBuf;
+
 public class SSLBufferDecrypter {
+    public final static int TLS_HEADER_SIZE = 5;
 
     private final SSLEngine m_sslEngine;
 
@@ -34,7 +39,35 @@ public class SSLBufferDecrypter {
         this.m_sslEngine = sslEngine;
     }
 
-    public void tlsunwrap(ByteBuffer srcBuffer, ByteBuffer dstBuffer) {
+    public boolean readTLSFrame(ScatteringByteChannel chn, ByteBuf buf) throws IOException {
+        int widx = buf.writerIndex();
+        ByteBuf header = buf.slice(widx, TLS_HEADER_SIZE).clear();
+        int rc = 0;
+        do {
+            rc = header.writeBytes(chn, header.writableBytes());
+        } while(rc > 0 && header.isWritable());
+        if (rc < 0) {
+            throw new IOException("channel closed while reading tls frame header");
+        }
+        if (rc == 0) return false;
+
+        int framesz = header.getShort(3);
+        if (framesz+header.capacity() > buf.writableBytes()) {
+            throw new IOException("destination buffer is too small to contain the whole frame");
+        }
+        buf.writerIndex(buf.writerIndex() + header.writerIndex());
+
+        ByteBuf frame = buf.slice(buf.writerIndex(), framesz).clear();
+        while (frame.isWritable()) {
+            if (frame.writeBytes(chn, frame.writableBytes()) < 0) {
+                throw new IOException("channel closed while reading tls frame header");
+            }
+        }
+        buf.writerIndex(buf.writerIndex()+framesz);
+        return true;
+    }
+
+    public int tlsunwrap(ByteBuffer srcBuffer, ByteBuffer dstBuffer) {
         while (true) {
             SSLEngineResult result = null;
             ByteBuffer slice = dstBuffer.slice();
@@ -45,10 +78,13 @@ public class SSLBufferDecrypter {
             }
             switch (result.getStatus()) {
                 case OK:
+                    if (result.bytesProduced() == 0 && !srcBuffer.hasRemaining()) {
+                        return 0;
+                    }
                     // in m_dstBuffer, newly decrtyped data is between pos and lim
                     if (result.bytesProduced() > 0) {
                         dstBuffer.limit(dstBuffer.position() + result.bytesProduced());
-                        return;
+                        return result.bytesProduced();
                         }
                     else {
                         continue;
@@ -62,5 +98,4 @@ public class SSLBufferDecrypter {
             }
         }
     }
-
 }

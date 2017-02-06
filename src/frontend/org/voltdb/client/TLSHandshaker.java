@@ -191,7 +191,6 @@ public class TLSHandshaker {
                 m_sc.configureBlocking(isBlocked);
             }
         }
-
         return true;
     }
 

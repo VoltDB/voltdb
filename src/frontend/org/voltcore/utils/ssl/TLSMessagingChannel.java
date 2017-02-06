@@ -52,96 +52,65 @@ public class TLSMessagingChannel extends MessagingChannel {
         return m_engine.getSession().getApplicationBufferSize();
     }
 
+    private final static int NOT_AVAILABLE = -1;
+
+    private int validateLength(int sz) throws IOException {
+        if (sz < 1 || sz > (1<<25)) {
+            throw new IOException("Invalid message length header value: " + sz
+                    + ". It must be between 1 and " + (1<<25));
+        }
+        return sz;
+    }
+
     @Override
     public ByteBuffer readMessage() throws IOException {
-        ByteBuf header = Unpooled.wrappedBuffer(new byte[5]);
-        ByteBuffer hdrjbb = header.nioBuffer();
-
-        int rc = 0;
-        do {
-            rc = m_socketChannel.read(hdrjbb);
-        } while(rc > 0 && hdrjbb.hasRemaining());
-        if (rc < 0) {
-            throw new IOException("failed to read tls frame header");
-        } else if (rc == 0) {
-            return null;
-        }
-
-        int framesz = header.getShort(3);
-        if (framesz <= 0) {
-            throw new IOException("unexpected tls frame size " + framesz);
-        }
-
-        ByteBuf readbuf = m_ce.allocator().ioBuffer(packetBufferSize());
-        ByteBuf frame = readbuf.slice(0, framesz+header.capacity()).clear();
-        header.readBytes(frame, header.readableBytes());
-        try {
-            while (frame.isWritable()) {
-                if (frame.writeBytes(m_socketChannel, frame.writableBytes()) < 0) {
-                    throw new IOException("failed to read tls frame");
-                }
-            }
-        } catch (IOException e) {
-            readbuf.release();
-            throw e;
-        }
         final int appsz = applicationBufferSize();
-        ByteBuf clear = m_ce.allocator().buffer(appsz).writerIndex(appsz);
-        ByteBuffer src = frame.nioBuffer();
-        ByteBuffer dst = clear.nioBuffer();
-        try {
-            m_decrypter.tlsunwrap(src, dst);
-            clear.writerIndex(dst.limit());
-            assert !src.hasRemaining() : "decrypter did not wholly consume the source buffer";
-        } catch (TLSException e) {
-            readbuf.release();
-            clear.release();
-            throw new IOException("failed to decrypt tls frame", e);
-        }
-        final int msgsz = clear.readInt();
+        ByteBuf readbuf = m_ce.allocator().ioBuffer(packetBufferSize());
+        CompositeByteBuf msgbb = Unpooled.compositeBuffer();
 
-        ByteBuf message = Unpooled.wrappedBuffer(new byte [msgsz]).clear();
-        clear.readBytes(message, clear.readableBytes());
-        clear.release();
-        final int needed = CipherExecutor.framesFor(msgsz);
         try {
-            for (int have = 1; have < needed; ++ have) {
-                header.clear();
-                while (header.isWritable()) {
-                    if (header.writeBytes(m_socketChannel, header.writableBytes()) < 0) {
-                        throw new IOException("failed to read tls frame header");
-                    }
+            ByteBuf clear = m_ce.allocator().buffer(appsz).writerIndex(appsz);
+            ByteBuffer src, dst;
+            do {
+                readbuf.clear();
+                if (!m_decrypter.readTLSFrame(m_socketChannel, readbuf)) {
+                    return null;
                 }
-                framesz = header.getShort(3);
-                if (framesz <= 0) {
-                    throw new IOException("inexpected tls frame size " + framesz);
-                }
-                frame = readbuf.slice(0, framesz+header.capacity()).clear();
-                header.readBytes(frame, header.readableBytes());
-                while (frame.isWritable()) {
-                    if (frame.writeBytes(m_socketChannel, frame.writableBytes()) < 0) {
-                        throw new IOException("failed to read tls frame");
-                    }
-                }
-                int clearsz = Math.min(CipherExecutor.PAGE_SIZE, message.readableBytes());
-                clear = message.slice(message.writerIndex(), clearsz).writerIndex(clearsz);
-                src = frame.nioBuffer();
+                src = readbuf.nioBuffer();
                 dst = clear.nioBuffer();
-                try {
-                    m_decrypter.tlsunwrap(src, dst);
-                } catch (TLSException e) {
-                    throw new IOException("failed to decrypt tls frame", e);
+            } while (m_decrypter.tlsunwrap(src, dst) == 0);
+
+            msgbb.addComponent(true, clear.writerIndex(dst.limit()));
+
+            int needed = msgbb.readableBytes() >= 4 ? validateLength(msgbb.readInt()) : NOT_AVAILABLE;
+            while (msgbb.readableBytes() < (needed == NOT_AVAILABLE ? 4 : needed)) {
+                clear = m_ce.allocator().buffer(appsz).writerIndex(appsz);
+                do {
+                    readbuf.clear();
+                    if (!m_decrypter.readTLSFrame(m_socketChannel, readbuf)) {
+                        return null;
+                    }
+                    src = readbuf.nioBuffer();
+                    dst = clear.nioBuffer();
+                } while (m_decrypter.tlsunwrap(src, dst) == 0);
+
+                msgbb.addComponent(true, clear.writerIndex(dst.limit()));
+
+                if (needed == NOT_AVAILABLE && msgbb.readableBytes() >= 4) {
+                    needed = validateLength(msgbb.readInt());
                 }
-                assert !src.hasRemaining() : "decrypter did not wholly consume the source buffer";
-                message.writerIndex(message.writerIndex()+dst.limit());
             }
-        } catch (IOException e) {
+
+            ByteBuffer retbb = ByteBuffer.allocate(needed);
+            msgbb.readBytes(retbb);
+            msgbb.discardReadComponents();
+
+            return (ByteBuffer)retbb.flip();
+
+        } finally {
             readbuf.release();
-            throw e;
+            msgbb.release();
         }
-        readbuf.release();
-        assert message.readableBytes() == msgsz : "failed to compose a whole message from expected tls frames";
-        return message.nioBuffer();
     }
 
     @Override

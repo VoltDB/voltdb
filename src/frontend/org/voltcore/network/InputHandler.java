@@ -36,7 +36,7 @@ public interface InputHandler {
      * @param inputStream
      * @return ByteBuffer containing the message data
      */
-    ByteBuffer retrieveNextMessage(ReadStream inputStream) throws IOException;
+    ByteBuffer retrieveNextMessage(NIOReadStream inputStream) throws IOException;
 
     /**
      * Handle the incoming message produced by retrieve next message

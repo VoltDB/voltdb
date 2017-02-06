@@ -31,7 +31,7 @@ public interface Connection {
      * Retrieve the read stream for this connection.
      * @return Reference to a stream of incoming data
      */
-    ReadStream readStream();
+    NIOReadStream readStream();
 
     void disableReadSelection();
     void enableReadSelection();

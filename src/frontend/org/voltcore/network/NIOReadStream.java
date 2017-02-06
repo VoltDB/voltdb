@@ -61,14 +61,12 @@ import com.google_voltpatches.common.collect.ImmutableList;
 Provides a non-blocking stream-like interface on top of the Java NIO ReadableByteChannel. It calls
 the underlying read() method only when needed.
 */
-public class NIOReadStream implements ReadStream {
+public class NIOReadStream {
 
-    @Override
     public int dataAvailable() {
         return m_totalAvailable;
     }
 
-    @Override
     public int getInt() {
         // TODO: Optimize?
         byte[] intbytes = new byte[4];
@@ -81,7 +79,6 @@ public class NIOReadStream implements ReadStream {
         return output;
     }
 
-    @Override
     public void getBytes(byte[] output) {
         if (m_totalAvailable < output.length) {
             throw new IllegalStateException("Requested " + output.length + " bytes; only have "
@@ -182,7 +179,6 @@ public class NIOReadStream implements ReadStream {
         }
     }
 
-    @Override
     public int read(ReadableByteChannel channel, int maxBytes, NetworkDBBPool pool) throws IOException {
         int bytesRead = 0;
         int lastRead = 1;
@@ -233,7 +229,6 @@ public class NIOReadStream implements ReadStream {
         return bytesRead;
     }
 
-    @Override
     public void shutdown() {
         for (BBContainer c : m_readBBContainers) {
             c.discard();
@@ -245,7 +240,6 @@ public class NIOReadStream implements ReadStream {
         m_poolBBContainer = null;
     }
 
-    @Override
     public int getBytes(ByteBuffer output) {
         throw new UnsupportedOperationException();
     }
@@ -256,7 +250,6 @@ public class NIOReadStream implements ReadStream {
     private long m_bytesRead = 0;
     private long m_lastBytesRead = 0;
 
-    @Override
     public long getBytesRead(boolean interval) {
         if (interval) {
             final long bytesRead = m_bytesRead;

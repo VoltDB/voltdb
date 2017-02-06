@@ -32,7 +32,7 @@ import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashMap;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.Connection;
-import org.voltcore.network.ReadStream;
+import org.voltcore.network.NIOReadStream;
 import org.voltcore.network.VoltProtocolHandler;
 import org.voltcore.network.WriteStream;
 import org.voltcore.utils.CoreUtils;
@@ -351,7 +351,7 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
     }
 
     @Override
-    public ReadStream readStream() {
+    public NIOReadStream readStream() {
         throw new UnsupportedOperationException();
     }
 

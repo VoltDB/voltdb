@@ -30,7 +30,6 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.NavigableSet;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
@@ -53,6 +52,7 @@ import javax.net.ssl.SSLEngine;
 import org.HdrHistogram_voltpatches.AbstractHistogram;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONObject;
+import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.BinaryPayloadMessage;
 import org.voltcore.messaging.HostMessenger;
@@ -60,8 +60,8 @@ import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.network.CipherExecutor;
 import org.voltcore.network.Connection;
+import org.voltcore.network.NIOReadStream;
 import org.voltcore.network.QueueMonitor;
-import org.voltcore.network.ReadStream;
 import org.voltcore.network.ReverseDNSPolicy;
 import org.voltcore.network.VoltNetworkPool;
 import org.voltcore.network.VoltPort;
@@ -71,6 +71,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
+import org.voltcore.utils.RateLimitedLogger;
 import org.voltcore.utils.ssl.MessagingChannel;
 import org.voltcore.utils.ssl.SSLConfiguration;
 import org.voltdb.AuthSystem.AuthProvider;
@@ -99,11 +100,9 @@ import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.base.Predicate;
 import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.common.base.Throwables;
-import com.google_voltpatches.common.collect.ImmutableSortedSet;
+import com.google_voltpatches.common.collect.ImmutableSet;
 import com.google_voltpatches.common.collect.Sets;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
-import org.voltcore.logging.Level;
-import org.voltcore.utils.RateLimitedLogger;
 
 /**
  * Represents VoltDB's connection to client libraries outside the cluster.
@@ -353,7 +352,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         sslEngine.setUseClientMode(false);
                         sslEngine.setNeedClientAuth(false);
 
-                        NavigableSet<String> enabled = ImmutableSortedSet.copyOf(sslEngine.getEnabledCipherSuites());
+                        Set<String> enabled = ImmutableSet.copyOf(sslEngine.getEnabledCipherSuites());
                         Set<String> intersection = Sets.intersection(SSLConfiguration.PREFERRED_CIPHERS, enabled);
                         if (intersection.isEmpty()) {
                             hostLog.warn("Preferred cipher suites are not available");
@@ -1682,7 +1681,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
 
         @Override
-        public ReadStream readStream() {
+        public NIOReadStream readStream() {
             throw new UnsupportedOperationException();
         }
 

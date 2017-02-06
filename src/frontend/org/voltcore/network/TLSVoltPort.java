@@ -171,7 +171,7 @@ public class TLSVoltPort extends VoltPort  {
                         if (read > 0) {
                             ByteBuf frameHeader = Unpooled.wrappedBuffer(new byte[TLS_HEADER_SIZE]);
                             while (readStream().dataAvailable() >= TLS_HEADER_SIZE) {
-                                NIOReadStream rdstrm = (NIOReadStream)readStream();
+                                NIOReadStream rdstrm = readStream();
                                 rdstrm.peekBytes(frameHeader.array());
                                 m_needed = frameHeader.getShort(3) + TLS_HEADER_SIZE;
                                 if (rdstrm.dataAvailable() < m_needed) break;
@@ -377,9 +377,9 @@ public class TLSVoltPort extends VoltPort  {
             final int appBuffSz = applicationBufferSize();
             ByteBuf dest = m_ce.allocator().buffer(appBuffSz).writerIndex(appBuffSz);
             ByteBuffer destjbb = dest.nioBuffer();
-
+            int decryptedBytes = 0;
             try {
-                m_decrypter.tlsunwrap(slicebbarr[0], destjbb);
+                decryptedBytes = m_decrypter.tlsunwrap(slicebbarr[0], destjbb);
             } catch (TLSException e) {
                 m_inFlight.release(); dest.release();
                 m_exceptions.offer(new ExecutionException("fragment decrypt task failed", e));
@@ -390,9 +390,13 @@ public class TLSVoltPort extends VoltPort  {
             assert !slicebbarr[0].hasRemaining() : "decrypter did not wholly consume the source buffer";
 
             // src buffer is wholly consumed
-            dest.writerIndex(destjbb.limit());
-            if (!isDead()) {
-                m_msgbb.addComponent(true, dest);
+            if (!isDead() ) {
+                if (decryptedBytes > 0) {
+                    dest.writerIndex(destjbb.limit());
+                    m_msgbb.addComponent(true, dest);
+                } else {
+                    dest.release();
+                }
 
                 int read = 0;
                 while (m_msgbb.readableBytes() >= getNeededBytes()) {
