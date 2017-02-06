@@ -50,8 +50,8 @@ AS
      FROM partitioned_table
  GROUP BY rowid_group;
 
--- Export Table for Partitioned Data Table deletions
-CREATE TABLE export_partitioned_table
+-- Stream Table for Partitioned Data Table deletions
+CREATE STREAM export_partitioned_table PARTITION ON COLUMN rowid
 (
   txnid                     BIGINT          NOT NULL
 , rowid                     BIGINT          NOT NULL
@@ -81,9 +81,8 @@ CREATE TABLE export_partitioned_table
 --, type_null_polygon         GEOGRAPHY
 --, type_not_null_polygon     GEOGRAPHY       NOT NULL
 );
-PARTITION TABLE export_partitioned_table ON COLUMN rowid;
 
-CREATE TABLE export_mirror_partitioned_table
+CREATE STREAM export_mirror_partitioned_table PARTITION ON COLUMN rowid
 (
   txnid                     BIGINT          NOT NULL
 , rowid                     BIGINT          NOT NULL
@@ -112,15 +111,12 @@ CREATE TABLE export_mirror_partitioned_table
 --, type_not_null_point       GEOGRAPHY_POINT NOT NULL
 --, type_null_polygon         GEOGRAPHY
 --, type_not_null_polygon     GEOGRAPHY       NOT NULL
-, PRIMARY KEY (rowid)
 );
-PARTITION TABLE export_mirror_partitioned_table ON COLUMN rowid;
 
-CREATE TABLE export_done_table
+CREATE STREAM export_done_table PARTITION ON COLUMN txnid
 (
   txnid                     BIGINT          NOT NULL
 );
-PARTITION TABLE export_done_table ON COLUMN txnid;
 
 -- Replicated Table
 CREATE TABLE replicated_table
@@ -170,8 +166,8 @@ AS
      FROM replicated_table
  GROUP BY rowid_group;
 
--- Export Table for Replicated Data Table deletions
-CREATE TABLE export_replicated_table
+-- Stream Table for Replicated Data Table deletions
+CREATE STREAM export_replicated_table
 (
   txnid                     BIGINT          NOT NULL
 , rowid                     BIGINT          NOT NULL
@@ -202,17 +198,11 @@ CREATE TABLE export_replicated_table
 --, type_not_null_polygon     GEOGRAPHY       NOT NULL
 );
 
-CREATE TABLE export_skinny_partitioned_table
+CREATE STREAM export_skinny_partitioned_table PARTITION ON COLUMN rowid
 (
   txnid                     BIGINT          NOT NULL
 , rowid                     BIGINT          NOT NULL
 );
-PARTITION TABLE export_skinny_partitioned_table ON COLUMN rowid;
-
-EXPORT TABLE export_skinny_partitioned_table;
-EXPORT TABLE export_partitioned_table;
-EXPORT TABLE export_replicated_table;
-EXPORT TABLE export_done_table;
 
 -- Simple User-Defined Stored Procedures, to test CREATE PROCEDURE AS ...
 -- and the display of User-Defined Stored Procedures in the VMC

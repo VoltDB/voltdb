@@ -1335,14 +1335,14 @@ public class FunctionSQL extends Expression {
             case FUNC_MOD : {
                 if (nodes[0].dataType == null) {
                     if (nodes[1].dataType == null) {
+                        // Data types for both operands are unknown, throw exception.
                         throw Error.error(ErrorCode.X_42567);
                     }
-                    if (nodes[0].dataType.isIntegralType()) {
-                        nodes[0].dataType = Type.SQL_BIGINT;
-                    }
-                    else {
-                        nodes[0].dataType = nodes[1].dataType;
-                    }
+                    nodes[0].dataType = nodes[1].dataType;
+                }
+                if (nodes[0].dataType.isIntegralType()) {
+                    // Promote the data type to BIGINT for integral data types.
+                    nodes[0].dataType = Type.SQL_BIGINT;
                 }
 
                 if (nodes[1].dataType == null) {

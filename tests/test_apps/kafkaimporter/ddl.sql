@@ -84,16 +84,13 @@ CREATE TABLE kafkamirrortable2
 PARTITION TABLE kafkamirrortable2 ON COLUMN key;
 
 -- Export table
-CREATE TABLE kafkaexporttable1
+CREATE STREAM kafkaexporttable1 PARTITION ON COLUMN KEY
      (
                   KEY   BIGINT NOT NULL ,
                   value BIGINT NOT NULL
      );
 
-PARTITION TABLE kafkaexporttable1 ON COLUMN KEY;
-EXPORT TABLE kafkaexporttable1;
-
-CREATE TABLE kafkaexporttable2
+CREATE STREAM kafkaexporttable2 PARTITION ON COLUMN KEY
     (
           key                       BIGINT        NOT NULL
         , value                     BIGINT        NOT NULL
@@ -119,8 +116,6 @@ CREATE TABLE kafkaexporttable2
         , type_null_varchar1024     VARCHAR(1024)
         , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
     );
-PARTITION TABLE kafkaexporttable2 ON COLUMN key;
-EXPORT TABLE kafkaexporttable2;
 
 
 CREATE TABLE importcounts

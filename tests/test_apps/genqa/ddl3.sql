@@ -46,7 +46,7 @@ AS
  GROUP BY rowid_group;
 
 -- Export Table for Partitioned Data Table deletions
-CREATE TABLE export_partitioned_table
+CREATE STREAM export_partitioned_table PARTITION ON COLUMN rowid export to target default
 (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
@@ -72,9 +72,8 @@ CREATE TABLE export_partitioned_table
 , type_null_varchar1024     VARCHAR(1024)
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 );
-PARTITION TABLE export_partitioned_table ON COLUMN rowid;
 
-CREATE TABLE export_partitioned_table_foo
+CREATE STREAM export_partitioned_table_foo PARTITION ON COLUMN rowid EXPORT TO TARGET foo
 (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
@@ -100,7 +99,6 @@ CREATE TABLE export_partitioned_table_foo
 , type_null_varchar1024     VARCHAR(1024)
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 );
-PARTITION TABLE export_partitioned_table_foo ON COLUMN rowid;
 
 CREATE TABLE export_mirror_partitioned_table
 (
@@ -127,21 +125,18 @@ CREATE TABLE export_mirror_partitioned_table
 , type_not_null_varchar128  VARCHAR(128)  NOT NULL
 , type_null_varchar1024     VARCHAR(1024)
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
-, PRIMARY KEY (rowid)
 );
 PARTITION TABLE export_mirror_partitioned_table ON COLUMN rowid;
 
-CREATE TABLE export_done_table
+CREATE STREAM export_done_table PARTITION ON COLUMN txnid export to target default
 (
   txnid                     BIGINT        NOT NULL
 );
-PARTITION TABLE export_done_table ON COLUMN txnid;
 
-CREATE TABLE export_done_table_foo
+CREATE STREAM export_done_table_foo PARTITION ON COLUMN txnid EXPORT TO TARGET foo
 (
   txnid                     BIGINT        NOT NULL
 );
-PARTITION TABLE export_done_table_foo ON COLUMN txnid;
 
 -- Replicated Table
 CREATE TABLE replicated_table
@@ -188,7 +183,7 @@ AS
  GROUP BY rowid_group;
 
 -- Export Table for Replicated Data Table deletions
-CREATE TABLE export_replicated_table
+CREATE STREAM export_replicated_table export to target default
 (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
@@ -215,7 +210,7 @@ CREATE TABLE export_replicated_table
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 );
 
-CREATE TABLE export_replicated_table_foo
+CREATE STREAM export_replicated_table_foo EXPORT TO TARGET foo
 (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
@@ -242,19 +237,17 @@ CREATE TABLE export_replicated_table_foo
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 );
 
-CREATE TABLE export_skinny_partitioned_table
+CREATE STREAM export_skinny_partitioned_table PARTITION ON COLUMN rowid export to target default
 (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
 );
-PARTITION TABLE export_skinny_partitioned_table ON COLUMN rowid;
 
-CREATE TABLE export_skinny_partitioned_table_foo
+CREATE STREAM export_skinny_partitioned_table_foo PARTITION ON COLUMN rowid EXPORT TO TARGET foo
 (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
 );
-PARTITION TABLE export_skinny_partitioned_table_foo ON COLUMN rowid;
 
 CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleSkinnyExportSinglePartition;
 CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleSinglePartition;
@@ -268,16 +261,3 @@ CREATE PROCEDURE FROM CLASS genqa.procedures.WaitSinglePartition;
 CREATE PROCEDURE FROM CLASS genqa.procedures.WaitMultiPartition;
 CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleExportDoneTable;
 CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleExportGroupDoneTable;
-
-PARTITION PROCEDURE JiggleSkinnyExportSinglePartition
-  ON TABLE export_skinny_partitioned_table COLUMN rowid;
-
-EXPORT TABLE export_skinny_partitioned_table;
-EXPORT TABLE export_partitioned_table;
-EXPORT TABLE export_replicated_table;
-EXPORT TABLE export_done_table;
-
-EXPORT TABLE export_skinny_partitioned_table_foo TO STREAM foo;
-EXPORT TABLE export_partitioned_table_foo TO STREAM foo;
-EXPORT TABLE export_replicated_table_foo TO STREAM foo;
-EXPORT TABLE export_done_table_foo TO STREAM foo;
