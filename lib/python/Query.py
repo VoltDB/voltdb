@@ -20,8 +20,17 @@ import cmd
 import socket
 import os.path
 from datetime import datetime
-from sslutils import FastSerializer
-from voltdbclient import ReadBuffer, VoltColumn, VoltTable, VoltException, VoltResponse, VoltProcedure
+
+# this case is to handle SSL set by apprunner in system tests
+# when called from sqlcov or other tests, there's no SSL involved and
+# no special handling needed
+try:
+    from sslutils import FastSerializer
+    from voltdbclient import ReadBuffer, VoltColumn, VoltTable, VoltException, VoltResponse, VoltProcedure
+    supportSSL = True
+except ImportError:
+    from voltdbclient import ReadBuffer, VoltColumn, VoltTable, VoltException, VoltResponse, VoltProcedure, FastSerializer
+    supportSSL = False
 
 class VoltQueryClient(cmd.Cmd):
     TYPES = {"byte": FastSerializer.VOLTTYPE_TINYINT,
@@ -43,8 +52,7 @@ class VoltQueryClient(cmd.Cmd):
                     FastSerializer.VOLTTYPE_TIMESTAMP:
                         lambda x: datetime.fromtimestamp(x)}
 
-    def __init__(self, host, port, username = "", password = "",
-                 dump_file = None, client_ssl=False, ssl_config_file=""):
+    def __init__(self, host, port, username = "", password = "", dump_file = None, client_ssl=False, ssl_config_file=""):
         cmd.Cmd.__init__(self)
 
         self.__quiet = False
@@ -52,13 +60,13 @@ class VoltQueryClient(cmd.Cmd):
         # self.__usessl = ssl
         # self.__ssl_config_file = ssl_config_file
 
-        self.__initialize(host, port, username, password, dump_file, client_ssl, ssl_config_file)
+        self.__initialize(host, port, username, password, client_ssl, ssl_config_file, dump_file)
 
-    def __initialize(self, host, port, username, password, dump_file, client_ssl, ssl_config_file):
-        self.fs = FastSerializer(host=host, port=port,
-                    username=username, password=password,
-                    dump_file_path=dump_file, client_ssl=client_ssl,
-                    ssl_config_file=ssl_config_file)
+    def __initialize(self, host, port, username, password, client_ssl, ssl_config_file, dump_file):
+        if supportSSL:
+            self.fs = FastSerializer(host=host, port=port, username=username, password=password, client_ssl=client_ssl, ssl_config_file=ssl_config_file, dump_file_path=dump_file)
+        else:
+            self.fs = FastSerializer(host=host, port=port, username=username, password=password, dump_file_path=dump_file)
 
         self.adhoc = VoltProcedure(self.fs, "@AdHoc",
                                    [FastSerializer.VOLTTYPE_STRING])
