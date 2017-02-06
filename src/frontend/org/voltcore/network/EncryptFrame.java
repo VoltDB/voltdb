@@ -23,14 +23,39 @@ import com.google_voltpatches.common.collect.ImmutableList;
 
 import io.netty_voltpatches.buffer.ByteBuf;
 
+/**
+ * Container and tracking class used during message encryptions
+ */
 class EncryptFrame {
 
     final static int UNCHUNKED_SIGIL = -1;
+    /**
+     * chunk number in a sequence of chunks. If a message is split into 3 chunks
+     * then their respective chunk numbers would be 1, 2, and 3. Each chunk
+     * chunks value would be 3
+     */
     final int chunkno;
+    /**
+     * chunk number in a sequence of chunks. If a message is split into 3 chunks
+     * then their respective chunk numbers would be 1, 2, and 3. Each chunk
+     * chunks value would be 3
+     */
     final int chunks;
+    /**
+     * Once encrypted this value signifies the difference in bytes between
+     * the encrypted chunk, and the non encrypted source
+     */
     final int delta;
+    /**
+     * SSLEngine encrypt can only encrypt up to 16k at a time, so a frame
+     * contains an encrypt operation source buffer which is a slice window
+     * into the underlying bb buffer
+     */
     final ByteBuf frame;
     final ByteBuf bb;
+    /**
+     * Indicates how many Volt messages this frame contains
+     */
     final int msgs;
 
 
@@ -55,13 +80,14 @@ class EncryptFrame {
             return ImmutableList.of();
         }
         if (bb.readableBytes() <= frameMax) {
-            return ImmutableList.of(new EncryptFrame(1, 1, 0, 1, bb, bb));
+            return ImmutableList.of(new EncryptFrame(1, 1, 0, msgs, bb, bb));
         }
         int frames = bb.writerIndex() / frameMax;
         frames = bb.writerIndex() % frameMax == 0 ? frames : frames+1;
         ImmutableList.Builder<EncryptFrame> lbld = ImmutableList.builder();
         for (int chunk = 1; chunk <= frames; ++chunk) {
             int sliceSz = Math.min(frameMax, bb.readableBytes());
+            // slices are views into the underlying byte buf (bb)
             EncryptFrame piece = new EncryptFrame(chunk, frames, 0, msgs, bb.readSlice(sliceSz), bb);
             lbld.add(piece);
         }

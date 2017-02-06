@@ -66,10 +66,16 @@ public class TLSNIOWriteStream extends NIOWriteStream {
         m_encrypter = new SSLBufferEncrypter(engine);
     }
 
+    /**
+     * this values may change if a TLS session renegotiates its cipher suite
+     */
     private int applicationBufferSize() {
         return m_sslEngine.getSession().getApplicationBufferSize();
     }
 
+    /**
+     * this values may change if a TLS session renegotiates its cipher suite
+     */
     private int packetBufferSize() {
         return m_sslEngine.getSession().getPacketBufferSize();
     }
@@ -78,7 +84,7 @@ public class TLSNIOWriteStream extends NIOWriteStream {
     int serializeQueuedWrites(NetworkDBBPool pool) throws IOException {
         checkForGatewayExceptions();
 
-        final int frameMax = Math.min(CipherExecutor.PAGE_SIZE, applicationBufferSize());
+        final int frameMax = Math.min(CipherExecutor.FRAME_SIZE, applicationBufferSize());
         int processedWrites = 0;
         final Deque<DeferredSerialization> oldlist = getQueuedWrites();
         if (oldlist.isEmpty()) return 0;
@@ -92,6 +98,8 @@ public class TLSNIOWriteStream extends NIOWriteStream {
             ++processedWrites;
             final int serializedSize = ds.getSerializedSize();
             if (serializedSize == DeferredSerialization.EMPTY_MESSAGE_LENGTH) continue;
+            // pack as messages you can inside a TLS frame before you send it to
+            // the encryption gateway
             if (serializedSize > frameMax) {
                 // frames may contain only one or more whole messages, or only
                 // partial parts of one message. a message may not contain whole
@@ -163,6 +171,9 @@ public class TLSNIOWriteStream extends NIOWriteStream {
     private volatile int m_partialSize = 0;
     private final static int NONE_ADDED = Integer.MIN_VALUE;
 
+    /**
+     * Gather all the frames that comprise a whole Volt Message
+     */
     private int addFramesForCompleteMessage() {
         boolean added = false;
         EncryptFrame frame = null;
@@ -283,7 +294,7 @@ public class TLSNIOWriteStream extends NIOWriteStream {
         return m_encrypted.size()
              + m_queuedWrites.size()
              + m_partialSize
-             + m_outbuf.numComponents(); // > 1 ? m_outbuf.numComponents() - 1 : 0;
+             + m_outbuf.numComponents();
     }
 
     @Override
@@ -344,7 +355,8 @@ public class TLSNIOWriteStream extends NIOWriteStream {
 
         synchronized void offer(EncryptFrame frame) throws IOException {
             final boolean wasEmpty = m_q.isEmpty();
-            List<EncryptFrame> chunks = frame.chunked(Math.min(CipherExecutor.PAGE_SIZE, applicationBufferSize()));
+            List<EncryptFrame> chunks = frame.chunked(
+                    Math.min(CipherExecutor.FRAME_SIZE, applicationBufferSize()));
 
             m_q.addAll(chunks);
             ++m_offered;

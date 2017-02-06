@@ -19,7 +19,7 @@ package org.voltcore.network;
 
 import java.util.Deque;
 
-import jsr166y.ConcurrentLinkedDeque;
+import java.util.concurrent.ConcurrentLinkedDeque;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 

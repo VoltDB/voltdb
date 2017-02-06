@@ -62,6 +62,9 @@ public class TLSVoltPort extends VoltPort  {
         m_dcryptgw = new DecryptionGateway();
     }
 
+    /**
+     * this values may change if a TLS session renegotiates its cipher suite
+     */
     private int applicationBufferSize() {
         return m_sslEngine.getSession().getApplicationBufferSize();
     }
@@ -145,7 +148,7 @@ public class TLSVoltPort extends VoltPort  {
         ((TLSNIOWriteStream)m_writeStream).waitForPendingEncrypts();
     }
 
-    private final static int MAX_READ = CipherExecutor.PAGE_SIZE << 1;
+    private final static int MAX_READ = CipherExecutor.FRAME_SIZE << 1; //32 KB
     private final static int NOT_AVAILABLE = -1;
 
     private int m_needed = NOT_AVAILABLE;
@@ -199,7 +202,7 @@ public class TLSVoltPort extends VoltPort  {
                 drainEncryptedStream();
                 /*
                  * some encrypt or decrypt task may have finished while this port is running
-                 * so enabling write interst would have been muted. Singal is there to
+                 * so enabling write interest would have been muted. Signal is there to
                  * reconsider finished decrypt or encrypt tasks.
                  */
             } while (m_signal.compareAndSet(true, false));
@@ -231,6 +234,12 @@ public class TLSVoltPort extends VoltPort  {
             }
         }
     }
+    /**
+     * if this port is running calls to enableWriteSelection are
+     * ignored by the super class. This signaling artifacts tells
+     * this port run() method to keep polling for finished encrypt
+     * and decrypt taks
+     */
     private final AtomicBoolean m_signal = new AtomicBoolean(false);
     /*
      * All interactions with write stream must be protected
@@ -291,7 +300,7 @@ public class TLSVoltPort extends VoltPort  {
      */
     class DecryptionGateway implements Runnable {
 
-        private final byte [] m_overlap = new byte[CipherExecutor.PAGE_SIZE + 2048];
+        private final byte [] m_overlap = new byte[CipherExecutor.FRAME_SIZE + 2048];
         private final ConcurrentLinkedDeque<NIOReadStream.Slice> m_q = new ConcurrentLinkedDeque<>();
         private final CompositeByteBuf m_msgbb = Unpooled.compositeBuffer();
         private volatile int m_needed = NOT_AVAILABLE;
@@ -366,7 +375,7 @@ public class TLSVoltPort extends VoltPort  {
             }
 
             ByteBuffer [] slicebbarr = slice.bb.nioBuffers();
-            // if frame overlaps two buffers then copy it to the ovelap buffer
+            // if frame overlaps two buffers then copy it to the overlap buffer
             // and use that instead for the unwrap src buffer
             if (slicebbarr.length > 1) {
                 src = Unpooled.wrappedBuffer(m_overlap).clear();
@@ -390,11 +399,13 @@ public class TLSVoltPort extends VoltPort  {
             assert !slicebbarr[0].hasRemaining() : "decrypter did not wholly consume the source buffer";
 
             // src buffer is wholly consumed
-            if (!isDead() ) {
+            if (!isDead()) {
                 if (decryptedBytes > 0) {
                     dest.writerIndex(destjbb.limit());
                     m_msgbb.addComponent(true, dest);
                 } else {
+                    // the TLS frame was consumed by the call to engines unwrap but it
+                    // did not yield any content
                     dest.release();
                 }
 
@@ -422,7 +433,7 @@ public class TLSVoltPort extends VoltPort  {
                     m_msgbb.discardReadComponents();
                     enableWriteSelection();
                 }
-            } else {
+            } else { // it isDead()
                 dest.release();
                 releaseDecryptedBuffer();
             }

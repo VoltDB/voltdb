@@ -154,7 +154,7 @@ public class PortConnector {
                 throw new IOException("Closed");
             };
         }
-        int allocsz = Math.min(CipherExecutor.PAGE_SIZE, Integer.highestOneBit((frame.capacity()<<1) + 128));
+        int allocsz = Math.min(CipherExecutor.FRAME_SIZE, Integer.highestOneBit((frame.capacity()<<1) + 128));
         m_tlsFrame = (ByteBuffer)ByteBuffer.allocate(allocsz).clear();
         m_dec.tlsunwrap((ByteBuffer)frame.flip(), m_tlsFrame);
         return m_tlsFrame;

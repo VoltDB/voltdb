@@ -46,7 +46,7 @@ public abstract class NIOWriteStreamBase {
     /**
      * Contains serialized buffers ready to write to the socket
      */
-    private final Deque<BBContainer> m_queuedBuffers = new ArrayDeque<BBContainer>();
+    protected final ArrayDeque<BBContainer> m_queuedBuffers = new ArrayDeque<BBContainer>();
 
     protected long m_bytesWritten = 0;
     protected long m_messagesWritten = 0;
@@ -78,12 +78,12 @@ public abstract class NIOWriteStreamBase {
      */
     public int getOutstandingMessageCount()
     {
-        return getQueuedBuffers().size();
+        return m_queuedBuffers.size();
     }
 
     public boolean isEmpty()
     {
-        return getQueuedBuffers().isEmpty() && m_currentWriteBuffer == null;
+        return m_queuedBuffers.isEmpty() && m_currentWriteBuffer == null;
     }
 
     abstract int drainTo (final GatheringByteChannel channel) throws IOException;
@@ -107,12 +107,12 @@ public abstract class NIOWriteStreamBase {
             processedWrites++;
             final int serializedSize = ds.getSerializedSize();
             if (serializedSize == DeferredSerialization.EMPTY_MESSAGE_LENGTH) continue;
-            BBContainer outCont = getQueuedBuffers().peekLast();
+            BBContainer outCont = m_queuedBuffers.peekLast();
             ByteBuffer outbuf = null;
             if (outCont == null || !outCont.b().hasRemaining()) {
                 outCont = pool.acquire();
                 outCont.b().clear();
-                getQueuedBuffers().offer(outCont);
+                m_queuedBuffers.offer(outCont);
             }
 
             outbuf = outCont.b();
@@ -141,7 +141,7 @@ public abstract class NIOWriteStreamBase {
                         outCont = pool.acquire();
                         outbuf = outCont.b();
                         outbuf.clear();
-                        getQueuedBuffers().offer(outCont);
+                        m_queuedBuffers.offer(outCont);
                     }
                     if (outbuf.remaining() >= buf.remaining()) {
                         outbuf.put(buf);
@@ -169,7 +169,7 @@ public abstract class NIOWriteStreamBase {
      * Validate that serialization is accurately reporting the amount of data necessary
      * to serialize the message
      */
-    public void checkSloppySerialization(ByteBuffer buf, DeferredSerialization ds) {
+    protected void checkSloppySerialization(ByteBuffer buf, DeferredSerialization ds) {
         if (buf.limit() != buf.capacity()) {
             if (ASSERT_ON) {
                 networkLog.fatal("Sloppy serialization size for message class " + ds);
@@ -195,17 +195,13 @@ public abstract class NIOWriteStreamBase {
             bytesReleased += m_currentWriteBuffer.b().remaining();
             m_currentWriteBuffer.discard();
         }
-        while ((c = getQueuedBuffers().poll()) != null) {
+        while ((c = m_queuedBuffers.poll()) != null) {
             //Buffer is not flipped after being written to in swap and serialize, need to do it here
             c.b().flip();
             bytesReleased += c.b().remaining();
             c.discard();
         }
         updateQueued(-bytesReleased, false);
-    }
-
-    protected Deque<BBContainer> getQueuedBuffers() {
-        return m_queuedBuffers;
     }
 
     /*

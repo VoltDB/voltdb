@@ -67,7 +67,7 @@ public class NIOReadStream {
         return m_totalAvailable;
     }
 
-    public int getInt() {
+    int getInt() {
         // TODO: Optimize?
         byte[] intbytes = new byte[4];
         getBytes(intbytes);
@@ -79,7 +79,12 @@ public class NIOReadStream {
         return output;
     }
 
-    public void getBytes(byte[] output) {
+    /**
+     * Move all bytes in current read buffers to output array, free read buffers
+     * back to thread local memory pool.
+     * @param output
+     */
+    void getBytes(byte[] output) {
         if (m_totalAvailable < output.length) {
             throw new IllegalStateException("Requested " + output.length + " bytes; only have "
                     + m_totalAvailable + " bytes; call tryRead() first");
@@ -114,7 +119,7 @@ public class NIOReadStream {
         }
     }
 
-    public Slice getSlice(final int size) {
+    Slice getSlice(final int size) {
         if (size < 0) {
             throw new IllegalArgumentException("negative slice size: " + size);
         }
@@ -155,7 +160,7 @@ public class NIOReadStream {
         return new Slice(slices.build());
     }
 
-    public void peekBytes(byte [] output) {
+    void peekBytes(byte [] output) {
         if (m_totalAvailable < output.length) {
             throw new IllegalStateException("Requested " + output.length + " bytes; only have "
                     + m_totalAvailable + " bytes; call tryRead() first");
@@ -179,7 +184,7 @@ public class NIOReadStream {
         }
     }
 
-    public int read(ReadableByteChannel channel, int maxBytes, NetworkDBBPool pool) throws IOException {
+    int read(ReadableByteChannel channel, int maxBytes, NetworkDBBPool pool) throws IOException {
         int bytesRead = 0;
         int lastRead = 1;
         try {
@@ -229,7 +234,7 @@ public class NIOReadStream {
         return bytesRead;
     }
 
-    public void shutdown() {
+    void shutdown() {
         for (BBContainer c : m_readBBContainers) {
             c.discard();
         }
@@ -240,17 +245,13 @@ public class NIOReadStream {
         m_poolBBContainer = null;
     }
 
-    public int getBytes(ByteBuffer output) {
-        throw new UnsupportedOperationException();
-    }
-
     private final Deque<BBContainer> m_readBBContainers = new ArrayDeque<BBContainer>();
     private BBContainer m_poolBBContainer = null;
     protected int m_totalAvailable = 0;
     private long m_bytesRead = 0;
     private long m_lastBytesRead = 0;
 
-    public long getBytesRead(boolean interval) {
+    long getBytesRead(boolean interval) {
         if (interval) {
             final long bytesRead = m_bytesRead;
             final long bytesReadThisTime = bytesRead - m_lastBytesRead;

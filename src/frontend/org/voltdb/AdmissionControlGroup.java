@@ -121,8 +121,6 @@ public class AdmissionControlGroup implements org.voltcore.network.QueueMonitor
             public void reduceBackpressure(int messageSize) {}
             @Override
             public boolean queue(int bytes) { return false; }
-            @Override
-            public boolean checkQueued() { return false; }
         };
     }
 
@@ -258,7 +256,7 @@ public class AdmissionControlGroup implements org.voltcore.network.QueueMonitor
         m_pendingTxnBytes += bytes;
         checkAndLogInvariants();
 
-        if (checkQueued()) {
+        if (m_pendingTxnBytes > MAX_DESIRED_PENDING_BYTES) {
             if (!m_hadBackPressure) {
                 hostLog.debug("TXN back pressure began");
                 m_hadBackPressure = true;
@@ -279,11 +277,6 @@ public class AdmissionControlGroup implements org.voltcore.network.QueueMonitor
         }
 
         return false;
-    }
-
-    @Override
-    public boolean checkQueued() {
-        return m_pendingTxnBytes > MAX_DESIRED_PENDING_BYTES;
     }
 
     public void logTransactionCompleted(

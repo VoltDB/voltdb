@@ -367,6 +367,13 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             m_socket.socket().setTcpNoDelay(true);
                             TLSHandshaker handshaker = new TLSHandshaker(m_socket, sslEngine);
                             handshakeStatus = handshaker.handshake();
+                            /*
+                             * The JDK caches SSL sessions when the participants are the same (i.e.
+                             * multiple connection requests from the same peer). Once a session is cached
+                             * the client side ends its handshake session quickly, and is able to send
+                             * the login Volt message before the server finishes its handshake. This message
+                             * is caught in the servers last handshake network read.
+                             */
                             remnant = handshaker.getRemnant();
 
                         } catch (IOException e) {
@@ -536,6 +543,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
          * Attempt to authenticate the user associated with this socket connection
          * @param socket
          * @param timeoutRef Populated with error on timeout
+         * @param remnant The JDK caches SSL sessions when the participants are the same (i.e.
+         *   multiple connection requests from the same peer). Once a session is cached
+         *   the client side ends its handshake session quickly, and is able to send
+         *   the login Volt message before the server finishes its handshake. This message
+         *   is caught in the servers last handshake network read.
          * @return AuthUser a set of user permissions or null if authentication fails
          * @throws IOException
          */
@@ -876,8 +888,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 public boolean queue(int bytes) {
                     return m_acg.get().queue(bytes);
                 }
-                @Override
-                public boolean checkQueued() { return false; }
             };
         }
 

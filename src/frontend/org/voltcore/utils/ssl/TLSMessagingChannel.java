@@ -44,10 +44,16 @@ public class TLSMessagingChannel extends MessagingChannel {
         m_encrypter = new SSLBufferEncrypter(m_engine);
     }
 
+    /**
+     * this values may change if a TLS session renegotiates its cipher suite
+     */
     private int packetBufferSize() {
         return m_engine.getSession().getPacketBufferSize();
     }
 
+    /**
+     * this values may change if a TLS session renegotiates its cipher suite
+     */
     private int applicationBufferSize() {
         return m_engine.getSession().getApplicationBufferSize();
     }
@@ -105,6 +111,8 @@ public class TLSMessagingChannel extends MessagingChannel {
             msgbb.readBytes(retbb);
             msgbb.discardReadComponents();
 
+            assert !msgbb.isReadable() : "read from unblocked channel that received multiple messages?";
+
             return (ByteBuffer)retbb.flip();
 
         } finally {
@@ -123,7 +131,7 @@ public class TLSMessagingChannel extends MessagingChannel {
         ByteBuf msg = Unpooled.wrappedBuffer(message);
         final int needed = CipherExecutor.framesFor(msg.readableBytes());
         for (int have = 0; have < needed; ++have) {
-            final int slicesz = Math.min(CipherExecutor.PAGE_SIZE, msg.readableBytes());
+            final int slicesz = Math.min(CipherExecutor.FRAME_SIZE, msg.readableBytes());
             ByteBuf clear = msg.readSlice(slicesz).writerIndex(slicesz);
             ByteBuf encr = m_ce.allocator().ioBuffer(packetBufferSize()).writerIndex(packetBufferSize());
             ByteBuffer src = clear.nioBuffer();

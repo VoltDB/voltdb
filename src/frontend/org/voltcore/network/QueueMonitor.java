@@ -28,10 +28,4 @@ public interface QueueMonitor {
      * @return True if the write stream should signal backpressure and false otherwise.
      */
     public boolean queue(int bytes);
-
-    /**
-     * Returns true if the number of queued bytes exceeds some limit.
-     * @return  True if there are too many queued bytes.
-     */
-    public boolean checkQueued();
 }

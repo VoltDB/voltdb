@@ -45,19 +45,8 @@ public enum CipherExecutor {
     SERVER(getWishedThreadCount()),
     CLIENT(2);
 
-    public final static int PAGE_SHIFT = 14; // 16384 (max TLS fragment)
-    public final static int PAGE_SIZE = 1 << PAGE_SHIFT;
-
-    private final static BigInteger LSB_MASK = new BigInteger(new byte[] {
-            (byte) 255,
-            (byte) 255,
-            (byte) 255,
-            (byte) 255,
-            (byte) 255,
-            (byte) 255,
-            (byte) 255,
-            (byte) 255 });
-
+    public final static int FRAME_SHIFT = 14; // 16384 (max TLS fragment)
+    public final static int FRAME_SIZE = 1 << FRAME_SHIFT;
 
     volatile ListeningExecutorService m_es;
     AtomicBoolean m_active = new AtomicBoolean(false);
@@ -120,6 +109,10 @@ public enum CipherExecutor {
         }
     }
 
+    /*
+     * To check for allocator leaks start your JVM with the following property set
+     * -Dio.netty.leakDetectionLevel=PARANOID
+     */
     public PooledByteBufAllocator allocator() {
         switch (this) {
         case CLIENT:
@@ -132,31 +125,33 @@ public enum CipherExecutor {
     }
 
     public final static int framesFor(int size) {
-        int pages = (size >> PAGE_SHIFT);
-        int modulo = size & (PAGE_SIZE - 1);
+        int pages = (size >> FRAME_SHIFT);
+        int modulo = size & (FRAME_SIZE - 1);
         return modulo > 0 ? pages+1 : pages;
     }
 
+    // Initialization on demand holder (JSR-133)
     private static class ClientPoolHolder {
         static final PooledByteBufAllocator INSTANCE =
                 new PooledByteBufAllocator(
                         true,
                         PooledByteBufAllocator.defaultNumHeapArena(),
                         PooledByteBufAllocator.defaultNumDirectArena(),
-                        PAGE_SIZE, /* page size */
+                        FRAME_SIZE, /* page size */
                         PooledByteBufAllocator.defaultMaxOrder(),
                         PooledByteBufAllocator.defaultTinyCacheSize(),
                         PooledByteBufAllocator.defaultSmallCacheSize(),
                         PooledByteBufAllocator.defaultNormalCacheSize());
     }
 
+    // Initialization on demand holder (JSR-133)
     private static class ServerPoolHolder {
         static final PooledByteBufAllocator INSTANCE =
                 new PooledByteBufAllocator(
                         true,
                         PooledByteBufAllocator.defaultNumHeapArena(),
                         PooledByteBufAllocator.defaultNumDirectArena(),
-                        PAGE_SIZE, /* page size */
+                        FRAME_SIZE, /* page size */
                         PooledByteBufAllocator.defaultMaxOrder(),
                         PooledByteBufAllocator.defaultTinyCacheSize(),
                         PooledByteBufAllocator.defaultSmallCacheSize(),
@@ -166,6 +161,16 @@ public enum CipherExecutor {
     public static CipherExecutor valueOf(SSLEngine engn) {
         return engn.getUseClientMode() ? CLIENT : SERVER;
     }
+
+    private final static BigInteger LSB_MASK = new BigInteger(new byte[] {
+            (byte) 255,
+            (byte) 255,
+            (byte) 255,
+            (byte) 255,
+            (byte) 255,
+            (byte) 255,
+            (byte) 255,
+            (byte) 255 });
 
     /*
      * for debugging purposes

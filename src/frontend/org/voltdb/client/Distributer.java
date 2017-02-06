@@ -880,11 +880,6 @@ class Distributer {
             return false;
         }
 
-        @Override
-        public boolean checkQueued() {
-            return m_queuedBytes > m_maxQueuedBytes;
-        }
-
         public InetSocketAddress getSocketAddress() {
             return m_connection.getRemoteSocketAddress();
         }

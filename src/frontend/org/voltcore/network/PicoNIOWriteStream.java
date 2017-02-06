@@ -87,13 +87,13 @@ public class PicoNIOWriteStream extends NIOWriteStreamBase {
             /*
              * Nothing to write
              */
-            if (m_currentWriteBuffer == null && getQueuedBuffers().isEmpty()) {
+            if (m_currentWriteBuffer == null && m_queuedBuffers.isEmpty()) {
                 break;
             }
 
             ByteBuffer buffer = null;
             if (m_currentWriteBuffer == null) {
-                m_currentWriteBuffer = getQueuedBuffers().poll();
+                m_currentWriteBuffer = m_queuedBuffers.poll();
                 buffer = m_currentWriteBuffer.b();
                 buffer.flip();
             } else {

@@ -69,7 +69,7 @@ public class TLSHandshaker {
 
     public boolean handshake() throws IOException {
         ByteBuffer txNetData = (ByteBuffer)ByteBuffer.allocate(m_appsz).clear();
-        ByteBuffer clearData = (ByteBuffer)ByteBuffer.allocate(CipherExecutor.PAGE_SIZE).clear();
+        ByteBuffer clearData = (ByteBuffer)ByteBuffer.allocate(CipherExecutor.FRAME_SIZE).clear();
 
         SSLEngineResult result = null;
         m_eng.beginHandshake();
@@ -121,7 +121,7 @@ public class TLSHandshaker {
                         break;
                     case BUFFER_UNDERFLOW:
                         // During handshake, this indicates that there's not yet data to read.  We'll stay
-                        // in this state until data shows up in m_netEncData.
+                        // in this state until data shows up in m_rxNetData.
                        break;
                     case CLOSED:
                         if (m_eng.isOutboundDone()) {
@@ -194,6 +194,17 @@ public class TLSHandshaker {
         return true;
     }
 
+    /**
+     * The JDK caches SSL sessions when the participants are the same (i.e.
+     * multiple connection requests from the same peer). Once a session is cached
+     * the client side ends its handshake session quickly, and is able to send
+     * the login Volt message before the server finishes its handshake. This message
+     * is caught in the servers last handshake network read. This method returns the
+     * login message unencrypted
+     *
+     * @return potentially a byte buffer containing the client login message
+     * @throws IOException if the decryption operation fails
+     */
     public ByteBuffer getRemnant() throws IOException {
         ByteBuffer bb = ((ByteBuffer)m_rxNetData.duplicate().flip()).slice();
         if (!bb.hasRemaining()) {
@@ -203,6 +214,7 @@ public class TLSHandshaker {
         SSLEngineResult result = m_eng.unwrap(bb, remnant);
         switch (result.getStatus()) {
         case OK:
+            assert !bb.hasRemaining() : "there are unexpected additional remnants";
             return ((ByteBuffer)remnant.flip()).slice().asReadOnlyBuffer();
         case BUFFER_OVERFLOW:
             throw new IOException("buffer underflow while decrypting handshake remnant");
