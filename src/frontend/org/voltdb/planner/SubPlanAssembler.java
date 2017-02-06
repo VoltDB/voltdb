@@ -1491,7 +1491,7 @@ public abstract class SubPlanAssembler {
                 // clause.  We don't return POSSIBLE_ORDER_SPOILER for
                 // window functions.
                 if (result == MatchResults.POSSIBLE_ORDER_SPOILER) {
-                    m_orderSpoilers.add(idx);
+                    m_orderSpoilers.add(indexEntry.m_indexEntryNumber);
                 }
             }
         }
