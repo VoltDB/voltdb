@@ -172,6 +172,9 @@ void MaterializedViewTriggerForWrite::allocateMinMaxSearchKeyTuple() {
     uint32_t nextIndexStoreLength;
     size_t minMaxSearchKeyBackingStoreSize = 0;
     BOOST_FOREACH(TableIndex *index, m_indexForMinMax) {
+        if (! index) {
+            continue;
+        }
         nextIndexStoreLength = index->getKeySchema()->tupleLength() + TUPLE_HEADER_SIZE;
         if (nextIndexStoreLength > minMaxSearchKeyBackingStoreSize) {
             minMaxSearchKeyBackingStoreSize = nextIndexStoreLength;
