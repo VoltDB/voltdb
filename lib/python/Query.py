@@ -20,8 +20,15 @@ import cmd
 import socket
 import os.path
 from datetime import datetime
-from sslutils import FastSerializer
-from voltdbclient import ReadBuffer, VoltColumn, VoltTable, VoltException, VoltResponse, VoltProcedure
+
+# this case is to handle SSL set by apprunner in system tests
+# when called from sqlcov or other tests, there's no SSL involved and
+# no special handling needed
+try:
+    from sslutils import FastSerializer
+    from voltdbclient import ReadBuffer, VoltColumn, VoltTable, VoltException, VoltResponse, VoltProcedure
+except ImportError:
+    from voltdbclient import ReadBuffer, VoltColumn, VoltTable, VoltException, VoltResponse, VoltProcedure, FastSerializer
 
 class VoltQueryClient(cmd.Cmd):
     TYPES = {"byte": FastSerializer.VOLTTYPE_TINYINT,
