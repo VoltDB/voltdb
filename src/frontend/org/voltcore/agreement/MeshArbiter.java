@@ -29,7 +29,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
-import com.google_voltpatches.common.collect.Lists;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.FaultMessage;
@@ -44,6 +43,7 @@ import org.voltcore.utils.RateLimitedLogger;
 import org.voltdb.VoltDB;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
+import com.google_voltpatches.common.collect.Lists;
 import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.collect.Sets;
 import com.google_voltpatches.common.primitives.Longs;
@@ -406,8 +406,21 @@ public class MeshArbiter {
             }
         }
 
-        long start = System.currentTimeMillis();
         boolean allDecisionsMatch = true;
+        // ENG-11789, It's possible to have all necessary decisions already at this point,
+        // in that case don't wait if all decisions are matched.
+        if (m_decidedSurvivors.keySet().containsAll(expectedSurvivors)) {
+            for (SiteFailureMessage remoteDecision : m_decidedSurvivors.values()) {
+                if (!sfm.m_survivors.equals(remoteDecision.m_survivors)) {
+                    allDecisionsMatch = false;
+                    break;
+                }
+            }
+            if (allDecisionsMatch) return true;
+        }
+
+        long start = System.currentTimeMillis();
+        allDecisionsMatch = true;
         do {
             final VoltMessage msg = m_mailbox.recvBlocking(receiveSubjects, 5);
             if (msg == null) {
@@ -589,18 +602,18 @@ public class MeshArbiter {
 
             } else if (m.getSubject() == Subject.SITE_FAILURE_FORWARD.getId()) {
 
-                SiteFailureForwardMessage fsfm = (SiteFailureForwardMessage) m;
+                SiteFailureForwardMessage sffm = (SiteFailureForwardMessage) m;
 
-                addForwardCandidate(fsfm);
+                addForwardCandidate(sffm);
 
-                if (   !hsIds.contains(fsfm.m_sourceHSId)
-                    || m_seeker.getSurvivors().contains(fsfm.m_reportingHSId)
-                    || m_failedSites.contains(fsfm.m_reportingHSId)
-                    || m_failedSites.containsAll(fsfm.getFailedSites())) continue;
+                if (   !hsIds.contains(sffm.m_sourceHSId)
+                    || m_seeker.getSurvivors().contains(sffm.m_reportingHSId)
+                    || m_failedSites.contains(sffm.m_reportingHSId)
+                    || m_failedSites.containsAll(sffm.getFailedSites())) continue;
 
-                m_seeker.add(fsfm);
+                m_seeker.add(sffm);
 
-                m_recoveryLog.info("Agreement, Received forward " + fsfm);
+                m_recoveryLog.info("Agreement, Received forward " + sffm);
 
                 forwardStallCount[0] = FORWARD_STALL_COUNT;
 

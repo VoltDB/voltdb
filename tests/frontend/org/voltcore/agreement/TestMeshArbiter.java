@@ -41,6 +41,8 @@ import static org.voltcore.agreement.maker.SiteFailureMessageMaker.FailureSiteFo
 import static org.voltcore.agreement.maker.SiteFailureMessageMaker.SiteFailureMessage;
 import static org.voltcore.agreement.maker.SiteFailureMessageMaker.fsfmMsg;
 import static org.voltcore.agreement.maker.SiteFailureMessageMaker.fsfmSource;
+import static org.voltcore.agreement.maker.SiteFailureMessageMaker.sfmDecided;
+import static org.voltcore.agreement.maker.SiteFailureMessageMaker.sfmDecision;
 import static org.voltcore.agreement.maker.SiteFailureMessageMaker.sfmFailed;
 import static org.voltcore.agreement.maker.SiteFailureMessageMaker.sfmFailures;
 import static org.voltcore.agreement.maker.SiteFailureMessageMaker.sfmSafe;
@@ -317,7 +319,6 @@ public class TestMeshArbiter {
 
         when(aide.getNewestSafeTransactionForInitiator(0L)).thenReturn(10L);
         when(aide.getNewestSafeTransactionForInitiator(1L)).thenReturn(11L);
-
         when(mbox.recvBlocking(any(Subject[].class), eq(5L)))
             .thenReturn(make(s23f.but(with(sfmSource,2L),with(sfmFailures,sfmFailed(0)))))
             .thenReturn(new FaultMessage(2L,0L,ImmutableSet.of(1L,2L,3L)))
@@ -333,6 +334,65 @@ public class TestMeshArbiter {
         verify(mbox,times(2)).send(any(long[].class), argThat(siteFailureIs(sfmFailed(1), sfmSurvived(0,2,3))));
 
         assertEquals(decision,ImmutableMap.<Long,Long>of(1L,11L));
+    }
+
+    @Test
+    public void testSingleLinkFailFromWitness_ENG_11789() throws Exception {
+        // Node 0, 1, 2, 3
+        // Link fail between Node 0 and 1
+        // This is from Node 0's perspective
+        Maker<SiteFailureMessage> s1f = a(SiteFailureMessage,
+                with(sfmSurvivors,Longs.asList(0,2,3)),
+                with(sfmFailures,sfmFailed(1)),
+                with(sfmSafeTxns,sfmSafe(0,10,1,11,2,22,3,33))
+                );
+        Maker<SiteFailureMessage> s0f = a(SiteFailureMessage,
+                with(sfmSurvivors,Longs.asList(1,2,3)),
+                with(sfmFailures,sfmFailed(0)),
+                with(sfmSafeTxns,sfmSafe(0,10,1,11,2,22,3,33))
+                );
+
+        Maker<SiteFailureMessage> s01f = a(SiteFailureMessage,
+                with(sfmSurvivors,Longs.asList(0,1,2,3)),
+                with(sfmFailures,sfmFailed(0,1)),
+                with(sfmSafeTxns,sfmSafe(0,10,1,11,2,22,3,33))
+                );
+        Maker<SiteFailureForwardMessage> uf = a(FailureSiteForwardMessage);
+        long[] notDecided = new long[]{ };
+
+        when(aide.getNewestSafeTransactionForInitiator(0L)).thenReturn(10L);
+        when(aide.getNewestSafeTransactionForInitiator(1L)).thenReturn(11L);
+        when(mbox.recvBlocking(any(Subject[].class), eq(5L)))
+            .thenReturn(make(s1f.but(with(sfmSource,0L),
+                                     with(sfmDecision,sfmDecided(notDecided)))))
+            .thenReturn(make(s01f.but(with(sfmSource,2L),
+                                      with(sfmDecision,sfmDecided(notDecided)),
+                                      with(sfmFailures,sfmFailed(1)))))
+            .thenReturn(new FaultMessage(2L,1L,ImmutableSet.of(0L,2L,3L)))
+            .thenReturn(new FaultMessage(2L,0L,ImmutableSet.of(1L,2L,3L)))
+            .thenReturn(make(s1f.but(with(sfmSource,2L),
+                                     with(sfmDecision,sfmDecided(1)))))   // N2 decides N1 is dead
+            .thenReturn(make(s1f.but(with(sfmSource,3L),
+                                     with(sfmDecision,sfmDecided(1)))))   // N3 decides N1 is dead
+            .thenReturn(make(s01f.but(with(sfmSource,2L),
+                                      with(sfmDecision,sfmDecided(notDecided))))) // N2 reports something different, stops notifyKill()
+            .thenReturn(make(s01f.but(with(sfmSource,2L),
+                                      with(sfmDecision,sfmDecided(notDecided))))) // Resubmit the message, restart the decision process
+            .thenReturn(make(s0f.but(with(sfmSource,2L),
+                                     with(sfmDecision,sfmDecided(0)))))   // N2 decides N0 is dead
+            .thenReturn(make(uf.but(with(fsfmSource,2L),
+                                    with(fsfmMsg,s0f),
+                                    with(sfmDecision,sfmDecided(notDecided))))) // N2 forwards N0 is dead
+            .thenReturn(new FaultMessage(2L,1L,ImmutableSet.of(0L,2L,3L)))
+            .thenReturn((VoltMessage)null)
+            ;
+        Map<Long,Long> decision = arbiter.reconfigureOnFault(hsids, new FaultMessage(0,1));
+
+        verify(mbox,times(0)).deliverFront(any(VoltMessage.class));
+        verify(mbox,times(2)).send(any(long[].class), argThat(siteFailureIs(sfmFailed(1), sfmSurvived(0,2,3))));
+
+        assertEquals(decision,ImmutableMap.<Long,Long>of(1L,11L));
+
     }
 
     @Test

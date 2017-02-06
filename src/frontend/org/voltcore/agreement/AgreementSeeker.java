@@ -230,7 +230,7 @@ public class AgreementSeeker {
         // failure mesh
         if (!m_hsids.contains(reportingHsid)) return;
 
-        // ship if the reporting site is reporting itself dead
+        // skip if the reporting site is reporting itself dead
         Boolean harakiri = failed.get(reportingHsid);
         if (harakiri != null && harakiri.booleanValue()) return;
 

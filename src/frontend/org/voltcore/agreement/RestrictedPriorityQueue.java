@@ -295,12 +295,9 @@ public class RestrictedPriorityQueue extends PriorityQueue<OrderableTransaction>
 
         // Remember, an 'in recovery' response satisfies the safety dance
         lid = m_initiatorData.get(ts.initiatorHSId);
-        if (lid == null) {
-            // what does this mean???
-        }
         // if the txn is newer than the last safe txn from initiatior, block
         //  except if this RPQ has safety turned off
-        else if (m_useSafetyDance && (ts.txnId > lid.m_lastSafeTxnId)) {
+        if (lid != null && m_useSafetyDance && (ts.txnId > lid.m_lastSafeTxnId)) {
             newState = QueueState.BLOCKED_SAFETY;
             executeStateChange(newState, ts, lid);
             return m_state;
