@@ -19,7 +19,6 @@
 #define CONTIGUOUSALLOCATOR_H_
 
 #include <cstdlib>
-#include "common/ThreadLocalPool.h"
 
 namespace voltdb {
 
@@ -73,9 +72,6 @@ class ContiguousAllocator {
      * the allocator.
      */
     Buffer *m_cachedBuffer;
-
-private:
-    ThreadLocalPool m_tlPool;
 
 public:
 
