@@ -970,7 +970,7 @@ public class TestJDBCDriver {
     }
 
     @Test
-    public void testSSLPropertiesFromURLnSystemProperties() {
+    public void testSSLPropertiesFromURL() {
         String url = "jdbc:voltdb://server1:21212,server2?"
                 + "ssl=true&keystore=/tmp/abc&keystorepassword=password&"
                 + "truststore=/tmp/xyz&truststorepassword=password";
