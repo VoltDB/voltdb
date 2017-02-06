@@ -15,7 +15,7 @@
 # along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
 
 def reset(runner):
-    status = runner.call_proc('@ResetDR', [], []).table(0).tuple(0).column_integer(0)
+    status = runner.call_proc('@ResetDR', [VOLT.FastSerializer.VOLTTYPE_TINYINT, VOLT.FastSerializer.VOLTTYPE_TINYINT], [-1, 0]).table(0).tuple(0).column_integer(0)
     if status == 0:
         runner.info('Conversation log is reset.')
     else:

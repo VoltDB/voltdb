@@ -546,6 +546,10 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             m_lastLocalMpUniqueId = -1L;
         }
 
+        public void resetDrAppliedTracker(byte clusterId) {
+            m_maxSeenDrLogsBySrcPartition.remove((int) clusterId);
+        }
+
         @Override
         public void initDRAppliedTracker(Map<Byte, Integer> clusterIdToPartitionCountMap) {
             for (Map.Entry<Byte, Integer> entry : clusterIdToPartitionCountMap.entrySet()) {
