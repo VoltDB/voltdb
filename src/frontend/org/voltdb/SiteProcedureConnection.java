@@ -231,4 +231,6 @@ public interface SiteProcedureConnection {
      * binary log stream when we set protocol version.
      */
     public void setDRProtocolVersion(int drVersion, long spHandle, long uniqueId);
+
+    public void setDRStreamEnd(long spHandle, long uniqueId);
 }

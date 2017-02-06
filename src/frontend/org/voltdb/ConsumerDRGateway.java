@@ -82,4 +82,8 @@ public interface ConsumerDRGateway extends Promotable {
     void resetDrAppliedTracker(byte clusterId);
 
     void populateEmptyTrackersIfNeeded(byte producerClusterId, int producerPartitionCount);
+
+    void resettingDR(boolean postCheck);
+
+    boolean isConnected();
 }

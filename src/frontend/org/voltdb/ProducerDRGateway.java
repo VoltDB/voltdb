@@ -190,4 +190,6 @@ public interface ProducerDRGateway {
     public void resumeAllReadersAsync();
 
     public void pauseAllReadersAsync();
+
+    public void resettingDR();
 }

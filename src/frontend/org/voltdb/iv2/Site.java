@@ -1689,6 +1689,11 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 EventType.DR_STREAM_START, uniqueId, m_lastCommittedSpHandle, spHandle, new byte[0]);
     }
 
+    public void setDRStreamEnd(long spHandle, long uniqueId) {
+        generateDREvent(
+                EventType.DR_STREAM_END, uniqueId, m_lastCommittedSpHandle, spHandle, new byte[0]);
+    }
+
     /**
      * Generate a in-stream DR event which pushes an event buffer to topend
      */
