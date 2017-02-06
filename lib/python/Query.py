@@ -20,7 +20,8 @@ import cmd
 import socket
 import os.path
 from datetime import datetime
-from voltdbclient import ReadBuffer, FastSerializer, VoltColumn, VoltTable, VoltException, VoltResponse, VoltProcedure
+from sslutils import FastSerializer
+from voltdbclient import ReadBuffer, VoltColumn, VoltTable, VoltException, VoltResponse, VoltProcedure
 
 class VoltQueryClient(cmd.Cmd):
     TYPES = {"byte": FastSerializer.VOLTTYPE_TINYINT,
