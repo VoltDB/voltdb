@@ -1048,7 +1048,6 @@ public class TestWindowedFunctions extends PlannerTestCase {
                          PlanNodeType.WINDOWFUNCTION,
                          PlanNodeType.INDEXSCAN);
         }
-
     }
 
     @Override
