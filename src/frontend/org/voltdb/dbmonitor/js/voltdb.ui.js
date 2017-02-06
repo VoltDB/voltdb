@@ -1080,9 +1080,7 @@ var loadPage = function (serverName, portid) {
             var role = drRoleDetail['DRROLE'][0][0];
             $("#drModeName").html(drRoleDetail['DRROLE'][0][0])
             if(role == "MASTER" || role == "XDCR"){
-                debugger;
                 voltDbRenderer.GetDrDetails(function (drDetails) {
-                    debugger;
                     populateDRGraphandTable(drRoleDetail, drDetails)
                 });
             } else if (role == "REPLICA"){
@@ -1292,11 +1290,10 @@ var loadPage = function (serverName, portid) {
             var combinedId = producerDbId + '_' + drRoleDetail['DRROLE'][i][2]
             var consumerDbId = drRoleDetail['DRROLE'][i][2];
             replicaLatency = [];
-            debugger;
             for (var key in response[combinedId]) {
 //                for (var j = 0; j <= response[key].length - 1; j++) {
-                    if(response[combinedId][key][i].LASTQUEUEDTIMESTAMP != undefined){
-                        replicaLatency.push((response[combinedId][key][i].LASTQUEUEDTIMESTAMP - response[combinedId][key][i].LASTACKTIMESTAMP) / 1000000);
+                    if(response[combinedId][key][0].LASTQUEUEDTIMESTAMP != undefined){
+                        replicaLatency.push((response[combinedId][key][0].LASTQUEUEDTIMESTAMP - response[combinedId][key][0].LASTACKTIMESTAMP) / 1000000);
                     }
 //                }
             }
@@ -1390,7 +1387,7 @@ var loadPage = function (serverName, portid) {
                               '                                <div class="tabs-filter-wrapperDR">' +
                               '                                    <div class="drTitle icon-master" id="drMasterTitle_' + combinedId + '">Master</div>' +
                               '                                    <div class="filter">' +
-                              '                                        <input name="filter" id="filterPartitionId_' + combinedId + '" type="text" class="search-box" onBlur="" placeholder="Search Partition ID"><a id="searchDrMasterData" href="javascript:void(0)" class="icon-search drIcon" title="Search">search</a>' +
+                              '                                        <input name="filter" id="filterPartitionId_' + combinedId + '" type="text" class="search-box" onBlur="" placeholder="Search Partition ID"><a id="searchDrMasterData_' + combinedId + '"  href="javascript:void(0)" class="icon-search drIcon" title="Search">search</a>' +
                               '                                    </div>' +
                               '                                    <div class="clear"></div>' +
                               '                                </div>' +
@@ -1422,7 +1419,7 @@ var loadPage = function (serverName, portid) {
                               '                                <div class="tabs-filter-wrapperDR">' +
                               '                                    <div class="drTitle icon-replica" id="drReplicaTitle_' + combinedId + '">Replica</div>' +
                               '                                    <div class="filter">' +
-                              '                                        <input name="filter" id="filterHostID_' + combinedId + '" type="text" class="search-box" onBlur="" placeholder="Search Server"><a id="searchDrMasterData" href="javascript:void(0)" class="icon-search drIcon" title="Search">search</a>' +
+                              '                                        <input name="filter" id="filterHostID_' + combinedId + '" type="text" class="search-box" onBlur="" placeholder="Search Server"><a id="searchDrMasterData_' + combinedId + '" href="javascript:void(0)" class="icon-search drIcon" title="Search">search</a>' +
                               '                                    </div>' +
                               '                                    <div class="clear"></div>' +
                               '                                </div>' +
@@ -1507,7 +1504,6 @@ var loadPage = function (serverName, portid) {
 
             $("#showHideDrBlock_" + combinedId).click(function (e) {
                 e.preventDefault();
-                debugger;
                 var headerState = $("#drSection_"+ combinedId).css('display');
                 if (headerState == 'none') {
                     $(this).removeClass('collapsed');
@@ -1974,12 +1970,11 @@ var loadPage = function (serverName, portid) {
             var htmlcontent = "";
             var replicaLatencyMs = 0;
             var replicaLatencyTrans = 0;
-            debugger;
             var chartList = VoltDbUI.drChartList;
             if(chartList != undefined && chartList.length > 0){
                 for(var i = 0; i < chartList.length; i++){
+                    htmlcontent = "";
                     for (var key in response[chartList[i]]) {
-                        debugger;
                         replicaLatencyTrans = response[chartList[i]][key][0].LASTQUEUEDDRID - response[chartList[i]][key][0].LASTACKDRID;
                         replicaLatencyMs = (response[chartList[i]][key][0].LASTQUEUEDTIMESTAMP - response[chartList[i]][key][0].LASTACKTIMESTAMP) / 1000;
                         htmlcontent = htmlcontent + "<tr>";
