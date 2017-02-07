@@ -972,16 +972,13 @@ public class TestJDBCDriver {
     @Test
     public void testSSLPropertiesFromURL() {
         String url = "jdbc:voltdb://server1:21212,server2?"
-                + "ssl=true&keystore=/tmp/abc&keystorepassword=password&"
-                + "truststore=/tmp/xyz&truststorepassword=password";
+                + "ssl=true&truststore=/tmp/xyz&truststorepassword=password";
         String[] servers = Driver.getServersFromURL(url);
         assertEquals("server1:21212", servers[0]);
         assertEquals("server2", servers[1]);
         Map<String, String> propMap = Driver.getPropsFromURL(url);
-        assertEquals(5, propMap.size());
+        assertEquals(3, propMap.size());
         assertEquals("true", propMap.get(Driver.SSL_PROP));
-        assertEquals("/tmp/abc", propMap.get(Driver.KEYSTORE_CONFIG_PROP));
-        assertEquals("password", propMap.get(Driver.KEYSTORE_PASSWORD_PROP));
         assertEquals("/tmp/xyz", propMap.get(Driver.TRUSTSTORE_CONFIG_PROP));
         assertEquals("password", propMap.get(Driver.TRUSTSTORE_PASSWORD_PROP));
     }

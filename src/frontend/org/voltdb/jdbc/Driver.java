@@ -46,8 +46,6 @@ public class Driver implements java.sql.Driver
     private static final String URL_PREFIX = "jdbc:voltdb:";
 
     static final String SSL_PROP= "ssl";
-    static final String KEYSTORE_CONFIG_PROP = "keystore";
-    static final String KEYSTORE_PASSWORD_PROP = "keystorepassword";
     static final String TRUSTSTORE_CONFIG_PROP = "truststore";
     static final String TRUSTSTORE_PASSWORD_PROP = "truststorepassword";
 
@@ -142,8 +140,6 @@ public class Driver implements java.sql.Driver
                 int maxoutstandingtxns = 0;
                 boolean reconnectOnConnectionLoss = false;
                 boolean enableSSL = false;
-                String keystorePath = null;
-                String keystorePassword = null;
                 String truststorePath = null;
                 String truststorePassword = null;
 
@@ -166,14 +162,6 @@ public class Driver implements java.sql.Driver
                     else if (key.toLowerCase().equals(SSL_PROP)) {
                         enableSSL = value.toLowerCase().equals("true");
                     }
-                    else if (key.toLowerCase().equals(KEYSTORE_CONFIG_PROP)) {
-                        if ((value != null) && value.trim().length() > 0) {
-                            keystorePath = value.trim();
-                        }
-                    }
-                    else if (key.toLowerCase().equals(KEYSTORE_PASSWORD_PROP)) {
-                        keystorePassword = value;
-                    }
                     else if (key.toLowerCase().equals(TRUSTSTORE_CONFIG_PROP)) {
                         if ((value != null) && value.trim().length() > 0) {
                             truststorePath = value.trim();
@@ -186,8 +174,7 @@ public class Driver implements java.sql.Driver
                 }
                 SSLConfiguration.SslConfig sslConfig = null;
                 if (enableSSL) {
-                    sslConfig = new SSLConfiguration.SslConfig(keystorePath, keystorePassword,
-                            truststorePath, truststorePassword);
+                    sslConfig = new SSLConfiguration.SslConfig(null, null, truststorePath, truststorePassword);
                 }
 
                 // Return JDBC connection wrapper for the client
