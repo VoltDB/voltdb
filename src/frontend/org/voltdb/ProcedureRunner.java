@@ -125,6 +125,7 @@ public class ProcedureRunner {
     // per procedure state and catalog info
     //
     protected ProcedureStatsCollector m_statsCollector;
+    protected ProcedureDetailStatsCollector m_statsDetailCollector;
     protected final Procedure m_catProc;
     protected final boolean m_isSysProc;
     protected final boolean m_isSinglePartition;
@@ -212,10 +213,18 @@ public class ProcedureRunner {
                 m_site.getCorrespondingSiteId(),
                 m_site.getCorrespondingPartitionId(),
                 m_catProc);
+        m_statsDetailCollector = new ProcedureDetailStatsCollector(
+                m_site.getCorrespondingSiteId(),
+                m_site.getCorrespondingPartitionId(),
+                m_catProc);
         VoltDB.instance().getStatsAgent().registerStatsSource(
                 StatsSelector.PROCEDURE,
                 site.getCorrespondingSiteId(),
                 m_statsCollector);
+        VoltDB.instance().getStatsAgent().registerStatsSource(
+                StatsSelector.PROCEDUREDETAIL,
+                site.getCorrespondingSiteId(),
+                m_statsDetailCollector);
 
         reflect();
     }
