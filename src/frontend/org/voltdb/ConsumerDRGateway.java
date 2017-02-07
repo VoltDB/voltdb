@@ -37,7 +37,7 @@ public interface ConsumerDRGateway extends Promotable {
 
     Map<Byte, DRRoleStats.State> getStates();
 
-    boolean isSyncSnapshotComplete( byte dataSourceCluster, List<MeshMemberInfo> expectedClusterMembers);
+    boolean isSyncSnapshotComplete(byte dataSourceCluster, List<MeshMemberInfo> expectedClusterMembers);
 
     void initialize(boolean resumeReplication);
 
