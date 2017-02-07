@@ -27,9 +27,12 @@ import geb.navigator.Navigator
 
 class DrPage extends VoltDBManagementCenterPage {
     static content = {
-        clusterId       { $("#drCLusterId") }
+
+        clusterRelArr  { $('#drArrow_0') }
+        drCLusterId    { $('#drCLusterId') }
     }
     static at = {
-        clusterId.displayed
+        drTab.displayed
+        drTab.attr('class') == 'active'
     }
 }
