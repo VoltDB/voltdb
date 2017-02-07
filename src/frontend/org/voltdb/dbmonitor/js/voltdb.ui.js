@@ -1111,15 +1111,16 @@ var loadPage = function (serverName, portid) {
     //                    MonitorGraphUI.RefreshDrReplicationGraph(replicationData, getCurrentServer(), "Seconds", getCurrentTab());
     //                });
                 }
-                showDrGraphAndData(drRoleDetail)
+                showDrGraphAndData(drRoleDetail, producerDbId)
             }
         }
 
-        var showDrGraphAndData = function(drRoleDetail){
+        var showDrGraphAndData = function(drRoleDetail, producerDbId){
+            var combinedId = ""
             var isDisabled = false;
             for(var i = 0; i <= drRoleDetail['DRROLE'].length -1 ; i++){
                 var role = drRoleDetail['DRROLE'][i][1];
-
+                combinedId = producerDbId + '_' + drRoleDetail['DRROLE'][i][2]
                 if (role == "DISABLED"){
                     isDisabled = true;
                 }
@@ -1127,6 +1128,7 @@ var loadPage = function (serverName, portid) {
 
             if(isDisabled == false){
                 voltDbRenderer.GetClusterReplicaInformation(function (replicaDetail) {
+
                     if (getCurrentServer() != undefined) {
                         var isReplicaDataVisible = false;
                         var isMasterDataVisible = false;
@@ -1161,11 +1163,11 @@ var loadPage = function (serverName, portid) {
                                                             showHideDrGraph(true)
                                                             isDrGraphVisible = true;
                                                             MonitorGraphUI.refreshGraphDR();
-                                                            $('#drReplicaSection').css('display', 'block');
+                                                            $('#drReplicaSection_' + combinedId).css('display', 'block');
                                                             isReplicaDataVisible = true;
                                                         } else {
                                                             showHideDrGraph(false);
-                                                            $('#drReplicaSection').css('display', 'none');
+                                                            $('#drReplicaSection_'+ combinedId).css('display', 'none');
                                                             isReplicaDataVisible = false;
                                                             isDrGraphVisible = false;
                                                         }
@@ -1206,13 +1208,13 @@ var loadPage = function (serverName, portid) {
                                                             showHideDrGraph(true);
                                                             isDrGraphVisible = true;
                                                             MonitorGraphUI.refreshGraphDR();
-                                                            $('#drReplicaSection').css('display', 'block');
+                                                            $('#drReplicaSection_'+ combinedId).css('display', 'block');
                                                             isReplicaDataVisible = true;
                                                             refreshDrReplicaSection(currentTab);
                                                         } else {
                                                             showHideDrGraph(false);
                                                             isDrGraphVisible = false;
-                                                            $('#drReplicaSection').css('display', 'none');
+                                                            $('#drReplicaSection_'+ combinedId).css('display', 'none');
                                                             isReplicaDataVisible = false;
                                                         }
 
@@ -1233,7 +1235,7 @@ var loadPage = function (serverName, portid) {
                                                     $("#divDrWrapperAdmin").show();
                                                     if(VoltDbUI.drConsumerState.toLowerCase() != 'disable') {
                                                         $("#divDrReplication").show();
-                                                        $('#drReplicaSection').css('display', 'block');
+                                                        $('#drReplicaSection_'+ combinedId).css('display', 'block');
                                                         isReplicaDataVisible = true;
                                                         showHideDrGraph(true)
                                                         isDrGraphVisible = true;
@@ -1241,7 +1243,7 @@ var loadPage = function (serverName, portid) {
                                                         refreshDrReplicaSection(currentTab);
                                                     } else {
                                                         $("#divDrReplication").hide();
-                                                        $('#drReplicaSection').css('display', 'none');
+                                                        $('#drReplicaSection_'+ combinedId).css('display', 'none');
                                                         isReplicaDataVisible = false;
                                                         showHideDrGraph(false);
                                                         isDrGraphVisible = false;
