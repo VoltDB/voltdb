@@ -1096,13 +1096,14 @@ var loadPage = function (serverName, portid) {
             var replicaLatency = [];
             var role = drRoleDetail['DRROLE'][0][0];
 
-            if (role == "REPLICA"){
-                var producerDbId = drDetails["CLUSTER_ID"];
-                var consumerDbId = drDetails["REMOTE_CLUSTER_ID"];
-            } else if(role == "MASTER" || role == "XDCR"){
-                var producerDbId = drDetails[0][0]["CLUSTER_ID"];
-                var consumerDbId = drDetails[0][0]["REMOTE_CLUSTER_ID"];
-            }
+            var producerDbId = drDetails["CLUSTER_ID"];
+//
+//            if (role == "REPLICA"){
+//                var producerDbId = drDetails["CLUSTER_ID"];
+//            } else if(role == "MASTER" || role == "XDCR"){
+//                var producerDbId = drDetails["CLUSTER_ID"];
+//            }
+
             $("#drCLusterId").html(" (ID: " + producerDbId + ")");
             if(drRoleDetail['DRROLE'].length > 0){
                 if(JSON.stringify(VoltDbUI.prevDrRoleDetail) != JSON.stringify(drRoleDetail)) {
@@ -1289,12 +1290,12 @@ var loadPage = function (serverName, portid) {
             var combinedId = producerDbId + '_' + drRoleDetail['DRROLE'][i][2]
             var consumerDbId = drRoleDetail['DRROLE'][i][2];
             replicaLatency = [];
-            for (var key in response) {
-                for (var j = 0; j <= response[key].length - 1; j++) {
-                    if(response[key][i].LASTQUEUEDTIMESTAMP != undefined){
-                        replicaLatency.push((response[key][j].LASTQUEUEDTIMESTAMP - response[key][j].LASTACKTIMESTAMP) / 1000000);
+            for (var key in response[combinedId]) {
+//                for (var j = 0; j <= response[key].length - 1; j++) {
+                    if(response[combinedId][key][0].LASTQUEUEDTIMESTAMP != undefined){
+                        replicaLatency.push((response[combinedId][key][0].LASTQUEUEDTIMESTAMP - response[combinedId][key][0].LASTACKTIMESTAMP) / 1000000);
                     }
-                }
+//                }
             }
 
             var showClass = "expandedDR";
@@ -1386,7 +1387,7 @@ var loadPage = function (serverName, portid) {
                               '                                <div class="tabs-filter-wrapperDR">' +
                               '                                    <div class="drTitle icon-master" id="drMasterTitle_' + combinedId + '">Master</div>' +
                               '                                    <div class="filter">' +
-                              '                                        <input name="filter" id="filterPartitionId_' + combinedId + '" type="text" class="search-box" onBlur="" placeholder="Search Partition ID"><a id="searchDrMasterData" href="javascript:void(0)" class="icon-search drIcon" title="Search">search</a>' +
+                              '                                        <input name="filter" id="filterPartitionId_' + combinedId + '" type="text" class="search-box" onBlur="" placeholder="Search Partition ID"><a id="searchDrMasterData_' + combinedId + '"  href="javascript:void(0)" class="icon-search drIcon" title="Search">search</a>' +
                               '                                    </div>' +
                               '                                    <div class="clear"></div>' +
                               '                                </div>' +
@@ -1418,7 +1419,7 @@ var loadPage = function (serverName, portid) {
                               '                                <div class="tabs-filter-wrapperDR">' +
                               '                                    <div class="drTitle icon-replica" id="drReplicaTitle_' + combinedId + '">Replica</div>' +
                               '                                    <div class="filter">' +
-                              '                                        <input name="filter" id="filterHostID_' + combinedId + '" type="text" class="search-box" onBlur="" placeholder="Search Server"><a id="searchDrMasterData" href="javascript:void(0)" class="icon-search drIcon" title="Search">search</a>' +
+                              '                                        <input name="filter" id="filterHostID_' + combinedId + '" type="text" class="search-box" onBlur="" placeholder="Search Server"><a id="searchDrMasterData_' + combinedId + '" href="javascript:void(0)" class="icon-search drIcon" title="Search">search</a>' +
                               '                                    </div>' +
                               '                                    <div class="clear"></div>' +
                               '                                </div>' +
@@ -1451,9 +1452,7 @@ var loadPage = function (serverName, portid) {
                               '</div>';
 
             $("#dr").append(htmlContent + htmlGraph + htmlDrTable);
-            debugger;
              if(role == "MASTER"){
-                debugger;
                 $("#drRelation_" + i).find('p').html(role + ' / REPLICA');
                 $("#drArrow_" + i).addClass("arrowSingle");
             }
@@ -1505,7 +1504,6 @@ var loadPage = function (serverName, portid) {
 
             $("#showHideDrBlock_" + combinedId).click(function (e) {
                 e.preventDefault();
-                debugger;
                 var headerState = $("#drSection_"+ combinedId).css('display');
                 if (headerState == 'none') {
                     $(this).removeClass('collapsed');
@@ -1972,96 +1970,102 @@ var loadPage = function (serverName, portid) {
             var htmlcontent = "";
             var replicaLatencyMs = 0;
             var replicaLatencyTrans = 0;
+            var chartList = VoltDbUI.drChartList;
+            if(chartList != undefined && chartList.length > 0){
+                for(var i = 0; i < chartList.length; i++){
+                    htmlcontent = "";
+                    for (var key in response[chartList[i]]) {
+                        replicaLatencyTrans = response[chartList[i]][key][0].LASTQUEUEDDRID - response[chartList[i]][key][0].LASTACKDRID;
+                        replicaLatencyMs = (response[chartList[i]][key][0].LASTQUEUEDTIMESTAMP - response[chartList[i]][key][0].LASTACKTIMESTAMP) / 1000;
+                        htmlcontent = htmlcontent + "<tr>";
+                        htmlcontent = htmlcontent + "<td style='text-align: right;'>" + key + "</td>" +
+                            "<td >" + VoltDbUI.drStatus + "</td>" +
+                            "<td style='text-align: right;'>" + (response[chartList[i]][key][0].TOTALBYTES / 1024 / 1024).toFixed(2) + "</td >" +
+                            "<td style='text-align: right;'>" + replicaLatencyMs + "</td >" +
+                            "<td style='text-align: right;'>" + replicaLatencyTrans + "</td >";
+                        htmlcontent = htmlcontent + "</tr>";
 
-            for (var key in response) {
-                for (var i = 0; i <= response[key].length - 1; i++) {
-                    replicaLatencyTrans = response[key][i].LASTQUEUEDDRID - response[key][i].LASTACKDRID;
-                    replicaLatencyMs = (response[key][i].LASTQUEUEDTIMESTAMP - response[key][i].LASTACKTIMESTAMP) / 1000;
-                    htmlcontent = htmlcontent + "<tr>";
-                    htmlcontent = htmlcontent + "<td style='text-align: right;'>" + key + "</td>" +
-                        "<td >" + VoltDbUI.drStatus + "</td>" +
-                        "<td style='text-align: right;'>" + (response[key][i].TOTALBYTES / 1024 / 1024).toFixed(2) + "</td >" +
-                        "<td style='text-align: right;'>" + replicaLatencyMs + "</td >" +
-                        "<td style='text-align: right;'>" + replicaLatencyTrans + "</td >";
-                    htmlcontent = htmlcontent + "</tr>";
+                    }
+                    var leftScroll = $("#tblDrMAster_wrapper_" + [chartList[i]]).find(".tblScroll").scrollLeft();
+                    if ($.fn.dataTable.isDataTable('#tblDrMAster_' + [chartList[i]])) {
+                        $("#tblDrMAster_" + [chartList[i]]).DataTable().destroy();
+                    }
+
+                    var content = "<table width='100%' border='0' cellspacing='0' id='tblDrMAster_" + [chartList[i]] + "'  cellpadding='0' class='storeTbl drTbl no-footer dataTable' aria-describedby='tblDrMAster_info' role='grid'>" +
+                        "<thead><tr role='row'><th id='partitionID_" + [chartList[i]] + "' width='20%' data-name='none' class='' tabindex='0' aria-controls='tblDrMAster_" + [chartList[i]] + "' rowspan='1' colspan='1' aria-sort='ascending' aria-label='Partition ID: activate to sort column descending'>Partition ID</th>" +
+                        "<th id='status_" + [chartList[i]] + "' width='20%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDrMAster_" + [chartList[i]] + "' rowspan='1' colspan='1' >Status</th>" +
+                        "<th id='mbOnDisk_" + [chartList[i]] + "' width='15%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDrMAster_" + [chartList[i]] + "' rowspan='1' colspan='1' >MB on disk</th>" +
+                        "<th id='replicaLatencyMs_" + [chartList[i]] + "' width='15%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDrMAster_" + [chartList[i]] + "' rowspan='1' colspan='1' >Replica Latency (ms)</th>" +
+                        "<th id='replicaLatencyTrans_" + [chartList[i]] + "' width='20%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDrMAster_" + [chartList[i]] + "' rowspan='1' colspan='1'>Replica latency (in transactions)</th></tr></thead><tbody>";
+                    $("#tblMAster_wrapper_" + [chartList[i]]).find(".drMasterContainer").html(content + htmlcontent + "</tbody></table>");
+
+                    table = $("#tblDrMAster_" + [chartList[i]]).DataTable({
+                        stateSave: true,
+                        pageLength: 5,
+                        "sPaginationType": "extStyleLF",
+                        "bAutoWidth": false,
+                        "language": {
+                            "zeroRecords": "No data to be displayed"
+                        },
+                        "fnDrawCallback": function () {
+                            if ($("#tblDrMAster_" + [chartList[i]]).find("tbody tr td").first().html() == "No data to be displayed") {
+                                $(this).parent().parent().find(".dataTables_paginate .navigationLabel .pageIndex").text("0");
+                            } else {
+                                $(this).parent().parent().find(".dataTables_paginate .navigationLabel .pageIndex").text(" " + this.fnPagingInfo().iPage + " ");
+                            }
+
+                            $(this).parent().parent().find(".dataTables_paginate .navigationLabel .totalPages").text(this.fnPagingInfo().iTotalPages);
+
+                            if ((screen.width == 1600) && (screen.height == 900)) {
+                                var length = $("#tblDrMAster tr").length - 1;
+                                if (length >= 5) {
+                                    $("#drMasterSection_" + [chartList[i]]).css("min-height", "280px");
+                                } else if (length == 4) {
+                                    $("#drMasterSection_" + [chartList[i]]).css("min-height", "250px");
+                                } else if (length == 3) {
+                                    $("#drMasterSection_" + [chartList[i]]).css("min-height", "230px");
+                                } else if (length == 2) {
+                                    $("#drMasterSection_" + [chartList[i]]).css("min-height", "200px");
+                                } else if (length == 1 || length == 0) {
+                                    $("#drMasterSection_" + [chartList[i]]).css("min-height", "170px");
+                                }
+                            } else if ((screen.width == 360) && (screen.height == 640)) {
+                                $("#drMasterSection_" + [chartList[i]]).css("min-height", "380px");
+                            } else if ((screen.width == 640) && (screen.height == 960)) {
+                                alert("iphone resolution mode");
+                                $("#drMasterSection_" + [chartList[i]]).css("min-height", "380px");
+                            }
+                        },
+
+                        "sDom": 'p<"tblScroll drScroll"t>',
+                        "aoColumns": [
+                            null,
+                            { "bSearchable": false },
+                            { "bSearchable": false },
+                            { "bSearchable": false },
+                            { "bSearchable": false }
+                        ]
+                    });
+
+                    $("#tblDrMAster_wrapper_" + [chartList[i]]).find(".tblScroll").scrollLeft(leftScroll);
+
+                    $("#tblMAster_wrapper_" + [chartList[i]]).find(".paginationDefault").remove();
+
+                    //Customizing DataTables to make it as existing pagination
+                    $(".paginate_disabled_previous").html("Prev");
+                    $(".paginate_enabled_next").html("Next");
+                    $(".paginate_disabled_next").html("Next");
+                    $(".paginate_enabled_previous").html("Prev");
+
+                    $(".paginate_disabled_previous").attr("title", "Previous Page");
+                    $(".paginate_enabled_next").attr("title", "Next Page");
+                    $(".paginate_disabled_next").attr("title", "Next Page");
+                    $(".paginate_enabled_previous").attr("title", "Previous Page");
+
+
                 }
-
-            }
-            var leftScroll = $("#tblDrMAster_wrapper").find(".tblScroll").scrollLeft();
-            if ($.fn.dataTable.isDataTable('#tblDrMAster')) {
-                $("#tblDrMAster").DataTable().destroy();
             }
 
-            var content = "<table width='100%' border='0' cellspacing='0' id='tblDrMAster' cellpadding='0' class='storeTbl drTbl no-footer dataTable' aria-describedby='tblDrMAster_info' role='grid'>" +
-                "<thead><tr role='row'><th id='partitionID' width='20%' data-name='none' class='' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1' aria-sort='ascending' aria-label='Partition ID: activate to sort column descending'>Partition ID</th>" +
-                "<th id='status' width='20%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1' >Status</th>" +
-                "<th id='mbOnDisk' width='15%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1' >MB on disk</th>" +
-                "<th id='replicaLatencyMs' width='15%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1' >Replica Latency (ms)</th>" +
-                "<th id='replicaLatencyTrans' width='20%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1'>Replica latency (in transactions)</th></tr></thead><tbody>";
-            $("#tblMAster_wrapper").find(".drMasterContainer").html(content + htmlcontent + "</tbody></table>");
-
-            table = $("#tblDrMAster").DataTable({
-                stateSave: true,
-                pageLength: 5,
-                "sPaginationType": "extStyleLF",
-                "bAutoWidth": false,
-                "language": {
-                    "zeroRecords": "No data to be displayed"
-                },
-                "fnDrawCallback": function () {
-                    if ($("#tblDrMAster").find("tbody tr td").first().html() == "No data to be displayed") {
-                        $(this).parent().parent().find(".dataTables_paginate .navigationLabel .pageIndex").text("0");
-                    } else {
-                        $(this).parent().parent().find(".dataTables_paginate .navigationLabel .pageIndex").text(" " + this.fnPagingInfo().iPage + " ");
-                    }
-
-                    $(this).parent().parent().find(".dataTables_paginate .navigationLabel .totalPages").text(this.fnPagingInfo().iTotalPages);
-
-                    if ((screen.width == 1600) && (screen.height == 900)) {
-                        var length = $("#tblDrMAster tr").length - 1;
-                        if (length >= 5) {
-                            $("#drMasterSection").css("min-height", "280px");
-                        } else if (length == 4) {
-                            $("#drMasterSection").css("min-height", "250px");
-                        } else if (length == 3) {
-                            $("#drMasterSection").css("min-height", "230px");
-                        } else if (length == 2) {
-                            $("#drMasterSection").css("min-height", "200px");
-                        } else if (length == 1 || length == 0) {
-                            $("#drMasterSection").css("min-height", "170px");
-                        }
-                    } else if ((screen.width == 360) && (screen.height == 640)) {
-                        $("#drMasterSection").css("min-height", "380px");
-                    } else if ((screen.width == 640) && (screen.height == 960)) {
-                        alert("iphone resolution mode");
-                        $("#drMasterSection").css("min-height", "380px");
-                    }
-                },
-
-                "sDom": 'p<"tblScroll drScroll"t>',
-                "aoColumns": [
-                    null,
-                    { "bSearchable": false },
-                    { "bSearchable": false },
-                    { "bSearchable": false },
-                    { "bSearchable": false }
-                ]
-            });
-
-            $("#tblDrMAster_wrapper").find(".tblScroll").scrollLeft(leftScroll);
-
-            $("#tblMAster_wrapper").find(".paginationDefault").remove();
-
-            //Customizing DataTables to make it as existing pagination
-            $(".paginate_disabled_previous").html("Prev");
-            $(".paginate_enabled_next").html("Next");
-            $(".paginate_disabled_next").html("Next");
-            $(".paginate_enabled_previous").html("Prev");
-
-            $(".paginate_disabled_previous").attr("title", "Previous Page");
-            $(".paginate_enabled_next").attr("title", "Next Page");
-            $(".paginate_disabled_next").attr("title", "Next Page");
-            $(".paginate_enabled_previous").attr("title", "Previous Page");
         });
 
         $('#filterPartitionId').on('keyup', function () {

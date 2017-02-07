@@ -2182,11 +2182,17 @@ function alertNodeClicked(obj) {
             counter = 0;
 
             connection.Metadata['@Statistics_DR_completeData'][0].data.forEach(function (info) {
+                var cluster_id = info[colIndex["CLUSTER_ID"]]
+                var producer_cluster_id = info[colIndex["REMOTE_CLUSTER_ID"]]
                 //Filter Master from Replica
                 if (info[colIndex["MODE"]] == "NORMAL") {
                     var partitionId = info[colIndex["PARTITION_ID"]];
-                    if (!drDetails.hasOwnProperty(partitionId)) {
-                        drDetails[partitionId] = [];
+                    if (!drDetails.hasOwnProperty(cluster_id + '_' + producer_cluster_id)) {
+                        drDetails[cluster_id + '_' + producer_cluster_id] = {};
+                    }
+
+                    if (!drDetails[cluster_id + '_' + producer_cluster_id].hasOwnProperty(partitionId)) {
+                            drDetails[cluster_id + '_' + producer_cluster_id][partitionId] = [];
                     }
                     var partitionDetails = {};
                     partitionDetails["TOTALBUFFERS"] = info[colIndex["TOTALBUFFERS"]];
@@ -2196,10 +2202,10 @@ function alertNodeClicked(obj) {
                     partitionDetails["LASTACKDRID"] = info[colIndex["LASTACKDRID"]];
                     partitionDetails["LASTQUEUEDTIMESTAMP"] = info[colIndex["LASTQUEUEDTIMESTAMP"]];
                     partitionDetails["LASTACKTIMESTAMP"] = info[colIndex["LASTACKTIMESTAMP"]];
-                    partitionDetails["CLUSTER_ID"] = info[colIndex["CLUSTER_ID"]];
                     partitionDetails["REMOTE_CLUSTER_ID"] = info[colIndex["REMOTE_CLUSTER_ID"]];
-                    drDetails[partitionId].push(partitionDetails);
+                    drDetails[cluster_id + '_' + producer_cluster_id][partitionId].push(partitionDetails);
                 }
+                    drDetails["CLUSTER_ID"] = info[colIndex["CLUSTER_ID"]];
             });
         };
 
@@ -2283,10 +2289,6 @@ function alertNodeClicked(obj) {
 
                 if (!replicationDetails.hasOwnProperty("DR_GRAPH")) {
                     replicationDetails["DR_GRAPH"] = {};
-
-                }
-
-                if(!replicationDetails["DR_GRAPH"].hasOwnProperty("cluster_id + '_' + producer_cluster_id")){
                     replicationDetails["DR_GRAPH"][cluster_id + '_' + producer_cluster_id] = {}
                     replicationDetails["DR_GRAPH"][cluster_id + '_' + producer_cluster_id]["REPLICATION_DATA"] = [];
                     replicationDetails["DR_GRAPH"][cluster_id + '_' + producer_cluster_id]['REPLICATION_RATE_1M'] = 0
