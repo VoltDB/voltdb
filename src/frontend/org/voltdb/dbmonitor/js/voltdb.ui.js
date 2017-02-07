@@ -1385,7 +1385,7 @@ var loadPage = function (serverName, portid) {
                               '                                    <div class="clear"></div>' +
                               '                                </div>' +
                               '                                <div class="clear"></div>' +
-                              '                                <div class="dataTables_paginate paging_extStyleLF paginationDefault" id="tblDrMAster_paginate_'+ combinedId +'">' +
+                              '                                <div class="dataTables_paginate paging_extStyleLF paginationDefault" id="tblDrMAster_'+ combinedId +'_paginate">' +
                               '                                    <span class="paginate_disabled_previous paginate_button" title="Previous Page">Prev</span>' +
                               '                                    <div class="navigationLabel">Page <span class="pageIndex"> 0 </span> of <span class="totalPages">0</span></div>' +
                               '                                    <span class="paginate_enabled_next paginate_button" title="Next Page">Next</span>' +
@@ -1394,12 +1394,12 @@ var loadPage = function (serverName, portid) {
                               '                                    <table width="100%" border="0" cellspacing="0" id="tblDrMAster_' + combinedId + '" cellpadding="0" class="storeTbl drTbl no-footer dataTable" aria-describedby="tblDrMAster_info" role="grid">' +
                               '                                        <thead>' +
                               '                                            <tr role="row">' +
-                              '                                                <th id="Th1" width="25%" data-name="none" class="" tabindex="0" aria-controls="tblDrMAster" rowspan="1" colspan="1" aria-sort="ascending" aria-label="Partition ID: activate to sort column descending">Partition ID</th>' +
-                              '                                                <th id="Th2" width="20%" data-name="none" class="sorting" tabindex="0" aria-controls="tblDrMAster" rowspan="1" colspan="1" aria-label="Status: activate to sort column ascending">Status</th>' +
-                              '                                                <th id="Th3" width="10%" data-name="none" class="sorting" tabindex="0" aria-controls="tblDrMAster" rowspan="1" colspan="1" aria-label="Total Buffer: activate to sort column ascending">Total Buffer</th>' +
-                              '                                                <th id="Th4" width="10%" data-name="none" class="sorting" tabindex="0" aria-controls="tblDrMAster" rowspan="1" colspan="1" aria-label="Buffer on disk: activate to sort column ascending">Buffer on disk</th>' +
-                              '                                                <th id="Th5" width="15%" data-name="none" class="sorting" tabindex="0" aria-controls="tblDrMAster" rowspan="1" colspan="1" aria-label="Replica Latency (ms): activate to sort column ascending">Replica Latency (ms)</th>' +
-                              '                                                <th id="Th6" width="20%" data-name="none" class="sorting" tabindex="0" aria-controls="tblDrMAster" rowspan="1" colspan="1" aria-label="Replica latency (in transactions): activate to sort column ascending">Replica latency (in transactions)</th>' +
+                              '                                                <th id="Th1" width="25%" data-name="none" class="" tabindex="0" aria-controls="tblDrMAster_'+ combinedId +'"  rowspan="1" colspan="1" aria-sort="ascending" aria-label="Partition ID: activate to sort column descending">Partition ID</th>' +
+                              '                                                <th id="Th2" width="20%" data-name="none" class="sorting" tabindex="0" aria-controls="tblDrMAster_'+ combinedId +'" rowspan="1" colspan="1" aria-label="Status: activate to sort column ascending">Status</th>' +
+                              '                                                <th id="Th3" width="10%" data-name="none" class="sorting" tabindex="0" aria-controls="tblDrMAster_'+ combinedId +'" rowspan="1" colspan="1" aria-label="Total Buffer: activate to sort column ascending">Total Buffer</th>' +
+                              '                                                <th id="Th4" width="10%" data-name="none" class="sorting" tabindex="0" aria-controls="tblDrMAster_'+ combinedId +'" rowspan="1" colspan="1" aria-label="Buffer on disk: activate to sort column ascending">Buffer on disk</th>' +
+                              '                                                <th id="Th5" width="15%" data-name="none" class="sorting" tabindex="0" aria-controls="tblDrMAster_'+ combinedId +'" rowspan="1" colspan="1" aria-label="Replica Latency (ms): activate to sort column ascending">Replica Latency (ms)</th>' +
+                              '                                                <th id="Th6" width="20%" data-name="none" class="sorting" tabindex="0" aria-controls="tblDrMAster_'+ combinedId +'" rowspan="1" colspan="1" aria-label="Replica latency (in transactions): activate to sort column ascending">Replica latency (in transactions)</th>' +
                               '                                            </tr>' +
                               '                                        </thead>' +
                               '                                        <tbody><tr><td colspan="6"> No data to be displayed</td></tr></tbody>' +
@@ -1955,6 +1955,7 @@ var loadPage = function (serverName, portid) {
         });
     };
 
+
     var refreshDrMasterSection = function () {
         $("#drMasterSection").show();
         voltDbRenderer.GetDrDetails(function (drDetails) {
@@ -1963,7 +1964,6 @@ var loadPage = function (serverName, portid) {
             var replicaLatencyMs = 0;
             var replicaLatencyTrans = 0;
             var chartList = VoltDbUI.drChartList;
-            var table = "";
             if(chartList != undefined && chartList.length > 0){
                 for(var i = 0; i < chartList.length; i++){
                     htmlcontent = "";
@@ -1979,7 +1979,7 @@ var loadPage = function (serverName, portid) {
                         htmlcontent = htmlcontent + "</tr>";
 
                     }
-                    var leftScroll = $("#tblDrMAster_wrapper_" + [chartList[i]]).find(".tblScroll").scrollLeft();
+                    var leftScroll = $("#tblDrMAster_" + [chartList[i]]+ "_wrapper").find(".tblScroll").scrollLeft();
                     if ($.fn.dataTable.isDataTable('#tblDrMAster_' + [chartList[i]])) {
                         $("#tblDrMAster_" + [chartList[i]]).DataTable().destroy();
                     }
@@ -1991,6 +1991,7 @@ var loadPage = function (serverName, portid) {
                         "<th id='replicaLatencyMs_" + [chartList[i]] + "' width='15%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDrMAster_" + [chartList[i]] + "' rowspan='1' colspan='1' >Replica Latency (ms)</th>" +
                         "<th id='replicaLatencyTrans_" + [chartList[i]] + "' width='20%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDrMAster_" + [chartList[i]] + "' rowspan='1' colspan='1'>Replica latency (in transactions)</th></tr></thead><tbody>";
                     $("#tblMAster_wrapper_" + [chartList[i]]).find(".drMasterContainer").html(content + htmlcontent + "</tbody></table>");
+
 
                     $("#tblDrMAster_" + [chartList[i]]).DataTable({
                         stateSave: true,
@@ -2040,7 +2041,7 @@ var loadPage = function (serverName, portid) {
                         ]
                     });
 
-                    $("#tblDrMAster_wrapper_" + [chartList[i]]).find(".tblScroll").scrollLeft(leftScroll);
+                    $("#tblDrMAster_" + [chartList[i]]+ "_wrapper").find(".tblScroll").scrollLeft(leftScroll);
 
                     $("#tblMAster_wrapper_" + [chartList[i]]).find(".paginationDefault").remove();
 
@@ -2056,7 +2057,8 @@ var loadPage = function (serverName, portid) {
                     $(".paginate_enabled_previous").attr("title", "Previous Page");
 
                      $('#filterPartitionId_' + [chartList[i]]).on('keyup', function () {
-                        $("#tblDrMAster_2_8").DataTable().search(this.value).draw();
+                         var id = $(this).attr('id').substring(18);
+                         $("#tblDrMAster_" + id).DataTable().search(this.value).draw();
                      });
 
                 }
