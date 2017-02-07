@@ -2162,6 +2162,11 @@ var loadPage = function (serverName, portid) {
                     $(".paginate_enabled_previous").attr("title", "Previous Page");
                     $(".paginate_enabled_previous").attr("title", "Previous Page");
 
+                    $('#filterHostID_' + [chartList[i]]).on('keyup', function () {
+                         var id = $(this).attr('id').substring(13);
+                         $("#tblDrReplica_" + id).DataTable().search(this.value).draw();
+                     });
+
                        //to show DR Mode and DR tables
                     if (VoltDbUI.drMasterState.toUpperCase() == 'ACTIVE') {
 
@@ -2178,15 +2183,9 @@ var loadPage = function (serverName, portid) {
                     }
 
                 }
-
-
             }
 
 
-        });
-
-        $('#filterHostID').on('keyup', function () {
-            replicaTable.search(this.value).draw();
         });
     };
 
