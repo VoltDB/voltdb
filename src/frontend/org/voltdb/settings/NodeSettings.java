@@ -29,18 +29,19 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.aeonbits.owner.Config.Sources;
-import org.aeonbits.owner.ConfigFactory;
 import org.voltdb.common.Constants;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltFile;
+
+import org.aeonbits.owner.Config.Sources;
+import org.aeonbits.owner.ConfigFactory;
 
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableSet;
 import com.google_voltpatches.common.collect.ImmutableSortedMap;
 
-@Sources({"file:${org.voltdb.config.dir}/path.properties", "file:${org.voltdb.config.dir}/../.paths"})
+@Sources({"${org.voltdb.config.dir}/path.properties", "${org.voltdb.config.dir}/../.paths"})
 public interface NodeSettings extends Settings {
 
     public final static String CL_SNAPSHOT_PATH_KEY = "org.voltdb.path.command_log_snapshot";

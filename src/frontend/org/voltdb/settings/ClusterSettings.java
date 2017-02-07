@@ -26,7 +26,7 @@ import org.aeonbits.owner.ConfigFactory;
 import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.common.base.Suppliers;
 
-@Sources("file:${org.voltdb.config.dir}/cluster.properties")
+@Sources("${org.voltdb.config.dir}/cluster.properties")
 public interface ClusterSettings extends Settings {
     // property keys
     public final static String HOST_COUNT = "org.voltdb.cluster.hostcount";
