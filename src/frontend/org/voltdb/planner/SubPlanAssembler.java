@@ -1598,10 +1598,10 @@ public abstract class SubPlanAssembler {
                         for (Integer spoiler : m_orderSpoilers) {
                             orderSpoilers[idx++] = spoiler;
                         }
-                        retval.m_finalExpressionOrder.addAll(answer.m_orderedMatchingExpressions);
                         // We will return this.
                         numOrderSpoilers = m_orderSpoilers.size();
                     }
+                    retval.m_finalExpressionOrder.addAll(answer.m_orderedMatchingExpressions);
                     // else numOrderSpoilers is already zero.
                 }
             }

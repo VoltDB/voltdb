@@ -569,6 +569,29 @@ public class RegressionSuite extends TestCase {
         input[permutation.get(input.length-1)] = tmp;
     }
 
+    /**
+     * Given a two dimensional array of longs, randomly permute the rows, but
+     * leave the columns alone.  This is used to generate test cases for kinds
+     * of sorts.
+     *
+     * @param input
+     */
+    static protected <T> T[][] shuffleArray(T [][] input) {
+        T[][] output = input.clone();
+        Integer [] indices = new Integer[input.length];
+        for (int idx = 0; idx < indices.length; idx += 1) {
+            indices[idx] = Integer.valueOf(idx);
+        }
+        List<Integer> permutation = Arrays.asList(indices);
+        Collections.shuffle(permutation);
+        T[] tmp = input[permutation.get(0)];
+        for (int idx = 0; idx < input.length-1; idx += 1) {
+            output[idx] = input[permutation.get(idx + 1)];
+        }
+        output[input.length-1] = tmp;
+        return output;
+    }
+
     static protected void validateTableColumnOfScalarLong(VoltTable vt, int col, long[] expected) {
         assertNotNull(expected);
         assertEquals(expected.length, vt.getRowCount());
