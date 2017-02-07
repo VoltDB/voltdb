@@ -40,6 +40,7 @@ import javax.security.auth.login.LoginException;
 
 import org.voltcore.utils.ssl.SSLConfiguration;
 import org.voltcore.utils.ssl.SSLConfiguration.SslConfig;
+
 import org.voltdb.types.VoltDecimalHelper;
 
 /**
@@ -71,7 +72,7 @@ public class ClientConfig {
     long m_maxConnectionRetryIntervalMS = DEFAULT_MAX_CONNECTION_RETRY_INTERVAL_MS;
     boolean m_sendReadsToReplicasBytDefaultIfCAEnabled = false;
     final AtomicReference<SSLContext> m_sslContextRef = new AtomicReference<>();
-    final SslConfig m_sslConfig;
+    SslConfig m_sslConfig;
     boolean m_topologyChangeAware = false;
     boolean m_enableSSL = false;
     String m_sslPropsFile = null;
@@ -555,6 +556,18 @@ public class ClientConfig {
      */
     public static void setRoundingConfig(boolean isEnabled, RoundingMode mode) {
         VoltDecimalHelper.setRoundingConfig(isEnabled, mode);
+    }
+
+    /**
+     * Configure SSL properties based on properties supplied with ssl config.
+     * Note if system properties like "javax.net.ssl.keyStore" are set, they
+     * take precedence
+     */
+    public void setSSLConfig(SSLConfiguration.SslConfig sslConfig) {
+        if (m_enableSSL && sslConfig != null) {
+            m_sslConfig = sslConfig;
+            SSLConfiguration.applySystemProperties(m_sslConfig);
+        }
     }
 
     /**

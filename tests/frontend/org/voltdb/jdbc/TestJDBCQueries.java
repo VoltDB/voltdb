@@ -42,17 +42,19 @@ import java.sql.Statement;
 import java.sql.Time;
 import java.sql.Timestamp;
 
+import org.voltdb.BackendTarget;
+import org.voltdb.ServerThread;
+import org.voltdb.VoltDB.Configuration;
+import org.voltdb.client.ClientConfig;
+import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.utils.Encoder;
+import org.voltdb.utils.MiscUtils;
+
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
-import org.voltdb.BackendTarget;
-import org.voltdb.ServerThread;
-import org.voltdb.VoltDB.Configuration;
-import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.utils.Encoder;
-import org.voltdb.utils.MiscUtils;
 
 public class TestJDBCQueries {
     private static final String TEST_XML = "jdbcparameterstest.xml";
@@ -60,7 +62,6 @@ public class TestJDBCQueries {
     static String testjar;
     static ServerThread server;
     static Connection conn;
-    static Connection myconn;
     static VoltProjectBuilder pb;
 
     static class Data
@@ -392,18 +393,18 @@ public class TestJDBCQueries {
         server.waitForInitialization();
 
         Class.forName("org.voltdb.jdbc.Driver");
-        conn = DriverManager.getConnection("jdbc:voltdb://localhost:21212");
-        myconn = null;
+        if(ClientConfig.ENABLE_SSL_FOR_TEST) {
+            conn = DriverManager.getConnection("jdbc:voltdb://localhost:21212?" + JDBCTestCommons.SSL_URL_SUFFIX);
+        }
+        else {
+            conn = DriverManager.getConnection("jdbc:voltdb://localhost:21212");
+        }
     }
 
     private static void stopServer() throws SQLException {
         if (conn != null) {
             conn.close();
             conn = null;
-        }
-        if (myconn != null) {
-            myconn.close();
-            myconn = null;
         }
         if (server != null) {
             try { server.shutdown(); } catch (InterruptedException e) { /*empty*/ }
