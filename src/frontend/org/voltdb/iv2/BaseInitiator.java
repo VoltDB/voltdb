@@ -35,6 +35,7 @@ import org.voltdb.StarvationTracker;
 import org.voltdb.StatsAgent;
 import org.voltdb.StatsSelector;
 import org.voltdb.VoltDB;
+import org.voltdb.iv2.Scheduler.SpiBalanceStatus;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.rejoin.TaskLog;
@@ -238,5 +239,9 @@ public abstract class BaseInitiator implements Initiator
         else {
             return null;
         }
+    }
+
+    public boolean isSPIBalanceRequested() {
+        return (m_scheduler.m_spiBalanceStatus == SpiBalanceStatus.REQUESTED);
     }
 }

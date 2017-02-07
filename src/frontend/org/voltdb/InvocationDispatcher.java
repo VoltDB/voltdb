@@ -1883,15 +1883,6 @@ public final class InvocationDispatcher {
 
         Iv2Trace.logCreateTransaction(workRequest);
         m_mailbox.send(initiatorHSId, workRequest);
-
-        //TO BE REMOVED
-        String dest = CoreUtils.hsIdToString(initiatorHSId);
-        if("0:0".equals(dest)) {
-            System.out.println("send to former leader 0:0 txn:" +txnId + " " +  invocation.toString());
-        } else if("2:0".equals(dest)) {
-            System.out.println("send to NEW leader 2:0 txn:" +txnId + " " +  invocation.toString());
-        }
-
         return true;
     }
 

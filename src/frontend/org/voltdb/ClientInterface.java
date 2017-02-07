@@ -101,6 +101,10 @@ import com.google_voltpatches.common.util.concurrent.ListenableFuture;
  */
 public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
+    public static final String DROP_TXN_RECOVERY = "Transaction dropped during fault recovery";
+    public static final String DROP_TXN_MASTERSHIP = "Transaction dropped due to change in mastership."
+                        + " It is possible the transaction was committed";
+
     static long TOPOLOGY_CHANGE_CHECK_MS = Long.getLong("TOPOLOGY_CHANGE_CHECK_MS", 5000);
     static long AUTH_TIMEOUT_MS = Long.getLong("AUTH_TIMEOUT_MS", 30000);
 
@@ -974,10 +978,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     ProcedurePartitionInfo ppi = (ProcedurePartitionInfo)catProc.getAttachment();
                     int partition = InvocationDispatcher.getPartitionForProcedure(ppi.index,
                             ppi.type, response.getInvocation());
-
-                    //TO BE REMOVED
-                    System.out.println("Restart txn: " + response.getTxnId() + ". " + response.getInvocation().toString());
-
                     createTransaction(cihm.connection.connectionId(),
                             response.getInvocation(),
                             isReadonly,
@@ -1199,9 +1199,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             ClientResponseImpl.RESPONSE_UNKNOWN,
                             ClientResponse.UNINITIALIZED_APP_STATUS_CODE,
                             null,
-                            new VoltTable[0],
-                            "Transaction dropped due to change in mastership. " +
-                            "It is possible the transaction was committed");
+                            new VoltTable[0], DROP_TXN_MASTERSHIP);
             response.setClientHandle(inFlight.m_clientHandle);
             ByteBuffer buf = ByteBuffer.allocate(response.getSerializedSize() + 4);
             buf.putInt(buf.capacity() - 4);

@@ -36,6 +36,7 @@ import org.voltcore.zk.ZKUtil;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 import org.voltdb.messaging.BalanceSPIMessage;
+import org.voltdb.messaging.BalanceSPIResponseMessage;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.DummyTransactionTaskMessage;
 import org.voltdb.messaging.DumpMessage;
@@ -324,11 +325,7 @@ public class InitiatorMailbox implements Mailbox
                 if (tmLog.isDebugEnabled()) {
                     tmLog.debug("SPI balance requested on this site!");
                 }
-                m_scheduler.m_spiBalanceStatus = Scheduler.SpiBalanceStatus.REQUESTED;
-
-                //mark it as not a leader. All the leader transactions will be resent to original senders
-                //start accepting replica transactions
-               // m_scheduler.m_isLeader = false;
+                m_scheduler.setSpiBalanceRequested(Scheduler.SpiBalanceStatus.REQUESTED);
 
                 //notify new leader to accept the promotion and take the leadership responsibility.
                 send(msg.getNewLeaderHSId(), message);
@@ -337,26 +334,42 @@ public class InitiatorMailbox implements Mailbox
             // new master, message comes after former leader has been notified.
             if (this.m_hsId == msg.getNewLeaderHSId()) {
                 ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
-                if (tmLog.isDebugEnabled()) {
-                    tmLog.debug(VoltZK.debugLeadersInfo(zk));
-                }
+                peekZooKeeper(zk);
                 LeaderCache leaderAppointee = new LeaderCache(zk, VoltZK.iv2appointees);
+                boolean success = false;
                 try {
                     leaderAppointee.start(true);
                     String hsidStr = ZKUtil.suffixHSIdsWithBalanceSPIRequest(msg.getNewLeaderHSId());
                     leaderAppointee.put(msg.getParititionId(), hsidStr);
+                    success = true;
                 } catch (InterruptedException | ExecutionException | KeeperException e) {
-                    tmLog.warn(String.format("Failed to migrate SPI for partition %d to hsid %d. %s", msg.getParititionId(), msg.getNewLeaderHSId(),e.getMessage()));
+                    tmLog.error(String.format("Failed to migrate SPI for partition %d to site %d. %s",
+                            msg.getParititionId(), CoreUtils.hsIdToString(msg.getNewLeaderHSId()),e.getMessage()));
                 } finally {
                     try {
                         leaderAppointee.shutdown();
                     } catch (InterruptedException e) {
                     }
                 }
-                if (tmLog.isDebugEnabled()) {
-                    tmLog.debug(VoltZK.debugLeadersInfo(zk));
+                if (!success) {
+                    //undo it
+                    send(msg.getFormerLeaderHSId(), new BalanceSPIResponseMessage());
                 }
+                peekZooKeeper(zk);
             }
+            return;
+        } else if (message instanceof BalanceSPIResponseMessage) {
+
+            //FIX ME: need let the transaction queue to be drained before setting these flags.
+//            if (m_scheduler.isSpiBalanceRequested()) {
+//                m_scheduler.setLeaderState(false);
+//                m_scheduler.setSpiBalanceRequested(Scheduler.SpiBalanceStatus.NONE);
+//            }
+
+            if (tmLog.isDebugEnabled()) {
+                tmLog.debug("[InitiatorMailbox] received BalanceSPIResponseMessage.");
+            }
+
             return;
         }
         m_repairLog.deliver(message);
@@ -493,5 +506,11 @@ public class InitiatorMailbox implements Mailbox
     public void notifyOfSnapshotNonce(String nonce, long snapshotSpHandle) {
         if (m_joinProducer == null) return;
         m_joinProducer.notifyOfSnapshotNonce(nonce, snapshotSpHandle);
+    }
+
+    private void peekZooKeeper(ZooKeeper zk) {
+        if (tmLog.isDebugEnabled()) {
+            tmLog.debug(VoltZK.debugLeadersInfo(zk));
+        }
     }
 }

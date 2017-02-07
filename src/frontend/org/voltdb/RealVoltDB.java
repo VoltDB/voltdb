@@ -1041,6 +1041,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 m_configuredReplicationFactor = topo.getReplicationFactor();
                 m_cartographer = new Cartographer(m_messenger, m_configuredReplicationFactor,
                         m_catalogContext.cluster.getNetworkpartition());
+
                 m_partitionZeroLeader = new Supplier<Boolean>() {
                     @Override
                     public Boolean get() {
@@ -1086,7 +1087,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 }
                 m_MPI = new MpInitiator(m_messenger, localHSIds, getStatsAgent());
                 m_iv2Initiators.put(MpInitiator.MP_INIT_PID, m_MPI);
-
                 // Make a list of HDIds to join
                 Map<Integer, Long> partsToHSIdsToRejoin = new HashMap<>();
                 for (Initiator init : m_iv2Initiators.values()) {
@@ -4271,5 +4271,19 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     @Override
     public Cartographer getCartograhper() {
         return m_cartographer;
+    }
+
+    public  boolean isSPIBalanceRequested() {
+        if (m_iv2Initiators == null) return false;
+
+        for (Initiator init : m_iv2Initiators.values()) {
+            if (init instanceof BaseInitiator) {
+                BaseInitiator baseInit = (BaseInitiator)init;
+                if (baseInit.isSPIBalanceRequested()) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 }

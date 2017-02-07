@@ -45,6 +45,7 @@ import org.voltcore.zk.LeaderElector;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.AbstractTopology;
 import org.voltdb.MailboxNodeContent;
+import org.voltdb.RealVoltDB;
 import org.voltdb.StatsSource;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable.ColumnInfo;
@@ -90,6 +91,10 @@ public class Cartographer extends StatsSource
     // local client interface so we can keep the CIs implementation
     private void sendLeaderChangeNotify(long hsId, int partitionId)
     {
+        RealVoltDB db = (RealVoltDB)(VoltDB.instance());
+        if (db.isSPIBalanceRequested()) {
+            return;
+        }
         try {
             JSONStringer stringer = new JSONStringer();
             stringer.object();
@@ -139,20 +144,29 @@ public class Cartographer extends StatsSource
             }
             // send the messages indicating promotion from here for each new master
             for (LeaderCallBackInfo newMasterInfo : newMasters) {
-                hostLog.info("[Cartographer]Master updates. new masters:" + newMasters.toString());
                 Long newMaster = newMasterInfo.m_HSID;
+                hostLog.info("[Cartographer] Sending leader change notification with new leader:" +
+                        CoreUtils.hsIdToString(newMaster) + " for partition:" + hsIdToPart.get(newMaster));
                 sendLeaderChangeNotify(newMaster, hsIdToPart.get(newMaster));
+            }
+
+            if (hostLog.isDebugEnabled()) {
+                Set<String> masters = Sets.newHashSet();
+                m_currentSPMasters.forEach((k) -> {
+                    masters.add(CoreUtils.hsIdToString(k));
+                });
+                hostLog.debug("[Cartographer] SP masters:" + masters);
+                masters.clear();
+                cache.values().forEach((k) -> {
+                    masters.add(CoreUtils.hsIdToString(k.m_HSID));
+                });
+                hostLog.debug("[Cartographer]Updated SP masters:" + masters + ". New masters:" + newMasters);
             }
 
             m_currentSPMasters.clear();
             for (LeaderCallBackInfo leader: cache.values()) {
                 m_currentSPMasters.add(leader.m_HSID);
             }
-            Set<String> masters = Sets.newHashSet();
-            m_currentSPMasters.forEach((k) -> {
-                masters.add(CoreUtils.hsIdToString(k));
-            });
-            hostLog.info("[Cartographer]Current masters:" + masters.toString());
         }
     };
 

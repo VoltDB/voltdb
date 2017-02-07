@@ -440,12 +440,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
         // mastership changed?
         if (m_spiBalanceStatus == SpiBalanceStatus.REQUESTED && !message.isForReplica()){
-
-            //TO BE REMOVED
-           System.out.println("misrouted to: " + CoreUtils.hsIdToString(m_mailbox.getHSId()) +
-                        "txn:" + message.getTxnId() +
-                        " " + message.getStoredProcedureInvocation().toString());
-
             InitiateResponseMessage response = new InitiateResponseMessage(message);
             response.setMispartitioned(true, message.getStoredProcedureInvocation(),
                     TheHashinator.getCurrentVersionedConfig());
@@ -453,11 +447,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             m_mailbox.send(message.getInitiatorHSId(), response);
             return;
         }
-
-        //TO BE REMOVED
-        System.out.println("processing: " + CoreUtils.hsIdToString(m_mailbox.getHSId()) +
-                "txn:" + message.getTxnId() +
-                " " + message.getStoredProcedureInvocation().toString());
 
         //start SPI balance operation if so requested.
         initiateSPIMigrationProcess(message);
@@ -601,6 +590,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         if (!"@BalanceSPI".equals(procedureName)) {
             return false;
         }
+        // check if any node still in rejoining or possibly joining status
+        ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
         if (tmLog.isDebugEnabled()) {
             tmLog.debug("[SpScheduler] Receive @BalanceSPI invocation...");
         }
@@ -613,14 +604,13 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             hostId = Integer.parseInt(params[2].toString());
             siteId = Integer.parseInt(params[3].toString());
         } catch(NumberFormatException e) {
-            tmLog.error("Input parameters for @BalanceSPI must be possitive integer." + e.getMessage());
+            tmLog.error("Input parameters for @BalanceSPI must be positive integer." + e.getMessage());
             return false;
         }
 
         Long newLeaderHSId = CoreUtils.getHSIdFromHostAndSite(hostId, siteId);
         Long formerLeaderHSId = null;
 
-        ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
         List<Long> replicas = TopologyZKUtils.getReplicasForPartition(zk, pid);
         if (replicas.isEmpty() || !replicas.contains(newLeaderHSId)) {
             tmLog.error(String.format("Failed to find the replica for %d on host %d, site %d. Transaction not initiated.", pid, hostId, siteId));

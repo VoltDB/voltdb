@@ -88,7 +88,7 @@ abstract public class Scheduler implements InitiatorMessageHandler
     protected final ReplaySequencer m_replaySequencer = new ReplaySequencer();
 
     //used for SPI balance
-    SpiBalanceStatus m_spiBalanceStatus = SpiBalanceStatus.NONE;
+    protected SpiBalanceStatus m_spiBalanceStatus = SpiBalanceStatus.NONE;
 
     /*
      * This lock is extremely dangerous to use without known the pattern.
@@ -212,4 +212,12 @@ abstract public class Scheduler implements InitiatorMessageHandler
     abstract public void enableWritingIv2FaultLog();
 
     abstract public boolean sequenceForReplay(VoltMessage m);
+
+    public boolean isSpiBalanceRequested() {
+        return (m_spiBalanceStatus == SpiBalanceStatus.REQUESTED);
+    }
+
+    public void setSpiBalanceRequested(SpiBalanceStatus status) {
+        m_spiBalanceStatus = status;
+    }
 }

@@ -311,7 +311,7 @@ public class ClientInterfaceHandleManager
                 ClientResponseImpl errorResponse =
                     new ClientResponseImpl(
                             ClientResponseImpl.RESPONSE_UNKNOWN,
-                            new VoltTable[0], "Transaction dropped during fault recovery",
+                            new VoltTable[0], ClientInterface.DROP_TXN_RECOVERY,
                             inFlight.m_clientHandle);
                 ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize() + 4);
                 buf.putInt(buf.capacity() - 4);
