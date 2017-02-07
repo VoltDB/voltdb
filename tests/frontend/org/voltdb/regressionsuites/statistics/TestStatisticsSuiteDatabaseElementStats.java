@@ -228,6 +228,12 @@ public class TestStatisticsSuiteDatabaseElementStats extends StatisticsTestSuite
         for (int ii = 0; ii < 3; ii++) {
             results = client.callProcedure("GoSleep", 3000, 0, null).getResults();
         }
+
+        // For now, just validate the schema of proceduredetail to be the same as procedure.
+        results = client.callProcedure("@Statistics", "proceduredetail", 0).getResults();
+        assertEquals(1, results.length);
+        validateSchema(results[0], expectedTable);
+
         results = client.callProcedure("@Statistics", "procedure", 0).getResults();
         System.out.println("Test procedures table: " + results[0].toString());
         // one aggregate table returned
