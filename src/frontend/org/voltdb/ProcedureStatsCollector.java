@@ -124,7 +124,7 @@ class ProcedureStatsCollector extends SiteStatsSource {
      */
     private boolean m_interval = false;
 
-    private final Procedure m_catProc;
+    private final String m_procName;
     private final int m_partitionId;
 
     /**
@@ -133,7 +133,7 @@ class ProcedureStatsCollector extends SiteStatsSource {
     public ProcedureStatsCollector(long siteId, int partitionId, Procedure catProc) {
         super(siteId, false);
         m_partitionId = partitionId;
-        m_catProc = catProc;
+        m_procName = catProc.getClassname();
     }
 
     /**
@@ -163,7 +163,7 @@ class ProcedureStatsCollector extends SiteStatsSource {
             {
                 if (Math.abs(delta) > 1000000000)
                 {
-                    log.info("Procedure: " + m_catProc.getTypeName() +
+                    log.info("Procedure: " + m_procName +
                              " recorded a negative execution time larger than one second: " +
                              delta);
                 }
@@ -220,7 +220,7 @@ class ProcedureStatsCollector extends SiteStatsSource {
     protected void updateStatsRow(Object rowKey, Object rowValues[]) {
         super.updateStatsRow(rowKey, rowValues);
         rowValues[columnNameToIndex.get("PARTITION_ID")] = m_partitionId;
-        rowValues[columnNameToIndex.get("PROCEDURE")] = m_catProc.getClassname();
+        rowValues[columnNameToIndex.get("PROCEDURE")] = m_procName;
         long invocations = m_invocations;
         long totalTimedExecutionTime = m_totalTimedExecutionTime;
         long timedInvocations = m_timedInvocations;
@@ -351,7 +351,7 @@ class ProcedureStatsCollector extends SiteStatsSource {
 
     @Override
     public String toString() {
-        return m_catProc.getTypeName();
+        return m_procName;
     }
 
     /**
@@ -376,5 +376,44 @@ class ProcedureStatsCollector extends SiteStatsSource {
      */
     public long getLastInvocations() {
         return m_lastInvocations;
+    }
+
+    public int getPartitionId() {
+        return m_partitionId;
+    }
+
+    public String getProcName() {
+        return m_procName;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if(super.equals(obj) == false) return false;
+        if (obj instanceof ProcedureStatsCollector == false) return false;
+
+        ProcedureStatsCollector stats = (ProcedureStatsCollector) obj;
+        if (stats.getPartitionId() != m_partitionId) return false;
+        if (! m_procName.equals(stats.getProcName())) return false;
+
+        return true;
+    }
+
+    @Override
+    public int hashCode() {
+        return super.hashCode() + m_partitionId + m_procName.hashCode();
+    }
+
+    /**
+     * @return true if this procedure statistics should be reset
+     */
+    public boolean resetAfterCatalogChange() {
+        // system procedure statistics should be kept
+        // example name: org.voltdb.sysprocs.UpdateApplicationCatalog, org.voltdb.sysprocs.AdHoc_RO_SP
+        if (m_procName.startsWith("org.voltdb.sysprocs.")) {
+            return false;
+        }
+
+        // TODO: we may want to know what user procedure got changed, and only reset them but keeping others.
+        return true;
     }
 }
