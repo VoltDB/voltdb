@@ -45,6 +45,9 @@ $(document).ready(function () {
                     }
                 }
             }
+            if(key.indexOf('DataTables_tblDrMAster') > -1 || key.indexOf('DataTables_tblDrReplica') > -1 || key.indexOf('DataTables_tblCmdLog_') > -1){
+                localStorage.removeItem(key)
+            }
         }
     }
 
