@@ -623,7 +623,7 @@ public class PlannerTestCase extends TestCase {
                 stack.isEmpty());
     }
 
-        /**
+    /**
      * Validate a plan, ignoring inline nodes.  This is kind of like
      * PlannerTestCase.compileToTopDownTree.  The differences are
      * <ol>
@@ -631,18 +631,23 @@ public class PlannerTestCase extends TestCase {
      *   <li>We can compile MP plans and SP plans, and</li>
      *   <li>The boundaries between fragments in MP plans
      *       are marked with PlanNodeType.INVALID.</li>
+     *   <li>We can describe inline nodes pretty easily.</li>
      * </ol>
+     *
      * See TestWindowFunctions.testWindowFunctionWithIndex for examples
      * of the use of this function.
      *
      * @param SQL The statement text.
      * @param numberOfFragments The number of expected fragments.
-     * @param types The plan node types of the out-of-line nodes.
+     * @param types The plan node types of the inline and out-of-line nodes.
+     *              If types[idx] is a PlanNodeType, then the node should
+     *              have no inline children.  If types[idx] is an array of
+     *              PlanNodeType values then the node has the type types[idx][0],
+     *              and it should have types[idx][1..] as inline children.
      */
     protected void validatePlan(String SQL,
                                 int numberOfFragments,
-                                PlanNodeType ...types) {
-        // compileToTopDownTree(SQL, numberOutputSchemaColumns, types);
+                                Object ...types) {
         List<AbstractPlanNode> fragments = compileToFragments(SQL);
         assertEquals(String.format("Expected %d fragments, not %d",
                                    numberOfFragments,
@@ -666,7 +671,27 @@ public class PlannerTestCase extends TestCase {
             }
             fragment += 1;
             for (;plan != null; idx += 1) {
-                assertEquals(types[idx], plan.getPlanNodeType());
+                if (types[idx] instanceof PlanNodeType) {
+                    assertTrue("Expected no inline nodes",
+                               plan.getChildCount() < 2);
+                    assertEquals(types[idx], plan.getPlanNodeType());
+                } else if (types[idx] instanceof PlanNodeType[]) {
+                    PlanNodeType childTypes[] = (PlanNodeType[])(types[idx]);
+                    assertEquals(childTypes[0], plan.getPlanNodeType());
+                    for (int tidx = 1; tidx < childTypes.length; tidx += 1) {
+                        PlanNodeType childType = childTypes[tidx];
+                        int cidx = 1;
+                        for (; cidx < plan.getChildCount(); cidx += 1) {
+                            if (childType.equals(plan.getChild(cidx).getPlanNodeType())) {
+                                break;
+                            }
+                        }
+                        assertTrue(String.format("Expected inline node of type %s", childType),
+                                   cidx < plan.getChildCount());
+                    }
+                } else {
+                    fail("Expected a PlanNodeType or an array of PlanNodeTypes here.");
+                }
                 plan = (plan.getChildCount() > 0) ? plan.getChild(0) : null;
             }
         }

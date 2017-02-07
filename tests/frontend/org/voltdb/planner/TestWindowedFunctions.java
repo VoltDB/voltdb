@@ -1048,6 +1048,34 @@ public class TestWindowedFunctions extends PlannerTestCase {
                          PlanNodeType.WINDOWFUNCTION,
                          PlanNodeType.INDEXSCAN);
         }
+        if (IS_ENABLED) {
+            // Check to see that order information is
+            // propagated through outer branches of
+            // joins.  Join order should not matter, so
+            // test with both orders.  Both should
+            // produce the same plan, though they need
+            // to order by the one with the index.
+            validatePlan("select * from vanilla_idx as oo, vanilla as ii order by oo.a, oo.b",
+                         1,
+                         PlanNodeType.SEND,
+                         PlanNodeType.PROJECTION,
+                         new PlanNodeType[] {PlanNodeType.NESTLOOP,
+                                             PlanNodeType.SEQSCAN},
+                         PlanNodeType.INDEXSCAN);
+            validatePlan("select * from vanilla as oo, vanilla_idx as ii order by ii.a, ii.b",
+                         1,
+                         PlanNodeType.SEND,
+                         PlanNodeType.PROJECTION,
+                         new PlanNodeType[] {PlanNodeType.NESTLOOP,
+                                             PlanNodeType.SEQSCAN},
+                         PlanNodeType.INDEXSCAN);
+            validatePlan("select * from vanilla_idx as oo join vanilla_idx as ii on oo.a = ii.a and oo.b = ii.b order by ii.a, ii.b",
+                         1,
+                         PlanNodeType.SEND,
+                         PlanNodeType.PROJECTION,
+                         PlanNodeType.NESTLOOPINDEX,
+                         PlanNodeType.INDEXSCAN);
+        }
     }
 
     @Override
