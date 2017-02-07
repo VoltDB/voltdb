@@ -555,27 +555,6 @@ public class RegressionSuite extends TestCase {
      *
      * @param input
      */
-    static protected void shuffleArrayOfLongs(long [][] input) {
-        Integer [] indices = new Integer[input.length];
-        for (int idx = 0; idx < indices.length; idx += 1) {
-            indices[idx] = Integer.valueOf(idx);
-        }
-        List<Integer> permutation = Arrays.asList(indices);
-        Collections.shuffle(permutation);
-        long[] tmp = input[permutation.get(0)];
-        for (int idx = 0; idx < input.length-1; idx += 1) {
-            input[permutation.get(idx)] = input[permutation.get(idx + 1)];
-        }
-        input[permutation.get(input.length-1)] = tmp;
-    }
-
-    /**
-     * Given a two dimensional array of longs, randomly permute the rows, but
-     * leave the columns alone.  This is used to generate test cases for kinds
-     * of sorts.
-     *
-     * @param input
-     */
     static protected <T> T[][] shuffleArray(T [][] input) {
         T[][] output = input.clone();
         Integer [] indices = new Integer[input.length];

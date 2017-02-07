@@ -1112,7 +1112,6 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     }
 
     private boolean m_skipInitalIndentationForExplain = false;
-
     public void setSkipInitalIndentationForExplain(boolean skip) {
         m_skipInitalIndentationForExplain = skip;
     }

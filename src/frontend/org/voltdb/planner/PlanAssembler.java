@@ -1796,7 +1796,7 @@ public class PlanAssembler {
      * @param root          The subtree which may need its output tuples ordered
      * @return true if the plan needs an OrderByPlanNode, false otherwise
      */
-    private boolean isOrderByNodeRequired(AbstractParsedStmt parsedStmt, AbstractPlanNode root) {
+    private static boolean isOrderByNodeRequired(AbstractParsedStmt parsedStmt, AbstractPlanNode root) {
         // Only sort when the statement has an ORDER BY.
         if ( ! parsedStmt.hasOrderByColumns()) {
             return false;
@@ -1938,7 +1938,7 @@ public class PlanAssembler {
      * @param root        The root of the plan needing ordering
      * @return new orderByNode (the new root) or the original root if no orderByNode was required.
      */
-    private AbstractPlanNode handleOrderBy(AbstractParsedStmt parsedStmt, AbstractPlanNode root) {
+    private static AbstractPlanNode handleOrderBy(AbstractParsedStmt parsedStmt, AbstractPlanNode root) {
         assert (parsedStmt instanceof ParsedSelectStmt || parsedStmt instanceof ParsedUnionStmt ||
                 parsedStmt instanceof ParsedDeleteStmt);
 

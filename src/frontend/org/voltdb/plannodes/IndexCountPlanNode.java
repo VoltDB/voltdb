@@ -417,7 +417,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         m_endType = IndexLookupType.get( jobj.getString( Members.END_TYPE.name() ) );
         m_targetIndexName = jobj.getString(Members.TARGET_INDEX_NAME.name());
         m_catalogIndex = db.getTables().get(super.m_targetTableName).getIndexes().get(m_targetIndexName);
-        //load end_expression
+        // load end_expression
         AbstractExpression.loadFromJSONArrayChild(m_endkeyExpressions, jobj,
                 Members.ENDKEY_EXPRESSIONS.name(), m_tableScan);
         // load searchkey_expressions

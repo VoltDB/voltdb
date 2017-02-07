@@ -248,8 +248,8 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             // then we add "nullExpr IS NULL" to the expression for matching tuples to skip. (ENG-11096)
             if (nullExprIndex == searchkeyExpressions.size()
                     || compareNotDistinct.get(nullExprIndex) == false) { // nullExprIndex == m_searchkeyExpressions.size() - 1
-            AbstractExpression expr = new OperatorExpression(ExpressionType.OPERATOR_IS_NULL, nullExpr, null);
-            exprs.add(expr);
+                AbstractExpression expr = new OperatorExpression(ExpressionType.OPERATOR_IS_NULL, nullExpr, null);
+                exprs.add(expr);
             }
             else {
                 return null;
@@ -363,8 +363,8 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         }
         // Verify that all sort expressions are covered by the consecutive index expressions
         // starting from the first one
-        List<AbstractExpression> indexedExprs = new ArrayList<>();
-        List<ColumnRef> indexedColRefs = new ArrayList<>();
+        List<AbstractExpression> indexedExprs = new ArrayList<AbstractExpression>();
+        List<ColumnRef> indexedColRefs = new ArrayList<ColumnRef>();
         boolean columnIndex = CatalogUtil.getCatalogIndexExpressions(getCatalogIndex(), getTableScan(),
                 indexedExprs, indexedColRefs);
         int indexExprCount = (columnIndex) ? indexedColRefs.size() : indexedExprs.size();
@@ -767,11 +767,11 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
                 jobj.getInt(Members.PURPOSE.name()) : FOR_SCANNING_PERFORMANCE_OR_ORDERING;
         m_targetIndexName = jobj.getString(Members.TARGET_INDEX_NAME.name());
         m_catalogIndex = db.getTables().get(super.m_targetTableName).getIndexes().get(m_targetIndexName);
-        //load end_expression
+        // load end_expression
         m_endExpression = AbstractExpression.fromJSONChild(jobj, Members.END_EXPRESSION.name(), m_tableScan);
         // load initial_expression
         m_initialExpression = AbstractExpression.fromJSONChild(jobj, Members.INITIAL_EXPRESSION.name(), m_tableScan);
-        //load searchkey_expressions
+        // load searchkey_expressions
         AbstractExpression.loadFromJSONArrayChild(m_searchkeyExpressions, jobj,
                 Members.SEARCHKEY_EXPRESSIONS.name(), m_tableScan);
         // load COMPARE_NOTDISTINCT flag vector
@@ -1035,4 +1035,5 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             collected.addAll(ae.findAllSubexpressionsOfClass(aeClass));
         }
     }
+
 }

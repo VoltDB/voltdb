@@ -314,7 +314,7 @@ public class TestWindowFunctionSuite extends RegressionSuite {
 
     // rank1 is the rank for partition by A, order by B
     // rank2 is the rank for partition by A, AA, order by B
-    private long expected[][] = new long[][] {
+    private Long expected[][] = new Long[][] {
         // A     AA   B     C    rank1   rank2   rank3
         //--------------------------------------
         {  1L,  301L, 1L,  101L, 1L,      1L,      1L},
@@ -355,11 +355,11 @@ public class TestWindowFunctionSuite extends RegressionSuite {
     private void subtestRankWithString() throws Exception {
         Client client = getClient();
 
-        long input[][] = expected.clone();
-        shuffleArrayOfLongs(input);
+        Long input[][] = expected.clone();
+        shuffleArray(input);
         ClientResponse cr;
         VoltTable vt;
-        for (long [] row : input) {
+        for (Long [] row : input) {
             cr = client.callProcedure("T_STRING.insert", row[colA], row[colB], Long.toString(row[colC], 10));
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             cr = client.callProcedure("T_STRING_A.insert", Long.toString(row[colA], 10), row[colB], row[colC]);
@@ -373,10 +373,10 @@ public class TestWindowFunctionSuite extends RegressionSuite {
         vt = cr.getResults()[0];
         assertEquals(expected.length, vt.getRowCount());
         for (int rowIdx = 0; vt.advanceRow(); rowIdx += 1) {
-            assertEquals(expected[rowIdx][colA], vt.getLong(0));
-            assertEquals(expected[rowIdx][colB], vt.getLong(1));
+            assertEquals(expected[rowIdx][colA], Long.valueOf(vt.getLong(0)));
+            assertEquals(expected[rowIdx][colB], Long.valueOf(vt.getLong(1)));
             assertEquals(Long.toString(expected[rowIdx][colC], 10), vt.getString(2));
-            assertEquals(expected[rowIdx][colR_A], vt.getLong(3));
+            assertEquals(expected[rowIdx][colR_A], Long.valueOf(vt.getLong(3)));
         }
         // Test with partition by over a string column
         sql = "select A, B, C, rank() over (partition by A order by B) as R from T_STRING_A ORDER BY A, B, C, R;";
@@ -386,9 +386,9 @@ public class TestWindowFunctionSuite extends RegressionSuite {
         assertEquals(expected.length, vt.getRowCount());
         for (int rowIdx = 0; vt.advanceRow(); rowIdx += 1) {
             assertEquals(Long.toString(expected[rowIdx][colA], 10), vt.getString(0));
-            assertEquals(expected[rowIdx][colB], vt.getLong(1));
-            assertEquals(expected[rowIdx][colC], vt.getLong(2));
-            assertEquals(expected[rowIdx][colR_A], vt.getLong(3));
+            assertEquals(expected[rowIdx][colB], Long.valueOf(vt.getLong(1)));
+            assertEquals(expected[rowIdx][colC], Long.valueOf(vt.getLong(2)));
+            assertEquals(expected[rowIdx][colR_A], Long.valueOf(vt.getLong(3)));
         }
     }
 
@@ -397,11 +397,11 @@ public class TestWindowFunctionSuite extends RegressionSuite {
         Client client = getClient();
 
         long baseTime = TimestampType.millisFromJDBCformat("1953-06-10 00:00:00");
-        long input[][] = expected.clone();
-        shuffleArrayOfLongs(input);
+        Long input[][] = expected.clone();
+        shuffleArray(input);
         ClientResponse cr;
         VoltTable vt;
-        for (long [] row : input) {
+        for (Long [] row : input) {
             cr = client.callProcedure("T_TIMESTAMP.insert", row[colA], row[colB], new TimestampType(baseTime + row[colB]*1000));
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         }
@@ -412,21 +412,21 @@ public class TestWindowFunctionSuite extends RegressionSuite {
         assertEquals(expected.length, vt.getRowCount());
         for (int rowIdx = 0; vt.advanceRow(); rowIdx += 1) {
             String msg = String.format("Row %d:", rowIdx);
-            assertEquals(msg, expected[rowIdx][colA], vt.getLong(0));
-            assertEquals(msg, expected[rowIdx][colB], vt.getLong(1));
+            assertEquals(msg, expected[rowIdx][colA], Long.valueOf(vt.getLong(0)));
+            assertEquals(msg, expected[rowIdx][colB], Long.valueOf(vt.getLong(1)));
             assertEquals(msg, baseTime + expected[rowIdx][colB]*1000, vt.getTimestampAsLong(2));
-            assertEquals(msg, expected[rowIdx][colR_A], vt.getLong(3));
+            assertEquals(msg, expected[rowIdx][colR_A], Long.valueOf(vt.getLong(3)));
         }
     }
 
     private void subtestRankPartitionedTable() throws Exception {
         Client client = getClient();
 
-        long input[][] = expected.clone();
-        shuffleArrayOfLongs(input);
+        Long input[][] = expected.clone();
+        shuffleArray(input);
         ClientResponse cr;
         VoltTable vt;
-        for (long [] row : input) {
+        for (Long [] row : input) {
             cr = client.callProcedure("T_PA.insert", row[colA], row[colB], row[colC]);
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             cr = client.callProcedure("T_PB.insert", row[colA], row[colB], row[colC]);
@@ -443,10 +443,10 @@ public class TestWindowFunctionSuite extends RegressionSuite {
         vt = cr.getResults()[0];
         for (int rowIdx = 0; vt.advanceRow(); rowIdx += 1) {
             String msg = String.format("Row %d:", rowIdx);
-            assertEquals(msg, expected[rowIdx][colA],    vt.getLong(0));
-            assertEquals(msg, expected[rowIdx][colB],    vt.getLong(1));
-            assertEquals(msg, expected[rowIdx][colC],    vt.getLong(2));
-            assertEquals(msg, expected[rowIdx][colR_A],  vt.getLong(3));
+            assertEquals(msg, expected[rowIdx][colA],    Long.valueOf(vt.getLong(0)));
+            assertEquals(msg, expected[rowIdx][colB],    Long.valueOf(vt.getLong(1)));
+            assertEquals(msg, expected[rowIdx][colC],    Long.valueOf(vt.getLong(2)));
+            assertEquals(msg, expected[rowIdx][colR_A],  Long.valueOf(vt.getLong(3)));
         }
         // Test rank with ordered window over a partitioned column, and
         // partition not over a partitioned column.
@@ -456,10 +456,10 @@ public class TestWindowFunctionSuite extends RegressionSuite {
         vt = cr.getResults()[0];
         for (int rowIdx = 0; vt.advanceRow(); rowIdx += 1) {
             String msg = String.format("Row %d:", rowIdx);
-            assertEquals(msg, expected[rowIdx][colA],    vt.getLong(0));
-            assertEquals(msg, expected[rowIdx][colB],    vt.getLong(1));
-            assertEquals(msg, expected[rowIdx][colC],    vt.getLong(2));
-            assertEquals(msg, expected[rowIdx][colR_A],  vt.getLong(3));
+            assertEquals(msg, expected[rowIdx][colA],    Long.valueOf(vt.getLong(0)));
+            assertEquals(msg, expected[rowIdx][colB],    Long.valueOf(vt.getLong(1)));
+            assertEquals(msg, expected[rowIdx][colC],    Long.valueOf(vt.getLong(2)));
+            assertEquals(msg, expected[rowIdx][colR_A],  Long.valueOf(vt.getLong(3)));
         }
         // Select rank with neither partition nor rank over partioned
         // columns, but with a partitioned table.
@@ -469,10 +469,10 @@ public class TestWindowFunctionSuite extends RegressionSuite {
         vt = cr.getResults()[0];
         for (int rowIdx = 0; vt.advanceRow(); rowIdx += 1) {
             String msg = String.format("Row %d:", rowIdx);
-            assertEquals(msg, expected[rowIdx][colA],    vt.getLong(0));
-            assertEquals(msg, expected[rowIdx][colB],    vt.getLong(1));
-            assertEquals(msg, expected[rowIdx][colC],    vt.getLong(2));
-            assertEquals(msg, expected[rowIdx][colR_A],  vt.getLong(3));
+            assertEquals(msg, expected[rowIdx][colA],    Long.valueOf(vt.getLong(0)));
+            assertEquals(msg, expected[rowIdx][colB],    Long.valueOf(vt.getLong(1)));
+            assertEquals(msg, expected[rowIdx][colC],    Long.valueOf(vt.getLong(2)));
+            assertEquals(msg, expected[rowIdx][colR_A],  Long.valueOf(vt.getLong(3)));
         }
         // Check rank with windowed partition on two columns, one partitioned and
         // one not partitioned, but ordered by a non-partitioned column.
@@ -482,10 +482,10 @@ public class TestWindowFunctionSuite extends RegressionSuite {
         vt = cr.getResults()[0];
         for (int rowIdx = 0; vt.advanceRow(); rowIdx += 1) {
             String msg = String.format("Row %d:", rowIdx);
-            assertEquals(msg, expected[rowIdx][colA],    vt.getLong(0));
-            assertEquals(msg, expected[rowIdx][colB],    vt.getLong(1));
-            assertEquals(msg, expected[rowIdx][colC],    vt.getLong(2));
-            assertEquals(msg, expected[rowIdx][colR_AA], vt.getLong(3));
+            assertEquals(msg, expected[rowIdx][colA],    Long.valueOf(vt.getLong(0)));
+            assertEquals(msg, expected[rowIdx][colB],    Long.valueOf(vt.getLong(1)));
+            assertEquals(msg, expected[rowIdx][colC],    Long.valueOf(vt.getLong(2)));
+            assertEquals(msg, expected[rowIdx][colR_AA], Long.valueOf(vt.getLong(3)));
         }
         // Check the previous case, but with the partition by order reversed.
         sql = "select A, B, C, rank() over (partition by AA, A order by B) as R from T_PAA ORDER BY A, AA, B, C, R;";
@@ -494,10 +494,10 @@ public class TestWindowFunctionSuite extends RegressionSuite {
         vt = cr.getResults()[0];
         for (int rowIdx = 0; vt.advanceRow(); rowIdx += 1) {
             String msg = String.format("Row %d:", rowIdx);
-            assertEquals(msg, expected[rowIdx][colA],    vt.getLong(0));
-            assertEquals(msg, expected[rowIdx][colB],    vt.getLong(1));
-            assertEquals(msg, expected[rowIdx][colC],    vt.getLong(2));
-            assertEquals(msg, expected[rowIdx][colR_AA], vt.getLong(3));
+            assertEquals(msg, expected[rowIdx][colA],    Long.valueOf(vt.getLong(0)));
+            assertEquals(msg, expected[rowIdx][colB],    Long.valueOf(vt.getLong(1)));
+            assertEquals(msg, expected[rowIdx][colC],    Long.valueOf(vt.getLong(2)));
+            assertEquals(msg, expected[rowIdx][colR_AA], Long.valueOf(vt.getLong(3)));
         }
 
     }
@@ -505,14 +505,14 @@ public class TestWindowFunctionSuite extends RegressionSuite {
     public void validateRankFunction(String sql, int expectedCol) throws Exception {
         Client client = getClient();
 
-        long input[][] = expected.clone();
-        shuffleArrayOfLongs(input);
+        Long input[][] = expected.clone();
+        shuffleArray(input);
         ClientResponse cr;
         VoltTable vt;
 
         cr = client.callProcedure("@AdHoc", "TRUNCATE TABLE T");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        for (long [] row : input) {
+        for (Long [] row : input) {
             cr = client.callProcedure("T.insert", row[colA], row[colB], row[colC]);
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         }
@@ -521,10 +521,10 @@ public class TestWindowFunctionSuite extends RegressionSuite {
         vt = cr.getResults()[0];
         for (int rowIdx = 0; vt.advanceRow(); rowIdx += 1) {
             String msg = String.format("Row %d:", rowIdx);
-            assertEquals(msg, expected[rowIdx][colA],       vt.getLong(0));
-            assertEquals(msg, expected[rowIdx][colB],       vt.getLong(1));
-            assertEquals(msg, expected[rowIdx][colC],       vt.getLong(2));
-            assertEquals(msg, expected[rowIdx][expectedCol],vt.getLong(3));
+            assertEquals(msg, expected[rowIdx][colA],       Long.valueOf(vt.getLong(0)));
+            assertEquals(msg, expected[rowIdx][colB],       Long.valueOf(vt.getLong(1)));
+            assertEquals(msg, expected[rowIdx][colC],       Long.valueOf(vt.getLong(2)));
+            assertEquals(msg, expected[rowIdx][expectedCol],Long.valueOf(vt.getLong(3)));
         }
     }
 
@@ -537,11 +537,11 @@ public class TestWindowFunctionSuite extends RegressionSuite {
     private void subtestRankMultPartitionBys() throws Exception {
         Client client = getClient();
 
-        long input[][] = expected.clone();
-        shuffleArrayOfLongs(input);
+        Long input[][] = expected.clone();
+        shuffleArray(input);
         ClientResponse cr;
         VoltTable vt;
-        for (long [] row : input) {
+        for (Long [] row : input) {
             cr = client.callProcedure("T.insert", row[0], row[1], row[2]);
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         }
@@ -551,10 +551,10 @@ public class TestWindowFunctionSuite extends RegressionSuite {
         vt = cr.getResults()[0];
         for (int rowIdx = 0; vt.advanceRow(); rowIdx += 1) {
             String msg = String.format("Row %d:", rowIdx);
-            assertEquals(msg, expected[rowIdx][colA],    vt.getLong(0));
-            assertEquals(msg, expected[rowIdx][colB],    vt.getLong(1));
-            assertEquals(msg, expected[rowIdx][colC],    vt.getLong(2));
-            assertEquals(msg, expected[rowIdx][colR_AA], vt.getLong(3));
+            assertEquals(msg, expected[rowIdx][colA],    Long.valueOf(vt.getLong(0)));
+            assertEquals(msg, expected[rowIdx][colB],    Long.valueOf(vt.getLong(1)));
+            assertEquals(msg, expected[rowIdx][colC],    Long.valueOf(vt.getLong(2)));
+            assertEquals(msg, expected[rowIdx][colR_AA], Long.valueOf(vt.getLong(3)));
         }
     }
 
@@ -571,11 +571,11 @@ public class TestWindowFunctionSuite extends RegressionSuite {
     private void subtestRankOrderbyExpressions() throws Exception {
         Client client = getClient();
 
-        long input[][] = expected.clone();
-        shuffleArrayOfLongs(input);
+        Long input[][] = expected.clone();
+        shuffleArray(input);
         ClientResponse cr;
         VoltTable vt;
-        for (long [] row : input) {
+        for (Long [] row : input) {
             cr = client.callProcedure("T.insert", row[colA], row[colB], row[colC]);
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         }
@@ -585,10 +585,10 @@ public class TestWindowFunctionSuite extends RegressionSuite {
         vt = cr.getResults()[0];
         for (int rowIdx = 0; vt.advanceRow(); rowIdx += 1) {
             String msg = String.format("Row %d:", rowIdx);
-            assertEquals(msg, expected[rowIdx][colA],    vt.getLong(0));
-            assertEquals(msg, expected[rowIdx][colB],    vt.getLong(1));
-            assertEquals(msg, expected[rowIdx][colC],    vt.getLong(2));
-            assertEquals(msg, expected[rowIdx][colR_A],  vt.getLong(3));
+            assertEquals(msg, expected[rowIdx][colA],    Long.valueOf(vt.getLong(0)));
+            assertEquals(msg, expected[rowIdx][colB],    Long.valueOf(vt.getLong(1)));
+            assertEquals(msg, expected[rowIdx][colC],    Long.valueOf(vt.getLong(2)));
+            assertEquals(msg, expected[rowIdx][colR_A],  Long.valueOf(vt.getLong(3)));
         }
     }
 

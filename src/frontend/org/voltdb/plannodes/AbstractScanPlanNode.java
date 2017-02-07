@@ -499,4 +499,5 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
             Map<Integer, Integer> diffMap) {
         m_differentiatorMap = new HashMap<>(diffMap);
     }
+
 }

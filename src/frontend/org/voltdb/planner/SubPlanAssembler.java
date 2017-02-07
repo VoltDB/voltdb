@@ -1627,13 +1627,6 @@ public abstract class SubPlanAssembler {
      *                           sortDirection
      * @param bindingsForOrder   restrictions on parameter settings that are prerequisite to the
      *                           any ordering optimization determined here.
-     * @param finalExpressionOrder The final expression order this index
-     *                             will impose.  For Window Functions we may
-     *                             not know or care about the order of the
-     *                             partition by expressions.  For example, if we are
-     *                             given "PARTITION BY A, B ORDER BY C, D", we
-     *                             can use an index with "(A, B, C, D)" or "(B, A, C, D)",
-     *                             but not "(A, B, D, C)".
      * @return the number of discovered orderSpoilers that will need to be recovered from,
      *         to maintain the established sortDirection - always 0 if no sort order was determined.
      */
