@@ -44,8 +44,8 @@ public interface Settings extends Accessible {
     public static void initialize(File voltdbroot) {
         if (ConfigFactory.getProperty(Settings.CONFIG_DIR) == null) try {
             File confDH = new VoltFile(voltdbroot, Constants.CONFIG_DIR).getCanonicalFile();
-            String uriPath = confDH.toURI().toASCIIString();
-            ConfigFactory.setProperty(Settings.CONFIG_DIR, uriPath);
+            String pathAsURI = confDH.toURI().getRawPath();
+            ConfigFactory.setProperty(Settings.CONFIG_DIR, pathAsURI);
         } catch (IOException e) {
             throw new SettingsException("failed to resolve the cluster settings directory", e);
         }
@@ -107,8 +107,7 @@ public interface Settings extends Accessible {
         if (configDN == null || configDN.trim().isEmpty()) {
             throw new IllegalStateException("property " + CONFIG_DIR + " must be defined");
         }
-
-        URI uri = URI.create(configDN);
+        URI uri = URI.create("file:" + configDN);
         File configDH = Paths.get(uri).toFile();
         if (!configDH.exists() && !configDH.mkdirs()) {
             throw new SettingsException("failed to create " + configDN);
