@@ -45,7 +45,6 @@ import org.voltcore.zk.LeaderElector;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.AbstractTopology;
 import org.voltdb.MailboxNodeContent;
-import org.voltdb.RealVoltDB;
 import org.voltdb.StatsSource;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable.ColumnInfo;
@@ -91,11 +90,10 @@ public class Cartographer extends StatsSource
     // local client interface so we can keep the CIs implementation
     private void sendLeaderChangeNotify(long hsId, int partitionId)
     {
-        RealVoltDB db = (RealVoltDB)(VoltDB.instance());
-        BaseInitiator initiator = db.getInitiatorWithSPIBalanceRequested();
-        if (initiator != null) {
+        if (VoltZK.countDownSPIBalanceIndicator(m_zk, m_hostMessenger.getHostId())) {
             return;
         }
+
         try {
             JSONStringer stringer = new JSONStringer();
             stringer.object();

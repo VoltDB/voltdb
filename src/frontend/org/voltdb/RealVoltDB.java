@@ -4262,18 +4262,4 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     public Cartographer getCartograhper() {
         return m_cartographer;
     }
-
-    public  BaseInitiator getInitiatorWithSPIBalanceRequested() {
-        if (m_iv2Initiators == null) return null;
-
-        for (Initiator init : m_iv2Initiators.values()) {
-            if (init instanceof BaseInitiator) {
-                BaseInitiator baseInit = (BaseInitiator)init;
-                if (baseInit.isSPIBalanceRequested()) {
-                    return baseInit;
-                }
-            }
-        }
-        return null;
-    }
 }

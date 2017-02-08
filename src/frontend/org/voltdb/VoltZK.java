@@ -18,6 +18,7 @@
 package org.voltdb;
 
 import java.io.UnsupportedEncodingException;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
@@ -175,6 +176,9 @@ public class VoltZK {
     // Shutdown save snapshot guard
     public static final String shutdown_save_guard = "/db/shutdown_save_guard";
 
+    //SPI migration
+    public static final String spi_balance = "/db/spi_balance";
+
     // Persistent nodes (mostly directories) to create on startup
     public static final String[] ZK_HIERARCHY = {
             root,
@@ -192,7 +196,8 @@ public class VoltZK {
             settings_base,
             cluster_settings,
             catalogUpdateBlockers,
-            request_truncation_snapshot
+            request_truncation_snapshot,
+            spi_balance
     };
 
     /**
@@ -357,5 +362,35 @@ public class VoltZK {
             return false;
         }
         return true;
+    }
+
+    public static void createSPIBalanceIndicator(ZooKeeper zk, Set<Integer> hostIds) {
+        for (int hostId: hostIds) {
+            String path = ZKUtil.joinZKPath(spi_balance, "node_" + hostId);
+            try {
+                zk.create(path, ByteBuffer.allocate(4).putInt(hostId).array(),
+                        Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+            }
+            catch (KeeperException | InterruptedException e) {
+                try {
+                    zk.setData(path, ByteBuffer.allocate(4).putInt(hostId).array(), -1);
+                } catch (KeeperException | InterruptedException e1) {
+                }
+            }
+        }
+    }
+
+    public static boolean countDownSPIBalanceIndicator(ZooKeeper zk, int hostId) {
+        try {
+            String path = ZKUtil.joinZKPath(spi_balance, "node_" + hostId);
+            if (zk.exists(path, false) == null) {
+                return false;
+            }
+            zk.delete(path, -1);
+            return true;
+        } catch (KeeperException | InterruptedException e) {
+        }
+
+        return false;
     }
 }

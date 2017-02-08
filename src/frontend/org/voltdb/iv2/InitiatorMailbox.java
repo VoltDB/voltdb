@@ -344,6 +344,8 @@ public class InitiatorMailbox implements Mailbox
             }
             m_scheduler.setSpiBalanceRequested(true);
             m_scheduler.m_isLeader = false;
+            HostMessenger messager = VoltDB.instance().getHostMessenger();
+            VoltZK.createSPIBalanceIndicator(messager.getZK(), messager.getLiveHostIds());
             //notify new leader to accept the promotion and take the leadership responsibility.
             send(msg.getNewLeaderHSId(), message);
         }
