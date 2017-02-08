@@ -27,17 +27,25 @@ import org.voltcore.messaging.VoltMessage;
  */
 public class BalanceSPIResponseMessage extends VoltMessage {
 
+    boolean m_success;
+
     public BalanceSPIResponseMessage() {}
+    public BalanceSPIResponseMessage(boolean success) {
+        m_success = success;
+    }
 
     @Override
     public int getSerializedSize()
     {
-        return super.getSerializedSize();
+        int msgsize = super.getSerializedSize();
+        msgsize += 1; // success flag
+        return msgsize;
     }
 
     @Override
     protected void initFromBuffer(ByteBuffer buf) throws IOException
     {
+        m_success = buf.get() == 1;
         assert(buf.capacity() == buf.position());
     }
 
@@ -45,7 +53,12 @@ public class BalanceSPIResponseMessage extends VoltMessage {
     public void flattenToBuffer(ByteBuffer buf) throws IOException
     {
         buf.put(VoltDbMessageFactory.BalanceSPI_RESPONSE_ID);
+        buf.put(m_success ? (byte) 1 : (byte) 0);
         assert(buf.capacity() == buf.position());
         buf.limit(buf.position());
+    }
+
+    public boolean isSuccess() {
+        return m_success;
     }
 }

@@ -429,6 +429,22 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
     }
 
+    private boolean handleMisRoutedTransaction(Iv2InitiateTaskMessage message) {
+        if (!isSpiBalanceRequested() || message.isForReplica()){
+            return false;
+        }
+        InitiateResponseMessage response = new InitiateResponseMessage(message);
+        response.setMispartitioned(true, message.getStoredProcedureInvocation(),
+                TheHashinator.getCurrentVersionedConfig());
+        response.m_sourceHSId = m_mailbox.getHSId();
+        m_mailbox.send(message.getInitiatorHSId(), response);
+        System.out.println("mis routed......." + response.getClientInterfaceHandle());
+        if (m_spiBalanceFirstSeenCIHandle == Long.MIN_VALUE) {
+            m_spiBalanceFirstSeenCIHandle = response.getClientInterfaceHandle();
+        }
+        return true;
+    }
+
     // SpScheduler expects to see InitiateTaskMessages corresponding to single-partition
     // procedures only.
     private void handleIv2InitiateTaskMessage(Iv2InitiateTaskMessage message)
@@ -439,14 +455,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
 
         // mastership changed?
-        if (m_spiBalanceStatus == SpiBalanceStatus.REQUESTED && !message.isForReplica()){
-            InitiateResponseMessage response = new InitiateResponseMessage(message);
-            response.setMispartitioned(true, message.getStoredProcedureInvocation(),
-                    TheHashinator.getCurrentVersionedConfig());
-            response.m_sourceHSId = m_mailbox.getHSId();
-            m_mailbox.send(message.getInitiatorHSId(), response);
-            return;
-        }
+        if (handleMisRoutedTransaction(message)) return;
 
         //start SPI balance operation if so requested.
         initiateSPIMigrationProcess(message);

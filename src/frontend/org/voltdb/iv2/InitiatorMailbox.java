@@ -325,7 +325,7 @@ public class InitiatorMailbox implements Mailbox
                 if (tmLog.isDebugEnabled()) {
                     tmLog.debug("SPI balance requested on this site!");
                 }
-                m_scheduler.setSpiBalanceRequested(Scheduler.SpiBalanceStatus.REQUESTED);
+                m_scheduler.setSpiBalanceRequested(true);
 
                 //notify new leader to accept the promotion and take the leadership responsibility.
                 send(msg.getNewLeaderHSId(), message);
@@ -352,24 +352,17 @@ public class InitiatorMailbox implements Mailbox
                     }
                 }
                 if (!success) {
-                    //undo it
-                    send(msg.getFormerLeaderHSId(), new BalanceSPIResponseMessage());
+                    //notify the former leader to undo it
+                    send(msg.getFormerLeaderHSId(), new BalanceSPIResponseMessage(success));
                 }
                 peekZooKeeper(zk);
             }
             return;
         } else if (message instanceof BalanceSPIResponseMessage) {
-
-            //FIX ME: need let the transaction queue to be drained before setting these flags.
-//            if (m_scheduler.isSpiBalanceRequested()) {
-//                m_scheduler.setLeaderState(false);
-//                m_scheduler.setSpiBalanceRequested(Scheduler.SpiBalanceStatus.NONE);
-//            }
-
-            if (tmLog.isDebugEnabled()) {
-                tmLog.debug("[InitiatorMailbox] received BalanceSPIResponseMessage.");
+            BalanceSPIResponseMessage msg = (BalanceSPIResponseMessage)message;
+            if (!msg.isSuccess()) {
+                m_scheduler.setSpiBalanceRequested(false);
             }
-
             return;
         }
         m_repairLog.deliver(message);

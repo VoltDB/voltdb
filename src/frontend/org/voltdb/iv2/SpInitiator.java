@@ -17,9 +17,7 @@
 
 package org.voltdb.iv2;
 
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.List;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.CancellationException;
@@ -47,8 +45,6 @@ import org.voltdb.export.ExportManager;
 import org.voltdb.iv2.LeaderCache.LeaderCallBackInfo;
 import org.voltdb.iv2.RepairAlgo.RepairResult;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
-import org.voltdb.messaging.BalanceSPIResponseMessage;
-
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.Sets;
 
@@ -86,7 +82,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
             }
 
             //This was the leader but SPI has been migrated, so demote it.
-            if (m_scheduler.m_spiBalanceStatus == Scheduler.SpiBalanceStatus.REQUESTED
+            if (m_scheduler.isSpiBalanceRequested()
                     && !leaders.contains(getInitiatorHSId())) {
                 m_scheduler.setLeaderState(false);
                 if (tmLog.isDebugEnabled()) {
@@ -209,18 +205,6 @@ public class SpInitiator extends BaseInitiator implements Promotable
                     LeaderCacheWriter iv2masters = new LeaderCache(m_messenger.getZK(),
                             m_zkMailboxNode);
                     iv2masters.put(m_partitionId, m_initiatorMailbox.getHSId());
-
-                    if (m_isBalanceSPIRequested) {
-                        List<Long> survivors = new ArrayList<Long>(m_term.getInterestingHSIds().get());
-                        survivors.remove(m_initiatorMailbox.getHSId());
-                        if (tmLog.isDebugEnabled()) {
-                            tmLog.debug("[acceptPromotion] repair survivors to change original leader state:" +
-                                    survivors);
-                        }
-
-                        BalanceSPIResponseMessage msg = new BalanceSPIResponseMessage();
-                        m_initiatorMailbox.send(com.google_voltpatches.common.primitives.Longs.toArray(survivors), msg);
-                    }
                 }
                 else {
                     // The only known reason to fail is a failed replica during

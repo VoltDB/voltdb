@@ -92,7 +92,8 @@ public class Cartographer extends StatsSource
     private void sendLeaderChangeNotify(long hsId, int partitionId)
     {
         RealVoltDB db = (RealVoltDB)(VoltDB.instance());
-        if (db.isSPIBalanceRequested()) {
+        BaseInitiator initiator = db.getInitiatorWithSPIBalanceRequested();
+        if (initiator != null) {
             return;
         }
         try {

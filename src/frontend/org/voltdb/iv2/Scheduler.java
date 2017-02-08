@@ -20,6 +20,7 @@ package org.voltdb.iv2;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
@@ -69,11 +70,6 @@ abstract public class Scheduler implements InitiatorMessageHandler
         }
     };
 
-    protected static enum SpiBalanceStatus {
-        NONE,
-        REQUESTED
-    };
-
     // The queue which the Site's runloop is going to poll for new work.  This
     // is fronted here by the TransactionTaskQueue and should not be directly
     // offered work.
@@ -88,7 +84,8 @@ abstract public class Scheduler implements InitiatorMessageHandler
     protected final ReplaySequencer m_replaySequencer = new ReplaySequencer();
 
     //used for SPI balance
-    protected SpiBalanceStatus m_spiBalanceStatus = SpiBalanceStatus.NONE;
+    protected AtomicBoolean m_spiBalanceStatus = new AtomicBoolean(Boolean.FALSE);
+    protected long m_spiBalanceFirstSeenCIHandle = Long.MIN_VALUE;
 
     /*
      * This lock is extremely dangerous to use without known the pattern.
@@ -214,10 +211,10 @@ abstract public class Scheduler implements InitiatorMessageHandler
     abstract public boolean sequenceForReplay(VoltMessage m);
 
     public boolean isSpiBalanceRequested() {
-        return (m_spiBalanceStatus == SpiBalanceStatus.REQUESTED);
+        return m_spiBalanceStatus.get();
     }
 
-    public void setSpiBalanceRequested(SpiBalanceStatus status) {
-        m_spiBalanceStatus = status;
+    public void setSpiBalanceRequested(boolean status) {
+        m_spiBalanceStatus.compareAndSet(!status, status);
     }
 }

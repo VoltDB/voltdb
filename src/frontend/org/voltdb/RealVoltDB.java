@@ -4273,17 +4273,17 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         return m_cartographer;
     }
 
-    public  boolean isSPIBalanceRequested() {
-        if (m_iv2Initiators == null) return false;
+    public  BaseInitiator getInitiatorWithSPIBalanceRequested() {
+        if (m_iv2Initiators == null) return null;
 
         for (Initiator init : m_iv2Initiators.values()) {
             if (init instanceof BaseInitiator) {
                 BaseInitiator baseInit = (BaseInitiator)init;
                 if (baseInit.isSPIBalanceRequested()) {
-                    return true;
+                    return baseInit;
                 }
             }
         }
-        return false;
+        return null;
     }
 }
