@@ -41,7 +41,6 @@ import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
-import org.voltdb.catalog.DatabaseConfiguration;
 import org.voltdb.catalog.IndexRef;
 import org.voltdb.catalog.MaterializedViewInfo;
 import org.voltdb.catalog.Table;
@@ -177,7 +176,7 @@ public class TestDDLCompiler extends TestCase {
 
         // RUN EXPECTING WARNINGS
         // compile successfully (but with two warnings hopefully)
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         boolean success = compiler.compileDDLString(schema1, jarOut.getPath());
         assertTrue(success);
 
@@ -223,7 +222,7 @@ public class TestDDLCompiler extends TestCase {
         schemaFile.deleteOnExit();
 
         // compile and fail on bad import
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         return compiler.compileFromDDL(jarOut.getPath(), schemaFile.getPath());
     }
 
@@ -259,7 +258,7 @@ public class TestDDLCompiler extends TestCase {
         schemaFile2.deleteOnExit();
 
         // compile and fail on bad import
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         boolean rslt = compiler.compileFromDDL(jarOut.getPath(), schemaFile1.getPath(), schemaFile2.getPath());
         assertTrue(checkWarn^compiler.m_warnings.isEmpty());
         return rslt;
@@ -418,7 +417,7 @@ public class TestDDLCompiler extends TestCase {
                 "No index found to support some of the join operations required to refresh the materialized view"
         };
 
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         for (int ii = 0; ii < schema.length; ++ii) {
             // compile successfully (but with two warnings hopefully)
             boolean success = compiler.compileDDLString(schema[ii], jarOut.getPath());
@@ -539,7 +538,7 @@ public class TestDDLCompiler extends TestCase {
                 "AS SELECT COUNT(*), MIN(D1+D2), MAX(ABS(D3)) " +
                 "FROM T;";
 
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         // compile successfully
         boolean success = compiler.compileDDLString(schema, jarOut.getPath());
         assertTrue(success);
@@ -563,46 +562,6 @@ public class TestDDLCompiler extends TestCase {
         jarOut.delete();
     }
 
-    public void testExportTables() {
-        File jarOut = new File("exportTables.jar");
-        jarOut.deleteOnExit();
-
-        String schema[] = {
-                // export table w/o group
-                "CREATE TABLE T (D1 INTEGER, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n" +
-                "EXPORT TABLE T;",
-
-                // export table w/ group
-                "CREATE TABLE T (D1 INTEGER, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n" +
-                "EXPORT TABLE T TO STREAM FOO;",
-
-                // export table w/ and w/o group
-                "CREATE TABLE T (T_D1 INTEGER, T_D2 INTEGER, T_D3 INTEGER, T_VAL1 INTEGER, T_VAL2 INTEGER, T_VAL3 INTEGER);\n" +
-                "CREATE TABLE S (S_D1 INTEGER, S_D2 INTEGER, S_D3 INTEGER, S_VAL1 INTEGER, S_VAL2 INTEGER, S_VAL3 INTEGER);\n" +
-                "EXPORT TABLE T;\n" +
-                "EXPORT TABLE S TO STREAM FOO;"
-        };
-
-        VoltCompiler compiler = new VoltCompiler();
-        for (int ii = 0; ii < schema.length; ++ii) {
-            File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema[ii]);
-            String schemaPath = schemaFile.getPath();
-
-            // compile successfully
-            boolean success = false;
-            try {
-                success = compiler.compileFromDDL(jarOut.getPath(), schemaPath);
-            }
-            catch (Exception e) {
-                // do nothing
-            }
-            assertTrue(success);
-
-            // cleanup after the test
-            jarOut.delete();
-        }
-    }
-
     public void testCreateStream() {
         File jarOut = new File("createStream.jar");
         jarOut.deleteOnExit();
@@ -619,7 +578,7 @@ public class TestDDLCompiler extends TestCase {
                 "CREATE STREAM S EXPORT TO TARGET BAR (D1 INTEGER, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n"
         };
 
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         for (int ii = 0; ii < schema.length; ++ii) {
             File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema[ii]);
             String schemaPath = schemaFile.getPath();
@@ -662,7 +621,7 @@ public class TestDDLCompiler extends TestCase {
                 "  DELETE FROM FOO WHERE D1 > 100));\n",
         };
 
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         for (int ii = 0; ii < schema.length; ++ii) {
             File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema[ii]);
             String schemaPath = schemaFile.getPath();
@@ -680,11 +639,10 @@ public class TestDDLCompiler extends TestCase {
         File jarOut = new File("exportDrTables.jar");
         jarOut.deleteOnExit();
 
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         File schemaFile = VoltProjectBuilder.writeStringToTempFile(
-        "CREATE TABLE T (D1 INTEGER, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n" +
-        "DR TABLE T;\n" +
-        "EXPORT TABLE T;");
+        "CREATE STREAM T (D1 INTEGER, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n" +
+        "DR TABLE T;");
         String schemaPath = schemaFile.getPath();
 
         try {
@@ -701,9 +659,8 @@ public class TestDDLCompiler extends TestCase {
         File jarOut = new File("setDatabaseConfig.jar");
         jarOut.deleteOnExit();
 
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(true);
         File schemaFile = VoltProjectBuilder.writeStringToTempFile(
-        "SET " + DatabaseConfiguration.DR_MODE_NAME + "=" + DatabaseConfiguration.ACTIVE_ACTIVE + ";\n" +
         "CREATE TABLE T (D1 INTEGER, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n" +
         "DR TABLE T;");
         String schemaPath = schemaFile.getPath();
@@ -714,6 +671,7 @@ public class TestDDLCompiler extends TestCase {
             fail(e.getMessage());
         }
 
+        compiler = new VoltCompiler(false);
         schemaFile = VoltProjectBuilder.writeStringToTempFile(
         "SET DR_MOD=ACTIVE_ACTIVE;\n" +
         "CREATE TABLE T (D1 INTEGER, D2 INTEGER, D3 INTEGER, VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER);\n" +
@@ -780,7 +738,7 @@ public class TestDDLCompiler extends TestCase {
                 "CREATE INDEX POLY ON GEO ( VALIDPOLYGONFROMTEXT( REGION ) );",
         };
 
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         for (int ii = 0; ii < schema.length; ++ii) {
             File schemaFile = VoltProjectBuilder.writeStringToTempFile(tableCreation + schema[ii]);
             String schemaPath = schemaFile.getPath();
@@ -817,7 +775,7 @@ public class TestDDLCompiler extends TestCase {
         String viewNames[] = {"v1", "v2", "v3", "v4"};
         String pcols[] = {"A2", null, "A2", null};
         assertEquals(viewNames.length, pcols.length);
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         File jarOut = new File("viewpcolselection.jar");
         jarOut.deleteOnExit();
         File schemaFile = VoltProjectBuilder.writeStringToTempFile(tableSchemas + partitionDDLs + viewDefinitions);
@@ -845,9 +803,8 @@ public class TestDDLCompiler extends TestCase {
         File jarOut = new File("setDatabaseConfig.jar");
         jarOut.deleteOnExit();
 
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(true);
         File schemaFile = VoltProjectBuilder.writeStringToTempFile(
-        "SET " + DatabaseConfiguration.DR_MODE_NAME + "=" + DatabaseConfiguration.ACTIVE_ACTIVE + ";\n" +
         "CREATE TABLE T (D1 INTEGER NOT NULL, D2 INTEGER, D3 VARCHAR(32), VAL1 INTEGER, VAL2 INTEGER, VAL3 INTEGER, PRIMARY KEY (D1), LIMIT PARTITION ROWS 1000);\n" +
         "DR TABLE T;\n" +
         "PARTITION TABLE T ON COLUMN D1;\n");

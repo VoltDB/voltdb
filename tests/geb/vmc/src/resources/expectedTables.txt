@@ -1,5 +1,4 @@
 # Expected Tables: (when running the default GEB VMC
 # test server; see ../../server/run_voltdb_server.sh)
-EXPORT_MIRROR_PARTITIONED_TABLE
 PARTITIONED_TABLE
 REPLICATED_TABLE

@@ -23,12 +23,10 @@
 
 package org.voltdb.regressionsuites;
 
-import java.io.IOException;
-
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
-import org.voltdb.client.ProcCallException;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb_testprocs.regressionsuites.fixedsql.Insert;
 
@@ -36,43 +34,42 @@ import org.voltdb_testprocs.regressionsuites.fixedsql.Insert;
  * System tests for UPDATE, mainly focusing on the correctness of the WHERE
  * clause
  */
-
 public class TestSqlUpdateSuite extends RegressionSuite {
-
-    /** Procedures used by this suite */
-    static final Class<?>[] PROCEDURES = { Insert.class };
-
     static final int ROWS = 10;
 
-    private void executeAndTestUpdate(Client client, String table, String update,
-                                      int expectedRowsChanged)
-    throws IOException, ProcCallException
-    {
-        for (int i = 0; i < ROWS; ++i)
-        {
+    private void insertRows(Client client, String table, int count) throws Exception {
+        for (int i = 0; i < count; ++i) {
             client.callProcedure("Insert", table, i, "desc", i, 14.5);
         }
+    }
+
+    private void executeAndTestUpdate(Client client, String table, String update,
+                                      int expectedRowsChanged) throws Exception {
+        insertRows(client, table, ROWS);
         VoltTable[] results = client.callProcedure("@AdHoc", update).getResults();
         // ADHOC update still returns number of modified rows * number of partitions
         // Comment this out until it's fixed; the select count should be good enough, though
         //assertEquals(expectedRowsChanged, results[0].asScalarLong());
-        String query = String.format("select count(%s.NUM) from %s where %s.NUM = -1",
-                                     table, table, table);
+        String query = "select count(X.NUM) from " + table + " X where X.NUM = -1";
         results = client.callProcedure("@AdHoc", query).getResults();
         assertEquals(String.format("Failing SQL: %s",query), expectedRowsChanged, results[0].asScalarLong());
-        client.callProcedure("@AdHoc",String.format("truncate table %s;",table));
+        client.callProcedure("@AdHoc", "truncate table " + table + ";");
 
     }
 
-    public void testUpdate()
-    throws IOException, ProcCallException
-    {
+    public void testUpdate() throws Exception {
+        subtestUpdateBasic();
+        subtestENG11918();
+        subtestUpdateWithSubquery();
+        subtestUpdateWithCaseWhen();
+    }
+
+    private void subtestUpdateBasic() throws Exception {
         Client client = getClient();
         String[] tables = {"P1", "R1"};
 
         System.out.println("testUpdate");
-        for (String table : tables)
-        {
+        for (String table : tables) {
             String update = String.format("update %s set %s.NUM = -1",
                                           table, table);
             // Expect all rows to change
@@ -80,8 +77,7 @@ public class TestSqlUpdateSuite extends RegressionSuite {
         }
 
         System.out.println("testUpdateWithEqualToIndexPredicate");
-        for (String table : tables)
-        {
+        for (String table : tables) {
             String update = String.format("update %s set %s.NUM = -1 where %s.ID = 5",
                                           table, table, table);
             // Only row with ID = 5 should change
@@ -89,8 +85,7 @@ public class TestSqlUpdateSuite extends RegressionSuite {
         }
 
         System.out.println("testUpdateWithEqualToNonIndexPredicate");
-        for (String table : tables)
-        {
+        for (String table : tables) {
             String update = String.format("update %s set %s.NUM = -1 where %s.NUM = 5",
                                           table, table, table);
             // Only row with NUM = 5 should change
@@ -101,8 +96,7 @@ public class TestSqlUpdateSuite extends RegressionSuite {
         // which generates the XML eaten by the planner didn't generate
         // anything in the <condition> element output for > or >= on an index
         System.out.println("testUpdateWithGreaterThanIndexPredicate");
-        for (String table : tables)
-        {
+        for (String table : tables) {
             String update = String.format("update %s set %s.NUM = -1 where %s.ID > 5",
                                           table, table, table);
             // Rows 6-9 should change
@@ -110,8 +104,7 @@ public class TestSqlUpdateSuite extends RegressionSuite {
         }
 
         System.out.println("testUpdateWithGreaterThanNonIndexPredicate");
-        for (String table : tables)
-        {
+        for (String table : tables) {
             String update = String.format("update %s set %s.NUM = -1 where %s.NUM > 5",
                                           table, table, table);
             // rows 6-9 should change
@@ -119,8 +112,7 @@ public class TestSqlUpdateSuite extends RegressionSuite {
         }
 
         System.out.println("testUpdateWithLessThanIndexPredicate");
-        for (String table : tables)
-        {
+        for (String table : tables) {
             String update = String.format("update %s set %s.NUM = -1 where %s.ID < 5",
                                           table, table, table);
             // Rows 0-4 should change
@@ -134,8 +126,7 @@ public class TestSqlUpdateSuite extends RegressionSuite {
         // element
         System.out.println("testUpdateWithOnePredicateAgainstIndexAndOneFalse");
 
-        for (String table : tables)
-        {
+        for (String table : tables) {
             String update = "update " + table + " set " + table + ".NUM = 100" +
                 " where " + table + ".NUM = 1000 and " + table + ".ID = 4";
             executeAndTestUpdate(client, table, update, 0);
@@ -146,16 +137,14 @@ public class TestSqlUpdateSuite extends RegressionSuite {
         // the index begin and end conditions, so the planner would only see the
         // begin condition in the <condition> element.
         System.out.println("testUpdateWithRangeAgainstIndex");
-        for (String table : tables)
-        {
+        for (String table : tables) {
             String update = String.format("update %s set %s.NUM = -1 where %s.ID < 8 and %s.ID > 5",
                                           table, table, table, table);
             executeAndTestUpdate(client, table, update, 2);
         }
 
         System.out.println("testUpdateWithRangeAgainstNonIndex");
-        for (String table : tables)
-        {
+        for (String table : tables) {
             String update = String.format("update %s set %s.NUM = -1 where %s.NUM < 8 and %s.NUM > 5",
                                           table, table, table, table);
             executeAndTestUpdate(client, table, update, 2);
@@ -172,6 +161,91 @@ public class TestSqlUpdateSuite extends RegressionSuite {
         System.out.println("testInvalidUpdate");
         verifyStmtFails(client, "UPDATE P1_VIEW SET NUM_SUM = 5",
                  "Illegal to modify a materialized view.");
+        verifyStmtFails(client, "UPDATE P1 SET NUM = 1 WHERE COUNT(*) IS NULL", "invalid WHERE expression");
+    }
+
+    public void subtestUpdateWithSubquery() throws Exception {
+        Client client = getClient();
+        String tables[] = {"P1", "R1"};
+        // insert rows where ID is 0..3
+        insertRows(client, "R2", 4);
+
+        for (String table : tables) {
+            // insert rows where ID is 0 and num is 0..9
+            insertRows(client, table, 10);
+
+            // update rows where ID is IN 0..3
+            VoltTable vt = client.callProcedure("@AdHoc",
+                    "UPDATE " + table + " SET NUM = NUM + 20 WHERE ID IN (SELECT ID FROM R2)")
+                    .getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] { 4 });
+
+            String stmt = "SELECT NUM FROM " + table + " ORDER BY NUM";
+            validateTableOfScalarLongs(client, stmt, new long[] { 4, 5, 6, 7, 8, 9, 20, 21, 22, 23 });
+
+            vt = client.callProcedure("@AdHoc",
+                    "UPDATE " + table + " SET NUM = (SELECT NUM FROM R2 WHERE ID = 3)")
+                    .getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] { 10 });
+
+            stmt = "SELECT NUM FROM " + table + " ORDER BY NUM";
+            validateTableOfScalarLongs(client, stmt, new long[] { 3, 3, 3, 3, 3, 3, 3, 3, 3, 3 });
+
+            vt = client.callProcedure("@AdHoc",
+                    "UPDATE " + table + " SET NUM = 20 WHERE ID = (SELECT MAX(NUM) FROM R2)")
+                    .getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] { 1 });
+
+            stmt = "SELECT NUM FROM " + table + " WHERE ID = (SELECT MAX(NUM) FROM R2)";
+            validateTableOfScalarLongs(client, stmt, new long[] { 20 });
+        }
+    }
+
+    private void subtestUpdateWithCaseWhen() throws Exception {
+        System.out.println("testUpdateWithCaseWhen");
+        Client client = getClient();
+
+        ClientResponse cr = client.callProcedure("@AdHoc", "truncate table p1;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        client.callProcedure("P1.Insert", 0, "", 150, 0.0);
+        client.callProcedure("P1.Insert", 1, "", 75, 0.0);
+        client.callProcedure("P1.Insert", 2, "", 30, 0.0);
+        client.callProcedure("P1.Insert", 3, "", 15, 0.0);
+        client.callProcedure("P1.Insert", 4, "", null, 0.0);
+
+        client.callProcedure("@AdHoc", "update p1 set "
+                + "num = case "
+                + "when num > 100 then 100 "
+                + "when num > 50 then 50 "
+                + "when num > 25 then 25 "
+                + "else num end;");
+
+        validateTableOfScalarLongs(client, "select num from p1 order by id asc",
+                new long[] {100, 50, 25, 15, Long.MIN_VALUE});
+
+        client.callProcedure("@AdHoc", "update p1 set "
+                + "num = case num "
+                + "when 100 then 101 "
+                + "when 50 then 52 "
+                + "when 25 then 27 "
+                + "else num end");
+        validateTableOfScalarLongs(client, "select num from p1 order by id asc",
+                new long[] {101, 52, 27, 15, Long.MIN_VALUE});
+    }
+
+    private void subtestENG11918() throws Exception {
+        System.out.println("testENG11918 (invalid timestamp cast)");
+
+        if (isHSQL()) {
+            // This regression test covers VoltDB-specific error behavior
+            return;
+        }
+
+        Client client = getClient();
+        client.callProcedure("@AdHoc", "INSERT INTO ENG_11918 (id, int, time) VALUES (101, 12, '1382-01-26 17:04:59');");
+        verifyStmtFails(client, "UPDATE ENG_11918 SET VCHAR = TIME WHERE INT != -0.539;",
+                "Input to SQL function CAST is outside of the supported range");
     }
 
     //
@@ -189,7 +263,7 @@ public class TestSqlUpdateSuite extends RegressionSuite {
 
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(Insert.class.getResource("sql-update-ddl.sql"));
-        project.addProcedures(PROCEDURES);
+        project.addProcedures(Insert.class);
 
         config = new LocalCluster("sqlupdate-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
         if (!config.compile(project)) fail();

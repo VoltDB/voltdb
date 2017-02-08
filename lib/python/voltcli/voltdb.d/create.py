@@ -26,10 +26,12 @@
                                 force_voltdb_create=True,
                                 supports_paused=True),
     options = (
-        # Hidden option to restore the hashinator in addition to the tables.
-        VOLT.BooleanOption('-r', '--replica', 'replica', 'start replica cluster', default = False),
+        VOLT.BooleanOption('-r', '--replica', 'replica',
+                           'start replica cluster (deprecated, please use role="replica" in the deployment file)',
+                           default = False),
     ),
-    description = 'Start a new, empty database.'
+    description = 'WARNING: The create is deprecated. Please use INIT and START. Start a new, empty database.',
+    hideverb=True
 )
 def create(runner):
     runner.go()

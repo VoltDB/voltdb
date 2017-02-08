@@ -313,10 +313,13 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
             for (int ctr = 0; ctr < activeNumOfSearchKeys; ctr++) {
                 // in a normal index scan, params would be substituted here,
                 // but this scan fills in params outside the loop
+
+                // When any part of the search key is NULL, the result is false when it compares to anything.
+                //   do early return optimization, our index comparator may not handle null comparison correctly.
+                // However, if the search key expression is "IS NOT DISTINCT FROM", then NULL values cannot be skipped.
+                // We will set the CompareNotDistinctFlags to true in the planner to mark this. (ENG-11096)
                 NValue candidateValue = m_indexNode->getSearchKeyExpressions()[ctr]->eval(&outer_tuple, NULL);
-                if (candidateValue.isNull()) {
-                    // when any part of the search key is NULL, the result is false when it compares to anything.
-                    // do early return optimization, our index comparator may not handle null comparison correctly.
+                if (candidateValue.isNull() && m_indexNode->getCompareNotDistinctFlags()[ctr] == false) {
                     keyException = true;
                     break;
                 }

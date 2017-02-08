@@ -70,10 +70,16 @@ function jars-ifneeded() {
     fi
 }
 
+# Init to directory voltdbroot
+function voltinit-ifneeded() {
+    voltdb init -C deployment.xml --force
+}
+
 # run the voltdb server locally
 function server() {
-    # run the server
-    voltdb create -d deployment.xml -l $LICENSE -H localhost
+    jars-ifneeded
+    voltinit-ifneeded
+    voltdb start -l $LICENSE -H localhost
 }
 
 # load schema and procedures

@@ -221,9 +221,11 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
 
     for (int ctr = 0; ctr < activeNumOfSearchKeys; ctr++) {
         NValue candidateValue = m_searchKeyArray[ctr]->eval(NULL, NULL);
-        if (candidateValue.isNull()) {
-            // when any part of the search key is NULL, the result is false when it compares to anything.
-            // do early return optimization, our index comparator may not handle null comparison correctly.
+        // When any part of the search key is NULL, the result is false when it compares to anything.
+        //   do early return optimization, our index comparator may not handle null comparison correctly.
+        // However, if the search key expression is "IS NOT DISTINCT FROM", then NULL values cannot be skipped.
+        // We will set the CompareNotDistinctFlags to true in the planner to mark this. (ENG-11096)
+        if (candidateValue.isNull() && m_node->getCompareNotDistinctFlags()[ctr] == false) {
             earlyReturnForSearchKeyOutOfRange = true;
             break;
         }

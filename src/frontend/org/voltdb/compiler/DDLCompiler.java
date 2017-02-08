@@ -98,7 +98,6 @@ public class DDLCompiler {
     private static final String PROCEDURE = "PROCEDURE";
     private static final String PARTITION = "PARTITION";
     private static final String REPLICATE = "REPLICATE";
-    private static final String EXPORT = "EXPORT";
     private static final String ROLE = "ROLE";
     private static final String DR = "DR";
 
@@ -271,7 +270,12 @@ public class DDLCompiler {
 
     private static void createOneDRConflictTable(StringBuilder sb, String name, boolean partitioned) {
         // If the conflict export table doesn't exist yet, create a new one.
-        sb.append("CREATE TABLE ").append(name).append(" (");
+        sb.append("CREATE STREAM ").append(name).append(" ");
+        // The partitioning here doesn't matter, it's only to trick the export system, not related to data placement.
+        if (partitioned) {
+            sb.append("PARTITION ON COLUMN ").append(DR_TIMESTAMP_COLUMN_NAME).append(" ");
+        }
+        sb.append("EXPORT TO TARGET ").append(CatalogUtil.DR_CONFLICTS_TABLE_EXPORT_GROUP).append(" (");
         for (String[] column : DR_CONFLICTS_EXPORT_TABLE_META_COLUMNS) {
             sb.append(column[0]).append(" ").append(column[1]);
             if (!column[0].equals(DR_TUPLE_COLUMN_NAME)) {
@@ -279,12 +283,6 @@ public class DDLCompiler {
             }
         }
         sb.append(");\n");
-        sb.append("EXPORT TABLE ").append(name).append(" TO STREAM ").append(CatalogUtil.DR_CONFLICTS_TABLE_EXPORT_GROUP).append(";\n");
-
-        // The partitioning here doesn't matter, it's only to trick the export system, not related to data placement.
-        if (partitioned) {
-            sb.append("PARTITION TABLE ").append(name).append(" ON COLUMN ").append(DR_TIMESTAMP_COLUMN_NAME).append(";\n");
-        }
     }
 
     private static boolean hasConflictTableInSchema(VoltXMLElement m_schema, String name) {
@@ -312,17 +310,17 @@ public class DDLCompiler {
     // Drop the dr conflicts table if A/A is disabled
     private void dropDRConflictTablesIfNeeded(StringBuilder sb) {
         if (hasConflictTableInSchema(m_schema, CatalogUtil.DR_CONFLICTS_PARTITIONED_EXPORT_TABLE)) {
-            sb.append("DROP TABLE " + CatalogUtil.DR_CONFLICTS_PARTITIONED_EXPORT_TABLE + ";\n");
+            sb.append("DROP STREAM " + CatalogUtil.DR_CONFLICTS_PARTITIONED_EXPORT_TABLE + ";\n");
         }
         if (hasConflictTableInSchema(m_schema, CatalogUtil.DR_CONFLICTS_REPLICATED_EXPORT_TABLE)) {
-            sb.append("DROP TABLE " + CatalogUtil.DR_CONFLICTS_REPLICATED_EXPORT_TABLE + ";\n");
+            sb.append("DROP STREAM " + CatalogUtil.DR_CONFLICTS_REPLICATED_EXPORT_TABLE + ";\n");
         }
     }
 
     // Generate DDL to create or drop the DR conflict table
-    private String generateDDLForDRConflictsTable(Database currentDB, Database previousDBIfAny) {
+    private String generateDDLForDRConflictsTable(Database currentDB, Database previousDBIfAny, boolean isCurrentXDCR) {
         StringBuilder sb = new StringBuilder();
-        if (currentDB.getIsactiveactivedred()) {
+        if (isCurrentXDCR) {
             createDRConflictTables(sb, previousDBIfAny);
         } else {
             dropDRConflictTablesIfNeeded(sb);
@@ -340,12 +338,13 @@ public class DDLCompiler {
      * @param db  current database
      * @param previousDBIfAny  previous status of database, liveDDL needs it
      * @param whichProcs  which type(s) of procedures to load
+     * @param isCurrentXDCR Does the current catalog has XDCR enabled
      * @throws VoltCompilerException
      */
     void loadAutogenExportTableSchema(Database db, Database previousDBIfAny,
-            DdlProceduresToLoad whichProcs)
+            DdlProceduresToLoad whichProcs, boolean isCurrentXDCR)
             throws VoltCompilerException {
-        Reader reader = new VoltCompilerStringReader(null, generateDDLForDRConflictsTable(db, previousDBIfAny));
+        Reader reader = new VoltCompilerStringReader(null, generateDDLForDRConflictsTable(db, previousDBIfAny, isCurrentXDCR));
         loadSchema(reader, db, whichProcs);
     }
 
@@ -890,38 +889,6 @@ public class DDLCompiler {
             return false;
         }
 
-        // matches if it is EXPORT TABLE
-        statementMatcher = SQLParser.matchExportTable(statement);
-        if (statementMatcher.matches()) {
-
-            // check the table portion
-            String tableName = checkIdentifierStart(statementMatcher.group(1), statement);
-
-            // group names should be the third group captured
-            String targetName = ((statementMatcher.groupCount() > 1) && (statementMatcher.group(2) != null)) ?
-                    checkIdentifierStart(statementMatcher.group(2), statement) :
-                    Constants.DEFAULT_EXPORT_CONNECTOR_NAME;
-
-            VoltXMLElement tableXML = m_schema.findChild("table", tableName.toUpperCase());
-
-            if (tableXML != null) {
-                if (tableXML.attributes.containsKey("drTable") && tableXML.attributes.get("drTable").equals("ENABLE")) {
-                    throw m_compiler.new VoltCompilerException(String.format(
-                            "Invalid EXPORT statement: table %s is a DR table.", tableName));
-                }
-                else {
-                    tableXML.attributes.put("export", targetName);
-                }
-            }
-            else {
-                throw m_compiler.new VoltCompilerException(String.format(
-                            "Invalid EXPORT statement: table %s was not present in the catalog.",
-                            tableName));
-            }
-
-            return true;
-        }
-
         // matches if it is DR TABLE <table-name> [DISABLE]
         // group 1 -- table name
         // group 2 -- NULL: enable dr
@@ -963,25 +930,9 @@ public class DDLCompiler {
         statementMatcher = SQLParser.matchSetGlobalParam(statement);
         if (statementMatcher.matches()) {
             String name = statementMatcher.group(1).toUpperCase();
-            String value = statementMatcher.group(2).toUpperCase();
             switch (name) {
                 case DatabaseConfiguration.DR_MODE_NAME:
-                    switch (value) {
-                        case DatabaseConfiguration.ACTIVE_ACTIVE: {
-                            db.setIsactiveactivedred(true);
-                        }
-                        break;
-                        case DatabaseConfiguration.ACTIVE_PASSIVE:
-                        case "DEFAULT": {
-                            db.setIsactiveactivedred(false);
-                        }
-                        break;
-                        default: {
-                            throw m_compiler.new VoltCompilerException(String.format(
-                                    "Invalid parameter value for %s. Candidate values are %s, %s/DEFAULT",
-                                    name, DatabaseConfiguration.ACTIVE_ACTIVE, DatabaseConfiguration.ACTIVE_PASSIVE));
-                        }
-                    }
+                    m_compiler.addWarn("Setting DR mode in the DDL is deprecated. Please use the role attribute of the <dr> tag in the deployment file.");
                     break;
                 default:
                     throw m_compiler.new VoltCompilerException(String.format(
@@ -1024,13 +975,6 @@ public class DDLCompiler {
             throw m_compiler.new VoltCompilerException(String.format(
                     "Invalid CREATE ROLE statement: \"%s\", " +
                     "expected syntax: CREATE ROLE <role>",
-                    statement.substring(0,statement.length()-1))); // remove trailing semicolon
-        }
-
-        if (EXPORT.equals(commandPrefix)) {
-            throw m_compiler.new VoltCompilerException(String.format(
-                    "Invalid EXPORT TABLE statement: \"%s\", " +
-                    "expected syntax: EXPORT TABLE <table>",
                     statement.substring(0,statement.length()-1))); // remove trailing semicolon
         }
 
@@ -1092,38 +1036,31 @@ public class DDLCompiler {
                     }
                 }
             }
-
+            VoltXMLElement tableXML = m_schema.findChild("table", tableName.toUpperCase());
+            if (tableXML != null) {
+                tableXML.attributes.put("stream", "true");
+            } else {
+                throw m_compiler.new VoltCompilerException(String.format(
+                        "Invalid STREAM statement: table %s does not exist", tableName));
+            }
             // process partition if specified
             if (columnName != null) {
-                VoltXMLElement tableXML = m_schema.findChild("table", tableName.toUpperCase());
-                if (tableXML != null) {
-                    tableXML.attributes.put("partitioncolumn", columnName.toUpperCase());
-                    // Column validity check done by VoltCompiler in post-processing
+                tableXML.attributes.put("partitioncolumn", columnName.toUpperCase());
+                // Column validity check done by VoltCompiler in post-processing
 
-                    // mark the table as dirty for the purposes of caching sql statements
-                    m_compiler.markTableAsDirty(tableName);
-                }
-                else {
-                    throw m_compiler.new VoltCompilerException(String.format(
-                            "Invalid PARTITION statement: table %s does not exist", tableName));
-                }
+                // mark the table as dirty for the purposes of caching sql statements
+                m_compiler.markTableAsDirty(tableName);
             }
 
             // process export
             targetName = (targetName != null) ? checkIdentifierStart(
                     targetName, statement) : Constants.DEFAULT_EXPORT_CONNECTOR_NAME;
 
-            VoltXMLElement tableXML = m_schema.findChild("table", tableName.toUpperCase());
-            if (tableXML != null) {
-                if (tableXML.attributes.containsKey("drTable") && tableXML.attributes.get("drTable").equals("ENABLE")) {
-                    throw m_compiler.new VoltCompilerException(String.format(
-                            "Invalid EXPORT statement: table %s is a DR table.", tableName));
-                } else {
-                    tableXML.attributes.put("export", targetName);
-                }
-            } else {
+            if (tableXML.attributes.containsKey("drTable") && "ENABLE".equals(tableXML.attributes.get("drTable"))) {
                 throw m_compiler.new VoltCompilerException(String.format(
-                        "Invalid EXPORT statement: table %s was not present in the catalog.", tableName));
+                        "Invalid CREATE STREAM statement: table %s is a DR table.", tableName));
+            } else {
+                tableXML.attributes.put("export", targetName);
             }
         } else {
             throw m_compiler.new VoltCompilerException(String.format("Invalid CREATE STREAM statement: \"%s\", "
@@ -1356,7 +1293,7 @@ public class DDLCompiler {
         return exportTableNames;
     }
 
-    void compileToCatalog(Database db) throws VoltCompilerException {
+    void compileToCatalog(Database db, boolean isXDCR) throws VoltCompilerException {
         // note this will need to be decompressed to be used
         String binDDL = Encoder.compressAndBase64Encode(m_fullDDL);
         db.setSchema(binDDL);
@@ -1368,7 +1305,7 @@ public class DDLCompiler {
         // build the local catalog from the xml catalog
         for (VoltXMLElement node : m_schema.children) {
             if (node.name.equals("table")) {
-                addTableToCatalog(db, node);
+                addTableToCatalog(db, node, isXDCR);
             }
         }
 
@@ -1669,7 +1606,7 @@ public class DDLCompiler {
         }
     }
 
-    private void addTableToCatalog(Database db, VoltXMLElement node)
+    private void addTableToCatalog(Database db, VoltXMLElement node, boolean isXDCR)
             throws VoltCompilerException {
         assert node.name.equals("table");
 
@@ -1677,10 +1614,10 @@ public class DDLCompiler {
         HashMap<String, Column> columnMap = new HashMap<String, Column>();
         HashMap<String, Index> indexMap = new HashMap<String, Index>();
 
-        String name = node.attributes.get("name");
+        final String name = node.attributes.get("name");
 
         // create a table node in the catalog
-        Table table = db.getTables().add(name);
+        final Table table = db.getTables().add(name);
         // set max value before return for view table
         table.setTuplelimit(Integer.MAX_VALUE);
 
@@ -1689,19 +1626,21 @@ public class DDLCompiler {
         table.setAnnotation(annotation);
 
         // handle the case where this is a materialized view
-        String query = node.attributes.get("query");
+        final String query = node.attributes.get("query");
         if (query != null) {
             assert(query.length() > 0);
             m_matViewMap.put(table, query);
         }
-
+        final boolean isStream = (node.attributes.get("stream") != null);
+        final String streamTarget = node.attributes.get("export");
+        final String streamPartitionColumn = node.attributes.get("partitioncolumn");
         // all tables start replicated
         // if a partition is found in the project file later,
         //  then this is reversed
         table.setIsreplicated(true);
 
         // map of index replacements for later constraint fixup
-        Map<String, String> indexReplacementMap = new TreeMap<String, String>();
+        final Map<String, String> indexReplacementMap = new TreeMap<String, String>();
 
         // Need the columnTypes sorted by column index.
         SortedMap<Integer, VoltType> columnTypes = new TreeMap<Integer, VoltType>();
@@ -1758,7 +1697,7 @@ public class DDLCompiler {
         }
 
         // Warn user if DR table don't have any unique index.
-        if (db.getIsactiveactivedred() &&
+        if (isXDCR &&
                 node.attributes.get("drTable") != null &&
                 node.attributes.get("drTable").equalsIgnoreCase("ENABLE")) {
             boolean hasUniqueIndex = false;
@@ -1822,8 +1761,7 @@ public class DDLCompiler {
         } else {
             // Get the final DDL for the table rebuilt from the catalog object
             // Don't need a real StringBuilder or export state to get the CREATE for a table
-            annotation.ddl = CatalogSchemaTools.toSchema(new StringBuilder(),
-                    table, query, null);
+            annotation.ddl = CatalogSchemaTools.toSchema(new StringBuilder(), table, query, isStream, streamPartitionColumn, streamTarget);
         }
     }
 

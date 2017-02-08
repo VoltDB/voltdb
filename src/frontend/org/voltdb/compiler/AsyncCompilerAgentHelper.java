@@ -30,6 +30,7 @@ import org.voltdb.common.Constants;
 import org.voltdb.compiler.ClassMatcher.ClassNameMatchStatus;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
+import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
@@ -95,7 +96,7 @@ public class AsyncCompilerAgentHelper
                 // provided operationBytes is the jarfile with the upsertable classes
                 try {
                     newCatalogBytes = modifyCatalogClasses(newCatalogBytes, work.operationString,
-                            work.operationBytes);
+                            work.operationBytes, work.drRole == DrRoleType.XDCR);
                 }
                 catch (IOException e) {
                     retval.errorMsg = "Unexpected IO exception @UpdateClasses modifying classes " +
@@ -111,7 +112,7 @@ public class AsyncCompilerAgentHelper
                 // work.adhocDDLStmts should be applied to the current catalog
                 try {
                     newCatalogBytes = addDDLToCatalog(context.catalog, context.getCatalogJarBytes(),
-                            work.adhocDDLStmts);
+                            work.adhocDDLStmts, work.drRole == DrRoleType.XDCR);
                 }
                 catch (VoltCompilerException vce) {
                     retval.errorMsg = vce.getMessage();
@@ -150,7 +151,7 @@ public class AsyncCompilerAgentHelper
             // try to get the new catalog from the params
             Pair<InMemoryJarfile, String> loadResults = null;
             try {
-                loadResults = CatalogUtil.loadAndUpgradeCatalogFromJar(newCatalogBytes);
+                loadResults = CatalogUtil.loadAndUpgradeCatalogFromJar(newCatalogBytes, work.drRole == DrRoleType.XDCR);
             }
             catch (IOException ioe) {
                 // Preserve a nicer message from the jarfile loading rather than
@@ -178,12 +179,6 @@ public class AsyncCompilerAgentHelper
             Catalog newCatalog = new Catalog();
             newCatalog.execute(newCatalogCommands);
 
-            String result = CatalogUtil.checkLicenseConstraint(newCatalog, m_licenseApi);
-            if (result != null) {
-                retval.errorMsg = result;
-                return retval;
-            }
-
             // Retrieve the original deployment string, if necessary
             if (deploymentString == null) {
                 // Go get the deployment string from the current catalog context
@@ -203,8 +198,12 @@ public class AsyncCompilerAgentHelper
                 retval.errorMsg = "Unable to update deployment configuration: Error parsing deployment string";
                 return retval;
             }
+            if (work.isPromotion && work.drRole == DrRoleType.REPLICA) {
+                assert dt.getDr().getRole() == DrRoleType.REPLICA;
+                dt.getDr().setRole(DrRoleType.MASTER);
+            }
 
-            result = CatalogUtil.compileDeployment(newCatalog, dt, false);
+            String result = CatalogUtil.compileDeployment(newCatalog, dt, false);
             if (result != null) {
                 retval.errorMsg = "Unable to update deployment configuration: " + result;
                 return retval;
@@ -261,7 +260,7 @@ public class AsyncCompilerAgentHelper
      * jarfile
      * @throws VoltCompilerException
      */
-    private byte[] addDDLToCatalog(Catalog oldCatalog, byte[] oldCatalogBytes, String[] adhocDDLStmts)
+    private byte[] addDDLToCatalog(Catalog oldCatalog, byte[] oldCatalogBytes, String[] adhocDDLStmts, boolean isXDCR)
     throws IOException, VoltCompilerException
     {
         InMemoryJarfile jarfile = CatalogUtil.loadInMemoryJarFile(oldCatalogBytes);
@@ -276,13 +275,13 @@ public class AsyncCompilerAgentHelper
         String newDDL = sb.toString();
         compilerLog.trace("Adhoc-modified DDL:\n" + newDDL);
 
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(isXDCR);
         compiler.compileInMemoryJarfileWithNewDDL(jarfile, newDDL, oldCatalog);
         return jarfile.getFullJarBytes();
     }
 
     private byte[] modifyCatalogClasses(byte[] oldCatalogBytes, String deletePatterns,
-            byte[] newClassBytes) throws IOException
+                                        byte[] newClassBytes, boolean isXDCR) throws IOException
     {
         // Create a new InMemoryJarfile based on the original catalog bytes,
         // modify it in place based on the @UpdateClasses inputs, and then
@@ -322,7 +321,7 @@ public class AsyncCompilerAgentHelper
         }
         if (deletedClasses || foundClasses) {
             compilerLog.info("Updating java classes available to stored procedures");
-            VoltCompiler compiler = new VoltCompiler();
+            VoltCompiler compiler = new VoltCompiler(isXDCR);
             compiler.compileInMemoryJarfile(jarfile);
         }
         return jarfile.getFullJarBytes();

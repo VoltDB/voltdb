@@ -158,7 +158,7 @@ public class SystemProcedureCatalog {
         builder.put("@UpdateApplicationCatalog",new Config("org.voltdb.sysprocs.UpdateApplicationCatalog", false, false, false, 0,    VoltType.INVALID,   false, false, false, true,      true,     false));
         builder.put("@LoadMultipartitionTable", new Config("org.voltdb.sysprocs.LoadMultipartitionTable",  false, false, false, 0,    VoltType.INVALID,   false, false, false, false,     true,     false));
         builder.put("@LoadSinglepartitionTable",new Config("org.voltdb.sysprocs.LoadSinglepartitionTable", true,  false, false, 0,    VoltType.VARBINARY, false, false, false, false,     true,     false));
-        builder.put("@Promote",                 new Config("org.voltdb.sysprocs.Promote",                  false, false, true,  0,    VoltType.INVALID,   false, false, true,  true,      false,    false));
+        builder.put("@Promote",                 new Config(null,                                           false, false, false, 0,    VoltType.INVALID,   false, false, true,  true,      false,    false));
         builder.put("@ValidatePartitioning",    new Config("org.voltdb.sysprocs.ValidatePartitioning",     false, false, false, 0,    VoltType.INVALID,   false, false, true,  true,      false,    false));
         builder.put("@GetHashinatorConfig",     new Config("org.voltdb.sysprocs.GetHashinatorConfig",      false, true,  false, 0,    VoltType.INVALID,   true,  false, true,  true,      false,    false));
         builder.put("@ApplyBinaryLogSP",        new Config("org.voltdb.sysprocs.ApplyBinaryLogSP",         true,  false, false, 0,    VoltType.VARBINARY, true,  false, false, true,      true,     false));

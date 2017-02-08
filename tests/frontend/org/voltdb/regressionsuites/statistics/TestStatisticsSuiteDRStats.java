@@ -46,45 +46,49 @@ import org.voltdb.regressionsuites.StatisticsTestSuiteBase;
 public class TestStatisticsSuiteDRStats extends StatisticsTestSuiteBase {
 
     private static int REPLICATION_PORT = 11000;
-    private static int CONSUMER_CLUSTER_COUNT = 2;
 
-    private static final ColumnInfo[] expectedDRNodeStatsSchema = new ColumnInfo[9];
-    private static final ColumnInfo[] expectedDRPartitionStatsSchema = new ColumnInfo[15];
+    private static final ColumnInfo[] expectedDRNodeStatsSchema;
+    private static final ColumnInfo[] expectedDRPartitionStatsSchema;
 
     static {
-        expectedDRNodeStatsSchema[0] = new ColumnInfo("TIMESTAMP", VoltType.BIGINT);
-        expectedDRNodeStatsSchema[1] = new ColumnInfo("HOST_ID", VoltType.INTEGER);
-        expectedDRNodeStatsSchema[2] = new ColumnInfo("HOSTNAME", VoltType.STRING);
-        expectedDRNodeStatsSchema[3] = new ColumnInfo("CONSUMERCLUSTERID", VoltType.SMALLINT);
-        expectedDRNodeStatsSchema[4] = new ColumnInfo("STATE", VoltType.STRING);
-        expectedDRNodeStatsSchema[5] = new ColumnInfo("SYNCSNAPSHOTSTATE", VoltType.STRING);
-        expectedDRNodeStatsSchema[6] = new ColumnInfo("ROWSINSYNCSNAPSHOT", VoltType.BIGINT);
-        expectedDRNodeStatsSchema[7] = new ColumnInfo("ROWSACKEDFORSYNCSNAPSHOT", VoltType.BIGINT);
-        expectedDRNodeStatsSchema[8] = new ColumnInfo("QUEUEDEPTH", VoltType.BIGINT);
+        expectedDRNodeStatsSchema = new ColumnInfo[] {
+            new ColumnInfo("TIMESTAMP", VoltType.BIGINT),
+            new ColumnInfo("HOST_ID", VoltType.INTEGER),
+            new ColumnInfo("HOSTNAME", VoltType.STRING),
+            new ColumnInfo("CLUSTER_ID", VoltType.SMALLINT),
+            new ColumnInfo("REMOTE_CLUSTER_ID", VoltType.SMALLINT),
+            new ColumnInfo("STATE", VoltType.STRING),
+            new ColumnInfo("SYNCSNAPSHOTSTATE", VoltType.STRING),
+            new ColumnInfo("ROWSINSYNCSNAPSHOT", VoltType.BIGINT),
+            new ColumnInfo("ROWSACKEDFORSYNCSNAPSHOT", VoltType.BIGINT),
+            new ColumnInfo("QUEUEDEPTH", VoltType.BIGINT)
+        };
 
-        expectedDRPartitionStatsSchema[0] = new ColumnInfo("TIMESTAMP", VoltType.BIGINT);
-        expectedDRPartitionStatsSchema[1] = new ColumnInfo("HOST_ID", VoltType.INTEGER);
-        expectedDRPartitionStatsSchema[2] = new ColumnInfo("HOSTNAME", VoltType.STRING);
-        expectedDRPartitionStatsSchema[3] = new ColumnInfo("CONSUMERCLUSTERID", VoltType.SMALLINT);
-        expectedDRPartitionStatsSchema[4] = new ColumnInfo("PARTITION_ID", VoltType.INTEGER);
-        expectedDRPartitionStatsSchema[5] = new ColumnInfo("STREAMTYPE", VoltType.STRING);
-        expectedDRPartitionStatsSchema[6] = new ColumnInfo("TOTALBYTES", VoltType.BIGINT);
-        expectedDRPartitionStatsSchema[7] = new ColumnInfo("TOTALBYTESINMEMORY", VoltType.BIGINT);
-        expectedDRPartitionStatsSchema[8] = new ColumnInfo("TOTALBUFFERS", VoltType.BIGINT);
-        expectedDRPartitionStatsSchema[9] = new ColumnInfo("LASTQUEUEDDRID", VoltType.BIGINT);
-        expectedDRPartitionStatsSchema[10] = new ColumnInfo("LASTACKDRID", VoltType.BIGINT);
-        expectedDRPartitionStatsSchema[11] = new ColumnInfo("LASTQUEUEDTIMESTAMP", VoltType.TIMESTAMP);
-        expectedDRPartitionStatsSchema[12] = new ColumnInfo("LASTACKTIMESTAMP", VoltType.TIMESTAMP);
-        expectedDRPartitionStatsSchema[13] = new ColumnInfo("ISSYNCED", VoltType.STRING);
-        expectedDRPartitionStatsSchema[14] = new ColumnInfo("MODE", VoltType.STRING);
+        expectedDRPartitionStatsSchema = new ColumnInfo[] {
+            new ColumnInfo("TIMESTAMP", VoltType.BIGINT),
+            new ColumnInfo("HOST_ID", VoltType.INTEGER),
+            new ColumnInfo("HOSTNAME", VoltType.STRING),
+            new ColumnInfo("CLUSTER_ID", VoltType.SMALLINT),
+            new ColumnInfo("REMOTE_CLUSTER_ID", VoltType.SMALLINT),
+            new ColumnInfo("PARTITION_ID", VoltType.INTEGER),
+            new ColumnInfo("STREAMTYPE", VoltType.STRING),
+            new ColumnInfo("TOTALBYTES", VoltType.BIGINT),
+            new ColumnInfo("TOTALBYTESINMEMORY", VoltType.BIGINT),
+            new ColumnInfo("TOTALBUFFERS", VoltType.BIGINT),
+            new ColumnInfo("LASTQUEUEDDRID", VoltType.BIGINT),
+            new ColumnInfo("LASTACKDRID", VoltType.BIGINT),
+            new ColumnInfo("LASTQUEUEDTIMESTAMP", VoltType.TIMESTAMP),
+            new ColumnInfo("LASTACKTIMESTAMP", VoltType.TIMESTAMP),
+            new ColumnInfo("ISSYNCED", VoltType.STRING),
+            new ColumnInfo("MODE", VoltType.STRING)
+        };
     }
 
     public TestStatisticsSuiteDRStats(String name) {
         super(name);
     }
 
-    // TODO temporarily disabled until the node stats fields have been decided for multiple consumer clusters case
-    public void notestDRNodeStatistics() throws Exception {
+    public void testDRNodeStatistics() throws Exception {
         if (!VoltDB.instance().getConfig().m_isEnterprise) {
             System.out.println("SKIPPING DRNODE STATS TESTS FOR COMMUNITY VERSION");
             return;
@@ -92,7 +96,6 @@ public class TestStatisticsSuiteDRStats extends StatisticsTestSuiteBase {
         System.out.println("\n\nTESTING DRNODE STATS\n\n\n");
         Client client  = getFullyConnectedClient();
 
-        assertEquals("Expected DRNodeStatistics schema length is 9", 9, expectedDRNodeStatsSchema.length);
         VoltTable expectedTable2 = new VoltTable(expectedDRNodeStatsSchema);
 
         //
@@ -118,7 +121,6 @@ public class TestStatisticsSuiteDRStats extends StatisticsTestSuiteBase {
         System.out.println("\n\nTESTING DRPRODUCERPARTITION STATS\n\n\n");
         Client client  = getFullyConnectedClient();
 
-        assertEquals("Expected DRPartitionStatistics schema length is 15", 15, expectedDRPartitionStatsSchema.length);
         VoltTable expectedTable1 = new VoltTable(expectedDRPartitionStatsSchema);
 
         //
@@ -142,7 +144,6 @@ public class TestStatisticsSuiteDRStats extends StatisticsTestSuiteBase {
         List<Client> consumerClients = new ArrayList<>();
         List<LocalCluster> consumerClusters = new ArrayList<>();
 
-        assertEquals("Expected DRPartitionStatistics schema length is 15", 15, expectedDRPartitionStatsSchema.length);
         VoltTable expectedTable1 = new VoltTable(expectedDRPartitionStatsSchema);
 
         ClientResponse cr = primaryClient.callProcedure("@AdHoc", "insert into employee values(1, 25);");
@@ -152,6 +153,7 @@ public class TestStatisticsSuiteDRStats extends StatisticsTestSuiteBase {
         String secondaryRoot = "/tmp/" + System.getProperty("user.name") + "-dr-stats-secondary";
 
         try {
+            int CONSUMER_CLUSTER_COUNT = 2;
             for (int n = 1; n <= CONSUMER_CLUSTER_COUNT; n++) {
                 LocalCluster consumerCluster = LocalCluster.createLocalCluster(drSchema, SITES, HOSTS, KFACTOR, n,
                         REPLICATION_PORT + 100 * n, REPLICATION_PORT, secondaryRoot, jarName, true);
@@ -207,8 +209,7 @@ public class TestStatisticsSuiteDRStats extends StatisticsTestSuiteBase {
         }
     }
 
-    // TODO temporarily disabled until the node stats fields have been decided for multiple consumer clusters case
-    public void notestDRStatistics() throws Exception {
+    public void testDRStatistics() throws Exception {
         if (!VoltDB.instance().getConfig().m_isEnterprise) {
             System.out.println("SKIPPING DR STATS TESTS FOR COMMUNITY VERSION");
             return;
@@ -216,10 +217,7 @@ public class TestStatisticsSuiteDRStats extends StatisticsTestSuiteBase {
         System.out.println("\n\nTESTING DR STATS\n\n\n");
         Client client  = getFullyConnectedClient();
 
-        assertEquals("Expected DRPartitionStatistics schema length is 15", 15, expectedDRPartitionStatsSchema.length);
         VoltTable expectedTable1 = new VoltTable(expectedDRPartitionStatsSchema);
-
-        assertEquals("Expected DRNodeStatistics schema length is 9", 9, expectedDRNodeStatsSchema.length);
         VoltTable expectedTable2 = new VoltTable(expectedDRNodeStatsSchema);
 
         //
@@ -232,17 +230,10 @@ public class TestStatisticsSuiteDRStats extends StatisticsTestSuiteBase {
         System.out.println("Test DR table: " + results[1].toString());
         validateSchema(results[0], expectedTable1);
         validateSchema(results[1], expectedTable2);
-        // One row per site (including the MPI on each host),
-        // don't have HSID for ease of check, just check a bunch of stuff
-        assertEquals(HOSTS * SITES + HOSTS, results[0].getRowCount());
-        results[0].advanceRow();
-        Map<String, String> columnTargets = new HashMap<>();
-        columnTargets.put("HOSTNAME", results[0].getString("HOSTNAME"));
-        validateRowSeenAtAllHosts(results[0], columnTargets, false);
-        results[0].advanceRow();
-        validateRowSeenAtAllPartitions(results[0], "HOSTNAME", results[0].getString("HOSTNAME"), false);
+
         // One row per host for DRNODE stats
         results[1].advanceRow();
+        Map<String, String> columnTargets = new HashMap<>();
         columnTargets.put("HOSTNAME", results[1].getString("HOSTNAME"));
         validateRowSeenAtAllHosts(results[1], columnTargets, true);
     }

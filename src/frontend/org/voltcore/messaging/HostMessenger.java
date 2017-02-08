@@ -1449,6 +1449,20 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         }
     }
 
+    /**
+     * Discard a mailbox by ref.
+     */
+    public void removeMailbox(final Mailbox mbox) {
+        synchronized (m_mapLock) {
+            ImmutableMap.Builder<Long, Mailbox> b = ImmutableMap.builder();
+            for (Map.Entry<Long, Mailbox> e : m_siteMailboxes.entrySet()) {
+                if (e.getValue() == mbox) continue;
+                b.put(e.getKey(), e.getValue());
+            }
+            m_siteMailboxes = b.build();
+        }
+    }
+
     public void send(final long destinationHSId, final VoltMessage message)
     {
         assert(message != null);

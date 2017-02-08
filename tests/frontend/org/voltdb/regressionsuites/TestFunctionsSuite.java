@@ -80,11 +80,17 @@ public class TestFunctionsSuite extends RegressionSuite {
         validateTableOfScalarDecimals(client, "select MOD(CAST(3.0 as decimal), CAST(2.0 as decimal)) from R1",  new BigDecimal[]{new BigDecimal("1.000000000000")});
         validateTableOfScalarDecimals(client, "select MOD(CAST(-25.32 as decimal), CAST(ratio as decimal)) from R1",  new BigDecimal[]{new BigDecimal("-0.020000000000")});
 
+        // Test MOD with NULL values
+        validateTableOfScalarDecimals(client, "select MOD(NULL, CAST(ratio as decimal)) from R1",  new BigDecimal[]{null});
+        validateTableOfScalarDecimals(client, "select MOD(CAST(3.12 as decimal), NULL) from R1",  new BigDecimal[]{null});
+        validateTableOfScalarDecimals(client, "select MOD(CAST(NULL AS decimal), CAST(ratio as decimal)) from R1",  new BigDecimal[]{null});
+        verifyStmtFails(client, "select MOD(NULL, NULL) from R1", "data type cast needed for parameter or null literal");
+
         // Mix of decimal and ints
         verifyStmtFails(client, "select MOD(25.32, 2) from R1", "incompatible data type in operation");
         verifyStmtFails(client, "select MOD(2, 25.32) from R1", "incompatible data type in operation");
 
-        // // Test guards on other types
+        // Test guards on other types
         verifyStmtFails(client, "select MOD('-25.32', 2.5) from R1", "incompatible data type in operation");
         verifyStmtFails(client, "select MOD(-25.32, ratio) from R1", "incompatible data type in operation");
     }

@@ -17,7 +17,11 @@
 
 package org.voltdb;
 
+import com.google_voltpatches.common.collect.ImmutableMap;
+import com.google_voltpatches.common.collect.Sets;
+
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.TreeMap;
@@ -26,11 +30,6 @@ public class DRRoleStats extends StatsSource {
     public static final String CN_ROLE = "ROLE";
     public static final String CN_STATE = "STATE";
     public static final String CN_REMOTE_CLUSTER_ID = "REMOTE_CLUSTER_ID";
-
-    // This will be replaced by the deployment file role once ENG-11457 and ENG-11459
-    public enum Role {
-        NONE, MASTER, REPLICA, XDCR
-    }
 
     public enum State {
         DISABLED, // Feature is completely disabled
@@ -79,73 +78,79 @@ public class DRRoleStats extends StatsSource {
     @Override
     protected void updateStatsRow(Object rowKey, Object[] rowValues)
     {
-        final ProducerDRGateway producer = m_vdb.getNodeDRGateway();
-        final DRProducerNodeStats producerStats;
-        if (producer != null) {
-            producerStats = producer.getNodeDRStats();
-        } else {
-            producerStats = null;
-        }
+        @SuppressWarnings("unchecked") Map.Entry<Byte, State> state = (Map.Entry<Byte, State>) rowKey;
+        final String role = getRole();
 
-        final Role role = getRole(producerStats);
-        State state = State.DISABLED;
-
-        if (role == Role.XDCR || role == Role.MASTER) {
-            if (producerStats != null) {
-                state = state.and(producerStats.state);
-            }
-        }
-
-        if (role == Role.XDCR || role == Role.REPLICA) {
-            final ConsumerDRGateway consumer = m_vdb.getConsumerDRGateway();
-            if (consumer != null) {
-                state = state.and(consumer.getState());
-            }
-        }
-
-        rowValues[columnNameToIndex.get(CN_ROLE)] = role.name();
-        rowValues[columnNameToIndex.get(CN_STATE)] = state.name();
-        rowValues[columnNameToIndex.get(CN_REMOTE_CLUSTER_ID)] = -1; // reserved for multi-cluster XDCR
+        rowValues[columnNameToIndex.get(CN_ROLE)] = role;
+        rowValues[columnNameToIndex.get(CN_STATE)] = state.getValue().name();
+        rowValues[columnNameToIndex.get(CN_REMOTE_CLUSTER_ID)] = state.getKey();
     }
 
     @Override
     protected Iterator<Object> getStatsRowKeyIterator(boolean interval)
     {
-        return new Iterator<Object>() {
-            boolean returnRow = true;
+        final ProducerDRGateway producer = m_vdb.getNodeDRGateway();
+        final Map<Byte, DRProducerNodeStats> producerStats;
+        if (producer != null) {
+            producerStats = producer.getNodeDRStats();
+        } else {
+            producerStats = ImmutableMap.of((byte) -1, DRProducerNodeStats.DISABLED_NODE_STATS);
+        }
 
+        final ConsumerDRGateway consumer = m_vdb.getConsumerDRGateway();
+        final Map<Byte, State> consumerStates;
+        if (consumer != null) {
+            consumerStates = consumer.getStates();
+        } else {
+            consumerStates = ImmutableMap.of((byte) -1, State.DISABLED);
+        }
+
+        final Map<Byte, State> states = mergeProducerConsumerStates(producerStats, consumerStates);
+
+        final Iterator<Map.Entry<Byte, State>> iter = states.entrySet().iterator();
+        return new Iterator<Object>() {
             @Override
             public boolean hasNext()
             {
-                return returnRow;
+                return iter.hasNext();
             }
 
             @Override
             public Object next()
             {
-                if (returnRow) {
-                    returnRow = false;
-                    return new Object();
-                } else {
-                    return null;
-                }
+                return iter.next();
             }
         };
     }
 
-    private Role getRole(DRProducerNodeStats producerStats)
+    private String getRole()
     {
-        if (m_vdb.getReplicationRole() == ReplicationRole.REPLICA) {
-            return Role.REPLICA;
-        } else if (producerStats != null && producerStats.state != State.DISABLED) {
-            if (m_vdb.getConsumerDRGateway() == null) {
-                return Role.MASTER;
-            } else {
-                return Role.XDCR;
+        return m_vdb.getCatalogContext().cluster.getDrrole().toUpperCase();
+    }
+
+    private static Map<Byte, State> mergeProducerConsumerStates(Map<Byte, DRProducerNodeStats> producerStats,
+                                                                Map<Byte, State> consumerStates)
+    {
+        Map<Byte, State> states = new HashMap<>();
+        for (byte clusterId : Sets.union(producerStats.keySet(), consumerStates.keySet())) {
+            final DRProducerNodeStats producerNodeStats = producerStats.get(clusterId);
+            final State consumerState = consumerStates.get(clusterId);
+            State finalState = State.DISABLED;
+            if (producerNodeStats != null) {
+                finalState = finalState.and(producerNodeStats.state);
             }
-        } else {
-            return Role.NONE;
+            if (consumerState != null) {
+                finalState = finalState.and(consumerState);
+            }
+            states.put(clusterId, finalState);
         }
+
+        // Remove the -1 placeholder if there are real cluster states
+        if (states.size() > 1) {
+            states.remove((byte) -1);
+        }
+
+        return states;
     }
 
     /**
@@ -168,14 +173,14 @@ public class DRRoleStats extends StatsSource {
             return stats;
         }
 
-        Role role = null;
+        String role = null;
         Map<Byte, State> states = new TreeMap<>();
         while (stats.advanceRow()) {
             final byte clusterId = (byte) stats.getLong(CN_REMOTE_CLUSTER_ID);
-            final Role curRole = Role.valueOf(stats.getString(CN_ROLE));
+            final String curRole = stats.getString(CN_ROLE);
             if (role == null) {
                 role = curRole;
-            } else if (curRole != role) {
+            } else if (!role.equals(curRole)) {
                 throw new IllegalArgumentException("Inconsistent DR role across cluster nodes: " + stats.toFormattedString(false));
             }
 
@@ -186,7 +191,7 @@ public class DRRoleStats extends StatsSource {
         assert role != null;
         stats.clearRowData();
         for (Map.Entry<Byte, State> e : states.entrySet()) {
-            stats.addRow(role.name(), e.getValue().name(), e.getKey());
+            stats.addRow(role, e.getValue().name(), e.getKey());
         }
         return stats;
     }

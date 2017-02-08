@@ -67,6 +67,7 @@ import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
 import org.voltdb.common.Constants;
 import org.voltdb.common.Permission;
+import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.compilereport.ReportMaker;
 import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.settings.ClusterSettings;
@@ -151,6 +152,8 @@ public class VoltCompiler {
     private final static String m_emptyDDLComment = "-- This DDL file is a placeholder for starting without a user-supplied catalog.\n";
 
     private ClassLoader m_classLoader = ClassLoader.getSystemClassLoader();
+
+    private final boolean m_isXDCR;
 
     /**
      * Represents output from a compile. This works similarly to Log4j; there
@@ -339,13 +342,15 @@ public class VoltCompiler {
     }
 
     /** Passing true to constructor indicates the compiler is being run in standalone mode */
-    public VoltCompiler(boolean standaloneCompiler) {
+    public VoltCompiler(boolean standaloneCompiler, boolean isXDCR) {
         this.standaloneCompiler = standaloneCompiler;
+        this.m_isXDCR = isXDCR;
     }
 
-    /** Parameterless constructor is for embedded VoltCompiler use only. */
-    public VoltCompiler() {
-        this(false);
+    /** Parameterless constructor is for embedded VoltCompiler use only.
+     * @param isXDCR*/
+    public VoltCompiler(boolean isXDCR) {
+        this(false, isXDCR);
     }
 
     public boolean hasErrors() {
@@ -476,7 +481,7 @@ public class VoltCompiler {
      */
     private void debugVerifyCatalog(InMemoryJarfile origJarFile, Catalog origCatalog)
     {
-        final VoltCompiler autoGenCompiler = new VoltCompiler();
+        final VoltCompiler autoGenCompiler = new VoltCompiler(m_isXDCR);
         // Make the new compiler use the original jarfile's classloader so it can
         // pull in the class files for procedures and imports
         autoGenCompiler.m_classLoader = origJarFile.getLoader();
@@ -945,7 +950,8 @@ public class VoltCompiler {
         // Actually parse and handle all the DDL
         // DDLCompiler also provides partition descriptors for DDL PARTITION
         // and REPLICATE statements.
-        final DDLCompiler ddlcompiler = new DDLCompiler(this, hsql, voltDdlTracker, m_classLoader);
+        final DDLCompiler ddlcompiler;
+        ddlcompiler = new DDLCompiler(this, hsql, voltDdlTracker, m_classLoader);
 
         if (cannonicalDDLIfAny != null) {
             // add the file object's path to the list of files for the jar
@@ -973,9 +979,9 @@ public class VoltCompiler {
         }
 
         // When A/A is enabled, create an export table for every DR table to log possible conflicts
-        ddlcompiler.loadAutogenExportTableSchema(db, previousDBIfAny, whichProcs);
+        ddlcompiler.loadAutogenExportTableSchema(db, previousDBIfAny, whichProcs, m_isXDCR);
 
-        ddlcompiler.compileToCatalog(db);
+        ddlcompiler.compileToCatalog(db, m_isXDCR);
 
         // add database estimates info
         addDatabaseEstimatesInfo(m_estimates, db);
@@ -1291,7 +1297,7 @@ public class VoltCompiler {
     public static void main(final String[] args)
     {
         // passing true to constructor indicates the compiler is being run in standalone mode
-        final VoltCompiler compiler = new VoltCompiler(true);
+        final VoltCompiler compiler = new VoltCompiler(true, false);
 
         boolean success = false;
         if (args.length > 0 && args[0].toLowerCase().endsWith(".jar")) {

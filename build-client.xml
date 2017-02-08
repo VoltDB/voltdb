@@ -96,6 +96,7 @@
 <fileset id="client.src.files" dir="${src.gpl.dir}"
         includes="org/voltcore/logging/Level.java
                   org/voltcore/logging/VoltLogger.java
+                  org/voltcore/logging/VoltNullLogger.java
                   org/voltcore/logging/VoltUtilLoggingLogger.java
                   org/voltcore/network/*.java
 
@@ -155,12 +156,11 @@
 PRIMARY ENTRY POINTS
 ***************************************
 -->
-
+    
 <target name="default"
     depends="compile, voltdbclient.jar"
     description="Compile Java client classes builds the client/jdbc Jarfile."
 />
-
 <!--
 ***************************************
 DISTRIBUTION

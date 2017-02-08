@@ -26,7 +26,6 @@ package org.voltdb.utils;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.util.Calendar;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -52,12 +51,9 @@ import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compilereport.ProcedureAnnotation;
-import org.voltdb.licensetool.LicenseApi;
-import org.voltdb.licensetool.LicenseException;
 import org.voltdb.types.ConstraintType;
 
 import junit.framework.TestCase;
-import static junit.framework.TestCase.assertEquals;
 
 public class TestCatalogUtil extends TestCase {
 
@@ -97,7 +93,7 @@ public class TestCatalogUtil extends TestCase {
         // Simple check to make sure things look ok...
         for (Table catalog_tbl : catalog_db.getTables()) {
             StringBuilder sb = new StringBuilder();
-            CatalogSchemaTools.toSchema(sb, catalog_tbl, null, null);
+            CatalogSchemaTools.toSchema(sb, catalog_tbl, null, false, null, null);
             String sql = sb.toString();
             assertTrue(sql.startsWith("CREATE TABLE " + catalog_tbl.getTypeName()));
 
@@ -572,179 +568,6 @@ public class TestCatalogUtil extends TestCase {
         }
     }
 
-    public void testCheckLicenseConstraint() {
-        catalog_db.setIsactiveactivedred(true);
-
-        LicenseApi lapi = new LicenseApi() {
-            @Override
-            public boolean initializeFromFile(File license) {
-                return false;
-            }
-
-            @Override
-            public boolean isTrial() {
-                return false;
-            }
-
-            @Override
-            public int maxHostcount() {
-                return 0;
-            }
-
-            @Override
-            public Calendar expires() {
-                return null;
-            }
-
-            @Override
-            public boolean verify() throws LicenseException {
-                return false;
-            }
-
-            @Override
-            public boolean isDrReplicationAllowed() {
-                return false;
-            }
-
-            @Override
-            public boolean isDrActiveActiveAllowed() {
-                return true;
-            }
-
-            @Override
-            public boolean isCommandLoggingAllowed() {
-                return false;
-            }
-
-            @Override
-            public boolean isAWSMarketplace() {
-                return false;
-            }
-
-            @Override
-            public boolean isEnterprise() {
-                return false;
-            }
-
-            @Override
-            public boolean isPro() {
-                return false;
-            }
-
-            @Override
-            public String licensee() {
-                return null;
-            }
-
-            @Override
-            public Calendar issued() {
-                // TODO Auto-generated method stub
-                return null;
-            }
-
-            @Override
-            public String note() {
-                return null;
-            }
-
-            @Override
-            public boolean hardExpiration() {
-                return false;
-            }
-
-            @Override
-            public boolean secondaryInitialization() {
-                return true;
-            }
-        };
-        assertNull("Setting DR Active-Active should succeed with qualified license",
-                   CatalogUtil.checkLicenseConstraint(catalog, lapi));
-
-        lapi = new LicenseApi() {
-            @Override
-            public boolean initializeFromFile(File license) {
-                return false;
-            }
-
-            @Override
-            public boolean isTrial() {
-                return false;
-            }
-
-            @Override
-            public int maxHostcount() {
-                return 0;
-            }
-
-            @Override
-            public Calendar expires() {
-                return null;
-            }
-
-            @Override
-            public boolean verify() throws LicenseException {
-                return false;
-            }
-
-            @Override
-            public boolean isDrReplicationAllowed() {
-                return false;
-            }
-
-            @Override
-            public boolean isDrActiveActiveAllowed() {
-                return false;
-            }
-
-            @Override
-            public boolean isCommandLoggingAllowed() {
-                return false;
-            }
-
-            @Override
-            public boolean isAWSMarketplace() {
-                return false;
-            }
-
-            @Override
-            public boolean isEnterprise() {
-                return false;
-            }
-
-            @Override
-            public boolean isPro() {
-                return false;
-            }
-
-            @Override
-            public String licensee() {
-                return null;
-            }
-
-            @Override
-            public Calendar issued() {
-                return null;
-            }
-
-            @Override
-            public String note() {
-                return null;
-            }
-
-            @Override
-            public boolean hardExpiration() {
-                return false;
-            }
-
-            @Override
-            public boolean secondaryInitialization() {
-                return true;
-            }
-        };
-        assertNotNull("Setting DR Active-Active should fail with unqualified license",
-                CatalogUtil.checkLicenseConstraint(catalog, lapi));
-    }
-
     public void testCompileDeploymentAgainstEmptyCatalog() {
         Catalog catalog = new Catalog();
         Cluster cluster = catalog.getClusters().add("cluster");
@@ -791,25 +614,14 @@ public class TestCatalogUtil extends TestCase {
             "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
             "<deployment>" +
             "   <cluster hostcount='3' kfactor='1' sitesperhost='2'/>" +
-            "   <partition-detection enabled='true'>" +
-            "   </partition-detection>" +
-            "</deployment>";
-
-        final String ppdEnabledWithPrefix =
-            "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
-            "<deployment>" +
-            "   <cluster hostcount='3' kfactor='1' sitesperhost='2'/>" +
-            "   <partition-detection enabled='true'>" +
-            "      <snapshot prefix='testPrefix'/>" +
-            "   </partition-detection>" +
+            "   <partition-detection enabled='true' />" +
             "</deployment>";
 
         final String ppdDisabledNoPrefix =
             "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
             "<deployment>" +
             "   <cluster hostcount='3' kfactor='1' sitesperhost='2'/>" +
-            "   <partition-detection enabled='false'>" +
-            "   </partition-detection>" +
+            "   <partition-detection enabled='false' />" +
             "</deployment>";
 
         final File tmpNoElement = VoltProjectBuilder.writeStringToTempFile(noElement);
@@ -817,7 +629,6 @@ public class TestCatalogUtil extends TestCase {
         assertTrue("Deployment file failed to parse: " + msg, msg == null);
         Cluster cluster = catalog.getClusters().get("cluster");
         assertTrue(cluster.getNetworkpartition());
-        assertEquals("partition_detection", cluster.getFaultsnapshots().get("CLUSTER_PARTITION").getPrefix());
 
         setUp();
         final File tmpEnabledDefault = VoltProjectBuilder.writeStringToTempFile(ppdEnabledDefaultPrefix);
@@ -825,15 +636,6 @@ public class TestCatalogUtil extends TestCase {
         assertTrue("Deployment file failed to parse: " + msg, msg == null);
         cluster = catalog.getClusters().get("cluster");
         assertTrue(cluster.getNetworkpartition());
-        assertEquals("partition_detection", cluster.getFaultsnapshots().get("CLUSTER_PARTITION").getPrefix());
-
-        setUp();
-        final File tmpEnabledPrefix = VoltProjectBuilder.writeStringToTempFile(ppdEnabledWithPrefix);
-        msg = CatalogUtil.compileDeployment(catalog, tmpEnabledPrefix.getPath(), false);
-        assertTrue("Deployment file failed to parse: " + msg, msg == null);
-        cluster = catalog.getClusters().get("cluster");
-        assertTrue(cluster.getNetworkpartition());
-        assertEquals("testPrefix", cluster.getFaultsnapshots().get("CLUSTER_PARTITION").getPrefix());
 
         setUp();
         final File tmpDisabled = VoltProjectBuilder.writeStringToTempFile(ppdDisabledNoPrefix);
@@ -845,7 +647,7 @@ public class TestCatalogUtil extends TestCase {
 
     public void testImportSettings() throws Exception {
 
-        File formatjar = CatalogUtil.createTemporaryEmptyCatalogJarFile();
+        File formatjar = CatalogUtil.createTemporaryEmptyCatalogJarFile(false);
         final String withBadImport1 =
                 "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
                 + "<deployment>"
@@ -873,7 +675,7 @@ public class TestCatalogUtil extends TestCase {
                 + "    </import>"
                 + "</deployment>";
         //Use catalog jar to point to a file to do dup test.
-        File catjar = CatalogUtil.createTemporaryEmptyCatalogJarFile();
+        File catjar = CatalogUtil.createTemporaryEmptyCatalogJarFile(false);
         final String withBadImport3 =
                 "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
                 + "<deployment>"
@@ -948,7 +750,7 @@ public class TestCatalogUtil extends TestCase {
         final File tmpBad = VoltProjectBuilder.writeStringToTempFile(withBadImport1);
         DeploymentType bad_deployment = CatalogUtil.getDeployment(new FileInputStream(tmpBad));
 
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         String x[] = {tmpDdl.getAbsolutePath()};
         Catalog cat = compiler.compileCatalogFromDDL(x);
 
@@ -959,7 +761,7 @@ public class TestCatalogUtil extends TestCase {
         final File tmpBad2 = VoltProjectBuilder.writeStringToTempFile(withBadImport2);
         DeploymentType bad_deployment2 = CatalogUtil.getDeployment(new FileInputStream(tmpBad2));
 
-        VoltCompiler compiler2 = new VoltCompiler();
+        VoltCompiler compiler2 = new VoltCompiler(false);
         String x2[] = {tmpDdl.getAbsolutePath()};
         Catalog cat2 = compiler2.compileCatalogFromDDL(x2);
 
@@ -970,7 +772,7 @@ public class TestCatalogUtil extends TestCase {
         final File tmpBad3 = VoltProjectBuilder.writeStringToTempFile(withBadImport3);
         DeploymentType bad_deployment3 = CatalogUtil.getDeployment(new FileInputStream(tmpBad3));
 
-        VoltCompiler compiler3 = new VoltCompiler();
+        VoltCompiler compiler3 = new VoltCompiler(false);
         String x3[] = {tmpDdl.getAbsolutePath()};
         Catalog cat3 = compiler3.compileCatalogFromDDL(x3);
 
@@ -981,7 +783,7 @@ public class TestCatalogUtil extends TestCase {
         final File tmpBad4 = VoltProjectBuilder.writeStringToTempFile(withGoodImport0);
         DeploymentType bad_deployment4 = CatalogUtil.getDeployment(new FileInputStream(tmpBad4));
 
-        VoltCompiler compiler4 = new VoltCompiler();
+        VoltCompiler compiler4 = new VoltCompiler(false);
         String x4[] = {tmpDdl.getAbsolutePath()};
         Catalog cat4 = compiler4.compileCatalogFromDDL(x4);
 
@@ -992,7 +794,7 @@ public class TestCatalogUtil extends TestCase {
         final File good1 = VoltProjectBuilder.writeStringToTempFile(goodImport1);
         DeploymentType good_deployment1 = CatalogUtil.getDeployment(new FileInputStream(good1));
 
-        VoltCompiler good_compiler1 = new VoltCompiler();
+        VoltCompiler good_compiler1 = new VoltCompiler(false);
         String x5[] = {tmpDdl.getAbsolutePath()};
         Catalog cat5 = good_compiler1.compileCatalogFromDDL(x5);
 
@@ -1003,7 +805,7 @@ public class TestCatalogUtil extends TestCase {
         final File tmpBad5 = VoltProjectBuilder.writeStringToTempFile(withBadFormatter1);
         DeploymentType bad_deployment5 = CatalogUtil.getDeployment(new FileInputStream(tmpBad5));
 
-        VoltCompiler compiler6 = new VoltCompiler();
+        VoltCompiler compiler6 = new VoltCompiler(false);
         String x6[] = {tmpDdl.getAbsolutePath()};
         Catalog cat6 = compiler6.compileCatalogFromDDL(x6);
 
@@ -1016,13 +818,13 @@ public class TestCatalogUtil extends TestCase {
      * The CRC of an empty catalog should always be the same.
      */
     public void testEmptyCatalogCRC() throws Exception {
-        File file1 = CatalogUtil.createTemporaryEmptyCatalogJarFile();
+        File file1 = CatalogUtil.createTemporaryEmptyCatalogJarFile(false);
         assertNotNull(file1);
         byte[] bytes1 = MiscUtils.fileToBytes(file1);
         InMemoryJarfile jar1 = new InMemoryJarfile(bytes1);
         long crc1 = jar1.getCRC();
         Thread.sleep(5000);
-        File file2 = CatalogUtil.createTemporaryEmptyCatalogJarFile();
+        File file2 = CatalogUtil.createTemporaryEmptyCatalogJarFile(false);
         assertNotNull(file2);
         byte[] bytes2 = MiscUtils.fileToBytes(file2);
         InMemoryJarfile jar2 = new InMemoryJarfile(bytes2);
@@ -1110,6 +912,72 @@ public class TestCatalogUtil extends TestCase {
             }
         }
         return containsTable;
+    }
+
+    public void testDRRole() throws Exception {
+        final String defaultRole =
+            "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
+            + "<deployment>"
+            + "<cluster hostcount='3' kfactor='1' sitesperhost='2' id='1'/>"
+            + "    <dr id='1'>"
+            + "    </dr>"
+            + "</deployment>";
+        final String masterRole =
+            "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
+            + "<deployment>"
+            + "<cluster hostcount='3' kfactor='1' sitesperhost='2' id='1'/>"
+            + "    <dr id='1' role='master'>"
+            + "    </dr>"
+            + "</deployment>";
+        final String replicaRole =
+            "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
+            + "<deployment>"
+            + "<cluster hostcount='3' kfactor='1' sitesperhost='2' id='1'/>"
+            + "    <dr id='1' role='replica'>"
+            + "    </dr>"
+            + "</deployment>";
+        final String xdcrRole =
+            "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
+            + "<deployment>"
+            + "<cluster hostcount='3' kfactor='1' sitesperhost='2' id='1'/>"
+            + "    <dr id='1' role='xdcr'>"
+            + "    </dr>"
+            + "</deployment>";
+        final String invalidRole =
+            "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
+            + "<deployment>"
+            + "<cluster hostcount='3' kfactor='1' sitesperhost='2' id='1'/>"
+            + "    <dr id='1' role='nonsense'>"
+            + "    </dr>"
+            + "</deployment>";
+
+
+        final File tmpDefault = VoltProjectBuilder.writeStringToTempFile(defaultRole);
+        DeploymentType defaultDeployment = CatalogUtil.getDeployment(new FileInputStream(tmpDefault));
+        CatalogUtil.compileDeployment(catalog, defaultDeployment, false);
+        assertEquals("master", catalog.getClusters().get("cluster").getDrrole());
+
+        setUp();
+        final File tmpMaster = VoltProjectBuilder.writeStringToTempFile(masterRole);
+        DeploymentType masterDeployment = CatalogUtil.getDeployment(new FileInputStream(tmpMaster));
+        CatalogUtil.compileDeployment(catalog, masterDeployment, false);
+        assertEquals("master", catalog.getClusters().get("cluster").getDrrole());
+
+        setUp();
+        final File tmpReplica = VoltProjectBuilder.writeStringToTempFile(replicaRole);
+        DeploymentType replicaDeployment = CatalogUtil.getDeployment(new FileInputStream(tmpReplica));
+        CatalogUtil.compileDeployment(catalog, replicaDeployment, false);
+        assertEquals("replica", catalog.getClusters().get("cluster").getDrrole());
+
+        setUp();
+        final File tmpXDCR = VoltProjectBuilder.writeStringToTempFile(xdcrRole);
+        DeploymentType xdcrDeployment = CatalogUtil.getDeployment(new FileInputStream(tmpXDCR));
+        CatalogUtil.compileDeployment(catalog, xdcrDeployment, false);
+        assertEquals("xdcr", catalog.getClusters().get("cluster").getDrrole());
+
+        setUp();
+        final File tmpInvalidRole = VoltProjectBuilder.writeStringToTempFile(invalidRole);
+        assertNull(CatalogUtil.getDeployment(new FileInputStream(tmpInvalidRole)));
     }
 
     public void testDRConnection() throws Exception {
@@ -1491,7 +1359,7 @@ public class TestCatalogUtil extends TestCase {
         DeploymentType deploymentWithDefault = CatalogUtil.getDeployment(new FileInputStream(tmpWithDefault));
 
         final File tmpDdl = VoltProjectBuilder.writeStringToTempFile(ddl);
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         String x[] = {tmpDdl.getAbsolutePath()};
         Catalog cat = compiler.compileCatalogFromDDL(x);
 
@@ -1521,7 +1389,7 @@ public class TestCatalogUtil extends TestCase {
         DeploymentType deploymentWithDefault = CatalogUtil.getDeployment(new FileInputStream(tmpWithDefault));
 
         final File tmpDdl = VoltProjectBuilder.writeStringToTempFile(ddl);
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         String x[] = {tmpDdl.getAbsolutePath()};
         Catalog cat = compiler.compileCatalogFromDDL(x);
 

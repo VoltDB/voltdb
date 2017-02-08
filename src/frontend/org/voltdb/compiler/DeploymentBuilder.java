@@ -32,11 +32,12 @@ import javax.xml.bind.Marshaller;
 import org.voltdb.compiler.deploymentfile.ClusterType;
 import org.voltdb.compiler.deploymentfile.CommandLogType;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
+import org.voltdb.compiler.deploymentfile.DrRoleType;
+import org.voltdb.compiler.deploymentfile.DrType;
 import org.voltdb.compiler.deploymentfile.ExportType;
 import org.voltdb.compiler.deploymentfile.HttpdType;
 import org.voltdb.compiler.deploymentfile.HttpdType.Jsonapi;
 import org.voltdb.compiler.deploymentfile.PartitionDetectionType;
-import org.voltdb.compiler.deploymentfile.PartitionDetectionType.Snapshot;
 import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.PathsType.Voltdbroot;
 import org.voltdb.compiler.deploymentfile.SchemaType;
@@ -97,7 +98,6 @@ public class DeploymentBuilder {
     private String m_voltRootPath = null;
 
     private boolean m_ppdEnabled = false;
-    private String m_ppdPrefix = "none";
 
     private String m_internalSnapshotPath;
     private String m_commandLogPath;
@@ -115,6 +115,8 @@ public class DeploymentBuilder {
 
     // whether to allow DDL over adhoc or use full catalog updates
     private boolean m_useDDLSchema = false;
+
+    private DrRoleType m_drRole = DrRoleType.NONE;
 
     public DeploymentBuilder() {
         this(1, 1, 0);
@@ -234,11 +236,10 @@ public class DeploymentBuilder {
         m_snapshotPath = path;
     }
 
-    public void setPartitionDetectionSettings(final String snapshotPath, final String ppdPrefix)
+    public void setPartitionDetectionSettings(final String snapshotPath)
     {
         m_ppdEnabled = true;
         m_snapshotPath = snapshotPath;
-        m_ppdPrefix = ppdPrefix;
     }
 
     public void addExport(boolean enabled) {
@@ -248,6 +249,10 @@ public class DeploymentBuilder {
     public void setMaxTempTableMemory(int max)
     {
         m_maxTempTableMemory = max;
+    }
+
+    public void setDrRole(DrRoleType role) {
+        m_drRole = role;
     }
 
     public void writeXML(String path) {
@@ -369,9 +374,6 @@ public class DeploymentBuilder {
         PartitionDetectionType ppd = factory.createPartitionDetectionType();
         deployment.setPartitionDetection(ppd);
         ppd.setEnabled(m_ppdEnabled);
-        Snapshot ppdsnapshot = factory.createPartitionDetectionTypeSnapshot();
-        ppd.setSnapshot(ppdsnapshot);
-        ppdsnapshot.setPrefix(m_ppdPrefix);
 
         // <systemsettings>
         SystemSettingsType systemSettingType = factory.createSystemSettingsType();
@@ -422,7 +424,14 @@ public class DeploymentBuilder {
         // <export>
         ExportType export = factory.createExportType();
         deployment.setExport(export);
-        export.setEnabled(m_elenabled);
+
+        // <dr>
+        if (m_drRole != DrRoleType.NONE) {
+            final DrType drType = factory.createDrType();
+            deployment.setDr(drType);
+            drType.setRole(m_drRole);
+            drType.setId(1);
+        }
 
         // Have some yummy boilerplate!
         String xml = null;

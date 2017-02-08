@@ -23,7 +23,8 @@
                                 supports_daemon=True,
                                 supports_multiple_daemons=True,
                                 check_environment_config=True),
-    description = 'Add the current node to a VoltDB cluster.'
+    description = 'WARNING: The add is deprecated. Please use INIT and START. Add the current node to a VoltDB cluster.',
+    hideverb = True
 )
 def add(runner):
     runner.go()

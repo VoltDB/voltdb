@@ -64,15 +64,19 @@ public class TestLiveDDLSchemaSwitch extends AdhocDDLTestBase {
 
     String m_pathToCatalog;
     String m_pathToDeployment;
+    String m_pathToReplicaDeployment;
     String m_pathToOtherCatalog;
     String m_pathToOtherDeployment;
+    String m_pathToOtherReplicaDeployment;
 
     void generateCatalogsAndDeployments(boolean useLiveDDL) throws Exception
     {
         m_pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");
         m_pathToDeployment = Configuration.getPathToCatalogForTest("adhocddl.xml");
+        m_pathToReplicaDeployment = Configuration.getPathToCatalogForTest("replicaadhocddl.xml");
         m_pathToOtherCatalog = Configuration.getPathToCatalogForTest("newadhocddl.jar");
         m_pathToOtherDeployment = Configuration.getPathToCatalogForTest("newadhocddl.xml");
+        m_pathToOtherReplicaDeployment = Configuration.getPathToCatalogForTest("newreplicaadhocddl.xml");
 
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema(
@@ -93,6 +97,11 @@ public class TestLiveDDLSchemaSwitch extends AdhocDDLTestBase {
         boolean success = builder.compile(m_pathToCatalog, 2, 1, 0);
         assertTrue("Schema compilation failed", success);
         MiscUtils.copyFile(builder.getPathToDeployment(), m_pathToDeployment);
+
+        builder.setDrReplica();
+        success = builder.compile(m_pathToCatalog, 2, 1, 0);
+        assertTrue("Schema compilation failed", success);
+        MiscUtils.copyFile(builder.getPathToDeployment(), m_pathToReplicaDeployment);
 
         // get an alternate deployment file
         builder = new VoltProjectBuilder();
@@ -115,6 +124,11 @@ public class TestLiveDDLSchemaSwitch extends AdhocDDLTestBase {
         success = builder.compile(m_pathToOtherCatalog, 2, 1, 0);
         assertTrue("2nd schema compilation failed", success);
         MiscUtils.copyFile(builder.getPathToDeployment(), m_pathToOtherDeployment);
+
+        builder.setDrReplica();
+        success = builder.compile(m_pathToOtherCatalog, 2, 1, 0);
+        assertTrue("2nd schema compilation failed", success);
+        MiscUtils.copyFile(builder.getPathToDeployment(), m_pathToOtherReplicaDeployment);
     }
 
     int getHeartbeatTimeout() throws Exception
@@ -176,7 +190,7 @@ public class TestLiveDDLSchemaSwitch extends AdhocDDLTestBase {
         threw = false;
         try {
             InMemoryJarfile jarfile = new InMemoryJarfile();
-            VoltCompiler comp = new VoltCompiler();
+            VoltCompiler comp = new VoltCompiler(false);
             comp.addClassToJar(jarfile, org.voltdb_testprocs.fullddlfeatures.testImportProc.class);
             m_client.callProcedure("@UpdateClasses", jarfile.getFullJarBytes(), null);
         }
@@ -241,7 +255,7 @@ public class TestLiveDDLSchemaSwitch extends AdhocDDLTestBase {
         if (!findClassInSystemCatalog("org.voltdb_testprocs.fullddlfeatures.testImportProc")) {
             // Also, @UpdateClasses should only work with adhoc DDL
             InMemoryJarfile jarfile = new InMemoryJarfile();
-            VoltCompiler comp = new VoltCompiler();
+            VoltCompiler comp = new VoltCompiler(false);
             comp.addClassToJar(jarfile, org.voltdb_testprocs.fullddlfeatures.testImportProc.class);
             try {
                 m_client.callProcedure("@UpdateClasses", jarfile.getFullJarBytes(), null);
@@ -280,8 +294,7 @@ public class TestLiveDDLSchemaSwitch extends AdhocDDLTestBase {
         // Fire up a cluster with no catalog
         VoltDB.Configuration config = new VoltDB.Configuration();
         config.m_pathToCatalog = m_pathToOtherCatalog;
-        config.m_pathToDeployment = m_pathToDeployment;
-        config.m_replicationRole = ReplicationRole.REPLICA;
+        config.m_pathToDeployment = m_pathToReplicaDeployment;
 
         try {
             startSystem(config);
@@ -300,7 +313,7 @@ public class TestLiveDDLSchemaSwitch extends AdhocDDLTestBase {
             // deployment-only UAC should succeed
             threw = false;
             try {
-                m_client.updateApplicationCatalog(null, new File(m_pathToOtherDeployment));
+                m_client.updateApplicationCatalog(null, new File(m_pathToOtherReplicaDeployment));
             }
             catch (ProcCallException pce) {
                 threw = true;
@@ -327,7 +340,7 @@ public class TestLiveDDLSchemaSwitch extends AdhocDDLTestBase {
             threw = false;
             try {
                 InMemoryJarfile jarfile = new InMemoryJarfile();
-                VoltCompiler comp = new VoltCompiler();
+                VoltCompiler comp = new VoltCompiler(false);
                 comp.addClassToJar(jarfile, org.voltdb_testprocs.fullddlfeatures.testImportProc.class);
                 m_client.callProcedure("@UpdateClasses", jarfile.getFullJarBytes(), null);
             }
@@ -355,8 +368,7 @@ public class TestLiveDDLSchemaSwitch extends AdhocDDLTestBase {
         // Fire up a cluster with no catalog
         VoltDB.Configuration config = new VoltDB.Configuration();
         config.m_pathToCatalog = m_pathToOtherCatalog;
-        config.m_pathToDeployment = m_pathToDeployment;
-        config.m_replicationRole = ReplicationRole.REPLICA;
+        config.m_pathToDeployment = m_pathToReplicaDeployment;
 
         try {
             startSystem(config);
@@ -376,7 +388,7 @@ public class TestLiveDDLSchemaSwitch extends AdhocDDLTestBase {
             // deployment-only UAC should fail
             threw = false;
             try {
-                m_client.updateApplicationCatalog(null, new File(m_pathToOtherDeployment));
+                m_client.updateApplicationCatalog(null, new File(m_pathToOtherReplicaDeployment));
             }
             catch (ProcCallException pce) {
                 threw = true;
@@ -412,7 +424,7 @@ public class TestLiveDDLSchemaSwitch extends AdhocDDLTestBase {
             threw = false;
             try {
                 InMemoryJarfile jarfile = new InMemoryJarfile();
-                VoltCompiler comp = new VoltCompiler();
+                VoltCompiler comp = new VoltCompiler(false);
                 comp.addClassToJar(jarfile, org.voltdb_testprocs.fullddlfeatures.testImportProc.class);
                 m_client.callProcedure("@UpdateClasses", jarfile.getFullJarBytes(), null);
             }
