@@ -27,12 +27,115 @@ import geb.navigator.Navigator
 
 class DrPage extends VoltDBManagementCenterPage {
     static content = {
+        clusterRelArr       { $('#drArrow_0') }
+        drCLusterId         { $('#drCLusterId') }
+        latencyTime         { $('#latencyDR') }
+        clusterId           { $('#dRProducerName') }
 
-        clusterRelArr  { $('#drArrow_0') }
-        drCLusterId    { $('#drCLusterId') }
+        drMode              { $('#dbDrMode') }
+
+        divDrReplication    { $("#divDrReplication") }
+        drSection           { $("#drSection") }
+        showHideData        { $('#ShowHideBlock') }
+        showHideDrBlock     { $("#showHideDrBlock") }
+
+        ascendingDT         { $(class:"sorting_asc") }
+        descendingDT        { $(class:"sorting_desc") }
+
+        partitionID         { $("#partitionID") }
+        mbOnDisk            { $("#mbOnDisk") }
+        replicaLatencyMs    { $("#replicaLatencyMs") }
+        replicaLatencyTrans { $("#replicaLatencyTrans") }
+        replicaServer       { $("#replicaServer") }
+
+        drMasterSection     {$("#drMasterSection")}
+        drReplicaSection    (required:false) { $("#drReplicaSection") }
     }
     static at = {
         drTab.displayed
         drTab.attr('class') == 'active'
+    }
+
+    def boolean isDrSectionOpen(){
+        return divDrReplication.displayed
+    }
+
+    def boolean isDrAreaOpen() {
+        return drSection.displayed
+    }
+
+    def boolean isDrMasterSectionOpen() {
+        return drMasterSection.displayed
+    }
+
+    def boolean isDrReplicaSectionOpen() {
+        return drReplicaSection.displayed
+    }
+
+    def boolean closeDrArea() {
+        clickToNotDisplay(showHideDrBlock, drSection)
+        return true
+    }
+
+    def boolean openDrArea(){
+        clickToDisplay(showHideDrBlock, drSection)
+        return true
+    }
+
+    /*
+     *  click the partitionID column in database table
+     */
+    def boolean clickPartitionID() {
+        partitionID.click()
+    }
+
+    /*
+     *  click the replicaLatencyMs column in DR MAster table
+     */
+    def boolean clickReplicaLatencyMs() {
+        replicaLatencyMs.click()
+    }
+
+    /*
+     *  click the status column in DR MAster table
+     */
+    def boolean clickMbOnDisk() {
+        mbOnDisk.click()
+    }
+
+    /*
+     *  click the replicaLatencyTrans column in DR MAster table
+     */
+    def boolean clickReplicaLatencyTrans() {
+        replicaLatencyTrans.click()
+    }
+
+    /*
+     *  click the server column in DR Replica table
+     */
+    def boolean clickReplicaServer() {
+        replicaServer.click()
+    }
+
+    /*
+     *   return true if table is in ascending order
+     *  to check ascending order, check the class "sorting_asc" displayed
+     */
+    def boolean tableInAscendingOrderDT() {
+        if ( ascendingDT.displayed )
+            return true
+        else
+            return false
+    }
+
+    /*
+     *  return true if table is in descending order
+     *  to check descending order, check the class "sorting_desc" displayed
+     */
+    def boolean tableInDescendingOrderDT() {
+        if ( descendingDT.displayed )
+            return true
+        else
+            return false
     }
 }

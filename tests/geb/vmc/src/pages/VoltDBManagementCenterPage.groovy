@@ -55,7 +55,7 @@ class VoltDBManagementCenterPage extends Page {
         adminLink (to: AdminPage)           { adminTab.find('a') }
         schemaLink (to: SchemaPage)         { schemaTab.find('a') }
         sqlQueryLink (to: SqlQueryPage)     { sqlQueryTab.find('a') }
-        drLink (to: DrPage)                  { $('#navDR > a') }
+        drLink (to: DrPage)                 { $('#navDR > a') }
         loginDialog (required: false)       { $('#loginBox') }
         usernameInput (required: false)     { loginDialog.find('input#username') }
         passwordInput (required: false)     { loginDialog.find('input#password') }
