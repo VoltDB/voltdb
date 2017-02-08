@@ -72,6 +72,9 @@ public:
     const std::vector<AbstractExpression*>& getSearchKeyExpressions() const
     { return m_searchkey_expressions; }
 
+    const std::vector<bool>& getCompareNotDistinctFlags() const
+    { return m_compare_not_distinct; }
+
     AbstractExpression* getEndExpression() const { return m_end_expression.get(); }
 
     AbstractExpression* getInitialExpression() const { return m_initial_expression.get(); }
@@ -86,6 +89,11 @@ protected:
 
     // TODO: Document
     OwningExpressionVector m_searchkey_expressions;
+
+    // If the search key expression is actually a "not distinct" expression,
+    //   we do not want the executor to skip null candidates.
+    // This flag vector will instruct the executor the correct behavior for null skipping. (ENG-11096)
+    std::vector<bool> m_compare_not_distinct;
 
     // TODO: Document
     boost::scoped_ptr<AbstractExpression> m_end_expression;

@@ -1090,25 +1090,6 @@ public class CatalogDiffEngine {
                                                                                 final String field)
     {
         if (prevType instanceof Database) {
-            if(field.equalsIgnoreCase("isActiveActiveDRed")) {
-                List<TablePopulationRequirements> retval = new ArrayList<>();
-                for (Table t : ((Database) prevType).getTables()) {
-                    if (t.getIsdred()) {
-                        String tableName = t.getTypeName();
-                        String errorMessage =
-                                String.format(
-                                        "Unable to change DR mode of table %s because it is not empty.",
-                                        tableName);
-                        TablePopulationRequirements entry =
-                            new TablePopulationRequirements(tableName,
-                                                            tableName,
-                                                            errorMessage);
-                        retval.add(entry);
-                    }
-                }
-                return retval;
-            }
-
             return null;
         }
 

@@ -323,17 +323,6 @@ schema = {
             "id": "partitionDetection",
             "type": "object",
             "properties": {
-                "snapshot": {
-                    "id": "snapshot",
-                    "type": "object",
-                    "properties": {
-                        "prefix": {
-                            "id": "prefix",
-                            "type": "string"
-                        }
-                    },
-                    "additionalProperties": False
-                },
                 "enabled": {
                     "id": "enabled",
                     "type": "boolean"

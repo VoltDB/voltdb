@@ -1128,17 +1128,18 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
                 fail();
             }
 
-            cr = client.callProcedure(proc, 1371808830000L, 1);
+            final long maxSec = GREGORIAN_EPOCH / 1000000;
+            cr = client.callProcedure(proc, maxSec, 1);
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             result = cr.getResults()[0];
             assertEquals(1, result.getRowCount());
             assertTrue(result.advanceRow());
             if (proc == "TO_TIMESTAMP_SECOND" || proc == "FROM_UNIXTIME") {
-                assertEquals(1371808830000000000L, result.getTimestampAsLong(0));
+                assertEquals(maxSec * 1000000, result.getTimestampAsLong(0));
             } else if (proc == "TO_TIMESTAMP_MILLIS" || proc == "TO_TIMESTAMP_MILLISECOND") {
-                assertEquals(1371808830000000L, result.getTimestampAsLong(0));
+                assertEquals(maxSec * 1000, result.getTimestampAsLong(0));
             } else if (proc == "TO_TIMESTAMP_MICROS" || proc == "TO_TIMESTAMP_MICROSECOND") {
-                assertEquals(1371808830000L, result.getTimestampAsLong(0));
+                assertEquals(maxSec, result.getTimestampAsLong(0));
             } else {
                 fail();
             }
@@ -2947,7 +2948,6 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         // Insert some valid and invalid data.
         Client client = getClient();
         ClientResponse cr;
-        VoltTable vt;
         cr = client.callProcedure("P2.insert", 100, GREGORIAN_EPOCH - 1000);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         cr = client.callProcedure("P2.insert", 101, NYE9999 + 1000);
@@ -2969,6 +2969,23 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         doTestIsValidTimestamp(200, true);
         doTestIsValidTimestamp(201, true);
         doTestIsValidTimestamp(202, true);
+
+        // How these functions might typically be used:
+        validateTableOfLongs(client,
+                "update p2 "
+                + "set tm = min_valid_timestamp() "
+                + "where tm < min_valid_timestamp()",
+                new long[][] {{1}});
+        validateTableOfLongs(client,
+                "update p2 "
+                + "set tm = max_valid_timestamp() "
+                + "where tm > max_valid_timestamp()",
+                new long[][] {{1}});
+
+        // No more invalid timestamps
+        validateTableOfLongs(client,
+                "select * from p2 where not is_valid_timestamp(tm)",
+                new long[][] {});
     }
 
 }

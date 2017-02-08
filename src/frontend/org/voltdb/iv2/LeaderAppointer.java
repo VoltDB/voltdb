@@ -52,7 +52,6 @@ import org.voltdb.ReplicationRole;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
-import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.iv2.LeaderCache.LeaderCallBackInfo;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -271,7 +270,6 @@ public class LeaderAppointer implements Promotable
     public LeaderAppointer(HostMessenger hm,
                            int numberOfPartitions,
                            int kfactor,
-                           SnapshotSchedule partitionSnapshotSchedule,
                            JSONObject topology,
                            MpInitiator mpi,
                            KSafetyStats stats,

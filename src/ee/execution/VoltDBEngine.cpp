@@ -586,7 +586,7 @@ bool VoltDBEngine::updateCatalogDatabaseReference() {
         VOLT_ERROR("Unable to find database catalog information");
         return false;
     }
-    m_isActiveActiveDREnabled = m_database->isActiveActiveDRed();
+    m_isActiveActiveDREnabled = cluster->drRole() == "xdcr";
 
     return true;
 }
@@ -780,7 +780,7 @@ bool VoltDBEngine::processCatalogAdditions(int64_t timestamp) {
             tcd = new TableCatalogDelegate(catalogTable->signature(),
                                            m_compactionThreshold);
             // use the delegate to init the table and create indexes n' stuff
-            tcd->init(*m_database, *catalogTable);
+            tcd->init(*m_database, *catalogTable, m_isActiveActiveDREnabled);
             m_catalogDelegates[catalogTable->path()] = tcd;
             Table* table = tcd->getTable();
             m_delegatesByName[table->name()] = tcd;
@@ -907,7 +907,7 @@ bool VoltDBEngine::processCatalogAdditions(int64_t timestamp) {
                          catalogTable->name().c_str());
                 LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_DEBUG, msg);
 
-                tcd->processSchemaChanges(*m_database, *catalogTable, m_delegatesByName);
+                tcd->processSchemaChanges(*m_database, *catalogTable, m_delegatesByName, m_isActiveActiveDREnabled);
 
                 snprintf(msg, sizeof(msg), "Table %s was successfully rebuilt with new schema.",
                          catalogTable->name().c_str());

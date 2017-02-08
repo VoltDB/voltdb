@@ -306,6 +306,25 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         for (AbstractPlanNode node : m_children) {
             node.getTablesAndIndexes(tablesRead, indexes);
         }
+        getTablesAndIndexesFromSubqueries(tablesRead, indexes);
+    }
+
+    /**
+     * Collect read tables read and index names used in the current node subquery expressions.
+     *
+     * @param tablesRead Set of table aliases read potentially added to at each recursive level.
+     * @param indexes Set of index names used in the plan tree
+     * Only the current node is of interest.
+     */
+    protected void getTablesAndIndexesFromSubqueries(Map<String, StmtTargetTableScan> tablesRead,
+            Collection<String> indexes) {
+        for(AbstractExpression expr : findAllSubquerySubexpressions()) {
+            assert(expr instanceof AbstractSubqueryExpression);
+            AbstractSubqueryExpression subquery = (AbstractSubqueryExpression) expr;
+            AbstractPlanNode subqueryNode = subquery.getSubqueryNode();
+            assert(subqueryNode != null);
+            subqueryNode.getTablesAndIndexes(tablesRead, indexes);
+        }
     }
 
     /**
@@ -1112,6 +1131,24 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
 
     abstract protected void loadFromJSONObject(JSONObject obj, Database db)
             throws JSONException;
+
+    protected static void loadBooleanArrayFromJSONObject(JSONObject jobj, String key, List<Boolean> target) throws JSONException {
+        if ( ! jobj.isNull(key)) {
+            JSONArray jarray = jobj.getJSONArray(key);
+            int numCols = jarray.length();
+            for (int ii = 0; ii < numCols; ++ii) {
+                target.add(jarray.getBoolean(ii));
+            }
+        }
+    }
+
+    protected static void booleanArrayToJSONString(JSONStringer stringer, String key, List<Boolean> array) throws JSONException {
+        stringer.key(key).array();
+        for (Boolean arrayElement : array) {
+            stringer.value(arrayElement);
+        }
+        stringer.endArray();
+    }
 
     protected static NodeSchema loadSchemaFromJSONObject(JSONObject jobj,
             String jsonKey) throws JSONException {

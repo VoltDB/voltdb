@@ -43,6 +43,8 @@
 
 #include "boost/scoped_ptr.hpp"
 
+#include "common/FixUnusedAssertHack.h"
+
 using voltdb::ExecutorContext;
 using voltdb::NValue;
 using voltdb::PersistentTable;
@@ -113,9 +115,9 @@ protected:
         static const std::string payload(
             "add / clusters cluster\n"
             "set /clusters#cluster localepoch 1199145600\n"
+            "set /clusters#cluster drRole \"xdcr\"\n"
             "add /clusters#cluster databases database\n"
             "set /clusters#cluster/databases#database schema \"eJwDAAAAAAE=\"\n"
-            "set $PREV isActiveActiveDRed true\n"
             ""
             "set /clusters#cluster/databases#database schema \"eJwlTDkCgDAI230NDSWUtdX/f8mgAzkBeoLBkZMBEw6C59cwrDRumLJiap5O07L9rStkqd0M8ZGa36ehHXZL52rGcng4USjf1wuc0Rgz\"\n"
             "add /clusters#cluster/databases#database tables T\n"

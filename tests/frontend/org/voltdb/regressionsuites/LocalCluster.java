@@ -44,6 +44,7 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.utils.CommandLine;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltFile;
@@ -1945,17 +1946,19 @@ public class LocalCluster extends VoltServerConfig {
                                                   int replicationPort, int remoteReplicationPort, String pathToVoltDBRoot, String jar,
                                                   boolean isReplica) throws IOException {
         return createLocalCluster(schemaDDL, siteCount, hostCount, kfactor, clusterId, replicationPort, remoteReplicationPort,
-                pathToVoltDBRoot, jar, isReplica, false);
+                pathToVoltDBRoot, jar, isReplica ? DrRoleType.REPLICA : DrRoleType.MASTER, false);
     }
 
     public static LocalCluster createLocalCluster(String schemaDDL, int siteCount, int hostCount, int kfactor, int clusterId,
                                                   int replicationPort, int remoteReplicationPort, String pathToVoltDBRoot, String jar,
-                                                  boolean isReplica, boolean hasLocalServer) throws IOException {
+                                                  DrRoleType drRole, boolean hasLocalServer) throws IOException {
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema(schemaDDL);
         builder.setDrProducerEnabled();
-        if (isReplica) {
+        if (drRole == DrRoleType.REPLICA) {
             builder.setDrReplica();
+        } else if (drRole == DrRoleType.XDCR) {
+            builder.setXDCR();
         }
         if (remoteReplicationPort != 0) {
             builder.setDRMasterHost("localhost:" + remoteReplicationPort);

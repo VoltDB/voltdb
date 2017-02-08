@@ -235,7 +235,7 @@ public class ExportManager
                          * For those use a naive leader election strategy that is implemented
                          * by export generation.
                          */
-                        nextGeneration.kickOffLeaderElection();
+                        nextGeneration.kickOffLeaderElection(m_messenger);
                     } else {
                         /*
                          * This strategy is the one that piggy backs on
@@ -270,7 +270,7 @@ public class ExportManager
         }
         try {
             //We close and delete regardless
-            drainedGeneration.closeAndDelete();
+            drainedGeneration.closeAndDelete(m_messenger);
         } catch (IOException e) {
             e.printStackTrace();
             exportLog.error(e);
@@ -396,6 +396,10 @@ public class ExportManager
         exportLog.info(String.format("Export is enabled and can overflow to %s.", VoltDB.instance().getExportOverflowPath()));
     }
 
+    public HostMessenger getHostMessenger() {
+        return m_messenger;
+    }
+
     private void clearOverflowData(CatalogContext catContext) throws ExportManager.SetupException {
         String overflowDir = VoltDB.instance().getExportOverflowPath();
         try {
@@ -484,7 +488,7 @@ public class ExportManager
                  * to choose which server is going to export each partition
                  */
                 if (!nextGeneration.isContinueingGeneration()) {
-                    nextGeneration.kickOffLeaderElection();
+                    nextGeneration.kickOffLeaderElection(m_messenger);
                 }
             } else {
                 /*
@@ -498,7 +502,7 @@ public class ExportManager
                      * For those use a naive leader election strategy that is implemented
                      * by export generation.
                      */
-                    nextGeneration.kickOffLeaderElection();
+                    nextGeneration.kickOffLeaderElection(m_messenger);
                 } else {
                     /*
                      * This strategy is the one that piggy backs on
@@ -655,7 +659,7 @@ public class ExportManager
 
     public void shutdown() {
         for (ExportGeneration generation : m_generations.values()) {
-            generation.close();
+            generation.close(m_messenger);
         }
         ExportDataProcessor proc = m_processor.getAndSet(null);
         if (proc != null) {

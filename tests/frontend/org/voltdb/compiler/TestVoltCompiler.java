@@ -248,7 +248,7 @@ public class TestVoltCompiler extends TestCase {
     }
 
     private ArrayList<Feedback> checkPartitionParam(String ddl, String table) {
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compileDDL(ddl, compiler);
         assertFalse(success);
         return compiler.m_errors;
@@ -259,7 +259,7 @@ public class TestVoltCompiler extends TestCase {
                 "PARTITION TABLE PKEY_BIGINT ON COLUMN PKEY;" +
                 "create procedure myTestProc as select num from PKEY_BIGINT where pkey = ? order by 1;";
 
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compileDDL(ddl, compiler);
         assertTrue(success);
 
@@ -321,8 +321,6 @@ public class TestVoltCompiler extends TestCase {
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(getClass().getResource("ExportTester-ddl.sql"));
         project.addExport(false /* disabled */);
-        project.setTableAsExportOnly("A");
-        project.setTableAsExportOnly("B");
         try {
             assertTrue(project.compile("/tmp/exportsettingstest.jar"));
             String catalogContents =
@@ -351,15 +349,7 @@ public class TestVoltCompiler extends TestCase {
         project.addSchema(TestVoltCompiler.class.getResource("ExportTester-ddl.sql"));
         project.addStmtProcedure("Dummy", "insert into a values (?, ?, ?);",
                                 "a.a_id: 0");
-        project.addPartitionInfo("A", "A_ID");
-        project.addPartitionInfo("B", "B_ID");
-        project.addPartitionInfo("e", "e_id");
-        project.addPartitionInfo("f", "f_id");
         project.addExport(true /* enabled */);
-        project.setTableAsExportOnly("A"); // uppercase DDL, uppercase export
-        project.setTableAsExportOnly("b"); // uppercase DDL, lowercase export
-        project.setTableAsExportOnly("E"); // lowercase DDL, uppercase export
-        project.setTableAsExportOnly("f"); // lowercase DDL, lowercase export
         try {
             assertTrue(project.compile("/tmp/exportsettingstest.jar"));
             String catalogContents =
@@ -382,30 +372,9 @@ public class TestVoltCompiler extends TestCase {
         }
     }
 
-    // test that the source table for a view is not export only
-    public void testViewSourceNotExportOnly() throws IOException {
+    public void testViewSourceExportOnlyValid() throws IOException {
         VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addSchema(TestVoltCompiler.class.getResource("ExportTesterWithView-ddl.sql"));
-        project.addStmtProcedure("Dummy", "select * from v_table1r_el_only");
-        project.addExport(true /* enabled */);
-        project.setTableAsExportOnly("table1r_el_only");
-        try {
-            assertFalse(project.compile("/tmp/exporttestview.jar"));
-        }
-        finally {
-            File jar = new File("/tmp/exporttestview.jar");
-            jar.delete();
-        }
-    }
-
-    public void testViewSourceExportOnly() throws IOException {
-        VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addSchema(TestVoltCompiler.class.getResource("ExportTesterWithView-ddl.sql"));
-        project.addStmtProcedure("Dummy", "select * from v_table2r_el_only");
-        project.addExport(true /* enabled */);
-        project.setTableAsExportOnly("table2r_el_only");
-        project.addPartitionInfo("table2r_el_only", "column1_bigint");
-
+        project.addSchema(TestVoltCompiler.class.getResource("ExportTesterWithView-good-ddl.sql"));
         try {
             assertTrue(project.compile("/tmp/exporttestview.jar"));
         }
@@ -417,10 +386,7 @@ public class TestVoltCompiler extends TestCase {
 
     public void testViewSourceExportOnlyInvalidNoPartitionColumn() throws IOException {
         VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addSchema(TestVoltCompiler.class.getResource("ExportTesterWithView-ddl.sql"));
-        project.addStmtProcedure("Dummy", "select * from v_table3r_el_only");
-        project.addExport(true /* enabled */);
-        project.setTableAsExportOnly("table3r_el_only");
+        project.addSchema(TestVoltCompiler.class.getResource("ExportTesterWithView-bad2-ddl.sql"));
         try {
             assertFalse(project.compile("/tmp/exporttestview.jar"));
         }
@@ -432,28 +398,7 @@ public class TestVoltCompiler extends TestCase {
 
     public void testViewSourceExportOnlyInvalidPartitionColumnNotInView() throws IOException {
         VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addSchema(TestVoltCompiler.class.getResource("ExportTesterWithView-ddl.sql"));
-        project.addStmtProcedure("Dummy", "select * from v_table4r_el_only");
-        project.addExport(true /* enabled */);
-        project.setTableAsExportOnly("table4r_el_only");
-        project.addPartitionInfo("table4r_el_only", "column1_bigint");
-
-        try {
-            assertFalse(project.compile("/tmp/exporttestview.jar"));
-        }
-        finally {
-            File jar = new File("/tmp/exporttestview.jar");
-            jar.delete();
-        }
-    }
-
-    // test that a view is not export only
-    public void testViewNotExportOnly() throws IOException {
-        VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addSchema(TestVoltCompiler.class.getResource("ExportTesterWithView-ddl.sql"));
-        project.addStmtProcedure("Dummy", "select * from table1r_el_only");
-        project.addExport(true /* enabled */);
-        project.setTableAsExportOnly("v_table1r_el_only");
+        project.addSchema(TestVoltCompiler.class.getResource("ExportTesterWithView-bad1-ddl.sql"));
         try {
             assertFalse(project.compile("/tmp/exporttestview.jar"));
         }
@@ -464,7 +409,7 @@ public class TestVoltCompiler extends TestCase {
     }
 
     public void testBadPath() {
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compiler.compileFromDDL(nothing_jar, "invalidnonsense");
         assertFalse(success);
     }
@@ -474,7 +419,7 @@ public class TestVoltCompiler extends TestCase {
             "create table books (cash integer default 23, title varchar(3) default 'foo', PRIMARY KEY(cash));\n"
                     + "create procedure from class org.voltdb.compiler.procedures.AddBookBoxed;";
 
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compileDDL(schema, compiler);
         assertFalse(success);
     }
@@ -485,7 +430,7 @@ public class TestVoltCompiler extends TestCase {
         String schema1 =
             "create table books (cash integer default 23, title varchar default 'foo', PRIMARY KEY(cash));";
 
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
 
         final boolean success = compileDDL(schema1, compiler);
         assertTrue(success);
@@ -497,7 +442,7 @@ public class TestVoltCompiler extends TestCase {
             "create table books (cash integer default 23, " +
             "title varchar("+length+") default 'foo', PRIMARY KEY(cash));";
 
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compileDDL(schema1, compiler);
         assertTrue(success);
 
@@ -537,7 +482,7 @@ public class TestVoltCompiler extends TestCase {
             "create table books (cash integer default 23, title varchar(3) default 'foo', PRIMARY KEY(cash));" +
             "partition table books on column cash;";
 
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compileDDL(schema, compiler);
         assertFalse(success);
 
@@ -560,7 +505,7 @@ public class TestVoltCompiler extends TestCase {
             System.exit(-1);
         }
 
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compiler.compileFromDDL(testout_jar, schemaPath);
         assertTrue(success);
     }
@@ -576,7 +521,7 @@ public class TestVoltCompiler extends TestCase {
             System.exit(-1);
         }
 
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compiler.compileFromDDL(testout_jar, schemaPath);
         assertFalse(success);
 
@@ -599,7 +544,7 @@ public class TestVoltCompiler extends TestCase {
             System.exit(-1);
         }
 
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compiler.compileFromDDL(testout_jar, schemaPath);
         assertTrue(success);
 
@@ -623,7 +568,7 @@ public class TestVoltCompiler extends TestCase {
         Map<String, ProcInfoData> overrideMap = new HashMap<String, ProcInfoData>();
         overrideMap.put("AddBook", info);
 
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         compiler.setProcInfoOverrides(overrideMap);
         final boolean success = compileDDL(schema, compiler);
         assertTrue(success);
@@ -644,7 +589,7 @@ public class TestVoltCompiler extends TestCase {
             "partition table books on column cash;\n" +
             "create procedure @Foo as select * from books;";
 
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compileDDL(schema, compiler);
         assertFalse(success);
     }
@@ -655,7 +600,7 @@ public class TestVoltCompiler extends TestCase {
             "create procedure Foo as select * from books;\n" +
             "PARTITION TABLE books ON COLUMN cash;";
 
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compileDDL(schema, compiler);
         assertTrue(success);
     }
@@ -670,14 +615,14 @@ public class TestVoltCompiler extends TestCase {
             "CREATE PROCEDURE Foo AS select * from books where cash = ?;" +
             "PARTITION PROCEDURE Foo ON TABLE BOOKS COLUMN CASH PARAMETER 0;";
 
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compileDDL(schema, compiler);
         assertTrue(success);
     }
 
     public void testCreateProcedureWithPartition() throws IOException {
         class Tester {
-            VoltCompiler compiler = new VoltCompiler();
+            VoltCompiler compiler = new VoltCompiler(false);
             String baseDDL =
                 "create table books (cash integer default 23 not null, "
                                   + "title varchar(3) default 'foo', "
@@ -782,7 +727,7 @@ public class TestVoltCompiler extends TestCase {
             "create procedure from class org.voltdb_testprocs.regressionsuites.fixedsql.TestENG2423$InnerProc;";
         File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema);
         String schemaPath = schemaFile.getPath();
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         assertTrue(compiler.compileFromDDL(testout_jar, schemaPath));
     }
 
@@ -794,7 +739,7 @@ public class TestVoltCompiler extends TestCase {
             "create view matt (title, cash, num, foo) as select title, cash, count(*), sum(cash) from books group by title, cash;\n" +
             "create view matt2 (title, cash, num, foo) as select books.title, books.cash, count(*), sum(books.cash) from books join foo on books.cash = foo.cash group by books.title, books.cash;";
 
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compileDDL(schema, compiler);
         assertTrue(success);
         Catalog c1 = compiler.getCatalog();
@@ -821,7 +766,7 @@ public class TestVoltCompiler extends TestCase {
             "  delete from books where title = ? and cash = ?;" +
             "partition procedure d1 on table books column cash parameter 1;";
 
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compileDDL(schema, compiler);
         assertTrue(success);
         Catalog c1 = compiler.getCatalog();
@@ -844,7 +789,7 @@ public class TestVoltCompiler extends TestCase {
     private VoltCompiler compileSchemaForDDLTest(String schema, boolean expectSuccess) {
         String schemaPath = getPathForSchema(schema);
 
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compiler.compileFromDDL(testout_jar, schemaPath);
         assertEquals(expectSuccess, success);
         return compiler;
@@ -1564,7 +1509,7 @@ public class TestVoltCompiler extends TestCase {
     }
 
     private void checkDDLErrorMessage(String ddl, String errorMsg) {
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         boolean success = compileDDL(ddl, compiler);
         checkCompilerErrorMessages(errorMsg, compiler, success);
     }
@@ -1692,16 +1637,16 @@ public class TestVoltCompiler extends TestCase {
         checkDDLErrorMessage(tableDDL+viewDDL, "This query is not plannable.  The planner cannot guarantee that all rows would be in a single partition.");
 
         // 6. Test view defined on joined tables where some source tables are streamed table.
-        viewDDL = "EXPORT TABLE T2;\n" +
+        viewDDL = "CREATE STREAM T3x PARTITION ON COLUMN a (a INTEGER NOT NULL, b INTEGER NOT NULL);\n" +
                   "CREATE VIEW V (aint, cnt, sumint) AS \n" +
-                  "SELECT T1.a, count(*), sum(T2.b) FROM T1 JOIN T2 ON T1.a=T2.a GROUP BY T1.a;";
-        checkDDLErrorMessage(tableDDL+viewDDL, "A materialized view (V) on joined tables cannot have streamed table (T2) as its source.");
+                  "SELECT T1.a, count(*), sum(T3x.b) FROM T1 JOIN T3x ON T1.a=T3x.a GROUP BY T1.a;";
+        checkDDLErrorMessage(tableDDL+viewDDL, "A materialized view (V) on joined tables cannot have streamed table (T3X) as its source.");
     }
 
     public void testDDLCompilerMatView() {
         // Test MatView.
         String ddl;
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
 
         // Subquery is replaced with a simple select
         ddl = "create table t(id integer not null, num integer, wage integer);\n" +
@@ -1937,7 +1882,7 @@ public class TestVoltCompiler extends TestCase {
 
     void compileLimitDeleteStmtAndCheckCatalog(String ddl, String expectedMessage, String tblName,
             int expectedLimit, String expectedStmt) {
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         boolean success = compileDDL(ddl, compiler);
         checkCompilerErrorMessages(expectedMessage, compiler, success);
 
@@ -2279,7 +2224,7 @@ public class TestVoltCompiler extends TestCase {
             "create table books (cash float default 0.0 NOT NULL, title varchar(10) default 'foo', PRIMARY KEY(cash));\n"
                 + "partition table books on column cash;";
 
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compileDDL(schema, compiler);
         assertFalse(success);
     }
@@ -2327,7 +2272,7 @@ public class TestVoltCompiler extends TestCase {
             " from books\n" +
             " group by id;";
 
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compileDDL(schema, compiler);
         assertFalse(success);
         for (Feedback error: compiler.m_errors) {
@@ -2930,7 +2875,7 @@ public class TestVoltCompiler extends TestCase {
     }
 
     private ArrayList<Feedback> checkInvalidProcedureDDL(String ddl) {
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compileDDL(ddl, compiler);
         assertFalse(success);
         return compiler.m_errors;
@@ -2945,7 +2890,7 @@ public class TestVoltCompiler extends TestCase {
                 "PARTITION TABLE books ON COLUMN cash;" +
                 "creAte PrOcEdUrE FrOm CLasS org.voltdb.compiler.procedures.AddBook;";
 
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compileDDL(schema, compiler);
         assertTrue(success);
 
@@ -2969,7 +2914,7 @@ public class TestVoltCompiler extends TestCase {
                 "create procedure from class org.voltdb.compiler.procedures.NotAnnotatedAddBook;" +
                 "paRtItiOn prOcEdure NotAnnotatedAddBook On taBLe   books coLUmN cash   ParaMETer  0;";
 
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compileDDL(schema, compiler);
         assertTrue(success);
 
@@ -3007,7 +2952,7 @@ public class TestVoltCompiler extends TestCase {
     }
 
     private void checkRoleDDL(String ddl, String errorRegex, TestRole... roles) throws Exception {
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         final boolean success = compileDDL(ddl, compiler);
 
         String error = (success || compiler.m_errors.size() == 0
@@ -3100,7 +3045,7 @@ public class TestVoltCompiler extends TestCase {
             givenSchema +
             StringUtils.join(ddl, " ");
 
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         boolean success;
         String error;
         try {
@@ -3293,11 +3238,6 @@ public class TestVoltCompiler extends TestCase {
         return connector.getTableinfo().getIgnoreCase(tableName);
     }
 
-    private ConnectorTableInfo getConnectorTableInfoFor(Database db,
-            String tableName) {
-        return getConnectorTableInfoFor(db, tableName, Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
-    }
-
     private String getPartitionColumnInfoFor(Database db, String tableName) {
         Table table = db.getTables().getIgnoreCase(tableName);
         if (table == null) {
@@ -3328,69 +3268,16 @@ public class TestVoltCompiler extends TestCase {
         Database db;
 
         db = goodDDLAgainstSimpleSchema(
-                "create table e1 (id integer, f1 varchar(16));",
-                "export table e1;"
+                "create stream e1 export to target e1 (id integer, f1 varchar(16));"
                 );
-        assertNotNull(getConnectorTableInfoFor(db, "e1"));
+        assertNotNull(getConnectorTableInfoFor(db, "e1", "e1"));
 
         db = goodDDLAgainstSimpleSchema(
-                "create table e1 (id integer, f1 varchar(16));",
-                "create table e2 (id integer, f1 varchar(16));",
-                "export table e1;",
-                "eXpOrt TABle E2;"
+                "create stream e1 export to target e1 (id integer, f1 varchar(16));",
+                "create stream e2 export to target E2 (id integer, f1 varchar(16));"
                 );
-        assertNotNull(getConnectorTableInfoFor(db, "e1"));
-        assertNotNull(getConnectorTableInfoFor(db, "e2"));
-    }
-
-    public void testBadExportTable() throws Exception {
-
-        badDDLAgainstSimpleSchema(".+\\sEXPORT statement: table non_existant was not present in the catalog.*",
-                "export table non_existant;"
-                );
-
-        badDDLAgainstSimpleSchema(".+contains invalid identifier \"1table_name_not_valid\".*",
-                "export table 1table_name_not_valid;"
-                );
-
-        badDDLAgainstSimpleSchema(".+Invalid EXPORT TABLE statement.*",
-                "export table one, two, three;"
-                );
-
-        badDDLAgainstSimpleSchema(".+Invalid EXPORT TABLE statement.*",
-                "export export table one;"
-                );
-
-        badDDLAgainstSimpleSchema(".+Invalid EXPORT TABLE statement.*",
-                "export table table one;"
-                );
-
-        badDDLAgainstSimpleSchema("Streams cannot be configured with indexes.*",
-                "export table books;"
-                );
-
-        badDDLAgainstSimpleSchema("Stream configured with materialized view.*",
-                "create table view_source( id integer, f1 varchar(16), f2 varchar(12));",
-                "create view my_view as select f2, count(*) as f2cnt from view_source group by f2;",
-                "export table view_source;"
-                );
-
-        badDDLAgainstSimpleSchema("Stream configured with materialized view.*",
-                "create stream view_source (id integer, f1 varchar(16), f2 varchar(12));",
-                "create view my_view as select f2, count(*) as f2cnt from view_source group by f2;"
-                );
-
-        badDDLAgainstSimpleSchema("View configured as export source.*",
-                "create table view_source( id integer, f1 varchar(16), f2 varchar(12));",
-                "create view my_view as select f2, count(*) as f2cnt from view_source group by f2;",
-                "export table my_view;"
-                );
-
-        badDDLAgainstSimpleSchema("View configured as export source.*",
-                "create stream view_source (id integer, f1 varchar(16), f2 varchar(12));",
-                "create view my_view as select f2, count(*) as f2cnt from view_source group by f2;",
-                "export table my_view;"
-                );
+        assertNotNull(getConnectorTableInfoFor(db, "e1", "e1"));
+        assertNotNull(getConnectorTableInfoFor(db, "e2", "e2"));
     }
 
     public void testGoodCreateStream() throws Exception {
@@ -3399,7 +3286,7 @@ public class TestVoltCompiler extends TestCase {
         db = goodDDLAgainstSimpleSchema(
                 "create stream e1 (id integer, f1 varchar(16));"
                 );
-        assertNotNull(getConnectorTableInfoFor(db, "e1"));
+        assertNotNull(getConnectorTableInfoFor(db, "e1", Constants.DEFAULT_EXPORT_CONNECTOR_NAME));
 
         db = goodDDLAgainstSimpleSchema(
                 "create stream e1 (id integer, f1 varchar(16));",
@@ -3408,9 +3295,9 @@ public class TestVoltCompiler extends TestCase {
                 "create stream e4 partition on column id export to target bar (id integer not null, f1 varchar(16));",
                 "create stream e5 export to target bar partition on column id (id integer not null, f1 varchar(16));"
                 );
-        assertNotNull(getConnectorTableInfoFor(db, "e1"));
+        assertNotNull(getConnectorTableInfoFor(db, "e1", Constants.DEFAULT_EXPORT_CONNECTOR_NAME));
         assertEquals(null, getPartitionColumnInfoFor(db,"e1"));
-        assertNotNull(getConnectorTableInfoFor(db, "e2"));
+        assertNotNull(getConnectorTableInfoFor(db, "e2", Constants.DEFAULT_EXPORT_CONNECTOR_NAME));
         assertEquals("ID", getPartitionColumnInfoFor(db,"e2"));
         assertNotNull(getConnectorTableInfoFor(db, "e3", "bar"));
         assertEquals(null, getPartitionColumnInfoFor(db,"e3"));
@@ -3453,10 +3340,9 @@ public class TestVoltCompiler extends TestCase {
                 "create stream foo export to target bar (id integer, primary key(id));"
                 );
 
-        badDDLAgainstSimpleSchema("View configured as export source.*",
+        badDDLAgainstSimpleSchema("Stream configured with materialized view without partitioned.*",
                 "create stream view_source partition on column id (id integer not null, f1 varchar(16), f2 varchar(12));",
-                "create view my_view as select f2, count(*) as f2cnt from view_source group by f2;",
-                "export table my_view;"
+                "create view my_view as select f2, count(*) as f2cnt from view_source group by f2;"
                 );
     }
 
@@ -3613,7 +3499,7 @@ public class TestVoltCompiler extends TestCase {
                 "  group by column2_integer\n;\n";
         File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema1);
         String schemaPath = schemaFile.getPath();
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
 
         boolean success = compiler.compileFromDDL(testout_jar, schemaPath);
         assertTrue(success);
@@ -3631,7 +3517,7 @@ public class TestVoltCompiler extends TestCase {
             "create procedure a.Foo as select * from books;"
         }, "\n"));
 
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         assertFalse("Compile with dotted proc name should fail",
                     compiler.compileFromDDL(testout_jar, ddlFile.getPath()));
         assertTrue("Compile with dotted proc name did not have the expected error message",

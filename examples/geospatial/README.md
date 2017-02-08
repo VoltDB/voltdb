@@ -98,7 +98,7 @@ Nibble Deletion
 ---------------------------
 As time passes, old bids will no longer be active, because their end timestamp is in the past. Rows in the `bids` table should therefore be purged to make room for new bids.
 
-Likewise, the oldest rows in the `ad_requests` table should be periodically aged out, once historical data has completed its useful lifetime.  We arbitrarily choose this time to be 6 seconds, to allow time for statistics to be displayed.  In a real application, this data might be written to an export table before being deleted.
+Likewise, the oldest rows in the `ad_requests` table should be periodically aged out, once historical data has completed its useful lifetime.  We arbitrarily choose this time to be 6 seconds, to allow time for statistics to be displayed.  In a real application, this data might be written to a stream table before being deleted.
 
 To achieve the deletion of unneeded data, we define a class called `NibbleDeleter` that gets rid of unneeded rows once every second.  Deleting large numbers of rows can impact performance, so we chose to do the delete small numbers of rows relatively frequently to minimize this impact.  This is sometimes called the "nibble" pattern and is common in VoltDB applications.  For more info on aging out data in VoltDB, see this blog post:
 

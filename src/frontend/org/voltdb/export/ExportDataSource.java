@@ -40,7 +40,6 @@ import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.BinaryPayloadMessage;
 import org.voltcore.messaging.Mailbox;
-import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
@@ -48,12 +47,10 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
-import org.voltdb.common.Constants;
 import org.voltdb.export.AdvertisedDataSource.ExportFormat;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.VoltFile;
 
-import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableList;
@@ -62,6 +59,10 @@ import com.google_voltpatches.common.util.concurrent.Futures;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
+import java.nio.charset.StandardCharsets;
+import java.util.concurrent.atomic.AtomicBoolean;
+import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
+import org.voltcore.utils.CoreUtils;
 
 /**
  *  Allows an ExportDataProcessor to access underlying table queues
@@ -106,7 +107,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     //This is released when all mailboxes are set.
     private final Semaphore m_allowAcceptingMastership = new Semaphore(0);
     private volatile boolean m_closed = false;
-    private volatile boolean m_mastershipAccepted = false;
+    private volatile AtomicBoolean m_mastershipAccepted = new AtomicBoolean(false);
+    private volatile boolean m_replicaMastershipRequested = false;
     private volatile ListeningExecutorService m_executor;
     private final Integer m_executorLock = new Integer(0);
     private final LinkedTransferQueue<RunnableWithES> m_queuedActions = new LinkedTransferQueue<>();
@@ -147,8 +149,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         };
         m_database = db;
         m_tableName = tableName;
+        m_signature = signature;
+        m_signatureBytes = m_signature.getBytes(StandardCharsets.UTF_8);
 
-        String nonce = signature + "_" + partitionId;
+        PureJavaCrc32 crc = new PureJavaCrc32();
+        crc.update(m_signatureBytes);
+        String nonce = m_tableName + "_" + crc.getValue() + "_" + partitionId;
 
         m_committedBuffers = new StreamBlockQueue(overflowPath, nonce);
 
@@ -157,8 +163,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
          * a catalog version and a table id so that it is constant across
          * catalog updates that add or drop tables.
          */
-        m_signature = signature;
-        m_signatureBytes = m_signature.getBytes(Constants.UTF8ENCODING);
         m_partitionId = partitionId;
 
         // Add the Export meta-data columns to the schema followed by the
@@ -206,7 +210,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             writeAdvertisementTo(stringer);
             stringer.endObject();
             JSONObject jsObj = new JSONObject(stringer.toString());
-            jsonBytes = jsObj.toString(4).getBytes(Charsets.UTF_8);
+            jsonBytes = jsObj.toString(4).getBytes(StandardCharsets.UTF_8);
         } catch (JSONException e) {
             exportLog.error("Failed to Write ad file for " + nonce);
             Throwables.propagate(e);
@@ -247,7 +251,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         byte data[] = Files.toByteArray(adFile);
         long hsid = -1;
         try {
-            JSONObject jsObj = new JSONObject(new String(data, Charsets.UTF_8));
+            JSONObject jsObj = new JSONObject(new String(data, StandardCharsets.UTF_8));
 
             long version = jsObj.getLong("adVersion");
             if (version != 0) {
@@ -263,7 +267,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             m_generation = jsObj.getLong("generation");
             m_partitionId = jsObj.getInt("partitionId");
             m_signature = jsObj.getString("signature");
-            m_signatureBytes = m_signature.getBytes(Constants.UTF8ENCODING);
+            m_signatureBytes = m_signature.getBytes(StandardCharsets.UTF_8);
             m_tableName = jsObj.getString("tableName");
             JSONArray columns = jsObj.getJSONArray("columns");
             for (int ii = 0; ii < columns.length(); ii++) {
@@ -290,10 +294,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         }
 
         String nonce;
+        PureJavaCrc32 crc = new PureJavaCrc32();
+        crc.update(m_signatureBytes);
         if (hsid == -1) {
-            nonce = m_signature + "_" + m_partitionId;
+            nonce = m_tableName + "_" + crc.getValue() + "_" + m_partitionId;
         } else {
-            nonce = m_signature + "_" + hsid + "_" + m_partitionId;
+            nonce = m_tableName + "_" + crc.getValue() + "_" + hsid + "_" + m_partitionId;
         }
         //If on disk generation matches catalog generation we dont do end of stream as it will be appended to.
         m_endOfStream = !isContinueingGeneration;
@@ -313,15 +319,14 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         m_ackMailboxRefs.set( ackMailboxes);
     }
 
-    private void releaseExportBytes(long releaseOffset) throws IOException {
+    private synchronized void releaseExportBytes(long releaseOffset) throws IOException {
         // if released offset is in an already-released past, just return success
         if (!m_committedBuffers.isEmpty() && releaseOffset < m_committedBuffers.peek().uso()) {
             return;
         }
 
         long lastUso = m_firstUnpolledUso;
-        while (!m_committedBuffers.isEmpty()
-                && releaseOffset >= m_committedBuffers.peek().uso()) {
+        while (!m_committedBuffers.isEmpty() && releaseOffset >= m_committedBuffers.peek().uso()) {
             StreamBlock sb = m_committedBuffers.peek();
             if (releaseOffset >= sb.uso() + sb.totalUso()) {
                 m_committedBuffers.pop();
@@ -654,6 +659,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             public void run() {
                 try {
                     m_committedBuffers.closeAndDelete();
+                    m_ackMailboxRefs.set(null);
                 } catch(IOException e) {
                     exportLog.rateLimitedLog(60, Level.WARN, e, "Error closing commit buffers");
                 } finally {
@@ -673,6 +679,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             public void run() {
                 try {
                     m_committedBuffers.close();
+                    m_ackMailboxRefs.set(null);
                 } catch (IOException e) {
                     exportLog.error(e);
                 } finally {
@@ -861,11 +868,14 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         if (m_runEveryWhere && !m_isMaster && runEveryWhere) {
             //These are single threaded so no need to lock.
             m_lastAckUSO = uso;
+            m_replicaMastershipRequested = true;
             if (!m_replicaRunning) {
-                exportLog.info("Export generation " + getGeneration() + " accepting mastership for " + getTableName() + " partition " + getPartitionId() + " as replica");
-                m_replicaRunning = true;
                 m_isMaster = false;
-                acceptMastership();
+                m_replicaRunning = acceptMastership();
+                //If we didnt accept mastership we will depend on next ack to accept.
+                if (m_replicaRunning) {
+                    exportLog.info("Export generation " + getGeneration() + " accepting mastership for " + getTableName() + " partition " + getPartitionId() + " as replica");
+                }
             }
             return;
         }
@@ -928,21 +938,27 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
      * Trigger an execution of the mastership runnable by the associated
      * executor service
      */
-    public synchronized void acceptMastership() {
-        Preconditions.checkNotNull(m_onMastership, "mastership runnable is not yet set");
-        if (m_mastershipAccepted) {
+    public synchronized boolean acceptMastership() {
+        if (m_onMastership == null) {
+            exportLog.info("Mastership Runnable not yet set " + getGeneration() + " Table " + getTableName() + " partition " + getPartitionId());
+            return false;
+        }
+        if (m_mastershipAccepted.get()) {
             exportLog.info("Export generation " + getGeneration() + " Table " + getTableName() + " mastership already accepted for partition " + getPartitionId());
-            return;
+            return true;
         }
         exportLog.info("Accepting mastership for export generation " + getGeneration() + " Table " + getTableName() + " partition " + getPartitionId());
-        m_mastershipAccepted = true;
         RunnableWithES runnable = new RunnableWithES("acceptMastership") {
             @Override
             public void run() {
                 try {
                     if (!getLocalExecutorService().isShutdown() || !m_closed) {
                         exportLog.info("Export generation " + getGeneration() + " Table " + getTableName() + " accepting mastership for partition " + getPartitionId());
-                        m_onMastership.run();
+                        if (m_onMastership != null) {
+                            if (m_mastershipAccepted.compareAndSet(false, true)) {
+                                m_onMastership.run();
+                            }
+                        }
                     }
                 } catch (Exception e) {
                     exportLog.error("Error in accepting mastership", e);
@@ -950,6 +966,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             }
         };
         stashOrSubmitTask(runnable, true, false);
+        return m_mastershipAccepted.get();
     }
 
     /**
@@ -959,6 +976,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     public void setOnMastership(Runnable toBeRunOnMastership) {
         Preconditions.checkNotNull(toBeRunOnMastership, "mastership runnable is null");
         m_onMastership = toBeRunOnMastership;
+        if (m_replicaMastershipRequested) {
+            acceptMastership();
+        }
     }
 
     public ExportFormat getExportFormat() {

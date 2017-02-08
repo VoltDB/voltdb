@@ -139,7 +139,7 @@ public class TestLeaderAppointer extends ZKTestBase {
         KSafetyStats stats = new KSafetyStats();
         m_dut = new LeaderAppointer(m_hm, m_topo.getPartitionCount(),
                 m_kfactor,
-                null, m_topo.topologyToJSON(), m_mpi, stats, false);
+                m_topo.topologyToJSON(), m_mpi, stats, false);
         m_dut.onReplayCompletion();
     }
 
@@ -287,7 +287,6 @@ public class TestLeaderAppointer extends ZKTestBase {
         m_dut = new LeaderAppointer(m_hm,
                                     m_topo.getPartitionCount(),
                                     m_kfactor,
-                                    null,
                                     m_topo.topologyToJSON(),
                                     m_mpi,
                                     new KSafetyStats(),
@@ -538,7 +537,6 @@ public class TestLeaderAppointer extends ZKTestBase {
         m_dut = new LeaderAppointer(m_hm,
                                     m_topo.getPartitionCount(),
                                     m_kfactor,
-                                    null,
                                     m_topo.topologyToJSON(),
                                     m_mpi,
                                     new KSafetyStats(),
