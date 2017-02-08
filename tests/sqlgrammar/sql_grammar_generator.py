@@ -24,11 +24,11 @@
 
 import os.path
 import re
-import subprocess
 import sys
 from datetime import timedelta
 from optparse import OptionParser
 from random import randrange
+from subprocess import Popen, PIPE, STDOUT
 from time import time
 from traceback import print_exc
 
@@ -36,7 +36,7 @@ __SYMBOL_DEFN  = re.compile(r"(?P<symbolname>[\w-]+)\s*::=\s*(?P<definition>.+)"
 __SYMBOL_REF   = re.compile(r"{(?P<symbolname>[\w-]+)}")
 __OPTIONAL     = re.compile(r"\[(?P<optionaltext>[^\[\]]*)\]")
 __WEIGHTED_XOR = re.compile(r"\s+(?P<weight>\d*)(?P<xor>\|)\s+")
-__XOR         = ' | '
+__XOR          = ' | '
 
 
 def get_grammar(grammar={}, grammar_filename='sql-grammar.txt', grammar_dir='.'):
@@ -176,20 +176,41 @@ def get_one_sql_statement(grammar, sql_statement_type='sql-statement', max_depth
     return sql.strip() + ';'
 
 
-def print_summary():
-    """Print a summary message, including the total number of SQL statements,
-    the number and percent of valid and invalid statements (if sqlcmd was
-    called), and the total amount execution of time. Print this message both
-    to STDOUT and to the sqlcmd output file (if any). And close both output
-    files - the SQL statement one and the sqlcmd one (if they exist).
+def print_file_tail(from_file, to_file, number_of_lines=50):
+    """Print a tail of the last 'number_of_lines' of the 'from_file', to the
+    'to_file' (typically the summary file).
     """
-    global start_time, sql_output_file, sqlcmd_output_file, count_sql_statements
+    command = 'tail -n ' + str(number_of_lines) + ' ' + from_file
+    if debug > 2:
+        print 'DEBUG: tail command:', command
+        sys.stdout.flush()
+    tail_proc = Popen(command, shell=True, stdin=PIPE, stdout=PIPE, stderr=STDOUT)
+    tail_message = 'Last ' + str(number_of_lines) + ' lines of ' + from_file + ':\n' \
+                 + tail_proc.communicate()[0].replace('\\n', '\n') + '\n'
+    print >> to_file, tail_message
+
+
+def print_summary(error_message=''):
+    """Prints various summary messages, to STDOUT, to the sqlcmd output file (if
+    specified and not STDOUT), and to the sqlcmd summary file (if specified and
+    not STDOUT); also, closes those output files, as well as the SQL statement
+    output file. The summary messages may include: tails of the VoltDB server
+    log file and/or of the VoltDB server's console (i.e., its STDOUT and STDERR);
+    the total amount of execution time; the number and percent of valid and
+    invalid SQL statements of various types, and their totals; and an error
+    message, if one was specified, which usually means that execution was halted
+    prematurely, due a VoltDB server crash.
+    """
+    global start_time, sql_output_file, sqlcmd_output_file, sqlcmd_summary_file, \
+        options, count_sql_statements
 
     # Generate the summary message (to be printed below)
     try:
+        last_sql_message = 'Last ' + str(len(last_n_sql_statements)) + ' SQL statements sent to sqlcmd:\n' \
+                         + '\n'.join(sql for sql in last_n_sql_statements) + '\n'
         seconds = time() - start_time
-        summary_message = '\n\nSUMMARY: in ' + re.sub('^0:', '', str(timedelta(0, round(seconds))), 1) \
-                        + ' ({0:.3f} seconds)'.format(seconds) + ', SQL statements by type:'
+        summary_message  = '\n\nSUMMARY: in ' + re.sub('^0:', '', str(timedelta(0, round(seconds))), 1) \
+                         + ' ({0:.3f} seconds)'.format(seconds) + ', SQL statements by type:'
 
         # Check for a special case: TRUNCATE statements were all valid,
         # none invalid, as sometimes happens
@@ -212,19 +233,26 @@ def print_summary():
                     summary_message += '{0:7d} '.format(count) + validity + ' ({0:3d}%),'.format(percent)
             percent = int(round(100.0 * sql_type_count / total_count))
             summary_message += '{0:7d} '.format(sql_type_count) + 'total ({0:3d}%)'.format(percent)
-        summary_message += '\n\n'
     except Exception as e:
         print '\n\nCaught exception attempting to print SUMMARY message:'
         print_exc()
         print '\n\nHere is count_sql_statements, which we were attempting to format & print:\n', count_sql_statements
 
-    # Print the summary message, and close output file(s)
+    # Print the summary messages, and close output file(s)
     if sql_output_file and sql_output_file is not sys.stdout:
         sql_output_file.close()
     if sqlcmd_output_file and sqlcmd_output_file is not sys.stdout:
-        print >> sqlcmd_output_file, summary_message
+        print >> sqlcmd_output_file, summary_message, error_message
         sqlcmd_output_file.close()
-    print summary_message
+    if sqlcmd_summary_file and sqlcmd_summary_file is not sys.stdout:
+        if options.log_files and options.log_number:
+            sys.stdout.flush()
+            for log_file in options.log_files.split(','):
+                print_file_tail(log_file, sqlcmd_summary_file, options.log_number)
+        print >> sqlcmd_summary_file, last_sql_message, summary_message, error_message
+        sqlcmd_summary_file.close()
+    print '\n\n', last_sql_message, summary_message, error_message
+
 
 def increment_sql_statement_indexes(index1, index2):
     """Increment the value of 'count_sql_statements' (a 2D dictionary, i.e.,
@@ -265,13 +293,28 @@ def print_sql_statement(sql, num_chars_in_sql_type=6):
     to sqlcmd, and print its output in the sqlcmd output file (which may be
     STDOUT).
     """
-    global sql_output_file, sqlcmd_output_file, sqlcmd_proc, debug
+    global sql_output_file, sqlcmd_output_file, echo_output_file, sqlcmd_proc, \
+        last_n_sql_statements, options, debug
 
     # Print the specified SQL statement to the specified output file
     print >> sql_output_file, sql
 
+    # If an 'echo' substring was specified, and is found in the current SQL
+    # statement, then echo it to the 'echo output file': this is useful for
+    # debugging things that were recently added to the SQL grammar (e.g., a
+    # new function name)
+    sql_contains_echo_substring = False
+    if options.echo and options.echo in sql:
+        sql_contains_echo_substring = True
+        print >> echo_output_file, '\n' + sql
+
     # If a sqlcmd sub-process has been defined, use it
     if sqlcmd_proc:
+
+        # Save the last options.summary_number SQL statements, for the summary
+        last_n_sql_statements.append(sql)
+        while len(last_n_sql_statements) > options.summary_number:
+            last_n_sql_statements.pop(0)
 
         # Pass the SQL statement to the sqlcmd sub-process
         sqlcmd_proc.stdin.write(sql + '\n')
@@ -281,6 +324,10 @@ def print_sql_statement(sql, num_chars_in_sql_type=6):
             # Retrieve (& print) the next line of output from the sqlcmd sub-process
             output = sqlcmd_proc.stdout.readline().rstrip('\n')
             print >> sqlcmd_output_file, output
+
+            # Debug print, if that 'echo' substring was found
+            if sql_contains_echo_substring and sql_was_echoed_as_output:
+                print >> echo_output_file, output
 
             if output:
                 # Wait until the SQL statement has been echoed by sqlcmd,
@@ -308,17 +355,16 @@ def print_sql_statement(sql, num_chars_in_sql_type=6):
                         print 'DEBUG: Found ERROR before SQL echoed, ', \
                               'with:\n  sql   :', sql, '\n  output:', output
 
-                # Check if sqlcmd cannot, or can no longer, reach the VoltDB server
-                elif ('Unable to connect' in output or 'No connections' in output
-                       or 'Connection refused' in output
-                       or ('Connection to database host' in output and 'was lost' in output) ):
-                    error_message = '\n\nFATAL ERROR: sqlcmd responded:\n    "' + output + \
-                                    '"\npossibly due to a VoltDB server crash (or it was ' + \
-                                    'never started), after SQL statement:\n    "' + sql + '"'
-                    print >> sqlcmd_output_file, error_message
-                    if sqlcmd_output_file is not sys.stdout:
-                        print error_message
-                    print_summary()
+                # Check if sqlcmd command not found, or if sqlcmd cannot, or
+                # can no longer, reach the VoltDB server
+                elif ('sqlcmd: command not found' in output
+                      or 'Unable to connect' in output or 'No connections' in output
+                      or 'Connection refused' in output
+                      or ('Connection to database host' in output and 'was lost' in output) ):
+                    error_message = '\n\n\nFATAL ERROR: sqlcmd responded:\n    "' + output + \
+                                    '"\nprobably due to a VoltDB server crash (or it was ' + \
+                                    'never started??), after SQL statement:\n    "' + sql + '"\n'
+                    print_summary(error_message)
                     sqlcmd_proc.communicate('exit')
                     exit(99)
     else:
@@ -353,14 +399,14 @@ def generate_sql_statements(sql_statement_type, num_sql_statements=0, max_save_s
         if (count_sql_statements and count_sql_statements.get('total')
                 and count_sql_statements['total'].get('total') and max_save_statements
                 and not count_sql_statements['total']['total'] % max_save_statements):
-            if sql_output_file and sql_output_file != sys.stdout:
+            if sql_output_file and sql_output_file is not sys.stdout:
                 filename = sql_output_file.name
                 sql_output_file.close()
-                sql_output_file = open(filename, 'w')
-            if sqlcmd_output_file and sqlcmd_output_file != sys.stdout:
+                sql_output_file = open(filename, 'w', 0)
+            if sqlcmd_output_file and sqlcmd_output_file is not sys.stdout:
                 filename = sqlcmd_output_file.name
                 sqlcmd_output_file.close()
-                sqlcmd_output_file = open(filename, 'w')
+                sqlcmd_output_file = open(filename, 'w', 0)
             for i in range(delete_statement_number):
                 print_sql_statement(get_one_sql_statement(grammar, delete_statement_type))
 
@@ -372,12 +418,12 @@ if __name__ == "__main__":
     parser.add_option("-p", "--path", dest="path", default=".",
                       help="path to the directory in which to find the grammar file(s) to be used [default: .]")
     parser.add_option("-g", "--grammar", dest="grammar_files", default="sql-grammar.txt",
-                      help="a file, or comma-separated list of files, that defines the SQL grammar "
+                      help="a file path/name, or comma-separated list of files, that defines the SQL grammar "
                          + "[default: sql-grammar.txt]")
     parser.add_option("-i", "--initial_type", dest="initial_type", default="insert-statement",
                       help="a type, or comma-separated list of types, of SQL statements to generate initially; typically "
                           + "used to initialize the database using INSERT statements [default: insert-statement]")
-    parser.add_option("-j", "--initial_number", dest="initial_number", default=0,
+    parser.add_option("-I", "--initial_number", dest="initial_number", default=0,
                       help="the number of each 'initial_type' of SQL statement to generate [default: 0]")
     parser.add_option("-t", "--type", dest="type", default="sql-statement",
                       help="a type, or comma-separated list of types, of SQL statements to generate "
@@ -385,25 +431,46 @@ if __name__ == "__main__":
     parser.add_option("-n", "--number", dest="number", default=0,
                       help="the number of each 'type' of SQL statement to generate; a negative value "
                          + "means keep generating until the number of minutes is reached [default: 0; "
-                         + "-1 if MINUTES is specified]")
+                         + "-1 if 'minutes' is specified]")
     parser.add_option("-m", "--minutes", dest="minutes", default=0,
                       help="the number of minutes to generate all SQL statements, of all types "
                          + "(if positive, overrides the number of SQL statements) [default: 0]")
     parser.add_option("-d", "--delete_type", dest="delete_type", default="truncate-statement",
                       help="a type of SQL statements used to delete data periodically, so that a VoltDB "
                          + "server's memory does not grow too large [default: truncate-statement]")
-    parser.add_option("-e", "--delete_number", dest="delete_number", default=10,
+    parser.add_option("-N", "--delete_number", dest="delete_number", default=10,
                       help="the number of 'delete_type' SQL statements to generate, each time [default: 10]")
     parser.add_option("-x", "--max_save", dest="max_save", default=10000,
                       help="the maximum number of SQL statements (and their results, if sqlcmd is called) to save "
                          + "in the output files; after this many SQL statements, the output files are erased, and "
                          + "'delete_type' statements are called, to clear the database and start fresh [default: 10000]")
     parser.add_option("-o", "--output", dest="sql_output", default=None,
-                      help="an output file name, to which to send all generated SQL statements; "
+                      help="an output file path/name, to which to send all generated SQL statements; "
                          + "if not specified, output goes to STDOUT [default: None]")
-    parser.add_option("-s", "--sqlcmd", dest="sqlcmd_output", default=None,
-                      help="an output file name, to which sqlcmd output is sent, or STDOUT to send the output there; the "
+    parser.add_option("-O", "--sqlcmd", dest="sqlcmd_output", default=None,
+                      help="an output file path/name, to which sqlcmd output is sent, or STDOUT to send the output there; the "
                          + "generated SQL statements are only passed to sqlcmd if this value is specified [default: None]")
+    parser.add_option("-s", "--summary", dest="sqlcmd_summary", default=None,
+                      help="an output file path/name, to which a summary of all sqlcmd output is sent; a similar "
+                         + "summary also goes to STDOUT, assuming that 'sqlcmd' is specified [default: None]")
+    parser.add_option("-S", "--summary_number", dest="summary_number", default=5,
+                      help="the number of SQL statements (the last ones sent to sqlcmd) to output to the 'summary' "
+                         + "file; only applies if 'sqlcmd' and 'summary' are also specified [default: 5]")
+    parser.add_option("-l", "--log", dest="log_files", default=None,
+                      help="a file path/name, or comma-separated list of file paths/names, such as the VoltDB log "
+                         + "file or console output; if this and 'summary' are specified, the summary will include "
+                         + "a 'tail' of each of these files [default: None]")
+    parser.add_option("-L", "--log_number", dest="log_number", default=100,
+                      help="the number of lines to 'tail' from the 'log' file(s); only applies "
+                         + "if 'summary' and 'log' are also specified [default: 100]")
+    parser.add_option("-e", "--echo", dest="echo", default=None,
+                      help="a substring to be searched for in all SQL statements sent to sqlcmd: if this is specified, "
+                         + "then all SQL statements that contain this substring, and their results, will be echoed (to "
+                         + "'echo_file'); this is useful for debugging new features, e.g., if you just added the LOG10 "
+                         + "function, you can set this to 'LOG10', to see its effect [default: None]")
+    parser.add_option("-E", "--echo_file", dest="echo_file", default=100,
+                      help="a file path/name to which to send 'echo' output; if not specified, 'echo' output "
+                         + "(if any) goes to STDOUT [default: None]")
     parser.add_option("-D", "--debug", dest="debug", default=0,
                       help="print debug info: 0 for none, increasing values (1-5) for more [default: 0]")
     (options, args) = parser.parse_args()
@@ -427,6 +494,12 @@ if __name__ == "__main__":
         print "DEBUG: options.max_save      :", options.max_save
         print "DEBUG: options.sql_output    :", options.sql_output
         print "DEBUG: options.sqlcmd_output :", options.sqlcmd_output
+        print "DEBUG: options.sqlcmd_summary:", options.sqlcmd_summary
+        print "DEBUG: options.summary_number:", options.summary_number
+        print "DEBUG: options.log_files     :", options.log_files
+        print "DEBUG: options.log_number    :", options.log_number
+        print "DEBUG: options.echo          :", options.echo
+        print "DEBUG: options.echo_file     :", options.echo_file
         print "DEBUG: options.debug         :", options.debug
         print "DEBUG: options (all):\n", options
         print "DEBUG: args (all):", args
@@ -457,23 +530,34 @@ if __name__ == "__main__":
     # Open the output file for generated SQL statements, if specified
     sql_output_file = sys.stdout
     if options.sql_output:
-        sql_output_file = open(options.sql_output, 'w')
+        sql_output_file = open(options.sql_output, 'w', 0)
+
+    # Open the output file for SQL statements to be echoed, if specified
+    echo_output_file = None
+    if options.echo:
+        echo_output_file = sys.stdout
+        if options.echo_file:
+            echo_output_file = open(options.echo_file, 'w', 0)
 
     # Open the sub-process used to execute SQL statements in sqlcmd,
     # and the output file for sqlcmd results, if specified
     sqlcmd_proc = None
     sqlcmd_output_file = None
+    sqlcmd_summary_file = None
+    last_n_sql_statements = []
     if options.sqlcmd_output:
-        if options.sqlcmd_output == "STDOUT":
+        if options.sqlcmd_output is "STDOUT":
             sqlcmd_output_file = sys.stdout
         else:
-            sqlcmd_output_file = open(options.sqlcmd_output, 'w')
-        command = 'sqlcmd --stop-on-error=false'
+            sqlcmd_output_file = open(options.sqlcmd_output, 'w', 0)
 
+        if options.sqlcmd_summary:
+            sqlcmd_summary_file = open(options.sqlcmd_summary, 'w', 0)
+
+        command = 'sqlcmd --stop-on-error=false'
         if debug > 2:
             print 'DEBUG: sqlcmd command:', command
-        sqlcmd_proc = subprocess.Popen(command, shell=True, stdin=subprocess.PIPE,
-                                       stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        sqlcmd_proc = Popen(command, shell=True, stdin=PIPE, stdout=PIPE, stderr=STDOUT)
 
     # Generate the specified number of each type of SQL statement;
     # and run each in sqlcmd, if the sqlcmd option was specified

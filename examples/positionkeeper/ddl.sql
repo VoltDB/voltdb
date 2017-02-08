@@ -109,7 +109,7 @@ CREATE PROCEDURE PARTITION ON TABLE prc COLUMN prc_sec PARAMETER 1
   FROM CLASS positionkeeper.PriceInsert;
 
 CREATE PROCEDURE get_all_pos_for_sec
-  PARTITION ON TABLE pos COLUMN codsec;
+  PARTITION ON TABLE pos COLUMN codsec
   AS SELECT * FROM pos WHERE codsec = ?;
 
 CREATE PROCEDURE get_all_pos_for_cnt

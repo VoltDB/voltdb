@@ -292,12 +292,12 @@ int-function-expr       ::= {int-expression} {math-operator} {int-expression} | 
                             {int-valued-string-expr} | {int-valued-time-expr} | {int-valued-t-unit-expr}
 numeric-function-expr   ::= {numeric-expression} {math-operator} {numeric-expression} | \
                             {math-function-0args}[()] | \
-                            {math-function-1arg}({numeric-expression}) | \
+                            {math-function-1arg}({numeric-expression}) 14| \
                             {math-function-2args}({numeric-expression}, {numeric-expression}) | \
                             {num-valued-time-expr}
 math-operator           ::= + | - | * | / | %
 math-function-0args     ::= PI
-math-function-1arg      ::= ABS | CEILING | EXP | FLOOR | LN | LOG | SQRT
+math-function-1arg      ::= ABS | CEILING | EXP | FLOOR | LN | LOG | LOG10 | SQRT | SIN | COS | TAN | CSC | SEC | COT
 math-function-2args     ::= POWER
 int-function-2args      ::= MOD
 
@@ -345,14 +345,20 @@ string-val-str-int-func ::= LEFT | RIGHT | REPEAT | SUBSTRING
 string-val-str-2int-fun ::= SUBSTRING
 string-val-str-int-expr ::= {string-val-str-int-func}({string-expression}, {int-expression}) | \
                             {string-val-str-2int-fun}({string-expression}, {int-expression}, {int-expression})
-# One function of 2 numbers (1 decimal and 1 integer) produce string values
+
+# One function of 2 numbers (1 decimal and 1 integer) produces string values
 string-val-num-int-func ::= FORMAT_CURRENCY
-string-val-num-int-expr ::= {string-val-num-int-func}({numeric-expression}, {int-expression})
+# One function of 1, 2, or 3 numbers (1 decimal and 2 optional integers) produces string values
+string-val-num-2int-fun ::= STR
+string-val-num-int-expr ::= {string-val-num-int-func}({numeric-expression}, {int-expression}) | \
+                            {string-val-num-2int-fun}({numeric-expression}) | \
+                            {string-val-num-2int-fun}({numeric-expression}, {int-expression}) | \
+                            {string-val-num-2int-fun}({numeric-expression}, {int-expression}, {int-expression})
 
 # Some string functions use special keywords (e.g. PLACING, FROM, FOR)
 string-special-func-expr::= OVERLAY({string-expression} PLACING {string-expression} FROM {int-expression} [FOR {int-expression}]) | \
                             SUBSTRING({string-expression} FROM {int-expression} [FOR {int-expression}]) | \
-                            TRIM([[{trim-keyword}] [{character} FROM]{string-expression})
+                            TRIM([[{trim-keyword}] [{character} FROM ]{string-expression})
 trim-keyword            ::= LEADING | TRAILING | BOTH
 
 ################################################################################
