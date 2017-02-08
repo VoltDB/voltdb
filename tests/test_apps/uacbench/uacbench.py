@@ -32,14 +32,17 @@ from optparse import OptionParser
 
 DEFAULT_CLASSES_DIR = "procedures/uac"
 DEFAULT_JARS_DIR = "jars"
-JARS_CMD_PRFIX = "./run.sh jars "
+JARS_CMD_PRFIX = "./run.sh uacjars "
 
+PAT_CREATE_PROC_STMT = "CREATE PROCEDURE FROM CLASS uac.Proc{0};"
+PAT_DROP_PROC_STMT = "DROP PROCEDURE uac.Proc{0};"
+PAT_CLS_DEL_STMT = "uac.Proc{0}"
 
 def generate_ddl(tables, ddlname):
-    tb = ('create table t{} (a integer not null, b varchar(10), c integer,'
+    tb = ('create table t{0} (a integer not null, b varchar(10), c integer,'
             'd smallint, e integer, primary key(a, b));'
-          'create index t{}_idx1 on t{}(a,c);'
-          'create index t{}_idx2 on t{}(a,d);'
+          'create index t{1}_idx1 on t{2}(a,c);'
+          'create index t{3}_idx2 on t{4}(a,d);'
     )
 
     ddl = "file -inlinebatch END_OF_BATCH\n";
@@ -52,12 +55,10 @@ def generate_ddl(tables, ddlname):
         java_file.write(ddl)
     return
 
-def generate_procedure_stmts(pfrom, pto, filename):
-    stmt = "CREATE PROCEDURE FROM CLASS uac.Proc{};"
-
+def procedure_stmts(pattern, pfrom, pto, filename):
     stmts = ""
     for i in range(pfrom, pto):
-        stmts += stmt.format(i) + "\n"
+        stmts += pattern.format(i) + "\n"
 
     if len(stmts.strip(' \t\n\r')) == 0:
         sys.exit("stmts not generated from " + str(pfrom) + " to " + str(pto) + " for file: " + filename)
@@ -104,16 +105,16 @@ def generate_base_jar(tablecount, procedurecount):
 
     # invoke shell script to compile jars
     # TODO: xin
-    subprocess.call(shlex.split('./run.sh jars uac_base.jar'))
+    subprocess.call(shlex.split('./run.sh uacjars uac_base.jar'))
 
     # generate procedure stmts
     filename = "%s/stmts_base.txt" % (DEFAULT_JARS_DIR)
-    generate_procedure_stmts(0, procedurecount, filename)
+    procedure_stmts(PAT_CREATE_PROC_STMT, 0, procedurecount, filename)
 
     return
 
-def generate_add_jars(procedurecount, invocations):
-    # add one procedure and create it
+def add_jars(procedurecount, invocations):
+    # add a procedure
     for i in range(0, invocations):
         j = procedurecount + i
         filename = "%s/Proc%d.java" % (DEFAULT_CLASSES_DIR, j)
@@ -125,10 +126,10 @@ def generate_add_jars(procedurecount, invocations):
 
         # generate procedure stmts
         filename = "%s/stmts_add_%d.txt" % (DEFAULT_JARS_DIR, j)
-        generate_procedure_stmts(procedurecount + i, j + 1, filename)
+        procedure_stmts(PAT_CREATE_PROC_STMT, j, j + 1, filename)
 
-def generate_add_batch_jars(procedurecount, invocations, batchsize):
-    # add one procedure and create it
+def add_batch_jars(procedurecount, invocations, batchsize):
+    # add procedures
     for i in range(0, invocations):
         base = procedurecount + i * batchsize
         for j in range(0, batchsize):
@@ -142,13 +143,41 @@ def generate_add_batch_jars(procedurecount, invocations, batchsize):
 
         # generate procedure stmts
         filename = "%s/stmts_add_batch_%d.txt" % (DEFAULT_JARS_DIR, base)
-        generate_procedure_stmts(base, base + batchsize, filename)
+        procedure_stmts(PAT_CREATE_PROC_STMT, base, base + batchsize, filename)
+
+def del_jars(procedurecount, invocations):
+    # drop a procedure
+    for i in range(0, invocations):
+        j = procedurecount - i - 1
+        # generate procedure stmts
+        filename = "%s/stmts_del_%d.txt" % (DEFAULT_JARS_DIR, j)
+        procedure_stmts(PAT_DROP_PROC_STMT, j, j + 1, filename)
+
+        filename = "%s/pat_del_%d.txt" % (DEFAULT_JARS_DIR, j)
+        procedure_stmts(PAT_CLS_DEL_STMT, j, j + 1, filename)
+
+def del_batch_jars(procedurecount, invocations, batchsize):
+    # drop procedures
+    for i in range(0, invocations):
+        base = procedurecount - (i + 1) * batchsize
+        # generate procedure stmts
+        filename = "%s/stmts_del_batch_%d.txt" % (DEFAULT_JARS_DIR, base)
+        procedure_stmts(PAT_DROP_PROC_STMT, base, base + batchsize, filename)
+
+        filename = "%s/pat_del_batch_%d.txt" % (DEFAULT_JARS_DIR, base)
+        procedure_stmts(PAT_CLS_DEL_STMT, base, base + batchsize, filename)
+
+
+def upd_jars(procedurecount, invocations):
+    # drop a procedure
+    del_jars(procedurecount, invocations);
+    add_jars(procedurecount, invocations);
 
 # cleaning the input dir
 def clean_dirpath(dirpath):
-    if os.path.exists(dirpath):
-        shutil.rmtree(dirpath)
-    os.makedirs(dirpath, 0755)
+    #if os.path.exists(dirpath):
+    #    shutil.rmtree(dirpath)
+    #os.makedirs(dirpath, 0755)
     return
 
 def clean():
@@ -175,8 +204,10 @@ if __name__ == "__main__":
 
     (options, args) = parser.parse_args()
 
-#     print "options:" + str(options)
-#     print "args:" + str(args)
+    if options.name == "UPD" or options.name == "UPD_BATCH":
+        sys.exit('Update a procedure without syntax change is similar to add a procedure, '
+                 'Otherwise it needs to drop a procedure then add a procedure\n'
+                 'Please run other benchmarks: ADD, ADD_BATCH, DROP, DROP_BATCH')
 
     # generate base jars: 500 tables with 1000 procedures
     generate_ddl(options.tablecount, "ddlbase.sql")
@@ -195,14 +226,15 @@ if __name__ == "__main__":
         sys.exit("No benchmark generated")
 
     if options.name == "ADD":
-        generate_add_jars(options.procedurecount, options.invocations)
+        add_jars(options.procedurecount, options.invocations)
     elif options.name == "ADD_BATCH":
-        generate_add_batch_jars(options.procedurecount, options.invocations, options.batchsize)
+        add_batch_jars(options.procedurecount, options.invocations, options.batchsize)
     elif options.name == "DEL":
-        sys.exit("Not support")
+        del_jars(options.procedurecount, options.invocations)
     elif options.name == "DEL_BATCH":
-        sys.exit("Not support")
-    elif options.name == "UPD":
-        sys.exit("Not support")
-    elif options.name == "UPD_BATCH":
-        sys.exit("Not support")
+        del_batch_jars(options.procedurecount, options.invocations, options.batchsize)
+#     elif options.name == "UPD" or options.name == "UPD_BATCH":
+#         sys.exit('Update a procedure without syntax change is similar to add a procedure, '
+#                  'Otherwise it needs to drop a procedure then add a procedure')
+#         upd_jars(options.procedurecount, options.invocations)
+#         upd_batch_jars(options.procedurecount, options.invocations, options.batchsize)
