@@ -121,6 +121,7 @@ import org.voltdb.dtxn.LatencyHistogramStats;
 import org.voltdb.dtxn.LatencyStats;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.export.ExportManager;
+import org.voltdb.importer.ChannelDistributer;
 import org.voltdb.importer.ImportManager;
 import org.voltdb.iv2.BaseInitiator;
 import org.voltdb.iv2.Cartographer;
@@ -229,6 +230,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     private OpsRegistrar m_opsRegistrar = new OpsRegistrar();
 
     private AsyncCompilerAgent m_asyncCompilerAgent = null;
+
     public AsyncCompilerAgent getAsyncCompilerAgent() { return m_asyncCompilerAgent; }
     private PartitionCountStats m_partitionCountStats = null;
     private IOStats m_ioStats = null;
@@ -385,6 +387,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     CommandLog m_commandLog;
     SnmpTrapSender m_snmp;
+
+    ChannelDistributer m_distributer;
 
     private volatile OperationMode m_mode = OperationMode.INITIALIZING;
     private OperationMode m_startMode = null;
@@ -1929,6 +1933,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             m_periodicWorks.remove(resMonitorWork);
         }
         ResourceUsageMonitor resMonitor  = new ResourceUsageMonitor(m_catalogContext.getDeployment().getSystemsettings(), getSnmpTrapSender());
+        m_distributer.registerCallback("__RESOURCE_MONITOR__", resMonitor);
         resMonitor.logResourceLimitConfigurationInfo();
         if (resMonitor.hasResourceLimitsConfigured()) {
             resMonitorWork = scheduleWork(resMonitor, resMonitor.getResourceCheckInterval(), resMonitor.getResourceCheckInterval(), TimeUnit.SECONDS);
@@ -1947,7 +1952,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
      * <li>moves the deployment file under the config directory
      * </ul>
      * @param config
-     * @param dt a {@link DeploymentTypel}
+     * @param dt a {@link DeploymentType}
      */
     private void stageDeploymemtFileForInitialize(Configuration config, DeploymentType dt) {
 
@@ -2931,6 +2936,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
                 //Shutdown import processors.
                 ImportManager.instance().shutdown();
+
+                //Shutdown Channel Distributer
+                if (m_distributer != null) {
+                    m_distributer.shutdown();
+                }
 
                 m_periodicWorks.clear();
                 m_snapshotCompletionMonitor.shutdown();

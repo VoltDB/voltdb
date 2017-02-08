@@ -80,13 +80,6 @@ public class ImportManager implements ChannelChangeCallback {
         m_moduleManager = getModuleManager();
     }
 
-    private void initializeChannelDistributer() throws BundleException {
-        if (m_distributer != null) return;
-
-        m_distributer = new ChannelDistributer(m_messenger.getZK(), String.valueOf(m_myHostId));
-        m_distributer.registerCallback("__IMPORT_MANAGER__", this);
-    }
-
     /**
      * Create the singleton ImportManager and initialize.
      * @param myHostId my host id in cluster
@@ -95,7 +88,7 @@ public class ImportManager implements ChannelChangeCallback {
      * @throws org.osgi.framework.BundleException
      * @throws java.io.IOException
      */
-    public static synchronized void initialize(int myHostId, CatalogContext catalogContext, HostMessenger messenger) throws BundleException, IOException {
+    public static synchronized void initialize(int myHostId, CatalogContext catalogContext, HostMessenger messenger, ChannelDistributer distributer) throws BundleException, IOException {
         ImporterStatsCollector statsCollector = new ImporterStatsCollector(myHostId);
         ImportManager em = new ImportManager(myHostId, messenger, statsCollector);
         VoltDB.instance().getStatsAgent().registerStatsSource(
@@ -104,13 +97,15 @@ public class ImportManager implements ChannelChangeCallback {
                 statsCollector);
 
         m_self = em;
+        em.m_distributer = distributer;
+        em.m_distributer.registerCallback("__IMPORT_MANAGER__", em);
         em.create(myHostId, catalogContext);
     }
 
     /**
      * This creates a import connector from configuration provided.
+     * @param myHostId
      * @param catalogContext
-     * @param partitions
      */
     private synchronized void create(int myHostId, CatalogContext catalogContext) {
         try {
@@ -118,7 +113,6 @@ public class ImportManager implements ChannelChangeCallback {
             if (importElement == null || importElement.getConfiguration().isEmpty()) {
                 return;
             }
-            initializeChannelDistributer();
 
             final String clusterTag = m_distributer.getClusterTag();
 
@@ -162,9 +156,6 @@ public class ImportManager implements ChannelChangeCallback {
 
     public synchronized void shutdown() {
         close();
-        if (m_distributer != null) {
-            m_distributer.shutdown();
-        }
     }
 
     public synchronized void close() {
