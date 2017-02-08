@@ -80,15 +80,6 @@ public class SpInitiator extends BaseInitiator implements Promotable
                     break;
                 }
             }
-
-            //This was the leader but SPI has been migrated, so demote it.
-            if (m_scheduler.isSpiBalanceRequested()
-                    && !leaders.contains(getInitiatorHSId())) {
-                m_scheduler.setLeaderState(false);
-                if (tmLog.isDebugEnabled()) {
-                    tmLog.debug(CoreUtils.hsIdToString(getInitiatorHSId()) + " is not a leader anymore. It has been demoted!");
-                }
-            }
         }
     };
 

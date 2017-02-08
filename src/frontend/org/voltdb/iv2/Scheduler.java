@@ -84,8 +84,7 @@ abstract public class Scheduler implements InitiatorMessageHandler
     protected final ReplaySequencer m_replaySequencer = new ReplaySequencer();
 
     //used for SPI balance
-    protected AtomicBoolean m_spiBalanceStatus = new AtomicBoolean(Boolean.FALSE);
-    protected long m_spiBalanceFirstSeenCIHandle = Long.MIN_VALUE;
+    protected AtomicBoolean m_spiBalanceRequested = new AtomicBoolean(Boolean.FALSE);
 
     /*
      * This lock is extremely dangerous to use without known the pattern.
@@ -211,10 +210,10 @@ abstract public class Scheduler implements InitiatorMessageHandler
     abstract public boolean sequenceForReplay(VoltMessage m);
 
     public boolean isSpiBalanceRequested() {
-        return m_spiBalanceStatus.get();
+        return m_spiBalanceRequested.get();
     }
 
     public void setSpiBalanceRequested(boolean status) {
-        m_spiBalanceStatus.compareAndSet(!status, status);
+        m_spiBalanceRequested.compareAndSet(!status, status);
     }
 }

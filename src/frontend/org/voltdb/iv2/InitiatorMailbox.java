@@ -318,56 +318,61 @@ public class InitiatorMailbox implements Mailbox
             return;
         }
         else if (message instanceof BalanceSPIMessage) {
-            BalanceSPIMessage msg = (BalanceSPIMessage) message;
-
-            // current master is notified to be demoted.
-            if (m_hsId == msg.getFormerLeaderHSId()) {
-                if (tmLog.isDebugEnabled()) {
-                    tmLog.debug("SPI balance requested on this site!");
-                }
-                m_scheduler.setSpiBalanceRequested(true);
-
-                //notify new leader to accept the promotion and take the leadership responsibility.
-                send(msg.getNewLeaderHSId(), message);
-            }
-
-            // new master, message comes after former leader has been notified.
-            if (this.m_hsId == msg.getNewLeaderHSId()) {
-                ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
-                peekZooKeeper(zk);
-                LeaderCache leaderAppointee = new LeaderCache(zk, VoltZK.iv2appointees);
-                boolean success = false;
-                try {
-                    leaderAppointee.start(true);
-                    String hsidStr = ZKUtil.suffixHSIdsWithBalanceSPIRequest(msg.getNewLeaderHSId());
-                    leaderAppointee.put(msg.getParititionId(), hsidStr);
-                    success = true;
-                } catch (InterruptedException | ExecutionException | KeeperException e) {
-                    tmLog.error(String.format("Failed to migrate SPI for partition %d to site %d. %s",
-                            msg.getParititionId(), CoreUtils.hsIdToString(msg.getNewLeaderHSId()),e.getMessage()));
-                } finally {
-                    try {
-                        leaderAppointee.shutdown();
-                    } catch (InterruptedException e) {
-                    }
-                }
-                if (!success) {
-                    //notify the former leader to undo it
-                    send(msg.getFormerLeaderHSId(), new BalanceSPIResponseMessage(success));
-                }
-                peekZooKeeper(zk);
-            }
+            handleSPIBalanceRequest(message);
             return;
         } else if (message instanceof BalanceSPIResponseMessage) {
             BalanceSPIResponseMessage msg = (BalanceSPIResponseMessage)message;
             if (!msg.isSuccess()) {
                 m_scheduler.setSpiBalanceRequested(false);
+                m_scheduler.m_isLeader = true;
             }
             return;
         }
         m_repairLog.deliver(message);
         if (canDeliver) {
             m_scheduler.deliver(message);
+        }
+    }
+
+    private void handleSPIBalanceRequest(VoltMessage message){
+        BalanceSPIMessage msg = (BalanceSPIMessage) message;
+
+        // current master is notified to be demoted.
+        if (m_hsId == msg.getFormerLeaderHSId()) {
+            if (tmLog.isDebugEnabled()) {
+                tmLog.debug("SPI balance requested on site:" + CoreUtils.hsIdToString(m_hsId));
+            }
+            m_scheduler.setSpiBalanceRequested(true);
+            m_scheduler.m_isLeader = false;
+            //notify new leader to accept the promotion and take the leadership responsibility.
+            send(msg.getNewLeaderHSId(), message);
+        }
+
+        // new master, message comes after former leader has been notified.
+        if (this.m_hsId == msg.getNewLeaderHSId()) {
+            ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
+            peekZooKeeper(zk);
+            LeaderCache leaderAppointee = new LeaderCache(zk, VoltZK.iv2appointees);
+            boolean success = false;
+            try {
+                leaderAppointee.start(true);
+                String hsidStr = ZKUtil.suffixHSIdsWithBalanceSPIRequest(msg.getNewLeaderHSId());
+                leaderAppointee.put(msg.getParititionId(), hsidStr);
+                success = true;
+            } catch (InterruptedException | ExecutionException | KeeperException e) {
+                tmLog.error(String.format("Failed to migrate SPI for partition %d to site %d. %s",
+                        msg.getParititionId(), CoreUtils.hsIdToString(msg.getNewLeaderHSId()),e.getMessage()));
+            } finally {
+                try {
+                    leaderAppointee.shutdown();
+                } catch (InterruptedException e) {
+                }
+            }
+            if (!success) {
+                //notify the former leader to undo it
+                send(msg.getFormerLeaderHSId(), new BalanceSPIResponseMessage(success));
+            }
+            peekZooKeeper(zk);
         }
     }
 

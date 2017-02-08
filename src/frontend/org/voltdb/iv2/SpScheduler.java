@@ -439,9 +439,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         response.m_sourceHSId = m_mailbox.getHSId();
         m_mailbox.send(message.getInitiatorHSId(), response);
         System.out.println("mis routed......." + response.getClientInterfaceHandle());
-        if (m_spiBalanceFirstSeenCIHandle == Long.MIN_VALUE) {
-            m_spiBalanceFirstSeenCIHandle = response.getClientInterfaceHandle();
-        }
         return true;
     }
 
