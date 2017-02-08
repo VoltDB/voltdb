@@ -1128,7 +1128,6 @@ var loadPage = function (serverName, portid) {
                     isDisabled = true;
                 }
             }
-
             if(isDisabled == false){
                 voltDbRenderer.GetClusterReplicaInformation(function (replicaDetail) {
 
@@ -1359,7 +1358,7 @@ var loadPage = function (serverName, portid) {
                               '                        <div class="leftShowhide">' +
                               '                            <div class="dr">' +
                               '                                <h1 class="headText1">' +
-                              '                                    <a href="javascript:void(0);" id="showHideDrBlock_' + combinedId + '" class="showhideIcon collapsed arrowAdjust">Show/Hide Database Replication (DR)</a>' +
+                              '                                    <a href="javascript:void(0);" id="showHideDrBlock_' + combinedId + '" class="showhideIcon expanded arrowAdjust">Show/Hide Database Replication (DR)</a>' +
                               '                                </h1>' +
                               '                            </div>' +
                               '                        </div>' +
@@ -1379,7 +1378,7 @@ var loadPage = function (serverName, portid) {
                               '                        </div>' +
                               '                        <div class="clear"></div>' +
                               '                    </div>' +
-                              '                    <div id="drSection_' + combinedId + '" class="drShowHide" style="display:none;">' +
+                              '                    <div id="drSection_' + combinedId + '" class="drShowHide" style="display:block;">' +
                               '                        <div id="drMasterSection_' + combinedId + '" class="masterWrapper" style="display:block;">' +
                               '                            <div id="tblMAster_wrapper_' + combinedId + '" class="dataTables_wrapper no-footer">' +
                               '                                <div class="tabs-filter-wrapperDR">' +
@@ -1488,7 +1487,8 @@ var loadPage = function (serverName, portid) {
 
             $("#dbPane_" + i + " div.menu_head").click(function (e) {
                 e.preventDefault();
-                var headerState = $("#dbPane_2 div.menu_body").css('display');
+                var id = $(this).parent().attr('id').substring(7);
+                var headerState = $("#dbPane_" + id + " div.menu_body").css('display');
                 if (headerState == 'none') {
                     $(this).removeClass('collapsedDR');
                     $(this).addClass('expandedDR');
@@ -2135,7 +2135,7 @@ var loadPage = function (serverName, portid) {
                                 $("#drReplicaSection_" + chartList[i]).css("min-height", "230px");
                             } else if (length == 2) {
                                 $("#drReplicaSection_" + chartList[i]).css("min-height", "200px");
-                            } else if (length == 1 || length == 0) {
+                            } else if (length == 1 || length     == 0) {
                                 $("#drReplicaSection_" + chartList[i]).css("min-height", "170px");
                             }
                         },
