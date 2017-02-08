@@ -65,7 +65,7 @@ class VoltQueryClient(cmd.Cmd):
 
     def __initialize(self, host, port, username, password, client_ssl, ssl_config_file, dump_file):
         # if supportSSL:
-        self.fs = FastSerializer(host=host, port=port, username=username, password=password, client_ssl=client_ssl, ssl_config_file=ssl_config_file, dump_file_path=dump_file)
+        self.fs = FastSerializer(host=host, port=port, username=username, password=password, ssl_config_file=ssl_config_file, dump_file_path=dump_file)
         # else:
         #     self.fs = FastSerializer(host=host, port=port, username=username, password=password, dump_file_path=dump_file)
 
