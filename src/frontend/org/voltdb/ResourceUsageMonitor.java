@@ -172,7 +172,7 @@ public class ResourceUsageMonitor implements Runnable, ChannelChangeCallback
 
     private void checkDRRole() {
         SyncCallback cb = new SyncCallback();
-        if (getConnectionHadler().callProcedure(getInternalUser(), false, BatchTimeoutOverrideType.NO_TIMEOUT, cb, "@DRROLE", 0)) {
+        if (getConnectionHadler().callProcedure(getInternalUser(), false, BatchTimeoutOverrideType.NO_TIMEOUT, cb, "@Statistics", "DRROLE",0)) {
             try {
                 cb.waitForResponse();
             } catch (InterruptedException e) {
@@ -185,13 +185,17 @@ public class ResourceUsageMonitor implements Runnable, ChannelChangeCallback
                 VoltTable result = r.getResults()[0];
                 while (result.advanceRow()) {
                     DrRoleType drRole = DrRoleType.fromValue(result.getString(DRRoleStats.CN_ROLE).toLowerCase());
+                    DRRoleStats.State state = DRRoleStats.State.valueOf(result.getString(DRRoleStats.CN_STATE));
+                    byte remoteCluster = (byte) result.getLong(DRRoleStats.CN_REMOTE_CLUSTER_ID);
+                    if (m_logger.isDebugEnabled()) {
+                        m_logger.debug("DRROLE stats: Role:" + drRole + " State:" + state + " Remote Cluster ID:" + remoteCluster);
+                    }
                     if (drRole == DrRoleType.NONE) {
                         continue;
                     }
-                    DRRoleStats.State state = DRRoleStats.State.valueOf(result.getString(DRRoleStats.CN_STATE));
-                    byte remoteCluster = (byte) result.getLong(DRRoleStats.CN_REMOTE_CLUSTER_ID);
+
                     if (DRRoleStats.State.STOPPED == state) {
-                        if (m_snmpDRTrapSent.getOrDefault(remoteCluster, false)) {
+                        if (!m_snmpDRTrapSent.getOrDefault(remoteCluster, false)) {
                             m_snmpTrapSender.statistics(FaultFacility.DR, String.format("Database Replication %s with Remote Cluster %d is broken.",
                                     drRole, remoteCluster));
                             m_snmpDRTrapSent.put(remoteCluster, true);
@@ -206,7 +210,7 @@ public class ResourceUsageMonitor implements Runnable, ChannelChangeCallback
             }
 
         } else {
-            m_logger.error("Unable to retrieve DRROLE STATS:: failed to invoke @DRROLE");
+            m_logger.error("Unable to retrieve DRROLE STATS:: failed to invoke @Statistics DRROLE, 0.");
         }
     }
 
@@ -300,7 +304,16 @@ public class ResourceUsageMonitor implements Runnable, ChannelChangeCallback
 
     @Override
     public void onChange(ImporterChannelAssignment assignment) {
+        if (m_logger.isDebugEnabled()) {
+            m_logger.debug("ImporterChannelAssignment: " + assignment);
+        }
+        if (assignment.getAdded().size() > 0) {
+            m_isDRRoleChecker = true;
+        }
 
+        if (assignment.getRemoved().size() > 0) {
+            m_isDRRoleChecker = false;
+        }
     }
 
     @Override
