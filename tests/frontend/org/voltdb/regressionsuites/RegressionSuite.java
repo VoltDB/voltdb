@@ -54,6 +54,7 @@ import org.voltdb.client.ProcCallException;
 import org.voltdb.common.Constants;
 import org.voltdb.types.GeographyPointValue;
 import org.voltdb.types.GeographyValue;
+import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.Encoder;
 
@@ -966,7 +967,7 @@ public class RegressionSuite extends TestCase {
                 assertEquals(msg, val, actualRow.getLong(i));
             }
             else if (expectedObj instanceof Double) {
-                double expectedValue= (Double)expectedObj;
+                double expectedValue = (Double)expectedObj;
                 double actualValue = actualRow.getDouble(i);
                 // check if the row value was evaluated as null. Looking
                 // at return is not reliable way to do so;
@@ -984,9 +985,17 @@ public class RegressionSuite extends TestCase {
                     assertTrue(fullMsg, Math.abs(expectedValue - actualValue) < epsilon);
                 }
             }
+            else if (expectedObj instanceof BigDecimal) {
+                BigDecimal val = (BigDecimal)expectedObj;
+                assertEquals(msg, val, actualRow.getDecimalAsBigDecimal(i));
+            }
             else if (expectedObj instanceof String) {
                 String val = (String)expectedObj;
                 assertEquals(msg, val, actualRow.getString(i));
+            }
+            else if (expectedObj instanceof TimestampType) {
+                TimestampType val = (TimestampType)expectedObj;
+                assertEquals(msg, val, actualRow.getTimestampAsTimestamp(i));
             }
             else {
                 fail("Unexpected type in expected row: " + expectedObj.getClass().getSimpleName());

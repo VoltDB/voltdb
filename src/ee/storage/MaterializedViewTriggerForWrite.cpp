@@ -172,13 +172,12 @@ void MaterializedViewTriggerForWrite::allocateMinMaxSearchKeyTuple() {
     uint32_t nextIndexStoreLength;
     size_t minMaxSearchKeyBackingStoreSize = 0;
     BOOST_FOREACH(TableIndex *index, m_indexForMinMax) {
-        // Because there might be a lot of indexes, find the largest space they may consume
-        // so that they can all share one space and use different schemas. (ENG-8512)
-        if (minMaxIndexIncludesAggCol(index, m_groupByColumnCount)) {
-            nextIndexStoreLength = index->getKeySchema()->tupleLength() + TUPLE_HEADER_SIZE;
-            if (nextIndexStoreLength > minMaxSearchKeyBackingStoreSize) {
-                minMaxSearchKeyBackingStoreSize = nextIndexStoreLength;
-            }
+        if (! index) {
+            continue;
+        }
+        nextIndexStoreLength = index->getKeySchema()->tupleLength() + TUPLE_HEADER_SIZE;
+        if (nextIndexStoreLength > minMaxSearchKeyBackingStoreSize) {
+            minMaxSearchKeyBackingStoreSize = nextIndexStoreLength;
         }
     }
     if (minMaxSearchKeyBackingStoreSize == m_minMaxSearchKeyBackingStoreSize) {
@@ -213,17 +212,17 @@ NValue MaterializedViewTriggerForWrite::findMinMaxFallbackValueIndexed(const Tab
     TableIndex *selectedIndex = m_indexForMinMax[minMaxAggIdx];
     IndexCursor minMaxCursor(selectedIndex->getTupleSchema());
 
+    m_minMaxSearchKeyTuple = TableTuple(selectedIndex->getKeySchema());
+    m_minMaxSearchKeyTuple.move(m_minMaxSearchKeyBackingStore.get());
+    for (int colindex = 0; colindex < m_groupByColumnCount; colindex++) {
+        NValue value = getGroupByValueFromSrcTuple(colindex, oldTuple);
+        m_minMaxSearchKeyTuple.setNValue(colindex, value);
+    }
     // Search for the min / max fallback value. use indexs differently according to their types.
     // (Does the index include min / max aggCol? - ENG-6511)
     if (minMaxIndexIncludesAggCol(selectedIndex, m_groupByColumnCount)) {
         // Assemble the m_minMaxSearchKeyTuple with
         // group-by column values and the old min/max value.
-        m_minMaxSearchKeyTuple = TableTuple(selectedIndex->getKeySchema());
-        m_minMaxSearchKeyTuple.move(m_minMaxSearchKeyBackingStore.get());
-        for (int colindex = 0; colindex < m_groupByColumnCount; colindex++) {
-            NValue value = getGroupByValueFromSrcTuple(colindex, oldTuple);
-            m_minMaxSearchKeyTuple.setNValue(colindex, value);
-        }
         NValue oldValue = getAggInputFromSrcTuple(aggIndex, oldTuple);
         m_minMaxSearchKeyTuple.setNValue((int)m_groupByColumnCount, oldValue);
         TableTuple tuple;
@@ -259,7 +258,7 @@ NValue MaterializedViewTriggerForWrite::findMinMaxFallbackValueIndexed(const Tab
     }
     else {
         // Use sub-optimal index (only group-by columns).
-        selectedIndex->moveToKey(&m_searchKeyTuple, minMaxCursor);
+        selectedIndex->moveToKey(&m_minMaxSearchKeyTuple, minMaxCursor);
         VOLT_TRACE("Starting to scan tuples using index %s\n", selectedIndex->debug().c_str());
         TableTuple tuple;
         while (!(tuple = selectedIndex->nextValueAtKey(minMaxCursor)).isNullTuple()) {
