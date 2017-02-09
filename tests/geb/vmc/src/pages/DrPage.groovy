@@ -50,6 +50,15 @@ class DrPage extends VoltDBManagementCenterPage {
 
         drMasterSection     {$("#drMasterSection")}
         drReplicaSection    (required:false) { $("#drReplicaSection") }
+
+        replicationRate1    { $("#replicationRate1") }
+        replicationRate5    {$("#replicationRate5")}
+        replicaStatus       {$("#replicaStatus")}
+        drReplicaTitle      {$("#drReplicaTitle")}
+        filterReplicaServerRows{$("#tblDrReplica").find(class:"sorting_1")}
+        drMasterTitle       {$("#drMasterTitle")}
+        partitionIdRows     {$("#tblDrMAster").find(class:"sorting_1")}
+        filterPartitionId   {$("#filterPartitionId")}
     }
     static at = {
         drTab.displayed
@@ -137,5 +146,34 @@ class DrPage extends VoltDBManagementCenterPage {
             return true
         else
             return false
+    }
+
+    /*
+     *  click the status column in Replication Rate 1min table
+     */
+    def boolean clickReplicationRate1() {
+        replicationRate1.click()
+    }
+
+    /*
+     * click the ReplicationRate5 column in DR Replica table
+     */
+    def boolean clickReplicationRate5() {
+        replicationRate5.click()
+    }
+
+    /*
+     *  click the status column in DR Replica table
+     */
+    def boolean clickReplicaStatus() {
+        replicaStatus.click()
+    }
+
+    def boolean drReplicaTitleDisplayed(){
+        return drReplicaTitle.displayed
+    }
+
+    def boolean drMasterTitleDisplayed(){
+        return drMasterTitle.displayed
     }
 }
