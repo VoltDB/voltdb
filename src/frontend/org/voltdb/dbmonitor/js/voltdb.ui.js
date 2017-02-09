@@ -1318,7 +1318,7 @@ var loadPage = function (serverName, portid) {
                               '<div class="drRelation" id="drRelation_'+ i +'"><div class="drRelationLeft"><span id="drArrow_' + i + '">' +
                                '<p></p></span></div>' +
                               '<div class="drRelationRight"><span class="iconDRDatabase"></span><div class="headText1 DRHeaderWrap">' +
-                              '<a href="#" class="showhideIcon expandedDR arrowAdjustDR">' +
+                              '<a href="#" class="showhideIcon arrowAdjustDR">' +
                               '<span class="DRHeaderName" id="dRHeaderName_' + i + '">Database ('+ drRoleDetail['DRROLE'][i][2] +')</span>' +
                               '</a></div>  <div class="latencyDR"></div></div><div class="clear"></div></div>' +
                               '            <div class="clear"></div>' +
