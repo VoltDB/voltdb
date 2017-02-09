@@ -196,7 +196,7 @@ public class ResourceUsageMonitor implements Runnable, ChannelChangeCallback
 
                     if (DRRoleStats.State.STOPPED == state) {
                         if (!m_snmpDRTrapSent.getOrDefault(remoteCluster, false)) {
-                            m_snmpTrapSender.statistics(FaultFacility.DR, String.format("Database Replication %s with Remote Cluster %d is broken.",
+                            m_snmpTrapSender.statistics(FaultFacility.DR, String.format("Database Replication ROLE: %s break with Remote Cluster %d.",
                                     drRole, remoteCluster));
                             m_snmpDRTrapSent.put(remoteCluster, true);
                         }
@@ -309,15 +309,17 @@ public class ResourceUsageMonitor implements Runnable, ChannelChangeCallback
         }
         if (assignment.getAdded().size() > 0) {
             m_isDRRoleChecker = true;
-        }
-
-        if (assignment.getRemoved().size() > 0) {
-            m_isDRRoleChecker = false;
+        } else {
+            if (assignment.getRemoved().size() > 0) {
+                m_isDRRoleChecker = false;
+            }
         }
     }
 
     @Override
     public void onClusterStateChange(VersionedOperationMode mode) {
-
+        if (m_logger.isDebugEnabled()) {
+            m_logger.debug("VersionedOperationMode: " + mode);
+        }
     }
 }

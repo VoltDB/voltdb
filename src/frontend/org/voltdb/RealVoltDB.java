@@ -1936,6 +1936,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
         ResourceUsageMonitor resMonitor  = new ResourceUsageMonitor(m_catalogContext.getDeployment().getSystemsettings(), getSnmpTrapSender());
         m_distributer.registerCallback("__RESOURCE_MONITOR__", resMonitor);
+        m_distributer.registerChannels("__RESOURCE_MONITOR__", Collections.emptySet());
         m_distributer.registerChannels("__RESOURCE_MONITOR__", Collections.singleton(URI.create("resource-monitor://dr/role")));
         resMonitor.logResourceLimitConfigurationInfo();
         if (resMonitor.hasResourceLimitsConfigured()) {
