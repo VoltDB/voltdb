@@ -191,6 +191,18 @@ public class Iv2Trace
         }
     }
 
+    public static void logMisroutedTransaction(Iv2InitiateTaskMessage itask, long localHSId)
+    {
+        if (IV2_TRACE_ENABLED) {
+            String logmsg = "misRoutedTxn %s from %s ciHandle %d %s spHandle %s trunc %s";
+            iv2log.trace(String.format(logmsg, CoreUtils.hsIdToString(localHSId),
+                        CoreUtils.hsIdToString(itask.m_sourceHSId),itask.getClientInterfaceHandle(),
+                        ClientInterfaceHandleManager.handleToString(itask.getClientInterfaceHandle()),
+                        txnIdToString(itask.getSpHandle()),
+                        txnIdToString(itask.getTruncationHandle())));
+        }
+    }
+
     public static void logIv2MultipartSentinel(MultiPartitionParticipantMessage message, long localHSId,
             long txnId)
     {

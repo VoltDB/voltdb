@@ -451,7 +451,10 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
 
         // mastership changed?
-        if (handleMisRoutedTransaction(message)) return;
+        if (handleMisRoutedTransaction(message)) {
+            Iv2Trace.logMisroutedTransaction(message, m_mailbox.getHSId());
+            return;
+        }
 
         //start SPI balance operation if so requested.
         initiateSPIMigrationProcess(message);
