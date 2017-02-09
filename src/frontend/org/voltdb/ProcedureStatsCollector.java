@@ -407,13 +407,13 @@ class ProcedureStatsCollector extends SiteStatsSource {
      * @return true if this procedure statistics should be reset
      */
     public boolean resetAfterCatalogChange() {
-        // system procedure statistics should be kept
-        // example name: org.voltdb.sysprocs.UpdateApplicationCatalog, org.voltdb.sysprocs.AdHoc_RO_SP
-        if (m_procName.startsWith("org.voltdb.sysprocs.")) {
+        // UpdateApplicationCatalog system procedure statistics should be kept
+        if (m_procName.startsWith("org.voltdb.sysprocs.UpdateApplicationCatalog")) {
             return false;
         }
 
-        // TODO: we may want to know what user procedure got changed, and only reset them but keeping others.
+        // TODO: we want want to keep other system procedure statistics ?
+        // TODO: we may want to only reset updated user procedure statistics but keeping others.
         return true;
     }
 }

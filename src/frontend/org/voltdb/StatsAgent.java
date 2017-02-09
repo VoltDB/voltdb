@@ -197,7 +197,7 @@ public class StatsAgent extends OpsAgent
         m_procInfo = getProcInfoSupplier();
 
         if (m_procStatsSource != null) {
-            // only reset user procedure statistics, but leave system procedure statistics unchanged
+            // only leave system procedure UAC statistics unchanged
             for (Entry<Long, NonBlockingHashMap<Integer, ProcedureStatsCollector>> entry: m_procStatsSource.entrySet()) {
                 NonBlockingHashMap<Integer, ProcedureStatsCollector> statsMap = entry.getValue();
                 statsMap.entrySet().removeIf(e -> e.getValue().resetAfterCatalogChange());
