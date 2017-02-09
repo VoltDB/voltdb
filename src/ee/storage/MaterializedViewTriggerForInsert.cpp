@@ -326,7 +326,6 @@ NValue MaterializedViewTriggerForInsert::getGroupByValueFromSrcTuple(int colInde
 
     int gbColIdx = m_groupByColIndexes[colIndex];
     return tuple.getNValue(gbColIdx);
-
 }
 
 void MaterializedViewTriggerForInsert::initializeTupleHavingNoGroupBy(bool fallible) {
