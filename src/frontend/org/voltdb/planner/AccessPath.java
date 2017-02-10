@@ -53,7 +53,8 @@ public class AccessPath {
     //
     // If a window function uses the index, then this will be set
     // to the number of the window function which uses this index.
-    // If it is set to -1 then no window function uses the index, but
+    // If it is set to SubPlanAssembler.STATEMENT_LEVEL_ORDER_BY_INDEX
+    // then no window function uses the index, but
     // the window function ordering is compatible with the statement
     // level ordering, and the statement level order does not need
     // an order by node.  If it is set to SubPlanAssembler.NO_INDEX_USE,
@@ -74,7 +75,7 @@ public class AccessPath {
     // themselves.  Note that this will never be null, but may be empty
     // if there is no index in this access path.
     //
-    List<AbstractExpression> m_finalExpressionOrder = new ArrayList<>();
+    final List<AbstractExpression> m_finalExpressionOrder = new ArrayList<>();
 
     @Override
     public String toString() {
@@ -116,14 +117,15 @@ public class AccessPath {
         return retval;
     }
     private String indexPurposeString() {
-        if (0 <= m_windowFunctionUsesIndex) {
-            return "Window function plan node " + m_windowFunctionUsesIndex;
-        }
-        if (SubPlanAssembler.STATEMENT_LEVEL_ORDER_BY_INDEX == m_windowFunctionUsesIndex) {
+        switch (m_windowFunctionUsesIndex) {
+        case SubPlanAssembler.STATEMENT_LEVEL_ORDER_BY_INDEX:
             return "Statement Level Order By";
-        }
-        if (SubPlanAssembler.NO_INDEX_USE == m_windowFunctionUsesIndex) {
+        case SubPlanAssembler.NO_INDEX_USE:
             return "No Indexing Used";
+        default:
+            if (0 <= m_windowFunctionUsesIndex) {
+                return "Window function plan node " + m_windowFunctionUsesIndex;
+            }
         }
         /*
          * This should never happen.

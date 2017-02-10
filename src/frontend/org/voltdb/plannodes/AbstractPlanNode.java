@@ -123,10 +123,6 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
      */
     protected String  m_nondeterminismDetail = "the query result does not guarantee a consistent ordering";
 
-    // Flag marking the sub-query plan
-    protected boolean m_isSubQuery = false;
-    protected StmtTableScan m_tableScan = null;
-
     // If a window function uses an index, we
     // mark which window function it is here.
     // If this is SubPlanAssembler.STATEMENT_LEVEL_ORDER_BY_INDEX,

@@ -1850,15 +1850,14 @@ public class PlanAssembler {
                 numberHashAggregates += 1;
             }
         }
-        if (probe != null) {
-            nonAggPlan = probe;
-        } else {
+        if (probe == null) {
             // No idea what happened here.  We can't find a
             // scan or join node at all.  This seems unlikely
             // to be right.  Maybe this should be an assert?
             nonAggPlan = root;
             return true;
         }
+        nonAggPlan = probe;
         //
         //   o If the SLOB cannot use the index, then we
         //     need an order by node always.
@@ -1925,11 +1924,10 @@ public class PlanAssembler {
             // window function will have the order by node, the SLOB
             // does not need one.  So this is a false.
             return false;
-        } else {
-            // This can actually never happen now,
-            // because we only support one window function.
-            return true;
         }
+        // This can actually never happen now,
+        // because we only support one window function.
+        return true;
     }
 
     /**

@@ -97,11 +97,6 @@ public abstract class SubPlanAssembler {
     /// the matched filter must remain in the list
     /// to eventually be applied as a post-filter.
     private final static boolean KEEP_IN_POST_FILTERS = false;
-    /**
-     * We need this to represent a successful match with no bindings.
-     */
-    private static List<AbstractExpression> m_emptyBindings = new ArrayList<>();
-
 
     SubPlanAssembler(Database db, AbstractParsedStmt parsedStmt, StatementPartitioning partitioning)
     {
@@ -963,8 +958,8 @@ public abstract class SubPlanAssembler {
      * window function PARTITION BY and ORDER BY specifications.
      * For example, if a table has a tree index on columns "(A, B, C)", then
      * "ORDER BY A", "ORDER BY A, B" and "ORDER BY A, B, C" are considered a match
-     * but NOT "ORDER BY A, C", "ORDER BY A, D", "ORDER BY A, B, C, D"
-     * or "ORDER BY B" or "ORDER BY B, A".
+     * but NOT "ORDER BY A, C", "ORDER BY A, D", "ORDER BY A, B, C, D",
+     * "ORDER BY B" or "ORDER BY B, A".
      *
      * Similarly, these window functions would match:
      * <ul>
@@ -1102,18 +1097,19 @@ public abstract class SubPlanAssembler {
      * This class tries to hide the difference between them for the
      * purposes of index selection.
      */
-    private class ExpressionOrColumn {
+    private static class ExpressionOrColumn {
         // Exactly one of these can be null.
         AbstractExpression m_expr;
         ColumnRef          m_colRef;
         // If m_colRef is non-null, then m_tableScan must
         // be non-null and name the table scan.
         StmtTableScan      m_tableScan;
-        // This is the expression or column index of this expression or
+        // This is the expression or column position of this expression or
         // ColumnRef in the candidate index.
-        int                m_indexEntryNumber;
-        // This is the sort direction of a statement
-        // expression.
+        int                m_indexKeyComponentPosition;
+        // This is the sort direction of a statement level
+        // order by.  If there is no statement level order
+        // by clause this will be SortDirectionType.INVALID.
         public SortDirectionType m_sortDirection;
 
         ExpressionOrColumn(int indexEntryNumber, AbstractExpression expr, SortDirectionType sortDir) {
@@ -1130,7 +1126,7 @@ public abstract class SubPlanAssembler {
             assert(colRef == null || tableScan != null);
             m_expr = expr;
             m_colRef = colRef;
-            m_indexEntryNumber = aIndexEntryNumber;
+            m_indexKeyComponentPosition = aIndexEntryNumber;
             m_tableScan = tableScan;
             m_sortDirection = sortDir;
         }
@@ -1151,8 +1147,8 @@ public abstract class SubPlanAssembler {
             // equals.  I'm not sure this is possible, but better safe
             // than sorry.
             //
-            if ((other.m_indexEntryNumber < 0 && m_indexEntryNumber < 0)
-                    || (0 <= other.m_indexEntryNumber && 0 <= m_indexEntryNumber)) {
+            if ((other.m_indexKeyComponentPosition < 0 && m_indexKeyComponentPosition < 0)
+                    || (0 <= other.m_indexKeyComponentPosition && 0 <= m_indexKeyComponentPosition)) {
                 // If they are both expressions, they must be equal.
                 if ((other.m_expr != null) && (m_expr != null)) {
                     return m_expr.equals(other.m_expr);
@@ -1171,8 +1167,8 @@ public abstract class SubPlanAssembler {
                 // uses.
                 return matchExpressionAndColumnRef(expr, cref, tscan);
             }
-            ExpressionOrColumn fromStmt = (m_indexEntryNumber < 0) ? this : other;
-            ExpressionOrColumn fromIndx = (m_indexEntryNumber < 0) ? other : this;
+            ExpressionOrColumn fromStmt = (m_indexKeyComponentPosition < 0) ? this : other;
+            ExpressionOrColumn fromIndx = (m_indexKeyComponentPosition < 0) ? other : this;
             return (findBindingsForOneIndexedExpression(fromStmt, fromIndx) != null);
         }
 
@@ -1202,13 +1198,12 @@ public abstract class SubPlanAssembler {
                                   * this score.
                                   */
     }
-
     /**
      * A WindowFunctionScore keeps track of the score of
      * a single window function or else the statement level
      * order by expressions.
      */
-    class WindowFunctionScore {
+    static class WindowFunctionScore {
         private static final int MAX_LIST_REMOVAL = 1000000;
 
         /**
@@ -1231,7 +1226,6 @@ public abstract class SubPlanAssembler {
             }
             assert(0 <= winFuncNum);
             m_windowFunctionNumber = winFuncNum;
-            m_isWindowFunction = true;
             m_sortDirection = SortDirectionType.INVALID;
         }
 
@@ -1248,7 +1242,6 @@ public abstract class SubPlanAssembler {
             }
             // Statement level order by expressions are number STATEMENT_LEVEL_ORDER_BY_INDEX.
             m_windowFunctionNumber = STATEMENT_LEVEL_ORDER_BY_INDEX;
-            m_isWindowFunction = false;
             m_sortDirection = SortDirectionType.INVALID;
         }
 
@@ -1261,46 +1254,47 @@ public abstract class SubPlanAssembler {
         // by list or else from the order by list.  At
         // the end this will be the concatenation of the
         // partition by list and the order by list.
-        List<AbstractExpression> m_orderedMatchingExpressions = new ArrayList<>();
+        final List<AbstractExpression> m_orderedMatchingExpressions = new ArrayList<>();
         // List of order by expressions, originally from the
         // WindowFunctionExpression.  These migrate to
         // m_orderedMatchingExpressions as they match.
-        List<ExpressionOrColumn> m_unmatchedOrderByExprs = new ArrayList<>();
+        final List<ExpressionOrColumn> m_unmatchedOrderByExprs = new ArrayList<>();
         // This is the index of the unmatched expression
         // we will be working on.
         int m_unmatchedOrderByCursor = 0;
         // This is the number of the window function.  It is
         // STATEMENT_LEVEL_ORDER_BY for the statement level order by list.
         int m_windowFunctionNumber;
-        // This is true if we ever see an index
-        // expression or column which we cannot
-        // match, even including single valued expressions
-        // here.
-        boolean m_isDead = false;
-        // This is true if we have run out of expressions
-        // to check.  Since we may be checking more than one
-        // candidate for using the index, we may run out of
-        // expressions at different times.
-        boolean m_isDone = false;
+
+        // A score can be dead, done or in progress.  Dead means
+        // We have seen something we cannot match.  Done means we
+        // have matched all the score's expressions.  In progress
+        // means we are still matching expressions.
+        private enum MatchingState {
+            INVALID,
+            INPROGRESS,
+            DEAD,
+            DONE
+        }
+
+        MatchingState m_matchingState = MatchingState.INPROGRESS;
         // This is the sort direction for this window function
         // or order by list.
         private SortDirectionType m_sortDirection = SortDirectionType.INVALID;
-        // This is true iff this is a window function score.
-        private boolean m_isWindowFunction;
         // This is the set of bindings generated by matches in this
         // candidate.
-        List<AbstractExpression> m_bindings = new ArrayList<>();
+        final List<AbstractExpression> m_bindings = new ArrayList<>();
 
         public int getNumberMatches() {
             return m_orderedMatchingExpressions.size();
         }
 
         public boolean isDead() {
-            return m_isDead;
+            return m_matchingState == MatchingState.DEAD;
         }
 
         public boolean isDone() {
-            if (m_isDone) {
+            if (m_matchingState == MatchingState.DONE) {
                 return true;
             }
             if (m_partitionByExprs.isEmpty() && 0 == m_unmatchedOrderByExprs.size()) {
@@ -1402,28 +1396,29 @@ public abstract class SubPlanAssembler {
             // statement level order by.  The index entry
             // number is in the ordinal number of the
             // expression or column reference in the index.
-            assert(0 <= indexEntry.m_indexEntryNumber);
-            if (m_isWindowFunction) {
+            assert(0 <= indexEntry.m_indexKeyComponentPosition);
+            if (isWindowFunction()) {
                 // No order spoilers with window functions.
                 markDead();
                 return MatchResults.DONE_OR_DEAD;
-            } else {
-                return MatchResults.POSSIBLE_ORDER_SPOILER;
             }
+            return MatchResults.POSSIBLE_ORDER_SPOILER;
         }
 
-        public boolean isWindowFunction() {
-            return m_isWindowFunction;
+        // Return true if this is a window function.  If it is a statement
+        // level order by we return false.
+        boolean isWindowFunction() {
+            return 0 <= m_windowFunctionNumber;
         }
 
         public void markDone() {
-            m_isDone = true;
-            m_isDead = false;
+            assert(m_matchingState == MatchingState.INPROGRESS);
+            m_matchingState = MatchingState.DONE;
         }
 
         public void markDead() {
-            m_isDead = true;
-            m_isDone = false;
+            assert(m_matchingState == MatchingState.INPROGRESS);
+            m_matchingState = MatchingState.DEAD;
         }
     };
 
@@ -1483,7 +1478,6 @@ public abstract class SubPlanAssembler {
         }
 
         public void matchIndexEntry(ExpressionOrColumn indexEntry) {
-            List<Integer> nomatches = new ArrayList<>();
             for (int idx = 0; idx < m_winFunctions.length; idx += 1) {
                 WindowFunctionScore score = m_winFunctions[idx];
                 MatchResults result = score.matchIndexEntry(indexEntry);
@@ -1491,7 +1485,7 @@ public abstract class SubPlanAssembler {
                 // clause.  We don't return POSSIBLE_ORDER_SPOILER for
                 // window functions.
                 if (result == MatchResults.POSSIBLE_ORDER_SPOILER) {
-                    m_orderSpoilers.add(indexEntry.m_indexEntryNumber);
+                    m_orderSpoilers.add(indexEntry.m_indexKeyComponentPosition);
                 }
             }
         }
@@ -1579,7 +1573,6 @@ public abstract class SubPlanAssembler {
                     }
 
                     // Add the bindings.
-                    assert(answer.m_bindings != null);
                     retval.bindings.addAll(answer.m_bindings);
 
                     // Mark the sort direction.
@@ -1670,7 +1663,11 @@ public abstract class SubPlanAssembler {
         //       non-null one IS.
         // What expressions do we care about?  We have two kinds.
         //   1.) The expressions from the statement level order by clause, OO.
-        //       This sequence of expressions must be a singular prefix of IS.
+        //       This sequence of expressions must be a prefix of IS with OS
+        //       singular values for some sequence OS.  The sequence OS will be
+        //       called the order spoilers.  Later on we will test that the
+        //       index expressions at the positions in OS can have only a
+        //       single value.
         //   2.) The expressions in a window function's partition by list, WP,
         //       followed by the expressions in the window function's
         //       order by list, WO.  The partition by functions are a set not
@@ -1678,13 +1675,13 @@ public abstract class SubPlanAssembler {
         //       such that S is a permutation of P and S+WO is a singular prefix
         //       of IS.
         //
-        // So, in both cases, order by and window function, we are looking for
+        // So, in both cases, statement level order by and window function, we are looking for
         // a sequence of expressions, S1, and a list of IS indices, OS, such
         // that S1 is a prefix of IS with OS-singular values.
         //
         // If the statement level order by expression list is not a prefix of
         // the index, we still care to know about window functions.  The reverse
-        // is not true.  If there are window functions but they all fail,
+        // is not true.  If there are window functions but they all fail to match the index,
         // we must give up on this index, even if the statement level order
         // by list is still matching.  This is because the window functions will
         // require sorting before the statement level order by clause's
@@ -1740,7 +1737,7 @@ public abstract class SubPlanAssembler {
      *         there is no match.  If there are no bindings but the
      *         expressions match, return an empty, non-null list.
      */
-    private List<AbstractExpression>
+    private static List<AbstractExpression>
         findBindingsForOneIndexedExpression(ExpressionOrColumn nextStatementEOC,
                                             ExpressionOrColumn indexEntry) {
         assert(nextStatementEOC.m_expr != null);
@@ -1750,7 +1747,7 @@ public abstract class SubPlanAssembler {
             // This is a column.  So try to match it
             // with the expression in nextStatementEOC.
             if (matchExpressionAndColumnRef(nextStatementExpr, indexColRef, indexEntry.m_tableScan)) {
-                return m_emptyBindings;
+                return s_reusableImmutableEmptyBinding;
             }
             return null;
         }
@@ -1763,15 +1760,13 @@ public abstract class SubPlanAssembler {
         return null;
     }
 
-    private boolean matchExpressionAndColumnRef(AbstractExpression statementExpr,
-                                                ColumnRef          indexColRef,
-                                                StmtTableScan      tableScan) {
+    private static boolean matchExpressionAndColumnRef(AbstractExpression statementExpr,
+                                                       ColumnRef indexColRef,
+                                                       StmtTableScan tableScan) {
         if (statementExpr instanceof TupleValueExpression) {
             TupleValueExpression tve = (TupleValueExpression)statementExpr;
             if (tve.getTableAlias().equals(tableScan.getTableAlias()) &&
                     tve.getColumnName().equals(indexColRef.getColumn().getTypeName())) {
-                // NB: m_emptyBindings is a null list.  That means
-                //     we matched, but with no bindings.
                 return true;
             }
         }
@@ -2249,6 +2244,8 @@ public abstract class SubPlanAssembler {
         scanNode.setBindings(path.bindings);
         scanNode.setEndExpression(ExpressionUtil.combinePredicates(path.endExprs));
         scanNode.setPredicate(path.otherExprs);
+        // Propagate the sorting information
+        // into the scan node from the access path.
         scanNode.setWindowFunctionUsesIndex(path.m_windowFunctionUsesIndex);
         scanNode.setSortOrderFromIndexScan(path.sortDirection);
         scanNode.setWindowFunctionIsCompatibleWithOrderBy(path.m_stmtOrderByIsCompatible);

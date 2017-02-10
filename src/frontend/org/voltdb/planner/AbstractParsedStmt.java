@@ -769,7 +769,7 @@ public abstract class AbstractParsedStmt {
         int tableCount = 0;
         StmtTargetTableScan simpler = null;
         for (Map.Entry<String, StmtTableScan> entry : selectSubquery.m_tableAliasMap.entrySet()) {
-            if (entry.getKey().contains(AbstractParsedStmt.TEMP_TABLE_NAME)) {
+            if (entry.getKey().startsWith(AbstractParsedStmt.TEMP_TABLE_NAME)) {
                 // This is an artificial table for a subquery expression
                 continue;
             }
@@ -1980,7 +1980,7 @@ public abstract class AbstractParsedStmt {
      * is non-zero for ParsedSelectStmt only.
      */
     public int getWindowFunctionExpressionCount() {
-        return 0;
+        return m_windowFunctionExpressions.size();
     }
     /*
      *  Extract all subexpressions of a given expression class from this statement

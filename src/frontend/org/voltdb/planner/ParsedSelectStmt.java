@@ -1785,11 +1785,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         return m_windowFunctionExpressions.size() > 0;
     }
 
-    @Override
-    public int getWindowFunctionExpressionCount() {
-        return m_windowFunctionExpressions.size();
-    }
-
     public boolean hasAggregateExpression() {
         return m_hasAggregateExpression;
     }

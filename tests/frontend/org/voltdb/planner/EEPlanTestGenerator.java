@@ -697,11 +697,17 @@ public class EEPlanTestGenerator extends PlannerTestCase {
     }
 
     /**
-     * Make a shuffled array.  Each row has two elements.  The
-     * first element indexed by idIndex is a the row index.
-     * The other element is a shuffled row index.
+     * Make a shuffled array.
      *
-     * @param nRows
+     * @param nRows The number of rows wanted.
+     * @param idIndex The index of the shuffled row.  This must be 0 or 1.
+     *                and is the column number of the permuted indexes.  For
+     *                example, if a = makeShuffledArray(100, 0), then for each
+     *                r, a[r][0] == r and the vector <a[s][1] | 0 <= s < 100>
+     *                is a permutation of the set {0, ..., 99}.  Similarly, if
+     *                b == makeShuffledArray(100, 1) then for each r,
+     *                b[r][1] == r and <b[s][0] | 0 <= s < 100> is a
+     *                permutation of the set {0, ..., 99}.
      * @return A shuffled array.
      */
     public static int[][] makeShuffledArray(int nRows, int idIndex) {

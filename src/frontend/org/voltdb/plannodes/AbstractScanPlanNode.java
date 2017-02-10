@@ -64,6 +64,10 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
     protected String m_targetTableName = "";
     protected String m_targetTableAlias = null;
 
+    // Flag marking the sub-query plan
+    protected boolean m_isSubQuery = false;
+    protected StmtTableScan m_tableScan = null;
+
     protected AbstractScanPlanNode() {
         super();
     }
