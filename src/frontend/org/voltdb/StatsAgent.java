@@ -622,9 +622,10 @@ public class StatsAgent extends OpsAgent
         NonBlockingHashMap<Long, NonBlockingHashSet<StatsSource>> siteIdToStatsSources =
                 m_registeredStatsSources.get(selector);
 
-        // There are cases early in rejoin where we can get polled before the server is ready to provide
-        // stats.  Just return null for now, which will result in no tables from this node.
         if (selector == StatsSelector.PROCEDURE) {
+            // PROCEDURE statistics is stored using a HashMap per HSID while other statistics are stored in
+            // a HashSet per HSID. The reason is that we want to reset some of the procedure statistics and
+            // keep the others.
             if (m_procStatsSource == null || m_procStatsSource.isEmpty()) {
                 return null;
             }
@@ -637,7 +638,10 @@ public class StatsAgent extends OpsAgent
                 }
                 siteIdToStatsSources.put(hsid, sset);
             }
-        } else if (siteIdToStatsSources == null || siteIdToStatsSources.isEmpty()) {
+        }
+        // There are cases early in rejoin where we can get polled before the server is ready to provide
+        // stats.  Just return null for now, which will result in no tables from this node.
+        else if (siteIdToStatsSources == null || siteIdToStatsSources.isEmpty()) {
             return null;
         }
 
