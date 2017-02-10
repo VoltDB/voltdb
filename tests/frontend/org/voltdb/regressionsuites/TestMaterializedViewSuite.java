@@ -24,6 +24,7 @@
 package org.voltdb.regressionsuites;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -38,6 +39,7 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.types.TimestampType;
 import org.voltdb_testprocs.regressionsuites.matviewprocs.AddPerson;
 import org.voltdb_testprocs.regressionsuites.matviewprocs.AddThing;
 import org.voltdb_testprocs.regressionsuites.matviewprocs.AggAges;
@@ -2293,6 +2295,35 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         doTestMVFailedCase(sql, "cannot include the function NOW or CURRENT_TIMESTAMP");
         sql = "CREATE VIEW MV AS SELECT L.ID, COUNT(*), MAX(NOW)  FROM ENG11495 AS L JOIN ENG11495 AS R ON L.TS = R.TS GROUP BY L.ID";
         doTestMVFailedCase(sql, "cannot include the function NOW or CURRENT_TIMESTAMP");
+    }
+
+    public void testENG11935() throws Exception {
+        // to_timestamp function is not implemented in the HSQL backend, skip HSQL.
+        if (isHSQL()) {
+            return;
+        }
+        // All the statements will not crash the server.
+        Client client = getClient();
+        // exec ENG11935.insert '0' 'abc' 1486148453 'def' 'ghi' 'jkl' 'mno0' 35094 30847 27285 36335 59247 50750 '0';
+        // exec ENG11935.insert '0' 'abc' 1486148453 'def' 'ghi' 'jkl' 'mno1' 35094 30847 27285 36335 59247 50750 '1';
+        client.callProcedure("ENG11935.insert", "0", "abc", 1486148453, "def", "ghi", "jkl",
+                             "mno0", 35094, 30847, 27285, 36335, 59247, 50750, "0");
+        client.callProcedure("ENG11935.insert", "0", "abc", 1486148453, "def", "ghi", "jkl",
+                             "mno1", 35094, 30847, 27285, 36335, 59247, 50750, "1");
+        TimestampType timestamp = new TimestampType("1970-01-18 04:50:00.000000");
+        VoltTable vt = client.callProcedure("@AdHoc", "SELECT * FROM V_ENG11935;").getResults()[0];
+        Object[][] expectedAnswer = new Object[][] {
+            {"0", "abc", "def", "ghi", "jkl", timestamp, 1486200, 2, "mno1",
+             new BigDecimal("1403760.000000000000"), new BigDecimal("1233880.000000000000"),
+             1091400, 1453400, 64662175800L, 73760050000L} };
+        assertContentOfTable(expectedAnswer, vt);
+        client.callProcedure("@AdHoc", "DELETE FROM ENG11935 WHERE VAR1 = '0' AND PRIMKEY = '1';");
+        vt = client.callProcedure("@AdHoc", "SELECT * FROM V_ENG11935;").getResults()[0];
+        expectedAnswer = new Object[][] {
+            {"0", "abc", "def", "ghi", "jkl", timestamp, 1486200, 1, "mno0",
+             new BigDecimal("701880.000000000000"), new BigDecimal("616940.000000000000"),
+             545700, 726700, 32331087900L, 36880025000L} };
+        assertContentOfTable(expectedAnswer, vt);
     }
 
     /**

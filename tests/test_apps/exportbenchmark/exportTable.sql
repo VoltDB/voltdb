@@ -1,6 +1,6 @@
 IMPORT CLASS exportbenchmark.procedures.SampleRecord;
 
-CREATE STREAM ALL_VALUES PARTITION ON COLUMN rowid (
+CREATE STREAM ALL_VALUES PARTITION ON COLUMN rowid EXPORT TO TARGET default (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
 , rowid_group               TINYINT       NOT NULL
