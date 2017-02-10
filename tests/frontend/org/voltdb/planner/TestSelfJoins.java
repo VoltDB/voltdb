@@ -336,10 +336,11 @@ public class TestSelfJoins  extends PlannerTestCase {
         // Here's a case that can't be optimized because it purposely uses the "wrong" column
         // in the GROUP BY and ORDER BY.
         apn = compile("select B.C FROM R2 A, R2 B WHERE B.A = A.A AND B.C > 1 GROUP BY A.A, B.C ORDER BY B.C");
-        //* for debug */ System.out.println(apn.toExplainPlanString());
+        /* for debug */ System.out.println(apn.toExplainPlanString());
         // Project-first case: GROUP BY column that is not in the order by or the display column list
         pn = apn.getChild(0);
-        assertTrue(pn instanceof OrderByPlanNode);
+        assertTrue(String.format("Expected PlanNodeType.ORDERBY not %s", pn.getPlanNodeType()),
+                   pn instanceof OrderByPlanNode);
         pn = pn.getChild(0);
         //TODO: This represents a missed optimization.
         // The projection could have been inlined.

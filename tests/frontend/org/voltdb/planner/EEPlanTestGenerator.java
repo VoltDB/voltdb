@@ -43,6 +43,10 @@
 
 package org.voltdb.planner;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
 public class EEPlanTestGenerator extends PlannerTestCase {
     private static final String DDL_FILENAME = "testplans-ee-generators.sql";
     @Override
@@ -690,6 +694,61 @@ public class EEPlanTestGenerator extends PlannerTestCase {
                                   //--------------------------------------
         }));;
         generateTests("executors", "TestWindowedCount", countDB);
+    }
+
+    /**
+     * Make a shuffled array.  Each row has two elements.  The
+     * first element indexed by idIndex is a the row index.
+     * The other element is a shuffled row index.
+     *
+     * @param nRows
+     * @return A shuffled array.
+     */
+    public static int[][] makeShuffledArray(int nRows, int idIndex) {
+        assert(idIndex == 0 || idIndex == 1);
+        List<Integer> list = new ArrayList<>();
+        for (int idx = 0; idx < nRows; idx += 1) {
+            list.add(idx);
+        }
+
+        Collections.shuffle(list);
+        int answer[][] = new int[nRows][];
+        for (int idx = 0; idx < nRows; idx += 1) {
+            answer[idx] = new int[2];
+            answer[idx][idIndex] = idx;
+            answer[idx][Math.abs(1-idIndex)] = list.get(idx);
+        }
+        return answer;
+    }
+
+    /**
+     * This tests order by when the ordering is provided
+     * by an index.  Note that this is currently
+     * disabled.  The commented-out line in this function which begins
+     * "generateTests" should be commented-in to enable this.
+     *
+     * @throws Exception
+     */
+    public void testOrderByPlan() throws Exception {
+        // Make a shuffled array
+        int[][] O1 = makeShuffledArray(20, 0);
+        int[][] O1ans = makeShuffledArray(20, 1);
+
+        TableConfig TConfig = new TableConfig("O1",
+                                              new String[] {"PKEY", "A_INT", "A_INLINE_STR", "A_POOL_STR"},
+                                              O1);
+
+        DBConfig rankDB = new DBConfig(getClass(),
+                                   EEPlanTestGenerator.class.getResource(DDL_FILENAME),
+                                   getCatalogString(),
+                                   TConfig);
+        String sqlStmt;
+        sqlStmt = "select * from O1 order by A_INT ASC";
+
+        rankDB.addTest(new TestConfig("test_order_by",
+                                      sqlStmt,
+                                      O1ans));
+        // generateTests("executors", "TestOrderBy", rankDB);
     }
 
     public void testGeneratedRankPlan() throws Exception {

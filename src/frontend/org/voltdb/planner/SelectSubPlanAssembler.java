@@ -56,10 +56,10 @@ import org.voltdb.utils.PermutationGenerator;
 public class SelectSubPlanAssembler extends SubPlanAssembler {
 
     /** The list of generated plans. This allows their generation in batches.*/
-    ArrayDeque<AbstractPlanNode> m_plans = new ArrayDeque<AbstractPlanNode>();
+    ArrayDeque<AbstractPlanNode> m_plans = new ArrayDeque<>();
 
     /** The list of all possible join orders, assembled by queueAllJoinOrders */
-    private ArrayDeque<JoinNode> m_joinOrders = new ArrayDeque<JoinNode>();
+    private ArrayDeque<JoinNode> m_joinOrders = new ArrayDeque<>();
 
     /**
      *
@@ -95,7 +95,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         // Generate possible join orders for each sub-tree separately
         ArrayList<List<JoinNode>> joinOrderList = generateJoinOrders(subTrees);
         // Reassemble the all possible combinations of the sub-tree and queue them
-        ArrayDeque<JoinNode> joinOrders = new ArrayDeque<JoinNode>();
+        ArrayDeque<JoinNode> joinOrders = new ArrayDeque<>();
         queueSubJoinOrders(joinOrderList, 0, new ArrayList<JoinNode>(), joinOrders, findAll);
         return joinOrders;
     }
@@ -117,7 +117,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         // Recursive step
         List<JoinNode> nextTrees = joinOrderList.get(joinOrderListIdx);
         for (JoinNode headTree: nextTrees) {
-            ArrayList<JoinNode> updatedJoinOrder = new ArrayList<JoinNode>();
+            ArrayList<JoinNode> updatedJoinOrder = new ArrayList<>();
             // Order is important: The top sub-trees must be first
             for (JoinNode node : currentJoinOrder) {
                 updatedJoinOrder.add((JoinNode)node.clone());
@@ -174,7 +174,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         // Get a list of the leaf nodes(tables) to permute them
         List<JoinNode> tableNodes = subTree.generateLeafNodesJoinOrder();
         List<List<JoinNode>> joinOrders = PermutationGenerator.generatePurmutations(tableNodes);
-        List<JoinNode> newTrees = new ArrayList<JoinNode>();
+        List<JoinNode> newTrees = new ArrayList<>();
         for (List<JoinNode> joinOrder: joinOrders) {
             newTrees.add(JoinNode.reconstructJoinTreeFromTableNodes(joinOrder, JoinType.INNER));
         }
@@ -480,7 +480,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
 // too expensive/complicated to test here? (parentNode.m_leftNode has a replicated result?) &&
 
         if (mayNeedInnerSendReceive && ! parentNode.m_joinInnerOuterList.isEmpty()) {
-            List<AccessPath> innerOuterAccessPaths = new ArrayList<AccessPath>();
+            List<AccessPath> innerOuterAccessPaths = new ArrayList<>();
             for (AccessPath innerAccessPath : innerChildNode.m_accessPaths) {
                 if ((innerAccessPath.index != null) &&
                     hasInnerOuterIndexExpression(innerChildNode.getTableAlias(),
@@ -554,21 +554,34 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
     private AbstractPlanNode getSelectSubPlanForJoinNode(JoinNode joinNode) {
         assert(joinNode != null);
         if (joinNode instanceof BranchNode) {
+            BranchNode branchJoinNode = (BranchNode)joinNode;
             // Outer node
             AbstractPlanNode outerScanPlan =
-                    getSelectSubPlanForJoinNode(((BranchNode)joinNode).getLeftNode());
+                    getSelectSubPlanForJoinNode(branchJoinNode.getLeftNode());
             if (outerScanPlan == null) {
                 return null;
             }
-
             // Inner Node.
             AbstractPlanNode innerScanPlan =
-                    getSelectSubPlanForJoinNode(((BranchNode)joinNode).getRightNode());
+                    getSelectSubPlanForJoinNode((branchJoinNode).getRightNode());
             if (innerScanPlan == null) {
                 return null;
             }
             // Join Node
-            return getSelectSubPlanForJoin((BranchNode)joinNode, outerScanPlan, innerScanPlan);
+            AbstractPlanNode answer = getSelectSubPlanForJoin(branchJoinNode,
+                                                              outerScanPlan,
+                                                              innerScanPlan);
+            // Propagate information used for order by clauses in window functions
+            // and the statement level order by clause.  This is only if the
+            // branch node is an inner join.
+            if ((answer != null)
+                    && (branchJoinNode.getJoinType() == JoinType.INNER)) {
+                answer.setWindowFunctionUsesIndex(outerScanPlan.getWindowFunctionUsesIndex());
+                answer.setWindowFunctionIsCompatibleWithOrderBy(outerScanPlan.isWindowFunctionCompatibleWithOrderBy());
+                answer.setFinalExpressionOrderFromIndexScan(outerScanPlan.getFinalExpressionOrderFromIndexScan());
+                answer.setSortOrderFromIndexScan(outerScanPlan.getSortOrderFromIndexScan());
+            }
+            return answer;
         }
 
         // End of recursion
@@ -603,7 +616,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                                                      AbstractPlanNode innerPlan)
     {
         // Filter (post-join) expressions
-        ArrayList<AbstractExpression> whereClauses  = new ArrayList<AbstractExpression>();
+        ArrayList<AbstractExpression> whereClauses  = new ArrayList<>();
         whereClauses.addAll(joinNode.m_whereInnerList);
         whereClauses.addAll(joinNode.m_whereInnerOuterList);
         if (joinNode.getJoinType() == JoinType.FULL) {
@@ -717,7 +730,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                 // predicates but the latter need to be pulled up into NLJ
                 // predicates because the IndexScan is executed once, not once
                 // per outer tuple.
-                ArrayList<AbstractExpression> otherExprs = new ArrayList<AbstractExpression>();
+                ArrayList<AbstractExpression> otherExprs = new ArrayList<>();
                 // PLEASE do not update the "innerAccessPath.otherExprs", it may be reused
                 // for other path evaluation on the other outer side join.
                 List<AbstractExpression> innerExpr = filterSingleTVEExpressions(innerAccessPath.otherExprs, otherExprs);
@@ -798,7 +811,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
      */
     private static List<AbstractExpression> filterSingleTVEExpressions(List<AbstractExpression> exprs,
             List<AbstractExpression> otherExprs) {
-        List<AbstractExpression> singleTVEExprs = new ArrayList<AbstractExpression>();
+        List<AbstractExpression> singleTVEExprs = new ArrayList<>();
         for (AbstractExpression expr : exprs) {
             List<TupleValueExpression> tves = ExpressionUtil.getTupleValueExpressions(expr);
             if (tves.size() == 1) {
@@ -828,7 +841,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                                                  Collection<AbstractExpression> initialExpr,
                                                  Collection<AbstractExpression> endExprs)
     {
-        HashSet<AbstractExpression> indexedExprs = new HashSet<AbstractExpression>();
+        HashSet<AbstractExpression> indexedExprs = new HashSet<>();
         indexedExprs.addAll(indexExprs);
         indexedExprs.addAll(initialExpr);
         indexedExprs.addAll(endExprs);
