@@ -23,7 +23,8 @@
 
 package org.voltdb.regressionsuites.statistics;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 import java.util.Arrays;
 import java.util.HashSet;
@@ -32,24 +33,24 @@ import java.util.Set;
 import org.junit.Test;
 import org.voltdb.AdhocDDLTestBase;
 import org.voltdb.VoltDB;
-import org.voltdb.VoltTable;
 import org.voltdb.VoltDB.Configuration;
+import org.voltdb.VoltTable;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.MiscUtils;
 
 public class TestProcedureStats extends AdhocDDLTestBase {
 
-    private void checkUAC() throws Exception {
+    private void checkUAC(long timedInvocations) throws Exception {
         VoltTable vt = m_client.callProcedure("@Statistics", "PROCEDURE", 0).getResults()[0];
         assertEquals(1, vt.getRowCount());
         vt.advanceRow();
         assertEquals("org.voltdb.sysprocs.UpdateApplicationCatalog", vt.getString(5));
+        assertEquals(timedInvocations, vt.getLong(7));
     }
 
     private void checkKeepedStats(String[] procs) throws Exception {
         VoltTable vt = m_client.callProcedure("@Statistics", "PROCEDURE", 0).getResults()[0];
         assertEquals(procs.length, vt.getRowCount());
-        System.err.println(vt);
         Set<String> procsSet = new HashSet<String>(Arrays.asList(procs));
         while (vt.advanceRow()) {
             assertTrue(procsSet.contains(vt.getString(5)));
@@ -84,7 +85,7 @@ public class TestProcedureStats extends AdhocDDLTestBase {
 
             vt = m_client.callProcedure("@AdHoc", "create table tb1 (a int primary key);").getResults()[0];
             assertEquals(1, vt.getRowCount());
-            checkUAC();
+            checkUAC(1);
 
             vt = m_client.callProcedure("TB1.insert", 1).getResults()[0];
             assertEquals(1, vt.getRowCount());
@@ -95,7 +96,7 @@ public class TestProcedureStats extends AdhocDDLTestBase {
             String ddl = "create table tb2 (a int not null unique); partition table tb2 on column a;";
             vt = m_client.callProcedure("@AdHoc", ddl).getResults()[0];
             // UAC called, only UAC system stats left
-            checkUAC();
+            checkUAC(2);
 
             //
             // call more user stats & other system stats
@@ -129,7 +130,7 @@ public class TestProcedureStats extends AdhocDDLTestBase {
             vt = m_client.callProcedure("@AdHoc", "alter table tb1 add column b int;").getResults()[0];
             assertEquals(1, vt.getRowCount());
             // UAC called, only UAC system stats left
-            checkUAC();
+            checkUAC(3);
         }
         finally {
             teardownSystem();

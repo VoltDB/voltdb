@@ -272,7 +272,7 @@ public class ProcedureRunner {
         assert(m_batch.size() == 0);
 
         try {
-            m_statsCollector.beginProcedure();
+            m_statsCollector.beginProcedure(isSystemProcedure());
 
             VoltTable[] results = null;
 

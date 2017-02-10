@@ -139,8 +139,8 @@ class ProcedureStatsCollector extends SiteStatsSource {
     /**
      * Called when a procedure begins executing. Caches the time the procedure starts.
      */
-    public final void beginProcedure() {
-        if (m_invocations % timeCollectionInterval == 0) {
+    public final void beginProcedure(boolean isSystemProc) {
+        if (m_invocations % timeCollectionInterval == 0 || (isSystemProc && isProcedureUAC())) {
             m_currentStartTime = System.nanoTime();
         }
     }
@@ -408,12 +408,17 @@ class ProcedureStatsCollector extends SiteStatsSource {
      */
     public boolean resetAfterCatalogChange() {
         // UpdateApplicationCatalog system procedure statistics should be kept
-        if (m_procName.startsWith("org.voltdb.sysprocs.UpdateApplicationCatalog")) {
+        if (isProcedureUAC()) {
             return false;
         }
 
         // TODO: we want want to keep other system procedure statistics ?
         // TODO: we may want to only reset updated user procedure statistics but keeping others.
         return true;
+    }
+
+    private boolean isProcedureUAC() {
+        if (m_procName == null) return false;
+        return m_procName.startsWith("org.voltdb.sysprocs.UpdateApplicationCatalog");
     }
 }
