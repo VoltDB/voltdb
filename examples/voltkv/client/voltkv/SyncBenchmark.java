@@ -139,6 +139,9 @@ public class SyncBenchmark {
         @Option(desc = "Filename to write raw summary statistics to.")
         String statsfile = "";
 
+        @Option(desc = "Enable SSL, Optionally provide configuration file.")
+        String sslfile = "";
+
         @Override
         public void validate() {
             if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
@@ -182,7 +185,8 @@ public class SyncBenchmark {
     public SyncBenchmark(KVConfig config) {
         this.config = config;
 
-        ClientConfig clientConfig = new ClientConfig("", "", new StatusListener());
+        Boolean ssl = (config.sslfile.length() > 0);
+        ClientConfig clientConfig = new ClientConfig("", "", new StatusListener(), ssl, config.sslfile);
         client = ClientFactory.createClient(clientConfig);
 
         periodicStatsContext = client.createStatsContext();
