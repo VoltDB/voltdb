@@ -399,6 +399,9 @@ public class StatsAgent extends OpsAgent
         case PROCEDUREPROFILE:
             stats = collectStats(StatsSelector.PROCEDURE, interval);
             break;
+        case PROCEDUREDETAIL:
+            stats = collectStats(StatsSelector.PROCEDUREDETAIL, interval);
+            break;
         case STARVATION:
             stats = collectStats(StatsSelector.STARVATION, interval);
             break;
