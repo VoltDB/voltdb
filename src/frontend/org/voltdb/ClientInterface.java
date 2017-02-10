@@ -904,9 +904,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             // by the ReplaySequencer and just remove the handle from the CIHM
             // without removing any handles before it which we haven't seen yet.
             ClientInterfaceHandleManager.Iv2InFlight clientData;
-            if (clientResponse != null &&
+            if (response.isMisrouted() || (clientResponse != null &&
                     clientResponse.getStatusString() != null &&
-                    clientResponse.getStatusString().equals(ClientResponseImpl.IGNORED_TRANSACTION)) {
+                    clientResponse.getStatusString().equals(ClientResponseImpl.IGNORED_TRANSACTION))) {
                 clientData = cihm.removeHandle(response.getClientInterfaceHandle());
             }
             else {
@@ -960,7 +960,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
          */
         private boolean restartTransaction(int messageSize, long nowNanos)
         {
-            if (response.isMispartitioned()) {
+            if (response.isMispartitioned() || response.isMisrouted()) {
                 // Restart a mis-partitioned or mis-routed transaction
                 assert response.getInvocation() != null;
                 assert response.getCurrentHashinatorConfig() != null;

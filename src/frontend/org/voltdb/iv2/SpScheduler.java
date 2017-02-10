@@ -46,7 +46,6 @@ import org.voltdb.Consistency.ReadLevel;
 import org.voltdb.SnapshotCompletionInterest;
 import org.voltdb.SnapshotCompletionMonitor;
 import org.voltdb.SystemProcedureCatalog;
-import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltZK;
@@ -434,8 +433,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             return false;
         }
         InitiateResponseMessage response = new InitiateResponseMessage(message);
-        response.setMispartitioned(true, message.getStoredProcedureInvocation(),
-                TheHashinator.getCurrentVersionedConfig());
+        response.setMisrouted(message.getStoredProcedureInvocation());
         response.m_sourceHSId = m_mailbox.getHSId();
         m_mailbox.send(message.getInitiatorHSId(), response);
         return true;
@@ -450,7 +448,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                     "should never receive multi-partition initiations.");
         }
 
-        // mastership changed?
+        // send back if SPI balance is requested.
         if (handleMisRoutedTransaction(message)) {
             Iv2Trace.logMisroutedTransaction(message, m_mailbox.getHSId());
             return;
