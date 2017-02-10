@@ -29,6 +29,7 @@ try:
     from voltdbclient import ReadBuffer, VoltColumn, VoltTable, VoltException, VoltResponse, VoltProcedure
     supportSSL = True
 except ImportError:
+    print "Import errors. No sslutils."
     from voltdbclient import ReadBuffer, VoltColumn, VoltTable, VoltException, VoltResponse, VoltProcedure, FastSerializer
     supportSSL = False
 
@@ -63,10 +64,10 @@ class VoltQueryClient(cmd.Cmd):
         self.__initialize(host, port, username, password, client_ssl, ssl_config_file, dump_file)
 
     def __initialize(self, host, port, username, password, client_ssl, ssl_config_file, dump_file):
-        if supportSSL:
-            self.fs = FastSerializer(host=host, port=port, username=username, password=password, client_ssl=client_ssl, ssl_config_file=ssl_config_file, dump_file_path=dump_file)
-        else:
-            self.fs = FastSerializer(host=host, port=port, username=username, password=password, dump_file_path=dump_file)
+        # if supportSSL:
+        self.fs = FastSerializer(host=host, port=port, username=username, password=password, ssl_config_file=ssl_config_file, dump_file_path=dump_file)
+        # else:
+        #     self.fs = FastSerializer(host=host, port=port, username=username, password=password, dump_file_path=dump_file)
 
         self.adhoc = VoltProcedure(self.fs, "@AdHoc",
                                    [FastSerializer.VOLTTYPE_STRING])

@@ -92,7 +92,6 @@ public class TLSNIOWriteStream extends NIOWriteStream {
         ByteBuf accum = m_ce.allocator().buffer(frameMax).clear();
 
         DeferredSerialization ds = null;
-        int bytesQueued = 0;
         int frameMsgs = 0;
         while ((ds = oldlist.poll()) != null) {
             ++processedWrites;
@@ -107,21 +106,21 @@ public class TLSNIOWriteStream extends NIOWriteStream {
                 if (accum.writerIndex() > 0) {
                     m_ecryptgw.offer(new EncryptFrame(accum, frameMsgs));
                     frameMsgs = 0;
-                    bytesQueued += accum.writerIndex();
+                    accum.writerIndex();
                     accum = m_ce.allocator().buffer(frameMax).clear();
                 }
                 ByteBuf big = m_ce.allocator().buffer(serializedSize).writerIndex(serializedSize);
                 ByteBuffer jbb = big.nioBuffer();
                 ds.serialize(jbb);
                 checkSloppySerialization(jbb, ds);
-                bytesQueued += big.writerIndex();
+                big.writerIndex();
                 m_ecryptgw.offer(new EncryptFrame(big, 1));
                 frameMsgs = 0;
                 continue;
             } else if (accum.writerIndex() + serializedSize > frameMax) {
                 m_ecryptgw.offer(new EncryptFrame(accum, frameMsgs));
                 frameMsgs = 0;
-                bytesQueued += accum.writerIndex();
+                accum.writerIndex();
                 accum = m_ce.allocator().buffer(frameMax).clear();
             }
             ByteBuf packet = accum.slice(accum.writerIndex(), serializedSize);
@@ -133,11 +132,10 @@ public class TLSNIOWriteStream extends NIOWriteStream {
         }
         if (accum.writerIndex() > 0) {
             m_ecryptgw.offer(new EncryptFrame(accum, frameMsgs));
-            bytesQueued += accum.writerIndex();
+            accum.writerIndex();
         } else {
             accum.release();
         }
-        updateQueued(bytesQueued, true);
         return processedWrites;
     }
 
@@ -177,7 +175,7 @@ public class TLSNIOWriteStream extends NIOWriteStream {
     private int addFramesForCompleteMessage() {
         boolean added = false;
         EncryptFrame frame = null;
-        int delta = 0;
+        int bytesQueued = 0;
 
         while (!added && (frame = m_encrypted.poll()) != null) {
             if (!frame.isLast()) {
@@ -195,20 +193,19 @@ public class TLSNIOWriteStream extends NIOWriteStream {
 
                 synchronized(m_partial) {
                     for (EncryptFrame frm: m_partial) {
-                        delta += frm.delta;
                         m_outbuf.addComponent(true, frm.frame);
+                        bytesQueued += frm.frame.readableBytes();
                     }
                     m_partial.clear();
                     m_partialSize = 0;
                 }
             }
-            delta += frame.delta;
             m_outbuf.addComponent(true, frame.frame);
+            bytesQueued += frame.frame.readableBytes();
             m_messagesInOutBuf += frame.msgs;
             added = true;
         }
-
-        return added ? delta : NONE_ADDED;
+        return added ? bytesQueued : NONE_ADDED;
     }
 
     @Override
@@ -236,15 +233,15 @@ public class TLSNIOWriteStream extends NIOWriteStream {
     @Override
     int drainTo(final GatheringByteChannel channel) throws IOException {
         int bytesWritten = 0;
-        int accumdelta = 0;
+        int bytesQueued = 0;
         try {
             long rc = 0;
             do {
                 checkForGatewayExceptions();
-                int delta = 0;
+                int queued = 0;
                 // add to output buffer frames that contain whole messages
-                while ((delta=addFramesForCompleteMessage()) != NONE_ADDED) {
-                    accumdelta += delta;
+                while ((queued=addFramesForCompleteMessage()) != NONE_ADDED) {
+                    bytesQueued += queued;
                 }
 
                 rc = m_outbuf.readBytes(channel, m_outbuf.readableBytes());
@@ -262,7 +259,10 @@ public class TLSNIOWriteStream extends NIOWriteStream {
 
             } while (rc > 0);
         } finally {
-            if (m_outbuf.numComponents() <= 1 && m_hadBackPressure && m_queuedWrites.size() <= m_maxQueuedWritesBeforeBackpressure) {
+            if (    m_outbuf.numComponents() <= 1
+                 && m_hadBackPressure
+                 && m_queuedWrites.size() <= m_maxQueuedWritesBeforeBackpressure
+            ) {
                 backpressureEnded();
             }
             if (bytesWritten > 0 && !isEmpty()) {
@@ -271,8 +271,10 @@ public class TLSNIOWriteStream extends NIOWriteStream {
                 m_lastPendingWriteTime = -1L;
             }
             if (bytesWritten > 0) {
-                updateQueued(accumdelta-bytesWritten, false);
+                updateQueued(bytesQueued-bytesWritten, false);
                 m_bytesWritten += bytesWritten;
+            } else if (bytesQueued > 0) {
+                updateQueued(bytesQueued, false);
             }
         }
         return bytesWritten;
@@ -351,15 +353,14 @@ public class TLSNIOWriteStream extends NIOWriteStream {
      */
     class EncryptionGateway implements Runnable {
         private final ConcurrentLinkedDeque<EncryptFrame> m_q = new ConcurrentLinkedDeque<>();
-        private long m_offered = 0L;
 
         synchronized void offer(EncryptFrame frame) throws IOException {
             final boolean wasEmpty = m_q.isEmpty();
+
             List<EncryptFrame> chunks = frame.chunked(
                     Math.min(CipherExecutor.FRAME_SIZE, applicationBufferSize()));
 
             m_q.addAll(chunks);
-            ++m_offered;
             m_inFlight.reducePermits(chunks.size());
 
             if (wasEmpty) {
@@ -383,7 +384,6 @@ public class TLSNIOWriteStream extends NIOWriteStream {
             return new StringBuilder(256).append("EncryptionGateway[")
                     .append("q.isEmpty()=").append(m_q.isEmpty())
                     .append(", partialSize=").append(m_partialSize)
-                    .append(", offered=").append(m_offered)
                     .append("]").toString();
         }
 
