@@ -1928,6 +1928,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     private void startResourceUsageMonitor() {
         if (resMonitorWork != null) {
+            m_distributer.registerChannels("__RESOURCE_MONITOR__", Collections.emptySet());
             resMonitorWork.cancel(false);
             try {
                 resMonitorWork.get();
@@ -1936,8 +1937,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
         ResourceUsageMonitor resMonitor  = new ResourceUsageMonitor(m_catalogContext.getDeployment().getSystemsettings(), getSnmpTrapSender());
         m_distributer.registerCallback("__RESOURCE_MONITOR__", resMonitor);
-        m_distributer.registerChannels("__RESOURCE_MONITOR__", Collections.emptySet());
-        m_distributer.registerChannels("__RESOURCE_MONITOR__", Collections.singleton(URI.create("resource-monitor://dr/role")));
+        m_distributer.registerChannels("__RESOURCE_MONITOR__", Collections.singleton(URI.create("resource-monitor://dr/role/" + m_distributer.getClusterTag())));
         resMonitor.logResourceLimitConfigurationInfo();
         if (resMonitor.hasResourceLimitsConfigured()) {
             resMonitorWork = scheduleWork(resMonitor, resMonitor.getResourceCheckInterval(), resMonitor.getResourceCheckInterval(), TimeUnit.SECONDS);
@@ -2945,6 +2945,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 if (m_distributer != null) {
                     m_distributer.shutdown();
                 }
+                // clear resMonitorWork
+                resMonitorWork = null;
 
                 m_periodicWorks.clear();
                 m_snapshotCompletionMonitor.shutdown();
