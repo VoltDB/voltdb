@@ -65,6 +65,24 @@ public class Iv2Trace
         }
     }
 
+    public static void logRestartTransaction(InitiateResponseMessage msg)
+    {
+        if (IV2_TRACE_ENABLED) {
+            String logmsg = "restartTxn %s ciHandle %s initHSId %s proc %s";
+            iv2log.trace(String.format(logmsg, CoreUtils.hsIdToString(msg.getInitiatorHSId()),
+                        ClientInterfaceHandleManager.handleToString(msg.getClientInterfaceHandle()),
+                        CoreUtils.hsIdToString(msg.getCoordinatorHSId()),
+                        msg.getInvocation().getProcName()));
+        }
+    }
+
+    public static void logFailoverTransaction(int partitionId, long initiatorHSId, int txnCount) {
+        if (IV2_TRACE_ENABLED) {
+            String logmsg = "failoverTxns partition %d, initHSId %s, txn count %d";
+            iv2log.trace(String.format(logmsg, partitionId, CoreUtils.hsIdToString(initiatorHSId), txnCount));
+        }
+    }
+
     public static void logFinishTransaction(InitiateResponseMessage msg, long localHSId)
     {
         if (IV2_TRACE_ENABLED) {

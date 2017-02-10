@@ -992,6 +992,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             partition,
                             messageSize,
                             nowNanos);
+                    Iv2Trace.logRestartTransaction(response);
                     return true;
                 } catch (Exception e) {
                     // unable to hash to a site, return an error
@@ -1107,7 +1108,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     // forward response; copy is annoying. want slice of response.
                     InitiateResponseMessage response = (InitiateResponseMessage)message;
                     StoredProcedureInvocation invocation = response.getInvocation();
-                    Iv2Trace.logFinishTransaction(response, m_mailbox.getHSId());
                     ClientInterfaceHandleManager cihm = m_cihm.get(response.getClientConnectionId());
                     Procedure procedure = null;
 
@@ -1121,6 +1121,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         //Pass it to the network thread like a ninja
                         //Only the network can use the CIHM
                         cihm.connection.writeStream().fastEnqueue(new ClientResponseWork(response, cihm, procedure));
+                        Iv2Trace.logFinishTransaction(response, m_mailbox.getHSId());
                     }
                 } else if (message instanceof BinaryPayloadMessage) {
                     handlePartitionFailOver((BinaryPayloadMessage)message);
@@ -1198,6 +1199,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
         List<Iv2InFlight> transactions =
                 cihm.removeHandlesForPartitionAndInitiator(partitionId, initiatorHSId);
+
+        if (!transactions.isEmpty()) {
+            Iv2Trace.logFailoverTransaction(partitionId, initiatorHSId, transactions.size());
+        }
 
         for (Iv2InFlight inFlight : transactions) {
             ClientResponseImpl response =
