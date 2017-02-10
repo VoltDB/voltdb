@@ -92,7 +92,6 @@ public class TLSNIOWriteStream extends NIOWriteStream {
         ByteBuf accum = m_ce.allocator().buffer(frameMax).clear();
 
         DeferredSerialization ds = null;
-        int bytesQueued = 0;
         int frameMsgs = 0;
         while ((ds = oldlist.poll()) != null) {
             ++processedWrites;
@@ -107,21 +106,21 @@ public class TLSNIOWriteStream extends NIOWriteStream {
                 if (accum.writerIndex() > 0) {
                     m_ecryptgw.offer(new EncryptFrame(accum, frameMsgs));
                     frameMsgs = 0;
-                    bytesQueued += accum.writerIndex();
+                    accum.writerIndex();
                     accum = m_ce.allocator().buffer(frameMax).clear();
                 }
                 ByteBuf big = m_ce.allocator().buffer(serializedSize).writerIndex(serializedSize);
                 ByteBuffer jbb = big.nioBuffer();
                 ds.serialize(jbb);
                 checkSloppySerialization(jbb, ds);
-                bytesQueued += big.writerIndex();
+                big.writerIndex();
                 m_ecryptgw.offer(new EncryptFrame(big, 1));
                 frameMsgs = 0;
                 continue;
             } else if (accum.writerIndex() + serializedSize > frameMax) {
                 m_ecryptgw.offer(new EncryptFrame(accum, frameMsgs));
                 frameMsgs = 0;
-                bytesQueued += accum.writerIndex();
+                accum.writerIndex();
                 accum = m_ce.allocator().buffer(frameMax).clear();
             }
             ByteBuf packet = accum.slice(accum.writerIndex(), serializedSize);
@@ -133,11 +132,10 @@ public class TLSNIOWriteStream extends NIOWriteStream {
         }
         if (accum.writerIndex() > 0) {
             m_ecryptgw.offer(new EncryptFrame(accum, frameMsgs));
-            bytesQueued += accum.writerIndex();
+            accum.writerIndex();
         } else {
             accum.release();
         }
-        updateQueued(bytesQueued, true);
         return processedWrites;
     }
 
@@ -178,6 +176,7 @@ public class TLSNIOWriteStream extends NIOWriteStream {
         boolean added = false;
         EncryptFrame frame = null;
         int delta = 0;
+        int bytesQueued = 0;
 
         while (!added && (frame = m_encrypted.poll()) != null) {
             if (!frame.isLast()) {
@@ -197,6 +196,7 @@ public class TLSNIOWriteStream extends NIOWriteStream {
                     for (EncryptFrame frm: m_partial) {
                         delta += frm.delta;
                         m_outbuf.addComponent(true, frm.frame);
+                        bytesQueued += frm.frame.readableBytes();
                     }
                     m_partial.clear();
                     m_partialSize = 0;
@@ -204,10 +204,11 @@ public class TLSNIOWriteStream extends NIOWriteStream {
             }
             delta += frame.delta;
             m_outbuf.addComponent(true, frame.frame);
+            bytesQueued += frame.frame.readableBytes();
             m_messagesInOutBuf += frame.msgs;
             added = true;
         }
-
+        updateQueued(bytesQueued, true);
         return added ? delta : NONE_ADDED;
     }
 
@@ -236,15 +237,12 @@ public class TLSNIOWriteStream extends NIOWriteStream {
     @Override
     int drainTo(final GatheringByteChannel channel) throws IOException {
         int bytesWritten = 0;
-        int accumdelta = 0;
         try {
             long rc = 0;
             do {
                 checkForGatewayExceptions();
-                int delta = 0;
                 // add to output buffer frames that contain whole messages
-                while ((delta=addFramesForCompleteMessage()) != NONE_ADDED) {
-                    accumdelta += delta;
+                while (addFramesForCompleteMessage() != NONE_ADDED) {
                 }
 
                 rc = m_outbuf.readBytes(channel, m_outbuf.readableBytes());
@@ -271,7 +269,7 @@ public class TLSNIOWriteStream extends NIOWriteStream {
                 m_lastPendingWriteTime = -1L;
             }
             if (bytesWritten > 0) {
-                updateQueued(accumdelta-bytesWritten, false);
+                updateQueued(-bytesWritten, false);
                 m_bytesWritten += bytesWritten;
             }
         }
