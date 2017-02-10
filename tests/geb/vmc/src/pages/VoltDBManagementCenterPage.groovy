@@ -301,7 +301,6 @@ class VoltDBManagementCenterPage extends Page {
      * @return true if a DrPage is currently open.
      */
     def boolean isDrPageOpen() {
-        waitFor(20) { drTab.isDisplayed() }
         if (drTab.attr('class') == 'active') {
             return true
         } else {
@@ -356,7 +355,6 @@ class VoltDBManagementCenterPage extends Page {
      */
     def void openDrPage() {
         if (!isDrPageOpen()) {
-            waitFor(20) { drLink.isDisplayed() }
             drLink.click()
         }
     }

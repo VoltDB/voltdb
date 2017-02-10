@@ -59,6 +59,12 @@ class DrPage extends VoltDBManagementCenterPage {
         drMasterTitle       {$("#drMasterTitle")}
         partitionIdRows     {$("#tblDrMAster").find(class:"sorting_1")}
         filterPartitionId   {$("#filterPartitionId")}
+
+        //graph
+        drGraphView         { $("#drGraphView")}
+        chartDrMin          { $("#visualizationDrReplicationRate_1 > g > g > g.nv-x.nv-axis.nvd3-svg > g > g.nv-axisMaxMin.nv-axisMaxMin-x.nv-axisMin-x > text") }
+        chartDrMax          { $("#visualizationDrReplicationRate_1 > g > g > g.nv-x.nv-axis.nvd3-svg > g > g.nv-axisMaxMin.nv-axisMaxMin-x.nv-axisMax-x > text") }
+
     }
     static at = {
         drTab.displayed
@@ -176,4 +182,55 @@ class DrPage extends VoltDBManagementCenterPage {
     def boolean drMasterTitleDisplayed(){
         return drMasterTitle.displayed
     }
+
+    def boolean chooseGraphView( String choice ) {
+        drGraphView.value(choice)
+    }
+
+    def String changeToMonth(String string) {
+        String date = string.substring(3, string.length()-9)
+        return date
+    }
+
+    def int changeToDate(String string) {
+        String date = string.substring(0, 2)
+        int dateInt = Integer.parseInt(date)
+        return dateInt
+    }
+
+    def String compareTime(String stringTwo, String stringOne) {
+        int hourOne = changeToHour(stringOne)
+        int hourTwo = changeToHour(stringTwo)
+        int minuteOne = changeToMinute(stringOne)
+        int minuteTwo = changeToMinute(stringTwo)
+
+        String result = ""
+
+        if(hourTwo-hourOne == 0) {
+            result = "seconds"
+        }
+        else {
+            if((minuteOne - minuteTwo) > 20 ) {
+                result = "seconds"
+            }
+            else {
+                result = "minutes"
+            }
+        }
+
+        return result
+    }
+
+    def int changeToHour(String string) {
+        String hour = string.substring(0, string.length()-6)
+        int hourInt = Integer.parseInt(hour)
+        return hourInt
+    }
+
+    def int changeToMinute( String string ) {
+        String minute = string.substring(3, string.length()-3)
+        int minuteInt = Integer.parseInt(minute)
+        return minuteInt
+    }
+
 }
