@@ -133,18 +133,12 @@ public class SwapTablesPlanNode extends AbstractOperationPlanNode {
         // and the primary key index found on otherTable.
         // Removing them as they are matched by indexes/constraints on theTable
         // and added to the list of swappable indexes should leave the sets empty.
-        HashSet<Index> candidateIndexSet = new HashSet<>();
+        HashSet<Index> otherIndexSet = new HashSet<>();
         // The constraint set is actually a HashMap to retain the
         // defining constraint name for help with error messages.
-        HashMap<Index, String> candidateConstraintIndexSet = new HashMap<>();
         // Track the primary key separately since it should match one-to-one.
+        HashMap<Index, String> otherConstraintIndexMap = new HashMap<>();
         Index otherPrimaryKeyIndex = null;
-
-        // Collect the user-defined (external) indexes on otherTable.
-        CatalogMap<Index> candidateIndexes = otherTable.getIndexes();
-        for (Index otherIndex : candidateIndexes) {
-            candidateIndexSet.add(otherIndex);
-        }
 
         // Collect the system-defined (internal) indexes supporting constraints
         // and the primary key index if any.
@@ -163,17 +157,76 @@ public class SwapTablesPlanNode extends AbstractOperationPlanNode {
                 continue;
             }
 
-            candidateConstraintIndexSet.put(otherIndex, otherConstraint.getTypeName());
+            otherConstraintIndexMap.put(otherIndex, otherConstraint.getTypeName());
+        }
+
+        // Collect the user-defined (external) indexes on otherTable.  The indexes
+        // in this set are removed as corresponding matches are found.
+        // System-generated indexes that support constraints are checked separately,
+        // so don't add them to this set.
+        CatalogMap<Index> candidateIndexes = otherTable.getIndexes();
+        for (Index otherIndex : candidateIndexes) {
+            if (otherIndex != otherPrimaryKeyIndex &&
+                    !otherConstraintIndexMap.containsKey(otherIndex)) {
+                otherIndexSet.add(otherIndex);
+            }
+        }
+
+        // Collect the indexes that support constraints on theTable
+        HashSet<Index> theConstraintIndexSet = new HashSet<>();
+        Index thePrimaryKeyIndex = null;
+        for (Constraint constraint : theTable.getConstraints()) {
+            Index theIndex = constraint.getIndex();
+            if (theIndex == null) {
+                continue;
+            }
+
+            if (constraint.getType() == ConstraintType.PRIMARY_KEY.getValue()) {
+                thePrimaryKeyIndex = theIndex;
+                continue;
+            }
+
+            theConstraintIndexSet.add(constraint.getIndex());
+        }
+
+        // Make sure that both either both or neither tables have primary keys, and if both,
+        // make sure the indexes are swappable.
+        if (thePrimaryKeyIndex != null && otherPrimaryKeyIndex != null) {
+            if (indexesCanBeSwapped(thePrimaryKeyIndex, otherPrimaryKeyIndex)) {
+                m_theIndexes.add(thePrimaryKeyIndex.getTypeName());
+                m_otherIndexes.add(otherPrimaryKeyIndex.getTypeName());
+            }
+            else {
+                feedback.append(fbSeparator)
+                .append("Swapping with table ").append(otherName)
+                .append(" with ").append(theName)
+                .append(" requires that primary key constraints match on both tables.");
+                fbSeparator = TRUE_FB_SEPARATOR;
+            }
+        }
+        else if ((thePrimaryKeyIndex != null && otherPrimaryKeyIndex == null)
+                || (thePrimaryKeyIndex == null && otherPrimaryKeyIndex != null)) {
+            feedback.append(fbSeparator)
+            .append("Swapping table ").append(theName)
+            .append(" with table ").append(otherName)
+            .append(" requires that they have the same primary key")
+            .append(" or that neither have one.");
+            fbSeparator = TRUE_FB_SEPARATOR;
         }
 
         // Try to cross-reference each user-defined index on the two tables.
         for (Index theIndex : theTable.getIndexes()) {
+            if (theConstraintIndexSet.contains(theIndex) || theIndex == thePrimaryKeyIndex) {
+                // Constraints are checked below.
+                continue;
+            }
+
             boolean matched = false;
-            for (Index otherIndex : candidateIndexSet) {
-                if (indexesCanBeSwapped(theIndex, otherIndex, null, null)) {
+            for (Index otherIndex : otherIndexSet) {
+                if (indexesCanBeSwapped(theIndex, otherIndex)) {
                     m_theIndexes.add(theIndex.getTypeName());
                     m_otherIndexes.add(otherIndex.getTypeName());
-                    candidateIndexSet.remove(otherIndex);
+                    otherIndexSet.remove(otherIndex);
                     matched = true;
                     break;
                 }
@@ -199,14 +252,14 @@ public class SwapTablesPlanNode extends AbstractOperationPlanNode {
             else {
                 diagnoseIndexMismatch(theIndex, otherIndex, feedback);
                 fbSeparator = TRUE_FB_SEPARATOR;
-                candidateIndexSet.remove(otherIndex);
+                otherIndexSet.remove(otherIndex);
             }
         }
 
         // At this point, all of theTable's indexes are matched.
         // All of otherTable's indexes should also have been
         // matched along the way.
-        if ( ! candidateIndexSet.isEmpty()) {
+        if ( ! otherIndexSet.isEmpty()) {
             feedback.append(fbSeparator)
             .append("Swapping with table ").append(otherName)
             .append(" requires that the table ").append(theName)
@@ -214,14 +267,13 @@ public class SwapTablesPlanNode extends AbstractOperationPlanNode {
             .append(" all of those defined on table ").append(otherName)
             .append("including those with the following index names: (");
             String separator = "";
-            for (Index remainder : candidateIndexSet) {
+            for (Index remainder : otherIndexSet) {
                 feedback.append(separator).append(remainder.getTypeName());
                 separator = ", ";
             }
             feedback.append(")");
             fbSeparator = TRUE_FB_SEPARATOR;
         }
-
 
         // Try to cross-reference each system-defined index supporting
         // constraints on the two tables.
@@ -234,39 +286,17 @@ public class SwapTablesPlanNode extends AbstractOperationPlanNode {
             }
 
             if (theConstraint.getType() == ConstraintType.PRIMARY_KEY.getValue()) {
-                if (otherPrimaryKeyIndex != null) {
-                    if (indexesCanBeSwapped(theIndex, otherPrimaryKeyIndex,
-                            feedback, fbSeparator)) {
-                        m_theIndexes.add(theIndex.getTypeName());
-                        m_otherIndexes.add(otherPrimaryKeyIndex.getTypeName());
-                    }
-                    else {
-                        diagnoseIndexMismatch(theIndex, otherPrimaryKeyIndex,
-                                feedback);
-                        fbSeparator = TRUE_FB_SEPARATOR;
-                    }
-                    // signal that otherTable's primary key was matched
-                    // (or mismatched).
-                    otherPrimaryKeyIndex = null;
-                }
-                else {
-                    feedback.append(fbSeparator)
-                    .append("Swapping table ").append(theName)
-                    .append(" with table ").append(otherName)
-                    .append(" requires that they have the same primary key")
-                    .append(" or that neither have one.");
-                    fbSeparator = TRUE_FB_SEPARATOR;
-                }
+                // Primary key compatibility checked above.
                 continue;
             }
 
             boolean matched = false;
-            for (Entry<Index, String> otherEntry : candidateConstraintIndexSet.entrySet()) {
+            for (Entry<Index, String> otherEntry : otherConstraintIndexMap.entrySet()) {
                 Index otherIndex = otherEntry.getKey();
-                if (indexesCanBeSwapped(theIndex, otherIndex, null, null)) {
+                if (indexesCanBeSwapped(theIndex, otherIndex)) {
                     m_theIndexes.add(theIndex.getTypeName());
                     m_otherIndexes.add(otherIndex.getTypeName());
-                    candidateConstraintIndexSet.remove(otherIndex);
+                    otherConstraintIndexMap.remove(otherIndex);
                     matched = true;
                     break;
                 }
@@ -305,25 +335,15 @@ public class SwapTablesPlanNode extends AbstractOperationPlanNode {
                 if (otherIndex != null) {
                     diagnoseIndexMismatch(theIndex, otherIndex, feedback);
                     fbSeparator = TRUE_FB_SEPARATOR;
-                    candidateConstraintIndexSet.remove(otherIndex);
+                    otherConstraintIndexMap.remove(otherIndex);
                 }
             }
-        }
-
-        if (otherPrimaryKeyIndex != null) {
-            // A primary key was found but not matched.
-            feedback.append(fbSeparator)
-            .append("Swapping table ").append(theName)
-            .append(" with table ").append(otherName)
-            .append(" requires that they have the same primary key")
-            .append(" or that neither have one.");
-            fbSeparator = TRUE_FB_SEPARATOR;
         }
 
         // At this point, all of theTable's index-based constraints are matched.
         // All of otherTable's index-based constraints should also have been
         // matched along the way.
-        if ( ! candidateConstraintIndexSet.isEmpty()) {
+        if ( ! otherConstraintIndexMap.isEmpty()) {
             feedback.append(fbSeparator)
             .append("Swapping with table ").append(otherName)
             .append(" requires that the table ").append(theName)
@@ -332,7 +352,7 @@ public class SwapTablesPlanNode extends AbstractOperationPlanNode {
             .append("including those with the following constraint or")
             .append(" system internal index names: (");
             String separator = "";
-            for (Entry<Index, String> remainder : candidateConstraintIndexSet.entrySet()) {
+            for (Entry<Index, String> remainder : otherConstraintIndexMap.entrySet()) {
                 String constraintName = remainder.getValue();
                 String description =
                         (constraintName != null && ! constraintName.equals("")) ?
@@ -425,8 +445,7 @@ public class SwapTablesPlanNode extends AbstractOperationPlanNode {
      * @param otherIndex candidate match for theIndex on the other target table
      * @param candidateIndexSet set of otherTable indexes as yet unmatched
      */
-    private static boolean indexesCanBeSwapped(Index theIndex, Index otherIndex,
-            StringBuilder feedback, String fbSeparator) {
+    private static boolean indexesCanBeSwapped(Index theIndex, Index otherIndex) {
         // Pairs of matching indexes must agree on type (int hash, etc.).
         if (theIndex.getType() != otherIndex.getType()) {
             return false;

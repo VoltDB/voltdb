@@ -26,8 +26,6 @@ package org.voltdb.regressionsuites;
 import java.io.IOException;
 import java.util.Random;
 
-import junit.framework.Test;
-
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -38,6 +36,8 @@ import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb_testprocs.regressionsuites.malicious.GoSleep;
+
+import junit.framework.Test;
 
 public class TestSystemProcedureSuite extends RegressionSuite {
     private static int SITES = 3;
@@ -763,6 +763,9 @@ public class TestSystemProcedureSuite extends RegressionSuite {
                 // or those with minor variations in syntax.
                 String otherTable = SWAPPY_PREFIX_PAIR[1] + SWAPPY_TABLES[jj][0];
 
+                //*enable to debug*/ System.out.println("ii = " + ii + ", jj = " +jj);
+                //*enable to debug*/ System.out.println("@SwapTables " + theTable + " " + otherTable);
+
                 // These pairs of numbers are indexes into SWAPPY_TABLES that
                 // represent definitions that are "close enough" for swapping
                 // purposes. These were experimentally discovered and then
@@ -784,8 +787,6 @@ public class TestSystemProcedureSuite extends RegressionSuite {
                     results = client.callProcedure("@AdHoc",
                             "SELECT COUNT(*) FROM " + theTable).getResults();
                     long preCount = results[0].asScalarLong();
-
-                    //*enable to debug*/ System.out.println("@SwapTables " + theTable + " " + otherTable);
                     results = client.callProcedure("@SwapTables",
                             theTable, otherTable).getResults();
                     //*enable to debug*/ System.out.println(results[0]);
