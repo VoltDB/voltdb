@@ -1404,7 +1404,7 @@ public class AbstractTopology {
             }
             int leaderId = partition.leaderHostId;
             if (missingHosts.contains(partition.leaderHostId)) {
-                //find the first host other than hosts with the partition
+                //find the first non-missing host that has the partition
                 for (Host host : topology.hostsById.values()) {
                     if (!missingHosts.contains(host.id)) {
                         List<Integer> list = topology.getPartitionIdList(host.id);

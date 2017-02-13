@@ -191,7 +191,7 @@ public class LeaderAppointer implements Promotable
                 }
                 if (children.size() == replicaCount) {
                     m_currentLeader = assignLeader(m_partitionId, updatedHSIds);
-                } else  if (tmLog.isInfoEnabled()) {
+                } else {
                     tmLog.info("Waiting on " + ((m_kfactor + 1) - children.size()) + " more nodes " +
                             "for k-safety before startup");
                 }
@@ -406,9 +406,7 @@ public class LeaderAppointer implements Promotable
             // call our callback, get the current full set of replicas, and
             // appoint a new leader if the seeded one has actually failed
             Map<Integer, Long> masters = m_iv2masters.pointInTimeCache();
-            if (tmLog.isInfoEnabled()) {
-                tmLog.info("LeaderAppointer repairing with master set: " + CoreUtils.hsIdValueMapToString(masters));
-            }
+            tmLog.info("LeaderAppointer repairing with master set: " + CoreUtils.hsIdValueMapToString(masters));
             //Setting the map to non-null causes the babysitters to populate it when cleaning up partitions
             //We are only racing with ourselves in that the creation of a babysitter can trigger callbacks
             //that result in partitions being cleaned up. We don't have to worry about some other leader appointer.
@@ -420,9 +418,7 @@ public class LeaderAppointer implements Promotable
                 //Skip processing the partition if it was cleaned up by a babysitter that was previously
                 //instantiated
                 if (m_removedPartitionsAtPromotionTime.contains(master.getKey())) {
-                    if (tmLog.isInfoEnabled()) {
-                        tmLog.info("During promotion partition " + master.getKey() + " was cleaned up. Skipping.");
-                    }
+                    tmLog.info("During promotion partition " + master.getKey() + " was cleaned up. Skipping.");
                     continue;
                 }
 
@@ -519,10 +515,8 @@ public class LeaderAppointer implements Promotable
                 break;
             }
         }
-        if (tmLog.isInfoEnabled()) {
-            tmLog.info("Appointing HSId " + CoreUtils.hsIdToString(masterHSId) + " as leader for partition " +
+        tmLog.info("Appointing HSId " + CoreUtils.hsIdToString(masterHSId) + " as leader for partition " +
                     partitionId);
-        }
         try {
             m_iv2appointees.put(partitionId, masterHSId);
         }
