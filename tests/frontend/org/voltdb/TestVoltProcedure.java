@@ -508,5 +508,14 @@ public class TestVoltProcedure extends TestCase {
             m_selector = selector;
             m_catalogId = catalogId;
         }
+
+        @Override
+        public ProcedureStatsCollector registerProcedureStatsSource(long catalogId, ProcedureStatsCollector source) {
+            m_source = source;
+            m_selector = StatsSelector.PROCEDURE;
+            m_catalogId = catalogId;
+
+            return source;
+        }
     }
 }

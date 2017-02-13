@@ -47,4 +47,23 @@ public abstract class SiteStatsSource extends StatsSource {
         rowValues[columnNameToIndex.get(VoltSystemProcedure.CNAME_SITE_ID)] = CoreUtils.getSiteIdFromHSId(m_siteId);
         super.updateStatsRow(rowKey, rowValues);
     }
+
+    public long getSiteId() {
+        return m_siteId;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if(super.equals(obj) == false) return false;
+        if (obj instanceof SiteStatsSource == false) return false;
+
+        SiteStatsSource stats = (SiteStatsSource) obj;
+        if (stats.getSiteId() != m_siteId) return false;
+        return true;
+    }
+
+    @Override
+    public int hashCode() {
+        return super.hashCode() + Long.hashCode(m_siteId);
+    }
 }
