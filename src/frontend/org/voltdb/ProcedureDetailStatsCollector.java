@@ -32,7 +32,7 @@ class ProcedureDetailStatsCollector extends SiteStatsSource {
     private static final VoltLogger log = new VoltLogger("HOST");
 
     /**
-     * Record procedure execution time ever N invocations
+     * Record procedure execution time every N invocations
      */
     final int timeCollectionInterval = 20;
 

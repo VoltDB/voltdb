@@ -209,22 +209,23 @@ public class ProcedureRunner {
 
         m_procedure.init(this);
 
-        m_statsCollector = new ProcedureStatsCollector(
-                m_site.getCorrespondingSiteId(),
-                m_site.getCorrespondingPartitionId(),
-                m_catProc);
         m_statsDetailCollector = new ProcedureDetailStatsCollector(
                 m_site.getCorrespondingSiteId(),
                 m_site.getCorrespondingPartitionId(),
                 m_catProc);
-        VoltDB.instance().getStatsAgent().registerStatsSource(
-                StatsSelector.PROCEDURE,
-                site.getCorrespondingSiteId(),
-                m_statsCollector);
+        m_statsCollector = new ProcedureStatsCollector(
+                m_site.getCorrespondingSiteId(),
+                m_site.getCorrespondingPartitionId(),
+                m_catProc);
         VoltDB.instance().getStatsAgent().registerStatsSource(
                 StatsSelector.PROCEDUREDETAIL,
                 site.getCorrespondingSiteId(),
                 m_statsDetailCollector);
+        VoltDB.instance().getStatsAgent().registerStatsSource(
+                StatsSelector.PROCEDURE,
+                site.getCorrespondingSiteId(),
+                m_statsCollector);
+
 
         reflect();
     }
