@@ -1426,8 +1426,8 @@ public abstract class SubPlanAssembler {
      * Objects of this class keep track of all window functions and
      * order by statement expressions.  We run the index expressions
      * over this scoreboard to see if any of them match appropriately.
-     * If so we pull out the window function or order by which
-     * match.
+     * If so we pull out the window function or statement level order by
+     * which match.
      */
     class WindowFunctionScoreboard {
         public WindowFunctionScoreboard(AbstractParsedStmt stmt, StmtTableScan tableScan) {

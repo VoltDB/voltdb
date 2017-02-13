@@ -1830,8 +1830,8 @@ public class PlanAssembler {
             // Count the number of window functions between the
             // root and the join/scan node.  Note that we know we
             // have a statement level order by (SLOB) here.  If the SLOB
-            // can use the index for ordering the scan or join node
-            // will know it.
+            // can use the index for ordering the scan or join node,
+            // we will have recorded it in the scan or join node.
             if (probe.getPlanNodeType() == PlanNodeType.WINDOWFUNCTION) {
                 numberWindowFunctions += 1;
             }
@@ -1913,7 +1913,8 @@ public class PlanAssembler {
             // Return true for MP (numberReceiveNodes > 0) and
             // false for SP (numberReceiveNodes == 0);
             return numberReceiveNodes > 0;
-        } else if (numberWindowFunctions == 1) {
+        }
+        if (numberWindowFunctions == 1) {
             // If the WF uses the index then getWindowFunctionUsesIndex()
             // will return 0.
             if ( ( nonAggPlan.getWindowFunctionUsesIndex() != 0 )

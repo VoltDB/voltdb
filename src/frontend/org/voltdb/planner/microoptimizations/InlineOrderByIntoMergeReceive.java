@@ -99,7 +99,8 @@ public class InlineOrderByIntoMergeReceive extends MicroOptimization {
     }
 
     /**
-     * Convert ReceivePlanNodes into MergeReceivePlanNodes.  We won't
+     * Convert ReceivePlanNodes into MergeReceivePlanNodes when the
+     * RECEIVE node's nearest parent is a window function.  We won't
      * have any inline limits or aggregates here, so this is somewhat
      * simpler than the order by case.
      *
@@ -107,10 +108,10 @@ public class InlineOrderByIntoMergeReceive extends MicroOptimization {
      * @return
      */
     private AbstractPlanNode applyOptimization(WindowFunctionPlanNode plan) {
-        AbstractPlanNode child = (plan.getChildCount() > 0) ? plan.getChild(0) : null;
-        if (child == null) {
-            return plan;
-        }
+        assert(plan.getChildCount() == 1);
+        assert(plan.getChild(0) != null);
+        AbstractPlanNode child = plan.getChild(0);
+        assert(child != null);
         // SP Plans which have an index which can provide
         // the window function ordering don't create
         // an order by node.
@@ -119,26 +120,31 @@ public class InlineOrderByIntoMergeReceive extends MicroOptimization {
         }
         OrderByPlanNode onode = (OrderByPlanNode)child;
         child = onode.getChild(0);
-        // The order by node needs to be followed by a
-        // Receive node.
+        // The order by node needs a RECEIVE node child
+        // for this optimization to work.
         if ( ! ( child instanceof ReceivePlanNode) ) {
             return plan;
         }
         ReceivePlanNode receiveNode = (ReceivePlanNode)child;
-        // No inline nodes are expected in the window function plan node.
-        assert(plan.getChildCount() == 1);
-        // No inline nodes are expected in the Receive node.
         assert(receiveNode.getChildCount() == 1);
         child = receiveNode.getChild(0);
-        // The Receive node must be followed by a Send node.
-        // Maybe this should be an assert.
-        if (! ( child instanceof SendPlanNode) ) {
-            return plan;
-        }
+        // The Receive node needs a send node child.
+        assert( child instanceof SendPlanNode );
         SendPlanNode sendNode = (SendPlanNode)child;
         child = sendNode.getChild(0);
         // If this window function does not use the
         // index then this optimization is not possible.
+        // We've recorded a number of the window function
+        // in the root of the subplan, which will be
+        // the first child of the send node.
+        //
+        // Right now the only window function has number
+        // 0, and we don't record that in the
+        // WINDOWFUNCTION plan node.  If there were
+        // more than one window function we would need
+        // to record a number in the plan node and
+        // then check that child.getWindowFunctionUsesIndex()
+        // returns the number in the plan node.
         if (child.getWindowFunctionUsesIndex() != 0) {
             return plan;
         }

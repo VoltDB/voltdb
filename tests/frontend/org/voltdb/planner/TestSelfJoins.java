@@ -339,8 +339,7 @@ public class TestSelfJoins  extends PlannerTestCase {
         //* for debug */ System.out.println(apn.toExplainPlanString());
         // Project-first case: GROUP BY column that is not in the order by or the display column list
         pn = apn.getChild(0);
-        assertTrue(String.format("Expected PlanNodeType.ORDERBY not %s", pn.getPlanNodeType()),
-                   pn instanceof OrderByPlanNode);
+        assertTrue(pn instanceof OrderByPlanNode);
         pn = pn.getChild(0);
         //TODO: This represents a missed optimization.
         // The projection could have been inlined.

@@ -549,7 +549,7 @@ public class RegressionSuite extends TestCase {
     }
 
     /**
-     * Given a two dimensional array of longs, randomly permute the rows, but
+     * Given a two dimensional array, randomly permute the rows, but
      * leave the columns alone.  This is used to generate test cases for kinds
      * of sorts.
      *
@@ -563,11 +563,9 @@ public class RegressionSuite extends TestCase {
         }
         List<Integer> permutation = Arrays.asList(indices);
         Collections.shuffle(permutation);
-        T[] tmp = input[permutation.get(0)];
-        for (int idx = 0; idx < input.length-1; idx += 1) {
-            output[idx] = input[permutation.get(idx + 1)];
+        for (int idx = 0; idx < input.length; idx += 1) {
+            output[idx] = input[permutation.get(idx)];
         }
-        output[input.length-1] = tmp;
         return output;
     }
 

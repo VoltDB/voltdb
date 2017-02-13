@@ -43,15 +43,14 @@
  * table, reads each row of the table and sends it to the output, possibly filtering
  * with a predicate or applying a limit or an offset.  A NESTED_LOOP plan node describes
  * a join computation, either an inner or outer join.
- * An inner join computation will be given two tables which must be scanned
+ * This join computation will be given two tables which must be scanned
  * in two nested loops.  For each row of the left hand table, which we call the <em>outer</em>
  * table, we look at each row of the right hand table, which we call the <em>inner</em>
  * table.  If the pair of rows satisfy the join condition, we write the row to the
  * output table.</br>
  * Note:  The computation for NESTED_LOOP is somewhat more complicated
- * than this, as we may be able to skip the scan of the inner table, and there
- * may be other optimizations.  Also, NESTED_LOOP can computer outer
- * joins.  We are just giving the flavor of the computation here.</br>
+ * than this, as we may be able to skip the scan of the inner table.  There
+ * may be other optimizations.</br>
  * Note Also: The tree formed by a plan is not very similar to the parse tree formed
  * from a SQL or DDL statement.  The plan relates to the SQL text approximately the
  * same way an assembly language program relates to a string of C++ program text.</p>
@@ -93,8 +92,8 @@
  * For example, a sort requires an entire table.
  * For row-wise operations, we avoid creating extra temporary
  * tables by combining scans. The row-by-row operations are placed in <em>inline</em>
- * nodes in a scan node.  Each row of the scan which passes the filters are
- * applied to the inline nodes during the scan.  The inline nodes have
+ * nodes in a scan node.  The inline nodes are applied to each row of
+ * the scan which passes the filters during the scan.  The inline nodes have
  * their own output columns, as discussed above.</p>
  *
  * <p>
@@ -107,12 +106,14 @@
  * The planner takes a data structure describing a DML or DQL SQL
  * statement.  It produces a plan of execution which can be used to
  * evaluate the statement.  The Execution Engine executes the plan.
- * Note that DDL is processed entirely differently, and is not part of
- * this discussion.</p>
-
+ * Note that DDL is processed entirely differently, and is generally
+ * not part of this discussion.  DDL which has embedded DQL or DML
+ * will need to be planned, as detailed here.  For example, materialized
+ * views, single statement procedure definitions and delete statement
+ * limit plans are DDL statements which have plannable elements.</p>
  * <h2>The Input</h2>
  * <p>
- * The input to the planner is ultimately a SQL statement, which is a
+ * The input to the planner is originally a SQL statement, which is a
  * text string.  The HSQL front end translates the user’s text into an
  * HSQL data structure which represents the statement.  This data
  * structure is translated into a second data structure called
@@ -143,7 +144,10 @@
  *       <li>The HAVING expression, if any,</li>
  *       <li>Any LIMIT or OFFSET constants.</li>
  *       <li>An indication of whether the statement is a SELECT, DELETE
- *           or INSERT statement.  DDL is not part of this process.</li>
+ *           INSERT, UPSERT or UPDATE statement, or a set operation like
+ *           UNION, or INTERSECT.  As we said
+ *           before, DDL is generally not planned, but some parts of
+ *           DDL statements may require planning.</li>
  *     </ol>
  *   </li>
  * </ol>
@@ -191,13 +195,12 @@
  *                serial aggregation.</li>
  *          </ul>
  *       </li>
- *       <li>Nodes to compute UNION,</li>
+ *       <li>Nodes to compute set operations, like UNION or INTERSECT,</li>
  *       <li>Nodes to compute ORDERBY,</li>
  *       <li>Nodes to compute PROJECTION,</li>
  *       <li>Nodes to compute MATERIALIZE,</li>
  *       <li>Nodes to compute LIMIT and OFFSET,</li>
  *       <li>Nodes to compute WINDOWFUNCTION.</li>
- *       <li>Nodes to compute window functions.</li>
  *     </ul>
  *   </li>
  * </ul>
@@ -229,11 +232,11 @@
  *
  * <p>
  * Plan nodes have different kinds of children.  A plan node can have
- * nodes which are out-of-line or inline.  The latter are used to
+ * child nodes which are out-of-line or inline.  The latter are used to
  * compute which can be computed row-wise, in a single pass through
  * the input table along with the parent node.  For example, a LIMIT
  * or OFFSET node is often made inline, since it just counts how many
- * trailing or initial rows to ignore.  PROJECTION nodes can also be
+ * initial rows to allow or ignore.  PROJECTION nodes can also be
  * inlined, since they operate only row-wise.  An ORDERBY node can
  * generally not be inlined, since the entire table must be present to
  * sort it.  But if the ORDERBY node’s input table comes from a
@@ -254,12 +257,10 @@
  * <h3>Fragment Execution</h3>
  * <p>
  * A fragment tree executes the operations of each of its plans,
- * starting with the leaves.  The only plan nodes which have more than
- * one out-of-line children are the join nodes, which have two
- * children.  At each node the execution function reads rows from
+ * starting with the leaves.  At each node the execution function reads rows from
  * the input tables, computes a function into a single row, perhaps
  * alters that row with inline plan nodes and writes the output row to
- * a single output table.  A plan node can have a single parent and a
+ * a single output table.  A plan node can only have a single parent and a
  * single output table.</p>
  *
  * <h2>The Planner’s Passes</h2>
@@ -274,7 +275,9 @@
  *       to this, but essentially each possible order of the
  *       tablescans is generated.  There is a limit to the size of
  *       this order set.  If there are more than 5 tables, the order
- *       in the statement is used, to avoid exponential explosion. </li>
+ *       in the statement is used, to avoid exponential explosion.
+ *       A java stored procedures, may also have an explicit
+ *       user-provided join order specification.</li>
  *   <li>Each join order results in a join tree, whose java type is
  *       JoinNode.
  *     <ol>
@@ -282,7 +285,7 @@
  *         and TableLeafNode.  These represent derived tables, which
  *         we often call subqueries, joined tables and tablescans
  *         respectively.</li>
- *       <li>We do some analysis of the join expressions, to
+ *       <li>We do some analysis of the join predicates, to
  *         distribute them to the proper JoinNode nodes.  For example,
  *           <ul>
  *             <li>
@@ -301,54 +304,55 @@
  *               Expressions which reference both branches of a join
  *               might be outer expressions of a higher level
  *               join.</li>
+ *             <li>For OUTER joins, the differing semantics of ON clauses
+ *                 and WHERE clauses also factor into where in the join
+ *                 tree a predicate should apply.</li>
  *           </ul>
  *       </li>
- *     </ol>
- *   </li>
- *   <li>
- *     The planner calculates a set of access paths for the tablescans.
- *     Note that this does not depend on the join order.  Each access
- *     path depends on a single table scan.  So, this does not need to
- *     be generated for each join order.</li>
- *     <ol>
  *       <li>
- *         These access paths will tell how the tablescan will be
- *         scanned.  It may be scanned directly or through an index.</li>
- *       <li>
- *         The scan associated with the access path may provide
- *         ordering for a statement level order by or a window
- *         function.  This is stored in the access path as well.</li>
- *       <li>
- *         For each join order, the planner creates a subplan in
- *         SubPlanAssembler.  This class traverses the join tree
- *         and, consulting with the access paths, turns the
- *         TableLeafNode and SubqueryLeafNode join nodes into some
- *         kind of AbstractScanPlanNode, and turns the BranchNodes
- *         into some kind of AbstractJoinPlanNode.  The result is a
- *         set of subplans.  These are just trees of scans and
- *         joins.  The other parts of the statement, order by,
- *         group by, limit, offset, having, and DML operations
- *         table insertion, update and deletion are not represented
- *         here.  In particular, if the plan is a multi-partition
- *         plan, it needs a SEND/RECEIVE pair to designate the
- *         boundary between the coordinator and distributed plans.
- *         But this pair will not be part of the subplan.</li>
- *       <li>
- *         For each subplan, the plan assembler in PlanAssembler
- *         adds new nodes on the top of the subplan tree, to form
- *         the complete tree.  These may include:
- *         <ul>
- *           <li>A SEND node on the top of the plan, to send the
- *               result to the server.</li>
- *           <li>SEND/RECEIVE pairs in multi-partition queries,</li>
- *           <li>Aggregate nodes, to calculate GROUP BY groups and
- *               aggregate functions.</li>
- *           <li>Window function nodes to calculate window
- *               functions,</li>
- *           <li>ORDERBY nodes to implement sorting.</li>
- *           <li>PROJECTION nodes to calculate display lists.</li>
- *         </ul>
- *         All but the first two are optional.</li>
+ *         The planner calculates a set of access paths for the tablescans.
+ *         Note that this does not depend on the join order.</li>
+ *         <ol>
+ *           <li>
+ *             These access paths will tell how the tablescan will be
+ *             scanned.  It may be scanned directly or through an index.</li>
+ *           <li>
+ *             The scan associated with the access path may provide
+ *             ordering for a statement level order by or a window
+ *             function.  This is stored in the access path as well.</li>
+ *           <li>
+ *             For each join order, the planner creates a subplan in
+ *             SubPlanAssembler.  This class traverses the join tree
+ *             and, consulting with the access paths, turns the
+ *             TableLeafNode and SubqueryLeafNode join nodes into some
+ *             kind of AbstractScanPlanNode, and turns the BranchNodes
+ *             into some kind of AbstractJoinPlanNode.  The result is a
+ *             set of subplans.  These are just trees of scans and
+ *             joins.  The other parts of the statement, order by,
+ *             group by, limit, offset, having, and DML operations
+ *             table insertion, update and deletion are not represented
+ *             here.  In particular, if the plan is a multi-partition
+ *             plan, it needs a SEND/RECEIVE pair to designate the
+ *             boundary between the coordinator and distributed plans.
+ *             But this pair will not be part of the subplan.</li>
+ *           <li>
+ *             For each subplan, the plan assembler in PlanAssembler
+ *             adds new nodes on the top of the subplan tree, to form
+ *             the complete tree.  These may include:
+ *             <ul>
+ *               <li>A SEND node on the top of the plan, to send the
+ *                   result to the server.</li>
+ *               <li>SEND/RECEIVE pairs in multi-partition queries,</li>
+ *               <li>Aggregate nodes, to calculate GROUP BY groups and
+ *                   aggregate functions.</li>
+ *               <li>Window function nodes to calculate window
+ *                   functions,</li>
+ *               <li>ORDERBY nodes to implement sorting.</li>
+ *               <li>PROJECTION nodes to calculate display lists.</li>
+ *             </ul>
+ *             All but the first two are optional.</li>
+ *         </ol>
+ *       </li>
  *     </ol>
  *   </li>
  * </ol>
