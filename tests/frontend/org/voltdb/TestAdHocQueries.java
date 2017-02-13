@@ -897,7 +897,8 @@ public class TestAdHocQueries extends AdHocQueryTester {
                 fail("Compilation should have failed.");
             }
             catch(ProcCallException e) {
-                assertTrue(e.getMessage().contains("Error compiling"));
+                String expectedMsg = "Error compiling";
+                assertTrue(e.getMessage().contains("invalid format for a constant timestamp value"));
             }
             String sql = String.format("INSERT INTO TS_CONSTRAINT_EXCEPTION VALUES ('%s','{}');",
                     new TimestampType().toString());
