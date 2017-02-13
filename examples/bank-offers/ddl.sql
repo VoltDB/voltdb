@@ -20,8 +20,8 @@
 --  GROUP BY type;
 --
 -- CREATE PROCEDURE foo AS SELECT * FROM foo;
--- CREATE PROCEDURE FROM CLASS procedures.UpsertSymbol;
--- PARTITION PROCEDURE UpsertSymbol ON TABLE symbols COLUMN symbol PARAMETER 0;
+-- CREATE PROCEDURE PARTITION ON TABLE symbols COLUMN symbol [PARAMETER 0]
+--  FROM CLASS procedures.UpsertSymbol;
 ---------------------------------------------------------------------------------
 
 -- Update classes from jar to that server will know about classes but not procedures yet.
@@ -118,8 +118,8 @@ GROUP BY TRUNCATE(SECOND,offer_ts);
 CREATE PROCEDURE recent_offer_totals AS
 SELECT * FROM total_offers ORDER BY offer_ts DESC LIMIT 60;
 
-CREATE PROCEDURE FROM CLASS bankoffers.CheckForOffers;
-PARTITION PROCEDURE CheckForOffers ON TABLE activity COLUMN acc_no PARAMETER 1;
+CREATE PROCEDURE PARTITION ON TABLE activity COLUMN acc_no PARAMETER 1
+  FROM CLASS bankoffers.CheckForOffers;
 
 CREATE PROCEDURE RecentOffersList AS
 SELECT og.offer_ts, c.cust_first_name, c.cust_last_name, og.offer_text, avt.acc_no, avt.vendor_id, avt.total_visits, avt.total_spend

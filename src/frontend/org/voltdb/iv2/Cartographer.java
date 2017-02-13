@@ -41,6 +41,7 @@ import org.voltcore.messaging.BinaryPayloadMessage;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
+import org.voltcore.zk.CoreZK;
 import org.voltcore.zk.LeaderElector;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.AbstractTopology;
@@ -539,7 +540,7 @@ public class Cartographer extends StatsSource
                     }
                     // check if any node still in rejoin status
                     try {
-                        if (m_zk.exists(VoltZK.rejoinNodeBlocker, false) != null) {
+                        if (m_zk.exists(CoreZK.rejoin_node_blocker, false) != null) {
                             return false;
                         }
                     } catch (KeeperException.NoNodeException ignore) {} // shouldn't happen
