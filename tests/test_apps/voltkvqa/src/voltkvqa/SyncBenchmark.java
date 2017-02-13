@@ -156,6 +156,9 @@ public class SyncBenchmark {
         @Option(desc = "password.")
         String password = "";
 
+        @Option(desc = "Enable SSL with configuration file.")
+        String sslfile = "";
+
         @Override
         public void validate() {
             if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
@@ -185,7 +188,8 @@ public class SyncBenchmark {
     public SyncBenchmark(KVConfig config) {
         this.config = config;
 
-        ClientConfig clientConfig = new ClientConfig(config.username, config.password);
+        Boolean ssl = (config.sslfile.length() > 0);
+        ClientConfig clientConfig = new ClientConfig(config.username, config.password, null, ssl, config.sslfile);
         clientConfig.setReconnectOnConnectionLoss(true);
         clientConfig.setClientAffinity(!config.noclientaffinity);
         client = ClientFactory.createClient(clientConfig);
