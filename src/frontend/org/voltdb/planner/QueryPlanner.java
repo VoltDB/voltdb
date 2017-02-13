@@ -210,8 +210,8 @@ public class QueryPlanner {
             throw new PlanningErrorException("Can not swap table \"" + theTable + "\" with itself.");
         }
         VoltXMLElement result = new VoltXMLElement("swap");
-        result.attributes.put("thetable", theTable);
-        result.attributes.put("othertable", otherTable);
+        result.attributes.put("thetable", theTable.toUpperCase());
+        result.attributes.put("othertable", otherTable.toUpperCase());
         return result;
     }
 

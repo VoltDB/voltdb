@@ -1,0 +1,22 @@
+
+create table swapper_table_foo (
+  i integer,
+  j varchar(32),
+  primary key (i)
+);
+Command succeeded.
+
+create table swapper_table_bar (
+  i integer,
+  j varchar(32),
+  primary key (i)
+);
+Command succeeded.
+
+insert into swapper_table_foo values (0, 'dog');
+(Returned 1 rows in #.##s)
+
+insert into swapper_table_foo values (1, 'cat');
+(Returned 1 rows in #.##s)
+
+exec @SwapTables Swapper_Table_Foo, Swapper_Table_BAR;
