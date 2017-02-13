@@ -92,6 +92,7 @@ public class TLSNIOWriteStream extends NIOWriteStream {
         ByteBuf accum = m_ce.allocator().buffer(frameMax).clear();
 
         DeferredSerialization ds = null;
+        int bytesQueued = 0;
         int frameMsgs = 0;
         while ((ds = oldlist.poll()) != null) {
             ++processedWrites;
@@ -106,21 +107,21 @@ public class TLSNIOWriteStream extends NIOWriteStream {
                 if (accum.writerIndex() > 0) {
                     m_ecryptgw.offer(new EncryptFrame(accum, frameMsgs));
                     frameMsgs = 0;
-                    accum.writerIndex();
+                    bytesQueued += accum.writerIndex();
                     accum = m_ce.allocator().buffer(frameMax).clear();
                 }
                 ByteBuf big = m_ce.allocator().buffer(serializedSize).writerIndex(serializedSize);
                 ByteBuffer jbb = big.nioBuffer();
                 ds.serialize(jbb);
                 checkSloppySerialization(jbb, ds);
-                big.writerIndex();
+                bytesQueued += big.writerIndex();
                 m_ecryptgw.offer(new EncryptFrame(big, 1));
                 frameMsgs = 0;
                 continue;
             } else if (accum.writerIndex() + serializedSize > frameMax) {
                 m_ecryptgw.offer(new EncryptFrame(accum, frameMsgs));
                 frameMsgs = 0;
-                accum.writerIndex();
+                bytesQueued += accum.writerIndex();
                 accum = m_ce.allocator().buffer(frameMax).clear();
             }
             ByteBuf packet = accum.slice(accum.writerIndex(), serializedSize);
@@ -132,10 +133,11 @@ public class TLSNIOWriteStream extends NIOWriteStream {
         }
         if (accum.writerIndex() > 0) {
             m_ecryptgw.offer(new EncryptFrame(accum, frameMsgs));
-            accum.writerIndex();
+            bytesQueued += accum.writerIndex();
         } else {
             accum.release();
         }
+        updateQueued(bytesQueued, true);
         return processedWrites;
     }
 
@@ -167,15 +169,24 @@ public class TLSNIOWriteStream extends NIOWriteStream {
 
     private final List<EncryptFrame> m_partial = new ArrayList<>();
     private volatile int m_partialSize = 0;
-    private final static int NONE_ADDED = Integer.MIN_VALUE;
 
+    static final class EncryptLedger {
+        final int delta;
+        final int bytes;
+
+        EncryptLedger(int aDelta, int aBytes) {
+            delta = aDelta;
+            bytes = aBytes;
+        }
+    }
     /**
      * Gather all the frames that comprise a whole Volt Message
      */
-    private int addFramesForCompleteMessage() {
+    private EncryptLedger addFramesForCompleteMessage() {
         boolean added = false;
         EncryptFrame frame = null;
-        int bytesQueued = 0;
+        int bytes = 0;
+        int delta = 0;
 
         while (!added && (frame = m_encrypted.poll()) != null) {
             if (!frame.isLast()) {
@@ -194,18 +205,21 @@ public class TLSNIOWriteStream extends NIOWriteStream {
                 synchronized(m_partial) {
                     for (EncryptFrame frm: m_partial) {
                         m_outbuf.addComponent(true, frm.frame);
-                        bytesQueued += frm.frame.readableBytes();
+                        bytes += frm.frame.readableBytes();
+                        delta += frm.delta;
                     }
                     m_partial.clear();
                     m_partialSize = 0;
                 }
             }
             m_outbuf.addComponent(true, frame.frame);
-            bytesQueued += frame.frame.readableBytes();
+            bytes += frame.frame.readableBytes();
+            delta += frame.delta;
+
             m_messagesInOutBuf += frame.msgs;
             added = true;
         }
-        return added ? bytesQueued : NONE_ADDED;
+        return added ? new EncryptLedger(delta, bytes) : null;
     }
 
     @Override
@@ -232,21 +246,21 @@ public class TLSNIOWriteStream extends NIOWriteStream {
 
     @Override
     int drainTo(final GatheringByteChannel channel) throws IOException {
-        int bytesWritten = 0;
-        int bytesQueued = 0;
+        int written = 0;
+        int delta = 0;
         try {
             long rc = 0;
             do {
                 checkForGatewayExceptions();
-                int queued = 0;
+                EncryptLedger queued = null;
                 // add to output buffer frames that contain whole messages
-                while ((queued=addFramesForCompleteMessage()) != NONE_ADDED) {
-                    bytesQueued += queued;
+                while ((queued=addFramesForCompleteMessage()) != null) {
+                    delta += queued.delta;
                 }
 
                 rc = m_outbuf.readBytes(channel, m_outbuf.readableBytes());
                 m_outbuf.discardReadComponents();
-                bytesWritten += rc;
+                written += rc;
 
                 if (m_outbuf.isReadable()) {
                     if (!m_hadBackPressure) {
@@ -265,19 +279,19 @@ public class TLSNIOWriteStream extends NIOWriteStream {
             ) {
                 backpressureEnded();
             }
-            if (bytesWritten > 0 && !isEmpty()) {
+            if (written > 0 && !isEmpty()) {
                 m_lastPendingWriteTime = EstTime.currentTimeMillis();
             } else {
                 m_lastPendingWriteTime = -1L;
             }
-            if (bytesWritten > 0) {
-                updateQueued(bytesQueued-bytesWritten, false);
-                m_bytesWritten += bytesWritten;
-            } else if (bytesQueued > 0) {
-                updateQueued(bytesQueued, false);
+            if (written > 0) {
+                updateQueued(delta-written, false);
+                m_bytesWritten += written;
+            } else if (delta > 0) {
+                updateQueued(delta, false);
             }
         }
-        return bytesWritten;
+        return written;
     }
 
     String dumpState() {
@@ -353,6 +367,7 @@ public class TLSNIOWriteStream extends NIOWriteStream {
      */
     class EncryptionGateway implements Runnable {
         private final ConcurrentLinkedDeque<EncryptFrame> m_q = new ConcurrentLinkedDeque<>();
+        private final int COALESCE_THRESHOLD = CipherExecutor.FRAME_SIZE - 4096;
 
         synchronized void offer(EncryptFrame frame) throws IOException {
             final boolean wasEmpty = m_q.isEmpty();
@@ -365,6 +380,37 @@ public class TLSNIOWriteStream extends NIOWriteStream {
 
             if (wasEmpty) {
                 submitSelf();
+            }
+        }
+
+        /**
+         * Encryption takes time and the likelihood that some or more encrypt frames
+         * are queued up behind the recently completed frame encryption is high. This
+         * takes queued up small frames and coalesces them into a bigger frame
+         */
+        private void coalesceEncryptFrames() {
+            EncryptFrame head = m_q.peek();
+            if (head == null || head.chunks > 1 || head.bb.readableBytes() > COALESCE_THRESHOLD) {
+                return;
+            }
+
+            m_q.poll();
+            ByteBuf bb = head.bb;
+            int msgs = head.msgs;
+            int released = 0;
+
+            head = m_q.peek();
+            while (head != null && head.chunks == 1 && head.bb.readableBytes() <= bb.writableBytes()) {
+                m_q.poll();
+                bb.writeBytes(head.bb, head.bb.readableBytes());
+                head.bb.release();
+                ++released;
+                msgs += head.msgs;
+                head = m_q.peek();
+            }
+            m_q.push(new EncryptFrame(bb, 0, msgs));
+            if (released > 0) {
+                m_inFlight.release(released);
             }
         }
 
@@ -436,6 +482,7 @@ public class TLSNIOWriteStream extends NIOWriteStream {
                     frame.bb.release();
                 }
                 m_inFlight.release();
+                coalesceEncryptFrames();
                 if (m_q.peek() != null && !m_isShutdown) {
                     submitSelf();
                 }

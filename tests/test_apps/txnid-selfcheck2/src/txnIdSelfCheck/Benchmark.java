@@ -356,23 +356,9 @@ public class Benchmark {
         log.info(HORIZONTAL_RULE);
         log.info(config.getConfigDumpString());
 
-        StatusListener statusListener = new StatusListener();
+        Boolean ssl = (config.sslfile.length() > 0);
+        ClientConfig clientConfig = new ClientConfig("", "", new StatusListener(), ssl, config.sslfile);
 
-        ClientConfig clientConfig = null;
-        if (config.sslfile.length() > 0) {
-            try {
-                clientConfig = new ClientConfig("", "", statusListener, true, config.sslfile);
-                clientConfig.enableSSL();
-            } catch (Exception e) {
-                System.err.println("Failed to configure ssl, exiting");
-                e.printStackTrace();
-                System.exit(-1);
-            }
-        } else
-            clientConfig = new ClientConfig("", "", statusListener);
-
-
-        // ClientConfig clientConfig = new ClientConfig("", "", statusListener);
         if (config.topologyaware) {
             clientConfig.setTopologyChangeAware(true);
         }
