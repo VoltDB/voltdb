@@ -85,15 +85,15 @@ public class UpdateClassesBenchmark {
         switch(upperCaseBen) {
         case "ADD":
             return ProcBenchmark.ADD;
-        case "DELETE":
+        case "DEL":
             return ProcBenchmark.DELETE;
-        case "UPDATE":
+        case "UPD":
             return ProcBenchmark.UPDATE;
         case "ADD_BATCH":
             return ProcBenchmark.ADD_BATCH;
-        case "DELETE_BATCH":
+        case "DEL_BATCH":
             return ProcBenchmark.DELETE_BATCH;
-        case "UPDATE_BATCH":
+        case "UPD_BATCH":
             return ProcBenchmark.UPDATE_BATCH;
         default:
             return null;
@@ -230,7 +230,7 @@ public class UpdateClassesBenchmark {
         connections.await();
     }
 
-    long doUpdateClassesWork(String prevStmts, byte[] jar, String delPattern, String stmts)
+    static long doUpdateClassesWork(Client client, String prevStmts, byte[] jar, String delPattern, String stmts)
             throws IOException, NoConnectionsException, ProcCallException {
         long startTS = System.nanoTime();
 
@@ -238,9 +238,13 @@ public class UpdateClassesBenchmark {
             client.callProcedure("@AdHoc", prevStmts);
         }
 
-        client.callProcedure("@UpdateClasses", jar, delPattern);
+        if (jar != null) {
+            client.callProcedure("@UpdateClasses", jar, delPattern);
+        }
 
-        client.callProcedure("@AdHoc", stmts);
+        if (stmts != null && stmts.length() > 0) {
+            client.callProcedure("@AdHoc", stmts);
+        }
 
         return System.nanoTime() - startTS;
     }
@@ -253,8 +257,114 @@ public class UpdateClassesBenchmark {
         return nanos * 1.0 / 1000 / 1000;
     }
 
-    static void runAddBenchmark(int counter) {
+    static String readClassDeletePattern(String filePath) throws IOException {
+        String[] delClasses = new String(readFileIntoByteArray(filePath)).split("\n");
 
+        String result = "";
+        for (int i = 0; i < delClasses.length; i++) {
+            result += delClasses[i];
+            if (i != delClasses.length - 1) {
+                result += ",";
+            }
+        }
+        return result;
+    }
+
+    static class BenchmarkResult {
+        long min;
+        long max;
+        long sum;
+
+        BenchmarkResult() {
+            min = Long.MAX_VALUE;
+            max = Long.MIN_VALUE;
+            sum = 0;
+        }
+    }
+
+    static BenchmarkResult runAdd(Client client, UpdateClassesConfig config, String jarPath) throws Exception {
+        BenchmarkResult res = new BenchmarkResult();
+        for (int i = 0; i < config.invocations; i++) {
+            int base = config.procedurecount + i;
+            String path = jarPath + "uac_add_" + base + ".jar";
+            byte[] jarBytes = readFileIntoByteArray(path);
+
+            path = jarPath + "stmts_add_" + base + ".txt";
+            String stmts = new String(readFileIntoByteArray(path));
+            System.out.println("Invocation " + i + ":" + stmts);
+            long duration = doUpdateClassesWork(client, null, jarBytes, null, stmts);
+            res.sum += duration;
+            if (duration > res.max) res.max = duration;
+            if (duration < res.min) res.min = duration;
+        }
+        return res;
+    }
+
+    static BenchmarkResult runAddBatch(Client client, UpdateClassesConfig config, String jarPath) throws Exception {
+        BenchmarkResult res = new BenchmarkResult();
+        for (int i = 0; i < config.invocations; i++) {
+            int base = config.procedurecount + i * config.batchsize;
+            String path = jarPath + "uac_add_batch_" + base + ".jar";
+            byte[] jarBytes = readFileIntoByteArray(path);
+            path = jarPath + "stmts_add_batch_" + base + ".txt";
+            String stmts = new String(readFileIntoByteArray(path));
+            System.out.println("Invocation " + i + ":" + stmts);
+            long duration = doUpdateClassesWork(client, null, jarBytes, null, stmts);
+            res.sum += duration;
+            if (duration > res.max) res.max = duration;
+            if (duration < res.min) res.min = duration;
+        }
+        return res;
+    }
+
+    static BenchmarkResult runDel(Client client, UpdateClassesConfig config, String jarPath) throws Exception {
+        BenchmarkResult res = new BenchmarkResult();
+        for (int i = 0; i < config.invocations; i++) {
+            int base = config.procedurecount - i - 1;
+
+            String path = jarPath + "stmts_del_" + base + ".txt";
+            String stmts = new String(readFileIntoByteArray(path));
+
+            String patDelPath = jarPath + "pat_del_" + base + ".txt";
+            String delPattern = readClassDeletePattern(patDelPath);
+
+            System.out.println("Invocation " + i + ":" + stmts);
+            long duration = doUpdateClassesWork(client, stmts, null, delPattern, null);
+            res.sum += duration;
+            if (duration > res.max) res.max = duration;
+            if (duration < res.min) res.min = duration;
+        }
+        return res;
+    }
+
+    static BenchmarkResult runDelBatch(Client client, UpdateClassesConfig config, String jarPath) throws Exception {
+        BenchmarkResult res = new BenchmarkResult();
+        for (int i = 0; i < config.invocations; i++) {
+            int base = config.procedurecount - (i + 1) * config.batchsize;
+
+            String path = jarPath + "stmts_del_batch_" + base + ".txt";
+            String stmts = new String(readFileIntoByteArray(path));
+
+            String patDelPath = jarPath + "pat_del_batch_" + base + ".txt";
+            String delPattern = readClassDeletePattern(patDelPath);
+
+            System.out.println("Invocation " + i + ":" + stmts);
+            long duration = doUpdateClassesWork(client, stmts, null, delPattern, null);
+            res.sum += duration;
+            if (duration > res.max) res.max = duration;
+            if (duration < res.min) res.min = duration;
+        }
+        return res;
+    }
+
+    static BenchmarkResult runUpd(Client client, UpdateClassesConfig config, String jarPath) throws Exception {
+        BenchmarkResult res_drop = runDel(client, config, jarPath);
+        BenchmarkResult res_add = runAdd(client, config, jarPath);
+        BenchmarkResult res = new BenchmarkResult();
+        res.max = res_drop.max + res_add.max;
+        res.min = res_drop.min + res_add.min;
+        res.sum = res_drop.sum + res_add.sum;
+        return res;
     }
 
     /**
@@ -281,63 +391,47 @@ public class UpdateClassesBenchmark {
         String jarPath = dirPath + "/jars/";
         byte[] jarBytes = readFileIntoByteArray(jarPath + "uac_base.jar");
         // setup the base case: 500 tables with 1000 procedures
-        String creatProcsStmts = new String(readFileIntoByteArray(jarPath + "stmts_base.txt"));
-        long duration = doUpdateClassesWork(null, jarBytes , null, creatProcsStmts);
+        String stmts = new String(readFileIntoByteArray(jarPath + "stmts_base.txt"));
+        long duration = doUpdateClassesWork(client, null, jarBytes , null, stmts);
         System.out.println(String.format("Created %d procedure using %f ms",
                 config.procedurecount, toMillis(duration)));
 
-        int counter = config.invocations;
         ProcBenchmark bench = fromString(config.name);
         // Benchmark start time
 
-        long min = Long.MAX_VALUE, max = Long.MIN_VALUE, sum = 0;
-
+        BenchmarkResult res = null;
         // TODO: refactor some of these codes when we have DEL/UPD benchmarks
         if (bench == ProcBenchmark.ADD) {
-            for (int i = 0; i < counter; i++) {
-                int base = config.procedurecount + i;
-                String path = jarPath + "uac_add_" + base + ".jar";
-                jarBytes = readFileIntoByteArray(path);
-
-                path = jarPath + "stmts_add_" + base + ".txt";
-                creatProcsStmts = new String(readFileIntoByteArray(path));
-                System.out.println("Invocation " + i + ":" + creatProcsStmts);
-                duration = doUpdateClassesWork(null, jarBytes, null, creatProcsStmts);
-                sum += duration;
-                if (duration > max) max = duration;
-                if (duration < min) min = duration;
-            }
+            res = runAdd(client, config, jarPath);
         } else if (bench == ProcBenchmark.ADD_BATCH) {
-            for (int i = 0; i < counter; i++) {
-                int base = config.procedurecount + i * config.batchsize;
-                String path = jarPath + "uac_add_batch_" + base + ".jar";
-                jarBytes = readFileIntoByteArray(path);
-                path = jarPath + "stmts_add_batch_" + base + ".txt";
-                creatProcsStmts = new String(readFileIntoByteArray(path));
-                System.out.println("Invocation " + i + ":" + creatProcsStmts);
-                duration = doUpdateClassesWork(null, jarBytes, null, creatProcsStmts);
-                sum += duration;
-                if (duration > max) max = duration;
-                if (duration < min) min = duration;
-            }
+            res = runAddBatch(client, config, jarPath);
+        } else if (bench == ProcBenchmark.DELETE) {
+            res = runDel(client, config, jarPath);
+        } else if (bench == ProcBenchmark.DELETE_BATCH) {
+            res = runDelBatch(client, config, jarPath);
+        } else if (bench == ProcBenchmark.UPDATE) {
+            res = runUpd(client, config, jarPath);
         }
 
-        double avg = toMillis(sum / counter);
+        double avg = toMillis(res.sum / config.invocations);
         System.out.printf("\n(Benchmark %s ran %d times in average %f ms, min %f ms, max %f ms)\n",
-                config.name, counter, avg, toMillis(min), toMillis(max));
+                config.name, config.invocations, avg, toMillis(res.min), toMillis(res.max));
 
         //retrieve stats
         ClientStats stats = fullStatsContext.fetch().getStats();
         // write stats to file
         //client.writeSummaryCSV(stats, config.statsfile);
 
-        fw.append(String.format("%s,%d,-1,%f,0,0,%f,%f,0,0,0,0,0,0\n",
+        // name, duration,invocations/tps,latmin,latmax,lat95,lat99
+        fw.append(String.format("%s,-1,%f,0,0,%f,%f,0,0,0,0,0,0\n",
                                 config.name,
-                                stats.getStartTimestamp(),
-                                toMillis(max),
-                                toMillis(min),
-                                avg/1000.0));
+                                avg,
+                                toMillis(res.min),
+                                toMillis(res.max)
+                                ));
 
+        fw.flush();
+        fw.close();
         // block until all outstanding txns return
         client.drain();
         // close down the client connections

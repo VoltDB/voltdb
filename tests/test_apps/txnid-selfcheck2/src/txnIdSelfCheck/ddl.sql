@@ -265,6 +265,36 @@ CREATE TABLE capp
 ) );
 PARTITION TABLE capp ON COLUMN p;
 
+-- import table
+CREATE TABLE importp
+(
+  ts         bigint             NOT NULL
+, cid        tinyint            NOT NULL
+, cnt        bigint             NOT NULL
+, CONSTRAINT PK_IMPORT_id_p PRIMARY KEY
+  (
+    cid
+  )
+, UNIQUE ( cid )
+);
+PARTITION TABLE importp ON COLUMN cid;
+CREATE INDEX P_IMPORTCIDINDEX ON importp (cid);
+
+-- import table
+CREATE TABLE importr
+(
+  ts         bigint             NOT NULL
+, cid        tinyint            NOT NULL
+, cnt        bigint             NOT NULL
+, CONSTRAINT PK_IMPORT_id_r PRIMARY KEY
+  (
+    cid
+  )
+, UNIQUE ( cid )
+);
+PARTITION TABLE importr ON COLUMN cid;
+CREATE INDEX R_IMPORTCIDINDEX ON importp (cid);
+
 -- base procedures you shouldn't call
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.UpdateBaseProc;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.ReplicatedUpdateBaseProc;
@@ -320,5 +350,9 @@ PARTITION PROCEDURE CAPPTableInsert ON TABLE capp COLUMN p;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.CAPRTableInsert;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.CAPPCountPartitionRows;
 PARTITION PROCEDURE CAPPCountPartitionRows ON TABLE capp COLUMN p;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.ImportInsertP;
+PARTITION PROCEDURE ImportInsertP ON TABLE importp COLUMN cid PARAMETER 3;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.ImportInsertR;
+PARTITION PROCEDURE ImportInsertR ON TABLE importr COLUMN cid PARAMETER 3;
 
 END_OF_BATCH
