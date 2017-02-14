@@ -37,6 +37,15 @@ public interface ConsumerDRGateway extends Promotable {
 
     Map<Byte, DRRoleStats.State> getStates();
 
+    /**
+     * If this cluster was a joiner (at some point) dataSourceCluster will not be -1. If this is the case
+     * the trackers for this clusterId must exist. If they don't exist, this cluster did not finish loading
+     * the snapshot as a joiner.
+     * @param dataSourceCluster
+     * @param expectedClusterMembers
+     * @return false if this cluster is a joiner and the sync snapshot did not finish loading form the
+     *         leader cluster
+     */
     boolean isSyncSnapshotComplete(byte dataSourceCluster, List<MeshMemberInfo> expectedClusterMembers);
 
     void initialize(boolean resumeReplication);
