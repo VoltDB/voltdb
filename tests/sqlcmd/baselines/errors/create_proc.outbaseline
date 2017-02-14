@@ -34,7 +34,7 @@ create procedure from class sqlcmdtest.Trivial;
 @SnapshotStatus           
 @Statistics               	statisticscomponent, bit
 @StopNode                 	int
-@SwapTables               	vharchar, varchar
+@SwapTables               	varchar, varchar
 @SystemCatalog            	metadataselector
 @SystemInformation        	sysinfoselector
 @UpdateApplicationCatalog 	varchar, varchar
@@ -80,7 +80,7 @@ Command succeeded.
 @SnapshotStatus           
 @Statistics               	statisticscomponent, bit
 @StopNode                 	int
-@SwapTables               	vharchar, varchar
+@SwapTables               	varchar, varchar
 @SystemCatalog            	metadataselector
 @SystemInformation        	sysinfoselector
 @UpdateApplicationCatalog 	varchar, varchar
@@ -113,7 +113,7 @@ Command succeeded.
 @SnapshotStatus           
 @Statistics               	statisticscomponent, bit
 @StopNode                 	int
-@SwapTables               	vharchar, varchar
+@SwapTables               	varchar, varchar
 @SystemCatalog            	metadataselector
 @SystemInformation        	sysinfoselector
 @UpdateApplicationCatalog 	varchar, varchar
@@ -186,7 +186,7 @@ create procedure from class sqlcmdtest.Trivial;
 @SnapshotStatus           
 @Statistics               	statisticscomponent, bit
 @StopNode                 	int
-@SwapTables               	vharchar, varchar
+@SwapTables               	varchar, varchar
 @SystemCatalog            	metadataselector
 @SystemInformation        	sysinfoselector
 @UpdateApplicationCatalog 	varchar, varchar
@@ -237,7 +237,7 @@ Command succeeded.
 @SnapshotStatus           
 @Statistics               	statisticscomponent, bit
 @StopNode                 	int
-@SwapTables               	vharchar, varchar
+@SwapTables               	varchar, varchar
 @SystemCatalog            	metadataselector
 @SystemInformation        	sysinfoselector
 @UpdateApplicationCatalog 	varchar, varchar
@@ -296,7 +296,7 @@ Command succeeded.
 @SnapshotStatus           
 @Statistics               	statisticscomponent, bit
 @StopNode                 	int
-@SwapTables               	vharchar, varchar
+@SwapTables               	varchar, varchar
 @SystemCatalog            	metadataselector
 @SystemInformation        	sysinfoselector
 @UpdateApplicationCatalog 	varchar, varchar
@@ -356,7 +356,7 @@ Command succeeded.
 @SnapshotStatus           
 @Statistics               	statisticscomponent, bit
 @StopNode                 	int
-@SwapTables               	vharchar, varchar
+@SwapTables               	varchar, varchar
 @SystemCatalog            	metadataselector
 @SystemInformation        	sysinfoselector
 @UpdateApplicationCatalog 	varchar, varchar
@@ -415,7 +415,7 @@ Command succeeded.
 @SnapshotStatus           
 @Statistics               	statisticscomponent, bit
 @StopNode                 	int
-@SwapTables               	vharchar, varchar
+@SwapTables               	varchar, varchar
 @SystemCatalog            	metadataselector
 @SystemInformation        	sysinfoselector
 @UpdateApplicationCatalog 	varchar, varchar

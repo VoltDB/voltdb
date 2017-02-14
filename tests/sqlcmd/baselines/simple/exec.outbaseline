@@ -97,118 +97,270 @@ create table t2 ( c integer, d varchar(4), e varchar(4) );
 Command succeeded.
 
 exec T.insert 1,'a';
+modified_tuples 
+----------------
+               1
+
 (Returned 1 rows in #.##s)
 
 execute T.insert 2 ab;
+modified_tuples 
+----------------
+               1
+
 (Returned 1 rows in #.##s)
 
 exec T.insert 3 'abc';
+modified_tuples 
+----------------
+               1
+
 (Returned 1 rows in #.##s)
 
 execute T.insert,4,abcd;
+modified_tuples 
+----------------
+               1
+
 (Returned 1 rows in #.##s)
 
  exec T.insert 11, 'a';
+modified_tuples 
+----------------
+               1
+
 (Returned 1 rows in #.##s)
 
   execute T.insert 12 ab;
+modified_tuples 
+----------------
+               1
+
 (Returned 1 rows in #.##s)
 
 exec    T.insert 13 , 'abc';
+modified_tuples 
+----------------
+               1
+
 (Returned 1 rows in #.##s)
 
 execute  T.insert  ,  14  ,  abcd;
+modified_tuples 
+----------------
+               1
+
 (Returned 1 rows in #.##s)
 
 	exec T.insert 21, 'a';
+modified_tuples 
+----------------
+               1
+
 (Returned 1 rows in #.##s)
 
   execute T.insert	22	ab;
+modified_tuples 
+----------------
+               1
+
 (Returned 1 rows in #.##s)
 
 exec 	  T.insert 23	,	'abc';
+modified_tuples 
+----------------
+               1
+
 (Returned 1 rows in #.##s)
 
 execute		T.insert		,		24		,		abcd;
+modified_tuples 
+----------------
+               1
+
 (Returned 1 rows in #.##s)
 
 exec    T.insert 31,  'a z';
+modified_tuples 
+----------------
+               1
+
 (Returned 1 rows in #.##s)
 
 execute T.insert 32   ' ab';
+modified_tuples 
+----------------
+               1
+
 (Returned 1 rows in #.##s)
 
 exec    T.insert 33 , 'abc ';
+modified_tuples 
+----------------
+               1
+
 (Returned 1 rows in #.##s)
 
  exec   T.insert 41,  'a;z';
+modified_tuples 
+----------------
+               1
+
 (Returned 1 rows in #.##s)
 
 execute T.insert 42   ';ab';
+modified_tuples 
+----------------
+               1
+
 (Returned 1 rows in #.##s)
 
 EXEC    T.insert 43 , 'abc;';
+modified_tuples 
+----------------
+               1
+
 (Returned 1 rows in #.##s)
 
 exec    T.insert 51,  'a,z';
+modified_tuples 
+----------------
+               1
+
 (Returned 1 rows in #.##s)
 
 execute T.insert 52   ',ab';
+modified_tuples 
+----------------
+               1
+
 (Returned 1 rows in #.##s)
 
 EXECUTE T.insert 53 , 'abc,';
+modified_tuples 
+----------------
+               1
+
 (Returned 1 rows in #.##s)
 
 exec    T.insert 61,  ' ,;';
+modified_tuples 
+----------------
+               1
+
 (Returned 1 rows in #.##s)
 
 execute T.insert 62   '; ,';
+modified_tuples 
+----------------
+               1
+
 (Returned 1 rows in #.##s)
 
 EXECUTE T.insert 63 , ';,  ';
+modified_tuples 
+----------------
+               1
+
 (Returned 1 rows in #.##s)
 
 EXECUTE T.insert 71 ,
  ';,  ';
+modified_tuples 
+----------------
+               1
+
 (Returned 1 rows in #.##s)
 
 exec    T.insert 81,  'x''';
+modified_tuples 
+----------------
+               1
+
 (Returned 1 rows in #.##s)
 
 exec    T.insert 82,  '''y';
+modified_tuples 
+----------------
+               1
+
 (Returned 1 rows in #.##s)
 
 exec    T.insert 83,  '''z''';
+modified_tuples 
+----------------
+               1
+
 (Returned 1 rows in #.##s)
 
 exec    T.insert 84,  ''' ''';
+modified_tuples 
+----------------
+               1
+
 (Returned 1 rows in #.##s)
 
 exec    T.insert 85,  '" "';
+modified_tuples 
+----------------
+               1
+
 (Returned 1 rows in #.##s)
 
 exec    T.insert 86,  ''' "';
+modified_tuples 
+----------------
+               1
+
 (Returned 1 rows in #.##s)
 
 exec    T.insert 87,  ''' "';
+modified_tuples 
+----------------
+               1
+
 (Returned 1 rows in #.##s)
 
 exec    T2.insert 88,  ''' '  ' ''';
+modified_tuples 
+----------------
+               1
+
 (Returned 1 rows in #.##s)
 
 exec    T.insert 91,  '( )';
+modified_tuples 
+----------------
+               1
+
 (Returned 1 rows in #.##s)
 
 exec    T.insert 92,  ')';
+modified_tuples 
+----------------
+               1
+
 (Returned 1 rows in #.##s)
 
 exec    T.insert 93,  '"(';
+modified_tuples 
+----------------
+               1
+
 (Returned 1 rows in #.##s)
 
 exec    T.insert 94,  '''()';
+modified_tuples 
+----------------
+               1
+
 (Returned 1 rows in #.##s)
 
 exec    T2.insert 95,  '('  ')';
+modified_tuples 
+----------------
+               1
+
 (Returned 1 rows in #.##s)
 
 exec p 'abc'    'abd';

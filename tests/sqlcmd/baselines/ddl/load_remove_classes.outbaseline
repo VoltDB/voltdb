@@ -84,7 +84,7 @@ Command succeeded.
 @SnapshotStatus           
 @Statistics               	statisticscomponent, bit
 @StopNode                 	int
-@SwapTables               	vharchar, varchar
+@SwapTables               	varchar, varchar
 @SystemCatalog            	metadataselector
 @SystemInformation        	sysinfoselector
 @UpdateApplicationCatalog 	varchar, varchar
@@ -123,7 +123,7 @@ Command succeeded.
 @SnapshotStatus           
 @Statistics               	statisticscomponent, bit
 @StopNode                 	int
-@SwapTables               	vharchar, varchar
+@SwapTables               	varchar, varchar
 @SystemCatalog            	metadataselector
 @SystemInformation        	sysinfoselector
 @UpdateApplicationCatalog 	varchar, varchar
@@ -168,6 +168,10 @@ C1
 (Returned 1 rows in #.##s)
 
 exec InsertEmployee John Smith Engineering;
+  
+--
+ 1
+
 (Returned 1 rows in #.##s)
 
 select * from EMPLOYEE;
@@ -185,6 +189,10 @@ C1
 (Returned 1 rows in #.##s)
 
 exec InsertEmployee Jane Jones Sales;
+  
+--
+ 1
+
 (Returned 1 rows in #.##s)
 
 select * from EMPLOYEE;
@@ -226,7 +234,7 @@ Command succeeded.
 @SnapshotStatus           
 @Statistics               	statisticscomponent, bit
 @StopNode                 	int
-@SwapTables               	vharchar, varchar
+@SwapTables               	varchar, varchar
 @SystemCatalog            	metadataselector
 @SystemInformation        	sysinfoselector
 @UpdateApplicationCatalog 	varchar, varchar
