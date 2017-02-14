@@ -174,8 +174,11 @@ class VoltNetwork implements Runnable, IOStatsIntf
             final ReverseDNSPolicy dns,
             final CipherExecutor cipherService,
             final SSLEngine sslEngine) throws IOException {
-        channel.configureBlocking (false);
-        channel.socket().setKeepAlive(true);
+
+        synchronized(channel.blockingLock()) {
+            channel.configureBlocking (false);
+            channel.socket().setKeepAlive(true);
+        }
 
         Callable<Connection> registerTask = new Callable<Connection>() {
             @Override

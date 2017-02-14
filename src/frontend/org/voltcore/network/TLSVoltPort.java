@@ -241,19 +241,11 @@ public class TLSVoltPort extends VoltPort  {
      * and decrypt taks
      */
     private final AtomicBoolean m_signal = new AtomicBoolean(false);
-    /*
-     * All interactions with write stream must be protected
-     * with a lock to ensure that interests ops are consistent with
-     * the state of writes queued to the stream. This prevent
-     * lost queued writes where the write is queued
-     * but the write interest op is not set.
-     */
+
     @Override
     protected void enableWriteSelection() {
-        synchronized (m_writeStream) {
-            m_signal.set(true);
-            super.enableWriteSelection();
-        }
+        m_signal.set(true);
+        super.enableWriteSelection();
     }
 
     @Override

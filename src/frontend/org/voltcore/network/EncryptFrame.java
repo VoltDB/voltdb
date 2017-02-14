@@ -63,6 +63,10 @@ class EncryptFrame {
         this(1, 1, UNCHUNKED_SIGIL, msgs, source, source);
     }
 
+    EncryptFrame(ByteBuf source, int delta, int msgs) {
+        this(1, 1, delta, msgs, source, source);
+    }
+
     public boolean isChunked() {
         return delta != UNCHUNKED_SIGIL;
     }
