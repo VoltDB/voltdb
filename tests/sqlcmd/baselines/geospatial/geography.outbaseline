@@ -12,31 +12,15 @@ create procedure make_polygon as
 Command succeeded.
 
 exec make_polygon 1 'polygon((-64.751 32.305, -80.437 25.244, -66.371 18.476, -64.751 32.305))';
-modified_tuples 
-----------------
-               1
-
 (Returned 1 rows in #.##s)
 
 exec make_polygon 2 'PoLyGoN((-64.751 32.305, -80.437 25.244, -66.371 18.476, -64.751 32.305))';
-modified_tuples 
-----------------
-               1
-
 (Returned 1 rows in #.##s)
 
 exec make_polygon 3 '  POLYGON  (  (  -64.751 32.305  ,  -80.437  25.244   ,  -66.371 18.476    ,  -64.751 32.305   )  ) ';
-modified_tuples 
-----------------
-               1
-
 (Returned 1 rows in #.##s)
 
 exec make_polygon 4 '  POLYGON(( -64.751 32.305,-80.437 25.244,-66.371 18.476,-64.751 32.305), (-68.874 28.066,-68.855 25.361,-73.381 28.376,-68.874 28.066))';
-modified_tuples 
-----------------
-               1
-
 (Returned 1 rows in #.##s)
 
 exec make_polygon 100 'NOT_A_POLYGON(...)';
@@ -56,10 +40,6 @@ exec make_polygon 106 'POLYGON ()';
 exec make_polygon 107 'POLYGON ((10 10, 20 20, 30 30))';
 
 exec make_polygon 200 null;
-modified_tuples 
-----------------
-               1
-
 (Returned 1 rows in #.##s)
 
 select * from polygons;

@@ -40,59 +40,27 @@ insert into FOO values ('2015-11-111 10:10:10', 'sqlfail');
 insert into FOO values ('2015-11-11 10:10:10.', 'sqlfail');
 
 exec FOO.insert '2015-11-11 10:11:12.123456' 'crud';
-modified_tuples 
-----------------
-               1
-
 (Returned 1 rows in #.##s)
 
 exec FOO.insert '2015-11-11 10:11:12.12345'  'crud';
-modified_tuples 
-----------------
-               1
-
 (Returned 1 rows in #.##s)
 
 exec FOO.insert '2015-11-11 10:11:12.1234'   'crud';
-modified_tuples 
-----------------
-               1
-
 (Returned 1 rows in #.##s)
 
 exec FOO.insert '2015-11-11 10:11:12.123'    'crud';
-modified_tuples 
-----------------
-               1
-
 (Returned 1 rows in #.##s)
 
 exec FOO.insert '2015-11-11 10:11:12.12'     'crud';
-modified_tuples 
-----------------
-               1
-
 (Returned 1 rows in #.##s)
 
 exec FOO.insert '2015-11-11 10:11:12.1'      'crud';
-modified_tuples 
-----------------
-               1
-
 (Returned 1 rows in #.##s)
 
 exec FOO.insert '2015-11-11 10:11:12'        'crud';
-modified_tuples 
-----------------
-               1
-
 (Returned 1 rows in #.##s)
 
 exec FOO.insert '2015-11-11'                 'crud';
-modified_tuples 
-----------------
-               1
-
 (Returned 1 rows in #.##s)
 
 exec FOO.insert '20150-11-11 10:10:10' 'crudfail';
