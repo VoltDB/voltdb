@@ -19,6 +19,9 @@ package org.voltdb;
 
 import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Map.Entry;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.catalog.Procedure;
@@ -36,88 +39,99 @@ class ProcedureStatsCollector extends SiteStatsSource {
      */
     final int timeCollectionInterval = 20;
 
-    /**
-     * Number of times this procedure has been invoked.
-     */
-    private long m_invocations = 0;
-    private long m_lastInvocations = 0;
+    class ProcedureStats {
+        /**
+         * The name of the statement.
+         */
+        private String m_stmtName;
 
-    /**
-     * Number of timed invocations
-     */
-    private long m_timedInvocations = 0;
-    private long m_lastTimedInvocations = 0;
+        /**
+         * Number of times this procedure has been invoked.
+         */
+        private long m_invocations = 0;
+        private long m_lastInvocations = 0;
 
-    /**
-     * Total amount of timed execution time
-     */
-    private long m_totalTimedExecutionTime = 0;
-    private long m_lastTotalTimedExecutionTime = 0;
+        /**
+         * Number of timed invocations
+         */
+        private long m_timedInvocations = 0;
+        private long m_lastTimedInvocations = 0;
 
-    /**
-     * Shortest amount of time this procedure has executed in
-     */
-    private long m_minExecutionTime = Long.MAX_VALUE;
-    private long m_lastMinExecutionTime = Long.MAX_VALUE;
+        /**
+         * Total amount of timed execution time
+         */
+        private long m_totalTimedExecutionTime = 0;
+        private long m_lastTotalTimedExecutionTime = 0;
 
-    /**
-     * Longest amount of time this procedure has executed in
-     */
-    private long m_maxExecutionTime = Long.MIN_VALUE;
-    private long m_lastMaxExecutionTime = Long.MIN_VALUE;
+        /**
+         * Shortest amount of time this procedure has executed in
+         */
+        private long m_minExecutionTime = Long.MAX_VALUE;
+        private long m_lastMinExecutionTime = Long.MAX_VALUE;
 
-    /**
-     * Time the procedure was last started
-     */
-    private long m_currentStartTime = -1;
+        /**
+         * Longest amount of time this procedure has executed in
+         */
+        private long m_maxExecutionTime = Long.MIN_VALUE;
+        private long m_lastMaxExecutionTime = Long.MIN_VALUE;
 
-    /**
-     * Count of the number of aborts (user initiated or DB initiated)
-     */
-    private long m_abortCount = 0;
-    private long m_lastAbortCount = 0;
+        /**
+         * Time the procedure was last started
+         */
+        private long m_currentStartTime = -1;
 
-    /**
-     * Count of the number of errors that occured during procedure execution
-     */
-    private long m_failureCount = 0;
-    private long m_lastFailureCount = 0;
+        /**
+         * Count of the number of aborts (user initiated or DB initiated)
+         */
+        private long m_abortCount = 0;
+        private long m_lastAbortCount = 0;
 
-    /**
-     * Smallest result size
-     */
-    private int m_minResultSize = Integer.MAX_VALUE;
-    private int m_lastMinResultSize = Integer.MAX_VALUE;
+        /**
+         * Count of the number of errors that occured during procedure execution
+         */
+        private long m_failureCount = 0;
+        private long m_lastFailureCount = 0;
 
-    /**
-     * Largest result size
-     */
-    private int m_maxResultSize = Integer.MIN_VALUE;
-    private int m_lastMaxResultSize = Integer.MIN_VALUE;
+        /**
+         * Smallest result size
+         */
+        private int m_minResultSize = Integer.MAX_VALUE;
+        private int m_lastMinResultSize = Integer.MAX_VALUE;
 
-    /**
-     * Total result size for calculating averages
-     */
-    private long m_totalResultSize = 0;
-    private long m_lastTotalResultSize = 0;
+        /**
+         * Largest result size
+         */
+        private int m_maxResultSize = Integer.MIN_VALUE;
+        private int m_lastMaxResultSize = Integer.MIN_VALUE;
 
-    /**
-     * Smallest parameter set size
-     */
-    private long m_minParameterSetSize = Long.MAX_VALUE;
-    private long m_lastMinParameterSetSize = Long.MAX_VALUE;
+        /**
+         * Total result size for calculating averages
+         */
+        private long m_totalResultSize = 0;
+        private long m_lastTotalResultSize = 0;
 
-    /**
-     * Largest parameter set size
-     */
-    private long m_maxParameterSetSize = Long.MIN_VALUE;
-    private long m_lastMaxParameterSetSize = Long.MIN_VALUE;
+        /**
+         * Smallest parameter set size
+         */
+        private long m_minParameterSetSize = Long.MAX_VALUE;
+        private long m_lastMinParameterSetSize = Long.MAX_VALUE;
 
-    /**
-     * Total parameter set size for calculating averages
-     */
-    private long m_totalParameterSetSize = 0;
-    private long m_lastTotalParameterSetSize = 0;
+        /**
+         * Largest parameter set size
+         */
+        private long m_maxParameterSetSize = Long.MIN_VALUE;
+        private long m_lastMaxParameterSetSize = Long.MIN_VALUE;
+
+        /**
+         * Total parameter set size for calculating averages
+         */
+        private long m_totalParameterSetSize = 0;
+        private long m_lastTotalParameterSetSize = 0;
+
+        public ProcedureStats(String stmtName) {
+            m_stmtName = stmtName;
+        }
+    }
 
     /**
      * Whether to return results in intervals since polling or since the beginning
@@ -127,21 +141,32 @@ class ProcedureStatsCollector extends SiteStatsSource {
     private final String m_procName;
     private final int m_partitionId;
 
+    private Map<SQLStmt, ProcedureStats> m_stats;
+    private ProcedureStats m_procStats;
+
     /**
      * Constructor requires no args because it has access to the enclosing classes members.
      */
-    public ProcedureStatsCollector(long siteId, int partitionId, Procedure catProc) {
+    public ProcedureStatsCollector(long siteId, int partitionId, Procedure catProc,
+                                   Map<SQLStmt, String> reversedStmtMap) {
         super(siteId, false);
         m_partitionId = partitionId;
         m_procName = catProc.getClassname();
+        m_stats = new LinkedHashMap<SQLStmt, ProcedureStats>();
+        m_procStats = new ProcedureStats("<ALL>");
+        // The NULL key entry is for the total statistics for the entire procedure.
+        m_stats.put(null, m_procStats);
+        for (Entry<SQLStmt, String> entry : reversedStmtMap.entrySet()) {
+            m_stats.put(entry.getKey(), new ProcedureStats(entry.getValue()));
+        }
     }
 
     /**
      * Called when a procedure begins executing. Caches the time the procedure starts.
      */
     public final void beginProcedure(boolean isSystemProc) {
-        if (m_invocations % timeCollectionInterval == 0 || (isSystemProc && isProcedureUAC())) {
-            m_currentStartTime = System.nanoTime();
+        if (m_procStats.m_invocations % timeCollectionInterval == 0 || (isSystemProc && isProcedureUAC())) {
+            m_procStats.m_currentStartTime = System.nanoTime();
         }
     }
 
@@ -154,11 +179,11 @@ class ProcedureStatsCollector extends SiteStatsSource {
             boolean failed,
             VoltTable[] results,
             ParameterSet parameterSet) {
-        if (m_currentStartTime > 0) {
+        if (m_procStats.m_currentStartTime > 0) {
             // This is a sampled invocation.
             // Update timings and size statistics.
             final long endTime = System.nanoTime();
-            final long delta = endTime - m_currentStartTime;
+            final long delta = endTime - m_procStats.m_currentStartTime;
             if (delta < 0)
             {
                 if (Math.abs(delta) > 1000000000)
@@ -170,14 +195,14 @@ class ProcedureStatsCollector extends SiteStatsSource {
             }
             else
             {
-                m_totalTimedExecutionTime += delta;
-                m_timedInvocations++;
+                m_procStats.m_totalTimedExecutionTime += delta;
+                m_procStats.m_timedInvocations++;
 
                 // sampled timings
-                m_minExecutionTime = Math.min( delta, m_minExecutionTime);
-                m_maxExecutionTime = Math.max( delta, m_maxExecutionTime);
-                m_lastMinExecutionTime = Math.min( delta, m_lastMinExecutionTime);
-                m_lastMaxExecutionTime = Math.max( delta, m_lastMaxExecutionTime);
+                m_procStats.m_minExecutionTime = Math.min( delta, m_procStats.m_minExecutionTime);
+                m_procStats.m_maxExecutionTime = Math.max( delta, m_procStats.m_maxExecutionTime);
+                m_procStats.m_lastMinExecutionTime = Math.min( delta, m_procStats.m_lastMinExecutionTime);
+                m_procStats.m_lastMaxExecutionTime = Math.max( delta, m_procStats.m_lastMaxExecutionTime);
 
                 // sampled size statistics
                 int resultSize = 0;
@@ -186,28 +211,28 @@ class ProcedureStatsCollector extends SiteStatsSource {
                         resultSize += result.getSerializedSize();
                     }
                 }
-                m_totalResultSize += resultSize;
-                m_minResultSize = Math.min(resultSize, m_minResultSize);
-                m_maxResultSize = Math.max(resultSize, m_maxResultSize);
-                m_lastMinResultSize = Math.min(resultSize, m_lastMinResultSize);
-                m_lastMaxResultSize = Math.max(resultSize, m_lastMaxResultSize);
+                m_procStats.m_totalResultSize += resultSize;
+                m_procStats.m_minResultSize = Math.min(resultSize, m_procStats.m_minResultSize);
+                m_procStats.m_maxResultSize = Math.max(resultSize, m_procStats.m_maxResultSize);
+                m_procStats.m_lastMinResultSize = Math.min(resultSize, m_procStats.m_lastMinResultSize);
+                m_procStats.m_lastMaxResultSize = Math.max(resultSize, m_procStats.m_lastMaxResultSize);
                 long parameterSetSize = (
                         parameterSet != null ? parameterSet.getSerializedSize() : 0);
-                m_totalParameterSetSize += parameterSetSize;
-                m_minParameterSetSize = Math.min(parameterSetSize, m_minParameterSetSize);
-                m_maxParameterSetSize = Math.max(parameterSetSize, m_maxParameterSetSize);
-                m_lastMinParameterSetSize = Math.min(parameterSetSize, m_lastMinParameterSetSize);
-                m_lastMaxParameterSetSize = Math.max(parameterSetSize, m_lastMaxParameterSetSize);
+                m_procStats.m_totalParameterSetSize += parameterSetSize;
+                m_procStats.m_minParameterSetSize = Math.min(parameterSetSize, m_procStats.m_minParameterSetSize);
+                m_procStats.m_maxParameterSetSize = Math.max(parameterSetSize, m_procStats.m_maxParameterSetSize);
+                m_procStats.m_lastMinParameterSetSize = Math.min(parameterSetSize, m_procStats.m_lastMinParameterSetSize);
+                m_procStats.m_lastMaxParameterSetSize = Math.max(parameterSetSize, m_procStats.m_lastMaxParameterSetSize);
             }
-            m_currentStartTime = -1;
+            m_procStats.m_currentStartTime = -1;
         }
         if (aborted) {
-            m_abortCount++;
+            m_procStats.m_abortCount++;
         }
         if (failed) {
-            m_failureCount++;
+            m_procStats.m_failureCount++;
         }
-        m_invocations++;
+        m_procStats.m_invocations++;
     }
 
     /**
@@ -221,51 +246,51 @@ class ProcedureStatsCollector extends SiteStatsSource {
         super.updateStatsRow(rowKey, rowValues);
         rowValues[columnNameToIndex.get("PARTITION_ID")] = m_partitionId;
         rowValues[columnNameToIndex.get("PROCEDURE")] = m_procName;
-        long invocations = m_invocations;
-        long totalTimedExecutionTime = m_totalTimedExecutionTime;
-        long timedInvocations = m_timedInvocations;
-        long minExecutionTime = m_minExecutionTime;
-        long maxExecutionTime = m_maxExecutionTime;
-        long abortCount = m_abortCount;
-        long failureCount = m_failureCount;
-        int minResultSize = m_minResultSize;
-        int maxResultSize = m_maxResultSize;
-        long totalResultSize = m_totalResultSize;
-        long minParameterSetSize = m_minParameterSetSize;
-        long maxParameterSetSize = m_maxParameterSetSize;
-        long totalParameterSetSize = m_totalParameterSetSize;
+        long invocations = m_procStats.m_invocations;
+        long totalTimedExecutionTime = m_procStats.m_totalTimedExecutionTime;
+        long timedInvocations = m_procStats.m_timedInvocations;
+        long minExecutionTime = m_procStats.m_minExecutionTime;
+        long maxExecutionTime = m_procStats.m_maxExecutionTime;
+        long abortCount = m_procStats.m_abortCount;
+        long failureCount = m_procStats.m_failureCount;
+        int minResultSize = m_procStats.m_minResultSize;
+        int maxResultSize = m_procStats.m_maxResultSize;
+        long totalResultSize = m_procStats.m_totalResultSize;
+        long minParameterSetSize = m_procStats.m_minParameterSetSize;
+        long maxParameterSetSize = m_procStats.m_maxParameterSetSize;
+        long totalParameterSetSize = m_procStats.m_totalParameterSetSize;
 
         if (m_interval) {
-            invocations = m_invocations - m_lastInvocations;
-            m_lastInvocations = m_invocations;
+            invocations = m_procStats.m_invocations - m_procStats.m_lastInvocations;
+            m_procStats.m_lastInvocations = m_procStats.m_invocations;
 
-            totalTimedExecutionTime = m_totalTimedExecutionTime - m_lastTotalTimedExecutionTime;
-            m_lastTotalTimedExecutionTime = m_totalTimedExecutionTime;
+            totalTimedExecutionTime = m_procStats.m_totalTimedExecutionTime - m_procStats.m_lastTotalTimedExecutionTime;
+            m_procStats.m_lastTotalTimedExecutionTime = m_procStats.m_totalTimedExecutionTime;
 
-            timedInvocations = m_timedInvocations - m_lastTimedInvocations;
-            m_lastTimedInvocations = m_timedInvocations;
+            timedInvocations = m_procStats.m_timedInvocations - m_procStats.m_lastTimedInvocations;
+            m_procStats.m_lastTimedInvocations = m_procStats.m_timedInvocations;
 
-            abortCount = m_abortCount - m_lastAbortCount;
-            m_lastAbortCount = m_abortCount;
+            abortCount = m_procStats.m_abortCount - m_procStats.m_lastAbortCount;
+            m_procStats.m_lastAbortCount = m_procStats.m_abortCount;
 
-            failureCount = m_failureCount - m_lastFailureCount;
-            m_lastFailureCount = m_failureCount;
+            failureCount = m_procStats.m_failureCount - m_procStats.m_lastFailureCount;
+            m_procStats.m_lastFailureCount = m_procStats.m_failureCount;
 
-            minExecutionTime = m_lastMinExecutionTime;
-            maxExecutionTime = m_lastMaxExecutionTime;
-            m_lastMinExecutionTime = Long.MAX_VALUE;
-            m_lastMaxExecutionTime = Long.MIN_VALUE;
+            minExecutionTime = m_procStats.m_lastMinExecutionTime;
+            maxExecutionTime = m_procStats.m_lastMaxExecutionTime;
+            m_procStats.m_lastMinExecutionTime = Long.MAX_VALUE;
+            m_procStats.m_lastMaxExecutionTime = Long.MIN_VALUE;
 
-            minResultSize = m_lastMinResultSize;
-            maxResultSize = m_lastMaxResultSize;
-            m_lastMinResultSize = Integer.MAX_VALUE;
-            m_lastMaxResultSize = Integer.MIN_VALUE;
+            minResultSize = m_procStats.m_lastMinResultSize;
+            maxResultSize = m_procStats.m_lastMaxResultSize;
+            m_procStats.m_lastMinResultSize = Integer.MAX_VALUE;
+            m_procStats.m_lastMaxResultSize = Integer.MIN_VALUE;
 
-            totalResultSize = m_totalResultSize - m_lastTotalResultSize;
-            m_lastTotalResultSize = m_totalResultSize;
+            totalResultSize = m_procStats.m_totalResultSize - m_procStats.m_lastTotalResultSize;
+            m_procStats.m_lastTotalResultSize = m_procStats.m_totalResultSize;
 
-            totalParameterSetSize = m_totalParameterSetSize - m_lastTotalParameterSetSize;
-            m_lastTotalParameterSetSize = m_totalParameterSetSize;
+            totalParameterSetSize = m_procStats.m_totalParameterSetSize - m_procStats.m_lastTotalParameterSetSize;
+            m_procStats.m_lastTotalParameterSetSize = m_procStats.m_totalParameterSetSize;
         }
 
         rowValues[columnNameToIndex.get("INVOCATIONS")] = invocations;
@@ -367,7 +392,7 @@ class ProcedureStatsCollector extends SiteStatsSource {
      * @return the m_invocations
      */
     public long getInvocations() {
-        return m_invocations;
+        return m_procStats.m_invocations;
     }
 
     /**
@@ -375,7 +400,7 @@ class ProcedureStatsCollector extends SiteStatsSource {
      * @return the m_lastInvocations
      */
     public long getLastInvocations() {
-        return m_lastInvocations;
+        return m_procStats.m_lastInvocations;
     }
 
     public int getPartitionId() {
