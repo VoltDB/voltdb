@@ -1259,18 +1259,22 @@ public class TestWindowedFunctions extends PlannerTestCase {
             // problems.
             //
             // We have an index on CTR + 100.
-            validatePlan("select * from O4 where CTR + 100 < 1000",
+            validatePlan("select * from O4 where CTR + 100 < 1000 order by id",
                          1,
                          PlanNodeType.SEND,
+                         PlanNodeType.PROJECTION,
+                         PlanNodeType.ORDERBY,
                          PlanNodeType.INDEXSCAN);
             // We don't have an index on CTR + 200.
             // But this is planned as CTR + P where P is a
             // parameter which knows it has been created from
             // a value of 100.  So, when we add 200 we should
             // not match, and we should not get an INDEXSCAN.
-            validatePlan("select * from O4 where CTR + 200 < 100",
+            validatePlan("select * from O4 where CTR + 200 < 100 order by id",
                          1,
                          PlanNodeType.SEND,
+                         PlanNodeType.PROJECTION,
+                         PlanNodeType.ORDERBY,
                          PlanNodeType.SEQSCAN);
         }
     }

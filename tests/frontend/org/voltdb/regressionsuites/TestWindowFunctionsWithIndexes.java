@@ -124,7 +124,7 @@ public class TestWindowFunctionsWithIndexes extends RegressionSuite {
                            String     tableName,
                            Object     tableContents[][]) throws Exception {
         String insertCmd = tableName + ".insert";
-        // Object tmp[][] = shuffleArray(tableContents);
+        Object tmp[][] = shuffleArray(tableContents);
         for (int idx = 0; idx < tableContents.length; idx += 1) {
             client.callProcedure(insertCmd, tableContents[idx]);
         }
@@ -524,8 +524,8 @@ public class TestWindowFunctionsWithIndexes extends RegressionSuite {
             // in a very similar way in the planner, and we
             // want to test that we can choose the right one
             // here.
-            validateQuery(client, "select * from O4 where CTR + 100 < 1000", m_O4);
-            validateQuery(client, "select * from O4 where CTR + 200 < 1000", m_O4);
+            validateQuery(client, "select * from O4 where CTR + 100 < 1000 order by id", m_O4);
+            validateQuery(client, "select * from O4 where CTR + 200 < 1000 order by id", m_O4);
         }
 
     }
