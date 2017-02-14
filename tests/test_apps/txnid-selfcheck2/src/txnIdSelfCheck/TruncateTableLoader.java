@@ -31,6 +31,7 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.voltcore.logging.Level;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
@@ -82,6 +83,9 @@ public class TruncateTableLoader extends BenchmarkThread {
         setPriority(getPriority() + 1);
 
         log.info("TruncateTableLoader table: "+ tableName + " targetCount: " + targetCount);
+
+        // To get more detailed output, uncomment this:
+        //log.setLevel(Level.DEBUG);
     }
 
     void shutdown() {
@@ -236,8 +240,8 @@ public class TruncateTableLoader extends BenchmarkThread {
             }
 
             try {
-                log.info(tableName + " current row count is " + currentRowCount
-                        + "; " + swapTableName + " row count is " + swapRowCount);
+                log.debug(tableName + " current row count is " + currentRowCount
+                         + "; " + swapTableName + " row count is " + swapRowCount);
                 long p = 0;
                 ClientResponse clientResponse = null;
                 String tp = this.truncateProcedure;
@@ -325,8 +329,8 @@ public class TruncateTableLoader extends BenchmarkThread {
             }
 
             try {
-                log.info("scan agg: " + tableName + " current row count is " + currentRowCount
-                        + "; " + swapTableName + " row count is " + swapRowCount);
+                log.debug("scan agg: " + tableName + " current row count is " + currentRowCount
+                         + "; " + swapTableName + " row count is " + swapRowCount);
                 shouldRollback = (byte) (r.nextInt(10) == 0 ? 1 : 0);
                 long p = Math.abs(r.nextLong());
                 String sp = this.scanAggProcedure;
@@ -359,8 +363,8 @@ public class TruncateTableLoader extends BenchmarkThread {
                 // just need to fall through and get out
                 throw new RuntimeException(e);
             }
-            log.info("table: " + tableName + "; rows sent: " + insertsTried + "; inserted: "
-                    + rowsLoaded + "; truncates: " + nTruncates + "; swaps: " + nSwaps);
+            log.debug("table: " + tableName + "; rows sent: " + insertsTried + "; inserted: "
+                     + rowsLoaded + "; truncates: " + nTruncates + "; swaps: " + nSwaps);
         }
         log.info("TruncateTableLoader normal exit for table " + tableName + "; rows sent: " + insertsTried
                 + "; inserted: " + rowsLoaded + "; truncates: " + nTruncates + "; swaps: " + nSwaps);
