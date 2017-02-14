@@ -519,9 +519,13 @@ public class TestWindowFunctionsWithIndexes extends RegressionSuite {
         }
         if (IS_ENABLED) {
             // Test that similar indexes don't cause
-            // problems.  There is a
-            validateQuery(client, "select * from O4 where CTR + 100 < 1000.0", m_O4);
-            validateQuery(client, "select * from O4 where CTR + 200 < 1000.0", m_O4);
+            // problems.  There is an index on CTR + 100,
+            // but no index on CTR + 200.  We represent these
+            // in a very similar way in the planner, and we
+            // want to test that we can choose the right one
+            // here.
+            validateQuery(client, "select * from O4 where CTR + 100 < 1000", m_O4);
+            validateQuery(client, "select * from O4 where CTR + 200 < 1000", m_O4);
         }
 
     }

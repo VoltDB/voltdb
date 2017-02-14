@@ -550,11 +550,11 @@ public class TestWindowedFunctions extends PlannerTestCase {
                 + explainPlanText, explainPlanText.contains(expected));
     }
 
-    // These two can be used to disable particular tests.
-    // Change "if (IS_ENABLED) { ... }" to "if (ISNOT_ENABLED) { ... }"
-    // below.
+    // This can be used to disable particular tests.
+    // Change IS_ENABLED to false, and then change all
+    // the IS_ENABLED occurrences to something else, like
+    // IS_DEBUGGING, which you will have to define here.
     private static boolean IS_ENABLED = true;
-    private static boolean ISNOT_ENABLED = false;
 
     /**
      * There is some theory here.  There are four ranges of variation
@@ -1259,7 +1259,7 @@ public class TestWindowedFunctions extends PlannerTestCase {
             // problems.
             //
             // We have an index on CTR + 100.
-            validatePlan("select * from O4 where CTR + 100 < 1000.0",
+            validatePlan("select * from O4 where CTR + 100 < 1000",
                          1,
                          PlanNodeType.SEND,
                          PlanNodeType.INDEXSCAN);
@@ -1268,7 +1268,7 @@ public class TestWindowedFunctions extends PlannerTestCase {
             // parameter which knows it has been created from
             // a value of 100.  So, when we add 200 we should
             // not match, and we should not get an INDEXSCAN.
-            validatePlan("select * from O4 where CTR + 200 < 100.0",
+            validatePlan("select * from O4 where CTR + 200 < 100",
                          1,
                          PlanNodeType.SEND,
                          PlanNodeType.SEQSCAN);
