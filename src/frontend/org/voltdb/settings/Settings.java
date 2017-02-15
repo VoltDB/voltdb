@@ -22,15 +22,18 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.net.URI;
+import java.nio.file.Paths;
 import java.util.NavigableMap;
 import java.util.Properties;
 import java.util.UUID;
 
-import org.aeonbits.owner.Accessible;
-import org.aeonbits.owner.ConfigFactory;
 import org.voltdb.common.Constants;
 import org.voltdb.utils.Digester;
 import org.voltdb.utils.VoltFile;
+
+import org.aeonbits.owner.Accessible;
+import org.aeonbits.owner.ConfigFactory;
 
 import com.google_voltpatches.common.base.Joiner;
 import com.google_voltpatches.common.collect.ImmutableSortedMap;
@@ -41,7 +44,8 @@ public interface Settings extends Accessible {
     public static void initialize(File voltdbroot) {
         if (ConfigFactory.getProperty(Settings.CONFIG_DIR) == null) try {
             File confDH = new VoltFile(voltdbroot, Constants.CONFIG_DIR).getCanonicalFile();
-            ConfigFactory.setProperty(Settings.CONFIG_DIR, confDH.getPath());
+            String pathAsURI = confDH.toURI().getRawPath();
+            ConfigFactory.setProperty(Settings.CONFIG_DIR, pathAsURI);
         } catch (IOException e) {
             throw new SettingsException("failed to resolve the cluster settings directory", e);
         }
@@ -103,7 +107,8 @@ public interface Settings extends Accessible {
         if (configDN == null || configDN.trim().isEmpty()) {
             throw new IllegalStateException("property " + CONFIG_DIR + " must be defined");
         }
-        File configDH = new File(configDN);
+        URI uri = URI.create("file:" + configDN);
+        File configDH = Paths.get(uri).toFile();
         if (!configDH.exists() && !configDH.mkdirs()) {
             throw new SettingsException("failed to create " + configDN);
         }

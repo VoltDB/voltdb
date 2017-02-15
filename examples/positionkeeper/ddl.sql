@@ -20,8 +20,9 @@
 --  GROUP BY type;
 --
 -- CREATE PROCEDURE foo AS SELECT * FROM foo;
--- CREATE PROCEDURE FROM CLASS procedures.UpsertSymbol;
--- PARTITION PROCEDURE UpsertSymbol ON TABLE symbols COLUMN symbol PARAMETER 0;
+-- CREATE PROCEDURE PARTITION ON TABLE symbols COLUMN symbol [PARAMETER 0]
+--  FROM CLASS procedures.UpsertSymbol;
+--
 ---------------------------------------------------------------------------------
 
 ------------- REPLICATED TABLES --------------
@@ -95,37 +96,37 @@ PARTITION TABLE prc ON COLUMN prc_sec;
 LOAD CLASSES positionkeeper-procs.jar;
 
 -- CREATE PROCEDURE foo AS SELECT * FROM foo;
--- CREATE PROCEDURE FROM CLASS procedures.UpsertSymbol;
--- PARTITION PROCEDURE UpsertSymbol ON TABLE symbols COLUMN symbol PARAMETER 0;
+-- CREATE PROCEDURE PARTITION ON TABLE symbols COLUMN symbol
+--   FROM CLASS procedures.UpsertSymbol;
 
-CREATE PROCEDURE FROM CLASS positionkeeper.OrderInsert;
-PARTITION PROCEDURE OrderInsert ON TABLE ord COLUMN ord_sec PARAMETER 2;
+CREATE PROCEDURE PARTITION ON TABLE ord COLUMN ord_sec PARAMETER 2
+  FROM CLASS positionkeeper.OrderInsert;
 
-CREATE PROCEDURE FROM CLASS positionkeeper.TradeInsert;
-PARTITION PROCEDURE TradeInsert ON TABLE trd COLUMN trd_sec PARAMETER 2;
+CREATE PROCEDURE PARTITION ON TABLE trd COLUMN trd_sec PARAMETER 2
+  FROM CLASS positionkeeper.TradeInsert;
 
-CREATE PROCEDURE FROM CLASS positionkeeper.PriceInsert;
-PARTITION PROCEDURE PriceInsert ON TABLE prc COLUMN prc_sec PARAMETER 1;
+CREATE PROCEDURE PARTITION ON TABLE prc COLUMN prc_sec PARAMETER 1
+  FROM CLASS positionkeeper.PriceInsert;
 
-CREATE PROCEDURE get_all_pos_for_sec AS
-  SELECT * FROM pos WHERE codsec = ?;
-PARTITION PROCEDURE get_all_pos_for_sec ON TABLE pos COLUMN codsec PARAMETER 0;
+CREATE PROCEDURE get_all_pos_for_sec
+  PARTITION ON TABLE pos COLUMN codsec
+  AS SELECT * FROM pos WHERE codsec = ?;
 
-CREATE PROCEDURE get_all_pos_for_cnt AS
-SELECT * FROM pos WHERE codcnt = ?;
+CREATE PROCEDURE get_all_pos_for_cnt
+  AS SELECT * FROM pos WHERE codcnt = ?;
 
-CREATE PROCEDURE get_all_ord_for_sec_cnt AS
-  SELECT * FROM ord WHERE ord_sec = ? AND ord_cnt = ?;
-PARTITION PROCEDURE get_all_ord_for_sec_cnt ON TABLE ord COLUMN ord_sec PARAMETER 0;
+CREATE PROCEDURE get_all_ord_for_sec_cnt
+  PARTITION ON TABLE ord COLUMN ord_sec
+  AS SELECT * FROM ord WHERE ord_sec = ? AND ord_cnt = ?;
 
-CREATE PROCEDURE get_all_trd_for_sec_cnt AS
-  SELECT * FROM trd WHERE trd_sec = ? AND trd_cnt = ?;
-PARTITION PROCEDURE get_all_trd_for_sec_cnt ON TABLE trd COLUMN trd_sec PARAMETER 0;
+CREATE PROCEDURE get_all_trd_for_sec_cnt
+  PARTITION ON TABLE trd COLUMN trd_sec
+  AS SELECT * FROM trd WHERE trd_sec = ? AND trd_cnt = ?;
 
-CREATE PROCEDURE get_pos_exe_val_for_sec_cnt AS
-  SELECT pos_cum_val_exe FROM pos WHERE codsec = ? AND codcnt = ?;
-PARTITION PROCEDURE get_pos_exe_val_for_sec_cnt ON TABLE pos COLUMN codsec PARAMETER 0;
+CREATE PROCEDURE get_pos_exe_val_for_sec_cnt
+  PARTITION ON TABLE pos COLUMN codsec
+  AS SELECT pos_cum_val_exe FROM pos WHERE codsec = ? AND codcnt = ?;
 
-CREATE PROCEDURE get_pos_ord_val_for_sec_cnt AS
-  SELECT pos_cum_val_ord FROM pos WHERE codsec = ? AND codcnt = ?;
-PARTITION PROCEDURE get_pos_ord_val_for_sec_cnt ON TABLE pos COLUMN codsec PARAMETER 0;
+CREATE PROCEDURE get_pos_ord_val_for_sec_cnt
+  PARTITION ON TABLE pos COLUMN codsec
+  AS SELECT pos_cum_val_ord FROM pos WHERE codsec = ? AND codcnt = ?;

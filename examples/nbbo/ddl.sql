@@ -22,12 +22,12 @@
 --  FROM example_of_types
 --  GROUP BY type;
 --
--- CREATE PROCEDURE select_example AS
--- SELECT name, status FROM example_of_types WHERE id = ?;
--- PARTITION PROCEDURE select_example ON TABLE example_of_types COLUMN id [PARAMETER 0];
+-- CREATE PROCEDURE select_example
+--  PARTITION ON TABLE example_of_types COLUMN id [PARAMETER 0]
+--  AS SELECT name, status FROM example_of_types WHERE id = ?;
 --
--- CREATE PROCEDURE FROM CLASS procedures.UpsertSymbol;
--- PARTITION PROCEDURE UpsertSymbol ON TABLE symbols COLUMN symbol PARAMETER 0;
+-- CREATE PROCEDURE PARTITION ON TABLE symbols COLUMN symbol PARAMETER 0
+--  FROM CLASS procedures.UpsertSymbol;
 ---------------------------------------------------------------------------------
 file -inlinebatch END_BATCH
 
@@ -71,38 +71,39 @@ CREATE TABLE nbbos (
 );
 PARTITION TABLE nbbos ON COLUMN symbol;
 
-CREATE PROCEDURE nbbo_last_symbol AS
-SELECT * FROM nbbos WHERE symbol = ? ORDER BY time desc LIMIT 1;
-PARTITION PROCEDURE nbbo_last_symbol ON TABLE nbbos COLUMN symbol PARAMETER 0;
+CREATE PROCEDURE nbbo_last_symbol
+  PARTITION ON TABLE nbbos COLUMN symbol
+  AS SELECT * FROM nbbos WHERE symbol = ? ORDER BY time desc LIMIT 1;
 
-CREATE PROCEDURE nbbo_last_bid_symbol AS
-SELECT bid, bsize, bid_exch, time FROM nbbos WHERE symbol = ? ORDER BY time desc LIMIT 1;
-PARTITION PROCEDURE nbbo_last_bid_symbol ON TABLE nbbos COLUMN symbol PARAMETER 0;
+CREATE PROCEDURE nbbo_last_bid_symbol
+  PARTITION ON TABLE nbbos COLUMN symbol
+  AS SELECT bid, bsize, bid_exch, time FROM nbbos WHERE symbol = ? ORDER BY time desc LIMIT 1;
 
-CREATE PROCEDURE nbbo_last_ask_symbol AS
-SELECT ask, asize, ask_exch, time FROM nbbos WHERE symbol = ? ORDER BY time desc LIMIT 1;
-PARTITION PROCEDURE nbbo_last_ask_symbol ON TABLE nbbos COLUMN symbol PARAMETER 0;
+CREATE PROCEDURE nbbo_last_ask_symbol
+  PARTITION ON TABLE nbbos COLUMN symbol
+  AS SELECT ask, asize, ask_exch, time FROM nbbos WHERE symbol = ? ORDER BY time desc LIMIT 1;
 
-CREATE PROCEDURE nbbo_hist_symbol AS
-SELECT * FROM nbbos WHERE symbol = ? and time > TO_TIMESTAMP(Second,SINCE_EPOCH(Second,NOW)-60*5) ORDER BY time desc;
-PARTITION PROCEDURE nbbo_hist_symbol ON TABLE nbbos COLUMN symbol PARAMETER 0;
+CREATE PROCEDURE nbbo_hist_symbol
+  PARTITION ON TABLE nbbos COLUMN symbol
+  AS SELECT * FROM nbbos WHERE symbol = ? and time > TO_TIMESTAMP(Second,SINCE_EPOCH(Second,NOW)-60*5) ORDER BY time desc;
 
-CREATE PROCEDURE last_ticks_symbol AS
-SELECT * FROM last_ticks WHERE symbol = ? ORDER BY exch;
-PARTITION PROCEDURE last_ticks_symbol ON TABLE last_ticks COLUMN symbol PARAMETER 0;
+CREATE PROCEDURE last_ticks_symbol
+  PARTITION ON TABLE last_ticks COLUMN symbol
+  AS SELECT * FROM last_ticks WHERE symbol = ? ORDER BY exch;
 
-CREATE PROCEDURE last_bids_symbol AS
-SELECT time, exch, bid_size, bid FROM last_ticks WHERE symbol = ? ORDER BY bid desc;
-PARTITION PROCEDURE last_bids_symbol ON TABLE last_ticks COLUMN symbol PARAMETER 0;
+CREATE PROCEDURE last_bids_symbol
+  PARTITION ON TABLE last_ticks COLUMN symbol
+  AS SELECT time, exch, bid_size, bid FROM last_ticks WHERE symbol = ? ORDER BY bid desc;
 
-CREATE PROCEDURE last_asks_symbol AS
-SELECT time, exch, ask_size, ask FROM last_ticks WHERE symbol = ? ORDER BY ask asc;
-PARTITION PROCEDURE last_asks_symbol ON TABLE last_ticks COLUMN symbol PARAMETER 0;
+CREATE PROCEDURE last_asks_symbol
+  PARTITION ON TABLE last_ticks COLUMN symbol
+  AS SELECT time, exch, ask_size, ask FROM last_ticks WHERE symbol = ? ORDER BY ask asc;
 
 END_BATCH
 
 -- Update classes from jar to that server will know about classes but not procedures yet.
 LOAD CLASSES nbbo-procs.jar;
 
-CREATE PROCEDURE FROM CLASS nbbo.ProcessTick;
-PARTITION PROCEDURE ProcessTick ON TABLE ticks COLUMN symbol PARAMETER 0;
+CREATE PROCEDURE PARTITION ON TABLE ticks COLUMN symbol
+  FROM CLASS nbbo.ProcessTick;
+
