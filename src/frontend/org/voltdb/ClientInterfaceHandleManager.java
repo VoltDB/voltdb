@@ -32,6 +32,7 @@ import org.voltdb.iv2.MpInitiator;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableMap.Builder;
+import com.google_voltpatches.common.collect.Maps;
 
 /**
  * This manages per-partition handles used to identify responses for
@@ -301,41 +302,51 @@ public class ClientInterfaceHandleManager
         }
 
         final Deque<Iv2InFlight> perPartDeque = readOnly ? partitionStuff.m_reads : partitionStuff.m_writes;
-        while (perPartDeque.peekFirst() != null) {
-            Iv2InFlight inFlight = perPartDeque.pollFirst();
+
+        //find the target Iv2InFlight. Upon SPI balance, transactions may be directed to both
+        //old and new initiators. We are only interested in the transactions which are directed to the same initiator
+        //as the one that target Iv2InFlight was directed to.
+        Iv2InFlight targetInFlight = null;
+        Map<Long, Deque<Iv2InFlight>> inFlightsByHSID = Maps.newHashMap();
+        for(Iterator<Iv2InFlight> it = perPartDeque.iterator();it.hasNext();) {
+            Iv2InFlight flight = it.next();
+            Deque<Iv2InFlight> flights = inFlightsByHSID.get(flight.m_initiatorHSId);
+            if (flights == null) {
+                flights = new ArrayDeque<Iv2InFlight>();
+                inFlightsByHSID.put(flight.m_initiatorHSId, flights);
+            }
+            flights.offer(flight);
+
+            //stop here, no need going beyond
+            if(ciHandle == flight.m_ciHandle) {
+                targetInFlight = flight;
+                break;
+            }
+        }
+        if (targetInFlight == null) return null;
+
+        for(Iv2InFlight inFlight : inFlightsByHSID.get(targetInFlight.m_initiatorHSId)) {
             if (inFlight.m_ciHandle < ciHandle) {
-                // lost txn, do something eventually
-                tmLog.debug("CI found dropped transaction with handle: " + inFlight.m_ciHandle +
-                        " for partition: " + partitionId + " while searching for handle " +
-                        ciHandle);
-                ClientResponseImpl errorResponse =
-                    new ClientResponseImpl(
-                            ClientResponseImpl.RESPONSE_UNKNOWN,
-                            new VoltTable[0], ClientInterface.DROP_TXN_RECOVERY,
-                            inFlight.m_clientHandle);
+                if (tmLog.isDebugEnabled()) {
+                    tmLog.debug(
+                      String.format("Found dropped txn with handle %d for partition %d while searching for handle %d.",
+                              inFlight.m_ciHandle, partitionId, ciHandle));
+                }
+                ClientResponseImpl errorResponse = new ClientResponseImpl(
+                                ClientResponseImpl.RESPONSE_UNKNOWN,
+                                new VoltTable[0], ClientInterface.DROP_TXN_RECOVERY,
+                                inFlight.m_clientHandle);
                 ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize() + 4);
                 buf.putInt(buf.capacity() - 4);
                 errorResponse.flattenToBuffer(buf);
                 buf.flip();
                 connection.writeStream().enqueue(buf);
-                m_outstandingTxns--;
-                m_acg.reduceBackpressure(inFlight.m_messageSize);
             }
-            else if (inFlight.m_ciHandle > ciHandle) {
-                // we've gone too far, need to jam this back into the front of the deque and run away.
-                tmLog.debug("CI clientData lookup missing handle: " + ciHandle
-                        + ". Next expected client data handle is: " + inFlight.m_ciHandle);
-                perPartDeque.addFirst(inFlight);
-                break;
-            }
-            else {
-                m_acg.reduceBackpressure(inFlight.m_messageSize);
-                m_outstandingTxns--;
-                return inFlight;
-            }
+            m_outstandingTxns--;
+            m_acg.reduceBackpressure(inFlight.m_messageSize);
+            perPartDeque.remove(inFlight);
         }
-        tmLog.debug("Unable to find Client data for client interface handle: " + ciHandle);
-        return null;
+        return targetInFlight;
     }
 
     /** Remove a specific handle without destroying any handles ordered before it */

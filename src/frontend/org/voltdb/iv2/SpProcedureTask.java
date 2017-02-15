@@ -52,7 +52,13 @@ public class SpProcedureTask extends ProcedureTask
     public SpProcedureTask(Mailbox initiator, String procName, TransactionTaskQueue queue,
                   Iv2InitiateTaskMessage msg)
     {
-       super(initiator, procName, new SpTransactionState(msg), queue);
+       super(initiator, procName, new SpTransactionState(msg), queue, false);
+    }
+
+    public SpProcedureTask(Mailbox initiator, String procName, TransactionTaskQueue queue,
+            Iv2InitiateTaskMessage msg, boolean isleader)
+    {
+        super(initiator, procName, new SpTransactionState(msg), queue, isleader);
     }
 
     /** Run is invoked by a run-loop to execute this transaction. */

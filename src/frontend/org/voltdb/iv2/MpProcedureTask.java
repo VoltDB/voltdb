@@ -64,7 +64,7 @@ public class MpProcedureTask extends ProcedureTask
         super(mailbox, procName,
               new MpTransactionState(mailbox, msg, pInitiators, partitionMasters,
                                      buddyHSId, isRestart),
-              queue);
+              queue, false);
         m_isRestart = isRestart;
         m_msg = msg;
         m_initiatorHSIds.addAll(pInitiators);
@@ -209,6 +209,7 @@ public class MpProcedureTask extends ProcedureTask
                 m_msg.isForReplay());
 
         complete.setTruncationHandle(m_msg.getTruncationHandle());
+        complete.setCreatedFromLeader(m_createdFromLeader);
         m_initiator.send(com.google_voltpatches.common.primitives.Longs.toArray(m_initiatorHSIds), complete);
         m_txnState.setDone();
         m_queue.flush(getTxnId());

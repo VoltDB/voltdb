@@ -40,7 +40,7 @@ public class CompleteTransactionTask extends TransactionTask
                                    TransactionTaskQueue queue,
                                    CompleteTransactionMessage msg)
     {
-        super(txnState, queue);
+        super(txnState, queue, msg.wasCreatedFromLeader());
         m_initiator = initiator;
         m_completeMsg = msg;
     }

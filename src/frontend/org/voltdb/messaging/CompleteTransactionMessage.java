@@ -30,6 +30,11 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
     boolean m_requiresAck;
     boolean m_rollbackForFault;
 
+
+    // a flag used for SPI balance operation, indicating that the task was created
+    //when the site was leader partition
+    boolean m_createdFromLeader;
+
     int m_hash;
     int m_flags = 0;
     static final int ISROLLBACK = 0;
@@ -106,11 +111,19 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
         return m_hash;
     }
 
+    public boolean wasCreatedFromLeader() {
+        return m_createdFromLeader;
+    }
+
+    public void setCreatedFromLeader(boolean createdFromLeader) {
+        m_createdFromLeader = createdFromLeader;
+    }
+
     @Override
     public int getSerializedSize()
     {
         int msgsize = super.getSerializedSize();
-        msgsize += 4 + 4;
+        msgsize += 4 + 4 + 1;
         return msgsize;
     }
 
@@ -121,6 +134,7 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
         super.flattenToBuffer(buf);
         buf.putInt(m_hash);
         buf.putInt(m_flags);
+        buf.put((byte) (m_createdFromLeader == true ? 1 : 0));
         assert(buf.capacity() == buf.position());
         buf.limit(buf.position());
     }
@@ -131,6 +145,7 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
         super.initFromBuffer(buf);
         m_hash = buf.getInt();
         m_flags = buf.getInt();
+        m_createdFromLeader = (buf.get() == 1);
         assert(buf.capacity() == buf.position());
     }
 

@@ -456,9 +456,11 @@ public final class InvocationDispatcher {
                 if (task.getParams().size() == 1) {
                     return takeShutdownSaveSnapshot(task, handler, ccxn, user, bypass);
                 }
-            }
-            else if ("@Rebalance".equals(procName)) {
+            } else if ("@Rebalance".equals(procName)) {
                 return dispatchRebalance(task);
+            } else if ("@BalanceSPI".equals(procName)) {
+                ClientResponseImpl resp = checkParamsForSPIBalance(task);
+                if (resp !=null) return resp;
             }
             // Verify that admin mode sysprocs are called from a client on the
             // admin port, otherwise return a failure
@@ -471,6 +473,7 @@ public final class InvocationDispatcher {
                         procName + " is not available to this client",
                         task.clientHandle);
             }
+
         }
         // If you're going to copy and paste something, CnP the pattern
         // up above.  -rtb.
@@ -500,6 +503,35 @@ public final class InvocationDispatcher {
                     "VoltDB failed to create the transaction internally.  It is possible this "
                     + "was caused by a node failure or intentional shutdown. If the cluster recovers, "
                     + "it should be safe to resend the work, as the work was never started.",
+                    task.clientHandle);
+        }
+
+        return null;
+    }
+
+    private ClientResponseImpl checkParamsForSPIBalance(StoredProcedureInvocation task) {
+
+        Object params[] = task.getParams().toArray();
+        if (params.length != 3 || !(params[0] instanceof Integer) ||
+                !(params[1] instanceof Integer) || !(params[2] instanceof Integer)) {
+            return  gracefulFailureResponse(
+                    "@BalanceSPI: requires integer partition id, host id and site id.",
+                    task.clientHandle);
+        }
+
+        int pid = (Integer) params[0];
+        int newHostId = (Integer) params[1];
+        Long hsid = VoltDB.instance().getCartograhper().getHSIdForMaster(pid);
+        if (newHostId == CoreUtils.getHostIdFromHSId(hsid)) {
+            return  gracefulFailureResponse(
+                    "@BalanceSPI: SPI is not allowed to move from one site to other on the same host.", task.clientHandle);
+        }
+
+        final HostMessenger messenger = VoltDB.instance().getHostMessenger();
+        Set<Integer> liveHids = messenger.getLiveHostIds();
+        if (!liveHids.contains(newHostId)) {
+            return  gracefulFailureResponse(
+                    String.format("@BalanceSPI: the host %d is not a member of the cluster.", newHostId),
                     task.clientHandle);
         }
 

@@ -31,6 +31,10 @@ public class CompleteTransactionResponseMessage extends VoltMessage
     boolean m_isRestart;
     boolean m_isRecovering = false;
 
+    // a flag used for SPI balance operation, indicating that the task was created
+    //when the site was leader partition
+    protected boolean m_createdFromLeader = false;
+
     /** Empty constructor for de-serialization */
     CompleteTransactionResponseMessage() {
         super();
@@ -42,6 +46,14 @@ public class CompleteTransactionResponseMessage extends VoltMessage
         m_spHandle = msg.getSpHandle();
         m_isRestart = msg.isRestart();
         m_spiHSId = msg.getCoordinatorHSId();
+    }
+
+    public boolean wasCreatedFromLeader() {
+        return m_createdFromLeader;
+    }
+
+    public void setCreatedFromLeader(boolean createdFromLeader) {
+        m_createdFromLeader = createdFromLeader;
     }
 
     public long getTxnId()
@@ -78,7 +90,7 @@ public class CompleteTransactionResponseMessage extends VoltMessage
     public int getSerializedSize()
     {
         int msgsize = super.getSerializedSize();
-        msgsize += 8 + 8 + 8 + 1 + 1;
+        msgsize += 8 + 8 + 8 + 1 + 1 + 1;
         return msgsize;
     }
 
@@ -91,6 +103,7 @@ public class CompleteTransactionResponseMessage extends VoltMessage
         buf.putLong(m_spiHSId);
         buf.put((byte) (m_isRestart ? 1 : 0));
         buf.put((byte) (m_isRecovering ? 1 : 0));
+        buf.put((byte) (m_createdFromLeader == true ? 1 : 0));
         assert(buf.capacity() == buf.position());
         buf.limit(buf.position());
     }
@@ -103,6 +116,7 @@ public class CompleteTransactionResponseMessage extends VoltMessage
         m_spiHSId = buf.getLong();
         m_isRestart = buf.get() == 1;
         m_isRecovering = buf.get() == 1;
+        m_createdFromLeader = (buf.get() == 1);
         assert(buf.capacity() == buf.position());
     }
 

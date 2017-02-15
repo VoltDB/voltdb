@@ -33,10 +33,21 @@ public abstract class TransactionTask extends SiteTasker
     final protected TransactionTaskQueue m_queue;
     protected ListenableFuture<Object> m_durabilityBackpressureFuture = CoreUtils.COMPLETED_FUTURE;
 
+    // a flag used for SPI balance operation, indicating that the task was created
+    //when the site was leader partition
+    protected boolean m_createdFromLeader = false;
+
     public TransactionTask(TransactionState txnState, TransactionTaskQueue queue)
     {
         m_txnState = txnState;
         m_queue = queue;
+    }
+
+    public TransactionTask(TransactionState txnState, TransactionTaskQueue queue, boolean createdFromLeader)
+    {
+        m_txnState = txnState;
+        m_queue = queue;
+        m_createdFromLeader = createdFromLeader;
     }
 
     public TransactionTask setDurabilityBackpressureFuture(ListenableFuture<Object> fut) {

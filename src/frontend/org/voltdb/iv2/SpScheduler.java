@@ -32,7 +32,6 @@ import java.util.TreeMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 
-import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
@@ -48,11 +47,9 @@ import org.voltdb.SnapshotCompletionMonitor;
 import org.voltdb.SystemProcedureCatalog;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
-import org.voltdb.VoltZK;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.iv2.SiteTasker.SiteTaskerRunnable;
-import org.voltdb.messaging.BalanceSPIMessage;
 import org.voltdb.messaging.BorrowTaskMessage;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.CompleteTransactionResponseMessage;
@@ -66,8 +63,6 @@ import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.Iv2LogFaultMessage;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
 import org.voltdb.messaging.RepairLogTruncationMessage;
-import org.voltdb.utils.TopologyZKUtils;
-
 import com.google_voltpatches.common.primitives.Ints;
 import com.google_voltpatches.common.primitives.Longs;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
@@ -429,13 +424,14 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     }
 
     private boolean handleMisRoutedTransaction(Iv2InitiateTaskMessage message) {
-        if (!isSpiBalanceRequested() || message.isForReplica()){
+        if (!isSpiBalanceRequested() || message.isForReplica() ||
+            "@BalanceSPI".equals(message.getStoredProcedureName())) {
             return false;
         }
         InitiateResponseMessage response = new InitiateResponseMessage(message);
         response.setMisrouted(message.getStoredProcedureInvocation());
         response.m_sourceHSId = m_mailbox.getHSId();
-        m_mailbox.send(message.getInitiatorHSId(), response);
+        m_mailbox.deliver(response);
         return true;
     }
 
@@ -448,14 +444,11 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                     "should never receive multi-partition initiations.");
         }
 
-        // send back if SPI balance is requested.
+        // route back if SPI balance is requested.
         if (handleMisRoutedTransaction(message)) {
             Iv2Trace.logMisroutedTransaction(message, m_mailbox.getHSId());
             return;
         }
-
-        //start SPI balance operation if so requested.
-        initiateSPIMigrationProcess(message);
 
         final String procedureName = message.getStoredProcedureName();
         long newSpHandle;
@@ -469,7 +462,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
              * it does looser tracking of client handles since it can't be
              * partitioned from the local replica.
              */
-            if (!m_isLeader &&
+            if (!m_isLeader && !isSpiBalanceRequested() &&
                     CoreUtils.getHostIdFromHSId(msg.getInitiatorHSId()) !=
                     CoreUtils.getHostIdFromHSId(m_mailbox.getHSId())) {
                 VoltDB.crashLocalVoltDB("Only allowed to do short circuit reads locally", true, null);
@@ -590,66 +583,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         doLocalInitiateOffer(msg);
     }
 
-    private boolean initiateSPIMigrationProcess(Iv2InitiateTaskMessage message) {
-
-        final String procedureName = message.getStoredProcedureName();
-        if (!"@BalanceSPI".equals(procedureName)) {
-            return false;
-        }
-        // check if any node still in rejoining or possibly joining status
-        ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
-        if (tmLog.isDebugEnabled()) {
-            tmLog.debug("[SpScheduler] Receive @BalanceSPI invocation...");
-        }
-
-        final Object[] params = message.getParameters();
-        int pid, hostId, siteId;
-        try {
-            assert(params.length > 2);
-            pid = Integer.parseInt(params[1].toString());
-            hostId = Integer.parseInt(params[2].toString());
-            siteId = Integer.parseInt(params[3].toString());
-        } catch(NumberFormatException e) {
-            tmLog.error("Input parameters for @BalanceSPI must be positive integer." + e.getMessage());
-            return false;
-        }
-
-        Long newLeaderHSId = CoreUtils.getHSIdFromHostAndSite(hostId, siteId);
-        Long formerLeaderHSId = null;
-
-        List<Long> replicas = TopologyZKUtils.getReplicasForPartition(zk, pid);
-        if (replicas.isEmpty() || !replicas.contains(newLeaderHSId)) {
-            tmLog.error(String.format("Failed to find the replica for %d on host %d, site %d. Transaction not initiated.", pid, hostId, siteId));
-            return false;
-        }
-
-        LeaderCache leaderAppointee = new LeaderCache(zk, VoltZK.iv2appointees);
-        try {
-            leaderAppointee.start(true);
-            formerLeaderHSId = leaderAppointee.get(pid);
-        } catch (InterruptedException | ExecutionException e) {
-            tmLog.warn(String.format("Failed to migrate SPI for partition %d", pid));
-        } finally {
-            try {
-                leaderAppointee.shutdown();
-            } catch (InterruptedException e) {
-            }
-        }
-        if (formerLeaderHSId == null) {
-            tmLog.error("Failed to find master initiator for partition: " + pid + ". Transaction not initiated.");
-            return false;
-        }
-
-        if (formerLeaderHSId == newLeaderHSId) {
-            tmLog.error(String.format("Can not migrate SPI from %d to %d. Transaction not initiated.", formerLeaderHSId, newLeaderHSId));
-            return false;
-        }
-
-        //send the request to current leader
-        m_mailbox.send(formerLeaderHSId, new BalanceSPIMessage(pid, newLeaderHSId, formerLeaderHSId));
-        return true;
-    }
-
     /**
      * Do the work necessary to turn the Iv2InitiateTaskMessage into a
      * TransactionTask which can be queued to the TransactionTaskQueue.
@@ -667,7 +600,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         final boolean shortcutRead = msg.isReadOnly() && (m_defaultConsistencyReadLevel == ReadLevel.FAST);
         final String procedureName = msg.getStoredProcedureName();
         final SpProcedureTask task =
-            new SpProcedureTask(m_mailbox, procedureName, m_pendingTasks, msg);
+            new SpProcedureTask(m_mailbox, procedureName, m_pendingTasks, msg, m_isLeader);
         if (!shortcutRead) {
             ListenableFuture<Object> durabilityBackpressureFuture =
                     m_cl.log(msg, msg.getSpHandle(), null, m_durabilityListener, task);
@@ -801,7 +734,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
             if (m_defaultConsistencyReadLevel == ReadLevel.SAFE) {
                 // InvocationDispatcher routes SAFE reads to SPI only
-                assert(m_isLeader);
+                assert(m_isLeader || (!message.wasCreatedFromLeader() && isSpiBalanceRequested()));
                 assert(m_bufferedReadLog != null);
                 m_bufferedReadLog.offer(m_mailbox, message, m_repairLogTruncationHandle);
                 return;
@@ -1116,7 +1049,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     private void handleCompleteTransactionMessage(CompleteTransactionMessage message)
     {
         CompleteTransactionMessage msg = message;
-        if (m_isLeader) {
+        boolean wasCreatedFromLeader = (isSpiBalanceRequested() && msg.wasCreatedFromLeader());
+        if (m_isLeader || wasCreatedFromLeader ) {
             msg = new CompleteTransactionMessage(m_mailbox.getHSId(), m_mailbox.getHSId(), message);
             // Set the spHandle so that on repair the new master will set the max seen spHandle
             // correctly
@@ -1156,6 +1090,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             // it also means this CompleteTransactionMessage message will be dropped because it's after snapshot.
             final CompleteTransactionResponseMessage resp = new CompleteTransactionResponseMessage(msg);
             resp.m_sourceHSId = m_mailbox.getHSId();
+            resp.setCreatedFromLeader(wasCreatedFromLeader);
             handleCompleteTransactionResponseMessage(resp);
         }
     }
@@ -1194,7 +1129,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         //
         // The SPI uses this response message to track if all replicas have
         // committed the transaction.
-        if (!m_isLeader) {
+        if (!m_isLeader && !msg.wasCreatedFromLeader()) {
             m_mailbox.send(msg.getSPIHSId(), msg);
         }
     }

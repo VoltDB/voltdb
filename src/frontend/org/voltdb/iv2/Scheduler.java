@@ -20,8 +20,6 @@ package org.voltdb.iv2;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicBoolean;
-
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
@@ -84,7 +82,7 @@ abstract public class Scheduler implements InitiatorMessageHandler
     protected final ReplaySequencer m_replaySequencer = new ReplaySequencer();
 
     //used for SPI balance
-    protected AtomicBoolean m_spiBalanceRequested = new AtomicBoolean(Boolean.FALSE);
+    protected boolean m_spiBalanceRequested = false;
 
     /*
      * This lock is extremely dangerous to use without known the pattern.
@@ -210,10 +208,10 @@ abstract public class Scheduler implements InitiatorMessageHandler
     abstract public boolean sequenceForReplay(VoltMessage m);
 
     public boolean isSpiBalanceRequested() {
-        return m_spiBalanceRequested.get();
+        return m_spiBalanceRequested;
     }
 
     public void setSpiBalanceRequested(boolean status) {
-        m_spiBalanceRequested.compareAndSet(!status, status);
+        m_spiBalanceRequested = status;
     }
 }

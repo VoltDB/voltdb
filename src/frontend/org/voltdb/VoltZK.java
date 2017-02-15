@@ -26,6 +26,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
@@ -38,6 +39,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltcore.zk.CoreZK;
 import org.voltcore.zk.ZKUtil;
+import org.voltdb.iv2.LeaderCache;
 
 /**
  * VoltZK provides constants for all voltdb-registered
@@ -391,6 +393,24 @@ public class VoltZK {
         } catch (KeeperException | InterruptedException e) {
         }
 
+        return false;
+    }
+
+    public static boolean appointLeader(ZooKeeper zk, int partitionId, String hsidStr, VoltLogger log) {
+        LeaderCache leaderAppointee = new LeaderCache(zk, iv2appointees);
+        try {
+            leaderAppointee.start(true);
+            leaderAppointee.put(partitionId, hsidStr);
+            return true;
+        } catch (InterruptedException | ExecutionException | KeeperException e) {
+            log.error(String.format("Failed to migrate SPI for partition %d. %s",
+                    partitionId, e.getMessage()));
+        } finally {
+            try {
+                leaderAppointee.shutdown();
+            } catch (InterruptedException e) {
+            }
+        }
         return false;
     }
 }

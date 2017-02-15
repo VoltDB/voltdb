@@ -239,8 +239,4 @@ public abstract class BaseInitiator implements Initiator
             return null;
         }
     }
-
-    public boolean isSPIBalanceRequested() {
-        return m_scheduler.isSpiBalanceRequested();
-    }
 }

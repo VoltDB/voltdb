@@ -56,6 +56,10 @@ public class InitiateResponseMessage extends VoltMessage {
     // Mis-routed invocation due to SPI change, send back to ClientInterface for restart
     private boolean m_misrouted;
 
+    // a flag used for SPI balance operation, indicating that the task was created
+    //when the site was leader partition
+    boolean m_createdFromLeader = false;
+
     /** Empty constructor for de-serialization */
     public InitiateResponseMessage()
     {
@@ -141,6 +145,14 @@ public class InitiateResponseMessage extends VoltMessage {
         return m_commit;
     }
 
+    public boolean wasCreatedFromLeader() {
+        return m_createdFromLeader;
+    }
+
+    public void setCreatedFromLeader(boolean createdFromLeader) {
+        m_createdFromLeader = createdFromLeader;
+    }
+
     public boolean isRecovering() {
         return m_recovering;
     }
@@ -156,7 +168,7 @@ public class InitiateResponseMessage extends VoltMessage {
     public boolean isMisrouted() {
         return m_misrouted;
     }
-    
+
     public StoredProcedureInvocation getInvocation() {
         return m_invocation;
     }
@@ -209,6 +221,7 @@ public class InitiateResponseMessage extends VoltMessage {
             + 1 // node recovering indication
             + 1 // mispartitioned invocation
             + 1 // misrouted
+            + 1 // createdFromLeader
             + m_response.getSerializedSize();
 
         if (m_mispartitioned || m_misrouted) {
@@ -235,6 +248,7 @@ public class InitiateResponseMessage extends VoltMessage {
         buf.put((byte) (m_recovering == true ? 1 : 0));
         buf.put((byte) (m_mispartitioned == true ? 1 : 0));
         buf.put((byte) (m_misrouted == true ? 1 : 0));
+        buf.put((byte) (m_createdFromLeader == true ? 1 : 0));
         m_response.flattenToBuffer(buf);
         if (m_mispartitioned || m_misrouted) {
             buf.putLong(m_currentHashinatorConfig.getFirst());
@@ -259,6 +273,7 @@ public class InitiateResponseMessage extends VoltMessage {
         m_recovering = buf.get() == 1;
         m_mispartitioned = buf.get() == 1;
         m_misrouted = buf.get() == 1;
+        m_createdFromLeader = buf.get() == 1;
         m_response = new ClientResponseImpl();
         m_response.initFromBuffer(buf);
         m_commit = (m_response.getStatus() == ClientResponseImpl.SUCCESS);

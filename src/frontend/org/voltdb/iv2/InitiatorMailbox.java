@@ -24,8 +24,6 @@ import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
 
-import org.apache.zookeeper_voltpatches.KeeperException;
-import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.Mailbox;
@@ -35,8 +33,6 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
-import org.voltdb.messaging.BalanceSPIMessage;
-import org.voltdb.messaging.BalanceSPIResponseMessage;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.DummyTransactionTaskMessage;
 import org.voltdb.messaging.DumpMessage;
@@ -46,7 +42,6 @@ import org.voltdb.messaging.Iv2RepairLogRequestMessage;
 import org.voltdb.messaging.Iv2RepairLogResponseMessage;
 import org.voltdb.messaging.RejoinMessage;
 import org.voltdb.messaging.RepairLogTruncationMessage;
-
 import com.google_voltpatches.common.base.Supplier;
 
 /**
@@ -317,64 +312,57 @@ public class InitiatorMailbox implements Mailbox
             m_repairLog.deliver(message);
             return;
         }
-        else if (message instanceof BalanceSPIMessage) {
-            handleSPIBalanceRequest(message);
-            return;
-        } else if (message instanceof BalanceSPIResponseMessage) {
-            BalanceSPIResponseMessage msg = (BalanceSPIResponseMessage)message;
-            if (!msg.isSuccess()) {
-                m_scheduler.setSpiBalanceRequested(false);
-                m_scheduler.m_isLeader = true;
-            }
-            return;
-        }
+
+        handleSPIBalanceIfRequested(message);
         m_repairLog.deliver(message);
         if (canDeliver) {
             m_scheduler.deliver(message);
         }
     }
 
-    private void handleSPIBalanceRequest(VoltMessage message){
-        BalanceSPIMessage msg = (BalanceSPIMessage) message;
+    private void handleSPIBalanceIfRequested(VoltMessage message){
 
-        // current master is notified to be demoted.
-        if (m_hsId == msg.getFormerLeaderHSId()) {
+        if (!(message instanceof Iv2InitiateTaskMessage)){
+            return;
+        }
+
+        Iv2InitiateTaskMessage msg = (Iv2InitiateTaskMessage) message;
+        if (!"@BalanceSPI".equals(msg.getStoredProcedureName())) {
+            return;
+        }
+
+        final Object[] params = msg.getParameters();
+        int pid = Integer.parseInt(params[0].toString());
+        Long currentLeaderHsid = getMasterHsId(pid);
+
+        // notify the current leader
+        if (currentLeaderHsid != getHSId()) {
             if (tmLog.isDebugEnabled()) {
-                tmLog.debug("SPI balance requested on site:" + CoreUtils.hsIdToString(m_hsId));
+                tmLog.debug("@BalanceSPI: receive SPI balance on " +
+                        CoreUtils.hsIdToString(getHSId()) + " for " +
+                        CoreUtils.hsIdToString(currentLeaderHsid));
+            }
+            send(currentLeaderHsid, msg);
+        } else {
+            if (tmLog.isDebugEnabled()) {
+                tmLog.debug("@BalanceSPI: process SPI balance on " +
+                        CoreUtils.hsIdToString(getHSId()) + " for " +
+                        CoreUtils.hsIdToString(currentLeaderHsid));
             }
             m_scheduler.setSpiBalanceRequested(true);
             m_scheduler.m_isLeader = false;
-            HostMessenger messager = VoltDB.instance().getHostMessenger();
-            VoltZK.createSPIBalanceIndicator(messager.getZK(), messager.getLiveHostIds());
-            //notify new leader to accept the promotion and take the leadership responsibility.
-            send(msg.getNewLeaderHSId(), message);
-        }
 
-        // new master, message comes after former leader has been notified.
-        if (this.m_hsId == msg.getNewLeaderHSId()) {
-            ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
-            peekZooKeeper(zk);
-            LeaderCache leaderAppointee = new LeaderCache(zk, VoltZK.iv2appointees);
-            boolean success = false;
-            try {
-                leaderAppointee.start(true);
-                String hsidStr = ZKUtil.suffixHSIdsWithBalanceSPIRequest(msg.getNewLeaderHSId());
-                leaderAppointee.put(msg.getParititionId(), hsidStr);
-                success = true;
-            } catch (InterruptedException | ExecutionException | KeeperException e) {
-                tmLog.error(String.format("Failed to migrate SPI for partition %d to site %d. %s",
-                        msg.getParititionId(), CoreUtils.hsIdToString(msg.getNewLeaderHSId()),e.getMessage()));
-            } finally {
-                try {
-                    leaderAppointee.shutdown();
-                } catch (InterruptedException e) {
-                }
+            int hostId = Integer.parseInt(params[1].toString());
+            int siteId = Integer.parseInt(params[2].toString());
+
+            // update the leader appointee
+            VoltZK.createSPIBalanceIndicator(m_messenger.getZK(), m_messenger.getLiveHostIds());
+            Long newLeaderHSId = CoreUtils.getHSIdFromHostAndSite(hostId, siteId);
+            String hsidStr = ZKUtil.suffixHSIdsWithBalanceSPIRequest(newLeaderHSId);
+            VoltZK.appointLeader(m_messenger.getZK(), pid, hsidStr, tmLog);
+            if (tmLog.isDebugEnabled()) {
+                tmLog.debug(VoltZK.debugLeadersInfo(m_messenger.getZK()));
             }
-            if (!success) {
-                //notify the former leader to undo it
-                send(msg.getFormerLeaderHSId(), new BalanceSPIResponseMessage(success));
-            }
-            peekZooKeeper(zk);
         }
     }
 
@@ -506,11 +494,5 @@ public class InitiatorMailbox implements Mailbox
     public void notifyOfSnapshotNonce(String nonce, long snapshotSpHandle) {
         if (m_joinProducer == null) return;
         m_joinProducer.notifyOfSnapshotNonce(nonce, snapshotSpHandle);
-    }
-
-    private void peekZooKeeper(ZooKeeper zk) {
-        if (tmLog.isDebugEnabled()) {
-            tmLog.debug(VoltZK.debugLeadersInfo(zk));
-        }
     }
 }

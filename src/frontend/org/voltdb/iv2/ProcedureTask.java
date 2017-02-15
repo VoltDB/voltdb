@@ -42,11 +42,10 @@ abstract public class ProcedureTask extends TransactionTask
 {
     final Mailbox m_initiator;
     final String m_procName;
-
     ProcedureTask(Mailbox initiator, String procName, TransactionState txn,
-                  TransactionTaskQueue queue)
+                  TransactionTaskQueue queue, boolean isleader)
     {
-        super(txn, queue);
+        super(txn, queue, isleader);
         m_initiator = initiator;
         m_procName = procName;
     }
@@ -63,7 +62,7 @@ abstract public class ProcedureTask extends TransactionTask
             SiteProcedureConnection siteConnection)
     {
         final InitiateResponseMessage response = new InitiateResponseMessage(task);
-
+        response.setCreatedFromLeader(m_createdFromLeader);
         try {
             Object[] callerParams = null;
             /*

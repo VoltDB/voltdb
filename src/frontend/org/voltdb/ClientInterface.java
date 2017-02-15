@@ -992,7 +992,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             partition,
                             messageSize,
                             nowNanos);
-                    Iv2Trace.logRestartTransaction(response);
                     return true;
                 } catch (Exception e) {
                     // unable to hash to a site, return an error
@@ -1000,7 +999,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     clientResponse = getMispartitionedErrorResponse(response.getInvocation(), catProc, e);
                 }
             }
-
             return false;
         }
     }

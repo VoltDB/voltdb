@@ -80,6 +80,12 @@ public class SpInitiator extends BaseInitiator implements Promotable
                     break;
                 }
             }
+
+            //This was the leader but SPI has been migrated, so demote it.
+            if ( tmLog.isDebugEnabled() && m_scheduler.isSpiBalanceRequested()
+                    && !leaders.contains(getInitiatorHSId())) {
+                tmLog.debug(CoreUtils.hsIdToString(getInitiatorHSId()) + " is not a leader anymore. It has been demoted!");
+            }
         }
     };
 
@@ -162,8 +168,6 @@ public class SpInitiator extends BaseInitiator implements Promotable
                     m_whoami);
             m_term.start();
             while (!success) {
-                RepairAlgo repair =
-                        m_initiatorMailbox.constructRepairAlgo(m_term.getInterestingHSIds(), m_whoami);
 
                 // if rejoining, a promotion can not be accepted. If the rejoin is
                 // in-progress, the loss of the master will terminate the rejoin
@@ -178,16 +182,25 @@ public class SpInitiator extends BaseInitiator implements Promotable
                 }
 
                 // term syslogs the start of leader promotion.
+                //do not engage the reprair whne the leader change is from SPI balance.
                 long txnid = Long.MIN_VALUE;
-                try {
-                    RepairResult res = repair.start().get();
-                    txnid = res.m_txnId;
+                if (!m_isBalanceSPIRequested) {
+                    RepairAlgo repair =
+                            m_initiatorMailbox.constructRepairAlgo(m_term.getInterestingHSIds(), m_whoami);
+                    try {
+                        RepairResult res = repair.start().get();
+                        txnid = res.m_txnId;
+                        success = true;
+                        m_initiatorMailbox.setLeaderState(txnid);
+                    } catch (CancellationException e) {
+                        success = false;
+                    }
+                } else {
                     success = true;
-                } catch (CancellationException e) {
-                    success = false;
+                    m_repairLog.setLeaderState(true);
+                    m_scheduler.setLeaderState(true);
                 }
                 if (success) {
-                    m_initiatorMailbox.setLeaderState(txnid);
                     tmLog.info(m_whoami
                              + "finished leader promotion. Took "
                              + (System.currentTimeMillis() - startTime) + " ms.");
@@ -196,6 +209,11 @@ public class SpInitiator extends BaseInitiator implements Promotable
                     LeaderCacheWriter iv2masters = new LeaderCache(m_messenger.getZK(),
                             m_zkMailboxNode);
                     iv2masters.put(m_partitionId, m_initiatorMailbox.getHSId());
+
+                    if (tmLog.isDebugEnabled() && m_isBalanceSPIRequested) {
+                        tmLog.debug("Site " + CoreUtils.hsIdToString(m_initiatorMailbox.getHSId()) +
+                                " becomes new leader from SPI balance request.");
+                    }
                 }
                 else {
                     // The only known reason to fail is a failed replica during
@@ -207,12 +225,14 @@ public class SpInitiator extends BaseInitiator implements Promotable
                             + (System.currentTimeMillis() - startTime) + " ms. of "
                             + "trying. Retrying.");
                 }
+                m_scheduler.setSpiBalanceRequested(false);
             }
             // Tag along and become the export master too
-            //leave the export on the former leader, now a replica
+            // leave the export on the former leader, now a replica
             if (!m_isBalanceSPIRequested) {
                 ExportManager.instance().acceptMastership(m_partitionId);
             }
+            m_isBalanceSPIRequested = false;
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Terminally failed leader promotion.", true, e);
         }
