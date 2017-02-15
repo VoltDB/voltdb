@@ -1250,13 +1250,15 @@ var loadPage = function (serverName, portid) {
                 var replicaLatency = [];
                 var role = drRoleDetail['DRROLE'][0][0];
 
-                if (role == "REPLICA"){
-                    var producerDbId = drDetails["CLUSTER_ID"];
-                    var consumerDbId = drDetails["REMOTE_CLUSTER_ID"];
-                }
-                else if(role == "MASTER" || role == "XDCR"){
-                     var producerDbId = drDetails[0][0]["CLUSTER_ID"];
-                    var consumerDbId = drDetails[0][0]["REMOTE_CLUSTER_ID"];
+                if(!jQuery.isEmptyObject(drDetails)){
+                    if (role == "REPLICA"){
+                        var producerDbId = drDetails["CLUSTER_ID"];
+                        var consumerDbId = drDetails["REMOTE_CLUSTER_ID"];
+                    }
+                    else if(role == "MASTER" || role == "XDCR"){
+                         var producerDbId = drDetails[0][0]["CLUSTER_ID"];
+                        var consumerDbId = drDetails[0][0]["REMOTE_CLUSTER_ID"];
+                    }
                 }
 
 
@@ -1280,7 +1282,14 @@ var loadPage = function (serverName, portid) {
                     $('.latencyDR').html('');
                 }
 
-                $("#dRProducerName").html('Database ('+ producerDbId +')');
+
+                if(producerDbId != undefined){
+                    $("#dRProducerName").html('Database ('+ producerDbId +')');
+                }
+                else{
+                    $("#dRProducerName").html('Database');
+                }
+
                 $("#dRConsumerName").html('Database ('+ consumerDbId +')');
                 if(role == "MASTER"){
                     $(".drRelationLeft").find('p').html(role + ' / REPLICA');

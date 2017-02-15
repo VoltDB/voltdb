@@ -4006,7 +4006,7 @@ fieldset { border:1px solid #ccc; padding:20px;}
     padding: 2px;
     resize: vertical;
     outline:none;
-    white-space: pre;
+    white-space: pre-line;
     font-size: 18px;
     font-family: Arial,Helvetica,sans-serif;
 
