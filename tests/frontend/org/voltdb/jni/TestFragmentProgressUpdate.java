@@ -439,6 +439,8 @@ public class TestFragmentProgressUpdate extends TestCase {
         long[] fragIds = new long[numFragsToExecute];
         ParameterSet[] paramSets = new ParameterSet[numFragsToExecute];
         String[] sqlTexts = new String[numFragsToExecute];
+        boolean[] writeFrags = new boolean[numFragsToExecute];
+        for (boolean writeFrag : writeFrags) { writeFrag = false; }
         createExecutionEngineInputs(stmtName, fragIds, paramSets, sqlTexts);
 
         // Replace the normal logger with a mocked one, so we can verify the message
@@ -478,7 +480,7 @@ public class TestFragmentProgressUpdate extends TestCase {
                     fragIds,
                     null,
                     paramSets,
-                    new boolean[] { false },
+                    writeFrags,
                     null,
                     sqlTexts,
                     3, 3, 2, 42,

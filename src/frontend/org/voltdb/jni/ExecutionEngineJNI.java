@@ -280,6 +280,8 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         m_nextDeserializerBufferOrigin.discard();
         m_exceptionBuffer = null;
         m_exceptionBufferOrigin.discard();
+        m_emptyDeserializer = null;
+        m_emptyDeserializerBuffer.discard();
         m_psetBufferC.discard();
         m_psetBuffer = null;
         perFragmentStatsBufferC.discard();
@@ -725,6 +727,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     @Override
     public byte[] executeTask(TaskType taskType, ByteBuffer task) throws EEException {
         try {
+            clearPsetAndEnsureCapacity(8);
             m_psetBuffer.putLong(0, taskType.taskId);
 
             //Clear is destructive, do it before the native call
