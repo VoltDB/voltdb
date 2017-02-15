@@ -368,6 +368,15 @@ public class Cartographer extends StatsSource
         return TopologyZKUtils.getReplicasForPartition(m_zk, partition);
     }
 
+    public Long getHSIDForPartitionHost(int hostId, int partition) {
+        List<Long> hsids = getReplicasForPartition(partition);
+        for (Long hsid: hsids) {
+           if (hostId ==CoreUtils.getHostIdFromHSId(hsid)){
+               return hsid;
+           }
+        }
+        return null;
+    }
     /**
      * Given a set of partition IDs, return a map of partition to a list of HSIDs of all the sites with copies of each partition
      */

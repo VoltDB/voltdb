@@ -512,10 +512,10 @@ public final class InvocationDispatcher {
     private ClientResponseImpl checkParamsForSPIBalance(StoredProcedureInvocation task) {
 
         Object params[] = task.getParams().toArray();
-        if (params.length != 3 || !(params[0] instanceof Integer) ||
-                !(params[1] instanceof Integer) || !(params[2] instanceof Integer)) {
+        if (params.length != 2 || !(params[0] instanceof Integer) ||
+                !(params[1] instanceof Integer)) {
             return  gracefulFailureResponse(
-                    "@BalanceSPI: requires integer partition id, host id and site id.",
+                    "@BalanceSPI: requires integer partition id, target host id.",
                     task.clientHandle);
         }
 
@@ -524,7 +524,7 @@ public final class InvocationDispatcher {
         Long hsid = VoltDB.instance().getCartograhper().getHSIdForMaster(pid);
         if (newHostId == CoreUtils.getHostIdFromHSId(hsid)) {
             return  gracefulFailureResponse(
-                    "@BalanceSPI: SPI is not allowed to move from one site to other on the same host.", task.clientHandle);
+                    "@BalanceSPI: SPI is already the host.", task.clientHandle);
         }
 
         final HostMessenger messenger = VoltDB.instance().getHostMessenger();

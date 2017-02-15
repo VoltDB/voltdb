@@ -353,13 +353,15 @@ public class InitiatorMailbox implements Mailbox
             m_scheduler.m_isLeader = false;
 
             int hostId = Integer.parseInt(params[1].toString());
-            int siteId = Integer.parseInt(params[2].toString());
-
-            // update the leader appointee
-            VoltZK.createSPIBalanceIndicator(m_messenger.getZK(), m_messenger.getLiveHostIds());
-            Long newLeaderHSId = CoreUtils.getHSIdFromHostAndSite(hostId, siteId);
-            String hsidStr = ZKUtil.suffixHSIdsWithBalanceSPIRequest(newLeaderHSId);
-            VoltZK.appointLeader(m_messenger.getZK(), pid, hsidStr, tmLog);
+            Long newLeaderHSId = VoltDB.instance().getCartograhper().getHSIDForPartitionHost(hostId, pid);
+            if (newLeaderHSId != null) {
+                // update the leader appointee
+                VoltZK.createSPIBalanceIndicator(m_messenger.getZK(), m_messenger.getLiveHostIds());
+                String hsidStr = ZKUtil.suffixHSIdsWithBalanceSPIRequest(newLeaderHSId);
+                VoltZK.appointLeader(m_messenger.getZK(), pid, hsidStr, tmLog);
+            } else {
+                tmLog.warn("SPI balance: There is no partition replica on the target host.");
+            }
             if (tmLog.isDebugEnabled()) {
                 tmLog.debug(VoltZK.debugLeadersInfo(m_messenger.getZK()));
             }
