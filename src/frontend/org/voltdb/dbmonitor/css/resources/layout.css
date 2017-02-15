@@ -2061,6 +2061,8 @@ h3.ui-state-active {
 display:block; position: relative; top:8px; margin:0 10px;  }
 .arrowSingle { background-image: url(images/arrow.png); width:190px; height:22px;
 display:block; position: relative; top:8px; margin:0 10px;  }
+.arrowSingleLeft { background-image: url(images/left_arrow.png); width:190px; height:22px;
+display:block; position: relative; top:8px; margin:0 10px;  }
 .drRelationRight { float:left; }
 
 /*********************jquery ui class override*********************/
@@ -4004,7 +4006,7 @@ fieldset { border:1px solid #ccc; padding:20px;}
     padding: 2px;
     resize: vertical;
     outline:none;
-    white-space: pre;
+    white-space: pre-line;
     font-size: 18px;
     font-family: Arial,Helvetica,sans-serif;
 

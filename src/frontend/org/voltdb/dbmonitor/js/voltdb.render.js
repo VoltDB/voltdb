@@ -2174,7 +2174,7 @@ function alertNodeClicked(obj) {
 
 
             connection.Metadata['@Statistics_DR_completeData'][0].schema.forEach(function (columnInfo) {
-                if (columnInfo["name"] == "PARTITION_ID" || columnInfo["name"] == "TOTALBUFFERS" || columnInfo["name"] == "TIMESTAMP" || columnInfo["name"] == "TOTALBYTES" || columnInfo["name"] == "MODE" || columnInfo["name"] == "LASTQUEUEDDRID" || columnInfo["name"] == "LASTACKDRID" || columnInfo["name"] == "LASTQUEUEDTIMESTAMP" || columnInfo["name"] == "LASTACKTIMESTAMP" || columnInfo["name"] == "CLUSTERID"|| columnInfo["name"] == "CONSUMERCLUSTERID")
+                if (columnInfo["name"] == "PARTITION_ID" || columnInfo["name"] == "TOTALBUFFERS" || columnInfo["name"] == "TIMESTAMP" || columnInfo["name"] == "TOTALBYTES" || columnInfo["name"] == "MODE" || columnInfo["name"] == "LASTQUEUEDDRID" || columnInfo["name"] == "LASTACKDRID" || columnInfo["name"] == "LASTQUEUEDTIMESTAMP" || columnInfo["name"] == "LASTACKTIMESTAMP" || columnInfo["name"] == "CLUSTER_ID"|| columnInfo["name"] == "REMOTE_CLUSTER_ID")
                     colIndex[columnInfo["name"]] = counter;
                 counter++;
             });
@@ -2196,8 +2196,8 @@ function alertNodeClicked(obj) {
                     partitionDetails["LASTACKDRID"] = info[colIndex["LASTACKDRID"]];
                     partitionDetails["LASTQUEUEDTIMESTAMP"] = info[colIndex["LASTQUEUEDTIMESTAMP"]];
                     partitionDetails["LASTACKTIMESTAMP"] = info[colIndex["LASTACKTIMESTAMP"]];
-                    partitionDetails["CLUSTERID"] = info[colIndex["CLUSTERID"]];
-                    partitionDetails["CONSUMERCLUSTERID"] = info[colIndex["CONSUMERCLUSTERID"]];
+                    partitionDetails["CLUSTER_ID"] = info[colIndex["CLUSTER_ID"]];
+                    partitionDetails["REMOTE_CLUSTER_ID"] = info[colIndex["REMOTE_CLUSTER_ID"]];
                     drDetails[partitionId].push(partitionDetails);
                 }
             });
@@ -2263,9 +2263,8 @@ function alertNodeClicked(obj) {
             if (connection.Metadata['@Statistics_DRCONSUMER'] == null) {
                 return;
             }
-
             connection.Metadata['@Statistics_DRCONSUMER'].schema.forEach(function (columnInfo) {
-                if (columnInfo["name"] == "HOSTNAME" || columnInfo["name"] == "TIMESTAMP" || columnInfo["name"] == "REPLICATION_RATE_1M" || columnInfo["name"] == "HOST_ID" || columnInfo["name"] == "STATE" || columnInfo["name"] == "REPLICATION_RATE_5M" || columnInfo["name"] == "CLUSTER_ID")
+                if (columnInfo["name"] == "HOSTNAME" || columnInfo["name"] == "TIMESTAMP" || columnInfo["name"] == "REPLICATION_RATE_1M" || columnInfo["name"] == "HOST_ID" || columnInfo["name"] == "STATE" || columnInfo["name"] == "REPLICATION_RATE_5M" || columnInfo["name"] == "CLUSTER_ID" || columnInfo["name"] == "REMOTE_CLUSTER_ID")
                     colIndex[columnInfo["name"]] = counter;
                 counter++;
             });
@@ -2294,6 +2293,7 @@ function alertNodeClicked(obj) {
                 repData["STATE"] = info[colIndex["STATE"]];
                 repData["REPLICATION_RATE_5M"] = info[colIndex["REPLICATION_RATE_5M"]] / 1000;
                 repData["REPLICATION_RATE_1M"] = info[colIndex["REPLICATION_RATE_1M"]] / 1000;
+                replicationDetails["DR_GRAPH"]["REMOTE_CLUSTER_ID"] = info[colIndex["REMOTE_CLUSTER_ID"]];
                 replicationDetails["DR_GRAPH"]["REPLICATION_DATA"].push(repData);
 
             });
