@@ -77,7 +77,7 @@ public class ClientInterfaceHandleManager
             m_partitionId = partitionId;
         }
 
-        public long getNextHandle()
+        public synchronized long getNextHandle()
         {
             if (m_sequence > SEQNUM_MAX) {
                 m_sequence = 0;
@@ -129,6 +129,16 @@ public class ClientInterfaceHandleManager
         private PartitionData(int partitionId) {
             m_generator = new HandleGenerator(partitionId);
         }
+
+        public synchronized void offerRead(Iv2InFlight infl) {
+            m_reads.offer(infl);
+
+        }
+
+        public synchronized void offerWrite(Iv2InFlight infl) {
+            m_writes.offer(infl);
+        }
+
     }
 
     private ImmutableMap<Integer, PartitionData> m_partitionStuff =
@@ -152,7 +162,7 @@ public class ClientInterfaceHandleManager
     {
         return new ClientInterfaceHandleManager(isAdmin, connection, callback, acg) {
             @Override
-            synchronized long getHandle(boolean isSinglePartition, int partitionId,
+            long getHandle(boolean isSinglePartition, int partitionId,
                     long clientHandle, int messageSize, long creationTimeNanos, String procName, long initiatorHSId,
                     boolean readOnly, boolean isShortCircuitRead) {
                 return super.getHandle(isSinglePartition, partitionId,
@@ -243,9 +253,9 @@ public class ClientInterfaceHandleManager
                  * Encode the read only-ness into the handle
                  */
                 ciHandle = setReadBit(ciHandle);
-                partitionStuff.m_reads.offer(inFlight);
+                partitionStuff.offerRead(inFlight);
             } else {
-                partitionStuff.m_writes.offer(inFlight);
+                partitionStuff.offerWrite(inFlight);
             }
         }
 
