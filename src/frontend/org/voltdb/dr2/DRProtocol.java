@@ -20,7 +20,12 @@ package org.voltdb.dr2;
 public interface DRProtocol {
     // Also update DRTupleStream.h if version changes
     public static final int PROTOCOL_VERSION = Integer.getInteger("DR_PROTOCOL_VERSION", 7);
-    public static final int COMPATIBLE_PROTOCOL_VERSION = 3;
+    public static final int COMPATIBLE_PROTOCOL_VERSION = 7;
+
+    // constant versions that don't change across releases
     public static final int MIXED_SIZE_PROTOCOL_VERSION = 4;
-    public static final int MUTLICLUSTER_PROTOCOL_VERSION = 7;
+    public static final int MULTICLUSTER_PROTOCOL_VERSION = 7;
+
+    // all previous compatible protocol versions
+    public static final int FIRST_COMPATIBLE_PROTOCOL_VERSION = 3;
 }
