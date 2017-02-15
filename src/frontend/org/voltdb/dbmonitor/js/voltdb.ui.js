@@ -302,7 +302,7 @@ $(document).ready(function () {
                     VoltDbUI.gutterInstanceHor.destroy();
                 VoltDbUI.gutterInstanceHor = Split(['#a', '#inputQuery'],{
                     gutterSize:15,
-                    minSize:380,
+                    minSize:400,
                     sizes:[25, 75]
                 });
             }
