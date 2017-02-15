@@ -30,8 +30,6 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.Connection;
 import org.voltdb.iv2.MpInitiator;
 
-import com.google_voltpatches.common.collect.ImmutableMap;
-import com.google_voltpatches.common.collect.ImmutableMap.Builder;
 
 /**
  * This manages per-partition handles used to identify responses for
@@ -141,8 +139,7 @@ public class ClientInterfaceHandleManager
 
     }
 
-    private ImmutableMap<Integer, PartitionData> m_partitionStuff =
-            new Builder<Integer, PartitionData>().build();
+    private final Map<Integer, PartitionData> m_partitionStuff = new HashMap<Integer, PartitionData>();
 
     ClientInterfaceHandleManager(boolean isAdmin, Connection connection, ClientInterfaceRepairCallback repairCallback, AdmissionControlGroup acg)
     {
@@ -224,11 +221,10 @@ public class ClientInterfaceHandleManager
 
         PartitionData partitionStuff = m_partitionStuff.get(partitionId);
         if (partitionStuff == null) {
-            partitionStuff = new PartitionData(partitionId);
-            m_partitionStuff =
-                    new Builder<Integer, PartitionData>().
-                        putAll(m_partitionStuff).
-                        put(partitionId, partitionStuff).build();
+            synchronized(m_partitionStuff) {
+                partitionStuff = new PartitionData(partitionId);
+                m_partitionStuff.put(partitionId, partitionStuff);
+            }
         }
 
         long ciHandle =
