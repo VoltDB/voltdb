@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -193,7 +193,7 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
                             kattrs, catProc, task, procName, partition, proccb, statsCollector, user, handle);
                     m_callbacks.put(handle, cb);
 
-                    ClientResponseImpl r = dispatcher.dispatch(task, kattrs, InternalClientResponseAdapter.this, user);
+                    ClientResponseImpl r = dispatcher.dispatch(task, kattrs, InternalClientResponseAdapter.this, user, null);
                     boolean bval = r == null || r.getStatus() == ClientResponse.SUCCESS;
                     if (r != null) {
                         try {

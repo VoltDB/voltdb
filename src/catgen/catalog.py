@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 # This file is part of VoltDB.
-# Copyright (C) 2008-2016 VoltDB Inc.
+# Copyright (C) 2008-2017 VoltDB Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -73,6 +73,7 @@ def genjava( classes, javaOnlyClasses, prepath, postpath, package ):
     os.system( interp( "cp $prepath/CatalogDiffEngine.java $postpath", locals() ) )
     os.system( interp( "cp $prepath/FilteredCatalogDiffEngine.java $postpath", locals() ) )
     os.system( interp( "cp $prepath/DRCatalogDiffEngine.java $postpath", locals() ) )
+    os.system( interp( "cp $prepath/DRCatalogCommands.java $postpath", locals() ) )
     os.system( interp( "cp $prepath/DatabaseConfiguration.java $postpath", locals() ) )
 
     ##########

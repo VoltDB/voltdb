@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -40,17 +40,13 @@ public class LatencyManualTest {
     public static void main(String[] args) throws Exception {
         try {
             String simpleSchema =
-                    "create table blah (" +
+                    "create stream blah partition on column ival (" +
                     "ival bigint default 0 not null, " +
                     "PRIMARY KEY(ival));";
 
             VoltProjectBuilder builder = new VoltProjectBuilder();
             builder.addLiteralSchema(simpleSchema);
             builder.addStmtProcedure("Insert", "insert into blah values (?);", null);
-            builder.addPartitionInfo("blah", "ival");
-            // this is a NOOP as builder will only honor it if there is
-            // and accompanying call to builder.addExport
-            builder.setTableAsExportOnly("blah");
 
             LocalCluster cluster = new LocalCluster("latencycheck.jar",
                     2, 1, 0, BackendTarget.NATIVE_EE_JNI);

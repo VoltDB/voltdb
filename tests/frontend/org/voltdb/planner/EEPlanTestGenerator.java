@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -105,12 +105,20 @@ public class EEPlanTestGenerator extends EEPlanGenerator {
     }
 
 
+    public static SchemaConfig ABCIntSchema = new SchemaConfig(new ColumnConfig("A", VoltType.INTEGER),
+                                                            new ColumnConfig("B", VoltType.INTEGER),
+                                                            new ColumnConfig("C", VoltType.INTEGER));
+
+    public static SchemaConfig ABIntSchema = new SchemaConfig(new ColumnConfig("A", VoltType.INTEGER),
+                                                              new ColumnConfig("B", VoltType.INTEGER));
+
+    public static SchemaConfig NameDataSchema = new SchemaConfig(new ColumnConfig("id", VoltType.INTEGER),
+                                                                 new ColumnConfig("name", VoltType.STRING, 32),
+                                                                 new ColumnConfig("data", VoltType.STRING, 1024));
+
     public void generatedPlannerTest() throws Exception {
         TableConfig AAAConfig = new TableConfig("AAA",
-                                                new SchemaConfig(
-                                                        new ColumnConfig("A", VoltType.INTEGER),
-                                                        new ColumnConfig("B", VoltType.INTEGER),
-                                                        new ColumnConfig("C", VoltType.INTEGER)),
+                                                ABCIntSchema,
                                                 new Object[][] {
                                                     { 1,  10,  101 },
                                                     { 1,  10,  102 },
@@ -128,10 +136,7 @@ public class EEPlanTestGenerator extends EEPlanGenerator {
                                                     { 3,  20,  202},
                                                     { 3,  30,  301}});
         TableConfig BBBConfig = new TableConfig("BBB",
-                                                new SchemaConfig(
-                                                        new ColumnConfig("A", VoltType.INTEGER),
-                                                        new ColumnConfig("B", VoltType.INTEGER),
-                                                        new ColumnConfig("C", VoltType.INTEGER)),
+                                                ABCIntSchema,
                                                 new Object[][] {
                                                     { 1,  10,  101 },
                                                     { 1,  10,  102 },
@@ -149,10 +154,7 @@ public class EEPlanTestGenerator extends EEPlanGenerator {
                                                     { 3,  20,  202},
                                                     { 3,  30,  301}});
         TableConfig XXXConfig = new TableConfig("XXX",
-                                                new SchemaConfig(
-                                                        new ColumnConfig("id", VoltType.INTEGER),
-                                                        new ColumnConfig("name", VoltType.STRING, 32),
-                                                        new ColumnConfig("data", VoltType.STRING, 1024)),
+                                                NameDataSchema,
                                                 new Object[][] {
                                                   { 1, "alpha", "beta" },
                                                   { 2, "gamma", "delta" }
@@ -163,10 +165,7 @@ public class EEPlanTestGenerator extends EEPlanGenerator {
         // a table when there is a lot of data, if it's possible.
         //
         TableConfig CCCConfig = new TableConfig("CCC",
-                                                new SchemaConfig(
-                                                        new ColumnConfig("id",   VoltType.INTEGER),
-                                                        new ColumnConfig("name", VoltType.STRING,  32),
-                                                        new ColumnConfig("data", VoltType.STRING,  1024)),
+                                                NameDataSchema,
                                                 10000000);
         DBConfig db = new DBConfig(getClass(),
                                    EEPlanTestGenerator.class.getResource(DDL_FILENAME),
@@ -181,9 +180,7 @@ public class EEPlanTestGenerator extends EEPlanGenerator {
         db.addTest(new TestConfig("test_order_by",
                                   sqlStmt,
                                   new TableConfig("order_by",
-                                                  new SchemaConfig(
-                                                          new ColumnConfig("A", VoltType.INTEGER),
-                                                          new ColumnConfig("B", VoltType.INTEGER)),
+                                                  ABIntSchema,
                                                   new Object[][] {
                                                    { 1,  10},
                                                    { 1,  10},
@@ -264,6 +261,610 @@ public class EEPlanTestGenerator extends EEPlanGenerator {
         generateTests("executors", "TestGeneratedPlans", db);
     }
 
+    public void generatedMaxPlan() throws Exception {
+        TableConfig TConfig = new TableConfig("T",
+                                              ABCIntSchema
+                                              new Integer[][] {
+                                                    // A   B     C
+                                                    //-------------
+                                                    {  1,  1,    1},
+                                                    {  1,  1,    2},
+                                                    {  1,  1,    3},
+                                                    {  1,  1,    4},
+                                                    {  1,  1,    5},
+                                                    //======================================
+                                                    {  1,  2,    1},
+                                                    {  1,  2,    2},
+                                                    {  1,  2,    3},
+                                                    {  1,  2,    4},
+                                                    {  1,  2,    5},
+                                                    //======================================
+                                                    {  1,  3,    1},
+                                                    {  1,  3,    2},
+                                                    {  1,  3,    3},
+                                                    {  1,  3,    4},
+                                                    {  1,  3,    5},
+                                                    //--------------------------------------
+                                                    {  2,  1,    1},
+                                                    {  2,  1,    2},
+                                                    {  2,  1,    3},
+                                                    {  2,  1,    4},
+                                                    {  2,  1,    5},
+                                                    //======================================
+                                                    {  2,  2,    1},
+                                                    {  2,  2,    2},
+                                                    {  2,  2,    3},
+                                                    {  2,  2,    4},
+                                                    {  2,  2,    5},
+                                                    //======================================
+                                                    {  2,  3,    1},
+                                                    {  2,  3,    2},
+                                                    {  2,  3,    3},
+                                                    {  2,  3,    4},
+                                                    {  2,  3,    5}
+                                                });
+        DBConfig countDB = new DBConfig(getClass(),
+                                   EEPlanTestGenerator.class.getResource(DDL_FILENAME),
+                                   getCatalogString(),
+                                   TConfig);
+        TableConfig testMaxLastRowOutput = new TableConfig("test_max_last_row",
+                                                           ABCIntSchema,
+                                                           new Integer[][] {
+                                                               {  1,  1,    0},
+                                                               {  1,  1,    0},
+                                                               {  1,  1,    0},
+                                                               {  1,  1,    0},
+                                                               {  1,  1,    0},
+                                                               //======================================
+                                                               {  1,  2,    0},
+                                                               {  1,  2,    0},
+                                                               {  1,  2,    0},
+                                                               {  1,  2,    0},
+                                                               {  1,  2,    0},
+                                                               //======================================
+                                                               {  1,  3,    0},
+                                                               {  1,  3,    0},
+                                                               {  1,  3,    0},
+                                                               {  1,  3,    0},
+                                                               {  1,  3,    0},
+                                                               //--------------------------------------
+                                                               {  2,  1,    0},
+                                                               {  2,  1,    0},
+                                                               {  2,  1,    0},
+                                                               {  2,  1,    0},
+                                                               {  2,  1,    0},
+                                                               //======================================
+                                                               {  2,  2,    0},
+                                                               {  2,  2,    0},
+                                                               {  2,  2,    0},
+                                                               {  2,  2,    0},
+                                                               {  2,  2,    0},
+                                                               //======================================
+                                                               {  2,  3,    0},
+                                                               {  2,  3,    0},
+                                                               {  2,  3,    0},
+                                                               {  2,  3,    0},
+                                                               {  2,  3,    0}});
+        TableConfig testMaxFirstRowOutput = new TableConfig("test_max_first_row",
+                                                            ABCIntSchema,
+                                                            new Integer[][] {
+                                                                {  1,  1,    0},
+                                                                {  1,  1,    0},
+                                                                {  1,  1,    0},
+                                                                {  1,  1,    0},
+                                                                {  1,  1,    0},
+                                                                //======================================
+                                                                {  1,  2,    0},
+                                                                {  1,  2,    0},
+                                                                {  1,  2,    0},
+                                                                {  1,  2,    0},
+                                                                {  1,  2,    0},
+                                                                //======================================
+                                                                {  1,  3,    0},
+                                                                {  1,  3,    0},
+                                                                {  1,  3,    0},
+                                                                {  1,  3,    0},
+                                                                {  1,  3,    0},
+                                                                //--------------------------------------
+                                                                {  2,  1,    0},
+                                                                {  2,  1,    0},
+                                                                {  2,  1,    0},
+                                                                {  2,  1,    0},
+                                                                {  2,  1,    0},
+                                                                //======================================
+                                                                {  2,  2,    0},
+                                                                {  2,  2,    0},
+                                                                {  2,  2,    0},
+                                                                {  2,  2,    0},
+                                                                {  2,  2,    0},
+                                                                //======================================
+                                                                {  2,  3,    0},
+                                                                {  2,  3,    0},
+                                                                {  2,  3,    0},
+                                                                {  2,  3,    0},
+                                                                {  2,  3,    0}});
+
+        countDB.addTest(new TestConfig("test_max_middle_row",
+                                       "select A, B, max(-1 * abs(3-C)) over (partition by A order by B) as R from T ORDER BY A, B, R;",
+                                       testMaxLastRowOutput);
+
+        countDB.addTest(new TestConfig("test_max_first_row",
+                                       "select A, B, max(-1 * abs(1-C)) over (partition by A order by B) as R from T ORDER BY A, B, R;",
+                                       testMaxFirstRowOutput);
+));
+
+        generateTests("executors", "TestWindowedMax", countDB);
+    }
+
+    public void generatedMinPlan() throws Exception {
+        TableConfig TConfig = new TableConfig("T",
+                                              ABCIntSchema,
+                                              new Integer[][] {
+                                                  // A   B     C
+                                                  //-------------
+                                                  {  1,  1,    1},
+                                                  {  1,  1,    2},
+                                                  {  1,  1,    3},
+                                                  {  1,  1,    4},
+                                                  {  1,  1,    5},
+                                                  //======================================
+                                                  {  1,  2,    1},
+                                                  {  1,  2,    2},
+                                                  {  1,  2,    3},
+                                                  {  1,  2,    4},
+                                                  {  1,  2,    5},
+                                                  //======================================
+                                                  {  1,  3,    1},
+                                                  {  1,  3,    2},
+                                                  {  1,  3,    3},
+                                                  {  1,  3,    4},
+                                                  {  1,  3,    5},
+                                                  //--------------------------------------
+                                                  {  2,  1,    1},
+                                                  {  2,  1,    2},
+                                                  {  2,  1,    3},
+                                                  {  2,  1,    4},
+                                                  {  2,  1,    5},
+                                                  //======================================
+                                                  {  2,  2,    1},
+                                                  {  2,  2,    2},
+                                                  {  2,  2,    3},
+                                                  {  2,  2,    4},
+                                                  {  2,  2,    5},
+                                                  //======================================
+                                                  {  2,  3,    1},
+                                                  {  2,  3,    2},
+                                                  {  2,  3,    3},
+                                                  {  2,  3,    4},
+                                                  {  2,  3,    5}
+                                              });
+        TableConfig testMinLastRowOutput = new TableConfig("test_min_last_row",
+                                                           ABCIntSchema,
+                                                           new Integer[][] {
+                                                               {  1,  1,    0},
+                                                               {  1,  1,    0},
+                                                               {  1,  1,    0},
+                                                               {  1,  1,    0},
+                                                               {  1,  1,    0},
+                                                               //======================================
+                                                               {  1,  2,    0},
+                                                               {  1,  2,    0},
+                                                               {  1,  2,    0},
+                                                               {  1,  2,    0},
+                                                               {  1,  2,    0},
+                                                               //======================================
+                                                               {  1,  3,    0},
+                                                               {  1,  3,    0},
+                                                               {  1,  3,    0},
+                                                               {  1,  3,    0},
+                                                               {  1,  3,    0},
+                                                               //--------------------------------------
+                                                               {  2,  1,    0},
+                                                               {  2,  1,    0},
+                                                               {  2,  1,    0},
+                                                               {  2,  1,    0},
+                                                               {  2,  1,    0},
+                                                               //======================================
+                                                               {  2,  2,    0},
+                                                               {  2,  2,    0},
+                                                               {  2,  2,    0},
+                                                               {  2,  2,    0},
+                                                               {  2,  2,    0},
+                                                               //======================================
+                                                               {  2,  3,    0},
+                                                               {  2,  3,    0},
+                                                               {  2,  3,    0},
+                                                               {  2,  3,    0},
+                                                               {  2,  3,    0}});
+        TableConfig testMinMiddlRowOutput = new TableConfig("test_min_middle_row",
+                                                            ABCIntSchema,
+                                                            new Integer[][] {
+                                                                {  1,  1,    0},
+                                                                {  1,  1,    0},
+                                                                {  1,  1,    0},
+                                                                {  1,  1,    0},
+                                                                {  1,  1,    0},
+                                                                //======================================
+                                                                {  1,  2,    0},
+                                                                {  1,  2,    0},
+                                                                {  1,  2,    0},
+                                                                {  1,  2,    0},
+                                                                {  1,  2,    0},
+                                                                //======================================
+                                                                {  1,  3,    0},
+                                                                {  1,  3,    0},
+                                                                {  1,  3,    0},
+                                                                {  1,  3,    0},
+                                                                {  1,  3,    0},
+                                                                //--------------------------------------
+                                                                {  2,  1,    0},
+                                                                {  2,  1,    0},
+                                                                {  2,  1,    0},
+                                                                {  2,  1,    0},
+                                                                {  2,  1,    0},
+                                                                //======================================
+                                                                {  2,  2,    0},
+                                                                {  2,  2,    0},
+                                                                {  2,  2,    0},
+                                                                {  2,  2,    0},
+                                                                {  2,  2,    0},
+                                                                //======================================
+                                                                {  2,  3,    0},
+                                                                {  2,  3,    0},
+                                                                {  2,  3,    0},
+                                                                {  2,  3,    0},
+                                                                {  2,  3,    0}});
+        TableConfig testMinFirstRowOutput = new TableConfig("test_min_first_row_output",
+                                                            ABCIntSchema,
+                                                            new Integer[][] {
+                                                                {  1,  1,    0},
+                                                                {  1,  1,    0},
+                                                                {  1,  1,    0},
+                                                                {  1,  1,    0},
+                                                                {  1,  1,    0},
+                                                                //======================================
+                                                                {  1,  2,    0},
+                                                                {  1,  2,    0},
+                                                                {  1,  2,    0},
+                                                                {  1,  2,    0},
+                                                                {  1,  2,    0},
+                                                                //======================================
+                                                                {  1,  3,    0},
+                                                                {  1,  3,    0},
+                                                                {  1,  3,    0},
+                                                                {  1,  3,    0},
+                                                                {  1,  3,    0},
+                                                                //--------------------------------------
+                                                                {  2,  1,    0},
+                                                                {  2,  1,    0},
+                                                                {  2,  1,    0},
+                                                                {  2,  1,    0},
+                                                                {  2,  1,    0},
+                                                                //======================================
+                                                                {  2,  2,    0},
+                                                                {  2,  2,    0},
+                                                                {  2,  2,    0},
+                                                                {  2,  2,    0},
+                                                                {  2,  2,    0},
+                                                                //======================================
+                                                                {  2,  3,    0},
+                                                                {  2,  3,    0},
+                                                                {  2,  3,    0},
+                                                                {  2,  3,    0},
+                                                                {  2,  3,    0}});
+        DBConfig countDB = new DBConfig(getClass(),
+                                        EEPlanTestGenerator.class.getResource(DDL_FILENAME),
+                                        getCatalogString(),
+                                        TConfig);
+        countDB.addTest(new TestConfig("test_min_last_row",
+                                       "select A, B, min(abs(5-C)) over (partition by A order by B) as R from T ORDER BY A, B, R;",
+                                       testMinLastRowOutput);
+
+        countDB.addTest(new TestConfig("test_min_middle_row",
+                                       "select A, B, min(abs(3-C)) over (partition by A order by B) as R from T ORDER BY A, B, R;",
+                                       testMinMiddleRowOutput));
+
+        countDB.addTest(new TestConfig("test_min_first_row",
+                                       "select A, B, min(abs(1-C)) over (partition by A order by B) as R from T ORDER BY A, B, R;",
+                                       testMinFirstRowOutput));
+
+        generateTests("executors", "TestWindowedMin", countDB);
+    }
+
+    public void generatedSumPlan() throws Exception {
+        TableConfig TConfig = new TableConfig("T",
+                                                new String[] {"A", "B", "C"},
+                                                new int[][] {
+                                                    // A   B     C
+                                                    //-------------
+                                                    {  1,  1,    1},
+                                                    {  1,  1,    2},
+                                                    {  1,  1,    3},
+                                                    {  1,  1,    4},
+                                                    {  1,  1,    5},
+                                                    //======================================
+                                                    {  1,  2,    1},
+                                                    {  1,  2,    2},
+                                                    {  1,  2,    3},
+                                                    {  1,  2,    4},
+                                                    {  1,  2,    5},
+                                                    //======================================
+                                                    {  1,  3,    1},
+                                                    {  1,  3,    2},
+                                                    {  1,  3,    3},
+                                                    {  1,  3,    4},
+                                                    {  1,  3,    5},
+                                                    //--------------------------------------
+                                                    {  2,  1,    1},
+                                                    {  2,  1,    2},
+                                                    {  2,  1,    3},
+                                                    {  2,  1,    4},
+                                                    {  2,  1,    5},
+                                                    //======================================
+                                                    {  2,  2,    1},
+                                                    {  2,  2,    2},
+                                                    {  2,  2,    3},
+                                                    {  2,  2,    4},
+                                                    {  2,  2,    5},
+                                                    //======================================
+                                                    {  2,  3,    1},
+                                                    {  2,  3,    2},
+                                                    {  2,  3,    3},
+                                                    {  2,  3,    4},
+                                                    {  2,  3,    5}
+                                                });
+        DBConfig countDB = new DBConfig(getClass(),
+                                   EEPlanTestGenerator.class.getResource(DDL_FILENAME),
+                                   getCatalogString(),
+                                   TConfig);
+        countDB.addTest(new TestConfig("test_min_last_row",
+                                  "select A, B, sum(B+C) over (partition by A order by B) as R from T ORDER BY A, B, R;",
+                                  new int[][] {{  1,  1,   20},
+                                               {  1,  1,   20},
+                                               {  1,  1,   20},
+                                               {  1,  1,   20},
+                                               {  1,  1,   20},
+                                               //======================================
+                                               {  1,  2,   45},
+                                               {  1,  2,   45},
+                                               {  1,  2,   45},
+                                               {  1,  2,   45},
+                                               {  1,  2,   45},
+                                               //======================================
+                                               {  1,  3,   75},
+                                               {  1,  3,   75},
+                                               {  1,  3,   75},
+                                               {  1,  3,   75},
+                                               {  1,  3,   75},
+                                               //--------------------------------------
+                                               {  2,  1,   20},
+                                               {  2,  1,   20},
+                                               {  2,  1,   20},
+                                               {  2,  1,   20},
+                                               {  2,  1,   20},
+                                               //======================================
+                                               {  2,  2,   45},
+                                               {  2,  2,   45},
+                                               {  2,  2,   45},
+                                               {  2,  2,   45},
+                                               {  2,  2,   45},
+                                               //======================================
+                                               {  2,  3,   75},
+                                               {  2,  3,   75},
+                                               {  2,  3,   75},
+                                               {  2,  3,   75},
+                                               {  2,  3,   75}
+        }));
+
+        generateTests("executors", "TestWindowedSum", countDB);
+    }
+
+    public void generatedCountPlan() throws Exception {
+        TableConfig TConfig = new TableConfig("T",
+                                                new String[] {"A", "B", "C"},
+                                                new int[][] {
+                                                    // A   B     C
+                                                    //-------------
+                                                    {  1,  1,  101},
+                                                    {  1,  1,  102},
+                                                    //======================================
+                                                    {  1,  2,  201},
+                                                    {  1,  2,  202},
+                                                    //======================================
+                                                    {  1,  3,  203},
+                                                    //--------------------------------------
+                                                    {  2,  1, 1101},
+                                                    {  2,  1, 1102},
+                                                    //======================================
+                                                    {  2,  2, 1201},
+                                                    {  2,  2, 1202},
+                                                    //======================================
+                                                    {  2,  3, 1203},
+                                                    //--------------------------------------
+                                                    { 20,  1, 2101},
+                                                    { 20,  1, 2102},
+                                                    //======================================
+                                                    { 20,  2, 2201},
+                                                    { 20,  2, 2202},
+                                                    //======================================
+                                                    { 20,  3, 2203},
+                                                    //--------------------------------------
+                                                });
+        DBConfig countDB = new DBConfig(getClass(),
+                                   EEPlanTestGenerator.class.getResource(DDL_FILENAME),
+                                   getCatalogString(),
+                                   TConfig);
+        String sqlStmt;
+        sqlStmt = "select A, B, C, count(*) over (partition by A order by B) as R from T ORDER BY A, B, C, R;";
+
+        countDB.addTest(new TestConfig("test_count_star",
+                                  sqlStmt,
+                                  new int[][] {
+                                  // A   B    C    count
+                                  //--------------------------------------
+                                  {  1,  1,  101, 2},
+                                  {  1,  1,  102, 2},
+                                  //======================================
+                                  {  1,  2,  201, 4},
+                                  {  1,  2,  202, 4},
+                                  //======================================
+                                  {  1,  3,  203, 5},
+                                  //--------------------------------------
+                                  {  2,  1, 1101, 2},
+                                  {  2,  1, 1102, 2},
+                                  //======================================
+                                  {  2,  2, 1201, 4},
+                                  {  2,  2, 1202, 4},
+                                  //======================================
+                                  {  2,  3, 1203, 5},
+                                  //--------------------------------------
+                                  { 20,  1, 2101, 2},
+                                  { 20,  1, 2102, 2},
+                                  //======================================
+                                  { 20,  2, 2201, 4},
+                                  { 20,  2, 2202, 4},
+                                  //======================================
+                                  { 20,  3, 2203, 5},
+                                  //--------------------------------------
+        }));;
+        sqlStmt = "select A, B, C, count(A+B) over (partition by A order by B) as R from T ORDER BY A, B, C, R;";
+
+        countDB.addTest(new TestConfig("test_count",
+                                  sqlStmt,
+                                  new int[][] {
+                                  // A   B    C    count
+                                  //--------------------------------------
+                                  {  1,  1,  101, 2},
+                                  {  1,  1,  102, 2},
+                                  //======================================
+                                  {  1,  2,  201, 4},
+                                  {  1,  2,  202, 4},
+                                  //======================================
+                                  {  1,  3,  203, 5},
+                                  //--------------------------------------
+                                  {  2,  1, 1101, 2},
+                                  {  2,  1, 1102, 2},
+                                  //=====================================
+                                  {  2,  2, 1201, 4},
+                                  {  2,  2, 1202, 4},
+                                  //======================================
+                                  {  2,  3, 1203, 5},
+                                  //--------------------------------------
+                                  { 20,  1, 2101, 2},
+                                  { 20,  1, 2102, 2},
+                                  //======================================
+                                  { 20,  2, 2201, 4},
+                                  { 20,  2, 2202, 4},
+                                  //======================================
+                                  { 20,  3, 2203, 5},
+                                  //--------------------------------------
+        }));;
+        generateTests("executors", "TestWindowedCount", countDB);
+    }
+
+    public void generatedRankPlan() throws Exception {
+        TableConfig TConfig = new TableConfig("T",
+                                                new String[] {"A", "B", "C"},
+                                                new int[][] {
+                                                    // A   B     C
+                                                    //-------------
+                                                    {  1,  1,  101},
+                                                    {  1,  1,  102},
+                                                    //======================================
+                                                    {  1,  2,  201},
+                                                    {  1,  2,  202},
+                                                    //======================================
+                                                    {  1,  3,  203},
+                                                    //--------------------------------------
+                                                    {  2,  1, 1101},
+                                                    {  2,  1, 1102},
+                                                    //======================================
+                                                    {  2,  2, 1201},
+                                                    {  2,  2, 1202},
+                                                    //======================================
+                                                    {  2,  3, 1203},
+                                                    //--------------------------------------
+                                                    { 20,  1, 2101},
+                                                    { 20,  1, 2102},
+                                                    //======================================
+                                                    { 20,  2, 2201},
+                                                    { 20,  2, 2202},
+                                                    //======================================
+                                                    { 20,  3, 2203},
+                                                    //--------------------------------------
+                                                });
+        DBConfig rankDB = new DBConfig(getClass(),
+                                   EEPlanTestGenerator.class.getResource(DDL_FILENAME),
+                                   getCatalogString(),
+                                   TConfig);
+        String sqlStmt;
+        sqlStmt = "select A, B, C, rank() over (partition by A order by B) as R from T ORDER BY A, B, C, R;";
+
+        rankDB.addTest(new TestConfig("test_rank",
+                                  sqlStmt,
+                                  new int[][] {
+                                  // A   B    C    rank
+                                  //--------------------------------------
+                                  {  1,  1,  101, 1},
+                                  {  1,  1,  102, 1},
+                                  //======================================
+                                  {  1,  2,  201, 3},
+                                  {  1,  2,  202, 3},
+                                  //======================================
+                                  {  1,  3,  203, 5},
+                                  //--------------------------------------
+                                  {  2,  1, 1101, 1},
+                                  {  2,  1, 1102, 1},
+                                  //======================================
+                                  {  2,  2, 1201, 3},
+                                  {  2,  2, 1202, 3},
+                                  //======================================
+                                  {  2,  3, 1203, 5},
+                                  //--------------------------------------
+                                  { 20,  1, 2101, 1},
+                                  { 20,  1, 2102, 1},
+                                  //======================================
+                                  { 20,  2, 2201, 3},
+                                  { 20,  2, 2202, 3},
+                                  //======================================
+                                  { 20,  3, 2203, 5},
+                                  //--------------------------------------
+        }));;
+        sqlStmt = "select A, B, C, dense_rank() over (partition by A order by B) as R from T ORDER BY A, B, C, R;";
+
+        rankDB.addTest(new TestConfig("test_dense_rank",
+                                  sqlStmt,
+                                  new int[][] {
+                                  // A   B    C    rank
+                                  //--------------------------------------
+                                  {  1,  1,  101, 1},
+                                  {  1,  1,  102, 1},
+                                  //======================================
+                                  {  1,  2,  201, 2},
+                                  {  1,  2,  202, 2},
+                                  //======================================
+                                  {  1,  3,  203, 3},
+                                  //--------------------------------------
+                                  {  2,  1, 1101, 1},
+                                  {  2,  1, 1102, 1},
+                                  //======================================
+                                  {  2,  2, 1201, 2},
+                                  {  2,  2, 1202, 2},
+                                  //======================================
+                                  {  2,  3, 1203, 3},
+                                  //--------------------------------------
+                                  { 20,  1, 2101, 1},
+                                  { 20,  1, 2102, 1},
+                                  //======================================
+                                  { 20,  2, 2201, 2},
+                                  { 20,  2, 2202, 2},
+                                  //======================================
+                                  { 20,  3, 2203, 3},
+                                  //--------------------------------------
+        }));;
+        generateTests("executors", "TestWindowedRank", rankDB);
+    }
+
     @Override
     protected void tearDown() throws Exception {
         super.tearDown();
@@ -274,6 +875,7 @@ public class EEPlanTestGenerator extends EEPlanGenerator {
         try {
             tg.setUp();
             tg.generatedPlannerTest();
+            tg.generatedRankPlan()
         } catch (Exception e) {
             System.err.printf("Unexpected exception: %s\n", e.getMessage());
             e.printStackTrace();

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -27,72 +27,68 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.SelectSubqueryExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.DeletePlanNode;
-import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.InsertPlanNode;
-import org.voltdb.plannodes.OrderByPlanNode;
 import org.voltdb.plannodes.ReceivePlanNode;
-import org.voltdb.plannodes.SendPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.plannodes.UpdatePlanNode;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.PlanNodeType;
 
-import java.util.Arrays;
-
 public class TestPlansDML extends PlannerTestCase {
 
-    List<AbstractPlanNode> pns;
     public void testBasicUpdateAndDelete() {
         // select * with ON clause should return all columns from all tables
-        AbstractPlanNode n;
+        List<AbstractPlanNode> pns;
         AbstractPlanNode pn;
+        AbstractPlanNode node;
 
         pns = compileToFragments("UPDATE R1 SET C = 1 WHERE C = 0");
         pn = pns.get(0);
         System.out.println(pn.toExplainPlanString());
-        n = pn.getChild(0).getChild(0);
-        assertTrue(n instanceof ReceivePlanNode);
+        node = pn.getChild(0).getChild(0);
+        assertTrue(node instanceof ReceivePlanNode);
         pn = pns.get(1);
-        n = pn.getChild(0);
-        assertTrue(n instanceof UpdatePlanNode);
+        node = pn.getChild(0);
+        assertTrue(node instanceof UpdatePlanNode);
 
         pns = compileToFragments("DELETE FROM R1 WHERE C = 0");
         pn = pns.get(0);
         System.out.println(pn.toExplainPlanString());
-        n = pn.getChild(0).getChild(0);
-        assertTrue(n instanceof ReceivePlanNode);
+        node = pn.getChild(0).getChild(0);
+        assertTrue(node instanceof ReceivePlanNode);
         pn = pns.get(1);
-        n = pn.getChild(0);
-        assertTrue(n instanceof DeletePlanNode);
+        node = pn.getChild(0);
+        assertTrue(node instanceof DeletePlanNode);
 
         pns = compileToFragments("INSERT INTO R1 VALUES (1, 2, 3)");
         pn = pns.get(0);
         System.out.println(pn.toExplainPlanString());
-        n = pn.getChild(0).getChild(0);
-        assertTrue(n instanceof ReceivePlanNode);
+        node = pn.getChild(0).getChild(0);
+        assertTrue(node instanceof ReceivePlanNode);
         pn = pns.get(1);
-        n = pn.getChild(0);
-        assertTrue(n instanceof InsertPlanNode);
+        node = pn.getChild(0);
+        assertTrue(node instanceof InsertPlanNode);
 
         pns = compileToFragments("UPDATE P1 SET C = 1 WHERE C = 0");
         pn = pns.get(0);
         System.out.println(pn.toExplainPlanString());
-        n = pn.getChild(0).getChild(0);
-        assertTrue(n instanceof ReceivePlanNode);
+        node = pn.getChild(0).getChild(0);
+        assertTrue(node instanceof ReceivePlanNode);
         pn = pns.get(1);
-        n = pn.getChild(0);
-        assertTrue(n instanceof UpdatePlanNode);
+        node = pn.getChild(0);
+        assertTrue(node instanceof UpdatePlanNode);
 
         pns = compileToFragments("DELETE FROM P1 WHERE C = 0");
         pn = pns.get(0);
         System.out.println(pn.toExplainPlanString());
-        n = pn.getChild(0).getChild(0);
-        assertTrue(n instanceof ReceivePlanNode);
+        node = pn.getChild(0).getChild(0);
+        assertTrue(node instanceof ReceivePlanNode);
         pn = pns.get(1);
-        n = pn.getChild(0);
-        assertTrue(n instanceof DeletePlanNode);
+        node = pn.getChild(0);
+        assertTrue(node instanceof DeletePlanNode);
 
         pns = compileToFragments("UPDATE P1 SET C = 1 WHERE A = 0");
         pn = pns.get(0);
@@ -115,18 +111,20 @@ public class TestPlansDML extends PlannerTestCase {
     }
 
     public void testTruncateTable() {
+        List<AbstractPlanNode> pns;
         String tbs[] = {"R1", "P1"};
         for (String tb: tbs) {
             pns = compileToFragments("Truncate table " + tb);
-            checkTruncateFlag();
+            checkTruncateFlag(pns);
 
             pns = compileToFragments("DELETE FROM " + tb);
-            checkTruncateFlag();
+            checkTruncateFlag(pns);
         }
     }
 
     public void testInsertIntoSelectPlan() {
-        System.out.println("\n\n\nRUNNING testInsertIntoSelectPlan\n\n");
+        System.out.println("\n\nRUNNING testInsertIntoSelectPlan\n\n");
+        List<AbstractPlanNode> pns;
 
         // This should be inferred as single-partition
         pns = compileToFragments("INSERT INTO P1 SELECT * FROM P2 WHERE A = ?");
@@ -192,6 +190,7 @@ public class TestPlansDML extends PlannerTestCase {
 
     public void testInsertSingleRowPlan() {
         System.out.println("\n\n\nRUNNING testInsertSingleRowPlan\n\n");
+        List<AbstractPlanNode> pns;
 
         // These test cases are from ENG-5929.
 
@@ -208,67 +207,150 @@ public class TestPlansDML extends PlannerTestCase {
 
     public void testDeleteOrderByPlan() {
         System.out.println("\n\n\nRUNNING testDeleteOrderByPlan\n\n");
+        List<AbstractPlanNode> pns;
+
+        PlanNodeType[] deleteFromIndexScan = { PlanNodeType.SEND,
+                PlanNodeType.DELETE,
+                PlanNodeType.INDEXSCAN,
+        };
+        PlanNodeType[] deleteFromSortedIndexScan = { PlanNodeType.SEND,
+                PlanNodeType.DELETE,
+                PlanNodeType.ORDERBY,
+                PlanNodeType.INDEXSCAN,
+        };
+        PlanNodeType[] deleteFromSortedSeqScan = { PlanNodeType.SEND,
+                PlanNodeType.DELETE,
+                PlanNodeType.ORDERBY,
+                PlanNodeType.SEQSCAN,
+        };
 
         // No ORDER BY node, since we can use index instead
         pns = compileToFragments("DELETE FROM R5 ORDER BY A LIMIT ?");
         assertEquals(2, pns.size());
         AbstractPlanNode collectorRoot = pns.get(1);
-        assertClassesMatchNodeChain(Arrays.asList(
-                SendPlanNode.class,
-                DeletePlanNode.class,
-                IndexScanPlanNode.class),
-                collectorRoot
-                );
+        assertLeftChain(collectorRoot, deleteFromIndexScan);
 
         // No ORDER BY node, since index scan is used to evaluate predicate
         pns = compileToFragments("DELETE FROM R5 WHERE A = 1 ORDER BY A LIMIT ?");
         assertEquals(2, pns.size());
         collectorRoot = pns.get(1);
-        assertClassesMatchNodeChain(Arrays.asList(
-                SendPlanNode.class,
-                DeletePlanNode.class,
-                IndexScanPlanNode.class),
-                collectorRoot
-                );
+        assertLeftChain(collectorRoot, deleteFromIndexScan);
 
         // Index used to evaluate predicate not suitable for ORDER BY
         pns = compileToFragments("DELETE FROM R5 WHERE A = 1 ORDER BY B, A, C, D LIMIT ?");
         assertEquals(2, pns.size());
         collectorRoot = pns.get(1);
-        assertClassesMatchNodeChain(Arrays.asList(
-                SendPlanNode.class,
-                DeletePlanNode.class,
-                OrderByPlanNode.class,
-                IndexScanPlanNode.class),
-                collectorRoot
-                );
+        assertLeftChain(collectorRoot, deleteFromSortedIndexScan);
 
         // Index can't be used either for predicate evaluation or ORDER BY
         pns = compileToFragments("DELETE FROM R5 WHERE B = 1 ORDER BY B, A, C, D LIMIT ?");
         assertEquals(2, pns.size());
         collectorRoot = pns.get(1);
-        assertClassesMatchNodeChain(Arrays.asList(
-                SendPlanNode.class,
-                DeletePlanNode.class,
-                OrderByPlanNode.class,
-                SeqScanPlanNode.class),
-                collectorRoot
-                );
+        assertLeftChain(collectorRoot, deleteFromSortedSeqScan);
     }
 
     /**
      * ENG-7384 Redundant predicate in DELETE/UPDATE statement plans.
      */
     public void testDMLPredicate() {
-        {
-            pns = compileToFragments("UPDATE P1 SET C = 1 WHERE A = 0");
-            assertEquals(1, pns.size());
-            checkPredicate(pns.get(0).getChild(0), ExpressionType.COMPARE_EQUAL);
+        List<AbstractPlanNode> pns;
+        pns = compileToFragments("UPDATE P1 SET C = 1 WHERE A = 0");
+        assertEquals(1, pns.size());
+        checkPredicate(pns.get(0).getChild(0), ExpressionType.COMPARE_EQUAL);
+
+        pns = compileToFragments("DELETE FROM P1 WHERE A > 0");
+        assertTrue(pns.size() == 2);
+        checkPredicate(pns.get(1).getChild(0).getChild(0), ExpressionType.COMPARE_GREATERTHAN);
+    }
+
+    public void testDMLwithExpressionSubqueries() {
+
+        String dmlSQL;
+
+        dmlSQL = "UPDATE R1 SET C = 1 WHERE C IN (SELECT A FROM R2 WHERE R2.A = R1.C);";
+        checkDMLPlanNodeAndSubqueryExpression(dmlSQL, ExpressionType.OPERATOR_EXISTS);
+
+        dmlSQL = "UPDATE R1 SET C = 1 WHERE EXISTS (SELECT A FROM R2 WHERE R1.C = R2.A);";
+        checkDMLPlanNodeAndSubqueryExpression(dmlSQL, ExpressionType.OPERATOR_EXISTS);
+
+        dmlSQL = "UPDATE R1 SET C = 1 WHERE C > ALL (SELECT A FROM R2);";
+        checkDMLPlanNodeAndSubqueryExpression(dmlSQL, ExpressionType.COMPARE_GREATERTHAN);
+
+        dmlSQL = "UPDATE P1 SET C = 1 WHERE A = 0 AND C > ALL (SELECT A FROM R2);";
+        checkDMLPlanNodeAndSubqueryExpression(dmlSQL, ExpressionType.CONJUNCTION_AND);
+
+        dmlSQL = "UPDATE P1 SET C = (SELECT C FROM R2 WHERE A = 0) ;";
+        checkDMLPlanNodeAndSubqueryExpression(dmlSQL, null);
+
+        dmlSQL = "DELETE FROM R1 WHERE C IN (SELECT A FROM R2);";
+        checkDMLPlanNodeAndSubqueryExpression(dmlSQL, ExpressionType.OPERATOR_EXISTS);
+
+        dmlSQL = "DELETE FROM R1 WHERE EXISTS (SELECT A FROM R2 WHERE R1.C = R2.A);";
+        checkDMLPlanNodeAndSubqueryExpression(dmlSQL, ExpressionType.OPERATOR_EXISTS);
+
+        dmlSQL = "DELETE FROM R1 WHERE C > ALL (SELECT A FROM R2);";
+        checkDMLPlanNodeAndSubqueryExpression(dmlSQL, ExpressionType.COMPARE_GREATERTHAN);
+
+        dmlSQL = "DELETE FROM P1 WHERE C > ALL (SELECT A FROM R2);";
+        checkDMLPlanNodeAndSubqueryExpression(dmlSQL, ExpressionType.COMPARE_GREATERTHAN);
+
+        dmlSQL = "DELETE FROM P1 WHERE A = 0 AND C > ALL (SELECT A FROM R2);";
+        checkDMLPlanNodeAndSubqueryExpression(dmlSQL, ExpressionType.CONJUNCTION_AND);
+
+        dmlSQL = "INSERT INTO P1 SELECT * FROM P1 PA WHERE NOT EXISTS (SELECT A FROM R1 RB WHERE PA.A = RB.A);";
+        checkDMLPlanNodeAndSubqueryExpression(dmlSQL, ExpressionType.OPERATOR_NOT);
+
+        dmlSQL = "INSERT INTO R1 SELECT * FROM R1 RA WHERE NOT EXISTS (SELECT A FROM R1 RB WHERE RA.A = RB.A);";
+        checkDMLPlanNodeAndSubqueryExpression(dmlSQL, ExpressionType.OPERATOR_NOT);
+
+        dmlSQL = "INSERT INTO R1 SELECT * FROM R1 RA WHERE RA.A IN (SELECT A FROM R2 WHERE R2.A > 0);";
+        checkDMLPlanNodeAndSubqueryExpression(dmlSQL, ExpressionType.OPERATOR_EXISTS);
+
+        dmlSQL = "INSERT INTO R1 (A, C, D) SELECT (SELECT MAX(A) FROM R1), 32, 32 FROM R1;";
+        checkDMLPlanNodeAndSubqueryExpression(dmlSQL, null);
+
+        dmlSQL = "INSERT INTO R1 (A, C, D) VALUES ((SELECT MAX(A) FROM R1), 32, 32);";
+        checkDMLPlanNodeAndSubqueryExpression(dmlSQL, null);
+
+        // Distributed expression subquery
+        failToCompile("DELETE FROM R1 WHERE C > ALL (SELECT A FROM P2 WHERE A = 1);", PlanAssembler.IN_EXISTS_SCALAR_ERROR_MESSAGE);
+
+        // Distributed expression subquery
+        failToCompile("UPDATE R1 SET C = (SELECT A FROM P2 WHERE A = 1);", PlanAssembler.IN_EXISTS_SCALAR_ERROR_MESSAGE);
+        failToCompile("insert into P1 (A,C) " +
+                "select A,C from R2 " +
+                "where not exists (select A from P1 AP1 where R2.A = AP1.A);",
+                "Subquery expressions are only supported for single partition procedures and AdHoc queries referencing only replicated tables.");
+
+        // Distributed expression subquery with inferred partitioning
+        failToCompile("DELETE FROM R1 WHERE C > ALL (SELECT A FROM P2);", PlanAssembler.IN_EXISTS_SCALAR_ERROR_MESSAGE);
+
+    }
+
+    void checkDMLPlanNodeAndSubqueryExpression(String dmlSQL, ExpressionType filterType) {
+        List<AbstractPlanNode> pns = compileToFragments(dmlSQL);
+        AbstractPlanNode dmlNode;
+
+        if (pns.size() == 2) {
+            dmlNode = pns.get(1).getChild(0);
+        } else {
+            dmlNode = pns.get(0);
         }
-        {
-            pns = compileToFragments("DELETE FROM P1 WHERE A > 0");
-            assertTrue(pns.size() == 2);
-            checkPredicate(pns.get(1).getChild(0).getChild(0), ExpressionType.COMPARE_GREATERTHAN);
+
+        String dmlType = dmlSQL.substring(0, dmlSQL.indexOf(' ')).trim().toUpperCase();
+        assertEquals(dmlType, dmlNode.getPlanNodeType().toString());
+
+        while(dmlNode.getPlanNodeType() != PlanNodeType.SEQSCAN && dmlNode.getPlanNodeType() != PlanNodeType.MATERIALIZE) {
+            dmlNode = dmlNode.getChild(0);
+        }
+        assertNotNull(dmlNode);
+
+        // Verify DML Predicate
+        if (filterType != null) {
+            AbstractExpression predicate = ((SeqScanPlanNode) dmlNode).getPredicate();
+            assertNotNull(predicate);
+            assertEquals(filterType, predicate.getExpressionType());
+            assertTrue(predicate.hasAnySubexpressionOfClass(SelectSubqueryExpression.class));
         }
     }
 
@@ -278,7 +360,7 @@ public class TestPlansDML extends PlannerTestCase {
         assertEquals(type, e.getExpressionType());
     }
 
-    private void checkTruncateFlag() {
+    private void checkTruncateFlag(List<AbstractPlanNode> pns) {
         assertTrue(pns.size() == 2);
 
         ArrayList<AbstractPlanNode> deletes = pns.get(1).findAllNodesOfType(PlanNodeType.DELETE);

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -22,13 +22,15 @@ import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
 
-import com.google_voltpatches.common.collect.ImmutableList;
-import com.google_voltpatches.common.collect.ImmutableMap;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.VoltTable;
+import org.voltdb.iv2.TxnEgo;
+
+import com.google_voltpatches.common.collect.ImmutableList;
+import com.google_voltpatches.common.collect.ImmutableMap;
 
 /**
  * Message from a stored procedure coordinator to an execution site
@@ -105,7 +107,7 @@ public class BorrowTaskMessage extends TransactionInfoBaseMessage
         sb.append("BORROW_TASK (FROM ");
         sb.append(CoreUtils.hsIdToString(m_coordinatorHSId));
         sb.append(") FOR TXN ");
-        sb.append(m_txnId);
+        sb.append(TxnEgo.txnIdToString(m_txnId));
 
         sb.append("\n");
         sb.append(" UNIQUE ID ").append(m_uniqueId).append("\n");

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -68,9 +68,10 @@ public class PlannerTestAideDeCamp {
      * @throws Exception
      */
     public PlannerTestAideDeCamp(URL ddlurl, String basename) throws Exception {
+        assert(ddlurl != null);
         String pth = ddlurl.getPath();
         String schemaPath = URLDecoder.decode(ddlurl.getPath(), "UTF-8");
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         hsql = HSQLInterface.loadHsqldb();
         VoltCompiler.DdlProceduresToLoad no_procs = DdlProceduresToLoad.NO_DDL_PROCEDURES;
         catalog = compiler.loadSchema(hsql, no_procs, schemaPath);

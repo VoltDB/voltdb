@@ -64,12 +64,12 @@ function catalog() {
     echo "Compiling the kvbenchmark application catalog."
     echo "To perform this action manually, use the command line: "
     echo
-    echo "voltdb compile --classpath obj -o $APPNAME.jar ddl.sql"
+    echo "voltdb legacycompile --classpath obj -o $APPNAME.jar ddl.sql"
     echo
-    $VOLTDB compile --classpath obj -o $APPNAME.jar ddl.sql
-    echo "voltdb compile --classpath obj -o $APPNAME-streamview.jar ddl-streamview.sql"
+    $VOLTDB legacycompile --classpath obj -o $APPNAME.jar ddl.sql
+    echo "voltdb legacycompile --classpath obj -o $APPNAME-streamview.jar ddl-streamview.sql"
     echo
-    $VOLTDB compile --classpath obj -o $APPNAME-streamview.jar ddl-streamview.sql
+    $VOLTDB legacycompile --classpath obj -o $APPNAME-streamview.jar ddl-streamview.sql
 
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
@@ -81,7 +81,7 @@ function streamview() {
     STREAMVIEW="true"
     server
 }
-    
+
 
 # run the voltdb server locally
 function server() {
@@ -92,7 +92,7 @@ function server() {
     # run the server
     echo "Starting the VoltDB server."
     echo "To perform this action manually, use the command line: "
-    echo 
+    echo
     echo "${VOLTDB} create -d deployment.xml -l ${LICENSE} -H ${HOST} ${APPNAME}$1.jar"
     echo
     ${VOLTDB} create -d deployment.xml -l ${LICENSE} -H ${HOST} ${APPNAME}$1.jar

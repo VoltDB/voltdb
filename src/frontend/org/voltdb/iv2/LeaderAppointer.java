@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -23,6 +23,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.NavigableSet;
 import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
@@ -47,10 +48,10 @@ import org.voltcore.zk.BabySitter;
 import org.voltcore.zk.LeaderElector;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.Promotable;
+import org.voltdb.ReplicationRole;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
-import org.voltdb.catalog.SnapshotSchedule;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
@@ -163,6 +164,7 @@ public class LeaderAppointer implements Promotable
                         int pid = aPartition.getInt("partition_id");
                         if (pid == m_partitionId) {
                             replicaCount = aPartition.getJSONArray("replicas").length();
+                            break;
                         }
                     }
                 } catch (JSONException e) {
@@ -188,8 +190,10 @@ public class LeaderAppointer implements Promotable
                     VoltDB.crashGlobalVoltDB("Detected node failure during command log replay. Cluster will shut down.",
                                              false, null);
                 }
-                // If we are a DR replica and starting from a snapshot, check if that has completed
-                if (m_expectingDrSnapshot && m_snapshotSyncComplete.get() == false) {
+                // If we are still a DR replica (not promoted) and starting from a snapshot,
+                // check if that has completed
+                if (VoltDB.instance().getReplicationRole() == ReplicationRole.REPLICA &&
+                    m_expectingDrSnapshot && m_snapshotSyncComplete.get() == false) {
                     VoltDB.crashGlobalVoltDB("Detected node failure before DR sync snapshot completes. Cluster will shut down.",
                                              false, null);
                 }
@@ -264,7 +268,6 @@ public class LeaderAppointer implements Promotable
     public LeaderAppointer(HostMessenger hm,
                            int numberOfPartitions,
                            int kfactor,
-                           SnapshotSchedule partitionSnapshotSchedule,
                            JSONObject topology,
                            MpInitiator mpi,
                            KSafetyStats stats,
@@ -470,6 +473,7 @@ public class LeaderAppointer implements Promotable
                     int pid = aPartition.getInt("partition_id");
                     if (pid == partitionId) {
                         masterHostId = aPartition.getInt("master");
+                        break;
                     }
                 }
             }
@@ -585,6 +589,10 @@ public class LeaderAppointer implements Promotable
         m_stats.setSafetySet(lackingReplication.build());
 
         return retval;
+    }
+
+    public NavigableSet<KSafetyStats.StatsPoint> getKSafetyStatsSet() {
+        return m_stats.getSafetySet();
     }
 
     private void removeAndCleanupPartition(int pid) {

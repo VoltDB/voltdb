@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -493,7 +493,7 @@ public class TestFragmentProgressUpdate extends TestCase {
             break;
         case STATEMENT_LIST:
             expectedSqlTextMsg = "Unable to report specific SQL statement text "
-                    + "for fragment task message index " + (numFragsToExecute - 1) + ".  "
+                    + "for fragment task message index " + (numFragsToExecute - 1) + ". "
                     + "It MAY be one of these " + (numFragsToExecute - 1) + " items: "
                     + "\"SELECT W_ID FROM WAREHOUSE LIMIT 1;\", ";
             break;

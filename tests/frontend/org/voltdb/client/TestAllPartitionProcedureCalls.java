@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -38,6 +38,7 @@ import org.voltdb.BackendTarget;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltTable;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.regressionsuites.JUnit4LocalClusterTest;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.utils.VoltFile;
 
@@ -45,7 +46,7 @@ import org.voltdb.utils.VoltFile;
  *  Test client all partition calls
  *
  */
-public class TestAllPartitionProcedureCalls {
+public class TestAllPartitionProcedureCalls extends JUnit4LocalClusterTest {
 
     static final int  ROWS = 1000;
     private LocalCluster cluster;
@@ -68,16 +69,6 @@ public class TestAllPartitionProcedureCalls {
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.setUseDDLSchema(true);
         project.addSchema(TestAllPartitionProcedureCalls.class.getResource("allpartitioncall.sql"));
-        project.addPartitionInfo("TABLE_INT_PARTITION", "value_number1");
-        project.addPartitionInfo("TABLE_STRING_PARTITION", "value_string");
-
-        project.addProcedures(new VoltProjectBuilder.ProcedureInfo(PartitionIntegerTestProc.class,
-                "TABLE_INT_PARTITION.value_number1"),
-                new VoltProjectBuilder.ProcedureInfo(PartitionStringTestProc.class,
-                        "TABLE_STRING_PARTITION.value_string"),
-                new VoltProjectBuilder.ProcedureInfo(PartitionFailureTestProc.class,
-                        "TABLE_INT_PARTITION.value_number1")
-                );
 
         boolean success = cluster.compile(project);
         assertTrue(success);
@@ -127,6 +118,34 @@ public class TestAllPartitionProcedureCalls {
         asyncTest(clientWithAffinity, "PartitionIntegerTestProc");
      }
 
+    @Test
+    public void testCallInvalidPartitionProcedure() throws Exception {
+        ClientResponseWithPartitionKey[] responses;
+
+        // check sysproc
+        responses = client.callAllPartitionProcedure("@Statistics", "MEMORY");
+        for (ClientResponseWithPartitionKey response : responses) {
+            assertEquals(ClientResponse.GRACEFUL_FAILURE, response.response.getStatus());
+            String msg = response.response.getStatusString();
+            assertTrue(msg.contains("Invalid procedure for all-partition execution"));
+        }
+
+        // check multipart
+        responses = client.callAllPartitionProcedure("MultiPartitionProcedureSample", 0);
+        for (ClientResponseWithPartitionKey response : responses) {
+            assertEquals(ClientResponse.GRACEFUL_FAILURE, response.response.getStatus());
+            String msg = response.response.getStatusString();
+            assertTrue(msg.contains("Invalid procedure for all-partition execution"));
+        }
+
+        // check wrong-partitioning
+        responses = client.callAllPartitionProcedure("PartitionedTestProcNonZeroPartitioningParam", 0, 1);
+        for (ClientResponseWithPartitionKey response : responses) {
+            assertEquals(ClientResponse.GRACEFUL_FAILURE, response.response.getStatus());
+            String msg = response.response.getStatusString();
+            assertTrue(msg.contains("Invalid procedure for all-partition execution"));
+        }
+    }
 
     @Test
     public void testSyncCallAllPartitionProcedureWithStringPartition() throws Exception {

@@ -6,7 +6,6 @@
         this.hostIP = "";
         this.shortApiCredentials = "";
         this.isLoginVerified = false;
-
         this.authorization = null;
         DbConnection = function (aServer, aPort, aAdmin, aUser, aPassword, aIsHashPassword, aProcess) {
             this.server = aServer == null ? 'localhost' : $.trim(aServer);
@@ -27,13 +26,18 @@
                 return (new iQueue(this));
             };
 
-            this.BuildParamSetForClusterState = function (procedure) {
+            this.BuildParamSetForClusterState = function (procedure, parameters) {
                 var credentials = [];
                 credentials[credentials.length] = encodeURIComponent('Procedure') + '=' + encodeURIComponent(procedure);
+                if(parameters != undefined)
+                    credentials[credentials.length] = encodeURIComponent('Parameters') + '=' + encodeURIComponent('[' + parameters + ']');
                 if (this.admin)
                     credentials[credentials.length] = 'admin=true';
                 var param = '';
-                param = credentials.join('&') + '&jsonp=?';
+                if(procedure != '@PrepareShutdown')
+                    param = credentials.join('&') + '&jsonp=?';
+                else
+                    param = credentials.join('&')
 
                 return param;
             };
@@ -147,8 +151,8 @@
                     uri = window.location.protocol + '/\/' + this.server + ':' + this.port + '/api/1.0/';
                 }
                 var params = '';
-                if (procedure == '@Pause' || procedure == '@Resume' || procedure == '@Shutdown' || procedure == '@Promote') {
-                    params = this.BuildParamSetForClusterState(procedure);
+                if (procedure == '@Pause' || procedure == '@Resume' || procedure == '@Shutdown' || procedure == '@Promote' || procedure == '@PrepareShutdown' || procedure == '@Quiesce'  ) {
+                    params = this.BuildParamSetForClusterState(procedure, parameters);
                 } else {
                     params = this.BuildParamSet(procedure, parameters, shortApiCallDetails, false);
                 }
@@ -317,12 +321,13 @@
                         this.EndExecute();
                     }
                 };
-
             };
+
             this.procedures = {
                 '@AdHoc': { '1': ['varchar'] },
                 '@Explain': { '1': ['varchar'] },
                 '@ExplainProc': { '1': ['varchar'] },
+                '@ExplainView': { '1': ['varchar'] },
                 '@Pause': { '0': [] },
                 '@Promote': { '0': [] },
                 '@Quiesce': { '0': [] },
@@ -492,7 +497,7 @@
                         checkConnection(false);
                     }
                 },
-                 statusCode:{
+                statusCode:{
                     401: function(response){
                         alert('Failed to authenticate to the server via Kerberos. Please check the configuration of your client/browser')
                     }
@@ -544,7 +549,7 @@
             } else {
                 jQuery.each(connection.procedureCommands.procedures, function (id, procedure) {
                     connectionQueue.BeginExecute(procedure['procedure'], (procedure['value'] === undefined ? procedure['parameter'] : [procedure['parameter'], procedure['value']]), function (data) {
-                        var suffix = (processName == "GRAPH_MEMORY" || processName == "GRAPH_TRANSACTION") || processName == "TABLE_INFORMATION" || processName == "TABLE_INFORMATION_CLIENTPORT" || processName == "CLUSTER_INFORMATION" || processName == "CLUSTER_REPLICA_INFORMATION" || processName == "GET_HOST_SITE_COUNT" ? "_" + processName : "";
+                        var suffix = (processName == "GRAPH_MEMORY" || processName == "GRAPH_TRANSACTION") || processName == "TABLE_INFORMATION" || processName == "TABLE_INFORMATION_CLIENTPORT" || processName == "CLUSTER_INFORMATION" || processName == "CLUSTER_REPLICA_INFORMATION" || processName == "GET_HOST_SITE_COUNT" || processName == "EXPORT_TABLE_INFORMATION"? "_" + processName : "";
 
                         if (processName == "SYSTEMINFORMATION_STOPSERVER") {
                             connection.Metadata[procedure['procedure'] + "_" + procedure['parameter'] + suffix + "_status"] = data.status;
@@ -553,7 +558,8 @@
                         else if (processName == "SYSTEMINFORMATION_PAUSECLUSTER" || processName == "SYSTEMINFORMATION_RESUMECLUSTER" || processName == "SYSTEMINFORMATION_SHUTDOWNCLUSTER") {
                             connection.Metadata[procedure['procedure'] + "_" + "status"] = data.status;
                         }
-                        else if (processName == "SYSTEMINFORMATION_SAVESNAPSHOT" || processName == "SYSTEMINFORMATION_RESTORESNAPSHOT") {
+                        else if (processName == "SYSTEMINFORMATION_SAVESNAPSHOT" || processName == "SYSTEMINFORMATION_RESTORESNAPSHOT" || processName == "PREPARE_SHUTDOWN_CLUSTER"
+                        || processName == "QUIESCE_CLUSTER") {
                             connection.Metadata[procedure['procedure'] + "_" + "status"] = data.status;
                             connection.Metadata[procedure['procedure'] + "_data"] = data.results[0];
                             connection.Metadata[procedure['procedure'] + "_statusstring"] = data.statusstring;
@@ -580,6 +586,7 @@
                 connection.Metadata['sysprocs'] = {
                     '@Explain': { '1': ['SQL (varchar)', 'Returns Table[]'] },
                     '@ExplainProc': { '1': ['Stored Procedure Name (varchar)', 'Returns Table[]'] },
+                    '@ExplainView': { '1': ['Materialized View Name (varchar)', 'Returns Table[]'] },
                     '@Pause': { '0': ['Returns bit'] },
                     '@Quiesce': { '0': ['Returns bit'] },
                     '@Resume': { '0': ['Returns bit'] },
@@ -672,9 +679,7 @@ jQuery.extend({
                     }
                 });
             }
-        }
-
-        else {
+        } else {
             jQuery.ajax({
                 type: 'POST',
                 url: url,
@@ -694,7 +699,6 @@ jQuery.extend({
             });
         }
     }
-
 });
 
 jQuery.extend({
@@ -723,7 +727,33 @@ jQuery.extend({
                     }
                 }
             });
-
+        } else if(formData.indexOf('PrepareShutdown') > -1){
+            jQuery.ajax({
+                type: 'GET',
+                url: url,
+                data: formData,
+                dataType: 'text',
+                beforeSend: function (request) {
+                    if (authorization != null) {
+                        request.setRequestHeader("Authorization", authorization);
+                    }
+                },
+                success: function (data) {
+                    final_data = json_parse(data, function (key, value) {
+                                                return value;
+                                            });
+                    final_data.results[0].data[0][0] = final_data.results[0].data[0][0]['c'].join('')
+                    callback(final_data);
+                },
+                error: function (e) {
+                    console.log(e.message);
+                },
+                 statusCode:{
+                    401: function(response){
+                        console.log('Failed to authenticate to the server via Kerberos. Please check the configuration of your client/browser');
+                    }
+                }
+            });
         } else {
             jQuery.ajax({
                 type: 'GET',
@@ -746,9 +776,7 @@ jQuery.extend({
                 }
             });
         }
-
     }
-
 });
 
 jQuery.extend({

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -26,11 +26,9 @@ package org.voltdb;
 import java.io.File;
 import java.net.URL;
 
-import org.aeonbits.owner.ConfigFactory;
 import org.voltcore.common.Constants;
 import org.voltcore.utils.InstanceId;
 import org.voltdb.probe.MeshProber;
-import org.voltdb.settings.Settings;
 import org.voltdb.utils.MiscUtils;
 
 /**
@@ -61,7 +59,7 @@ public class ServerThread extends Thread {
         // Disable loading the EE if running against HSQL.
         m_config.m_noLoadLibVOLTDB = m_config.m_backend == BackendTarget.HSQLDB_BACKEND;
         m_config.m_forceVoltdbCreate = true;
-        if (config.m_startAction == StartAction.INITIALIZE) {
+        if (config.m_startAction == StartAction.INITIALIZE || config.m_startAction == StartAction.GET) {
             VoltDB.ignoreCrash = true;
         }
         setName("ServerThread");
@@ -151,15 +149,18 @@ public class ServerThread extends Thread {
 
     @Override
     public void run() {
-        ConfigFactory.clearProperty(Settings.CONFIG_DIR);
         VoltDB.initialize(m_config);
         VoltDB.instance().run();
     }
 
-    //Call this if you are doing init only
+    //Call this if you are doing init only or action GET
     public void initialize() {
-        ConfigFactory.clearProperty(Settings.CONFIG_DIR);
         VoltDB.initialize(m_config);
+    }
+
+    //Call this if you are doing init only or action GET
+    public void cli() {
+        VoltDB.cli(m_config);
     }
 
     public void waitForInitialization() {
@@ -174,6 +175,14 @@ public class ServerThread extends Thread {
         while (!VoltDB.instance().isRunning() ||
                VoltDB.instance().getMode() == OperationMode.INITIALIZING ||
                VoltDB.instance().rejoining()) {
+            Thread.yield();
+        }
+    }
+
+    public void waitForClientInterface() {
+        while (!VoltDB.instance().isRunning() ||
+                VoltDB.instance().getClientInterface() == null ||
+                !VoltDB.instance().getClientInterface().isAcceptingConnections()) {
             Thread.yield();
         }
     }

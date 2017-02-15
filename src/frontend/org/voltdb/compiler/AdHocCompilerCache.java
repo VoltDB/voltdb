@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -334,6 +334,7 @@ public class AdHocCompilerCache implements Serializable {
         if (! hasUserQuestionMarkParameters) {
             AdHocPlannedStatement cachedPlan = m_literalCache.get(sql);
             if (cachedPlan == null) {
+                //* enable to debug */ System.out.println("DEBUG: Caching literal '" + sql + "'");
                 m_literalCache.put(sql, plan);
                 ++m_literalInsertions;
             }

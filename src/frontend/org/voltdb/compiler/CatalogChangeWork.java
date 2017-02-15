@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -18,7 +18,7 @@
 package org.voltdb.compiler;
 
 import org.voltdb.AuthSystem;
-import org.voltdb.client.ProcedureInvocationType;
+import org.voltdb.compiler.deploymentfile.DrRoleType;
 
 public class CatalogChangeWork extends AsyncCompilerWork {
     private static final long serialVersionUID = -5257248292283453286L;
@@ -35,6 +35,7 @@ public class CatalogChangeWork extends AsyncCompilerWork {
     final String operationString;
     final String[] adhocDDLStmts;
     final byte[] replayHashOverride;
+    final boolean isPromotion;
     public final long replayTxnId;
     public final long replayUniqueId;
 
@@ -42,17 +43,14 @@ public class CatalogChangeWork extends AsyncCompilerWork {
             long replySiteId,
             long clientHandle, long connectionId, String hostname, boolean adminConnection,
             Object clientData, byte[] operationBytes, String operationString,
-            String invocationName, ProcedureInvocationType type,
-            long originalTxnId, long originalUniqueId,
-            boolean onReplica, boolean useAdhocDDL,
+            String invocationName, DrRoleType drRole, boolean useAdhocDDL,
             AsyncCompilerWorkCompletionHandler completionHandler,
             AuthSystem.AuthUser user, byte[] replayHashOverride,
-            long replayTxnId, long replayUniqeuId)
+            boolean isPromotion, long replayTxnId, long replayUniqeuId)
     {
         super(replySiteId, false, clientHandle, connectionId, hostname,
-              adminConnection, clientData, invocationName, type,
-              originalTxnId, originalUniqueId,
-              onReplica, useAdhocDDL,
+              adminConnection, clientData, invocationName,
+              drRole, useAdhocDDL,
               completionHandler, user);
         if (operationBytes != null) {
             this.operationBytes = operationBytes.clone();
@@ -63,6 +61,7 @@ public class CatalogChangeWork extends AsyncCompilerWork {
         this.operationString = operationString;
         adhocDDLStmts = null;
         this.replayHashOverride = replayHashOverride;
+        this.isPromotion = isPromotion;
         this.replayTxnId = replayTxnId;
         this.replayUniqueId = replayUniqeuId;
     }
@@ -82,10 +81,7 @@ public class CatalogChangeWork extends AsyncCompilerWork {
               adhocDDL.adminConnection,
               adhocDDL.clientData,
               adhocDDL.invocationName,
-              adhocDDL.invocationType,
-              adhocDDL.originalTxnId,
-              adhocDDL.originalUniqueId,
-              adhocDDL.onReplica,
+              adhocDDL.drRole,
               adhocDDL.useAdhocDDL,
               adhocDDL.completionHandler,
               adhocDDL.user);
@@ -95,6 +91,7 @@ public class CatalogChangeWork extends AsyncCompilerWork {
         this.operationString = null;
         this.adhocDDLStmts = adhocDDL.sqlStatements;
         this.replayHashOverride = null;
+        this.isPromotion = false;
         this.replayTxnId = -1L;
         this.replayUniqueId = -1L;
     }

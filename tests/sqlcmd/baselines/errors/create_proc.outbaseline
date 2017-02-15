@@ -15,6 +15,7 @@ create procedure from class sqlcmdtest.Trivial;
 --- System Procedures --------------------------------------
 @Explain                  	varchar
 @ExplainProc              	varchar
+@ExplainView              	varchar
 @GC                       
 @GetPartitionKeys         	varchar
 @Pause                    
@@ -26,8 +27,9 @@ create procedure from class sqlcmdtest.Trivial;
 @SnapshotDelete           	varchar, varchar
 @SnapshotRestore          	varchar, varchar
 @SnapshotRestore          	varchar
-@SnapshotSave             	varchar, varchar, bit
+@SnapshotSave             
 @SnapshotSave             	varchar
+@SnapshotSave             	varchar, varchar, bit
 @SnapshotScan             	varchar
 @SnapshotStatus           
 @Statistics               	statisticscomponent, bit
@@ -58,6 +60,7 @@ Command succeeded.
 --- System Procedures --------------------------------------
 @Explain                  	varchar
 @ExplainProc              	varchar
+@ExplainView              	varchar
 @GC                       
 @GetPartitionKeys         	varchar
 @Pause                    
@@ -69,8 +72,9 @@ Command succeeded.
 @SnapshotDelete           	varchar, varchar
 @SnapshotRestore          	varchar, varchar
 @SnapshotRestore          	varchar
-@SnapshotSave             	varchar, varchar, bit
+@SnapshotSave             
 @SnapshotSave             	varchar
+@SnapshotSave             	varchar, varchar, bit
 @SnapshotScan             	varchar
 @SnapshotStatus           
 @Statistics               	statisticscomponent, bit
@@ -88,6 +92,7 @@ Command succeeded.
 --- System Procedures --------------------------------------
 @Explain                  	varchar
 @ExplainProc              	varchar
+@ExplainView              	varchar
 @GC                       
 @GetPartitionKeys         	varchar
 @Pause                    
@@ -99,8 +104,9 @@ Command succeeded.
 @SnapshotDelete           	varchar, varchar
 @SnapshotRestore          	varchar, varchar
 @SnapshotRestore          	varchar
-@SnapshotSave             	varchar, varchar, bit
+@SnapshotSave             
 @SnapshotSave             	varchar
+@SnapshotSave             	varchar, varchar, bit
 @SnapshotScan             	varchar
 @SnapshotStatus           
 @Statistics               	statisticscomponent, bit
@@ -158,6 +164,7 @@ create procedure from class sqlcmdtest.Trivial;
 --- System Procedures --------------------------------------
 @Explain                  	varchar
 @ExplainProc              	varchar
+@ExplainView              	varchar
 @GC                       
 @GetPartitionKeys         	varchar
 @Pause                    
@@ -169,8 +176,9 @@ create procedure from class sqlcmdtest.Trivial;
 @SnapshotDelete           	varchar, varchar
 @SnapshotRestore          	varchar, varchar
 @SnapshotRestore          	varchar
-@SnapshotSave             	varchar, varchar, bit
+@SnapshotSave             
 @SnapshotSave             	varchar
+@SnapshotSave             	varchar, varchar, bit
 @SnapshotScan             	varchar
 @SnapshotStatus           
 @Statistics               	statisticscomponent, bit
@@ -206,6 +214,7 @@ Command succeeded.
 --- System Procedures --------------------------------------
 @Explain                  	varchar
 @ExplainProc              	varchar
+@ExplainView              	varchar
 @GC                       
 @GetPartitionKeys         	varchar
 @Pause                    
@@ -217,8 +226,9 @@ Command succeeded.
 @SnapshotDelete           	varchar, varchar
 @SnapshotRestore          	varchar, varchar
 @SnapshotRestore          	varchar
-@SnapshotSave             	varchar, varchar, bit
+@SnapshotSave             
 @SnapshotSave             	varchar
+@SnapshotSave             	varchar, varchar, bit
 @SnapshotScan             	varchar
 @SnapshotStatus           
 @Statistics               	statisticscomponent, bit
@@ -262,6 +272,7 @@ Command succeeded.
 --- System Procedures --------------------------------------
 @Explain                  	varchar
 @ExplainProc              	varchar
+@ExplainView              	varchar
 @GC                       
 @GetPartitionKeys         	varchar
 @Pause                    
@@ -273,8 +284,9 @@ Command succeeded.
 @SnapshotDelete           	varchar, varchar
 @SnapshotRestore          	varchar, varchar
 @SnapshotRestore          	varchar
-@SnapshotSave             	varchar, varchar, bit
+@SnapshotSave             
 @SnapshotSave             	varchar
+@SnapshotSave             	varchar, varchar, bit
 @SnapshotScan             	varchar
 @SnapshotStatus           
 @Statistics               	statisticscomponent, bit
@@ -319,6 +331,7 @@ Command succeeded.
 --- System Procedures --------------------------------------
 @Explain                  	varchar
 @ExplainProc              	varchar
+@ExplainView              	varchar
 @GC                       
 @GetPartitionKeys         	varchar
 @Pause                    
@@ -330,8 +343,9 @@ Command succeeded.
 @SnapshotDelete           	varchar, varchar
 @SnapshotRestore          	varchar, varchar
 @SnapshotRestore          	varchar
-@SnapshotSave             	varchar, varchar, bit
+@SnapshotSave             
 @SnapshotSave             	varchar
+@SnapshotSave             	varchar, varchar, bit
 @SnapshotScan             	varchar
 @SnapshotStatus           
 @Statistics               	statisticscomponent, bit
@@ -375,6 +389,7 @@ Command succeeded.
 --- System Procedures --------------------------------------
 @Explain                  	varchar
 @ExplainProc              	varchar
+@ExplainView              	varchar
 @GC                       
 @GetPartitionKeys         	varchar
 @Pause                    
@@ -386,8 +401,9 @@ Command succeeded.
 @SnapshotDelete           	varchar, varchar
 @SnapshotRestore          	varchar, varchar
 @SnapshotRestore          	varchar
-@SnapshotSave             	varchar, varchar, bit
+@SnapshotSave             
 @SnapshotSave             	varchar
+@SnapshotSave             	varchar, varchar, bit
 @SnapshotScan             	varchar
 @SnapshotStatus           
 @Statistics               	statisticscomponent, bit

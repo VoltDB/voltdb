@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -54,7 +54,6 @@
 #include "plannodes/limitnode.h"
 #include "storage/temptable.h"
 #include "storage/tableiterator.h"
-#include "executors/partitionbyexecutor.h"
 
 #include "boost/foreach.hpp"
 #include "boost/unordered_map.hpp"
@@ -139,7 +138,7 @@ struct NotDistinct {
 template<class D>
 class SumAgg : public Agg
 {
-  public:
+public:
     // We're providing a NULL pool argument here to ifDistinct because
     // SUM only operates on numeric values which don't have the same
     // issues as inlined strings.
@@ -506,79 +505,7 @@ public:
     }
 };
 
-/**
- * An Agg for windowed rank.
- */
-class WindowedRankAgg : public Agg
-{
-public:
-    WindowedRankAgg(ExpressionType aggType)
-        : m_rank(0),
-          m_peerCount(0),
-          m_isDenseRank(aggType == EXPRESSION_TYPE_AGGREGATE_WINDOWED_DENSE_RANK)
-    {
-        ;
-    }
-
-    virtual void advance(const NValue& val)
-    {
-        int64_t valint = ValuePeeker::peekAsBigInt(val);
-        if (m_peerCount == 0) {
-            VOLT_TRACE("Start of partition by group: val == %s",
-                       val.debug().c_str());
-            m_lastOrderByValue = valint;
-            m_peerCount = 1;
-            m_rank = 1;
-        } else if (m_lastOrderByValue != valint) {
-            VOLT_TRACE("Start of order by group: %s -> %s",
-                       m_lastOrderByValue,
-                       valint);
-            m_lastOrderByValue = valint;
-            if (m_isDenseRank) {
-                m_rank += 1;
-            } else {
-                m_rank += m_peerCount;
-            }
-            m_peerCount = 1;
-        } else {
-            VOLT_TRACE("Old OrderBy Peer Group: %s", val.debug().c_str());
-            ++m_peerCount;
-        }
-    }
-
-    virtual NValue finalize(ValueType type)
-    {
-        VOLT_TRACE("finalize(m_rank == %d)", (int)m_rank);
-        return ValueFactory::getBigIntValue(m_rank).castAs(type);
-    }
-
-    virtual void resetAgg()
-    {
-        VOLT_TRACE("reset windowed agg");
-        m_haveAdvanced = false;
-        m_rank = 0;
-        m_peerCount = 0;
-    }
-
-private:
-    // This is the actual rank answer.
-    int64_t                            m_rank;
-    // This is the peer count.  It counts the number of
-    // rows whose rank are equal to the last row.  When
-    // we see a row with a new order by expression value,
-    // we reset this to zero.
-    int64_t                            m_peerCount;
-    // This is the last value of the order by expression.  Since the
-    // default order by unit is RANGE, and we don't have any way to
-    // change that syntactically in HSQL, we only get one value for
-    // the order by.  So, we can save this in a single NValue.
-    int64_t                            m_lastOrderByValue;
-    // We don't support dense rank now.  But we can easily.  So
-    // add support now.
-    bool                               m_isDenseRank;
-};
-
-/**
+/*
  * Create an instance of an aggregator for the specified aggregate type and "distinct" flag.
  * The object is allocated from the provided memory pool.
  */
@@ -612,16 +539,12 @@ inline Agg* getAggInstance(Pool& memoryPool, ExpressionType agg_type, bool isDis
         return new (memoryPool) ValsToHyperLogLogAgg();
     case EXPRESSION_TYPE_AGGREGATE_HYPERLOGLOGS_TO_CARD:
         return new (memoryPool) HyperLogLogsToCardAgg();
-    case EXPRESSION_TYPE_AGGREGATE_WINDOWED_RANK:
-        {
-            return new (memoryPool) WindowedRankAgg(agg_type);
-        }
     default:
-    {
-        char message[128];
-        snprintf(message, sizeof(message), "Unknown aggregate type %d", agg_type);
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
-    }
+        {
+            char message[128];
+            snprintf(message, sizeof(message), "Unknown aggregate type %d", agg_type);
+            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
+        }
     }
 }
 
@@ -631,7 +554,6 @@ bool AggregateExecutorBase::p_init(AbstractPlanNode*, TempTableLimits* limits)
     assert(node);
 
     m_inputExpressions = node->getAggregateInputExpressions();
-    std::string spacer("");
     for (int i = 0; i < m_inputExpressions.size(); i++) {
         VOLT_DEBUG("AGG INPUT EXPRESSION[%d]: %s",
                    i,
@@ -677,7 +599,7 @@ bool AggregateExecutorBase::p_init(AbstractPlanNode*, TempTableLimits* limits)
         for (int ii = 0; ii < m_groupByExpressions.size(); ii++) {
             if (std::find(m_partialSerialGroupByColumns.begin(),
                           m_partialSerialGroupByColumns.end(), ii)
-                       == m_partialSerialGroupByColumns.end() )
+                == m_partialSerialGroupByColumns.end() )
             {
                 // Find the partial hash group by columns
                 m_partialHashGroupByColumns.push_back(ii);;
@@ -756,7 +678,7 @@ inline bool AggregateExecutorBase::insertOutputTuple(AggregateRow* aggregateRow)
     VOLT_TRACE("Setting passthrough columns");
     BOOST_FOREACH(int output_col_index, m_passThroughColumns) {
         tempTuple.setNValue(output_col_index,
-                         m_outputColumnExpressions[output_col_index]->eval(&(aggregateRow->m_passThroughTuple)));
+                            m_outputColumnExpressions[output_col_index]->eval(&(aggregateRow->m_passThroughTuple)));
     }
 
     bool needInsert = m_postfilter.eval(&tempTuple, NULL);
@@ -817,7 +739,7 @@ TableTuple& AggregateExecutorBase::swapWithInprogressGroupByKeyTuple() {
 }
 
 TableTuple AggregateExecutorBase::p_execute_init(const NValueArray& params,
-        ProgressMonitorProxy* pmp, const TupleSchema * schema, TempTable* newTempTable, CountingPostfilter* parentPostfilter)
+                                                 ProgressMonitorProxy* pmp, const TupleSchema * schema, TempTable* newTempTable, CountingPostfilter* parentPostfilter)
 {
     if (newTempTable != NULL) {
         m_tmpOutputTable = newTempTable;
@@ -836,8 +758,7 @@ TableTuple AggregateExecutorBase::p_execute_init(const NValueArray& params,
     // set the schema first because of the NON-null check in MOVE function
     m_inProgressGroupByKeyTuple.move(NULL);
 
-    char * storage = reinterpret_cast<char*>(
-            m_memoryPool.allocateZeroes(schema->tupleLength() + TUPLE_HEADER_SIZE));
+    char * storage = reinterpret_cast<char*>(m_memoryPool.allocateZeroes(schema->tupleLength() + TUPLE_HEADER_SIZE));
     return TableTuple(storage, schema);
 }
 
@@ -851,15 +772,13 @@ void AggregateExecutorBase::p_execute_finish()
     m_memoryPool.purge();
 }
 
-// By default, we output one row per group.
-bool AggregateExecutorBase::outputForEachInputRow() const {
-    return false;
-}
-
 AggregateHashExecutor::~AggregateHashExecutor() {}
 
 TableTuple AggregateHashExecutor::p_execute_init(const NValueArray& params,
-        ProgressMonitorProxy* pmp, const TupleSchema * schema, TempTable* newTempTable, CountingPostfilter* parentPostfilter)
+                                                 ProgressMonitorProxy* pmp,
+                                                 const TupleSchema * schema,
+                                                 TempTable* newTempTable,
+                                                 CountingPostfilter* parentPostfilter)
 {
     VOLT_TRACE("hash aggregate executor init..");
     m_hash.clear();
@@ -877,7 +796,7 @@ bool AggregateHashExecutor::p_execute(const NValueArray& params)
     const TupleSchema * inputSchema = input_table->schema();
     assert(inputSchema);
     TableIterator it = input_table->iteratorDeletingAsWeGo();
-    ProgressMonitorProxy pmp(m_engine, this);
+    ProgressMonitorProxy pmp(m_engine->getExecutorContext(), this);
 
     TableTuple nextTuple = AggregateHashExecutor::p_execute_init(params, &pmp, inputSchema, NULL);
 
@@ -908,8 +827,7 @@ void AggregateHashExecutor::p_execute_tuple(const TableTuple& nextTuple) {
 
         initAggInstances(aggregateRow);
 
-        char* storage = reinterpret_cast<char*>(
-                m_memoryPool.allocateZeroes(m_inputSchema->tupleLength() + TUPLE_HEADER_SIZE));
+        char* storage = reinterpret_cast<char*>(m_memoryPool.allocateZeroes(m_inputSchema->tupleLength() + TUPLE_HEADER_SIZE));
         TableTuple passThroughTupleSource = TableTuple(storage, m_inputSchema);
 
         aggregateRow->recordPassThroughTuple(passThroughTupleSource, nextTuple);
@@ -927,7 +845,7 @@ void AggregateHashExecutor::p_execute_tuple(const TableTuple& nextTuple) {
     }
     // update the aggregation calculation.
     advanceAggs(aggregateRow, nextTuple);
- }
+}
 
 void AggregateHashExecutor::p_execute_finish() {
     VOLT_TRACE("finalizing..");
@@ -952,18 +870,19 @@ AggregateSerialExecutor::~AggregateSerialExecutor() {}
 
 
 TableTuple AggregateSerialExecutor::p_execute_init(const NValueArray& params,
-        ProgressMonitorProxy* pmp, const TupleSchema * schema, TempTable* newTempTable, CountingPostfilter* parentPostfilter)
+                                                   ProgressMonitorProxy* pmp,
+                                                   const TupleSchema * schema,
+                                                   TempTable* newTempTable,
+                                                   CountingPostfilter* parentPostfilter)
 {
     VOLT_TRACE("serial aggregate executor init..");
-    TableTuple nextInputTuple = AggregateExecutorBase::p_execute_init(
-            params, pmp, schema, newTempTable, parentPostfilter);
+    TableTuple nextInputTuple = AggregateExecutorBase::p_execute_init(params, pmp, schema, newTempTable, parentPostfilter);
 
     m_aggregateRow = new (m_memoryPool, m_aggTypes.size()) AggregateRow();
     m_noInputRows = true;
     m_failPrePredicateOnFirstRow = false;
 
-    char* storage = reinterpret_cast<char*>(
-            m_memoryPool.allocateZeroes(schema->tupleLength() + TUPLE_HEADER_SIZE));
+    char* storage = reinterpret_cast<char*>(m_memoryPool.allocateZeroes(schema->tupleLength() + TUPLE_HEADER_SIZE));
     m_passThroughTupleSource = TableTuple(storage, schema);
 
     // for next input tuple
@@ -979,7 +898,7 @@ bool AggregateSerialExecutor::p_execute(const NValueArray& params)
     TableIterator it = input_table->iteratorDeletingAsWeGo();
     TableTuple nextTuple(input_table->schema());
 
-    ProgressMonitorProxy pmp(m_engine, this);
+    ProgressMonitorProxy pmp(m_engine->getExecutorContext(), this);
     AggregateSerialExecutor::p_execute_init(params, &pmp, input_table->schema(), NULL);
 
     while (m_postfilter.isUnderLimit() && it.next(nextTuple)) {
@@ -1015,40 +934,19 @@ void AggregateSerialExecutor::p_execute_tuple(const TableTuple& nextTuple) {
 
     initGroupByKeyTuple(nextTuple);
 
-    // We may want to output a row even if the group
-    // does not change.  This may happen for windowed operations.
-    // So, remember this here.
-    bool emitOnEachInput = outputForEachInputRow();
-    bool outputRow = emitOnEachInput;
-    bool resetAggs = false;
-
     for (int ii = m_groupByKeySchema->columnCount() - 1; ii >= 0; --ii) {
         if (nextGroupByKeyTuple.getNValue(ii).compare(m_inProgressGroupByKeyTuple.getNValue(ii)) != 0) {
-            VOLT_TRACE("new group!: %s -> %s",
-                       nextGroupByKeyTuple.getNValue(ii).toString().c_str(),
-                       m_inProgressGroupByKeyTuple.getNValue(ii).toString().c_str());
-            // Remember to output the old row.
-            outputRow = true;
-            // We also want to reset the aggs.
-            resetAggs = true;
+            VOLT_TRACE("new group!");
+            // Output old row.
+            if (insertOutputTuple(m_aggregateRow)) {
+                m_pmp->countdownProgress();
+            }
+            m_aggregateRow->resetAggs();
+
+            // record the new group scanned tuple
+            m_aggregateRow->recordPassThroughTuple(m_passThroughTupleSource, nextTuple);
             break;
         }
-    }
-    if (outputRow) {
-        if (insertOutputTuple(m_aggregateRow)) {
-            m_pmp->countdownProgress();
-        }
-    }
-    if (resetAggs) {
-        m_aggregateRow->resetAggs();
-    }
-    if (resetAggs || emitOnEachInput) {
-        // record the new group scanned tuple
-        // We want to do this if we are emitting an
-        // output row for each input row, since the
-        // partition by expressions are not group by
-        // expressions.
-        m_aggregateRow->recordPassThroughTuple(m_passThroughTupleSource, nextTuple);
     }
     // update the aggregation calculation.
     advanceAggs(m_aggregateRow, nextTuple);
@@ -1092,8 +990,7 @@ TableTuple AggregatePartialExecutor::p_execute_init(const NValueArray& params,
         ProgressMonitorProxy* pmp, const TupleSchema * schema, TempTable* newTempTable, CountingPostfilter* parentPostfilter)
 {
     VOLT_TRACE("partial aggregate executor init..");
-    TableTuple nextInputTuple = AggregateExecutorBase::p_execute_init(
-            params, pmp, schema, newTempTable, parentPostfilter);
+    TableTuple nextInputTuple = AggregateExecutorBase::p_execute_init(params, pmp, schema, newTempTable, parentPostfilter);
 
     m_atTheFirstRow = true;
     m_nextPartialGroupByKeyStorage.init(m_groupByKeyPartialHashSchema, &m_memoryPool);
@@ -1115,7 +1012,7 @@ bool AggregatePartialExecutor::p_execute(const NValueArray& params)
     TableIterator it = input_table->iteratorDeletingAsWeGo();
     TableTuple nextTuple(input_table->schema());
 
-    ProgressMonitorProxy pmp(m_engine, this);
+    ProgressMonitorProxy pmp(m_engine->getExecutorContext(), this);
     AggregatePartialExecutor::p_execute_init(params, &pmp, input_table->schema(), NULL);
 
     while (m_postfilter.isUnderLimit() && it.next(nextTuple)) {
@@ -1184,7 +1081,7 @@ void AggregatePartialExecutor::p_execute_tuple(const TableTuple& nextTuple) {
         initAggInstances(aggregateRow);
 
         char* storage = reinterpret_cast<char*>(
-                        m_memoryPool.allocateZeroes(m_inputSchema->tupleLength() + TUPLE_HEADER_SIZE));
+                                                m_memoryPool.allocateZeroes(m_inputSchema->tupleLength() + TUPLE_HEADER_SIZE));
         TableTuple passThroughTupleSource = TableTuple (storage, m_inputSchema);
         aggregateRow->recordPassThroughTuple(passThroughTupleSource, nextTuple);
         // The map is referencing the current key tuple for use by the new group,
@@ -1218,5 +1115,4 @@ void AggregatePartialExecutor::p_execute_finish()
 
     AggregateExecutorBase::p_execute_finish();
 }
-
 }

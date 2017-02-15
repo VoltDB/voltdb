@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -79,10 +79,15 @@ template<> inline NValue NValue::callUnary<FUNC_SPACE>() const {
 
     int32_t count = static_cast<int32_t>(castAsBigIntAndGetValue());
     if (count < 0) {
-        char msg[1024];
-        snprintf(msg, 1024, "data exception: substring error");
         throw SQLException(SQLException::data_exception_string_data_length_mismatch,
-            msg);
+                           "The argument to the SPACE function is negative");
+    } else if (ThreadLocalPool::POOLED_MAX_VALUE_LENGTH < count) {
+        std::ostringstream oss;
+        oss << "The argument to the SPACE function is larger than the maximum size allowed for strings ("
+            << ThreadLocalPool::POOLED_MAX_VALUE_LENGTH << " bytes). "
+            << "Reduce either the string size or repetition count.";
+        throw SQLException(SQLException::data_exception_string_data_length_mismatch,
+                           oss.str().c_str());
     }
 
     std::string spacesStr(count, ' ');
@@ -137,7 +142,7 @@ template<> inline NValue NValue::call<FUNC_REPEAT>(const std::vector<NValue>& ar
     if (countArg.isNull()) {
         return getNullStringValue();
     }
-    int32_t count = static_cast<int32_t>(countArg.castAsBigIntAndGetValue());
+    int64_t count = countArg.castAsBigIntAndGetValue();
     if (count < 0) {
         char msg[1024];
         snprintf(msg, 1024, "data exception: substring error");
@@ -148,19 +153,24 @@ template<> inline NValue NValue::call<FUNC_REPEAT>(const std::vector<NValue>& ar
         return getTempStringValue("", 0);
     }
 
-    int32_t length;
-    const char* buf = strValue.getObject_withoutNull(&length);
-    if ((count * length) > ThreadLocalPool::POOLED_MAX_VALUE_LENGTH) {
-        char msg[1024];
-        snprintf(msg, sizeof(msg), "REPEAT function call would create a string of size %d which is larger than the maximum size %d",
-                 count * length, ThreadLocalPool::POOLED_MAX_VALUE_LENGTH);
+    int32_t argLength32;
+    const char* buf = strValue.getObject_withoutNull(&argLength32);
+    int64_t argLength = static_cast<int64_t>(argLength32);
+
+    bool overflowed = false;
+    int64_t outputLength = NValue::multiplyAndCheckOverflow(count, argLength, &overflowed);
+    if (overflowed || outputLength > ThreadLocalPool::POOLED_MAX_VALUE_LENGTH) {
+        std::ostringstream oss;
+        oss << "The result of the REPEAT function is larger than the maximum size allowed for strings ("
+            << ThreadLocalPool::POOLED_MAX_VALUE_LENGTH << " bytes). "
+            << "Reduce either the string size or repetition count.";
         throw SQLException(SQLException::data_exception_string_data_length_mismatch,
-                           msg);
+                           oss.str().c_str());
     }
 
     std::string repeatStr;
     while (count-- > 0) {
-        repeatStr.append(buf, length);
+        repeatStr.append(buf, argLength);
     }
 
     return getTempStringValue(repeatStr.c_str(), repeatStr.length());
@@ -213,10 +223,8 @@ template<> inline NValue NValue::call<FUNC_LEFT>(const std::vector<NValue>& argu
     }
     int32_t count = static_cast<int32_t>(startArg.castAsBigIntAndGetValue());
     if (count < 0) {
-        char msg[1024];
-        snprintf(msg, 1024, "data exception: substring error");
         throw SQLException(SQLException::data_exception_string_data_length_mismatch,
-            msg);
+                           "The argument to the LEFT function is negative");
     }
     if (count == 0) {
         return getTempStringValue("", 0);
@@ -246,10 +254,8 @@ template<> inline NValue NValue::call<FUNC_RIGHT>(const std::vector<NValue>& arg
 
     int32_t count = static_cast<int32_t>(startArg.castAsBigIntAndGetValue());
     if (count < 0) {
-        char msg[1024];
-        snprintf(msg, 1024, "data exception: substring error");
         throw SQLException(SQLException::data_exception_string_data_length_mismatch,
-            msg);
+                           "The argument to the RIGHT function is negative.");
     }
     if (count == 0) {
         return getTempStringValue("", 0);

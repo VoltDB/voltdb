@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -23,9 +23,15 @@
 
 package org.voltdb.regressionsuites;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
 import java.io.File;
 import java.io.IOException;
 
+import org.junit.Test;
 import org.voltdb.AdhocDDLTestBase;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltDB;
@@ -61,6 +67,7 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
     static Class<?>[] COLLIDING_CLASSES = { org.voltdb_testprocs.fullddlfeatures.testImportProc.class,
         org.voltdb_testprocs.fullddlfeatures.testCreateProcFromClassProc.class };
 
+    @Test
     public void testBasic() throws Exception {
         System.out.println("\n\n-----\n testBasic \n-----\n\n");
 
@@ -76,11 +83,11 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
         // This is maybe cheating a little bit?
         InMemoryJarfile jarfile = new InMemoryJarfile();
         for (Class<?> clazz : PROC_CLASSES) {
-            VoltCompiler comp = new VoltCompiler();
+            VoltCompiler comp = new VoltCompiler(false);
             comp.addClassToJar(jarfile, clazz);
         }
         for (Class<?> clazz : EXTRA_CLASSES) {
-            VoltCompiler comp = new VoltCompiler();
+            VoltCompiler comp = new VoltCompiler(false);
             comp.addClassToJar(jarfile, clazz);
         }
         // Add a deployment file just to have something other than classes in the jar
@@ -169,6 +176,7 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
         }
     }
 
+    @Test
     public void testRoleControl() throws Exception {
         System.out.println("\n\n-----\n testRoleControl \n-----\n\n");
 
@@ -195,11 +203,11 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
         // This is maybe cheating a little bit?
         InMemoryJarfile jarfile = new InMemoryJarfile();
         for (Class<?> clazz : PROC_CLASSES) {
-            VoltCompiler comp = new VoltCompiler();
+            VoltCompiler comp = new VoltCompiler(false);
             comp.addClassToJar(jarfile, clazz);
         }
         for (Class<?> clazz : EXTRA_CLASSES) {
-            VoltCompiler comp = new VoltCompiler();
+            VoltCompiler comp = new VoltCompiler(false);
             comp.addClassToJar(jarfile, clazz);
         }
 
@@ -274,6 +282,7 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
         }
     }
 
+    @Test
     public void testCollidingClasses() throws Exception {
         System.out.println("\n\n-----\n testCollidingProc \n-----\n\n");
 
@@ -289,11 +298,11 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
         // This is maybe cheating a little bit?
         InMemoryJarfile jarfile = new InMemoryJarfile();
         for (Class<?> clazz : PROC_CLASSES) {
-            VoltCompiler comp = new VoltCompiler();
+            VoltCompiler comp = new VoltCompiler(false);
             comp.addClassToJar(jarfile, clazz);
         }
         for (Class<?> clazz : EXTRA_CLASSES) {
-            VoltCompiler comp = new VoltCompiler();
+            VoltCompiler comp = new VoltCompiler(false);
             comp.addClassToJar(jarfile, clazz);
         }
 
@@ -344,7 +353,7 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
             // now, let's collide identically simpleName'd classes
             InMemoryJarfile boom = new InMemoryJarfile();
             for (Class<?> clazz : COLLIDING_CLASSES) {
-                VoltCompiler comp = new VoltCompiler();
+                VoltCompiler comp = new VoltCompiler(false);
                 comp.addClassToJar(boom, clazz);
             }
             resp = m_client.callProcedure("@UpdateClasses", boom.getFullJarBytes(), null);
@@ -365,6 +374,7 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
         }
     }
 
+    @Test
     public void testNonJarInput() throws Exception {
         System.out.println("\n\n-----\n testNonJarInput \n-----\n\n");
 
@@ -403,6 +413,7 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
         }
     }
 
+    @Test
     public void testInnerClasses() throws Exception {
         System.out.println("\n\n-----\n testInnerClasses \n-----\n\n");
 
@@ -424,7 +435,7 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
             // Something sane ought to work
             ClientResponse resp;
             InMemoryJarfile boom = new InMemoryJarfile();
-            VoltCompiler comp = new VoltCompiler();
+            VoltCompiler comp = new VoltCompiler(false);
             comp.addClassToJar(boom, org.voltdb_testprocs.updateclasses.InnerClassesTestProc.class);
             try {
                 resp = m_client.callProcedure("@UpdateClasses", boom.getFullJarBytes(), null);
@@ -438,7 +449,7 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
             // Error in non-visible inner class static initializer?
             boolean threw = false;
             boom = new InMemoryJarfile();
-            comp = new VoltCompiler();
+            comp = new VoltCompiler(false);
             comp.addClassToJar(boom, org.voltdb_testprocs.updateclasses.BadInnerClassesTestProc.class);
             try {
                 resp = m_client.callProcedure("@UpdateClasses", boom.getFullJarBytes(), null);
@@ -455,6 +466,7 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
         }
     }
 
+    @Test
     public void testBadInitializerClasses() throws Exception {
         System.out.println("\n\n-----\n testBadInitializerClasses \n-----\n\n");
 
@@ -475,7 +487,7 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
 
             ClientResponse resp;
             InMemoryJarfile boom = new InMemoryJarfile();
-            VoltCompiler comp = new VoltCompiler();
+            VoltCompiler comp = new VoltCompiler(false);
             comp.addClassToJar(boom, org.voltdb_testprocs.updateclasses.testBadInitializerProc.class);
             boolean threw = false;
             try {
@@ -490,7 +502,7 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
 
             threw = false;
             boom = new InMemoryJarfile();
-            comp = new VoltCompiler();
+            comp = new VoltCompiler(false);
             comp.addClassToJar(boom, org.voltdb_testprocs.updateclasses.BadClassLoadClass.class);
             try {
                 resp = m_client.callProcedure("@UpdateClasses", boom.getFullJarBytes(), null);
@@ -514,6 +526,7 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
     // comma-separated matches
     // combine new jarfile with deleted stuff
     // deleting inner classes
+    @Test
     public void testDeleteClasses() throws Exception {
         System.out.println("\n\n-----\n testCollidingProc \n-----\n\n");
 
@@ -529,15 +542,15 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
         // This is maybe cheating a little bit?
         InMemoryJarfile jarfile = new InMemoryJarfile();
         for (Class<?> clazz : PROC_CLASSES) {
-            VoltCompiler comp = new VoltCompiler();
+            VoltCompiler comp = new VoltCompiler(false);
             comp.addClassToJar(jarfile, clazz);
         }
         for (Class<?> clazz : EXTRA_CLASSES) {
-            VoltCompiler comp = new VoltCompiler();
+            VoltCompiler comp = new VoltCompiler(false);
             comp.addClassToJar(jarfile, clazz);
         }
         for (Class<?> clazz : COLLIDING_CLASSES) {
-            VoltCompiler comp = new VoltCompiler();
+            VoltCompiler comp = new VoltCompiler(false);
             comp.addClassToJar(jarfile, clazz);
         }
 
@@ -598,11 +611,11 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
             // make a jar without the extra
             InMemoryJarfile jarfile2 = new InMemoryJarfile();
             for (Class<?> clazz : PROC_CLASSES) {
-                VoltCompiler comp = new VoltCompiler();
+                VoltCompiler comp = new VoltCompiler(false);
                 comp.addClassToJar(jarfile2, clazz);
             }
             for (Class<?> clazz : COLLIDING_CLASSES) {
-                VoltCompiler comp = new VoltCompiler();
+                VoltCompiler comp = new VoltCompiler(false);
                 comp.addClassToJar(jarfile2, clazz);
             }
 
@@ -621,7 +634,7 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
 
             // now add a class with inner classes
             InMemoryJarfile inner = new InMemoryJarfile();
-            VoltCompiler comp = new VoltCompiler();
+            VoltCompiler comp = new VoltCompiler(false);
             comp.addClassToJar(inner, org.voltdb_testprocs.updateclasses.InnerClassesTestProc.class);
             resp = m_client.callProcedure("@UpdateClasses", inner.getFullJarBytes(), null);
             // old stuff should have survived
@@ -678,6 +691,104 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
             assertTrue(findClassInSystemCatalog(PROC_CLASSES[1].getCanonicalName()));
             assertTrue(findClassInSystemCatalog(COLLIDING_CLASSES[0].getCanonicalName()));
             assertTrue(findClassInSystemCatalog(COLLIDING_CLASSES[1].getCanonicalName()));
+        }
+        finally {
+            teardownSystem();
+        }
+    }
+
+    @Test
+    public void testStatsAfterUpdateClasses() throws Exception {
+        System.out.println("\n\n-----\n testStatsAfterUpdateClasses \n-----\n\n");
+
+        String pathToCatalog = Configuration.getPathToCatalogForTest("updateclasses.jar");
+        String pathToDeployment = Configuration.getPathToCatalogForTest("updateclasses.xml");
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("create table tb1 (a int);");
+        builder.setUseDDLSchema(true);
+        boolean success = builder.compile(pathToCatalog, 1, 1, 0);
+        assertTrue("Schema compilation failed", success);
+        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
+
+        // This is maybe cheating a little bit?
+        InMemoryJarfile jarfile = new InMemoryJarfile();
+        for (Class<?> clazz : PROC_CLASSES) {
+            VoltCompiler comp = new VoltCompiler(false);
+            comp.addClassToJar(jarfile, clazz);
+        }
+        for (Class<?> clazz : EXTRA_CLASSES) {
+            VoltCompiler comp = new VoltCompiler(false);
+            comp.addClassToJar(jarfile, clazz);
+        }
+        // Add a deployment file just to have something other than classes in the jar
+        jarfile.put("deployment.xml", new File(pathToDeployment));
+
+        try {
+            VoltDB.Configuration config = new VoltDB.Configuration();
+            config.m_pathToCatalog = pathToCatalog;
+            config.m_pathToDeployment = pathToDeployment;
+            startSystem(config);
+
+            ClientResponse resp;
+            VoltTable vt;
+            resp = m_client.callProcedure("@SystemCatalog", "CLASSES");
+            // New cluster, you're like summer vacation...
+            assertEquals(0, resp.getResults()[0].getRowCount());
+            assertFalse(VoltTableTestHelpers.moveToMatchingRow(resp.getResults()[0], "CLASS_NAME",
+                        PROC_CLASSES[0].getCanonicalName()));
+
+            resp = m_client.callProcedure("@UpdateClasses", jarfile.getFullJarBytes(), null);
+
+            // check stats after UAC
+            vt = m_client.callProcedure("@Statistics", "PROCEDURE", 0).getResults()[0];
+            assertEquals(1, vt.getRowCount());
+            vt.advanceRow();
+            assertEquals("org.voltdb.sysprocs.UpdateApplicationCatalog", vt.getString(5));
+
+            // create procedure 0
+            resp = m_client.callProcedure("@AdHoc", "create procedure from class " +
+                    PROC_CLASSES[0].getCanonicalName() + ";");
+            // check stats after UAC
+            vt = m_client.callProcedure("@Statistics", "PROCEDURE", 0).getResults()[0];
+            assertEquals(vt.getRowCount(), 1);
+            vt.advanceRow();
+            assertEquals("org.voltdb.sysprocs.UpdateApplicationCatalog", vt.getString(5));
+
+            // invoke a new user procedure
+            vt = m_client.callProcedure(PROC_CLASSES[0].getSimpleName()).getResults()[0];
+            assertEquals(10L, vt.asScalarLong());
+            vt = m_client.callProcedure(PROC_CLASSES[0].getSimpleName()).getResults()[0];
+            assertEquals(10L, vt.asScalarLong());
+            vt = m_client.callProcedure(PROC_CLASSES[0].getSimpleName()).getResults()[0];
+            assertEquals(10L, vt.asScalarLong());
+
+            // check stats
+            vt = m_client.callProcedure("@Statistics", "PROCEDURE", 0).getResults()[0];
+            assertEquals(2, vt.getRowCount());
+            assertTrue(vt.toString().contains("org.voltdb_testprocs.updateclasses.testImportProc"));
+            assertTrue(vt.toString().contains("org.voltdb.sysprocs.UpdateApplicationCatalog"));
+
+            // create procedure 1
+            resp = m_client.callProcedure("@AdHoc", "create procedure from class " +
+                    PROC_CLASSES[1].getCanonicalName() + ";");
+            // check stats
+            vt = m_client.callProcedure("@Statistics", "PROCEDURE", 0).getResults()[0];
+            assertEquals(1, vt.getRowCount());
+            vt.advanceRow();
+            assertEquals("org.voltdb.sysprocs.UpdateApplicationCatalog", vt.getString(5));
+
+            resp = m_client.callProcedure(PROC_CLASSES[1].getSimpleName(), 1l, "", "");
+            assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+
+            vt = m_client.callProcedure("@Statistics", "PROCEDURE", 0).getResults()[0];
+            assertEquals(2, vt.getRowCount());
+
+            vt = m_client.callProcedure(PROC_CLASSES[0].getSimpleName()).getResults()[0];
+            assertEquals(10L, vt.asScalarLong());
+
+            vt = m_client.callProcedure("@Statistics", "PROCEDURE", 0).getResults()[0];
+            assertEquals(3, vt.getRowCount());
+
         }
         finally {
             teardownSystem();

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -23,6 +23,12 @@
 
 package org.voltdb;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
+import org.junit.Test;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
@@ -41,6 +47,7 @@ public class TestAdhocCreateDropJavaProc extends AdhocDDLTestBase {
 
     static Class<?>[] EXTRA_CLASSES = { org.voltdb_testprocs.updateclasses.NoMeaningClass.class };
 
+    @Test
     public void testBasic() throws Exception
     {
         System.out.println("\n\n-----\n testBasic \n-----\n\n");
@@ -79,7 +86,7 @@ public class TestAdhocCreateDropJavaProc extends AdhocDDLTestBase {
             assertFalse(findProcedureInSystemCatalog("testImportProc"));
 
             InMemoryJarfile jarfile = new InMemoryJarfile();
-            VoltCompiler comp = new VoltCompiler();
+            VoltCompiler comp = new VoltCompiler(false);
             comp.addClassToJar(jarfile, org.voltdb_testprocs.updateclasses.testImportProc.class);
 
             resp = m_client.callProcedure("@UpdateClasses", jarfile.getFullJarBytes(), null);
@@ -108,7 +115,7 @@ public class TestAdhocCreateDropJavaProc extends AdhocDDLTestBase {
 
             // Okay, add the missing dependency
             jarfile = new InMemoryJarfile();
-            comp = new VoltCompiler();
+            comp = new VoltCompiler(false);
             comp.addClassToJar(jarfile, org.voltdb_testprocs.updateclasses.NoMeaningClass.class);
             resp = m_client.callProcedure("@UpdateClasses", jarfile.getFullJarBytes(), null);
             // now we should be able to call it
@@ -159,13 +166,16 @@ public class TestAdhocCreateDropJavaProc extends AdhocDDLTestBase {
             }
             resp = m_client.callProcedure("@SystemCatalog", "CLASSES");
             assertEquals(0, resp.getResults()[0].getRowCount()); // no classes in catalog
+            m_client.close();
+            cluster.shutDown();
         }
-        finally {
-            teardownSystem();
+        catch (Exception e) {
+            e.printStackTrace();
         }
     }
 
     // This test should trigger the same failure seen in ENG-6611
+    @Test
     public void testCreateUsingExistingImport() throws Exception
     {
         System.out.println("\n\n-----\n testCreateUsingExistingImport \n-----\n\n");
@@ -194,7 +204,7 @@ public class TestAdhocCreateDropJavaProc extends AdhocDDLTestBase {
 
             // Now load the procedure requiring the already-resident dependency
             InMemoryJarfile jarfile = new InMemoryJarfile();
-            VoltCompiler comp = new VoltCompiler();
+            VoltCompiler comp = new VoltCompiler(false);
             comp.addClassToJar(jarfile, org.voltdb_testprocs.updateclasses.testImportProc.class);
 
             try {
@@ -223,9 +233,11 @@ public class TestAdhocCreateDropJavaProc extends AdhocDDLTestBase {
                 fail("Should be able to call fully consistent procedure");
             }
             assertEquals(10L, resp.getResults()[0].asScalarLong());
+            m_client.close();
+            cluster.shutDown();
         }
-        finally {
-            teardownSystem();
+        catch (Exception e) {
+            e.printStackTrace();
         }
     }
 }

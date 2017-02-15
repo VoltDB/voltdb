@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -112,19 +112,20 @@ public abstract class SubPlanAssembler {
     abstract AbstractPlanNode nextPlan();
 
     /**
-     * Generate all possible access paths for given sets of join and filter expressions for a table.
+     * Generate all possible access paths for given sets of join and filter
+     * expressions for a table.
      * The list includes the naive (scan) pass and possible index scans
      *
-     * @param table Table to generate access pass for
+     * @param table Table to generate access path for
      * @param joinExprs join expressions this table is part of
      * @param filterExprs filter expressions this table is part of
      * @param postExprs post expressions this table is part of
      * @return List of valid access paths
      */
     protected ArrayList<AccessPath> getRelevantAccessPathsForTable(StmtTableScan tableScan,
-                                                                   List<AbstractExpression> joinExprs,
-                                                                   List<AbstractExpression> filterExprs,
-                                                                   List<AbstractExpression> postExprs) {
+            List<AbstractExpression> joinExprs,
+            List<AbstractExpression> filterExprs,
+            List<AbstractExpression> postExprs) {
         ArrayList<AccessPath> paths = new ArrayList<AccessPath>();
         List<AbstractExpression> allJoinExprs = new ArrayList<AbstractExpression>();
         List<AbstractExpression> allExprs = new ArrayList<AbstractExpression>();
@@ -146,40 +147,74 @@ public abstract class SubPlanAssembler {
         Collection<Index> indexes = tableScan.getIndexes();
         for (Index index : indexes) {
             AccessPath path = getRelevantAccessPathForIndex(tableScan, allExprs, index);
-            if (path != null) {
-                assert (path.index != null);
-                if (!path.index.getPredicatejson().isEmpty()) {
-                    // One more check for partial indexes to make sure the index predicate is
-                    // completely covered by the query expressions.
-                    // Process the index WHERE clause into a list of anded sub-expressions and process each expression
-                    // separately searching the query (or matview) for a covering expression for each of these expressions.
-                    // All index WHERE sub-expressions must be covered to enable the index.
-                    // For optimization purposes, keep track of the covering (query) expressions that exactly match the
-                    // covered index sub-expression. They can be eliminated from the post-filter expressions.
-                    List<AbstractExpression> exactMatchCoveringExprs = new ArrayList<AbstractExpression>();
-                    if (isPartialIndexPredicateCovered(tableScan, allExprs, path.index, exactMatchCoveringExprs)) {
-                        filterPostPredicateForPartialIndex(path, exactMatchCoveringExprs);
-                    } else {
-                        path = null;
+
+            // Process the index WHERE clause into a list of anded
+            // sub-expressions and process each sub-expression, searching the
+            // query (or matview) WHERE clause for an expression to cover each
+            // of them. Coverage can be in the form of an identical filter or
+            // a more restrictive filter. Specifically, comparison filters like
+            // "X > 1" cover the index predicate filter "X is not null" but are
+            // not an exact match. As such, they are not completely optimized
+            // out by use of the partial index.
+            // The partial index's WHERE sub-expressions must be covered to
+            // allow ANY use of the index.
+            // Of the covering sub-expressions (from the query or view),
+            // those that also EXACTLY match their covered index sub-expression
+            // are tracked in exactMatchCoveringExprs so that they
+            // can be eliminated from the post-filter expressions.
+            List<AbstractExpression> exactMatchCoveringExprs = null;
+            boolean hasCoveredPredicate = false;
+            String predicatejson = index.getPredicatejson();
+            if (path == null) {
+                if (predicatejson.isEmpty()) {
+                    // Skip the uselessly irrelevant whole-table index.
+                    continue;
+                }
+                exactMatchCoveringExprs = new ArrayList<>();
+                hasCoveredPredicate = isPartialIndexPredicateCovered(
+                            tableScan, allExprs,
+                            predicatejson, exactMatchCoveringExprs);
+                if ( ! hasCoveredPredicate) {
+                    // Skip the index with the inapplicable predicate.
+                    continue;
+                }
+                // The partial index with a covered predicate can be used
+                // solely to eliminate a post-filter or even just to reduce the
+                // number of post-filtered tuples,
+                // even though its indexed columns are irrelevant -- so
+                // getRelevantAccessPathForIndex did not return a valid path.
+                // Override the path for a forward scan of the entire partial
+                // index.  The irrelevant keys of the index are ignored.
+                path = getRelevantNaivePath(allJoinExprs, filterExprs);
+                path.index = index;
+                path.lookupType = IndexLookupType.GTE;
+            }
+            else {
+                assert(path.index != null);
+                assert(path.index == index);
+                // This index on relevant column(s) may need to be rejected if
+                // its predicate is not applicable.
+                if ( ! predicatejson.isEmpty()) {
+                    exactMatchCoveringExprs = new ArrayList<>();
+                    hasCoveredPredicate = isPartialIndexPredicateCovered(
+                            tableScan, allExprs, predicatejson, exactMatchCoveringExprs);
+                    if ( ! hasCoveredPredicate) {
+                        // Skip the index with the inapplicable predicate.
+                        continue;
                     }
                 }
-            } else if (!index.getPredicatejson().isEmpty()) {
-                // Partial index can be used solely to eliminate a post-filter
-                // even when the indexed columns are irrelevant
-                List<AbstractExpression> exactMatchCoveringExprs = new ArrayList<AbstractExpression>();
-                if (isPartialIndexPredicateCovered(tableScan, allExprs, index, exactMatchCoveringExprs)) {
-                    path = getRelevantNaivePath(allJoinExprs, filterExprs);
-                    filterPostPredicateForPartialIndex(path, exactMatchCoveringExprs);
-                    path.index = index;
-                    path.lookupType = IndexLookupType.GTE;
-                }
             }
-            if (path != null) {
-                if (postExprs != null) {
-                    path.joinExprs.addAll(postExprs);
-                }
-                paths.add(path);
+
+            assert(path != null);
+            if (hasCoveredPredicate) {
+                assert(exactMatchCoveringExprs != null);
+                filterPostPredicateForPartialIndex(path,
+                        exactMatchCoveringExprs);
             }
+            if (postExprs != null) {
+                path.joinExprs.addAll(postExprs);
+            }
+            paths.add(path);
         }
 
         return paths;
@@ -247,26 +282,25 @@ public abstract class SubPlanAssembler {
     };
 
     /**
-     * Split the index WHERE clause into a list of sub-expressions and process each expression
-     * separately searching the query (or matview) for a covering expression for each of these expressions.
+     * Split the index WHERE clause into a list of sub-expressions and process
+     * each expression separately searching the query (or matview) for a
+     * covering expression for each of these expressions.
      * All index WHERE sub-expressions must be covered to enable the index.
-     * Collect the query expressions that exactly match the index expression. They can be eliminated from the
-     * post-filters as an optimization
+     * Collect the query expressions that EXACTLY match the index expression.
+     * They can be eliminated from the post-filters as an optimization.
      *
      * @param tableScan The source table.
      * @param coveringExprs The set of query predicate expressions.
      * @param index The partial index to cover.
-     * @param exactMatchCoveringExprs The output subset of the query predicates that exactly match the
+     * @param exactMatchCoveringExprs The output subset of the query predicates that EXACTLY match the
      *        index predicate expression(s)
-     * @return TRUE if the index predicate is completely covered by the query expressions.
+     * @return TRUE if the index has a predicate that is completely covered by the query expressions.
      */
-    public static boolean isPartialIndexPredicateCovered(StmtTableScan tableScan, List<AbstractExpression> coveringExprs, Index index, List<AbstractExpression> exactMatchCoveringExprs) {
-        assert(index != null);
-        String predicatejson = index.getPredicatejson();
-        if (predicatejson.isEmpty()) {
-            // Not a partial index
-            return true;
-        }
+    public static boolean isPartialIndexPredicateCovered(StmtTableScan tableScan,
+            List<AbstractExpression> coveringExprs,
+            String predicatejson,
+            List<AbstractExpression> exactMatchCoveringExprs) {
+        assert ( ! predicatejson.isEmpty());
         AbstractExpression indexPredicate = null;
         try {
             indexPredicate = AbstractExpression.fromJSONString(predicatejson, tableScan);
@@ -325,8 +359,7 @@ public abstract class SubPlanAssembler {
         }
 
         // Copy the expressions to a new working list that can be culled as filters are processed.
-        List<AbstractExpression> filtersToCover = new ArrayList<AbstractExpression>();
-        filtersToCover.addAll(exprs);
+        List<AbstractExpression> filtersToCover = new ArrayList<>(exprs);
 
         boolean indexIsGeographical;
         String exprsjson = index.getExpressionsjson();
@@ -431,7 +464,9 @@ public abstract class SubPlanAssembler {
             // Equality filters get first priority.
             boolean allowIndexedJoinFilters = (inListExpr == null);
             IndexableExpression eqExpr = getIndexableExpressionFromFilters(
-                ExpressionType.COMPARE_EQUAL, ExpressionType.COMPARE_EQUAL,
+                // NOT DISTINCT can be also considered as an equality comparison.
+                // The only difference is that NULL is not distinct from NULL, but NULL != NULL. (ENG-11096)
+                ExpressionType.COMPARE_EQUAL, ExpressionType.COMPARE_NOTDISTINCT,
                 coveringExpr, coveringColId, tableScan, filtersToCover,
                 allowIndexedJoinFilters, EXCLUDE_FROM_POST_FILTERS);
 
@@ -597,19 +632,75 @@ public abstract class SubPlanAssembler {
                     coveringExpr, coveringColId, tableScan, filtersToCover,
                     allowIndexedJoinFilters, EXCLUDE_FROM_POST_FILTERS);
             }
-        }
 
-        if (startingBoundExpr != null) {
-            AbstractExpression lowerBoundExpr = startingBoundExpr.getFilter();
-            retval.indexExprs.add(lowerBoundExpr);
-            retval.bindings.addAll(startingBoundExpr.getBindings());
-            if (lowerBoundExpr.getExpressionType() == ExpressionType.COMPARE_GREATERTHAN) {
-                retval.lookupType = IndexLookupType.GT;
-            } else {
-                assert(lowerBoundExpr.getExpressionType() == ExpressionType.COMPARE_GREATERTHANOREQUALTO);
-                retval.lookupType = IndexLookupType.GTE;
+            if (startingBoundExpr != null) {
+                AbstractExpression lowerBoundExpr = startingBoundExpr.getFilter();
+                retval.indexExprs.add(lowerBoundExpr);
+                retval.bindings.addAll(startingBoundExpr.getBindings());
+                if (lowerBoundExpr.getExpressionType() == ExpressionType.COMPARE_GREATERTHAN) {
+                    retval.lookupType = IndexLookupType.GT;
+                }
+                else {
+                    assert(lowerBoundExpr.getExpressionType() == ExpressionType.COMPARE_GREATERTHANOREQUALTO);
+                    retval.lookupType = IndexLookupType.GTE;
+                }
+                retval.use = IndexUseType.INDEX_SCAN;
             }
-            retval.use = IndexUseType.INDEX_SCAN;
+
+            if (endingBoundExpr != null) {
+                AbstractExpression upperBoundComparator = endingBoundExpr.getFilter();
+                retval.use = IndexUseType.INDEX_SCAN;
+                retval.bindings.addAll(endingBoundExpr.getBindings());
+
+                // if we already have a lower bound, or the sorting direction is already determined
+                // do not do the reverse scan optimization
+                if (retval.sortDirection != SortDirectionType.DESC &&
+                    (startingBoundExpr != null || retval.sortDirection == SortDirectionType.ASC)) {
+                    retval.endExprs.add(upperBoundComparator);
+                    if (retval.lookupType == IndexLookupType.EQ) {
+                        retval.lookupType = IndexLookupType.GTE;
+                    }
+                }
+                else {
+                    // Optimizable to use reverse scan.
+                    // only do reverse scan optimization when no lowerBoundExpr and lookup type is either < or <=.
+                    if (upperBoundComparator.getExpressionType() == ExpressionType.COMPARE_LESSTHAN) {
+                        retval.lookupType = IndexLookupType.LT;
+                    }
+                    else {
+                        assert upperBoundComparator.getExpressionType() == ExpressionType.COMPARE_LESSTHANOREQUALTO;
+                        retval.lookupType = IndexLookupType.LTE;
+                    }
+                    // Unlike a lower bound, an upper bound does not automatically filter out nulls
+                    // as required by the comparison filter, so construct a NOT NULL comparator and
+                    // add to post-filter
+                    // TODO: Implement an abstract isNullable() method on AbstractExpression and use
+                    // that here to optimize out the "NOT NULL" comparator for NOT NULL columns
+                    if (startingBoundExpr == null) {
+                        AbstractExpression newComparator = new OperatorExpression(ExpressionType.OPERATOR_NOT,
+                                new OperatorExpression(ExpressionType.OPERATOR_IS_NULL), null);
+                        newComparator.getLeft().setLeft(upperBoundComparator.getLeft());
+                        newComparator.finalizeValueTypes();
+                        retval.otherExprs.add(newComparator);
+                    }
+                    else {
+                        int lastIdx = retval.indexExprs.size() -1;
+                        retval.indexExprs.remove(lastIdx);
+
+                        AbstractExpression lowerBoundComparator = startingBoundExpr.getFilter();
+                        retval.endExprs.add(lowerBoundComparator);
+                    }
+
+                    // add to indexExprs because it will be used as part of searchKey
+                    retval.indexExprs.add(upperBoundComparator);
+                    // initialExpr is set for both cases
+                    // but will be used for LTE and only when overflow case of LT.
+                    // The initial expression is needed to control a (short?) forward scan to
+                    // adjust the start of a reverse iteration after it had to initially settle
+                    // for starting at "greater than a prefix key".
+                    retval.initialExpr.addAll(retval.indexExprs);
+                }
+            }
         }
 
         if (endingBoundExpr == null) {
@@ -677,57 +768,6 @@ public abstract class SubPlanAssembler {
                 }
             }
         }
-        else {
-            AbstractExpression upperBoundComparator = endingBoundExpr.getFilter();
-            retval.use = IndexUseType.INDEX_SCAN;
-            retval.bindings.addAll(endingBoundExpr.getBindings());
-
-            // if we already have a lower bound, or the sorting direction is already determined
-            // do not do the reverse scan optimization
-            if (retval.sortDirection != SortDirectionType.DESC &&
-                (startingBoundExpr != null || retval.sortDirection == SortDirectionType.ASC)) {
-                retval.endExprs.add(upperBoundComparator);
-                if (retval.lookupType == IndexLookupType.EQ) {
-                    retval.lookupType = IndexLookupType.GTE;
-                }
-            } else {
-                // Optimizable to use reverse scan.
-                // only do reverse scan optimization when no lowerBoundExpr and lookup type is either < or <=.
-                if (upperBoundComparator.getExpressionType() == ExpressionType.COMPARE_LESSTHAN) {
-                    retval.lookupType = IndexLookupType.LT;
-                } else {
-                    assert upperBoundComparator.getExpressionType() == ExpressionType.COMPARE_LESSTHANOREQUALTO;
-                    retval.lookupType = IndexLookupType.LTE;
-                }
-                // Unlike a lower bound, an upper bound does not automatically filter out nulls
-                // as required by the comparison filter, so construct a NOT NULL comparator and
-                // add to post-filter
-                // TODO: Implement an abstract isNullable() method on AbstractExpression and use
-                // that here to optimize out the "NOT NULL" comparator for NOT NULL columns
-                if (startingBoundExpr == null) {
-                    AbstractExpression newComparator = new OperatorExpression(ExpressionType.OPERATOR_NOT,
-                            new OperatorExpression(ExpressionType.OPERATOR_IS_NULL), null);
-                    newComparator.getLeft().setLeft(upperBoundComparator.getLeft());
-                    newComparator.finalizeValueTypes();
-                    retval.otherExprs.add(newComparator);
-                } else {
-                    int lastIdx = retval.indexExprs.size() -1;
-                    retval.indexExprs.remove(lastIdx);
-
-                    AbstractExpression lowerBoundComparator = startingBoundExpr.getFilter();
-                    retval.endExprs.add(lowerBoundComparator);
-                }
-
-                // add to indexExprs because it will be used as part of searchKey
-                retval.indexExprs.add(upperBoundComparator);
-                // initialExpr is set for both cases
-                // but will be used for LTE and only when overflow case of LT.
-                // The initial expression is needed to control a (short?) forward scan to
-                // adjust the start of a reverse iteration after it had to initially settle
-                // for starting at "greater than a prefix key".
-                retval.initialExpr.addAll(retval.indexExprs);
-            }
-        }
 
         // index not relevant to expression
         if (retval.indexExprs.size() == 0 &&
@@ -736,57 +776,76 @@ public abstract class SubPlanAssembler {
             return null;
         }
 
-        // If all of the index key components are not covered by comparisons (but SOME are),
-        // then the scan may need to be reconfigured to account for the scan key being padded
-        // with null values for the components that are not being filtered.
-        //
+        // If all of the index key components are not covered by comparisons
+        // (but SOME are), then the scan may need to be reconfigured to account
+        // for the scan key being padded in the EE with null values for the
+        // components that are not being filtered.
         if (retval.indexExprs.size() < keyComponentCount) {
-            // If IndexUseType has the default value of COVERING_UNIQUE_EQUALITY, then the
-            // scan can use GTE instead to match all values, not only the null values, for the
-            // unfiltered components -- assuming that any value is considered >= null.
-            if (retval.use == IndexUseType.COVERING_UNIQUE_EQUALITY) {
-                retval.use = IndexUseType.INDEX_SCAN;
-                // With no key, the lookup type will be ignored and the sort direction will
-                // determine the scan direction; With prefix key and explicit DESC order by,
-                // tell the EE to do reverse scan.
-                if (retval.sortDirection == SortDirectionType.DESC && retval.indexExprs.size() > 0) {
-                    retval.lookupType = IndexLookupType.LTE;
-                    // The initial expression is needed to control a (short?) forward scan to
-                    // adjust the start of a reverse iteration after it had to initially settle
-                    // for starting at "greater than a prefix key".
-                    retval.initialExpr.addAll(retval.indexExprs);
-                } else {
-                    retval.lookupType = IndexLookupType.GTE;
-                }
-            }
-            // GTE scans can have any number of null key components appended without changing
-            // the effective value. So, that leaves GT scans.
-            else if (retval.lookupType == IndexLookupType.GT) {
-                // GT scans pose a problem in that any compound key in the index that was an exact
-                // equality match on the filtered key component(s) and had a non-null value for any
-                // remaining component(s) would be mistaken for a match.
-                // The current work-around for this is to add (back) the GT condition to the set of
-                // "other" filter expressions that get evaluated for each tuple found in the index scan.
-                // This will eliminate the initial entries that are equal on the prefix key.
-                // This is not as efficient as getting the index scan to start in the "correct" place,
-                // but it puts off having to change the EE code.
-                // TODO: ENG-3913 describes more ambitious alternative solutions that include:
-                //  - padding with MAX values rather than null/MIN values for GT scans.
-                //  - adding the GT condition as a special "initialExpr" post-condition
-                //    that disables itself as soon as it evaluates to true for any row
-                //    -- it would be expected to always evaluate to true after that.
-                AbstractExpression comparator = startingBoundExpr.getOriginalFilter();
-                retval.otherExprs.add(comparator);
-            }
+            correctAccessPathForPrefixKeyCoverage(retval, startingBoundExpr);
         }
 
-        // All remaining filters get covered as post-filters
-        // to be applied after the "random access" go at the index.
+        // All remaining filters get applied as post-filters
+        // on tuples fetched from the index.
         retval.otherExprs.addAll(filtersToCover);
         if (retval.sortDirection != SortDirectionType.INVALID) {
             retval.bindings.addAll(bindingsForOrder);
         }
         return retval;
+    }
+
+    private void correctAccessPathForPrefixKeyCoverage(AccessPath retval,
+            IndexableExpression startingBoundExpr) {
+        // If IndexUseType has the default value of COVERING_UNIQUE_EQUALITY, then the
+        // scan can use GTE instead to match all values, not only the null values, for the
+        // unfiltered components -- assuming that any value is considered >= null.
+        if (retval.use == IndexUseType.COVERING_UNIQUE_EQUALITY) {
+            correctEqualityForPrefixKey(retval);
+            return;
+        }
+
+        // GTE scans can have any number of null key components appended without changing
+        // the effective value. So, that leaves GT scans.
+        if (retval.lookupType == IndexLookupType.GT) {
+            correctForwardScanForPrefixKey(retval, startingBoundExpr);
+        }
+    }
+
+    private void correctEqualityForPrefixKey(AccessPath retval) {
+        retval.use = IndexUseType.INDEX_SCAN;
+        // With no key, the lookup type will be ignored and the sort direction will
+        // determine the scan direction; With prefix key and explicit DESC order by,
+        // tell the EE to do reverse scan.
+        if (retval.sortDirection == SortDirectionType.DESC && retval.indexExprs.size() > 0) {
+            retval.lookupType = IndexLookupType.LTE;
+            // The initial expression is needed to control a (short?) forward scan to
+            // adjust the start of a reverse iteration after it had to initially settle
+            // for starting at "greater than a prefix key".
+            retval.initialExpr.addAll(retval.indexExprs);
+        }
+        else {
+            retval.lookupType = IndexLookupType.GTE;
+        }
+    }
+
+    private void correctForwardScanForPrefixKey(AccessPath retval,
+            IndexableExpression startingBoundExpr) {
+        // GT scans pose a problem in that they would mistakenly match any
+        // compound key in the index that was EQUAL on the prefix key(s) but
+        // greater than the EE's null key padding (that is, any non-nulls)
+        // for the non-filtered suffix key(s).
+        // The current work-around for this is to add (back) the GT condition
+        // to the set of "other" filter expressions that get evaluated for each
+        // tuple found in the index scan.
+        // This will eliminate the initial entries that are equal on the prefix key.
+        // This is not as efficient as getting the index scan to start in the
+        // "correct" place, but it puts off having to change the EE code.
+        // TODO: ENG-3913 describes more ambitious alternative solutions that include:
+        //  - padding with MAX values rather than null/MIN values for GT scans.
+        //  - adding the GT condition as a special "initialExpr" post-condition
+        //    that disables itself as soon as it evaluates to true for any row
+        //    -- it would be expected to always evaluate to true after that.
+        AbstractExpression comparator = startingBoundExpr.getOriginalFilter();
+        retval.otherExprs.add(comparator);
     }
 
     private AccessPath getRelevantAccessPathForGeoIndex(AccessPath retval, StmtTableScan tableScan,
@@ -1009,72 +1068,71 @@ public abstract class SubPlanAssembler {
             List<AbstractExpression> bindingsForOrder)
     {
         if (!m_parsedStmt.hasOrderByColumns()
-                || m_parsedStmt.orderByColumns().isEmpty()) {
+                || m_parsedStmt.orderByColumns().isEmpty()
+                // There need to be enough indexed expressions to provide full sort coverage.
+                || m_parsedStmt.orderByColumns().size() > keyComponentCount) {
             return 0;
-        } else if (m_parsedStmt instanceof ParsedSelectStmt) {
+        }
+        if (m_parsedStmt instanceof ParsedSelectStmt) {
             // If this parsed select statement has a windowed expression,
             // we don't want to consider the order by at all.
             // Note that this is the content of ENG-10474.
             ParsedSelectStmt pss = (ParsedSelectStmt)m_parsedStmt;
-            if (pss.hasWindowedExpression()) {
+            if (pss.hasWindowFunctionExpression()) {
                 return 0;
             }
         }
         int nSpoilers = 0;
-        int countOrderBys = m_parsedStmt.orderByColumns().size();
-        // There need to be enough indexed expressions to provide full sort coverage.
-        if (countOrderBys > 0 && countOrderBys <= keyComponentCount) {
-            boolean ascending = m_parsedStmt.orderByColumns().get(0).ascending;
-            retval.sortDirection = ascending ? SortDirectionType.ASC : SortDirectionType.DESC;
-            int jj = 0;
-            for (ParsedColInfo colInfo : m_parsedStmt.orderByColumns()) {
-                // This retry loop allows catching special cases that don't perfectly match the
-                // ORDER BY columns but may still be usable for ordering.
-                for ( ; jj < keyComponentCount; ++jj) {
-                    if (colInfo.ascending == ascending) {
-                        // Explicitly advance to the each indexed expression/column
-                        // to match them with the query's "ORDER BY" expressions.
-                        if (indexedExprs == null) {
-                            ColumnRef nextColRef = indexedColRefs.get(jj);
-                            if (colInfo.expression instanceof TupleValueExpression &&
-                                colInfo.tableAlias.equals(tableScan.getTableAlias()) &&
-                                colInfo.columnName.equals(nextColRef.getColumn().getTypeName())) {
-                                break;
-                            }
-                        } else {
-                            assert(jj < indexedExprs.size());
-                            AbstractExpression nextExpr = indexedExprs.get(jj);
-                            List<AbstractExpression> moreBindings =
-                                colInfo.expression.bindingToIndexedExpression(nextExpr);
-                            // Non-null bindings (even an empty list) denotes a match.
-                            if (moreBindings != null) {
-                                bindingsForOrder.addAll(moreBindings);
-                                break;
-                            }
+        boolean ascending = m_parsedStmt.orderByColumns().get(0).ascending;
+        retval.sortDirection = ascending ? SortDirectionType.ASC : SortDirectionType.DESC;
+        int jj = 0;
+        for (ParsedColInfo colInfo : m_parsedStmt.orderByColumns()) {
+            // This retry loop allows catching special cases that don't perfectly match the
+            // ORDER BY columns but may still be usable for ordering.
+            for ( ; jj < keyComponentCount; ++jj) {
+                if (colInfo.ascending == ascending) {
+                    // Explicitly advance to the each indexed expression/column
+                    // to match them with the query's "ORDER BY" expressions.
+                    if (indexedExprs == null) {
+                        ColumnRef nextColRef = indexedColRefs.get(jj);
+                        if (colInfo.expression instanceof TupleValueExpression &&
+                            colInfo.tableAlias.equals(tableScan.getTableAlias()) &&
+                            colInfo.columnName.equals(nextColRef.getColumn().getTypeName())) {
+                            break;
+                        }
+                    } else {
+                        assert(jj < indexedExprs.size());
+                        AbstractExpression nextExpr = indexedExprs.get(jj);
+                        List<AbstractExpression> moreBindings =
+                            colInfo.expression.bindingToIndexedExpression(nextExpr);
+                        // Non-null bindings (even an empty list) denotes a match.
+                        if (moreBindings != null) {
+                            bindingsForOrder.addAll(moreBindings);
+                            break;
                         }
                     }
-                    // The ORDER BY column did not match the established ascending/descending
-                    // pattern OR did not match the next index key component.
-                    // The only hope for the sort being preserved is that
-                    // (A) the ORDER BY column matches a later index key component
-                    // -- so keep searching -- AND
-                    // (B) the current (and each intervening) index key component is constrained
-                    // to a single value, i.e. it is equality-filtered.
-                    // -- so note the current component's position (jj).
-                    orderSpoilers[nSpoilers++] = jj;
                 }
-                if (jj < keyComponentCount) {
-                    // The loop exited prematurely.
-                    // That means the current ORDER BY column matched the current key component,
-                    // so move on to the next key component (to match the next ORDER BY column).
-                    ++jj;
-                } else {
-                    // The current ORDER BY column ran out of key components to try to match.
-                    // This is an outright failure case.
-                    retval.sortDirection = SortDirectionType.INVALID;
-                    bindingsForOrder.clear(); // suddenly irrelevant
-                    return 0;  // Any orderSpoilers are also suddenly irrelevant.
-                }
+                // The ORDER BY column did not match the established ascending/descending
+                // pattern OR did not match the next index key component.
+                // The only hope for the sort being preserved is that
+                // (A) the ORDER BY column matches a later index key component
+                // -- so keep searching -- AND
+                // (B) the current (and each intervening) index key component is constrained
+                // to a single value, i.e. it is equality-filtered.
+                // -- so note the current component's position (jj).
+                orderSpoilers[nSpoilers++] = jj;
+            }
+            if (jj < keyComponentCount) {
+                // The loop exited prematurely.
+                // That means the current ORDER BY column matched the current key component,
+                // so move on to the next key component (to match the next ORDER BY column).
+                ++jj;
+            } else {
+                // The current ORDER BY column ran out of key components to try to match.
+                // This is an outright failure case.
+                retval.sortDirection = SortDirectionType.INVALID;
+                bindingsForOrder.clear(); // suddenly irrelevant
+                return 0;  // Any orderSpoilers are also suddenly irrelevant.
             }
         }
         return nSpoilers;
@@ -1516,24 +1574,25 @@ public abstract class SubPlanAssembler {
         for (AbstractExpression expr : path.indexExprs) {
             if (path.lookupType == IndexLookupType.GEO_CONTAINS) {
                 scanNode.addSearchKeyExpression(expr);
+                scanNode.addCompareNotDistinctFlag(false);
                 continue;
             }
-            AbstractExpression expr2 = expr.getRight();
-            assert(expr2 != null);
+            AbstractExpression exprRightChild = expr.getRight();
+            assert(exprRightChild != null);
             if (expr.getExpressionType() == ExpressionType.COMPARE_IN) {
                 // Replace this method's result with an injected NLIJ.
-                resultNode = injectIndexedJoinWithMaterializedScan(expr2, scanNode);
+                resultNode = injectIndexedJoinWithMaterializedScan(exprRightChild, scanNode);
                 // Extract a TVE from the LHS MaterializedScan for use by the IndexScan in its new role.
                 MaterializedScanPlanNode matscan = (MaterializedScanPlanNode)resultNode.getChild(0);
                 AbstractExpression elemExpr = matscan.getOutputExpression();
                 assert(elemExpr != null);
                 // Replace the IN LIST condition in the end expression referencing all the list elements
                 // with a more efficient equality filter referencing the TVE for each element in turn.
-                replaceInListFilterWithEqualityFilter(path.endExprs, expr2, elemExpr);
+                replaceInListFilterWithEqualityFilter(path.endExprs, exprRightChild, elemExpr);
                 // Set up the similar VectorValue --> TVE replacement of the search key expression.
-                expr2 = elemExpr;
+                exprRightChild = elemExpr;
             }
-            if (expr2 instanceof AbstractSubqueryExpression) {
+            if (exprRightChild instanceof AbstractSubqueryExpression) {
                 // The AbstractSubqueryExpression must be wrapped up into a
                 // ScalarValueExpression which extracts the actual row/column from
                 // the subquery
@@ -1542,7 +1601,9 @@ public abstract class SubPlanAssembler {
                 // DEAD CODE with the guards on index: ENG-8203
                 assert(false);
             }
-            scanNode.addSearchKeyExpression(expr2);
+            scanNode.addSearchKeyExpression(exprRightChild);
+            // If the index expression is an "IS NOT DISTINCT FROM" comparison, let the NULL values go through. (ENG-11096)
+            scanNode.addCompareNotDistinctFlag(expr.getExpressionType() == ExpressionType.COMPARE_NOTDISTINCT);
         }
         // create the IndexScanNode with all its metadata
         scanNode.setLookupType(path.lookupType);

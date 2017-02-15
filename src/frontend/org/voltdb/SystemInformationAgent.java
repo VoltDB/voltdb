@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -139,7 +139,7 @@ public class SystemInformationAgent extends OpsAgent
         CatalogContext catalogContext = getCatalogContext();
         VoltTable result =
                 SystemInformation.populateDeploymentProperties(catalogContext.cluster,
-                        catalogContext.database, catalogContext.getClusterSettings());
+                        catalogContext.database, catalogContext.getClusterSettings(), catalogContext.getNodeSettings());
         if (result == null) {
             sendErrorResponse(psr.c, ClientResponse.GRACEFUL_FAILURE,
                     "Unable to collect DEPLOYMENT information for @SystemInformation", psr.clientData);

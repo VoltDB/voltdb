@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -65,29 +65,28 @@ std::string TableTuple::debug(const std::string& tableName) const {
     }
 
     if (isActive() == false) {
-        buffer << " <DELETED>";
-    } else {
-        for (int ctr = 0; ctr < m_schema->columnCount(); ctr++) {
+        buffer << " <DELETED> ";
+    }
+    for (int ctr = 0; ctr < m_schema->columnCount(); ctr++) {
+        buffer << "(";
+        if (isNull(ctr)) {
+            buffer << "<NULL>";
+        } else {
+            buffer << getNValue(ctr).debug();
+        }
+        buffer << ")";
+    }
+
+    if (m_schema->hiddenColumnCount() > 0) {
+        buffer << " hidden->";
+        for (int ctr = 0; ctr < m_schema->hiddenColumnCount(); ctr++) {
             buffer << "(";
-            if (isNull(ctr)) {
+            if (isHiddenNull(ctr)) {
                 buffer << "<NULL>";
             } else {
-                buffer << getNValue(ctr).debug();
+                buffer << getHiddenNValue(ctr).debug();
             }
             buffer << ")";
-        }
-
-        if (m_schema->hiddenColumnCount() > 0) {
-            buffer << " hidden->";
-            for (int ctr = 0; ctr < m_schema->hiddenColumnCount(); ctr++) {
-                buffer << "(";
-                if (isHiddenNull(ctr)) {
-                    buffer << "<NULL>";
-                } else {
-                    buffer << getHiddenNValue(ctr).debug();
-                }
-                buffer << ")";
-            }
         }
     }
 

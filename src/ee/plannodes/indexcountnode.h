@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -48,6 +48,9 @@ public:
     const std::vector<AbstractExpression*>& getSearchKeyExpressions() const
     { return m_searchkey_expressions; }
 
+    const std::vector<bool>& getCompareNotDistinctFlags() const
+    { return m_compare_not_distinct; }
+
     AbstractExpression* getSkipNullPredicate() const { return m_skip_null_predicate.get(); }
 
 protected:
@@ -58,6 +61,11 @@ protected:
 
     // TODO: Document
     OwningExpressionVector m_searchkey_expressions;
+
+    // If the search key expression is actually a "not distinct" expression,
+    //   we do not want the executor to skip null candidates.
+    // This flag vector will instruct the executor the correct behavior for null skipping. (ENG-11096)
+    std::vector<bool> m_compare_not_distinct;
 
     // TODO: Document
     OwningExpressionVector m_endkey_expressions;

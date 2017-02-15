@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -29,11 +29,13 @@ import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.DRConsumerDrIdTracker;
+import org.voltdb.DRIdempotencyResult;
 import org.voltdb.DependencyPair;
 import org.voltdb.HsqlBackend;
 import org.voltdb.LoadedProcedureSet;
 import org.voltdb.NonVoltDBBackend;
 import org.voltdb.ParameterSet;
+import org.voltdb.PartitionDRGateway;
 import org.voltdb.PostGISBackend;
 import org.voltdb.PostgreSQLBackend;
 import org.voltdb.ProcedureRunner;
@@ -54,6 +56,8 @@ import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.dtxn.UndoAction;
 import org.voltdb.exceptions.EEException;
+import org.voltdb.settings.ClusterSettings;
+import org.voltdb.settings.NodeSettings;
 
 /**
  * An implementation of Site which provides only the functionality
@@ -110,6 +114,16 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
      */
     SystemProcedureExecutionContext m_sysprocContext = new SystemProcedureExecutionContext() {
         @Override
+        public ClusterSettings getClusterSettings() {
+            throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");
+        }
+
+        @Override
+        public NodeSettings getPaths() {
+            throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");
+        }
+
+        @Override
         public Database getDatabase() {
             throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");
         }
@@ -126,6 +140,11 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
 
         @Override
         public long getSiteId() {
+            throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");
+        }
+
+        @Override
+        public int getLocalSitesCount() {
             throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");
         }
 
@@ -244,8 +263,8 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         }
 
         @Override
-        public byte isExpectedApplyBinaryLog(int producerClusterId, int producerPartitionId,
-                                                long lastReceivedDRId)
+        public DRIdempotencyResult isExpectedApplyBinaryLog(int producerClusterId, int producerPartitionId,
+                                                            long lastReceivedDRId)
         {
             throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
         }
@@ -265,6 +284,11 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
 
         @Override
         public void resetDrAppliedTracker() {
+            throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+        }
+
+        @Override
+        public void initDRAppliedTracker(Map<Byte, Integer> clusterIdToPartitionCountMap) {
             throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
         }
 
@@ -404,6 +428,12 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     public int getCorrespondingClusterId()
     {
         return m_context.cluster.getDrclusterid();
+    }
+
+    @Override
+    public PartitionDRGateway getDRGateway()
+    {
+        throw new UnsupportedOperationException("RO MP Site doesn't have DR gateway");
     }
 
     @Override
@@ -627,6 +657,12 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
 
     @Override
     public void setDRProtocolVersion(int drVersion) {
+        throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+    }
+
+    @Override
+    public void setDRProtocolVersion(int drVersion, long spHandle, long uniqueId)
+    {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
     }
 }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -52,7 +52,7 @@ class AdminDrTest extends TestBase {
         }
     }
 
-    def "Check all the titles and labels in Database Replication (DR) section"(){
+    def checkAllTheTitlesAndLabelsInDatabaseReplicationSection() {
         boolean result = page.CheckIfDREnabled();
         expect: "Database Replication (DR) titles and labels are displayed"
         if(result){
@@ -81,7 +81,7 @@ class AdminDrTest extends TestBase {
         }
     }
 
-    def "Check the values of DR id, master, and replica Source"(){
+    def checkTheValuesOfDrIdMasterAndReplicaSource() {
         when:
         at AdminPage
         then:
@@ -127,7 +127,7 @@ class AdminDrTest extends TestBase {
         }
     }
 
-    def "Check if replica source is defined in case of Replica"(){
+    def checkIfReplicaSourceIsDefinedForReplica() {
         when:
         at AdminPage
         then:
@@ -147,7 +147,7 @@ class AdminDrTest extends TestBase {
         }
     }
 
-    def "Check if replica value is off for master and on for replica"(){
+    def checkIfReplicaValueIsOffForMasterAndOnForReplica() {
         when:
         at AdminPage
         then:
@@ -176,7 +176,7 @@ class AdminDrTest extends TestBase {
         }
     }
 
-    def "Check DR mode"(){
+    def checkDrMode() {
         expect: "DR mode is present and is either Master, Replica or Both"
         boolean result = page.CheckIfDREnabled();
         if(result){
@@ -191,7 +191,7 @@ class AdminDrTest extends TestBase {
         }
     }
 
-    def "Check whether Ok and cancel button are displayed when Master Edit button is clicked"(){
+    def checkWhetherOkAndCancelButtonAreDisplayedWhenMasterEditButtonIsClicked() {
         when:
         at AdminPage
         then:
@@ -216,7 +216,7 @@ class AdminDrTest extends TestBase {
         }
     }
 
-    def "Check cancel edit button for master edit. Click Master edit button and then cancel"(){
+    def checkCancelEditButtonForMasterEditClickMasterEditButtonAndThenCancel() {
         when:
         at AdminPage
         then:
@@ -242,7 +242,7 @@ class AdminDrTest extends TestBase {
         }
     }
 
-    def "Check cancel button on edit master popup. Click Master edit button and ok, then cancel button on popup"(){
+    def checkCancelButtonOnEditMasterPopupClickMasterEditButtonAndOkThenCancelButtonOnPopup() {
         when:
         at AdminPage
         then:
@@ -274,7 +274,7 @@ class AdminDrTest extends TestBase {
         }
     }
 
-    def "Check ok button on edit master popup.Click master edit button and then ok button on popup"(){
+    def checkOkButtonOnEditMasterPopupClickMasterEditButtonAndThenOkButtonOnPopup() {
         when:
         at AdminPage
         then:
@@ -305,7 +305,7 @@ class AdminDrTest extends TestBase {
         }
     }
 
-    def "Click master edit and click checkbox to on/off master and then save value"() {
+    def clickMasterEditAndClickCheckboxToOnOoffMasterAndThenSaveValue() {
         when:
         at AdminPage
         then:
@@ -331,7 +331,6 @@ class AdminDrTest extends TestBase {
             then:
             String enabledDisabledEdited = page.masterValue.text()
             println(enabledDisabledEdited)
-
             waitFor(waitTime) { page.drMode.isDisplayed() }
             String drState = page.drMode.text()
             if (enabledDisabled.toLowerCase() == "on") {

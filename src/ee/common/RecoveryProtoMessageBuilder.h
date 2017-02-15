@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -24,7 +24,6 @@
 namespace voltdb {
 class Pool;
 class TupleSchema;
-class TupleSerializer;
 class ReferenceSerializeOutput;
 
 /*
@@ -52,7 +51,6 @@ public:
             uint32_t totalTupleCount,//Number of tuples in table overall
                                     //Not the number in this message. Used to size hash tables.
             ReferenceSerializeOutput *out,
-            TupleSerializer *serializer,
             const TupleSchema *schema);
 
     /*

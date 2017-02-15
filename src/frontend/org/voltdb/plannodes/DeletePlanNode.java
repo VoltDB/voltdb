@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -51,7 +51,7 @@ public class DeletePlanNode extends AbstractOperationPlanNode {
     @Override
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
-        stringer.key(Members.TRUNCATE.name()).value(m_truncate);
+        stringer.keySymbolValuePair(Members.TRUNCATE.name(), m_truncate);
     }
 
     @Override

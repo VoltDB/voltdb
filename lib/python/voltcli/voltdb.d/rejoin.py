@@ -1,5 +1,5 @@
 # This file is part of VoltDB.
-# Copyright (C) 2008-2016 VoltDB Inc.
+# Copyright (C) 2008-2017 VoltDB Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -23,7 +23,8 @@
                                 supports_daemon=True,
                                 supports_multiple_daemons=True,
                                 check_environment_config=True),
-    description = 'Rejoin the current node to a VoltDB cluster.'
+    description = 'WARNING: The rejoin is deprecated. Please use INIT and START. Rejoin the current node to a VoltDB cluster.',
+    hideverb=True
 )
 def rejoin(runner):
     runner.go()

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -27,6 +27,7 @@
 namespace voltdb {
 
 // Extra space to write a StoredProcedureInvocation wrapper in Java without copying
+// this magic number is tied to the serialization size of an InvocationBuffer
 const int MAGIC_DR_TRANSACTION_PADDING = 78;
 const int SECONDARY_BUFFER_SIZE = (45 * 1024 * 1024) + 4096;
 // Use this to indicate uninitialized DR mark

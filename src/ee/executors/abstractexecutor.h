@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -75,6 +75,12 @@ class AbstractExecutor {
     /** Invoke a plannode's associated executor */
     bool execute(const NValueArray& params);
 
+    /** The temp output table for this executor.  May be null for a
+     *  SEND node! */
+    const TempTable* getTempOutputTable() const {
+        return m_tmpOutputTable;
+    }
+
     /**
      * Returns the plannode that generated this executor.
      */
@@ -133,17 +139,17 @@ class AbstractExecutor {
     virtual bool p_init(AbstractPlanNode*,
                         TempTableLimits* limits) = 0;
 
-    /** Concrete executor classes impelmenet execution in p_execute() */
+    /** Concrete executor classes implement execution in p_execute() */
     virtual bool p_execute(const NValueArray& params) = 0;
 
     /**
-     * Set up a multi-column temp output table for those executors that require one.
+     * Set up a multi-column temporary output table for those executors that require one.
      * Called from p_init.
      */
     void setTempOutputTable(TempTableLimits* limits, const std::string tempTableName="temp");
 
     /**
-     * Set up a single-column temp output table for DML executors that require one to return their counts.
+     * Set up a single-column temporary output table for DML executors that require one to return their counts.
      * Called from p_init.
      */
     void setDMLCountOutputTable(TempTableLimits* limits);

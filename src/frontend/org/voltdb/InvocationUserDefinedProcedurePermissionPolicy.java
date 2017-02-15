@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,10 +17,10 @@
 
 package org.voltdb;
 
-import org.voltdb.AuthSystem.AuthUser;
-import org.voltdb.catalog.Procedure;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
+import org.voltdb.AuthSystem.AuthUser;
+import org.voltdb.catalog.Procedure;
 import org.voltdb.utils.LogKeys;
 
 /**
@@ -56,10 +56,10 @@ public class InvocationUserDefinedProcedurePermissionPolicy extends InvocationPe
     public ClientResponseImpl getErrorResponse(AuthUser user, StoredProcedureInvocation invocation, Procedure procedure) {
         authLog.l7dlog(Level.INFO,
                 LogKeys.auth_ClientInterface_LackingPermissionForProcedure.name(),
-                new String[] { user.m_name, invocation.procName }, null);
+                new String[] { user.m_name, invocation.getProcName() }, null);
         return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
                 new VoltTable[0],
-                "User does not have permission to invoke " + invocation.procName,
+                "User does not have permission to invoke " + invocation.getProcName(),
                 invocation.clientHandle);
     }
 

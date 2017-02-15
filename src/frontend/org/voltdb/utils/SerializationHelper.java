@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -25,8 +25,8 @@ import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.common.Constants;
-import org.voltdb.types.GeographyValue;
 import org.voltdb.types.GeographyPointValue;
+import org.voltdb.types.GeographyValue;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
 
@@ -64,10 +64,12 @@ public class SerializationHelper {
         if (len == VoltType.NULL_STRING_LENGTH) {
             return null;
         }
-        assert len >= 0;
 
         if (len < VoltType.NULL_STRING_LENGTH) {
             throw new IOException("String length is negative " + len);
+        }
+        if (len > buf.remaining()) {
+            throw new IOException("String length is bigger than total buffer " + len);
         }
 
         // now assume not null
@@ -83,10 +85,12 @@ public class SerializationHelper {
         if (len == VoltType.NULL_STRING_LENGTH) {
             return null;
         }
-        assert len >= 0;
 
         if (len < VoltType.NULL_STRING_LENGTH) {
             throw new IOException("Varbinary length is negative " + len);
+        }
+        if (len > buf.remaining()) {
+            throw new IOException("Varbinary length is bigger than total buffer " + len);
         }
 
         // now assume not null
@@ -107,6 +111,9 @@ public class SerializationHelper {
         else if (type == byte.class) {
             if (count > (VoltType.MAX_VALUE_LENGTH)) {
                 throw new IOException("Array length is greater then the max of 1 megabyte " + count);
+            }
+            if (count > buf.remaining()) {
+                throw new IOException("Array length is greater than total buffer " + count);
             }
             final byte[] retval = new byte[count];
             buf.get(retval);

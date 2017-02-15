@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -64,7 +64,6 @@ public class RandomMsgGenerator
         StoredProcedureInvocation spi = mock(StoredProcedureInvocation.class);
         ParameterSet ps = mock(ParameterSet.class);
         when(spi.getParams()).thenReturn(ps);
-        when(spi.getOriginalTxnId()).thenReturn((long)-1);
         if (binaryLog) {
             when(ps.toArray()).thenReturn(new Object[] {null, 0l, 0l, Long.MIN_VALUE, Long.MIN_VALUE, null});
             if (!isMp) {

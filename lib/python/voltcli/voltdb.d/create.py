@@ -1,5 +1,5 @@
 # This file is part of VoltDB.
-# Copyright (C) 2008-2016 VoltDB Inc.
+# Copyright (C) 2008-2017 VoltDB Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -26,10 +26,12 @@
                                 force_voltdb_create=True,
                                 supports_paused=True),
     options = (
-        # Hidden option to restore the hashinator in addition to the tables.
-        VOLT.BooleanOption('-r', '--replica', 'replica', 'start replica cluster', default = False),
+        VOLT.BooleanOption('-r', '--replica', 'replica',
+                           'start replica cluster (deprecated, please use role="replica" in the deployment file)',
+                           default = False),
     ),
-    description = 'Start a new, empty database.'
+    description = 'WARNING: The create is deprecated. Please use INIT and START. Start a new, empty database.',
+    hideverb=True
 )
 def create(runner):
     runner.go()

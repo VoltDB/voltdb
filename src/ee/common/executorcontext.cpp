@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -77,17 +77,17 @@ ExecutorContext::ExecutorContext(int64_t siteId,
                 UndoQuantum *undoQuantum,
                 Topend* topend,
                 Pool* tempStringPool,
-                NValueArray* params,
                 VoltDBEngine* engine,
                 std::string hostname,
                 CatalogId hostId,
                 AbstractDRTupleStream *drStream,
                 AbstractDRTupleStream *drReplicatedStream,
                 CatalogId drClusterId) :
-    m_topEnd(topend),
+    m_topend(topend),
     m_tempStringPool(tempStringPool),
     m_undoQuantum(undoQuantum),
-    m_staticParams(params),
+    m_staticParams(MAX_PARAM_COUNT),
+    m_tuplesModifiedStack(),
     m_executorsMap(),
     m_drStream(drStream),
     m_drReplicatedStream(drReplicatedStream),
@@ -99,7 +99,8 @@ ExecutorContext::ExecutorContext(int64_t siteId,
     m_partitionId(partitionId),
     m_hostname(hostname),
     m_hostId(hostId),
-    m_drClusterId(drClusterId)
+    m_drClusterId(drClusterId),
+    m_progressStats()
 {
     (void)pthread_once(&static_keyOnce, globalInitOrCreateOncePerProcess);
     bindToThread();
@@ -120,19 +121,18 @@ void ExecutorContext::bindToThread()
     VOLT_DEBUG("Installing EC(%ld)", (long)this);
 }
 
-
 ExecutorContext* ExecutorContext::getExecutorContext() {
     (void)pthread_once(&static_keyOnce, globalInitOrCreateOncePerProcess);
     return static_cast<ExecutorContext*>(pthread_getspecific(static_key));
 }
 
-Table* ExecutorContext::executeExecutors(int subqueryId)
+UniqueTempTableResult ExecutorContext::executeExecutors(int subqueryId)
 {
     const std::vector<AbstractExecutor*>& executorList = getExecutors(subqueryId);
     return executeExecutors(executorList, subqueryId);
 }
 
-Table* ExecutorContext::executeExecutors(const std::vector<AbstractExecutor*>& executorList,
+UniqueTempTableResult ExecutorContext::executeExecutors(const std::vector<AbstractExecutor*>& executorList,
                                          int subqueryId)
 {
     // Walk through the list and execute each plannode.
@@ -147,7 +147,7 @@ Table* ExecutorContext::executeExecutors(const std::vector<AbstractExecutor*>& e
             assert(executor);
             // Call the execute method to actually perform whatever action
             // it is that the node is supposed to do...
-            if (!executor->execute(*m_staticParams)) {
+            if (!executor->execute(m_staticParams)) {
                 throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                     "Unspecified execution error detected");
             }
@@ -185,7 +185,15 @@ Table* ExecutorContext::executeExecutors(const std::vector<AbstractExecutor*>& e
         }
         throw;
     }
-    return executorList[ttl-1]->getPlanNode()->getOutputTable();
+
+    // Cleanup all but the temp table produced by the last executor.
+    // The last temp table is the result which the caller may care about.
+    for (int i = 0; i < executorList.size() - 1; ++i) {
+        executorList[i]->cleanupTempOutputTable();
+    }
+
+    TempTable *result = executorList[ttl-1]->getPlanNode()->getTempOutputTable();
+    return UniqueTempTableResult(result);
 }
 
 Table* ExecutorContext::getSubqueryOutputTable(int subqueryId) const
@@ -218,6 +226,42 @@ void ExecutorContext::cleanupExecutorsForSubquery(int subqueryId) const
 {
     const std::vector<AbstractExecutor*>& executorList = getExecutors(subqueryId);
     cleanupExecutorsForSubquery(executorList);
+}
+
+void ExecutorContext::resetExecutionMetadata(ExecutorVector* executorVector) {
+
+    if (m_tuplesModifiedStack.size() != 0) {
+        m_tuplesModifiedStack.pop();
+    }
+    assert (m_tuplesModifiedStack.size() == 0);
+
+    executorVector->resetLimitStats();
+}
+
+void ExecutorContext::reportProgressToTopend(const TempTableLimits *limits) {
+
+    int64_t allocated = limits != NULL ? limits->getAllocated() : -1;
+    int64_t peak = limits != NULL ? limits->getPeakMemoryInBytes() : -1;
+
+    //Update stats in java and let java determine if we should cancel this query.
+    m_progressStats.TuplesProcessedInFragment += m_progressStats.TuplesProcessedSinceReport;
+    int64_t tupleReportThreshold = m_topend->fragmentProgressUpdate(m_engine->getCurrentIndexInBatch(),
+                                        m_progressStats.LastAccessedPlanNodeType,
+                                        m_progressStats.TuplesProcessedInBatch + m_progressStats.TuplesProcessedInFragment,
+                                        allocated,
+                                        peak);
+    m_progressStats.TuplesProcessedSinceReport = 0;
+
+    if (tupleReportThreshold < 0) {
+        VOLT_DEBUG("Interrupt query.");
+        char buff[100];
+        snprintf(buff, 100,
+                "A SQL query was terminated after %.03f seconds because it exceeded the",
+                static_cast<double>(tupleReportThreshold) / -1000.0);
+
+        throw InterruptException(std::string(buff));
+    }
+    m_progressStats.TupleReportThreshold = tupleReportThreshold;
 }
 
 bool ExecutorContext::allOutputTempTablesAreEmpty() const {

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -77,7 +77,6 @@ class AdminTest extends TestBase {
             }
         }
     }
-
 
     // DIRECTORIES
 
@@ -881,8 +880,8 @@ class AdminTest extends TestBase {
         }
     }
 
-//    // SECURITY
-//
+    // SECURITY
+
     def securityButton(){
         when:
         at AdminPage
@@ -892,12 +891,9 @@ class AdminTest extends TestBase {
                 page.securityEdit.click()
                 page.securityEditOk.isDisplayed()
                 page.securityEditCancel.isDisplayed()
-            }
-            catch(geb.waiting.WaitTimeoutException e){
+            } catch(geb.waiting.WaitTimeoutException e) {
                 println("Security Edit cannot be displayed")
-            }
-            catch(org.openqa.selenium.ElementNotVisibleException e)
-            {
+            } catch(org.openqa.selenium.ElementNotVisibleException e) {
                 println("Security Edit cannot be displayed")
             }
         }
@@ -918,12 +914,9 @@ class AdminTest extends TestBase {
             page.securityEditCancel.click()
             println("security edit canceled!")
             page.securityEdit.isDisplayed()
-        }
-        catch(geb.waiting.WaitTimeoutException e){
+        } catch(geb.waiting.WaitTimeoutException e) {
             println("Security Edit cannot be displayed")
-        }
-        catch(org.openqa.selenium.ElementNotVisibleException e)
-        {
+        } catch(org.openqa.selenium.ElementNotVisibleException e) {
             println("Security Edit cannot be displayed")
         }
     }
@@ -945,14 +938,12 @@ class AdminTest extends TestBase {
                 println("cancel clicked")
                 page.securityEdit.isDisplayed()
             }
-        } catch(geb.waiting.WaitTimeoutException e){
+        } catch(geb.waiting.WaitTimeoutException e) {
             println("Security Edit cannot be displayed")
-        }
-        catch(org.openqa.selenium.ElementNotVisibleException e) {
+        } catch(org.openqa.selenium.ElementNotVisibleException e) {
             println("Security Edit cannot be displayed")
         }
     }
-
 
     def securityEditButtonAndOkAndOk(){
         when:
@@ -987,7 +978,6 @@ class AdminTest extends TestBase {
         !(string.equals(""))
     }
 
-
     def verifyAutoSnapshotsEdit() {
         when:
         at AdminPage
@@ -1001,19 +991,14 @@ class AdminTest extends TestBase {
             page.autoSnapshotsEditCheckbox.isDisplayed()
             page.autoSnapshotsEditOk.isDisplayed()
             page.autoSnapshotsEditCancel.isDisplayed()
-
         }
         waitFor(waitTime){
-
             page.frequencyEdit.isDisplayed()
             //println("first wait")
             page.retainedEdit.isDisplayed()
             page.fileprefixEdit.isDisplayed()
-
-
         }
     }
-
 
     def autoSnapshotAndClickCancel() {
         when:
@@ -1071,7 +1056,6 @@ class AdminTest extends TestBase {
         else if ( enabledDisabled.toLowerCase() == "off" ) {
             assert enabledDisabledEdited.toLowerCase().equals("on")
         }
-
     }
 
     def verifyClickEditAndCancel() {
@@ -1132,7 +1116,6 @@ class AdminTest extends TestBase {
         initialFreq     = page.frequency.text()
         initialFreqUnit = page.frequencyUnit.text()
         initialRetained = page.retained.text()
-
         then:
         waitFor(waitTime) {
             page.autoSnapshotsEdit.isDisplayed()
@@ -1195,9 +1178,7 @@ class AdminTest extends TestBase {
         }
     }
 
-
     // NETWORK INTERFACES
-
 
     def networkInterfacesTitle() {
         int count = 0
@@ -1263,7 +1244,6 @@ class AdminTest extends TestBase {
             assert false
         }
     }
-
 
     def clusterSettingsTitle() {
         int count = 0
@@ -1395,7 +1375,6 @@ class AdminTest extends TestBase {
         println()
     }
 
-
     def httpPortTitle() {
         int count = 0
         testStatus = false
@@ -1427,7 +1406,6 @@ class AdminTest extends TestBase {
         }
         println()
     }
-
 
     def internalPortTitle() {
         int count = 0
@@ -1461,7 +1439,6 @@ class AdminTest extends TestBase {
         println()
     }
 
-
     def zookeeperPortTitle() {
         int count = 0
         testStatus = false
@@ -1493,7 +1470,6 @@ class AdminTest extends TestBase {
         }
         println()
     }
-
 
     def replicationPortTitle() {
         int count = 0
@@ -1593,7 +1569,6 @@ class AdminTest extends TestBase {
 
     // HEADER TESTS
 
-
     def headerBanner() {
         when:
         at AdminPage
@@ -1601,14 +1576,12 @@ class AdminTest extends TestBase {
         waitFor(waitTime) { header.banner.isDisplayed() }
     }
 
-
     def headerImage() {
         when:
         at AdminPage
         then:
         waitFor(waitTime) { header.image.isDisplayed() }
     }
-
 
     def headerLogout() {
         when:'Check Security Enabled'
@@ -1629,7 +1602,6 @@ class AdminTest extends TestBase {
             waitFor(waitTime) { header.logout.isDisplayed() }
         }
     }
-
 
     def headerHelp() {
         when:
@@ -1663,7 +1635,6 @@ class AdminTest extends TestBase {
         }
     }
 
-
     def tabAdmin() {
         when:
         at AdminPage
@@ -1673,7 +1644,6 @@ class AdminTest extends TestBase {
             header.tabAdmin.text().toLowerCase().equals("Admin".toLowerCase())
         }
     }
-
 
     def tabSchema() {
         when:
@@ -1686,7 +1656,6 @@ class AdminTest extends TestBase {
         }
     }
 
-
     def tabSqlQuery() {
         when:
         at AdminPage
@@ -1695,7 +1664,6 @@ class AdminTest extends TestBase {
             header.tabSQLQuery.text().toLowerCase().equals("SQL Query".toLowerCase())
         }
     }
-
 
     def usernameIfEnabled() {
         when:'Check Security Enabled'
@@ -1715,7 +1683,6 @@ class AdminTest extends TestBase {
         }
     }
 
-
     def usernameClickAndClose() {
         when:
         at AdminPage
@@ -1729,7 +1696,6 @@ class AdminTest extends TestBase {
         }
         header.popupClose.click()
     }
-
 
     def headerUsernameClickAndCancel() {
         when:
@@ -1746,7 +1712,6 @@ class AdminTest extends TestBase {
     }
 
     // LOGOUT TEST
-
 
     def logoutButtonClose()  {
         when:'Check Security Enabled'
@@ -1769,7 +1734,6 @@ class AdminTest extends TestBase {
             header.popupClose.click()
         }
     }
-
 
     def logoutButtonCancel()  {
         when:'Check Security Enabled'
@@ -1794,7 +1758,6 @@ class AdminTest extends TestBase {
     }
 
     // HELP POPUP TEST
-
 
     def helpPopup() {
         when:
@@ -1824,14 +1787,12 @@ class AdminTest extends TestBase {
 
     // FOOTER TESTS
 
-
     def footer() {
         when:
         at AdminPage
         then:
         waitFor(waitTime) { footer.banner.isDisplayed() }
     }
-
 
     def footerText() {
         when:
@@ -1846,7 +1807,6 @@ class AdminTest extends TestBase {
 
     //download automation test
 
-
     def downloadConfiguration() {
         when:
         at AdminPage
@@ -1859,8 +1819,7 @@ class AdminTest extends TestBase {
 
     //CLUSTER
 
-
-    def "cluster title"(){
+    def clusterTitle() {
         when:
         at AdminPage
         waitFor(waitTime) { cluster.clusterTitle.isDisplayed() }
@@ -1868,16 +1827,14 @@ class AdminTest extends TestBase {
         cluster.clusterTitle.text().equals("Cluster")
     }
 
-
-    def "check promote button"(){
+    def checkPromoteButton() {
         when:
         at AdminPage
         then:
         waitFor(waitTime) { cluster.promotebutton.isDisplayed() }
     }
 
-
-    def "check pause cancel"(){
+    def checkPauseCancel() {
         boolean result = false
         int count = 0
         when:
@@ -1940,7 +1897,6 @@ class AdminTest extends TestBase {
         when:
         if (result == false) {
             println("Pause VMC")
-
             try {
                 page.cluster.pausebutton.click()
                 waitFor(waitTime) { page.cluster.pauseok.isDisplayed() }
@@ -1960,7 +1916,6 @@ class AdminTest extends TestBase {
         then:
         println()
     }
-
 
     def pauseAndResume(){
         boolean result = false
@@ -2085,7 +2040,6 @@ class AdminTest extends TestBase {
         println()
     }
 
-
     def saveAndCancelPopup(){
         when:
         at AdminPage
@@ -2096,7 +2050,6 @@ class AdminTest extends TestBase {
         cluster.saveconfirmation.text().toLowerCase().equals("Save".toLowerCase());
         cluster.savecancel.click()
     }
-
 
     def saveInEmptyPath(){
         String emptyPath = page.getEmptyPath()
@@ -2115,7 +2068,6 @@ class AdminTest extends TestBase {
         println("error message verified")
     }
 
-
     def saveForInvalidPath(){
         String invalidPath = page.getInvalidPath()
 
@@ -2133,7 +2085,6 @@ class AdminTest extends TestBase {
         println("error location for saving verified")
     }
 
-
     def saveSuccess(){
         String validPath = page.getValidPath()
         when:
@@ -2149,7 +2100,6 @@ class AdminTest extends TestBase {
         cluster.savesuccessok.click()
         println("save succeeded and clicked!!")
     }
-
 
     def restoreButtonClickAndCancelPopup(){
         String validPath = page.getValidPath()
@@ -2169,7 +2119,6 @@ class AdminTest extends TestBase {
         cluster.restorecancelbutton.click()
     }
 
-
     def restoreButtonClickAndClosePopup(){
         when:
         at AdminPage
@@ -2183,7 +2132,6 @@ class AdminTest extends TestBase {
         cluster.restoreconfirmation.text().toLowerCase().equals("Restore".toLowerCase())
         cluster.restoreclosebutton.click()
     }
-
 
     def restoreClickAndSearchFail(){
         String invalidPath = page.getInvalidPath()
@@ -2199,7 +2147,6 @@ class AdminTest extends TestBase {
         cluster.restoreconfirmation.text().toLowerCase().equals("Restore".toLowerCase())
     }
 
-
     def searchButtonClickInEmptyPathOfRestore(){
         String emptyPath = page.getEmptyPath()
         when:
@@ -2211,7 +2158,6 @@ class AdminTest extends TestBase {
         waitFor(waitTime) { cluster.restoreconfirmation.isDisplayed() }
         cluster.restoreconfirmation.text().toLowerCase().equals("Restore".toLowerCase())
     }
-
 
     def restoreClickAndVerifyRestorePopupForNo(){
         when:
@@ -2234,7 +2180,6 @@ class AdminTest extends TestBase {
         //  println("No clicked for restore popup")
         // waitFor(waitTime){cluster.restorecancelbutton.isDisplayed()}
         // cluster.restorecancelbutton.click()
-
     }
 
     def restoreClickAndRestoreForYes(){
@@ -2261,7 +2206,6 @@ class AdminTest extends TestBase {
         // println("ok clicked and message displayed after restoring")
     }
 
-
     def shutdownCancel(){
         when:
         at AdminPage
@@ -2284,10 +2228,9 @@ class AdminTest extends TestBase {
         cluster.shutdownclosebutton.click()
     }
 
-//server name list test
+    //server name list test
 
-    def "Check Cluster Status"() {
-
+    def checkClusterStatus() {
         when: 'clicked server button'
         at AdminPage
         page.serverbutton.isDisplayed()
@@ -2299,15 +2242,12 @@ class AdminTest extends TestBase {
             println("currently running server is : "+ page.servername.text())
         }
         try {
-
             if (!page.cluster.resumebutton.displayed) {
                 if (page.shutdownServerStop.displayed) {
                     println("Servers are stopped")
                 }
             }
-        }
-        catch(geb.error.RequiredPageContentNotPresent e)
-        {
+        } catch(geb.error.RequiredPageContentNotPresent e) {
             println("Resume button is not displayed")
         }
 
@@ -2318,18 +2258,14 @@ class AdminTest extends TestBase {
                 }
 
             }
-        }
-        catch(geb.error.RequiredPageContentNotPresent e)
-        {
+        } catch(geb.error.RequiredPageContentNotPresent e) {
             println("Resume button is displayed")
         }
     }
 
-
-
     // Overview Expansion
 
-    def "HTTP Access Expand:Check Text"() {
+    def httpAccessExpandCheckText() {
         when:
         page.overview.httpAccess.click()
         then:
@@ -2339,7 +2275,7 @@ class AdminTest extends TestBase {
         }
     }
 
-    def "Command Logging Expand:Check Text"() {
+    def commandLoggingExpandCheckText() {
         int count = 0
 
         when:
@@ -2364,11 +2300,9 @@ class AdminTest extends TestBase {
         }
     }
 
-
     //server setting
 
-    def "Check server setting and display its respective value"(){
-
+    def checkServerSettingAndDisplayItsRespectiveValue() {
         when:
         while(true){
             if(waitFor(waitTime){page.networkInterfaces.serverSettingTitle.isDisplayed()} && page.networkInterfaces.serverSettingTitle.text() !=""){
@@ -2376,7 +2310,6 @@ class AdminTest extends TestBase {
             }else println("Server setting title not displayed so not processing further")
             break;
         }
-
         then:
         if(page.networkInterfaces.serversettingclientvalue.text()==""){
             println("Client port value in server setting is empty")}
@@ -2401,7 +2334,6 @@ class AdminTest extends TestBase {
         if(page.networkInterfaces.serversettingreplicationvalue.text()==""){
             println("Replication port value in server setting is empty")}
         else{println("Replication port value in server setting is not empty, value:" +page.networkInterfaces.serversettingreplicationvalue.text())}
-
     }
 
     def cleanupSpec() {

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -153,7 +153,7 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         clustertransactionmax       { $("#visualisationTransaction > g > g > g.nv-x.nv-axis > g > g:nth-child(3) > text")}
 
         //partition idle graph
-        partitiongraphmin               { $("#visualisationPartitionIdleTime > g > g > g.nv-x.nv-axis > g > g:nth-child(2) > text")}
+        partitiongraphmin               (required: false) { $("#visualisationPartitionIdleTime > g > g > g.nv-x.nv-axis > g > g:nth-child(2) > text")}
         partitiongraphmax               { $("#visualisationPartitionIdleTime > g > g > g.nv-x.nv-axis > g > g:nth-child(3) > text")}
 
         //command log statistics graph
@@ -1274,4 +1274,41 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
 
         return result
     }
+
+    /*
+     *  openPartitionIdleGraph opens and checks the
+     *
+     */
+    def boolean openPartitionIdleGraph() {
+        openDisplayPreference()
+        preferencesTitleDisplayed()
+        savePreferencesBtnDisplayed()
+        popupCloseDisplayed()
+
+        partitionIdleTimeCheckboxDisplayed()
+        partitionIdleTimeCheckboxClick()
+        savePreferences()
+
+        if (partitionIdleTimeDisplayed())
+            return true
+        else
+            return false
+    }
+
+    def boolean closePartitionIdleGraph() {
+        openDisplayPreference()
+        preferencesTitleDisplayed()
+        savePreferencesBtnDisplayed()
+        popupCloseDisplayed()
+
+        partitionIdleTimeCheckboxDisplayed()
+        partitionIdleTimeCheckboxClick()
+        savePreferences()
+
+        if (partitionIdleTimeDisplayed())
+            return false
+        else
+            return true
+    }
+
 }

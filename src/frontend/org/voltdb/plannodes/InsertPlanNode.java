@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -83,7 +83,7 @@ public class InsertPlanNode extends AbstractOperationPlanNode {
     @Override
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
-        stringer.key(Members.MULTI_PARTITION.name()).value(m_multiPartition);
+        stringer.keySymbolValuePair(Members.MULTI_PARTITION.name(), m_multiPartition);
         stringer.key(Members.FIELD_MAP.name()).array();
         for (int i : m_fieldMap) {
             stringer.value(i);
@@ -91,11 +91,11 @@ public class InsertPlanNode extends AbstractOperationPlanNode {
         stringer.endArray();
 
         if (m_isUpsert) {
-            stringer.key(Members.UPSERT.name()).value(true);
+            stringer.keySymbolValuePair(Members.UPSERT.name(), true);
         }
 
         if (m_sourceIsPartitioned) {
-            stringer.key(Members.SOURCE_IS_PARTITIONED.name()).value(true);
+            stringer.keySymbolValuePair(Members.SOURCE_IS_PARTITIONED.name(), true);
         }
     }
 

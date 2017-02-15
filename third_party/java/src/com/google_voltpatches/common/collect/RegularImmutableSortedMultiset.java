@@ -18,10 +18,9 @@ import static com.google_voltpatches.common.base.Preconditions.checkNotNull;
 import static com.google_voltpatches.common.base.Preconditions.checkPositionIndexes;
 import static com.google_voltpatches.common.collect.BoundType.CLOSED;
 
+import com.google_voltpatches.common.annotations.GwtIncompatible;
 import com.google_voltpatches.common.primitives.Ints;
-
 import java.util.Comparator;
-
 import javax.annotation_voltpatches.Nullable;
 
 /**
@@ -30,8 +29,12 @@ import javax.annotation_voltpatches.Nullable;
  * @author Louis Wasserman
  */
 @SuppressWarnings("serial") // uses writeReplace, not default serialization
+@GwtIncompatible
 final class RegularImmutableSortedMultiset<E> extends ImmutableSortedMultiset<E> {
   private static final long[] ZERO_CUMULATIVE_COUNTS = {0};
+
+  static final ImmutableSortedMultiset<Comparable> NATURAL_EMPTY_MULTISET =
+      new RegularImmutableSortedMultiset<Comparable>(Ordering.natural());
 
   private final transient RegularImmutableSortedSet<E> elementSet;
   private final transient long[] cumulativeCounts;
@@ -107,8 +110,7 @@ final class RegularImmutableSortedMultiset<E> extends ImmutableSortedMultiset<E>
     } else if (from == 0 && to == length) {
       return this;
     } else {
-      RegularImmutableSortedSet<E> subElementSet =
-          (RegularImmutableSortedSet<E>) elementSet.getSubSet(from, to);
+      RegularImmutableSortedSet<E> subElementSet = elementSet.getSubSet(from, to);
       return new RegularImmutableSortedMultiset<E>(
           subElementSet, cumulativeCounts, offset + from, to - from);
     }

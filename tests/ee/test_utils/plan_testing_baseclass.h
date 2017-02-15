@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -49,6 +49,8 @@
 #include <string.h>
 #include "execution/VoltDBEngine.h"
 #include "common/ValueFactory.hpp"
+#include "common/SerializableEEException.h"
+
 #include "test_utils/LoadTableFrom.hpp"
 #include "test_utils/plan_testing_config.h"
 
@@ -137,7 +139,7 @@ public:
                              m_exception_buffer.get(), 4096);
         m_engine->resetReusedResultOutputBuffer();
         int partitionCount = 3;
-        ASSERT_TRUE(m_engine->initialize(this->m_cluster_id, this->m_site_id, 0, 0, "", 0, 1024, voltdb::DEFAULT_TEMP_TABLE_MEMORY, false));
+        m_engine->initialize(m_cluster_id, m_site_id, 0, 0, "", 0, 1024, voltdb::DEFAULT_TEMP_TABLE_MEMORY, false);
         m_engine->updateHashinator(voltdb::HASHINATOR_LEGACY, (char*)&partitionCount, NULL, 0);
         ASSERT_TRUE(m_engine->loadCatalog( -2, m_catalog_string));
 
@@ -336,7 +338,11 @@ public:
             // Execute the plan.  You'd think this would be more
             // impressive.
             //
-            m_engine->executePlanFragments(1, &fragmentId, NULL, emptyParams, 1000, 1000, 1000, 1000, 1);
+            try {
+                m_engine->executePlanFragments(1, &fragmentId, NULL, emptyParams, 1000, 1000, 1000, 1000, 1);
+            } catch (voltdb::SerializableEEException &ex) {
+                throw;
+            }
     }
 
     /**
@@ -356,7 +362,7 @@ public:
         const voltdb::TupleSchema* res_schema = result->schema();
         voltdb::TableTuple tuple(res_schema);
         voltdb::TableIterator &iter = result->iterator();
-        if (!iter.hasNext()) {
+        if (!iter.hasNext() && nRows > 0) {
             printf("No results!!\n");
             ASSERT_FALSE(true);
         }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -47,6 +47,7 @@ import org.voltdb.sysprocs.saverestore.CSVSnapshotWritePlan;
 import org.voltdb.sysprocs.saverestore.HashinatorSnapshotData;
 import org.voltdb.sysprocs.saverestore.IndexSnapshotWritePlan;
 import org.voltdb.sysprocs.saverestore.NativeSnapshotWritePlan;
+import org.voltdb.sysprocs.saverestore.SnapshotPathType;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.SnapshotWritePlan;
 import org.voltdb.sysprocs.saverestore.StreamSnapshotWritePlan;
@@ -54,7 +55,6 @@ import org.voltdb.sysprocs.saverestore.StreamSnapshotWritePlan;
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.collect.Sets;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
-import org.voltdb.sysprocs.saverestore.SnapshotPathType;
 
 /**
  * SnapshotSaveAPI extracts reusuable snapshot production code
@@ -115,7 +115,6 @@ public class SnapshotSaveAPI
     {
         TRACE_LOG.trace("Creating snapshot target and handing to EEs");
         final VoltTable result = SnapshotUtil.constructNodeResultsTable();
-        final int numLocalSites = context.getCluster().getDeployment().get("deployment").getSitesperhost();
         JSONObject jsData = null;
         if (data != null && !data.isEmpty()) {
             try {
@@ -174,7 +173,7 @@ public class SnapshotSaveAPI
                     m_allLocalSiteSnapshotDigestData = new ExtensibleSnapshotDigestData(
                             SnapshotSiteProcessor.getExportSequenceNumbers(),
                             SnapshotSiteProcessor.getDRTupleStreamStateInfo(),
-                            remoteDataCenterLastIds);
+                            remoteDataCenterLastIds, finalJsData);
                     createSetupIv2(
                             file_path,
                             pathType,
@@ -194,6 +193,7 @@ public class SnapshotSaveAPI
 
             // Create a barrier to use with the current number of sites to wait for
             // or if the barrier is already set up check if it is broken and reset if necessary
+            final int numLocalSites = context.getLocalSitesCount();
             SnapshotSiteProcessor.readySnapshotSetupBarriers(numLocalSites);
 
             //From within this EE, record the sequence numbers as of the start of the snapshot (now)
@@ -394,14 +394,14 @@ public class SnapshotSaveAPI
         try {
             JSONStringer stringer = new JSONStringer();
             stringer.object();
-            stringer.key("txnId").value(txnId);
-            stringer.key("isTruncation").value(isTruncation);
-            stringer.key("didSucceed").value(false);
-            stringer.key("hostCount").value(-1);
-            stringer.key(SnapshotUtil.JSON_PATH).value(path);
-            stringer.key(SnapshotUtil.JSON_PATH_TYPE).value(pathType);
-            stringer.key(SnapshotUtil.JSON_NONCE).value(nonce);
-            stringer.key("truncReqId").value(truncReqId);
+            stringer.keySymbolValuePair("txnId", txnId);
+            stringer.keySymbolValuePair("isTruncation", isTruncation);
+            stringer.keySymbolValuePair("didSucceed", false);
+            stringer.keySymbolValuePair("hostCount", -1);
+            stringer.keySymbolValuePair(SnapshotUtil.JSON_PATH, path);
+            stringer.keySymbolValuePair(SnapshotUtil.JSON_PATH_TYPE, pathType);
+            stringer.keySymbolValuePair(SnapshotUtil.JSON_NONCE, nonce);
+            stringer.keySymbolValuePair("truncReqId", truncReqId);
             stringer.key("exportSequenceNumbers").object().endObject();
             stringer.endObject();
             JSONObject jsonObj = new JSONObject(stringer.toString());

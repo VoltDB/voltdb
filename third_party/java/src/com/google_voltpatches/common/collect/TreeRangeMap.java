@@ -27,7 +27,6 @@ import com.google_voltpatches.common.annotations.GwtIncompatible;
 import com.google_voltpatches.common.base.MoreObjects;
 import com.google_voltpatches.common.base.Predicate;
 import com.google_voltpatches.common.collect.Maps.IteratorBasedAbstractMap;
-
 import java.util.AbstractMap;
 import java.util.Collection;
 import java.util.Collections;
@@ -38,7 +37,6 @@ import java.util.Map.Entry;
 import java.util.NavigableMap;
 import java.util.NoSuchElementException;
 import java.util.Set;
-
 import javax.annotation_voltpatches.Nullable;
 
 /**
@@ -52,7 +50,7 @@ import javax.annotation_voltpatches.Nullable;
  * @since 14.0
  */
 @Beta
-@GwtIncompatible("NavigableMap")
+@GwtIncompatible // NavigableMap
 public final class TreeRangeMap<K extends Comparable, V> implements RangeMap<K, V> {
 
   private final NavigableMap<Cut<K>, RangeMapEntry<K, V>> entriesByLowerBound;
@@ -299,7 +297,7 @@ public final class TreeRangeMap<K extends Comparable, V> implements RangeMap<K, 
         public void putAll(RangeMap rangeMap) {
           if (!rangeMap.asMapOfRanges().isEmpty()) {
             throw new IllegalArgumentException(
-                "Cannot putAll(nonEmptyRangeMap) into an empty " + "subRangeMap");
+                "Cannot putAll(nonEmptyRangeMap) into an empty subRangeMap");
           }
         }
 
@@ -448,7 +446,7 @@ public final class TreeRangeMap<K extends Comparable, V> implements RangeMap<K, 
 
             @Override
             protected Entry<Range<K>, V> computeNext() {
-              while (backingItr.hasNext()) {
+              if (backingItr.hasNext()) {
                 RangeMapEntry<K, V> entry = backingItr.next();
                 if (entry.getUpperBound().compareTo(subRange.lowerBound) <= 0) {
                   return endOfData();

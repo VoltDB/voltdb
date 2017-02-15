@@ -16,11 +16,12 @@
 /**
  * Hash functions and related structures.
  *
- * <p>See the Guava User Guide article on <a href=
- * "https://github.com/google/guava/wiki/HashingExplained">
- * hashing</a>.
+ * <p>See the Guava User Guide article on
+ * <a href="https://github.com/google/guava/wiki/HashingExplained">hashing</a>.
  */
+@CheckReturnValue
 @ParametersAreNonnullByDefault
 package com.google_voltpatches.common.hash;
 
+import javax.annotation_voltpatches.CheckReturnValue;
 import javax.annotation_voltpatches.ParametersAreNonnullByDefault;

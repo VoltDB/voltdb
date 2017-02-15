@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -493,12 +493,12 @@ public class AsyncBenchmark {
         timer.cancel();
 
         shutdown.set(true);
-
+        /* don't wait for a proper cleanup just go away the system may not be healthy -pr
         // block until all outstanding txns return
         for (Client client : clients) {
             client.drain();
             client.close();
-        }
+        }*/
 
         log.info(HORIZONTAL_RULE);
         log.info("Benchmark Complete");

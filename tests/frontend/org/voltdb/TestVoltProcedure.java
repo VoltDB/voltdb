@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -507,6 +507,15 @@ public class TestVoltProcedure extends TestCase {
             m_source = source;
             m_selector = selector;
             m_catalogId = catalogId;
+        }
+
+        @Override
+        public ProcedureStatsCollector registerProcedureStatsSource(long catalogId, ProcedureStatsCollector source) {
+            m_source = source;
+            m_selector = StatsSelector.PROCEDURE;
+            m_catalogId = catalogId;
+
+            return source;
         }
     }
 }

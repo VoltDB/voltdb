@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -20,10 +20,8 @@ package org.voltdb.planner;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.catalog.Database;
@@ -364,24 +362,6 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
         return ! m_orderColumns.isEmpty();
     }
 
-    @Override
-    public List<StmtSubqueryScan> findAllFromSubqueries() {
-        List<StmtSubqueryScan> subqueries = new ArrayList<StmtSubqueryScan>();
-        for (AbstractParsedStmt childStmt : m_children) {
-            subqueries.addAll(childStmt.findAllFromSubqueries());
-        }
-        return subqueries;
-    }
-
-    @Override
-    public Set<AbstractExpression> findAllSubexpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
-        Set<AbstractExpression> exprs = new HashSet<AbstractExpression>();
-        for (AbstractParsedStmt childStmt : m_children) {
-            exprs.addAll(childStmt.findAllSubexpressionsOfClass(aeClass));
-        }
-        return exprs;
-    }
-
     /**
      * Break up UNION/INTERSECT (ALL) set ops into individual selects that are part
      * of the IN/EXISTS subquery into multiple expressions for each set op child
@@ -443,7 +423,7 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
             }
             newExpr.setExpressionType(expr.getExpressionType());
             if (ExpressionType.COMPARE_EQUAL == expr.getExpressionType()) {
-                newExpr.setLeft((AbstractExpression) expr.getLeft().clone());
+                newExpr.setLeft(expr.getLeft().clone());
                 newExpr.setRight(childSubqueryExpr);
                 assert(newExpr instanceof ComparisonExpression);
                 ((ComparisonExpression)newExpr).setQuantifier(((ComparisonExpression)expr).getQuantifier());

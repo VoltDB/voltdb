@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -26,7 +26,6 @@ package org.voltdb.utils;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
-import static org.voltdb.VoltDB.CONFIG_DIR;
 
 import java.io.BufferedWriter;
 import java.io.File;
@@ -49,20 +48,23 @@ import java.util.zip.ZipFile;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.BackendTarget;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
+import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.regressionsuites.JUnit4LocalClusterTest;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb_testprocs.regressionsuites.failureprocs.CrashJVM;
 import org.voltdb_testprocs.regressionsuites.failureprocs.CrashVoltDBProc;
 
 import com.google_voltpatches.common.base.Charsets;
 
-public class TestCollector {
+public class TestCollector extends JUnit4LocalClusterTest {
     private static final int STARTUP_DELAY = 3000;
     VoltProjectBuilder builder;
     LocalCluster cluster;
@@ -106,6 +108,12 @@ public class TestCollector {
         client.createConnection(listener);
     }
 
+    @After
+    public void tearDown() throws Exception {
+        client.close();
+        cluster.shutDown();
+    }
+
     private ZipFile collect(String voltDbRootPath, boolean skipHeapDump, int days) throws Exception {
         if(resetCurrentTime) {
             Collector.m_currentTimeMillis = System.currentTimeMillis();
@@ -130,7 +138,7 @@ public class TestCollector {
     }
 
     private int getpid(String voltDbRootPath) throws Exception {
-        File configLogDir = new File(voltDbRootPath, CONFIG_DIR);
+        File configLogDir = new File(voltDbRootPath, Constants.CONFIG_DIR);
         File configInfo = new File(configLogDir, "config.json");
 
         JSONObject jsonObject = Collector.parseJSONFile(configInfo.getCanonicalPath());
@@ -139,7 +147,7 @@ public class TestCollector {
         return pid;
     }
     private String getWorkingDir(String voltDbRootPath) throws Exception {
-        File configLogDir = new File(voltDbRootPath, CONFIG_DIR);
+        File configLogDir = new File(voltDbRootPath, Constants.CONFIG_DIR);
         File configInfo = new File(configLogDir, "config.json");
 
         JSONObject jsonObject = Collector.parseJSONFile(configInfo.getCanonicalPath());
@@ -149,7 +157,7 @@ public class TestCollector {
     }
 
     private List<String> getLogPaths(String voltDbRootPath) throws Exception {
-        File configLogDir = new File(voltDbRootPath, CONFIG_DIR);
+        File configLogDir = new File(voltDbRootPath, Constants.CONFIG_DIR);
         File configInfo = new File(configLogDir, "config.json");
         JSONObject jsonObject = Collector.parseJSONFile(configInfo.getCanonicalPath());
         List<String> logPaths = new ArrayList<String>();
@@ -164,7 +172,7 @@ public class TestCollector {
     private void createLogFiles() throws Exception {
 
         try {
-           String configInfoPath = voltDbRootPath + File.separator + CONFIG_DIR + File.separator + "config.json";;
+           String configInfoPath = voltDbRootPath + File.separator + Constants.CONFIG_DIR + File.separator + "config.json";;
            JSONObject jsonObject= Collector.parseJSONFile(configInfoPath);
            JSONArray jsonArray = jsonObject.getJSONArray("log4jDst");
 

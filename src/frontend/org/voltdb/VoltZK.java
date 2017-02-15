@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -113,9 +113,6 @@ public class VoltZK {
     public static final String rejoinActiveBlocker = ZKUtil.joinZKPath(catalogUpdateBlockers, "rejoin_blocker");
     public static final String request_truncation_snapshot_node = ZKUtil.joinZKPath(request_truncation_snapshot, "request_");
 
-    // root for rejoin nodes
-    public static final String rejoinNodeBlocker = "/db/rejoin_nodes_blocker";
-
     // Synchronized State Machine
     public static final String syncStateMachine = "/db/synchronized_states";
 
@@ -124,6 +121,9 @@ public class VoltZK {
 
     // Cluster settings
     public static final String cluster_settings = ZKUtil.joinZKPath(settings_base, "cluster");
+
+    // Shutdown save snapshot guard
+    public static final String shutdown_save_guard = "/db/shutdown_save_guard";
 
     // Persistent nodes (mostly directories) to create on startup
     public static final String[] ZK_HIERARCHY = {
@@ -224,6 +224,25 @@ public class VoltZK {
             try {
                clusterMetadata.put( hostId, new String(cb.getData(), "UTF-8"));
             } catch (KeeperException.NoNodeException e){}
+        }
+    }
+
+    public static Pair<String, Integer> getDRInterfaceAndPortFromMetadata(String metadata)
+    throws IllegalArgumentException {
+        try {
+            JSONObject obj = new JSONObject(metadata);
+            //Pick drInterface if specified...it will be empty if none specified.
+            //we should pick then from the "interfaces" array and use 0th element.
+            String hostName = obj.getString("drInterface");
+            if (hostName == null || hostName.length() <= 0) {
+                hostName = obj.getJSONArray("interfaces").getString(0);
+            }
+            assert(hostName != null);
+            assert(hostName.length() > 0);
+
+            return Pair.of(hostName, obj.getInt("drPort"));
+        } catch (JSONException e) {
+            throw new IllegalArgumentException("Error parsing host metadata", e);
         }
     }
 

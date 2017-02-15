@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -167,7 +167,7 @@ public class StandaloneExportGeneration implements Generation {
      *
      */
     @Override
-    public void kickOffLeaderElection() {
+    public void kickOffLeaderElection(final HostMessenger ignored) {
         for (Map<String, ExportDataSource> sources : getDataSourceByPartition().values()) {
 
             for (final ExportDataSource source : sources.values()) {
@@ -305,7 +305,7 @@ public class StandaloneExportGeneration implements Generation {
     }
 
     @Override
-    public void close() {
+    public void close(final HostMessenger messenger) {
         List<ListenableFuture<?>> tasks = new ArrayList<ListenableFuture<?>>();
         for (Map<String, ExportDataSource> sources : m_dataSourcesByPartition.values()) {
             for (ExportDataSource source : sources.values()) {

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -20,11 +20,15 @@ package org.voltdb;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
+import java.util.Map;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.UUID;
 
+import org.apache.zookeeper_voltpatches.KeeperException;
+import org.json_voltpatches.JSONException;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.messaging.HostMessenger;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
@@ -36,11 +40,11 @@ import org.voltdb.catalog.Table;
 import org.voltdb.compiler.PlannerTool;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.settings.ClusterSettings;
+import org.voltdb.settings.DbSettings;
+import org.voltdb.settings.NodeSettings;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.VoltFile;
-
-import com.google_voltpatches.common.base.Supplier;
 
 public class CatalogContext {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
@@ -77,6 +81,7 @@ public class CatalogContext {
     // The DPM knows which default procs COULD EXIST
     //  and also how to get SQL for them.
     public final DefaultProcedureManager m_defaultProcs;
+    public final HostMessenger m_messenger;
 
     /*
      * Planner associated with this catalog version.
@@ -90,18 +95,19 @@ public class CatalogContext {
     // Some people may be interested in the JAXB rather than the raw deployment bytes.
     private DeploymentType m_memoizedDeployment;
 
-    // cluster settings
-    private final Supplier<ClusterSettings> m_clusterSettings;
+    // database settings. contains both cluster and path settings
+    private final DbSettings m_dbSettings;
 
     public CatalogContext(
             long transactionId,
             long uniqueId,
             Catalog catalog,
-            Supplier<ClusterSettings> settings,
+            DbSettings settings,
             byte[] catalogBytes,
             byte[] catalogBytesHash,
             byte[] deploymentBytes,
-            int version)
+            int version,
+            HostMessenger messenger)
     {
         m_transactionId = transactionId;
         m_uniqueId = uniqueId;
@@ -146,7 +152,7 @@ public class CatalogContext {
         tables = database.getTables();
         authSystem = new AuthSystem(database, cluster.getSecurityenabled());
 
-        this.m_clusterSettings = settings;
+        this.m_dbSettings = settings;
 
         this.deploymentBytes = deploymentBytes;
         this.deploymentHash = CatalogUtil.makeDeploymentHash(deploymentBytes);
@@ -158,6 +164,7 @@ public class CatalogContext {
         m_jdbc = new JdbcDatabaseMetaDataGenerator(catalog, m_defaultProcs, m_jarfile);
         m_ptool = new PlannerTool(cluster, database, catalogHash);
         catalogVersion = version;
+        m_messenger = messenger;
 
         if (procedures != null) {
             for (Procedure proc : procedures) {
@@ -174,7 +181,11 @@ public class CatalogContext {
     }
 
     public ClusterSettings getClusterSettings() {
-        return m_clusterSettings.get();
+        return m_dbSettings.getCluster();
+    }
+
+    public NodeSettings getNodeSettings() {
+        return m_dbSettings.getNodeSetting();
     }
 
     public CatalogContext update(
@@ -184,7 +195,8 @@ public class CatalogContext {
             byte[] catalogBytesHash,
             String diffCommands,
             boolean incrementVersion,
-            byte[] deploymentBytes)
+            byte[] deploymentBytes,
+            HostMessenger messenger)
     {
         Catalog newCatalog = catalog.deepCopy();
         newCatalog.execute(diffCommands);
@@ -210,11 +222,12 @@ public class CatalogContext {
                     txnId,
                     uniqueId,
                     newCatalog,
-                    this.m_clusterSettings,
+                    this.m_dbSettings,
                     bytes,
                     catalogBytesHash,
                     depbytes,
-                    catalogVersion + incValue);
+                    catalogVersion + incValue,
+                    messenger);
         return retval;
     }
 
@@ -309,22 +322,40 @@ public class CatalogContext {
 
         // topology
         Deployment deployment = cluster.getDeployment().iterator().next();
-        int hostCount = m_clusterSettings.get().hostcount();
-        int sitesPerHost = deployment.getSitesperhost();
+        int hostCount = m_dbSettings.getCluster().hostcount();
+        Map<Integer, Integer> sphMap;
+        try {
+            sphMap = m_messenger.getSitesPerHostMapFromZK();
+        } catch (KeeperException | InterruptedException | JSONException e) {
+            hostLog.warn("Failed to get sitesperhost information from Zookeeper", e);
+            sphMap = null;
+        }
         int kFactor = deployment.getKfactor();
-        logLines.put("deployment1",
-                String.format("Cluster has %d hosts with leader hostname: \"%s\". %d sites per host. K = %d.",
-                hostCount, VoltDB.instance().getConfig().m_leader, sitesPerHost, kFactor));
+        if (sphMap == null) {
+            logLines.put("deployment1",
+                    String.format("Cluster has %d hosts with leader hostname: \"%s\". [unknown] local sites count. K = %d.",
+                            hostCount, VoltDB.instance().getConfig().m_leader, kFactor));
+            logLines.put("deployment2", "Unable to retrieve partition information from the cluster.");
+        } else {
+            int localSitesCount = sphMap.get(m_messenger.getHostId());
+            logLines.put("deployment1",
+                    String.format("Cluster has %d hosts with leader hostname: \"%s\". %d local sites count. K = %d.",
+                            hostCount, VoltDB.instance().getConfig().m_leader, localSitesCount, kFactor));
 
-        int replicas = kFactor + 1;
-        int partitionCount = sitesPerHost * hostCount / replicas;
-        logLines.put("deployment2",
-                String.format("The entire cluster has %d %s of%s %d logical partition%s.",
-                replicas,
-                replicas > 1 ? "copies" : "copy",
-                partitionCount > 1 ? " each of the" : "",
-                partitionCount,
-                partitionCount > 1 ? "s" : ""));
+            int totalSitesCount = 0;
+            for (Map.Entry<Integer, Integer> e : sphMap.entrySet()) {
+                totalSitesCount += e.getValue();
+            }
+            int replicas = kFactor + 1;
+            int partitionCount = totalSitesCount / replicas;
+            logLines.put("deployment2",
+                    String.format("The entire cluster has %d %s of%s %d logical partition%s.",
+                            replicas,
+                            replicas > 1 ? "copies" : "copy",
+                                    partitionCount > 1 ? " each of the" : "",
+                                            partitionCount,
+                                            partitionCount > 1 ? "s" : ""));
+        }
 
         // voltdb root
         logLines.put("voltdbroot", "Using \"" + VoltDB.instance().getVoltDBRootPath() + "\" for voltdbroot directory.");
@@ -381,5 +412,9 @@ public class CatalogContext {
     public byte[] getCatalogHash()
     {
         return catalogHash;
+    }
+
+    public InMemoryJarfile getCatalogJar() {
+        return m_jarfile;
     }
 }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -19,6 +19,11 @@ package org.voltdb;
 
 import org.voltdb.compiler.deploymentfile.ReadlevelType;
 
+/**
+ * Note: A shortcut read (FAST) is a read operation sent to any replica and completed with no
+ * confirmation or communication with other replicas. In a partition scenario, it's
+ * possible to read an unconfirmed transaction's writes that will be lost.
+ */
 public abstract class Consistency {
 
     public enum ReadLevel {

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -20,19 +20,24 @@ package org.voltdb.sysprocs;
 import java.io.File;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 
 import org.apache.log4j.Logger;
 import org.apache.log4j.net.SocketHubAppender;
+import org.apache.zookeeper_voltpatches.KeeperException;
+import org.apache.zookeeper_voltpatches.data.Stat;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.common.Constants;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.zk.CoreZK;
 import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
@@ -53,6 +58,7 @@ import org.voltdb.catalog.Systemsettings;
 import org.voltdb.catalog.User;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.settings.ClusterSettings;
+import org.voltdb.settings.NodeSettings;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltTableUtil;
@@ -129,7 +135,8 @@ public class SystemInformation extends VoltSystemProcedure
             // All other sites should just return empty results tables.
             if (context.isLowestSiteId())
             {
-                result = populateDeploymentProperties(context.getCluster(), context.getDatabase(), m_settings);
+                result = populateDeploymentProperties(context.getCluster(),
+                        context.getDatabase(), m_clusterSettings, m_nodeSettings);
             }
             else
             {
@@ -444,12 +451,29 @@ public class SystemInformation extends VoltSystemProcedure
         if (MiscUtils.isPro()) {
             vt.addRow(hostId, "LICENSE", VoltDB.instance().getLicenseInformation());
         }
-
+        populatePartitionGroups(hostId, vt);
         return vt;
     }
 
+    private static void populatePartitionGroups(Integer hostId, VoltTable vt) {
+        try {
+            byte[]  bytes = VoltDB.instance().getHostMessenger().getZK().getData(CoreZK.hosts_host + hostId, false, new Stat());
+            String hostInfo = new String(bytes, StandardCharsets.UTF_8);
+            JSONObject obj = new JSONObject(hostInfo);
+            vt.addRow(hostId, "PLACEMENTGROUP",obj.getString("group"));
+        } catch (KeeperException | InterruptedException | JSONException e) {
+            vt.addRow(hostId, "PLACEMENTGROUP","NULL");
+        }
+        Set<Integer> buddies = VoltDB.instance().getCartograhper().getHostIdsWithinPartitionGroup(hostId);
+        String[] strIds = buddies.stream().sorted().map(i -> String.valueOf(i)).toArray(String[]::new);
+        vt.addRow(hostId, "PARTITIONGROUP",String.join(",", strIds));
+    }
+
     static public VoltTable populateDeploymentProperties(
-            Cluster cluster, Database database, ClusterSettings clusterSettings)
+            Cluster cluster,
+            Database database,
+            ClusterSettings clusterSettings,
+            NodeSettings nodeSettings)
     {
         VoltTable results = new VoltTable(clusterInfoSchema);
         // it would be awesome if these property names could come
@@ -459,7 +483,7 @@ public class SystemInformation extends VoltSystemProcedure
         Deployment deploy = cluster.getDeployment().get("deployment");
         results.addRow("hostcount", Integer.toString(clusterSettings.hostcount()));
         results.addRow("kfactor", Integer.toString(deploy.getKfactor()));
-        results.addRow("sitesperhost", Integer.toString(deploy.getSitesperhost()));
+        results.addRow("sitesperhost", Integer.toString(nodeSettings.getLocalSitesCount()));
 
         String http_enabled = "false";
         int http_port = VoltDB.instance().getConfig().m_httpPort;
@@ -502,25 +526,11 @@ public class SystemInformation extends VoltSystemProcedure
         if (cluster.getNetworkpartition())
         {
             partition_detect_enabled = "true";
-            String partition_detect_snapshot_path = VoltDB.instance().getSnapshotPath();
-            String partition_detect_snapshot_prefix =
-                cluster.getFaultsnapshots().get("CLUSTER_PARTITION").getPrefix();
-            results.addRow("snapshotpath",
-                           partition_detect_snapshot_path);
-            results.addRow("partitiondetectionsnapshotprefix",
-                           partition_detect_snapshot_prefix);
         }
         results.addRow("partitiondetection", partition_detect_enabled);
 
         results.addRow("heartbeattimeout", Integer.toString(cluster.getHeartbeattimeout()));
-
         results.addRow("adminport", Integer.toString(VoltDB.instance().getConfig().m_adminPort));
-        String adminstartup = "false";
-        if (cluster.getAdminstartup())
-        {
-            adminstartup = "true";
-        }
-        results.addRow("adminstartup", adminstartup);
 
         String command_log_enabled = "false";
         // log name is MAGIC, you knoooow

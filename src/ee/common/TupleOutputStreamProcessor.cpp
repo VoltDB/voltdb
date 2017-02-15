@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,7 +17,6 @@
 
 #include "TupleOutputStream.h"
 #include "TupleOutputStreamProcessor.h"
-#include "TupleSerializer.h"
 #include "tabletuple.h"
 #include <limits>
 
@@ -96,9 +95,7 @@ void TupleOutputStreamProcessor::close()
  * Expects buffer space was already checked.
  * Returns true when the caller should yield to allow other work to proceed.
  */
-bool TupleOutputStreamProcessor::writeRow(TupleSerializer &tupleSerializer,
-                                          TableTuple &tuple,
-                                          bool *deleteRow)
+bool TupleOutputStreamProcessor::writeRow(TableTuple &tuple, bool *deleteRow)
 {
     if (m_table == NULL) {
         throwFatalException("TupleOutputStreamProcessor::writeRow() was called before open().");
@@ -138,7 +135,7 @@ bool TupleOutputStreamProcessor::writeRow(TupleSerializer &tupleSerializer,
                 throwFatalException(
                     "TupleOutputStreamProcessor::writeRow() failed because buffer has no space.");
             }
-            iter->writeRow(tupleSerializer, tuple);
+            iter->writeRow(tuple);
 
             // Check if we'll need to yield after handling this row.
             if (!yield) {

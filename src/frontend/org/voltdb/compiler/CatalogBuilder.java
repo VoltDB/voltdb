@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -33,7 +33,6 @@ import java.util.List;
 import java.util.Map;
 
 import org.voltdb.ProcInfoData;
-import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.NotImplementedException;
 
@@ -46,7 +45,7 @@ import org.voltdb.utils.NotImplementedException;
  */
 public class CatalogBuilder {
 
-    final LinkedHashSet<String> m_schemas = new LinkedHashSet<String>();
+    final LinkedHashSet<String> m_schemas = new LinkedHashSet<>();
     private StringBuffer transformer = new StringBuffer();
 
     public static final class ProcedureInfo {
@@ -111,12 +110,12 @@ public class CatalogBuilder {
         }
     }
 
-    final LinkedHashSet<Class<?>> m_supplementals = new LinkedHashSet<Class<?>>();
+    final LinkedHashSet<Class<?>> m_supplementals = new LinkedHashSet<>();
 
     List<String> m_elAuthGroups;      // authorized groups
 
     PrintStream m_compilerDebugPrintStream = null;
-    final Map<String, ProcInfoData> m_procInfoOverrides = new HashMap<String, ProcInfoData>();
+    final Map<String, ProcInfoData> m_procInfoOverrides = new HashMap<>();
 
     private List<String> m_diagnostics;
 
@@ -196,7 +195,7 @@ public class CatalogBuilder {
     }
 
     public void addProcedures(final Class<?>... procedures) {
-        final ArrayList<ProcedureInfo> procArray = new ArrayList<ProcedureInfo>();
+        final ArrayList<ProcedureInfo> procArray = new ArrayList<>();
         for (final Class<?> procedure : procedures)
             procArray.add(new ProcedureInfo(new String[0], procedure));
         addProcedures(procArray);
@@ -206,7 +205,7 @@ public class CatalogBuilder {
      * List of roles permitted to invoke the procedure
      */
     public void addProcedures(final ProcedureInfo... procedures) {
-        final ArrayList<ProcedureInfo> procArray = new ArrayList<ProcedureInfo>();
+        final ArrayList<ProcedureInfo> procArray = new ArrayList<>();
         for (final ProcedureInfo procedure : procedures)
             procArray.add(procedure);
         addProcedures(procArray);
@@ -214,7 +213,7 @@ public class CatalogBuilder {
 
     public void addProcedures(final Iterable<ProcedureInfo> procedures) {
         // check for duplicates and existings
-        final HashSet<ProcedureInfo> newProcs = new HashSet<ProcedureInfo>();
+        final HashSet<ProcedureInfo> newProcs = new HashSet<>();
         for (final ProcedureInfo procedure : procedures) {
             assert(newProcs.contains(procedure) == false);
             newProcs.add(procedure);
@@ -254,7 +253,7 @@ public class CatalogBuilder {
     }
 
     public void addSupplementalClasses(final Class<?>... supplementals) {
-        final ArrayList<Class<?>> suppArray = new ArrayList<Class<?>>();
+        final ArrayList<Class<?>> suppArray = new ArrayList<>();
         for (final Class<?> supplemental : supplementals)
             suppArray.add(supplemental);
         addSupplementalClasses(suppArray);
@@ -262,7 +261,7 @@ public class CatalogBuilder {
 
     public void addSupplementalClasses(final Iterable<Class<?>> supplementals) {
         // check for duplicates and existings
-        final HashSet<Class<?>> newSupps = new HashSet<Class<?>>();
+        final HashSet<Class<?>> newSupps = new HashSet<>();
         for (final Class<?> supplemental : supplementals) {
             assert(newSupps.contains(supplemental) == false);
             assert(m_supplementals.contains(supplemental) == false);
@@ -276,11 +275,6 @@ public class CatalogBuilder {
 
     public void addPartitionInfo(final String tableName, final String partitionColumnName) {
         transformer.append("PARTITION TABLE " + tableName + " ON COLUMN " + partitionColumnName + ";");
-    }
-
-    public void setTableAsExportOnly(String name) {
-        assert(name != null);
-        transformer.append("Export TABLE " + name + ";");
     }
 
     public void addExport(List<String> groups) {
@@ -308,7 +302,7 @@ public class CatalogBuilder {
         try {
             File jarFile = File.createTempFile("catalogasbytes", ".jar");
 
-            if (!compile(new VoltCompiler(), jarFile.getAbsolutePath())) {
+            if (!compile(new VoltCompiler(false), jarFile.getAbsolutePath())) {
                 return null;
             }
             return MiscUtils.fileToBytes(jarFile);
@@ -319,7 +313,7 @@ public class CatalogBuilder {
     }
 
     public boolean compile(final String jarPath) {
-        return compile(new VoltCompiler(), jarPath);
+        return compile(new VoltCompiler(false), jarPath);
     }
 
     public boolean compile(final VoltCompiler compiler,
@@ -343,13 +337,7 @@ public class CatalogBuilder {
             compiler.enableDetailedCapture();
         }
 
-        boolean success = false;
-        try {
-            success = compiler.compileFromDDL(jarPath, schemaPath);
-        } catch (VoltCompilerException e1) {
-            e1.printStackTrace();
-            return false;
-        }
+        boolean success = compiler.compileFromDDL(jarPath, schemaPath);
 
         m_diagnostics = compiler.harvestCapturedDetail();
         if (m_compilerDebugPrintStream != null) {
@@ -393,7 +381,7 @@ public class CatalogBuilder {
     public void enableDiagnostics() {
         // This empty dummy value enables the feature and provides a default fallback return value,
         // but gets replaced in the normal code path.
-        m_diagnostics = new ArrayList<String>();
+        m_diagnostics = new ArrayList<>();
     }
 
     /** Access the VoltCompiler's recent plan output, for diagnostic purposes */

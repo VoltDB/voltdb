@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -48,7 +48,7 @@ public class TestDDLSource extends TestCase{
             ddlWriter = new PrintWriter(ddlName);
             ddlWriter.println(ddl);
             ddlWriter.close();
-            VoltCompiler vc = new VoltCompiler(true); // trick it into behaving like standalone
+            VoltCompiler vc = new VoltCompiler(true, false); // trick it into behaving like standalone
             boolean success = vc.compileFromDDL(jarName, ddlName);
             assertTrue("Catalog compilation failed!", success);
             report = new String(Files.readAllBytes(Paths.get("catalog-report.html")), Charsets.UTF_8);

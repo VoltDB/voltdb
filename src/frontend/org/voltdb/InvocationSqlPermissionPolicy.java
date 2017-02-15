@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -38,13 +38,13 @@ public class InvocationSqlPermissionPolicy extends InvocationPermissionPolicy {
      */
     @Override
     public PolicyResult shouldAccept(AuthUser user, StoredProcedureInvocation invocation, Procedure proc) {
-        if (proc.getSystemproc() && invocation.procName.startsWith("@AdHoc_RW")) {
+        if (proc.getSystemproc() && invocation.getProcName().startsWith("@AdHoc_RW")) {
             if (user.hasPermission(Permission.SQL)) {
                 return PolicyResult.ALLOW;
             }
             return PolicyResult.DENY;
         }
-        if (proc.getSystemproc() && invocation.procName.startsWith("@AdHoc")) {
+        if (proc.getSystemproc() && invocation.getProcName().startsWith("@AdHoc")) {
             if (user.hasPermission(Permission.SQLREAD)) {
                 return PolicyResult.ALLOW;
             }

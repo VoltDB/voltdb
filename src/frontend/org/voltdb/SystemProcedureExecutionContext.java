@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -26,15 +26,23 @@ import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.dtxn.SiteTracker;
+import org.voltdb.settings.ClusterSettings;
+import org.voltdb.settings.NodeSettings;
 
 public interface SystemProcedureExecutionContext {
     public Database getDatabase();
 
     public Cluster getCluster();
 
+    public ClusterSettings getClusterSettings();
+
+    public NodeSettings getPaths();
+
     public long getSpHandleForSnapshotDigest();
 
     public long getSiteId();
+
+    public int getLocalSitesCount();
 
     // does this site have "lowest site id" responsibilities.
     public boolean isLowestSiteId();
@@ -86,8 +94,8 @@ public interface SystemProcedureExecutionContext {
 
     public void forceAllDRNodeBuffersToDisk(final boolean nofsync);
 
-    public byte isExpectedApplyBinaryLog(int producerClusterId, int producerPartitionId,
-                                         long lastReceivedDRId);
+    public DRIdempotencyResult isExpectedApplyBinaryLog(int producerClusterId, int producerPartitionId,
+                                                        long lastReceivedDRId);
 
     public void appendApplyBinaryLogTxns(int producerClusterId, int producerPartitionId,
                                          long localUniqueId, DRConsumerDrIdTracker tracker);
@@ -95,6 +103,8 @@ public interface SystemProcedureExecutionContext {
     public void recoverWithDrAppliedTrackers(Map<Integer, Map<Integer, DRConsumerDrIdTracker>> trackers);
 
     public void resetDrAppliedTracker();
+
+    public void initDRAppliedTracker(Map<Byte, Integer> clusterIdToPartitionCountMap);
 
     public Map<Integer, Map<Integer, DRConsumerDrIdTracker>> getDrAppliedTrackers();
 

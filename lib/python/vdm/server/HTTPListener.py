@@ -1,5 +1,5 @@
 # This file is part of VoltDB.
-# Copyright (C) 2008-2016 VoltDB Inc.
+# Copyright (C) 2008-2017 VoltDB Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -44,6 +44,7 @@ from flask_logging import Filter
 import Configuration
 import signal
 import thread
+
 
 filter_log = Filter('/api/1.0/', 'GET')
 
@@ -167,12 +168,6 @@ def map_deployment(request, database_id):
     if 'cluster' in request.json and 'kfactor' in request.json['cluster']:
         deployment['cluster']['kfactor'] = request.json['cluster']['kfactor']
 
-    if 'admin-mode' in request.json and 'adminstartup' in request.json['admin-mode']:
-        deployment['admin-mode']['adminstartup'] = request.json['admin-mode']['adminstartup']
-
-    if 'admin-mode' in request.json and 'port' in request.json['admin-mode']:
-        deployment['admin-mode']['port'] = request.json['admin-mode']['port']
-
     if 'commandlog' in request.json and 'adminstartup' in request.json['commandlog']:
         deployment['commandlog']['adminstartup'] = request.json['commandlog']['adminstartup']
 
@@ -209,11 +204,6 @@ def map_deployment(request, database_id):
 
     if 'partition-detection' in request.json and 'enabled' in request.json['partition-detection']:
         deployment['partition-detection']['enabled'] = request.json['partition-detection']['enabled']
-
-    if 'partition-detection' in request.json and 'snapshot' in request.json['partition-detection'] \
-            and 'prefix' in request.json['partition-detection']['snapshot']:
-        deployment['partition-detection']['snapshot']['prefix'] = \
-            request.json['partition-detection']['snapshot']['prefix']
 
     if 'paths' in request.json and 'commandlog' in request.json['paths'] and \
                     'path' in request.json['paths']['commandlog']:
@@ -450,6 +440,51 @@ def map_deployment(request, database_id):
                 else:
                     deployment['dr']['port'] = None
 
+    if 'snmp' in request.json:
+        if request.json['snmp']:
+            if 'snmp' not in deployment or ('snmp' in deployment and not deployment['snmp']):
+                deployment['snmp'] = {}
+
+            if 'enabled' in request.json['snmp'] and request.json['snmp']['enabled'] != '':
+                deployment['snmp']['enabled'] = request.json['snmp']['enabled']
+            else:
+                deployment['snmp']['enabled'] = True
+
+            if 'target' in request.json['snmp']:
+                deployment['snmp']['target'] = request.json['snmp']['target']
+
+            if 'community' in request.json['snmp']:
+                deployment['snmp']['community'] = request.json['snmp']['community']
+            else:
+                deployment['snmp']['community'] = 'public'
+
+            if 'username' in request.json['snmp']:
+                deployment['snmp']['username'] = request.json['snmp']['username']
+            else:
+                deployment['snmp']['username'] = None
+
+            if 'authprotocol' in request.json['snmp']:
+                deployment['snmp']['authprotocol'] = request.json['snmp']['authprotocol']
+            else:
+                deployment['snmp']['authprotocol'] = 'SHA'
+
+            if 'authkey' in request.json['snmp']:
+                deployment['snmp']['authkey'] = request.json['snmp']['authkey']
+            else:
+                deployment['snmp']['authkey'] = 'voltdbauthkey'
+
+            if 'privacyprotocol' in request.json['snmp']:
+                deployment['snmp']['privacyprotocol'] = request.json['snmp']['privacyprotocol']
+            else:
+                deployment['snmp']['privacyprotocol'] = 'AES'
+
+            if 'privacykey' in request.json['snmp']:
+                deployment['snmp']['privacykey'] = request.json['snmp']['privacykey']
+            else:
+                deployment['snmp']['privacykey'] = 'voltdbprivacykey'
+        else:
+            deployment['snmp'] = None
+
     return deployment
 
 
@@ -667,6 +702,7 @@ class Global:
     MODULE_PATH = ''
     DELETED_HOSTNAME = ''
     VOLT_SERVER_PATH = ''
+    DEFAULT_PATH = []
 
 
 class ServerAPI(MethodView):
@@ -758,7 +794,13 @@ class ServerAPI(MethodView):
             'internal-listener': request.json.get('internal-listener', "").strip().lstrip("0"),
             'http-listener': request.json.get('http-listener', "").strip().lstrip("0"),
             'placement-group': request.json.get('placement-group', "").strip(),
-            'isAdded': False
+            'isAdded': False,
+            'voltdbroot': request.json.get('voltdbroot', "").strip(),
+            'snapshots': request.json.get('snapshots', "").strip(),
+            'exportoverflow': request.json.get('exportoverflow', "").strip(),
+            'commandlog': request.json.get('commandlog', "").strip(),
+            'commandlogsnapshot': request.json.get('commandlogsnapshot', "").strip(),
+            'droverflow': request.json.get('droverflow', "").strip()
         }
 
         # Add server to the current database
@@ -884,6 +926,18 @@ class ServerAPI(MethodView):
             current_server['placement-group'] = \
                 str(request.json.get('placement-group', current_server['placement-group']))
             current_server['isAdded'] = current_server['isAdded']
+            current_server['voltdbroot'] = \
+                str(request.json.get('voltdbroot', current_server['voltdbroot']))
+            current_server['snapshots'] = \
+                str(request.json.get('snapshots', current_server['snapshots']))
+            current_server['exportoverflow'] = \
+                str(request.json.get('exportoverflow', current_server['exportoverflow']))
+            current_server['commandlog'] = \
+                str(request.json.get('commandlog', current_server['commandlog']))
+            current_server['commandlogsnapshot'] = \
+                str(request.json.get('commandlogsnapshot', current_server['commandlogsnapshot']))
+            current_server['droverflow'] = \
+                str(request.json.get('droverflow', current_server['droverflow']))
             sync_configuration()
             Configuration.write_configuration_file()
             return jsonify({'status': 200, 'statusString': 'OK', 'server': current_server})
@@ -1415,9 +1469,13 @@ class StartLocalServerAPI(MethodView):
             sid = -1
             if 'pause' in request.args:
                 pause = request.args.get('pause')
+            else:
+                pause = "false"
 
             if 'force' in request.args:
                 force = request.args.get('force')
+            else:
+                force = "false"
 
             if 'id' in request.args:
                 sid = int(request.args.get('id'))
@@ -1638,6 +1696,7 @@ class DatabaseDeploymentAPI(MethodView):
     @staticmethod
     def put(database_id):
         if 'application/json' in request.headers['Content-Type']:
+
             inputs = JsonInputs(request)
             if not inputs.validate():
                 return jsonify(status=401, statusString=inputs.errors)
@@ -1816,6 +1875,7 @@ def main(runner, amodule, config_dir, data_dir, server):
     global __IP__
     global __PORT__
 
+
     config_path = os.path.join(config_dir, 'voltdeploy.xml')
 
     arrServer = {}
@@ -1846,9 +1906,11 @@ def main(runner, amodule, config_dir, data_dir, server):
                              'enabled': True, 'external-interface': "", 'internal-interface': "",
                              'public-interface': "", 'client-listener': "", 'internal-listener': "",
                              'admin-listener': "", 'http-listener': "", 'replication-listener': "",
-                             'zookeeper-listener': "", 'placement-group': "", 'isAdded': False}
-
+                             'zookeeper-listener': "", 'placement-group': "", 'isAdded': False, 'voltdbroot': "",
+                             'snapshots': "", 'exportoverflow': "", 'commandlog': "",
+                             'commandlogsnapshot': "", 'droverflow': ""}
         Global.DATABASES[1] = {'id': 1, 'name': "Database", "members": [1]}
+
 
     Configuration.write_configuration_file()
 

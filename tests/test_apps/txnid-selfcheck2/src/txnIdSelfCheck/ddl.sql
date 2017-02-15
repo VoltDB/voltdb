@@ -1,3 +1,8 @@
+LOAD CLASSES txnid.jar;
+
+-- Tell sqlcmd to batch the following commands together,
+-- so that the schema loads quickly.
+file -inlinebatch END_OF_BATCH
 
 -- partitioned table
 CREATE TABLE partitioned
@@ -135,7 +140,7 @@ CREATE TABLE forDroppedProcedure
 PARTITION TABLE forDroppedProcedure ON COLUMN p;
 
 -- export tables
-CREATE STREAM partitioned_export PARTITION ON COLUMN cid
+CREATE STREAM partitioned_export PARTITION ON COLUMN cid export to target default
 (
   txnid      bigint             NOT NULL
 , prevtxnid  bigint             NOT NULL
@@ -148,8 +153,6 @@ CREATE STREAM partitioned_export PARTITION ON COLUMN cid
 , adhocjmp   bigint             NOT NULL
 , value      varbinary(1048576) NOT NULL
 );
--- PARTITION TABLE partitioned_export ON COLUMN cid;
--- EXPORT TABLE partitioned_export;
 
 CREATE VIEW ex_partview (
     cid,
@@ -167,7 +170,7 @@ FROM partitioned_export GROUP BY cid;
 
 CREATE TABLE ex_partview_shadow (
     cid tinyint not null,
-    entries bigint,
+    entries int,
     maximum bigint,
     minimum bigint,
     summation bigint,
@@ -175,7 +178,7 @@ CREATE TABLE ex_partview_shadow (
 );
 PARTITION TABLE ex_partview_shadow ON COLUMN cid;
 
-CREATE STREAM replicated_export
+CREATE STREAM replicated_export export to target default
 (
   txnid      bigint             NOT NULL
 , prevtxnid  bigint             NOT NULL
@@ -188,7 +191,6 @@ CREATE STREAM replicated_export
 , adhocjmp   bigint             NOT NULL
 , value      varbinary(1048576) NOT NULL
 );
--- EXPORT TABLE replicated_export;
 
 -- For loadsinglepartition
 CREATE TABLE loadp
@@ -263,6 +265,36 @@ CREATE TABLE capp
 ) );
 PARTITION TABLE capp ON COLUMN p;
 
+-- import table
+CREATE TABLE importp
+(
+  ts         bigint             NOT NULL
+, cid        tinyint            NOT NULL
+, cnt        bigint             NOT NULL
+, CONSTRAINT PK_IMPORT_id_p PRIMARY KEY
+  (
+    cid
+  )
+, UNIQUE ( cid )
+);
+PARTITION TABLE importp ON COLUMN cid;
+CREATE INDEX P_IMPORTCIDINDEX ON importp (cid);
+
+-- import table
+CREATE TABLE importr
+(
+  ts         bigint             NOT NULL
+, cid        tinyint            NOT NULL
+, cnt        bigint             NOT NULL
+, CONSTRAINT PK_IMPORT_id_r PRIMARY KEY
+  (
+    cid
+  )
+, UNIQUE ( cid )
+);
+PARTITION TABLE importr ON COLUMN cid;
+CREATE INDEX R_IMPORTCIDINDEX ON importp (cid);
+
 -- base procedures you shouldn't call
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.UpdateBaseProc;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.ReplicatedUpdateBaseProc;
@@ -303,7 +335,7 @@ CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.DeleteOnlyLoadTableSP;
 PARTITION PROCEDURE DeleteOnlyLoadTableSP ON TABLE loadp COLUMN cid;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.DeleteOnlyLoadTableMP;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TRUPTableInsert;
-PARTITION PROCEDURE TRUPTableInsert ON TABLE bigp COLUMN p;
+PARTITION PROCEDURE TRUPTableInsert ON TABLE trup COLUMN p;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TRURTableInsert;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TRUPTruncateTableSP;
 PARTITION PROCEDURE TRUPTruncateTableSP ON TABLE trup COLUMN p;
@@ -318,4 +350,9 @@ PARTITION PROCEDURE CAPPTableInsert ON TABLE capp COLUMN p;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.CAPRTableInsert;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.CAPPCountPartitionRows;
 PARTITION PROCEDURE CAPPCountPartitionRows ON TABLE capp COLUMN p;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.ImportInsertP;
+PARTITION PROCEDURE ImportInsertP ON TABLE importp COLUMN cid PARAMETER 3;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.ImportInsertR;
+PARTITION PROCEDURE ImportInsertR ON TABLE importr COLUMN cid PARAMETER 3;
 
+END_OF_BATCH

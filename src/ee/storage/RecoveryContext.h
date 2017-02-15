@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -32,7 +32,7 @@ class ReferenceSerializeOutput;
 
 class RecoveryContext : public TableStreamerContext {
 
-    friend bool TableStreamer::activateStream(PersistentTableSurgeon&, TupleSerializer&,
+    friend bool TableStreamer::activateStream(PersistentTableSurgeon&,
                                               TableStreamType, const std::vector<std::string>&);
 
 public:
@@ -58,7 +58,6 @@ private:
     RecoveryContext(PersistentTable &table,
                     PersistentTableSurgeon &surgeon,
                     int32_t partitionId,
-                    TupleSerializer &serializer,
                     int32_t tableId);
 
     bool m_firstMessage;

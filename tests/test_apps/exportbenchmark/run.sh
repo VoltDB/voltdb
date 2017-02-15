@@ -46,7 +46,7 @@ function clean() {
 # Grab the necessary command line arguments
 function parse_command_line() {
     OPTIND=1
-    
+
     while getopts ":h?e:n:" opt; do
 	case "$opt" in
 	e)
@@ -91,7 +91,7 @@ function catalog() {
     echo
     echo "voltdb compile --classpath obj -o $APPNAME.jar exportTable.sql"
     echo
-    $VOLTDB compile --classpath obj -o $APPNAME.jar exportTable.sql
+    $VOLTDB legacycompile --classpath obj -o $APPNAME.jar exportTable.sql
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
 }
@@ -113,7 +113,7 @@ function server() {
     # run the server
     echo "Starting the VoltDB server."
     echo "To perform this action manually, use the command line: "
-    echo 
+    echo
     echo "VOLTDB_OPTS=\"${VOLTDB_OPTS}\" ${VOLTDB} create -d deployment.xml -l ${LICENSE} -H ${HOST} ${APPNAME}.jar"
     echo
     VOLTDB_OPTS="${VOLTDB_OPTS}" ${VOLTDB} create -d deployment.xml -l ${LICENSE} -H ${HOST} ${APPNAME}.jar

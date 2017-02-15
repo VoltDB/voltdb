@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -70,6 +70,11 @@ std::string IndexScanPlanNode::debugInfo(const std::string &spacer) const
         buffer << m_searchkey_expressions[ctr]->debug(spacer);
     }
 
+    buffer << spacer << "Ignore null candidate value flags for search keys:\n";
+    for (int ctr = 0, cnt = (int)m_compare_not_distinct.size(); ctr < cnt; ctr++) {
+        buffer << spacer << (m_compare_not_distinct[ctr] ? "true" : "false");
+    }
+
     buffer << spacer << "End Expression: ";
     if (m_end_expression != NULL) {
         buffer << "\n" << m_end_expression->debug(spacer);
@@ -110,6 +115,7 @@ void IndexScanPlanNode::loadFromJSONObject(PlannerDomValue obj)
     m_skip_null_predicate.reset(loadExpressionFromJSONObject("SKIP_NULL_PREDICATE", obj));
 
     m_searchkey_expressions.loadExpressionArrayFromJSONObject("SEARCHKEY_EXPRESSIONS", obj);
+    loadBooleanArrayFromJSONObject("COMPARE_NOTDISTINCT", obj, m_compare_not_distinct);
 }
 
 } // namespace voltdb

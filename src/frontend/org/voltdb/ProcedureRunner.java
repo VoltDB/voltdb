@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -45,7 +45,6 @@ import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.StmtParameter;
 import org.voltdb.client.BatchTimeoutOverrideType;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.client.ProcedureInvocationType;
 import org.voltdb.compiler.AdHocPlannedStatement;
 import org.voltdb.compiler.AdHocPlannedStmtBatch;
 import org.voltdb.compiler.Language;
@@ -209,14 +208,15 @@ public class ProcedureRunner {
 
         m_procedure.init(this);
 
-        m_statsCollector = new ProcedureStatsCollector(
-                m_site.getCorrespondingSiteId(),
-                m_site.getCorrespondingPartitionId(),
-                m_catProc);
-        VoltDB.instance().getStatsAgent().registerStatsSource(
-                StatsSelector.PROCEDURE,
+        // Normally m_statsCollector is returned as it is and there is no affect to assign it to itself.
+        // Sometimes when this procedure statistics needs to reuse the existing one, the old stats gets returned.
+        m_statsCollector = VoltDB.instance().getStatsAgent().registerProcedureStatsSource(
                 site.getCorrespondingSiteId(),
-                m_statsCollector);
+                new ProcedureStatsCollector(
+                        m_site.getCorrespondingSiteId(),
+                        m_site.getCorrespondingPartitionId(),
+                        m_catProc)
+                );
 
         reflect();
     }
@@ -234,12 +234,7 @@ public class ProcedureRunner {
      * @return The transaction id for determinism, not for ordering.
      */
     long getTransactionId() {
-        StoredProcedureInvocation invocation = m_txnState.getInvocation();
-        if (invocation != null && ProcedureInvocationType.isDeprecatedInternalDRType(invocation.getType())) {
-            return invocation.getOriginalTxnId();
-        } else {
-            return m_txnState.txnId;
-        }
+        return m_txnState.txnId;
     }
 
     Random getSeededRandomNumberGenerator() {
@@ -279,7 +274,7 @@ public class ProcedureRunner {
         assert(m_batch.size() == 0);
 
         try {
-            m_statsCollector.beginProcedure();
+            m_statsCollector.beginProcedure(isSystemProcedure());
 
             VoltTable[] results = null;
 
@@ -425,12 +420,6 @@ public class ProcedureRunner {
             if (ClientResponseImpl.isTransactionallySuccessful(retval.getStatus()) && (hash != 0)) {
                 retval.setHash(hash);
             }
-            if ((m_txnState != null) && // may be null for tests
-                (m_txnState.getInvocation() != null) &&
-                (ProcedureInvocationType.isDeprecatedInternalDRType(m_txnState.getInvocation().getType())))
-            {
-                retval.convertResultsToHashForDeterminism();
-            }
         }
         finally {
             // finally at the call(..) scope to ensure params can be
@@ -462,6 +451,11 @@ public class ProcedureRunner {
      */
     public boolean checkPartition(TransactionState txnState, TheHashinator hashinator) {
         if (m_isSinglePartition) {
+            // can happen when a proc changes from multi-to-single after it's routed
+            if (hashinator == null) {
+                return false; // this will kick it back to CI for re-routing
+            }
+
             TheHashinator.HashinatorType hashinatorType = hashinator.getConfigurationType();
             if (hashinatorType == TheHashinator.HashinatorType.LEGACY) {
                 // Legacy hashinator is not used for elastic, no need to check partitioning. In fact,
@@ -576,12 +570,7 @@ public class ProcedureRunner {
      * partition so plenty of headroom.
      */
     public long getUniqueId() {
-        StoredProcedureInvocation invocation = m_txnState.getInvocation();
-        if (invocation != null && ProcedureInvocationType.isDeprecatedInternalDRType(invocation.getType())) {
-            return invocation.getOriginalUniqueId();
-        } else {
-            return m_txnState.uniqueId;
-        }
+        return m_txnState.uniqueId;
     }
 
     /*

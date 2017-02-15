@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -19,6 +19,7 @@
 #include "common/MiscUtil.h"
 #include "common/TupleOutputStream.h"
 #include "common/TupleOutputStreamProcessor.h"
+#include "storage/AbstractDRTupleStream.h"
 #include "storage/ElasticIndexReadContext.h"
 #include "storage/persistenttable.h"
 #include "logging/LogManager.h"
@@ -34,9 +35,8 @@ ElasticIndexReadContext::ElasticIndexReadContext(
         PersistentTable &table,
         PersistentTableSurgeon &surgeon,
         int32_t partitionId,
-        TupleSerializer &serializer,
         const std::vector<std::string> &predicateStrings) :
-    TableStreamerContext(table, surgeon, partitionId, serializer),
+    TableStreamerContext(table, surgeon, partitionId),
     m_predicateStrings(predicateStrings),
     m_materialized(false)
 {}
@@ -141,7 +141,7 @@ int64_t ElasticIndexReadContext::handleStreamMore(
                 // output.
                 if (!tuple.isPendingDelete()) {
                     // Write the tuple.
-                    yield = outputStreams.writeRow(getSerializer(), tuple);
+                    yield = outputStreams.writeRow(tuple);
                 } else {
                     throwFatalException("Materializing a deleted tuple from the elastic context.");
                 }

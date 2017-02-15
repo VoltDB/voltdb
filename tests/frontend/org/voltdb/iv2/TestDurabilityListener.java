@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -256,6 +256,6 @@ public class TestDurabilityListener {
         final Iv2InitiateTaskMessage msg = new Iv2InitiateTaskMessage(0, 0, 0, 0, uniqId,
                                                                       false, isSp, new StoredProcedureInvocation(),
                                                                       0, 0, false);
-        return new SpProcedureTask(null, "Hello", taskQueue, msg, null);
+        return new SpProcedureTask(null, "Hello", taskQueue, msg);
     }
 }

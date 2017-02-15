@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -365,8 +365,6 @@ public class TestRepairLog
         StoredProcedureInvocation spi = new StoredProcedureInvocation();
         spi.setProcName("@ApplyBinaryLogSP");
         spi.setParams(0, endSpUniqueId - 10, endSpUniqueId, endSpUniqueId, endMpUniqueId, new byte[]{0});
-        spi.setOriginalUniqueId(endSpUniqueId - 10);
-        spi.setOriginalTxnId(endSpUniqueId -15);
 
         Iv2InitiateTaskMessage msg =
                 new Iv2InitiateTaskMessage(0l, 0l, 0l, Long.MIN_VALUE, 0l, false, true,

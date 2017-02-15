@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -116,9 +116,9 @@ public class TestClientClose extends TestCase {
         try {
             client1.createConnection("localhost");
             client2.createConnection("localhost");
-            VoltTable configData1 = client1.callProcedure("@SystemCatalog", "CONFIG").getResults()[0];
+            VoltTable configData1 = client1.callProcedure("@SystemCatalog", "TYPEINFO").getResults()[0];
             client1.close();
-            VoltTable configData2 = client2.callProcedure("@SystemCatalog", "CONFIG").getResults()[0];
+            VoltTable configData2 = client2.callProcedure("@SystemCatalog", "TYPEINFO").getResults()[0];
         } catch (IOException | ProcCallException e) {
             fail("Something failed in call procedure for a client after close another one.");
         } finally {

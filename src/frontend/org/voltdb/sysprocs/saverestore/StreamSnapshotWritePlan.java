@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -44,6 +44,7 @@ import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.catalog.Table;
+import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.rejoin.StreamSnapshotAckReceiver;
 import org.voltdb.rejoin.StreamSnapshotDataTarget;
@@ -135,7 +136,7 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
         Map<Integer, byte[]> schemas = new HashMap<Integer, byte[]>();
         for (final Table table : config.tables) {
             VoltTable schemaTable;
-            if (context.getDatabase().getIsactiveactivedred() && table.getIsdred()) {
+            if (DrRoleType.XDCR.value().equals(context.getCluster().getDrrole()) && table.getIsdred()) {
                 schemaTable = CatalogUtil.getVoltTable(table, CatalogUtil.DR_HIDDEN_COLUMN_INFO);
             }
             else {

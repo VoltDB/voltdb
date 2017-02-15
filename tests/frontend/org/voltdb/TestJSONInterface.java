@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -64,6 +64,7 @@ import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URL;
 import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HashMap;
@@ -118,6 +119,7 @@ import org.voltdb.utils.Encoder;
 import org.voltdb.utils.MiscUtils;
 
 import junit.framework.TestCase;
+import org.voltdb.compiler.deploymentfile.SnmpType;
 
 public class TestJSONInterface extends TestCase {
     final static ContentType utf8ApplicationFormUrlEncoded =
@@ -322,7 +324,7 @@ public class TestJSONInterface extends TestCase {
         // Call insert
         String paramsInJSON = pset.toJSONString();
         //System.out.println(paramsInJSON);
-        HashMap<String, String> params = new HashMap<String, String>();
+        HashMap<String, String> params = new HashMap<>();
         params.put("Procedure", procName);
         params.put("Parameters", paramsInJSON);
         if (procCallTimeout > 0) {
@@ -484,6 +486,70 @@ public class TestJSONInterface extends TestCase {
         return pkStart;
     }
 
+    public void testaUpdateDeploymentSnmpConfig() throws Exception {
+        try {
+            String simpleSchema
+                    = "CREATE TABLE foo (\n"
+                    + "    bar BIGINT NOT NULL,\n"
+                    + "    PRIMARY KEY (bar)\n"
+                    + ");";
+
+            File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
+            String schemaPath = schemaFile.getPath();
+            schemaPath = URLEncoder.encode(schemaPath, "UTF-8");
+
+            VoltProjectBuilder builder = new VoltProjectBuilder();
+            builder.addSchema(schemaPath);
+            builder.addPartitionInfo("foo", "bar");
+            builder.addProcedures(DelayProc.class);
+            builder.setHTTPDPort(8095);
+            boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
+            assertTrue(success);
+
+            VoltDB.Configuration config = new VoltDB.Configuration();
+            config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
+            config.m_pathToDeployment = builder.getPathToDeployment();
+            server = new ServerThread(config);
+            server.start();
+            server.waitForInitialization();
+
+            //Get deployment
+            String jdep = getUrlOverJSON("http://localhost:8095/deployment", null, null, null, 200,  "application/json");
+            Map<String,String> params = new HashMap<>();
+
+            ObjectMapper mapper = new ObjectMapper();
+            DeploymentType deptype = mapper.readValue(jdep, DeploymentType.class);
+
+            SnmpType snmpConfig = new SnmpType();
+            snmpConfig.setTarget("localhost");
+            deptype.setSnmp(snmpConfig);
+            String ndeptype = URLEncoder.encode(mapper.writeValueAsString(deptype), StandardCharsets.UTF_8.toString());
+            params.put("deployment", ndeptype);
+            String pdep = postUrlOverJSON("http://localhost:8095/deployment/", null, null, null, 200, "application/json", params);
+            assertTrue(pdep.contains("Deployment Updated"));
+            jdep = getUrlOverJSON("http://localhost:8095/deployment", null, null, null, 200,  "application/json");
+            DeploymentType gotValue = mapper.readValue(jdep, DeploymentType.class);
+            assertEquals("public", gotValue.getSnmp().getCommunity());
+
+            snmpConfig.setCommunity("foobar");
+            deptype.setSnmp(snmpConfig);
+            ndeptype = URLEncoder.encode(mapper.writeValueAsString(deptype), StandardCharsets.UTF_8.toString());
+            params.put("deployment", ndeptype);
+            pdep = postUrlOverJSON("http://localhost:8095/deployment/", null, null, null, 200, "application/json", params);
+            assertTrue(pdep.contains("Deployment Updated"));
+            jdep = getUrlOverJSON("http://localhost:8095/deployment", null, null, null, 200,  "application/json");
+            gotValue = mapper.readValue(jdep, DeploymentType.class);
+            assertEquals("foobar", gotValue.getSnmp().getCommunity());
+
+        } finally {
+            if (server != null) {
+                server.shutdown();
+                server.join();
+            }
+            server = null;
+        }
+    }
+
     public void testAJAXAndClientTogether() throws Exception {
         try {
             String simpleSchema
@@ -626,12 +692,13 @@ public class TestJSONInterface extends TestCase {
             builder.addStmtProcedure("Insert", "insert into blah values (?,?,?,?,?);");
             builder.addProcedures(CrazyBlahProc.class);
             builder.setHTTPDPort(8095);
-            boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"), 1, 1, 0, 21213, true, 0);
+            boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"), 1, 1, 0, 0);
             assertTrue(success);
 
             config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
             config.m_pathToDeployment = builder.getPathToDeployment();
-
+            config.m_adminPort = 21213;
+            config.m_isPaused = true;
             server = new ServerThread(config);
             server.start();
             server.waitForInitialization();
@@ -727,7 +794,7 @@ public class TestJSONInterface extends TestCase {
             builder.addStmtProcedure("Insert", "insert into blah values (?,?,?,?,?);");
             builder.addProcedures(CrazyBlahProc.class);
             builder.setHTTPDPort(8095);
-            boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"), 1, 1, 0, 21213, false, 0);
+            boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"), 1, 1, 0, 0);
             assertTrue(success);
 
             config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
@@ -1046,7 +1113,7 @@ public class TestJSONInterface extends TestCase {
             // test malformed auth (too short hash)
             pset = ParameterSet.fromArrayNoCopy(u.name + "-X2", u.password + "-X2", u.name + "-X2");
             String paramsInJSON = pset.toJSONString();
-            HashMap<String, String> params = new HashMap<String, String>();
+            HashMap<String, String> params = new HashMap<>();
             params.put("Procedure", "Insert");
             params.put("Parameters", paramsInJSON);
             params.put("User", u.name);
@@ -1059,7 +1126,7 @@ public class TestJSONInterface extends TestCase {
             // test malformed auth (gibberish password, but good length)
             pset = ParameterSet.fromArrayNoCopy(u.name + "-X3", u.password + "-X3", u.name + "-X3");
             paramsInJSON = pset.toJSONString();
-            params = new HashMap<String, String>();
+            params = new HashMap<>();
             params.put("Procedure", "Insert");
             params.put("Parameters", paramsInJSON);
             params.put("User", u.name);
@@ -1672,6 +1739,7 @@ public class TestJSONInterface extends TestCase {
             ResourceMonitorType resourceMonitor = new ResourceMonitorType();
             Memorylimit memLimit = new Memorylimit();
             memLimit.setSize("10");
+            memLimit.setAlert("5");
             resourceMonitor.setMemorylimit(memLimit);
             ss.setResourcemonitor(resourceMonitor);
             String ndeptype = mapper.writeValueAsString(deptype);

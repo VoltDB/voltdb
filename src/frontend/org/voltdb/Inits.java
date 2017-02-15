@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -47,12 +47,17 @@ import org.voltdb.catalog.Catalog;
 import org.voltdb.common.Constants;
 import org.voltdb.common.NodeState;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
+import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.compiler.deploymentfile.HttpsType;
 import org.voltdb.export.ExportManager;
 import org.voltdb.importer.ImportManager;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.TxnEgo;
 import org.voltdb.iv2.UniqueIdGenerator;
+import org.voltdb.modular.ModuleManager;
+import org.voltdb.settings.DbSettings;
+import org.voltdb.settings.NodeSettings;
+import org.voltdb.snmp.SnmpTrapSender;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CatalogUtil.CatalogAndIds;
 import org.voltdb.utils.HTTPAdminListener;
@@ -284,7 +289,8 @@ public class Inits {
                     // If no catalog was supplied provide an empty one.
                     if (m_rvdb.m_pathToStartupCatalog == null) {
                         try {
-                            File emptyJarFile = CatalogUtil.createTemporaryEmptyCatalogJarFile();
+                            File emptyJarFile = CatalogUtil.createTemporaryEmptyCatalogJarFile(
+                                DrRoleType.XDCR.value().equals(m_rvdb.getCatalogContext().getCluster().getDrrole()));
                             if (emptyJarFile == null) {
                                 VoltDB.crashLocalVoltDB("Failed to generate empty catalog.");
                             }
@@ -358,7 +364,8 @@ public class Inits {
             byte[] catalogJarHash = null;
             try {
                 Pair<InMemoryJarfile, String> loadResults =
-                    CatalogUtil.loadAndUpgradeCatalogFromJar(catalogStuff.catalogBytes);
+                    CatalogUtil.loadAndUpgradeCatalogFromJar(catalogStuff.catalogBytes,
+                                                             DrRoleType.XDCR.value().equals(m_rvdb.getCatalogContext().getCluster().getDrrole()));
                 serializedCatalog =
                     CatalogUtil.getSerializedCatalogStringFromJar(loadResults.getFirst());
                 catalogJarBytes = loadResults.getFirst().getFullJarBytes();
@@ -375,16 +382,11 @@ public class Inits {
             catalog.execute(serializedCatalog);
             serializedCatalog = null;
 
-            String result = CatalogUtil.checkLicenseConstraint(catalog, m_rvdb.getLicenseApi());
-            if (result != null) {
-                VoltDB.crashLocalVoltDB(result);
-            }
-
             // note if this fails it will print an error first
             // This is where we compile real catalog and create runtime
             // catalog context. To validate deployment we compile and create
             // a starter context which uses a placeholder catalog.
-            result = CatalogUtil.compileDeployment(catalog, m_deployment, false);
+            String result = CatalogUtil.compileDeployment(catalog, m_deployment, false);
             if (result != null) {
                 VoltDB.crashLocalVoltDB(result);
             }
@@ -394,12 +396,13 @@ public class Inits {
                         catalogStuff.txnId,
                         catalogStuff.uniqueId,
                         catalog,
-                        m_rvdb.m_clusterSettings,
+                        new DbSettings(m_rvdb.m_clusterSettings, m_rvdb.m_nodeSettings),
                         catalogJarBytes,
                         catalogJarHash,
                         // Our starter catalog has set the deployment stuff, just yoink it out for now
                         m_rvdb.m_catalogContext.getDeploymentBytes(),
-                        catalogStuff.version);
+                        catalogStuff.version,
+                        m_rvdb.m_messenger);
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB("Error agreeing on starting catalog version", true, e);
             }
@@ -424,7 +427,7 @@ public class Inits {
 
                 if (!MiscUtils.validateLicense(m_rvdb.getLicenseApi(),
                                                m_rvdb.m_clusterSettings.get().hostcount(),
-                                               m_rvdb.getReplicationRole()))
+                                               DrRoleType.fromValue(m_rvdb.getCatalogContext().getCluster().getDrrole())))
                 {
                     // validateLicense logs. Exit call is here for testability.
                     VoltDB.crashGlobalVoltDB("VoltDB license constraints are not met.", false, null);
@@ -468,12 +471,38 @@ public class Inits {
         }
     }
 
+    class SetupSNMP extends InitWork {
+        SetupSNMP() {
+        }
+
+        @Override
+        public void run() {
+            if (m_config.m_isEnterprise && m_deployment.getSnmp() != null && m_deployment.getSnmp().isEnabled()) {
+                try {
+                    Class<?> loggerClass = MiscUtils.loadProClass("org.voltdb.snmp.SnmpTrapSenderImpl",
+                                                               "SNMP Adapter", false);
+                    if (loggerClass != null) {
+                        final Constructor<?> constructor = loggerClass.getConstructor();
+                        m_rvdb.m_snmp = (SnmpTrapSender) constructor.newInstance();
+                        m_rvdb.m_snmp.initialize(
+                                m_deployment.getSnmp(),
+                                m_rvdb.getHostMessenger(),
+                                m_rvdb.getCatalogContext().cluster.getDrclusterid());
+                    }
+                } catch (Exception e) {
+                    VoltDB.crashLocalVoltDB("Unable to instantiate SNMP", true, e);
+                }
+            }
+        }
+    }
+
     class StartHTTPServer extends InitWork {
         StartHTTPServer() {
         }
 
         //Setup http server with given port and interface
-        private void setupHttpServer(String httpInterface, int httpPortStart, boolean findAny, boolean mustListen) {
+        private void setupHttpServer(String httpInterface, String publicInterface,
+                int httpPortStart, boolean findAny, boolean mustListen) {
 
             boolean success = false;
             int httpPort = httpPortStart;
@@ -482,7 +511,7 @@ public class Inits {
             for (; true; httpPort++) {
                 try {
                     m_rvdb.m_adminListener = new HTTPAdminListener(
-                            m_rvdb.m_jsonEnabled, httpInterface, httpPort, httpsType, mustListen
+                            m_rvdb.m_jsonEnabled, httpInterface, publicInterface, httpPort, httpsType, mustListen
                             );
                     success = true;
                     break;
@@ -533,17 +562,17 @@ public class Inits {
             }
             // if set by cli use that.
             if (m_config.m_httpPort != Constants.HTTP_PORT_DISABLED) {
-                setupHttpServer(m_config.m_httpPortInterface, m_config.m_httpPort, false, true);
+                setupHttpServer(m_config.m_httpPortInterface, m_config.m_publicInterface, m_config.m_httpPort, false, true);
                 // if not set by the user, just find a free port
             } else if (httpPort == Constants.HTTP_PORT_AUTO) {
                 // if not set scan for an open port starting with the default
                 httpPort = httpsEnabled ? VoltDB.DEFAULT_HTTPS_PORT : VoltDB.DEFAULT_HTTP_PORT;
-                setupHttpServer("", httpPort, true, false);
+                setupHttpServer("", "", httpPort, true, false);
             } else if (httpPort != Constants.HTTP_PORT_DISABLED) {
                 if (!m_deployment.getHttpd().isEnabled()) {
                     return;
                 }
-                setupHttpServer("", httpPort, false, true);
+                setupHttpServer(m_config.m_httpPortInterface, m_config.m_publicInterface, httpPort, false, true);
             }
         }
     }
@@ -555,19 +584,6 @@ public class Inits {
         @Override
         public void run() {
             int adminPort = VoltDB.DEFAULT_ADMIN_PORT;
-
-            // See if we should bring the server up in admin mode
-            if (m_deployment.getAdminMode() != null) {
-                // rejoining nodes figure out admin mode from other nodes
-                if (m_isRejoin == false) {
-                    if (m_deployment.getAdminMode().isAdminstartup()) {
-                        m_rvdb.setStartMode(OperationMode.PAUSED);
-                    }
-                }
-
-                // set the adminPort from the deployment file
-                adminPort = m_deployment.getAdminMode().getPort();
-            }
 
             // allow command line override
             if (m_config.m_adminPort > 0)
@@ -583,6 +599,7 @@ public class Inits {
 
     class SetupReplicationRole extends InitWork {
         SetupReplicationRole() {
+            dependsOn(LoadCatalog.class);
         }
 
         @Override
@@ -590,8 +607,7 @@ public class Inits {
             try {
                 JSONStringer js = new JSONStringer();
                 js.object();
-                js.key("role").value(m_config.m_replicationRole.ordinal());
-                js.key("active").value(m_rvdb.getReplicationActive());
+                js.keySymbolValuePair("active", m_rvdb.getReplicationActive());
                 js.endObject();
 
                 ZooKeeper zk = m_rvdb.getHostMessenger().getZK();
@@ -608,23 +624,11 @@ public class Inits {
                     String discoveredReplicationConfig =
                         new String(zk.getData(VoltZK.replicationconfig, false, null), "UTF-8");
                     JSONObject discoveredjsObj = new JSONObject(discoveredReplicationConfig);
-                    ReplicationRole discoveredRole = ReplicationRole.get((byte) discoveredjsObj.getLong("role"));
-                    if (!discoveredRole.equals(m_config.m_replicationRole)) {
-                        VoltDB.crashGlobalVoltDB("Discovered replication role " + discoveredRole +
-                                " doesn't match locally specified replication role " + m_config.m_replicationRole,
-                                true, null);
-                    }
-
-                    // See if we should bring the server up in WAN replication mode
-                    m_rvdb.setReplicationRole(discoveredRole);
                 } else {
                     String discoveredReplicationConfig =
                             new String(zk.getData(VoltZK.replicationconfig, false, null), "UTF-8");
                     JSONObject discoveredjsObj = new JSONObject(discoveredReplicationConfig);
-                    ReplicationRole discoveredRole = ReplicationRole.get((byte) discoveredjsObj.getLong("role"));
                     boolean replicationActive = discoveredjsObj.getBoolean("active");
-                    // See if we should bring the server up in WAN replication mode
-                    m_rvdb.setReplicationRole(discoveredRole);
                     m_rvdb.setReplicationActive(replicationActive);
                 }
             } catch (Exception e) {
@@ -633,9 +637,21 @@ public class Inits {
         }
     }
 
+    class InitModuleManager extends InitWork {
+        InitModuleManager() {
+        }
+
+        @Override
+        public void run() {
+            ModuleManager.initializeCacheRoot(new File(m_config.m_voltdbRoot, VoltDB.MODULE_CACHE));
+            // TODO: start foundation bundles
+        }
+    }
+
     class InitExport extends InitWork {
         InitExport() {
             dependsOn(LoadCatalog.class);
+            dependsOn(InitModuleManager.class);
         }
 
         @Override
@@ -659,6 +675,7 @@ public class Inits {
     class InitImport extends InitWork {
         InitImport() {
             dependsOn(LoadCatalog.class);
+            dependsOn(InitModuleManager.class);
         }
 
         @Override
@@ -731,6 +748,7 @@ public class Inits {
 
                 org.voltdb.catalog.CommandLog cl = m_rvdb.m_catalogContext.cluster.getLogconfig().get("log");
                 if (cl == null || !cl.getEnabled()) return;
+                NodeSettings paths = m_rvdb.m_nodeSettings;
                 try {
                     m_rvdb.m_restoreAgent = new RestoreAgent(
                                                       m_rvdb.m_messenger,
@@ -738,11 +756,12 @@ public class Inits {
                                                       m_rvdb,
                                                       m_config.m_startAction,
                                                       cl.getEnabled(),
-                                                      VoltDB.instance().getCommandLogPath(),
-                                                      VoltDB.instance().getCommandLogSnapshotPath(),
+                                                      paths.resolve(paths.getCommandLog()).getPath(),
+                                                      paths.resolve(paths.getCommandLogSnapshot()).getPath(),
                                                       snapshotPath,
                                                       allPartitions,
-                                                      VoltDB.instance().getVoltDBRootPath());
+                                                      paths.getVoltDBRoot().getPath(),
+                                                      m_rvdb.m_terminusNonce);
                 } catch (IOException e) {
                     VoltDB.crashLocalVoltDB("Unable to construct the RestoreAgent", true, e);
                 }
@@ -754,7 +773,7 @@ public class Inits {
                     m_statusTracker.setNodeState(NodeState.RECOVERING);
                 }
                 // if the restore agent found a catalog, set the following info
-                // so the right node can send it out to the others
+                // so the right node can send it out to the others.
                 if (catalog != null) {
                     // Make sure the catalog corresponds to the current server version.
                     // Prevent automatic upgrades by rejecting mismatched versions.
@@ -772,20 +791,32 @@ public class Inits {
                             String catalogVersion = buildInfo[0];
                             String serverVersion = m_rvdb.getVersionString();
                             if (!catalogVersion.equals(serverVersion)) {
-                                VoltDB.crashLocalVoltDB(String.format(
-                                        "Unable to load version %s catalog \"%s\" "
-                                        + "from snapshot into a version %s server.",
-                                        catalogVersion, catalogPath, serverVersion), false, null);
+                                if (!m_rvdb.m_restoreAgent.willRestoreShutdownSnaphot()) {
+                                    VoltDB.crashLocalVoltDB(String.format(
+                                            "Unable to load version %s catalog \"%s\" "
+                                                    + "from snapshot into a version %s server.",
+                                                    catalogVersion, catalogPath, serverVersion), false, null);
+                                    return;
+                                }
+                                // upgrade the catalog - the following will save the recpmpiled catalog
+                                // under voltdbroot/catalog-[serverVersion].jar
+                                CatalogUtil.loadAndUpgradeCatalogFromJar(catalogBytes,
+                                                                         DrRoleType.XDCR.value().equals(m_rvdb.getCatalogContext().getCluster().getDrrole()));
+                                NodeSettings pathSettings = m_rvdb.m_nodeSettings;
+                                File recoverCatalogFH = new File(pathSettings.getVoltDBRoot(), "catalog-" + serverVersion + ".jar");
+                                catalogPath = recoverCatalogFH.getPath();
                             }
                         }
                         catch (IOException e) {
                             // Make it non-fatal with no check performed.
                             hostLog.warn(String.format(
                                     "Unable to load catalog for version check due to exception: %s.",
-                                    e.getMessage()));
+                                    e.getMessage()), e);
                         }
                     }
-                    hostLog.debug("Found catalog to load on host " + hostId + ": " + catalogPath);
+                    if (hostLog.isDebugEnabled()) {
+                        hostLog.debug("Found catalog to load on host " + hostId + ": " + catalogPath);
+                    }
                     m_rvdb.m_hostIdWithStartupCatalog = hostId;
                     assert(m_rvdb.m_hostIdWithStartupCatalog >= 0);
                     m_rvdb.m_pathToStartupCatalog = catalogPath;

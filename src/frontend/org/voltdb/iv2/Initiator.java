@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -41,15 +41,20 @@ public interface Initiator
     public void configure(BackendTarget backend,
                           CatalogContext catalogContext,
                           String serializedCatalog,
-                          int kfactor, CatalogSpecificPlanner csp,
+                          CatalogSpecificPlanner csp,
                           int numberOfPartitions,
                           StartAction startAction,
                           StatsAgent agent,
                           MemoryStats memStats,
                           CommandLog cl,
-                          ProducerDRGateway nodeDRGateway,
-                          boolean createMpDRGateway, String coreBindIds)
+                          String coreBindIds,
+                          boolean hasMPDRGateway)
         throws KeeperException, InterruptedException, ExecutionException;
+
+    /** Create DR gateway */
+    public void initDRGateway(StartAction startAction,
+                              ProducerDRGateway nodeDRGateway,
+                              boolean createMpDRGateway);
 
     /** Shutdown an Initiator and its sub-components. */
     public void shutdown();

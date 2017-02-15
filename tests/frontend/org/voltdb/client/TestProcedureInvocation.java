@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -208,36 +208,6 @@ public class TestProcedureInvocation extends TestCase{
         }
 
         verifySpi(spi);
-    }
-
-    /**
-     * Test de/ser a replicated procedure invocation.
-     * @throws IOException
-     */
-    public void testWriteReplicated() throws IOException {
-        ProcedureInvocation invocation = new ProcedureInvocation(12345, 56789, 54321, "test", 1);
-        ByteBuffer buf = ByteBuffer.allocate(invocation.getSerializedSize());
-        try {
-            invocation.flattenToBuffer(buf);
-        } catch (IOException e) {
-            e.printStackTrace();
-            fail();
-        }
-
-        buf.flip();
-
-        StoredProcedureInvocation spi = new StoredProcedureInvocation();
-        try {
-            spi.initFromBuffer(buf);
-        } catch (IOException e) {
-            e.printStackTrace();
-            fail();
-        }
-
-        assertEquals(54321, spi.getClientHandle());
-        assertEquals(12345, spi.getOriginalTxnId());
-        assertEquals(56789, spi.getOriginalUniqueId());
-        assertEquals("test", spi.getProcName());
     }
 
     public void testGetAsBytes() throws Exception {

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,22 +17,30 @@
 
 package org.voltdb.plannodes;
 
+import java.util.Collection;
+
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.Database;
+import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.AbstractSubqueryExpression;
 import org.voltdb.types.PlanNodeType;
 
 public class MaterializePlanNode extends ProjectionPlanNode {
 
     public enum Members {
-        BATCHED;
+        BATCHED; // OBSOLETE
     }
-
-    protected boolean m_batched = false;
 
     public MaterializePlanNode() {
         super();
+    }
+
+    public MaterializePlanNode(NodeSchema schema) {
+        super();
+        m_outputSchema = schema;
+        m_hasSignificantOutputSchema = true;
     }
 
     @Override
@@ -40,26 +48,23 @@ public class MaterializePlanNode extends ProjectionPlanNode {
         return PlanNodeType.MATERIALIZE;
     }
 
-    public void setBatched(boolean batched) {
-        m_batched = batched;
-    }
-
-    public boolean isBatched() {
-        return m_batched;
-    }
-
     @Override
-    public void generateOutputSchema(Database db)
-    {
+    public void generateOutputSchema(Database db) {
         // MaterializePlanNodes have no children
         assert(m_children.size() == 0);
         // MaterializePlanNode's output schema is pre-determined, don't touch
+        // except when its output column(s) has a scalar subquery expression
+        // Generate the output schema for subqueries if any
+        Collection<AbstractExpression> exprs = findAllSubquerySubexpressions();
+        for (AbstractExpression expr: exprs) {
+            ((AbstractSubqueryExpression) expr).generateOutputSchema(db);
+        }
+
         return;
     }
 
     @Override
-    public void resolveColumnIndexes()
-    {
+    public void resolveColumnIndexes() {
         // MaterializePlanNodes have no children
         assert(m_children.size() == 0);
     }
@@ -67,13 +72,14 @@ public class MaterializePlanNode extends ProjectionPlanNode {
     @Override
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
-        stringer.key(Members.BATCHED.name()).value(m_batched);
+        stringer.keySymbolValuePair(Members.BATCHED.name(), false);
     }
 
     @Override
-    public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
+    public void loadFromJSONObject(JSONObject jobj, Database db)
+            throws JSONException {
         super.loadFromJSONObject(jobj, db);
-        m_batched = jobj.getBoolean( Members.BATCHED.name() );
+        assert( ! jobj.getBoolean(Members.BATCHED.name()));
     }
 
     @Override

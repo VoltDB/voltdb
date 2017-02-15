@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 # This file is part of VoltDB.
-# Copyright (C) 2008-2016 VoltDB Inc.
+# Copyright (C) 2008-2017 VoltDB Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -27,33 +27,16 @@ from xml.etree.ElementTree import ElementTree
 
 root_dir = os.path.dirname(os.path.dirname(__file__))
 config_path = os.path.join(root_dir, 'config.xml')
-project_path = os.path.join(root_dir, 'project.xml')
 ddl_path = os.path.join(root_dir, 'ddl.sql')
 
-ddl_start = '-- DDL generated for ad hoc benchmark - this will be overwritten'
-ddl_end = None
+ddl_start = """-- DDL generated for ad hoc benchmark - this will be overwritten
+file -inlinebatch END_OF_BATCH
+"""
+ddl_end = 'END_OF_BATCH'
 ddl_pk = 'CONSTRAINT PK_%s PRIMARY KEY (%s)'
-ddl_partition = '-- PARTITION BY ( %s )'
+ddl_partition = 'PARTITION TABLE %s ON COLUMN %s;'
 table_start = '\nCREATE TABLE %s\n('
 table_end = ');'
-project_start = '''\
-<?xml version="1.0"?>
-<project>
-    <info>
-        <name>Ad Hoc Benchmark</name>
-        <version>1.0</version>
-        <description>Analyzes ad hoc query overhead.</description>
-    </info>
-    <database>
-        <schemas>
-            <schema path='ddl.sql' />
-        </schemas>
-        <partitions>'''
-project_partition="            <partition table='%s' column='%s' />"
-project_end = '''\
-        </partitions>
-    </database>
-</project>'''
 announcement_separator = '-' * 42
 
 class Fatal(Exception):
@@ -140,15 +123,6 @@ def get_tables():
         raise Fatal('Bad table attribute value', e)
     return tables
 
-def generate_project(tables):
-    yield project_start
-    for table in tables:
-        if table.partcol is not None:
-            for variation in range(table.nvariations):
-                yield project_partition % ('%s_%d' % (table.name, variation+1),
-                                                      table.columns[table.partcol].name)
-    yield project_end
-
 def generate_comma_separated_list(generator, indent, comment):
     first = True
     for line in generator:
@@ -170,8 +144,6 @@ def generate_table_ddl_lines(table, name):
         yield '%s %s%s' % (column.name, column.type, modifiers)
     if table.pkcol is not None:
         yield ddl_pk % (name, table.columns[table.pkcol].name)
-    if table.partcol is not None:
-        yield ddl_partition % (table.columns[table.partcol].name)
 
 def generate_ddl(tables):
     yield ddl_start
@@ -183,6 +155,8 @@ def generate_ddl(tables):
             for line in generate_comma_separated_list(generator, '  ', '--'):
                 yield line
             yield table_end
+            if table.partcol is not None:
+                yield ddl_partition % (name, table.columns[table.partcol].name)
     yield ddl_end
 
 def generate_file(path, generator):
@@ -203,7 +177,6 @@ def generate_file(path, generator):
 
 def main():
     tables = get_tables()
-    generate_file(project_path, generate_project(tables))
     generate_file(ddl_path, generate_ddl(tables))
 
 if __name__ == '__main__':

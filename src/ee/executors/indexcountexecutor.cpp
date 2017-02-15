@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -179,7 +179,7 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
         VOLT_DEBUG("<Index Count>Initial (all null) search key: '%s'", searchKey.debugNoHeader().c_str());
         for (int ctr = 0; ctr < activeNumOfSearchKeys; ctr++) {
             NValue candidateValue = m_searchKeyArray[ctr]->eval(NULL, NULL);
-            if (candidateValue.isNull()) {
+            if (candidateValue.isNull() && m_node->getCompareNotDistinctFlags()[ctr] == false) {
                 // when any part of the search key is NULL, the result is false when it compares to anything.
                 // do early return optimization, our index comparator may not handle null comparison correctly.
                 earlyReturnForSearchKeyOutOfRange = true;
@@ -241,7 +241,7 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
         VOLT_DEBUG("Initial (all null) end key: '%s'", endKey.debugNoHeader().c_str());
         for (int ctr = 0; ctr < m_numOfEndkeys; ctr++) {
             NValue endKeyValue = m_endKeyArray[ctr]->eval(NULL, NULL);
-            if (endKeyValue.isNull()) {
+            if (endKeyValue.isNull() && m_node->getCompareNotDistinctFlags()[ctr] == false) {
                 // when any part of the search key is NULL, the result is false when it compares to anything.
                 // do early return optimization, our index comparator may not handle null comparison correctly.
                 earlyReturnForSearchKeyOutOfRange = true;

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -152,7 +152,6 @@ public class MpProcedureTask extends ProcedureTask
                     m_msg.isForReplay());
 
             restart.setTruncationHandle(m_msg.getTruncationHandle());
-            restart.setOriginalTxnId(m_msg.getOriginalTxnId());
             m_initiator.send(com.google_voltpatches.common.primitives.Longs.toArray(m_initiatorHSIds), restart);
         }
         final InitiateResponseMessage response = processInitiateTask(txn.m_initiationMsg, siteConnection);
@@ -210,7 +209,6 @@ public class MpProcedureTask extends ProcedureTask
                 m_msg.isForReplay());
 
         complete.setTruncationHandle(m_msg.getTruncationHandle());
-        complete.setOriginalTxnId(m_msg.getOriginalTxnId());
         m_initiator.send(com.google_voltpatches.common.primitives.Longs.toArray(m_initiatorHSIds), complete);
         m_txnState.setDone();
         m_queue.flush(getTxnId());

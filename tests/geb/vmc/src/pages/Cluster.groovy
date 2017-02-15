@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -21,7 +21,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
- package vmcTest.pages
+package vmcTest.pages
 
 import geb.Module
 import java.util.List;
@@ -45,8 +45,8 @@ class Cluster extends Module {
         promotecancel               { $("#promoteConfirmCancel") }
         promoteok                   { $("#promoteConfirmOk") }
         title                       { $("#admin > div.adminWrapper > div.adminLeft > h1") }
-        pausebutton                 { $("#pauseConfirmation", class:"resume", text:"Pause") }
-        resumebutton                { $("#resumeConfirmation", class:"pause", text:"Resume") }
+        pausebutton                 { $("#pauseConfirmation") }
+        resumebutton                { $("#resumeConfirmation") }
         resumeok                    { $("#btnResumeConfirmationOk") }
         pauseok                     { $("#btnPauseConfirmationOk") }
         pausecancel                 { $("#btnPauseConfirmationCancel") }
@@ -85,7 +85,5 @@ class Cluster extends Module {
         saveyes                     {$("body > div.popup_cont > div.popup > div > div.saveConfirmation > div.overlay-btns > a.btn.closeBtn")}
         failedsaveok                { $("#btnSaveSnapshotStatus", text:"Ok")}
         downloadconfigurationbutton { $("#downloadAdminConfigurations") }
-
     }
-
 }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,7 +17,6 @@
 
 #include "common/TupleOutputStreamProcessor.h"
 #include "common/TupleOutputStream.h"
-#include "common/TupleSerializer.h"
 #include "storage/TableStreamerContext.h"
 #include "storage/persistenttable.h"
 
@@ -31,12 +30,10 @@ TableStreamerContext::TableStreamerContext(
         PersistentTable &table,
         PersistentTableSurgeon &surgeon,
         int32_t partitionId,
-        TupleSerializer &serializer,
         const std::vector<std::string> &predicateStrings) :
     m_surgeon(surgeon),
     m_table(table),
-    m_maxTupleLength(serializer.getMaxSerializedTupleSize(table.schema())),
-    m_serializer(serializer),
+    m_maxTupleLength(table.schema()->getMaxSerializedTupleSize(true)),
     m_partitionId(partitionId)
 {
     TableStreamerContext::updatePredicates(predicateStrings);
@@ -48,12 +45,10 @@ TableStreamerContext::TableStreamerContext(
 TableStreamerContext::TableStreamerContext(
         PersistentTable &table,
         PersistentTableSurgeon &surgeon,
-        int32_t partitionId,
-        TupleSerializer &serializer) :
+        int32_t partitionId) :
     m_surgeon(surgeon),
     m_table(table),
-    m_maxTupleLength(serializer.getMaxSerializedTupleSize(table.schema())),
-    m_serializer(serializer),
+    m_maxTupleLength(table.schema()->getMaxSerializedTupleSize(true)),
     m_partitionId(partitionId)
 {}
 

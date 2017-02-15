@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -23,18 +23,19 @@
 
 package org.voltdb;
 
-import java.io.IOException;
+import static org.junit.Assert.assertTrue;
 
-import junit.framework.TestCase;
+import java.io.IOException;
 
 import org.voltcore.utils.PortGenerator;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.regressionsuites.JUnit4LocalClusterTest;
 import org.voltdb.utils.MiscUtils;
 
-public abstract class AdHocQueryTester extends TestCase {
+public abstract class AdHocQueryTester extends JUnit4LocalClusterTest {
 
     // TODO: make an enum
     protected final int NOT_VALIDATING_SP_RESULT = 0;

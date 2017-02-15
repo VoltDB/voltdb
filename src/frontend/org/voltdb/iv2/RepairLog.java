@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -29,10 +29,7 @@ import java.util.List;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
-import org.voltdb.Consistency;
-import org.voltdb.Consistency.ReadLevel;
 import org.voltdb.TheHashinator;
-import org.voltdb.VoltDB;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.DumpMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
@@ -68,9 +65,6 @@ public class RepairLog
 
     // The HSID of this initiator, for logging purposes
     long m_HSId = Long.MIN_VALUE;
-
-    // used to decide if we should shortcut reads
-    private final Consistency.ReadLevel m_defaultConsistencyReadLevel;
 
     // want voltmessage as payload with message-independent metadata.
     static class Item
@@ -132,8 +126,6 @@ public class RepairLog
     {
         m_logSP = new ArrayDeque<Item>();
         m_logMP = new ArrayDeque<Item>();
-
-        m_defaultConsistencyReadLevel = VoltDB.Configuration.getDefaultReadConsistencyLevel();
     }
 
     // get the HSID for dump logging
@@ -160,62 +152,56 @@ public class RepairLog
     // the repairLog if the message includes a truncation hint.
     public void deliver(VoltMessage msg)
     {
-        /**
-         * Note: A shortcut read is a read operation sent to any replica and completed with no
-         * confirmation or communication with other replicas. In a partition scenario, it's
-         * possible to read an unconfirmed transaction's writes that will be lost.
-         */
-
         if (!m_isLeader && msg instanceof Iv2InitiateTaskMessage) {
             final Iv2InitiateTaskMessage m = (Iv2InitiateTaskMessage)msg;
-
-            boolean shortcutRead = m.isReadOnly() && (m_defaultConsistencyReadLevel == ReadLevel.FAST);
-
-            // We can't repair shortcut-read SP transactions due to their short-circuited nature.
-            // Just don't log them to the repair log.
-            if (!shortcutRead) {
-                m_lastSpHandle = m.getSpHandle();
-                truncate(m.getTruncationHandle(), IS_SP);
-                m_logSP.add(new Item(IS_SP, m, m.getSpHandle(), m.getTxnId()));
+            // We can't repair read only SP transactions. Just don't log them to the repair log.
+            if (m.isReadOnly()) {
+                return;
             }
+
+            m_lastSpHandle = m.getSpHandle();
+            truncate(m.getTruncationHandle(), IS_SP);
+            m_logSP.add(new Item(IS_SP, m, m.getSpHandle(), m.getTxnId()));
         } else if (msg instanceof FragmentTaskMessage) {
             final FragmentTaskMessage m = (FragmentTaskMessage) msg;
 
-            boolean shortcutRead = m.isReadOnly() && (m_defaultConsistencyReadLevel == ReadLevel.FAST);
+            // We can't repair read only SP transactions. Just don't log them to the repair log.
+            if (m.isReadOnly()) {
+                return;
+            }
 
-            if (!shortcutRead) {
-                truncate(m.getTruncationHandle(), IS_MP);
-                // only log the first fragment of a procedure (and handle 1st case)
-                if (m.getTxnId() > m_lastMpHandle || m_lastMpHandle == Long.MAX_VALUE) {
-                    m_logMP.add(new Item(IS_MP, m, m.getSpHandle(), m.getTxnId()));
-                    m_lastMpHandle = m.getTxnId();
-                    m_lastSpHandle = m.getSpHandle();
-                }
+            truncate(m.getTruncationHandle(), IS_MP);
+            // only log the first fragment of a procedure (and handle 1st case)
+            if (m.getTxnId() > m_lastMpHandle || m_lastMpHandle == Long.MAX_VALUE) {
+                m_logMP.add(new Item(IS_MP, m, m.getSpHandle(), m.getTxnId()));
+                m_lastMpHandle = m.getTxnId();
+                m_lastSpHandle = m.getSpHandle();
             }
         }
         else if (msg instanceof CompleteTransactionMessage) {
             // a CompleteTransactionMessage which indicates restart is not the end of the
             // transaction.  We don't want to log it in the repair log.
             CompleteTransactionMessage ctm = (CompleteTransactionMessage)msg;
-
-            boolean shortcutRead = ctm.isReadOnly() && (m_defaultConsistencyReadLevel == ReadLevel.FAST);
-
-            if (!shortcutRead && !ctm.isRestart()) {
-                truncate(ctm.getTruncationHandle(), IS_MP);
-                m_logMP.add(new Item(IS_MP, ctm, ctm.getSpHandle(), ctm.getTxnId()));
-                //Restore will send a complete transaction message with a lower mp transaction id because
-                //the restore transaction precedes the loading of the right mp transaction id from the snapshot
-                //Hence Math.max
-                m_lastMpHandle = Math.max(m_lastMpHandle, ctm.getTxnId());
-                m_lastSpHandle = ctm.getSpHandle();
+            // We can't repair read only SP transactions. Just don't log them to the repair log.
+            // Restart transaction do not need to be repaired here, don't log them as well.
+            if (ctm.isReadOnly() || ctm.isRestart()) {
+                return;
             }
+
+            truncate(ctm.getTruncationHandle(), IS_MP);
+            m_logMP.add(new Item(IS_MP, ctm, ctm.getSpHandle(), ctm.getTxnId()));
+            //Restore will send a complete transaction message with a lower mp transaction id because
+            //the restore transaction precedes the loading of the right mp transaction id from the snapshot
+            //Hence Math.max
+            m_lastMpHandle = Math.max(m_lastMpHandle, ctm.getTxnId());
+            m_lastSpHandle = ctm.getSpHandle();
         }
         else if (msg instanceof DumpMessage) {
             String who = CoreUtils.hsIdToString(m_HSId);
-            tmLog.warn("Repair log dump for site: " + who + ", isLeader: " + m_isLeader);
-            tmLog.warn("" + who + ": lastSpHandle: " + m_lastSpHandle + ", lastMpHandle: " + m_lastMpHandle);
+            tmLog.warn("Repair log dump for site: " + who + ", isLeader: " + m_isLeader
+                    + ", " + who + ": lastSpHandle: " + m_lastSpHandle + ", lastMpHandle: " + m_lastMpHandle);
             for (Iv2RepairLogResponseMessage il : contents(0l, false)) {
-               tmLog.warn("" + who + ": msg: " + il);
+               tmLog.warn("[Repair log contents]" + who + ": msg: " + il);
             }
         }
         else if (msg instanceof RepairLogTruncationMessage) {
@@ -292,7 +278,9 @@ public class RepairLog
         Collections.sort(items, m_handleComparator);
 
         int ofTotal = items.size() + 1;
-        tmLog.debug("Responding with " + ofTotal + " repair log parts.");
+        if (tmLog.isDebugEnabled()) {
+            tmLog.debug("Responding with " + ofTotal + " repair log parts.");
+        }
         List<Iv2RepairLogResponseMessage> responses =
             new LinkedList<Iv2RepairLogResponseMessage>();
 
@@ -307,7 +295,7 @@ public class RepairLog
                         TheHashinator.getCurrentVersionedConfigCooked());
         responses.add(hheader);
 
-        int seq = responses.size();
+        int seq = responses.size(); // = 1, as the first sequence
 
         Iterator<Item> itemator = items.iterator();
         while (itemator.hasNext()) {

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -453,7 +453,22 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
                                       Collection<Integer> involvedPartitions) {
         m_initiateTask = initiateTask;
         m_involvedPartitions = ImmutableSet.copyOf(involvedPartitions);
-        m_initiateTaskBuffer = ByteBuffer.allocate(initiateTask.getSerializedSize());
+        // this function may be called for the same instance twice, with slightly different
+        // but same size initiateTask. The second call is intended to update the spHandle in
+        // the initiateTask to a new value and update the corresponding buffer, therefore it
+        // only change the spHandle which takes a fixed amount of bytes, the only component
+        // that can change size, which is the StoredProcedureInvocation, isn't changed at all.
+        // Because of these, the serialized size will be the same for the two calls and the
+        // buffer only needs to be allocated once. When this function is called the second
+        // time, just reset the position and limit and reserialize the updated content to the
+        // existing ByteBuffer so we can save an allocation.
+        if (m_initiateTaskBuffer == null) {
+            m_initiateTaskBuffer = ByteBuffer.allocate(initiateTask.getSerializedSize());
+        }
+        else {
+            m_initiateTaskBuffer.position(0);
+            m_initiateTaskBuffer.limit(initiateTask.getSerializedSize());
+        }
         try {
             initiateTask.flattenToBuffer(m_initiateTaskBuffer);
             m_initiateTaskBuffer.flip();
@@ -944,8 +959,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
 
         sb.append("FRAGMENT_TASK (FROM ");
         sb.append(CoreUtils.hsIdToString(m_coordinatorHSId));
-        sb.append(") FOR TXN ");
-        sb.append(TxnEgo.txnIdToString(m_txnId));
+        sb.append(") FOR TXN ").append(TxnEgo.txnIdToString(m_txnId));
         sb.append(" FOR REPLAY ").append(isForReplay());
         sb.append(", SP HANDLE: ").append(TxnEgo.txnIdToString(getSpHandle()));
         sb.append("\n");

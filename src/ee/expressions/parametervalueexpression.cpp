@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -58,10 +58,10 @@ namespace voltdb {
         VOLT_TRACE("ParameterValueExpression %d", value_idx);
         ExecutorContext* context = ExecutorContext::getExecutorContext();
 
-        NValueArray* params = context->getParameterContainer();
+        NValueArray& params = context->getParameterContainer();
 
-        assert(value_idx < params->size());
-        m_paramValue = &(*params)[value_idx];
+        assert(value_idx < params.size());
+        m_paramValue = &params[value_idx];
     };
 
 }

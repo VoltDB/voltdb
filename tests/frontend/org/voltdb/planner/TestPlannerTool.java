@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -23,9 +23,12 @@
 
 package org.voltdb.planner;
 
+import static org.mockito.Mockito.mock;
+
 import java.io.File;
 import java.io.IOException;
 
+import org.voltcore.messaging.HostMessenger;
 import org.voltdb.CatalogContext;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.catalog.Catalog;
@@ -33,10 +36,10 @@ import org.voltdb.compiler.AdHocPlannedStatement;
 import org.voltdb.compiler.PlannerTool;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.settings.ClusterSettings;
+import org.voltdb.settings.DbSettings;
+import org.voltdb.settings.NodeSettings;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.MiscUtils;
-
-import com.google_voltpatches.common.base.Supplier;
 
 import junit.framework.TestCase;
 
@@ -60,11 +63,11 @@ public class TestPlannerTool extends TestCase {
         }*/
 
         byte[] bytes = MiscUtils.fileToBytes(new File("tpcc-oop.jar"));
-        String serializedCatalog = CatalogUtil.getSerializedCatalogStringFromJar(CatalogUtil.loadAndUpgradeCatalogFromJar(bytes).getFirst());
+        String serializedCatalog = CatalogUtil.getSerializedCatalogStringFromJar(CatalogUtil.loadAndUpgradeCatalogFromJar(bytes, false).getFirst());
         Catalog catalog = new Catalog();
         catalog.execute(serializedCatalog);
-        Supplier<ClusterSettings> settings = ClusterSettings.create().asSupplier();
-        CatalogContext context = new CatalogContext(0, 0, catalog, settings, bytes, null, new byte[] {}, 0);
+        DbSettings settings = new DbSettings(ClusterSettings.create().asSupplier(),NodeSettings.create());
+        CatalogContext context = new CatalogContext(0, 0, catalog, settings, bytes, null, new byte[] {}, 0, mock(HostMessenger.class));
 
         m_pt = new PlannerTool(context.cluster, context.database, context.getCatalogHash());
 
@@ -155,12 +158,12 @@ public class TestPlannerTool extends TestCase {
         jar.deleteOnExit();
         builder.compile("testbadddl-oop.jar");
         byte[] bytes = MiscUtils.fileToBytes(new File("testbadddl-oop.jar"));
-        String serializedCatalog = CatalogUtil.getSerializedCatalogStringFromJar(CatalogUtil.loadAndUpgradeCatalogFromJar(bytes).getFirst());
+        String serializedCatalog = CatalogUtil.getSerializedCatalogStringFromJar(CatalogUtil.loadAndUpgradeCatalogFromJar(bytes, false).getFirst());
         assertNotNull(serializedCatalog);
         Catalog c = new Catalog();
         c.execute(serializedCatalog);
-        Supplier<ClusterSettings> settings = ClusterSettings.create().asSupplier();
-        CatalogContext context = new CatalogContext(0, 0, c, settings, bytes, null, new byte[] {}, 0);
+        DbSettings settings = new DbSettings(ClusterSettings.create().asSupplier(), NodeSettings.create());
+        CatalogContext context = new CatalogContext(0, 0, c, settings, bytes, null, new byte[] {}, 0, mock(HostMessenger.class));
 
         m_pt = new PlannerTool(context.cluster, context.database, context.getCatalogHash());
 

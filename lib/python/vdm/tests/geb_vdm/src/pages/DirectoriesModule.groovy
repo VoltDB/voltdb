@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -19,16 +19,17 @@ import geb.Module
 
 class DirectoriesModule extends Module {
     static content = {
-        rootDestinationText         { $("#divDbManager > div:nth-child(6) > div > div.col-md-6.clusterConfigRight > div.main > div.adminDirect > table > tbody > tr:nth-child(1) > td:nth-child(1)") }
-        snapshotText                { $("#divDbManager > div:nth-child(6) > div > div.col-md-6.clusterConfigRight > div.main > div.adminDirect > table > tbody > tr:nth-child(2) > td:nth-child(1)") }
-        exportOverflowText          { $("#divDbManager > div:nth-child(6) > div > div.col-md-6.clusterConfigRight > div.main > div.adminDirect > table > tbody > tr:nth-child(3) > td:nth-child(1)") }
-        commandLogText              { $("#divDbManager > div:nth-child(6) > div > div.col-md-6.clusterConfigRight > div.main > div.adminDirect > table > tbody > tr:nth-child(4) > td:nth-child(1)") }
-        commandLogSnapshotsText     { $("#divDbManager > div:nth-child(6) > div > div.col-md-6.clusterConfigRight > div.main > div.adminDirect > table > tbody > tr:nth-child(5) > td:nth-child(1)") }
+        rootDestinationText         { $("#divDbManager > div:nth-child(8) > div > div > div > div.wrapOverview > div.mainTblLeft > table > tbody > tr:nth-child(1) > td:nth-child(1)") }
+        snapshotText                { $("#divDbManager > div:nth-child(8) > div > div > div > div.wrapOverview > div.mainTblLeft > table > tbody > tr:nth-child(2) > td:nth-child(1)") }
+        exportOverflowText          { $("#divDbManager > div:nth-child(8) > div > div > div > div.wrapOverview > div.mainTblLeft > table > tbody > tr:nth-child(3) > td:nth-child(1)") }
+        commandLogText              { $("#divDbManager > div:nth-child(8) > div > div > div > div.wrapOverview > div.mainTblRight > table > tbody > tr:nth-child(1) > td:nth-child(1)") }
+        commandLogSnapshotsText     { $("#divDbManager > div:nth-child(8) > div > div > div > div.wrapOverview > div.mainTblRight > table > tbody > tr:nth-child(2) > td:nth-child(1)") }
 
         rootDestinationField        { $(id:"txtVoltdbRootDir") }
         snapshotField               { $(id:"txtSnapshotDir") }
         exportOverflowField         { $(id:"txtExportOverflowDir") }
         commandLogField             { $(id:"txtCommandLogDir") }
         commandLogSnapshotsField    { $(id:"txtCommandLogSnapDir") }
+
     }
 }

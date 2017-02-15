@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -46,5 +46,24 @@ public abstract class SiteStatsSource extends StatsSource {
     protected void updateStatsRow(Object rowKey, Object rowValues[]) {
         rowValues[columnNameToIndex.get(VoltSystemProcedure.CNAME_SITE_ID)] = CoreUtils.getSiteIdFromHSId(m_siteId);
         super.updateStatsRow(rowKey, rowValues);
+    }
+
+    public long getSiteId() {
+        return m_siteId;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if(super.equals(obj) == false) return false;
+        if (obj instanceof SiteStatsSource == false) return false;
+
+        SiteStatsSource stats = (SiteStatsSource) obj;
+        if (stats.getSiteId() != m_siteId) return false;
+        return true;
+    }
+
+    @Override
+    public int hashCode() {
+        return super.hashCode() + Long.hashCode(m_siteId);
     }
 }

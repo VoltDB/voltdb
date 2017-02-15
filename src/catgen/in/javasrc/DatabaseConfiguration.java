@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -30,28 +30,14 @@ public class DatabaseConfiguration {
 
     // DR_MODE
     public static final String DR_MODE_NAME = "DR";
-    public static final String ACTIVE_ACTIVE = "ACTIVE";
-    public static final String ACTIVE_PASSIVE = "PASSIVE";
-    public static final DatabaseConfiguration DR_MODE = new DatabaseConfiguration(
-        DR_MODE_NAME,
-        "Data replication mode: either " + ACTIVE_ACTIVE + " or " + ACTIVE_PASSIVE,
-        new ConfigurationValueFiller() {
-            @Override
-            public String getValue(Database db) {
-                return (db.getIsactiveactivedred() ? ACTIVE_ACTIVE : ACTIVE_PASSIVE);
-            }
-        }
-    );
 
     // add more configurations above, don't forget to add them and their names below after that
     static {
-        configurationList = new DatabaseConfiguration[] { DR_MODE };
         String[] names = new String[] { DR_MODE_NAME };
 
         allNames = Joiner.on(", ").join(names);
     }
 
-    public static final DatabaseConfiguration[] configurationList;
     public static final String allNames;
 
     private interface ConfigurationValueFiller {

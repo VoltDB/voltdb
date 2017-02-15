@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -23,11 +23,8 @@
 #include "StreamPredicateList.h"
 
 namespace voltdb {
-
-class TupleSerializer;
 class TableTuple;
 class PersistentTable;
-class TupleSerializer;
 class TupleOutputStream;
 class StreamPredicateList;
 
@@ -64,8 +61,7 @@ public:
      * numCopiesMade helps deletion logic decide when something is being moved.
      * Returns true when the caller should yield to allow other work to proceed.
      */
-    bool writeRow(TupleSerializer &tupleSerializer,
-                  TableTuple &tuple,
+    bool writeRow(TableTuple &tuple,
                   bool *deleteRow = NULL);
 
 private:

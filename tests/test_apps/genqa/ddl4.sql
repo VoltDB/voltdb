@@ -1,7 +1,7 @@
 IMPORT CLASS genqa2.procedures.SampleRecord;
 
 -- Export Table for Partitioned Data Table deletions
-CREATE TABLE export_partitioned_table2
+CREATE STREAM export_partitioned_table2 PARTITION ON COLUMN rowid export to target default
 (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
@@ -27,9 +27,8 @@ CREATE TABLE export_partitioned_table2
 , type_null_varchar1024     VARCHAR(1024)
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 );
-PARTITION TABLE export_partitioned_table2 ON COLUMN rowid;
 
-CREATE TABLE export_partitioned_table2_foo
+CREATE STREAM export_partitioned_table2_foo PARTITION ON COLUMN rowid export to target default
 (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
@@ -55,7 +54,6 @@ CREATE TABLE export_partitioned_table2_foo
 , type_null_varchar1024     VARCHAR(1024)
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 );
-PARTITION TABLE export_partitioned_table2_foo ON COLUMN rowid;
 
 CREATE TABLE export_mirror_partitioned_table2
 (
@@ -82,49 +80,33 @@ CREATE TABLE export_mirror_partitioned_table2
 , type_not_null_varchar128  VARCHAR(128)  NOT NULL
 , type_null_varchar1024     VARCHAR(1024)
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
-, PRIMARY KEY (rowid)
 );
 PARTITION TABLE export_mirror_partitioned_table2 ON COLUMN rowid;
 
-CREATE TABLE export_skinny_partitioned_table2
+CREATE STREAM export_skinny_partitioned_table2 PARTITION ON COLUMN rowid export to target default
 (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
 );
-PARTITION TABLE export_skinny_partitioned_table2 ON COLUMN rowid;
 
-CREATE TABLE export_skinny_partitioned_table2_foo
+CREATE STREAM export_skinny_partitioned_table2_foo PARTITION ON COLUMN rowid EXPORT TO TARGET foo
 (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
 );
-PARTITION TABLE export_skinny_partitioned_table2_foo ON COLUMN rowid;
 
-CREATE TABLE export_done_table
+CREATE STREAM export_done_table PARTITION ON COLUMN txnid export to target default
 (
   txnid                     BIGINT        NOT NULL
 );
-PARTITION TABLE export_done_table ON COLUMN txnid;
 
-CREATE TABLE export_done_table_foo
+CREATE STREAM export_done_table_foo PARTITION ON COLUMN txnid EXPORT TO TARGET foo
 (
   txnid                     BIGINT        NOT NULL
 );
-PARTITION TABLE export_done_table_foo ON COLUMN txnid;
 
 CREATE PROCEDURE FROM CLASS genqa2.procedures.JiggleSkinnyExportSinglePartition;
 CREATE PROCEDURE FROM CLASS genqa2.procedures.JiggleExportSinglePartition;
 CREATE PROCEDURE FROM CLASS genqa2.procedures.JiggleExportGroupSinglePartition;
 CREATE PROCEDURE FROM CLASS genqa2.procedures.JiggleExportDoneTable;
 CREATE PROCEDURE FROM CLASS genqa2.procedures.JiggleExportGroupDoneTable;
-
-PARTITION PROCEDURE JiggleSkinnyExportSinglePartition
-  ON TABLE export_skinny_partitioned_table2 COLUMN rowid;
-
-EXPORT TABLE export_skinny_partitioned_table2;
-EXPORT TABLE export_partitioned_table2;
-EXPORT TABLE export_done_table;
-
-EXPORT TABLE export_skinny_partitioned_table2_foo TO STREAM foo;
-EXPORT TABLE export_partitioned_table2_foo TO STREAM foo;
-EXPORT TABLE export_done_table_foo TO STREAM foo;

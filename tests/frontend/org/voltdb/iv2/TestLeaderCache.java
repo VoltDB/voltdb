@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -22,18 +22,16 @@
  */
 package org.voltdb.iv2;
 
-import java.util.Map;
-
 import static org.junit.Assert.assertEquals;
 
-import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
+import java.util.Map;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
+import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-
 import org.voltcore.zk.ZKTestBase;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -46,6 +44,7 @@ public class TestLeaderCache extends ZKTestBase {
     {
         volatile ImmutableMap<Integer, Long> m_cache = null;
 
+        @Override
         public void run(ImmutableMap<Integer, Long> cache)
         {
             m_cache = cache;

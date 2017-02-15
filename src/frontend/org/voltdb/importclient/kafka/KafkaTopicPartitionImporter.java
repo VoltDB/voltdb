@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -58,6 +58,7 @@ import kafka.javaapi.TopicMetadataRequest;
 import kafka.javaapi.consumer.SimpleConsumer;
 import kafka.message.MessageAndOffset;
 import kafka.network.BlockingChannel;
+import org.voltcore.utils.EstTime;
 
 /**
  * Implementation that imports from a Kafka topic. This is for a single partition of a Kafka topic.
@@ -74,13 +75,17 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
     //Start with invalid so consumer will fetch it.
     private final AtomicLong m_currentOffset = new AtomicLong(-1);
     private long m_lastCommittedOffset = -1;
-    private final AtomicReference<BlockingChannel> m_offsetManager = new AtomicReference<BlockingChannel>();
+    private final AtomicReference<BlockingChannel> m_offsetManager = new AtomicReference<>();
     private SimpleConsumer m_consumer = null;
     private final TopicAndPartition m_topicAndPartition;
     private final Gap m_gapTracker = new Gap(Integer.getInteger("KAFKA_IMPORT_GAP_LEAD", 32_768));
+    private final int m_gapFullWait = Integer.getInteger("KAFKA_IMPORT_GAP_WAIT", 2_000);
     private final KafkaStreamImporterConfig m_config;
     private HostAndPort m_coordinator;
     private final FetchRequestBuilder m_fetchRequestBuilder;
+    boolean noTransaction = false;
+    //Counters for commit policies.
+    private long m_lastCommitTime = 0;
 
     public KafkaTopicPartitionImporter(KafkaStreamImporterConfig config)
     {
@@ -438,7 +443,6 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                 }
                 sleepCounter = 1;
                 for (MessageAndOffset messageAndOffset : fetchResponse.messageSet(m_topicAndPartition.topic(), m_topicAndPartition.partition())) {
-
                     //You may be catchin up so dont sleep.
                     currentFetchCount++;
                     long currentOffset = messageAndOffset.offset();
@@ -454,15 +458,13 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                         }
                     }
                     ByteBuffer payload = messageAndOffset.message().payload();
-
                     String line = new String(payload.array(),payload.arrayOffset(),payload.limit(),StandardCharsets.UTF_8);
                     try {
                         m_gapTracker.submit(messageAndOffset.nextOffset());
                         Invocation invocation = new Invocation(m_config.getProcedure(), formatter.transform(line));
                         TopicPartitionInvocationCallback cb = new TopicPartitionInvocationCallback(
-                                messageAndOffset.nextOffset(), cbcnt, m_gapTracker, m_dead,
-                                invocation);
-                         if (!callProcedure(invocation, cb)) {
+                                messageAndOffset.nextOffset(), cbcnt, m_gapTracker, m_dead);
+                         if (!noTransaction && !callProcedure(invocation, cb)) {
                               if (isDebugEnabled()) {
                                  debug(null, "Failed to process Invocation possibly bad data: " + line);
                               }
@@ -489,11 +491,14 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                         } catch (InterruptedException ie) {
                         }
                 }
-                commitOffset();
+                if (shouldCommit()) {
+                    commitOffset();
+                }
             }
         } catch (Exception ex) {
             error(ex, "Failed to start topic partition fetcher for " + m_topicAndPartition);
         } finally {
+            //Dont care about return as it wil force a commit.
             commitOffset();
             KafkaStreamImporterConfig.closeConsumer(m_consumer);
             m_consumer = null;
@@ -510,9 +515,24 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
 
     }
 
+    //Based on commit policy
+    public boolean shouldCommit() {
+        switch(m_config.getCommitPolicy()) {
+            case TIME:
+                return (EstTime.currentTimeMillis() > (m_lastCommitTime + m_config.getTriggerValue()));
+        }
+        return true;
+    }
+
+    public void resetCounters() {
+        switch(m_config.getCommitPolicy()) {
+            case TIME:
+                m_lastCommitTime = EstTime.currentTimeMillis();
+        }
+    }
+
     public boolean commitOffset() {
         final short version = 1;
-
         final long safe = m_gapTracker.commit(-1L);
         if (safe > m_lastCommittedOffset) {
             long now = System.currentTimeMillis();
@@ -560,9 +580,11 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                 return false;
             }
             m_lastCommittedOffset = safe;
+            resetCounters();
+            return true;
         }
 
-        return true;
+        return false;
     }
 
     final class Gap {
@@ -570,7 +592,6 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
         long s = -1L;
         long offer = -1L;
         final long [] lag;
-        private final long gapTrackerCheckMaxTimeMs = 2_000;
 
         Gap(int leeway) {
             if (leeway <= 0) {
@@ -586,7 +607,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
             if ((offset - c) >= lag.length) {
                 offer = offset;
                 try {
-                    wait(gapTrackerCheckMaxTimeMs);
+                    wait(m_gapFullWait);
                 } catch (InterruptedException e) {
                     rateLimitedLog(Level.WARN, e, "Gap tracker wait was interrupted for" + m_topicAndPartition);
                 }
@@ -639,9 +660,13 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
     }
 
     @Override
+    public String getTaskThreadName() {
+        return getName() + " - " + (m_topicAndPartition == null ? "Unknown" : m_topicAndPartition.toString());
+    }
+
+    @Override
     protected void stop()
     {
-        // Nothing to stop. shouldRun() should take care of exiting the work loop.
     }
 
     //Per topic per partition that we are responsible for.
@@ -652,19 +677,16 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
         private final AtomicLong m_cbcnt;
         private final Gap m_tracker;
         private final AtomicBoolean m_dontCommit;
-        private final Invocation m_invocation;
 
         public TopicPartitionInvocationCallback(
                 final long offset,
                 final AtomicLong cbcnt,
                 final Gap tracker,
-                final AtomicBoolean dontCommit,
-                final Invocation invocation) {
+                final AtomicBoolean dontCommit) {
             m_offset = offset;
             m_cbcnt = cbcnt;
             m_tracker = tracker;
             m_dontCommit = dontCommit;
-            m_invocation = invocation;
         }
 
         @Override
@@ -674,11 +696,6 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
             if (!m_dontCommit.get() && response.getStatus() != ClientResponse.SERVER_UNAVAILABLE) {
                 m_tracker.commit(m_offset);
             }
-        }
-
-        @SuppressWarnings("unused")
-        public Invocation getInvocation() {
-            return m_invocation;
         }
     }
 }

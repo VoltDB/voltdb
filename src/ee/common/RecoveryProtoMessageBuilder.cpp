@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -19,7 +19,6 @@
 #include "common/FatalException.hpp"
 #include "common/types.h"
 #include "common/Pool.hpp"
-#include "common/TupleSerializer.h"
 
 namespace voltdb {
 /*
@@ -30,11 +29,10 @@ RecoveryProtoMsgBuilder::RecoveryProtoMsgBuilder(
         CatalogId tableId,
         uint32_t totalTupleCount,
         ReferenceSerializeOutput *out,
-        TupleSerializer *serializer,
         const TupleSchema *schema) :
     m_out(out),
     m_tupleCount(0),
-    m_maxSerializedSize(serializer->getMaxSerializedTupleSize(schema))
+    m_maxSerializedSize(schema->getMaxSerializedTupleSize(true))
 {
     assert(m_out);
     m_out->writeByte(static_cast<int8_t>(type));
@@ -49,7 +47,7 @@ RecoveryProtoMsgBuilder::RecoveryProtoMsgBuilder(
 void RecoveryProtoMsgBuilder::addTuple(TableTuple tuple) {
     assert(m_out);
     assert(canAddMoreTuples());
-    tuple.serializeTo(*m_out);
+    tuple.serializeTo(*m_out, true);
     m_tupleCount++;
 }
 

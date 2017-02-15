@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -23,11 +23,8 @@
 #include "serializeio.h"
 
 namespace voltdb {
-
-class TupleSerializer;
 class TableTuple;
 class PersistentTable;
-class TupleSerializer;
 
 /**
  * Serialization output class with some additional data that allows the
@@ -55,8 +52,7 @@ public:
     /**
      * Write a tuple and return the number of bytes written.
      */
-    std::size_t writeRow(TupleSerializer &tupleSerializer,
-                         const TableTuple &tuple);
+    std::size_t writeRow(const TableTuple &tuple);
 
     /**
      * Return true if nbytes can fit in the buffer's remaining space.

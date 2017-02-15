@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -107,7 +107,7 @@ public class CatalogUpgradeTools
         InMemoryJarfile jarfile = CatalogUtil.loadInMemoryJarFile(catalogBytes);
         // Let VoltCompiler do a version check and upgrade the catalog on the fly.
         // I.e. jarfile may be modified.
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(false);
         String upgradeFromVersion = compiler.upgradeCatalogAsNeeded(jarfile);
         if (expectUpgrade) {
             TestCase.assertTrue(upgradeFromVersion!=null);

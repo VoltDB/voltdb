@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -189,7 +189,7 @@ private:
             snprintf(buffer, sizeof(buffer), "%3.1f", number);
         }
         else {
-            int wholeNumberDigits = log10(abs(number)) + 1;
+            int wholeNumberDigits = log10(std::abs(number)) + 1;
             snprintf(buffer, sizeof(buffer), "%.*g", (wholeNumberDigits + decimalPrecision), number);
         }
         return buffer;

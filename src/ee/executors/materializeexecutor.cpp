@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -45,6 +45,7 @@
 
 #include "materializeexecutor.h"
 #include "common/debuglog.h"
+#include "common/executorcontext.hpp"
 #include "common/common.h"
 #include "common/tabletuple.h"
 #include "execution/VoltDBEngine.h"
@@ -105,7 +106,7 @@ bool MaterializeExecutor::p_execute(const NValueArray &params) {
 
     // batched insertion
     if (batched) {
-        int paramcnt = engine->getUsedParamcnt();
+        int paramcnt = engine->getExecutorContext()->getUsedParameterCount();
         VOLT_TRACE("batched insertion with %d params. %d for each tuple.", paramcnt, m_columnCount);
         TableTuple &temp_tuple = output_table->tempTuple();
         for (int i = 0, tuples = paramcnt / m_columnCount; i < tuples; ++i) {

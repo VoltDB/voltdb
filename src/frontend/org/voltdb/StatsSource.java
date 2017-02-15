@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -194,4 +194,25 @@ public abstract class StatsSource {
      * @return Iterator of Objects representing keys that identify unique stats rows
      */
     abstract protected Iterator<Object> getStatsRowKeyIterator(boolean interval);
+
+    public Integer getHostId() {
+        return m_hostId;
+    }
+
+    /**
+     * Not widely used other than PROCEDURE stats for hash map purpose.
+     */
+    @Override
+    public boolean equals(Object obj) {
+        if (obj instanceof StatsSource == false) return false;
+        StatsSource stats = (StatsSource) obj;
+        if (stats.isEEStats() != m_isEEStats) return false;
+        if (stats.getHostId() != m_hostId) return false;
+        return true;
+    }
+
+    @Override
+    public int hashCode() {
+        return Boolean.hashCode(m_isEEStats) + m_hostId;
+    }
 }

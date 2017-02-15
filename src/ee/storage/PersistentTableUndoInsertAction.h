@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -28,8 +28,9 @@ namespace voltdb {
 class PersistentTableUndoInsertAction: public voltdb::UndoAction {
 public:
     inline PersistentTableUndoInsertAction(char* insertedTuple,
-                                           voltdb::PersistentTableSurgeon *table)
-        : m_tuple(insertedTuple), m_table(table)
+                                           voltdb::PersistentTableSurgeon *tableSurgeon)
+        : m_tuple(insertedTuple)
+        , m_tableSurgeon(tableSurgeon)
     { }
 
     virtual ~PersistentTableUndoInsertAction() { }
@@ -38,17 +39,18 @@ public:
      * Undo whatever this undo action was created to undo
      */
     virtual void undo() {
-        m_table->deleteTupleForUndo(m_tuple);
+        m_tableSurgeon->deleteTupleForUndo(m_tuple);
     }
 
     /*
      * Release any resources held by the undo action. It will not need
      * to be undone in the future.
      */
-    void release() { }
+    virtual void release() { }
+
 private:
     char* m_tuple;
-    PersistentTableSurgeon *m_table;
+    PersistentTableSurgeon *m_tableSurgeon;
 };
 
 }

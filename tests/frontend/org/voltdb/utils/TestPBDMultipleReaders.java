@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -98,44 +98,6 @@ public class TestPBDMultipleReaders {
             if (i < numSegments-1) currNumSegments--;
             assertEquals(currNumSegments, TestPersistentBinaryDeque.getSortedDirectoryListing().size());
         }
-    }
-
-    @Test
-    public void testSavedReaders() throws Exception {
-        int numBuffers = 100;
-        for (int i=0; i<numBuffers; i++) {
-            m_pbd.offer( DBBPool.wrapBB(TestPersistentBinaryDeque.getFilledBuffer(i)) );
-        }
-        int numSegments = TestPersistentBinaryDeque.getSortedDirectoryListing().size();
-
-        int numReaders = 3;
-        PBDReader[] readers = new PBDReader[numReaders];
-        for (int i=0; i<numReaders; i++) {
-            readers[i] = new PBDReader("reader" + i);
-        }
-
-        // Close and finish reading using one reader.
-        // This shouldn't delete the segments.
-        m_pbd.close();
-        m_pbd = new PersistentBinaryDeque(TestPersistentBinaryDeque.TEST_NONCE, TestPersistentBinaryDeque.TEST_DIR, logger );
-        readers[0] = new PBDReader("reader0");
-        readers[0].readToEndOfSegment();
-        assertEquals(numSegments+1, TestPersistentBinaryDeque.getSortedDirectoryListing().size());
-
-        // Once the rest of readers finish reading the segment, the segments should be deleted
-        for (int i=1; i<numReaders; i++) {
-            readers[i] = new PBDReader("reader" + i);
-            readers[i].readToEndOfSegment();
-        }
-        assertEquals(numSegments, TestPersistentBinaryDeque.getSortedDirectoryListing().size());
-
-        //Finish reading all segments
-        for (int i=1; i<numSegments; i++) {
-            for (int j=0; j<numReaders; j++) {
-                readers[j].readToEndOfSegment();
-            }
-        }
-        assertEquals(1, TestPersistentBinaryDeque.getSortedDirectoryListing().size());
     }
 
     @Test

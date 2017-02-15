@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -53,61 +53,37 @@ public class TestPartitionDDL extends TestCase {
         new File(testout_jar).delete();
     }
 
-    class Item {
+    class DDLItem {
         final String[] m_strings;
 
-        Item(final String... strings) {
+        DDLItem(final String... strings) {
             m_strings = strings;
         }
 
-        String toDDL() {
-            return null;
-        }
-
-        String toXML() {
-            return null;
-        }
-    }
-
-    class DDL extends Item {
-        DDL(final String... ddlStrings) {
-            super(ddlStrings);
-        }
-        @Override
         String toDDL() {
             return StringUtils.join(m_strings, '\n');
         }
     }
 
-    class ReplicateDDL extends DDL {
+    class ReplicateDDL extends DDLItem {
         ReplicateDDL(final String tableName) {
             super(String.format("REPLICATE TABLE %s;", tableName));
         }
     }
 
-    class PartitionDDL extends DDL {
+    class PartitionDDL extends DDLItem {
         PartitionDDL(final String tableName, final String columnName) {
             super(String.format("PARTITION TABLE %s ON COLUMN %s;", tableName, columnName));
         }
     }
 
-    class PartitionXML extends Item {
-        PartitionXML(final String tableName, final String columnName) {
-            super(tableName, columnName);
-        }
-        @Override
-        String toXML() {
-            return String.format("<partition table='%s' column='%s' />", m_strings[0], m_strings[1]);
-        }
-    }
-
     class Tester {
-        final Item schemaItem;
+        final DDLItem schemaItem;
         final static String partitionedProc = "org.voltdb.compiler.procedures.AddBook";
         final static String replicatedProc = "org.voltdb.compiler.procedures.EmptyProcedure";
 
         Tester() {
-            schemaItem = new DDL(
+            schemaItem = new DDLItem(
                 "create table books (",
                     "cash integer default 0 NOT NULL,",
                     "title varchar(10) default 'foo',",
@@ -115,54 +91,20 @@ public class TestPartitionDDL extends TestCase {
                 ");");
         }
 
-        Tester(DDL schemaItemIn) {
+        Tester(DDLItem schemaItemIn) {
             schemaItem = schemaItemIn;
         }
 
-        String writeDDL(final Item... items) {
+        String writeDDL(final boolean partitioned, final DDLItem... items) {
             StringBuilder sb = new StringBuilder();
             sb.append(schemaItem.toDDL());
             sb.append('\n');
-            for (Item item : items) {
-                String line = item.toXML();
-                if (line == null) {
-                    sb.append(item.toDDL());
-                    sb.append('\n');
-                }
+            for (DDLItem item : items) {
+                sb.append(item.toDDL());
+                sb.append('\n');
             }
             final File ddlFile = VoltProjectBuilder.writeStringToTempFile(sb.toString());
             return ddlFile.getPath();
-        }
-
-        String writeXML(final boolean partitioned, final String ddlPath, final Item... items) {
-            String xmlText =
-                    "<?xml version=\"1.0\"?>\n" +
-                    "<project>\n" +
-                    "  <database>\n" +
-                    "  <schemas>\n" +
-                    "    <schema path='" + ddlPath + "' />\n" +
-                    "  </schemas>\n";
-                int nxml = 0;
-                for (Item item : items) {
-                    String line = item.toXML();
-                    if (line != null) {
-                        nxml++;
-                        if (nxml == 1) {
-                            xmlText += "  <partitions>\n";
-                        }
-                        xmlText += String.format("    %s\n", line);
-                    }
-                }
-                if (nxml > 0) {
-                    xmlText += "  </partitions>\n";
-                }
-            xmlText += "    <procedures>\n";
-            xmlText += String.format("      <procedure class='%s' />\n",
-                                    partitioned ? partitionedProc : replicatedProc);
-            xmlText += "    </procedures>\n" +
-                    "  </database>\n" +
-                    "</project>\n";
-            return VoltProjectBuilder.writeStringToTempFile(xmlText).getPath();
         }
 
         String getMessages(final VoltCompiler compiler, final boolean success) {
@@ -182,14 +124,13 @@ public class TestPartitionDDL extends TestCase {
         void test(final boolean partitioned,
                   final String failRegex,
                   final int additionalTables,
-                  final Item... items) {
+                  final DDLItem... items) {
             // Generate DDL and XML files.
-            String ddlPath = writeDDL(items);
-            String xmlPath = writeXML(partitioned, ddlPath, items);
+            String ddlPath = writeDDL(partitioned, items);
 
             // Compile the catalog.
-            final VoltCompiler compiler = new VoltCompiler();
-            boolean success = compiler.compileWithProjectXML(xmlPath, testout_jar);
+            final VoltCompiler compiler = new VoltCompiler(false);
+            boolean success = compiler.compileFromDDL(testout_jar, ddlPath);
 
             // Check for expected compilation success or failure.
             String s = getMessages(compiler, false);
@@ -221,7 +162,7 @@ public class TestPartitionDDL extends TestCase {
          *  Call when expected result is a partitioned table.
          * @param items
          */
-        void partitioned(final Item... items) {
+        void partitioned(final DDLItem... items) {
             test(true, null, 0, items);
         }
 
@@ -229,7 +170,7 @@ public class TestPartitionDDL extends TestCase {
          * Call when expected result is a replicated table.
          * @param items
          */
-        void replicated(final Item... items) {
+        void replicated(final DDLItem... items) {
             test(false, null, 0, items);
         }
 
@@ -239,7 +180,7 @@ public class TestPartitionDDL extends TestCase {
          * @param failRegex
          * @param items
          */
-        void bad(final String failRegex, final Item... items) {
+        void bad(final String failRegex, final DDLItem... items) {
             test(false, failRegex, 0, items);
         }
 
@@ -247,7 +188,7 @@ public class TestPartitionDDL extends TestCase {
          * Call when DDL has a view and it should pass.
          * @param items
          */
-        void view_good(final boolean partitioned, final Item... items) {
+        void view_good(final boolean partitioned, final DDLItem... items) {
             test(partitioned, null, 1, items);
         }
 
@@ -255,7 +196,7 @@ public class TestPartitionDDL extends TestCase {
          * Call when DDL has a view and it should fail.
          * @param items
          */
-        void view_bad(final String failRegex, final boolean partitioned, final Item... items) {
+        void view_bad(final String failRegex, final boolean partitioned, final DDLItem... items) {
             test(partitioned, failRegex, 1, items);
         }
     }
@@ -267,7 +208,7 @@ public class TestPartitionDDL extends TestCase {
         tester.replicated();
 
         // Garbage statement added.
-        tester.bad(".*unexpected token.*", new DDL("asldkf sadlfk;"));
+        tester.bad(".*unexpected token.*", new DDLItem("asldkf sadlfk;"));
     }
 
     public void testBadReplicate() {
@@ -275,30 +216,30 @@ public class TestPartitionDDL extends TestCase {
 
         // REPLICATE statement with no semi-colon.
         tester.bad(".*no semicolon found.*",
-                new DDL("REPLICATE TABLE books"));
+                new DDLItem("REPLICATE TABLE books"));
 
         // REPLICATE statement with missing argument.
         tester.bad(".*Invalid REPLICATE statement.*",
-                new DDL("REPLICATE TABLE;"));
+                new DDLItem("REPLICATE TABLE;"));
 
         // REPLICATE statement with too many arguments.
         tester.bad(".*Invalid REPLICATE statement.*",
-                new DDL("REPLICATE TABLE books NOW;"));
+                new DDLItem("REPLICATE TABLE books NOW;"));
 
         // REPLICATE with bad table clause.
         tester.bad(".*Invalid REPLICATE statement.*",
-                new DDL("REPLICATE TABLEX books;"));
+                new DDLItem("REPLICATE TABLEX books;"));
 
         //REPLICATE with bad table identifier
         tester.bad(".*Unknown indentifier in DDL.*",
-                new DDL("REPLICATE TABLE 0books;"));
+                new DDLItem("REPLICATE TABLE 0books;"));
     }
 
     public void testGoodReplicate() {
         Tester tester = new Tester();
 
         // REPLICATE with annoying whitespace.
-        tester.replicated(new DDL("\t\t  REPLICATE\r\nTABLE\nbooks\t\t\n  ;"));
+        tester.replicated(new DDLItem("\t\t  REPLICATE\r\nTABLE\nbooks\t\t\n  ;"));
 
         // REPLICATE with clean statement.
         tester.replicated(new ReplicateDDL("books"));
@@ -309,35 +250,32 @@ public class TestPartitionDDL extends TestCase {
 
         // PARTITION statement with no semi-colon.
         tester.bad(".*no semicolon found.*",
-                new DDL("PARTITION TABLE books ON COLUMN cash"));
+                new DDLItem("PARTITION TABLE books ON COLUMN cash"));
 
         // PARTITION statement with missing arguments.
         tester.bad(".*Invalid PARTITION statement.*",
-                new DDL("PARTITION TABLE;"));
+                new DDLItem("PARTITION TABLE;"));
 
         // PARTITION statement with too many arguments.
         tester.bad(".*Invalid PARTITION statement.*",
-                new DDL("PARTITION TABLE books ON COLUMN cash COW;"));
+                new DDLItem("PARTITION TABLE books ON COLUMN cash COW;"));
 
         // PARTITION statement intermixed with procedure.
         tester.bad(".*Invalid PARTITION statement.*",
-                new DDL("PARTITION TABLE books PROCEDURE bruha ON COLUMN cash;"));
+                new DDLItem("PARTITION TABLE books PROCEDURE bruha ON COLUMN cash;"));
 
         // PARTITION with bad table clause.
         tester.bad(".*Invalid PARTITION statement.*",
-                new DDL("PARTITION TABLEX books ON COLUMN cash;"));
+                new DDLItem("PARTITION TABLEX books ON COLUMN cash;"));
     }
 
     public void testGoodPartition() {
         Tester tester = new Tester();
 
         // PARTITION with annoying whitespace.
-        tester.partitioned(new DDL("\t\t  PARTITION\r\nTABLE\nbooks\r\n\tON COLUMN cash\t\t\n  ;"));
+        tester.partitioned(new DDLItem("\t\t  PARTITION\r\nTABLE\nbooks\r\n\tON COLUMN cash\t\t\n  ;"));
 
         // PARTITION from DDL.
         tester.partitioned(new PartitionDDL("books", "cash"));
-
-        // PARTITION from XML.
-        tester.partitioned(new PartitionXML("books", "cash"));
     }
 }

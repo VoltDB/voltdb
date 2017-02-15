@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -99,7 +99,7 @@ import org.voltdb.utils.VoltFile;
         }
     }
 
-    private static class SocketDataPusher extends Thread {
+    public static class SocketDataPusher extends Thread {
         private static final String m_server = "localhost";
         private OutputStream m_sout;
         private final CountDownLatch m_latch;

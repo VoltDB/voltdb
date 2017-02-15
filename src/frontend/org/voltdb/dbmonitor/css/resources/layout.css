@@ -48,7 +48,7 @@ h1 {
     color: #FFFFFF;
     font: 14px Arial, Helvetica, sans-serif;
     text-shadow: none;
-    text-decoration: none;
+    text-decoration: none !important;
     border-radius: 0;
     border: none;
 }
@@ -81,7 +81,7 @@ li.joiningIcon,
 li.missingIcon,
 li.alertIcon,
 a.alertIcon,
-
+.iconDRDatabase,
 input.icon-search,
 a.save-search,
 a.icon-search,
@@ -91,9 +91,11 @@ a.showServers, a.hideServers, .popup_close, .icon-document, .icon-tables, .icon-
     background-repeat: no-repeat;
 }
 
-
-
-
+.iconDRDatabase {
+    background-position: left top;
+    height: 25px;
+    line-height: 25px;
+}
 .user {
     background-position: left -209px;
     width: 25px;
@@ -314,7 +316,7 @@ html, body {
 
     .headLeft .logo {
         float: left;
-        width: 140px;
+        width: 85px;
         padding: 8px 0 0 0;
 		margin-right:90px;
     }
@@ -406,6 +408,8 @@ ul.topRightList {
 
         .menuHome ul li ul {
             display: none;
+            position:absolute;
+            right:5px;
         }
 
         .menuHome ul li a {
@@ -413,7 +417,7 @@ ul.topRightList {
             text-decoration: none;
             color: #000000;
 		  /*padding: 3px 2px 5px 15px;*/
-            padding: 3px 2px 5px 72px;
+            padding: 3px 2px 5px 10px;
             white-space: nowrap;
         }
 
@@ -649,6 +653,7 @@ ul.rightShowhideList {
     -moz-box-shadow: 0px 6px 7px -5px #ccc; /* Firefox 3.5 - 3.6 */
     box-shadow: 0px 6px 7px -5px #ccc; /* Opera 10.5, IE 9, Firefox 4+, Chrome 6+, iOS 5 */
 }
+.chartDR {margin-bottom:10px;}
 
 .left {
     float: left;
@@ -706,9 +711,15 @@ ul.rightShowhideList {
 .collapsed {
     background: #fbfbfb url(images/voltdb-icon-sprite.png) 20px -535px no-repeat;
 }
+.collapsedDR {
+    background:url(images/voltdb-icon-sprite.png) 20px -537px no-repeat;
+}
 
 .expanded {
     background: #fbfbfb url(images/voltdb-icon-sprite.png) 20px -490px no-repeat;
+}
+.expandedDR {
+    background:url(images/voltdb-icon-sprite.png) 20px -491px no-repeat;
 }
 
 .leftShowhide .expanded {
@@ -721,6 +732,11 @@ ul.rightShowhideList {
 
 .arrowAdjust {
     padding: 0px 0 0 26px;
+    position: relative;
+    top: 4px;
+}
+.arrowAdjustDR {
+    padding: 0px 0 0 7px;
     position: relative;
     top: 4px;
 }
@@ -1168,7 +1184,7 @@ table.serversTbl tr.serverActive {
     ul.servers-list li.monitoring a {
         font-weight: bold;
         color: #76bd1d;
-        
+
     }
 
     .serverNameAlign {float: left; word-break: break-all;}
@@ -1440,7 +1456,7 @@ a.icon-document {
         color: #76bd1d;
     }
 
-#schema, #sqlQuery, #admin {
+#schema, #sqlQuery, #admin, #dr {
     display: none;
 }
 
@@ -1637,7 +1653,7 @@ div.popup {
      ::i-block-chrome,.overlay-content  {
      width: 450px;
     }
-   
+
 }
 
 .graphPop {
@@ -1648,6 +1664,11 @@ div.popup {
 .overlay-btns {
     text-align: right;
     padding: 5px 20px 20px 20px;
+
+}
+.overlayShutdownBtn {
+    text-align: center;
+    padding: 5px 0 24px 0;
 }
 
 
@@ -1657,7 +1678,7 @@ div.popup {
     margin-bottom: 5px;
     height: 30px;
     line-height: 35px;
-   
+
 }
 
     .user-preferences li.last {
@@ -1864,10 +1885,12 @@ ul.topRightList li a {
     background: #FFFFFF;
     padding: 15px;
 }
+.queryResultStyle {margin-top:3px;position: relative;top:4px;}
 
 .blockWrapper {
     margin-bottom: 20px;
     margin-top:3px;
+
 }
 
 .objectExplorer {
@@ -1891,10 +1914,11 @@ ul.topRightList li a {
 .queryInput .query textarea {
     width: 100%;
     padding: 1%;
-    resize: none !important;
+    /*resize: none !important;*/
     height: 215px;
     border: 1px solid #CCCCCC;
-    line-height: 25px;
+    /*line-height: 25px;*/
+    resize:vertical;
     font-size: 18px;
 }
 
@@ -1918,15 +1942,15 @@ ul.topRightList li a {
         float: left;
     }
 
-.blockWrapper h1.theHeading {
-    margin: 0 0 1.5px 0 !important;
-    padding: 17px 20px 17px 45px;
-    background-color: #FFFFFF;
-    -webkit-box-shadow: 0px 6px 7px -5px #ccc;
-    -moz-box-shadow: 0px 6px 7px -5px #ccc;
-    box-shadow: 0px 6px 7px -5px #ccc;
+#Ul1 {
+    float: right !important;
 }
-
+.blockWrapper h1.theHeading {
+    margin: 0 0 10px 0 !important;
+    padding: 17px 20px 9px 0;
+    background-color: #FFFFFF;
+    border-bottom:1px solid #ccc;
+    }
 .blockWrapper h1.theHeadingQuery {
     margin: 0 0 1.5px 0 !important;
     padding: 0px 0px 8px 2px;
@@ -1937,10 +1961,9 @@ ul.topRightList li a {
 }
 
 .queryStatus {
-    padding: 10px;
-    background: #f2f2f2;
-    border-bottom: 1px solid #ccc;
-    color: #333;
+    padding:12px 0 0 10px;
+    color: #aaa;
+
 }
 
 .ui-accordion {
@@ -1980,7 +2003,7 @@ h3.ui-accordion-header {
     height: auto !important;
 }
 
-h3.ui-accordion-header, h3.ui-accordion-header-active, .icon-query, h1.icon-queryResult {
+h3.ui-accordion-header, h3.ui-accordion-header-active, .icon-query/* h1.icon-queryResult*/ {
     background-image: url(images/voltdb-icon-sprite.png)!important;
     background-repeat: no-repeat!important;
 }
@@ -2009,10 +2032,36 @@ h3.ui-state-active {
     background-position: 15px -1254px;
 }
 
-h1.icon-queryResult {
-    background-position: 0px -1039px;
+/*h1.icon-queryResult {
+    background-position: 0px -1034px;
     padding-left:30px!important;
+}*/
+.icon-queryResult { float:left;
+    background-image: url(images/icon_query_result.jpg);
+    background-repeat: no-repeat; width:25px; height:25px; margin:0 5px 0 0;}
+/***********************************DR page*******************************/
+.containerMain1 { background:#fff; padding:10px;margin-bottom: 20px;border: 1px solid #ccc;}
+.DRContantWrap {background:#ccc; padding:10px; display:block;}
+.contentDR {
+    margin: 0 0 20px 0;
+    padding:0 20px;
+
+
 }
+.drHead { background-color:#fff; padding:5px 20px 20px 37px; border:none;  }
+.drBody { padding:0;}
+.DRHeaderName { position:relative;top:5px; font-size:16px;}
+.drPending { color: #ea151d;}
+.iconDRDatabase {float: left; width: 20px; margin: 0 0 0 12px; position: relative;top: 3px;}
+.DRHeaderWrap {float:left;}
+.drRelation { float:left; }
+.drRelationLeft { float:left;  }
+.drRelationLeft span p { position:relative; top:-10px; font-size: 12px; text-align:center; }
+.arrowDouble { background-image: url(images/arrow_double.png); width:190px; height:20px;
+display:block; position: relative; top:8px; margin:0 10px;  }
+.arrowSingle { background-image: url(images/arrow.png); width:190px; height:22px;
+display:block; position: relative; top:8px; margin:0 10px;  }
+.drRelationRight { float:left; }
 
 /*********************jquery ui class override*********************/
 #accordionProcedures .ui-state-default, #accordionTable .ui-state-default,#accordionStreamedTable .ui-state-default,
@@ -2033,18 +2082,22 @@ border:1px solid #FFF;
     color:#222;
 }
 
+
 #worktabs .ui-state-active a, .ui-state-active a:link, .ui-state-active a:visited { color:#FFF; background:#76BD1D; padding:.5em .2em; border-radius:12px 2px 0 0;}
 #worktabs .ui-state-active, .ui-widget-content .ui-state-active, .ui-widget-header .ui-state-active {background:#76BD1D;}
 #worktabs .ui-tabs-nav { padding:1px 0 0px 3px !important; border-radius:0;}
 #worktabs .ui-tabs-nav li { border:1px solid #CCC!important; margin-top:2px; border-radius:12px 2px 0 0;}
-#worktabs .ui-tabs-panel {padding:0 3px; position:relative; top:-3px; }
+#worktabs .ui-tabs-panel {padding:0 3px; position:relative; top:-1px; }
 #worktabs .ui-tabs-nav .ui-tabs-anchor {font-size: 12px; font-weight: bold;}
 #worktabs ul li#liNewQuery {background: #ccc; border:none!important; padding-top:1px;border-radius: 12px 2px 0 0;}
 #worktabs ul li a.ui-tabs-anchor { padding:.5em .2em;}
+.workspace {height:100%}
 .workspace .ui-tabs .ui-tabs-nav li { margin:1px 2px 0 0;}
 .workspace .ui-tabs .ui-tabs-nav li.ui-tabs-active { padding-bottom:0;}
+
 .disableCloserTab { opacity:0.5;}
 #queryError span.error{ color: #c70000; font-size:13px; }
+.latencyDR{float: left;padding: 9px 0 0 20px;font-size: 16px;}
 
 /*********************jquery ui class override ends*********************/
 
@@ -2061,8 +2114,9 @@ border:1px solid #FFF;
 
 .resultHtml, .resultCsv, .resultMonospace {
     width: 100%;
+    height:85%;
     overflow: auto;
-    height: 200px;
+
 }
 
 .queryResult pre {
@@ -2226,6 +2280,10 @@ ul.helpSchemaList {
         font: 15px Arial, Helvetica, sans-serif;
     }
 
+.tableL2 {margin-bottom: 10px !important;}
+.primaryrow2 td:nth-child(2){
+     word-break: break-all;}
+
 .VDBQueryHelp {
 }
 
@@ -2272,13 +2330,14 @@ label.error {
     color: #c70000;
     width: auto;
     display: block;
-    line-height: 0px;
+    line-height: 15px;
     font-size: 11px;
     /*padding: 10px 5px 0 7px;*/
     padding: 10px 5px 0 0;
     margin: 0 0 6px 0;
-    height: 10px;
+    height:auto;
 }
+/*.tdSnapshotFrequency label.error{line-height:15px; height:auto;}*/
 
 .adminWrapper {
     margin: 0;
@@ -2586,7 +2645,7 @@ ul.adminClusterList li a.shutdown {
     height: 17px;
     position: relative;
     top: 5px;
-   
+
 }
 
 .deleteSmall {
@@ -2690,7 +2749,7 @@ ul.adminClusterList li a.shutdown {
 .labelCollapsed {
     /*background-position: -468px -11px;*/
     padding-left: 22px;
-    background: url("images/up.png")0 1px no-repeat; 
+    background: url("images/up.png")0 1px no-repeat;
 }
 
 .labelExpanded {
@@ -2749,7 +2808,7 @@ ul.adminClusterList li a.shutdown {
 }
 
 input.exitableTxtBx {
-    width: 35px; /*position:relative; top:6px;*/
+    width: 55px; /*position:relative; top:6px;*/
     padding: 2px 3px;
 }
 
@@ -2759,7 +2818,7 @@ input.exitableFilePrefix {
 }
 
 input.exitableMemoryLimit {
-    width: 90px; /*position:relative; top:6px;*/
+    width: 60px; /*position:relative; top:6px;*/
     padding: 2px 3px;
 }
 
@@ -2844,7 +2903,7 @@ input.exitableMemoryLimit {
 }
 
 .serverHeader { background: #dee0e0; }
-.serverHeader:hover  {  
+.serverHeader:hover  {
     background: #dee0e0 !important;
 }
 tr.serverHeader:hover {background: #dee0e0;}
@@ -3017,7 +3076,7 @@ td.heartbeattd span.unit, td.queryTimeOut span.unit {
 }
 
     .overviewTbl table td {
-        white-space: nowrap !important;
+       white-space: nowrap !important;
     }
 
 .confirmationHeight {
@@ -3414,7 +3473,7 @@ table.tblPopup {
 /****DR *******/
 
 .drWrapper {
-    margin: 20px 0 0 0;
+    margin: 0 0 0 0;
 }
 
     .drWrapper .content {
@@ -3745,7 +3804,7 @@ svg.nvd3-svg { width:95% !important; }
 
 /**************************QueryTimeOut*************************/
 .queryHeadName { float:left; width:100px; height:22px; text-indent:40px; padding-top:17px;}
-.queryTimeoutName { 
+.queryTimeoutName {
     background: #d0d2d2 none repeat scroll 0 0;
     cursor: pointer;
     float: left;
@@ -3822,6 +3881,7 @@ fieldset { border:1px solid #ccc; padding:20px;}
 .chartDataContent ul li { line-height:20px;}
 .chartDataContent input[ type="checkbox"] { position:relative;top:2px;}
 .chartDownloadBtn{text-align: right;padding: 5px 0px 0px 20px;}*/
+ .wordBreak{word-break: break-all; line-height:22px!important;}
 
 /********************jquery us css override*****************/
 #worktabs .ui-widget-header { border:none;}
@@ -3886,6 +3946,97 @@ fieldset { border:1px solid #ccc; padding:20px;}
     color: #fff;
 }
 
+/****split css****/
+
+.split {
+   -webkit-box-sizing: border-box;
+      -moz-box-sizing: border-box;
+           box-sizing: border-box;
+
+   overflow-y: hidden;
+   overflow-x: auto;
+ }
+ @-moz-document url-prefix() {
+ split { overflow-y:auto;}
+ }
+ .tabScroller{height:88%; margin-bottom:0;}
+
+ .content {
+   border: 1px solid #C0C0C0;
+   box-shadow: inset 0 1px 2px #e4e4e4;
+   background-color: #fff;
+ }
+
+ .gutter {
+   background-color: transparent;
+
+   background-repeat: no-repeat;
+   background-position: 50%;
+ }
+
+ .gutter.gutter-horizontal {
+   cursor: col-resize;
+   background-image: url(images/vertical.png);
+   background-color:#eee;
+ }
+
+ .gutter.gutter-vertical {
+   cursor: row-resize;
+   background-image: url(images/horizontal.png);
+   background-color:#eee;
+   margin-top:15px;
+ }
+
+ .split.split-horizontal, .gutter.gutter-horizontal {
+   height:96.5%;
+   float: left;
+ }
+
+
+ .querybox {
+    -moz-appearance: textfield-multiline;
+    -webkit-appearance: textarea;
+    border: 1px solid #ccc;
+    font: medium -moz-fixed;
+    font: -webkit-small-control;
+    height: 170px;
+    overflow: auto;
+    padding: 2px;
+    resize: vertical;
+    outline:none;
+    white-space: pre;
+    font-size: 18px;
+    font-family: Arial,Helvetica,sans-serif;
+
+}
+.workspace .ui-widget-content {border:none;}
+/*.queryWrapper {border:1px solid #ccc;}*/
+.queryWrapper { height:calc(100% - 85px)}
+
+.verticalWrapper{
+height: 90%;
+ /*height:calc(95% - 92px);*/
+}
+
+
+
+/**********************Shutdown ******************************/
+ul#shutdownMsg{ margin:0; padding:0;}
+ul#shutdownMsg li{ font-size:13px; line-height:20px; }
+.shutdownNormal{ position:relative; padding-right:23px; top:2px;}
+.shutdownSuccess{ position:relative; padding-right:5px; top:2px;}
+.shutdownLoader{ position:relative; padding-right:5px; top:4px;}
+.shutdownFailure{ position:relative; padding-right:5px; top:4px;}
+.shutdownErrorMsg {  padding:0 20px 15px 20px;color:#c70000; line-height:15px; width:400px;}
+.shutdownErrorMsg h2 { font-weight:bold; font-size:13px;}
+.shutdownRetryMsg { padding: 0 0 11px 0; text-align: center;}
+
+/******************SNMP******************************/
+.snmpForm > form input[type="text"],.snmpFormSelect > form > select { width:156px;}
+.loadingSNMP { position:static;}
+
+
+
 /*********************************************media Qu********************/
 
 @media (max-width: 300px) {
@@ -3909,7 +4060,7 @@ fieldset { border:1px solid #ccc; padding:20px;}
     }
 	.downloadConfig { margin-bottom:5px;}
 
-  
+
 }
 
 @media (min-width: 320px) and (max-width:360px) {
@@ -3941,6 +4092,7 @@ fieldset { border:1px solid #ccc; padding:20px;}
 
 
 
+
 }
 @media (max-width: 360px) {
     .headerAdminContent {
@@ -3968,7 +4120,7 @@ fieldset { border:1px solid #ccc; padding:20px;}
     }
 
     .displayPre {
-        height: 172px;
+        height: 120px;
     }
 
     ul.rightShowhideList {
@@ -3989,7 +4141,7 @@ fieldset { border:1px solid #ccc; padding:20px;}
         float: left;
         padding-top: 15px;
     }
-    
+
     .tabs-filter-wrapperDR .filter {
         float: none;
         width: auto;
@@ -4021,7 +4173,24 @@ fieldset { border:1px solid #ccc; padding:20px;}
 	.queryHeadName { float:none;}
 	.queryTimeOutLabel { width:86%; margin-right:2px;}
 
+
 }
+@media (max-width: 480px) {
+        .split {
+        -webkit-box-sizing:content-box;
+        -moz-box-sizing: content-box;
+        box-sizing: content-box;
+        overflow-x: hidden;
+        overflow-y: auto;}
+        .resultHtml { height:65%;}
+        .queryWrapper {border:1px solid #ccc;margin: 10px 0 0 0; height:calc(60% - 85px)}
+        .blockWrapper h1.theHeading { border:none;padding:17px 20px 30px 0;}
+        .queryStatus{ background:#f2f2f2;float:none;padding: 10px;border-bottom: 1px solid#ccc;color: #333;margin-top: 18px;}
+        .exportType select {margin-top: 5px;}
+
+    }
+
+
 
 @media (min-width: 639px) and (max-width:640px) {
     #serverConfigAdmin {
@@ -4038,7 +4207,7 @@ fieldset { border:1px solid #ccc; padding:20px;}
     .tabs-filter-wrapperDR {
         width: 560px;
     }
-    /*admin*/   
+    /*admin*/
     .server-info-heading .servIp {margin-left: 10%;margin-top: 0;}
     ul.servers-list li span.servIpNum {margin-left: 8%;}
     /*.serverNameAlign { width: 26%;}*/
@@ -4046,6 +4215,8 @@ fieldset { border:1px solid #ccc; padding:20px;}
 
 
 @media (max-width: 699px) {
+    .arrowDRDatabase {background-image: url(images/arrow_small.png); width:60px; height:16px;
+    display:block; position: relative; top:8px; margin:0 10px; }
     .logHeight {height: 364px;}
 
     ul.topRightList li.responsiveMenuPlaceHolder {
@@ -4545,7 +4716,7 @@ fieldset { border:1px solid #ccc; padding:20px;}
     /*.popup_cont {
         width: 380px;
     }*/
-	
+
 }
 
 @media (width: 768px) {
@@ -4576,6 +4747,8 @@ fieldset { border:1px solid #ccc; padding:20px;}
 @media (min-width: 768px) and (max-width: 800px) {
      .server-info-heading .servIp{margin-left: 14%;}
     ul.servers-list li span.servIpNum {margin-left: 3%;}
+
+
 }
 @media (min-width: 700px) and (max-width: 902px) {
     .overviewTbl {
@@ -4608,7 +4781,7 @@ fieldset { border:1px solid #ccc; padding:20px;}
 }
 
 @media (width: 320px) {
-    
+
 
     input.icon-search {
         width: 182px;
@@ -4678,12 +4851,20 @@ fieldset { border:1px solid #ccc; padding:20px;}
 .refreshBtn { margin-bottom:10px;}
 }
 
+@media (min-width: 700px) and (max-width: 800px) {
+
+    .headLeft .logo {width: 60px;}
+    .menuHome ul li a {padding-right:5px;}
+    #nav ul li a { padding:28px 9px 0 9px;}
+
+}
+
 
 @media (min-width: 768px) and (max-width:1246px) {
     .partitionHeight {
         height: 310px!important;
     }
-     
+
 
     .drScroll {
         overflow: visible !important;
@@ -4693,7 +4874,7 @@ fieldset { border:1px solid #ccc; padding:20px;}
 @media screen and (orientation:landscape) {
     .popup_cont {
         top: 5%;
-		
+
     }
 }
 
@@ -4752,5 +4933,72 @@ fieldset { border:1px solid #ccc; padding:20px;}
         height:120px;
 
     }
+    .split {
+        -webkit-box-sizing:content-box;
+        -moz-box-sizing: content-box;
+        box-sizing: content-box;
+        overflow-x: hidden;
+        overflow-y: auto;
+     }
+    .resultHtml { height:65%;}
+    .queryWrapper {margin: 10px 0 0 0; height:calc(95% - 85px)}
+    .blockWrapper h1.theHeading { /*border:none;*/}
+    /*.queryStatus{ background:#f2f2f2;float:none;padding: 10px;border-bottom: 1px solid#ccc;color: #333;margin-top: -6px;}*/
+    .exportType select {margin-top: 5px;}
+    .queryResultStyle {float:none;}
+    .textWritingArea { height:98%;}
+
 }
+
+@media (max-width:768px) {
+.split.split-horizontal, .gutter.gutter-horizontal{height:75%;}
+
+}
+
+/* ----------- iPad mini ----------- */
+
+
+@media only screen
+  and (min-width: 768px)
+  and (max-width: 1024px)
+   {
+  /*.queryStatus{ float: none;
+    padding: 25px 0 0 10px;
+    position: relative;
+    top: 6px;
+    right: 10px;}*/
+
+
+  }
+
+  @media only screen
+  and (min-width: 768px)
+  and (max-width: 1024px)
+  and (orientation:portrait)
+   {
+     #a{width:100% !important;}
+   }
+
+@media (width: 1024px)
+{
+/*.queryInput { width:580px!important; }*/
+.queryStatus { padding:30px 34px 0 0; float:none;}
+.blockWrapper h1.theHeading{ /*padding:0; */ }
+.queryResultStyle{position: relative;top: 17px;}
+.icon-queryResult {margin-top:13px;}
+.exportType select{margin-top:-3px;}
+#inputQuery{ height:102.8%!important;}
+
+
+}
+
+@media only screen
+  and (min-width: 768px)
+  and (max-width: 1024px)
+  and (orientation:landscape)
+   {
+     .split.split-horizontal{height:99% !important;}
+   }
+
+
 

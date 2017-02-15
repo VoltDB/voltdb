@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -158,8 +158,13 @@ class AggregateExecutorBase : public AbstractExecutor
 {
 public:
     AggregateExecutorBase(VoltDBEngine* engine, AbstractPlanNode* abstract_node) :
-        AbstractExecutor(engine, abstract_node), m_groupByKeySchema(NULL),
-        m_prePredicate(NULL), m_postPredicate(NULL)
+        AbstractExecutor(engine, abstract_node),
+        m_groupByKeySchema(NULL),
+        m_prePredicate(NULL),
+        m_postPredicate(NULL),
+        m_pmp(NULL),
+        m_inputSchema(NULL),
+        m_groupByKeyPartialHashSchema(NULL)
     { }
     ~AggregateExecutorBase()
     {
@@ -218,13 +223,7 @@ protected:
      */
     TableTuple& swapWithInprogressGroupByKeyTuple();
 
-    /**
-     * If this returns true, this class expects to output a row for
-     * each input row.  The aggregates are windowed aggregates.
-     */
-    virtual bool outputForEachInputRow() const;
-
-    /**
+    /*
      * List of columns in the output schema that are passing through
      * the value from a column in the input table and not doing any
      * aggregation.

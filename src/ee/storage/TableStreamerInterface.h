@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -23,19 +23,15 @@
 #include "storage/TupleBlock.h"
 #include "storage/TableStreamerContext.h"
 
-namespace voltdb
-{
-    class TupleSerializer;
-    class TupleOutputStreamProcessor;
-    class PersistentTableSurgeon;
+namespace voltdb {
+class TupleOutputStreamProcessor;
+class PersistentTableSurgeon;
 
     /**
      * Defines the interface for table streaming.
      */
-    class TableStreamerInterface
-    {
+    class TableStreamerInterface {
     public:
-
         virtual ~TableStreamerInterface()
         {}
 
@@ -43,7 +39,6 @@ namespace voltdb
          * Activate streaming.
          */
         virtual bool activateStream(PersistentTableSurgeon &surgeon,
-                                    TupleSerializer &serializer,
                                     TableStreamType streamType,
                                     const std::vector<std::string> &predicateStrings) = 0;
 

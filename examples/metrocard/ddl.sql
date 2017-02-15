@@ -35,8 +35,8 @@
 --  FROM example_of_types
 --  GROUP BY type;
 --
--- CREATE PROCEDURE FROM CLASS procedures.UpsertSymbol;
--- PARTITION PROCEDURE UpsertSymbol ON TABLE symbols COLUMN symbol PARAMETER 0;
+-- CREATE PROCEDURE PARTITION ON TABLE symbols COLUMN symbol [PARAMETER 0]
+--  FROM CLASS procedures.UpsertSymbol;
 ---------------------------------------------------------------------------------
 
 -- Update classes from jar to that server will know about classes but not procedures yet.
@@ -77,7 +77,7 @@ CREATE TABLE activity(
 );
 PARTITION TABLE activity ON COLUMN card_id;
 
-CREATE TABLE card_alert_export(
+CREATE STREAM card_alert_export PARTITION ON COLUMN card_id EXPORT TO TARGET alertstream (
   card_id               INTEGER        NOT NULL,
   export_time           BIGINT         NOT NULL,
   station_name          VARCHAR(25)    NOT NULL,
@@ -87,7 +87,6 @@ CREATE TABLE card_alert_export(
   notify                TINYINT           DEFAULT 0, -- 0=don't contact, 1=email, 2=text
   alert_message         VARCHAR(64)    NOT NULL
 );
-PARTITION TABLE card_alert_export ON COLUMN card_id;
 
 -------------- VIEWS ------------------------------------------------------------
 CREATE VIEW secondly_entries_by_station
@@ -127,11 +126,8 @@ CREATE PROCEDURE FROM CLASS metrocard.GetBusiestStationInLastMinute;
 CREATE PROCEDURE FROM CLASS metrocard.GetSwipesPerSecond;
 
 
-CREATE PROCEDURE ReplenishCard AS
+CREATE PROCEDURE ReplenishCard PARTITION ON TABLE cards COLUMN card_id PARAMETER 1 AS
 UPDATE cards SET balance = balance + ?
 WHERE card_id = ? AND card_type = 0;
-PARTITION PROCEDURE ReplenishCard ON TABLE cards COLUMN card_id PARAMETER 1;
-
-EXPORT TABLE card_alert_export to STREAM alertstream;
 
 END_OF_BATCH

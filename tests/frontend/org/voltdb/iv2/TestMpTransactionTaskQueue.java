@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -64,7 +64,7 @@ public class TestMpTransactionTaskQueue extends TestCase
         m_MPpool = mock(MpRoSitePool.class);
         // Accept work for a while
         when(m_MPpool.canAcceptWork()).thenReturn(true);
-        m_dut = new MpTransactionTaskQueue(m_writeQueue,TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId());
+        m_dut = new MpTransactionTaskQueue(m_writeQueue);
         m_dut.setMpRoSitePool(m_MPpool);
     }
 

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
+ * Copyright (C) 2008-2017 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -32,6 +32,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.VoltDB;
+import org.voltdb.utils.VoltFile;
 import org.voltdb.utils.VoltTableUtil;
 
 /**
@@ -51,7 +52,7 @@ public class DuplicateRowHandler {
     public DuplicateRowHandler(String path, Date now) {
         SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd-HH:mm:ss.SSSZ");
         this.now = sdf.format(now);
-        outputPath = new File(path);
+        outputPath = new VoltFile(path);
         if (!outputPath.exists()) {
             throw new RuntimeException("Output path for duplicates \"" + outputPath + "\" does not exist");
         }
