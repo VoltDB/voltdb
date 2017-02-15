@@ -52,6 +52,7 @@ import org.voltdb.planner.parseinfo.BranchNode;
 import org.voltdb.planner.parseinfo.JoinNode;
 import org.voltdb.planner.parseinfo.StmtSubqueryScan;
 import org.voltdb.planner.parseinfo.StmtTableScan;
+import org.voltdb.plannodes.IndexSortablePlanNode;
 import org.voltdb.plannodes.AbstractJoinPlanNode;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractReceivePlanNode;
@@ -60,6 +61,7 @@ import org.voltdb.plannodes.AggregatePlanNode;
 import org.voltdb.plannodes.DeletePlanNode;
 import org.voltdb.plannodes.HashAggregatePlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
+import org.voltdb.plannodes.IndexUseForOrderBy;
 import org.voltdb.plannodes.InsertPlanNode;
 import org.voltdb.plannodes.LimitPlanNode;
 import org.voltdb.plannodes.MaterializePlanNode;
@@ -1808,7 +1810,6 @@ public class PlanAssembler {
         // when they enforce an ordering equivalent to the one requested in the ORDER BY
         // or window function clause.  Even an intervening non-hash aggregate will not interfere
         // in this optimization.
-        AbstractPlanNode nonAggPlan;
 
         // Is there a window function between the root and the
         // scan or join nodes?  Also, does this window function
@@ -1854,10 +1855,9 @@ public class PlanAssembler {
             // No idea what happened here.  We can't find a
             // scan or join node at all.  This seems unlikely
             // to be right.  Maybe this should be an assert?
-            nonAggPlan = root;
             return true;
         }
-        nonAggPlan = probe;
+
         //
         //   o If the SLOB cannot use the index, then we
         //     need an order by node always.
@@ -1896,7 +1896,13 @@ public class PlanAssembler {
         //     the situation is like the one-window function
         //     below.)
         //
-        if (nonAggPlan.getSortOrderFromIndexScan() == SortDirectionType.INVALID) {
+        if ( ! (probe instanceof IndexSortablePlanNode)) {
+            return true;
+        }
+
+        IndexUseForOrderBy indexUse = ((IndexSortablePlanNode)probe).indexUse();
+
+        if (indexUse.getSortOrderFromIndexScan() == SortDirectionType.INVALID) {
             return true;
         }
         // Hash aggregates and partial aggregates
@@ -1906,10 +1912,10 @@ public class PlanAssembler {
             return true;
         }
         if ( numberWindowFunctions == 0 ) {
-            if ( nonAggPlan.getWindowFunctionUsesIndex() == SubPlanAssembler.NO_INDEX_USE ) {
+            if ( indexUse.getWindowFunctionUsesIndex() == SubPlanAssembler.NO_INDEX_USE ) {
                 return true;
             }
-            assert( nonAggPlan.getWindowFunctionUsesIndex() == SubPlanAssembler.STATEMENT_LEVEL_ORDER_BY_INDEX );
+            assert( indexUse.getWindowFunctionUsesIndex() == SubPlanAssembler.STATEMENT_LEVEL_ORDER_BY_INDEX );
             // Return true for MP (numberReceiveNodes > 0) and
             // false for SP (numberReceiveNodes == 0);
             return numberReceiveNodes > 0;
@@ -1917,8 +1923,8 @@ public class PlanAssembler {
         if (numberWindowFunctions == 1) {
             // If the WF uses the index then getWindowFunctionUsesIndex()
             // will return 0.
-            if ( ( nonAggPlan.getWindowFunctionUsesIndex() != 0 )
-                    || ( ! nonAggPlan.isWindowFunctionCompatibleWithOrderBy() ) ) {
+            if ( ( indexUse.getWindowFunctionUsesIndex() != 0 )
+                    || ( ! indexUse.isWindowFunctionCompatibleWithOrderBy() ) ) {
                 return true;
             }
             // Both the WF and the SLOB can use the index.  Since the
@@ -2315,7 +2321,7 @@ public class PlanAssembler {
         // We always need an order by plan node, even if the sort
         // is optimized away by an index.  This may be turned
         // into an inline order by in a MergeReceivePlanNode.
-        AbstractPlanNode scanNode = findScanNodeForWindowFunction(root);
+        IndexUseForOrderBy scanNode = findScanNodeForWindowFunction(root);
         AbstractPlanNode cnode = null;
         int winfunc = (scanNode == null) ? SubPlanAssembler.NO_INDEX_USE : scanNode.getWindowFunctionUsesIndex();
         // If we have an index which is compatible with the statement
@@ -2395,13 +2401,17 @@ public class PlanAssembler {
         return pnode;
     }
 
-    private AbstractPlanNode findScanNodeForWindowFunction(AbstractPlanNode root) {
-        while (root != null
-                && ( ! (( root instanceof AbstractJoinPlanNode )
-                        || (root instanceof AbstractScanPlanNode )))) {
-            root = (root.getChildCount() == 0) ? null : root.getChild(0);
+    private IndexUseForOrderBy findScanNodeForWindowFunction(AbstractPlanNode root) {
+        while (root != null) {
+            if (root instanceof IndexSortablePlanNode) {
+                return ((IndexSortablePlanNode) root).indexUse();
+            }
+            if (root.getChildCount() == 0) {
+                break;
+            }
+            root = root.getChild(0);
         }
-        return root;
+        return null;
     }
 
     private AbstractPlanNode handleAggregationOperators(AbstractPlanNode root) {

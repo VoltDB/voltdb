@@ -29,13 +29,12 @@ import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AbstractSubqueryExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
-import org.voltdb.planner.SubPlanAssembler;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.JoinType;
 import org.voltdb.types.PlanNodeType;
 import org.voltdb.types.SortDirectionType;
 
-public abstract class AbstractJoinPlanNode extends AbstractIndexSortablePlanNode {
+public abstract class AbstractJoinPlanNode extends AbstractPlanNode implements IndexSortablePlanNode {
 
     public enum Members {
         SORT_DIRECTION,
@@ -55,37 +54,7 @@ public abstract class AbstractJoinPlanNode extends AbstractIndexSortablePlanNode
     protected AbstractExpression m_wherePredicate = null;
 
     protected NodeSchema m_outputSchemaPreInlineAgg = null;
-
-    // If a window function uses an index, we
-    // mark which window function it is here.
-    // If this is SubPlanAssembler.STATEMENT_LEVEL_ORDER_BY_INDEX,
-    // the statement level order by function uses this index.
-    // If this is SubPlanAssembler.NO_INDEX_USE, then nothing
-    // uses this index.
-    //
-    // This will be propagated into a scan plan from the access
-    // path and up the outer branch of a join.
-    private int m_windowFunctionUsesIndex = SubPlanAssembler.NO_INDEX_USE;
-    // If m_windowFunctionUsesIndex is non-negative, so that
-    // the index is used to order a window function, but the
-    //
-    // This will be propagated into a scan plan from the access
-    // path and up the outer branch of a join.
-    private boolean m_windowFunctionIsCompatibleWithOrderBy = false;
-    // If there is an index scan used for ordering,
-    // this is the final expression order.  This may
-    // be used for a window function or for the statement
-    // level order by or both.
-    //
-    // This will be propagated into a scan plan from the access
-    // path and up the outer branch of a join.
-    private List<AbstractExpression> m_finalExpressionOrderFromIndexScan;
-    // Set the order direction for an index scan.  There
-    // is only one of these.
-    //
-    // This will be propagated into a scan plan from the access
-    // path and up the outer branch of a join.
-    private SortDirectionType m_sortDirectionFromIndexScan = SortDirectionType.INVALID;
+    private final IndexUseForOrderBy m_indexUse = new IndexUseForOrderBy();
 
     protected AbstractJoinPlanNode() {
         super();
@@ -318,13 +287,8 @@ public abstract class AbstractJoinPlanNode extends AbstractIndexSortablePlanNode
             m_sortDirection = SortDirectionType.INVALID;
             return;
         }
-        if (outerTable.getPlanNodeType() == PlanNodeType.INDEXSCAN) {
-            m_sortDirection = ((IndexScanPlanNode)outerTable).getSortDirection();
-            return;
-        }
-        if (outerTable instanceof AbstractJoinPlanNode) {
-            ((AbstractJoinPlanNode)outerTable).resolveSortDirection();
-            m_sortDirection = ((AbstractJoinPlanNode)outerTable).getSortDirection();
+        if (outerTable instanceof IndexSortablePlanNode) {
+            m_sortDirection = ((IndexSortablePlanNode)outerTable).indexUse().getSortOrderFromIndexScan();
         }
     }
 
@@ -493,6 +457,16 @@ public abstract class AbstractJoinPlanNode extends AbstractIndexSortablePlanNode
     @Override
     public void adjustDifferentiatorField(TupleValueExpression tve) {
         tve.setDifferentiator(tve.getColumnIndex());
+    }
+
+    @Override
+    public IndexUseForOrderBy indexUse() {
+        return m_indexUse;
+    }
+
+    @Override
+    public AbstractPlanNode planNode() {
+        return this;
     }
 
 }

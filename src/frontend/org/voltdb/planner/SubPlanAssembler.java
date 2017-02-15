@@ -46,9 +46,11 @@ import org.voltdb.expressions.WindowFunctionExpression;
 import org.voltdb.planner.parseinfo.JoinNode;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
+import org.voltdb.plannodes.IndexSortablePlanNode;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
+import org.voltdb.plannodes.IndexUseForOrderBy;
 import org.voltdb.plannodes.MaterializedScanPlanNode;
 import org.voltdb.plannodes.NestLoopIndexPlanNode;
 import org.voltdb.plannodes.ReceivePlanNode;
@@ -2193,8 +2195,8 @@ public abstract class SubPlanAssembler {
      * @return An index scan plan node OR,
                in one edge case, an NLIJ of a MaterializedScan and an index scan plan node.
      */
-    private static AbstractPlanNode getIndexAccessPlanForTable(StmtTableScan tableScan, AccessPath path)
-    {
+    private static AbstractPlanNode getIndexAccessPlanForTable(
+            StmtTableScan tableScan, AccessPath path) {
         // now assume this will be an index scan and get the relevant index
         Index index = path.index;
         IndexScanPlanNode scanNode = new IndexScanPlanNode(tableScan, index);
@@ -2246,23 +2248,25 @@ public abstract class SubPlanAssembler {
         scanNode.setPredicate(path.otherExprs);
         // Propagate the sorting information
         // into the scan node from the access path.
-        scanNode.setWindowFunctionUsesIndex(path.m_windowFunctionUsesIndex);
-        scanNode.setSortOrderFromIndexScan(path.sortDirection);
-        scanNode.setWindowFunctionIsCompatibleWithOrderBy(path.m_stmtOrderByIsCompatible);
-        scanNode.setFinalExpressionOrderFromIndexScan(path.m_finalExpressionOrder);
         // The initial expression is needed to control a (short?) forward scan to adjust the start of a reverse
         // iteration after it had to initially settle for starting at "greater than a prefix key".
         scanNode.setInitialExpression(ExpressionUtil.combinePredicates(path.initialExpr));
         scanNode.setSkipNullPredicate();
         scanNode.setEliminatedPostFilters(path.eliminatedPostExprs);
+        if (scanNode instanceof IndexSortablePlanNode) {
+            IndexUseForOrderBy indexUse = ((IndexSortablePlanNode)scanNode).indexUse();
+            indexUse.setWindowFunctionUsesIndex(path.m_windowFunctionUsesIndex);
+            indexUse.setSortOrderFromIndexScan(path.sortDirection);
+            indexUse.setWindowFunctionIsCompatibleWithOrderBy(path.m_stmtOrderByIsCompatible);
+            indexUse.setFinalExpressionOrderFromIndexScan(path.m_finalExpressionOrder);
+        }
         return resultNode;
     }
 
 
     // Generate a plan for an IN-LIST-driven index scan
-    private static AbstractPlanNode injectIndexedJoinWithMaterializedScan(AbstractExpression listElements,
-                                                                   IndexScanPlanNode scanNode)
-    {
+    private static AbstractPlanNode injectIndexedJoinWithMaterializedScan(
+            AbstractExpression listElements, IndexScanPlanNode scanNode) {
         MaterializedScanPlanNode matScan = new MaterializedScanPlanNode();
         assert(listElements instanceof VectorValueExpression || listElements instanceof ParameterValueExpression);
         matScan.setRowData(listElements);

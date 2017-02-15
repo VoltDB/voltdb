@@ -26,6 +26,7 @@ import java.util.Queue;
 import java.util.Set;
 
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.plannodes.IndexSortablePlanNode;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.AggregatePlanNode;
@@ -122,7 +123,7 @@ public class InlineOrderByIntoMergeReceive extends MicroOptimization {
         child = onode.getChild(0);
         // The order by node needs a RECEIVE node child
         // for this optimization to work.
-        if ( ! ( child instanceof ReceivePlanNode) ) {
+        if ( ! ( child instanceof ReceivePlanNode)) {
             return plan;
         }
         ReceivePlanNode receiveNode = (ReceivePlanNode)child;
@@ -145,7 +146,11 @@ public class InlineOrderByIntoMergeReceive extends MicroOptimization {
         // to record a number in the plan node and
         // then check that child.getWindowFunctionUsesIndex()
         // returns the number in the plan node.
-        if (child.getWindowFunctionUsesIndex() != 0) {
+        if ( ! ( child instanceof IndexSortablePlanNode)) {
+            return plan;
+        }
+        IndexSortablePlanNode indexed = (IndexSortablePlanNode)child;
+        if (indexed.indexUse().getWindowFunctionUsesIndex() != 0) {
             return plan;
         }
         // Remove the Receive node and the Order by node

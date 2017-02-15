@@ -20,13 +20,45 @@ import java.util.List;
 
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.planner.PlanningErrorException;
+import org.voltdb.planner.SubPlanAssembler;
 import org.voltdb.types.SortDirectionType;
 
 /**
  * This is the interface for the class AbstractIndexSortablePlanNode.  See
  * the comment there for more direction.
  */
-public interface IndexUseForOrderBy {
+public class IndexUseForOrderBy {
+    // If a window function uses an index, we
+    // mark which window function it is here.
+    // If this is SubPlanAssembler.STATEMENT_LEVEL_ORDER_BY_INDEX,
+    // the statement level order by function uses this index.
+    // If this is SubPlanAssembler.NO_INDEX_USE, then nothing
+    // uses this index.
+    //
+    // This will be propagated into a scan plan from the access
+    // path and up the outer branch of a join.
+    private int m_windowFunctionUsesIndex = SubPlanAssembler.NO_INDEX_USE;
+    // If m_windowFunctionUsesIndex is non-negative, so that
+    // the index is used to order a window function, but the
+    //
+    // This will be propagated into a scan plan from the access
+    // path and up the outer branch of a join.
+    private boolean m_windowFunctionIsCompatibleWithOrderBy = false;
+    // If there is an index scan used for ordering,
+    // this is the final expression order.  This may
+    // be used for a window function or for the statement
+    // level order by or both.
+    //
+    // This will be propagated into a scan plan from the access
+    // path and up the outer branch of a join.
+    private List<AbstractExpression> m_finalExpressionOrderFromIndexScan;
+    // Set the order direction for an index scan.  There
+    // is only one of these.
+    //
+    // This will be propagated into a scan plan from the access
+    // path and up the outer branch of a join.
+    private SortDirectionType m_sortDirectionFromIndexScan = SortDirectionType.INVALID;
+
     /**
      * Return the number of the window function which
      * uses an index to provide ordering.  If none uses an
@@ -37,9 +69,71 @@ public interface IndexUseForOrderBy {
      *
      * @return
      */
-    default public int getWindowFunctionUsesIndex() throws PlanningErrorException {
-        throw new PlanningErrorException("Internal Error: IndexUseForOrderBy.getWindowFunctionUsesIndex called on "
-                                         + getClass().getName() + " object.");
+
+    /**
+     * Set which window function or statement level order by
+     * uses the index for ordering.  Only one window function
+     * can use an index, and the statement level order by
+     * can use the index or not, depending on the expressions
+     * in the order by.
+     *
+     * @param windowFunctionUsesIndex
+     */
+
+    /**
+     * Is the window function compatible with an index.  If there is
+     * a window function and a statement level order by, both need
+     * to be compatible with each other for the statement level order
+     * by to use the index.  The window function can use the index by
+     * itself.
+     *
+     * @return
+     */
+
+    /**
+     * Set whether the statement level orderby can use an index.
+     *
+     * @param value
+     */
+
+    /**
+     * If there is an index scan used for for this plan we propagate the
+     * final expression list here.  This should only happen in join nodes
+     * and scan nodes.
+     *
+     * @return
+     */
+
+    /**
+     * Set the final expression order from an index scan.  This should only be
+     * called for join and scan nodes.
+     *
+     * @param finalExpressionOrder
+     */
+    /**
+     * Get a sort order from an index scan.  This should only be called from
+     * scan and join nodes, as it is not propagated past them.
+     *
+     * @return
+     */
+    /**
+     * Set a scan order from an index scan.  This should only be
+     * called from scan and join nodes.
+     *
+     * @param sortOrderFromIndexScan
+     */
+    /**
+     * Return the number of the window function which
+     * uses an index to provide ordering.  If none uses an
+     * index, but there is a statement level order by which
+     * uses an index, return SubPlanAssembler.STATEMENT_LEVEL_ORDER_BY_INDEX.
+     * If nothing uses an index for ordering, return
+     * SubPlanAssember.NO_INDEX_USE.
+     *
+     * @return
+     */
+    public int getWindowFunctionUsesIndex() throws PlanningErrorException {
+        return m_windowFunctionUsesIndex;
     }
 
     /**
@@ -51,9 +145,8 @@ public interface IndexUseForOrderBy {
      *
      * @param windowFunctionUsesIndex
      */
-    default public void setWindowFunctionUsesIndex(int windowFunctionUsesIndex)  throws PlanningErrorException {
-        throw new PlanningErrorException("Internal Error: IndexUseForOrderBy.setWindowFunctionUsesIndex called on "
-                                         + getClass().getName() + " object.");
+    public void setWindowFunctionUsesIndex(int windowFunctionUsesIndex) {
+        m_windowFunctionUsesIndex = windowFunctionUsesIndex;
     }
 
     /**
@@ -65,9 +158,8 @@ public interface IndexUseForOrderBy {
      *
      * @return
      */
-    default public boolean isWindowFunctionCompatibleWithOrderBy()  throws PlanningErrorException {
-        throw new PlanningErrorException("Internal Error: IndexUseForOrderBy.isWindowFunctionCompatibleWithOrderBy called on "
-                                         + getClass().getName() + " object.");
+    public boolean isWindowFunctionCompatibleWithOrderBy() {
+        return m_windowFunctionIsCompatibleWithOrderBy;
     }
 
     /**
@@ -75,9 +167,8 @@ public interface IndexUseForOrderBy {
      *
      * @param value
      */
-    default public void setWindowFunctionIsCompatibleWithOrderBy(boolean value) throws PlanningErrorException {
-        throw new PlanningErrorException("Internal Error: IndexUseForOrderBy.setWindowFunctionIsCompatibleWithOrderBy called on "
-                                         + getClass().getName() + " object.");
+    public void setWindowFunctionIsCompatibleWithOrderBy(boolean value) {
+        m_windowFunctionIsCompatibleWithOrderBy = value;
     }
 
     /**
@@ -87,9 +178,8 @@ public interface IndexUseForOrderBy {
      *
      * @return
      */
-    default public List<AbstractExpression> getFinalExpressionOrderFromIndexScan() throws PlanningErrorException {
-        throw new PlanningErrorException("Internal Error: IndexUseForOrderBy.getFinalExpressionOrderFromIndexScan called on "
-                                         + getClass().getName() + " object.");
+    public List<AbstractExpression> getFinalExpressionOrderFromIndexScan() {
+        return m_finalExpressionOrderFromIndexScan;
     }
 
     /**
@@ -98,9 +188,8 @@ public interface IndexUseForOrderBy {
      *
      * @param finalExpressionOrder
      */
-    default public void setFinalExpressionOrderFromIndexScan(List<AbstractExpression> finalExpressionOrder)  throws PlanningErrorException {
-        throw new PlanningErrorException("Internal Error: IndexUseForOrderBy.setFinalExpressionOrderFromIndexScan called on "
-                                         + getClass().getName() + " object.");
+    public void setFinalExpressionOrderFromIndexScan(List<AbstractExpression> finalExpressionOrder) {
+        m_finalExpressionOrderFromIndexScan = finalExpressionOrder;
     }
 
     /**
@@ -109,9 +198,8 @@ public interface IndexUseForOrderBy {
      *
      * @return
      */
-    default public SortDirectionType getSortOrderFromIndexScan()  throws PlanningErrorException {
-        throw new PlanningErrorException("Internal Error: IndexUseForOrderBy.getSortOrderFromIndexScan called on "
-                                         + getClass().getName() + " object.");
+    public SortDirectionType getSortOrderFromIndexScan() {
+        return m_sortDirectionFromIndexScan;
     }
 
     /**
@@ -120,8 +208,7 @@ public interface IndexUseForOrderBy {
      *
      * @param sortOrderFromIndexScan
      */
-    default public void setSortOrderFromIndexScan(SortDirectionType sortOrderFromIndexScan) throws PlanningErrorException {
-        throw new PlanningErrorException("Internal Error: IndexUseForOrderBy.setFinalExpressionOrderFromIndexScan called on "
-                                         + getClass().getName() + " object.");
+    public void setSortOrderFromIndexScan(SortDirectionType sortOrderFromIndexScan) {
+        m_sortDirectionFromIndexScan = sortOrderFromIndexScan;
     }
 }

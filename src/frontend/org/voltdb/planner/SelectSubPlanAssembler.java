@@ -34,10 +34,12 @@ import org.voltdb.planner.parseinfo.JoinNode;
 import org.voltdb.planner.parseinfo.StmtSubqueryScan;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.SubqueryLeafNode;
+    import org.voltdb.plannodes.IndexSortablePlanNode;
 import org.voltdb.plannodes.AbstractJoinPlanNode;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractReceivePlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
+import org.voltdb.plannodes.IndexUseForOrderBy;
 import org.voltdb.plannodes.MaterializedScanPlanNode;
 import org.voltdb.plannodes.NestLoopIndexPlanNode;
 import org.voltdb.plannodes.NestLoopPlanNode;
@@ -568,20 +570,23 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                 return null;
             }
             // Join Node
-            AbstractPlanNode answer = getSelectSubPlanForJoin(branchJoinNode,
+            IndexSortablePlanNode answer = getSelectSubPlanForJoin(branchJoinNode,
                                                               outerScanPlan,
                                                               innerScanPlan);
             // Propagate information used for order by clauses in window functions
             // and the statement level order by clause.  This is only if the
             // branch node is an inner join.
             if ((answer != null)
-                    && (branchJoinNode.getJoinType() == JoinType.INNER)) {
-                answer.setWindowFunctionUsesIndex(outerScanPlan.getWindowFunctionUsesIndex());
-                answer.setWindowFunctionIsCompatibleWithOrderBy(outerScanPlan.isWindowFunctionCompatibleWithOrderBy());
-                answer.setFinalExpressionOrderFromIndexScan(outerScanPlan.getFinalExpressionOrderFromIndexScan());
-                answer.setSortOrderFromIndexScan(outerScanPlan.getSortOrderFromIndexScan());
+                    && (branchJoinNode.getJoinType() == JoinType.INNER)
+                    && outerScanPlan instanceof IndexSortablePlanNode) {
+                IndexUseForOrderBy indexUseForJoin = answer.indexUse();
+                IndexUseForOrderBy indexUseFromScan = ((IndexSortablePlanNode)outerScanPlan).indexUse();
+                indexUseForJoin.setWindowFunctionUsesIndex(indexUseFromScan.getWindowFunctionUsesIndex());
+                indexUseForJoin.setWindowFunctionIsCompatibleWithOrderBy(indexUseFromScan.isWindowFunctionCompatibleWithOrderBy());
+                indexUseForJoin.setFinalExpressionOrderFromIndexScan(indexUseFromScan.getFinalExpressionOrderFromIndexScan());
+                indexUseForJoin.setSortOrderFromIndexScan(indexUseFromScan.getSortOrderFromIndexScan());
             }
-            return answer;
+            return answer.planNode();
         }
 
         // End of recursion
@@ -611,7 +616,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
      * @return A completed plan-sub-graph
      * or null if a valid plan can not be produced for given access paths.
      */
-    private AbstractPlanNode getSelectSubPlanForJoin(BranchNode joinNode,
+    private IndexSortablePlanNode getSelectSubPlanForJoin(BranchNode joinNode,
                                                      AbstractPlanNode outerPlan,
                                                      AbstractPlanNode innerPlan)
     {

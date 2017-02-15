@@ -45,15 +45,13 @@ import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AbstractSubqueryExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.PlanStatistics;
-import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.planner.StatsField;
-import org.voltdb.planner.SubPlanAssembler;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.types.PlanNodeType;
 import org.voltdb.types.SortDirectionType;
 
-public abstract class AbstractPlanNode implements JSONString, Comparable<AbstractPlanNode>, IndexUseForOrderBy {
+public abstract class AbstractPlanNode implements JSONString, Comparable<AbstractPlanNode> {
 
     /**
      * Internal PlanNodeId counter. Note that this member is static, which means
@@ -233,7 +231,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
      * sort of node it is, so that its parent will be able to resolve
      * its indexes successfully.
      *
-     * Should get called on the plan graph after any optimizations but before throws PlanningErrorException
+     * Should get called on the plan graph after any optimizations but before
      * the plan gets fragmented.
      * FIXME: This needs to be reworked with generateOutputSchema to eliminate redundancies.
      */

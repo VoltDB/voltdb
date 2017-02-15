@@ -36,15 +36,13 @@ import org.voltdb.expressions.AbstractSubqueryExpression;
 import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
-import org.voltdb.planner.SubPlanAssembler;
 import org.voltdb.planner.parseinfo.StmtSubqueryScan;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.types.PlanNodeType;
-import org.voltdb.types.SortDirectionType;
 import org.voltdb.utils.CatalogUtil;
 
-public abstract class AbstractScanPlanNode extends AbstractIndexSortablePlanNode {
+public abstract class AbstractScanPlanNode extends AbstractPlanNode {
     public enum Members {
         PREDICATE,
         TARGET_TABLE_NAME,

@@ -27,7 +27,6 @@ import java.util.Set;
 
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.lib.StringUtil;
-import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
@@ -52,7 +51,7 @@ import org.voltdb.types.PlanNodeType;
 import org.voltdb.types.SortDirectionType;
 import org.voltdb.utils.CatalogUtil;
 
-public class IndexScanPlanNode extends AbstractScanPlanNode {
+public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSortablePlanNode {
 
     public enum Members {
         TARGET_INDEX_NAME,
@@ -121,6 +120,8 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
 
     // Post-filters that got eliminated by exactly matched partial index filters
     private final List<AbstractExpression> m_eliminatedPostFilterExpressions = new ArrayList<>();
+
+    private final IndexUseForOrderBy m_indexUse = new IndexUseForOrderBy();
 
     public IndexScanPlanNode() {
         super();
@@ -1034,6 +1035,18 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         for (AbstractExpression ae : m_searchkeyExpressions) {
             collected.addAll(ae.findAllSubexpressionsOfClass(aeClass));
         }
+    }
+
+    @Override
+    public IndexUseForOrderBy indexUse() {
+        // TODO Auto-generated method stub
+        return m_indexUse;
+    }
+
+    @Override
+    public AbstractPlanNode planNode() {
+        // TODO Auto-generated method stub
+        return this;
     }
 
 }
