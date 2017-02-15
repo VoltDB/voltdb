@@ -586,6 +586,9 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                 indexUseForJoin.setFinalExpressionOrderFromIndexScan(indexUseFromScan.getFinalExpressionOrderFromIndexScan());
                 indexUseForJoin.setSortOrderFromIndexScan(indexUseFromScan.getSortOrderFromIndexScan());
             }
+            if (answer == null) {
+                return null;
+            }
             return answer.planNode();
         }
 
