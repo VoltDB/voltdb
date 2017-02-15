@@ -696,4 +696,102 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
             teardownSystem();
         }
     }
+
+    @Test
+    public void testStatsAfterUpdateClasses() throws Exception {
+        System.out.println("\n\n-----\n testStatsAfterUpdateClasses \n-----\n\n");
+
+        String pathToCatalog = Configuration.getPathToCatalogForTest("updateclasses.jar");
+        String pathToDeployment = Configuration.getPathToCatalogForTest("updateclasses.xml");
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("create table tb1 (a int);");
+        builder.setUseDDLSchema(true);
+        boolean success = builder.compile(pathToCatalog, 1, 1, 0);
+        assertTrue("Schema compilation failed", success);
+        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
+
+        // This is maybe cheating a little bit?
+        InMemoryJarfile jarfile = new InMemoryJarfile();
+        for (Class<?> clazz : PROC_CLASSES) {
+            VoltCompiler comp = new VoltCompiler(false);
+            comp.addClassToJar(jarfile, clazz);
+        }
+        for (Class<?> clazz : EXTRA_CLASSES) {
+            VoltCompiler comp = new VoltCompiler(false);
+            comp.addClassToJar(jarfile, clazz);
+        }
+        // Add a deployment file just to have something other than classes in the jar
+        jarfile.put("deployment.xml", new File(pathToDeployment));
+
+        try {
+            VoltDB.Configuration config = new VoltDB.Configuration();
+            config.m_pathToCatalog = pathToCatalog;
+            config.m_pathToDeployment = pathToDeployment;
+            startSystem(config);
+
+            ClientResponse resp;
+            VoltTable vt;
+            resp = m_client.callProcedure("@SystemCatalog", "CLASSES");
+            // New cluster, you're like summer vacation...
+            assertEquals(0, resp.getResults()[0].getRowCount());
+            assertFalse(VoltTableTestHelpers.moveToMatchingRow(resp.getResults()[0], "CLASS_NAME",
+                        PROC_CLASSES[0].getCanonicalName()));
+
+            resp = m_client.callProcedure("@UpdateClasses", jarfile.getFullJarBytes(), null);
+
+            // check stats after UAC
+            vt = m_client.callProcedure("@Statistics", "PROCEDURE", 0).getResults()[0];
+            assertEquals(1, vt.getRowCount());
+            vt.advanceRow();
+            assertEquals("org.voltdb.sysprocs.UpdateApplicationCatalog", vt.getString(5));
+
+            // create procedure 0
+            resp = m_client.callProcedure("@AdHoc", "create procedure from class " +
+                    PROC_CLASSES[0].getCanonicalName() + ";");
+            // check stats after UAC
+            vt = m_client.callProcedure("@Statistics", "PROCEDURE", 0).getResults()[0];
+            assertEquals(vt.getRowCount(), 1);
+            vt.advanceRow();
+            assertEquals("org.voltdb.sysprocs.UpdateApplicationCatalog", vt.getString(5));
+
+            // invoke a new user procedure
+            vt = m_client.callProcedure(PROC_CLASSES[0].getSimpleName()).getResults()[0];
+            assertEquals(10L, vt.asScalarLong());
+            vt = m_client.callProcedure(PROC_CLASSES[0].getSimpleName()).getResults()[0];
+            assertEquals(10L, vt.asScalarLong());
+            vt = m_client.callProcedure(PROC_CLASSES[0].getSimpleName()).getResults()[0];
+            assertEquals(10L, vt.asScalarLong());
+
+            // check stats
+            vt = m_client.callProcedure("@Statistics", "PROCEDURE", 0).getResults()[0];
+            assertEquals(2, vt.getRowCount());
+            assertTrue(vt.toString().contains("org.voltdb_testprocs.updateclasses.testImportProc"));
+            assertTrue(vt.toString().contains("org.voltdb.sysprocs.UpdateApplicationCatalog"));
+
+            // create procedure 1
+            resp = m_client.callProcedure("@AdHoc", "create procedure from class " +
+                    PROC_CLASSES[1].getCanonicalName() + ";");
+            // check stats
+            vt = m_client.callProcedure("@Statistics", "PROCEDURE", 0).getResults()[0];
+            assertEquals(1, vt.getRowCount());
+            vt.advanceRow();
+            assertEquals("org.voltdb.sysprocs.UpdateApplicationCatalog", vt.getString(5));
+
+            resp = m_client.callProcedure(PROC_CLASSES[1].getSimpleName(), 1l, "", "");
+            assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+
+            vt = m_client.callProcedure("@Statistics", "PROCEDURE", 0).getResults()[0];
+            assertEquals(2, vt.getRowCount());
+
+            vt = m_client.callProcedure(PROC_CLASSES[0].getSimpleName()).getResults()[0];
+            assertEquals(10L, vt.asScalarLong());
+
+            vt = m_client.callProcedure("@Statistics", "PROCEDURE", 0).getResults()[0];
+            assertEquals(3, vt.getRowCount());
+
+        }
+        finally {
+            teardownSystem();
+        }
+    }
 }

@@ -77,6 +77,8 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.VoltZK;
 import org.voltdb.catalog.Catalog;
+import org.voltdb.catalog.Catalog.CatalogCmd;
+import org.voltdb.catalog.CatalogDiffEngine;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.CatalogType;
 import org.voltdb.catalog.Cluster;
@@ -217,6 +219,20 @@ public abstract class CatalogUtil {
     {
         // Throws IOException on load failure.
         InMemoryJarfile jarfile = loadInMemoryJarFile(catalogBytes);
+
+        return loadAndUpgradeCatalogFromJar(jarfile, isXDCR);
+    }
+
+    /**
+     * Load a catalog from the InMemoryJarfile.
+     *
+     * @param jarfile
+     * @return Pair containing updated InMemoryJarFile and upgraded version (or null if it wasn't upgraded)
+     * @throws IOException if there is no version information in the catalog.
+     */
+    public static Pair<InMemoryJarfile, String> loadAndUpgradeCatalogFromJar(InMemoryJarfile jarfile, boolean isXDCR)
+        throws IOException
+    {
         // Let VoltCompiler do a version check and upgrade the catalog on the fly.
         // I.e. jarfile may be modified.
         VoltCompiler compiler = new VoltCompiler(isXDCR);
@@ -288,9 +304,7 @@ public abstract class CatalogUtil {
         assert(catalogBytes != null);
 
         InMemoryJarfile jarfile = new InMemoryJarfile(catalogBytes);
-        byte[] serializedCatalogBytes = jarfile.get(CATALOG_FILENAME);
-
-        if (null == serializedCatalogBytes) {
+        if (!jarfile.containsKey(CATALOG_FILENAME)) {
             throw new IOException("Database catalog not found - please build your application using the current version of VoltDB.");
         }
 
@@ -2572,6 +2586,49 @@ public abstract class CatalogUtil {
             paths.getDroverflow().setPath(VoltDB.instance().getDROverflowPath());
         }
         return deployment;
+    }
+
+    /**
+     * {@link CatalogDiffEngine} generates statement commands that will apply on catalog.
+     * Most of these diffCmds are useful for java in memory catalog, but only very few are used in EE.
+     * This function will generate EE applicable diffCmds.
+     * @param diffCmds
+     * @return
+     */
+    public static String getDiffCommandsForEE(String diffCmds) {
+        if (diffCmds == null || diffCmds.length() == 0) return "";
+        // We know EE does not care procedure changes, so we can skip them for EE diffs.
+        // There are more like deployment changes, the better way is to filter all the other
+        // catalog type changes other than the ones used in EE.
+        // Refer the EE catalog usage.
+
+        // e.g.
+        // add /clusters#cluster/databases#database procedures Vote
+        // set /clusters#cluster/databases#database/procedures#Vote classname "voter.Vote"
+        // set $PREV readonly false
+        // set $PREV singlepartition true
+        // add /clusters#cluster/databases#database/procedures#Vote statements checkContestantStmt
+        // set /clusters#cluster/databases#database/procedures#Vote/statements#checkContestantStmt sqltext "SELECT contes...
+        // set $PREV querytype 2
+        // set $PREV readonly true
+        // set $PREV singlepartition true
+
+        StringBuilder sb = new StringBuilder();
+        String[] cmds = diffCmds.split("\n");
+        boolean skip = false;
+        for (int i = 0; i < cmds.length; i++) {
+            String stmt = cmds[i];
+
+            char cmd = Catalog.parseStmtCmd(stmt);
+            if (cmd == 'a' || cmd == 'd') { // add, del
+                CatalogCmd catCmd = Catalog.parseStmt(stmt);
+                skip = catCmd.isProcedureRelatedCmd();
+            }
+            if (!skip) {
+                sb.append(stmt).append("\n");
+            }
+        }
+        return sb.toString();
     }
 
 }
