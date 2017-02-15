@@ -122,6 +122,10 @@ public class Pause extends VoltSystemProcedure {
             }
         }
 
+        // Force a tick so that stats will be updated.
+        // Primarily added to get latest table stats for DR pause and empty db check.
+        ctx.getSiteProcedureConnection().tick();
+
         VoltTable t = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);
         t.addRow(VoltSystemProcedure.STATUS_OK);
         return (new VoltTable[] {t});
