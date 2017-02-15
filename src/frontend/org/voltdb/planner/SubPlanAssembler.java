@@ -1206,7 +1206,6 @@ public abstract class SubPlanAssembler {
      * order by expressions.
      */
     static class WindowFunctionScore {
-        private static final int MAX_LIST_REMOVAL = 1000000;
 
         /**
          * A constructor for creating a score from a
@@ -1344,10 +1343,9 @@ public abstract class SubPlanAssembler {
                         // an expression, say with "PARTITION BY A, A",
                         // we need to remove them all.  But guard against
                         // an infinite loop here;
-                        for (idx = 0; m_partitionByExprs.remove(eorc) && idx < MAX_LIST_REMOVAL; idx += 1) {
-                            ;
+                        while (m_partitionByExprs.remove(eorc)) {
+                            /* Do Nothing */;
                         }
-                        assert(idx < MAX_LIST_REMOVAL);
                         m_bindings.addAll(moreBindings);
                         return MatchResults.MATCHED;
                     }
@@ -1387,10 +1385,9 @@ public abstract class SubPlanAssembler {
                 m_bindings.addAll(moreBindings);
                 // Remove the next statement EOC from the unmatched OrderByExpressions
                 // list since we matched it.  We need to remove all of them,
-                for (idx = 0; m_unmatchedOrderByExprs.remove(nextStatementEOC) && idx < MAX_LIST_REMOVAL; idx += 1) {
-                    ;
+                while (m_unmatchedOrderByExprs.remove(nextStatementEOC)) {
+                    /* Do Nothing */ ;
                 }
-                assert(idx < MAX_LIST_REMOVAL);
                 return MatchResults.MATCHED;
             }
             // No Bindings were found.  Mark this as a
