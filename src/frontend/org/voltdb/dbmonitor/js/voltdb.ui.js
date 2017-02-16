@@ -1323,7 +1323,7 @@ var loadPage = function (serverName, portid) {
                               '<div class="drRelationRight"><span class="iconDRDatabase"></span><div class="headText1 DRHeaderWrap">' +
                               '<a href="#" class="showhideIcon arrowAdjustDR">' +
                               '<span class="DRHeaderName" id="dRHeaderName_' + i + '">Database ('+ drRoleDetail['DRROLE'][i][2] +')</span>' +
-                              '</a></div>  <div class="latencyDR"></div></div><div class="clear"></div></div>' +
+                              '</a></div>  <div class="latencyDR latencyDR_' + combinedId + '"></div></div><div class="clear"></div></div>' +
                               '            <div class="clear"></div>' +
                               '        </div>'
 
@@ -1469,11 +1469,11 @@ var loadPage = function (serverName, portid) {
 
             VoltDbUI.drChartList.push(combinedId);
 
-            $('.latencyDR').html('');
+            $('.latencyDR_' + combinedId).html('');
             if(replicaLatency.length != 0){
-                $('.latencyDR').html("<p>Latency <span id='latencyDR_" + combinedId + "'>" + max(replicaLatency) + " </span> sec</p>")
+                $('.latencyDR_' + combinedId).html("<p>Latency <span id='latencyDR_" + combinedId + "'>" + max(replicaLatency) + " </span> sec</p>")
             } else {
-                $('.latencyDR').html('');
+                $('.latencyDR_' + combinedId).html('');
             }
 
             if(producerDbId != undefined){
