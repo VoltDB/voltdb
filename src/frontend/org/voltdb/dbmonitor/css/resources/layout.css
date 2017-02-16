@@ -726,7 +726,7 @@ ul.rightShowhideList {
 .expandedDR {
     background:url(images/down_dr.png)7px 11px no-repeat;
     position:relative;
-    top:5px;
+
 }
 
 .leftShowhide .expanded {
@@ -2055,7 +2055,7 @@ h3.ui-state-active {
 
 
 }
-.drHead { background-color:#fff; padding:5px 20px 20px 25px; border:none;  }
+.drHead { background-color:#fff; padding:5px 20px 15px 25px; border:none;  }
 .drBody { padding:0;}
 .DRHeaderName { position:relative;top:5px; font-size:16px;}
 .drPending { color: #ea151d;}
