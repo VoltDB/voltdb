@@ -1471,7 +1471,7 @@ var loadPage = function (serverName, portid) {
 
             $('.latencyDR').html('');
             if(replicaLatency.length != 0){
-                $('.latencyDR').html("<p>Latency <span id='latencyDR'>" + max(replicaLatency) + " </span> sec</p>")
+                $('.latencyDR').html("<p>Latency <span id='latencyDR_" + combinedId + "'>" + max(replicaLatency) + " </span> sec</p>")
             } else {
                 $('.latencyDR').html('');
             }
