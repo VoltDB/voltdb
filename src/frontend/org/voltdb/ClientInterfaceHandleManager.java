@@ -20,6 +20,7 @@ package org.voltdb;
 import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -61,9 +62,9 @@ public class ClientInterfaceHandleManager
 
     private volatile boolean m_wantsTopologyUpdates = false;
 
-    private HandleGenerator m_shortCircuitHG = new HandleGenerator(SHORT_CIRCUIT_PART_ID);
+    private final HandleGenerator m_shortCircuitHG = new HandleGenerator(SHORT_CIRCUIT_PART_ID);
 
-    private final Map<Long, Iv2InFlight> m_shortCircuitReads = new HashMap<Long, Iv2InFlight>();
+    private final Map<Long, Iv2InFlight> m_shortCircuitReads = Collections.synchronizedMap(new HashMap<>());
 
     private static class HandleGenerator
     {
@@ -121,8 +122,8 @@ public class ClientInterfaceHandleManager
 
     static class PartitionData {
         private final HandleGenerator m_generator;
-        private final Deque<Iv2InFlight> m_reads = new ArrayDeque<Iv2InFlight>();
-        private final Deque<Iv2InFlight> m_writes = new ArrayDeque<Iv2InFlight>();
+        private final Deque<Iv2InFlight> m_reads = new ArrayDeque<>();
+        private final Deque<Iv2InFlight> m_writes = new ArrayDeque<>();
 
         private PartitionData(int partitionId) {
             m_generator = new HandleGenerator(partitionId);
@@ -229,7 +230,7 @@ public class ClientInterfaceHandleManager
 
         long ciHandle =
                 isShortCircuitRead ? m_shortCircuitHG.getNextHandle() : partitionStuff.m_generator.getNextHandle();
-        Iv2InFlight inFlight =
+        final Iv2InFlight inFlight =
                 new Iv2InFlight(ciHandle, clientHandle, messageSize, creationTimeNanos, procName, initiatorHSId);
 
         if (isShortCircuitRead) {
