@@ -727,7 +727,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     @Override
     public byte[] executeTask(TaskType taskType, ByteBuffer task) throws EEException {
         try {
-            clearPsetAndEnsureCapacity(8);
+            assert(m_psetBuffer.limit() >= 8);
             m_psetBuffer.putLong(0, taskType.taskId);
 
             //Clear is destructive, do it before the native call
