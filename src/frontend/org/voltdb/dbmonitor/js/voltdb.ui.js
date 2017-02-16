@@ -1100,7 +1100,13 @@ var loadPage = function (serverName, portid) {
             var role = drRoleDetail['DRROLE'][0][0];
             var producerDbId = drDetails["CLUSTER_ID"];
 
-            $("#drCLusterId").html(" (ID: " + producerDbId + ")");
+            if(producerDbId != undefined){
+                $("#drCLusterId").html(" (ID: " + producerDbId + ")");
+            }
+            else{
+                $("#drCLusterId").html("");
+            }
+
             if(drRoleDetail['DRROLE'].length > 0){
                 if(JSON.stringify(VoltDbUI.prevDrRoleDetail) != JSON.stringify(drRoleDetail)) {
                     VoltDbUI.prevDrRoleDetail = drRoleDetail;
@@ -1308,7 +1314,7 @@ var loadPage = function (serverName, portid) {
                               '            <span class="iconDRDatabase"></span>' +
                               '            <h1 class="headText1 DRHeaderWrap">' +
                               '                <a href="#" id="showHideGraphBlock_' + i + '" class="showhideIcon arrowAdjustDR">' +
-                              '                    <span class="DRHeaderName" id="dRHeaderName_' + i + '">Database ('+ producerDbId +')</span>' +
+                              '                    <span class="DRHeaderName" id="dRHeaderName_' + i + '"></span>' +
                               '<span class="DRHeaderName drPending" id="drPending_'+ i +'"></span>' +
                               '                </a>' +
                               '            </h1>' +
@@ -1470,6 +1476,12 @@ var loadPage = function (serverName, portid) {
                 $('.latencyDR').html('');
             }
 
+            if(producerDbId != undefined){
+                $("#dRHeaderName_" + i).html("Database ("+ producerDbId +") ")
+            }
+            else{
+                $("#dRHeaderName_" + i).html("Database ")
+            }
 
             $("#drPending_" + i).html('');
             if(drRoleDetail['DRROLE'][i][1] == "PENDING"){
