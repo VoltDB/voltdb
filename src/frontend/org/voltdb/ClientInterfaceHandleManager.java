@@ -322,8 +322,19 @@ public class ClientInterfaceHandleManager
                 targetInFlight = flight;
                 break;
             }
+
+            //couldn't find
+            if (flight.m_ciHandle > ciHandle) {
+                if (tmLog.isDebugEnabled()) {
+                    tmLog.debug("CI clientData lookup missing handle: " + ciHandle
+                            + ". Next expected client data handle is: " + flight.m_ciHandle);
+                }
+                break;
+            }
         }
-        if (targetInFlight == null) return null;
+        if (targetInFlight == null) {
+            return null;
+        }
 
         for(Iv2InFlight inFlight : inFlightsByHSID.get(targetInFlight.m_initiatorHSId)) {
             if (inFlight.m_ciHandle < ciHandle) {
