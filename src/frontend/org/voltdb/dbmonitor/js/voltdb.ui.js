@@ -1110,9 +1110,6 @@ var loadPage = function (serverName, portid) {
                     MonitorGraphUI.InitializeDrData();
                     MonitorGraphUI.InitializeDRGraph();
                     MonitorGraphUI.AddDrGraph("Seconds");
-    //                voltDbRenderer.GetDrReplicationInformation(function (replicationData) {
-    //                    MonitorGraphUI.RefreshDrReplicationGraph(replicationData, getCurrentServer(), "Seconds", getCurrentTab());
-    //                });
                 }
                 showDrGraphAndData(drRoleDetail, producerDbId)
             }
@@ -1465,16 +1462,6 @@ var loadPage = function (serverName, portid) {
             }
 
             VoltDbUI.drChartList.push(combinedId);
-            if(!jQuery.isEmptyObject(drDetails)){
-                if (role == "REPLICA"){
-                    var producerDbId = drDetails["CLUSTER_ID"];
-                    var consumerDbId = drDetails["REMOTE_CLUSTER_ID"];
-                }
-                else if(role == "MASTER" || role == "XDCR"){
-                     var producerDbId = drDetails[0][0]["CLUSTER_ID"];
-                    var consumerDbId = drDetails[0][0]["REMOTE_CLUSTER_ID"];
-                }
-            }
 
             $('.latencyDR').html('');
             if(replicaLatency.length != 0){
