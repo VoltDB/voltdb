@@ -17,6 +17,7 @@
 
 package org.voltdb.client;
 
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.voltcore.logging.VoltLogger;
@@ -30,6 +31,7 @@ import org.voltcore.utils.EstTimeUpdater;
 public abstract class ClientFactory {
 
     static AtomicInteger ACTIVE_CLIENT_COUNT = new AtomicInteger(0);
+    static CountDownLatch INITIALIZATION_LATCH = new CountDownLatch(1);
 
     /**
      * <p>Create a {@link Client} with no connections. The Client will be optimized to send stored procedure invocations
@@ -39,12 +41,7 @@ public abstract class ClientFactory {
      * @return Newly constructed {@link Client}
      */
     public static Client createClient() {
-        if (ACTIVE_CLIENT_COUNT.incrementAndGet() == 1) {
-            VoltLogger.startAsynchronousLogging();
-            EstTimeUpdater.start();
-            ReverseDNSCache.start();
-        }
-        return new ClientImpl(new ClientConfig());
+        return createClient(new ClientConfig());
     }
 
     /**
@@ -57,12 +54,21 @@ public abstract class ClientFactory {
      * @return A configured client
      */
     public static Client createClient(ClientConfig config) {
-        if (ACTIVE_CLIENT_COUNT.incrementAndGet() == 1) {
-            VoltLogger.startAsynchronousLogging();
-            EstTimeUpdater.start();
-            ReverseDNSCache.start();
+        Client client = null;
+        try {
+            if (ACTIVE_CLIENT_COUNT.incrementAndGet() == 1) {
+                VoltLogger.startAsynchronousLogging();
+                EstTimeUpdater.start();
+                ReverseDNSCache.start();
+                INITIALIZATION_LATCH.countDown();
+            }
+            else {
+                INITIALIZATION_LATCH.await();
+            }
+            client = new ClientImpl(config);
         }
-        return new ClientImpl(config);
+        catch (InterruptedException e) {}
+        return client;
     }
 
     public static void decreaseClientNum() throws InterruptedException {
