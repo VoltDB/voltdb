@@ -38,7 +38,9 @@ import org.voltdb.VoltTable;
 public class UpdateLogging extends VoltSystemProcedure
 {
     @Override
-    public void init() {}
+    public long[] getPlanFragmentIds() {
+        return new long[]{};
+    }
 
     @Override
     public DependencyPair executePlanFragment(

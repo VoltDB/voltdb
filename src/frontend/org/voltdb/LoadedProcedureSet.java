@@ -73,7 +73,7 @@ public class LoadedProcedureSet {
     public LoadedProcedureSet(SiteProcedureConnection site) {
         m_site = site;
 
-        m_runnerFactory = new ProcedureRunnerFactory(site, site.getSystemProcedureExecutionContext());
+        m_runnerFactory = new ProcedureRunnerFactory(m_site, m_site.getSystemProcedureExecutionContext());
         m_csp = null;
         m_defaultProcCache = new HashMap<>();
         m_defaultProcManager = null;
@@ -86,7 +86,7 @@ public class LoadedProcedureSet {
         }
     }
 
-    public void registerPlanFragment(final long pfId, final ProcedureRunner proc) {
+    private void registerPlanFragment(final long pfId, final ProcedureRunner proc) {
         synchronized (m_registeredSysProcPlanFragments) {
             assert(m_registeredSysProcPlanFragments.containsKey(pfId) == false);
             m_registeredSysProcPlanFragments.put(pfId, proc);
@@ -219,9 +219,17 @@ public class LoadedProcedureSet {
                 }
 
                 runner = m_runnerFactory.create(procedure, proc, m_csp);
-                procedure.initSysProc(m_site, this, proc, catalogContext.cluster,
+                procedure.initSysProc(m_site, catalogContext.cluster,
                         catalogContext.getClusterSettings(),
                         catalogContext.getNodeSettings());
+
+                // register the plan fragments with procedure set
+                long[] planFragments = procedure.getPlanFragmentIds();
+                assert(planFragments != null);
+                for (long pfId: planFragments) {
+                    registerPlanFragment(pfId, runner);
+                }
+
                 builder.put(entry.getKey().intern(), runner);
             }
         }

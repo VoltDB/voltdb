@@ -34,7 +34,8 @@ import org.voltdb.jni.ExecutionEngine.TaskType;
 public class ExecuteTask_SP extends VoltSystemProcedure {
 
     @Override
-    public void init() {
+    public long[] getPlanFragmentIds() {
+        return new long[]{};
     }
 
     @Override

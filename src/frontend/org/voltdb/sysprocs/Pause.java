@@ -46,7 +46,9 @@ public class Pause extends VoltSystemProcedure {
     private final static OperationMode PAUSED = OperationMode.PAUSED;
 
     @Override
-    public void init() {}
+    public long[] getPlanFragmentIds() {
+        return new long[]{};
+    }
 
     @Override
     public DependencyPair executePlanFragment(

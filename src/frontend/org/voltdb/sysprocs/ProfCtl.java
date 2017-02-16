@@ -21,9 +21,9 @@ import java.util.List;
 import java.util.Map;
 
 import org.voltdb.DependencyPair;
-import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
+import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
@@ -39,7 +39,8 @@ import org.voltdb.VoltType;
 public class ProfCtl extends VoltSystemProcedure {
 
     @Override
-    public void init() {
+    public long[] getPlanFragmentIds() {
+        return new long[]{};
     }
 
     @Override
