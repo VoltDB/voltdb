@@ -308,7 +308,7 @@ $(document).ready(function () {
                     VoltDbUI.gutterInstanceHor.destroy();
                 VoltDbUI.gutterInstanceHor = Split(['#a', '#inputQuery'],{
                     gutterSize:15,
-                    minSize:380,
+                    minSize:400,
                     sizes:[25, 75]
                 });
             }
@@ -1465,6 +1465,16 @@ var loadPage = function (serverName, portid) {
             }
 
             VoltDbUI.drChartList.push(combinedId);
+            if(!jQuery.isEmptyObject(drDetails)){
+                if (role == "REPLICA"){
+                    var producerDbId = drDetails["CLUSTER_ID"];
+                    var consumerDbId = drDetails["REMOTE_CLUSTER_ID"];
+                }
+                else if(role == "MASTER" || role == "XDCR"){
+                     var producerDbId = drDetails[0][0]["CLUSTER_ID"];
+                    var consumerDbId = drDetails[0][0]["REMOTE_CLUSTER_ID"];
+                }
+            }
 
             $('.latencyDR').html('');
             if(replicaLatency.length != 0){
@@ -1508,6 +1518,7 @@ var loadPage = function (serverName, portid) {
                 } else {
                     $(this).removeClass('expanded');
                     $(this).addClass('collapsed');
+
                 }
                 $("#drSection_"+ combinedId).slideToggle(300);
             });

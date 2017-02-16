@@ -236,7 +236,7 @@ CREATE STREAM export_geo_partitioned_table PARTITION ON COLUMN rowid EXPORT TO T
 
 -- should be an exact copy of the stream. Used for verifiing
 -- export stream contents.
-CREATE STREAM export_geo_mirror_partitioned_table PARTITION ON COLUMN rowid
+CREATE TABLE export_geo_mirror_partitioned_table
 (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
@@ -266,6 +266,7 @@ CREATE STREAM export_geo_mirror_partitioned_table PARTITION ON COLUMN rowid
 , type_null_geography_point GEOGRAPHY_POINT
 , type_not_null_geography_point GEOGRAPHY_POINT NOT NULL
 );
+PARTITION TABLE export_geo_mirror_partitioned_table ON COLUMN rowid;
 
 CREATE STREAM export_geo_done_table PARTITION ON COLUMN txnid EXPORT TO TARGET abc
 (

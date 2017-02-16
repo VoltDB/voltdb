@@ -128,4 +128,5 @@ create index idx4_TMIN_TREE on TMIN (ABS(B));
 create index idx5_TMIN_TREE on TMIN (A,ABS(B));
 create index idx6_TMIN_TREE on TMIN (ABS(A),B);
 
-
+CREATE TABLE T_ENG_11096 (a int, b int, c int, d int);
+CREATE INDEX IDX_ENG_11096 ON T_ENG_11096(a, b, c);

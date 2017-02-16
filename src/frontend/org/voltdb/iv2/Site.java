@@ -99,6 +99,7 @@ import org.voltdb.rejoin.TaskLog;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.settings.NodeSettings;
 import org.voltdb.sysprocs.SysProcFragmentId;
+import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MinimumRatioMaintainer;
@@ -1463,6 +1464,13 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
         if (isMPI) {
             // the rest of the work applies to sites with real EEs
+            return true;
+        }
+
+        diffCmds = CatalogUtil.getDiffCommandsForEE(diffCmds);
+        if (diffCmds.length() == 0) {
+            // empty diff cmds for the EE to apply, so skip the JNI call
+            hostLog.info("Skipped applying diff commands on EE.");
             return true;
         }
 

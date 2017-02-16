@@ -26,6 +26,7 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
+import org.voltcore.logging.VoltNullLogger.CoreNullLogger;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.RateLimitedLogger;
 
@@ -66,10 +67,14 @@ public class VoltLogger {
     // The pool containing the logger thread(s) or null if asynch logging is disabled so that
     // all logging takes place synchronously on the caller's thread.
     private static ExecutorService m_asynchLoggerPool =
+            // out for no async logging
             Boolean.getBoolean("DISABLE_ASYNC_LOGGING") ?
                     null :
-                    new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<Runnable>(),
-                            new LoggerThreadFactory());
+                    // quick out for when we want no logging whatsoever
+                    "true".equals(System.getProperty("voltdb_no_logging")) ?
+                            null :
+                            new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<Runnable>(),
+                                    new LoggerThreadFactory());
 
     /// ShutdownHooks calls shutdownAsynchronousLogging when it is finished running its hooks
     /// just before executing its final action -- which is typically to shutdown Log4J logging.
@@ -101,6 +106,11 @@ public class VoltLogger {
     }
 
     public static synchronized void startAsynchronousLogging(){
+        // quick out for when we want no logging whatsoever
+        if ("true".equals(System.getProperty("voltdb_no_logging"))) {
+            return;
+        }
+
         if (m_asynchLoggerPool == null && !Boolean.getBoolean("DISABLE_ASYNC_LOGGING")) {
             m_asynchLoggerPool = new ThreadPoolExecutor(
                1, 1, 0L, TimeUnit.MILLISECONDS,
@@ -354,6 +364,12 @@ public class VoltLogger {
      * @param classname The id of the logger.
      */
     public VoltLogger(String classname) {
+        // quick out for when we want no logging whatsoever
+        if ("true".equals(System.getProperty("voltdb_no_logging"))) {
+            m_logger = new CoreNullLogger();
+            return;
+        }
+
         CoreVoltLogger tempLogger = null;
         // try to load the Log4j logger without importing it
         // any exception thrown will just keep going

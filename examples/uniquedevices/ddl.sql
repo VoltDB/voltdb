@@ -32,15 +32,17 @@ LOAD CLASSES uniquedevices-procs.jar;
 
 -- stored procedures
 
-CREATE PROCEDURE FROM CLASS uniquedevices.CountDeviceEstimate;
-PARTITION PROCEDURE CountDeviceEstimate ON TABLE estimates COLUMN appid;
-CREATE PROCEDURE FROM CLASS uniquedevices.CountDeviceExact;
-PARTITION PROCEDURE CountDeviceExact ON TABLE estimates COLUMN appid;
-CREATE PROCEDURE FROM CLASS uniquedevices.CountDeviceHybrid;
-PARTITION PROCEDURE CountDeviceHybrid ON TABLE estimates COLUMN appid;
+CREATE PROCEDURE PARTITION ON TABLE estimates COLUMN appid
+  FROM CLASS uniquedevices.CountDeviceEstimate;
 
-CREATE PROCEDURE GetCardEstForApp AS
-    SELECT devicecount FROM estimates WHERE appid = ?;
-PARTITION PROCEDURE GetCardEstForApp ON TABLE estimates COLUMN appid;
-CREATE PROCEDURE TopApps AS
-    SELECT appid, devicecount FROM estimates ORDER BY devicecount DESC LIMIT 10;
+CREATE PROCEDURE PARTITION ON TABLE estimates COLUMN appid
+  FROM CLASS uniquedevices.CountDeviceExact;
+
+CREATE PROCEDURE PARTITION ON TABLE estimates COLUMN appid
+  FROM CLASS uniquedevices.CountDeviceHybrid;
+
+CREATE PROCEDURE GetCardEstForApp
+    PARTITION ON TABLE estimates COLUMN appid
+    AS SELECT devicecount FROM estimates WHERE appid = ?;
+CREATE PROCEDURE TopApps
+    AS SELECT appid, devicecount FROM estimates ORDER BY devicecount DESC LIMIT 10;

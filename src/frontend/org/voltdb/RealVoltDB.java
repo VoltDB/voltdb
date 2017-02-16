@@ -3204,9 +3204,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     m_adminListener.notifyOfCatalogUpdate();
                 }
 
-                // 4. Flush StatisticsAgent old catalog statistics.
-                // Otherwise, the stats agent will hold all old catalogs
-                // in memory.
+                // 4. Flush StatisticsAgent old user PROCEDURE statistics.
+                // The stats agent will hold all other stats in memory.
                 getStatsAgent().notifyOfCatalogUpdate();
 
                 // 5. MPIs don't run fragments. Update them here. Do
