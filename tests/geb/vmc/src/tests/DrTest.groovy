@@ -59,16 +59,17 @@ class DrTest extends TestBase {
             }
         }
     }
-
+    def divId = "1_3"
     def checkClusterId() {
         when:
         println("Process only if DR is present")
+        divId = $('#drProducerId').jquery.text()
         then:
         if(isDrTabVisible) {
             when:
-            page.clusterId.isDisplayed()
+            waitFor(10){drCLusterId.isDisplayed()}
             then:
-            println(page.clusterId.text())
+            println(page.drCLusterId.text())
         } else {
             println("DR is not available.")
         }
@@ -82,11 +83,11 @@ class DrTest extends TestBase {
            when: "Check Dr Mode"
            page.drMode.isDisplayed()
            then: "Dr Mode must be Master or Both"
-           println("DR Mode" + page.drMode.text())
+           println("DR Mode " + page.drMode.text())
            if (page.drMode.text().equals("") || page.drMode.text().equals("Replica")) {
                println("No Master mode")
            } else {
-               page.latencyTime.isDisplayed()
+               $('#latencyDR_' + divId).isDisplayed()
            }
         } else {
            println("DR is not available.")
@@ -108,26 +109,26 @@ class DrTest extends TestBase {
             else {
                 println("Master mode")
                 when: "ensure the DR section is open"
-                if (!page.isDrSectionOpen()) {
-                   waitFor(30){ page.openDrArea()}
+                if (!page.isDrSectionOpen(divId)) {
+                   waitFor(30){ page.openDrArea(divId)}
                 }
                 then: 'DR area is open (initially)'
-                page.isDrAreaOpen()
+                page.isDrAreaOpen(divId)
 
                 when: 'click Show/Hide Graph (to close)'
-                page.closeDrArea()
+                page.closeDrArea(divId)
                 then:'Dr area is closed'
-                !page.isDrAreaOpen()
+                !page.isDrAreaOpen(divId)
 
                 when:'click Show/Hide Graph (to open)'
-                page.openDrArea()
+                page.openDrArea(divId)
                 then:'Dr area is open (again)'
-                page.isDrAreaOpen()
+                page.isDrAreaOpen(divId)
 
                 when: 'click Show/Hide DR (to close again)'
-                page.closeDrArea()
+                page.closeDrArea(divId)
                 then: 'Graph area is closed (again)'
-                !page.isDrAreaOpen()
+                !page.isDrAreaOpen(divId)
             }
         } else {
             println("DR is not available.")
@@ -147,8 +148,8 @@ class DrTest extends TestBase {
             }
             else {
                 when: 'click Partition ID'
-                waitFor(20) { page.isDrMasterSectionOpen() }
-                waitFor(10) { page.clickPartitionID() }
+                waitFor(20) { page.isDrMasterSectionOpen(divId) }
+                waitFor(10) { page.clickPartitionID(divId) }
                 then: 'check if row count is in descending'
                 if (waitFor(20) { page.tableInDescendingOrderDT() })
                     after = "descending"
@@ -156,7 +157,7 @@ class DrTest extends TestBase {
                     after = "ascending"
 
                 when: 'click Partition ID'
-                waitFor(10) { page.clickPartitionID() }
+                waitFor(10) { page.clickPartitionID(divId) }
                 then: 'check if row count is in ascending'
                 if (page.tableInAscendingOrderDT())
                     before = "ascending"
@@ -188,8 +189,8 @@ class DrTest extends TestBase {
             }
             else {
                 when: 'click MB On disk'
-                waitFor(20){page.isDrMasterSectionOpen()}
-                waitFor(10){ page.clickMbOnDisk()}
+                waitFor(20){page.isDrMasterSectionOpen(divId)}
+                waitFor(10){ page.clickMbOnDisk(divId)}
                 then: 'check if row count is in ascending'
                 if (page.tableInAscendingOrderDT())
                     before = "ascending"
@@ -197,7 +198,7 @@ class DrTest extends TestBase {
                     before = "descending"
 
                 when: 'click MB On disk'
-                waitFor(10){ page.clickMbOnDisk()}
+                waitFor(10){ page.clickMbOnDisk(divId)}
                 then: 'check if row count is in descending'
                 if (waitFor(20){page.tableInDescendingOrderDT()})
                     after = "descending"
@@ -229,8 +230,8 @@ class DrTest extends TestBase {
             }
             else {
                 when: 'click Replica Latency(ms)'
-                waitFor(20){page.isDrMasterSectionOpen()}
-                waitFor(10) { page.clickReplicaLatencyMs() }
+                waitFor(20){page.isDrMasterSectionOpen(divId)}
+                waitFor(10) { page.clickReplicaLatencyMs(divId) }
                 then: 'check if row count is in ascending'
                 if (page.tableInAscendingOrderDT())
                     before = "ascending"
@@ -238,7 +239,7 @@ class DrTest extends TestBase {
                     before = "descending"
 
                 when: 'click Replica Latency(ms)'
-                waitFor(10){ page.clickReplicaLatencyMs()}
+                waitFor(10){ page.clickReplicaLatencyMs(divId)}
                 then: 'check if row count is in descending'
                 if (waitFor(20) { page.tableInDescendingOrderDT() })
                     after = "descending"
@@ -270,8 +271,8 @@ class DrTest extends TestBase {
             }
             else {
                 when: 'click Replica Latency(Trans)'
-                waitFor(20){page.isDrMasterSectionOpen()}
-                waitFor(10) { page.clickReplicaLatencyTrans() }
+                waitFor(20){page.isDrMasterSectionOpen(divId)}
+                waitFor(10) { page.clickReplicaLatencyTrans(divId) }
                 then: 'check if row count is in ascending'
                 if (page.tableInAscendingOrderDT())
                     before = "ascending"
@@ -279,7 +280,7 @@ class DrTest extends TestBase {
                     before = "descending"
 
                 when: 'click Replica Latency(Trans)'
-                waitFor(10) { page.clickReplicaLatencyTrans() }
+                waitFor(10) { page.clickReplicaLatencyTrans(divId) }
                 then: 'check if row count is in descending'
                 if (waitFor(20) { page.tableInDescendingOrderDT() })
                     after = "descending"
@@ -303,13 +304,13 @@ class DrTest extends TestBase {
         then:
         if(isDrTabVisible) {
             when: "Check Master Title is displayed or not"
-            if(page.drMasterTitleDisplayed()) {
+            if(page.drMasterTitleDisplayed(divId)) {
                 assert true
             }
             then:
-            if(page.drMasterTitleDisplayed()) {
-                println(waitFor(20) { page.drMasterTitle.text() })
-                page.drMasterTitle.text().equals("Master")
+            if(page.drMasterTitleDisplayed(divId)) {
+                println(waitFor(20) { $("#drMasterTitle_" + divId).text() })
+                $("#drMasterTitle_" + divId).text().equals("Master")
             }
             else {
                 println("Master Section is not visible")
@@ -329,12 +330,12 @@ class DrTest extends TestBase {
             boolean isDROpen = false
 
             when: "Check if DR section is present"
-            if(!page.isDrSectionOpen()) {
+            if(!page.isDrSectionOpen(divId)) {
                 isDROpen = false
                 println("Dr Replication is not present")
             }
             else {
-                if(!page.isDrMasterSectionOpen()) {
+                if(!page.isDrMasterSectionOpen(divId)) {
                     println("Dr MAster section is not present")
                     isDROpen = false
                 }
@@ -347,16 +348,16 @@ class DrTest extends TestBase {
 
             when: "Set the value of Master filter"
             if(isDROpen==true) {
-                if (page.partitionIdRows.size() > 1) {
-                    searchText = page.partitionIdRows[0].text().substring(0, 1)
-                    page.filterPartitionId.value(page.partitionIdRows[0].text().substring(0, 1))
+                if ($("#tblDrMAster_" + divId).find(class:"sorting_1").size() > 1) {
+                    searchText = $("#tblDrMAster_" + divId).find(class:"sorting_1")[0].text().substring(0, 1)
+                    $("#filterPartitionId_" + divId).value($("#tblDrMAster_" + divId).find(class:"sorting_1")[0].text().substring(0, 1))
                 } else {
                     isValid = false
                     assert true
                 }
                 then: "check the table"
-                for (def i = 0; i <= page.partitionIdRows.size() - 1; i++) {
-                    if (!page.partitionIdRows[i].text().toString().contains(searchText)) {
+                for (def i = 0; i <= $("#tblDrMAster_" + divId).find(class:"sorting_1").size() - 1; i++) {
+                    if (!$("#tblDrMAster_" + divId).find(class:"sorting_1")[i].text().toString().contains(searchText)) {
                         println("test false")
                         isValid = false
                         break

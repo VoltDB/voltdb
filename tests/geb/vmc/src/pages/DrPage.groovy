@@ -32,7 +32,7 @@ class DrPage extends VoltDBManagementCenterPage {
         latencyTime         { $('#latencyDR') }
         clusterId           { $('#dRProducerName') }
 
-        drMode              { $('#dbDrMode') }
+        drMode              { $('#drModeName') }
 
         divDrReplication    { $("#divDrReplication") }
         drSection           { $("#drSection") }
@@ -71,58 +71,58 @@ class DrPage extends VoltDBManagementCenterPage {
         drTab.attr('class') == 'active'
     }
 
-    def boolean isDrSectionOpen(){
-        return divDrReplication.displayed
+    def boolean isDrSectionOpen(divId){
+        return $("#divDrReplication" + divId).displayed
     }
 
-    def boolean isDrAreaOpen() {
-        return drSection.displayed
+    def boolean isDrAreaOpen(divId) {
+        return $("#drSection_" + divId).displayed
     }
 
-    def boolean isDrMasterSectionOpen() {
-        return drMasterSection.displayed
+    def boolean isDrMasterSectionOpen(divId) {
+        return $("#drMasterSection_" + divId).displayed
     }
 
     def boolean isDrReplicaSectionOpen() {
         return drReplicaSection.displayed
     }
 
-    def boolean closeDrArea() {
-        clickToNotDisplay(showHideDrBlock, drSection)
+    def boolean closeDrArea(divId) {
+        clickToNotDisplay($("#showHideDrBlock_" + divId), $("#drSection_" + divId))
         return true
     }
 
-    def boolean openDrArea(){
-        clickToDisplay(showHideDrBlock, drSection)
+    def boolean openDrArea(divId){
+        clickToDisplay($("#showHideDrBlock_" + divId), $("#drSection_" + divId))
         return true
     }
 
     /*
      *  click the partitionID column in database table
      */
-    def boolean clickPartitionID() {
-        partitionID.click()
+    def boolean clickPartitionID(divId) {
+        $("#partitionID_" + divId).click()
     }
 
     /*
      *  click the replicaLatencyMs column in DR MAster table
      */
-    def boolean clickReplicaLatencyMs() {
-        replicaLatencyMs.click()
+    def boolean clickReplicaLatencyMs(divId) {
+        $("#replicaLatencyMs_" + divId).click()
     }
 
     /*
      *  click the status column in DR MAster table
      */
-    def boolean clickMbOnDisk() {
-        mbOnDisk.click()
+    def boolean clickMbOnDisk(divId) {
+        $("#mbOnDisk_" + divId).click()
     }
 
     /*
      *  click the replicaLatencyTrans column in DR MAster table
      */
-    def boolean clickReplicaLatencyTrans() {
-        replicaLatencyTrans.click()
+    def boolean clickReplicaLatencyTrans(divId) {
+        $("#replicaLatencyTrans_" + divId).click()
     }
 
     /*
@@ -179,8 +179,8 @@ class DrPage extends VoltDBManagementCenterPage {
         return drReplicaTitle.displayed
     }
 
-    def boolean drMasterTitleDisplayed(){
-        return drMasterTitle.displayed
+    def boolean drMasterTitleDisplayed(divId){
+        return $("#drMasterTitle_" + divId).displayed
     }
 
     def boolean chooseGraphView( String choice ) {
