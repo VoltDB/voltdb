@@ -1289,9 +1289,11 @@ var loadPage = function (serverName, portid) {
        var getDrHtmlContent = function(i, producerDbId, drRoleDetail, response){
             var combinedId = producerDbId + '_' + drRoleDetail['DRROLE'][i][2]
             var consumerDbId = drRoleDetail['DRROLE'][i][2];
-            $('#drProducerId').html(producerDbId)
-            $('#drRemoteId').html(consumerDbId)
-            $('#drCombinedId').html(combinedId)
+            if(i == 0) {
+                $('#drProducerId').html(producerDbId)
+                $('#drRemoteId').html(consumerDbId)
+                $('#drCombinedId').html(combinedId)
+            }
             replicaLatency = [];
             for (var key in response[combinedId]) {
                     if(response[combinedId][key][0] != undefined){
