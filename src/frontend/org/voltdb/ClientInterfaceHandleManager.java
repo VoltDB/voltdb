@@ -140,7 +140,7 @@ public class ClientInterfaceHandleManager
 
     }
 
-    private final Map<Integer, PartitionData> m_partitionStuff = new HashMap<Integer, PartitionData>();
+    private final Map<Integer, PartitionData> m_partitionStuff = Collections.synchronizedMap(new HashMap<Integer, PartitionData>());
 
     ClientInterfaceHandleManager(boolean isAdmin, Connection connection, ClientInterfaceRepairCallback repairCallback, AdmissionControlGroup acg)
     {
@@ -222,10 +222,8 @@ public class ClientInterfaceHandleManager
 
         PartitionData partitionStuff = m_partitionStuff.get(partitionId);
         if (partitionStuff == null) {
-            synchronized(m_partitionStuff) {
-                partitionStuff = new PartitionData(partitionId);
-                m_partitionStuff.put(partitionId, partitionStuff);
-            }
+            m_partitionStuff.putIfAbsent(partitionId, new PartitionData(partitionId));
+            partitionStuff = m_partitionStuff.get(partitionId);
         }
 
         long ciHandle =
