@@ -68,6 +68,14 @@ public enum CipherExecutor {
         return Math.max(2, coreCount/2);
     }
 
+    /**
+     * Guarantee execution of the given {@link Runnable} whether or not its
+     * executor service is active. When it is not the {@link Runnable} is
+     * executed in situ on the same thread that invokes this method
+     *
+     * @param r a {@link Runnable} task
+     * @return a {@link ListenableFuture} for the given task
+     */
     final public ListenableFuture<?> submit(Runnable r) {
         try {
             return m_es.submit(r);
@@ -76,6 +84,14 @@ public enum CipherExecutor {
         }
     }
 
+    /**
+     * Guarantee execution of the given {@link Callable&lt;T&gt;} whether or not its
+     * executor service is active. When it is not the {@link Callable&lt;T&gt;} is
+     * executed in situ on the same thread that invokes this method
+     *
+     * @param r a {@link Callable&lt;T&gt;} task
+     * @return a {@link ListenableFuture&lt;T&gt;} for the given task
+     */
     final public <T> ListenableFuture<T> submit(Callable<T> c) {
         try {
             return m_es.submit(c);
