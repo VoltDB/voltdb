@@ -17,9 +17,6 @@
 
 package org.voltdb.client;
 
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.atomic.AtomicInteger;
-
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.ReverseDNSCache;
 import org.voltcore.utils.EstTimeUpdater;
@@ -30,8 +27,7 @@ import org.voltcore.utils.EstTimeUpdater;
  */
 public abstract class ClientFactory {
 
-    static AtomicInteger ACTIVE_CLIENT_COUNT = new AtomicInteger(0);
-    static CountDownLatch INITIALIZATION_LATCH = new CountDownLatch(1);
+    static int m_activeClientCount = 0;
 
     /**
      * <p>Create a {@link Client} with no connections. The Client will be optimized to send stored procedure invocations
@@ -55,29 +51,20 @@ public abstract class ClientFactory {
      */
     public static Client createClient(ClientConfig config) {
         Client client = null;
-        try {
-            if (ACTIVE_CLIENT_COUNT.incrementAndGet() == 1) {
+        synchronized (ClientFactory.class) {
+            if (++m_activeClientCount == 1) {
                 VoltLogger.startAsynchronousLogging();
                 EstTimeUpdater.start();
                 ReverseDNSCache.start();
-                INITIALIZATION_LATCH.countDown();
             }
-            else {
-                INITIALIZATION_LATCH.await();
-            }
-            client = new ClientImpl(config);
         }
-        catch (InterruptedException e) {}
+        client = new ClientImpl(config);
         return client;
     }
 
-    public static void decreaseClientNum() throws InterruptedException {
+    public static synchronized void decreaseClientNum() throws InterruptedException {
         // the client is the last alive client. Before exit, close all the static resources and threads.
-        int count = ACTIVE_CLIENT_COUNT.get();
-        if (count <= 0) {
-            return;
-        }
-        if (ACTIVE_CLIENT_COUNT.decrementAndGet() == 0) {
+        if (--m_activeClientCount == 0) {
             //Shut down the logger.
             VoltLogger.shutdownAsynchronousLogging();
             //Estimate Time Updater stop updates.
@@ -85,13 +72,9 @@ public abstract class ClientFactory {
             //stop ReverseDNSCache.
             ReverseDNSCache.stop();
         }
-        count = ACTIVE_CLIENT_COUNT.get();
-        if (count < 0) {
-            ACTIVE_CLIENT_COUNT.compareAndSet(count,0);
-        }
     }
 
-    public static void increaseClientCountToOne() {
-        ACTIVE_CLIENT_COUNT.compareAndSet(0,1);
+    public static synchronized void increaseClientCountToOne() {
+        m_activeClientCount++;
     }
 }
