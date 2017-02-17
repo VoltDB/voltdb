@@ -1922,6 +1922,7 @@ public final class VoltTable extends VoltTableRow implements JSONString {
             m_buffer.position(0);
             heapBuffer.put(m_buffer);
             heapBuffer.position(heapBuffer.limit());
+            m_buffer = heapBuffer;
         }
     }
 

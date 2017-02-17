@@ -48,6 +48,9 @@ public class TestBigBatchAndFallbackBufferResults extends RegressionSuite {
 
     private void processBigMultiQueryProc(Client client, int returnBuffer, int checkMiddle, int useFinal,
             int firstMod, int secondMod, int thirdMod) throws NoConnectionsException, IOException, ProcCallException {
+        String reqStr = returnBuffer + ", " + checkMiddle + ", " + useFinal + " using ( " +
+                firstMod + ":" + secondMod + ":" + thirdMod +")";
+        System.out.println("requesting: " + reqStr);
         ClientResponse cr = client.callProcedure("SPMultiStatementQuery", 0, returnBuffer, checkMiddle, useFinal, firstMod, secondMod, thirdMod);
         assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
         VoltTable vt = cr.getResults()[0];

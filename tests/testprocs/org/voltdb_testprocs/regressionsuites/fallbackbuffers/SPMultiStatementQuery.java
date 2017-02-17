@@ -25,6 +25,7 @@ package org.voltdb_testprocs.regressionsuites.fallbackbuffers;
 
 import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 
@@ -45,19 +46,26 @@ public class SPMultiStatementQuery extends VoltProcedure {
 
     public final SQLStmt query = new SQLStmt("select * from P1 where MOD(id, ?) = 0");
 
+    static final int SHARED_BUFFER_SIZE = 10 * 1024 * 1024;
     private boolean isTrue(int value) {
         return value == 0 ? false: true;
     }
 
     private void checkBuffer(ByteBuffer buf, boolean mayBeDirect, boolean isFinal) {
         if (isFinal) {
-            assertTrue(buf.isDirect());
+            if (!buf.isDirect()) {
+                throw new VoltAbortException("The final buffer should be direct");
+            }
         }
-        else if (buf.capacity() > 10 * 1024 * 1024) {
-            assertFalse(buf.isDirect());
+        else if (buf.capacity() > SHARED_BUFFER_SIZE) {
+            if (buf.isDirect()) {
+                throw new VoltAbortException("Fallback buffers should be copied into Heap Buffers");
+            }
         }
         else {
-            assertTrue(mayBeDirect == buf.isDirect());
+            if (mayBeDirect != buf.isDirect()) {
+                throw new VoltAbortException("Unexpected result buffer");
+            }
         }
     }
 
