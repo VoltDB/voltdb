@@ -38,17 +38,6 @@ public class TLSException extends RuntimeException {
         super(message, cause);
     }
 
-    public IOException ioCause() {
-        Throwable cause = getCause();
-        while (cause != null) {
-            if (cause instanceof IOException) {
-                return (IOException)cause;
-            }
-            cause = cause.getCause();
-        }
-        return null;
-    }
-
     public static TLSException inChain(Throwable t) {
         Throwable cause = t;
         while (cause != null) {

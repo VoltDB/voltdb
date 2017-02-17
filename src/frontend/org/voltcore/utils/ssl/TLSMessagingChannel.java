@@ -153,11 +153,11 @@ public class TLSMessagingChannel extends MessagingChannel {
                 bytesWritten += outbuf.readBytes(m_socketChannel, outbuf.readableBytes());
             }
         } catch (IOException e) {
-            outbuf.release();
             throw e;
+        } finally {
+            outbuf.release();
         }
 
-        outbuf.release();
         message.position(message.position() + msg.readerIndex());
         return bytesWritten;
     }

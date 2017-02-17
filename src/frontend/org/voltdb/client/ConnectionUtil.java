@@ -53,7 +53,6 @@ import org.voltdb.utils.SerializationHelper;
 import com.google_voltpatches.common.base.Function;
 import com.google_voltpatches.common.base.Optional;
 import com.google_voltpatches.common.base.Predicates;
-import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.FluentIterable;
 
 /**
@@ -247,9 +246,6 @@ public class ConnectionUtil {
             SerializationHelper.writeVarbinary(usernameBytes, b);
             b.put(hashedPassword);
             b.flip();
-
-
-            // TODO: do the retry here... ( 1 to 4 )
 
             try {
                 messagingChannel.writeMessage(b);
@@ -451,9 +447,9 @@ public class ConnectionUtil {
                         context.dispose();
                         context = null;
                     } catch (GSSException ex) {
-                        Throwables.propagate(ex);
+                        throw new RuntimeException(ex);
                     } catch (IOException ex) {
-                        Throwables.propagate(ex);
+                        throw new RuntimeException(ex);
                     } finally {
                         if (context != null) try { context.dispose(); } catch (Exception ignoreIt) {}
                     }
