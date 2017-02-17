@@ -26,8 +26,10 @@ import org.voltcore.utils.EstTimeUpdater;
  *
  */
 public abstract class ClientFactory {
-
+    // If m_preserveResources is set m_activeClientCount will always be 1 irrespective of the number of clients
+    // initialized through the factory.
     static int m_activeClientCount = 0;
+    static boolean m_preserveResources = false;
 
     /**
      * <p>Create a {@link Client} with no connections. The Client will be optimized to send stored procedure invocations
@@ -52,7 +54,7 @@ public abstract class ClientFactory {
     public static Client createClient(ClientConfig config) {
         Client client = null;
         synchronized (ClientFactory.class) {
-            if (++m_activeClientCount == 1) {
+            if (!m_preserveResources && ++m_activeClientCount == 1) {
                 VoltLogger.startAsynchronousLogging();
                 EstTimeUpdater.start();
                 ReverseDNSCache.start();
@@ -64,7 +66,8 @@ public abstract class ClientFactory {
 
     public static synchronized void decreaseClientNum() throws InterruptedException {
         // the client is the last alive client. Before exit, close all the static resources and threads.
-        if (--m_activeClientCount == 0) {
+        if (!m_preserveResources && m_activeClientCount <= 1) {
+            m_activeClientCount = 0;
             //Shut down the logger.
             VoltLogger.shutdownAsynchronousLogging();
             //Estimate Time Updater stop updates.
@@ -72,9 +75,18 @@ public abstract class ClientFactory {
             //stop ReverseDNSCache.
             ReverseDNSCache.stop();
         }
+        else {
+            m_activeClientCount--;
+        }
     }
 
     public static synchronized void increaseClientCountToOne() {
-        m_activeClientCount++;
+        // This method is intended to ensure that the resources needed to create clients
+        // are always initialized and won't be released with the active client count goes to zero.
+        m_preserveResources = true;
+        VoltLogger.startAsynchronousLogging();
+        EstTimeUpdater.start();
+        ReverseDNSCache.start();
+        m_activeClientCount = 1;
     }
 }

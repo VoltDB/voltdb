@@ -63,7 +63,8 @@ public class TestClientClose extends TestCase {
             localServer = new ServerThread(config);
             localServer.start();
             localServer.waitForInitialization();
-            while (ClientFactory.m_activeClientCount >0) {
+            ClientFactory.m_preserveResources = false;
+            while (ClientFactory.m_activeClientCount > 0) {
                 try {
                     ClientFactory.decreaseClientNum();
                 }

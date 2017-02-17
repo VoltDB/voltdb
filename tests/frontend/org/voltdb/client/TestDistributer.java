@@ -309,7 +309,7 @@ public class TestDistributer extends TestCase {
     @Override
     public void setUp()
     {
-        while (ClientFactory.m_activeClientCount >0) {
+        while (ClientFactory.m_activeClientCount > 0) {
             try {
                 ClientFactory.decreaseClientNum();
             }
