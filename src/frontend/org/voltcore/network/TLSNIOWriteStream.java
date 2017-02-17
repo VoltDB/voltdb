@@ -54,7 +54,7 @@ public class TLSNIOWriteStream extends NIOWriteStream {
     private final SSLEngine m_sslEngine;
     private final SSLBufferEncrypter m_encrypter;
     private final EncryptionGateway m_ecryptgw = new EncryptionGateway();
-    private int m_ledger = 0;
+    private int m_queuedBytes = 0;
 
     public TLSNIOWriteStream(VoltPort port, Runnable offBackPressureCallback,
             Runnable onBackPressureCallback, QueueMonitor monitor,
@@ -144,7 +144,7 @@ public class TLSNIOWriteStream extends NIOWriteStream {
     @Override
     public void updateQueued(int queued, boolean noBackpressureSignal) {
         super.updateQueued(queued, noBackpressureSignal);
-        m_ledger += queued;
+        m_queuedBytes += queued;
     }
 
     void waitForPendingEncrypts() throws IOException {
@@ -350,7 +350,7 @@ public class TLSNIOWriteStream extends NIOWriteStream {
 
             // we have to use ledger because we have no idea how much encrypt delta
             // corresponds to what is left in the output buffer
-            final int unqueue = -m_ledger;
+            final int unqueue = -m_queuedBytes;
             updateQueued(unqueue, false);
         } finally {
             m_inFlight.drainPermits();

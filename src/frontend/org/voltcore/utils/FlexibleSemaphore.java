@@ -19,6 +19,10 @@ package org.voltcore.utils;
 
 import java.util.concurrent.Semaphore;
 
+/**
+ * An extension to {@link Semaphore} that exposes the {@link #reducePermits(int)}
+ * method
+ */
 public class FlexibleSemaphore extends Semaphore {
     private static final long serialVersionUID = 5771901806711171430L;
     public FlexibleSemaphore( int permits) {
