@@ -165,27 +165,28 @@ public class ProcedureRunner {
                 }
             };
 
-    ProcedureRunner(VoltProcedure procedure,
+    ProcedureRunner(Language lang,
+                    VoltProcedure procedure,
                     SiteProcedureConnection site,
-                    SystemProcedureExecutionContext sysprocContext,
                     Procedure catProc,
                     CatalogSpecificPlanner csp) {
+        this(lang, procedure, site, null, catProc, csp);
+        // assert this constructor for non-system procedures
+        assert(procedure instanceof VoltSystemProcedure == false);
+    }
+
+    ProcedureRunner(Language lang,
+            VoltProcedure procedure,
+            SiteProcedureConnection site,
+            SystemProcedureExecutionContext sysprocContext,
+            Procedure catProc,
+            CatalogSpecificPlanner csp) {
+
         assert(m_inputCRC.getValue() == 0L);
-
-        String language = catProc.getLanguage();
-
-        if (language != null && !language.trim().isEmpty()) {
-            m_language = Language.valueOf(language.trim().toUpperCase());
-        } else if (procedure instanceof StmtProcedure){
-            m_language = null;
-        } else {
-            m_language = Language.JAVA;
-        }
-
-        if (procedure instanceof StmtProcedure) {
+        m_language = lang;
+        if (m_language == null) {
             m_procedureName = catProc.getTypeName().intern();
-        }
-        else {
+        } else {
             m_procedureName = m_language.accept(procedureNameRetriever, procedure);
         }
         m_procedure = procedure;
@@ -1019,17 +1020,7 @@ public class ProcedureRunner {
         Map<String, SQLStmt> stmtMap;
 
         // fill in the sql for single statement procs
-        if (m_catProc.getHasjava()) {
-            // this is where, in the case of java procedures, m_procMethod is set
-            m_paramTypes = m_language.accept(parametersTypeRetriever, this);
-
-            if (m_procMethod == null && m_language == Language.JAVA) {
-                throw new RuntimeException("No \"run\" method found in: " + m_procedure.getClass().getName());
-            }
-            // iterate through the fields and deal with sql statements
-            stmtMap = m_language.accept(sqlStatementsRetriever, this);
-        }
-        else {
+        if (m_language == null) {
             try {
                 stmtMap = ProcedureCompiler.getValidSQLStmts(null, m_procedureName, m_procedure.getClass(), m_procedure, true);
                 SQLStmt stmt = stmtMap.get(VoltDB.ANON_STMT_NAME);
@@ -1083,6 +1074,16 @@ public class ProcedureRunner {
                 return;
             }
         }
+        else {
+            // this is where, in the case of java procedures, m_procMethod is set
+            m_paramTypes = m_language.accept(parametersTypeRetriever, this);
+
+            if (m_procMethod == null && m_language == Language.JAVA) {
+                throw new RuntimeException("No \"run\" method found in: " + m_procedure.getClass().getName());
+            }
+            // iterate through the fields and deal with sql statements
+            stmtMap = m_language.accept(sqlStatementsRetriever, this);
+        }
 
         for (final Entry<String, SQLStmt> entry : stmtMap.entrySet()) {
             String name = entry.getKey();
@@ -1104,46 +1105,46 @@ public class ProcedureRunner {
 
     private final static Language.Visitor<Class<?>[], ProcedureRunner> parametersTypeRetriever =
             new Language.Visitor<Class<?>[], ProcedureRunner>() {
-                @Override
-                public Class<?>[] visitJava(ProcedureRunner p) {
-                    Method[] methods = p.m_procedure.getClass().getDeclaredMethods();
+        @Override
+        public Class<?>[] visitJava(ProcedureRunner p) {
+            Method[] methods = p.m_procedure.getClass().getDeclaredMethods();
 
-                    for (final Method m : methods) {
-                        String name = m.getName();
-                        if (name.equals("run")) {
-                            if (Modifier.isPublic(m.getModifiers()) == false) {
-                                continue;
-                            }
-                            p.m_procMethod = m;
-                            return m.getParameterTypes();
-                        }
+            for (final Method m : methods) {
+                String name = m.getName();
+                if (name.equals("run")) {
+                    if (Modifier.isPublic(m.getModifiers()) == false) {
+                        continue;
                     }
-                    return null;
+                    p.m_procMethod = m;
+                    return m.getParameterTypes();
                 }
-                @Override
-                public Class<?>[] visitGroovy(ProcedureRunner p) {
-                    return ((GroovyScriptProcedureDelegate)p.m_procedure).getParameterTypes();
-                }
-            };
+            }
+            return null;
+        }
+        @Override
+        public Class<?>[] visitGroovy(ProcedureRunner p) {
+            return ((GroovyScriptProcedureDelegate)p.m_procedure).getParameterTypes();
+        }
+    };
 
    private final static Language.Visitor<Map<String,SQLStmt>, ProcedureRunner> sqlStatementsRetriever =
            new Language.Visitor<Map<String,SQLStmt>, ProcedureRunner>() {
-            @Override
-            public Map<String, SQLStmt> visitJava(ProcedureRunner p) {
-                Map<String, SQLStmt> stmtMap = null;
-                try {
-                    stmtMap = ProcedureCompiler.getValidSQLStmts(null, p.m_procedureName, p.m_procedure.getClass(), p.m_procedure, true);
-                } catch (Exception e1) {
-                    // shouldn't throw anything outside of the compiler
-                    e1.printStackTrace();
-                }
-                return stmtMap;
-            }
-            @Override
-            public Map<String, SQLStmt> visitGroovy(ProcedureRunner p) {
-                return ((GroovyScriptProcedureDelegate)p.m_procedure).getStatementMap();
-            }
-        };
+       @Override
+       public Map<String, SQLStmt> visitJava(ProcedureRunner p) {
+           Map<String, SQLStmt> stmtMap = null;
+           try {
+               stmtMap = ProcedureCompiler.getValidSQLStmts(null, p.m_procedureName, p.m_procedure.getClass(), p.m_procedure, true);
+           } catch (Exception e1) {
+               // shouldn't throw anything outside of the compiler
+               e1.printStackTrace();
+           }
+           return stmtMap;
+       }
+       @Override
+       public Map<String, SQLStmt> visitGroovy(ProcedureRunner p) {
+           return ((GroovyScriptProcedureDelegate)p.m_procedure).getStatementMap();
+       }
+   };
 
    /**
     * Test whether or not the given stack frame is within a procedure invocation

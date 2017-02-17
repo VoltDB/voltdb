@@ -52,7 +52,6 @@ public class LoadedProcedureSet {
             };
 
     final SiteProcedureConnection m_site;
-    final ProcedureRunnerFactory m_runnerFactory;
 
     // user procedures.
     ImmutableMap<String, ProcedureRunner> m_userProcs = ImmutableMap.<String, ProcedureRunner>builder().build();
@@ -73,7 +72,6 @@ public class LoadedProcedureSet {
     public LoadedProcedureSet(SiteProcedureConnection site) {
         m_site = site;
 
-        m_runnerFactory = new ProcedureRunnerFactory(m_site, m_site.getSystemProcedureExecutionContext());
         m_csp = null;
         m_defaultProcCache = new HashMap<>();
         m_defaultProcManager = null;
@@ -97,8 +95,19 @@ public class LoadedProcedureSet {
             CatalogContext catalogContext,
             CatalogSpecificPlanner csp)
     {
-        m_registeredSysProcPlanFragments.clear();
+        loadProceduresForCatalogUpdate(catalogContext, csp);
 
+        // reload system procedures
+        m_sysProcs = loadSystemProcedures(catalogContext);
+    }
+
+    /**
+     * When catalog updates, only user procedures needs to be reloaded. System procedures can be left without changes.
+     */
+    public void loadProceduresForCatalogUpdate(
+            CatalogContext catalogContext,
+            CatalogSpecificPlanner csp)
+    {
         m_csp = csp;
         m_defaultProcManager = catalogContext.m_defaultProcs;
         // default proc caches clear on catalog update
@@ -106,17 +115,19 @@ public class LoadedProcedureSet {
         m_plannerTool = catalogContext.m_ptool;
 
         // reload user procedures
-        m_userProcs = loadUserProceduresFromCatalog(catalogContext);
-
-        // reload system procedures
-        m_sysProcs = loadSystemProcedures(catalogContext);
+        m_userProcs = loadUserProcedureRunners(catalogContext, m_site, m_csp);
     }
 
-    private ImmutableMap<String, ProcedureRunner> loadUserProceduresFromCatalog(
-            CatalogContext catalogContext) {
+    private static ImmutableMap<String, ProcedureRunner> loadUserProcedureRunners(
+            CatalogContext catalogContext,
+            SiteProcedureConnection site,
+            CatalogSpecificPlanner csp
+            ) {
+        ImmutableMap.Builder<String, ProcedureRunner> builder = ImmutableMap.<String, ProcedureRunner>builder();
+
         // load up all the stored procedures
         final CatalogMap<Procedure> catalogProcedures = catalogContext.database.getProcedures();
-        ImmutableMap.Builder<String, ProcedureRunner> builder = ImmutableMap.<String, ProcedureRunner>builder();
+
         for (final Procedure proc : catalogProcedures) {
             // Sysprocs used to be in the catalog. Now they aren't. Ignore
             // sysprocs found in old catalog versions. (PRO-365)
@@ -124,11 +135,10 @@ public class LoadedProcedureSet {
                 continue;
             }
 
-            ProcedureRunner runner = null;
             VoltProcedure procedure = null;
+            // default to Java
+            Language lang = Language.JAVA;
             if (proc.getHasjava()) {
-                // default to Java
-                Language lang = Language.JAVA;
                 try {
                     lang = Language.valueOf(proc.getLanguage());
                 } catch (IllegalArgumentException e) {
@@ -159,22 +169,26 @@ public class LoadedProcedureSet {
                 catch (final Exception e) {
                     // TODO: remove the extra meaningless parameter "0"
                     hostLog.l7dlog( Level.WARN, LogKeys.host_ExecutionSite_GenericException.name(),
-                                    new Object[] { m_site.getCorrespondingSiteId(), 0}, e);
+                                    new Object[] { site.getCorrespondingSiteId(), 0}, e);
                 }
             }
             else {
                 procedure = new ProcedureRunner.StmtProcedure();
+                lang = null;
             }
 
             assert(procedure != null);
-            runner = m_runnerFactory.create(procedure, proc, m_csp);
+            ProcedureRunner runner = new ProcedureRunner(lang, procedure, site, proc, csp);
             builder.put(proc.getTypeName().intern(), runner);
         }
         return builder.build();
     }
 
+
     private ImmutableMap<String, ProcedureRunner> loadSystemProcedures(
             CatalogContext catalogContext) {
+        // clean up all the registered system plan fragments before reloading system procedures
+        m_registeredSysProcPlanFragments.clear();
         ImmutableMap.Builder<String, ProcedureRunner> builder = ImmutableMap.<String, ProcedureRunner>builder();
 
         Set<Entry<String,Config>> entrySet = SystemProcedureCatalog.listing.entrySet();
@@ -183,7 +197,6 @@ public class LoadedProcedureSet {
             Procedure proc = sysProc.asCatalogProcedure();
 
             VoltSystemProcedure procedure = null;
-            ProcedureRunner runner = null;
 
             final String className = sysProc.getClassname();
             Class<?> procClass = null;
@@ -218,7 +231,10 @@ public class LoadedProcedureSet {
                             new Object[] { m_site.getCorrespondingSiteId(), 0 }, e);
                 }
 
-                runner = m_runnerFactory.create(procedure, proc, m_csp);
+                ProcedureRunner runner = new ProcedureRunner(Language.JAVA, procedure,
+                        m_site, m_site.getSystemProcedureExecutionContext(),
+                        proc, m_csp);
+
                 procedure.initSysProc(m_site, catalogContext.cluster,
                         catalogContext.getClusterSettings(),
                         catalogContext.getNodeSettings());
@@ -256,7 +272,7 @@ public class LoadedProcedureSet {
                 String sqlText = m_defaultProcManager.sqlForDefaultProc(catProc);
                 Procedure newCatProc = StatementCompiler.compileDefaultProcedure(m_plannerTool, catProc, sqlText);
                 VoltProcedure voltProc = new ProcedureRunner.StmtProcedure();
-                pr = m_runnerFactory.create(voltProc, newCatProc, m_csp);
+                pr = new ProcedureRunner(null, voltProc, m_site, newCatProc, m_csp);
                 // this will ensure any created fragment tasks know to load the plans
                 // for this plan-on-the-fly procedure
                 pr.setProcNameToLoadForFragmentTasks(catProc.getTypeName());
