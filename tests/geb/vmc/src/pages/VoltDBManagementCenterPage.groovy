@@ -45,21 +45,23 @@ class VoltDBManagementCenterPage extends Page {
 
     static url = ''  // relative to the baseUrl
     static content = {
-        navTabs { $('#nav') }
-        dbMonitorTab { navTabs.find('#navDbmonitor') }
-    adminTab { navTabs.find('#navAdmin') }
-        schemaTab    { navTabs.find('#navSchema') }
-        sqlQueryTab  { navTabs.find('#navSqlQuery') }
-        dbMonitorLink(to: DbMonitorPage) { dbMonitorTab.find('a') }
-    adminLink(to: AdminPage) { adminTab.find('a') }
-        schemaLink   (to: SchemaPage)    { schemaTab.find('a') }
-        sqlQueryLink (to: SqlQueryPage)  { sqlQueryTab.find('a') }
-        loginDialog  (required: false) { $('#loginBox') }
-        usernameInput   (required: false) { loginDialog.find('input#username') }
-        passwordInput   (required: false) { loginDialog.find('input#password') }
-        loginButton  (required: false) { loginDialog.find('#LoginBtn') }
+        navTabs                             { $('#nav') }
+        dbMonitorTab                        { navTabs.find('#navDbmonitor') }
+        adminTab                            { navTabs.find('#navAdmin') }
+        schemaTab                           { navTabs.find('#navSchema') }
+        sqlQueryTab                         { navTabs.find('#navSqlQuery') }
+        drTab                               { $('#navDR') }
+        dbMonitorLink (to: DbMonitorPage)   { dbMonitorTab.find('a') }
+        adminLink (to: AdminPage)           { adminTab.find('a') }
+        schemaLink (to: SchemaPage)         { schemaTab.find('a') }
+        sqlQueryLink (to: SqlQueryPage)     { sqlQueryTab.find('a') }
+        drLink (to: DrPage)                 { $('#navDR > a') }
+        loginDialog (required: false)       { $('#loginBox') }
+        usernameInput (required: false)     { loginDialog.find('input#username') }
+        passwordInput (required: false)     { loginDialog.find('input#password') }
+        loginButton (required: false)       { loginDialog.find('#LoginBtn') }
 
-    header { module Header }
+        header { module Header }
         footer { module Footer }
     }
     static at = {
@@ -294,6 +296,19 @@ class VoltDBManagementCenterPage extends Page {
     }
 
     /**
+     * Returns true if the current page is a DrPage (i.e., the "Dr"
+     * tab of the VoltDB Management Center page is currently open).
+     * @return true if a DrPage is currently open.
+     */
+    def boolean isDrPageOpen() {
+        if (drTab.attr('class') == 'active') {
+            return true
+        } else {
+            return false
+        }
+    }
+
+    /**
      * Clicks the "DB Monitor" link, opening the "DB Monitor" page (or tab);
      * if the "DB Monitor" page is already open, no action is taken.
      */
@@ -303,7 +318,7 @@ class VoltDBManagementCenterPage extends Page {
         }
     }
 
-/**
+    /**
      * Clicks the "Admin" link, opening the "Admin" page (or tab);
      * if the "Admin" page is already open, no action is taken.
      */
@@ -317,8 +332,6 @@ class VoltDBManagementCenterPage extends Page {
      * Clicks the "Schema" link, opening the "Schema" page (or tab);
      * if the "Schema" page is already open, no action is taken.
      */
-
-
     def void openSchemaPage() {
         if (!isSchemaPageOpen()) {
             schemaLink.click()
@@ -333,6 +346,16 @@ class VoltDBManagementCenterPage extends Page {
         if (!isSqlQueryPageOpen()) {
             sqlQueryLink.click()
             waitFor() { !$('#tabMain').find('#tabScroller').text().isEmpty() }
+        }
+    }
+
+    /**
+     * Clicks the "Dr" link, opening the "Dr" page (or tab);
+     * if the "Dr" page is already open, no action is taken.
+     */
+    def void openDrPage() {
+        if (!isDrPageOpen()) {
+            drLink.click()
         }
     }
 

@@ -127,7 +127,7 @@ public class SyncBenchmark {
         boolean ssl = false;
 
         @Option(desc = "SSL Configuration file")
-        String ssl_config = null;
+        String ssl_config = "";
 
         @Override
         public void validate() {
