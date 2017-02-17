@@ -410,11 +410,13 @@ public class KafkaLoader {
                 Class[] ctorParmTypes = new Class[]{ String.class, Properties.class };
                 Constructor ctor = classz.getDeclaredConstructor(ctorParmTypes);
                 Properties p = new Properties();
+                String format = "csv";
                 if (cfg.formatterProperties.length() > 0) {
                     InputStream pfile = new FileInputStream(cfg.formatterProperties);
                     p.load(pfile);
+                    format = p.getProperty("format", "csv");
                 }
-                Object[] ctorParms = new Object[]{ "formatter", p };
+                Object[] ctorParms = new Object[]{ format, p };
                 cfg.iformatter = (Formatter<String>) ctor.newInstance(ctorParms);
             }
             KafkaLoader kloader = new KafkaLoader(cfg);
