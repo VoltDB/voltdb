@@ -671,23 +671,18 @@ public class PlannerTestCase extends TestCase {
             }
             fragment += 1;
             for (;plan != null; idx += 1) {
+                if (types.length <= idx) {
+                    fail(String.format("Expected %d plan nodes, but found more.", types.length));
+                }
                 if (types[idx] instanceof PlanNodeType) {
-                    assertTrue("Expected no inline nodes",
-                               plan.getChildCount() < 2);
                     assertEquals(types[idx], plan.getPlanNodeType());
                 } else if (types[idx] instanceof PlanNodeType[]) {
                     PlanNodeType childTypes[] = (PlanNodeType[])(types[idx]);
                     assertEquals(childTypes[0], plan.getPlanNodeType());
                     for (int tidx = 1; tidx < childTypes.length; tidx += 1) {
                         PlanNodeType childType = childTypes[tidx];
-                        int cidx = 1;
-                        for (; cidx < plan.getChildCount(); cidx += 1) {
-                            if (childType.equals(plan.getChild(cidx).getPlanNodeType())) {
-                                break;
-                            }
-                        }
                         assertTrue(String.format("Expected inline node of type %s", childType),
-                                   cidx < plan.getChildCount());
+                                   plan.getInlinePlanNode(childType) != null);
                     }
                 } else {
                     fail("Expected a PlanNodeType or an array of PlanNodeTypes here.");

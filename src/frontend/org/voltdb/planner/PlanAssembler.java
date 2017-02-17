@@ -2406,6 +2406,12 @@ public class PlanAssembler {
             if (root instanceof IndexSortablePlanNode) {
                 return ((IndexSortablePlanNode) root).indexUse();
             }
+            // Any other kind of scan or join plan
+            // node cannot have a useful index.
+            if ((root instanceof AbstractScanPlanNode)
+                    || (root instanceof AbstractJoinPlanNode)) {
+                return null;
+            }
             if (root.getChildCount() == 0) {
                 break;
             }

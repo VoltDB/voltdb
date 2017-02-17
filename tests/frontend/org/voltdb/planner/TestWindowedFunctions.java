@@ -1237,15 +1237,13 @@ public class TestWindowedFunctions extends PlannerTestCase {
                          1,
                          PlanNodeType.SEND,
                          PlanNodeType.PROJECTION,
-                         new PlanNodeType[] {PlanNodeType.NESTLOOP,
-                                             PlanNodeType.SEQSCAN},
+                         PlanNodeType.NESTLOOP,
                          PlanNodeType.INDEXSCAN);
             validatePlan("select * from vanilla as oo, vanilla_idx as ii order by ii.a, ii.b",
                          1,
                          PlanNodeType.SEND,
                          PlanNodeType.PROJECTION,
-                         new PlanNodeType[] {PlanNodeType.NESTLOOP,
-                                             PlanNodeType.SEQSCAN},
+                         PlanNodeType.NESTLOOP,
                          PlanNodeType.INDEXSCAN);
             validatePlan("select * from vanilla_idx as oo join vanilla_idx as ii on oo.a = ii.a and oo.b = ii.b order by ii.a, ii.b",
                          1,
@@ -1276,6 +1274,21 @@ public class TestWindowedFunctions extends PlannerTestCase {
                          PlanNodeType.PROJECTION,
                          PlanNodeType.ORDERBY,
                          PlanNodeType.SEQSCAN);
+        }
+        if (IS_ENABLED) {
+            validatePlan("SELECT *, RANK() OVER ( ORDER BY ID ) FUNC FROM (SELECT *, RANK() OVER ( ORDER BY ID DESC ) SUBFUNC FROM P_DECIMAL W12) SUB",
+                         2,
+                         PlanNodeType.SEND,
+                         PlanNodeType.PROJECTION,
+                         PlanNodeType.WINDOWFUNCTION,
+                         PlanNodeType.ORDERBY,
+                         PlanNodeType.SEQSCAN,
+                         PlanNodeType.PROJECTION,
+                         PlanNodeType.WINDOWFUNCTION,
+                         new PlanNodeType[] {PlanNodeType.MERGERECEIVE, PlanNodeType.ORDERBY},
+                         PlanNodeType.INVALID,
+                         PlanNodeType.SEND,
+                         PlanNodeType.INDEXSCAN);
         }
     }
 

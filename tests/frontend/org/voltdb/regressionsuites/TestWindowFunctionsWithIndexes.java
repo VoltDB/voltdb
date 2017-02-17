@@ -42,10 +42,12 @@
  */package org.voltdb.regressionsuites;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.net.URL;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
@@ -99,19 +101,11 @@ public class TestWindowFunctionsWithIndexes extends RegressionSuite {
         cr = client.callProcedure("@AdHoc", string);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         VoltTable vt = cr.getResults()[0];
-        assertEquals(o4.length, vt.getRowCount());
-        for (int ridx = 0; ridx < o4.length; ridx += 1) {
-            assertTrue(vt.advanceRow());
-            Object[] erow = o4[ridx];
-            assertEquals(erow.length, vt.getColumnCount());
-            for (int cidx = 0; cidx < erow.length; cidx += 1) {
-                Object expected = erow[cidx];
-                Long l = vt.getLong(cidx);
-                assertEquals(expected, vt.getLong(cidx));
-            }
-        }
+        assertApproximateContentOfTable(o4, vt, 1.0e-4);
     }
     static private Object [][] m_O4;
+    static private Object [][] m_P_DECIMAL;
+    static private Object [][] m_P_DECIMAL_OUTPUT;
     /**
      * Initialize a table with some values.
      *
@@ -174,6 +168,36 @@ public class TestWindowFunctionsWithIndexes extends RegressionSuite {
         initTable(client,
                   "O4",
                   m_O4);
+
+        // Initialize P_DECIMAL.
+        m_P_DECIMAL_OUTPUT = new Object[][] {
+            {0, new BigDecimal(43.7466723728), null, 0.0167254440373, 8, 1},
+            {1, new BigDecimal(43.7466723728), null, 0.655978114997, 7, 2},
+            {2, new BigDecimal(43.7466723728), new BigDecimal(74.1274731896), 0.503481924952, 6, 3},
+            {3, new BigDecimal(43.7466723728), new BigDecimal(74.1274731896), 0.970442363316, 5, 4},
+            {4, new BigDecimal(5.36338386576), null, 0.606293209075, 4, 5},
+            {5, new BigDecimal(5.36338386576), null, 0.719625466141, 3, 6},
+            {6, new BigDecimal(5.36338386576), new BigDecimal(59.9097237768), 0.175559752822, 2, 7},
+            {7, new BigDecimal(5.36338386576), new BigDecimal(59.9097237768), 0.405504260609, 1, 8}
+        };
+        m_P_DECIMAL = new Object[][] {
+            {0, new BigDecimal(43.7466723728), null, 0.0167254440373},
+            {1, new BigDecimal(43.7466723728), null, 0.655978114997},
+            {2, new BigDecimal(43.7466723728), new BigDecimal(74.1274731896), 0.503481924952},
+            {3, new BigDecimal(43.7466723728), new BigDecimal(74.1274731896), 0.970442363316},
+            {4, new BigDecimal(5.36338386576), null, 0.606293209075},
+            {5, new BigDecimal(5.36338386576), null, 0.719625466141},
+            {6, new BigDecimal(5.36338386576), new BigDecimal(59.9097237768), 0.175559752822},
+            {7, new BigDecimal(5.36338386576), new BigDecimal(59.9097237768), 0.405504260609}
+        };
+        client.callProcedure("P_DECIMAL.insert", m_P_DECIMAL[0]);
+        client.callProcedure("P_DECIMAL.insert", m_P_DECIMAL[1]);
+        client.callProcedure("P_DECIMAL.insert", m_P_DECIMAL[2]);
+        client.callProcedure("P_DECIMAL.insert", m_P_DECIMAL[3]);
+        client.callProcedure("P_DECIMAL.insert", m_P_DECIMAL[4]);
+        client.callProcedure("P_DECIMAL.insert", m_P_DECIMAL[5]);
+        client.callProcedure("P_DECIMAL.insert", m_P_DECIMAL[6]);
+        client.callProcedure("P_DECIMAL.insert", m_P_DECIMAL[7]);
     }
 
     public void testAll() throws Exception {
@@ -528,7 +552,13 @@ public class TestWindowFunctionsWithIndexes extends RegressionSuite {
             validateQuery(client, "select * from O4 where CTR + 200 < 1000 order by id", m_O4);
         }
 
+        if (IS_ENABLED) {
+            String SQL = "SELECT *, RANK() OVER ( ORDER BY ID ) FUNC FROM (SELECT *, RANK() OVER ( ORDER BY ID DESC ) SUBFUNC FROM P_DECIMAL W12) SUB";
+            validateQuery(client, SQL, m_P_DECIMAL_OUTPUT);
+        }
+
     }
+
 
 
     static public junit.framework.Test suite() {

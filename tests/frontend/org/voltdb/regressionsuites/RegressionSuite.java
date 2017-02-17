@@ -987,8 +987,11 @@ public class RegressionSuite extends TestCase {
                 }
             }
             else if (expectedObj instanceof BigDecimal) {
-                BigDecimal val = (BigDecimal)expectedObj;
-                assertEquals(msg, val, actualRow.getDecimalAsBigDecimal(i));
+                BigDecimal exp = (BigDecimal)expectedObj;
+                BigDecimal got = actualRow.getDecimalAsBigDecimal(i);
+                // Either both are null or neither are null.
+                assertEquals(exp == null, got == null);
+                assertEquals(msg, exp.doubleValue(), got.doubleValue(), epsilon);
             }
             else if (expectedObj instanceof String) {
                 String val = (String)expectedObj;
