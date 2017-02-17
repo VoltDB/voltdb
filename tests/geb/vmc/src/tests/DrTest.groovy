@@ -59,11 +59,13 @@ class DrTest extends TestBase {
             }
         }
     }
-    def divId = "1_3"
+
+    def divId
+
     def checkClusterId() {
         when:
         println("Process only if DR is present")
-        divId = $('#drProducerId').jquery.text()
+        divId = $("#drCombinedId").jquery.text()
         then:
         if(isDrTabVisible) {
             when:
@@ -78,13 +80,14 @@ class DrTest extends TestBase {
     def checkLatencyDr() {
         when:
         println("Process only if DR is present")
+        divId = $("#drCombinedId").jquery.text()
         then:
         if(isDrTabVisible) {
            when: "Check Dr Mode"
            page.drMode.isDisplayed()
            then: "Dr Mode must be Master or Both"
            println("DR Mode " + page.drMode.text())
-           if (page.drMode.text().equals("") || page.drMode.text().equals("Replica")) {
+           if (page.drMode.text().equals("") || page.drMode.text().equals("REPLICA")) {
                println("No Master mode")
            } else {
                $('#latencyDR_' + divId).isDisplayed()
@@ -97,6 +100,7 @@ class DrTest extends TestBase {
     def verifyShowAndHideDatabaseReplicationTableMASTER() {
         when:
         println("Process only if DR is present")
+        divId = $("#drCombinedId").jquery.text()
         then:
         if(isDrTabVisible) {
             when: "Check Dr Mode"
@@ -138,6 +142,7 @@ class DrTest extends TestBase {
     def verifyTheAscendingAndDescendingInThePartitionIdColumnOfDatabaseReplicationTableMASTER() {
         when:
         println("Process only if DR is present")
+        divId = $("#drCombinedId").jquery.text()
         then:
         if(isDrTabVisible) {
             String before = ""
@@ -179,6 +184,7 @@ class DrTest extends TestBase {
     def verifyTheAscendingAndDescendingInMbOnDiskColumnOfDatabaseReplicationTableMASTER() {
         when:
         println("Process only if DR is present")
+        divId = $("#drCombinedId").jquery.text()
         then:
         if(isDrTabVisible) {
             String before = ""
@@ -220,6 +226,7 @@ class DrTest extends TestBase {
     def verifyTheAscendingAndDescendingInTheReplicaLatencyColumnOfDatabaseReplicationTableMASTER() {
         when:
         println("Process only if DR is present")
+        divId = $("#drCombinedId").jquery.text()
         then:
         if(isDrTabVisible) {
             String before = ""
@@ -261,6 +268,7 @@ class DrTest extends TestBase {
     def verifyTheAscendingAndDescendingInReplicaLatencyColumnOfDatabaseReplicationTableMASTER() {
         when:
         println("Process only if DR is present")
+        divId = $("#drCombinedId").jquery.text()
         then:
         if(isDrTabVisible) {
             String before = ""
@@ -301,6 +309,7 @@ class DrTest extends TestBase {
     def verifyTheTextInTheTitleInDatabaseReplicationTableMASTER() {
         when:
         println("Process only if DR is present")
+        divId = $("#drCombinedId").jquery.text()
         then:
         if(isDrTabVisible) {
             when: "Check Master Title is displayed or not"
@@ -323,6 +332,7 @@ class DrTest extends TestBase {
     def verifySearchInDatabaseReplicationTableMASTER() {
         when:
         println("Process only if DR is present")
+        divId = $("#drCombinedId").jquery.text()
         then:
         if(isDrTabVisible) {
             boolean isValid=false
@@ -384,38 +394,39 @@ class DrTest extends TestBase {
     def verifyShowAndHideDatabaseReplicationTableREPLICA() {
         when:
         println("Process only if DR is present")
+        divId = $("#drCombinedId").jquery.text()
         then:
         if(isDrTabVisible) {
             when: "Check Dr Mode"
             page.drMode.isDisplayed()
             then: "Dr Mode must be Master or Both"
             println("DR Mode" + page.drMode.text())
-            if(page.drMode.text().equals("") || page.drMode.text().equals("Master")) {
+            if(page.drMode.text().equals("") || page.drMode.text().equals("MASTER") || page.drMode.text().equals("XDCR")) {
                 println("No Replica mode")
             }
             else {
                 println("Replica mode")
                 when: "ensure the DR section is open"
-                if(!page.isDrSectionOpen()) {
-                    waitFor(30){ page.openDrArea()}
+                if(!page.isDrSectionOpen(divId)) {
+                    waitFor(20){ page.openDrArea(divId)}
                 }
                 then: 'DR area is open (initially)'
-                page.isDrAreaOpen()
+                page.isDrAreaOpen(divId)
 
                 when: 'click Show/Hide Graph (to close)'
-                page.closeDrArea()
+                page.closeDrArea(divId)
                 then:'Dr area is closed'
-                !page.isDrAreaOpen()
+                !page.isDrAreaOpen(divId)
 
                 when:'click Show/Hide Graph (to open)'
-                page.openDrArea()
+                page.openDrArea(divId)
                 then:'Dr area is open (again)'
-                page.isDrAreaOpen()
+                page.isDrAreaOpen(divId)
 
                 when: 'click Show/Hide DR (to close again)'
-                page.closeDrArea()
+                page.closeDrArea(divId)
                 then: 'Graph area is closed (again)'
-                !page.isDrAreaOpen()
+                !page.isDrAreaOpen(divId)
             }
         } else {
             println("DR is not available.")
@@ -425,29 +436,30 @@ class DrTest extends TestBase {
     def verifyTheAscendingAndDescendingInServerColumnOfDatabaseReplicationTableREPLICA() {
         when:
         println("Process only if DR is present")
+        divId = $("#drCombinedId").jquery.text()
         then:
         if(isDrTabVisible) {
             String before = ""
             String after  = ""
 
             when:"Check if Dr Replica is Displayed"
-            if(page.drMode.text().equals("") || page.drMode.text().equals("Master")) {
+            if(page.drMode.text().equals("") || page.drMode.text().equals("MASTER") || page.drMode.text().equals("XDCR")) {
                 println("Replica section is not visible")
             }
             else {
                 when: 'click Replica Server'
-                waitFor(waitTime) { page.isDrReplicaSectionOpen() }
-                waitFor(10){ page.clickReplicaServer() }
+                waitFor(waitTime) { page.isDrReplicaSectionOpen(divId) }
+                waitFor(10){ page.clickReplicaServer(divId) }
                 then: 'check if row count is in ascending'
-                if (replicaServer.attr("class") == "sorting_asc")
+                if ($("#replicaServer_" + divId).attr("class") == "sorting_asc")
                     before = "ascending"
                 else
                     before = "descending"
 
                 when: 'click Replica Server'
-                waitFor(10){ page.clickReplicaServer()}
+                waitFor(10){ page.clickReplicaServer(divId)}
                 then: 'check if row count is in descending'
-                if (replicaServer.attr("class") == "sorting_desc")
+                if ($("#replicaServer_" + divId).attr("class") == "sorting_desc")
                     after = "descending"
                 else
                     after = "ascending"
@@ -468,18 +480,19 @@ class DrTest extends TestBase {
     def verifyTheAscendingAndDescendingInStatusColumnOfDatabaseReplicationTableREPLICA() {
         when:
         println("Process only if DR is present")
+        divId = $("#drCombinedId").jquery.text()
         then:
         if(isDrTabVisible) {
             String before = ""
             String after  = ""
             when:"Check if Dr Master is Displayed"
-            if(page.drMode.text().equals("") || page.drMode.text().equals("Master")) {
+            if(page.drMode.text().equals("") || page.drMode.text().equals("MASTER") || page.drMode.text().equals("XDCR")) {
                 println("Replica section is not visible")
             }
             else {
                 when: 'click Replica Status'
-                waitFor(waitTime) { page.isDrReplicaSectionOpen() }
-                waitFor(10){ page.clickReplicaStatus()}
+                waitFor(10) { page.isDrReplicaSectionOpen(divId) }
+                waitFor(10){ page.clickReplicaStatus(divId)}
                 then: 'check if row count is in ascending'
                 if (page.tableInAscendingOrderDT())
                     before = "ascending"
@@ -487,9 +500,9 @@ class DrTest extends TestBase {
                     before = "descending"
 
                 when: 'click Replica Status'
-                waitFor(10){ page.clickReplicaStatus()}
+                waitFor(10){ page.clickReplicaStatus(divId)}
                 then: 'check if row count is in descending'
-                if (waitFor(20){page.tableInDescendingOrderDT()})
+                if (waitFor(10){page.tableInDescendingOrderDT()})
                     after = "descending"
                 else
                     after = "ascending"
@@ -508,18 +521,19 @@ class DrTest extends TestBase {
     def verifyTheAscendingAndDescendingInReplicationRate1MinColumnOfDatabaseReplicationTableREPLICA() {
         when:
         println("Process only if DR is present")
+        divId = $("#drCombinedId").jquery.text()
         then:
         if(isDrTabVisible) {
             String before = ""
             String after  = ""
             when:"Check if Dr Master is Displayed"
-            if(page.drMode.text().equals("") || page.drMode.text().equals("Master")) {
+            if(page.drMode.text().equals("") || page.drMode.text().equals("MASTER") || page.drMode.text().equals("XDCR")) {
                 println("Replica section is not visible")
             }
             else {
                 when: 'click Replication Rate (1 min)'
-                waitFor(waitTime) { page.isDrReplicaSectionOpen() }
-                waitFor(10){ page.clickReplicationRate1()}
+                waitFor(waitTime) { page.isDrReplicaSectionOpen(divId) }
+                waitFor(10){ page.clickReplicationRate1(divId)}
                 then: 'check if row count is in ascending'
                 if (page.tableInAscendingOrderDT())
                     before = "ascending"
@@ -527,7 +541,7 @@ class DrTest extends TestBase {
                     before = "descending"
 
                 when: 'click Replication Rate (1 min)'
-                waitFor(10){ page.clickReplicationRate1()}
+                waitFor(10){ page.clickReplicationRate1(divId)}
                 then: 'check if row count is in descending'
                 if (waitFor(20){page.tableInDescendingOrderDT()})
                     after = "descending"
@@ -548,18 +562,19 @@ class DrTest extends TestBase {
     def verifyTheAscendingAndDescendingInTheReplicationRate5MinColumnOfDatabaseReplicationTableREPLICA() {
         when:
         println("Process only if DR is present")
+        divId = $("#drCombinedId").jquery.text()
         then:
         if(isDrTabVisible) {
             String before = ""
             String after = ""
             when: "Check if Dr Master is Displayed"
-            if (page.drMode.text().equals("") || page.drMode.text().equals("Master") ) {
+            if (page.drMode.text().equals("") || page.drMode.text().equals("MASTER") || page.drMode.text().equals("XDCR")) {
                 println("Replica section is not visible")
             }
             else {
                 when: 'click Replication Rate (5 min)'
-                waitFor(40) { page.isDrReplicaSectionOpen() }
-                waitFor(10) { page.clickReplicationRate5() }
+                waitFor(10) { page.isDrReplicaSectionOpen(divId) }
+                waitFor(10) { page.clickReplicationRate5(divId) }
                 then: 'check if row count is in ascending'
                 if (page.tableInAscendingOrderDT())
                     before = "ascending"
@@ -567,7 +582,7 @@ class DrTest extends TestBase {
                     before = "descending"
 
                 when: 'click Replication Rate (5 min)'
-                waitFor(10) { page.clickReplicationRate5() }
+                waitFor(10) { page.clickReplicationRate5(divId) }
                 then: 'check if row count is in descending'
                 if (waitFor(20) { page.tableInDescendingOrderDT() })
                     after = "descending"
@@ -588,16 +603,17 @@ class DrTest extends TestBase {
     def verifyTheTextInTheTitleInDatabaseReplicationTableREPLICA() {
         when:
         println("Process only if DR is present")
+        divId = $("#drCombinedId").jquery.text()
         then:
         if(isDrTabVisible) {
             when: "Check Replica Title is displayed or not"
-            if(page.drReplicaTitleDisplayed()) {
+            if(page.drReplicaTitleDisplayed(divId)) {
                 assert true
             }
             then:
-            if(page.drReplicaTitleDisplayed()) {
-                println(waitFor(20) { page.drReplicaTitle.text() })
-                page.drReplicaTitle.text().equals("Replica")
+            if(page.drReplicaTitleDisplayed(divId)) {
+                println(waitFor(10) { $("#drReplicaTitle_" + divId).text() })
+                $("#drReplicaTitle_" + divId).text().equals("Replica")
             }
             else {
                 println("Replica Section is not visible")
@@ -610,6 +626,7 @@ class DrTest extends TestBase {
     def verifySearchInDatabaseReplicationTableREPLICA() {
         when:
         println("Process only if DR is present")
+        divId = $("#drCombinedId").jquery.text()
         then:
         if(isDrTabVisible) {
             boolean isValid=false
@@ -617,12 +634,12 @@ class DrTest extends TestBase {
             boolean isDROpen = false
 
             when: "Check if DR section is present"
-            if(!page.isDrSectionOpen()) {
+            if(!page.isDrSectionOpen(divId)) {
                 isDROpen = false
                 println("Dr Replication is not present")
             }
             else {
-                if(!page.isDrReplicaSectionOpen()) {
+                if(!page.isDrReplicaSectionOpen(divId)) {
                     println("Dr Replica section is not present")
                     isDROpen = false
                 }
@@ -635,16 +652,16 @@ class DrTest extends TestBase {
 
             when: "Set the value of Master filter"
             if(isDROpen==true) {
-                if (page.filterReplicaServerRows.size() > 1) {
-                    searchText = waitFor(20){page.filterReplicaServerRows[0].text().substring(0, 1)}
-                    page.filterHostID.value(page.filterReplicaServerRows[0].text().substring(0, 1))
+                if ($("#tblDrReplica_" + divId).find(class:"sorting_1").size() > 1) {
+                    searchText = waitFor(15){$("#tblDrReplica_" + divId).find(class:"sorting_1")[0].text().substring(0, 1)}
+                    $("#filterHostID_" + divId).value($("#tblDrReplica_" + divId).find(class:"sorting_1")[0].text().substring(0, 1))
                 } else {
                     isValid = false
                     assert true
                 }
                 then: "check the table"
-                for (def i = 0; i <= page.filterReplicaServerRows.size() - 1; i++) {
-                    if (!page.filterReplicaServerRows[i].text().toString().contains(searchText)) {
+                for (def i = 0; i <= $("#tblDrReplica_" + divId).find(class:"sorting_1").size() - 1; i++) {
+                    if (!$("#tblDrReplica_" + divId).find(class:"sorting_1")[i].text().toString().contains(searchText)) {
                         println("test false")
                         isValid = false
                         break
@@ -671,6 +688,7 @@ class DrTest extends TestBase {
     def checkMinValueInDrGraphSeconds() {
         when:
         println("Process only if DR is present")
+        divId = $("#drCombinedId").jquery.text()
         then:
         if(isDrTabVisible) {
             if(page.drMode.text().equals("") || page.drMode.text().equals("Master")) {
@@ -726,6 +744,7 @@ class DrTest extends TestBase {
     def checkMaxValueInDrGraphSeconds() {
         when:
         println("Process only if DR is present")
+        divId = $("#drCombinedId").jquery.text()
         then:
         if(isDrTabVisible) {
             if(page.drMode.text().equals("") || page.drMode.text().equals("Master")) {

@@ -83,8 +83,8 @@ class DrPage extends VoltDBManagementCenterPage {
         return $("#drMasterSection_" + divId).displayed
     }
 
-    def boolean isDrReplicaSectionOpen() {
-        return drReplicaSection.displayed
+    def boolean isDrReplicaSectionOpen(divId) {
+        return $("#drReplicaSection_" + divId).displayed
     }
 
     def boolean closeDrArea(divId) {
@@ -128,8 +128,8 @@ class DrPage extends VoltDBManagementCenterPage {
     /*
      *  click the server column in DR Replica table
      */
-    def boolean clickReplicaServer() {
-        replicaServer.click()
+    def boolean clickReplicaServer(divId) {
+        $("#replicaServer_" + divId).click()
     }
 
     /*
@@ -157,26 +157,26 @@ class DrPage extends VoltDBManagementCenterPage {
     /*
      *  click the status column in Replication Rate 1min table
      */
-    def boolean clickReplicationRate1() {
-        replicationRate1.click()
+    def boolean clickReplicationRate1(divId) {
+        $("#replicationRate1_" + divId).click()
     }
 
     /*
      * click the ReplicationRate5 column in DR Replica table
      */
-    def boolean clickReplicationRate5() {
-        replicationRate5.click()
+    def boolean clickReplicationRate5(divId) {
+        $("#replicationRate5_" + divId).click()
     }
 
     /*
      *  click the status column in DR Replica table
      */
-    def boolean clickReplicaStatus() {
-        replicaStatus.click()
+    def boolean clickReplicaStatus(divId) {
+        $("#replicaStatus_" + divId).click()
     }
 
-    def boolean drReplicaTitleDisplayed(){
-        return drReplicaTitle.displayed
+    def boolean drReplicaTitleDisplayed(divId){
+        return $("#drReplicaTitle_" + divId).displayed
     }
 
     def boolean drMasterTitleDisplayed(divId){
