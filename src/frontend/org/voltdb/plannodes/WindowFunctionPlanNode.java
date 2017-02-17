@@ -259,7 +259,7 @@ public class WindowFunctionPlanNode extends AbstractPlanNode {
 
     @Override
     protected String explainPlanForNode(String indent) {
-        return("WindowFunctionPlanNode: ops: " + m_aggregateTypes.get(0).name() + "()");
+        return("WINDOW FUNCTION AGGREGATION: ops: " + m_aggregateTypes.get(0).name() + "()");
     }
 
     public List<AbstractExpression> getPartitionByExpressions() {

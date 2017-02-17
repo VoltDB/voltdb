@@ -28,3 +28,13 @@ create table AAA (
   C integer
  );
  
+-- Order By Table, from the order by suite.
+--
+CREATE TABLE O1 (
+ PKEY          INTEGER NOT NULL,
+ A_INT         INTEGER,
+ PRIMARY KEY (PKEY)
+);
+
+PARTITION TABLE O1 ON COLUMN PKEY;
+CREATE INDEX IDX_O1_A_INT_PKEY on O1 (A_INT, PKEY);

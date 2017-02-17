@@ -125,33 +125,12 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
                 + ");"
                 + "PARTITION TABLE T_STRING_INLINE_PC ON COLUMN C;"
 
-                + "CREATE TABLE T_TIMESTAMP ("
-                + "  A INTEGER,"
-                + "  B INTEGER,"
-                + "  C TIMESTAMP"
-                + ");"
-
-                + "CREATE TABLE T_4COL (\n"
-                + "  A INTEGER,"
-                + "  AA INTEGER,"
-                + "  B INTEGER,"
-                + "  C INTEGER"
-                + ");\n"
-
                 + "CREATE TABLE T_PA (\n"
                 + "  A INTEGER NOT NULL,"
                 + "  B INTEGER NOT NULL,"
                 + "  C INTEGER NOT NULL"
                 + ");\n"
                 + "PARTITION TABLE T_PA ON COLUMN A;"
-
-                + "CREATE TABLE T_PAA (\n"
-                + "  A INTEGER NOT NULL,"
-                + "  AA INTEGER NOT NULL,"
-                + "  B INTEGER NOT NULL,"
-                + "  C INTEGER NOT NULL"
-                + ");\n"
-                + "PARTITION TABLE T_PAA ON COLUMN AA;"
 
                 + "CREATE TABLE T_PB (\n"
                 + "  A INTEGER NOT NULL,"
@@ -167,45 +146,6 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
                 + ");\n"
                 + "PARTITION TABLE T_PC ON COLUMN C;"
 
-                + "create table tu (a integer, b integer);"
-                + "create unique index idx1 on tu (a);"
-                + "create unique index idx2 on tu (b, a);"
-                + "create unique index idx3 on tu (a) where a > 30;"
-
-                + "create table tm (a integer, b integer);"
-                + "create index tm_idx1 on tm (a);"
-                + "create index tm_idx2 on tm (b, a);"
-
-                + "create table pu (a integer, b integer);"
-                + "create index pu_idx1 on pu (a);"
-                + "create index pu_idx2 on pu (b, a);"
-
-                + "CREATE TABLE P1_ENG_10972 ("
-                + "     ID INTEGER NOT NULL, "
-                + "     VCHAR VARCHAR(300), "
-                + "     NUM INTEGER, "
-                + "     RATIO FLOAT, "
-                + "     PRIMARY KEY (ID) "
-                + "   ); "
-                + "PARTITION TABLE P1_ENG_10972 ON COLUMN ID; "
-
-                + "CREATE TABLE P2 ("
-                + "  ID INTEGER NOT NULL,"
-                + "  TINY TINYINT NOT NULL,"
-                + "  SMALL SMALLINT,"
-                + "  BIG BIGINT NOT NULL,"
-                + "  PRIMARY KEY (ID, TINY)"
-                + ");"
-                + "PARTITION TABLE P2 ON COLUMN TINY;"
-
-                + "CREATE TABLE P1_ENG_11029 ("
-                + "        ID INTEGER NOT NULL,"
-                + "        TINY TINYINT NOT NULL,"
-                + "        SMALL SMALLINT NOT NULL,"
-                + "        BIG BIGINT NOT NULL,"
-                + "        PRIMARY KEY (ID)"
-                + ");"
-                + "PARTITION TABLE P1_ENG_11029 ON COLUMN ID;"
                 ;
         project.addLiteralSchema(literalSchema);
         project.setUseDDLSchema(true);
@@ -793,7 +733,26 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
         validateStringTable(cr.getResults()[0], expected);
     }
 
-    public void testMin() throws Exception {
+    private static final boolean IS_ENABLED = true;
+    private static final boolean ISNOT_ENABLED = false;
+
+    public void testAll() throws Exception {
+        Client client = getClient();
+        if (IS_ENABLED) {
+            truncateAllTables(client);
+            subtestMin();
+        }
+        if (IS_ENABLED) {
+            truncateAllTables(client);
+            subtestMax();
+        }
+        if (IS_ENABLED) {
+            truncateAllTables(client);
+            subtestSum();
+        }
+    }
+
+    private void subtestMin() throws Exception {
         Client client = getClient();
         ClientResponse cr;
 
@@ -1273,7 +1232,7 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
                             expectStringTableAllNull);
     }
 
-    public void testMax() throws Exception {
+    private void subtestMax() throws Exception {
         Client client = getClient();
         ClientResponse cr;
 
@@ -1746,7 +1705,7 @@ public class TestWindowFunctionSuiteMinMaxSum extends RegressionSuite {
                              expectStringTableAllNull);
     }
 
-    public void testSum() throws Exception {
+    private void subtestSum() throws Exception {
         Client client = getClient();
         ClientResponse cr;
 
