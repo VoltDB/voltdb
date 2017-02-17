@@ -72,14 +72,17 @@ public:
      * just for this test.  But that is not easily done.
      */
     TestWindowedCount(uint32_t randomSeed = (unsigned int)time(NULL)) {
-        initialize(m_PartitionByExecutorDB, randomSeed);
+        initialize(m_testDB, randomSeed);
     }
 
     ~TestWindowedCount() { }
 protected:
-    static DBConfig         m_PartitionByExecutorDB;
+    static DBConfig         m_testDB;
 };
 
+/*
+ * All the test cases are here.
+ */
 TEST_F(TestWindowedCount, test_count_star) {
     static int testIndex = 0;
     executeTest(allTests[testIndex]);
@@ -91,13 +94,111 @@ TEST_F(TestWindowedCount, test_count) {
 
 
 namespace {
+/*
+ * These are the names of all the columns.
+ */
 const char *T_ColumnNames[] = {
-    "A"
+    "A",
     "B",
     "C",
 };
+const char *count_output_ColumnNames[] = {
+    "A",
+    "B",
+    "C",
+    "D",
+};
+const char *count_output_ColumnNames[] = {
+    "A",
+    "B",
+    "C",
+    "D",
+};
+const char *count_output_ColumnNames[] = {
+    "A",
+    "B",
+    "C",
+    "D",
+};
 
 
+/*
+ * These are the types of all the columns.
+ */
+const voltdb::ValueType T_Types[] = {
+    voltdb::VALUE_TYPE_INTEGER,
+    voltdb::VALUE_TYPE_INTEGER,
+    voltdb::VALUE_TYPE_INTEGER,
+};
+const voltdb::ValueType count_output_Types[] = {
+    voltdb::VALUE_TYPE_INTEGER,
+    voltdb::VALUE_TYPE_INTEGER,
+    voltdb::VALUE_TYPE_INTEGER,
+    voltdb::VALUE_TYPE_INTEGER,
+};
+const voltdb::ValueType count_output_Types[] = {
+    voltdb::VALUE_TYPE_INTEGER,
+    voltdb::VALUE_TYPE_INTEGER,
+    voltdb::VALUE_TYPE_INTEGER,
+    voltdb::VALUE_TYPE_INTEGER,
+};
+const voltdb::ValueType count_output_Types[] = {
+    voltdb::VALUE_TYPE_INTEGER,
+    voltdb::VALUE_TYPE_INTEGER,
+    voltdb::VALUE_TYPE_INTEGER,
+    voltdb::VALUE_TYPE_INTEGER,
+};
+
+
+/*
+ * These are the sizes of all the column data.
+ */
+const int32_t T_Sizes[] = {
+    4,
+    4,
+    4,
+};
+const int32_t count_output_Sizes[] = {
+    4,
+    4,
+    4,
+    4,
+};
+const int32_t count_output_Sizes[] = {
+    4,
+    4,
+    4,
+    4,
+};
+const int32_t count_output_Sizes[] = {
+    4,
+    4,
+    4,
+    4,
+};
+
+
+/*
+ * These are the strings in each populated columns.
+ * The data will either be integers or indices into this table.
+ */
+int32_t num_T_strings = 0;
+const char *T_Strings[] = {
+};
+int32_t num_count_output_strings = 0;
+const char *count_output_Strings[] = {
+};
+int32_t num_count_output_strings = 0;
+const char *count_output_Strings[] = {
+};
+int32_t num_count_output_strings = 0;
+const char *count_output_Strings[] = {
+};
+
+
+/*
+ * This is the data in all columns.
+ */
 const int NUM_TABLE_ROWS_T = 15;
 const int NUM_TABLE_COLS_T = 3;
 const int TData[NUM_TABLE_ROWS_T * NUM_TABLE_COLS_T] = {
@@ -118,62 +219,127 @@ const int TData[NUM_TABLE_ROWS_T * NUM_TABLE_COLS_T] = {
      20,  3,2203,
 };
 
+const int NUM_TABLE_ROWS_COUNT_OUTPUT = 15;
+const int NUM_TABLE_COLS_COUNT_OUTPUT = 4;
+const int count_outputData[NUM_TABLE_ROWS_COUNT_OUTPUT * NUM_TABLE_COLS_COUNT_OUTPUT] = {
+      1,  1,101,  2,
+      1,  1,102,  2,
+      1,  2,201,  4,
+      1,  2,202,  4,
+      1,  3,203,  5,
+      2,  1,1101,  2,
+      2,  1,1102,  2,
+      2,  2,1201,  4,
+      2,  2,1202,  4,
+      2,  3,1203,  5,
+     20,  1,2101,  2,
+     20,  1,2102,  2,
+     20,  2,2201,  4,
+     20,  2,2202,  4,
+     20,  3,2203,  5,
+};
+
+const int NUM_TABLE_ROWS_COUNT_OUTPUT = 15;
+const int NUM_TABLE_COLS_COUNT_OUTPUT = 4;
+const int count_outputData[NUM_TABLE_ROWS_COUNT_OUTPUT * NUM_TABLE_COLS_COUNT_OUTPUT] = {
+      1,  1,101,  2,
+      1,  1,102,  2,
+      1,  2,201,  4,
+      1,  2,202,  4,
+      1,  3,203,  5,
+      2,  1,1101,  2,
+      2,  1,1102,  2,
+      2,  2,1201,  4,
+      2,  2,1202,  4,
+      2,  3,1203,  5,
+     20,  1,2101,  2,
+     20,  1,2102,  2,
+     20,  2,2201,  4,
+     20,  2,2202,  4,
+     20,  3,2203,  5,
+};
+
+const int NUM_TABLE_ROWS_COUNT_OUTPUT = 15;
+const int NUM_TABLE_COLS_COUNT_OUTPUT = 4;
+const int count_outputData[NUM_TABLE_ROWS_COUNT_OUTPUT * NUM_TABLE_COLS_COUNT_OUTPUT] = {
+      1,  1,101,  2,
+      1,  1,102,  2,
+      1,  2,201,  4,
+      1,  2,202,  4,
+      1,  3,203,  5,
+      2,  1,1101,  2,
+      2,  1,1102,  2,
+      2,  2,1201,  4,
+      2,  2,1202,  4,
+      2,  3,1203,  5,
+     20,  1,2101,  2,
+     20,  1,2102,  2,
+     20,  2,2201,  4,
+     20,  2,2202,  4,
+     20,  3,2203,  5,
+};
 
 
+
+/*
+ * These are the names of all the columns.
+ */
+/*
+ * These knit together all the bits of data which form a table.
+ */
 const TableConfig TConfig = {
     "T",
     T_ColumnNames,
+    T_Types,
+    T_Sizes,
     NUM_TABLE_ROWS_T,
     NUM_TABLE_COLS_T,
-    TData
+    TData,
+    T_Strings,
+    num_T_strings
+};
+const TableConfig count_outputConfig = {
+    "count_output",
+    count_output_ColumnNames,
+    count_output_Types,
+    count_output_Sizes,
+    NUM_TABLE_ROWS_COUNT_OUTPUT,
+    NUM_TABLE_COLS_COUNT_OUTPUT,
+    count_outputData,
+    count_output_Strings,
+    num_count_output_strings
+};
+const TableConfig count_outputConfig = {
+    "count_output",
+    count_output_ColumnNames,
+    count_output_Types,
+    count_output_Sizes,
+    NUM_TABLE_ROWS_COUNT_OUTPUT,
+    NUM_TABLE_COLS_COUNT_OUTPUT,
+    count_outputData,
+    count_output_Strings,
+    num_count_output_strings
+};
+const TableConfig count_outputConfig = {
+    "count_output",
+    count_output_ColumnNames,
+    count_output_Types,
+    count_output_Sizes,
+    NUM_TABLE_ROWS_COUNT_OUTPUT,
+    NUM_TABLE_COLS_COUNT_OUTPUT,
+    count_outputData,
+    count_output_Strings,
+    num_count_output_strings
 };
 
 
+/*
+ * This holds all the persistent tables.
+ */
 const TableConfig *allTables[] = {
     &TConfig,
-
+    &count_outputConfig,
 };
-
-const int NUM_OUTPUT_ROWS_TEST_COUNT_STAR = 15;
-const int NUM_OUTPUT_COLS_TEST_COUNT_STAR = 4;
-const int outputTable_test_count_star[NUM_OUTPUT_ROWS_TEST_COUNT_STAR * NUM_OUTPUT_COLS_TEST_COUNT_STAR] = {
-      1,  1,101,  2,
-      1,  1,102,  2,
-      1,  2,201,  4,
-      1,  2,202,  4,
-      1,  3,203,  5,
-      2,  1,1101,  2,
-      2,  1,1102,  2,
-      2,  2,1201,  4,
-      2,  2,1202,  4,
-      2,  3,1203,  5,
-     20,  1,2101,  2,
-     20,  1,2102,  2,
-     20,  2,2201,  4,
-     20,  2,2202,  4,
-     20,  3,2203,  5,
-};
-
-const int NUM_OUTPUT_ROWS_TEST_COUNT = 15;
-const int NUM_OUTPUT_COLS_TEST_COUNT = 4;
-const int outputTable_test_count[NUM_OUTPUT_ROWS_TEST_COUNT * NUM_OUTPUT_COLS_TEST_COUNT] = {
-      1,  1,101,  2,
-      1,  1,102,  2,
-      1,  2,201,  4,
-      1,  2,202,  4,
-      1,  3,203,  5,
-      2,  1,1101,  2,
-      2,  1,1102,  2,
-      2,  2,1201,  4,
-      2,  2,1202,  4,
-      2,  3,1203,  5,
-     20,  1,2101,  2,
-     20,  1,2102,  2,
-     20,  2,2201,  4,
-     20,  2,2202,  4,
-     20,  3,2203,  5,
-};
-
 
 
 TestConfig allTests[2] = {
@@ -389,9 +555,7 @@ TestConfig allTests[2] = {
         "        }\n"
         "    ]\n"
         "}",
-        NUM_OUTPUT_ROWS_TEST_COUNT_STAR,
-        NUM_OUTPUT_COLS_TEST_COUNT_STAR,
-        outputTable_test_count_star
+        &count_outputConfig
     },
     {
         // SQL Statement
@@ -618,15 +782,13 @@ TestConfig allTests[2] = {
         "        }\n"
         "    ]\n"
         "}",
-        NUM_OUTPUT_ROWS_TEST_COUNT,
-        NUM_OUTPUT_COLS_TEST_COUNT,
-        outputTable_test_count
+        &count_outputConfig
     },
 };
 
 }
 
-DBConfig TestWindowedCount::m_PartitionByExecutorDB =
+DBConfig TestWindowedCount::m_testDB =
 
 {
     //
@@ -661,7 +823,19 @@ DBConfig TestWindowedCount::m_PartitionByExecutorDB =
     "  B integer,\n"
     "  C integer\n"
     " );\n"
-    " ",
+    " \n"
+    "create table CCC (\n"
+    "  id integer,\n"
+    "  name varchar(32),\n"
+    "  data varchar(1024)\n"
+    ");\n"
+    " \n"
+    "create table XXX (\n"
+    "  id integer primary key not null,\n"
+    "  name varchar(32),\n"
+    "  data varchar(1024)\n"
+    ");\n"
+    "",
     //
     // Catalog String
     //
@@ -675,12 +849,13 @@ DBConfig TestWindowedCount::m_PartitionByExecutorDB =
     "set $PREV useddlschema false\n"
     "set $PREV drConsumerEnabled false\n"
     "set $PREV drProducerEnabled false\n"
+    "set $PREV drRole \"\"\n"
     "set $PREV drClusterId 0\n"
     "set $PREV drProducerPort 0\n"
     "set $PREV drMasterHost \"\"\n"
     "set $PREV drFlushInterval 0\n"
     "add /clusters#cluster databases database\n"
-    "set /clusters#cluster/databases#database schema \"eJy1UkEOwyAMu+81EJykuZa1/3/SDGLTprZbe5hQOGAHmxiDi62eJDksm1g1laSQZGHGXX2y8OLwUuab7dKR27rWIm1dalEpRxooKlBkBbp72hFUjJfIxErNJiuwNBYcqiJ1IHKIlA2SJL5Ldp8v0QC2V2DB2qzxVNlVn3LkNGac76BqcFznFeiP3DudS9eZyY/mtzuN8TwrjEAtMwDdD/t9qgxlaUxzBvMx1QOkbJD0W3h8mT8JPwASSZ/F\"\n"
+    "set /clusters#cluster/databases#database schema \"eJy9UsuOw0AIu+/XzICBcE2a/P8nrRml+1CabXroCk1GGoxtII4Q36JJC3h38cVNmkGapzu/FpNnaCBU5w9/CEeveK1EKl4qMdEzDagJDN2A4Z52BAv2TmTiaWWTJ7EWCgEzkWXPyGlGD5km+bfk8PklmsCRAiu2ssZXY9VylyOmkHm9gqrJcV1XoD9ib3QuQ2cmPsvvcJp7e65cgXnnAuzxsn9OlUtZC+nBxfya6klGD5n2XHj/Zf5fWCu+hUmAMwFfWXcbDE4ucfWpbplUVTjeOw5DqT/AdW0qemUVNlU8MdaisT5pivRBUp/5nsPqFoVfw8i3vLGFTyRq52Q=\"\n"
     "set $PREV isActiveActiveDRed false\n"
     "set $PREV securityprovider \"\"\n"
     "add /clusters#cluster/databases#database groups administrator\n"
@@ -779,6 +954,50 @@ DBConfig TestWindowedCount::m_PartitionByExecutorDB =
     "set $PREV size 4\n"
     "set $PREV nullable true\n"
     "set $PREV name \"C\"\n"
+    "set $PREV defaultvalue null\n"
+    "set $PREV defaulttype 0\n"
+    "set $PREV aggregatetype 0\n"
+    "set $PREV matviewsource null\n"
+    "set $PREV matview null\n"
+    "set $PREV inbytes false\n"
+    "add /clusters#cluster/databases#database tables CCC\n"
+    "set /clusters#cluster/databases#database/tables#CCC isreplicated true\n"
+    "set $PREV partitioncolumn null\n"
+    "set $PREV estimatedtuplecount 0\n"
+    "set $PREV materializer null\n"
+    "set $PREV signature \"CCC|ivv\"\n"
+    "set $PREV tuplelimit 2147483647\n"
+    "set $PREV isDRed false\n"
+    "add /clusters#cluster/databases#database/tables#CCC columns DATA\n"
+    "set /clusters#cluster/databases#database/tables#CCC/columns#DATA index 2\n"
+    "set $PREV type 9\n"
+    "set $PREV size 1024\n"
+    "set $PREV nullable true\n"
+    "set $PREV name \"DATA\"\n"
+    "set $PREV defaultvalue null\n"
+    "set $PREV defaulttype 0\n"
+    "set $PREV aggregatetype 0\n"
+    "set $PREV matviewsource null\n"
+    "set $PREV matview null\n"
+    "set $PREV inbytes false\n"
+    "add /clusters#cluster/databases#database/tables#CCC columns ID\n"
+    "set /clusters#cluster/databases#database/tables#CCC/columns#ID index 0\n"
+    "set $PREV type 5\n"
+    "set $PREV size 4\n"
+    "set $PREV nullable true\n"
+    "set $PREV name \"ID\"\n"
+    "set $PREV defaultvalue null\n"
+    "set $PREV defaulttype 0\n"
+    "set $PREV aggregatetype 0\n"
+    "set $PREV matviewsource null\n"
+    "set $PREV matview null\n"
+    "set $PREV inbytes false\n"
+    "add /clusters#cluster/databases#database/tables#CCC columns NAME\n"
+    "set /clusters#cluster/databases#database/tables#CCC/columns#NAME index 1\n"
+    "set $PREV type 9\n"
+    "set $PREV size 32\n"
+    "set $PREV nullable true\n"
+    "set $PREV name \"NAME\"\n"
     "set $PREV defaultvalue null\n"
     "set $PREV defaulttype 0\n"
     "set $PREV aggregatetype 0\n"
@@ -888,6 +1107,65 @@ DBConfig TestWindowedCount::m_PartitionByExecutorDB =
     "set $PREV matviewsource null\n"
     "set $PREV matview null\n"
     "set $PREV inbytes false\n"
+    "add /clusters#cluster/databases#database tables XXX\n"
+    "set /clusters#cluster/databases#database/tables#XXX isreplicated true\n"
+    "set $PREV partitioncolumn null\n"
+    "set $PREV estimatedtuplecount 0\n"
+    "set $PREV materializer null\n"
+    "set $PREV signature \"XXX|ivv\"\n"
+    "set $PREV tuplelimit 2147483647\n"
+    "set $PREV isDRed false\n"
+    "add /clusters#cluster/databases#database/tables#XXX columns DATA\n"
+    "set /clusters#cluster/databases#database/tables#XXX/columns#DATA index 2\n"
+    "set $PREV type 9\n"
+    "set $PREV size 1024\n"
+    "set $PREV nullable true\n"
+    "set $PREV name \"DATA\"\n"
+    "set $PREV defaultvalue null\n"
+    "set $PREV defaulttype 0\n"
+    "set $PREV aggregatetype 0\n"
+    "set $PREV matviewsource null\n"
+    "set $PREV matview null\n"
+    "set $PREV inbytes false\n"
+    "add /clusters#cluster/databases#database/tables#XXX columns ID\n"
+    "set /clusters#cluster/databases#database/tables#XXX/columns#ID index 0\n"
+    "set $PREV type 5\n"
+    "set $PREV size 4\n"
+    "set $PREV nullable false\n"
+    "set $PREV name \"ID\"\n"
+    "set $PREV defaultvalue null\n"
+    "set $PREV defaulttype 0\n"
+    "set $PREV aggregatetype 0\n"
+    "set $PREV matviewsource null\n"
+    "set $PREV matview null\n"
+    "set $PREV inbytes false\n"
+    "add /clusters#cluster/databases#database/tables#XXX columns NAME\n"
+    "set /clusters#cluster/databases#database/tables#XXX/columns#NAME index 1\n"
+    "set $PREV type 9\n"
+    "set $PREV size 32\n"
+    "set $PREV nullable true\n"
+    "set $PREV name \"NAME\"\n"
+    "set $PREV defaultvalue null\n"
+    "set $PREV defaulttype 0\n"
+    "set $PREV aggregatetype 0\n"
+    "set $PREV matviewsource null\n"
+    "set $PREV matview null\n"
+    "set $PREV inbytes false\n"
+    "add /clusters#cluster/databases#database/tables#XXX indexes VOLTDB_AUTOGEN_IDX_PK_XXX_ID\n"
+    "set /clusters#cluster/databases#database/tables#XXX/indexes#VOLTDB_AUTOGEN_IDX_PK_XXX_ID unique true\n"
+    "set $PREV assumeUnique false\n"
+    "set $PREV countable true\n"
+    "set $PREV type 1\n"
+    "set $PREV expressionsjson \"\"\n"
+    "set $PREV predicatejson \"\"\n"
+    "add /clusters#cluster/databases#database/tables#XXX/indexes#VOLTDB_AUTOGEN_IDX_PK_XXX_ID columns ID\n"
+    "set /clusters#cluster/databases#database/tables#XXX/indexes#VOLTDB_AUTOGEN_IDX_PK_XXX_ID/columns#ID index 0\n"
+    "set $PREV column /clusters#cluster/databases#database/tables#XXX/columns#ID\n"
+    "add /clusters#cluster/databases#database/tables#XXX constraints VOLTDB_AUTOGEN_IDX_PK_XXX_ID\n"
+    "set /clusters#cluster/databases#database/tables#XXX/constraints#VOLTDB_AUTOGEN_IDX_PK_XXX_ID type 4\n"
+    "set $PREV oncommit \"\"\n"
+    "set $PREV index /clusters#cluster/databases#database/tables#XXX/indexes#VOLTDB_AUTOGEN_IDX_PK_XXX_ID\n"
+    "set $PREV foreignkeytable null\n"
     "add /clusters#cluster/databases#database procedures testplanseegenerator\n"
     "set /clusters#cluster/databases#database/procedures#testplanseegenerator classname \"\"\n"
     "set $PREV readonly false\n"
@@ -902,8 +1180,56 @@ DBConfig TestWindowedCount::m_PartitionByExecutorDB =
     "set $PREV partitioncolumn null\n"
     "set $PREV partitionparameter 0\n"
     "set $PREV allowedInShutdown false\n"
+    "add /clusters#cluster/databases#database/procedures#testplanseegenerator statements stmt-0\n"
+    "set /clusters#cluster/databases#database/procedures#testplanseegenerator/statements#stmt-0 sqltext \"select A, B from AAA order by A, B;\"\n"
+    "set $PREV querytype 2\n"
+    "set $PREV readonly true\n"
+    "set $PREV singlepartition true\n"
+    "set $PREV replicatedtabledml false\n"
+    "set $PREV iscontentdeterministic false\n"
+    "set $PREV isorderdeterministic false\n"
+    "set $PREV nondeterminismdetail \"\"\n"
+    "set $PREV cost 0\n"
+    "set $PREV seqscancount 0\n"
+    "set $PREV explainplan \"\"\n"
+    "set $PREV tablesread \"\"\n"
+    "set $PREV tablesupdated \"\"\n"
+    "set $PREV indexesused \"\"\n"
+    "set $PREV cachekeyprefix \"\"\n"
+    "add /clusters#cluster/databases#database/procedures#testplanseegenerator statements stmt-1\n"
+    "set /clusters#cluster/databases#database/procedures#testplanseegenerator/statements#stmt-1 sqltext \"select AAA.A, AAA.B, BBB.C from AAA join BBB on AAA.C = BBB.C order by AAA.A, AAA.B, AAA.C;\"\n"
+    "set $PREV querytype 2\n"
+    "set $PREV readonly true\n"
+    "set $PREV singlepartition true\n"
+    "set $PREV replicatedtabledml false\n"
+    "set $PREV iscontentdeterministic false\n"
+    "set $PREV isorderdeterministic false\n"
+    "set $PREV nondeterminismdetail \"\"\n"
+    "set $PREV cost 0\n"
+    "set $PREV seqscancount 0\n"
+    "set $PREV explainplan \"\"\n"
+    "set $PREV tablesread \"\"\n"
+    "set $PREV tablesupdated \"\"\n"
+    "set $PREV indexesused \"\"\n"
+    "set $PREV cachekeyprefix \"\"\n"
+    "add /clusters#cluster/databases#database/procedures#testplanseegenerator statements stmt-2\n"
+    "set /clusters#cluster/databases#database/procedures#testplanseegenerator/statements#stmt-2 sqltext \"select * from CCC;\"\n"
+    "set $PREV querytype 2\n"
+    "set $PREV readonly true\n"
+    "set $PREV singlepartition true\n"
+    "set $PREV replicatedtabledml false\n"
+    "set $PREV iscontentdeterministic false\n"
+    "set $PREV isorderdeterministic false\n"
+    "set $PREV nondeterminismdetail \"\"\n"
+    "set $PREV cost 0\n"
+    "set $PREV seqscancount 0\n"
+    "set $PREV explainplan \"\"\n"
+    "set $PREV tablesread \"\"\n"
+    "set $PREV tablesupdated \"\"\n"
+    "set $PREV indexesused \"\"\n"
+    "set $PREV cachekeyprefix \"\"\n"
     "",
-    1,
+    2,
     allTables
 };
 

@@ -39,47 +39,6 @@
  * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
  * License for the specific language governing permissions and limitations under
  * the License.
- *//* This file is part of VoltDB.
- * Copyright (C) 2008-2016 VoltDB Inc.
- *
- * This file contains original code and/or modifications of original code.
- * Any modifications made by VoltDB Inc. are licensed under the following
- * terms and conditions:
- *
- * Permission is hereby granted, free of charge, to any person obtaining
- * a copy of this software and associated documentation files (the
- * "Software"), to deal in the Software without restriction, including
- * without limitation the rights to use, copy, modify, merge, publish,
- * distribute, sublicense, and/or sell copies of the Software, and to
- * permit persons to whom the Software is furnished to do so, subject to
- * the following conditions:
- *
- * The above copyright notice and this permission notice shall be
- * included in all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
- * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
- * IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
- * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
- * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
- * OTHER DEALINGS IN THE SOFTWARE.
- */
-/**
- * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements. See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership. The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
  */
 /******************************************************************************************
  *
@@ -312,7 +271,7 @@ const int BBBData[NUM_TABLE_ROWS_BBB * NUM_TABLE_COLS_BBB] = {
       3, 30,301,
 };
 
-const int NUM_TABLE_ROWS_CCC = 1000000;
+const int NUM_TABLE_ROWS_CCC = 10000000;
 const int NUM_TABLE_COLS_CCC = 3;
 ;
 const int NUM_TABLE_ROWS_XXX = 2;
@@ -841,8 +800,23 @@ DBConfig TestGeneratedPlans::m_testDB =
     //
     // DDL.
     //
+    "drop table T if exists;\n"
     "drop table AAA if exists;\n"
     "drop table BBB if exists;\n"
+    "drop table R1 if exists;\n"
+    "\n"
+    "CREATE TABLE T (\n"
+    "  A INTEGER,\n"
+    "  B INTEGER,\n"
+    "  C INTEGER\n"
+    ");\n"
+    "\n"
+    "CREATE TABLE R1 (\n"
+    "  ID INTEGER NOT NULL,\n"
+    "  TINY INTEGER NOT NULL,\n"
+    "  BIG INTEGER NOT NULL,\n"
+    "  PRIMARY KEY (ID)\n"
+    ");\n"
     "\n"
     "create table AAA (\n"
     "  A integer,\n"
@@ -877,18 +851,17 @@ DBConfig TestGeneratedPlans::m_testDB =
     "set $PREV httpdportno 0\n"
     "set $PREV jsonapi false\n"
     "set $PREV networkpartition false\n"
-    "set $PREV adminport 0\n"
-    "set $PREV adminstartup false\n"
     "set $PREV heartbeatTimeout 0\n"
     "set $PREV useddlschema false\n"
     "set $PREV drConsumerEnabled false\n"
     "set $PREV drProducerEnabled false\n"
+    "set $PREV drRole \"\"\n"
     "set $PREV drClusterId 0\n"
     "set $PREV drProducerPort 0\n"
     "set $PREV drMasterHost \"\"\n"
     "set $PREV drFlushInterval 0\n"
     "add /clusters#cluster databases database\n"
-    "set /clusters#cluster/databases#database schema \"eJy9T8sOwyAMu+9rggMOXNu1//9Jc1C1HdZup00WIIhfsAa4h8GishBc2WC1JGAcpPYWnSM8argvN55LkLiSuCSNRYJ2noSuZXmfFlsyGbIB1mOCy4m/TfJ9fA4++v4/2BOvYBnUqwBu0t2nA+UFOnue6O4OjCevzqRywituDq/ifivWeuJLMQuTfqiU7EOmXPQ+ZtU9kr9Fk9/6wy88APRzjfg=\"\n"
+    "set /clusters#cluster/databases#database schema \"eJy9UsuOw0AIu+/XzICBcE2a/P8nrRml+1CabXroCk1GGoxtII4Q36JJC3h38cVNmkGapzu/FpNnaCBU5w9/CEeveK1EKl4qMdEzDagJDN2A4Z52BAv2TmTiaWWTJ7EWCgEzkWXPyGlGD5km+bfk8PklmsCRAiu2ssZXY9VylyOmkHm9gqrJcV1XoD9ib3QuQ2cmPsvvcJp7e65cgXnnAuzxsn9OlUtZC+nBxfya6klGD5n2XHj/Zf5fWCu+hUmAMwFfWXcbDE4ucfWpbplUVTjeOw5DqT/AdW0qemUVNlU8MdaisT5pivRBUp/5nsPqFoVfw8i3vLGFTyRq52Q=\"\n"
     "set $PREV isActiveActiveDRed false\n"
     "set $PREV securityprovider \"\"\n"
     "add /clusters#cluster/databases#database groups administrator\n"
@@ -1037,6 +1010,109 @@ DBConfig TestGeneratedPlans::m_testDB =
     "set $PREV matviewsource null\n"
     "set $PREV matview null\n"
     "set $PREV inbytes false\n"
+    "add /clusters#cluster/databases#database tables R1\n"
+    "set /clusters#cluster/databases#database/tables#R1 isreplicated true\n"
+    "set $PREV partitioncolumn null\n"
+    "set $PREV estimatedtuplecount 0\n"
+    "set $PREV materializer null\n"
+    "set $PREV signature \"R1|iii\"\n"
+    "set $PREV tuplelimit 2147483647\n"
+    "set $PREV isDRed false\n"
+    "add /clusters#cluster/databases#database/tables#R1 columns BIG\n"
+    "set /clusters#cluster/databases#database/tables#R1/columns#BIG index 2\n"
+    "set $PREV type 5\n"
+    "set $PREV size 4\n"
+    "set $PREV nullable false\n"
+    "set $PREV name \"BIG\"\n"
+    "set $PREV defaultvalue null\n"
+    "set $PREV defaulttype 0\n"
+    "set $PREV aggregatetype 0\n"
+    "set $PREV matviewsource null\n"
+    "set $PREV matview null\n"
+    "set $PREV inbytes false\n"
+    "add /clusters#cluster/databases#database/tables#R1 columns ID\n"
+    "set /clusters#cluster/databases#database/tables#R1/columns#ID index 0\n"
+    "set $PREV type 5\n"
+    "set $PREV size 4\n"
+    "set $PREV nullable false\n"
+    "set $PREV name \"ID\"\n"
+    "set $PREV defaultvalue null\n"
+    "set $PREV defaulttype 0\n"
+    "set $PREV aggregatetype 0\n"
+    "set $PREV matviewsource null\n"
+    "set $PREV matview null\n"
+    "set $PREV inbytes false\n"
+    "add /clusters#cluster/databases#database/tables#R1 columns TINY\n"
+    "set /clusters#cluster/databases#database/tables#R1/columns#TINY index 1\n"
+    "set $PREV type 5\n"
+    "set $PREV size 4\n"
+    "set $PREV nullable false\n"
+    "set $PREV name \"TINY\"\n"
+    "set $PREV defaultvalue null\n"
+    "set $PREV defaulttype 0\n"
+    "set $PREV aggregatetype 0\n"
+    "set $PREV matviewsource null\n"
+    "set $PREV matview null\n"
+    "set $PREV inbytes false\n"
+    "add /clusters#cluster/databases#database/tables#R1 indexes VOLTDB_AUTOGEN_IDX_PK_R1_ID\n"
+    "set /clusters#cluster/databases#database/tables#R1/indexes#VOLTDB_AUTOGEN_IDX_PK_R1_ID unique true\n"
+    "set $PREV assumeUnique false\n"
+    "set $PREV countable true\n"
+    "set $PREV type 1\n"
+    "set $PREV expressionsjson \"\"\n"
+    "set $PREV predicatejson \"\"\n"
+    "add /clusters#cluster/databases#database/tables#R1/indexes#VOLTDB_AUTOGEN_IDX_PK_R1_ID columns ID\n"
+    "set /clusters#cluster/databases#database/tables#R1/indexes#VOLTDB_AUTOGEN_IDX_PK_R1_ID/columns#ID index 0\n"
+    "set $PREV column /clusters#cluster/databases#database/tables#R1/columns#ID\n"
+    "add /clusters#cluster/databases#database/tables#R1 constraints VOLTDB_AUTOGEN_IDX_PK_R1_ID\n"
+    "set /clusters#cluster/databases#database/tables#R1/constraints#VOLTDB_AUTOGEN_IDX_PK_R1_ID type 4\n"
+    "set $PREV oncommit \"\"\n"
+    "set $PREV index /clusters#cluster/databases#database/tables#R1/indexes#VOLTDB_AUTOGEN_IDX_PK_R1_ID\n"
+    "set $PREV foreignkeytable null\n"
+    "add /clusters#cluster/databases#database tables T\n"
+    "set /clusters#cluster/databases#database/tables#T isreplicated true\n"
+    "set $PREV partitioncolumn null\n"
+    "set $PREV estimatedtuplecount 0\n"
+    "set $PREV materializer null\n"
+    "set $PREV signature \"T|iii\"\n"
+    "set $PREV tuplelimit 2147483647\n"
+    "set $PREV isDRed false\n"
+    "add /clusters#cluster/databases#database/tables#T columns A\n"
+    "set /clusters#cluster/databases#database/tables#T/columns#A index 0\n"
+    "set $PREV type 5\n"
+    "set $PREV size 4\n"
+    "set $PREV nullable true\n"
+    "set $PREV name \"A\"\n"
+    "set $PREV defaultvalue null\n"
+    "set $PREV defaulttype 0\n"
+    "set $PREV aggregatetype 0\n"
+    "set $PREV matviewsource null\n"
+    "set $PREV matview null\n"
+    "set $PREV inbytes false\n"
+    "add /clusters#cluster/databases#database/tables#T columns B\n"
+    "set /clusters#cluster/databases#database/tables#T/columns#B index 1\n"
+    "set $PREV type 5\n"
+    "set $PREV size 4\n"
+    "set $PREV nullable true\n"
+    "set $PREV name \"B\"\n"
+    "set $PREV defaultvalue null\n"
+    "set $PREV defaulttype 0\n"
+    "set $PREV aggregatetype 0\n"
+    "set $PREV matviewsource null\n"
+    "set $PREV matview null\n"
+    "set $PREV inbytes false\n"
+    "add /clusters#cluster/databases#database/tables#T columns C\n"
+    "set /clusters#cluster/databases#database/tables#T/columns#C index 2\n"
+    "set $PREV type 5\n"
+    "set $PREV size 4\n"
+    "set $PREV nullable true\n"
+    "set $PREV name \"C\"\n"
+    "set $PREV defaultvalue null\n"
+    "set $PREV defaulttype 0\n"
+    "set $PREV aggregatetype 0\n"
+    "set $PREV matviewsource null\n"
+    "set $PREV matview null\n"
+    "set $PREV inbytes false\n"
     "add /clusters#cluster/databases#database tables XXX\n"
     "set /clusters#cluster/databases#database/tables#XXX isreplicated true\n"
     "set $PREV partitioncolumn null\n"
@@ -1109,6 +1185,7 @@ DBConfig TestGeneratedPlans::m_testDB =
     "set $PREV partitiontable null\n"
     "set $PREV partitioncolumn null\n"
     "set $PREV partitionparameter 0\n"
+    "set $PREV allowedInShutdown false\n"
     "",
     4,
     allTables
