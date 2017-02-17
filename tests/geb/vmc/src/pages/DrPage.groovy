@@ -32,6 +32,8 @@ class DrPage extends VoltDBManagementCenterPage {
         latencyTime         { $('#latencyDR') }
         clusterId           { $('#dRProducerName') }
         drPending           { $('#drPending_0') }
+        drArrow             { $('#drArrow_0') }
+        drArrowParagraph    { $('#drArrow_0 p') }
 
         drMode              { $('#drModeName') }
 

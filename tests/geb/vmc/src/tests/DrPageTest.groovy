@@ -97,6 +97,30 @@ class DrPageTest extends TestBase {
         }
     }
 
+    def verifyClusterRelation() {
+        when:
+        println("Process only if DR is present")
+        divId = $("#drCombinedId").jquery.text()
+        then:
+        if(isDrTabVisible && !page.isDrPendingPresent()) {
+            when:
+            waitFor(5){ drArrow.isDisplayed() }
+            then:
+            if (page.drMode.text().equals("REPLICA")) {
+                assert drArrow.attr("class") == "arrowSingleLeft"
+                assert drArrowParagraph.jquery.html() == "REPLICA / MASTER"
+            } else if(page.drMode.text().equals("MASTER")){
+                assert drArrow.attr("class") == "arrowSingle"
+                assert drArrowParagraph.jquery.html() == "MASTER / REPLICA"
+            } else {
+                assert drArrow.attr("class") == "arrowDouble"
+                assert drArrowParagraph.jquery.html() == "XDCR"
+            }
+        } else {
+            println("DR is not available.")
+        }
+    }
+
     def verifyShowAndHideDatabaseReplicationTableMASTER() {
         when:
         println("Process only if DR is present")
