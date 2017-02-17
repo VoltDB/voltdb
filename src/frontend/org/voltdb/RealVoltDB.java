@@ -1924,13 +1924,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     private void startHealthMonitor() {
         if (resMonitorWork != null) {
+            m_globalServiceElector.unregisterService(m_healthMonitor);
             resMonitorWork.cancel(false);
             try {
                 resMonitorWork.get();
             } catch(Exception e) { } // Ignore exceptions because we don't really care about the result here.
             m_periodicWorks.remove(resMonitorWork);
         }
-        m_globalServiceElector.unregisterService(m_healthMonitor);
         m_healthMonitor  = new HealthMonitor(m_catalogContext.getDeployment().getSystemsettings(), getSnmpTrapSender());
         m_healthMonitor.logResourceLimitConfigurationInfo();
         if (m_healthMonitor.hasResourceLimitsConfigured()) {
