@@ -261,6 +261,11 @@ static const int FUNC_VOLT_REGEXP_POSITION             = 20041;
 static const int FUNC_VOLT_ROUND                       = 20042;
 static const int FUNC_VOLT_STR                         = 20043;
 
+// our local function
+static const int FUNC_MY_INET_NTOA                     = 20044;
+static const int FUNC_MY_INET_ATON4                    = 20045;
+static const int FUNC_MY_INET_ATON6                    = 20046;
+
 // Geospatial functions
 static const int FUNC_VOLT_POINTFROMTEXT               = 21000;
 static const int FUNC_VOLT_POLYGONFROMTEXT             = 21001;
