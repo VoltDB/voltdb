@@ -58,7 +58,13 @@ public class StatsAgent extends OpsAgent
     protected void dispatchFinalAggregations(PendingOpsRequest request)
     {
         StatsSelector subselector = StatsSelector.valueOf(request.subselector);
+        // the base table is the output of PROCEDUREDETAIL, all the other procedure-related
+        // sub-selectors need to build their final output by aggregating the base table.
         switch (subselector) {
+        case PROCEDURE:
+            request.aggregateTables =
+            aggregateProcedureStats(request.aggregateTables);
+            break;
         case PROCEDUREPROFILE:
             request.aggregateTables =
             aggregateProcedureProfileStats(request.aggregateTables);
@@ -188,6 +194,18 @@ public class StatsAgent extends OpsAgent
         return new VoltTable[] { timeTable.sortByOutput("PROCEDURE_OUTPUT") };
     }
 
+    /**
+     * Produce PROCEDURE aggregation of PROCEDURE subselector
+     */
+
+    private VoltTable[] aggregateProcedureStats(VoltTable[] baseStats)
+    {
+        if (baseStats == null || baseStats.length != 1) {
+            return baseStats;
+        }
+        // TODO: Build in the future tickets.
+        return baseStats;
+    }
 
     /**
      * Need to release references to catalog related stats sources
@@ -410,6 +428,7 @@ public class StatsAgent extends OpsAgent
         case PROCEDUREINPUT:
         case PROCEDUREOUTPUT:
         case PROCEDUREPROFILE:
+        case PROCEDUREDETAIL:
             stats = collectStats(StatsSelector.PROCEDURE, interval);
             break;
         case STARVATION:
