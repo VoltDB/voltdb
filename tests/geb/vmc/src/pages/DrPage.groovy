@@ -31,6 +31,7 @@ class DrPage extends VoltDBManagementCenterPage {
         drCLusterId         { $('#drCLusterId') }
         latencyTime         { $('#latencyDR') }
         clusterId           { $('#dRProducerName') }
+        drPending           { $('#drPending_0') }
 
         drMode              { $('#drModeName') }
 
@@ -73,6 +74,10 @@ class DrPage extends VoltDBManagementCenterPage {
 
     def boolean isDrSectionOpen(divId){
         return $("#divDrReplication" + divId).displayed
+    }
+
+    def boolean isDrPendingPresent(divId){
+        return drPending.displayed
     }
 
     def boolean isDrAreaOpen(divId) {

@@ -26,7 +26,7 @@ package vmcTest.tests
 import vmcTest.pages.*
 import geb.Page.*
 
-class DrTest extends TestBase {
+class DrPageTest extends TestBase {
     def isDrTabVisible = false
 
     def setup() { // called before each test
@@ -67,7 +67,7 @@ class DrTest extends TestBase {
         println("Process only if DR is present")
         divId = $("#drCombinedId").jquery.text()
         then:
-        if(isDrTabVisible) {
+        if(isDrTabVisible && !page.isDrPendingPresent()) {
             when:
             waitFor(10){drCLusterId.isDisplayed()}
             then:
@@ -107,14 +107,14 @@ class DrTest extends TestBase {
             page.drMode.isDisplayed()
             then: "Dr Mode must be Master or Both"
             println("DR Mode" + page.drMode.text())
-            if (page.drMode.text().equals("") || page.drMode.text().equals("Replica")) {
+            if (page.drMode.text().equals("") || page.drMode.text().equals("REPLICA")) {
                 println("No Master mode")
             }
             else {
                 println("Master mode")
                 when: "ensure the DR section is open"
                 if (!page.isDrSectionOpen(divId)) {
-                   waitFor(30){ page.openDrArea(divId)}
+                   waitFor(10){ page.openDrArea(divId)}
                 }
                 then: 'DR area is open (initially)'
                 page.isDrAreaOpen(divId)
@@ -148,15 +148,15 @@ class DrTest extends TestBase {
             String before = ""
             String after  = ""
             when:"Check if Dr Master is Displayed"
-            if (page.drMode.text().equals("") || page.drMode.text().equals("Replica")) {
+            if (page.drMode.text().equals("") || page.drMode.text().equals("REPLICA")) {
                 println("Master section is not visible")
             }
             else {
                 when: 'click Partition ID'
-                waitFor(20) { page.isDrMasterSectionOpen(divId) }
+                waitFor(10) { page.isDrMasterSectionOpen(divId) }
                 waitFor(10) { page.clickPartitionID(divId) }
                 then: 'check if row count is in descending'
-                if (waitFor(20) { page.tableInDescendingOrderDT() })
+                if (waitFor(10) { page.tableInDescendingOrderDT() })
                     after = "descending"
                 else
                     after = "ascending"
@@ -190,12 +190,12 @@ class DrTest extends TestBase {
             String before = ""
             String after  = ""
             when:"Check if Dr Master is Displayed"
-            if(page.drMode.text().equals("") || page.drMode.text().equals("Replica")) {
+            if(page.drMode.text().equals("") || page.drMode.text().equals("REPLICA")) {
                 println("Master section is not visible")
             }
             else {
                 when: 'click MB On disk'
-                waitFor(20){page.isDrMasterSectionOpen(divId)}
+                waitFor(10){page.isDrMasterSectionOpen(divId)}
                 waitFor(10){ page.clickMbOnDisk(divId)}
                 then: 'check if row count is in ascending'
                 if (page.tableInAscendingOrderDT())
@@ -232,7 +232,7 @@ class DrTest extends TestBase {
             String before = ""
             String after  = ""
             when:"Check if Dr Master is Displayed"
-            if(page.drMode.text().equals("") || page.drMode.text().equals("Replica")) {
+            if(page.drMode.text().equals("") || page.drMode.text().equals("REPLICA")) {
                 println("Master section is not visible")
             }
             else {
@@ -274,7 +274,7 @@ class DrTest extends TestBase {
             String before = ""
             String after  = ""
             when:"Check if Dr Master is Displayed"
-            if(page.drMode.text().equals("") || page.drMode.text().equals("Replica")) {
+            if(page.drMode.text().equals("") || page.drMode.text().equals("REPLICA")) {
                 println("Master section is not visible")
             }
             else {
@@ -334,7 +334,7 @@ class DrTest extends TestBase {
         println("Process only if DR is present")
         divId = $("#drCombinedId").jquery.text()
         then:
-        if(isDrTabVisible) {
+        if(isDrTabVisible && !isDrPendingPresent()) {
             boolean isValid=false
             String searchText = ""
             boolean isDROpen = false
@@ -401,7 +401,7 @@ class DrTest extends TestBase {
             page.drMode.isDisplayed()
             then: "Dr Mode must be Master or Both"
             println("DR Mode" + page.drMode.text())
-            if(page.drMode.text().equals("") || page.drMode.text().equals("MASTER") || page.drMode.text().equals("XDCR")) {
+            if(page.drMode.text().equals("") || page.drMode.text().equals("MASTER")){// || page.drMode.text().equals("XDCR")) {
                 println("No Replica mode")
             }
             else {
@@ -443,7 +443,7 @@ class DrTest extends TestBase {
             String after  = ""
 
             when:"Check if Dr Replica is Displayed"
-            if(page.drMode.text().equals("") || page.drMode.text().equals("MASTER") || page.drMode.text().equals("XDCR")) {
+            if(page.drMode.text().equals("") || page.drMode.text().equals("MASTER")){// || page.drMode.text().equals("XDCR")) {
                 println("Replica section is not visible")
             }
             else {
@@ -486,7 +486,7 @@ class DrTest extends TestBase {
             String before = ""
             String after  = ""
             when:"Check if Dr Master is Displayed"
-            if(page.drMode.text().equals("") || page.drMode.text().equals("MASTER") || page.drMode.text().equals("XDCR")) {
+            if(page.drMode.text().equals("") || page.drMode.text().equals("MASTER")){// || page.drMode.text().equals("XDCR")) {
                 println("Replica section is not visible")
             }
             else {
@@ -527,7 +527,7 @@ class DrTest extends TestBase {
             String before = ""
             String after  = ""
             when:"Check if Dr Master is Displayed"
-            if(page.drMode.text().equals("") || page.drMode.text().equals("MASTER") || page.drMode.text().equals("XDCR")) {
+            if(page.drMode.text().equals("") || page.drMode.text().equals("MASTER")){// || page.drMode.text().equals("XDCR")) {
                 println("Replica section is not visible")
             }
             else {
@@ -568,7 +568,7 @@ class DrTest extends TestBase {
             String before = ""
             String after = ""
             when: "Check if Dr Master is Displayed"
-            if (page.drMode.text().equals("") || page.drMode.text().equals("MASTER") || page.drMode.text().equals("XDCR")) {
+            if (page.drMode.text().equals("") || page.drMode.text().equals("MASTER")){// || page.drMode.text().equals("XDCR")) {
                 println("Replica section is not visible")
             }
             else {
@@ -685,116 +685,116 @@ class DrTest extends TestBase {
         }
     }
 
-    def checkMinValueInDrGraphSeconds() {
-        when:
-        println("Process only if DR is present")
-        divId = $("#drCombinedId").jquery.text()
-        then:
-        if(isDrTabVisible) {
-            if(page.drMode.text().equals("") || page.drMode.text().equals("Master")) {
-                println("Replica section is not visible")
-            }
-            else {
-                int count = 0
-                when:
-                // This loop is used to gain time.
-                //        while(count<numberOfTrials) {
-                //            count++
-                //            page.chooseGraphView("Minutes")
-                //            page.chooseGraphView("Minutes")
-                //            page.chooseGraphView("Seconds")
-                //            if(graphView.text().equals("")) {
-                //                break
-                //            }
-                //        }
-                count = 0
-                then:
-                String stringMax
-                String stringMin
-
-                while (count < numberOfTrials) {
-                    count++
-                    try {
-                        waitFor(waitTime) {
-                            page.chartDrMax.isDisplayed()
-                        }
-                        stringMax = page.chartDrMax.text()
-                        stringMin = page.chartDrMin.text()
-                        break
-                    } catch (geb.waiting.WaitTimeoutException e) {
-                        println("WaitTimeoutException")
-                    }
-                }
-
-                String result = page.compareTime(stringMax, stringMin)
-
-                if (result.equals("seconds")) {
-                    println("The minimum value is " + stringMin + " and the time is in " + result)
-                    assert true
-                } else {
-                    println("FAIL: It is not in seconds")
-                    assert false
-                }
-            }
-        } else {
-            println("DR is not available.")
-        }
-    }
-
-    def checkMaxValueInDrGraphSeconds() {
-        when:
-        println("Process only if DR is present")
-        divId = $("#drCombinedId").jquery.text()
-        then:
-        if(isDrTabVisible) {
-            if(page.drMode.text().equals("") || page.drMode.text().equals("Master")) {
-                println("Replica section is not visible")
-            }
-            else {
-                int count = 0
-                when:
-                // This loop is used to gain time.
-                //        while(count<numberOfTrials) {
-                //            count++
-                //            page.chooseGraphView("Minutes")
-                //            page.chooseGraphView("Minutes")
-                //            page.chooseGraphView("Seconds")
-                //            if(graphView.text().equals("")) {
-                //                break
-                //            }
-                //        }
-                count = 0
-                then:
-                String stringMax
-                String stringMin
-
-                while (count < numberOfTrials) {
-                    count++
-                    try {
-                        waitFor(waitTime) {
-                            page.chartDrMax.isDisplayed()
-                        }
-                        stringMax = page.chartDrMax.text()
-                        stringMin = page.chartDrMin.text()
-                        break
-                    } catch (geb.waiting.WaitTimeoutException e) {
-                        println("WaitTimeoutException")
-                    }
-                }
-
-                String result = page.compareTime(stringMax, stringMin)
-
-                if (result.equals("seconds")) {
-                    println("The maximum value is " + stringMax + " and the time is in " + result)
-                    assert true
-                } else {
-                    println("FAIL: It is not in seconds")
-                    assert false
-                }
-            }
-        } else {
-            println("DR is not available.")
-        }
-    }
+//    def checkMinValueInDrGraphSeconds() {
+//        when:
+//        println("Process only if DR is present")
+//        divId = $("#drCombinedId").jquery.text()
+//        then:
+//        if(isDrTabVisible) {
+//            if(page.drMode.text().equals("") || page.drMode.text().equals("Master")) {
+//                println("Replica section is not visible")
+//            }
+//            else {
+//                int count = 0
+//                when:
+//                // This loop is used to gain time.
+//                //        while(count<numberOfTrials) {
+//                //            count++
+//                //            page.chooseGraphView("Minutes")
+//                //            page.chooseGraphView("Minutes")
+//                //            page.chooseGraphView("Seconds")
+//                //            if(graphView.text().equals("")) {
+//                //                break
+//                //            }
+//                //        }
+//                count = 0
+//                then:
+//                String stringMax
+//                String stringMin
+//
+//                while (count < numberOfTrials) {
+//                    count++
+//                    try {
+//                        waitFor(waitTime) {
+//                            page.chartDrMax.isDisplayed()
+//                        }
+//                        stringMax = page.chartDrMax.text()
+//                        stringMin = page.chartDrMin.text()
+//                        break
+//                    } catch (geb.waiting.WaitTimeoutException e) {
+//                        println("WaitTimeoutException")
+//                    }
+//                }
+//
+//                String result = page.compareTime(stringMax, stringMin)
+//
+//                if (result.equals("seconds")) {
+//                    println("The minimum value is " + stringMin + " and the time is in " + result)
+//                    assert true
+//                } else {
+//                    println("FAIL: It is not in seconds")
+//                    assert false
+//                }
+//            }
+//        } else {
+//            println("DR is not available.")
+//        }
+//    }
+//
+//    def checkMaxValueInDrGraphSeconds() {
+//        when:
+//        println("Process only if DR is present")
+//        divId = $("#drCombinedId").jquery.text()
+//        then:
+//        if(isDrTabVisible) {
+//            if(page.drMode.text().equals("") || page.drMode.text().equals("Master")) {
+//                println("Replica section is not visible")
+//            }
+//            else {
+//                int count = 0
+//                when:
+//                // This loop is used to gain time.
+//                //        while(count<numberOfTrials) {
+//                //            count++
+//                //            page.chooseGraphView("Minutes")
+//                //            page.chooseGraphView("Minutes")
+//                //            page.chooseGraphView("Seconds")
+//                //            if(graphView.text().equals("")) {
+//                //                break
+//                //            }
+//                //        }
+//                count = 0
+//                then:
+//                String stringMax
+//                String stringMin
+//
+//                while (count < numberOfTrials) {
+//                    count++
+//                    try {
+//                        waitFor(waitTime) {
+//                            page.chartDrMax.isDisplayed()
+//                        }
+//                        stringMax = page.chartDrMax.text()
+//                        stringMin = page.chartDrMin.text()
+//                        break
+//                    } catch (geb.waiting.WaitTimeoutException e) {
+//                        println("WaitTimeoutException")
+//                    }
+//                }
+//
+//                String result = page.compareTime(stringMax, stringMin)
+//
+//                if (result.equals("seconds")) {
+//                    println("The maximum value is " + stringMax + " and the time is in " + result)
+//                    assert true
+//                } else {
+//                    println("FAIL: It is not in seconds")
+//                    assert false
+//                }
+//            }
+//        } else {
+//            println("DR is not available.")
+//        }
+//    }
 
 }
