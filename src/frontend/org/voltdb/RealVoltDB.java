@@ -1257,7 +1257,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 getStatsAgent().registerStatsSource(StatsSelector.DRPRODUCERPARTITION, 0,
                         new DRProducerStatsBase.DRProducerPartitionStatsBase());
             }
-            createDRConsumerIfNeeded();
             m_drRoleStats = new DRRoleStats(this);
             getStatsAgent().registerStatsSource(StatsSelector.DRROLE, 0, m_drRoleStats);
 
@@ -3220,18 +3219,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
                 // 6. Perform updates required by the DR subsystem
 
-                // 6.1. Create the DR consumer if we've just enabled active-active.
-                // Perform any actions that would have been taken during the ordinary
-                // initialization path
-                if (createDRConsumerIfNeeded()) {
-                    for (int pid : m_cartographer.getPartitions()) {
-                        // Notify the consumer of leaders because it was disabled before
-                        ClientInterfaceRepairCallback callback = (ClientInterfaceRepairCallback) m_consumerDRGateway;
-                        callback.repairCompleted(pid, m_cartographer.getHSIdForMaster(pid));
-                    }
-                    // Even though we are active-active, we must be a joiner so our conversation file must be empty
-                    m_consumerDRGateway.initialize(false, (byte)-1, new ArrayList<>());
-                } else if (m_consumerDRGateway != null) {
+                // 6.1. Perform any actions that would have been taken during the ordinary initialization path
+                if (m_consumerDRGateway != null) {
                     // 6.2. If we are a DR replica and the consumer was created
                     // before the catalog update, we may care about a deployment
                     // update. If it was created above, no need to notify
@@ -3486,8 +3475,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             m_snmp.hostUp("Host is now a cluster member");
 
             if (m_producerDRGateway != null && !m_producerDRGateway.isStarted()) {
-                // Initialize DR producer and start listening on the DR ports
+                // Initialize DR producer and consumer start listening on the DR ports
                 initializeDRProducer();
+                createDRConsumerIfNeeded();
                 prepareReplication();
             }
         }
@@ -3722,6 +3712,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             }
 
             // Start listening on the DR ports
+            createDRConsumerIfNeeded();
             prepareReplication();
             startResourceUsageMonitor();
 
@@ -3842,18 +3833,18 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     private void prepareReplication() {
         try {
+            boolean okToStartDR = true;
             if (m_consumerDRGateway != null) {
-                Pair<Byte, List<MeshMemberInfo>> expectedClusterMembers;
-                if (m_producerDRGateway != null) {
-                    expectedClusterMembers = m_producerDRGateway.getInitialConversations();
+                if (m_config.m_startAction == StartAction.RECOVER) {
+                    Pair<Byte, List<MeshMemberInfo>> expectedClusterMembers = m_producerDRGateway.getInitialConversations();
+                    okToStartDR = m_consumerDRGateway.isSyncSnapshotComplete(expectedClusterMembers.getFirst(),
+                            expectedClusterMembers.getSecond());
                 }
-                else {
-                    expectedClusterMembers = Pair.of((byte)-1, new ArrayList<>());
+                if (okToStartDR) {
+                    m_consumerDRGateway.initialize(m_config.m_startAction != StartAction.CREATE);
                 }
-                m_consumerDRGateway.initialize(m_config.m_startAction != StartAction.CREATE,
-                        expectedClusterMembers.getFirst(), expectedClusterMembers.getSecond());
             }
-            if (m_producerDRGateway != null) {
+            if (m_producerDRGateway != null && okToStartDR) {
                 m_producerDRGateway.startListening(m_catalogContext.cluster.getDrproducerenabled(),
                                                    VoltDB.getReplicationPort(m_catalogContext.cluster.getDrproducerport()),
                                                    VoltDB.getDefaultReplicationInterface());
@@ -3871,20 +3862,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     private boolean createDRConsumerIfNeeded() {
-        if (!m_config.m_isEnterprise
-                || (m_consumerDRGateway != null)
-                || !m_catalogContext.cluster.getDrconsumerenabled()) {
+        if (!m_config.m_isEnterprise || (m_consumerDRGateway != null)) {
             return false;
         }
         final String drRole = m_catalogContext.getCluster().getDrrole();
         if (DrRoleType.REPLICA.value().equals(drRole) || DrRoleType.XDCR.value().equals(drRole)) {
-            String drProducerHost = m_catalogContext.cluster.getDrmasterhost();
             byte drConsumerClusterId = (byte)m_catalogContext.cluster.getDrclusterid();
             final Pair<String, Integer> drIfAndPort = VoltZK.getDRInterfaceAndPortFromMetadata(m_localMetadata);
-            if (m_catalogContext.cluster.getDrconsumerenabled() &&
-                    (drProducerHost == null || drProducerHost.isEmpty())) {
-                VoltDB.crashLocalVoltDB("Cannot start as DR consumer without an enabled DR data connection.");
-            }
             try {
                 Class<?> rdrgwClass = Class.forName("org.voltdb.dr2.ConsumerDRGatewayImpl");
                 Constructor<?> rdrgwConstructor = rdrgwClass.getConstructor(
