@@ -105,6 +105,7 @@ public class VoltZK {
     public static final String leaders_initiators = "/db/leaders/initiators";
     public static final String leaders_globalservice = "/db/leaders/globalservice";
     public static final String lastKnownLiveNodes = "/db/lastKnownLiveNodes";
+    public static final String balancespi_initiator = "/db/balancespi";
 
     public static final String debugLeadersInfo(ZooKeeper zk) {
         StringBuilder build = new StringBuilder("ZooKeeper:\n");
@@ -113,7 +114,7 @@ public class VoltZK {
         build.append(printZKDir(zk, iv2mpi));
         build.append(printZKDir(zk, leaders_initiators));
         build.append(printZKDir(zk, leaders_globalservice));
-        build.append(printZKDir(zk, lastKnownLiveNodes));
+        build.append(printZKDir(zk, balancespi_initiator));
 
         return build.toString();
     }
@@ -176,7 +177,7 @@ public class VoltZK {
     public static final String shutdown_save_guard = "/db/shutdown_save_guard";
 
     //SPI migration
-    public static final String spi_balance = "/db/spi_balance";
+    public static final String balancespi_counter = "/db/spi_balance";
 
     // Persistent nodes (mostly directories) to create on startup
     public static final String[] ZK_HIERARCHY = {
@@ -196,7 +197,8 @@ public class VoltZK {
             cluster_settings,
             catalogUpdateBlockers,
             request_truncation_snapshot,
-            spi_balance
+            balancespi_counter,
+            balancespi_initiator
     };
 
     /**
@@ -365,7 +367,7 @@ public class VoltZK {
 
     public static void createSPIBalanceIndicator(ZooKeeper zk, Set<Integer> hostIds) {
         for (int hostId: hostIds) {
-            String path = ZKUtil.joinZKPath(spi_balance, "node_" + hostId);
+            String path = ZKUtil.joinZKPath(balancespi_counter, "node_" + hostId);
             try {
                 zk.create(path, ByteBuffer.allocate(4).putInt(hostId).array(),
                         Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
@@ -381,7 +383,7 @@ public class VoltZK {
 
     public static boolean countDownSPIBalanceIndicator(ZooKeeper zk, int hostId) {
         try {
-            String path = ZKUtil.joinZKPath(spi_balance, "node_" + hostId);
+            String path = ZKUtil.joinZKPath(balancespi_counter, "node_" + hostId);
             if (zk.exists(path, false) == null) {
                 return false;
             }
@@ -393,14 +395,14 @@ public class VoltZK {
         return false;
     }
 
-    public static boolean appointLeader(ZooKeeper zk, int partitionId, String hsidStr, VoltLogger log) {
-        LeaderCache leaderAppointee = new LeaderCache(zk, iv2appointees);
+    public static boolean updateLeaderCacheNode(ZooKeeper zk, String rootDir, int partitionId, String hsidStr, VoltLogger log) {
+        LeaderCache leaderAppointee = new LeaderCache(zk, rootDir);
         try {
             leaderAppointee.start(true);
             leaderAppointee.put(partitionId, hsidStr);
             return true;
         } catch (InterruptedException | ExecutionException | KeeperException e) {
-            log.error(String.format("Failed to migrate SPI for partition %d. %s",
+            log.error(String.format("Failed to update leader cache node for partition %d. %s",
                     partitionId, e.getMessage()));
         } finally {
             try {

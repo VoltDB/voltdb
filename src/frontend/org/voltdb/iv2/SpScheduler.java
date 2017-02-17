@@ -424,8 +424,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     }
 
     private boolean handleMisRoutedTransaction(Iv2InitiateTaskMessage message) {
-        if (!isSpiBalanceRequested() || message.isForReplica() ||
-            "@BalanceSPI".equals(message.getStoredProcedureName())) {
+        if (!isSpiBalanceRequested() || message.isForReplica()) {
             return false;
         }
         InitiateResponseMessage response = new InitiateResponseMessage(message);

@@ -30,7 +30,6 @@ import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
-import org.voltcore.zk.ZKUtil;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 import org.voltdb.messaging.CompleteTransactionMessage;
@@ -313,58 +312,9 @@ public class InitiatorMailbox implements Mailbox
             return;
         }
 
-        handleSPIBalanceIfRequested(message);
         m_repairLog.deliver(message);
         if (canDeliver) {
             m_scheduler.deliver(message);
-        }
-    }
-
-    private void handleSPIBalanceIfRequested(VoltMessage message){
-
-        if (!(message instanceof Iv2InitiateTaskMessage)){
-            return;
-        }
-
-        Iv2InitiateTaskMessage msg = (Iv2InitiateTaskMessage) message;
-        if (!"@BalanceSPI".equals(msg.getStoredProcedureName())) {
-            return;
-        }
-
-        final Object[] params = msg.getParameters();
-        int pid = Integer.parseInt(params[0].toString());
-        Long currentLeaderHsid = getMasterHsId(pid);
-
-        // notify the current leader
-        if (currentLeaderHsid != getHSId()) {
-            if (tmLog.isDebugEnabled()) {
-                tmLog.debug("@BalanceSPI: receive SPI balance on " +
-                        CoreUtils.hsIdToString(getHSId()) + " for " +
-                        CoreUtils.hsIdToString(currentLeaderHsid));
-            }
-            send(currentLeaderHsid, msg);
-        } else {
-            if (tmLog.isDebugEnabled()) {
-                tmLog.debug("@BalanceSPI: process SPI balance on " +
-                        CoreUtils.hsIdToString(getHSId()) + " for " +
-                        CoreUtils.hsIdToString(currentLeaderHsid));
-            }
-            m_scheduler.setSpiBalanceRequested(true);
-            m_scheduler.m_isLeader = false;
-
-            int hostId = Integer.parseInt(params[1].toString());
-            Long newLeaderHSId = VoltDB.instance().getCartograhper().getHSIDForPartitionHost(hostId, pid);
-            if (newLeaderHSId != null) {
-                // update the leader appointee
-                VoltZK.createSPIBalanceIndicator(m_messenger.getZK(), m_messenger.getLiveHostIds());
-                String hsidStr = ZKUtil.suffixHSIdsWithBalanceSPIRequest(newLeaderHSId);
-                VoltZK.appointLeader(m_messenger.getZK(), pid, hsidStr, tmLog);
-            } else {
-                tmLog.warn("SPI balance: There is no partition replica on the target host.");
-            }
-            if (tmLog.isDebugEnabled()) {
-                tmLog.debug(VoltZK.debugLeadersInfo(m_messenger.getZK()));
-            }
         }
     }
 
