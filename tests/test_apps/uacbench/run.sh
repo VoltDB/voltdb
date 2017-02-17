@@ -31,18 +31,18 @@ function clean() {
 }
 
 # compile the source code for procedures and the client into jarfiles
-function jars() {
+function uacjars() {
     # compile java source
     javac -classpath $APPCLASSPATH procedures/uac/*.java
 
     # build procedure and client jars
-    if [ $# -gt 0 ]; then 
+    if [ $# -gt 0 ]; then
         CLASSESJARS="${1}"
 	fi
 	if [ ! -d "jars" ]; then
 		mkdir jars
 	fi
-	
+
     jar cf "jars/${CLASSESJARS}" -C procedures uac
 
     # remove compiled .class files
@@ -60,7 +60,7 @@ function jar_client() {
 # compile the procedure and client jarfiles if they don't exist
 function jars-ifneeded() {
     if [ ! -e jars/${CLASSESJARS} ] || [ ! -e uac-client.jar ]; then
-        jars;
+        uacjars;
     fi
 }
 
@@ -77,28 +77,23 @@ function server() {
 }
 
 function prepare() {
-	clean
-	echo "Expect 5 parameter: benchmark_name invocation_times table_count procedure_count batch_size"
-	touch ben.config
-	if [ $# -eq 5 ]; then
-			# write a config file 
-		echo "BENCHMARK_NAME=${1}"$'\n' >> ben.config
-		echo "INVOCATIONS=${2}"$'\n' >> ben.config
-		echo "TABLE_COUNT=${3}"$'\n' >> ben.config
-		echo "PROCEDURE_COUNT=${4}"$'\n' >> ben.config
-		echo "BATCH_SIZE=${5}"$'\n' >> ben.config
-	else
-		echo "Received ${#} parameters. Prepare for the default config"
-		# write a config file 
-		echo "BENCHMARK_NAME=ADD" >> ben.config
+	#clean
+    # we need to prepare a set of files for each type of benchmark
+    mkdir -p procedures/uac
+    for tname in "ADD" "ADD_BATCH" "DEL" "DEL_BATCH"; do
+
+        rm -f ben.config
+	    touch ben.config
+		# write a config file
+		echo "BENCHMARK_NAME=${tname}" >> ben.config
 		echo "INVOCATIONS=5" >> ben.config
 		echo "TABLE_COUNT=500" >> ben.config
 		echo "PROCEDURE_COUNT=1000" >> ben.config
-		echo "BATCH_SIZE=1" >> ben.config
-	fi
-	
-	source ben.config
-	python uacbench.py -n ${BENCHMARK_NAME} -i ${INVOCATIONS} -t ${TABLE_COUNT} -p ${PROCEDURE_COUNT} -b ${BATCH_SIZE}
+		echo "BATCH_SIZE=10" >> ben.config
+
+	    source ben.config
+	    python uacbench.py -n ${BENCHMARK_NAME} -i ${INVOCATIONS} -t ${TABLE_COUNT} -p ${PROCEDURE_COUNT} -b ${BATCH_SIZE}
+    done
 }
 
 # load schema and procedures
@@ -110,6 +105,10 @@ function init() {
 # run the client that drives the example
 function client() {
     benchmark
+}
+
+function jars() {
+    prepare
 }
 
 # Asynchronous benchmark sample

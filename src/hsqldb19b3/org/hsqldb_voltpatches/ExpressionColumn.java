@@ -782,19 +782,26 @@ public class ExpressionColumn extends Expression {
     static void checkColumnsResolved(HsqlList set) {
 
         if (set != null && !set.isEmpty()) {
-            ExpressionColumn e  = (ExpressionColumn) set.get(0);
-            StringBuffer     sb = new StringBuffer();
+            Object obj = set.get(0);
+            if (obj instanceof ExpressionColumn) {
+                ExpressionColumn e  = (ExpressionColumn) obj;
+                StringBuffer     sb = new StringBuffer();
 
-            if (e.schema != null) {
-                sb.append(e.schema + '.');
+                if (e.schema != null) {
+                    sb.append(e.schema + '.');
+                }
+
+                if (e.tableName != null) {
+                    sb.append(e.tableName + '.');
+                }
+
+                throw Error.error(ErrorCode.X_42501,
+                                  sb.toString() + e.getColumnName());
             }
-
-            if (e.tableName != null) {
-                sb.append(e.tableName + '.');
+            else {
+                assert(obj instanceof ExpressionAggregate);
+                throw Error.error(ErrorCode.X_47000);
             }
-
-            throw Error.error(ErrorCode.X_42501,
-                              sb.toString() + e.getColumnName());
         }
     }
 

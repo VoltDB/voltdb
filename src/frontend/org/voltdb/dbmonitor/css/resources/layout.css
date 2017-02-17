@@ -86,7 +86,7 @@ input.icon-search,
 a.save-search,
 a.icon-search,
 ul.clusterStat, li.activeServerName,.timeOutCross,
-a.showServers, a.hideServers, .popup_close, .icon-document, .icon-tables, .icon-procedures, .pref-storedProc, .pref-tables, .pref-graph, .icon-server, #toggleMenu, .iconDeleteAddConfig, .drArrow, .icon-master, .icon-replica, .icon-command {
+a.showServers, a.hideServers, .popup_close, .icon-document, .icon-tables, .icon-procedures, .pref-storedProc, .pref-tables, .pref-graph, .icon-server, #toggleMenu, .iconDeleteAddConfig, .drArrow, .icon-master, .icon-replica, .icon-command, .drIconHead {
     background-image: url(images/voltdb-icon-sprite.png) !important;
     background-repeat: no-repeat;
 }
@@ -109,6 +109,11 @@ a.showServers, a.hideServers, .popup_close, .icon-document, .icon-tables, .icon-
 }
 
 .clusterIcon {
+    background-position: left top;
+    height: 25px;
+    line-height: 25px;
+}
+.drIconHead {
     background-position: left top;
     height: 25px;
     line-height: 25px;
@@ -709,25 +714,27 @@ ul.rightShowhideList {
 }
 
 .collapsed {
-    background: #fbfbfb url(images/voltdb-icon-sprite.png) 20px -535px no-repeat;
+   background: #fbfbfb url(images/voltdb-icon-sprite.png) 20px -535px no-repeat;
 }
 .collapsedDR {
-    background:url(images/voltdb-icon-sprite.png) 20px -537px no-repeat;
+    background:url(images/up_dr.png)7px 11px no-repeat;
 }
 
 .expanded {
     background: #fbfbfb url(images/voltdb-icon-sprite.png) 20px -490px no-repeat;
 }
 .expandedDR {
-    background:url(images/voltdb-icon-sprite.png) 20px -491px no-repeat;
+    background:url(images/down_dr.png)7px 11px no-repeat;
+    position:relative;
+
 }
 
 .leftShowhide .expanded {
-    background: #fbfbfb url(images/voltdb-icon-sprite.png) 0px -506px no-repeat;
+   background: #fbfbfb url(images/voltdb-icon-sprite.png) 0px -506px no-repeat;
 }
 
 .leftShowhide .collapsed {
-    background: #fbfbfb url(images/voltdb-icon-sprite.png) 0px -550px no-repeat;
+   background: #fbfbfb url(images/voltdb-icon-sprite.png) 0px -550px no-repeat;
 }
 
 .arrowAdjust {
@@ -2048,7 +2055,7 @@ h3.ui-state-active {
 
 
 }
-.drHead { background-color:#fff; padding:5px 20px 20px 37px; border:none;  }
+.drHead { background-color:#fff; padding:5px 20px 15px 25px; border:none;  }
 .drBody { padding:0;}
 .DRHeaderName { position:relative;top:5px; font-size:16px;}
 .drPending { color: #ea151d;}
@@ -2061,7 +2068,18 @@ h3.ui-state-active {
 display:block; position: relative; top:8px; margin:0 10px;  }
 .arrowSingle { background-image: url(images/arrow.png); width:190px; height:22px;
 display:block; position: relative; top:8px; margin:0 10px;  }
+.arrowSingleLeft { background-image: url(images/left_arrow.png); width:190px; height:22px;
+display:block; position: relative; top:8px; margin:0 10px;  }
 .drRelationRight { float:left; }
+
+ul.drShowhideList { margin: 0;padding: 0;float: left;}
+ul.drShowhideList li { margin: 0; float: left; padding: 0px 0 0 10px; }
+ul.drShowhideList li > a.btn { top: 5px;position: relative; }
+.drSelectLeft { float:left;}
+.drModeRight {float:right;}
+ul.drHeadList { margin:0;padding: 0; float: left;height: 28px;line-height: 30px;}
+ul.drHeadList li { margin: 0 0 0 10px;padding: 0;float: left;font-size: 14px;}
+ul.drHeadList li.drArrow { background-position: left -456px; color: #76bd1d;padding-left: 15px;}
 
 /*********************jquery ui class override*********************/
 #accordionProcedures .ui-state-default, #accordionTable .ui-state-default,#accordionStreamedTable .ui-state-default,
@@ -3575,6 +3593,17 @@ tr.drSubSection td {
     top: -6px;
 }
 
+.DRHeaderWrapper {
+    margin: 0 0 20px 0;
+    padding: 10px 20px;
+    background: #FFFFFF;
+    -webkit-box-shadow: 0px 6px 7px -5px #ccc;
+    -moz-box-shadow: 0px 6px 7px -5px #ccc;
+    box-shadow: 0px 6px 7px -5px #ccc;
+}
+.DRHeaderLeft{ float:left;}
+.DRHeaderRight{ float:right;}
+
 .icon-master {
     background-position: left -1604px;
 }
@@ -4004,7 +4033,7 @@ fieldset { border:1px solid #ccc; padding:20px;}
     padding: 2px;
     resize: vertical;
     outline:none;
-    white-space: pre;
+    white-space: pre-line;
     font-size: 18px;
     font-family: Arial,Helvetica,sans-serif;
 
@@ -4837,6 +4866,43 @@ ul#shutdownMsg li{ font-size:13px; line-height:20px; }
      }
 
 }
+
+@media (max-width: 564px) {
+
+.arrowSingle {
+    background-image:url("images/arrow_vertical_small_down.png");
+    width: 16px;
+    height: 60px;
+    display: block;
+    margin: 20px 10px 10px 15px;
+    }
+.DRMR, .DRMRLeft,.drRelation, .drRelationLeft { float:none;}
+.drRelationLeft span p {
+    position: absolute;
+    top: 0px;
+    font-size: 14px;
+    padding: 12px 0 0 20px;
+    }
+
+  .arrowSingleLeft {
+    background-image: url("images/arrow_vertical_small_up.png");
+    width: 16px;
+    height: 60px;
+    display: block;
+    margin: 24px 10px 10px 15px;
+    }
+
+    .arrowDouble {
+    background-image: url("images/arrow_vertical_small_double.png");
+    width: 16px;
+    height: 60px;
+    display: block;
+    margin: 24px 10px 10px 15px;
+    }
+
+}
+
+
 
 @media (width: 1024px) {
     .logHeight {

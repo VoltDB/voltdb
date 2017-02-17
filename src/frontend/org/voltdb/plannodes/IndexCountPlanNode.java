@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.Set;
 
 import org.hsqldb_voltpatches.HSQLInterface;
+import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
@@ -51,6 +52,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
     public enum Members {
         TARGET_INDEX_NAME,
         SEARCHKEY_EXPRESSIONS,
+        COMPARE_NOTDISTINCT,
         ENDKEY_EXPRESSIONS,
         SKIP_NULL_PREDICATE,
         LOOKUP_TYPE,
@@ -70,6 +72,9 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
     // This list of expressions corresponds to the values that we will use
     // at runtime in the lookup on the index
     protected List<AbstractExpression> m_searchkeyExpressions = new ArrayList<AbstractExpression>();
+
+    // If the search key expression is actually a "not distinct" expression, we do not want the executor to skip null candidates.
+    protected List<Boolean> m_compareNotDistinct = new ArrayList<Boolean>();
 
     // The overall index lookup operation type
     protected IndexLookupType m_lookupType = IndexLookupType.EQ;
@@ -117,6 +122,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         if ( ! isp.isReverseScan()) {
             m_lookupType = isp.m_lookupType;
             m_searchkeyExpressions = isp.m_searchkeyExpressions;
+            m_compareNotDistinct = isp.m_compareNotDistinct;
 
             m_endType = endType;
             m_endkeyExpressions.addAll(endKeys);
@@ -129,6 +135,11 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
             assert(endType == IndexLookupType.EQ);
             m_lookupType = endType;     // must be EQ, but doesn't matter, since previous lookup type is not GT
             m_searchkeyExpressions.addAll(endKeys);
+            m_compareNotDistinct = isp.m_compareNotDistinct;
+            // For this additional < / <= expression, we set CompareNotDistinctFlag = false.
+            // This is because the endkey came from doubleBoundExpr (in getRelevantAccessPathForIndex()),
+            // which has no way to be "IS NOT DISTINCT FROM". (ENG-11096)
+            m_compareNotDistinct.add(false);
             m_endType = isp.m_lookupType;
             m_endkeyExpressions = isp.getSearchKeyExpressions();
 
@@ -144,8 +155,12 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         return m_skip_null_predicate != null;
     }
 
+    public List<Boolean> getCompareNotDistinctFlags() {
+        return m_compareNotDistinct;
+    }
+
     private void setSkipNullPredicate(boolean isReverseScan) {
-        int nextKeyIndex;
+        int nullExprIndex;
         if (isReverseScan) {
             if (m_searchkeyExpressions.size() >= m_endkeyExpressions.size()) {
                 return;
@@ -153,7 +168,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
 
             assert(m_endType == IndexLookupType.LT || m_endType == IndexLookupType.LTE);
             assert(m_endkeyExpressions.size() - m_searchkeyExpressions.size() == 1);
-            nextKeyIndex = m_searchkeyExpressions.size();
+            nullExprIndex = m_searchkeyExpressions.size();
         }
         else {
             // useful for underflow case to eliminate nulls
@@ -163,10 +178,11 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
             }
 
             assert(m_searchkeyExpressions.size() > 0);
-            nextKeyIndex = m_searchkeyExpressions.size() - 1;
+            nullExprIndex = m_searchkeyExpressions.size() - 1;
         }
         m_skip_null_predicate = IndexScanPlanNode.buildSkipNullPredicate(
-                nextKeyIndex, m_catalogIndex, m_tableScan, m_searchkeyExpressions);
+                nullExprIndex, m_catalogIndex, m_tableScan,
+                m_searchkeyExpressions, m_compareNotDistinct);
         if (m_skip_null_predicate != null) {
             m_skip_null_predicate.resolveForTable((Table)m_catalogIndex.getParent());
         }
@@ -217,7 +233,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
                 endType = IndexLookupType.LTE;
             }
             else {
-                assert(exprType == ExpressionType.COMPARE_EQUAL);
+                assert(exprType == ExpressionType.COMPARE_EQUAL || exprType == ExpressionType.COMPARE_NOTDISTINCT);
             }
 
             // PlanNodes all need private deep copies of expressions
@@ -386,6 +402,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         }
 
         stringer.key(Members.SEARCHKEY_EXPRESSIONS.name()).array(m_searchkeyExpressions);
+        booleanArrayToJSONString(stringer, Members.COMPARE_NOTDISTINCT.name(), m_compareNotDistinct);
 
         if (m_skip_null_predicate != null) {
             stringer.key(Members.SKIP_NULL_PREDICATE.name()).value(m_skip_null_predicate);
@@ -400,12 +417,15 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         m_endType = IndexLookupType.get( jobj.getString( Members.END_TYPE.name() ) );
         m_targetIndexName = jobj.getString(Members.TARGET_INDEX_NAME.name());
         m_catalogIndex = db.getTables().get(super.m_targetTableName).getIndexes().get(m_targetIndexName);
-        //load end_expression
+        // load end_expression
         AbstractExpression.loadFromJSONArrayChild(m_endkeyExpressions, jobj,
                 Members.ENDKEY_EXPRESSIONS.name(), m_tableScan);
+        // load searchkey_expressions
         AbstractExpression.loadFromJSONArrayChild(m_searchkeyExpressions, jobj,
                 Members.SEARCHKEY_EXPRESSIONS.name(), m_tableScan);
-
+        // load COMPARE_NOTDISTINCT flag vector
+        loadBooleanArrayFromJSONObject(jobj, Members.COMPARE_NOTDISTINCT.name(), m_compareNotDistinct);
+        // load skip_null_predicate
         m_skip_null_predicate = AbstractExpression.fromJSONChild(jobj, Members.SKIP_NULL_PREDICATE.name(), m_tableScan);
     }
 
@@ -460,11 +480,11 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         // Explain the search keys that describe the boundaries of the index count, like
         // "(event_type = 1 AND event_start > x.start_time)"
         if (searchkeySize > 0) {
-            String start = explainKeys(asIndexed, m_searchkeyExpressions, m_targetTableName, m_lookupType);
+            String start = explainKeys(asIndexed, m_searchkeyExpressions, m_targetTableName, m_lookupType, m_compareNotDistinct);
             usageInfo += "\n" + indent + " count matches from " + start;
         }
         if (endkeySize > 0) {
-            String end = explainKeys(asIndexed, m_endkeyExpressions, m_targetTableName, m_endType);
+            String end = explainKeys(asIndexed, m_endkeyExpressions, m_targetTableName, m_endType, m_compareNotDistinct);
             usageInfo += "\n" + indent + " count matches to " + end;
         }
         if (m_skip_null_predicate != null) {
@@ -489,19 +509,29 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
     }
 
     private static String explainKeys(String[] asIndexed, List<AbstractExpression> keyExpressions,
-            String targetTableName, IndexLookupType lookupType) {
+            String targetTableName, IndexLookupType lookupType, List<Boolean> compareNotDistinct) {
         String conjunction = "";
         String result = "(";
         int prefixSize = keyExpressions.size() - 1;
         for (int ii = 0; ii < prefixSize; ++ii) {
-            result += conjunction +
-                asIndexed[ii] + " = " + keyExpressions.get(ii).explain(targetTableName);
+            result += conjunction + asIndexed[ii] +
+                (compareNotDistinct.get(ii) ? " NOT DISTINCT " : " = ") +
+                keyExpressions.get(ii).explain(targetTableName);
             conjunction = ") AND (";
         }
         // last element
-        result += conjunction +
-            asIndexed[prefixSize] + " " + lookupType.getSymbol() + " " +
-            keyExpressions.get(prefixSize).explain(targetTableName) + ")";
+        result += conjunction + asIndexed[prefixSize] + " ";
+        if (lookupType == IndexLookupType.EQ && compareNotDistinct.get(prefixSize)) {
+            result += "NOT DISTINCT";
+        }
+        else {
+            result += lookupType.getSymbol();
+        }
+        result += " " + keyExpressions.get(prefixSize).explain(targetTableName);
+        if (lookupType != IndexLookupType.EQ && compareNotDistinct.get(prefixSize)) {
+            result += ", including NULLs";
+        }
+        result += ")";
         return result;
     }
 
