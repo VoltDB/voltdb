@@ -17,6 +17,7 @@
 
 package org.voltdb;
 
+import org.apache.zookeeper_voltpatches.KeeperException;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.AuthSystem.AuthUser;
@@ -26,9 +27,6 @@ import org.voltdb.client.SyncCallback;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.compiler.deploymentfile.ResourceMonitorType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
-import org.voltdb.importer.ChannelChangeCallback;
-import org.voltdb.importer.ImporterChannelAssignment;
-import org.voltdb.importer.VersionedOperationMode;
 import org.voltdb.snmp.FaultFacility;
 import org.voltdb.snmp.SnmpTrapSender;
 import org.voltdb.snmp.ThresholdType;
@@ -37,15 +35,15 @@ import org.voltdb.utils.PlatformProperties;
 import org.voltdb.utils.SystemStatsCollector;
 import org.voltdb.utils.SystemStatsCollector.Datum;
 
-import java.net.URI;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
 
 /**
  * Used to periodically check if the server's resource utilization is above the configured limits
  * and pause the server.
  */
-public class ResourceUsageMonitor implements Runnable, ChannelChangeCallback
+public class HealthMonitor implements Runnable, Promotable
 {
     private static final VoltLogger m_logger = new VoltLogger("HOST");
 
@@ -58,10 +56,10 @@ public class ResourceUsageMonitor implements Runnable, ChannelChangeCallback
     private String m_snmpRssLimitStr;
     private long m_snmpRssLimit;
     private ThresholdType m_snmpRssCriteria;
-    private URI m_DRRoleCheckerURI = null;
     private Map<Byte,Boolean> m_snmpDRTrapSent = new HashMap<>();
+    private boolean m_isLeader;
 
-    public ResourceUsageMonitor(SystemSettingsType systemSettings, SnmpTrapSender snmpTrapSender)
+    public HealthMonitor(SystemSettingsType systemSettings, SnmpTrapSender snmpTrapSender)
     {
         if (systemSettings == null || systemSettings.getResourcemonitor() == null) {
             return;
@@ -134,7 +132,7 @@ public class ResourceUsageMonitor implements Runnable, ChannelChangeCallback
         }
 
         // check DRRole stats if it's responsible
-        if (m_DRRoleCheckerURI != null) {
+        if (m_isLeader) {
             checkDRRole();
         }
 
@@ -305,25 +303,7 @@ public class ResourceUsageMonitor implements Runnable, ChannelChangeCallback
     }
 
     @Override
-    public void onChange(ImporterChannelAssignment assignment) {
-        if (m_logger.isDebugEnabled()) {
-            m_logger.debug("ImporterChannelAssignment: " + assignment);
-        }
-        if (assignment.getAdded().size() > 0) {
-            m_DRRoleCheckerURI = (URI) assignment.getAdded().toArray()[0];
-        }
-
-        if ((assignment.getRemoved().size() > 0) &&
-                (m_DRRoleCheckerURI != null) &&
-                (m_DRRoleCheckerURI.equals(assignment.getRemoved().toArray()[0]))) {
-            m_DRRoleCheckerURI = null;
-        }
-    }
-
-    @Override
-    public void onClusterStateChange(VersionedOperationMode mode) {
-        if (m_logger.isDebugEnabled()) {
-            m_logger.debug("VersionedOperationMode: " + mode);
-        }
+    public void acceptPromotion() throws InterruptedException, ExecutionException, KeeperException {
+        m_isLeader = true;
     }
 }

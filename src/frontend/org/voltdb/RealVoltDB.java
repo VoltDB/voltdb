@@ -41,12 +41,10 @@ import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
-import java.net.URI;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Date;
 import java.util.Enumeration;
 import java.util.HashMap;
@@ -123,7 +121,6 @@ import org.voltdb.dtxn.LatencyHistogramStats;
 import org.voltdb.dtxn.LatencyStats;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.export.ExportManager;
-import org.voltdb.importer.ChannelDistributer;
 import org.voltdb.importer.ImportManager;
 import org.voltdb.iv2.BaseInitiator;
 import org.voltdb.iv2.Cartographer;
@@ -260,6 +257,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     MpInitiator m_MPI = null;
     Map<Integer, Long> m_iv2InitiatorStartingTxnIds = new HashMap<>();
     private ScheduledFuture<?> resMonitorWork;
+    private HealthMonitor m_healthMonitor;
 
 
     private NodeStateTracker m_statusTracker;
@@ -389,8 +387,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     CommandLog m_commandLog;
     SnmpTrapSender m_snmp;
-
-    ChannelDistributer m_distributer;
 
     private volatile OperationMode m_mode = OperationMode.INITIALIZING;
     private OperationMode m_startMode = null;
@@ -1926,21 +1922,20 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         GCInspector.instance.start(m_periodicPriorityWorkThread);
     }
 
-    private void startResourceUsageMonitor() {
+    private void startHealthMonitor() {
         if (resMonitorWork != null) {
-            m_distributer.registerChannels("__RESOURCE_MONITOR__", Collections.emptySet());
             resMonitorWork.cancel(false);
             try {
                 resMonitorWork.get();
             } catch(Exception e) { } // Ignore exceptions because we don't really care about the result here.
             m_periodicWorks.remove(resMonitorWork);
         }
-        ResourceUsageMonitor resMonitor  = new ResourceUsageMonitor(m_catalogContext.getDeployment().getSystemsettings(), getSnmpTrapSender());
-        m_distributer.registerCallback("__RESOURCE_MONITOR__", resMonitor);
-        m_distributer.registerChannels("__RESOURCE_MONITOR__", Collections.singleton(URI.create("resource-monitor://dr/role/" + m_distributer.getClusterTag())));
-        resMonitor.logResourceLimitConfigurationInfo();
-        if (resMonitor.hasResourceLimitsConfigured()) {
-            resMonitorWork = scheduleWork(resMonitor, resMonitor.getResourceCheckInterval(), resMonitor.getResourceCheckInterval(), TimeUnit.SECONDS);
+        m_globalServiceElector.unregisterService(m_healthMonitor);
+        m_healthMonitor  = new HealthMonitor(m_catalogContext.getDeployment().getSystemsettings(), getSnmpTrapSender());
+        m_healthMonitor.logResourceLimitConfigurationInfo();
+        if (m_healthMonitor.hasResourceLimitsConfigured()) {
+            m_globalServiceElector.registerService(m_healthMonitor);
+            resMonitorWork = scheduleWork(m_healthMonitor, m_healthMonitor.getResourceCheckInterval(), m_healthMonitor.getResourceCheckInterval(), TimeUnit.SECONDS);
             m_periodicWorks.add(resMonitorWork);
         }
     }
@@ -2941,10 +2936,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 //Shutdown import processors.
                 ImportManager.instance().shutdown();
 
-                //Shutdown Channel Distributer
-                if (m_distributer != null) {
-                    m_distributer.shutdown();
-                }
                 // clear resMonitorWork
                 resMonitorWork = null;
 
@@ -3284,7 +3275,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     m_snmp.notifyOfCatalogUpdate(m_catalogContext.getDeployment().getSnmp());
                 }
                 // restart resource usage monitoring task
-                startResourceUsageMonitor();
+                startHealthMonitor();
 
                 checkHeapSanity(MiscUtils.isPro(), m_catalogContext.tables.size(),
                         (m_iv2Initiators.size() - 1), m_configuredReplicationFactor);
@@ -3508,7 +3499,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 prepareReplication();
             }
         }
-        startResourceUsageMonitor();
+        startHealthMonitor();
 
         try {
             if (m_adminListener != null) {
@@ -3740,7 +3731,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
             // Start listening on the DR ports
             prepareReplication();
-            startResourceUsageMonitor();
+            startHealthMonitor();
 
             // Allow export datasources to start consuming their binary deques safely
             // as at this juncture the initial truncation snapshot is already complete

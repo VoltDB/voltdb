@@ -103,7 +103,7 @@ import com.google_voltpatches.common.util.concurrent.SettableFuture;
  */
 public class ChannelDistributer implements ChannelChangeCallback {
 
-    private final static VoltLogger LOG = new VoltLogger("HOST");
+    private final static VoltLogger LOG = new VoltLogger("IMPORT");
 
     /** root for all importer nodes */
     static final String IMPORT_DN = "/import";
