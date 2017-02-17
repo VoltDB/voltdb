@@ -39,37 +39,54 @@ public class LoadedProcedureSet {
 
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
+    private static Language.CheckedExceptionVisitor<VoltProcedure, Class<?>, Exception> procedureInstantiator =
+            new Language.CheckedExceptionVisitor<VoltProcedure, Class<?>, Exception>() {
+                @Override
+                public VoltProcedure visitJava(Class<?> p) throws Exception {
+                    return (VoltProcedure)p.newInstance();
+                }
+                @Override
+                public VoltProcedure visitGroovy(Class<?> p) throws Exception {
+                    return new GroovyScriptProcedureDelegate(p);
+                }
+            };
+
+    final SiteProcedureConnection m_site;
+    final ProcedureRunnerFactory m_runnerFactory;
+
     // user procedures.
-    ImmutableMap<String, ProcedureRunner> procs = ImmutableMap.<String, ProcedureRunner>builder().build();
-    // cached default procs
-    Map<String, ProcedureRunner> m_defaultProcCache = new HashMap<>();
+    ImmutableMap<String, ProcedureRunner> m_userProcs = ImmutableMap.<String, ProcedureRunner>builder().build();
+
+    // system procedures.
+    ImmutableMap<String, ProcedureRunner> m_sysProcs = ImmutableMap.<String, ProcedureRunner>builder().build();
 
     // map of sysproc fragment ids to system procedures.
-    final HashMap<Long, ProcedureRunner> m_registeredSysProcPlanFragments =
-        new HashMap<Long, ProcedureRunner>();
+    final HashMap<Long, ProcedureRunner> m_registeredSysProcPlanFragments = new HashMap<Long, ProcedureRunner>();
 
-    final ProcedureRunnerFactory m_runnerFactory;
-    CatalogSpecificPlanner m_csp = null;
-    PlannerTool m_plannerTool = null;
-    DefaultProcedureManager m_defaultProcManager = null;
-    final long m_siteId;
-    final int m_siteIndex;
-    final SiteProcedureConnection m_site;
+    CatalogSpecificPlanner m_csp;
 
-    public LoadedProcedureSet(SiteProcedureConnection site, ProcedureRunnerFactory runnerFactory, long siteId, int siteIndex) {
-        m_runnerFactory = runnerFactory;
-        m_siteId = siteId;
-        m_siteIndex = siteIndex;
+    // cached default procs
+    Map<String, ProcedureRunner> m_defaultProcCache;
+    DefaultProcedureManager m_defaultProcManager;
+    PlannerTool m_plannerTool;
+
+    public LoadedProcedureSet(SiteProcedureConnection site) {
         m_site = site;
+
+        m_runnerFactory = new ProcedureRunnerFactory(m_site, m_site.getSystemProcedureExecutionContext());
+        m_csp = null;
+        m_defaultProcCache = new HashMap<>();
+        m_defaultProcManager = null;
+        m_plannerTool = null;
     }
 
-   public ProcedureRunner getSysproc(long fragmentId) {
+    public ProcedureRunner getSysproc(long fragmentId) {
         synchronized (m_registeredSysProcPlanFragments) {
             return m_registeredSysProcPlanFragments.get(fragmentId);
         }
     }
 
-    public void registerPlanFragment(final long pfId, final ProcedureRunner proc) {
+    private void registerPlanFragment(final long pfId, final ProcedureRunner proc) {
         synchronized (m_registeredSysProcPlanFragments) {
             assert(m_registeredSysProcPlanFragments.containsKey(pfId) == false);
             m_registeredSysProcPlanFragments.put(pfId, proc);
@@ -78,31 +95,29 @@ public class LoadedProcedureSet {
 
     public void loadProcedures(
             CatalogContext catalogContext,
-            BackendTarget backendTarget,
             CatalogSpecificPlanner csp)
     {
+        m_registeredSysProcPlanFragments.clear();
+
+        m_csp = csp;
+        m_defaultProcManager = catalogContext.m_defaultProcs;
         // default proc caches clear on catalog update
         m_defaultProcCache.clear();
-
-        m_defaultProcManager = catalogContext.m_defaultProcs;
-        m_csp = csp;
         m_plannerTool = catalogContext.m_ptool;
-        m_registeredSysProcPlanFragments.clear();
-        ImmutableMap.Builder<String, ProcedureRunner> builder =
-                loadProceduresFromCatalog(catalogContext, backendTarget);
-        loadSystemProcedures(catalogContext, backendTarget, builder);
-        procs = builder.build();
 
+        // reload user procedures
+        m_userProcs = loadUserProceduresFromCatalog(catalogContext);
+
+        // reload system procedures
+        m_sysProcs = loadSystemProcedures(catalogContext);
     }
 
-    private ImmutableMap.Builder<String, ProcedureRunner> loadProceduresFromCatalog(
-            CatalogContext catalogContext,
-            BackendTarget backendTarget) {
+    private ImmutableMap<String, ProcedureRunner> loadUserProceduresFromCatalog(
+            CatalogContext catalogContext) {
         // load up all the stored procedures
         final CatalogMap<Procedure> catalogProcedures = catalogContext.database.getProcedures();
         ImmutableMap.Builder<String, ProcedureRunner> builder = ImmutableMap.<String, ProcedureRunner>builder();
         for (final Procedure proc : catalogProcedures) {
-
             // Sysprocs used to be in the catalog. Now they aren't. Ignore
             // sysprocs found in old catalog versions. (PRO-365)
             if (proc.getTypeName().startsWith("@")) {
@@ -112,16 +127,15 @@ public class LoadedProcedureSet {
             ProcedureRunner runner = null;
             VoltProcedure procedure = null;
             if (proc.getHasjava()) {
-                final String className = proc.getClassname();
-
-                Language lang;
+                // default to Java
+                Language lang = Language.JAVA;
                 try {
                     lang = Language.valueOf(proc.getLanguage());
                 } catch (IllegalArgumentException e) {
-                    // default to java for earlier compiled catalogs
-                    lang = Language.JAVA;
+                    // default to Java for earlier compiled catalogs
                 }
 
+                final String className = proc.getClassname();
                 Class<?> procClass = null;
                 try {
                     procClass = catalogContext.classForProcedure(className);
@@ -143,8 +157,9 @@ public class LoadedProcedureSet {
                     procedure = lang.accept(procedureInstantiator, procClass);
                 }
                 catch (final Exception e) {
+                    // TODO: remove the extra meaningless parameter "0"
                     hostLog.l7dlog( Level.WARN, LogKeys.host_ExecutionSite_GenericException.name(),
-                                    new Object[] { m_siteId, m_siteIndex }, e);
+                                    new Object[] { m_site.getCorrespondingSiteId(), 0}, e);
                 }
             }
             else {
@@ -155,25 +170,13 @@ public class LoadedProcedureSet {
             runner = m_runnerFactory.create(procedure, proc, m_csp);
             builder.put(proc.getTypeName().intern(), runner);
         }
-        return builder;
+        return builder.build();
     }
 
-    private static Language.CheckedExceptionVisitor<VoltProcedure, Class<?>, Exception> procedureInstantiator =
-            new Language.CheckedExceptionVisitor<VoltProcedure, Class<?>, Exception>() {
-                @Override
-                public VoltProcedure visitJava(Class<?> p) throws Exception {
-                    return (VoltProcedure)p.newInstance();
-                }
-                @Override
-                public VoltProcedure visitGroovy(Class<?> p) throws Exception {
-                    return new GroovyScriptProcedureDelegate(p);
-                }
-            };
+    private ImmutableMap<String, ProcedureRunner> loadSystemProcedures(
+            CatalogContext catalogContext) {
+        ImmutableMap.Builder<String, ProcedureRunner> builder = ImmutableMap.<String, ProcedureRunner>builder();
 
-    private void loadSystemProcedures(
-            CatalogContext catalogContext,
-            BackendTarget backendTarget,
-            ImmutableMap.Builder<String, ProcedureRunner> builder) {
         Set<Entry<String,Config>> entrySet = SystemProcedureCatalog.listing.entrySet();
         for (Entry<String, Config> entry : entrySet) {
             Config sysProc = entry.getValue();
@@ -197,7 +200,8 @@ public class LoadedProcedureSet {
                     hostLog.l7dlog(
                             Level.WARN,
                             LogKeys.host_ExecutionSite_GenericException.name(),
-                            new Object[] { m_siteId, m_siteIndex },
+                            // TODO: remove the extra meaningless parameter "0"
+                            new Object[] { m_site.getCorrespondingSiteId(), 0 },
                             e);
                     VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
                 }
@@ -207,26 +211,38 @@ public class LoadedProcedureSet {
                 }
                 catch (final InstantiationException e) {
                     hostLog.l7dlog( Level.WARN, LogKeys.host_ExecutionSite_GenericException.name(),
-                            new Object[] { m_siteId, m_siteIndex }, e);
+                            new Object[] { m_site.getCorrespondingSiteId(), 0 }, e);
                 }
                 catch (final IllegalAccessException e) {
                     hostLog.l7dlog( Level.WARN, LogKeys.host_ExecutionSite_GenericException.name(),
-                            new Object[] { m_siteId, m_siteIndex }, e);
+                            new Object[] { m_site.getCorrespondingSiteId(), 0 }, e);
                 }
 
                 runner = m_runnerFactory.create(procedure, proc, m_csp);
-                procedure.initSysProc(m_site, this, proc, catalogContext.cluster,
+                procedure.initSysProc(m_site, catalogContext.cluster,
                         catalogContext.getClusterSettings(),
                         catalogContext.getNodeSettings());
+
+                // register the plan fragments with procedure set
+                long[] planFragments = procedure.getPlanFragmentIds();
+                assert(planFragments != null);
+                for (long pfId: planFragments) {
+                    registerPlanFragment(pfId, runner);
+                }
+
                 builder.put(entry.getKey().intern(), runner);
             }
         }
+        return builder.build();
     }
 
     public ProcedureRunner getProcByName(String procName)
     {
         // Check the procs from the catalog
-        ProcedureRunner pr = procs.get(procName);
+        ProcedureRunner pr = m_userProcs.get(procName);
+        if (pr == null) {
+            pr = m_sysProcs.get(procName);
+        }
 
         // if not there, check the default proc cache
         if (pr == null) {

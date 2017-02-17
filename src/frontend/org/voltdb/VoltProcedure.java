@@ -136,9 +136,9 @@ public abstract class VoltProcedure {
     {
         if (m_initialized) {
             throw new IllegalStateException("VoltProcedure has already been initialized");
-        } else {
-            m_initialized = true;
         }
+
+        m_initialized = true;
         m_runner = procRunner;
     }
 

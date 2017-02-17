@@ -2700,7 +2700,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 (m_iv2Initiators.size() - 1), m_configuredReplicationFactor);
         hostLog.info("Minimum required Java heap for catalog and server config is " + minRqt + " MB.");
 
-        SortedMap<String, String> dbgMap = m_catalogContext.getDebuggingInfoFromCatalog();
+        SortedMap<String, String> dbgMap = m_catalogContext.getDebuggingInfoFromCatalog(true);
         for (String line : dbgMap.values()) {
             hostLog.info(line);
         }
@@ -3136,7 +3136,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                         Encoder.hexEncode(deploymentHash).substring(0, 10)));
 
                 // get old debugging info
-                SortedMap<String, String> oldDbgMap = m_catalogContext.getDebuggingInfoFromCatalog();
+                SortedMap<String, String> oldDbgMap = m_catalogContext.getDebuggingInfoFromCatalog(false);
                 byte[] oldDeployHash = m_catalogContext.deploymentHash;
                 final String oldDRConnectionSource = m_catalogContext.cluster.getDrmasterhost();
 
@@ -3158,7 +3158,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                                 csp));
 
                 // log the stuff that's changed in this new catalog update
-                SortedMap<String, String> newDbgMap = m_catalogContext.getDebuggingInfoFromCatalog();
+                SortedMap<String, String> newDbgMap = m_catalogContext.getDebuggingInfoFromCatalog(false);
                 for (Entry<String, String> e : newDbgMap.entrySet()) {
                     // skip log lines that are unchanged
                     if (oldDbgMap.containsKey(e.getKey()) && oldDbgMap.get(e.getKey()).equals(e.getValue())) {
