@@ -670,7 +670,10 @@ void PersistentTable::swapTableState(PersistentTable* otherTable) {
     setTableForStreamIndexing(otherTable->tableForStreamIndexing());
     otherTable->setTableForStreamIndexing(heldStreamIndexingTable);
 
-    std::swap(m_tableStreamer, otherTable->m_tableStreamer);
+    // NOTE: do not swap m_tableStreamers here... we want them to
+    // stick to their original tables, so that if a swap occurs during
+    // an ongoing snapshot, subsequent changes to the table notify the
+    // right TableStreamer instance.
 }
 
 void PersistentTable::swapTableIndexes(PersistentTable* otherTable,
