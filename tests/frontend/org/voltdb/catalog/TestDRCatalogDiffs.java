@@ -35,8 +35,6 @@ import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.MiscUtils;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
 
 public class TestDRCatalogDiffs {
     @Test
@@ -770,6 +768,27 @@ public class TestDRCatalogDiffs {
             threw = true;
         }
         assertTrue(threw);
+    }
+
+    /**
+     * Don't serialize views, DR doesn't care.
+     */
+    @Test
+    public void testFilterViewInfo() throws Exception {
+        String masterSchema =
+        "CREATE TABLE T1 (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL);\n" +
+        "CREATE TABLE T2 (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL);\n" +
+        "CREATE VIEW foo (C1, total) AS SELECT C1, COUNT(*) FROM T1 GROUP BY C1;\n" +
+        "CREATE VIEW foo2 (C1, total) AS SELECT T1.C1, COUNT(*) FROM T1 JOIN T2 ON T1.C1 = T2.C1 GROUP BY T1.C1;\n" +
+        "DR TABLE T1;\n" +
+        "DR TABLE T2;\n";
+        Catalog masterCatalog = createCatalog(masterSchema);
+
+        String commands = DRCatalogDiffEngine.serializeCatalogCommandsForDr(masterCatalog).getSecond();
+        String decodedCommands = Encoder.decodeBase64AndDecompress(commands);
+
+        assertFalse(decodedCommands.contains(" views "));
+        assertFalse(decodedCommands.contains(" mvHandlerInfo "));
     }
 
     private CatalogDiffEngine runCatalogDiff(String masterSchema, String replicaSchema) throws Exception {

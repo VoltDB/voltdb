@@ -23,6 +23,7 @@ package org.voltdb.catalog;
 
 import java.util.List;
 
+import com.google_voltpatches.common.collect.Sets;
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
 import org.voltcore.utils.Pair;
 import org.voltdb.common.Constants;
@@ -49,7 +50,7 @@ public class DRCatalogDiffEngine extends CatalogDiffEngine {
             if (t.getIsdred() && t.getMaterializer() == null && !CatalogUtil.isTableExportOnly(db, t)) {
                 t.writeCreationCommand(sb);
                 t.writeFieldCommands(sb);
-                t.writeChildCommands(sb);
+                t.writeChildCommands(sb, Sets.newHashSet(Column.class, Index.class, Constraint.class, Statement.class));
             }
         }
         String catalogCommands = sb.toString();
