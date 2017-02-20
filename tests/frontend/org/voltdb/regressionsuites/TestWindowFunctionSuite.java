@@ -185,8 +185,70 @@ public class TestWindowFunctionSuite extends RegressionSuite {
         client.callProcedure("tu.insert", 70, 3);
         client.callProcedure("tu.insert", 80, 2);
     }
+    private static final boolean IS_ENABLED = true;
+    private static final boolean ISNOT_ENABLED = false;
 
-    public void testRank_UNIQUE() throws NoConnectionsException, IOException, ProcCallException {
+    public void testAll() throws Exception {
+        Client client = getClient();
+        if (IS_ENABLED) {
+            truncateAllTables(client);
+            subtestRank_UNIQUE();
+        }
+        if (IS_ENABLED) {
+            truncateAllTables(client);
+            subtestRank_NON_UNIQUE();
+        }
+        if (IS_ENABLED) {
+            truncateAllTables(client);
+            subtestRankWithString();
+        }
+        if (IS_ENABLED) {
+            truncateAllTables(client);
+            subtestRankWithTimestamp();
+        }
+        if (IS_ENABLED) {
+            truncateAllTables(client);
+            subtestRankPartitionedTable();
+        }
+        if (IS_ENABLED) {
+            truncateAllTables(client);
+            subtestRank();
+        }
+        if (IS_ENABLED) {
+            truncateAllTables(client);
+            subtestRankMultPartitionBys();
+        }
+        if (IS_ENABLED) {
+            truncateAllTables(client);
+            subtestRankWithEmptyTable();
+        }
+        if (IS_ENABLED) {
+            truncateAllTables(client);
+            subtestRankOrderbyExpressions();
+        }
+        if (IS_ENABLED) {
+            truncateAllTables(client);
+            subtestSubqueryWindowFunctionExpressions();
+        }
+        if (IS_ENABLED) {
+            truncateAllTables(client);
+            subtestExplainPlan();
+        }
+        if (IS_ENABLED) {
+            truncateAllTables(client);
+            subtestEng10972();
+        }
+        if (IS_ENABLED) {
+            truncateAllTables(client);
+            subtestEng11029();
+        }
+        if (IS_ENABLED) {
+            truncateAllTables(client);
+            subtestCount();
+        }
+    }
+
+    private void subtestRank_UNIQUE() throws NoConnectionsException, IOException, ProcCallException {
         Client client = getClient();
         VoltTable vt = null;
 
@@ -204,7 +266,7 @@ public class TestWindowFunctionSuite extends RegressionSuite {
         //
         initUniqueTableExtra(client, true);
 
-        vt = client.callProcedure("@AdHoc", "select a, rank() over (partition by b order by a) from tu order by a;").getResults()[0];
+        vt = client.callProcedure("@AdHoc", "select a, rank() over (partition by b order by a) as r from tu order by a;").getResults()[0];
         validateTableOfLongs(vt, new long[][]{{10, 1}, {20, 1}, {30, 2}, {40, 1}, {50, 3}, {60, 2}, {70, 2}, {80, 3}});
 
         vt = client.callProcedure("@AdHoc", "select a, rank() over (partition by b order by a desc) from tu order by a;").getResults()[0];
@@ -215,7 +277,7 @@ public class TestWindowFunctionSuite extends RegressionSuite {
     //
     // NON-UNIQUE RANK SCAN TEST
     //
-    public void testRank_NON_UNIQUE() throws NoConnectionsException, IOException, ProcCallException {
+    private void subtestRank_NON_UNIQUE() throws NoConnectionsException, IOException, ProcCallException {
         Client client = getClient();
         VoltTable vt = null;
 
@@ -252,7 +314,7 @@ public class TestWindowFunctionSuite extends RegressionSuite {
 
     // rank1 is the rank for partition by A, order by B
     // rank2 is the rank for partition by A, AA, order by B
-    private long expected[][] = new long[][] {
+    private Long expected[][] = new Long[][] {
         // A     AA   B     C    rank1   rank2   rank3
         //--------------------------------------
         {  1L,  301L, 1L,  101L, 1L,      1L,      1L},
@@ -290,14 +352,14 @@ public class TestWindowFunctionSuite extends RegressionSuite {
     final int colR_AA       = 5;
     final int colR_dense    = 6;
 
-    public void testRankWithString() throws Exception {
+    private void subtestRankWithString() throws Exception {
         Client client = getClient();
 
-        long input[][] = expected.clone();
-        shuffleArrayOfLongs(input);
+        Long input[][] = expected.clone();
+        shuffleArray(input);
         ClientResponse cr;
         VoltTable vt;
-        for (long [] row : input) {
+        for (Long [] row : input) {
             cr = client.callProcedure("T_STRING.insert", row[colA], row[colB], Long.toString(row[colC], 10));
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             cr = client.callProcedure("T_STRING_A.insert", Long.toString(row[colA], 10), row[colB], row[colC]);
@@ -311,10 +373,10 @@ public class TestWindowFunctionSuite extends RegressionSuite {
         vt = cr.getResults()[0];
         assertEquals(expected.length, vt.getRowCount());
         for (int rowIdx = 0; vt.advanceRow(); rowIdx += 1) {
-            assertEquals(expected[rowIdx][colA], vt.getLong(0));
-            assertEquals(expected[rowIdx][colB], vt.getLong(1));
+            assertEquals(expected[rowIdx][colA], Long.valueOf(vt.getLong(0)));
+            assertEquals(expected[rowIdx][colB], Long.valueOf(vt.getLong(1)));
             assertEquals(Long.toString(expected[rowIdx][colC], 10), vt.getString(2));
-            assertEquals(expected[rowIdx][colR_A], vt.getLong(3));
+            assertEquals(expected[rowIdx][colR_A], Long.valueOf(vt.getLong(3)));
         }
         // Test with partition by over a string column
         sql = "select A, B, C, rank() over (partition by A order by B) as R from T_STRING_A ORDER BY A, B, C, R;";
@@ -324,22 +386,22 @@ public class TestWindowFunctionSuite extends RegressionSuite {
         assertEquals(expected.length, vt.getRowCount());
         for (int rowIdx = 0; vt.advanceRow(); rowIdx += 1) {
             assertEquals(Long.toString(expected[rowIdx][colA], 10), vt.getString(0));
-            assertEquals(expected[rowIdx][colB], vt.getLong(1));
-            assertEquals(expected[rowIdx][colC], vt.getLong(2));
-            assertEquals(expected[rowIdx][colR_A], vt.getLong(3));
+            assertEquals(expected[rowIdx][colB], Long.valueOf(vt.getLong(1)));
+            assertEquals(expected[rowIdx][colC], Long.valueOf(vt.getLong(2)));
+            assertEquals(expected[rowIdx][colR_A], Long.valueOf(vt.getLong(3)));
         }
     }
 
 
-    public void testRankWithTimestamp() throws Exception {
+    private void subtestRankWithTimestamp() throws Exception {
         Client client = getClient();
 
         long baseTime = TimestampType.millisFromJDBCformat("1953-06-10 00:00:00");
-        long input[][] = expected.clone();
-        shuffleArrayOfLongs(input);
+        Long input[][] = expected.clone();
+        shuffleArray(input);
         ClientResponse cr;
         VoltTable vt;
-        for (long [] row : input) {
+        for (Long [] row : input) {
             cr = client.callProcedure("T_TIMESTAMP.insert", row[colA], row[colB], new TimestampType(baseTime + row[colB]*1000));
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         }
@@ -350,21 +412,21 @@ public class TestWindowFunctionSuite extends RegressionSuite {
         assertEquals(expected.length, vt.getRowCount());
         for (int rowIdx = 0; vt.advanceRow(); rowIdx += 1) {
             String msg = String.format("Row %d:", rowIdx);
-            assertEquals(msg, expected[rowIdx][colA], vt.getLong(0));
-            assertEquals(msg, expected[rowIdx][colB], vt.getLong(1));
+            assertEquals(msg, expected[rowIdx][colA], Long.valueOf(vt.getLong(0)));
+            assertEquals(msg, expected[rowIdx][colB], Long.valueOf(vt.getLong(1)));
             assertEquals(msg, baseTime + expected[rowIdx][colB]*1000, vt.getTimestampAsLong(2));
-            assertEquals(msg, expected[rowIdx][colR_A], vt.getLong(3));
+            assertEquals(msg, expected[rowIdx][colR_A], Long.valueOf(vt.getLong(3)));
         }
     }
 
-    public void testRankPartitionedTable() throws Exception {
+    private void subtestRankPartitionedTable() throws Exception {
         Client client = getClient();
 
-        long input[][] = expected.clone();
-        shuffleArrayOfLongs(input);
+        Long input[][] = expected.clone();
+        shuffleArray(input);
         ClientResponse cr;
         VoltTable vt;
-        for (long [] row : input) {
+        for (Long [] row : input) {
             cr = client.callProcedure("T_PA.insert", row[colA], row[colB], row[colC]);
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             cr = client.callProcedure("T_PB.insert", row[colA], row[colB], row[colC]);
@@ -381,10 +443,10 @@ public class TestWindowFunctionSuite extends RegressionSuite {
         vt = cr.getResults()[0];
         for (int rowIdx = 0; vt.advanceRow(); rowIdx += 1) {
             String msg = String.format("Row %d:", rowIdx);
-            assertEquals(msg, expected[rowIdx][colA],    vt.getLong(0));
-            assertEquals(msg, expected[rowIdx][colB],    vt.getLong(1));
-            assertEquals(msg, expected[rowIdx][colC],    vt.getLong(2));
-            assertEquals(msg, expected[rowIdx][colR_A],  vt.getLong(3));
+            assertEquals(msg, expected[rowIdx][colA],    Long.valueOf(vt.getLong(0)));
+            assertEquals(msg, expected[rowIdx][colB],    Long.valueOf(vt.getLong(1)));
+            assertEquals(msg, expected[rowIdx][colC],    Long.valueOf(vt.getLong(2)));
+            assertEquals(msg, expected[rowIdx][colR_A],  Long.valueOf(vt.getLong(3)));
         }
         // Test rank with ordered window over a partitioned column, and
         // partition not over a partitioned column.
@@ -394,10 +456,10 @@ public class TestWindowFunctionSuite extends RegressionSuite {
         vt = cr.getResults()[0];
         for (int rowIdx = 0; vt.advanceRow(); rowIdx += 1) {
             String msg = String.format("Row %d:", rowIdx);
-            assertEquals(msg, expected[rowIdx][colA],    vt.getLong(0));
-            assertEquals(msg, expected[rowIdx][colB],    vt.getLong(1));
-            assertEquals(msg, expected[rowIdx][colC],    vt.getLong(2));
-            assertEquals(msg, expected[rowIdx][colR_A],  vt.getLong(3));
+            assertEquals(msg, expected[rowIdx][colA],    Long.valueOf(vt.getLong(0)));
+            assertEquals(msg, expected[rowIdx][colB],    Long.valueOf(vt.getLong(1)));
+            assertEquals(msg, expected[rowIdx][colC],    Long.valueOf(vt.getLong(2)));
+            assertEquals(msg, expected[rowIdx][colR_A],  Long.valueOf(vt.getLong(3)));
         }
         // Select rank with neither partition nor rank over partioned
         // columns, but with a partitioned table.
@@ -407,10 +469,10 @@ public class TestWindowFunctionSuite extends RegressionSuite {
         vt = cr.getResults()[0];
         for (int rowIdx = 0; vt.advanceRow(); rowIdx += 1) {
             String msg = String.format("Row %d:", rowIdx);
-            assertEquals(msg, expected[rowIdx][colA],    vt.getLong(0));
-            assertEquals(msg, expected[rowIdx][colB],    vt.getLong(1));
-            assertEquals(msg, expected[rowIdx][colC],    vt.getLong(2));
-            assertEquals(msg, expected[rowIdx][colR_A],  vt.getLong(3));
+            assertEquals(msg, expected[rowIdx][colA],    Long.valueOf(vt.getLong(0)));
+            assertEquals(msg, expected[rowIdx][colB],    Long.valueOf(vt.getLong(1)));
+            assertEquals(msg, expected[rowIdx][colC],    Long.valueOf(vt.getLong(2)));
+            assertEquals(msg, expected[rowIdx][colR_A],  Long.valueOf(vt.getLong(3)));
         }
         // Check rank with windowed partition on two columns, one partitioned and
         // one not partitioned, but ordered by a non-partitioned column.
@@ -420,10 +482,10 @@ public class TestWindowFunctionSuite extends RegressionSuite {
         vt = cr.getResults()[0];
         for (int rowIdx = 0; vt.advanceRow(); rowIdx += 1) {
             String msg = String.format("Row %d:", rowIdx);
-            assertEquals(msg, expected[rowIdx][colA],    vt.getLong(0));
-            assertEquals(msg, expected[rowIdx][colB],    vt.getLong(1));
-            assertEquals(msg, expected[rowIdx][colC],    vt.getLong(2));
-            assertEquals(msg, expected[rowIdx][colR_AA], vt.getLong(3));
+            assertEquals(msg, expected[rowIdx][colA],    Long.valueOf(vt.getLong(0)));
+            assertEquals(msg, expected[rowIdx][colB],    Long.valueOf(vt.getLong(1)));
+            assertEquals(msg, expected[rowIdx][colC],    Long.valueOf(vt.getLong(2)));
+            assertEquals(msg, expected[rowIdx][colR_AA], Long.valueOf(vt.getLong(3)));
         }
         // Check the previous case, but with the partition by order reversed.
         sql = "select A, B, C, rank() over (partition by AA, A order by B) as R from T_PAA ORDER BY A, AA, B, C, R;";
@@ -432,10 +494,10 @@ public class TestWindowFunctionSuite extends RegressionSuite {
         vt = cr.getResults()[0];
         for (int rowIdx = 0; vt.advanceRow(); rowIdx += 1) {
             String msg = String.format("Row %d:", rowIdx);
-            assertEquals(msg, expected[rowIdx][colA],    vt.getLong(0));
-            assertEquals(msg, expected[rowIdx][colB],    vt.getLong(1));
-            assertEquals(msg, expected[rowIdx][colC],    vt.getLong(2));
-            assertEquals(msg, expected[rowIdx][colR_AA], vt.getLong(3));
+            assertEquals(msg, expected[rowIdx][colA],    Long.valueOf(vt.getLong(0)));
+            assertEquals(msg, expected[rowIdx][colB],    Long.valueOf(vt.getLong(1)));
+            assertEquals(msg, expected[rowIdx][colC],    Long.valueOf(vt.getLong(2)));
+            assertEquals(msg, expected[rowIdx][colR_AA], Long.valueOf(vt.getLong(3)));
         }
 
     }
@@ -443,14 +505,14 @@ public class TestWindowFunctionSuite extends RegressionSuite {
     public void validateRankFunction(String sql, int expectedCol) throws Exception {
         Client client = getClient();
 
-        long input[][] = expected.clone();
-        shuffleArrayOfLongs(input);
+        Long input[][] = expected.clone();
+        shuffleArray(input);
         ClientResponse cr;
         VoltTable vt;
 
         cr = client.callProcedure("@AdHoc", "TRUNCATE TABLE T");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        for (long [] row : input) {
+        for (Long [] row : input) {
             cr = client.callProcedure("T.insert", row[colA], row[colB], row[colC]);
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         }
@@ -459,27 +521,27 @@ public class TestWindowFunctionSuite extends RegressionSuite {
         vt = cr.getResults()[0];
         for (int rowIdx = 0; vt.advanceRow(); rowIdx += 1) {
             String msg = String.format("Row %d:", rowIdx);
-            assertEquals(msg, expected[rowIdx][colA],       vt.getLong(0));
-            assertEquals(msg, expected[rowIdx][colB],       vt.getLong(1));
-            assertEquals(msg, expected[rowIdx][colC],       vt.getLong(2));
-            assertEquals(msg, expected[rowIdx][expectedCol],vt.getLong(3));
+            assertEquals(msg, expected[rowIdx][colA],       Long.valueOf(vt.getLong(0)));
+            assertEquals(msg, expected[rowIdx][colB],       Long.valueOf(vt.getLong(1)));
+            assertEquals(msg, expected[rowIdx][colC],       Long.valueOf(vt.getLong(2)));
+            assertEquals(msg, expected[rowIdx][expectedCol],Long.valueOf(vt.getLong(3)));
         }
     }
 
-    public void testRank() throws Exception {
+    private void subtestRank() throws Exception {
         validateRankFunction("select A, B, C, dense_rank() over (partition by A order by B) as R from T ORDER BY A, B, C, R;",
                              colR_dense);
         validateRankFunction("select A, B, C, rank() over (partition by A order by B) as R from T ORDER BY A, B, C, R;",
                               colR_A);
     }
-    public void testRankMultPartitionBys() throws Exception {
+    private void subtestRankMultPartitionBys() throws Exception {
         Client client = getClient();
 
-        long input[][] = expected.clone();
-        shuffleArrayOfLongs(input);
+        Long input[][] = expected.clone();
+        shuffleArray(input);
         ClientResponse cr;
         VoltTable vt;
-        for (long [] row : input) {
+        for (Long [] row : input) {
             cr = client.callProcedure("T.insert", row[0], row[1], row[2]);
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         }
@@ -489,14 +551,14 @@ public class TestWindowFunctionSuite extends RegressionSuite {
         vt = cr.getResults()[0];
         for (int rowIdx = 0; vt.advanceRow(); rowIdx += 1) {
             String msg = String.format("Row %d:", rowIdx);
-            assertEquals(msg, expected[rowIdx][colA],    vt.getLong(0));
-            assertEquals(msg, expected[rowIdx][colB],    vt.getLong(1));
-            assertEquals(msg, expected[rowIdx][colC],    vt.getLong(2));
-            assertEquals(msg, expected[rowIdx][colR_AA], vt.getLong(3));
+            assertEquals(msg, expected[rowIdx][colA],    Long.valueOf(vt.getLong(0)));
+            assertEquals(msg, expected[rowIdx][colB],    Long.valueOf(vt.getLong(1)));
+            assertEquals(msg, expected[rowIdx][colC],    Long.valueOf(vt.getLong(2)));
+            assertEquals(msg, expected[rowIdx][colR_AA], Long.valueOf(vt.getLong(3)));
         }
     }
 
-    public void testRankWithEmptyTable() throws Exception {
+    private void subtestRankWithEmptyTable() throws Exception {
         Client client = getClient();
 
         ClientResponse cr;
@@ -506,14 +568,14 @@ public class TestWindowFunctionSuite extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         // That's it.  If the EE does not crash we are happy.
     }
-    public void testRankOrderbyExpressions() throws Exception {
+    private void subtestRankOrderbyExpressions() throws Exception {
         Client client = getClient();
 
-        long input[][] = expected.clone();
-        shuffleArrayOfLongs(input);
+        Long input[][] = expected.clone();
+        shuffleArray(input);
         ClientResponse cr;
         VoltTable vt;
-        for (long [] row : input) {
+        for (Long [] row : input) {
             cr = client.callProcedure("T.insert", row[colA], row[colB], row[colC]);
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         }
@@ -523,10 +585,10 @@ public class TestWindowFunctionSuite extends RegressionSuite {
         vt = cr.getResults()[0];
         for (int rowIdx = 0; vt.advanceRow(); rowIdx += 1) {
             String msg = String.format("Row %d:", rowIdx);
-            assertEquals(msg, expected[rowIdx][colA],    vt.getLong(0));
-            assertEquals(msg, expected[rowIdx][colB],    vt.getLong(1));
-            assertEquals(msg, expected[rowIdx][colC],    vt.getLong(2));
-            assertEquals(msg, expected[rowIdx][colR_A],  vt.getLong(3));
+            assertEquals(msg, expected[rowIdx][colA],    Long.valueOf(vt.getLong(0)));
+            assertEquals(msg, expected[rowIdx][colB],    Long.valueOf(vt.getLong(1)));
+            assertEquals(msg, expected[rowIdx][colC],    Long.valueOf(vt.getLong(2)));
+            assertEquals(msg, expected[rowIdx][colR_A],  Long.valueOf(vt.getLong(3)));
         }
     }
 
@@ -538,7 +600,7 @@ public class TestWindowFunctionSuite extends RegressionSuite {
      *
      * @throws Exception
      */
-    public void testSubqueryWindowFunctionExpressions() throws Exception {
+    private void subtestSubqueryWindowFunctionExpressions() throws Exception {
         Client client = getClient();
 
         client.callProcedure("P2.insert", 0, 2, null, -67);
@@ -585,7 +647,7 @@ public class TestWindowFunctionSuite extends RegressionSuite {
      * the same as the original plan.  We don't serialize sort orders
      * for windowed aggregates.
      */
-    public void testExplainPlan() throws Exception {
+    private void subtestExplainPlan() throws Exception {
         Client client = getClient();
         String sql = "select rank() over ( partition by A, B order by C ) from T;";
 
@@ -604,7 +666,7 @@ public class TestWindowFunctionSuite extends RegressionSuite {
         }
     }
 
-    public void testEng10972() throws Exception {
+    private void subtestEng10972() throws Exception {
         // reproducer for ENG-10972 and ENG-10973, found by sqlcoverage
         Client client = getClient();
         VoltTable vt;
@@ -631,7 +693,7 @@ public class TestWindowFunctionSuite extends RegressionSuite {
             {2.0, 1}}, vt);
     }
 
-    public void testEng11029() throws Exception {
+    private void subtestEng11029() throws Exception {
         // Regression test for ENG-11029
         Client client = getClient();
 
@@ -700,7 +762,7 @@ public class TestWindowFunctionSuite extends RegressionSuite {
         validateTableOfLongs(vt, expected);
     }
 
-    public void testCount() throws Exception {
+    private void subtestCount() throws Exception {
         Client client = getClient();
         initUniqueTable(client);
 
