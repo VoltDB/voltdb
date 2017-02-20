@@ -175,7 +175,7 @@ public:
         if (id != NULL) {
             *id = tbl->relativeIndex();
         }
-        voltdb::PersistentTable *pt = dynamic_cast<voltdb::PersistentTable *>(m_engine->getTable(name));
+        voltdb::PersistentTable *pt = dynamic_cast<voltdb::PersistentTable *>(m_engine->getTableByName(name));
         if (table != NULL) {
             *table = pt;
         }

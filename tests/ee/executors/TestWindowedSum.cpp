@@ -257,6 +257,7 @@ const TableConfig test_sum_outputConfig = {
  */
 const TableConfig *allTables[] = {
     &TConfig,
+    &test_sum_outputConfig,
 };
 
 
@@ -1045,7 +1046,7 @@ DBConfig TestWindowedSum::m_testDB =
     "set $PREV indexesused \"\"\n"
     "set $PREV cachekeyprefix \"\"\n"
     "",
-    1,
+    2,
     allTables
 };
 

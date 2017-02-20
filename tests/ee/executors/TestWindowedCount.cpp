@@ -108,36 +108,12 @@ const char *count_output_ColumnNames[] = {
     "C",
     "D",
 };
-const char *count_output_ColumnNames[] = {
-    "A",
-    "B",
-    "C",
-    "D",
-};
-const char *count_output_ColumnNames[] = {
-    "A",
-    "B",
-    "C",
-    "D",
-};
 
 
 /*
  * These are the types of all the columns.
  */
 const voltdb::ValueType T_Types[] = {
-    voltdb::VALUE_TYPE_INTEGER,
-    voltdb::VALUE_TYPE_INTEGER,
-    voltdb::VALUE_TYPE_INTEGER,
-};
-const voltdb::ValueType count_output_Types[] = {
-    voltdb::VALUE_TYPE_INTEGER,
-    voltdb::VALUE_TYPE_INTEGER,
-    voltdb::VALUE_TYPE_INTEGER,
-    voltdb::VALUE_TYPE_INTEGER,
-};
-const voltdb::ValueType count_output_Types[] = {
-    voltdb::VALUE_TYPE_INTEGER,
     voltdb::VALUE_TYPE_INTEGER,
     voltdb::VALUE_TYPE_INTEGER,
     voltdb::VALUE_TYPE_INTEGER,
@@ -164,18 +140,6 @@ const int32_t count_output_Sizes[] = {
     4,
     4,
 };
-const int32_t count_output_Sizes[] = {
-    4,
-    4,
-    4,
-    4,
-};
-const int32_t count_output_Sizes[] = {
-    4,
-    4,
-    4,
-    4,
-};
 
 
 /*
@@ -184,12 +148,6 @@ const int32_t count_output_Sizes[] = {
  */
 int32_t num_T_strings = 0;
 const char *T_Strings[] = {
-};
-int32_t num_count_output_strings = 0;
-const char *count_output_Strings[] = {
-};
-int32_t num_count_output_strings = 0;
-const char *count_output_Strings[] = {
 };
 int32_t num_count_output_strings = 0;
 const char *count_output_Strings[] = {
@@ -239,46 +197,6 @@ const int count_outputData[NUM_TABLE_ROWS_COUNT_OUTPUT * NUM_TABLE_COLS_COUNT_OU
      20,  3,2203,  5,
 };
 
-const int NUM_TABLE_ROWS_COUNT_OUTPUT = 15;
-const int NUM_TABLE_COLS_COUNT_OUTPUT = 4;
-const int count_outputData[NUM_TABLE_ROWS_COUNT_OUTPUT * NUM_TABLE_COLS_COUNT_OUTPUT] = {
-      1,  1,101,  2,
-      1,  1,102,  2,
-      1,  2,201,  4,
-      1,  2,202,  4,
-      1,  3,203,  5,
-      2,  1,1101,  2,
-      2,  1,1102,  2,
-      2,  2,1201,  4,
-      2,  2,1202,  4,
-      2,  3,1203,  5,
-     20,  1,2101,  2,
-     20,  1,2102,  2,
-     20,  2,2201,  4,
-     20,  2,2202,  4,
-     20,  3,2203,  5,
-};
-
-const int NUM_TABLE_ROWS_COUNT_OUTPUT = 15;
-const int NUM_TABLE_COLS_COUNT_OUTPUT = 4;
-const int count_outputData[NUM_TABLE_ROWS_COUNT_OUTPUT * NUM_TABLE_COLS_COUNT_OUTPUT] = {
-      1,  1,101,  2,
-      1,  1,102,  2,
-      1,  2,201,  4,
-      1,  2,202,  4,
-      1,  3,203,  5,
-      2,  1,1101,  2,
-      2,  1,1102,  2,
-      2,  2,1201,  4,
-      2,  2,1202,  4,
-      2,  3,1203,  5,
-     20,  1,2101,  2,
-     20,  1,2102,  2,
-     20,  2,2201,  4,
-     20,  2,2202,  4,
-     20,  3,2203,  5,
-};
-
 
 
 /*
@@ -297,28 +215,6 @@ const TableConfig TConfig = {
     TData,
     T_Strings,
     num_T_strings
-};
-const TableConfig count_outputConfig = {
-    "count_output",
-    count_output_ColumnNames,
-    count_output_Types,
-    count_output_Sizes,
-    NUM_TABLE_ROWS_COUNT_OUTPUT,
-    NUM_TABLE_COLS_COUNT_OUTPUT,
-    count_outputData,
-    count_output_Strings,
-    num_count_output_strings
-};
-const TableConfig count_outputConfig = {
-    "count_output",
-    count_output_ColumnNames,
-    count_output_Types,
-    count_output_Sizes,
-    NUM_TABLE_ROWS_COUNT_OUTPUT,
-    NUM_TABLE_COLS_COUNT_OUTPUT,
-    count_outputData,
-    count_output_Strings,
-    num_count_output_strings
 };
 const TableConfig count_outputConfig = {
     "count_output",

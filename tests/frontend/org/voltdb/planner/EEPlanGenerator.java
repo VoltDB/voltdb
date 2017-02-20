@@ -98,7 +98,7 @@ import org.voltdb.VoltType;
 import org.voltdb.plannodes.AbstractPlanNode;
 
 /**
- * This
+ * This class generates some C++ unit tests.
  */
 public class EEPlanGenerator extends PlannerTestCase {
 
@@ -500,9 +500,11 @@ public class EEPlanGenerator extends PlannerTestCase {
                 getOneTableColumnTypesString(sb, tc);
             }
             for (TestConfig tstConfig : m_testConfigs) {
+                /*
                 if (tstConfig.hasExpectedData()) {
                     getOneTableColumnTypesString(sb, tstConfig.getExpectedOutput());
                 }
+                */
             }
             return sb.toString();
         }
@@ -521,11 +523,13 @@ public class EEPlanGenerator extends PlannerTestCase {
             for (TableConfig tc : m_tables) {
                 getOneTableColumnSizeString(sb, tc);
             }
+            /*
             for (TestConfig tstConfig : m_testConfigs) {
                 if (tstConfig.hasExpectedData()) {
                     getOneTableColumnSizeString(sb, tstConfig.getExpectedOutput());
                 }
             }
+            */
             return sb.toString();
         }
 
@@ -543,11 +547,13 @@ public class EEPlanGenerator extends PlannerTestCase {
             for (TableConfig tc : m_tables) {
                 getOneTableColumnNames(sb, tc);
             }
+            /*
             for (TestConfig tstConfig : m_testConfigs) {
                 if (tstConfig.hasExpectedData()) {
                     getOneTableColumnNames(sb, tstConfig.getExpectedOutput());
                 }
             }
+            */
             return sb.toString();
         }
 
@@ -597,11 +603,13 @@ public class EEPlanGenerator extends PlannerTestCase {
             for (TableConfig tc : m_tables) {
                 getOneTableStrings(sb, tc);
             }
+            /*
             for (TestConfig tstConfig : m_testConfigs) {
                 if (tstConfig.hasExpectedData()) {
                     getOneTableStrings(sb, tstConfig.getExpectedOutput());
                 }
             }
+            */
             return sb.toString();
         }
 
@@ -620,11 +628,13 @@ public class EEPlanGenerator extends PlannerTestCase {
             for (TableConfig tc : m_tables) {
                 getOneTableData(sb, tc);
             }
+            /*
             for (TestConfig tstConfig : m_testConfigs) {
                 if (tstConfig.hasExpectedData()) {
                     getOneTableData(sb, tstConfig.getExpectedOutput());
                 }
             }
+            */
             return sb.toString();
         }
 
@@ -645,11 +655,13 @@ public class EEPlanGenerator extends PlannerTestCase {
             for (TableConfig tc : m_tables) {
                 writeOneTableConfig(sb, tc);
             }
+            /*
             for (TestConfig tc : m_testConfigs) {
                 if (tc.hasExpectedData()) {
                     writeOneTableConfig(sb, tc.getExpectedOutput());
                 }
             }
+            */
             return sb.toString();
         }
 

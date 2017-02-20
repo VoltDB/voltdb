@@ -247,15 +247,16 @@ public class EEPlanTestGenerator extends EEPlanGenerator {
     public void generatedPlannerTest() throws Exception {
         // Create a DB config, which contains all the tables.
         // Note that result tables, like orderByOutput or
-        // joinOutput don't need to be added.  Only the
-        // tables we expect a query to use needs to be added here.
+        // joinOutput need to be added.
         DBConfig db = new DBConfig(getClass(),
                                    EEPlanTestGenerator.class.getResource(DDL_FILENAME),
                                    getCatalogString(),
                                    AAAConfig,
                                    BBBConfig,
                                    CCCConfig,
-                                   XXXConfig);
+                                   XXXConfig,
+                                   orderByOutput,
+                                   joinOutput);
         // Add a test.  This test runs the select statement
         // and expects the result to be orderByOutput.
         db.addTest(new TestConfig("test_order_by",
@@ -361,7 +362,8 @@ public class EEPlanTestGenerator extends EEPlanGenerator {
         DBConfig maxDB = new DBConfig(getClass(),
                                       EEPlanTestGenerator.class.getResource(DDL_FILENAME),
                                       getCatalogString(),
-                                      TConfig);
+                                      TConfig,
+                                      testOutput);
         maxDB.addTest(new TestConfig("test_max_first_row",
                                      "select A, B, max(-1 * abs(1-C)) over (partition by A order by B) as R from T ORDER BY A, B, R;",
                                      testOutput));
@@ -381,7 +383,8 @@ public class EEPlanTestGenerator extends EEPlanGenerator {
         DBConfig minDB = new DBConfig(getClass(),
                                       EEPlanTestGenerator.class.getResource(DDL_FILENAME),
                                       getCatalogString(),
-                                      TConfig);
+                                      TConfig,
+                                      testOutput);
 
         minDB.addTest(new TestConfig("test_min_last_row",
                                      "select A, B, min(abs(5-C)) over (partition by A order by B) as R from T ORDER BY A, B, R;",
@@ -441,7 +444,8 @@ public class EEPlanTestGenerator extends EEPlanGenerator {
         DBConfig sumDB = new DBConfig(getClass(),
                                       EEPlanTestGenerator.class.getResource(DDL_FILENAME),
                                       getCatalogString(),
-                                      TConfig);
+                                      TConfig,
+                                      sumOutput);
         sumDB.addTest(new TestConfig("test_min_last_row",
                                      "select A, B, sum(B+C) over (partition by A order by B) as R from T ORDER BY A, B, R;",
                                      sumOutput));
@@ -556,7 +560,7 @@ public class EEPlanTestGenerator extends EEPlanGenerator {
                                                                     { 20,  2, 2202},
                                                                     //======================================
                                                                     { 20,  3, 2203}});
-    public final static TableConfig rankOutput = new TableConfig("rank_dense_output",
+    public final static TableConfig rankOutput = new TableConfig("rank_output",
                                                              ABCDIntSchema,
                                                              new Integer[][] {
                                                                  // A   B    C    rank
@@ -620,7 +624,9 @@ public class EEPlanTestGenerator extends EEPlanGenerator {
         DBConfig rankDB = new DBConfig(getClass(),
                                        EEPlanTestGenerator.class.getResource(DDL_FILENAME),
                                        getCatalogString(),
-                                       rankInput);
+                                       rankInput,
+                                       rankOutput,
+                                       rankDenseOutput);
         String sqlStmt;
         sqlStmt = "select A, B, C, rank() over (partition by A order by B) as R from T ORDER BY A, B, C, R;";
 

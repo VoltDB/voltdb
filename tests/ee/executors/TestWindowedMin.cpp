@@ -111,32 +111,12 @@ const char *test_output_ColumnNames[] = {
     "B",
     "C",
 };
-const char *test_output_ColumnNames[] = {
-    "A",
-    "B",
-    "C",
-};
-const char *test_output_ColumnNames[] = {
-    "A",
-    "B",
-    "C",
-};
 
 
 /*
  * These are the types of all the columns.
  */
 const voltdb::ValueType T_Types[] = {
-    voltdb::VALUE_TYPE_INTEGER,
-    voltdb::VALUE_TYPE_INTEGER,
-    voltdb::VALUE_TYPE_INTEGER,
-};
-const voltdb::ValueType test_output_Types[] = {
-    voltdb::VALUE_TYPE_INTEGER,
-    voltdb::VALUE_TYPE_INTEGER,
-    voltdb::VALUE_TYPE_INTEGER,
-};
-const voltdb::ValueType test_output_Types[] = {
     voltdb::VALUE_TYPE_INTEGER,
     voltdb::VALUE_TYPE_INTEGER,
     voltdb::VALUE_TYPE_INTEGER,
@@ -161,16 +141,6 @@ const int32_t test_output_Sizes[] = {
     4,
     4,
 };
-const int32_t test_output_Sizes[] = {
-    4,
-    4,
-    4,
-};
-const int32_t test_output_Sizes[] = {
-    4,
-    4,
-    4,
-};
 
 
 /*
@@ -179,12 +149,6 @@ const int32_t test_output_Sizes[] = {
  */
 int32_t num_T_strings = 0;
 const char *T_Strings[] = {
-};
-int32_t num_test_output_strings = 0;
-const char *test_output_Strings[] = {
-};
-int32_t num_test_output_strings = 0;
-const char *test_output_Strings[] = {
 };
 int32_t num_test_output_strings = 0;
 const char *test_output_Strings[] = {
@@ -264,76 +228,6 @@ const int test_outputData[NUM_TABLE_ROWS_TEST_OUTPUT * NUM_TABLE_COLS_TEST_OUTPU
       2,  3,  0,
 };
 
-const int NUM_TABLE_ROWS_TEST_OUTPUT = 30;
-const int NUM_TABLE_COLS_TEST_OUTPUT = 3;
-const int test_outputData[NUM_TABLE_ROWS_TEST_OUTPUT * NUM_TABLE_COLS_TEST_OUTPUT] = {
-      1,  1,  0,
-      1,  1,  0,
-      1,  1,  0,
-      1,  1,  0,
-      1,  1,  0,
-      1,  2,  0,
-      1,  2,  0,
-      1,  2,  0,
-      1,  2,  0,
-      1,  2,  0,
-      1,  3,  0,
-      1,  3,  0,
-      1,  3,  0,
-      1,  3,  0,
-      1,  3,  0,
-      2,  1,  0,
-      2,  1,  0,
-      2,  1,  0,
-      2,  1,  0,
-      2,  1,  0,
-      2,  2,  0,
-      2,  2,  0,
-      2,  2,  0,
-      2,  2,  0,
-      2,  2,  0,
-      2,  3,  0,
-      2,  3,  0,
-      2,  3,  0,
-      2,  3,  0,
-      2,  3,  0,
-};
-
-const int NUM_TABLE_ROWS_TEST_OUTPUT = 30;
-const int NUM_TABLE_COLS_TEST_OUTPUT = 3;
-const int test_outputData[NUM_TABLE_ROWS_TEST_OUTPUT * NUM_TABLE_COLS_TEST_OUTPUT] = {
-      1,  1,  0,
-      1,  1,  0,
-      1,  1,  0,
-      1,  1,  0,
-      1,  1,  0,
-      1,  2,  0,
-      1,  2,  0,
-      1,  2,  0,
-      1,  2,  0,
-      1,  2,  0,
-      1,  3,  0,
-      1,  3,  0,
-      1,  3,  0,
-      1,  3,  0,
-      1,  3,  0,
-      2,  1,  0,
-      2,  1,  0,
-      2,  1,  0,
-      2,  1,  0,
-      2,  1,  0,
-      2,  2,  0,
-      2,  2,  0,
-      2,  2,  0,
-      2,  2,  0,
-      2,  2,  0,
-      2,  3,  0,
-      2,  3,  0,
-      2,  3,  0,
-      2,  3,  0,
-      2,  3,  0,
-};
-
 
 
 /*
@@ -364,28 +258,6 @@ const TableConfig test_outputConfig = {
     test_output_Strings,
     num_test_output_strings
 };
-const TableConfig test_outputConfig = {
-    "test_output",
-    test_output_ColumnNames,
-    test_output_Types,
-    test_output_Sizes,
-    NUM_TABLE_ROWS_TEST_OUTPUT,
-    NUM_TABLE_COLS_TEST_OUTPUT,
-    test_outputData,
-    test_output_Strings,
-    num_test_output_strings
-};
-const TableConfig test_outputConfig = {
-    "test_output",
-    test_output_ColumnNames,
-    test_output_Types,
-    test_output_Sizes,
-    NUM_TABLE_ROWS_TEST_OUTPUT,
-    NUM_TABLE_COLS_TEST_OUTPUT,
-    test_outputData,
-    test_output_Strings,
-    num_test_output_strings
-};
 
 
 /*
@@ -393,6 +265,7 @@ const TableConfig test_outputConfig = {
  */
 const TableConfig *allTables[] = {
     &TConfig,
+    &test_outputConfig,
 };
 
 
@@ -1531,7 +1404,7 @@ DBConfig TestWindowedMin::m_testDB =
     "set $PREV indexesused \"\"\n"
     "set $PREV cachekeyprefix \"\"\n"
     "",
-    1,
+    2,
     allTables
 };
 

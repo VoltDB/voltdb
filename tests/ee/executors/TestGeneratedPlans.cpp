@@ -435,6 +435,8 @@ const TableConfig *allTables[] = {
     &BBBConfig,
     &CCCConfig,
     &XXXConfig,
+    &order_byConfig,
+    &test_joinConfig,
 };
 
 
@@ -1187,7 +1189,7 @@ DBConfig TestGeneratedPlans::m_testDB =
     "set $PREV partitionparameter 0\n"
     "set $PREV allowedInShutdown false\n"
     "",
-    4,
+    6,
     allTables
 };
 
