@@ -209,6 +209,8 @@ public class ProcedureRunner {
 
         m_procedure.init(this);
 
+        // We need to map each statement that was defined in the stored procedure with its variable name.
+        // This is used to track granular statistics for each statement.
         Map<SQLStmt, String> reversedStmtMap = reflect();
 
         // Normally m_statsCollector is returned as it is and there is no affect to assign it to itself.
@@ -1017,8 +1019,8 @@ public class ProcedureRunner {
     }
 
     // Returns a reversed map from the statement to the variable name that was defined in the java code.
-    //      - for single statement stored procedure, it is named as VoltDB.ANON_STMT_NAME
-    //      - it should return an empty map for system stored procedures.
+    //   - for single statement stored procedure, it is named as VoltDB.ANON_STMT_NAME (sql)
+    //   - it should return an empty map for system stored procedures.
     protected Map<SQLStmt, String> reflect() {
         Map<String, SQLStmt> stmtMap;
 

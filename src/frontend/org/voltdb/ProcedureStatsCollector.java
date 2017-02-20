@@ -39,6 +39,9 @@ class ProcedureStatsCollector extends SiteStatsSource {
      */
     final int timeCollectionInterval = 20;
 
+    /**
+     * Record statistics for each statement in the stored procedure.
+     */
     class ProcedureStmtStat {
         /**
          * The name of the statement.
@@ -152,6 +155,7 @@ class ProcedureStatsCollector extends SiteStatsSource {
         super(siteId, false);
         m_partitionId = partitionId;
         m_procName = catProc.getClassname();
+        // Use LinkedHashMap to have a fixed element order.
         m_stats = new LinkedHashMap<SQLStmt, ProcedureStmtStat>();
         m_procStat = new ProcedureStmtStat("<ALL>");
         // The NULL key entry is for the total statistics for the entire procedure.
@@ -237,9 +241,10 @@ class ProcedureStatsCollector extends SiteStatsSource {
 
     /**
      * Update the rowValues array with the latest statistical information.
-     * This method is overrides the super class version
+     * This method overrides the super class version
      * which must also be called so that it can update its columns.
-     * @param values Values of each column of the row of stats. Used as output.
+     * @param rowKey The corresponding ProcedureStmtStat structure.
+     * @param rowValues Values of each column of the row of stats. Used as output.
      */
     @Override
     protected void updateStatsRow(Object rowKey, Object rowValues[]) {
@@ -247,9 +252,7 @@ class ProcedureStatsCollector extends SiteStatsSource {
         rowValues[columnNameToIndex.get("PARTITION_ID")] = m_partitionId;
         rowValues[columnNameToIndex.get("PROCEDURE")] = m_procName;
         ProcedureStmtStat currRow = (ProcedureStmtStat)rowKey;
-        if (currRow == null) {
-            return;
-        }
+        assert(currRow != null);
         rowValues[columnNameToIndex.get("STATEMENT")] = currRow.m_stmtName;
         long invocations = currRow.m_invocations;
         long totalTimedExecutionTime = currRow.m_totalTimedExecutionTime;

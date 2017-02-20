@@ -60,6 +60,7 @@ public class StatsAgent extends OpsAgent
     {
         StatsSelector subselector = StatsSelector.valueOf(request.subselector);
         switch (subselector) {
+        // For PROCEDURE-series tables, they are all based on the procedure detail table.
         case PROCEDURE:
             request.aggregateTables =
             aggregateProcedureStats(request.aggregateTables);
@@ -115,6 +116,7 @@ public class StatsAgent extends OpsAgent
 
     /**
      * Produce PROCEDURE aggregation of PROCEDURE subselector
+     * Basically it leaves out the rows that were not labeled as "<ALL>".
      */
     private VoltTable[] aggregateProcedureStats(VoltTable[] baseStats)
     {
@@ -182,6 +184,9 @@ public class StatsAgent extends OpsAgent
         StatsProcProfTable timeTable = new StatsProcProfTable();
         baseStats[0].resetRowPosition();
         while (baseStats[0].advanceRow()) {
+            if ( ! baseStats[0].getString("STATEMENT").equalsIgnoreCase("<ALL>")) {
+                continue;
+            }
             String pname = baseStats[0].getString("PROCEDURE");
 
             timeTable.updateTable(!isReadOnlyProcedure(pname),
@@ -209,6 +214,9 @@ public class StatsAgent extends OpsAgent
         StatsProcInputTable timeTable = new StatsProcInputTable();
         baseStats[0].resetRowPosition();
         while (baseStats[0].advanceRow()) {
+            if ( ! baseStats[0].getString("STATEMENT").equalsIgnoreCase("<ALL>")) {
+                continue;
+            }
             String pname = baseStats[0].getString("PROCEDURE");
             timeTable.updateTable(!isReadOnlyProcedure(pname),
                     pname,
@@ -236,6 +244,9 @@ public class StatsAgent extends OpsAgent
         StatsProcOutputTable timeTable = new StatsProcOutputTable();
         baseStats[0].resetRowPosition();
         while (baseStats[0].advanceRow()) {
+            if ( ! baseStats[0].getString("STATEMENT").equalsIgnoreCase("<ALL>")) {
+                continue;
+            }
             String pname = baseStats[0].getString("PROCEDURE");
             timeTable.updateTable(!isReadOnlyProcedure(pname),
                     pname,
