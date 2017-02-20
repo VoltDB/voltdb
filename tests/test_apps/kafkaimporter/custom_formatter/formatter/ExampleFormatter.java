@@ -41,7 +41,7 @@ public class ExampleFormatter implements Formatter<String> {
      *                <format-property ...>...</format-property> below the specification of importer properties.
      */
     Properties m_prop;
-    ExampleFormatter (String formatName, Properties prop) {
+    public ExampleFormatter (String formatName, Properties prop) {
         // System.out.println("+++ ExampleFormatter properties: " + prop.propertyNames());
         m_prop = prop;
     }
