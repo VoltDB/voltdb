@@ -729,7 +729,7 @@ public abstract class AbstractParsedStmt {
         // If there is no usable alias because the subquery is inside an expression,
         // generate a unique one for internal use.
         if (tableAlias == null) {
-            tableAlias = "VOLT_TEMP_TABLE_" + subquery.m_stmtId;
+            tableAlias = AbstractParsedStmt.TEMP_TABLE_NAME + "_" + subquery.m_stmtId;
         }
         StmtSubqueryScan subqueryScan =
                 new StmtSubqueryScan(subquery, tableAlias, m_stmtId);
@@ -769,7 +769,7 @@ public abstract class AbstractParsedStmt {
         int tableCount = 0;
         StmtTargetTableScan simpler = null;
         for (Map.Entry<String, StmtTableScan> entry : selectSubquery.m_tableAliasMap.entrySet()) {
-            if (entry.getKey().contains("VOLT_TEMP_TABLE")) {
+            if (entry.getKey().startsWith(AbstractParsedStmt.TEMP_TABLE_NAME)) {
                 // This is an artificial table for a subquery expression
                 continue;
             }
@@ -1975,6 +1975,13 @@ public abstract class AbstractParsedStmt {
         return null;
     }
 
+    /**
+     * Return the number of window function expressions.  This
+     * is non-zero for ParsedSelectStmt only.
+     */
+    public int getWindowFunctionExpressionCount() {
+        return m_windowFunctionExpressions.size();
+    }
     /*
      *  Extract all subexpressions of a given expression class from this statement
      */

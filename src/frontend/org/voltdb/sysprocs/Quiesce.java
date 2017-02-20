@@ -20,7 +20,6 @@ package org.voltdb.sysprocs;
 import java.util.List;
 import java.util.Map;
 
-import org.voltcore.logging.VoltLogger;
 import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
@@ -44,12 +43,10 @@ public class Quiesce extends VoltSystemProcedure {
 
     static final int DEP_SITES = (int) SysProcFragmentId.PF_quiesce_sites | DtxnConstants.MULTIPARTITION_DEPENDENCY;
     static final int DEP_PROCESSED_SITES = (int) SysProcFragmentId.PF_quiesce_processed_sites;
-    private static final VoltLogger HOST_LOG = new VoltLogger("HOST");
 
     @Override
-    public void init() {
-        registerPlanFragment(SysProcFragmentId.PF_quiesce_sites);
-        registerPlanFragment(SysProcFragmentId.PF_quiesce_processed_sites);
+    public long[] getPlanFragmentIds() {
+        return new long[]{SysProcFragmentId.PF_quiesce_sites, SysProcFragmentId.PF_quiesce_processed_sites};
     }
 
     @Override

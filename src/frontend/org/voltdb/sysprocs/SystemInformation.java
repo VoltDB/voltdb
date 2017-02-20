@@ -91,12 +91,14 @@ public class SystemInformation extends VoltSystemProcedure
     };
 
     @Override
-    public void init()
+    public long[] getPlanFragmentIds()
     {
-        registerPlanFragment(SysProcFragmentId.PF_systemInformationOverview);
-        registerPlanFragment(SysProcFragmentId.PF_systemInformationOverviewAggregate);
-        registerPlanFragment(SysProcFragmentId.PF_systemInformationDeployment);
-        registerPlanFragment(SysProcFragmentId.PF_systemInformationAggregate);
+        return new long[]{
+            SysProcFragmentId.PF_systemInformationOverview,
+            SysProcFragmentId.PF_systemInformationOverviewAggregate,
+            SysProcFragmentId.PF_systemInformationDeployment,
+            SysProcFragmentId.PF_systemInformationAggregate
+        };
     }
 
     @Override

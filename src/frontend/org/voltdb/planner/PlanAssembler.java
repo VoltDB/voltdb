@@ -52,6 +52,7 @@ import org.voltdb.planner.parseinfo.BranchNode;
 import org.voltdb.planner.parseinfo.JoinNode;
 import org.voltdb.planner.parseinfo.StmtSubqueryScan;
 import org.voltdb.planner.parseinfo.StmtTableScan;
+import org.voltdb.plannodes.IndexSortablePlanNode;
 import org.voltdb.plannodes.AbstractJoinPlanNode;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractReceivePlanNode;
@@ -60,6 +61,7 @@ import org.voltdb.plannodes.AggregatePlanNode;
 import org.voltdb.plannodes.DeletePlanNode;
 import org.voltdb.plannodes.HashAggregatePlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
+import org.voltdb.plannodes.IndexUseForOrderBy;
 import org.voltdb.plannodes.InsertPlanNode;
 import org.voltdb.plannodes.LimitPlanNode;
 import org.voltdb.plannodes.MaterializePlanNode;
@@ -68,7 +70,6 @@ import org.voltdb.plannodes.NestLoopPlanNode;
 import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.plannodes.OrderByPlanNode;
 import org.voltdb.plannodes.PartialAggregatePlanNode;
-import org.voltdb.plannodes.WindowFunctionPlanNode;
 import org.voltdb.plannodes.ProjectionPlanNode;
 import org.voltdb.plannodes.ReceivePlanNode;
 import org.voltdb.plannodes.SchemaColumn;
@@ -76,6 +77,7 @@ import org.voltdb.plannodes.SendPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.plannodes.UnionPlanNode;
 import org.voltdb.plannodes.UpdatePlanNode;
+import org.voltdb.plannodes.WindowFunctionPlanNode;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.IndexType;
@@ -1788,7 +1790,10 @@ public class PlanAssembler {
     /**
      * Determine if an OrderByPlanNode is needed.  This may return false if the
      * statement has no ORDER BY clause, or if the subtree is already producing
-     * rows in the correct order.
+     * rows in the correct order.  Note that a hash aggregate node will cause this
+     * to return true, and a serial or partial aggregate node may cause this
+     * to return true.
+     *
      * @param parsedStmt    The statement whose plan may need an OrderByPlanNode
      * @param root          The subtree which may need its output tuples ordered
      * @return true if the plan needs an OrderByPlanNode, false otherwise
@@ -1799,34 +1804,136 @@ public class PlanAssembler {
             return false;
         }
 
-        SortDirectionType sortDirection = SortDirectionType.INVALID;
         // Skip the explicit ORDER BY plan step if an IndexScan is already providing the equivalent ordering.
         // Note that even tree index scans that produce values in their own "key order" only report
         // their sort direction != SortDirectionType.INVALID
-        // when they enforce an ordering equivalent to the one requested in the ORDER BY clause.
-        // Even an intervening non-hash aggregate will not interfere in this optimization.
-        AbstractPlanNode nonAggPlan = root;
+        // when they enforce an ordering equivalent to the one requested in the ORDER BY
+        // or window function clause.  Even an intervening non-hash aggregate will not interfere
+        // in this optimization.
 
+        // Is there a window function between the root and the
+        // scan or join nodes?  Also, does this window function
+        // use the index.
+        int numberWindowFunctions = 0;
+        int numberReceiveNodes = 0;
+        int numberHashAggregates = 0;
         // EE keeps the insertion ORDER so that ORDER BY could apply before DISTINCT.
         // However, this probably is not optimal if there are low cardinality results.
         // Again, we have to replace the TVEs for ORDER BY clause for these cases in planning.
+        //
+        // Find the scan or join node.
+        AbstractPlanNode probe;
+        for (probe = root;
+                ! ((probe instanceof AbstractJoinPlanNode)
+                    || (probe instanceof AbstractScanPlanNode))
+                && (probe != null);
+            probe = (probe.getChildCount() > 0) ? probe.getChild(0) : null) {
+            // Count the number of window functions between the
+            // root and the join/scan node.  Note that we know we
+            // have a statement level order by (SLOB) here.  If the SLOB
+            // can use the index for ordering the scan or join node,
+            // we will have recorded it in the scan or join node.
+            if (probe.getPlanNodeType() == PlanNodeType.WINDOWFUNCTION) {
+                numberWindowFunctions += 1;
+            }
+            // Also, see if there are receive nodes.  We need to
+            // generate an ORDERBY node if there are RECEIVE nodes,
+            // because the RECEIVE->MERGERECEIVE microoptimization
+            // needs them.
+            if (probe.getPlanNodeType() == PlanNodeType.RECEIVE) {
+                numberReceiveNodes += 1;
+            }
+            // Finally, count the number of non-serial aggregate
+            // nodes.  A hash or partial aggregate operation invalidates
+            // the ordering, but a serial aggregation does not.
+            if ((probe.getPlanNodeType() == PlanNodeType.HASHAGGREGATE)
+                    || (probe.getPlanNodeType() == PlanNodeType.PARTIALAGGREGATE)) {
+                numberHashAggregates += 1;
+            }
+        }
+        if (probe == null) {
+            // No idea what happened here.  We can't find a
+            // scan or join node at all.  This seems unlikely
+            // to be right.  Maybe this should be an assert?
+            return true;
+        }
 
-        if (nonAggPlan.getPlanNodeType() == PlanNodeType.AGGREGATE) {
-            nonAggPlan = nonAggPlan.getChild(0);
-        }
-        if (nonAggPlan instanceof IndexScanPlanNode) {
-            sortDirection = ((IndexScanPlanNode)nonAggPlan).getSortDirection();
-        }
-        // Optimization for NestLoopIndex on IN list, possibly other cases of ordered join results.
-        // Skip the explicit ORDER BY plan step if NestLoopIndex is providing the equivalent ordering
-        else if (nonAggPlan instanceof AbstractJoinPlanNode) {
-            sortDirection = ((AbstractJoinPlanNode)nonAggPlan).getSortDirection();
+        //
+        //   o If the SLOB cannot use the index, then we
+        //     need an order by node always.
+        //   o If there are zero window functions, then
+        //     - If the SLOB cannot use the index than we
+        //       need an order by node.
+        //     - If the SLOB can use the index, then
+        //       = If the statement is a single fragment
+        //         statement then we don't need an order by
+        //         node.
+        //       = If the statement is a two fragment
+        //         statement then we need an order by node.
+        //         This is because we will convert the RECEIVE
+        //         node into a MERGERECEIVE node in the
+        //         microoptimizer, and the MERGERECEIVE
+        //         node needs an inline order by node to do
+        //         the merge.
+        //   o If there is only one window function, then
+        //     - If the window function does not use the index
+        //       then we always need an order by node.
+        //     - If the window function can use the index but
+        //       the SLOB can't use the index, then we need an
+        //       order by node.
+        //     - If both the SLOB and the window function can
+        //       use the index, then we don't need an order
+        //       by, no matter how many fragments this statement
+        //       has.  This is because any RECEIVE node will be
+        //       a descendent of the window function node.  So
+        //       the RECEIVE to MERGERECEIVE conversion happens
+        //       in the window function and not the order by.
+        //   o If there is more than one window function then
+        //     we always need an order by node.  The second
+        //     window function will invalidate the ordering of
+        //     the first one.  (Actually, if the SLOB order is
+        //     compatible with the last window function then
+        //     the situation is like the one-window function
+        //     below.)
+        //
+        if ( ! (probe instanceof IndexSortablePlanNode)) {
+            return true;
         }
 
-        if (sortDirection != SortDirectionType.INVALID) {
+        IndexUseForOrderBy indexUse = ((IndexSortablePlanNode)probe).indexUse();
+
+        if (indexUse.getSortOrderFromIndexScan() == SortDirectionType.INVALID) {
+            return true;
+        }
+        // Hash aggregates and partial aggregates
+        // invalidate the index ordering.  So, we will need
+        // an ORDERBY node.
+        if (numberHashAggregates > 0) {
+            return true;
+        }
+        if ( numberWindowFunctions == 0 ) {
+            if ( indexUse.getWindowFunctionUsesIndex() == SubPlanAssembler.NO_INDEX_USE ) {
+                return true;
+            }
+            assert( indexUse.getWindowFunctionUsesIndex() == SubPlanAssembler.STATEMENT_LEVEL_ORDER_BY_INDEX );
+            // Return true for MP (numberReceiveNodes > 0) and
+            // false for SP (numberReceiveNodes == 0);
+            return numberReceiveNodes > 0;
+        }
+        if (numberWindowFunctions == 1) {
+            // If the WF uses the index then getWindowFunctionUsesIndex()
+            // will return 0.
+            if ( ( indexUse.getWindowFunctionUsesIndex() != 0 )
+                    || ( ! indexUse.isWindowFunctionCompatibleWithOrderBy() ) ) {
+                return true;
+            }
+            // Both the WF and the SLOB can use the index.  Since the
+            // window function will have the order by node, the SLOB
+            // does not need one.  So this is a false.
             return false;
         }
-
+        // This can actually never happen now,
+        // because we only support one window function.
         return true;
     }
 
@@ -2211,43 +2318,106 @@ public class PlanAssembler {
         // we will add the input columns.
         WindowFunctionPlanNode pnode = new WindowFunctionPlanNode();
         pnode.setWindowFunctionExpression(winExpr);
-        OrderByPlanNode onode = new OrderByPlanNode();
-        // We need to extract more information from the windowed expression.
-        // to construct the output schema.
-        List<AbstractExpression> partitionByExpressions = winExpr.getPartitionByExpressions();
-        // If the order by expression list contains a partition by expression then
-        // we won't have to sort by it twice.  We sort by the partition by expressions
-        // first, and we don't care what order we sort by them.  So, find the
-        // sort direction in the order by list and use that in the partition by
-        // list, and then mark that it was deleted in the order by
-        // list.
-        //
-        // We choose to make this dontsort rather than dosort because the
-        // Java default value for boolean is false, and we want to sort by
-        // default.
-        boolean dontsort[] = new boolean[winExpr.getOrderbySize()];
-        List<AbstractExpression> orderByExpressions = winExpr.getOrderByExpressions();
-        List<SortDirectionType>  orderByDirections  = winExpr.getOrderByDirections();
-        for (int idx = 0; idx < winExpr.getPartitionbySize(); ++idx) {
-            SortDirectionType pdir = SortDirectionType.ASC;
-            AbstractExpression partitionByExpression = partitionByExpressions.get(idx);
-            int sidx = winExpr.getSortIndexOfOrderByExpression(partitionByExpression);
-            if (0 <= sidx) {
-                pdir = orderByDirections.get(sidx);
-                dontsort[sidx] = true;
+        // We always need an order by plan node, even if the sort
+        // is optimized away by an index.  This may be turned
+        // into an inline order by in a MergeReceivePlanNode.
+        IndexUseForOrderBy scanNode = findScanNodeForWindowFunction(root);
+        AbstractPlanNode cnode = null;
+        int winfunc = (scanNode == null) ? SubPlanAssembler.NO_INDEX_USE : scanNode.getWindowFunctionUsesIndex();
+        // If we have an index which is compatible with the statement
+        // level order by, and we have a window function which can't
+        // use the index we have to ignore the statement level order by
+        // index use.  We will need to order the input according to the
+        // window function first, and that will in general invalidate the
+        // statement level order by ordering.
+        if ((SubPlanAssembler.STATEMENT_LEVEL_ORDER_BY_INDEX == winfunc)
+                || (SubPlanAssembler.NO_INDEX_USE == winfunc)) {
+            // No index.  Calculate the expression order here and stuff it into
+            // the order by node.  Note that if we support more than one window
+            // function this would be the case when scanNode.getWindowFunctionUsesIndex()
+            // returns a window function number which is different from the number
+            // of winExpr.
+            List<AbstractExpression> partitionByExpressions = winExpr.getPartitionByExpressions();
+            // If the order by expression list contains a partition by expression then
+            // we won't have to sort by it twice.  We sort by the partition by expressions
+            // first, and we don't care what order we sort by them.  So, find the
+            // sort direction in the order by list and use that in the partition by
+            // list, and then mark that it was deleted in the order by
+            // list.
+            //
+            // We choose to make this dontsort rather than dosort because the
+            // Java default value for boolean is false, and we want to sort by
+            // default.
+            boolean dontsort[] = new boolean[winExpr.getOrderbySize()];
+            List<AbstractExpression> orderByExpressions = winExpr.getOrderByExpressions();
+            List<SortDirectionType>  orderByDirections  = winExpr.getOrderByDirections();
+            OrderByPlanNode onode = new OrderByPlanNode();
+            for (int idx = 0; idx < winExpr.getPartitionbySize(); ++idx) {
+                SortDirectionType pdir = SortDirectionType.ASC;
+                AbstractExpression partitionByExpression = partitionByExpressions.get(idx);
+                int sidx = winExpr.getSortIndexOfOrderByExpression(partitionByExpression);
+                if (0 <= sidx) {
+                    pdir = orderByDirections.get(sidx);
+                    dontsort[sidx] = true;
+                }
+                onode.addSort(partitionByExpression, pdir);
             }
-            onode.addSort(partitionByExpression, pdir);
-        }
-        for (int idx = 0; idx < winExpr.getOrderbySize(); ++idx) {
-            if (!dontsort[idx]) {
-                AbstractExpression orderByExpr = orderByExpressions.get(idx);
-                SortDirectionType  orderByDir  = orderByDirections.get(idx);
-                onode.addSort(orderByExpr, orderByDir);
+            for (int idx = 0; idx < winExpr.getOrderbySize(); ++idx) {
+                if (!dontsort[idx]) {
+                    AbstractExpression orderByExpr = orderByExpressions.get(idx);
+                    SortDirectionType  orderByDir  = orderByDirections.get(idx);
+                    onode.addSort(orderByExpr, orderByDir);
+                }
+            }
+            onode.addAndLinkChild(root);
+            cnode = onode;
+        } else {
+            assert(scanNode != null);
+            // This means the index is good for this window function.
+            // If this is an MP statement we still need to generate the
+            // order by node, because we may need to turn it into an
+            // inline order by node of a MergeReceive node.
+            assert( 0 == scanNode.getWindowFunctionUsesIndex() );
+            if (m_partitioning.requiresTwoFragments()) {
+                OrderByPlanNode onode = new OrderByPlanNode();
+                SortDirectionType dir = scanNode.getSortOrderFromIndexScan();
+                assert(dir != SortDirectionType.INVALID);
+                // This was created when the index was determined.
+                // We cached it in the scan node.
+                List<AbstractExpression> orderExprs = scanNode.getFinalExpressionOrderFromIndexScan();
+                assert(orderExprs != null);
+                for (AbstractExpression ae : orderExprs) {
+                    onode.addSort(ae, dir);
+                }
+                // Link in the OrderByNode.
+                onode.addAndLinkChild(root);
+                cnode = onode;
+            } else {
+                // Don't create and link in the order by node.
+                cnode = root;
             }
         }
-        onode.addAndLinkChild(root);
-        pnode.addAndLinkChild(onode);
+        pnode.addAndLinkChild(cnode);
         return pnode;
+    }
+
+    private IndexUseForOrderBy findScanNodeForWindowFunction(AbstractPlanNode root) {
+        while (root != null) {
+            if (root instanceof IndexSortablePlanNode) {
+                return ((IndexSortablePlanNode) root).indexUse();
+            }
+            // Any other kind of scan or join plan
+            // node cannot have a useful index.
+            if ((root instanceof AbstractScanPlanNode)
+                    || (root instanceof AbstractJoinPlanNode)) {
+                return null;
+            }
+            if (root.getChildCount() == 0) {
+                break;
+            }
+            root = root.getChild(0);
+        }
+        return null;
     }
 
     private AbstractPlanNode handleAggregationOperators(AbstractPlanNode root) {

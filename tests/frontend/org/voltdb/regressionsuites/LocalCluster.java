@@ -1984,6 +1984,8 @@ public class LocalCluster extends VoltServerConfig {
         System.out.println("Starting local cluster.");
         lc.setHasLocalServer(hasLocalServer);
         lc.overrideAnyRequestForValgrind();
+        lc.setJavaProperty("DR_QUERY_INTERVAL", "5");
+        lc.setJavaProperty("DR_RECV_TIMEOUT", "5000");
         if (!lc.isNewCli()) {
             lc.setDeploymentAndVoltDBRoot(builder.getPathToDeployment(), pathToVoltDBRoot);
             lc.startUp(false);
