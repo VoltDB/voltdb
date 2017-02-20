@@ -685,7 +685,7 @@ public class ExportManager
             return exportBytes;
         } catch (Exception e) {
             //Don't let anything take down the execution site thread
-            exportLog.error(e);
+            exportLog.error("Failed to get export queued bytes.", e);
         }
         return 0;
     }
