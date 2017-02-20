@@ -145,7 +145,7 @@ public class HealthMonitor implements Runnable, Promotable
                     m_logger.error("Interrupted while pausing cluster for resource overusage", e);
                     return;
                 }
-                ClientResponseImpl r = ClientResponseImpl.class.cast(cb.getResponse());
+                ClientResponse r = cb.getResponse();
                 if (r.getStatus() != ClientResponse.SUCCESS) {
                     m_logger.error("Unable to pause cluster for resource overusage: " + r.getStatusString());
                 }
@@ -179,7 +179,7 @@ public class HealthMonitor implements Runnable, Promotable
                 m_logger.error("Interrupted while retrieving cluster for DRROLE STATS", e);
                 return;
             }
-            ClientResponseImpl r = ClientResponseImpl.class.cast(cb.getResponse());
+            ClientResponse r = cb.getResponse();
             if (r.getStatus() != ClientResponse.SUCCESS) {
                 m_logger.error("Unable to retrieve DRROLE STATS: " + r.getStatusString());
                 return;
