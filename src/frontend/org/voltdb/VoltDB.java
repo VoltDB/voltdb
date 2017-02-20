@@ -112,9 +112,6 @@ public class VoltDB {
     static {
         REAL_DEFAULT_TIMEZONE = TimeZone.getDefault();
         setDefaultTimezone();
-        EstTimeUpdater.start();
-        VoltLogger.startAsynchronousLogging();
-        ReverseDNSCache.start();
         ClientFactory.increaseClientCountToOne();
     }
 
