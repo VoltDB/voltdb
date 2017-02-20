@@ -96,6 +96,9 @@ public class PersistentBinaryDeque implements BinaryDeque {
         public BBContainer poll(OutputContainerFactory ocf) throws IOException {
             synchronized (PersistentBinaryDeque.this) {
                 if (m_closed) {
+                    if (m_usageSpecificLog.isDebugEnabled()) {
+                        m_usageSpecificLog.debug(new Exception("Poll on closed reader"));
+                    }
                     throw new IOException("Reader " + m_cursorId + " has been closed");
                 }
                 assertions();
@@ -138,6 +141,9 @@ public class PersistentBinaryDeque implements BinaryDeque {
         public int getNumObjects() throws IOException {
             synchronized(PersistentBinaryDeque.this) {
                 if (m_closed) {
+                    if (m_usageSpecificLog.isDebugEnabled()) {
+                        m_usageSpecificLog.debug(new Exception("getNumObjects on closed reader"));
+                    }
                     throw new IOException("Reader " + m_cursorId + " has been closed");
                 }
                 return m_numObjects - m_numObjectsDeleted - m_numRead;
@@ -153,6 +159,9 @@ public class PersistentBinaryDeque implements BinaryDeque {
         public long sizeInBytes() throws IOException {
             synchronized(PersistentBinaryDeque.this) {
                 if (m_closed) {
+                    if (m_usageSpecificLog.isDebugEnabled()) {
+                        m_usageSpecificLog.debug(new Exception("sizeInBytes on closed reader"));
+                    }
                     throw new IOException("Reader " + m_cursorId + " has been closed");
                 }
                 assertions();
