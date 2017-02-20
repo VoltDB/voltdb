@@ -167,10 +167,8 @@ public class KafkaLoader {
         int kpartitions = 10;
         @Option(shortOpt = "c", desc = "Kafka Consumer Configuration File")
         String config = "";
-        @Option(desc = "Formatter class to use (Optional) .")
+        @Option(desc = "Formatter configuration file. (Optional) .")
         String formatter = "";
-        @Option(desc = "Formatter properties files (Optional).")
-        String formatterProperties = "";
 
         /**
          * Batch size for processing batched operations.
@@ -406,16 +404,18 @@ public class KafkaLoader {
         cfg.parse(KafkaLoader.class.getName(), args);
         try {
             if (cfg.formatter.length() > 0) {
-                Class classz = Class.forName(cfg.formatter);
+                Properties p = new Properties();
+                InputStream pfile = new FileInputStream(cfg.formatter);
+                p.load(pfile);
+                String formatter = p.getProperty("formatter");
+                if (formatter == null || formatter.trim().length() == 0) {
+                    m_log.error("formatter class must be specified in formatter file as formatter=<class>: " + cfg.formatter);
+                    System.exit(-1);
+                }
+                String format = p.getProperty("format", "csv");
+                Class classz = Class.forName(formatter);
                 Class[] ctorParmTypes = new Class[]{ String.class, Properties.class };
                 Constructor ctor = classz.getDeclaredConstructor(ctorParmTypes);
-                Properties p = new Properties();
-                String format = "csv";
-                if (cfg.formatterProperties.length() > 0) {
-                    InputStream pfile = new FileInputStream(cfg.formatterProperties);
-                    p.load(pfile);
-                    format = p.getProperty("format", "csv");
-                }
                 Object[] ctorParms = new Object[]{ format, p };
                 cfg.iformatter = (Formatter<String>) ctor.newInstance(ctorParms);
             }
