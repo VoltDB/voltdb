@@ -25,6 +25,7 @@ package org.voltdb.client;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
@@ -41,6 +42,7 @@ import junit.framework.TestCase;
 import org.junit.Test;
 import org.voltcore.network.Connection;
 import org.voltcore.network.QueueMonitor;
+import org.voltcore.network.ReverseDNSCache;
 import org.voltcore.network.VoltNetworkPool;
 import org.voltcore.network.VoltProtocolHandler;
 import org.voltdb.ClientResponseImpl;
@@ -302,6 +304,19 @@ public class TestDistributer extends TestCase {
         public void clientCallback(ClientResponse clientResponse) {
             throw new RuntimeException();
         }
+    }
+
+    @Override
+    public void setUp()
+    {
+        while (ClientFactory.m_activeClientCount > 0) {
+            try {
+                ClientFactory.decreaseClientNum();
+            }
+            catch (InterruptedException e) {}
+        }
+        // The DNS cache is always initialized in the started state
+        ReverseDNSCache.start();
     }
 
     @Test
@@ -952,5 +967,83 @@ public class TestDistributer extends TestCase {
         }
     }
 
+    static public class threadedClient extends Thread {
+        Client c = null;
+        public static CountDownLatch establishConnection = new CountDownLatch(1);
+        public static CountDownLatch teardownConnection = new CountDownLatch(1);
+        public static AtomicInteger gracefulExits = new AtomicInteger(0);
+
+        public static ClientConfig config = new ClientConfig();
+        static {
+            config.setMaxOutstandingTxns(5);
+            config.setConnectionResponseTimeout(2000);
+        }
+
+        static Client createClient() throws UnknownHostException, IOException {
+            Client client = ClientFactory.createClient(config);
+            client.createConnection("localhost", 20000);
+            return client;
+        }
+
+        @Override
+        public void run() {
+            try {
+                establishConnection.await();
+                c = createClient();
+                teardownConnection.await();
+                gracefulExits.incrementAndGet();
+            }
+            catch (InterruptedException | IOException e) {
+            }
+            finally {
+                if (c != null) {
+                    try {
+                        c.close();
+                    }
+                    catch (InterruptedException e) {
+                    }
+                }
+            }
+        }
+    }
+
+    public void testParallelClientConnections() throws Exception {
+        Thread t1 = new threadedClient();
+        t1.start();
+        Thread t2 = new threadedClient();
+        t2.start();
+        Thread t3 = new threadedClient();
+        t3.start();
+
+        MockVolt volt0 = new MockVolt(20000);
+        volt0.handleConnection = false;
+
+        try {
+            volt0.start();
+            Client forceRemoveDNSThread = threadedClient.createClient();
+            forceRemoveDNSThread.close();
+            boolean dnsThreadUp = true;
+            while (dnsThreadUp) {
+                try {
+                    ReverseDNSCache.submit(new Runnable() {
+                        @Override
+                        public void run() {}
+                    });
+                }
+                catch (IllegalStateException e) {
+                    dnsThreadUp = false;
+                }
+            }
+            threadedClient.establishConnection.countDown();
+        }
+        finally {
+            threadedClient.teardownConnection.countDown();
+            t1.join();
+            t2.join();
+            t3.join();
+            assertEquals(threadedClient.gracefulExits.get(), 3);
+            volt0.shutdown();
+        }
+    }
 }
 

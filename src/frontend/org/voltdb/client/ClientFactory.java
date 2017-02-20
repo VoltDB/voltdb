@@ -17,8 +17,6 @@
 
 package org.voltdb.client;
 
-import java.util.concurrent.atomic.AtomicInteger;
-
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.ReverseDNSCache;
 import org.voltcore.utils.EstTimeUpdater;
@@ -28,8 +26,10 @@ import org.voltcore.utils.EstTimeUpdater;
  *
  */
 public abstract class ClientFactory {
-
-    static AtomicInteger ACTIVE_CLIENT_COUNT = new AtomicInteger(0);
+    // If m_preserveResources is set m_activeClientCount will always be 1 irrespective of the number of clients
+    // initialized through the factory.
+    static int m_activeClientCount = 0;
+    static boolean m_preserveResources = false;
 
     /**
      * <p>Create a {@link Client} with no connections. The Client will be optimized to send stored procedure invocations
@@ -39,12 +39,7 @@ public abstract class ClientFactory {
      * @return Newly constructed {@link Client}
      */
     public static Client createClient() {
-        if (ACTIVE_CLIENT_COUNT.incrementAndGet() == 1) {
-            VoltLogger.startAsynchronousLogging();
-            EstTimeUpdater.start();
-            ReverseDNSCache.start();
-        }
-        return new ClientImpl(new ClientConfig());
+        return createClient(new ClientConfig());
     }
 
     /**
@@ -57,21 +52,22 @@ public abstract class ClientFactory {
      * @return A configured client
      */
     public static Client createClient(ClientConfig config) {
-        if (ACTIVE_CLIENT_COUNT.incrementAndGet() == 1) {
-            VoltLogger.startAsynchronousLogging();
-            EstTimeUpdater.start();
-            ReverseDNSCache.start();
+        Client client = null;
+        synchronized (ClientFactory.class) {
+            if (!m_preserveResources && ++m_activeClientCount == 1) {
+                VoltLogger.startAsynchronousLogging();
+                EstTimeUpdater.start();
+                ReverseDNSCache.start();
+            }
         }
-        return new ClientImpl(config);
+        client = new ClientImpl(config);
+        return client;
     }
 
-    public static void decreaseClientNum() throws InterruptedException {
+    public static synchronized void decreaseClientNum() throws InterruptedException {
         // the client is the last alive client. Before exit, close all the static resources and threads.
-        int count = ACTIVE_CLIENT_COUNT.get();
-        if (count <= 0) {
-            return;
-        }
-        if (ACTIVE_CLIENT_COUNT.decrementAndGet() == 0) {
+        if (!m_preserveResources && m_activeClientCount <= 1) {
+            m_activeClientCount = 0;
             //Shut down the logger.
             VoltLogger.shutdownAsynchronousLogging();
             //Estimate Time Updater stop updates.
@@ -79,13 +75,18 @@ public abstract class ClientFactory {
             //stop ReverseDNSCache.
             ReverseDNSCache.stop();
         }
-        count = ACTIVE_CLIENT_COUNT.get();
-        if (count < 0) {
-            ACTIVE_CLIENT_COUNT.compareAndSet(count,0);
+        else {
+            m_activeClientCount--;
         }
     }
 
-    public static void increaseClientCountToOne() {
-        ACTIVE_CLIENT_COUNT.compareAndSet(0,1);
+    public static synchronized void increaseClientCountToOne() {
+        // This method is intended to ensure that the resources needed to create clients
+        // are always initialized and won't be released with the active client count goes to zero.
+        m_preserveResources = true;
+        VoltLogger.startAsynchronousLogging();
+        EstTimeUpdater.start();
+        ReverseDNSCache.start();
+        m_activeClientCount = 1;
     }
 }
