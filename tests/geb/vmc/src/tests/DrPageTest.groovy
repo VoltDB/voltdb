@@ -709,116 +709,193 @@ class DrPageTest extends TestBase {
         }
     }
 
-//    def checkMinValueInDrGraphSeconds() {
-//        when:
-//        println("Process only if DR is present")
-//        divId = $("#drCombinedId").jquery.text()
-//        then:
-//        if(isDrTabVisible) {
-//            if(page.drMode.text().equals("") || page.drMode.text().equals("Master")) {
-//                println("Replica section is not visible")
-//            }
-//            else {
-//                int count = 0
-//                when:
-//                // This loop is used to gain time.
-//                //        while(count<numberOfTrials) {
-//                //            count++
-//                //            page.chooseGraphView("Minutes")
-//                //            page.chooseGraphView("Minutes")
-//                //            page.chooseGraphView("Seconds")
-//                //            if(graphView.text().equals("")) {
-//                //                break
-//                //            }
-//                //        }
-//                count = 0
-//                then:
-//                String stringMax
-//                String stringMin
-//
-//                while (count < numberOfTrials) {
-//                    count++
-//                    try {
-//                        waitFor(waitTime) {
-//                            page.chartDrMax.isDisplayed()
-//                        }
-//                        stringMax = page.chartDrMax.text()
-//                        stringMin = page.chartDrMin.text()
-//                        break
-//                    } catch (geb.waiting.WaitTimeoutException e) {
-//                        println("WaitTimeoutException")
-//                    }
-//                }
-//
-//                String result = page.compareTime(stringMax, stringMin)
-//
-//                if (result.equals("seconds")) {
-//                    println("The minimum value is " + stringMin + " and the time is in " + result)
-//                    assert true
-//                } else {
-//                    println("FAIL: It is not in seconds")
-//                    assert false
-//                }
-//            }
-//        } else {
-//            println("DR is not available.")
-//        }
-//    }
-//
-//    def checkMaxValueInDrGraphSeconds() {
-//        when:
-//        println("Process only if DR is present")
-//        divId = $("#drCombinedId").jquery.text()
-//        then:
-//        if(isDrTabVisible) {
-//            if(page.drMode.text().equals("") || page.drMode.text().equals("Master")) {
-//                println("Replica section is not visible")
-//            }
-//            else {
-//                int count = 0
-//                when:
-//                // This loop is used to gain time.
-//                //        while(count<numberOfTrials) {
-//                //            count++
-//                //            page.chooseGraphView("Minutes")
-//                //            page.chooseGraphView("Minutes")
-//                //            page.chooseGraphView("Seconds")
-//                //            if(graphView.text().equals("")) {
-//                //                break
-//                //            }
-//                //        }
-//                count = 0
-//                then:
-//                String stringMax
-//                String stringMin
-//
-//                while (count < numberOfTrials) {
-//                    count++
-//                    try {
-//                        waitFor(waitTime) {
-//                            page.chartDrMax.isDisplayed()
-//                        }
-//                        stringMax = page.chartDrMax.text()
-//                        stringMin = page.chartDrMin.text()
-//                        break
-//                    } catch (geb.waiting.WaitTimeoutException e) {
-//                        println("WaitTimeoutException")
-//                    }
-//                }
-//
-//                String result = page.compareTime(stringMax, stringMin)
-//
-//                if (result.equals("seconds")) {
-//                    println("The maximum value is " + stringMax + " and the time is in " + result)
-//                    assert true
-//                } else {
-//                    println("FAIL: It is not in seconds")
-//                    assert false
-//                }
-//            }
-//        } else {
-//            println("DR is not available.")
-//        }
-//    }
+    def checkMinAndMaxValueInDrGraphSeconds() {
+        String stringMax
+        String stringMin
+        int count = 0
 
+        when:
+        println("Process only if DR is present")
+        divId = $("#drCombinedId").jquery.text()
+        then:
+        if(isDrTabVisible) {
+            println(page.drMode.text() + " MODE")
+            if(page.drMode.text().equals("") || page.drMode.text().toLowerCase().equals(("master").toLowerCase())) {
+                println("Replica section is not visible")
+            }
+            else {
+                when:
+                count = 0
+                page.chooseGraphView("Seconds")
+                then:
+                println(divId)
+                while (count < 3) {
+                    count++
+                    try {
+                        waitFor(waitTime) {
+                            $('#ChartDrReplicationRate_' + divId).isDisplayed()
+                        }
+                        waitFor(waitTime) {
+                            $('#visualizationDrReplicationRate_' + divId + ' > g > g > g.nv-x.nv-axis.nvd3-svg > g > g.nv-axisMaxMin.nv-axisMaxMin-x.nv-axisMax-x > text').isDisplayed()
+                            $('#visualizationDrReplicationRate_' + divId + ' > g > g > g.nv-x.nv-axis.nvd3-svg > g > g.nv-axisMaxMin.nv-axisMaxMin-x.nv-axisMin-x > text').isDisplayed()
+                        }
+                        stringMax = $('#visualizationDrReplicationRate_' + divId + ' > g > g > g.nv-x.nv-axis.nvd3-svg > g > g.nv-axisMaxMin.nv-axisMaxMin-x.nv-axisMax-x > text').text()
+                        stringMin = $('#visualizationDrReplicationRate_' + divId + ' > g > g > g.nv-x.nv-axis.nvd3-svg > g > g.nv-axisMaxMin.nv-axisMaxMin-x.nv-axisMin-x > text').text()
+
+                        break
+                    } catch (geb.waiting.WaitTimeoutException e) {
+                        println("WaitTimeoutException")
+                    }
+                }
+
+                String result = page.compareTime(stringMax, stringMin)
+
+                if (result.equals("seconds")) {
+                    println("The maximum value is " + stringMax)
+                    println("The minimum value is " + stringMin)
+                    println("The time is in " + result)
+                    assert true
+                } else {
+                    println("FAIL: It is not in seconds")
+                    assert false
+                }
+            }
+        } else {
+            println("DR is not available.")
+        }
+    }
+
+    def checkMinAndMaxValueInDrGraphMinutes() {
+        String stringMax
+        String stringMin
+        int count = 0
+
+        when:
+        println("Process only if DR is present")
+        divId = $("#drCombinedId").jquery.text()
+        then:
+        if(isDrTabVisible) {
+            println(page.drMode.text() + " MODE")
+            if(page.drMode.text().equals("") || page.drMode.text().toLowerCase().equals(("master").toLowerCase())) {
+                println("Replica section is not visible")
+            }
+            else {
+                when:
+                page.drGraphView.value("Minutes")
+                page.drGraphView.value("Seconds")
+                page.drGraphView.value("Minutes")
+                then:
+                count = 0
+                while (count < numberOfTrials) {
+                    count++
+                    try {
+                        waitFor(waitTime) {
+                            $('#ChartDrReplicationRate_' + divId).isDisplayed()
+                        }
+                        waitFor(waitTime) {
+                            $('#visualizationDrReplicationRate_' + divId + ' > g > g > g.nv-x.nv-axis.nvd3-svg > g > g.nv-axisMaxMin.nv-axisMaxMin-x.nv-axisMax-x > text').isDisplayed()
+                            $('#visualizationDrReplicationRate_' + divId + ' > g > g > g.nv-x.nv-axis.nvd3-svg > g > g.nv-axisMaxMin.nv-axisMaxMin-x.nv-axisMin-x > text').isDisplayed()
+                        }
+                        report 'hello'
+                        stringMax = $('#visualizationDrReplicationRate_' + divId + ' > g > g > g.nv-x.nv-axis.nvd3-svg > g > g.nv-axisMaxMin.nv-axisMaxMin-x.nv-axisMax-x > text').text()
+                        stringMin = $('#visualizationDrReplicationRate_' + divId + ' > g > g > g.nv-x.nv-axis.nvd3-svg > g > g.nv-axisMaxMin.nv-axisMaxMin-x.nv-axisMin-x > text').text()
+
+                        break
+                    } catch (geb.waiting.WaitTimeoutException e) {
+                        println("WaitTimeoutException")
+                    }
+                }
+
+                String result = page.compareTime(stringMax, stringMin)
+                println(stringMax)
+                println(stringMin)
+                println(result)
+                if (result.toLowerCase().equals("minutes")) {
+                    println("The maximum value is " + stringMax)
+                    println("The minimum value is " + stringMin)
+                    println("The time is in " + result)
+                    assert true
+                } else {
+                    println("FAIL: It is not in minutes")
+                    assert false
+                }
+            }
+        } else {
+            println("DR is not available.")
+        }
+    }
+
+    def checkMinAndMaxValueInDrGraphDays() {
+        String stringMax
+        String stringMin
+        int count = 0
+
+        when:
+        println("Process only if DR is present")
+        divId = $("#drCombinedId").jquery.text()
+        then:
+        if(isDrTabVisible) {
+            println(page.drMode.text() + " MODE")
+            if(page.drMode.text().equals("") || page.drMode.text().toLowerCase().equals(("master").toLowerCase())) {
+                println("Replica section is not visible")
+            }
+            else {
+                when:
+                count = 0
+                page.drGraphView.value("Days")
+                report 'asdf'
+                then:
+                count = 0
+                while (count < 3) {
+                    count++
+                    try {
+                        waitFor(waitTime) {
+                            $('#ChartDrReplicationRate_' + divId).isDisplayed()
+                        }
+                        waitFor(waitTime) {
+                            $('#visualizationDrReplicationRate_' + divId + ' > g > g > g.nv-x.nv-axis.nvd3-svg > g > g.nv-axisMaxMin.nv-axisMaxMin-x.nv-axisMax-x > text').isDisplayed()
+                            $('#visualizationDrReplicationRate_' + divId + ' > g > g > g.nv-x.nv-axis.nvd3-svg > g > g.nv-axisMaxMin.nv-axisMaxMin-x.nv-axisMin-x > text').isDisplayed()
+                        }
+                        stringMax = $('#visualizationDrReplicationRate_' + divId + ' > g > g > g.nv-x.nv-axis.nvd3-svg > g > g.nv-axisMaxMin.nv-axisMaxMin-x.nv-axisMax-x > text').text()
+                        stringMin = $('#visualizationDrReplicationRate_' + divId + ' > g > g > g.nv-x.nv-axis.nvd3-svg > g > g.nv-axisMaxMin.nv-axisMaxMin-x.nv-axisMin-x > text').text()
+
+                        break
+                    } catch (geb.waiting.WaitTimeoutException e) {
+                        println("WaitTimeoutException")
+                    }
+                }
+                String monthMax = page.changeToMonth(stringMax)
+                String monthMin = page.changeToMonth(stringMin)
+
+                String dateMax = page.changeToDate(stringMax)
+                String dateMin = page.changeToDate(stringMin)
+
+                int intDateMax = Integer.parseInt(dateMax)
+                int intDateMin = Integer.parseInt(dateMin)
+
+                if(monthMax.equals(monthMin)) {
+                    if(intDateMax > intDateMin) {
+                        println("The maximum value is " + stringMax)
+                        println("The minimum value is " + stringMin)
+                        println("The time is in Days")
+                    }
+                    else {
+                        println("FAIL: Date of Max is less than that of date of Min for same month")
+                        assert false
+                    }
+                }
+                else {
+                    if (intDateMax < intDateMin) {
+                        println("Success")
+                    }
+                    else {
+                        println("FAIL: Date of Max is more than that of date of Min for new month")
+                        assert false
+                    }
+                }
+            }
+        } else {
+            println("DR is not available.")
+        }
+    }
 }
