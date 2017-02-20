@@ -37,7 +37,8 @@ public class Statistics extends VoltSystemProcedure {
     }
 
     @Override
-    public void init() {
+    public long[] getPlanFragmentIds() {
+        return new long[]{};
     }
 
     @Override

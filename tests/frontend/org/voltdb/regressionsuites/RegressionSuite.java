@@ -48,6 +48,7 @@ import org.voltdb.client.ClientAuthScheme;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientConfigForTest;
 import org.voltdb.client.ClientFactory;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ConnectionUtil;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
@@ -549,24 +550,24 @@ public class RegressionSuite extends TestCase {
     }
 
     /**
-     * Given a two dimensional array of longs, randomly permute the rows, but
+     * Given a two dimensional array, randomly permute the rows, but
      * leave the columns alone.  This is used to generate test cases for kinds
      * of sorts.
      *
      * @param input
      */
-    static protected void shuffleArrayOfLongs(long [][] input) {
+    static protected <T> T[][] shuffleArray(T [][] input) {
+        T[][] output = input.clone();
         Integer [] indices = new Integer[input.length];
         for (int idx = 0; idx < indices.length; idx += 1) {
             indices[idx] = Integer.valueOf(idx);
         }
         List<Integer> permutation = Arrays.asList(indices);
         Collections.shuffle(permutation);
-        long[] tmp = input[permutation.get(0)];
-        for (int idx = 0; idx < input.length-1; idx += 1) {
-            input[permutation.get(idx)] = input[permutation.get(idx + 1)];
+        for (int idx = 0; idx < input.length; idx += 1) {
+            output[idx] = input[permutation.get(idx)];
         }
-        input[permutation.get(input.length-1)] = tmp;
+        return output;
     }
 
     static protected void validateTableColumnOfScalarLong(VoltTable vt, int col, long[] expected) {
@@ -986,8 +987,11 @@ public class RegressionSuite extends TestCase {
                 }
             }
             else if (expectedObj instanceof BigDecimal) {
-                BigDecimal val = (BigDecimal)expectedObj;
-                assertEquals(msg, val, actualRow.getDecimalAsBigDecimal(i));
+                BigDecimal exp = (BigDecimal)expectedObj;
+                BigDecimal got = actualRow.getDecimalAsBigDecimal(i);
+                // Either both are null or neither are null.
+                assertEquals(exp == null, got == null);
+                assertEquals(msg, exp.doubleValue(), got.doubleValue(), epsilon);
             }
             else if (expectedObj instanceof String) {
                 String val = (String)expectedObj;
@@ -1211,6 +1215,20 @@ public class RegressionSuite extends TestCase {
         client.callProcedure("@AdHoc", "Truncate table " + tb);
         validateTableOfScalarLongs(client, "select count(*) from " + tb, new long[]{0});
     }
+
+    protected static void truncateAllTables(Client client) throws Exception {
+        ClientResponse cr;
+        cr = client.callProcedure("@SystemCatalog", "TABLES");
+        assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
+        VoltTable vt = cr.getResults()[0];
+        String allTables[] = new String[vt.getRowCount()];
+        int idx = 0;
+        while (vt.advanceRow()) {
+            allTables[idx++] = vt.getString("TABLE_NAME");
+        }
+        truncateTables(client, allTables);
+    }
+
 
     /**
      * A convenience method to build a Properties object initialized with an

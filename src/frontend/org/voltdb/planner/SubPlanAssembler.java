@@ -23,6 +23,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
+import java.util.TreeSet;
 
 import org.hsqldb_voltpatches.FunctionForVoltDB;
 import org.json_voltpatches.JSONException;
@@ -41,12 +42,15 @@ import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.expressions.VectorValueExpression;
+import org.voltdb.expressions.WindowFunctionExpression;
 import org.voltdb.planner.parseinfo.JoinNode;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
+import org.voltdb.plannodes.IndexSortablePlanNode;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
+import org.voltdb.plannodes.IndexUseForOrderBy;
 import org.voltdb.plannodes.MaterializedScanPlanNode;
 import org.voltdb.plannodes.NestLoopIndexPlanNode;
 import org.voltdb.plannodes.ReceivePlanNode;
@@ -82,7 +86,7 @@ public abstract class SubPlanAssembler {
     // but just get their contents dumped into a summary List that was created
     // inline and NOT initialized here.
     private final static List<AbstractExpression> s_reusableImmutableEmptyBinding =
-        new ArrayList<AbstractExpression>();
+        new ArrayList<>();
 
     // Constants to specify how getIndexableExpressionFromFilters should react
     // to finding a filter that matches the current criteria.
@@ -126,9 +130,9 @@ public abstract class SubPlanAssembler {
             List<AbstractExpression> joinExprs,
             List<AbstractExpression> filterExprs,
             List<AbstractExpression> postExprs) {
-        ArrayList<AccessPath> paths = new ArrayList<AccessPath>();
-        List<AbstractExpression> allJoinExprs = new ArrayList<AbstractExpression>();
-        List<AbstractExpression> allExprs = new ArrayList<AbstractExpression>();
+        ArrayList<AccessPath> paths = new ArrayList<>();
+        List<AbstractExpression> allJoinExprs = new ArrayList<>();
+        List<AbstractExpression> allExprs = new ArrayList<>();
         // add the empty seq-scan access path
         if (joinExprs != null) {
             allExprs.addAll(joinExprs);
@@ -421,10 +425,14 @@ public abstract class SubPlanAssembler {
         // In some borderline cases, the determination to use the index's order is optimistic and
         // provisional; it can be undone later in this function as new info comes to light.
         int orderSpoilers[] = new int[keyComponentCount];
-        List<AbstractExpression> bindingsForOrder = new ArrayList<AbstractExpression>();
-        int nSpoilers = determineIndexOrdering(tableScan, keyComponentCount,
-                                               indexedExprs, indexedColRefs,
-                                               retval, orderSpoilers, bindingsForOrder);
+        List<AbstractExpression> bindingsForOrder = new ArrayList<>();
+        int nSpoilers = determineIndexOrdering(tableScan,
+                                               keyComponentCount,
+                                               indexedExprs,
+                                               indexedColRefs,
+                                               retval,
+                                               orderSpoilers,
+                                               bindingsForOrder);
 
         // Use as many covering indexed expressions as possible to optimize comparator expressions that can use them.
 
@@ -581,6 +589,8 @@ public abstract class SubPlanAssembler {
                 // Some order spoiler didn't have an equality filter.
                 // Invalidate the provisional indexed ordering.
                 retval.sortDirection = SortDirectionType.INVALID;
+                retval.m_stmtOrderByIsCompatible = false;
+                retval.m_windowFunctionUsesIndex = NO_INDEX_USE;
                 bindingsForOrder.clear(); // suddenly irrelevant
             }
             else {
@@ -942,18 +952,56 @@ public abstract class SubPlanAssembler {
         return false;
     }
 
-    /**
-     * Try to use the index scan's inherent ordering to implement the ORDER BY clause.
-     * The most common scenario for this optimization is when the ORDER BY "columns"
-     * (actually a list of columns OR expressions) corresponds to a prefix or a complete
-     * match of a tree index's key components (also columns/expressions),
-     * in the same order from major to minor.
-     * For example, if a table has a tree index on columns "(A, B)", then
-     * "ORDER BY A" or "ORDER BY A, B" are considered a match
-     * but NOT "ORDER BY A, C" or "ORDER BY A, B, C" or "ORDER BY B" or "ORDER BY B, A".
+    /*
+     * Try to use the index scan's inherent ordering to implement some ORDER BY
+     * or WINDOW FUNCTION clauses.
+     *
+     * These clauses can be statement level ORDER BY clauses or else
+     * window function PARTITION BY and ORDER BY specifications.
+     * For example, if a table has a tree index on columns "(A, B, C)", then
+     * "ORDER BY A", "ORDER BY A, B" and "ORDER BY A, B, C" are considered a match
+     * but NOT "ORDER BY A, C", "ORDER BY A, D", "ORDER BY A, B, C, D",
+     * "ORDER BY B" or "ORDER BY B, A".
+     *
+     * Similarly, these window functions would match:
+     * <ul>
+     *   <li>"MIN(E) OVER (PARTITION BY A, B ORDER BY C)"</li>
+     *   <li>"MIN(E) OVER (PARTITION BY A ORDER BY B)"</br>
+     *       The order expressions don't need to use all the
+     *       index expressions.
+     *   </li>
+     *   <li>"MIN(E) OVER (PARTITION BY B, A ORDER BY B)"</li>
+     *       We don't care about the order of PARTITION BY expressions.
+     * </ul>
+     * These, however, would not match.
+     * <ul>
+     *   <li>"MIN(E) OVER (PARTITION BY A, C ORDER BY B)"</br>
+     *       Index expressions must match all the PARTITION BY
+     *       expressions before they match any ORDER BY
+     *       expressions.  They can't match B until they match
+     *       A and C.
+     *   </li>
+     *   <li>"MIN(E) OVER (PARTITION BY A, D ORDER BY B)"</br>
+     *       All partition by expressions must appear in the
+     *       index.
+     *   </li>
+     * </ul>
+     *
+     * We do this selection for a particular index by iterating over
+     * the index's expressions or column references.  We try to match
+     * the expression-or-column-reference to each candidate window function
+     * or statement level order by expression sequence.  We keep a
+     * scoreboard with one score for each candidate.  If a candidate
+     * peters out because it doesn't match at all, we mark it dead.
+     * If a candidate runs out of expressions, and the sort orders
+     * are sensible, it is marked done and is usable.  We currently
+     * support only one window function for a select statement.  But the
+     * same set of matching logic applies to window functions and any statement
+     * level order by clause, so generalizing to multiple window functions
+     * is essentially cost free.
      *
      * TODO: In theory, we COULD leverage index ordering when the index covers only a prefix of
-     * the ORDER BY list, such as the "ORDER BY A, B, C" case listed above.
+     * the ordering requirement list, such as the "ORDER BY A, B, C, D" case listed above.
      * But that still requires an ORDER BY plan node.
      * To gain any substantial advantage, the ORDER BY plan node would have to be smart enough
      * to apply just an incremental "minor" sort on "C" to subsets of the result "grouped by"
@@ -1045,6 +1093,518 @@ public abstract class SubPlanAssembler {
      * So, the effort to determine the sort direction of an index scan that participates in a join
      * is currently ALWAYS wasted, and in the future, would continue to be wasted effort for the
      * majority of index scans that do not fall into one of the narrow special cases just described.
+     */
+    /**
+     * An index can hold either an expression or a column reference.
+     * This class tries to hide the difference between them for the
+     * purposes of index selection.
+     */
+    private static class ExpressionOrColumn {
+        // Exactly one of these can be null.
+        AbstractExpression m_expr;
+        ColumnRef          m_colRef;
+        // If m_colRef is non-null, then m_tableScan must
+        // be non-null and name the table scan.
+        StmtTableScan      m_tableScan;
+        // This is the expression or column position of this expression or
+        // ColumnRef in the candidate index.
+        int                m_indexKeyComponentPosition;
+        // This is the sort direction of a statement level
+        // order by.  If there is no statement level order
+        // by clause this will be SortDirectionType.INVALID.
+        public SortDirectionType m_sortDirection;
+
+        ExpressionOrColumn(int indexEntryNumber, AbstractExpression expr, SortDirectionType sortDir) {
+            this(indexEntryNumber, null, expr, sortDir, null);
+        }
+
+        ExpressionOrColumn(int aIndexEntryNumber,
+                           StmtTableScan tableScan,
+                           AbstractExpression expr,
+                           SortDirectionType sortDir,
+                           ColumnRef colRef) {
+            // Exactly one of expr or colRef can be null.
+            assert((expr == null) == (colRef != null));
+            assert(colRef == null || tableScan != null);
+            m_expr = expr;
+            m_colRef = colRef;
+            m_indexKeyComponentPosition = aIndexEntryNumber;
+            m_tableScan = tableScan;
+            m_sortDirection = sortDir;
+        }
+
+        @Override
+        public boolean equals(Object otherObj) {
+            if ( ! ( otherObj instanceof ExpressionOrColumn) ) {
+                return false;
+            }
+            ExpressionOrColumn other = (ExpressionOrColumn)otherObj;
+            //
+            // The function findBindingsForOneIndexedExpression is almost
+            // like equality, but it matches parameters specially.  It's
+            // exactly what we want here, but we have to make sure the
+            // ExpressionOrColumn from the index is the second parameter.
+            //
+            // If both are from the same place, then we reduce this to
+            // equals.  I'm not sure this is possible, but better safe
+            // than sorry.
+            //
+            if ((other.m_indexKeyComponentPosition < 0 && m_indexKeyComponentPosition < 0)
+                    || (0 <= other.m_indexKeyComponentPosition && 0 <= m_indexKeyComponentPosition)) {
+                // If they are both expressions, they must be equal.
+                if ((other.m_expr != null) && (m_expr != null)) {
+                    return m_expr.equals(other.m_expr);
+                }
+                // If they are both column references they must be equal.
+                if ((other.m_colRef != null) && (m_colRef != null)) {
+                    return m_colRef.equals(other.m_colRef);
+                }
+                // If they are mixed, sort out which is the column
+                // reference and which is the expression.
+                AbstractExpression expr = (m_expr != null) ? m_expr : other.m_expr;
+                ColumnRef cref = (m_colRef != null) ? m_colRef : other.m_colRef;
+                StmtTableScan tscan = (m_tableScan != null) ? m_tableScan : other.m_tableScan;
+                assert(expr != null && cref != null);
+                // Use the same matcher that findBindingsForOneIndexedExpression
+                // uses.
+                return matchExpressionAndColumnRef(expr, cref, tscan);
+            }
+            ExpressionOrColumn fromStmt = (m_indexKeyComponentPosition < 0) ? this : other;
+            ExpressionOrColumn fromIndx = (m_indexKeyComponentPosition < 0) ? other : this;
+            return (findBindingsForOneIndexedExpression(fromStmt, fromIndx) != null);
+        }
+
+    }
+
+    /**
+     * These are some constants for using indexes for window functions.
+     */
+    public final static int NO_INDEX_USE = -2;
+    public final static int STATEMENT_LEVEL_ORDER_BY_INDEX = -1;
+
+    /** When a match is attempted, it may match,
+     * fail to match or else be a possible order spoiler.
+     *
+     */
+    private enum MatchResults {
+        MATCHED,                 /**
+                                  * The attempt matched.
+                                  */
+        POSSIBLE_ORDER_SPOILER,  /**
+                                  * The attempt did not match,
+                                  * but this may be an order spoiler.
+                                  */
+        DONE_OR_DEAD             /**
+                                  * The score is dead or done.
+                                  * So don't do anything else with
+                                  * this score.
+                                  */
+    }
+    /**
+     * A WindowFunctionScore keeps track of the score of
+     * a single window function or else the statement level
+     * order by expressions.
+     */
+    static class WindowFunctionScore {
+
+        /**
+         * A constructor for creating a score from a
+         * WindowFunctionExpression.
+         *
+         * @param winfunc
+         * @param tableAlias
+         */
+        public WindowFunctionScore(WindowFunctionExpression winfunc,
+                                   int winFuncNum) {
+            for (int idx = 0; idx < winfunc.getPartitionbySize(); idx += 1) {
+                AbstractExpression ae = winfunc.getPartitionByExpressions().get(idx);
+                m_partitionByExprs.add(new ExpressionOrColumn(-1, ae, SortDirectionType.INVALID));
+            }
+            for (int idx = 0; idx < winfunc.getOrderbySize(); idx += 1) {
+                AbstractExpression ae = winfunc.getOrderByExpressions().get(idx);
+                SortDirectionType sd = winfunc.getOrderByDirections().get(idx);
+                m_unmatchedOrderByExprs.add(new ExpressionOrColumn(-1, ae, sd));
+            }
+            assert(0 <= winFuncNum);
+            m_windowFunctionNumber = winFuncNum;
+            m_sortDirection = SortDirectionType.INVALID;
+        }
+
+        /**
+         * A constructor for creating a score from a
+         * statement level order by expression.
+         *
+         * @param orderByExpressions The order by expressions.
+         */
+        public WindowFunctionScore(List<ParsedColInfo> orderByExpressions) {
+            for (ParsedColInfo pci : orderByExpressions) {
+                SortDirectionType sortDir = pci.ascending ? SortDirectionType.ASC : SortDirectionType.DESC;
+                m_unmatchedOrderByExprs.add(new ExpressionOrColumn(-1, pci.expression, sortDir));
+            }
+            // Statement level order by expressions are number STATEMENT_LEVEL_ORDER_BY_INDEX.
+            m_windowFunctionNumber = STATEMENT_LEVEL_ORDER_BY_INDEX;
+            m_sortDirection = SortDirectionType.INVALID;
+        }
+
+        // Set of active partition by expressions
+        // for this window function.
+        List<ExpressionOrColumn> m_partitionByExprs = new ArrayList<>();
+        // Sequence of expressions which
+        // either match index expression or which have
+        // single values.   These are from the partition
+        // by list or else from the order by list.  At
+        // the end this will be the concatenation of the
+        // partition by list and the order by list.
+        final List<AbstractExpression> m_orderedMatchingExpressions = new ArrayList<>();
+        // List of order by expressions, originally from the
+        // WindowFunctionExpression.  These migrate to
+        // m_orderedMatchingExpressions as they match.
+        final List<ExpressionOrColumn> m_unmatchedOrderByExprs = new ArrayList<>();
+        // This is the index of the unmatched expression
+        // we will be working on.
+        int m_unmatchedOrderByCursor = 0;
+        // This is the number of the window function.  It is
+        // STATEMENT_LEVEL_ORDER_BY for the statement level order by list.
+        int m_windowFunctionNumber;
+
+        // A score can be dead, done or in progress.  Dead means
+        // We have seen something we cannot match.  Done means we
+        // have matched all the score's expressions.  In progress
+        // means we are still matching expressions.
+        private enum MatchingState {
+            INVALID,
+            INPROGRESS,
+            DEAD,
+            DONE
+        }
+
+        MatchingState m_matchingState = MatchingState.INPROGRESS;
+        // This is the sort direction for this window function
+        // or order by list.
+        private SortDirectionType m_sortDirection = SortDirectionType.INVALID;
+        // This is the set of bindings generated by matches in this
+        // candidate.
+        final List<AbstractExpression> m_bindings = new ArrayList<>();
+
+        public int getNumberMatches() {
+            return m_orderedMatchingExpressions.size();
+        }
+
+        public boolean isDead() {
+            return m_matchingState == MatchingState.DEAD;
+        }
+
+        public boolean isDone() {
+            if (m_matchingState == MatchingState.DONE) {
+                return true;
+            }
+            if (m_partitionByExprs.isEmpty() && 0 == m_unmatchedOrderByExprs.size()) {
+                markDone();
+                // Settle on a sort direction.
+                if (m_sortDirection == SortDirectionType.INVALID) {
+                    m_sortDirection = SortDirectionType.ASC;
+                }
+                return true;
+            }
+            return false;
+        }
+
+        public MatchResults matchIndexEntry(ExpressionOrColumn indexEntry) {
+            int idx;
+            // Don't bother to do anything if
+            // we are dead or done.
+            if (isDead() || isDone()) {
+                return MatchResults.DONE_OR_DEAD;
+            }
+            // If there are more partition by expressions, then
+            // find one which matches the indexEntry and move it
+            // to the end of the ordered  matching expressions.
+            if ( ! m_partitionByExprs.isEmpty() ) {
+                List<AbstractExpression> moreBindings = null;
+                for (ExpressionOrColumn eorc : m_partitionByExprs) {
+                    moreBindings = findBindingsForOneIndexedExpression(eorc, indexEntry);
+                    if (moreBindings != null) {
+                        // Good.  We matched.  Add the bindings.
+                        // But we can't set the sort direction
+                        // yet, because partition by doesn't
+                        // care.  Note that eorc and indexEntry
+                        // may not be equal.  They are just
+                        // matching.  An expression in eorc
+                        // might match a column reference in
+                        // indexEntry, or eorc may have parameters
+                        // which need to match expressions in indexEntry.
+                        m_orderedMatchingExpressions.add(eorc.m_expr);
+                        // If there are expressions later on in the
+                        // m_partitionByExprs or m_unmatchedOrderByExprs
+                        // which match this expression we need to
+                        // delete them.  We can safely ignore them.
+                        //
+                        // If there are more than one instances of
+                        // an expression, say with "PARTITION BY A, A",
+                        // we need to remove them all.  But guard against
+                        // an infinite loop here;
+                        while (m_partitionByExprs.remove(eorc)) {
+                            /* Do Nothing */;
+                        }
+                        m_bindings.addAll(moreBindings);
+                        return MatchResults.MATCHED;
+                    }
+                }
+                // Mark this as dead.  We are not going
+                // to manage order spoilers with window functions.
+                markDead();
+                return MatchResults.DONE_OR_DEAD;
+            }
+            // If there are no partition by expressions,
+            // we need to look at the unmatched order by expressions.
+            // These need to be AbstractExpressions.  But we may
+            // match with a ColumnRef in the index.
+            ExpressionOrColumn nextStatementEOC = m_unmatchedOrderByExprs.get(0);
+            // If we have not settled on a sort direction
+            // yet, we have to decide now.
+            if (m_sortDirection == SortDirectionType.INVALID) {
+                m_sortDirection = nextStatementEOC.m_sortDirection;
+            }
+            if (nextStatementEOC.m_sortDirection != m_sortDirection) {
+                // If the sort directions are not all
+                // equal we can't use this index for this
+                // candidate.  So just declare it dead.
+                markDead();
+                return MatchResults.DONE_OR_DEAD;
+            }
+            // NOTABENE: This is really the important part of
+            //           this function.
+            List<AbstractExpression> moreBindings
+                = findBindingsForOneIndexedExpression(nextStatementEOC, indexEntry);
+            if ( moreBindings != null ) {
+                // We matched, because moreBindings != null, and
+                // the sort direction matched as well.  So
+                // add nextEOC to the order matching expressions
+                // list and add the bindings to the bindings list.
+                m_orderedMatchingExpressions.add(nextStatementEOC.m_expr);
+                m_bindings.addAll(moreBindings);
+                // Remove the next statement EOC from the unmatched OrderByExpressions
+                // list since we matched it.  We need to remove all of them,
+                while (m_unmatchedOrderByExprs.remove(nextStatementEOC)) {
+                    /* Do Nothing */ ;
+                }
+                return MatchResults.MATCHED;
+            }
+            // No Bindings were found.  Mark this as a
+            // potential order spoiler if it's in a
+            // statement level order by.  The index entry
+            // number is in the ordinal number of the
+            // expression or column reference in the index.
+            assert(0 <= indexEntry.m_indexKeyComponentPosition);
+            if (isWindowFunction()) {
+                // No order spoilers with window functions.
+                markDead();
+                return MatchResults.DONE_OR_DEAD;
+            }
+            return MatchResults.POSSIBLE_ORDER_SPOILER;
+        }
+
+        // Return true if this is a window function.  If it is a statement
+        // level order by we return false.
+        boolean isWindowFunction() {
+            return 0 <= m_windowFunctionNumber;
+        }
+
+        public void markDone() {
+            assert(m_matchingState == MatchingState.INPROGRESS);
+            m_matchingState = MatchingState.DONE;
+        }
+
+        public void markDead() {
+            assert(m_matchingState == MatchingState.INPROGRESS);
+            m_matchingState = MatchingState.DEAD;
+        }
+    };
+
+    /**
+     * Objects of this class keep track of all window functions and
+     * order by statement expressions.  We run the index expressions
+     * over this scoreboard to see if any of them match appropriately.
+     * If so we pull out the window function or statement level order by
+     * which match.
+     */
+    class WindowFunctionScoreboard {
+        public WindowFunctionScoreboard(AbstractParsedStmt stmt, StmtTableScan tableScan) {
+            m_numWinScores = stmt.getWindowFunctionExpressionCount();
+            m_numOrderByScores = stmt.hasOrderByColumns() ? 1 : 0;
+            m_winFunctions = new WindowFunctionScore[m_numWinScores + m_numOrderByScores];
+            for (int idx = 0; idx < m_numWinScores; idx += 1) {
+                // stmt has to be a ParsedSelectStmt if 0 < m_numWinScores.
+                // So this cast will be ok.
+                ParsedSelectStmt pss = (ParsedSelectStmt)stmt;
+                m_winFunctions[idx] = new WindowFunctionScore(pss.getWindowFunctionExpressions().get(idx),
+                                                              idx);
+            }
+            if (m_numOrderByScores > 0) {
+                m_winFunctions[m_numWinScores] = new WindowFunctionScore(stmt.orderByColumns());
+            }
+        }
+
+        private WindowFunctionScore m_winFunctions[];
+        private int m_numWinScores;
+        private int m_numOrderByScores;
+        private Set<Integer> m_orderSpoilers = new TreeSet<>();
+
+        /*
+         * Unfortunately the sort direction must be the
+         * same for all the expressions or columns.
+         */
+        SortDirectionType m_sortDirection = SortDirectionType.INVALID;
+        public boolean isDone() {
+            for (WindowFunctionScore score : m_winFunctions) {
+                if (!score.isDone()) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        public boolean isDead(boolean windowFunctionsOnly) {
+            for (WindowFunctionScore score : m_winFunctions) {
+                if (windowFunctionsOnly && ( ! score.isWindowFunction())) {
+                    continue;
+                }
+                if (!score.isDead()) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        public void matchIndexEntry(ExpressionOrColumn indexEntry) {
+            for (int idx = 0; idx < m_winFunctions.length; idx += 1) {
+                WindowFunctionScore score = m_winFunctions[idx];
+                MatchResults result = score.matchIndexEntry(indexEntry);
+                // This can only happen with a statement level order by
+                // clause.  We don't return POSSIBLE_ORDER_SPOILER for
+                // window functions.
+                if (result == MatchResults.POSSIBLE_ORDER_SPOILER) {
+                    m_orderSpoilers.add(indexEntry.m_indexKeyComponentPosition);
+                }
+            }
+        }
+
+        /**
+         * Return the number of order spoilers.  Also, fill in
+         * the AccessPath, the order spoilers list and the bindings.
+         *
+         * We prefer window functions to statement level
+         * order by expressions.  If there is more than one
+         * window functions, we prefer the one with the least
+         * number of order spoilers.  In the case of ties we
+         * return the first one in the list, which is essentially
+         * random.  Perhaps we can do better.
+         *
+         * @return The number of order spoilers in the candidate we choose.
+         */
+        public int getResult(AccessPath retval,
+                             int orderSpoilers[],
+                             List<AbstractExpression> bindings) {
+            WindowFunctionScore answer = null;
+            // Fill in the failing return values as a fallback.
+            retval.bindings.clear();
+            retval.m_windowFunctionUsesIndex = NO_INDEX_USE;
+            retval.m_stmtOrderByIsCompatible = false;
+            retval.sortDirection = SortDirectionType.INVALID;
+            int numOrderSpoilers = 0;
+
+            // The statement level order by expressions
+            // are always the last in the list.  So, if there
+            // are no window functions which match this
+            // index, and the order by expressions match,
+            // then the last time through this list will pick
+            // the order by expressions.  If a window function
+            // matches, we will pick it up first.  We
+            // can only match the statement level order by
+            // statements if on score from a window function
+            // matches.
+            for (WindowFunctionScore score : m_winFunctions) {
+                if (score.isDone()) {
+                    assert( ! score.isDead() );
+                    // Prefer window functions, and prefer longer matches, but we'll
+                    // take anything.
+                    if ((answer == null)
+                            || !answer.isWindowFunction()
+                            || answer.getNumberMatches() < score.getNumberMatches()) {
+                        answer = score;
+                    }
+                }
+            }
+            if (answer != null) {
+                assert(answer.m_sortDirection != null);
+                if (m_numOrderByScores > 0) {
+                    assert(m_numOrderByScores + m_numWinScores <= m_winFunctions.length);
+                    WindowFunctionScore orderByScore = m_winFunctions[m_numOrderByScores + m_numWinScores - 1];
+                    assert(orderByScore != null);
+                    // If the order by score is done and the
+                    // sort directions match then this
+                    // index may be usable for the statement level
+                    // order by as well as for any
+                    // window functions.
+                    if ((orderByScore.m_sortDirection == answer.m_sortDirection)
+                            && orderByScore.isDone()) {
+                        retval.m_stmtOrderByIsCompatible = true;
+                    } else {
+                        retval.m_stmtOrderByIsCompatible = false;
+                    }
+               }
+                if (answer.m_sortDirection != SortDirectionType.INVALID) {
+
+                    // Mark how we are using this index.
+                    retval.m_windowFunctionUsesIndex = answer.m_windowFunctionNumber;
+                    // If we have an index for the Statement Level
+                    // Order By clause but there is a window function
+                    // that can't use the index, then we can't use the
+                    // index at all. for ordering.  The window function
+                    // will invalidate the ordering for the statment level
+                    // order by clause.
+                    if ((retval.m_windowFunctionUsesIndex == STATEMENT_LEVEL_ORDER_BY_INDEX)
+                            && (0 < m_numWinScores)) {
+                        retval.m_stmtOrderByIsCompatible = false;
+                        retval.m_windowFunctionUsesIndex = NO_INDEX_USE;
+                        retval.sortDirection = SortDirectionType.INVALID;
+                        return 0;
+                    }
+
+                    // Add the bindings.
+                    retval.bindings.addAll(answer.m_bindings);
+
+                    // Mark the sort direction.
+                    if (retval.m_windowFunctionUsesIndex == NO_INDEX_USE) {
+                        retval.sortDirection = SortDirectionType.INVALID;
+                    } else {
+                        retval.sortDirection = answer.m_sortDirection;
+                    }
+
+                    // Add the order spoilers if the index is
+                    // compatible with the statement level
+                    // order by clause.
+                    if (retval.m_stmtOrderByIsCompatible) {
+                        assert(m_orderSpoilers.size() <= orderSpoilers.length);
+                        int idx = 0;
+                        for (Integer spoiler : m_orderSpoilers) {
+                            orderSpoilers[idx++] = spoiler;
+                        }
+                        // We will return this.
+                        numOrderSpoilers = m_orderSpoilers.size();
+                    }
+                    retval.m_finalExpressionOrder.addAll(answer.m_orderedMatchingExpressions);
+                    // else numOrderSpoilers is already zero.
+                }
+            }
+            return numOrderSpoilers;
+        }
+    }
+
+    /**
+     * Determine if an index, which is in the AccessPath argument
+     * retval, can satisfy a parsed select statement's order by or
+     * window function ordering requirements.
      *
      * @param table              only used here to validate base table names of ORDER BY columns' .
      * @param bindingsForOrder   restrictions on parameter settings that are prerequisite to the
@@ -1058,86 +1618,159 @@ public abstract class SubPlanAssembler {
      * @param orderSpoilers      positions of key components which MAY invalidate the tentative
      *                           sortDirection
      * @param bindingsForOrder   restrictions on parameter settings that are prerequisite to the
-     *                           any ordering optimization determined here
+     *                           any ordering optimization determined here.
      * @return the number of discovered orderSpoilers that will need to be recovered from,
      *         to maintain the established sortDirection - always 0 if no sort order was determined.
      */
-    private int determineIndexOrdering(StmtTableScan tableScan, int keyComponentCount,
-            List<AbstractExpression> indexedExprs, List<ColumnRef> indexedColRefs,
-            AccessPath retval, int[] orderSpoilers,
+    private int determineIndexOrdering(StmtTableScan tableScan,
+            int keyComponentCount,
+            List<AbstractExpression> indexedExprs,
+            List<ColumnRef> indexedColRefs,
+            AccessPath retval,
+            int[] orderSpoilers,
             List<AbstractExpression> bindingsForOrder)
     {
-        if (!m_parsedStmt.hasOrderByColumns()
-                || m_parsedStmt.orderByColumns().isEmpty()
-                // There need to be enough indexed expressions to provide full sort coverage.
-                || m_parsedStmt.orderByColumns().size() > keyComponentCount) {
+        // Organize a little bit.
+        ParsedSelectStmt pss = (m_parsedStmt instanceof ParsedSelectStmt)
+                                  ? ((ParsedSelectStmt)m_parsedStmt)
+                                  : null;
+        boolean hasOrderBy = ( m_parsedStmt.hasOrderByColumns()
+                                  && ( ! m_parsedStmt.orderByColumns().isEmpty() ) );
+        boolean hasWindowFunctions = (pss != null && pss.hasWindowFunctionExpression());
+        //
+        // If we have no statement level order by or window functions,
+        // then we can't use this index for ordering, and we
+        // return 0.
+        //
+        if (! hasOrderBy && ! hasWindowFunctions) {
             return 0;
         }
-        if (m_parsedStmt instanceof ParsedSelectStmt) {
-            // If this parsed select statement has a windowed expression,
-            // we don't want to consider the order by at all.
-            // Note that this is the content of ENG-10474.
-            ParsedSelectStmt pss = (ParsedSelectStmt)m_parsedStmt;
-            if (pss.hasWindowFunctionExpression()) {
-                return 0;
-            }
+        //
+        // We make a definition.  Let S1 and S2 be sequences of expressions,
+        // and OS be an increasing sequence of indices into S2.  Let erase(S2, OS) be
+        // the sequence of expressions which results from erasing all S2
+        // expressions whose indices are in OS.  We say *S1 is a prefix of
+        // S2 with OS-singular values* if S1 is a prefix of erase(S2, OS).
+        // That is to say, if we erase the expressions in S2 whose indices are
+        // in OS, S1 is a prefix of the result.
+        //
+        // What expressions must we match?
+        //   1.) We have the parameters indexedExpressions and indexedColRefs.
+        //       These are the expressions or column references in an index.
+        //       Exactly one of them is non-null.  Since these are both an
+        //       indexed sequence of expression-like things, denote the
+        //       non-null one IS.
+        // What expressions do we care about?  We have two kinds.
+        //   1.) The expressions from the statement level order by clause, OO.
+        //       This sequence of expressions must be a prefix of IS with OS
+        //       singular values for some sequence OS.  The sequence OS will be
+        //       called the order spoilers.  Later on we will test that the
+        //       index expressions at the positions in OS can have only a
+        //       single value.
+        //   2.) The expressions in a window function's partition by list, WP,
+        //       followed by the expressions in the window function's
+        //       order by list, WO.  The partition by functions are a set not
+        //       a sequence.  We need to find a sequence of expressions, S,
+        //       such that S is a permutation of P and S+WO is a singular prefix
+        //       of IS.
+        //
+        // So, in both cases, statement level order by and window function, we are looking for
+        // a sequence of expressions, S1, and a list of IS indices, OS, such
+        // that S1 is a prefix of IS with OS-singular values.
+        //
+        // If the statement level order by expression list is not a prefix of
+        // the index, we still care to know about window functions.  The reverse
+        // is not true.  If there are window functions but they all fail to match the index,
+        // we must give up on this index, even if the statement level order
+        // by list is still matching.  This is because the window functions will
+        // require sorting before the statement level order by clause's
+        // sort, and this window function sort will invalidate the statement level
+        // order by sort.
+        //
+        // Note also that it's possible that the statement level order by and
+        // the window function order by are compatible.  So this index may provide
+        // all the sorting needed.
+        //
+        // There need to be enough indexed expressions to provide full sort coverage.
+        // More indexed expressions are ok.
+        //
+        // We keep a scoreboard which keeps track of everything.  All the window
+        // functions and statement level order by functions are kept in the scoreboard.
+        //
+        WindowFunctionScoreboard windowFunctionScores = new WindowFunctionScoreboard(m_parsedStmt, tableScan);
+        // indexCtr is an index into the index expressions or columns.
+        for (int indexCtr = 0; !windowFunctionScores.isDone() && indexCtr < keyComponentCount; indexCtr += 1) {
+            // Figure out what to do with index expression or column at indexCtr.
+            // First, fetch it out.
+            AbstractExpression indexExpr = (indexedExprs == null) ? null : indexedExprs.get(indexCtr);
+            ColumnRef indexColRef = (indexedColRefs == null) ? null : indexedColRefs.get(indexCtr);
+            // Then see if it matches something.  If
+            // this doesn't match one thing it may match
+            // another.  If it doesn't match anything, it may
+            // be an order spoiler, which we will maintain in
+            // the scoreboard.
+            windowFunctionScores.matchIndexEntry(new ExpressionOrColumn(indexCtr,
+                                                                        tableScan,
+                                                                        indexExpr,
+                                                                        SortDirectionType.INVALID,
+                                                                        indexColRef));
         }
-        int nSpoilers = 0;
-        boolean ascending = m_parsedStmt.orderByColumns().get(0).ascending;
-        retval.sortDirection = ascending ? SortDirectionType.ASC : SortDirectionType.DESC;
-        int jj = 0;
-        for (ParsedColInfo colInfo : m_parsedStmt.orderByColumns()) {
-            // This retry loop allows catching special cases that don't perfectly match the
-            // ORDER BY columns but may still be usable for ordering.
-            for ( ; jj < keyComponentCount; ++jj) {
-                if (colInfo.ascending == ascending) {
-                    // Explicitly advance to the each indexed expression/column
-                    // to match them with the query's "ORDER BY" expressions.
-                    if (indexedExprs == null) {
-                        ColumnRef nextColRef = indexedColRefs.get(jj);
-                        if (colInfo.expression instanceof TupleValueExpression &&
-                            colInfo.tableAlias.equals(tableScan.getTableAlias()) &&
-                            colInfo.columnName.equals(nextColRef.getColumn().getTypeName())) {
-                            break;
-                        }
-                    } else {
-                        assert(jj < indexedExprs.size());
-                        AbstractExpression nextExpr = indexedExprs.get(jj);
-                        List<AbstractExpression> moreBindings =
-                            colInfo.expression.bindingToIndexedExpression(nextExpr);
-                        // Non-null bindings (even an empty list) denotes a match.
-                        if (moreBindings != null) {
-                            bindingsForOrder.addAll(moreBindings);
-                            break;
-                        }
-                    }
-                }
-                // The ORDER BY column did not match the established ascending/descending
-                // pattern OR did not match the next index key component.
-                // The only hope for the sort being preserved is that
-                // (A) the ORDER BY column matches a later index key component
-                // -- so keep searching -- AND
-                // (B) the current (and each intervening) index key component is constrained
-                // to a single value, i.e. it is equality-filtered.
-                // -- so note the current component's position (jj).
-                orderSpoilers[nSpoilers++] = jj;
-            }
-            if (jj < keyComponentCount) {
-                // The loop exited prematurely.
-                // That means the current ORDER BY column matched the current key component,
-                // so move on to the next key component (to match the next ORDER BY column).
-                ++jj;
-            } else {
-                // The current ORDER BY column ran out of key components to try to match.
-                // This is an outright failure case.
-                retval.sortDirection = SortDirectionType.INVALID;
-                bindingsForOrder.clear(); // suddenly irrelevant
-                return 0;  // Any orderSpoilers are also suddenly irrelevant.
-            }
-        }
-        return nSpoilers;
+        //
+        // The result is the number of order spoilers, but
+        // also the access path we have chosen, the order
+        // spoilers themselves and the bindings.  Return these
+        // by reference.
+        //
+        return windowFunctionScores.getResult(retval, orderSpoilers, bindingsForOrder);
     }
 
+
+    /**
+     * Match the indexEntry, which is from an index, with
+     * a statement expression or column.  The nextStatementEOC
+     * must be an expression, not a column reference.
+     *
+     * @param nextStatementEOC The expression or column in the SQL statement.
+     * @param indexEntry The expression or column in the index.
+     * @return A list of bindings for this match.  Return null if
+     *         there is no match.  If there are no bindings but the
+     *         expressions match, return an empty, non-null list.
+     */
+    private static List<AbstractExpression>
+        findBindingsForOneIndexedExpression(ExpressionOrColumn nextStatementEOC,
+                                            ExpressionOrColumn indexEntry) {
+        assert(nextStatementEOC.m_expr != null);
+        AbstractExpression nextStatementExpr = nextStatementEOC.m_expr;
+        if (indexEntry.m_colRef != null) {
+            ColumnRef indexColRef = indexEntry.m_colRef;
+            // This is a column.  So try to match it
+            // with the expression in nextStatementEOC.
+            if (matchExpressionAndColumnRef(nextStatementExpr, indexColRef, indexEntry.m_tableScan)) {
+                return s_reusableImmutableEmptyBinding;
+            }
+            return null;
+        }
+        // So, this index entry is an expression.
+        List<AbstractExpression> moreBindings =
+                nextStatementEOC.m_expr.bindingToIndexedExpression(indexEntry.m_expr);
+        if (moreBindings != null) {
+            return moreBindings;
+        }
+        return null;
+    }
+
+    private static boolean matchExpressionAndColumnRef(AbstractExpression statementExpr,
+                                                       ColumnRef indexColRef,
+                                                       StmtTableScan tableScan) {
+        if (statementExpr instanceof TupleValueExpression) {
+            TupleValueExpression tve = (TupleValueExpression)statementExpr;
+            if (tve.getTableAlias().equals(tableScan.getTableAlias()) &&
+                    tve.getColumnName().equals(indexColRef.getColumn().getTypeName())) {
+                return true;
+            }
+        }
+        return false;
+    }
 
     /**
      * @param orderSpoilers  positions of index key components that would need to be
@@ -1158,7 +1791,7 @@ public abstract class SubPlanAssembler {
         // Filters leveraged for an optimization, such as the skipping of an ORDER BY plan node
         // always risk adding a dependency on a particular parameterization, so be prepared to
         // add prerequisite parameter bindings to the plan.
-        List<AbstractExpression> otherBindingsForOrder = new ArrayList<AbstractExpression>();
+        List<AbstractExpression> otherBindingsForOrder = new ArrayList<>();
         // Order spoilers must be recovered in the order they were found
         // for the index ordering to be considered acceptable.
         // Each spoiler key component is recovered by the detection of an equality filter on it.
@@ -1287,7 +1920,7 @@ public abstract class SubPlanAssembler {
                             // is often a "shared object" and is intended to be treated as immutable.
                             // To add a parameter to it, first copy the List.
                             List<AbstractExpression> moreBinding =
-                                new ArrayList<AbstractExpression>(binding);
+                                new ArrayList<>(binding);
                             moreBinding.add(pve);
                             binding = moreBinding;
                         } else if (otherExpr instanceof ConstantValueExpression) {
@@ -1417,7 +2050,7 @@ public abstract class SubPlanAssembler {
      */
     private static List<AbstractExpression> removeNotNullCoveredExpressions(StmtTableScan tableScan, List<AbstractExpression> coveringExprs, List<AbstractExpression> exprsToCover) {
         // Collect all TVEs from NULL-rejecting covering expressions
-        Set<TupleValueExpression> coveringTves = new HashSet<TupleValueExpression>();
+        Set<TupleValueExpression> coveringTves = new HashSet<>();
         for (AbstractExpression coveringExpr : coveringExprs) {
             if (ExpressionUtil.isNullRejectingExpression(coveringExpr, tableScan.getTableAlias())) {
                 coveringTves.addAll(ExpressionUtil.getTupleValueExpressions(coveringExpr));
@@ -1559,8 +2192,8 @@ public abstract class SubPlanAssembler {
      * @return An index scan plan node OR,
                in one edge case, an NLIJ of a MaterializedScan and an index scan plan node.
      */
-    private static AbstractPlanNode getIndexAccessPlanForTable(StmtTableScan tableScan, AccessPath path)
-    {
+    private static AbstractPlanNode getIndexAccessPlanForTable(
+            StmtTableScan tableScan, AccessPath path) {
         // now assume this will be an index scan and get the relevant index
         Index index = path.index;
         IndexScanPlanNode scanNode = new IndexScanPlanNode(tableScan, index);
@@ -1610,19 +2243,27 @@ public abstract class SubPlanAssembler {
         scanNode.setBindings(path.bindings);
         scanNode.setEndExpression(ExpressionUtil.combinePredicates(path.endExprs));
         scanNode.setPredicate(path.otherExprs);
+        // Propagate the sorting information
+        // into the scan node from the access path.
         // The initial expression is needed to control a (short?) forward scan to adjust the start of a reverse
         // iteration after it had to initially settle for starting at "greater than a prefix key".
         scanNode.setInitialExpression(ExpressionUtil.combinePredicates(path.initialExpr));
         scanNode.setSkipNullPredicate();
         scanNode.setEliminatedPostFilters(path.eliminatedPostExprs);
+        if (scanNode instanceof IndexSortablePlanNode) {
+            IndexUseForOrderBy indexUse = ((IndexSortablePlanNode)scanNode).indexUse();
+            indexUse.setWindowFunctionUsesIndex(path.m_windowFunctionUsesIndex);
+            indexUse.setSortOrderFromIndexScan(path.sortDirection);
+            indexUse.setWindowFunctionIsCompatibleWithOrderBy(path.m_stmtOrderByIsCompatible);
+            indexUse.setFinalExpressionOrderFromIndexScan(path.m_finalExpressionOrder);
+        }
         return resultNode;
     }
 
 
     // Generate a plan for an IN-LIST-driven index scan
-    private static AbstractPlanNode injectIndexedJoinWithMaterializedScan(AbstractExpression listElements,
-                                                                   IndexScanPlanNode scanNode)
-    {
+    private static AbstractPlanNode injectIndexedJoinWithMaterializedScan(
+            AbstractExpression listElements, IndexScanPlanNode scanNode) {
         MaterializedScanPlanNode matScan = new MaterializedScanPlanNode();
         assert(listElements instanceof VectorValueExpression || listElements instanceof ParameterValueExpression);
         matScan.setRowData(listElements);

@@ -34,7 +34,6 @@ class DrPage extends VoltDBManagementCenterPage {
         drPending           { $('#drPending_0') }
         drArrow             { $('#drArrow_0') }
         drArrowParagraph    { $('#drArrow_0 p') }
-
         drMode              { $('#drModeName') }
 
         divDrReplication    { $("#divDrReplication") }
@@ -135,6 +134,7 @@ class DrPage extends VoltDBManagementCenterPage {
     /*
      *  click the server column in DR Replica table
      */
+
     def boolean clickReplicaServer(divId) {
         $("#replicaServer_" + divId).click()
     }
@@ -164,6 +164,7 @@ class DrPage extends VoltDBManagementCenterPage {
     /*
      *  click the status column in Replication Rate 1min table
      */
+
     def boolean clickReplicationRate1(divId) {
         $("#replicationRate1_" + divId).click()
     }
@@ -171,6 +172,7 @@ class DrPage extends VoltDBManagementCenterPage {
     /*
      * click the ReplicationRate5 column in DR Replica table
      */
+
     def boolean clickReplicationRate5(divId) {
         $("#replicationRate5_" + divId).click()
     }
@@ -178,12 +180,14 @@ class DrPage extends VoltDBManagementCenterPage {
     /*
      *  click the status column in DR Replica table
      */
+
     def boolean clickReplicaStatus(divId) {
         $("#replicaStatus_" + divId).click()
     }
 
     def boolean drReplicaTitleDisplayed(divId){
         return $("#drReplicaTitle_" + divId).displayed
+
     }
 
     def boolean drMasterTitleDisplayed(divId){
