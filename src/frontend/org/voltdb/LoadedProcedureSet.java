@@ -79,34 +79,37 @@ public class LoadedProcedureSet {
     }
 
     public ProcedureRunner getSysproc(long fragmentId) {
-        synchronized (m_registeredSysProcPlanFragments) {
-            return m_registeredSysProcPlanFragments.get(fragmentId);
-        }
+        return m_registeredSysProcPlanFragments.get(fragmentId);
     }
 
     private void registerPlanFragment(final long pfId, final ProcedureRunner proc) {
-        synchronized (m_registeredSysProcPlanFragments) {
-            assert(m_registeredSysProcPlanFragments.containsKey(pfId) == false);
-            m_registeredSysProcPlanFragments.put(pfId, proc);
-        }
-    }
-
-    public void loadProcedures(
-            CatalogContext catalogContext,
-            CatalogSpecificPlanner csp)
-    {
-        loadProceduresForCatalogUpdate(catalogContext, csp);
-
-        // reload system procedures
-        m_sysProcs = loadSystemProcedures(catalogContext);
+        assert(m_registeredSysProcPlanFragments.containsKey(pfId) == false);
+        m_registeredSysProcPlanFragments.put(pfId, proc);
     }
 
     /**
-     * When catalog updates, only user procedures needs to be reloaded. System procedures can be left without changes.
+     * Load all user procedures and system procedures as new procedures from beginning.
+     * @param catalogContext
+     * @param csp
      */
-    public void loadProceduresForCatalogUpdate(
+    public void loadProcedures(
             CatalogContext catalogContext,
-            CatalogSpecificPlanner csp)
+            CatalogSpecificPlanner csp) {
+        loadProcedures(catalogContext, csp, false);
+    }
+
+    /**
+     * Load procedures.
+     * If @param forUpdateOnly, it will try to reuse existing loaded procedures
+     * as many as possible, other than completely loading procedures from beginning.
+     * @param catalogContext
+     * @param csp
+     * @param forUpdateOnly
+     */
+    public void loadProcedures(
+            CatalogContext catalogContext,
+            CatalogSpecificPlanner csp,
+            boolean forUpdateOnly)
     {
         m_csp = csp;
         m_defaultProcManager = catalogContext.m_defaultProcs;
@@ -116,6 +119,24 @@ public class LoadedProcedureSet {
 
         // reload user procedures
         m_userProcs = loadUserProcedureRunners(catalogContext, m_site, m_csp);
+
+        if (forUpdateOnly) {
+            reInitSystemProcedureRunners(catalogContext, csp);
+        } else {
+            // reload all system procedures from beginning
+            m_sysProcs = loadSystemProcedures(catalogContext, m_site, csp);
+        }
+
+    }
+
+    /**
+     * When catalog updates, only user procedures needs to be reloaded. System procedures can be left without changes.
+     */
+    public void loadProceduresForCatalogUpdate(
+            CatalogContext catalogContext,
+            CatalogSpecificPlanner csp)
+    {
+
     }
 
     private static ImmutableMap<String, ProcedureRunner> loadUserProcedureRunners(
@@ -186,7 +207,9 @@ public class LoadedProcedureSet {
 
 
     private ImmutableMap<String, ProcedureRunner> loadSystemProcedures(
-            CatalogContext catalogContext) {
+            CatalogContext catalogContext,
+            SiteProcedureConnection site,
+            CatalogSpecificPlanner csp) {
         // clean up all the registered system plan fragments before reloading system procedures
         m_registeredSysProcPlanFragments.clear();
         ImmutableMap.Builder<String, ProcedureRunner> builder = ImmutableMap.<String, ProcedureRunner>builder();
@@ -214,7 +237,7 @@ public class LoadedProcedureSet {
                             Level.WARN,
                             LogKeys.host_ExecutionSite_GenericException.name(),
                             // TODO: remove the extra meaningless parameter "0"
-                            new Object[] { m_site.getCorrespondingSiteId(), 0 },
+                            new Object[] { site.getCorrespondingSiteId(), 0 },
                             e);
                     VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
                 }
@@ -224,18 +247,18 @@ public class LoadedProcedureSet {
                 }
                 catch (final InstantiationException e) {
                     hostLog.l7dlog( Level.WARN, LogKeys.host_ExecutionSite_GenericException.name(),
-                            new Object[] { m_site.getCorrespondingSiteId(), 0 }, e);
+                            new Object[] { site.getCorrespondingSiteId(), 0 }, e);
                 }
                 catch (final IllegalAccessException e) {
                     hostLog.l7dlog( Level.WARN, LogKeys.host_ExecutionSite_GenericException.name(),
-                            new Object[] { m_site.getCorrespondingSiteId(), 0 }, e);
+                            new Object[] { site.getCorrespondingSiteId(), 0 }, e);
                 }
 
                 ProcedureRunner runner = new ProcedureRunner(Language.JAVA, procedure,
-                        m_site, m_site.getSystemProcedureExecutionContext(),
-                        proc, m_csp);
+                        site, site.getSystemProcedureExecutionContext(),
+                        proc, csp);
 
-                procedure.initSysProc(m_site, catalogContext.cluster,
+                procedure.initSysProc(site, catalogContext.cluster,
                         catalogContext.getClusterSettings(),
                         catalogContext.getNodeSettings());
 
@@ -250,6 +273,16 @@ public class LoadedProcedureSet {
             }
         }
         return builder.build();
+    }
+
+    public void reInitSystemProcedureRunners(
+            CatalogContext catalogContext,
+            CatalogSpecificPlanner csp)
+    {
+        for (Entry<String, ProcedureRunner> entry: m_sysProcs.entrySet()) {
+            ProcedureRunner runner = entry.getValue();
+            runner.reInitSysProc(catalogContext, csp);
+        }
     }
 
     public ProcedureRunner getProcByName(String procName)

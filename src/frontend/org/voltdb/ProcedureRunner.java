@@ -120,7 +120,7 @@ public class ProcedureRunner {
     //
     protected final SiteProcedureConnection m_site;
     protected final SystemProcedureExecutionContext m_systemProcedureContext;
-    protected final CatalogSpecificPlanner m_csp;
+    protected CatalogSpecificPlanner m_csp;
 
     // per procedure state and catalog info
     //
@@ -220,6 +220,20 @@ public class ProcedureRunner {
                 );
 
         reflect();
+    }
+
+    public void reInitSysProc(CatalogContext catalogContext, CatalogSpecificPlanner csp) {
+        assert(m_procedure != null);
+        if (! m_isSysProc) {
+            return;
+        }
+        assert(m_procedure instanceof VoltSystemProcedure);
+        ((VoltSystemProcedure) m_procedure).initSysProc(m_site,
+                catalogContext.cluster,
+                catalogContext.getClusterSettings(),
+                catalogContext.getNodeSettings());
+
+        m_csp = csp;
     }
 
     public Procedure getCatalogProcedure() {
