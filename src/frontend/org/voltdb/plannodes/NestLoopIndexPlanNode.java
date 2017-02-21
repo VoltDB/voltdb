@@ -270,4 +270,5 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
                     jobj.getString(Members.SORT_DIRECTION.name()));
         }
     }
+
 }

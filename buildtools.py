@@ -506,7 +506,7 @@ def buildMakefile(CTX):
     makefile.write("\t$(AR) $(ARFLAGS) $@ $?\n")
     harness_source = TEST_PREFIX + "/harness.cpp"
     makefile.write("objects/harness.o: $(ROOTDIR)/" + harness_source + "\n")
-    makefile.write("\t$(CCACHE) $(COMPILE.cpp) -MMD -MP -o $@ $^\n")
+    makefile.write("\t$(CCACHE) $(COMPILE.cpp) -MMD -MP -o $@ $(ROOTDIR)/" + harness_source + "\n")
     makefile.write("-include %s\n" % "objects/harness.d")
     makefile.write("\n")
     cleanobjs += ["objects/volt.a", "objects/harness.o", "objects/harness.d"]

@@ -45,6 +45,9 @@ $(document).ready(function () {
                     }
                 }
             }
+            if(key.indexOf('DataTables_tblDrMAster') > -1 || key.indexOf('DataTables_tblDrReplica') > -1 || key.indexOf('DataTables_tblCmdLog_') > -1){
+                localStorage.removeItem(key)
+            }
         }
     }
 
@@ -100,6 +103,9 @@ $(document).ready(function () {
 
             if (json["GraphView"] != undefined && json["GraphView"] != "")
                 saveInLocalStorage("graph-view", json["GraphView"]);
+
+            if (json["DrGraphView"] != undefined && json["DrGraphView"] != "")
+                saveInLocalStorage("dr-graph-view", json["DrGraphView"]);
 
             if (json["CurrentServer"] != undefined && json["CurrentServer"] != "")
                 saveCurrentServer(json["CurrentServer"]);
@@ -302,7 +308,7 @@ $(document).ready(function () {
                     VoltDbUI.gutterInstanceHor.destroy();
                 VoltDbUI.gutterInstanceHor = Split(['#a', '#inputQuery'],{
                     gutterSize:15,
-                    minSize:380,
+                    minSize:400,
                     sizes:[25, 75]
                 });
             }
@@ -445,7 +451,7 @@ function convertArrayOfObjectsToCSV(args) {
     return result;
 }
 
-function downloadCSV(event,args,whichChart) {
+function downloadCSV(event,args,whichChart, chartId) {
     if (navigator.userAgent.indexOf('Safari') != -1 && navigator.userAgent.indexOf('Chrome') == -1 ||
     navigator.userAgent.indexOf('MSIE') > 0 || navigator.userAgent.indexOf('Trident/') > 0 ) {
         event.preventDefault()
@@ -455,6 +461,7 @@ function downloadCSV(event,args,whichChart) {
 
     var data, filename, link;
     var graphView = $("#graphView").val()
+    var drGraphVIew = $("#drGraphView").val()
     var chartData = {}
 
     if (whichChart == "cpu"){
@@ -517,14 +524,14 @@ function downloadCSV(event,args,whichChart) {
 
     }
     else if (whichChart == "dataReplication"){
-        if (graphView == "Seconds"){
-            chartData = JSON.parse(localStorage.drDetails)
+        if (drGraphVIew == "Seconds"){
+            chartData = JSON.parse(localStorage["drDetails_" + chartId])
         }
-        else if (graphView == "Minutes"){
-            chartData = JSON.parse(localStorage.drDetailsMin)
+        else if (drGraphVIew == "Minutes"){
+            chartData = JSON.parse(localStorage["drDetailsMin_" + chartId])
         }
-        else if (graphView == "Days"){
-            chartData = JSON.parse(localStorage.drDetailsDay)
+        else if (drGraphVIew == "Days"){
+            chartData = JSON.parse(localStorage["drDetailsDay_" + chartId])
         }
     }
     else if (whichChart == "commandLog"){
@@ -545,7 +552,11 @@ function downloadCSV(event,args,whichChart) {
     });
     if (csv == null) return;
 
-    filename = args.filename + "-" + graphView + ".csv";
+    if(whichChart == "dataReplication")
+        filename = args.filename + "-" + drGraphVIew + ".csv";
+    else
+        filename = args.filename + "-" + graphView + ".csv";
+
     data = encodeURI(csv);
 
     var blob = new Blob([csv], {type: "text/csv;"});
@@ -828,6 +839,7 @@ var loadPage = function (serverName, portid) {
                 var data = {
                     CurrentServer: clickedServer,
                     GraphView: VoltDbUI.getFromLocalStorage("graph-view"),
+                    DrGraphView: VoltDbUI.getFromLocalStorage("dr-graph-view"),
                     DisplayPreferences: VoltDbUI.getFromLocalStorage("user-preferences"),
                     AlertThreshold: VoltDbUI.getFromLocalStorage("alert-threshold"),
                     username: VoltDbUI.getCookie("username"),
@@ -866,6 +878,7 @@ var loadPage = function (serverName, portid) {
                 var data = {
                     CurrentServer: clickedServer,
                     GraphView: VoltDbUI.getFromLocalStorage("graph-view"),
+                    DrGraphView: VoltDbUI.getFromLocalStorage("dr-graph-view"),
                     DisplayPreferences: VoltDbUI.getFromLocalStorage("user-preferences"),
                     AlertThreshold: VoltDbUI.getFromLocalStorage("alert-threshold"),
                     username: VoltDbUI.getCookie("username"),
@@ -1066,418 +1079,480 @@ var loadPage = function (serverName, portid) {
 
         showHideCmdlogDataAndCharts(VoltDbUI.isCommandLogEnabled, graphView, currentTab);
 
-        voltDbRenderer.GetClusterReplicaInformation(function (replicaDetail) {
-            if (getCurrentServer() != undefined) {
-//                $('#dRHeaderName').html(getCurrentServer())
-                var isReplicaDataVisible = false;
-                var isMasterDataVisible = false;
-                var isDrGraphVisible = false;
-                var currentServer = getCurrentServer();
-                if (replicaDetail.hasOwnProperty(currentServer))
-                    VoltDbUI.drReplicationRole = replicaDetail[currentServer]['status'];
-                else
-                    return;
-                voltDbRenderer.GetDrStatusInformation(function (drDetails) {
+        voltDbRenderer.GetDrRoleInformation(function(drRoleDetail){
+            var role = drRoleDetail['DRROLE'][0][0];
+            $("#drModeName").html(drRoleDetail['DRROLE'][0][0])
+            if(role == "MASTER" || role == "XDCR"){
+                voltDbRenderer.GetDrDetails(function (drDetails) {
+                    populateDRGraphandTable(drRoleDetail, drDetails)
+                });
+            } else if (role == "REPLICA"){
+                 voltDbRenderer.GetDrReplicationInformation(function (replicationData) {
+                        populateDRGraphandTable(drRoleDetail, replicationData["DR_GRAPH"])
+                 });
+            }
+
+        });
+
+        var populateDRGraphandTable = function(drRoleDetail, drDetails){
+            var response = drDetails;
+            var replicaLatency = [];
+            var role = drRoleDetail['DRROLE'][0][0];
+            var producerDbId = drDetails["CLUSTER_ID"];
+
+            if(producerDbId != undefined){
+                $("#drCLusterId").html(" (ID: " + producerDbId + ")");
+            }
+            else{
+                $("#drCLusterId").html("");
+            }
+
+            if(drRoleDetail['DRROLE'].length > 0){
+                if(JSON.stringify(VoltDbUI.prevDrRoleDetail) != JSON.stringify(drRoleDetail)) {
+                    VoltDbUI.prevDrRoleDetail = drRoleDetail;
+                    for(var i = 0; i < drRoleDetail['DRROLE'].length ; i++){
+                        var htmlContent = getDrHtmlContent(i, producerDbId, drRoleDetail, response);
+                    }
+                    MonitorGraphUI.InitializeDrData();
+                    MonitorGraphUI.InitializeDRGraph();
+                    MonitorGraphUI.AddDrGraph("Seconds");
+                }
+                showDrGraphAndData(drRoleDetail, producerDbId)
+            }
+        }
+
+        var showDrGraphAndData = function(drRoleDetail, producerDbId){
+            var combinedId = ""
+            var isDisabled = false;
+            for(var i = 0; i <= drRoleDetail['DRROLE'].length -1 ; i++){
+                var role = drRoleDetail['DRROLE'][i][1];
+                combinedId = producerDbId + '_' + drRoleDetail['DRROLE'][i][2]
+                if (role == "DISABLED"){
+                    isDisabled = true;
+                }
+            }
+            if(isDisabled == false){
+                voltDbRenderer.GetClusterReplicaInformation(function (replicaDetail) {
+
                     if (getCurrentServer() != undefined) {
-                        var drResult = drDetails["Details"]["STATUS"];
-                        if (drResult != -2 && drDetails.hasOwnProperty(currentServer) && drDetails[currentServer].hasOwnProperty('MASTERENABLED')) {
-                            if(drDetails[currentServer]['STATE'] != 'DISABLED'){
-                                VoltDbUI.drMasterEnabled = (drDetails[currentServer]['MASTERENABLED'] != null && drDetails[currentServer]['MASTERENABLED'] != false) ? true : false;
-                                VoltDbUI.drMasterState = (drDetails[currentServer]['STATE']);
-                                //show master/replica table
-                                voltDbRenderer.GetDrConsumerInformation(function(drConsumerDetails){
-                                    if(drConsumerDetails.hasOwnProperty(currentServer) && drConsumerDetails[currentServer].hasOwnProperty('STATE'))
-                                        VoltDbUI.drConsumerState = drConsumerDetails[currentServer]['STATE'];
-                                    else
-                                        VoltDbUI.drConsumerState = 'DISABLE'
-                                    if(!(drDetails[currentServer]['STATE'] == 'OFF' && VoltDbUI.drConsumerState == 'DISABLE')){
-                                        if (!(VoltDbUI.drReplicationRole.toLowerCase() == "none" && !VoltDbUI.drMasterEnabled)) {
-                                            var userPreference = getUserPreferences();
-                                            VoltDbUI.isDRInfoRequired = true;
-                                            VoltDbUI.drStatus = drDetails[currentServer]['SYNCSNAPSHOTSTATE'];
-                                            // showHideLastLineClass(true);
-                                            $("#divDrWrapperAdmin").show();
-                                            if (VoltDbUI.drReplicationRole.toLowerCase() == 'replica') {
-                                                if(VoltDbUI.drConsumerState.toLowerCase() != 'disable') {
-                                                    $("#ChartDrReplicationRate").show();
-                                                    isDrGraphVisible = true;
-                                                    MonitorGraphUI.refreshGraphDR();
-                                                    $('#drReplicaSection').css('display', 'block');
-                                                    isReplicaDataVisible = true;
+                        var isReplicaDataVisible = false;
+                        var isMasterDataVisible = false;
+                        var isDrGraphVisible = false;
+                        var currentServer = getCurrentServer();
+                        if (replicaDetail.hasOwnProperty(currentServer))
+                            VoltDbUI.drReplicationRole = replicaDetail[currentServer]['status'];
+                        else
+                            return;
+                        voltDbRenderer.GetDrStatusInformation(function (drDetails) {
+                            if (getCurrentServer() != undefined) {
+                                var drResult = drDetails["Details"]["STATUS"];
+                                if (drResult != -2 && drDetails.hasOwnProperty(currentServer) && drDetails[currentServer].hasOwnProperty('MASTERENABLED')) {
+                                    if(drDetails[currentServer]['STATE'] != 'DISABLED'){
+                                        VoltDbUI.drMasterEnabled = (drDetails[currentServer]['MASTERENABLED'] != null && drDetails[currentServer]['MASTERENABLED'] != false) ? true : false;
+                                        VoltDbUI.drMasterState = (drDetails[currentServer]['STATE']);
+                                        //show master/replica table
+                                        voltDbRenderer.GetDrConsumerInformation(function(drConsumerDetails){
+                                            if(drConsumerDetails.hasOwnProperty(currentServer) && drConsumerDetails[currentServer].hasOwnProperty('STATE'))
+                                                VoltDbUI.drConsumerState = drConsumerDetails[currentServer]['STATE'];
+                                            else
+                                                VoltDbUI.drConsumerState = 'DISABLE'
+                                            if(!(drDetails[currentServer]['STATE'] == 'OFF' && VoltDbUI.drConsumerState == 'DISABLE')){
+                                                if (!(VoltDbUI.drReplicationRole.toLowerCase() == "none" && !VoltDbUI.drMasterEnabled)) {
+                                                    var userPreference = getUserPreferences();
+                                                    VoltDbUI.isDRInfoRequired = true;
+                                                    VoltDbUI.drStatus = drDetails[currentServer]['SYNCSNAPSHOTSTATE'];
+                                                    // showHideLastLineClass(true);
+                                                    $("#divDrWrapperAdmin").show();
+                                                    if (VoltDbUI.drReplicationRole.toLowerCase() == 'replica') {
+                                                        if(VoltDbUI.drConsumerState.toLowerCase() != 'disable') {
+                                                            showHideDrGraph(true)
+                                                            isDrGraphVisible = true;
+                                                            MonitorGraphUI.refreshGraphDR();
+                                                            $('#drReplicaSection_' + combinedId).css('display', 'block');
+                                                            isReplicaDataVisible = true;
+                                                        } else {
+                                                            showHideDrGraph(false);
+                                                            $('#drReplicaSection_'+ combinedId).css('display', 'none');
+                                                            isReplicaDataVisible = false;
+                                                            isDrGraphVisible = false;
+                                                        }
+                                                        refreshDrReplicaSection(currentTab);
+                                                        //to show DR Mode and DR tables
+                                                        if (VoltDbUI.drMasterState.toUpperCase() == 'ACTIVE') {
+                                                            $("#dbDrMode").text("Both");
+                                                            $('#drMasterSection').css('display', 'block');
+                                                            isMasterDataVisible = true;
+                                                            refreshDrMasterSection();
+                                                            $(".replicaWrapper").css('top', '-27px');
+                                                        } else {
+                                                            $("#dbDrMode").text("Replica");
+                                                            $(".replicaWrapper").css('top', '0px');
+                                                            $('#drMasterSection').css('display', 'none');
+                                                            isMasterDataVisible = false;
+                                                        }
+                                                        if(VoltDbUI.drConsumerState.toLowerCase() != 'disable' || VoltDbUI.drMasterState.toUpperCase() == 'ACTIVE'){
+                                                            $("#divDrReplication").show();
+                                                        } else {
+                                                            $("#divDrReplication").hide();
+                                                        }
+                                                    } else {
+                                                        voltDbRenderer.GetDrInformations(function (clusterInfo) {
+                                                            $('#clusterId').show();
+                                                            $('#clusterId').html(" (ID: " + clusterInfo[getCurrentServer()]['CLUSTER_ID'] + ")");
+                                                        });
+                                                        //to show DR Mode
+                                                        if (VoltDbUI.drMasterEnabled) {
+                                                            $("#dbDrMode").text("Master");
+                                                            $('#drMasterSection').css('display', 'block');
+                                                            isMasterDataVisible = true;
+                                                            refreshDrMasterSection();
+                                                        } else {
+                                                            isMasterDataVisible = false;
+                                                        }
+                                                        if(VoltDbUI.drMasterEnabled && VoltDbUI.drConsumerState.toLowerCase() != 'disable') {
+                                                            showHideDrGraph(true);
+                                                            isDrGraphVisible = true;
+                                                            MonitorGraphUI.refreshGraphDR();
+                                                            $('#drReplicaSection_'+ combinedId).css('display', 'block');
+                                                            isReplicaDataVisible = true;
+                                                            refreshDrReplicaSection(currentTab);
+                                                        } else {
+                                                            showHideDrGraph(false);
+                                                            isDrGraphVisible = false;
+                                                            $('#drReplicaSection_'+ combinedId).css('display', 'none');
+                                                            isReplicaDataVisible = false;
+                                                        }
+
+                                                        if(VoltDbUI.drMasterEnabled || VoltDbUI.drConsumerState.toLowerCase() != 'disable'){
+                                                            $("#divDrReplication").show();
+                                                        } else {
+                                                            $("#divDrReplication").hide();
+                                                        }
+                                                    }
                                                 } else {
-                                                    $('#drReplicaSection').css('display', 'none');
-                                                    isReplicaDataVisible = false;
-                                                    $("#ChartDrReplicationRate").hide();
-                                                    isDrGraphVisible = false;
-                                                }
-                                                refreshDrReplicaSection(graphView, currentTab);
-                                                //to show DR Mode and DR tables
-                                                if (VoltDbUI.drMasterState.toUpperCase() == 'ACTIVE') {
-                                                    $("#dbDrMode").text("Both");
-                                                    $('#drMasterSection').css('display', 'block');
-                                                    isMasterDataVisible = true;
-                                                    refreshDrMasterSection();
-                                                    $(".replicaWrapper").css('top', '-27px');
-                                                } else {
-                                                    $("#dbDrMode").text("Replica");
-                                                    $(".replicaWrapper").css('top', '0px');
+                                                    var userPreference = getUserPreferences();
+                                                    voltDbRenderer.GetDrInformations(function (clusterInfo) {
+                                                        $('#clusterId').show();
+                                                        $('#clusterId').html(" (ID: " + clusterInfo[getCurrentServer()]['CLUSTER_ID'] + ")");
+                                                    });
+                                                    VoltDbUI.isDRInfoRequired = true;
+                                                    $("#divDrReplication").hide();
+                                                    $("#divDrWrapperAdmin").show();
+                                                    if(VoltDbUI.drConsumerState.toLowerCase() != 'disable') {
+                                                        $("#divDrReplication").show();
+                                                        $('#drReplicaSection_'+ combinedId).css('display', 'block');
+                                                        isReplicaDataVisible = true;
+                                                        showHideDrGraph(true)
+                                                        isDrGraphVisible = true;
+                                                        MonitorGraphUI.refreshGraphDR();
+                                                        refreshDrReplicaSection(currentTab);
+                                                    } else {
+                                                        $("#divDrReplication").hide();
+                                                        $('#drReplicaSection_'+ combinedId).css('display', 'none');
+                                                        isReplicaDataVisible = false;
+                                                        showHideDrGraph(false);
+                                                        isDrGraphVisible = false;
+                                                    }
                                                     $('#drMasterSection').css('display', 'none');
                                                     isMasterDataVisible = false;
                                                 }
-                                                if(VoltDbUI.drConsumerState.toLowerCase() != 'disable' || VoltDbUI.drMasterState.toUpperCase() == 'ACTIVE'){
-                                                    $("#divDrReplication").show();
-                                                } else {
-                                                    $("#divDrReplication").hide();
+                                                if(isDrGraphVisible || isMasterDataVisible || isReplicaDataVisible){
+                                                    var curTab = VoltDbUI.getCookie("current-tab");
+                                                    if (curTab == NavigationTabs.DR){
+                                                        $("#overlay").show();
+                                                        setTimeout(function () { $("#navDR > a").trigger("click"); }, 100);
+                                                    }
+
+                                                    $('#navDR').show();
                                                 }
                                             } else {
-                                                voltDbRenderer.GetDrInformations(function (clusterInfo) {
-                                                    $('#clusterId').show();
-                                                    $('#clusterId').html(" (ID: " + clusterInfo[getCurrentServer()]['CLUSTER_ID'] + ")");
-                                                });
-                                                //to show DR Mode
-                                                if (VoltDbUI.drMasterEnabled) {
-                                                    $("#dbDrMode").text("Master");
-                                                    $('#drMasterSection').css('display', 'block');
-                                                    isMasterDataVisible = true;
-                                                    refreshDrMasterSection();
-                                                } else {
-                                                    isMasterDataVisible = false;
-                                                }
-                                                if(VoltDbUI.drMasterEnabled && VoltDbUI.drConsumerState.toLowerCase() != 'disable') {
-                                                    $("#ChartDrReplicationRate").show();
-                                                    isDrGraphVisible = true;
-                                                    MonitorGraphUI.refreshGraphDR();
-                                                    $('#drReplicaSection').css('display', 'block');
-                                                    isReplicaDataVisible = true;
-                                                    refreshDrReplicaSection(graphView, currentTab);
-                                                } else {
-                                                    $("#ChartDrReplicationRate").hide();
-                                                    isDrGraphVisible = false;
-                                                    $('#drReplicaSection').css('display', 'none');
-                                                    isReplicaDataVisible = false;
-                                                }
-
-                                                if(VoltDbUI.drMasterEnabled || VoltDbUI.drConsumerState.toLowerCase() != 'disable'){
-                                                    $("#divDrReplication").show();
-                                                } else {
-                                                    $("#divDrReplication").hide();
-                                                }
+                                                hideDrInformation()
                                             }
-                                        } else {
-                                            var userPreference = getUserPreferences();
-                                            voltDbRenderer.GetDrInformations(function (clusterInfo) {
-                                                $('#clusterId').show();
-                                                $('#clusterId').html(" (ID: " + clusterInfo[getCurrentServer()]['CLUSTER_ID'] + ")");
-                                            });
-                                            VoltDbUI.isDRInfoRequired = true;
-                                            $("#divDrReplication").hide();
-                                            $("#divDrWrapperAdmin").show();
-                                            if(VoltDbUI.drConsumerState.toLowerCase() != 'disable') {
-                                                $("#divDrReplication").show();
-                                                $('#drReplicaSection').css('display', 'block');
-                                                isReplicaDataVisible = true;
-                                                $("#ChartDrReplicationRate").show();
-                                                isDrGraphVisible = true;
-                                                MonitorGraphUI.refreshGraphDR();
-                                                refreshDrReplicaSection(graphView, currentTab);
-                                            } else {
-                                                $("#divDrReplication").hide();
-                                                $('#drReplicaSection').css('display', 'none');
-                                                isReplicaDataVisible = false;
-                                                $("#ChartDrReplicationRate").hide();
-                                                isDrGraphVisible = false;
-                                            }
-                                            $('#drMasterSection').css('display', 'none');
-                                            isMasterDataVisible = false;
-                                        }
-                                        if(isDrGraphVisible || isMasterDataVisible || isReplicaDataVisible){
-                                            var curTab = VoltDbUI.getCookie("current-tab");
-                                            if (curTab == NavigationTabs.DR){
-                                                $("#overlay").show();
-                                                setTimeout(function () { $("#navDR > a").trigger("click"); }, 100);
-                                            }
-
-                                            $('#navDR').show();
-                                        }
-                                    } else {
+                                        })
+                                    }
+                                    else{
                                         hideDrInformation()
                                     }
-                                })
-                            }
-                            else{
-                                hideDrInformation()
-                            }
 
-                        } else {
-                            hideDrInformation()
-                        }
-                    }
-                });
-            } else {
-                hideDrInformation()
-            }
-        });
-
-        //pm
-        voltDbRenderer.GetAdminDeploymentInformation(false, function (adminConfigValues, rawConfigValues) {
-            voltDbRenderer.GetDrRoleInformation(function(drRoleDetail){
-                    var role = drRoleDetail['DRROLE'][0][0];
-                    var producerDbId = rawConfigValues.dr.id;
-                    var consumerDbId = drRoleDetail['DRROLE'][0][2];
-                 voltDbRenderer.GetDrDetails(function (drDetails) {
-                    var response = drDetails;
-                    var replicaLatency = [];
-
-                    for (var key in response) {
-                        if(key != undefined){
-                            for (var i = 0; i <= response[key].length - 1; i++) {
-                                replicaLatency.push(response[key][i].LASTQUEUEDTIMESTAMP - response[key][i].LASTACKTIMESTAMP);
-                            }
-                        }
-
-                    }
-
-                    $('.latencyDR').html('');
-                    if(replicaLatency.length != 0){
-                        $('.latencyDR').html("<p>Latency <span id='latencyDR'>" + max(replicaLatency) + " </span> sec</p>")
-                    }
-                    else{
-                        $('.latencyDR').html('');
-                    }
-
-                    $("#dRProducerName").html('Database ('+ producerDbId +')');
-                    $("#dRConsumerName").html('Database ('+ consumerDbId +')');
-                    if(role == "MASTER"){
-                        $(".drRelationLeft").find('p').html(role + '/ REPLICA');
-                        $("#drArrow").addClass("arrowSingle");
-                    }
-                    else if (role == "REPLICA"){
-                        $(".drRelationLeft").find('p').html(role + '/ MASTER');
-                        $("#drArrow").removeClass("arrowDouble");
-                        $("#drArrow").addClass("arrowSingle");
-                    }
-                    else{
-                        $(".drRelationLeft").find('p').html(role);
-                        $("#drArrow").removeClass("arrowSingle");
-                        $("#drArrow").addClass("arrowDouble");
-                    }
-                    $("#drPending_1").html('')
-
-                    if(drRoleDetail['DRROLE'][0][1] == "PENDING"){
-                        $("#drPending_1").html("( No active connection )")
-                        $("#drPending_1").show();
-                        $("#drRelation_1").hide();
-                    }else{
-                        $("#drRelation_1").show();
-                        $("#drPending_1").hide();
-                    }
-
-                    if(drRoleDetail['DRROLE'].length > 1){
-                        for(var i = 2; i <= drRoleDetail['DRROLE'].length ; i++){
-                            consumerDbId = drRoleDetail['DRROLE'][i - 1][2];
-                            replicaLatency = [];
-                            for (var key in response) {
-                                for (var i = 0; i <= response[key].length - 1; i++) {
-                                    if(response[key][i].CONSUMERCLUSTERID == consumerDbId){
-                                        replicaLatency.push(response[key][i].LASTQUEUEDTIMESTAMP - response[key][i].LASTACKTIMESTAMP);
-                                    }
-                                }
-                            }
-
-                            var showClass = "expandedDR";
-                            var displayCss = "display:block";
-                            var displayArrow = "arrowSingle";
-                            if($("#dbPane_"+ i).find(".menu_head").hasClass("collapsedDR")){
-                                showClass = "collapsedDR";
-                                displayCss = "display:none";
-                            }
-                            $("#dbPane_"+ i).parent().remove();
-
-                            if(drRoleDetail['DRROLE'][i - 1][0] == "XDCR"){
-                                displayArrow = "arrowDouble";
-                            }
-                            else{
-                                displayArrow = "arrowSingle";
-                            }
-
-                            var htmlContent = '<div class="containerMain1" id="containerMain_'+ i + '">' +
-                                              '    <div id="dbPane_' + i + '" class="menu_list dbPane">' +
-                                              '        <!--Code for menu starts here-->' +
-                                              '        <div class="menu_head drHead '+ showClass +'">' +
-                                              '            <span class="iconDRDatabase"></span>' +
-                                              '            <h1 class="headText1 DRHeaderWrap">' +
-                                              '                <a href="#" id="showHideGraphBlock_' + i + '" class="showhideIcon arrowAdjustDR">' +
-                                              '                    <span class="DRHeaderName" id="dRHeaderName_' + i + '">Database ('+ rawConfigValues.dr.id +')</span>' +
-                                              '<span class="DRHeaderName drPending" id="drPending_'+ i +'"></span>' +
-                                              '                </a>' +
-                                              '            </h1>' +
-                                              '<div class="drRelation" id="drRelation_'+ i +'"><div class="drRelationLeft"><span class="'+ displayArrow +'">' +
-                                               '<p>'+drRoleDetail['DRROLE'][i - 1][0]+'</p></span></div>' +
-                                              '<div class="drRelationRight"><span class="iconDRDatabase"></span><div class="headText1 DRHeaderWrap">' +
-                                              '<a href="#" class="showhideIcon expandedDR arrowAdjustDR">' +
-                                              '<span class="DRHeaderName" id="dRHeaderName_' + i + '">Database ('+ drRoleDetail['DRROLE'][i - 1][2] +')</span>' +
-                                              '</a></div>  <div class="latencyDR"><p>Latency '+ max(replicaLatency) +' sec</p></div></div><div class="clear"></div></div>' +
-                                              '            <div class="clear"></div>' +
-                                              '        </div>'
-
-
-                            var htmlGraph =   '        <div class="menu_body drBody" style="'+ displayCss +'">' +
-
-                                              '            <div class="DRContantWrap">' +
-                                              '<h1>No Data Available</h1>' +
-    //                                          '                <div id="mainGraphBlock' + i + '">' +
-    //                                          '                    <div class="errorMsgLocalStorageFull" style="display:none">' +
-    //                                          '                        <div class="errorMsgLocalWrapper">' +
-    //                                          '                            <img src="css/resources/images/alert.png" alt="Alert"/>' +
-    //                                          '                        </div>' +
-    //                                          '                        <div class="textMsgLocalWrapper">' +
-    //                                          '                            <p>Local storage is full. Please delete some saved queries from SQL Query tab or minimize the retained time interval using the above sliding window.</p>' +
-    //                                          '                        </div>' +
-    //                                          '                        <div class="clear"></div>' +
-    //                                          '                    </div>' +
-    //                                          '                    <div class="graphChart" id="graphChart_' + i + '">' +
-    //                                          '<h1>No Data Available</h1>' +
-    ////                                          '                        <div id="ChartDrReplicationRate_' + i + '" class="chart chartDR" style="display: block">' +
-    ////                                          '                            <div class="chartHeader">' +
-    ////                                          '                                <h1>Database Replication (DR)' +
-    ////                                          '                                    <a href="#" class="downloadBtnChart" onclick=' +
-    ////                                          '                                         downloadCSV(event, { filename: "DrReplication-data" }, "dataReplication");' +
-    ////                                          '                                     > <img class="downloadCls" src="css/resources/images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>' +
-    ////                                          '                                    <div class="clear"></div>' +
-    ////                                          '                                </h1>' +
-    ////                                          '                            </div>' +
-    ////                                          '                            <svg id="visualizationDrReplicationRate_' + i + '" width="100%" height="400"></svg>' +
-    //                                          '                        </div>' +
-                                              '                    </div>' +
-                                              '                </div>'
-
-
-                            var htmlDrTable = '                <div class="drWrapper" id="divDrReplication' + i + '" style="display:block">' +
-                                              '                    <div class="content drHeader" id="drHeader'+ i + '">' +
-                                              '                        <div class="leftShowhide">' +
-                                              '                            <div class="dr">' +
-                                              '                                <h1 class="headText1">' +
-                                              '                                    <a href="javascript:void(0);" id="showHideDrBlock_' + i + '" class="showhideIcon collapsed arrowAdjust">Show/Hide Database Replication (DR)</a>' +
-                                              '                                </h1>' +
-                                              '                            </div>' +
-                                              '                        </div>' +
-                                              '                        <div class="rightShowhide">' +
-                                              '                            <ul class="drList">' +
-                                              '                                <li>Mode</li>' +
-                                              '                                <li id="dbDrMode_' + i + '" class="drArrow">Master</li>' +
-                                              '                            </ul>' +
-                                              '                            <ul class="drList">' +
-                                              '                                <li class="alertIcon warningDr" id="drAlertWarning_' + i + '" style="display: none">' +
-                                              '                                    <a id="drWarning_' + i + '" href="#drPartitionWarning" class="drWarning">' +
-                                              '                                        <span style="margin:0 0 0 24px">Warning</span>' +
-                                              '                                    </a>' +
-                                              '                                </li>' +
-                                              '                            </ul>' +
-                                              '                            <div class="clear"></div>' +
-                                              '                        </div>' +
-                                              '                        <div class="clear"></div>' +
-                                              '                    </div>' +
-                                              '                    <div id="drSection_' + i + '" class="drShowHide" style="display:none;">' +
-                                              '                        <div id="drMasterSection_' + i + '" class="masterWrapper" style="display:block;">' +
-                                              '                            <div id="tblMAster_wrapper_' + i + '" class="dataTables_wrapper no-footer">' +
-                                              '                                <div class="tabs-filter-wrapperDR">' +
-                                              '                                    <div class="drTitle icon-master" id="drMasterTitle_' + i + '">Master</div>' +
-                                              '                                    <div class="filter">' +
-                                              '                                        <input name="filter" id="filterPartitionId_' + i + '" type="text" class="search-box" onBlur="" placeholder="Search Partition ID"><a id="searchDrMasterData" href="javascript:void(0)" class="icon-search drIcon" title="Search">search</a>' +
-                                              '                                    </div>' +
-                                              '                                    <div class="clear"></div>' +
-                                              '                                </div>' +
-                                              '                                <div class="clear"></div>' +
-                                              '                                <div class="dataTables_paginate paging_extStyleLF paginationDefault" id="tblDrMAster_paginate_'+ i +'">' +
-                                              '                                    <span class="paginate_disabled_previous paginate_button" title="Previous Page">Prev</span>' +
-                                              '                                    <div class="navigationLabel">Page <span class="pageIndex"> 0 </span> of <span class="totalPages">0</span></div>' +
-                                              '                                    <span class="paginate_enabled_next paginate_button" title="Next Page">Next</span>' +
-                                              '                                </div>' +
-                                              '                                <div class="drMasterContainer">' +
-                                              '                                    <table width="100%" border="0" cellspacing="0" id="tblDrMAster_' + i + '" cellpadding="0" class="storeTbl drTbl no-footer dataTable" aria-describedby="tblDrMAster_info" role="grid">' +
-                                              '                                        <thead>' +
-                                              '                                            <tr role="row">' +
-                                              '                                                <th id="Th1" width="25%" data-name="none" class="" tabindex="0" aria-controls="tblDrMAster" rowspan="1" colspan="1" aria-sort="ascending" aria-label="Partition ID: activate to sort column descending">Partition ID</th>' +
-                                              '                                                <th id="Th2" width="20%" data-name="none" class="sorting" tabindex="0" aria-controls="tblDrMAster" rowspan="1" colspan="1" aria-label="Status: activate to sort column ascending">Status</th>' +
-                                              '                                                <th id="Th3" width="10%" data-name="none" class="sorting" tabindex="0" aria-controls="tblDrMAster" rowspan="1" colspan="1" aria-label="Total Buffer: activate to sort column ascending">Total Buffer</th>' +
-                                              '                                                <th id="Th4" width="10%" data-name="none" class="sorting" tabindex="0" aria-controls="tblDrMAster" rowspan="1" colspan="1" aria-label="Buffer on disk: activate to sort column ascending">Buffer on disk</th>' +
-                                              '                                                <th id="Th5" width="15%" data-name="none" class="sorting" tabindex="0" aria-controls="tblDrMAster" rowspan="1" colspan="1" aria-label="Replica Latency (ms): activate to sort column ascending">Replica Latency (ms)</th>' +
-                                              '                                                <th id="Th6" width="20%" data-name="none" class="sorting" tabindex="0" aria-controls="tblDrMAster" rowspan="1" colspan="1" aria-label="Replica latency (in transactions): activate to sort column ascending">Replica latency (in transactions)</th>' +
-                                              '                                            </tr>' +
-                                              '                                        </thead>' +
-                                              '                                        <tbody><tr><td colspan="6"> No data to be displayed</td></tr></tbody>' +
-                                              '                                    </table>' +
-                                              '                                </div>' +
-                                              '                            </div>' +
-                                              '                        </div>' +
-                                              '                        <div id="drReplicaSection_' + i + '" class="replicaWrapper" style="display:block">' +
-                                              '                            <div id="tblReplica_wrapper_' + i +'" class="dataTables_wrapper no-footer">' +
-                                              '                                <div class="tabs-filter-wrapperDR">' +
-                                              '                                    <div class="drTitle icon-replica" id="drReplicaTitle_' + i + '">Replica</div>' +
-                                              '                                    <div class="filter">' +
-                                              '                                        <input name="filter" id="filterHostID_' + i + '" type="text" class="search-box" onBlur="" placeholder="Search Server"><a id="searchDrMasterData" href="javascript:void(0)" class="icon-search drIcon" title="Search">search</a>' +
-                                              '                                    </div>' +
-                                              '                                    <div class="clear"></div>' +
-                                              '                                </div>' +
-                                              '                                <div class="clear"></div>' +
-                                              '                                <div class="dataTables_paginate paging_extStyleLF paginationDefault" id="tblDrReplica_paginate_' + i + '">' +
-                                              '                                    <span class="paginate_disabled_previous paginate_button" title="Previous Page">Prev</span>' +
-                                              '                                    <div class="navigationLabel">Page <span class="pageIndex"> 0 </span> of <span class="totalPages">0</span></div>' +
-                                              '                                    <span class="paginate_enabled_next paginate_button" title="Next Page">Next</span>' +
-                                              '                                </div>' +
-                                              '                                <div class="drReplicaContainer">' +
-                                              '                                    <table width="100%" border="0" cellspacing="0" id="tblDrReplica_' + i + '" cellpadding="0" class="storeTbl drTbl no-footer dataTable" aria-describedby="tblDrReplica_info" role="grid">' +
-                                              '                                        <thead>' +
-                                              '                                            <tr>' +
-                                              '                                                <th id="Th7" width="25%" data-name="none">Server</th>' +
-                                              '                                                <th id="Th8" width="25%" data-name="none">Status</th>' +
-                                              '                                                <th id="Th9" width="25%" data-name="none">Replication rate (last 1 minute)</th>' +
-                                              '                                                <th id="Th10" width="25%" data-name="none">Replication rate (last 5 minutes)</th>' +
-                                              '                                            </tr>' +
-                                              '                                        </thead>' +
-                                              '                                        <tbody><tr><td colspan="6"> No data to be displayed</td></tr></tbody>' +
-                                              '                                    </table>' +
-                                              '                                </div>' +
-                                              '                            </div>' +
-                                              '                        </div>' +
-                                              '                    </div>' +
-                                              '                </div>' +
-                                              '            </div>' +
-                                              '        </div>' +
-                                              '    </div>' +
-                                              '</div>';
-
-
-                            $("#dr").append(htmlContent + htmlGraph)
-
-                            $("#drPending_" + i).html('');
-                            if(drRoleDetail['DRROLE'][i - 1][1] == "PENDING"){
-                                $("#drPending_" + i).html("( No active connection )")
-                                $("#drPending_" + i).show();
-                                $("#drRelation_" + i).hide();
-                            }else{
-                                $("#drRelation_" + i).show();
-                                $("#drPending_" + i).hide();
-                            }
-
-                            $("#dbPane_2 div.menu_head").click(function () {
-                                var headerState = $("#dbPane_2 div.menu_body").css('display');
-                                if (headerState == 'none') {
-                                    $(this).removeClass('collapsedDR');
-                                    $(this).addClass('expandedDR');
                                 } else {
-                                    $(this).removeClass('expandedDR');
-                                    $(this).addClass('collapsedDR');
+                                    hideDrInformation()
                                 }
-                                $(this).next("div.menu_body").slideToggle(300).siblings("div.menu_body").slideUp("slow");
-                            });
-                     }
-                  }
+                            }
+                        });
+                    } else {
+                        hideDrInformation()
+                    }
                 });
+            }
+        }
 
+       var getDrHtmlContent = function(i, producerDbId, drRoleDetail, response){
+            var combinedId = producerDbId + '_' + drRoleDetail['DRROLE'][i][2]
+            var consumerDbId = drRoleDetail['DRROLE'][i][2];
+
+            if(i == 0) {
+                $('#drProducerId').html(producerDbId)
+                $('#drRemoteId').html(consumerDbId)
+                $('#drCombinedId').html(combinedId)
+            }
+
+            replicaLatency = [];
+            for (var key in response[combinedId]) {
+                    if(response[combinedId][key][0] != undefined){
+                        if(response[combinedId][key][0].LASTQUEUEDTIMESTAMP != undefined){
+                            replicaLatency.push((response[combinedId][key][0].LASTQUEUEDTIMESTAMP - response[combinedId][key][0].LASTACKTIMESTAMP) / 1000000);
+                        }
+                    }
+            }
+
+            var showClass = "expandedDR";
+            var displayCss = "display:block";
+            if($("#dbPane_"+ i).find(".menu_head").hasClass("collapsedDR")){
+                showClass = "collapsedDR";
+                displayCss = "display:none";
+            }
+            $("#dbPane_"+ i).parent().remove();
+
+            var role = drRoleDetail['DRROLE'][i][0];
+            var htmlContent = '<div class="containerMain1" id="containerMain_'+ i + '">' +
+                              '    <div id="dbPane_' + i + '" class="menu_list dbPane">' +
+                              '        <!--Code for menu starts here-->' +
+                              '        <div class="menu_head drHead '+ showClass +'">' +
+                              '            <span class="iconDRDatabase"></span>' +
+                              '            <h1 class="headText1 DRHeaderWrap">' +
+                              '                <a href="#" id="showHideGraphBlock_' + i + '" class="showhideIcon arrowAdjustDR">' +
+                              '                    <span class="DRHeaderName" id="dRHeaderName_' + i + '"></span>' +
+                              '<span class="DRHeaderName drPending" id="drPending_'+ i +'"></span>' +
+                              '                </a>' +
+                              '            </h1>' +
+                              '<div class="drRelation" id="drRelation_'+ i +'"><div class="drRelationLeft"><span id="drArrow_' + i + '">' +
+                               '<p></p></span></div>' +
+                              '<div class="drRelationRight"><span class="iconDRDatabase"></span><div class="headText1 DRHeaderWrap">' +
+                              '<a href="#" class="showhideIcon arrowAdjustDR">' +
+                              '<span class="DRHeaderName" id="dRHeaderName_' + i + '">Database ('+ drRoleDetail['DRROLE'][i][2] +')</span>' +
+                              '</a></div>  <div class="latencyDR latencyDR_' + combinedId + '"></div></div><div class="clear"></div></div>' +
+                              '            <div class="clear"></div>' +
+                              '        </div>'
+
+
+            var htmlGraph =   '        <div class="menu_body drBody" style="'+ displayCss +'">' +
+
+                              '            <div class="DRContantWrap">' +
+                              '                <div id="mainGraphBlock_' + combinedId + '">' +
+                              '                    <div class="errorMsgLocalStorageFull" style="display:none">' +
+                              '                        <div class="errorMsgLocalWrapper">' +
+                              '                            <img src="css/resources/images/alert.png" alt="Alert"/>' +
+                              '                        </div>' +
+                              '                        <div class="textMsgLocalWrapper">' +
+                              '                            <p>Local storage is full. Please delete some saved queries from SQL Query tab or minimize the retained time interval using the above sliding window.</p>' +
+                              '                        </div>' +
+                              '                        <div class="clear"></div>' +
+                              '                    </div>' +
+                              '                    <div class="graphChart" id="graphChart_' + combinedId + '">' +
+                              '                        <div id="ChartDrReplicationRate_' + combinedId + '" class="chart chartDR" style="display: block">' +
+                              '                            <div class="chartHeader">' +
+                              '                                <h1>Database Replication (DR)' +
+                              '                                    <a href="#" class="downloadBtnChart" ' +
+                              '                                     > <img class="downloadCls" src="css/resources/images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>' +
+                              '                                    <div class="clear"></div>' +
+                              '                                </h1>' +
+                              '                            </div>' +
+                              '                            <svg id="visualizationDrReplicationRate_' + combinedId + '" width="100%" height="400"></svg>' +
+                              '                        </div>' +
+                              '                    </div>' +
+                              '                </div>'
+
+
+            var htmlDrTable = '                <div class="drWrapper" id="divDrReplication' + combinedId + '" style="display:block">' +
+                              '                    <div class="content drHeader" id="drHeader'+ combinedId + '">' +
+                              '                        <div class="leftShowhide">' +
+                              '                            <div class="dr">' +
+                              '                                <h1 class="headText1">' +
+                              '                                    <a href="javascript:void(0);" id="showHideDrBlock_' + combinedId + '" class="showhideIcon expanded arrowAdjust">Show/Hide Database Replication (DR)</a>' +
+                              '                                </h1>' +
+                              '                            </div>' +
+                              '                        </div>' +
+                              '                        <div class="rightShowhide">' +
+                              '                            <ul class="drList">' +
+                              '                                <li>Mode</li>' +
+                              '                                <li id="dbDrMode_' + combinedId + '" class="drArrow">Master</li>' +
+                              '                            </ul>' +
+                              '                            <ul class="drList">' +
+                              '                                <li class="alertIcon warningDr" id="drAlertWarning_' + combinedId + '" style="display: none">' +
+                              '                                    <a id="drWarning_' + combinedId + '" href="#drPartitionWarning" class="drWarning">' +
+                              '                                        <span style="margin:0 0 0 24px">Warning</span>' +
+                              '                                    </a>' +
+                              '                                </li>' +
+                              '                            </ul>' +
+                              '                            <div class="clear"></div>' +
+                              '                        </div>' +
+                              '                        <div class="clear"></div>' +
+                              '                    </div>' +
+                              '                    <div id="drSection_' + combinedId + '" class="drShowHide" style="display:block;">' +
+                              '                        <div id="drMasterSection_' + combinedId + '" class="masterWrapper" style="display:block;">' +
+                              '                            <div id="tblMAster_wrapper_' + combinedId + '" class="dataTables_wrapper no-footer">' +
+                              '                                <div class="tabs-filter-wrapperDR">' +
+                              '                                    <div class="drTitle icon-master" id="drMasterTitle_' + combinedId + '">Master</div>' +
+                              '                                    <div class="filter">' +
+                              '                                        <input name="filter" id="filterPartitionId_' + combinedId + '" type="text" class="search-box" onBlur="" placeholder="Search Partition ID"><a id="searchDrMasterData_' + combinedId + '"  href="javascript:void(0)" class="icon-search drIcon" title="Search">search</a>' +
+                              '                                    </div>' +
+                              '                                    <div class="clear"></div>' +
+                              '                                </div>' +
+                              '                                <div class="clear"></div>' +
+                              '                                <div class="dataTables_paginate paging_extStyleLF paginationDefault" id="tblDrMAster_'+ combinedId +'_paginate">' +
+                              '                                    <span class="paginate_disabled_previous paginate_button" title="Previous Page">Prev</span>' +
+                              '                                    <div class="navigationLabel">Page <span class="pageIndex"> 0 </span> of <span class="totalPages">0</span></div>' +
+                              '                                    <span class="paginate_enabled_next paginate_button" title="Next Page">Next</span>' +
+                              '                                </div>' +
+                              '                                <div class="drMasterContainer">' +
+                              '                                    <table width="100%" border="0" cellspacing="0" id="tblDrMAster_' + combinedId + '" cellpadding="0" class="storeTbl drTbl no-footer dataTable" aria-describedby="tblDrMAster_info" role="grid">' +
+                              '                                        <thead>' +
+                              '                                            <tr role="row">' +
+                              '                                                <th id="Th1" width="25%" data-name="none" class="" tabindex="0" aria-controls="tblDrMAster_'+ combinedId +'"  rowspan="1" colspan="1" aria-sort="ascending" aria-label="Partition ID: activate to sort column descending">Partition ID</th>' +
+                              '                                                <th id="Th2" width="20%" data-name="none" class="sorting" tabindex="0" aria-controls="tblDrMAster_'+ combinedId +'" rowspan="1" colspan="1" aria-label="Status: activate to sort column ascending">Status</th>' +
+                              '                                                <th id="Th3" width="10%" data-name="none" class="sorting" tabindex="0" aria-controls="tblDrMAster_'+ combinedId +'" rowspan="1" colspan="1" aria-label="Total Buffer: activate to sort column ascending">Total Buffer</th>' +
+                              '                                                <th id="Th4" width="10%" data-name="none" class="sorting" tabindex="0" aria-controls="tblDrMAster_'+ combinedId +'" rowspan="1" colspan="1" aria-label="Buffer on disk: activate to sort column ascending">Buffer on disk</th>' +
+                              '                                                <th id="Th5" width="15%" data-name="none" class="sorting" tabindex="0" aria-controls="tblDrMAster_'+ combinedId +'" rowspan="1" colspan="1" aria-label="Replica Latency (ms): activate to sort column ascending">Replica Latency (ms)</th>' +
+                              '                                                <th id="Th6" width="20%" data-name="none" class="sorting" tabindex="0" aria-controls="tblDrMAster_'+ combinedId +'" rowspan="1" colspan="1" aria-label="Replica latency (in transactions): activate to sort column ascending">Replica latency (in transactions)</th>' +
+                              '                                            </tr>' +
+                              '                                        </thead>' +
+                              '                                        <tbody><tr><td colspan="6"> No data to be displayed</td></tr></tbody>' +
+                              '                                    </table>' +
+                              '                                </div>' +
+                              '                            </div>' +
+                              '                        </div>' +
+                              '                        <div id="drReplicaSection_' + combinedId + '" class="replicaWrapper" style="display:block">' +
+                              '                            <div id="tblReplica_wrapper_' + combinedId +'" class="dataTables_wrapper no-footer">' +
+                              '                                <div class="tabs-filter-wrapperDR">' +
+                              '                                    <div class="drTitle icon-replica" id="drReplicaTitle_' + combinedId + '">Replica</div>' +
+                              '                                    <div class="filter">' +
+                              '                                        <input name="filter" id="filterHostID_' + combinedId + '" type="text" class="search-box" onBlur="" placeholder="Search Server"><a id="searchDrMasterData_' + combinedId + '" href="javascript:void(0)" class="icon-search drIcon" title="Search">search</a>' +
+                              '                                    </div>' +
+                              '                                    <div class="clear"></div>' +
+                              '                                </div>' +
+                              '                                <div class="clear"></div>' +
+                              '                                <div class="dataTables_paginate paging_extStyleLF paginationDefault" id="tblDrReplica_paginate_' + combinedId + '">' +
+                              '                                    <span class="paginate_disabled_previous paginate_button" title="Previous Page">Prev</span>' +
+                              '                                    <div class="navigationLabel">Page <span class="pageIndex"> 0 </span> of <span class="totalPages">0</span></div>' +
+                              '                                    <span class="paginate_enabled_next paginate_button" title="Next Page">Next</span>' +
+                              '                                </div>' +
+                              '                                <div class="drReplicaContainer">' +
+                              '                                    <table width="100%" border="0" cellspacing="0" id="tblDrReplica_' + combinedId + '" cellpadding="0" class="storeTbl drTbl no-footer dataTable" aria-describedby="tblDrReplica_info" role="grid">' +
+                              '                                        <thead>' +
+                              '                                            <tr>' +
+                              '                                                <th id="Th7" width="25%" data-name="none">Server</th>' +
+                              '                                                <th id="Th8" width="25%" data-name="none">Status</th>' +
+                              '                                                <th id="Th9" width="25%" data-name="none">Replication rate (last 1 minute)</th>' +
+                              '                                                <th id="Th10" width="25%" data-name="none">Replication rate (last 5 minutes)</th>' +
+                              '                                            </tr>' +
+                              '                                        </thead>' +
+                              '                                        <tbody><tr><td colspan="6"> No data to be displayed</td></tr></tbody>' +
+                              '                                    </table>' +
+                              '                                </div>' +
+                              '                            </div>' +
+                              '                        </div>' +
+                              '                    </div>' +
+                              '                </div>' +
+                              '            </div>' +
+                              '        </div>' +
+                              '    </div>' +
+                              '</div>';
+
+            $("#dr").append(htmlContent + htmlGraph + htmlDrTable);
+             if(role == "MASTER"){
+                $("#drRelation_" + i).find('p').html(role + ' / REPLICA');
+                $("#drArrow_" + i).addClass("arrowSingle");
+            }
+            else if (role == "REPLICA"){
+                $("#drRelation_" + i).find('p').html(role + ' / MASTER');
+                $("#drArrow_" + i).removeClass("arrowDouble");
+                $("#drArrow_" + i).addClass("arrowSingleLeft");
+            }
+            else if (role == "XDCR"){
+                $("#drRelation_" + i).find('p').html(role);
+                $("#drArrow_" + i).removeClass("arrowSingle");
+                $("#drArrow_" + i).addClass("arrowDouble");
+            }
+
+            VoltDbUI.drChartList.push(combinedId);
+
+            $('.latencyDR_' + combinedId).html('');
+            if(replicaLatency.length != 0){
+                $('.latencyDR_' + combinedId).html("<p>Latency <span id='latencyDR_" + combinedId + "'>" + max(replicaLatency) + " </span> sec</p>")
+            } else {
+                $('.latencyDR_' + combinedId).html('');
+            }
+
+            if(producerDbId != undefined){
+                $("#dRHeaderName_" + i).html("Database ("+ producerDbId +") ")
+            }
+            else{
+                $("#dRHeaderName_" + i).html("Database ")
+            }
+
+            $("#drPending_" + i).html('');
+            if(drRoleDetail['DRROLE'][i][1] == "PENDING"){
+                $("#drPending_" + i).html("( No active connection )")
+                $("#drPending_" + i).show();
+                $("#drRelation_" + i).hide();
+            } else {
+                $("#drRelation_" + i).show();
+                $("#drPending_" + i).hide();
+            }
+
+
+            $("#dbPane_" + i + " div.menu_head").click(function (e) {
+                e.preventDefault();
+                var id = $(this).parent().attr('id').substring(7);
+                var headerState = $("#dbPane_" + id + " div.menu_body").css('display');
+                if (headerState == 'none') {
+                    $(this).removeClass('collapsedDR');
+                    $(this).addClass('expandedDR');
+                } else {
+                    $(this).removeClass('expandedDR');
+                    $(this).addClass('collapsedDR');
+                }
+                $(this).next("div.menu_body").slideToggle(300).siblings("div.menu_body").slideUp("slow");
             });
-        });
 
+            $("#showHideDrBlock_" + combinedId).click(function (e) {
+                e.preventDefault();
+                var headerState = $("#drSection_"+ combinedId).css('display');
+                if (headerState == 'none') {
+                    $(this).removeClass('collapsed');
+                    $(this).addClass('expanded');
+                } else {
+                    $(this).removeClass('expanded');
+                    $(this).addClass('collapsed');
+
+                }
+                $("#drSection_"+ combinedId).slideToggle(300);
+            });
+
+            $(".downloadBtnChart").on("click", function(e){
+                var divChartNameSplit = $(this).closest(".chartDR")[0].id.split("_");
+                var chartId = divChartNameSplit[1] + "_" + divChartNameSplit[2];
+                var args = {"filename": "dr-chart-data"}
+                downloadCSV(e, args, "dataReplication", chartId);
+            });
+
+        }
+
+
+        var showHideDrGraph = function(status){
+            var chartList =  VoltDbUI.drChartList;
+            if(chartList != undefined && chartList.length > 0){
+                for(var i = 0; i < chartList.length; i++){
+                    if(status){
+                        $('#ChartDrReplicationRate_' + chartList[i]).show();
+                        $('#divDrView').show();
+                    } else {
+                        $('#ChartDrReplicationRate_' + chartList[i]).hide();
+                        $('#divDrView').hide();
+                    }
+                }
+            }
+        }
 
         voltDbRenderer.GetDeploymentInformation(function (deploymentDetails) {
                 if (deploymentDetails != undefined) {
@@ -1506,8 +1581,8 @@ var loadPage = function (serverName, portid) {
             $('#clusterId').html("");
             VoltDbUI.isDRInfoRequired = false;
             $("#divDrReplication").hide();
-            $("#ChartDrReplicationRate").hide();
             $("#divDrWrapperAdmin").hide();
+            showHideDrGraph(false);
         }
 
         var loadProcedureInformations = function (procedureMetadata) {
@@ -1902,6 +1977,7 @@ var loadPage = function (serverName, portid) {
         });
     };
 
+
     var refreshDrMasterSection = function () {
         $("#drMasterSection").show();
         voltDbRenderer.GetDrDetails(function (drDetails) {
@@ -1909,101 +1985,109 @@ var loadPage = function (serverName, portid) {
             var htmlcontent = "";
             var replicaLatencyMs = 0;
             var replicaLatencyTrans = 0;
+            var chartList = VoltDbUI.drChartList;
+            if(chartList != undefined && chartList.length > 0){
+                for(var i = 0; i < chartList.length; i++){
+                    htmlcontent = "";
+                    for (var key in response[chartList[i]]) {
+                        replicaLatencyTrans = response[chartList[i]][key][0].LASTQUEUEDDRID - response[chartList[i]][key][0].LASTACKDRID;
+                        replicaLatencyMs = (response[chartList[i]][key][0].LASTQUEUEDTIMESTAMP - response[chartList[i]][key][0].LASTACKTIMESTAMP) / 1000;
+                        htmlcontent = htmlcontent + "<tr>";
+                        htmlcontent = htmlcontent + "<td style='text-align: right;'>" + key + "</td>" +
+                            "<td >" + VoltDbUI.drStatus + "</td>" +
+                            "<td style='text-align: right;'>" + (response[chartList[i]][key][0].TOTALBYTES / 1024 / 1024).toFixed(2) + "</td >" +
+                            "<td style='text-align: right;'>" + replicaLatencyMs + "</td >" +
+                            "<td style='text-align: right;'>" + replicaLatencyTrans + "</td >";
+                        htmlcontent = htmlcontent + "</tr>";
 
-            for (var key in response) {
-                for (var i = 0; i <= response[key].length - 1; i++) {
-                    replicaLatencyTrans = response[key][i].LASTQUEUEDDRID - response[key][i].LASTACKDRID;
-                    replicaLatencyMs = (response[key][i].LASTQUEUEDTIMESTAMP - response[key][i].LASTACKTIMESTAMP) / 1000;
-                    htmlcontent = htmlcontent + "<tr>";
-                    htmlcontent = htmlcontent + "<td style='text-align: right;'>" + key + "</td>" +
-                        "<td >" + VoltDbUI.drStatus + "</td>" +
-                        "<td style='text-align: right;'>" + (response[key][i].TOTALBYTES / 1024 / 1024).toFixed(2) + "</td >" +
-                        "<td style='text-align: right;'>" + replicaLatencyMs + "</td >" +
-                        "<td style='text-align: right;'>" + replicaLatencyTrans + "</td >";
-                    htmlcontent = htmlcontent + "</tr>";
+                    }
+                    var leftScroll = $("#tblDrMAster_" + [chartList[i]]+ "_wrapper").find(".tblScroll").scrollLeft();
+                    if ($.fn.dataTable.isDataTable('#tblDrMAster_' + [chartList[i]])) {
+                        $("#tblDrMAster_" + [chartList[i]]).DataTable().destroy();
+                    }
+
+                    var content = "<table width='100%' border='0' cellspacing='0' id='tblDrMAster_" + [chartList[i]] + "'  cellpadding='0' class='storeTbl drTbl no-footer dataTable' aria-describedby='tblDrMAster_info' role='grid'>" +
+                        "<thead><tr role='row'><th id='partitionID_" + [chartList[i]] + "' width='20%' data-name='none' class='' tabindex='0' aria-controls='tblDrMAster_" + [chartList[i]] + "' rowspan='1' colspan='1' aria-sort='ascending' aria-label='Partition ID: activate to sort column descending'>Partition ID</th>" +
+                        "<th id='status_" + [chartList[i]] + "' width='20%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDrMAster_" + [chartList[i]] + "' rowspan='1' colspan='1' >Status</th>" +
+                        "<th id='mbOnDisk_" + [chartList[i]] + "' width='15%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDrMAster_" + [chartList[i]] + "' rowspan='1' colspan='1' >MB on disk</th>" +
+                        "<th id='replicaLatencyMs_" + [chartList[i]] + "' width='15%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDrMAster_" + [chartList[i]] + "' rowspan='1' colspan='1' >Replica Latency (ms)</th>" +
+                        "<th id='replicaLatencyTrans_" + [chartList[i]] + "' width='20%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDrMAster_" + [chartList[i]] + "' rowspan='1' colspan='1'>Replica latency (in transactions)</th></tr></thead><tbody>";
+                    $("#tblMAster_wrapper_" + [chartList[i]]).find(".drMasterContainer").html(content + htmlcontent + "</tbody></table>");
+
+
+                    $("#tblDrMAster_" + [chartList[i]]).DataTable({
+                        stateSave: true,
+                        pageLength: 5,
+                        "sPaginationType": "extStyleLF",
+                        "bAutoWidth": false,
+                        "language": {
+                            "zeroRecords": "No data to be displayed"
+                        },
+                        "fnDrawCallback": function () {
+                            if ($("#tblDrMAster_" + [chartList[i]]).find("tbody tr td").first().html() == "No data to be displayed") {
+                                $(this).parent().parent().find(".dataTables_paginate .navigationLabel .pageIndex").text("0");
+                            } else {
+                                $(this).parent().parent().find(".dataTables_paginate .navigationLabel .pageIndex").text(" " + this.fnPagingInfo().iPage + " ");
+                            }
+
+                            $(this).parent().parent().find(".dataTables_paginate .navigationLabel .totalPages").text(this.fnPagingInfo().iTotalPages);
+
+                            if ((screen.width == 1600) && (screen.height == 900)) {
+                                var length = $("#tblDrMAster_" + [chartList[i]] + " tr").length - 1;
+                                if (length >= 5) {
+                                    $("#drMasterSection_" + [chartList[i]]).css("min-height", "280px");
+                                } else if (length == 4) {
+                                    $("#drMasterSection_" + [chartList[i]]).css("min-height", "250px");
+                                } else if (length == 3) {
+                                    $("#drMasterSection_" + [chartList[i]]).css("min-height", "230px");
+                                } else if (length == 2) {
+                                    $("#drMasterSection_" + [chartList[i]]).css("min-height", "200px");
+                                } else if (length == 1 || length == 0) {
+                                    $("#drMasterSection_" + [chartList[i]]).css("min-height", "170px");
+                                }
+                            } else if ((screen.width == 360) && (screen.height == 640)) {
+                                $("#drMasterSection_" + [chartList[i]]).css("min-height", "380px");
+                            } else if ((screen.width == 640) && (screen.height == 960)) {
+                                alert("iphone resolution mode");
+                                $("#drMasterSection_" + [chartList[i]]).css("min-height", "380px");
+                            }
+                        },
+
+                        "sDom": 'p<"tblScroll drScroll"t>',
+                        "aoColumns": [
+                            null,
+                            { "bSearchable": false },
+                            { "bSearchable": false },
+                            { "bSearchable": false },
+                            { "bSearchable": false }
+                        ]
+                    });
+
+                    $("#tblDrMAster_" + [chartList[i]]+ "_wrapper").find(".tblScroll").scrollLeft(leftScroll);
+
+                    $("#tblMAster_wrapper_" + [chartList[i]]).find(".paginationDefault").remove();
+
+                    //Customizing DataTables to make it as existing pagination
+                    $(".paginate_disabled_previous").html("Prev");
+                    $(".paginate_enabled_next").html("Next");
+                    $(".paginate_disabled_next").html("Next");
+                    $(".paginate_enabled_previous").html("Prev");
+
+                    $(".paginate_disabled_previous").attr("title", "Previous Page");
+                    $(".paginate_enabled_next").attr("title", "Next Page");
+                    $(".paginate_disabled_next").attr("title", "Next Page");
+                    $(".paginate_enabled_previous").attr("title", "Previous Page");
+
+                     $('#filterPartitionId_' + [chartList[i]]).on('keyup', function () {
+                         var id = $(this).attr('id').substring(18);
+                         $("#tblDrMAster_" + id).DataTable().search(this.value).draw();
+                     });
+
                 }
-
-            }
-            var leftScroll = $("#tblDrMAster_wrapper").find(".tblScroll").scrollLeft();
-            if ($.fn.dataTable.isDataTable('#tblDrMAster')) {
-                $("#tblDrMAster").DataTable().destroy();
             }
 
-            var content = "<table width='100%' border='0' cellspacing='0' id='tblDrMAster' cellpadding='0' class='storeTbl drTbl no-footer dataTable' aria-describedby='tblDrMAster_info' role='grid'>" +
-                "<thead><tr role='row'><th id='partitionID' width='20%' data-name='none' class='' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1' aria-sort='ascending' aria-label='Partition ID: activate to sort column descending'>Partition ID</th>" +
-                "<th id='status' width='20%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1' >Status</th>" +
-                "<th id='mbOnDisk' width='15%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1' >MB on disk</th>" +
-                "<th id='replicaLatencyMs' width='15%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1' >Replica Latency (ms)</th>" +
-                "<th id='replicaLatencyTrans' width='20%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDrMAster' rowspan='1' colspan='1'>Replica latency (in transactions)</th></tr></thead><tbody>";
-            $("#tblMAster_wrapper").find(".drMasterContainer").html(content + htmlcontent + "</tbody></table>");
-
-            table = $("#tblDrMAster").DataTable({
-                stateSave: true,
-                pageLength: 5,
-                "sPaginationType": "extStyleLF",
-                "bAutoWidth": false,
-                "language": {
-                    "zeroRecords": "No data to be displayed"
-                },
-                "fnDrawCallback": function () {
-                    if ($("#tblDrMAster").find("tbody tr td").first().html() == "No data to be displayed") {
-                        $(this).parent().parent().find(".dataTables_paginate .navigationLabel .pageIndex").text("0");
-                    } else {
-                        $(this).parent().parent().find(".dataTables_paginate .navigationLabel .pageIndex").text(" " + this.fnPagingInfo().iPage + " ");
-                    }
-
-                    $(this).parent().parent().find(".dataTables_paginate .navigationLabel .totalPages").text(this.fnPagingInfo().iTotalPages);
-
-                    if ((screen.width == 1600) && (screen.height == 900)) {
-                        var length = $("#tblDrMAster tr").length - 1;
-                        if (length >= 5) {
-                            $("#drMasterSection").css("min-height", "280px");
-                        } else if (length == 4) {
-                            $("#drMasterSection").css("min-height", "250px");
-                        } else if (length == 3) {
-                            $("#drMasterSection").css("min-height", "230px");
-                        } else if (length == 2) {
-                            $("#drMasterSection").css("min-height", "200px");
-                        } else if (length == 1 || length == 0) {
-                            $("#drMasterSection").css("min-height", "170px");
-                        }
-                    } else if ((screen.width == 360) && (screen.height == 640)) {
-                        $("#drMasterSection").css("min-height", "380px");
-                    } else if ((screen.width == 640) && (screen.height == 960)) {
-                        alert("iphone resolution mode");
-                        $("#drMasterSection").css("min-height", "380px");
-                    }
-                },
-
-                "sDom": 'p<"tblScroll drScroll"t>',
-                "aoColumns": [
-                    null,
-                    { "bSearchable": false },
-                    { "bSearchable": false },
-                    { "bSearchable": false },
-                    { "bSearchable": false }
-                ]
-            });
-
-            $("#tblDrMAster_wrapper").find(".tblScroll").scrollLeft(leftScroll);
-
-            $("#tblMAster_wrapper").find(".paginationDefault").remove();
-
-            //Customizing DataTables to make it as existing pagination
-            $(".paginate_disabled_previous").html("Prev");
-            $(".paginate_enabled_next").html("Next");
-            $(".paginate_disabled_next").html("Next");
-            $(".paginate_enabled_previous").html("Prev");
-
-            $(".paginate_disabled_previous").attr("title", "Previous Page");
-            $(".paginate_enabled_next").attr("title", "Next Page");
-            $(".paginate_disabled_next").attr("title", "Next Page");
-            $(".paginate_enabled_previous").attr("title", "Previous Page");
         });
 
-        $('#filterPartitionId').on('keyup', function () {
-            table.search(this.value).draw();
-        });
     };
 
     var replicaTable = '';
@@ -2014,86 +2098,111 @@ var loadPage = function (serverName, portid) {
             $('#clusterId').html(" (ID: " + replicationData["DR_GRAPH"]["CLUSTER_ID"] + ")");
 
             MonitorGraphUI.RefreshDrReplicationGraph(replicationData, getCurrentServer(), graphView, currentTab);
-            replicationWarning(replicationData["DR_GRAPH"]['WARNING_COUNT']);
 
-            var response = replicationData["DR_GRAPH"]["REPLICATION_DATA"];
-            var htmlcontent = "";
+            var chartList = VoltDbUI.drChartList;
+            if(chartList != undefined && chartList.length > 0){
+                for(var i = 0; i < chartList.length; i++){
+                    replicationWarning(replicationData["DR_GRAPH"].WARNING_COUNT);
 
-            for (var key in response) {
-                htmlcontent = htmlcontent + "<tr>";
-                htmlcontent = htmlcontent + "<td>" + response[key].HOSTNAME + "</td>" +
-                    "<td>" + response[key].STATE + "</td>" +
-                    "<td>" + response[key].REPLICATION_RATE_1M + "</td >" +
-                    "<td>" + response[key].REPLICATION_RATE_5M + "</td >";
-                htmlcontent = htmlcontent + "</tr>";
-            }
+                    var response = replicationData["DR_GRAPH"][chartList[i]].REPLICATION_DATA;
+                    var htmlcontent = "";
 
-            var leftScroll = $("#tblDrReplica_wrapper").find(".tblScroll").scrollLeft();
-            if ($.fn.dataTable.isDataTable('#tblDrReplica')) {
-                $("#tblDrReplica").DataTable().destroy();
-            }
-            var content = " <table width='100%' border='0' cellspacing='0' id='tblDrReplica' cellpadding='0' class='storeTbl drTbl no-footer dataTable'><thead><tr><th id='replicaServer' width='25%' data-name='none'>Server</th><th id='replicaStatus' width='25%' data-name='none'>Status</th><th id='replicationRate1' width='25%' data-name='none'>Replication rate (last 1 minute)</th>" +
-                                               "<th id='replicationRate5' width='25%' data-name='none'>Replication rate (last 5 minutes)</th></tr></thead>" +
-                                        "<tbody>";
-            $("#drReplicaSection").find(".drReplicaContainer").html(content + htmlcontent + "</tbody></table>");
+                    for (var key in response) {
+                        htmlcontent = htmlcontent + "<tr>";
+                        htmlcontent = htmlcontent + "<td>" + response[key].HOSTNAME + "</td>" +
+                            "<td>" + response[key].STATE + "</td>" +
+                            "<td>" + response[key].REPLICATION_RATE_1M + "</td >" +
+                            "<td>" + response[key].REPLICATION_RATE_5M + "</td >";
+                        htmlcontent = htmlcontent + "</tr>";
+                    }
 
-            replicaTable = $("#tblDrReplica").DataTable({
-                stateSave: true,
-                pageLength: 5,
-                "sPaginationType": "extStyleLF",
-                "bAutoWidth": false,
-                "language": {
-                    "zeroRecords": "No data to be displayed"
-                },
-                "fnDrawCallback": function () {
+                    var leftScroll = $("#tblDrReplica_wrapper_" + chartList[i]).find(".tblScroll").scrollLeft();
+                    if ($.fn.dataTable.isDataTable('#tblDrReplica_'+ chartList[i])) {
+                        $("#tblDrReplica_"+ chartList[i]).DataTable().destroy();
+                    }
+                    var content = " <table width='100%' border='0' cellspacing='0' id='tblDrReplica_" + [chartList[i]] + "' cellpadding='0' class='storeTbl drTbl no-footer dataTable'><thead><tr><th id='replicaServer_" + [chartList[i]] + "' width='25%' data-name='none'>Server</th><th id='replicaStatus_" + [chartList[i]] + "' width='25%' data-name='none'>Status</th><th id='replicationRate1_" + [chartList[i]] + "' width='25%' data-name='none'>Replication rate (last 1 minute)</th>" +
+                                                       "<th id='replicationRate5_" + chartList[i] + "' width='25%' data-name='none'>Replication rate (last 5 minutes)</th></tr></thead>" +
+                                                "<tbody>";
+                    $("#drReplicaSection_"+ chartList[i]).find(".drReplicaContainer").html(content + htmlcontent + "</tbody></table>");
 
-                    if ($("#tblDrReplica").find("tbody tr td").first().html() == "No data to be displayed") {
-                        $(this).parent().parent().find(".dataTables_paginate .navigationLabel .pageIndex").text("0");
+                    replicaTable = $("#tblDrReplica_" + chartList[i]).DataTable({
+                        stateSave: true,
+                        pageLength: 5,
+                        "sPaginationType": "extStyleLF",
+                        "bAutoWidth": false,
+                        "language": {
+                            "zeroRecords": "No data to be displayed"
+                        },
+                        "fnDrawCallback": function () {
+
+                            if ($("#tblDrReplica_" + chartList[i]).find("tbody tr td").first().html() == "No data to be displayed") {
+                                $(this).parent().parent().find(".dataTables_paginate .navigationLabel .pageIndex").text("0");
+                            } else {
+                                $(this).parent().parent().find(".dataTables_paginate .navigationLabel .pageIndex").text(" " + this.fnPagingInfo().iPage + " ");
+                            }
+
+
+                            $(this).parent().parent().find(".dataTables_paginate .navigationLabel .totalPages").text(this.fnPagingInfo().iTotalPages);
+                            var length = $("#tblDrReplica_" + chartList[i] +" tr").length - 1;
+                            if (length >= 5) {
+                                $("#drReplicaSection_" + chartList[i]).css("min-height", "280px");
+                            } else if (length == 4) {
+                                $("#drReplicaSection_" + chartList[i]).css("min-height", "250px");
+                            } else if (length == 3) {
+                                $("#drReplicaSection_" + chartList[i]).css("min-height", "230px");
+                            } else if (length == 2) {
+                                $("#drReplicaSection_" + chartList[i]).css("min-height", "200px");
+                            } else if (length == 1 || length     == 0) {
+                                $("#drReplicaSection_" + chartList[i]).css("min-height", "170px");
+                            }
+                        },
+                        "sDom": 'p<"tblScroll drScroll"t>',
+                        "aoColumns": [
+                            null,
+                            { "bSearchable": false },
+                            { "bSearchable": false },
+                            { "bSearchable": false }
+                        ]
+                    });
+
+                    $("#tblDrReplica_wrapper_" + chartList[i]).find(".tblScroll").scrollLeft(leftScroll);
+                    $("#tblReplica_wrapper_" + chartList[i]).find(".paginationDefault").remove();
+
+                    //  Customizing DataTables to make it as existing pagination
+                    $(".paginate_disabled_previous").html("Prev");
+                    $(".paginate_enabled_next").html("Next");
+                    $(".paginate_disabled_next").html("Next");
+                    $(".paginate_enabled_previous").html("Prev");
+                    $(".paginate_disabled_previous").attr("title", "Previous Page");
+                    $(".paginate_enabled_next").attr("title", "Next Page");
+                    $(".paginate_disabled_next").attr("title", "Next Page");
+                    $(".paginate_enabled_previous").attr("title", "Previous Page");
+                    $(".paginate_enabled_previous").attr("title", "Previous Page");
+
+                    $('#filterHostID_' + [chartList[i]]).on('keyup', function () {
+                         var id = $(this).attr('id').substring(13);
+                         $("#tblDrReplica_" + id).DataTable().search(this.value).draw();
+                     });
+
+                       //to show DR Mode and DR tables
+                    if (VoltDbUI.drMasterState.toUpperCase() == 'ACTIVE') {
+
+                        $("#dbDrMode_" + chartList[i]).text("Both");
+                        $('#drMasterSection_'+ chartList[i]).css('display', 'block');
+                        isMasterDataVisible = true;
+                        refreshDrMasterSection();
+                        $(".replicaWrapper").css('top', '-27px');
                     } else {
-                        $(this).parent().parent().find(".dataTables_paginate .navigationLabel .pageIndex").text(" " + this.fnPagingInfo().iPage + " ");
+                        $("#dbDrMode_" + chartList[i]).text("Replica");
+                        $(".replicaWrapper").css('top', '0px');
+                        $('#drMasterSection_'+ chartList[i]).css('display', 'none');
+                        isMasterDataVisible = false;
                     }
 
+                }
+            }
 
-                    $(this).parent().parent().find(".dataTables_paginate .navigationLabel .totalPages").text(this.fnPagingInfo().iTotalPages);
-                    var length = $("#tblDrReplica tr").length - 1;
-                    if (length >= 5) {
-                        $("#drReplicaSection").css("min-height", "280px");
-                    } else if (length == 4) {
-                        $("#drReplicaSection").css("min-height", "250px");
-                    } else if (length == 3) {
-                        $("#drReplicaSection").css("min-height", "230px");
-                    } else if (length == 2) {
-                        $("#drReplicaSection").css("min-height", "200px");
-                    } else if (length == 1 || length == 0) {
-                        $("#drReplicaSection").css("min-height", "170px");
-                    }
-                },
-                "sDom": 'p<"tblScroll drScroll"t>',
-                "aoColumns": [
-                    null,
-                    { "bSearchable": false },
-                    { "bSearchable": false },
-                    { "bSearchable": false }
-                ]
-            });
 
-            $("#tblDrReplica_wrapper").find(".tblScroll").scrollLeft(leftScroll);
-            $("#tblReplica_wrapper").find(".paginationDefault").remove();
-
-            //  Customizing DataTables to make it as existing pagination
-            $(".paginate_disabled_previous").html("Prev");
-            $(".paginate_enabled_next").html("Next");
-            $(".paginate_disabled_next").html("Next");
-            $(".paginate_enabled_previous").html("Prev");
-            $(".paginate_disabled_previous").attr("title", "Previous Page");
-            $(".paginate_enabled_next").attr("title", "Next Page");
-            $(".paginate_disabled_next").attr("title", "Next Page");
-            $(".paginate_enabled_previous").attr("title", "Previous Page");
-            $(".paginate_enabled_previous").attr("title", "Previous Page");
-        });
-
-        $('#filterHostID').on('keyup', function () {
-            replicaTable.search(this.value).draw();
         });
     };
 
@@ -2246,7 +2355,11 @@ var loadPage = function (serverName, portid) {
     if (VoltDbUI.getFromLocalStorage("graph-view") == undefined || VoltDbUI.getFromLocalStorage("graph-view") == null)
         saveInLocalStorage("graph-view", $("#graphView").val());
 
+    if (VoltDbUI.getFromLocalStorage("dr-graph-view") == undefined || VoltDbUI.getFromLocalStorage("graph-view") == null)
+        saveInLocalStorage("dr-graph-view", $("#drGraphView").val());
+
     $("#graphView").val(VoltDbUI.getFromLocalStorage("graph-view"));
+    $("#drGraphView").val(VoltDbUI.getFromLocalStorage("dr-graph-view") != undefined ? VoltDbUI.getFromLocalStorage("dr-graph-view"): "Seconds");
     MonitorGraphUI.AddGraph(VoltDbUI.getFromLocalStorage("graph-view"), $('#chartServerCPU'), $('#chartServerRAM'), $('#chartClusterLatency'), $('#chartClusterTransactions'), $('#chartPartitionIdleTime'), $('#ChartDrReplicationRate'), $('#chartCommandLogging'));
 
     $('#PROCEDURE,#INVOCATIONS,#MIN_LATENCY,#MAX_LATENCY,#AVG_LATENCY,#AVG_LATENCY,#PERC_EXECUTION').unbind('click');
@@ -2450,6 +2563,13 @@ var loadPage = function (serverName, portid) {
         saveInLocalStorage("graph-view", graphView);
         MonitorGraphUI.RefreshGraph(graphView);
         MonitorGraphUI.UpdateCharts();
+    });
+
+    $("#drGraphView").on("change", function () {
+        var drGraphView = $("#drGraphView").val();
+        saveInLocalStorage("dr-graph-view", drGraphView);
+        MonitorGraphUI.RefreshDrGraph(drGraphView);
+        MonitorGraphUI.UpdateDrCharts();
     });
 
     //slides the element with class "menu_body" when paragraph with class "menu_head" is clicked
@@ -2807,6 +2927,7 @@ var adjustGraphSpacing = function () {
 
 (function (window) {
     var iVoltDbUi = (function () {
+        this.prevDrRoleDetail = {}
         this.drChartList = []
         this.isSchemaTabLoading = false;
         this.drMasterEnabled = false;

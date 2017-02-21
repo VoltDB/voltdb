@@ -681,7 +681,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     m_committedBuffers.close();
                     m_ackMailboxRefs.set(null);
                 } catch (IOException e) {
-                    exportLog.error(e);
+                    exportLog.error(e.getMessage(), e);
                 } finally {
                     getLocalExecutorService().shutdown();
                 }

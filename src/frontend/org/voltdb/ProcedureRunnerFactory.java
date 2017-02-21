@@ -24,8 +24,7 @@ public class ProcedureRunnerFactory {
     protected SiteProcedureConnection m_site;
     protected SystemProcedureExecutionContext m_context;
 
-    public void configure(SiteProcedureConnection site,
-            SystemProcedureExecutionContext context) {
+    public ProcedureRunnerFactory(SiteProcedureConnection site, SystemProcedureExecutionContext context) {
         m_site = site;
         m_context = context;
     }

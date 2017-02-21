@@ -74,11 +74,12 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
             SysProcFragmentId.PF_updateCatalogAggregate;
 
     @Override
-    public void init() {
-        registerPlanFragment(SysProcFragmentId.PF_updateCatalogPrecheckAndSync);
-        registerPlanFragment(SysProcFragmentId.PF_updateCatalogPrecheckAndSyncAggregate);
-        registerPlanFragment(SysProcFragmentId.PF_updateCatalog);
-        registerPlanFragment(SysProcFragmentId.PF_updateCatalogAggregate);
+    public long[] getPlanFragmentIds() {
+        return new long[]{
+            SysProcFragmentId.PF_updateCatalogPrecheckAndSync,
+            SysProcFragmentId.PF_updateCatalogPrecheckAndSyncAggregate,
+            SysProcFragmentId.PF_updateCatalog,
+            SysProcFragmentId.PF_updateCatalogAggregate};
     }
 
     /**
@@ -415,7 +416,6 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
     }
 
     private final void performCatalogVerifyWork(
-            String catalogDiffCommands,
             int expectedCatalogVersion,
             String[] tablesThatMustBeEmpty,
             String[] reasonsForEmptyTables,
@@ -556,7 +556,6 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
 
         try {
             performCatalogVerifyWork(
-                    catalogDiffCommands,
                     expectedCatalogVersion,
                     tablesThatMustBeEmpty,
                     reasonsForEmptyTables,
