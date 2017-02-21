@@ -423,17 +423,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
     }
 
-    private boolean handleMisRoutedTransaction(Iv2InitiateTaskMessage message) {
-        if (!isSpiBalanceRequested() || message.isForReplica()) {
-            return false;
-        }
-        InitiateResponseMessage response = new InitiateResponseMessage(message);
-        response.setMisrouted(message.getStoredProcedureInvocation());
-        response.m_sourceHSId = m_mailbox.getHSId();
-        m_mailbox.deliver(response);
-        return true;
-    }
-
     // SpScheduler expects to see InitiateTaskMessages corresponding to single-partition
     // procedures only.
     private void handleIv2InitiateTaskMessage(Iv2InitiateTaskMessage message)
@@ -441,12 +430,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         if (!message.isSinglePartition()) {
             throw new RuntimeException("SpScheduler.handleIv2InitiateTaskMessage " +
                     "should never receive multi-partition initiations.");
-        }
-
-        // route back if SPI balance is requested.
-        if (handleMisRoutedTransaction(message)) {
-            Iv2Trace.logMisroutedTransaction(message, m_mailbox.getHSId());
-            return;
         }
 
         final String procedureName = message.getStoredProcedureName();

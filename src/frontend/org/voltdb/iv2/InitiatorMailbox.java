@@ -36,6 +36,7 @@ import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.DummyTransactionTaskMessage;
 import org.voltdb.messaging.DumpMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
+import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.Iv2RepairLogRequestMessage;
 import org.voltdb.messaging.Iv2RepairLogResponseMessage;
@@ -96,8 +97,8 @@ public class InitiatorMailbox implements Mailbox
         enableWritingIv2FaultLogInternal();
     }
 
-    synchronized public RepairAlgo constructRepairAlgo(Supplier<List<Long>> survivors, String whoami) {
-        RepairAlgo ra = new SpPromoteAlgo( survivors.get(), this, whoami, m_partitionId);
+    synchronized public RepairAlgo constructRepairAlgo(Supplier<List<Long>> survivors, String whoami, boolean isBalanceSPI) {
+        RepairAlgo ra = new SpPromoteAlgo( survivors.get(), this, whoami, m_partitionId, isBalanceSPI);
         if (hostLog.isDebugEnabled()) {
             hostLog.debug("[InitiatorMailbox:constructRepairAlgo] whoami: " + whoami + ", partitionId: " +
                     m_partitionId + ", survivors: " + Arrays.toString(survivors.get().toArray()));
@@ -311,11 +312,28 @@ public class InitiatorMailbox implements Mailbox
             m_repairLog.deliver(message);
             return;
         }
+        else if (message instanceof Iv2InitiateTaskMessage) {
+            if (handleMisRoutedTransaction((Iv2InitiateTaskMessage)message)) {
+                return;
+            }
+        }
 
         m_repairLog.deliver(message);
         if (canDeliver) {
             m_scheduler.deliver(message);
         }
+    }
+
+    private boolean handleMisRoutedTransaction(Iv2InitiateTaskMessage message) {
+        if (!m_scheduler.isSpiBalanceRequested() || message.isForReplica()) {
+            return false;
+        }
+        InitiateResponseMessage response = new InitiateResponseMessage(message);
+        response.setMisrouted(message.getStoredProcedureInvocation());
+        response.m_sourceHSId = getHSId();
+        deliver(response);
+        Iv2Trace.logMisroutedTransaction(message, getHSId());
+        return true;
     }
 
     @Override

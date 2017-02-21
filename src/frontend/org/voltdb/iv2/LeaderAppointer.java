@@ -424,7 +424,6 @@ public class LeaderAppointer implements Promotable
                 }
             }
             m_removedPartitionsAtPromotionTime = null;
-
             // just go ahead and promote our MPI
             m_MPI.acceptPromotion();
             // set up a watcher on the partitions dir so that new partitions will be picked up

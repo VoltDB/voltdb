@@ -60,7 +60,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
     private boolean m_isBalanceSPIRequested = false;
     private final TickProducer m_tickProducer;
     private final LeaderCache m_balanceSpiCache;
-
+    private boolean m_promoted = false;
     LeaderCache.Callback m_leadersChangeHandler = new LeaderCache.Callback()
     {
         @Override
@@ -76,9 +76,12 @@ public class SpInitiator extends BaseInitiator implements Promotable
             for (Entry<Integer, LeaderCallBackInfo> entry: cache.entrySet()) {
                 Long HSId = entry.getValue().m_HSID;
                 leaders.add(HSId);
-                if (HSId == getInitiatorHSId()) {
-                    m_isBalanceSPIRequested = entry.getValue().m_isBalanceSPIRequested;
-                    acceptPromotion();
+                if (HSId == getInitiatorHSId()){
+                    if (!m_promoted) {
+                        m_isBalanceSPIRequested = entry.getValue().m_isBalanceSPIRequested;
+                        acceptPromotion();
+                        m_promoted = true;
+                    }
                     break;
                 }
             }
@@ -185,15 +188,8 @@ public class SpInitiator extends BaseInitiator implements Promotable
         m_scheduler.m_isLeader = false;
         m_repairLog.setLeaderState(false);
 
-        // create indicators, including all hosts and MP, to be used to
-        // block the leader change notifications in Cartographer.
-        // Leader change notifications will force transactions to be dropped.
-        Set<Integer> hosts = m_messenger.getLiveHostIds();
-        hosts.add(MpInitiator.MP_INIT_PID);
-        VoltZK.createSPIBalanceIndicator(m_messenger.getZK(), hosts);
-
         String hsidStr = ZKUtil.suffixHSIdsWithBalanceSPIRequest(newLeaderHSId);
-        VoltZK.updateLeaderCacheNode(m_messenger.getZK(), VoltZK.iv2appointees,  partition, hsidStr, tmLog);
+        VoltZK.updateLeaderCacheNode(m_messenger.getZK(), VoltZK.iv2appointees, partition, hsidStr, tmLog);
         if (tmLog.isDebugEnabled()) {
             tmLog.debug(VoltZK.debugLeadersInfo(m_messenger.getZK()));
         }
@@ -226,23 +222,17 @@ public class SpInitiator extends BaseInitiator implements Promotable
                 // term syslogs the start of leader promotion.
                 //do not engage the reprair whne the leader change is from SPI balance.
                 long txnid = Long.MIN_VALUE;
-                if (!m_isBalanceSPIRequested) {
-                    RepairAlgo repair =
-                            m_initiatorMailbox.constructRepairAlgo(m_term.getInterestingHSIds(), m_whoami);
-                    try {
-                        RepairResult res = repair.start().get();
-                        txnid = res.m_txnId;
-                        success = true;
-                        m_initiatorMailbox.setLeaderState(txnid);
-                    } catch (CancellationException e) {
-                        success = false;
-                    }
-                } else {
+                RepairAlgo repair =
+                        m_initiatorMailbox.constructRepairAlgo(m_term.getInterestingHSIds(), m_whoami, m_isBalanceSPIRequested);
+                try {
+                    RepairResult res = repair.start().get();
+                    txnid = res.m_txnId;
                     success = true;
-                    m_repairLog.setLeaderState(true);
-                    m_scheduler.setLeaderState(true);
+                } catch (CancellationException e) {
+                    success = false;
                 }
                 if (success) {
+                    m_initiatorMailbox.setLeaderState(txnid);
                     tmLog.info(m_whoami
                              + "finished leader promotion. Took "
                              + (System.currentTimeMillis() - startTime) + " ms.");
@@ -250,11 +240,16 @@ public class SpInitiator extends BaseInitiator implements Promotable
                     // in the promotion algorithm.
                     LeaderCacheWriter iv2masters = new LeaderCache(m_messenger.getZK(),
                             m_zkMailboxNode);
-                    iv2masters.put(m_partitionId, m_initiatorMailbox.getHSId());
 
-                    if (tmLog.isDebugEnabled() && m_isBalanceSPIRequested) {
-                        tmLog.debug("Site " + CoreUtils.hsIdToString(m_initiatorMailbox.getHSId()) +
-                                " becomes new leader from SPI balance request.");
+                    if (m_isBalanceSPIRequested) {
+                        String hsidStr = ZKUtil.suffixHSIdsWithBalanceSPIRequest(m_initiatorMailbox.getHSId());
+                        iv2masters.put(m_partitionId,hsidStr);
+                        if (tmLog.isDebugEnabled()) {
+                            tmLog.debug("Site " + CoreUtils.hsIdToString(m_initiatorMailbox.getHSId()) +
+                                    " becomes new leader from SPI balance request.");
+                        }
+                    } else {
+                        iv2masters.put(m_partitionId, m_initiatorMailbox.getHSId());
                     }
                 }
                 else {

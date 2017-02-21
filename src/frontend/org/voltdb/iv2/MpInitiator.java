@@ -119,8 +119,7 @@ public class MpInitiator extends BaseInitiator implements Promotable
             m_term.start();
             while (!success) {
                 final RepairAlgo repair =
-                        m_initiatorMailbox.constructRepairAlgo(m_term.getInterestingHSIds(), m_whoami);
-
+                        m_initiatorMailbox.constructRepairAlgo(m_term.getInterestingHSIds(), m_whoami, false);
                 // term syslogs the start of leader promotion.
                 long txnid = Long.MIN_VALUE;
                 try {

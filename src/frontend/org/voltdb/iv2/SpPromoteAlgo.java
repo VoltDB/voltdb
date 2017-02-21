@@ -43,7 +43,7 @@ public class SpPromoteAlgo implements RepairAlgo
     private final long m_requestId = System.nanoTime();
     private final List<Long> m_survivors;
     private long m_maxSeenTxnId;
-
+    private final boolean m_isBalanceSPI;
     // Each Term can process at most one promotion; if promotion fails, make
     // a new Term and try again (if that's your big plan...)
     private final SettableFuture<RepairResult> m_promotionResult = SettableFuture.create();
@@ -110,13 +110,14 @@ public class SpPromoteAlgo implements RepairAlgo
      * Setup a new RepairAlgo but don't take any action to take responsibility.
      */
     public SpPromoteAlgo(List<Long> survivors, InitiatorMailbox mailbox,
-            String whoami, int partitionId)
+            String whoami, int partitionId, boolean isBalanceSPI)
     {
         m_mailbox = mailbox;
         m_survivors = survivors;
 
         m_whoami = whoami;
         m_maxSeenTxnId = TxnEgo.makeZero(partitionId).getTxnId();
+        m_isBalanceSPI = isBalanceSPI;
     }
 
     @Override
@@ -187,7 +188,11 @@ public class SpPromoteAlgo implements RepairAlgo
                           + " responses for " + rrs.m_expectedResponses
                           + " repair log entries from " + CoreUtils.hsIdToString(response.m_sourceHSId));
                 if (areRepairLogsComplete()) {
-                    repairSurvivors();
+                    if (m_isBalanceSPI) {
+                        m_promotionResult.set(new RepairResult(m_maxSeenTxnId));
+                    } else {
+                        repairSurvivors();
+                    }
                 }
             }
         }

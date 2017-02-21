@@ -35,10 +35,9 @@ import java.util.concurrent.ExecutorService;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONException;
-import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.messaging.BinaryPayloadMessage;
 import org.voltcore.messaging.HostMessenger;
+import org.voltcore.messaging.NodeFailureNotificationMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltcore.zk.CoreZK;
@@ -78,8 +77,6 @@ public class Cartographer extends StatsSource
     private final ZooKeeper m_zk;
     private final Set<Integer> m_allMasters = new HashSet<Integer>();
 
-    public static final String JSON_PARTITION_ID = "partitionId";
-    public static final String JSON_INITIATOR_HSID = "initiatorHSId";
     private final int m_configuredReplicationFactor;
     private final boolean m_partitionDetectionEnabled;
 
@@ -89,23 +86,16 @@ public class Cartographer extends StatsSource
     // This message used to be sent by the SP or MP initiator when they accepted a promotion.
     // For dev speed, we'll detect mastership changes here and construct and send this message to the
     // local client interface so we can keep the CIs implementation
-    private void sendLeaderChangeNotify(long hsId, int partitionId)
+    private void sendLeaderChangeNotify(long hsId, int partitionId, boolean balanceSPI)
     {
-        if (VoltZK.countDownSPIBalanceIndicator(m_zk, m_hostMessenger.getHostId())) {
-            return;
-        }
+        if (balanceSPI) return;
+        hostLog.info("[Cartographer] Sending leader change notification with new leader:" +
+                CoreUtils.hsIdToString(hsId) + " for partition:" + partitionId);
 
         try {
-            JSONStringer stringer = new JSONStringer();
-            stringer.object();
-            stringer.keySymbolValuePair(JSON_PARTITION_ID, partitionId);
-            stringer.keySymbolValuePair(JSON_INITIATOR_HSID, hsId);
-            stringer.endObject();
-            BinaryPayloadMessage bpm = new BinaryPayloadMessage(new byte[0], stringer.toString().getBytes("UTF-8"));
-            int hostId = m_hostMessenger.getHostId();
-            m_hostMessenger.send(CoreUtils.getHSIdFromHostAndSite(hostId,
-                        HostMessenger.CLIENT_INTERFACE_SITE_ID),
-                    bpm);
+            NodeFailureNotificationMessage msg = new NodeFailureNotificationMessage(partitionId, hsId);
+            m_hostMessenger.send(CoreUtils.getHSIdFromHostAndSite(m_hostMessenger.getHostId(),
+                        HostMessenger.CLIENT_INTERFACE_SITE_ID),msg);
         }
         catch (Exception e) {
             VoltDB.crashLocalVoltDB("Unable to propogate leader promotion to client interface.", true, e);
@@ -120,7 +110,8 @@ public class Cartographer extends StatsSource
             int pid = MpInitiator.MP_INIT_PID;
             // Can be zero-length at startup
             if (cache.size() > 0) {
-                sendLeaderChangeNotify(cache.get(pid).m_HSID, pid);
+                hostLog.info("[Cartographer MP] Sending leader change notification with new leader:");
+                sendLeaderChangeNotify(cache.get(pid).m_HSID, pid, false);
             }
         }
     };
@@ -145,9 +136,7 @@ public class Cartographer extends StatsSource
             // send the messages indicating promotion from here for each new master
             for (LeaderCallBackInfo newMasterInfo : newMasters) {
                 Long newMaster = newMasterInfo.m_HSID;
-                hostLog.info("[Cartographer] Sending leader change notification with new leader:" +
-                        CoreUtils.hsIdToString(newMaster) + " for partition:" + hsIdToPart.get(newMaster));
-                sendLeaderChangeNotify(newMaster, hsIdToPart.get(newMaster));
+                sendLeaderChangeNotify(newMaster, hsIdToPart.get(newMaster), newMasterInfo.m_isBalanceSPIRequested);
             }
 
             if (hostLog.isDebugEnabled()) {
