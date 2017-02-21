@@ -410,6 +410,7 @@ public class StatsAgent extends OpsAgent
         case PROCEDUREINPUT:
         case PROCEDUREOUTPUT:
         case PROCEDUREPROFILE:
+        case PROCEDUREDETAIL:
             stats = collectStats(StatsSelector.PROCEDURE, interval);
             break;
         case STARVATION:

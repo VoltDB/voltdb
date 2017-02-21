@@ -308,6 +308,11 @@ public class TestStatisticsSuiteDatabaseElementStats extends StatisticsTestSuite
                    avg_parameter_set_size,
                    avg_parameter_set_size < 1000000L);
 
+        // Validate the schema of PROCEDUREDETAIL
+        results = client.callProcedure("@Statistics", "proceduredetail", 0).getResults();
+        assertEquals(1, results.length);
+        validateSchema(results[0], expectedTable);
+
         // Validate the PROCEDUREPROFILE aggregation.
         results = client.callProcedure("@Statistics", "procedureprofile", 0).getResults();
         System.out.println("\n\n\n" + results[0].toString() + "\n\n\n");

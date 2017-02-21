@@ -20,6 +20,8 @@ import au.com.bytecode.opencsv_voltpatches.CSVParser;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.lang.reflect.Constructor;
 
 import java.util.HashMap;
 import java.util.List;
@@ -43,6 +45,8 @@ import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.importer.formatter.FormatException;
+import org.voltdb.importer.formatter.Formatter;
 
 /**
  * KafkaConsumer loads data from kafka into voltdb
@@ -163,6 +167,8 @@ public class KafkaLoader {
         int kpartitions = 10;
         @Option(shortOpt = "c", desc = "Kafka Consumer Configuration File")
         String config = "";
+        @Option(desc = "Formatter configuration file. (Optional) .")
+        String formatter = "";
 
         /**
          * Batch size for processing batched operations.
@@ -179,6 +185,7 @@ public class KafkaLoader {
         @Option(desc = "Use upsert instead of insert", hasArg = false)
         boolean update = false;
 
+        Formatter<String> iformatter = null;
         /**
          * Validate command line options.
          */
@@ -311,11 +318,13 @@ public class KafkaLoader {
         private final KafkaStream m_stream;
         private final CSVDataLoader m_loader;
         private final CSVParser m_csvParser;
+        private final Formatter<String> m_formatter;
 
-        public KafkaConsumer(KafkaStream a_stream, CSVDataLoader loader) {
+        public KafkaConsumer(KafkaStream a_stream, CSVDataLoader loader, Formatter<String> formatter) {
             m_stream = a_stream;
             m_loader = loader;
             m_csvParser = new CSVParser();
+            m_formatter = formatter;
         }
 
         @Override
@@ -327,7 +336,18 @@ public class KafkaLoader {
                 long offset = md.offset();
                 String smsg = new String(msg);
                 try {
-                    m_loader.insertRow(new RowWithMetaData(smsg, offset), m_csvParser.parseLine(smsg));
+                    Object params[];
+                    if (m_formatter != null) {
+                        try {
+                            params = m_formatter.transform(smsg);
+                        } catch (FormatException fe) {
+                            continue;
+                        }
+                    } else {
+                        params = m_csvParser.parseLine(smsg);
+                    }
+                    if (params == null) continue;
+                    m_loader.insertRow(new RowWithMetaData(smsg, offset), params);
                 } catch (Exception ex) {
                     m_log.error("Consumer stopped", ex);
                     System.exit(1);
@@ -349,7 +369,7 @@ public class KafkaLoader {
 
         // now launch all the threads for partitions.
         for (final KafkaStream stream : streams) {
-            KafkaConsumer bconsumer = new KafkaConsumer(stream, loader);
+            KafkaConsumer bconsumer = new KafkaConsumer(stream, loader, m_config.iformatter);
             executor.submit(bconsumer);
         }
 
@@ -383,6 +403,22 @@ public class KafkaLoader {
         final KafkaConfig cfg = new KafkaConfig();
         cfg.parse(KafkaLoader.class.getName(), args);
         try {
+            if (cfg.formatter.length() > 0) {
+                Properties p = new Properties();
+                InputStream pfile = new FileInputStream(cfg.formatter);
+                p.load(pfile);
+                String formatter = p.getProperty("formatter");
+                if (formatter == null || formatter.trim().length() == 0) {
+                    m_log.error("formatter class must be specified in formatter file as formatter=<class>: " + cfg.formatter);
+                    System.exit(-1);
+                }
+                String format = p.getProperty("format", "csv");
+                Class classz = Class.forName(formatter);
+                Class[] ctorParmTypes = new Class[]{ String.class, Properties.class };
+                Constructor ctor = classz.getDeclaredConstructor(ctorParmTypes);
+                Object[] ctorParms = new Object[]{ format, p };
+                cfg.iformatter = (Formatter<String>) ctor.newInstance(ctorParms);
+            }
             KafkaLoader kloader = new KafkaLoader(cfg);
             kloader.processKafkaMessages();
         } catch (Exception e) {
