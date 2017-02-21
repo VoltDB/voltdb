@@ -363,8 +363,8 @@ public class TruncateTableLoader extends BenchmarkThread {
                 // just need to fall through and get out
                 throw new RuntimeException(e);
             }
-            log.debug("table: " + tableName + "; rows sent: " + insertsTried + "; inserted: "
-                     + rowsLoaded + "; truncates: " + nTruncates + "; swaps: " + nSwaps);
+            log.info("table: " + tableName + "; rows sent: " + insertsTried + "; inserted: "
+                    + rowsLoaded + "; truncates: " + nTruncates + "; swaps: " + nSwaps);
         }
         log.info("TruncateTableLoader normal exit for table " + tableName + "; rows sent: " + insertsTried
                 + "; inserted: " + rowsLoaded + "; truncates: " + nTruncates + "; swaps: " + nSwaps);

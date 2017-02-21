@@ -196,7 +196,8 @@ public class Benchmark {
             if (maxvaluesize <= 0) exitWithMessageAndUsage("maxvaluesize must be > 0");
             if (entropy <= 0) exitWithMessageAndUsage("entropy must be > 0");
             if (entropy > 127) exitWithMessageAndUsage("entropy must be <= 127");
-            if (mpratio < 0.0 || mpratio > 1.0) exitWithMessageAndUsage("mpRatio must be between 0.0 and 1.0");
+            if (mpratio < 0.0 || mpratio > 1.0) exitWithMessageAndUsage("mpratio must be between 0.0 and 1.0");
+            if (swapratio < 0.0 || swapratio > 1.0) exitWithMessageAndUsage("swapratio must be between 0.0 and 1.0");
             if (upsertratio < 0.0 || upsertratio > 1.0) exitWithMessageAndUsage("upsertratio must be between 0.0 and 1.0");
             if (upserthitratio < 0.0 || upserthitratio > 1.0) exitWithMessageAndUsage("upserthitratio must be between 0.0 and 1.0");
         }
