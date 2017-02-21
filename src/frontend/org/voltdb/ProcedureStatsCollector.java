@@ -264,8 +264,8 @@ class ProcedureStatsCollector extends SiteStatsSource {
         int minResultSize = currRow.m_minResultSize;
         int maxResultSize = currRow.m_maxResultSize;
         long totalResultSize = currRow.m_totalResultSize;
-        long minParameterSetSize = currRow.m_minParameterSetSize;
-        long maxParameterSetSize = currRow.m_maxParameterSetSize;
+        int minParameterSetSize = currRow.m_minParameterSetSize;
+        int maxParameterSetSize = currRow.m_maxParameterSetSize;
         long totalParameterSetSize = currRow.m_totalParameterSetSize;
 
         if (m_interval) {
