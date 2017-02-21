@@ -250,6 +250,12 @@ public class SwapTablesPlanNode extends AbstractOperationPlanNode {
                 fbSeparator = TRUE_FB_SEPARATOR;
             }
             else {
+                feedback.append(fbSeparator)
+                .append("Swapping requires the table ").append(otherName)
+                .append(" to define an index corresponding to the index ").append(theIndexName)
+                .append(" on table ").append(theName)
+                .append(", but the closest candidate index (" + otherIndexName + ")")
+                .append(" has mismatches in the following attributes: ");
                 diagnoseIndexMismatch(theIndex, otherIndex, feedback);
                 fbSeparator = TRUE_FB_SEPARATOR;
                 otherIndexSet.remove(otherIndex);
