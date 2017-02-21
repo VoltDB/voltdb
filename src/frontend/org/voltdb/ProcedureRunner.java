@@ -209,8 +209,8 @@ public class ProcedureRunner {
 
         m_procedure.init(this);
 
-        // We need to map each statement that was defined in the stored procedure with its variable name.
-        // This is used to track granular statistics for each statement.
+        // Map each statement that was defined in the stored procedure with its SQLStmt variable name.
+        // The variable name is used in the granular statistics for stored procedures.
         Map<SQLStmt, String> reversedStmtMap = reflect();
 
         // Normally m_statsCollector is returned as it is and there is no affect to assign it to itself.

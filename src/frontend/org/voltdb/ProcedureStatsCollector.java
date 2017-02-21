@@ -45,6 +45,7 @@ class ProcedureStatsCollector extends SiteStatsSource {
     class ProcedureStmtStat {
         /**
          * The name of the statement.
+         * If it's for the statistics of the whole procedure, the name will be <ALL>.
          */
         private String m_stmtName;
 
@@ -157,9 +158,11 @@ class ProcedureStatsCollector extends SiteStatsSource {
         m_procName = catProc.getClassname();
         // Use LinkedHashMap to have a fixed element order.
         m_stats = new LinkedHashMap<SQLStmt, ProcedureStmtStat>();
+        // Use one ProcedureStmtStat instance to hold the procedure-wide statistics.
         m_procStat = new ProcedureStmtStat("<ALL>");
-        // The NULL key entry is for the total statistics for the entire procedure.
+        // The NULL key entry is reserved for the procedure-wide statistics.
         m_stats.put(null, m_procStat);
+        // Add statistics for the individual SQL statements.
         for (Entry<SQLStmt, String> entry : reversedStmtMap.entrySet()) {
             m_stats.put(entry.getKey(), new ProcedureStmtStat(entry.getValue()));
         }
@@ -243,7 +246,7 @@ class ProcedureStatsCollector extends SiteStatsSource {
      * Update the rowValues array with the latest statistical information.
      * This method overrides the super class version
      * which must also be called so that it can update its columns.
-     * @param rowKey The corresponding ProcedureStmtStat structure.
+     * @param rowKey The corresponding ProcedureStmtStat structure for this row.
      * @param rowValues Values of each column of the row of stats. Used as output.
      */
     @Override
