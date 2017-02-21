@@ -18,6 +18,11 @@
 from voltcli.hostinfo import Host
 from voltcli.hostinfo import Hosts
 from xml.etree import ElementTree
+import os.path
+
+# TODO: change to actual release version when in-service upgrade is released
+RELEASE_MAJOR_VERSION = 7
+RELEASE_MINOR_VERSION = 0
 
 @VOLT.Command(
     bundles = VOLT.AdminBundle(),
@@ -30,6 +35,46 @@ from xml.etree import ElementTree
 
 def plan_upgrade(runner):
     
+    clusterSize = basicCheck(runner)
+    
+    # first check the existence of root path on all the existing nodes
+    # 1. how to know the nodes information?
+    # 2. how to check path on every node? ( a new system pro0cedure? ) 
+    # 3. how to check the new root is valid?
+    # 4. does the directory contain .initialized file? If it has, then this is a initialized root.
+    # runner.call_proc('@UpgradeCheck',[VOLT.FastSerializer.VOLTTYPE_STRING], [runner.opts.new_kit, runner.opts.new_root])
+    
+    # assume both new_kit and new_root exist
+    
+    # verify the version of new kit is above the feature release version (e.g. 7.3)
+    try:
+        versionF = open(os.path.join(runner.opts.new_kit, 'version.txt'), 'r')
+    except IOError:
+        runner.abort("Couldn't find version information in new VoltDB kit.")
+    
+    version = versionF.read().split(".");
+    if len(version) < 2:
+        runner.abort("Invalid version information in new VoltDB kit.")
+    majorVersion = version[0];
+    minorVersion = version[1];
+    if (int(majorVersion) < RELEASE_MAJOR_VERSION or 
+        int(majorVersion) == RELEASE_MAJOR_VERSION and int(minorVersion) < RELEASE_MINOR_VERSION):
+        runner.abort("The version of new VoltDB kit is too low. In-service upgrade is supported from V%d.%d" 
+                     % (RELEASE_MAJOR_VERSION, RELEASE_MINOR_VERSION));
+    
+    # verify that the new root is initialized
+    initialized = False
+    if os.path.isfile(os.path.join(runner.opts.new_root, 'voltdbroot', '.initialized')) :
+        initialized = True
+        
+    # Need a new node?
+    needNewNode = False
+    if clusterSize % 2 == 1:
+        needNewNode = True
+    
+    generateCommands(initialized, needNewNode)
+
+def basicCheck(runner):
     # Know about the current cluster
     # 1. existing number of nodes
     # 2. k-factor
@@ -86,28 +131,31 @@ def plan_upgrade(runner):
         runner.abort("Current cluster doesn't have duplicate partitions to perform in-service upgrade. K-factor: %d" % kfactor)
     
     # N = 1, abort with error message
-    if numberOfNodes == 1:
+    if numberOfNodes == 1: 
         runner.abort("Current cluster doesn't have enough node to perform in-service upgrade, at least two nodes are required")
         
     # N = 2, don't recommend, must turn partition detection off
     if numberOfNodes == 2 and pd_enabled:
         runner.abort("In two-nodes cluster, you can't preform in-service upgrade when partition detection is enabled ")
     
-    # first check the existence of root path on all the existing nodes
-    # 1. how to know the nodes information?
-    # 2. how to check path on every node? ( a new system procedure? ) 
-    # 3. how to check the new root is valid?
-    # 4. does the directory contain .initialized file? If it has, then this is a initialized root.
-    runner.call_proc('@UpgradeCheck')
+    return numberOfNodes
+
+def generateCommands(initialized, needNewNode):
+    file = open('upgradePlan.txt', 'w+')
     
-    # verify the version of new kit is above the feature release version (e.g. 7.3)
-    # 1. check kit path existence (maybe also check the sub-directory structure?)
-    # 2. read version.txt to get the version
-    # 3. print it out
+    #1 for the new cluster, initialize the new root path if not being initialized already
     
-    # should I also check the md5sum of the kit ( feel like an overkill )
+    #2 based on the information from @SystemInformation, choose half of the nodes to kill (how to choose?)
     
-    # check the need of new node 
-    # 1. if # of nodes is odd, then a new node is needed (do we need that information?)
-    # 2. Suggest run the generated command list on new node first
-    # 3. Do we use the host name of the new node?
+    #3 start the new cluster ( need the license path, may need hostname or ip from the extra node )
+    
+    #4 set up XDCR replication between two clusters (how to generate command for it? call @UAC?)
+    
+    #5 call 'voltadmin shutdown --wait' on the original cluster
+    
+    #6 initialize a new VoltDB root path on the nodes being shutdown ( may not need all of them)
+    
+    #7 rejoin the nodes being shutdown recently to the new cluster
+    
+    #8 turn on XDCR (optional), to avoid annoying 'Couldn't connect to host XX' message 
+        
