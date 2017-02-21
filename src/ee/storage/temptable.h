@@ -138,9 +138,9 @@ class TempTable : public Table {
     // ------------------------------------------------------------------
     virtual std::string tableType() const;
     virtual voltdb::TableStats* getTableStats();
-
-    // ptr to global integer tracking temp table memory allocated per frag
-    TempTableLimits* m_limits;
+    const TempTableLimits* getTempTableLimits() const {
+        return m_limits;
+    }
 
   protected:
     // can not use this constructor to coerce a cast
@@ -165,6 +165,9 @@ class TempTable : public Table {
   private:
     // pointers to chunks of data. Specific to table impl. Don't leak this type.
     std::vector<TBPtr> m_data;
+
+    // ptr to global integer tracking temp table memory allocated per frag
+    TempTableLimits* m_limits;
 };
 
 inline void TempTable::insertTempTupleDeepCopy(const TableTuple &source, Pool *pool) {
