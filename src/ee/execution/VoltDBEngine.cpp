@@ -139,9 +139,8 @@ typedef boost::multi_index::multi_index_container<
 class EnginePlanSet : public PlanSet { };
 
 VoltDBEngine::VoltDBEngine(Topend *topend, LogProxy *logProxy)
-<<<<<<< HEAD
-      m_allTuplesScanned(0),
     : m_currentIndexInBatch(-1),
+      m_allTuplesScanned(0),
       m_tuplesProcessedInBatch(0),
       m_tuplesProcessedInFragment(0),
       m_tuplesProcessedSinceReport(0),
