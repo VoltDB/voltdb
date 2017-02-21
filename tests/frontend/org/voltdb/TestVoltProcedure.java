@@ -456,13 +456,13 @@ public class TestVoltProcedure extends TestCase {
             runner.setupTransaction(null);
             runner.call(params.toArray());
             statsRow = agent.m_source.getStatsRows(false, 0L);
-            assertEquals(statsRow[0][6], new Long(ii));
+            assertEquals(statsRow[0][7], new Long(ii));
         }
-        assertTrue(((Long)statsRow[0][6]).longValue() > 0L);
         assertTrue(((Long)statsRow[0][7]).longValue() > 0L);
-        assertFalse(statsRow[0][8].equals(0));
+        assertTrue(((Long)statsRow[0][8]).longValue() > 0L);
         assertFalse(statsRow[0][9].equals(0));
-        assertTrue(((Long)statsRow[0][9]) > 0L);
+        assertFalse(statsRow[0][10].equals(0));
+        assertTrue(((Long)statsRow[0][10]) > 0L);
     }
 
     public void testGetClusterId() {
