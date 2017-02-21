@@ -417,7 +417,7 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
 
         m_stringPool.purge();
     }
-    m_granularStatsOutput.writeIntAt(succeededFragmentsCountOffset, m_currentIndexInBatch + 1 - failures);
+    m_granularStatsOutput.writeIntAt(succeededFragmentsCountOffset, m_currentIndexInBatch);
 
     m_currentIndexInBatch = -1;
 
