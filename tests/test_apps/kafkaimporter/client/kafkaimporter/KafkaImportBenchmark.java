@@ -245,12 +245,12 @@ public class KafkaImportBenchmark {
                 double tps = MatchChecks.getTPS(client);
                 fw.append(String.format("%d,%d,%d,%d,%d,%d,%d,0,0,0,0,0,0\n",
                                     stats.getStartTimestamp(),
-                                    duration,
-                                    successfulInserts.get(),
-                                    serverEndTS - serverStartTS,
-                                    decodeTime,
-                                    decodeSum.longValue(),
-                                    (long)tps);
+                                    config.duration,
+                                    0,
+                                    0,
+                                    0,
+                                    0,
+                                    (long)tps));
                 fw.close();
             }
         } catch (IOException e) {
