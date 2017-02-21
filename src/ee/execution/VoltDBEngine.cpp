@@ -107,6 +107,7 @@
 #include <sstream>
 #include <locale>
 #include <typeinfo>
+#include <chrono> // For granular statistics
 
 ENABLE_BOOST_FOREACH_ON_CONST_MAP(Column);
 ENABLE_BOOST_FOREACH_ON_CONST_MAP(Index);
@@ -381,6 +382,10 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
     m_executorContext->m_progressStats.resetForNewBatch();
     NValueArray &params = m_executorContext->getParameterContainer();
 
+    size_t succeededFragmentsCountOffset = m_granularStatsOutput.reserveBytes(sizeof(int32_t));
+    std::chrono::time_point<std::chrono::system_clock> startTime, endTime;
+    std::chrono::duration<float> elapsedSeconds;
+
     for (m_currentIndexInBatch = 0; m_currentIndexInBatch < numFragments; ++m_currentIndexInBatch) {
 
         int usedParamcnt = serialInput.readShort();
@@ -395,6 +400,7 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
         }
 
         // success is 0 and error is 1.
+        startTime = std::chrono::system_clock::now();
         if (executePlanFragment(planfragmentIds[m_currentIndexInBatch],
                                 inputDependencyIds ? inputDependencyIds[m_currentIndexInBatch] : -1,
                                 m_currentIndexInBatch == 0,
@@ -402,12 +408,16 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
             ++failures;
             break;
         }
+        endTime = std::chrono::system_clock::now();
+        elapsedSeconds = endTime - startTime;
+        m_granularStatsOutput.writeFloat(elapsedSeconds.count());
 
         // at the end of each frag, rollup and reset counters
         m_executorContext->m_progressStats.rollUpForPlanFragment();
 
         m_stringPool.purge();
     }
+    m_granularStatsOutput.writeIntAt(succeededFragmentsCountOffset, m_currentIndexInBatch + 1 - failures);
 
     m_currentIndexInBatch = -1;
 
@@ -1413,11 +1423,15 @@ int VoltDBEngine::getResultsSize() const {
     return static_cast<int>(m_resultOutput.size());
 }
 
-void VoltDBEngine::setBuffers(char* parameterBuffer, int parameterBuffercapacity,
+void VoltDBEngine::setBuffers(char* parameterBuffer, int parameterBufferCapacity,
+        char* granularStatsBuffer, int granularStatsBufferCapacity,
         char* resultBuffer, int resultBufferCapacity,
         char* exceptionBuffer, int exceptionBufferCapacity) {
     m_parameterBuffer = parameterBuffer;
-    m_parameterBufferCapacity = parameterBuffercapacity;
+    m_parameterBufferCapacity = parameterBufferCapacity;
+
+    m_granularStatsBuffer = granularStatsBuffer;
+    m_granularStatsBufferCapacity = granularStatsBufferCapacity;
 
     m_reusedResultBuffer = resultBuffer;
     m_reusedResultCapacity = resultBufferCapacity;

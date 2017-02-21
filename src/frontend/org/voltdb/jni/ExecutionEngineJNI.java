@@ -84,6 +84,11 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     private BBContainer psetBufferC = null;
     private ByteBuffer psetBuffer = null;
 
+    /** Create a ByteBuffer (in a container) for the C++ side to share granular statistics
+    with Java. */
+    private BBContainer granularStatsBufferC = null;
+    private ByteBuffer granularStatsBuffer = null;
+
     /**
      * A deserializer backed by a direct byte buffer, for fast access from C++.
      * Since this is generally the largest shared buffer between Java and C++
@@ -152,9 +157,20 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         checkErrorCode(errorCode);
 
         setupPsetBuffer(256 * 1024); // 256k seems like a reasonable per-ee number (but is totally pulled from my a**)
+        setupGranularStatsBuffer(256 * 1024); // 256k seems like a reasonable per-ee number (but is totally pulled from my a**)
+        updateEEBufferPointers();
 
         updateHashinator(hashinatorConfig);
         //LOG.info("Initialized Execution Engine");
+    }
+
+    final void updateEEBufferPointers() {
+        int errorCode = nativeSetBuffers(pointer,
+                psetBuffer, psetBuffer.capacity(),
+                granularStatsBuffer, granularStatsBuffer.capacity(),
+                deserializer.buffer(), deserializer.buffer().capacity(),
+                exceptionBuffer, exceptionBuffer.capacity());
+        checkErrorCode(errorCode);
     }
 
     final void setupPsetBuffer(int size) {
@@ -165,21 +181,41 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
         psetBufferC = DBBPool.allocateDirect(size);
         psetBuffer = psetBufferC.b();
+    }
 
-        int errorCode = nativeSetBuffers(pointer, psetBuffer,
-                psetBuffer.capacity(),
-                deserializer.buffer(), deserializer.buffer().capacity(),
-                exceptionBuffer, exceptionBuffer.capacity());
-        checkErrorCode(errorCode);
+    final void setupGranularStatsBuffer(int size) {
+        if (granularStatsBuffer != null) {
+            granularStatsBufferC.discard();
+            granularStatsBuffer = null;
+        }
+
+        granularStatsBufferC = DBBPool.allocateDirect(size);
+        granularStatsBuffer = granularStatsBufferC.b();
     }
 
     final void clearPsetAndEnsureCapacity(int size) {
         assert(psetBuffer != null);
         if (size > psetBuffer.capacity()) {
             setupPsetBuffer(size);
+            updateEEBufferPointers();
         }
         else {
             psetBuffer.clear();
+        }
+    }
+
+    final void clearGranularStatsAndEnsureCapacity(int batchSize) {
+        assert(granularStatsBuffer != null);
+        // Determine the required size of the granular stats buffer:
+        // int32_t succeededFragmentsCount
+        // succeededFragmentsCount * sizeof(float) for duration time numbers.
+        int size = (batchSize + 1) * 4;
+        if (size > granularStatsBuffer.capacity()) {
+            setupGranularStatsBuffer(size);
+            updateEEBufferPointers();
+        }
+        else {
+            granularStatsBuffer.clear();
         }
     }
 
@@ -303,6 +339,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             }
         }
         // checkMaxFsSize();
+        clearGranularStatsAndEnsureCapacity(batchSize);
 
         // Execute the plan, passing a raw pointer to the byte buffers for input and output
         //Clear is destructive, do it before the native call

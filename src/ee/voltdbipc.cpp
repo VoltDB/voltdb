@@ -194,6 +194,7 @@ private:
     void setupSigHandler(void) const;
 
     int m_fd;
+    char *m_granularStatsBuffer;
     char *m_reusedResultBuffer;
     char *m_exceptionBuffer;
     bool m_terminate;
@@ -397,6 +398,7 @@ VoltDBIPC::VoltDBIPC(int fd) : m_fd(fd) {
     m_engine = NULL;
     m_counter = 0;
     m_reusedResultBuffer = NULL;
+    m_granularStatsBuffer = NULL;
     m_tupleBuffer = NULL;
     m_tupleBufferSize = 0;
     m_terminate = false;
@@ -412,6 +414,7 @@ VoltDBIPC::~VoltDBIPC() {
     if (m_engine != NULL) {
         delete m_engine;
         delete [] m_reusedResultBuffer;
+        delete [] m_granularStatsBuffer;
         delete [] m_tupleBuffer;
         delete [] m_exceptionBuffer;
     }
@@ -628,10 +631,12 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
         m_engine = new VoltDBEngine(this, new voltdb::StdoutLogProxy());
         m_engine->getLogManager()->setLogLevels(cs->logLevels);
         m_reusedResultBuffer = new char[MAX_MSG_SZ];
+        m_granularStatsBuffer = new char[MAX_MSG_SZ];
         std::memset(m_reusedResultBuffer, 0, MAX_MSG_SZ);
         m_exceptionBuffer = new char[MAX_MSG_SZ];
-        m_engine->setBuffers(NULL, 0, m_reusedResultBuffer, MAX_MSG_SZ,
-                             m_exceptionBuffer, MAX_MSG_SZ);
+        m_engine->setBuffers(NULL, 0, m_granularStatsBuffer, MAX_MSG_SZ,
+                                      m_reusedResultBuffer, MAX_MSG_SZ,
+                                      m_exceptionBuffer, MAX_MSG_SZ);
         // The tuple buffer gets expanded (doubled) as needed, but never compacted.
         m_tupleBufferSize = MAX_MSG_SZ;
         m_tupleBuffer = new char[m_tupleBufferSize];
@@ -782,6 +787,7 @@ void VoltDBIPC::executePlanFragments(struct ipc_command *cmd) {
 
     // and reset to space for the results output
     m_engine->resetReusedResultOutputBuffer(1);//1 byte to add status code
+    m_engine->resetGranularStatisticsOutputBuffer();
 
     try {
         errors = m_engine->executePlanFragments(numFrags,
