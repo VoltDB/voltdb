@@ -105,6 +105,18 @@ public class MatchChecks {
         }
     }
 
+    protected static double getTPS(Client client) {
+        // check the min, max, and row count to calculate TPS
+        ClientResponse response = doAdHoc(client, "select sum(TOTAL_ROWS_EXPORTED) from exportcounts order by 1;");
+        response = doAdHoc(client, "select count(*), since_epoch(microSecond, max(insert_time)) - since_epoch(microsecond, min(insert_time))  from KAFKAIMPORTTABLE1;");
+        VoltTable countQueryResult = response.getResults()[0];
+        countQueryResult.advanceRow();
+        long importRowCount = (long) countQueryResult.get(0, VoltType.BIGINT);
+        long elapsedMicroSecs = (long) countQueryResult.get(1, VoltType.BIGINT);
+        double tps = (double) importRowCount / (double) elapsedMicroSecs;
+        return tps;
+    }
+
     protected static long getExportRowCount(Client client) {
         // get the count of rows exported
         ClientResponse response = doAdHoc(client, "select sum(TOTAL_ROWS_EXPORTED) from exportcounts order by 1;");

@@ -43,6 +43,7 @@
 package client.kafkaimporter;
 
 import java.io.FileWriter;
+import java.io.IOException;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -148,9 +149,6 @@ public class KafkaImportBenchmark {
         @Option(desc = "Number of streams and topics we're importing.")
         int streams = 1;
 
-        @Option(desc = "Performance test only.")
-        boolean perftest = false;
-
         @Override
         public void validate() {
             if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
@@ -159,8 +157,6 @@ public class KafkaImportBenchmark {
             // if (expected_rows <= 0) exitWithMessageAndUsage("row number must be > 0");
             if (!useexport && alltypes) exitWithMessageAndUsage("groovy loader and alltypes are mutually exclusive");
             if (displayinterval <= 0) exitWithMessageAndUsage("displayinterval must be > 0");
-            if (perftest && statsfile.length() == 0) statsfile = "kafkaimporter.csv";
-
             log.info("finished validating args");
         }
     }
@@ -240,8 +236,28 @@ public class KafkaImportBenchmark {
                     stats.getAverageLatency(), stats.kPercentileLatencyAsDouble(0.95)));
         } catch (Exception ex) {
             log.error("Exception in printStatistics", ex);
-			// e.printStackTrace(); check from import that's needed for this
         }
+
+        // Write stats to file if requested
+        try {
+            if ((config.statsfile != null) && (config.statsfile.length() != 0)) {
+                FileWriter fw = new FileWriter(config.statsfile);
+                double tps = MatchChecks.getTPS(client);
+                fw.append(String.format("%d,%d,%d,%d,%d,%d,%d,0,0,0,0,0,0\n",
+                                    stats.getStartTimestamp(),
+                                    duration,
+                                    successfulInserts.get(),
+                                    serverEndTS - serverStartTS,
+                                    decodeTime,
+                                    decodeSum.longValue(),
+                                    (long)tps);
+                fw.close();
+            }
+        } catch (IOException e) {
+            System.err.println("Error writing stats file");
+            e.printStackTrace();
+        }
+
     }
 
     protected static void scheduleCheckTimer() {
@@ -279,25 +295,6 @@ public class KafkaImportBenchmark {
         config.displayinterval * 1000,
         config.displayinterval * 1000);
     }
-
-    /**
-     * Prints the results to a csv file for charting
-     *
-     * @throws Exception if anything unexpected happens.
-    public synchronized static void printResults() throws Exception {
-        FileWriter fw = null;
-
-        if ((config.statsfile != null) && (config.statsfile.length() != 0)) {
-            fw = new FileWriter(config.statsfile);
-            fw.append(String.format("%s,%d,-1,%d,0,0,0,0,0,0,0,0,0,0\n",
-                    (config.partitioned ? "Partitioned" : "Replicated"),
-                    benchmarkStartTS/1000, // back to seconds
-                    runCount.get()/((checkDB.maxInsertTime()-benchmarkStartTS)/1000))); // throughput -- TPS
-            fw.close();
-        }
-    }
-    **/
-
 
     /**
      * Core benchmark code.
