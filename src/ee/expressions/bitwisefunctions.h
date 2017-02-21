@@ -232,8 +232,25 @@ template<> inline NValue NValue::call<FUNC_VOLT_BIT_SHIFT_RIGHT>(const std::vect
 }
 
 #include <arpa/inet.h>
-template<> inline NValue NValue::callUnary<FUNC_MY_INET_NTOA>() const {
-    if (getValueType() != VALUE_TYPE_BIGINT && 
+/**
+ * Given a host order IPv4 or IPv6 address, return the presentation form of
+ * the address.  The single argument must have one of two types.
+ * <ul>
+ *   <li>If the argument has type BIGINT, then the lower 32 bits
+ *       of the value are interpreted as an IPv4 internet address in
+ *       host byte order.  This address is converted to presentation
+ *       format, which is the usual numbers and dots format.</li>
+ *   <li>If the argument has type VARBINARY, then the value is a
+ *       string of hexadecimal digits whose value is an IP address.
+ *       If the argument is 4 bytes long the digit string is an
+ *       IPv4 address.  If the argument is 32 bytes long, the digit
+ *       string is an IPv6 address.  Note that these lengths are twice
+ *       the size of the binary representation, since they are encoded
+ *       as hexadecimal digits.</li>
+ * </ul>
+ */
+template<> inline NValue NValue::callUnary<FUNC_INET_NTOA>() const {
+    if (getValueType() != VALUE_TYPE_BIGINT &&
         getValueType() != VALUE_TYPE_VARBINARY) {
         // The parser should enforce this for us, but just in case...
         throw SQLException(SQLException::dynamic_sql_error, "unsupported non-BigInt/VarBinary type for SQL INET_NTOA function");
@@ -277,37 +294,48 @@ template<> inline NValue NValue::callUnary<FUNC_MY_INET_NTOA>() const {
     }
     return getNullStringValue();
 }
-template<> inline NValue NValue::callUnary<FUNC_MY_INET_ATON4>() const {
+
+/**
+ * Given a string representing an IPv4 address, return the
+ * address as a BIGINT value in host byte order.  If the string
+ * cannot be parsed, throw a SQLException.  Note that this is
+ * the inverse of FUNC_MY_INET_NTOA when the argument type is
+ * BIGINT.
+ */
+template<> inline NValue NValue::callUnary<FUNC_INET4_ATON>() const {
     if (getValueType() != VALUE_TYPE_VARCHAR) {
         throw SQLException(SQLException::dynamic_sql_error, "unsupported non-VARCHAR type for SQL INET_ATON4 function");
     }
 
     std::string token = toString();
-    // TODO check for input ipaddress string more, over octet value...
-    if (token.find('.') != std::string::npos){
-        uint32_t addr;
-        if(inet_pton(AF_INET, token.c_str(), (void*) &(addr))==1){
-            return NValue::getBigIntValue(static_cast<int64_t>(ntohl(addr)));
-        }
+    uint32_t addr;
+    // Let inet_pton do the validation.
+    if(inet_pton(AF_INET, token.c_str(), (void*) &(addr))==1){
+        return NValue::getBigIntValue(static_cast<int64_t>(ntohl(addr)));
     }
-    throw SQLException(SQLException::dynamic_sql_error, "unrecognize ipv4 address format string");
+    throw SQLException(SQLException::dynamic_sql_error, "unrecognized ipv4 address format string");
 }
-template<> inline NValue NValue::callUnary<FUNC_MY_INET_ATON6>() const {
+
+/**
+ * Given a string representing an IPv6 address, return the
+ * address as a VARBINARY.  The address will be represented as
+ * a 128 bit number.  More significant bits will appear before
+ * less significant bits in the output.
+ */
+template<> inline NValue NValue::callUnary<FUNC_INET6_ATON>() const {
     if (getValueType() != VALUE_TYPE_VARCHAR) {
         throw SQLException(SQLException::dynamic_sql_error, "unsupported non-VARCHAR type for SQL INET_ATON6 function");
     }
 
     std::string token = toString();
-    // TODO check for input ip-address string more strictly
-    if(token.find(':') != std::string::npos){
-        const size_t IPV6BINLEN = 16;
-        unsigned char addr[IPV6BINLEN];
-        if(inet_pton(AF_INET6, token.c_str(), (void*) addr)==1){
-            return NValue::getAllocatedValue(VALUE_TYPE_VARBINARY,
-                    (const char*) addr, IPV6BINLEN, getTempStringPool());
-        }
+    const size_t IPV6BINLEN = 16;
+    unsigned char addr[IPV6BINLEN];
+    // Let inet_pton do the validation.
+    if(inet_pton(AF_INET6, token.c_str(), (void*) addr)==1){
+        return NValue::getAllocatedValue(VALUE_TYPE_VARBINARY,
+                (const char*) addr, IPV6BINLEN, getTempStringPool());
     }
-    throw SQLException(SQLException::dynamic_sql_error, "unrecognize ipv6 address format string");
+    throw SQLException(SQLException::dynamic_sql_error, "unrecognized ipv6 address format string");
 }
 
 }

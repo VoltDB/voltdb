@@ -418,14 +418,14 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
        case FUNC_SEC:
             ret = new UnaryFunctionExpression<FUNC_SEC>((*arguments)[0]);
             break;
-        case FUNC_MY_INET_NTOA:
-            ret = new UnaryFunctionExpression<FUNC_MY_INET_NTOA>((*arguments)[0]);
+        case FUNC_INET_NTOA:
+            ret = new UnaryFunctionExpression<FUNC_INET_NTOA>((*arguments)[0]);
             break;
-        case FUNC_MY_INET_ATON4:
-            ret = new UnaryFunctionExpression<FUNC_MY_INET_ATON4>((*arguments)[0]);
+        case FUNC_INET4_ATON:
+            ret = new UnaryFunctionExpression<FUNC_INET4_ATON>((*arguments)[0]);
             break;
-        case FUNC_MY_INET_ATON6:
-            ret = new UnaryFunctionExpression<FUNC_MY_INET_ATON6>((*arguments)[0]);
+        case FUNC_INET6_ATON:
+            ret = new UnaryFunctionExpression<FUNC_INET6_ATON>((*arguments)[0]);
             break;
         default:
             return NULL;
