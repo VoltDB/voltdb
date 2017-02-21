@@ -636,7 +636,8 @@ public class SocketJoiner {
             catch (java.net.ConnectException
                   |java.nio.channels.UnresolvedAddressException
                   |java.net.NoRouteToHostException
-                  |java.net.PortUnreachableException e)
+                  |java.net.PortUnreachableException
+                  |java.net.UnknownHostException e)
             {
                 // reset the socket to null for loop purposes
                 socket = null;
