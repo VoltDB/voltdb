@@ -109,8 +109,8 @@ public class ImportManager implements ChannelChangeCallback {
 
     /**
      * This creates a import connector from configuration provided.
+     * @param myHostId
      * @param catalogContext
-     * @param partitions
      */
     private synchronized void create(int myHostId, CatalogContext catalogContext) {
         try {
