@@ -208,8 +208,8 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         assert(granularStatsBuffer != null);
         // Determine the required size of the granular stats buffer:
         // int32_t succeededFragmentsCount
-        // succeededFragmentsCount * sizeof(float) for duration time numbers.
-        int size = (batchSize + 1) * 4;
+        // succeededFragmentsCount * sizeof(int64_t) for duration time numbers.
+        int size = 4 + batchSize * 8;
         if (size > granularStatsBuffer.capacity()) {
             setupGranularStatsBuffer(size);
             updateEEBufferPointers();
