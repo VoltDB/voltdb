@@ -269,6 +269,9 @@ public class PlannerTool {
                     partitioning = plan.getStatementPartitioning();
                 }
             }
+            catch (PlanningErrorException pex) {
+                throw pex;
+            }
             catch (Exception e) {
                 /*
                  * Don't log PlanningErrorExceptions or HSQLParseExceptions, as
