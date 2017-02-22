@@ -383,7 +383,7 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
     NValueArray &params = m_executorContext->getParameterContainer();
 
     size_t succeededFragmentsCountOffset = m_granularStatsOutput.reserveBytes(sizeof(int32_t));
-    std::chrono::time_point<std::chrono::system_clock> startTime, endTime;
+    std::chrono::high_resolution_clock::time_point startTime, endTime;
     std::chrono::duration<int64_t, std::nano> elapsedNanoseconds;
 
     for (m_currentIndexInBatch = 0; m_currentIndexInBatch < numFragments; ++m_currentIndexInBatch) {
@@ -400,17 +400,19 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
         }
 
         // success is 0 and error is 1.
-        startTime = std::chrono::system_clock::now();
+        startTime = std::chrono::high_resolution_clock::now();
         if (executePlanFragment(planfragmentIds[m_currentIndexInBatch],
                                 inputDependencyIds ? inputDependencyIds[m_currentIndexInBatch] : -1,
                                 m_currentIndexInBatch == 0,
                                 m_currentIndexInBatch == (numFragments - 1))) {
             ++failures;
-            break;
         }
-        endTime = std::chrono::system_clock::now();
+        endTime = std::chrono::high_resolution_clock::now();
         elapsedNanoseconds = std::chrono::duration_cast<std::chrono::nanoseconds>(endTime - startTime);
         m_granularStatsOutput.writeLong(elapsedNanoseconds.count());
+        if (failures > 0) {
+            break;
+        }
 
         // at the end of each frag, rollup and reset counters
         m_executorContext->m_progressStats.rollUpForPlanFragment();
