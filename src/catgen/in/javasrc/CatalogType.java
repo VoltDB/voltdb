@@ -22,6 +22,7 @@
 package org.voltdb.catalog;
 
 import java.lang.reflect.Field;
+import java.util.Collection;
 
 
 /**
@@ -51,7 +52,7 @@ public abstract class CatalogType implements Comparable<CatalogType> {
         @SuppressWarnings("unchecked")
         synchronized T resolve() {
             if (m_unresolvedPath != null) {
-                m_value = (T) getCatalog().getItemForRef(m_unresolvedPath);
+                m_value = (T) getCatalog().getItemForPath(m_unresolvedPath);
                 m_unresolvedPath = null;
             }
             return m_value;
@@ -270,9 +271,19 @@ public abstract class CatalogType implements Comparable<CatalogType> {
     }
 
     void writeChildCommands(StringBuilder sb)  {
+        writeChildCommands(sb, null);
+    }
+
+    /**
+     * Write catalog commands of the children in the white list.
+     * @param whiteList A white list of CatalogType classes
+     */
+    void writeChildCommands(StringBuilder sb, Collection<Class<? extends CatalogType> > whiteList)  {
         for (String childCollection : getChildCollections()) {
             CatalogMap<? extends CatalogType> map = getCollection(childCollection);
-            map.writeCommandsForMembers(sb);
+            if (whiteList == null || whiteList.contains(map.m_cls)) {
+                map.writeCommandsForMembers(sb);
+            }
         }
     }
 

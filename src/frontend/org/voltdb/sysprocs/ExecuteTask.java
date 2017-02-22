@@ -56,9 +56,8 @@ public class ExecuteTask extends VoltSystemProcedure {
     }
 
     @Override
-    public void init() {
-        registerPlanFragment(SysProcFragmentId.PF_executeTask);
-        registerPlanFragment(SysProcFragmentId.PF_executeTaskAggregate);
+    public long[] getPlanFragmentIds() {
+        return new long[]{SysProcFragmentId.PF_executeTask, SysProcFragmentId.PF_executeTaskAggregate};
     }
 
     @Override
@@ -154,7 +153,8 @@ public class ExecuteTask extends VoltSystemProcedure {
                     buffer.get(paramBuf);
                     ByteArrayInputStream bais = new ByteArrayInputStream(paramBuf);
                     ObjectInputStream ois = new ObjectInputStream(bais);
-                    Map<Integer, Map<Integer, DRConsumerDrIdTracker>> clusterToPartitionMap = (Map<Integer, Map<Integer, DRConsumerDrIdTracker>>)ois.readObject();
+                    Map<Integer, Map<Integer, DRConsumerDrIdTracker>> clusterToPartitionMap =
+                            (Map<Integer, Map<Integer, DRConsumerDrIdTracker>>)ois.readObject();
                     context.recoverWithDrAppliedTrackers(clusterToPartitionMap);
                     result.addRow(STATUS_OK);
                 } catch (Exception e) {

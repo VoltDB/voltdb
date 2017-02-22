@@ -46,7 +46,9 @@ import org.voltdb.types.ConstraintType;
 public class LoadSinglepartitionTable extends VoltSystemProcedure
 {
     @Override
-    public void init() {}
+    public long[] getPlanFragmentIds() {
+        return new long[]{};
+    }
 
     /**
      * This single-partition sysproc has no special fragments

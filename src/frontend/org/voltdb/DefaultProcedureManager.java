@@ -44,7 +44,7 @@ import org.voltdb.utils.CatalogUtil;
  * It has three jobs. First, know what the set of callable default procs is. This is used by
  * the system catalog stats (jdbc metadata, etc..) and by ClientInterface to accept calls for
  * default procs. Second, it has to generate SQL for default procs. Third, it actually supplies
- * compiled org.voltdb.catalog.Procedure instaces to execution sites upon request.
+ * compiled org.voltdb.catalog.Procedure instances to execution sites upon request.
  *
  */
 public class DefaultProcedureManager {

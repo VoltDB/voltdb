@@ -46,7 +46,9 @@ public class Pause extends VoltSystemProcedure {
     private final static OperationMode PAUSED = OperationMode.PAUSED;
 
     @Override
-    public void init() {}
+    public long[] getPlanFragmentIds() {
+        return new long[]{};
+    }
 
     @Override
     public DependencyPair executePlanFragment(
@@ -121,6 +123,10 @@ public class Pause extends VoltSystemProcedure {
                 throw new RuntimeException(e);
             }
         }
+
+        // Force a tick so that stats will be updated.
+        // Primarily added to get latest table stats for DR pause and empty db check.
+        ctx.getSiteProcedureConnection().tick();
 
         VoltTable t = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);
         t.addRow(VoltSystemProcedure.STATUS_OK);

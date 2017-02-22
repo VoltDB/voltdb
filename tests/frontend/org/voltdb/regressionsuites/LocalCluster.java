@@ -1976,6 +1976,13 @@ public class LocalCluster extends VoltServerConfig {
                                                   int replicationPort, int remoteReplicationPort, String pathToVoltDBRoot, String jar,
                                                   DrRoleType drRole, boolean hasLocalServer) throws IOException {
         VoltProjectBuilder builder = new VoltProjectBuilder();
+        return createLocalCluster(schemaDDL, siteCount, hostCount, kfactor, clusterId, replicationPort, remoteReplicationPort,
+                pathToVoltDBRoot, jar, drRole, hasLocalServer, builder);
+    }
+
+    public static LocalCluster createLocalCluster(String schemaDDL, int siteCount, int hostCount, int kfactor, int clusterId,
+                                                  int replicationPort, int remoteReplicationPort, String pathToVoltDBRoot, String jar,
+                                                  DrRoleType drRole, boolean hasLocalServer, VoltProjectBuilder builder) throws IOException {
         builder.addLiteralSchema(schemaDDL);
         builder.setDrProducerEnabled();
         if (drRole == DrRoleType.REPLICA) {
@@ -1994,6 +2001,8 @@ public class LocalCluster extends VoltServerConfig {
         System.out.println("Starting local cluster.");
         lc.setHasLocalServer(hasLocalServer);
         lc.overrideAnyRequestForValgrind();
+        lc.setJavaProperty("DR_QUERY_INTERVAL", "5");
+        lc.setJavaProperty("DR_RECV_TIMEOUT", "5000");
         if (!lc.isNewCli()) {
             lc.setDeploymentAndVoltDBRoot(builder.getPathToDeployment(), pathToVoltDBRoot);
             lc.startUp(false);

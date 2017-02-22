@@ -99,6 +99,7 @@ import org.voltdb.rejoin.TaskLog;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.settings.NodeSettings;
 import org.voltdb.sysprocs.SysProcFragmentId;
+import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MinimumRatioMaintainer;
@@ -1459,10 +1460,17 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         m_context = context;
         m_ee.setBatchTimeout(m_context.cluster.getDeployment().get("deployment").
                 getSystemsettings().get("systemsettings").getQuerytimeout());
-        m_loadedProcedures.loadProcedures(m_context, m_backend, csp);
+        m_loadedProcedures.loadProcedures(m_context, csp, false);
 
         if (isMPI) {
             // the rest of the work applies to sites with real EEs
+            return true;
+        }
+
+        diffCmds = CatalogUtil.getDiffCommandsForEE(diffCmds);
+        if (diffCmds.length() == 0) {
+            // empty diff cmds for the EE to apply, so skip the JNI call
+            hostLog.info("Skipped applying diff commands on EE.");
             return true;
         }
 
@@ -1514,7 +1522,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     public boolean updateSettings(CatalogContext context, CatalogSpecificPlanner csp) {
         m_context = context;
         // here you could bring the timeout settings
-        m_loadedProcedures.loadProcedures(m_context, m_backend, csp);
+        m_loadedProcedures.loadProcedures(m_context, csp);
         return true;
     }
 
@@ -1651,5 +1659,10 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         paramBuffer.putInt(payloads.length);
         paramBuffer.put(payloads);
         m_ee.executeTask(TaskType.GENERATE_DR_EVENT, paramBuffer);
+    }
+
+    @Override
+    public SystemProcedureExecutionContext getSystemProcedureExecutionContext() {
+        return m_sysprocContext;
     }
 }
