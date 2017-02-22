@@ -193,10 +193,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     @Override
     public void setMaxSeenTxnId(long maxSeenTxnId)
     {
-        //Saw transactions before. The master site may become a replica.
-        if(m_txnEgo.getTxnId() > 0 && maxSeenTxnId == Long.MIN_VALUE) {
-            return;
-        }
         super.setMaxSeenTxnId(maxSeenTxnId);
         writeIv2ViableReplayEntry();
     }
@@ -435,7 +431,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         final String procedureName = message.getStoredProcedureName();
         long newSpHandle;
         long uniqueId = Long.MIN_VALUE;
-
         Iv2InitiateTaskMessage msg = message;
         if (m_isLeader || message.isReadOnly()) {
             /*

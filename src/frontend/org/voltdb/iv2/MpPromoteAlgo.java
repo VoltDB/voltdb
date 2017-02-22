@@ -113,6 +113,7 @@ public class MpPromoteAlgo implements RepairAlgo
     {
         m_survivors = new ArrayList<Long>(survivors);
         m_mailbox = mailbox;
+
         m_whoami = whoami;
     }
 
