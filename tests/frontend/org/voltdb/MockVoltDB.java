@@ -816,7 +816,7 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
-    public boolean isShuttingdown() {
+    public boolean isPreparingShuttingdown() {
         return false;
     }
 

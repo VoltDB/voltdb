@@ -553,13 +553,11 @@ public final class InvocationDispatcher {
                     task.clientHandle);
         }
 
-        if (voltdb.isShuttingdown() && procedure.getAllowedinshutdown()) {
-            return null;
-        }
+        if (voltdb.isPreparingShuttingdown()) {
+            if (procedure.getAllowedinshutdown()) return null;
 
-        if (voltdb.isShuttingdown()) {
             return serverUnavailableResponse(
-                    "Server shutdown in progress - new transactions are not processed.",
+                    "Server is shutting down.",
                     task.clientHandle);
         }
 
@@ -1133,7 +1131,7 @@ public final class InvocationDispatcher {
         }
         VoltDBInterface voltdb = VoltDB.instance();
 
-        if (!voltdb.isShuttingdown()) {
+        if (!voltdb.isPreparingShuttingdown()) {
             log.warn("Ignoring shutdown save snapshot request as VoltDB is not shutting down");
             return unexpectedFailureResponse(
                     "Ignoring shutdown save snapshot request as VoltDB is not shutting down",
