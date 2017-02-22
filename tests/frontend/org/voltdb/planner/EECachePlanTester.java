@@ -103,10 +103,7 @@ public class EECachePlanTester extends EEPlanGenerator {
         // a table when there is a lot of data, if it's possible.
         //
         TableConfig CCCConfig = new TableConfig("CCC",
-                                                new SchemaConfig(
-                                                        new ColumnConfig("id",   VoltType.INTEGER),
-                                                        new ColumnConfig("name", VoltType.STRING,  32),
-                                                        new ColumnConfig("data", VoltType.STRING,  1024)),
+                                                getDatabase(),
                                                 NUMBER_ROWS);
         DBConfig db = new DBConfig(getClass(),
                                    EEPlanTestGenerator.class.getResource(DDL_FILENAME),

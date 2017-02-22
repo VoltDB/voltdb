@@ -95,6 +95,9 @@ import java.util.Map;
 
 import org.json_voltpatches.JSONException;
 import org.voltdb.VoltType;
+import org.voltdb.catalog.Column;
+import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Table;
 import org.voltdb.plannodes.AbstractPlanNode;
 
 /**
@@ -214,6 +217,11 @@ public class EEPlanGenerator extends PlannerTestCase {
      * specified by the schema.
      */
     protected static class ColumnConfig {
+        public ColumnConfig(Column col) {
+            m_name = col.getName();
+            m_type = VoltType.get((byte)col.getType());
+            m_length = col.getSize();
+        }
         public ColumnConfig(String name, VoltType type, int length) {
             assert(0 <= length || type != VoltType.STRING);
             m_name   = name;
@@ -260,8 +268,26 @@ public class EEPlanGenerator extends PlannerTestCase {
         }
         private List<ColumnConfig>  m_columns = new ArrayList<>();
     }
+
     /**
-     * Define a table.
+     * Define a schema from the catalog.
+     */
+    private static SchemaConfig makeSchemaConfig(String tableName,
+                                                 Database db) {
+        Table dbTable = db.getTables().get(tableName);
+        assert(dbTable != null);
+        ColumnConfig[] cols = new ColumnConfig[dbTable.getColumns().size()];
+        int idx = 0;
+        for (Column col : dbTable.getColumns()) {
+            cols[idx] = new ColumnConfig(col);
+            idx += 1;
+        }
+        return new SchemaConfig(cols);
+    }
+
+    /**
+     * Fetch the definition of a Table from the catalog
+     * in a format we can easily use.
      */
     protected static class TableConfig {
         /**
@@ -272,16 +298,18 @@ public class EEPlanGenerator extends PlannerTestCase {
          * @param schema
          * @param data
          */
-        public TableConfig(String       tableName,
-                           SchemaConfig schema,
-                           Object   data[][]) {
+        public TableConfig(String tableName,
+                           Database db,
+                           Object[][] data) {
+            SchemaConfig schema = makeSchemaConfig(tableName, db);
             m_tableName   = tableName;
             m_schema      = schema;
             if (data != null) {
-                m_rowCount    = data.length;
-                m_data        = computeData(data);
+                m_rowCount = data.length;
+                m_data = computeData(data);
             } else {
-                m_rowCount    = 0;
+                m_rowCount = 0;
+                m_data = null;
             }
             ensureTable();
         }
@@ -296,10 +324,10 @@ public class EEPlanGenerator extends PlannerTestCase {
          * @param schema
          * @param nrows
          */
-        public TableConfig(String       tableName,
-                           SchemaConfig schema,
-                           int          nrows) {
-            this(tableName, schema, null);
+        public TableConfig(String tableName,
+                            Database db,
+                           int nrows) {
+            this(tableName, db, null);
             m_rowCount    = nrows;
         }
 
@@ -312,9 +340,9 @@ public class EEPlanGenerator extends PlannerTestCase {
          * or else an index into the string table for strings.
          */
         private int[][] computeData(Object[][] data) {
-            int answer[][] = new int[data.length][m_schema.getNumColumns()];
+            int[][] answer = new int[data.length][m_schema.getNumColumns()];
             for (int ridx = 0; ridx < data.length; ridx += 1) {
-                Object [] row = data[ridx];
+                Object[] row = data[ridx];
                 for (int cidx = 0; cidx < row.length; cidx += 1) {
                     Object obj = row[cidx];
                     if (obj instanceof Number) {
@@ -399,11 +427,16 @@ public class EEPlanGenerator extends PlannerTestCase {
         public Object getNumStrings() {
             return m_strings.size();
         }
-        String       m_tableName;
+        String m_tableName;
         SchemaConfig m_schema;
-        int          m_data[][] = null;
+        int[][] m_data = null;
         List<String> m_strings = new ArrayList<>();
-        int          m_rowCount;
+        int m_rowCount;
+    }
+
+    protected Database getDatabase() {
+        Database db = getCatalog().getClusters().get("cluster").getDatabases().get("database");
+        return db;
     }
 
     /**
@@ -499,13 +532,6 @@ public class EEPlanGenerator extends PlannerTestCase {
             for (TableConfig tc : m_tables) {
                 getOneTableColumnTypesString(sb, tc);
             }
-            for (TestConfig tstConfig : m_testConfigs) {
-                /*
-                if (tstConfig.hasExpectedData()) {
-                    getOneTableColumnTypesString(sb, tstConfig.getExpectedOutput());
-                }
-                */
-            }
             return sb.toString();
         }
 
@@ -523,13 +549,6 @@ public class EEPlanGenerator extends PlannerTestCase {
             for (TableConfig tc : m_tables) {
                 getOneTableColumnSizeString(sb, tc);
             }
-            /*
-            for (TestConfig tstConfig : m_testConfigs) {
-                if (tstConfig.hasExpectedData()) {
-                    getOneTableColumnSizeString(sb, tstConfig.getExpectedOutput());
-                }
-            }
-            */
             return sb.toString();
         }
 
@@ -547,13 +566,6 @@ public class EEPlanGenerator extends PlannerTestCase {
             for (TableConfig tc : m_tables) {
                 getOneTableColumnNames(sb, tc);
             }
-            /*
-            for (TestConfig tstConfig : m_testConfigs) {
-                if (tstConfig.hasExpectedData()) {
-                    getOneTableColumnNames(sb, tstConfig.getExpectedOutput());
-                }
-            }
-            */
             return sb.toString();
         }
 
@@ -568,12 +580,12 @@ public class EEPlanGenerator extends PlannerTestCase {
         }
 
         private void writeTable(StringBuffer sb,
-                                String       tableName,
-                                String       rowCountName,
-                                int          rowCount,
-                                String       colCountName,
-                                int          colCount,
-                                int          data[][]) {
+                                String tableName,
+                                String rowCountName,
+                                int rowCount,
+                                String colCountName,
+                                int colCount,
+                                int[][] data) {
             sb.append(String.format("const int %s = %d;\n", rowCountName, rowCount));
             sb.append(String.format("const int %s = %d;\n", colCountName, colCount));
             //
@@ -603,13 +615,6 @@ public class EEPlanGenerator extends PlannerTestCase {
             for (TableConfig tc : m_tables) {
                 getOneTableStrings(sb, tc);
             }
-            /*
-            for (TestConfig tstConfig : m_testConfigs) {
-                if (tstConfig.hasExpectedData()) {
-                    getOneTableStrings(sb, tstConfig.getExpectedOutput());
-                }
-            }
-            */
             return sb.toString();
         }
 
@@ -628,13 +633,6 @@ public class EEPlanGenerator extends PlannerTestCase {
             for (TableConfig tc : m_tables) {
                 getOneTableData(sb, tc);
             }
-            /*
-            for (TestConfig tstConfig : m_testConfigs) {
-                if (tstConfig.hasExpectedData()) {
-                    getOneTableData(sb, tstConfig.getExpectedOutput());
-                }
-            }
-            */
             return sb.toString();
         }
 
@@ -655,13 +653,6 @@ public class EEPlanGenerator extends PlannerTestCase {
             for (TableConfig tc : m_tables) {
                 writeOneTableConfig(sb, tc);
             }
-            /*
-            for (TestConfig tc : m_testConfigs) {
-                if (tc.hasExpectedData()) {
-                    writeOneTableConfig(sb, tc.getExpectedOutput());
-                }
-            }
-            */
             return sb.toString();
         }
 

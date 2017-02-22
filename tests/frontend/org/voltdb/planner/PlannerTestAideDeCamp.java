@@ -211,6 +211,9 @@ public class PlannerTestAideDeCamp {
         return plannodes;
     }
 
+    public Catalog getCatalog() {
+        return db.getCatalog();
+    }
     public String getCatalogString() {
         return db.getCatalog().serialize();
     }

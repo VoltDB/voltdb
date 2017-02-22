@@ -112,16 +112,16 @@ const char *BBB_ColumnNames[] = {
     "C",
 };
 const char *CCC_ColumnNames[] = {
-    "id",
-    "name",
-    "data",
+    "DATA",
+    "ID",
+    "NAME",
 };
 const char *XXX_ColumnNames[] = {
-    "id",
-    "name",
-    "data",
+    "DATA",
+    "ID",
+    "NAME",
 };
-const char *order_by_ColumnNames[] = {
+const char *test_order_by_ColumnNames[] = {
     "A",
     "B",
 };
@@ -146,16 +146,16 @@ const voltdb::ValueType BBB_Types[] = {
     voltdb::VALUE_TYPE_INTEGER,
 };
 const voltdb::ValueType CCC_Types[] = {
-    voltdb::VALUE_TYPE_INTEGER,
     voltdb::VALUE_TYPE_VARCHAR,
+    voltdb::VALUE_TYPE_INTEGER,
     voltdb::VALUE_TYPE_VARCHAR,
 };
 const voltdb::ValueType XXX_Types[] = {
+    voltdb::VALUE_TYPE_VARCHAR,
     voltdb::VALUE_TYPE_INTEGER,
     voltdb::VALUE_TYPE_VARCHAR,
-    voltdb::VALUE_TYPE_VARCHAR,
 };
-const voltdb::ValueType order_by_Types[] = {
+const voltdb::ValueType test_order_by_Types[] = {
     voltdb::VALUE_TYPE_INTEGER,
     voltdb::VALUE_TYPE_INTEGER,
 };
@@ -180,16 +180,16 @@ const int32_t BBB_Sizes[] = {
     4,
 };
 const int32_t CCC_Sizes[] = {
+    1024,
     4,
     32,
-    1024,
 };
 const int32_t XXX_Sizes[] = {
+    1024,
     4,
     32,
-    1024,
 };
-const int32_t order_by_Sizes[] = {
+const int32_t test_order_by_Sizes[] = {
     4,
     4,
 };
@@ -220,8 +220,8 @@ const char *XXX_Strings[] = {
     "gamma",
     "delta",
 };
-int32_t num_order_by_strings = 0;
-const char *order_by_Strings[] = {
+int32_t num_test_order_by_strings = 0;
+const char *test_order_by_Strings[] = {
 };
 int32_t num_test_join_strings = 0;
 const char *test_join_Strings[] = {
@@ -281,9 +281,9 @@ const int XXXData[NUM_TABLE_ROWS_XXX * NUM_TABLE_COLS_XXX] = {
       2,  2,  3,
 };
 
-const int NUM_TABLE_ROWS_ORDER_BY = 15;
-const int NUM_TABLE_COLS_ORDER_BY = 2;
-const int order_byData[NUM_TABLE_ROWS_ORDER_BY * NUM_TABLE_COLS_ORDER_BY] = {
+const int NUM_TABLE_ROWS_TEST_ORDER_BY = 15;
+const int NUM_TABLE_COLS_TEST_ORDER_BY = 2;
+const int test_order_byData[NUM_TABLE_ROWS_TEST_ORDER_BY * NUM_TABLE_COLS_TEST_ORDER_BY] = {
       1, 10,
       1, 10,
       1, 20,
@@ -403,16 +403,16 @@ const TableConfig XXXConfig = {
     XXX_Strings,
     num_XXX_strings
 };
-const TableConfig order_byConfig = {
-    "order_by",
-    order_by_ColumnNames,
-    order_by_Types,
-    order_by_Sizes,
-    NUM_TABLE_ROWS_ORDER_BY,
-    NUM_TABLE_COLS_ORDER_BY,
-    order_byData,
-    order_by_Strings,
-    num_order_by_strings
+const TableConfig test_order_byConfig = {
+    "test_order_by",
+    test_order_by_ColumnNames,
+    test_order_by_Types,
+    test_order_by_Sizes,
+    NUM_TABLE_ROWS_TEST_ORDER_BY,
+    NUM_TABLE_COLS_TEST_ORDER_BY,
+    test_order_byData,
+    test_order_by_Strings,
+    num_test_order_by_strings
 };
 const TableConfig test_joinConfig = {
     "test_join",
@@ -435,7 +435,7 @@ const TableConfig *allTables[] = {
     &BBBConfig,
     &CCCConfig,
     &XXXConfig,
-    &order_byConfig,
+    &test_order_byConfig,
     &test_joinConfig,
 };
 
@@ -534,7 +534,7 @@ TestConfig allTests[3] = {
         "        }\n"
         "    ]\n"
         "}",
-        &order_byConfig
+        &test_order_byConfig
     },
     {
         // SQL Statement
@@ -803,9 +803,18 @@ DBConfig TestGeneratedPlans::m_testDB =
     // DDL.
     //
     "drop table T if exists;\n"
-    "drop table AAA if exists;\n"
-    "drop table BBB if exists;\n"
     "drop table R1 if exists;\n"
+    "drop table AAA if exists;\n"
+    "drop table count_output if exists;\n"
+    "drop table test_sum_output if exists;\n"
+    "drop table BBB if exists;\n"
+    "drop table test_output if exists;\n"
+    "drop table CCC if exists;\n"
+    "drop table test_order_by if exists;\n"
+    "drop table test_join if exists;\n"
+    "drop table XXX if exists;\n"
+    "drop table rank_output if exists;\n"
+    "drop table rank_dense_output if exists;\n"
     "\n"
     "CREATE TABLE T (\n"
     "  A INTEGER,\n"
@@ -826,23 +835,67 @@ DBConfig TestGeneratedPlans::m_testDB =
     "  C integer\n"
     " );\n"
     " \n"
+    "create table COUNT_OUTPUT (\n"
+    "  A integer,\n"
+    "  B integer,\n"
+    "  C integer,\n"
+    "  D integer\n"
+    " );\n"
+    " \n"
+    " create table test_sum_output (\n"
+    "  A integer,\n"
+    "  B integer,\n"
+    "  C integer\n"
+    "); \n"
     " create table BBB (\n"
     "  A integer,\n"
     "  B integer,\n"
     "  C integer\n"
     " );\n"
     " \n"
+    "create table test_output (\n"
+    "  A integer,\n"
+    "  B integer,\n"
+    "  C integer\n"
+    ");\n"
+    " \n"
     "create table CCC (\n"
     "  id integer,\n"
     "  name varchar(32),\n"
     "  data varchar(1024)\n"
     ");\n"
-    " \n"
+    "\n"
+    "create table test_order_by (\n"
+    "  a integer,\n"
+    "  b integer\n"
+    ");\n"
+    "\n"
+    "create table test_join (\n"
+    "  a   integer,\n"
+    "  b   integer,\n"
+    "  c   integer\n"
+    ");\n"
+    "\n"
     "create table XXX (\n"
     "  id integer primary key not null,\n"
     "  name varchar(32),\n"
     "  data varchar(1024)\n"
     ");\n"
+    "\n"
+    "create table rank_output (\n"
+    "  A integer,\n"
+    "  B integer,\n"
+    "  C integer,\n"
+    "  R integer\n"
+    ");\n"
+    "\n"
+    "create table rank_dense_output (\n"
+    "  A integer,\n"
+    "  B integer,\n"
+    "  C integer,\n"
+    "  R integer\n"
+    ");\n"
+    "  \n"
     "",
     //
     // Catalog String
@@ -863,7 +916,7 @@ DBConfig TestGeneratedPlans::m_testDB =
     "set $PREV drMasterHost \"\"\n"
     "set $PREV drFlushInterval 0\n"
     "add /clusters#cluster databases database\n"
-    "set /clusters#cluster/databases#database schema \"eJy9UsuOw0AIu+/XzICBcE2a/P8nrRml+1CabXroCk1GGoxtII4Q36JJC3h38cVNmkGapzu/FpNnaCBU5w9/CEeveK1EKl4qMdEzDagJDN2A4Z52BAv2TmTiaWWTJ7EWCgEzkWXPyGlGD5km+bfk8PklmsCRAiu2ssZXY9VylyOmkHm9gqrJcV1XoD9ib3QuQ2cmPsvvcJp7e65cgXnnAuzxsn9OlUtZC+nBxfya6klGD5n2XHj/Zf5fWCu+hUmAMwFfWXcbDE4ucfWpbplUVTjeOw5DqT/AdW0qemUVNlU8MdaisT5pivRBUp/5nsPqFoVfw8i3vLGFTyRq52Q=\"\n"
+    "set /clusters#cluster/databases#database schema \"eJzFVVluwyAQ/e9pYDbMZ+2Y+x+pbxBOI3l3UldIGDPLG2Y1SWQlBQpJLBrZYEpBhYJlM+yaOsuJkyTm/suW2YnjKQGJvk6JGONObUyixU9gDr6fUoKzOosW7GqPN1QJ+bqIfh2VfV1HJfM/wplSvqrm2woEx3Mp0vk6h0g4j9a/E+9fFTAfycOmh9QJK4lKVJFaDkhXkkFaaRAe4stTWLKMziVwjRINjUKrFJ5RAuVtyFpeT9AsMlchoxQ3DbcKqWGCA49z5uMSQM1w5nEE2AfeByynitODP7u91dLcnmeMYKhFz6PlZvDqVc8v57Tk6frq1RUKzyhhH5jxIvVXavETvsH3j5syUeSCkXst6+Ne2/FZa3u3B2uted79/taAJ1iIz6Pa1KPzRHtUDQZdhBHW+Zc6ZiZUxsQnFSku8EUOTHykirba/NPYVR/Z3EcnAJ8D4RWoeWcFbIPKi9Q9c6YBsxmYkHwkZAQF7q0DsMd9rqEqdRiMqLHBhv8J4crA+5tupBdCfmCc3mzsD5tkOXg=\"\n"
     "set $PREV isActiveActiveDRed false\n"
     "set $PREV securityprovider \"\"\n"
     "add /clusters#cluster/databases#database groups administrator\n"
@@ -1012,6 +1065,62 @@ DBConfig TestGeneratedPlans::m_testDB =
     "set $PREV matviewsource null\n"
     "set $PREV matview null\n"
     "set $PREV inbytes false\n"
+    "add /clusters#cluster/databases#database tables COUNT_OUTPUT\n"
+    "set /clusters#cluster/databases#database/tables#COUNT_OUTPUT isreplicated true\n"
+    "set $PREV partitioncolumn null\n"
+    "set $PREV estimatedtuplecount 0\n"
+    "set $PREV materializer null\n"
+    "set $PREV signature \"COUNT_OUTPUT|iiii\"\n"
+    "set $PREV tuplelimit 2147483647\n"
+    "set $PREV isDRed false\n"
+    "add /clusters#cluster/databases#database/tables#COUNT_OUTPUT columns A\n"
+    "set /clusters#cluster/databases#database/tables#COUNT_OUTPUT/columns#A index 0\n"
+    "set $PREV type 5\n"
+    "set $PREV size 4\n"
+    "set $PREV nullable true\n"
+    "set $PREV name \"A\"\n"
+    "set $PREV defaultvalue null\n"
+    "set $PREV defaulttype 0\n"
+    "set $PREV aggregatetype 0\n"
+    "set $PREV matviewsource null\n"
+    "set $PREV matview null\n"
+    "set $PREV inbytes false\n"
+    "add /clusters#cluster/databases#database/tables#COUNT_OUTPUT columns B\n"
+    "set /clusters#cluster/databases#database/tables#COUNT_OUTPUT/columns#B index 1\n"
+    "set $PREV type 5\n"
+    "set $PREV size 4\n"
+    "set $PREV nullable true\n"
+    "set $PREV name \"B\"\n"
+    "set $PREV defaultvalue null\n"
+    "set $PREV defaulttype 0\n"
+    "set $PREV aggregatetype 0\n"
+    "set $PREV matviewsource null\n"
+    "set $PREV matview null\n"
+    "set $PREV inbytes false\n"
+    "add /clusters#cluster/databases#database/tables#COUNT_OUTPUT columns C\n"
+    "set /clusters#cluster/databases#database/tables#COUNT_OUTPUT/columns#C index 2\n"
+    "set $PREV type 5\n"
+    "set $PREV size 4\n"
+    "set $PREV nullable true\n"
+    "set $PREV name \"C\"\n"
+    "set $PREV defaultvalue null\n"
+    "set $PREV defaulttype 0\n"
+    "set $PREV aggregatetype 0\n"
+    "set $PREV matviewsource null\n"
+    "set $PREV matview null\n"
+    "set $PREV inbytes false\n"
+    "add /clusters#cluster/databases#database/tables#COUNT_OUTPUT columns D\n"
+    "set /clusters#cluster/databases#database/tables#COUNT_OUTPUT/columns#D index 3\n"
+    "set $PREV type 5\n"
+    "set $PREV size 4\n"
+    "set $PREV nullable true\n"
+    "set $PREV name \"D\"\n"
+    "set $PREV defaultvalue null\n"
+    "set $PREV defaulttype 0\n"
+    "set $PREV aggregatetype 0\n"
+    "set $PREV matviewsource null\n"
+    "set $PREV matview null\n"
+    "set $PREV inbytes false\n"
     "add /clusters#cluster/databases#database tables R1\n"
     "set /clusters#cluster/databases#database/tables#R1 isreplicated true\n"
     "set $PREV partitioncolumn null\n"
@@ -1071,6 +1180,118 @@ DBConfig TestGeneratedPlans::m_testDB =
     "set $PREV oncommit \"\"\n"
     "set $PREV index /clusters#cluster/databases#database/tables#R1/indexes#VOLTDB_AUTOGEN_IDX_PK_R1_ID\n"
     "set $PREV foreignkeytable null\n"
+    "add /clusters#cluster/databases#database tables RANK_DENSE_OUTPUT\n"
+    "set /clusters#cluster/databases#database/tables#RANK_DENSE_OUTPUT isreplicated true\n"
+    "set $PREV partitioncolumn null\n"
+    "set $PREV estimatedtuplecount 0\n"
+    "set $PREV materializer null\n"
+    "set $PREV signature \"RANK_DENSE_OUTPUT|iiii\"\n"
+    "set $PREV tuplelimit 2147483647\n"
+    "set $PREV isDRed false\n"
+    "add /clusters#cluster/databases#database/tables#RANK_DENSE_OUTPUT columns A\n"
+    "set /clusters#cluster/databases#database/tables#RANK_DENSE_OUTPUT/columns#A index 0\n"
+    "set $PREV type 5\n"
+    "set $PREV size 4\n"
+    "set $PREV nullable true\n"
+    "set $PREV name \"A\"\n"
+    "set $PREV defaultvalue null\n"
+    "set $PREV defaulttype 0\n"
+    "set $PREV aggregatetype 0\n"
+    "set $PREV matviewsource null\n"
+    "set $PREV matview null\n"
+    "set $PREV inbytes false\n"
+    "add /clusters#cluster/databases#database/tables#RANK_DENSE_OUTPUT columns B\n"
+    "set /clusters#cluster/databases#database/tables#RANK_DENSE_OUTPUT/columns#B index 1\n"
+    "set $PREV type 5\n"
+    "set $PREV size 4\n"
+    "set $PREV nullable true\n"
+    "set $PREV name \"B\"\n"
+    "set $PREV defaultvalue null\n"
+    "set $PREV defaulttype 0\n"
+    "set $PREV aggregatetype 0\n"
+    "set $PREV matviewsource null\n"
+    "set $PREV matview null\n"
+    "set $PREV inbytes false\n"
+    "add /clusters#cluster/databases#database/tables#RANK_DENSE_OUTPUT columns C\n"
+    "set /clusters#cluster/databases#database/tables#RANK_DENSE_OUTPUT/columns#C index 2\n"
+    "set $PREV type 5\n"
+    "set $PREV size 4\n"
+    "set $PREV nullable true\n"
+    "set $PREV name \"C\"\n"
+    "set $PREV defaultvalue null\n"
+    "set $PREV defaulttype 0\n"
+    "set $PREV aggregatetype 0\n"
+    "set $PREV matviewsource null\n"
+    "set $PREV matview null\n"
+    "set $PREV inbytes false\n"
+    "add /clusters#cluster/databases#database/tables#RANK_DENSE_OUTPUT columns R\n"
+    "set /clusters#cluster/databases#database/tables#RANK_DENSE_OUTPUT/columns#R index 3\n"
+    "set $PREV type 5\n"
+    "set $PREV size 4\n"
+    "set $PREV nullable true\n"
+    "set $PREV name \"R\"\n"
+    "set $PREV defaultvalue null\n"
+    "set $PREV defaulttype 0\n"
+    "set $PREV aggregatetype 0\n"
+    "set $PREV matviewsource null\n"
+    "set $PREV matview null\n"
+    "set $PREV inbytes false\n"
+    "add /clusters#cluster/databases#database tables RANK_OUTPUT\n"
+    "set /clusters#cluster/databases#database/tables#RANK_OUTPUT isreplicated true\n"
+    "set $PREV partitioncolumn null\n"
+    "set $PREV estimatedtuplecount 0\n"
+    "set $PREV materializer null\n"
+    "set $PREV signature \"RANK_OUTPUT|iiii\"\n"
+    "set $PREV tuplelimit 2147483647\n"
+    "set $PREV isDRed false\n"
+    "add /clusters#cluster/databases#database/tables#RANK_OUTPUT columns A\n"
+    "set /clusters#cluster/databases#database/tables#RANK_OUTPUT/columns#A index 0\n"
+    "set $PREV type 5\n"
+    "set $PREV size 4\n"
+    "set $PREV nullable true\n"
+    "set $PREV name \"A\"\n"
+    "set $PREV defaultvalue null\n"
+    "set $PREV defaulttype 0\n"
+    "set $PREV aggregatetype 0\n"
+    "set $PREV matviewsource null\n"
+    "set $PREV matview null\n"
+    "set $PREV inbytes false\n"
+    "add /clusters#cluster/databases#database/tables#RANK_OUTPUT columns B\n"
+    "set /clusters#cluster/databases#database/tables#RANK_OUTPUT/columns#B index 1\n"
+    "set $PREV type 5\n"
+    "set $PREV size 4\n"
+    "set $PREV nullable true\n"
+    "set $PREV name \"B\"\n"
+    "set $PREV defaultvalue null\n"
+    "set $PREV defaulttype 0\n"
+    "set $PREV aggregatetype 0\n"
+    "set $PREV matviewsource null\n"
+    "set $PREV matview null\n"
+    "set $PREV inbytes false\n"
+    "add /clusters#cluster/databases#database/tables#RANK_OUTPUT columns C\n"
+    "set /clusters#cluster/databases#database/tables#RANK_OUTPUT/columns#C index 2\n"
+    "set $PREV type 5\n"
+    "set $PREV size 4\n"
+    "set $PREV nullable true\n"
+    "set $PREV name \"C\"\n"
+    "set $PREV defaultvalue null\n"
+    "set $PREV defaulttype 0\n"
+    "set $PREV aggregatetype 0\n"
+    "set $PREV matviewsource null\n"
+    "set $PREV matview null\n"
+    "set $PREV inbytes false\n"
+    "add /clusters#cluster/databases#database/tables#RANK_OUTPUT columns R\n"
+    "set /clusters#cluster/databases#database/tables#RANK_OUTPUT/columns#R index 3\n"
+    "set $PREV type 5\n"
+    "set $PREV size 4\n"
+    "set $PREV nullable true\n"
+    "set $PREV name \"R\"\n"
+    "set $PREV defaultvalue null\n"
+    "set $PREV defaulttype 0\n"
+    "set $PREV aggregatetype 0\n"
+    "set $PREV matviewsource null\n"
+    "set $PREV matview null\n"
+    "set $PREV inbytes false\n"
     "add /clusters#cluster/databases#database tables T\n"
     "set /clusters#cluster/databases#database/tables#T isreplicated true\n"
     "set $PREV partitioncolumn null\n"
@@ -1105,6 +1326,170 @@ DBConfig TestGeneratedPlans::m_testDB =
     "set $PREV inbytes false\n"
     "add /clusters#cluster/databases#database/tables#T columns C\n"
     "set /clusters#cluster/databases#database/tables#T/columns#C index 2\n"
+    "set $PREV type 5\n"
+    "set $PREV size 4\n"
+    "set $PREV nullable true\n"
+    "set $PREV name \"C\"\n"
+    "set $PREV defaultvalue null\n"
+    "set $PREV defaulttype 0\n"
+    "set $PREV aggregatetype 0\n"
+    "set $PREV matviewsource null\n"
+    "set $PREV matview null\n"
+    "set $PREV inbytes false\n"
+    "add /clusters#cluster/databases#database tables TEST_JOIN\n"
+    "set /clusters#cluster/databases#database/tables#TEST_JOIN isreplicated true\n"
+    "set $PREV partitioncolumn null\n"
+    "set $PREV estimatedtuplecount 0\n"
+    "set $PREV materializer null\n"
+    "set $PREV signature \"TEST_JOIN|iii\"\n"
+    "set $PREV tuplelimit 2147483647\n"
+    "set $PREV isDRed false\n"
+    "add /clusters#cluster/databases#database/tables#TEST_JOIN columns A\n"
+    "set /clusters#cluster/databases#database/tables#TEST_JOIN/columns#A index 0\n"
+    "set $PREV type 5\n"
+    "set $PREV size 4\n"
+    "set $PREV nullable true\n"
+    "set $PREV name \"A\"\n"
+    "set $PREV defaultvalue null\n"
+    "set $PREV defaulttype 0\n"
+    "set $PREV aggregatetype 0\n"
+    "set $PREV matviewsource null\n"
+    "set $PREV matview null\n"
+    "set $PREV inbytes false\n"
+    "add /clusters#cluster/databases#database/tables#TEST_JOIN columns B\n"
+    "set /clusters#cluster/databases#database/tables#TEST_JOIN/columns#B index 1\n"
+    "set $PREV type 5\n"
+    "set $PREV size 4\n"
+    "set $PREV nullable true\n"
+    "set $PREV name \"B\"\n"
+    "set $PREV defaultvalue null\n"
+    "set $PREV defaulttype 0\n"
+    "set $PREV aggregatetype 0\n"
+    "set $PREV matviewsource null\n"
+    "set $PREV matview null\n"
+    "set $PREV inbytes false\n"
+    "add /clusters#cluster/databases#database/tables#TEST_JOIN columns C\n"
+    "set /clusters#cluster/databases#database/tables#TEST_JOIN/columns#C index 2\n"
+    "set $PREV type 5\n"
+    "set $PREV size 4\n"
+    "set $PREV nullable true\n"
+    "set $PREV name \"C\"\n"
+    "set $PREV defaultvalue null\n"
+    "set $PREV defaulttype 0\n"
+    "set $PREV aggregatetype 0\n"
+    "set $PREV matviewsource null\n"
+    "set $PREV matview null\n"
+    "set $PREV inbytes false\n"
+    "add /clusters#cluster/databases#database tables TEST_ORDER_BY\n"
+    "set /clusters#cluster/databases#database/tables#TEST_ORDER_BY isreplicated true\n"
+    "set $PREV partitioncolumn null\n"
+    "set $PREV estimatedtuplecount 0\n"
+    "set $PREV materializer null\n"
+    "set $PREV signature \"TEST_ORDER_BY|ii\"\n"
+    "set $PREV tuplelimit 2147483647\n"
+    "set $PREV isDRed false\n"
+    "add /clusters#cluster/databases#database/tables#TEST_ORDER_BY columns A\n"
+    "set /clusters#cluster/databases#database/tables#TEST_ORDER_BY/columns#A index 0\n"
+    "set $PREV type 5\n"
+    "set $PREV size 4\n"
+    "set $PREV nullable true\n"
+    "set $PREV name \"A\"\n"
+    "set $PREV defaultvalue null\n"
+    "set $PREV defaulttype 0\n"
+    "set $PREV aggregatetype 0\n"
+    "set $PREV matviewsource null\n"
+    "set $PREV matview null\n"
+    "set $PREV inbytes false\n"
+    "add /clusters#cluster/databases#database/tables#TEST_ORDER_BY columns B\n"
+    "set /clusters#cluster/databases#database/tables#TEST_ORDER_BY/columns#B index 1\n"
+    "set $PREV type 5\n"
+    "set $PREV size 4\n"
+    "set $PREV nullable true\n"
+    "set $PREV name \"B\"\n"
+    "set $PREV defaultvalue null\n"
+    "set $PREV defaulttype 0\n"
+    "set $PREV aggregatetype 0\n"
+    "set $PREV matviewsource null\n"
+    "set $PREV matview null\n"
+    "set $PREV inbytes false\n"
+    "add /clusters#cluster/databases#database tables TEST_OUTPUT\n"
+    "set /clusters#cluster/databases#database/tables#TEST_OUTPUT isreplicated true\n"
+    "set $PREV partitioncolumn null\n"
+    "set $PREV estimatedtuplecount 0\n"
+    "set $PREV materializer null\n"
+    "set $PREV signature \"TEST_OUTPUT|iii\"\n"
+    "set $PREV tuplelimit 2147483647\n"
+    "set $PREV isDRed false\n"
+    "add /clusters#cluster/databases#database/tables#TEST_OUTPUT columns A\n"
+    "set /clusters#cluster/databases#database/tables#TEST_OUTPUT/columns#A index 0\n"
+    "set $PREV type 5\n"
+    "set $PREV size 4\n"
+    "set $PREV nullable true\n"
+    "set $PREV name \"A\"\n"
+    "set $PREV defaultvalue null\n"
+    "set $PREV defaulttype 0\n"
+    "set $PREV aggregatetype 0\n"
+    "set $PREV matviewsource null\n"
+    "set $PREV matview null\n"
+    "set $PREV inbytes false\n"
+    "add /clusters#cluster/databases#database/tables#TEST_OUTPUT columns B\n"
+    "set /clusters#cluster/databases#database/tables#TEST_OUTPUT/columns#B index 1\n"
+    "set $PREV type 5\n"
+    "set $PREV size 4\n"
+    "set $PREV nullable true\n"
+    "set $PREV name \"B\"\n"
+    "set $PREV defaultvalue null\n"
+    "set $PREV defaulttype 0\n"
+    "set $PREV aggregatetype 0\n"
+    "set $PREV matviewsource null\n"
+    "set $PREV matview null\n"
+    "set $PREV inbytes false\n"
+    "add /clusters#cluster/databases#database/tables#TEST_OUTPUT columns C\n"
+    "set /clusters#cluster/databases#database/tables#TEST_OUTPUT/columns#C index 2\n"
+    "set $PREV type 5\n"
+    "set $PREV size 4\n"
+    "set $PREV nullable true\n"
+    "set $PREV name \"C\"\n"
+    "set $PREV defaultvalue null\n"
+    "set $PREV defaulttype 0\n"
+    "set $PREV aggregatetype 0\n"
+    "set $PREV matviewsource null\n"
+    "set $PREV matview null\n"
+    "set $PREV inbytes false\n"
+    "add /clusters#cluster/databases#database tables TEST_SUM_OUTPUT\n"
+    "set /clusters#cluster/databases#database/tables#TEST_SUM_OUTPUT isreplicated true\n"
+    "set $PREV partitioncolumn null\n"
+    "set $PREV estimatedtuplecount 0\n"
+    "set $PREV materializer null\n"
+    "set $PREV signature \"TEST_SUM_OUTPUT|iii\"\n"
+    "set $PREV tuplelimit 2147483647\n"
+    "set $PREV isDRed false\n"
+    "add /clusters#cluster/databases#database/tables#TEST_SUM_OUTPUT columns A\n"
+    "set /clusters#cluster/databases#database/tables#TEST_SUM_OUTPUT/columns#A index 0\n"
+    "set $PREV type 5\n"
+    "set $PREV size 4\n"
+    "set $PREV nullable true\n"
+    "set $PREV name \"A\"\n"
+    "set $PREV defaultvalue null\n"
+    "set $PREV defaulttype 0\n"
+    "set $PREV aggregatetype 0\n"
+    "set $PREV matviewsource null\n"
+    "set $PREV matview null\n"
+    "set $PREV inbytes false\n"
+    "add /clusters#cluster/databases#database/tables#TEST_SUM_OUTPUT columns B\n"
+    "set /clusters#cluster/databases#database/tables#TEST_SUM_OUTPUT/columns#B index 1\n"
+    "set $PREV type 5\n"
+    "set $PREV size 4\n"
+    "set $PREV nullable true\n"
+    "set $PREV name \"B\"\n"
+    "set $PREV defaultvalue null\n"
+    "set $PREV defaulttype 0\n"
+    "set $PREV aggregatetype 0\n"
+    "set $PREV matviewsource null\n"
+    "set $PREV matview null\n"
+    "set $PREV inbytes false\n"
+    "add /clusters#cluster/databases#database/tables#TEST_SUM_OUTPUT columns C\n"
+    "set /clusters#cluster/databases#database/tables#TEST_SUM_OUTPUT/columns#C index 2\n"
     "set $PREV type 5\n"
     "set $PREV size 4\n"
     "set $PREV nullable true\n"

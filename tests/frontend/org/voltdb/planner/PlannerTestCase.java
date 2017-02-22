@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Stack;
 
 import org.apache.commons.lang3.StringUtils;
+import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DeterminismMode;
 import org.voltdb.expressions.AbstractExpression;
@@ -308,6 +309,10 @@ public class PlannerTestCase extends TestCase {
 
     public String getCatalogString() {
         return m_aide.getCatalogString();
+    }
+
+    public Catalog getCatalog() {
+        return m_aide.getCatalog();
     }
 
     Database getDatabase() {
