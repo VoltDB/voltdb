@@ -121,22 +121,13 @@ public class LoadedProcedureSet {
         m_userProcs = loadUserProcedureRunners(catalogContext, m_site, m_csp);
 
         if (forUpdateOnly) {
+            // When catalog updates, only user procedures needs to be reloaded.
+            // System procedures can be left without changes.
             reInitSystemProcedureRunners(catalogContext, csp);
         } else {
             // reload all system procedures from beginning
             m_sysProcs = loadSystemProcedures(catalogContext, m_site, csp);
         }
-
-    }
-
-    /**
-     * When catalog updates, only user procedures needs to be reloaded. System procedures can be left without changes.
-     */
-    public void loadProceduresForCatalogUpdate(
-            CatalogContext catalogContext,
-            CatalogSpecificPlanner csp)
-    {
-
     }
 
     private static ImmutableMap<String, ProcedureRunner> loadUserProcedureRunners(

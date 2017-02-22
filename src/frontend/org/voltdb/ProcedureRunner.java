@@ -227,7 +227,6 @@ public class ProcedureRunner {
         if (! m_isSysProc) {
             return;
         }
-        assert(m_procedure instanceof VoltSystemProcedure);
         ((VoltSystemProcedure) m_procedure).initSysProc(m_site,
                 catalogContext.cluster,
                 catalogContext.getClusterSettings(),
