@@ -85,7 +85,6 @@ public class ProcedureRunner {
         SQLStmt stmt;
         ParameterSet params;
         Expectation expectation = null;
-        ByteBuffer serialization = null;
     }
     protected final ArrayList<QueuedSQL> m_batch = new ArrayList<QueuedSQL>(100);
     // cached fake SQLStmt array for single statement non-java procs
@@ -648,25 +647,6 @@ public class ProcedureRunner {
         return m_site.getCorrespondingClusterId();
     }
 
-    private void updateCRC(QueuedSQL queuedSQL) {
-        if (!queuedSQL.stmt.isReadOnly) {
-            m_inputCRC.update(queuedSQL.stmt.sqlCRC);
-            try {
-                ByteBuffer buf = ByteBuffer.allocate(queuedSQL.params.getSerializedSize());
-                queuedSQL.params.flattenToBuffer(buf);
-                buf.flip();
-                m_inputCRC.update(buf.array());
-                queuedSQL.serialization = buf;
-            } catch (IOException e) {
-                log.error("Unable to compute CRC of parameters to " +
-                        "a SQL statement in procedure: " + m_procedureName, e);
-                // don't crash
-                // presumably, this will fail deterministically at all replicas
-                // just log the error and hope people report it
-            }
-        }
-    }
-
     public void voltQueueSQL(final SQLStmt stmt, Expectation expectation, Object... args) {
         if (stmt == null) {
             throw new IllegalArgumentException("SQLStmt parameter to voltQueueSQL(..) was null.");
@@ -676,7 +656,6 @@ public class ProcedureRunner {
         queuedSQL.params = getCleanParams(stmt, true, args);
         queuedSQL.stmt = stmt;
 
-        updateCRC(queuedSQL);
         m_batch.add(queuedSQL);
     }
 
@@ -751,7 +730,6 @@ public class ProcedureRunner {
             }
             queuedSQL.params = getCleanParams(queuedSQL.stmt, false, argumentParams);
 
-            updateCRC(queuedSQL);
             m_batch.add(queuedSQL);
         }
         catch (Exception e) {
@@ -1564,14 +1542,8 @@ public class ProcedureRunner {
            // Build the set of params for the frags
            ByteBuffer paramBuf = null;
            try {
-               if (queuedSQL.serialization != null) {
-                   paramBuf = ByteBuffer.allocate(queuedSQL.serialization.capacity());
-                   paramBuf.put(queuedSQL.serialization);
-               }
-               else {
-                   paramBuf = ByteBuffer.allocate(queuedSQL.params.getSerializedSize());
-                   queuedSQL.params.flattenToBuffer(paramBuf);
-               }
+               paramBuf = ByteBuffer.allocate(queuedSQL.params.getSerializedSize());
+               queuedSQL.params.flattenToBuffer(paramBuf);
            } catch (IOException e) {
                throw new RuntimeException("Error serializing parameters for SQL statement: " +
                                           queuedSQL.stmt.getText() + " with params: " +
@@ -1646,12 +1618,7 @@ public class ProcedureRunner {
            assert(qs.stmt.collector == null);
            fragmentIds[i] = qs.stmt.aggregator.id;
            // use the pre-serialized params if it exists
-           if (qs.serialization != null) {
-               params[i] = qs.serialization;
-           }
-           else {
-               params[i] = qs.params;
-           }
+           params[i] = qs.params;
            sqlTexts[i] = qs.stmt.getText();
            isWriteFrag[i] = !qs.stmt.isReadOnly;
            i++;

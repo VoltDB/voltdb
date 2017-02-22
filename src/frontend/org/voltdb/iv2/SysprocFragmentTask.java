@@ -18,6 +18,7 @@
 package org.voltdb.iv2;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -52,14 +53,14 @@ public class SysprocFragmentTask extends TransactionTask
     final Mailbox m_initiator;
     final FragmentTaskMessage m_fragmentMsg;
     Map<Integer, List<VoltTable>> m_inputDeps;
-    static final VoltTable m_dummyResponse =
-            new VoltTable(new ColumnInfo[] {new ColumnInfo("STATUS", VoltType.TINYINT)});
+    boolean m_respBufferable = true;
+    static final byte[] m_rawDummyResponse;
 
     static {
-        m_dummyResponse.setStatusCode(VoltTableUtil.NULL_DEPENDENCY_STATUS);
+        VoltTable dummyResponse = new VoltTable(new ColumnInfo("STATUS", VoltType.TINYINT));
+        dummyResponse.setStatusCode(VoltTableUtil.NULL_DEPENDENCY_STATUS);
+        m_rawDummyResponse = dummyResponse.buildReusableDependenyResult();
     }
-
-    boolean m_respBufferable = true;
 
     // This constructor is used during live rejoin log replay.
     SysprocFragmentTask(Mailbox mailbox,
@@ -104,7 +105,8 @@ public class SysprocFragmentTask extends TransactionTask
         // on elastic join, so the fragment response message is actually going to the MPI.
         for (int frag = 0; frag < m_fragmentMsg.getFragmentCount(); frag++) {
             final int outputDepId = m_fragmentMsg.getOutputDepId(frag);
-            response.addDependency(new DependencyPair.TableDependencyPair(outputDepId, m_dummyResponse));
+            response.addDependency(new DependencyPair.BufferDependencyPair(outputDepId,
+                    m_rawDummyResponse, 0, m_rawDummyResponse.length));
         }
         response.setRespBufferable(m_respBufferable);
         m_initiator.deliver(response);
@@ -226,7 +228,8 @@ public class SysprocFragmentTask extends TransactionTask
                 if (currentFragResponse.getTableCount() == 0) {
                     // Make sure the response has at least 1 result with a valid DependencyId
                     currentFragResponse.addDependency(new
-                            DependencyPair.TableDependencyPair(m_fragmentMsg.getOutputDepId(0), m_dummyResult));
+                            DependencyPair.BufferDependencyPair(m_fragmentMsg.getOutputDepId(0),
+                                    m_rawDummyResult, 0, m_rawDummyResult.length));
                 }
                 break;
             } catch (final SQLException e) {
@@ -236,7 +239,8 @@ public class SysprocFragmentTask extends TransactionTask
                 if (currentFragResponse.getTableCount() == 0) {
                     // Make sure the response has at least 1 result with a valid DependencyId
                     currentFragResponse.addDependency(new
-                            DependencyPair.TableDependencyPair(m_fragmentMsg.getOutputDepId(0), m_dummyResult));
+                            DependencyPair.BufferDependencyPair(m_fragmentMsg.getOutputDepId(0),
+                                    m_rawDummyResult, 0, m_rawDummyResult.length));
                 }
                 break;
             }
@@ -253,7 +257,8 @@ public class SysprocFragmentTask extends TransactionTask
                 if (currentFragResponse.getTableCount() == 0) {
                     // Make sure the response has at least 1 result with a valid DependencyId
                     currentFragResponse.addDependency(new
-                            DependencyPair.TableDependencyPair(m_fragmentMsg.getOutputDepId(0), m_dummyResult));
+                            DependencyPair.BufferDependencyPair(m_fragmentMsg.getOutputDepId(0),
+                                    m_rawDummyResult, 0, m_rawDummyResult.length));
                 }
             }
             catch (final VoltAbortException e) {
@@ -263,7 +268,8 @@ public class SysprocFragmentTask extends TransactionTask
                 if (currentFragResponse.getTableCount() == 0) {
                     // Make sure the response has at least 1 result with a valid DependencyId
                     currentFragResponse.addDependency(new
-                            DependencyPair.TableDependencyPair(m_fragmentMsg.getOutputDepId(0), m_dummyResult));
+                            DependencyPair.BufferDependencyPair(m_fragmentMsg.getOutputDepId(0),
+                                    m_rawDummyResult, 0, m_rawDummyResult.length));
                 }
                 break;
             }

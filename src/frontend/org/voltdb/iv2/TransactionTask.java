@@ -35,8 +35,12 @@ public abstract class TransactionTask extends SiteTasker
     protected static final VoltLogger execLog = new VoltLogger("EXEC");
     protected static final VoltLogger hostLog = new VoltLogger("HOST");
 
-    protected static final VoltTable m_dummyResult =
-            new VoltTable(new ColumnInfo[] {new ColumnInfo("UNUSED", VoltType.INTEGER)}, 1);
+    protected static final byte[] m_rawDummyResult;
+
+    static {
+        VoltTable dummyResult = new VoltTable(new ColumnInfo("UNUSED", VoltType.INTEGER));
+        m_rawDummyResult = dummyResult.buildReusableDependenyResult();
+    }
 
     final protected TransactionState m_txnState;
     final protected TransactionTaskQueue m_queue;

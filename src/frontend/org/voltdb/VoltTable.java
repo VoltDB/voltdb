@@ -1894,6 +1894,14 @@ public final class VoltTable extends VoltTableRow implements JSONString {
         buf.put(dup);
     }
 
+    public byte[] buildReusableDependenyResult() {
+        ByteBuffer dup = m_buffer.duplicate();
+        ByteBuffer responseBuf = ByteBuffer.allocate(dup.limit());
+        dup.position(0);
+        responseBuf.put(dup);
+        return responseBuf.array();
+    }
+
     private void initFromRawBuffer() {
         m_buffer.position(m_buffer.limit());
 

@@ -600,6 +600,7 @@ public class LocalCluster extends VoltServerConfig {
         m_cmdLines.add(cmdln);
         if (isNewCli) {
             cmdln.m_startAction = StartAction.PROBE;
+            cmdln.enableAdd(action == StartAction.JOIN);
             cmdln.m_hostCount = m_hostCount;
             String hostIdStr = cmdln.getJavaProperty(clusterHostIdProperty);
             String root = m_hostRoots.get(hostIdStr);

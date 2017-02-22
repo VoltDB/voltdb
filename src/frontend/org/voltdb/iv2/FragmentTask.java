@@ -56,8 +56,15 @@ public class FragmentTask extends TransactionTask
     final Mailbox m_initiator;
     final FragmentTaskMessage m_fragmentMsg;
     final Map<Integer, List<VoltTable>> m_inputDeps;
-
     boolean m_respBufferable = true;
+    static final byte[] m_rawDummyResponse;
+
+    static {
+        VoltTable dummyResponse = new VoltTable(new ColumnInfo("STATUS", VoltType.TINYINT));
+        dummyResponse.setStatusCode(VoltTableUtil.NULL_DEPENDENCY_STATUS);
+        m_rawDummyResponse = dummyResponse.buildReusableDependenyResult();
+    }
+
     // This constructor is used during live rejoin log replay.
     FragmentTask(Mailbox mailbox,
                  FragmentTaskMessage message,
@@ -186,11 +193,10 @@ public class FragmentTask extends TransactionTask
 
         // Set the dependencies even if this is a dummy response. This site could be the master
         // on elastic join, so the fragment response message is actually going to the MPI.
-        VoltTable depTable = new VoltTable(new ColumnInfo("STATUS", VoltType.TINYINT));
-        depTable.setStatusCode(VoltTableUtil.NULL_DEPENDENCY_STATUS);
         for (int frag = 0; frag < m_fragmentMsg.getFragmentCount(); frag++) {
             final int outputDepId = m_fragmentMsg.getOutputDepId(frag);
-            response.addDependency(new DependencyPair.TableDependencyPair(outputDepId, depTable));
+            response.addDependency(new DependencyPair.BufferDependencyPair(outputDepId,
+                    m_rawDummyResponse, 0, m_rawDummyResponse.length));
         }
 
         deliverResponse(response);
@@ -243,7 +249,7 @@ public class FragmentTask extends TransactionTask
 
         // IZZY: actually need the "executor" HSId these days?
         final FragmentResponseMessage currentFragResponse =
-            new FragmentResponseMessage(m_fragmentMsg, m_initiator.getHSId());
+                new FragmentResponseMessage(m_fragmentMsg, m_initiator.getHSId());
         currentFragResponse.setStatus(FragmentResponseMessage.SUCCESS, null);
 
         if (m_inputDeps != null) {
@@ -252,7 +258,8 @@ public class FragmentTask extends TransactionTask
 
         if (m_fragmentMsg.isEmptyForRestart()) {
             int outputDepId = m_fragmentMsg.getOutputDepId(0);
-            currentFragResponse.addDependency(new DependencyPair.TableDependencyPair(outputDepId, m_dummyResult));
+            currentFragResponse.addDependency(new DependencyPair.BufferDependencyPair(outputDepId,
+                    m_rawDummyResponse, 0, m_rawDummyResponse.length));
             return currentFragResponse;
         }
 
@@ -357,7 +364,8 @@ public class FragmentTask extends TransactionTask
                 currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
                 if (currentFragResponse.getTableCount() == 0) {
                     // Make sure the response has at least 1 result with a valid DependencyId
-                    currentFragResponse.addDependency(new DependencyPair.TableDependencyPair(outputDepId, m_dummyResult));
+                    currentFragResponse.addDependency(new DependencyPair.BufferDependencyPair(outputDepId,
+                            m_rawDummyResult, 0, m_rawDummyResult.length));
                 }
                 break;
             } catch (final SQLException e) {
@@ -365,7 +373,8 @@ public class FragmentTask extends TransactionTask
                 currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
                 if (currentFragResponse.getTableCount() == 0) {
                     // Make sure the response has at least 1 result with a valid DependencyId
-                    currentFragResponse.addDependency(new DependencyPair.TableDependencyPair(outputDepId, m_dummyResult));
+                    currentFragResponse.addDependency(new DependencyPair.BufferDependencyPair(outputDepId,
+                            m_rawDummyResult, 0, m_rawDummyResult.length));
                 }
                 break;
             }
@@ -374,7 +383,8 @@ public class FragmentTask extends TransactionTask
                 currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
                 if (currentFragResponse.getTableCount() == 0) {
                     // Make sure the response has at least 1 result with a valid DependencyId
-                    currentFragResponse.addDependency(new DependencyPair.TableDependencyPair(outputDepId, m_dummyResult));
+                    currentFragResponse.addDependency(new DependencyPair.BufferDependencyPair(outputDepId,
+                            m_rawDummyResult, 0, m_rawDummyResult.length));
                 }
                 break;
             }
