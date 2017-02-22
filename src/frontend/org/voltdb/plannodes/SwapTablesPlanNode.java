@@ -269,9 +269,9 @@ public class SwapTablesPlanNode extends AbstractOperationPlanNode {
             feedback.append(fbSeparator)
             .append("Swapping with table ").append(otherName)
             .append(" requires that the table ").append(theName)
-            .append("\" define indexes corresponding to ")
+            .append("    define indexes corresponding to ")
             .append(" all of those defined on table ").append(otherName)
-            .append("including those with the following index names: (");
+            .append(" including those with the following index names: (");
             String separator = "";
             for (Index remainder : otherIndexSet) {
                 feedback.append(separator).append(remainder.getTypeName());

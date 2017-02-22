@@ -156,6 +156,11 @@ public class TestSystemProcedureSuite extends RegressionSuite {
                 "",
                 " PARTITION TABLE %s_WITH_ALT_PARTITIONING ON COLUMN NONID;",
             },
+            { "_WITH_MANY_FEATURES", // 20
+              ", PRIMARY KEY (ID), UNIQUE (NONID, NAME), LIMIT PARTITION ROWS 1000",
+              " CREATE INDEX %s_WITH_MANY_FEATURES ON %s_WITH_MANY_FEATURES (NONID / 2); "
+              + "CREATE INDEX %s_PARTIAL_WITH_MANY_FEATURES ON %s_WITH_MANY_FEATURES (NONID / 3) WHERE NONID > 1000;",
+            }
     };
 
     // These template tables only need one instantiation each and are
@@ -327,7 +332,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         for (String[] tableDefPart : SWAPPY_TABLES) {
             String tableName = prefix + tableDefPart[0];
             String internalExtras = String.format(tableDefPart[1], tableName);
-            String externalExtras = String.format(tableDefPart[2], prefix, prefix, prefix);
+            String externalExtras = String.format(tableDefPart[2], prefix, prefix, prefix, prefix, prefix);
             schema.append("CREATE TABLE ").append(tableName)
             .append(" (\n" +
                     "  NAME VARCHAR(32 BYTES) NOT NULL,\n" +
@@ -355,7 +360,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         project.addLiteralSchema(schema.toString());
     }
 
-    public void notestPing() throws IOException, ProcCallException {
+    public void testPing() throws IOException, ProcCallException {
         Client client = getClient();
         ClientResponse cr = client.callProcedure("@Ping");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
@@ -384,7 +389,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         }
     }
 
-    public void notestProSysprocErrorOnCommunity() throws Exception {
+    public void testProSysprocErrorOnCommunity() throws Exception {
         // this test only applies to community edition
         if (MiscUtils.isPro()) {
             return;
@@ -401,7 +406,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         //checkProSysprocError(client, "@Promote", 0);
     }
 
-    public void notestInvalidProcedureName() throws IOException {
+    public void testInvalidProcedureName() throws IOException {
         Client client = getClient();
         try {
             client.callProcedure("@SomeInvalidSysProcName", "1", "2");
@@ -432,7 +437,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
             "</root>" +
         "</log4j:configuration>";
 
-    public void notestUpdateLogging() throws Exception {
+    public void testUpdateLogging() throws Exception {
         Client client = getClient();
         VoltTable results[] = null;
         results = client.callProcedure("@UpdateLogging", m_loggingConfig).getResults();
@@ -441,7 +446,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         }
     }
 
-    public void notestPromoteMaster() throws Exception {
+    public void testPromoteMaster() throws Exception {
         Client client = getClient();
         try {
             client.callProcedure("@Promote");
@@ -454,7 +459,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
 
     // Pretty lame test but at least invoke the procedure.
     // "@Quiesce" is used more meaningfully in TestExportSuite.
-    public void notestQuiesce() throws IOException, ProcCallException {
+    public void testQuiesce() throws IOException, ProcCallException {
         Client client = getClient();
         VoltTable results[] = client.callProcedure("@Quiesce").getResults();
         assertEquals(1, results.length);
@@ -462,7 +467,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         assertEquals(results[0].get(0, VoltType.BIGINT), new Long(0));
     }
 
-    public void notestLoadMultipartitionTableProceduresUpsertWithNoPrimaryKey() throws Exception{
+    public void testLoadMultipartitionTableProceduresUpsertWithNoPrimaryKey() throws Exception{
         // using insert for @Load*Table
         byte upsertMode = (byte) 1;
         Client client = getClient();
@@ -476,7 +481,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         }
     }
 
-    public void notestLoadMultipartitionTableAndIndexStatsAndValidatePartitioning() throws Exception {
+    public void testLoadMultipartitionTableAndIndexStatsAndValidatePartitioning() throws Exception {
         // using insert for @Load*Table
         byte upsertMode = (byte) 0;
         Client client = getClient();
@@ -657,7 +662,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
     }
 
     // verify that these commands don't blow up
-    public void notestProfCtl() throws Exception {
+    public void testProfCtl() throws Exception {
         Client client = getClient();
 
         //
@@ -718,7 +723,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         vt = resp.getResults()[0];
     }
 
-    public void notestPause() throws Exception {
+    public void testPause() throws Exception {
         Client client = getClient();
         VoltTable[] results = client.callProcedure("@UpdateLogging", m_loggingConfig).getResults();
         for (VoltTable result : results) {
@@ -808,31 +813,30 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         }
     }
 
-    public void testSwapTables() throws Exception {
-        Client client = getClient();
-
+    private void populateSwappyTables(Client client, String thisTable, String thatTable) throws Exception {
         // Populate the tables with traceable rows.
         // After each swap, confirm that both tables are populated, that
         // the total number of rows is unchanged, and that the first table's
         // column sum HAS changed.
-        for (String[] tableDefPart : SWAPPY_TABLES) {
-            String tableRoot = tableDefPart[0];
 
-            // One row for THIS table.
-            client.callProcedure(SWAPPY_PREFIX_PAIR[0] + tableRoot + ".insert",
-                    "1", 1.0, 1, 1);
+        // One row for THIS table.
+        client.callProcedure(thisTable + ".insert",
+                "1", 1.0, 1, 1);
 
-            // Two rows for THAT table.
-            client.callProcedure(SWAPPY_PREFIX_PAIR[1] + tableRoot + ".insert",
-                    "2", 2.0, 2, 2);
-            client.callProcedure(SWAPPY_PREFIX_PAIR[1] + tableRoot + ".insert",
-                    "3", 3.0, 3, 3);
-        }
+        // Two rows for THAT table.
+        client.callProcedure(thatTable + ".insert",
+                "2", null, 2, 2);
+        client.callProcedure(thatTable + ".insert",
+                "3", 3.0, 3, 3);
+    }
+
+    public void testSwapTables() throws Exception {
+        Client client = getClient();
 
         for (int ii = 0; ii < SWAPPY_TABLES.length; ++ii) {
             String theTable = SWAPPY_PREFIX_PAIR[0] + SWAPPY_TABLES[ii][0];
 
-            for (int jj = 13; jj < 14; ++jj) {//SWAPPY_TABLES.length; ++jj) {
+            for (int jj = 0; jj < SWAPPY_TABLES.length; ++jj) {
                 // Allow swapping only for identically defined tables
                 // or those with minor variations in syntax.
                 String otherTable = SWAPPY_PREFIX_PAIR[1] + SWAPPY_TABLES[jj][0];
@@ -856,7 +860,10 @@ public class TestSystemProcedureSuite extends RegressionSuite {
                         (ii == 10 && jj == 11) || (ii == 11 && jj == 10) ||
                         (ii == 15 && jj == 16) || (ii == 16 && jj == 15) ||
                         (ii == 17 && jj == 18) || (ii == 18 && jj == 17)) {
+
                     VoltTable[] results;
+
+                    populateSwappyTables(client, theTable, otherTable);
 
                     results = client.callProcedure("@AdHoc",
                             "SELECT COUNT(*) FROM " + theTable).getResults();
@@ -896,6 +903,38 @@ public class TestSystemProcedureSuite extends RegressionSuite {
                     totalCount = postCount + results[0].asScalarLong();
                     assertEquals(3, totalCount);
 
+                    results = client.callProcedure("@AdHoc",
+                            "TRUNCATE TABLE " + theTable).getResults();
+                    assertEquals(1, results[0].asScalarLong());
+
+                    // Try a swap with one empty table.
+                    results = client.callProcedure("@SwapTables",
+                            otherTable, theTable).getResults();
+                    assertNotNull(results);
+                    assertEquals(1, results.length);
+                    assertEquals(2, results[0].asScalarLong());
+
+                    results = client.callProcedure("@AdHoc",
+                            "SELECT COUNT(*) FROM " + otherTable).getResults();
+                    postCount = results[0].asScalarLong();
+                    assertEquals(0, results[0].asScalarLong());
+
+                    results = client.callProcedure("@AdHoc",
+                            "SELECT COUNT(*) FROM " + theTable).getResults();
+                    postCount = results[0].asScalarLong();
+                    assertEquals(2, results[0].asScalarLong());
+
+                    results = client.callProcedure("@AdHoc",
+                            "TRUNCATE TABLE " + theTable).getResults();
+                    assertEquals(2, results[0].asScalarLong());
+
+                    // Try a swap with both empty tables.
+                    results = client.callProcedure("@SwapTables",
+                            otherTable, theTable).getResults();
+                    assertNotNull(results);
+                    assertEquals(1, results.length);
+                    assertEquals(0, results[0].asScalarLong());
+
                     continue;
                 }
 
@@ -908,11 +947,9 @@ public class TestSystemProcedureSuite extends RegressionSuite {
                             theTable + " with " + otherTable);
                 }
                 catch (ProcCallException ex) {
-                    System.out.println(ii + " " + jj);
-                    System.out.println(ex.getMessage());
                     if (! ex.getMessage().contains("Swapping")) {
                         System.out.println("sup w/ incompatible tables " +
-                            ii + " and " + jj + ":" + ex);
+                                ii + " and " + jj + ":" + ex);
                     }
                     assertTrue("Expected message about swapping but got " + ex.getMessage(),
                             ex.getMessage().contains("Swapping"));
@@ -921,7 +958,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         }
     }
 
-    public void notestOneOffNegativeSwapTables() throws Exception {
+    public void testOneOffNegativeSwapTables() throws Exception {
         Client client = getClient();
 
         String tableA = SWAPPY_PREFIX_PAIR[0] + SWAPPY_TABLES[0][0];
