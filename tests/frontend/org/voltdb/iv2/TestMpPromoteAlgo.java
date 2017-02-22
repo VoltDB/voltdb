@@ -206,7 +206,7 @@ public class TestMpPromoteAlgo
         masters.add(2L);
         masters.add(3L);
 
-        MpPromoteAlgo algo = new MpPromoteAlgo(masters, mailbox, "Test", false);
+        MpPromoteAlgo algo = new MpPromoteAlgo(masters, mailbox, "Test");
         long requestId = algo.getRequestId();
         Future<RepairResult> result = algo.start();
         verify(mailbox, times(1)).send(any(long[].class), any(Iv2RepairLogRequestMessage.class));
@@ -256,7 +256,7 @@ public class TestMpPromoteAlgo
         masters.add(2L);
         masters.add(3L);
 
-        MpPromoteAlgo algo = new MpPromoteAlgo(masters, mailbox, "Test", false);
+        MpPromoteAlgo algo = new MpPromoteAlgo(masters, mailbox, "Test");
         long requestId = algo.getRequestId();
         Future<RepairResult> result = algo.start();
 
@@ -321,7 +321,7 @@ public class TestMpPromoteAlgo
         masters.add(2L);
         masters.add(3L);
 
-        MpPromoteAlgo algo = new MpPromoteAlgo(masters, mailbox, "Test", false);
+        MpPromoteAlgo algo = new MpPromoteAlgo(masters, mailbox, "Test");
         long requestId = algo.getRequestId();
         Future<RepairResult> result = algo.start();
         verify(mailbox, times(1)).send(any(long[].class), any(Iv2RepairLogRequestMessage.class));
@@ -355,7 +355,7 @@ public class TestMpPromoteAlgo
         masters.add(1L);
         masters.add(2L);
 
-        MpPromoteAlgo algo = new MpPromoteAlgo(masters, mailbox, "Test", false);
+        MpPromoteAlgo algo = new MpPromoteAlgo(masters, mailbox, "Test");
         long requestId = algo.getRequestId();
         Future<RepairResult> result = algo.start();
         verify(mailbox, times(1)).send(any(long[].class), any(Iv2RepairLogRequestMessage.class));
@@ -431,7 +431,7 @@ public class TestMpPromoteAlgo
         survivors.add(0l);
         survivors.add(1l);
         survivors.add(2l);
-        MpPromoteAlgo dut = new MpPromoteAlgo(survivors, mbox, "bleh ", false);
+        MpPromoteAlgo dut = new MpPromoteAlgo(survivors, mbox, "bleh ");
         Future<RepairResult> result = dut.start();
         for (int i = 0; i < 3; i++) {
             List<Iv2RepairLogResponseMessage> stuff = logs[i].contents(dut.getRequestId(), true);

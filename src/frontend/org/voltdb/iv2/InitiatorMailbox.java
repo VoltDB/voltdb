@@ -107,6 +107,9 @@ public class InitiatorMailbox implements Mailbox
         return ra;
     }
 
+    synchronized public RepairAlgo constructRepairAlgo(Supplier<List<Long>> survivors, String whoami) {
+        return constructRepairAlgo(survivors, whoami, false);
+    }
     protected void setRepairAlgoInternal(RepairAlgo algo)
     {
         assert(lockingVows());
@@ -398,10 +401,9 @@ public class InitiatorMailbox implements Mailbox
                 req.isMPIRequest());
 
         if (tmLog.isDebugEnabled()) {
-            tmLog.debug(""
-                    + CoreUtils.hsIdToString(getHSId())
+            tmLog.debug(CoreUtils.hsIdToString(getHSId())
                     + " handling repair log request id " + req.getRequestId()
-                    + " for " + CoreUtils.hsIdToString(message.m_sourceHSId) + ". ");
+                    + " for " + CoreUtils.hsIdToString(message.m_sourceHSId));
         }
         for (Iv2RepairLogResponseMessage log : logs) {
             send(message.m_sourceHSId, log);

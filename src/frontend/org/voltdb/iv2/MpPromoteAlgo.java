@@ -53,7 +53,6 @@ public class MpPromoteAlgo implements RepairAlgo
     // Each Term can process at most one promotion; if promotion fails, make
     // a new Term and try again (if that's your big plan...)
     private final SettableFuture<RepairResult> m_promotionResult = SettableFuture.create();
-    private final boolean m_isBalanceSPI;
 
     long getRequestId()
     {
@@ -110,12 +109,11 @@ public class MpPromoteAlgo implements RepairAlgo
      * Setup a new RepairAlgo but don't take any action to take responsibility.
      */
     public MpPromoteAlgo(List<Long> survivors, InitiatorMailbox mailbox,
-            String whoami, boolean isBalanceSPI)
+            String whoami)
     {
         m_survivors = new ArrayList<Long>(survivors);
         m_mailbox = mailbox;
         m_whoami = whoami;
-        m_isBalanceSPI = isBalanceSPI;
     }
 
     @Override

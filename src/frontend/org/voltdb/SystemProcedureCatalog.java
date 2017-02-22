@@ -155,7 +155,7 @@ public class SystemProcedureCatalog {
         builder.put("@SystemInformation",       new Config("org.voltdb.sysprocs.SystemInformation",        false, true,  false, 0,    VoltType.INVALID,   false, false, true,  true,      false,    false));
         builder.put("@UpdateLogging",           new Config("org.voltdb.sysprocs.UpdateLogging",            false, false, true,  0,    VoltType.INVALID,   false, false, true,  true,      false,    false));
         builder.put("@BalancePartitions",       new Config("org.voltdb.sysprocs.BalancePartitions",        false, false, false, 0,    VoltType.INVALID,   true,  true,  true,  false,     true,     false));
-        builder.put("@BalanceSPI",              new Config("org.voltdb.sysprocs.BalanceSPI",               true,  true,  false, 0,    VoltType.BIGINT,    true,  true,  true,  false,     true,     false));
+        builder.put("@BalanceSPI",              new Config("org.voltdb.sysprocs.BalanceSPI",               true,  true,  false, 0,    VoltType.BIGINT,    true,  true,  true,  false,     false,    false));
         builder.put("@UpdateApplicationCatalog",new Config("org.voltdb.sysprocs.UpdateApplicationCatalog", false, false, false, 0,    VoltType.INVALID,   false, false, false, true,      true,     false));
         builder.put("@LoadMultipartitionTable", new Config("org.voltdb.sysprocs.LoadMultipartitionTable",  false, false, false, 0,    VoltType.INVALID,   false, false, false, false,     true,     false));
         builder.put("@LoadSinglepartitionTable",new Config("org.voltdb.sysprocs.LoadSinglepartitionTable", true,  false, false, 0,    VoltType.VARBINARY, false, false, false, false,     true,     false));

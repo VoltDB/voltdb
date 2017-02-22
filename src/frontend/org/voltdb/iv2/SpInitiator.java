@@ -86,10 +86,11 @@ public class SpInitiator extends BaseInitiator implements Promotable
                 }
             }
 
-            //This was the leader but SPI has been migrated, so demote it.
-            if ( tmLog.isDebugEnabled() && m_scheduler.isSpiBalanceRequested()
-                    && !leaders.contains(getInitiatorHSId())) {
-                tmLog.debug(CoreUtils.hsIdToString(getInitiatorHSId()) + " is not a leader anymore. It has been demoted!");
+            if (!leaders.contains(getInitiatorHSId())) {
+                m_promoted = false;
+                if (tmLog.isDebugEnabled()) {
+                    tmLog.debug(CoreUtils.hsIdToString(getInitiatorHSId()) + " is not a partition leader.");
+                }
             }
         }
     };
@@ -190,8 +191,13 @@ public class SpInitiator extends BaseInitiator implements Promotable
 
         String hsidStr = ZKUtil.suffixHSIdsWithBalanceSPIRequest(newLeaderHSId);
         VoltZK.updateLeaderCacheNode(m_messenger.getZK(), VoltZK.iv2appointees, partition, hsidStr, tmLog);
-        if (tmLog.isDebugEnabled()) {
-            tmLog.debug(VoltZK.debugLeadersInfo(m_messenger.getZK()));
+
+        //remove the indicator
+        try {
+            ZKUtil.asyncDeleteRecursively(m_messenger.getZK(),
+                    ZKUtil.joinZKPath(VoltZK.balancespi_initiator, String.valueOf(partition)));
+        } catch (Exception e) {
+            tmLog.error("Error removing partition info", e);
         }
     }
 
