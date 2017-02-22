@@ -58,18 +58,10 @@ import javax.xml.namespace.QName;
 import javax.xml.validation.Schema;
 import javax.xml.validation.SchemaFactory;
 
-import org.apache.commons.lang3.ArrayUtils;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
-import org.apache.zookeeper_voltpatches.CreateMode;
-import org.apache.zookeeper_voltpatches.KeeperException;
-import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
-import org.apache.zookeeper_voltpatches.ZooKeeper;
-import org.json_voltpatches.JSONException;
-import org.mindrot.BCrypt;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
+
 import org.voltdb.HealthMonitor;
 import org.voltdb.SystemProcedureCatalog;
 import org.voltdb.VoltDB;
@@ -139,6 +131,16 @@ import org.voltdb.settings.DbSettings;
 import org.voltdb.settings.NodeSettings;
 import org.voltdb.snmp.DummySnmpTrapSender;
 import org.voltdb.types.ConstraintType;
+
+import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
+import org.apache.zookeeper_voltpatches.CreateMode;
+import org.apache.zookeeper_voltpatches.KeeperException;
+import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
+import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.json_voltpatches.JSONException;
+import org.mindrot.BCrypt;
 import org.xml.sax.SAXException;
 
 import com.google_voltpatches.common.base.Charsets;
@@ -288,6 +290,27 @@ public abstract class CatalogUtil {
         }
 
         return buildInfoLines;
+    }
+
+    /**
+     * Get the auto generated DDL from the catalog jar.
+     *
+     * @param jarfile in-memory catalog jar file
+     * @return Auto generated DDL stored in catalog.jar
+     * @throws IOException If the catalog or the auto generated ddl cannot be loaded.
+     */
+    public static String getAutoGenDDLFromJar(InMemoryJarfile jarfile)
+            throws IOException
+    {
+        // Read the raw build info bytes.
+        byte[] ddlBytes = jarfile.get(VoltCompiler.AUTOGEN_DDL_FILE_NAME);
+        if (ddlBytes == null) {
+            throw new IOException("Auto generated schema DDL not found - please make sure the database is initialized with valid schema.");
+        }
+
+        // Convert the bytes to a string and split by lines.
+        String ddl = new String(ddlBytes, Constants.UTF8ENCODING);
+        return ddl.trim();
     }
 
     /**

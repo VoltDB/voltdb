@@ -45,6 +45,7 @@ import org.voltcore.utils.EstTimeUpdater;
 import org.voltcore.utils.OnDemandBinaryLogger;
 import org.voltcore.utils.PortGenerator;
 import org.voltcore.utils.ShutdownHooks;
+
 import org.voltdb.client.ClientFactory;
 import org.voltdb.common.Constants;
 import org.voltdb.probe.MeshProber;
@@ -239,7 +240,7 @@ public class VoltDB {
         public boolean m_isPaused = false;
 
         /** GET option */
-        public GetActionArgument m_getOption = GetActionArgument.DEPLOYMENT;
+        public GetActionArgument m_getOption = null;
         public String m_getOutput = null;
 
         private final static void referToDocAndExit() {
@@ -609,9 +610,29 @@ public class VoltDB {
                 } else if (arg.equalsIgnoreCase("getvoltdbroot")) {
                     //Can not use voltdbroot which creates directory we dont intend to create for get deployment etc.
                     m_voltdbRoot = new VoltFile(args[++i]);
+                    if (!DBROOT.equals(m_voltdbRoot.getName())) {
+                        m_voltdbRoot = new VoltFile(m_voltdbRoot, DBROOT);
+                    }
+                    if (!m_voltdbRoot.exists()) {
+                        System.err.println("FATAL: Database directory \"" + m_voltdbRoot.getPath() + "\" does not exists");
+                        referToDocAndExit();
+                    }
                 } else if (arg.equalsIgnoreCase("get")) {
                     m_startAction = StartAction.GET;
-                    GetActionArgument.valueOf(args[++i].trim().toUpperCase());
+                    String actionVerb = args[++i];
+                    if (actionVerb == null || actionVerb.trim().length() == 0) {
+                        System.err.println("FATAL: Supply valid action verb for \"get\" command. "
+                                + "Supported action verbs for get are: " + GetActionArgument.supportedVerbs());
+                        referToDocAndExit();
+                    }
+
+                    try {
+                        m_getOption = GetActionArgument.valueOf(GetActionArgument.class, actionVerb.trim().toUpperCase());
+                    } catch (IllegalArgumentException excp) {
+                        System.err.println(actionVerb + " is not a valid \"get\" verb. Please provide valid action verb: " + GetActionArgument.supportedVerbs());
+                        referToDocAndExit();
+                    }
+                    m_getOutput = m_getOption.getDefaultOutput();
                 } else if (arg.equalsIgnoreCase("file")) {
                     m_getOutput = args[++i].trim();
                 } else {
@@ -619,13 +640,11 @@ public class VoltDB {
                     referToDocAndExit();
                 }
             }
-            //I am a get
+            // Get command
             if (m_startAction == StartAction.GET) {
-                //We dont want crash file created.
+                // We dont want crash file created.
                 VoltDB.exitAfterMessage = true;
-                File configInfoDir = new VoltFile(m_voltdbRoot, Constants.CONFIG_DIR);
-                File depFH = new VoltFile(configInfoDir, "deployment.xml");
-                m_pathToDeployment = depFH.getAbsolutePath();
+                inspectGetCommand();
                 return;
             }
             // set file logger root file directory. From this point on you can use loggers
@@ -690,6 +709,32 @@ public class VoltDB {
         private boolean isInitialized() {
             File inzFH = new VoltFile(m_voltdbRoot, VoltDB.INITIALIZED_MARKER);
             return inzFH.exists() && inzFH.isFile() && inzFH.canRead();
+        }
+
+        private void inspectGetCommand() {
+            File configInfoDir = new VoltFile(m_voltdbRoot, Constants.CONFIG_DIR);
+            switch (m_getOption) {
+                case DEPLOYMENT: {
+                    File depFH = new VoltFile(configInfoDir, "deployment.xml");
+                    if (!depFH.exists()) {
+                        System.out.println("FATAL: Deployment file \"" + depFH.getAbsolutePath() + "\" not found.");
+                        exit(-1);
+                    }
+                    m_pathToDeployment = depFH.getAbsolutePath();
+                    return;
+                }
+                case SCHEMA:
+                case CLASSES: {
+                    File catalogFH = new VoltFile(configInfoDir, "catalog.jar");
+                    if (!catalogFH.exists()) {
+                        System.out.println("FATAL: Catalog jar file \"" + catalogFH.getAbsolutePath() + "\" not found. "
+                                + "Please make sure the database path points to an initialized database");
+                        exit(-1);
+                    }
+                    m_pathToCatalog = catalogFH.getAbsolutePath();
+                    return;
+                }
+            }
         }
 
         public Map<String,String> asClusterSettingsMap() {

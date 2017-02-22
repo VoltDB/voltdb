@@ -15,22 +15,43 @@
 # along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
 
 import sys, os, subprocess
+from voltcli import utility
 
-voltdbroot_help = ('Specifies the root directory for the database. The default '
+dir_spec_help = ('Specifies the root directory for the database. The default '
                    'is voltdbroot under the current working directory.')
+get_resource_help = ('Supported configuration resources for get command are \'deployment\', \'schema\' and \'classes\'.\n'
+                     '    deployment - gets deployment configuration of current node\n'
+                     '    schema     - gets schema of current node\n'
+                     '    classes    - gets Java stored procedures of current node\n')
+
 @VOLT.Command(
-    description = 'Get voltdb configuration settings.',
+    description = 'Get voltdb configuration resource.',
     options = (
-        VOLT.StringOption('-o', '--out', 'output', 'File to save configuration obtained.', default=""),
+        VOLT.StringOption('-o', '--output', 'output', 'Specifies file to save the configuration resource to.', default=None),
+        VOLT.StringOption('-D', '--dir', 'directory_spec', dir_spec_help, default=None),
+        VOLT.BooleanOption('-f', '--force', 'force', 'Stores the output file even if the VoltDB managed directories '
+                                                     'contain files from a previous session that may be overwritten.')
     ),
     arguments = (
-        VOLT.StringArgument('deployment', 'Get deployment configuration of current node.', default = 'deployment'),
-        VOLT.StringArgument('voltdbroot', voltdbroot_help, min_count=1, max_count=1, optional = True, default="voltdbroot" )
+        VOLT.StringArgument('resource', get_resource_help, default = None),
     )
 )
 
 def get(runner):
-    if runner.opts.voltdbroot is None:
-        runner.opts.voltdbroot = "voltdbroot"
-    runner.args.extend(['get', runner.opts.deployment, 'getvoltdbroot', runner.opts.voltdbroot, 'file', runner.opts.output])
+    runner.args.extend(['get'])
+
+    if runner.opts.resource in ('deployment', 'schema', 'classes'):
+        runner.args.extend([runner.opts.resource])
+    else:
+        utility.abort('Expected actions for get command are deployment, schema or classes')
+
+    if runner.opts.output:
+        runner.args.extend(['file', runner.opts.output])
+    if runner.opts.directory_spec:
+        runner.args.extend(['getvoltdbroot', runner.opts.directory_spec])
+    if runner.opts.force:
+        runner.args.extend(['force'])
+
+    print('Args: %s' % runner.args)
+
     runner.java_execute('org.voltdb.VoltDB', None, *runner.args)
