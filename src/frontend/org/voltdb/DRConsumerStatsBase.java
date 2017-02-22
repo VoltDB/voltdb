@@ -64,6 +64,12 @@ public class DRConsumerStatsBase {
         protected Iterator<Object> getStatsRowKeyIterator(boolean interval) {
             return ImmutableSet.of().iterator();
         }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            return false;
+        }
     }
 
     public static class DRConsumerPartitionStatsBase extends StatsSource {
@@ -88,6 +94,12 @@ public class DRConsumerStatsBase {
         @Override
         protected Iterator<Object> getStatsRowKeyIterator(boolean interval) {
             return ImmutableSet.of().iterator();
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            return false;
         }
     }
 
