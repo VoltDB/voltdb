@@ -67,11 +67,11 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
     protected String m_targetIndexName;
 
     //
-    protected List<AbstractExpression> m_endkeyExpressions = new ArrayList<AbstractExpression>();
+    protected List<AbstractExpression> m_endkeyExpressions = new ArrayList<>();
 
     // This list of expressions corresponds to the values that we will use
     // at runtime in the lookup on the index
-    protected List<AbstractExpression> m_searchkeyExpressions = new ArrayList<AbstractExpression>();
+    protected List<AbstractExpression> m_searchkeyExpressions = new ArrayList<>();
 
     // If the search key expression is actually a "not distinct" expression, we do not want the executor to skip null candidates.
     protected List<Boolean> m_compareNotDistinct = new ArrayList<Boolean>();
@@ -86,7 +86,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
     // this index scan is going to use
     protected Index m_catalogIndex = null;
 
-    private ArrayList<AbstractExpression> m_bindings;
+    private List<AbstractExpression> m_bindings;
 
     private AbstractExpression m_skip_null_predicate;
 
@@ -211,7 +211,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         // add support for reverse scan
         // for ASC scan, check endExpression;
         // for DESC scan (isReverseScan()), check the searchkeys
-        List<AbstractExpression> endKeys = new ArrayList<AbstractExpression>();
+        List<AbstractExpression> endKeys = new ArrayList<>();
 
         // Translate the index scan's end condition into a list of end key
         // expressions and note the comparison operand of the last one.
@@ -535,7 +535,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         return result;
     }
 
-    public ArrayList<AbstractExpression> getBindings() {
+    public List<AbstractExpression> getBindings() {
         return m_bindings;
     }
 

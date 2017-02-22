@@ -126,6 +126,10 @@ done
 for f in $ZKLIB/z*.jar; do
   CLASSPATH=${CLASSPATH}:$f;
 done
+# Add formatter lib if using --formatter option.
+for f in $FORMATTER_LIB/*.jar; do
+  CLASSPATH=${CLASSPATH}:$f;
+done
 
 # run it
 export CMDVAL="$JAVA -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp -Djava.awt.headless=true $JAVA_HEAP_MAX $VOLTDB_OPTS -Dlog4j.configuration=file://${LOG4J_CONFIG_PATH} "

@@ -16,7 +16,7 @@
  */
 #ifndef SRC_EE_PLANNODES_WINDOWFUNCTIONNODE_H_
 #define SRC_EE_PLANNODES_WINDOWFUNCTIONNODE_H_
-#include "aggregatenode.h"
+#include "abstractplannode.h"
 
 namespace voltdb {
 class WindowFunctionPlanNode : public AbstractPlanNode {
