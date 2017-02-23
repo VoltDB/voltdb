@@ -324,7 +324,7 @@ public class FragmentTask extends TransactionTask
                         new long[] { fragmentId },
                         new long [] { inputDepId },
                         new ParameterSet[] { params },
-                        new boolean[] { false },
+                        new boolean[] { false },    // FragmentTasks don't generate statement hashes
                         null,
                         stmtText == null ? null : new String[] { stmtText },
                         m_txnState.txnId,
