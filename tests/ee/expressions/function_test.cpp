@@ -182,6 +182,11 @@ static NValue getSomeValue(const Boolean value)
     return ValueFactory::getBooleanValue(static_cast<bool>(value));
 }
 
+static NValue getSomeValue(const in6_addr *addr)
+{
+    return ValueFactory::getTempBinaryValue((const char *)addr, sizeof(in6_addr));
+}
+
 static NValue& getSomeValue(NValue &val)
 {
     return val;
@@ -472,6 +477,23 @@ TEST_F(FunctionTest, BinTest) {
                       0);
             expectedz[(BIGINT_SIZE-1) - idx] = '1';
     }
+}
+
+TEST_F(ExpressionTest, Inet6_ntoaTest) {
+    in6_addr addr;
+    const char *presentation = "ab01:cd12:ef21:01ab:12cd:34ef:a01b:c23d";
+    addr.s6_addr16[0] = htons(0xab01);
+    addr.s6_addr16[1] = htons(0xcd12);
+    addr.s6_addr16[2] = htons(0xef21);
+    addr.s6_addr16[3] = htons(0x01ab);
+    addr.s6_addr16[4] = htons(0x12cd);
+    addr.s6_addr16[5] = htons(0x34ef);
+    addr.s6_addr16[6] = htons(0xa01b);
+    addr.s6_addr16[7] = htons(0xc23d);
+    ASSERT_EQ(testUnary(FUNC_VOLT_INET6_NTOA,
+                        &addr,
+                        presentation),
+              0);
 }
 
 TEST_F(FunctionTest, NaturalLogTest) {

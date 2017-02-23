@@ -2451,7 +2451,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         }
         ClientResponse cr;
         VoltTable vt;
-
+        String actual_str;
         cr = client.callProcedure("@AdHoc", "select inet6_aton(?) from inet_empty", presentation);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         vt = cr.getResults()[0];
@@ -2460,21 +2460,23 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertEquals(bytes.length, actual.length);
         assertEqualByteArrays(bytes, actual);
 
+        /*
         cr = client.callProcedure("@AdHoc", "select inet6_ntoa(?) from inet_empty", bytes);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         vt = cr.getResults()[0];
         assertTrue(vt.advanceRow());
-        String actual_str = vt.getString(0);
+        actual_str = vt.getString(0);
         assertEquals(presentation, actual_str);
-
+        */
+        /*
         cr = client.callProcedure("@AdHoc", "select inet6_ntoa(inet6_aton(?)) from inet_empty", presentation);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         vt = cr.getResults()[0];
         assertTrue(vt.advanceRow());
         actual_str = vt.getString(0);
         assertEquals(presentation, actual_str);
-
-        cr = client.callProcedure("@AdHoc", "select inet6_aton(inet_ntoa(?)) from inet_empty", bytes);
+        */
+        cr = client.callProcedure("@AdHoc", "select inet6_aton(inet6_ntoa(?)) from inet_empty", bytes);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         vt = cr.getResults()[0];
         assertTrue(vt.advanceRow());
@@ -2500,8 +2502,6 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         validateIPv4Addr(client, "1.2.3.4",
                          0x01020304);
 
-        // Note:  The binary version needs to be an int.  It needs to have
-        //        a zero sign bit.
         validateIPv6Addr(client, "ab01:cd12:ef21:01ab:12cd:34ef:a01b:c23d",
                          new short[] {
                                  (short)0xab01,
