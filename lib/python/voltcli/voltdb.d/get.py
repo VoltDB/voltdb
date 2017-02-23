@@ -18,18 +18,19 @@ import sys, os, subprocess
 from voltcli import utility
 
 dir_spec_help = ('Specifies the root directory for the database. The default is the current working directory.')
-get_resource_help = ('Supported configuration resources for get command are \'deployment\' and \'schema\'.\n'
-                     '    deployment - gets deployment configuration of current node\n'
-                     '    schema     - gets schema of current node\n')
+get_resource_help = ('Supported configuration resources for get command are \'deployment\' and \'schema\'.\r\n'
+                     '           deployment - gets deployment configuration of current node\n'
+                     '           schema     - gets schema of current node\n')
+output_help = ("Specifies the path and file name for the output file. Defaults are: "
+               "Deployment - deployment.xml;\r\n"
+               "Schema - schema.sql;")
 
 @VOLT.Command(
-    description = 'Get voltdb configuration resource.',
+    description = 'Write the selected database resource (deployment or schema) to a file.',
     options = (
-        VOLT.StringOption('-o', '--output', 'output', 'Specifies file to save the configuration resource to.',
-                          default=None),
+        VOLT.StringOption('-o', '--output', 'output', output_help, default=None),
         VOLT.StringOption('-D', '--dir', 'directory_spec', dir_spec_help, default=None),
-        VOLT.BooleanOption('-f', '--force', 'force', 'Stores the output file even if the resouces file from the '
-                                                     'previous session that may be overwritten.')
+        VOLT.BooleanOption('-f', '--force', 'force', 'Overwrites an existing file.')
     ),
     arguments = (
         VOLT.StringArgument('resource', get_resource_help, default=None),
