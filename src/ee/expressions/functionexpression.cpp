@@ -421,8 +421,11 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
         case FUNC_INET_NTOA:
             ret = new UnaryFunctionExpression<FUNC_INET_NTOA>((*arguments)[0]);
             break;
-        case FUNC_INET4_ATON:
-            ret = new UnaryFunctionExpression<FUNC_INET4_ATON>((*arguments)[0]);
+        case FUNC_INET_ATON:
+            ret = new UnaryFunctionExpression<FUNC_INET_ATON>((*arguments)[0]);
+            break;
+        case FUNC_INET6_NTOA:
+            ret = new UnaryFunctionExpression<FUNC_INET6_NTOA>((*arguments)[0]);
             break;
         case FUNC_INET6_ATON:
             ret = new UnaryFunctionExpression<FUNC_INET6_ATON>((*arguments)[0]);

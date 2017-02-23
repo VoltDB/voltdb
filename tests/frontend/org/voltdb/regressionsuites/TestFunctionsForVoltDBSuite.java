@@ -172,8 +172,24 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
                 ";\n" +
 
                 "CREATE TABLE BINARYTEST (ID INTEGER, bdata varbinary(256), PRIMARY KEY(ID));" +
-                /* DDL for testing internet address functions */
+                // DDL for testing internet address functions
+                // INET_EMPTY will have one row.  The contents of the
+                // data will not matter. We just calculate with constant
+                // valued expressions in the display list.
+                //
+                // INET4_TEST and INET6_TEST will have a bunch of rows, each
+                // with a presentation and binary version.  We will test
+                // that the translation from one equals the other and
+                // that the other equals the translation to the one.
                 "CREATE TABLE INET_EMPTY ( DUMMY INTEGER ); " +
+                "CREATE TABLE INET4_TEST ( " +
+                "    PRES         VARCHAR, " +
+                "    BIN          BIGINT " +
+                ");" +
+                "CREATE TABLE INET6_TEST ( " +
+                "    PRES         VARCHAR, " +
+                "    BIN          BIGINT " +
+                ");" +
                 "";
         try {
             project.addLiteralSchema(literalSchema);
@@ -2359,7 +2375,10 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
 
     private void validateIPv4Addr(Client client,
                                  String presentation,
-                                 int binary) throws Exception {
+                                 int binaryint) throws Exception {
+        // Make sure the binary format is not
+        // sign extended.
+        long binary = (binaryint & 0xFFFFFFFFL);
         ClientResponse cr;
         VoltTable vt;
         //
@@ -2377,18 +2396,18 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
 
         // Now, test if converting the presentation matches the binary.
         cr = client.callProcedure("@AdHoc",
-                                  String.format("select inet4_aton('%s') from inet_empty;",
+                                  String.format("select inet_aton('%s') from inet_empty;",
                                                 presentation));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         vt = cr.getResults()[0];
         assertEquals(1, vt.getRowCount());
         assertEquals(1, vt.getColumnCount());
         assertTrue(vt.advanceRow());
-        assertEquals((long)binary, vt.getLong(0));
+        assertEquals(binary, vt.getLong(0));
 
         // Now test that the two are inverses one of the other.
         cr = client.callProcedure("@AdHoc",
-                                  String.format("select inet4_aton(inet_ntoa(cast(%d as bigint))) from inet_empty;",
+                                  String.format("select inet_aton(inet_ntoa(cast(%d as bigint))) from inet_empty;",
                                                 binary));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         vt = cr.getResults()[0];
@@ -2399,7 +2418,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
 
         // Finally, test that the two are inverses the other of the one.
         cr = client.callProcedure("@AdHoc",
-                                  String.format("select inet_ntoa(inet4_aton('%s')) from inet_empty;",
+                                  String.format("select inet_ntoa(inet_aton('%s')) from inet_empty;",
                                                 presentation));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         vt = cr.getResults()[0];
@@ -2409,9 +2428,58 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertEquals(presentation, vt.getString(0));
     }
 
+    private void assertEqualByteArrays(byte[] bytes, byte[] actual) {
+        for (int idx = 0; idx < actual.length; idx += 1) {
+            assertEquals(String.format("Byte %d is different: %s != %s",
+                                       idx, bytes[idx], actual[idx]),
+                         bytes[idx], actual[idx]);
+        }
+    }
     private void validateIPv6Addr(Client client,
                                  String presentation,
-                                 short  addr[]) {
+                                 short  addr[]) throws Exception {
+        // We only want 8 shorts.
+
+        assertEquals(8, addr.length);
+        // Make bytes be an IPv6 address in network byte order.
+        byte[] bytes = new byte[8 * 2];
+        for (int idx = 0; idx < 8; idx += 1) {
+            // Network byte order is big endian
+            // We are just swapping by shorts.
+            bytes[2 * idx + 0] = (byte)((addr[idx] >> 8) & 0xFF);
+            bytes[2 * idx + 1] = (byte)((addr[idx] >> 0) & 0xFF);
+        }
+        ClientResponse cr;
+        VoltTable vt;
+
+        cr = client.callProcedure("@AdHoc", "select inet6_aton(?) from inet_empty", presentation);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        vt = cr.getResults()[0];
+        assertTrue(vt.advanceRow());
+        byte[] actual = vt.getVarbinary(0);
+        assertEquals(bytes.length, actual.length);
+        assertEqualByteArrays(bytes, actual);
+
+        cr = client.callProcedure("@AdHoc", "select inet6_ntoa(?) from inet_empty", bytes);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        vt = cr.getResults()[0];
+        assertTrue(vt.advanceRow());
+        String actual_str = vt.getString(0);
+        assertEquals(presentation, actual_str);
+
+        cr = client.callProcedure("@AdHoc", "select inet6_ntoa(inet6_aton(?)) from inet_empty", presentation);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        vt = cr.getResults()[0];
+        assertTrue(vt.advanceRow());
+        actual_str = vt.getString(0);
+        assertEquals(presentation, actual_str);
+
+        cr = client.callProcedure("@AdHoc", "select inet6_aton(inet_ntoa(?)) from inet_empty", bytes);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        vt = cr.getResults()[0];
+        assertTrue(vt.advanceRow());
+        actual = vt.getVarbinary(0);
+        assertEqualByteArrays(bytes, actual);
     }
 
     public void testInternetAddresses() throws Exception {
@@ -2431,6 +2499,9 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
                          0x01010101);
         validateIPv4Addr(client, "1.2.3.4",
                          0x01020304);
+
+        // Note:  The binary version needs to be an int.  It needs to have
+        //        a zero sign bit.
         validateIPv6Addr(client, "ab01:cd12:ef21:01ab:12cd:34ef:a01b:c23d",
                          new short[] {
                                  (short)0xab01,
