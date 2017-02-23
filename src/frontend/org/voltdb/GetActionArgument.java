@@ -19,37 +19,28 @@ package org.voltdb;
 
 public enum GetActionArgument {
 
-    DEPLOYMENT("deployment") {
+    DEPLOYMENT() {
         @Override
         public String getDefaultOutput() {
             return "deployment.xml";
         }
     },
-    SCHEMA("schema") {
+    SCHEMA() {
         @Override
         public String getDefaultOutput() {
             return "schema.sql";
         }
     },
-    CLASSES("classes") {
+    CLASSES() {
         @Override
         public String getDefaultOutput() {
             return "procedures.jar";
         }
     };
 
-    final String m_resource;
-
     public String getDefaultOutput() { return ""; }
-    public String getVerb() { return m_resource; }
 
-//    GetActionArgument() {
-//        m_resource = name().toLowerCase();
-//    }
-
-    GetActionArgument(String verb) {
-        m_resource = verb;
-    }
+    GetActionArgument() { }
 
     public static String supportedVerbs() {
         StringBuilder verbNames = new StringBuilder();

@@ -24,24 +24,31 @@
 package org.voltdb.regressionsuites;
 
 
-import java.io.File;
-import static junit.framework.TestCase.assertEquals;
-import static junit.framework.TestCase.assertNotNull;
-import org.voltdb.BackendTarget;
-import org.voltdb.VoltTable;
-import org.voltdb.client.Client;
-import org.voltdb.utils.MiscUtils;
+import static junit.framework.Assert.assertEquals;
+import static junit.framework.Assert.assertNotNull;
+import static junit.framework.Assert.assertTrue;
 
-import static junit.framework.TestCase.assertTrue;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+
+import org.voltdb.BackendTarget;
 import org.voltdb.ServerThread;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltDB.Configuration;
+import org.voltdb.VoltDB.SimulatedExitException;
+import org.voltdb.VoltTable;
+import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
+import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.utils.CatalogUtil;
+import org.voltdb.utils.MiscUtils;
+
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
 import org.voltdb_testprocs.regressionsuites.failureprocs.CrashJVM;
 import org.voltdb_testprocs.regressionsuites.failureprocs.CrashVoltDBProc;
 
@@ -60,6 +67,7 @@ public class TestInitStartLocalClusterAllOutOfProcess extends JUnit4LocalCluster
     String listener;
     Client client;
     String voltDbRootPath;
+    String voltDBRootParent;
 
     @Before
     public void setUp() throws Exception {
@@ -87,6 +95,7 @@ public class TestInitStartLocalClusterAllOutOfProcess extends JUnit4LocalCluster
             voltDbRoot = new File(voltDbFilePrefix, builder.getPathToVoltRoot().getPath());
         }
         voltDbRootPath = voltDbRoot.getCanonicalPath();
+        voltDBRootParent = voltDbRoot.getParent();
         listener = cluster.getListenerAddresses().get(0);
         client = ClientFactory.createClient();
         client.createConnection(listener);
@@ -113,23 +122,51 @@ public class TestInitStartLocalClusterAllOutOfProcess extends JUnit4LocalCluster
         }
         assertTrue(found);
         assertEquals(org.voltcore.common.Constants.DEFAULT_HEARTBEAT_TIMEOUT_SECONDS, timeout);
+    }
 
-        File out = File.createTempFile("get_deployment", ".xm");
-        VoltDB.Configuration c1 = new VoltDB.Configuration(new String[]{"get", "deployment",
-            "getvoltdbroot", voltDbRootPath,
-            "file", out.getAbsolutePath() + "l"});
+    @Test
+    public void testGetDeployment() throws Exception {
+        File deployment = File.createTempFile("get_deployment", ".xm");
+        if (deployment.exists()) deployment.delete();
+
+        Configuration c1 = new VoltDB.Configuration(new String[]{"get", "deployment",
+            "getvoltdbroot", voltDBRootParent,
+            "file", deployment.getAbsolutePath() + "l"});
         ServerThread server = new ServerThread(c1);
 
         try {
             server.cli();
-        } catch (Throwable ex) {
+        } catch (SimulatedExitException ex) {
             //Good
         }
 
-        DeploymentType dt = CatalogUtil.parseDeployment(out.getAbsolutePath() + "l");
+        DeploymentType dt = CatalogUtil.parseDeployment(deployment.getAbsolutePath() + "l");
         assertNotNull(dt);
         assertEquals(dt.getPaths().getVoltdbroot().getPath(), voltDbRootPath);
+    }
 
+    @Test
+    public void testGetSchema() throws Exception {
+        File schema = File.createTempFile("schema", ".sql");
+
+        Configuration c1 = new VoltDB.Configuration(new String[]{"get", "schema",
+            "getvoltdbroot", voltDBRootParent,
+            "file", schema.getAbsolutePath(), "forceget"});
+        ServerThread server = new ServerThread(c1);
+
+        try {
+            server.cli();
+        } catch (SimulatedExitException ex) {
+            //Good
+        }
+
+        byte[] encoded = Files.readAllBytes(Paths.get(schema.getAbsolutePath()));
+        assertNotNull(encoded);
+        assertTrue(encoded.length > 0);
+        String ddl = new String(encoded, Constants.UTF8ENCODING);
+        assertTrue(ddl.toLowerCase().contains("create table blah ("));
+        assertTrue(ddl.toLowerCase().contains("ival bigint default '0' not null"));
+        assertTrue(ddl.toLowerCase().contains("primary key (ival)"));
     }
 
 }

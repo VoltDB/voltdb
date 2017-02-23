@@ -307,8 +307,6 @@ public abstract class CatalogUtil {
         if (ddlBytes == null) {
             throw new IOException("Auto generated schema DDL not found - please make sure the database is initialized with valid schema.");
         }
-
-        // Convert the bytes to a string and split by lines.
         String ddl = new String(ddlBytes, Constants.UTF8ENCODING);
         return ddl.trim();
     }

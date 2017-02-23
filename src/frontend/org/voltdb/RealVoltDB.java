@@ -614,7 +614,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             // We don't have catalog context so host count is not there.
             String out;
             if ((out = CatalogUtil.getDeployment(dt, true)) != null) {
-                if ((new File(config.m_getOutput)).exists() && !config.m_forceVoltdbCreate) {
+                if ((new File(config.m_getOutput)).exists() && !config.m_forceGetCreate) {
                     System.err.println("Failed to save deployment, file already exists: " + config.m_getOutput);
                     VoltDB.exit(-1);
                 }
@@ -635,7 +635,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     private void outputSchema(Configuration config) {
-        if ((new File(config.m_getOutput)).exists() && !config.m_forceVoltdbCreate) {
+        if ((new File(config.m_getOutput)).exists() && !config.m_forceGetCreate) {
             System.err.println("Failed to save scehma file, file already exists: " + config.m_getOutput);
             VoltDB.exit(-1);
         }

@@ -241,7 +241,15 @@ public class VoltDB {
 
         /** GET option */
         public GetActionArgument m_getOption = null;
+        /**
+         * Name of output file in which get command will store it's result
+         */
         public String m_getOutput = null;
+        /**
+         * Flag to indicate whether to force store the result even if there is already an existing
+         * file with same name
+         */
+        public boolean m_forceGetCreate = false;
 
         private final static void referToDocAndExit() {
             System.out.println("Please refer to VoltDB documentation for command line usage.");
@@ -619,23 +627,26 @@ public class VoltDB {
                     }
                 } else if (arg.equalsIgnoreCase("get")) {
                     m_startAction = StartAction.GET;
-                    String actionVerb = args[++i];
-                    if (actionVerb == null || actionVerb.trim().length() == 0) {
-                        System.err.println("FATAL: Supply valid action verb for \"get\" command. "
-                                + "Supported action verbs for get are: " + GetActionArgument.supportedVerbs());
+                    String argument = args[++i];
+                    if (argument == null || argument.trim().length() == 0) {
+                        System.err.println("FATAL: Supply a valid non-null argument for \"get\" command. "
+                                + "Supported arguments for get are: " + GetActionArgument.supportedVerbs());
                         referToDocAndExit();
                     }
 
                     try {
-                        m_getOption = GetActionArgument.valueOf(GetActionArgument.class, actionVerb.trim().toUpperCase());
+                        m_getOption = GetActionArgument.valueOf(GetActionArgument.class, argument.trim().toUpperCase());
                     } catch (IllegalArgumentException excp) {
-                        System.err.println(actionVerb + " is not a valid \"get\" verb. Please provide valid action verb: " + GetActionArgument.supportedVerbs());
+                        System.err.println("FATAL:" + argument + " is not a valid \"get\" command argument. Please provide a valid argument: " + GetActionArgument.supportedVerbs());
                         referToDocAndExit();
                     }
                     m_getOutput = m_getOption.getDefaultOutput();
                 } else if (arg.equalsIgnoreCase("file")) {
                     m_getOutput = args[++i].trim();
-                } else {
+                } else if (arg.equalsIgnoreCase("forceget")) {
+                    m_forceGetCreate = true;
+                }
+                else {
                     System.err.println("FATAL: Unrecognized option to VoltDB: " + arg);
                     referToDocAndExit();
                 }
