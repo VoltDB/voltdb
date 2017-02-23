@@ -50,7 +50,7 @@ class DatabaseTest extends TestBase {
         String[] extractedValue = ["random_input", "random_input"]
         int newValue = 0
         boolean foundStatus = false
-
+        int numberOfTrials = 5
         expect: 'Expect the add database button'
         waitFor { buttonDatabase.isDisplayed() }
 
