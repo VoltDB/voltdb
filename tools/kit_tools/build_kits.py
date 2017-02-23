@@ -113,7 +113,7 @@ def buildRabbitMQExport(version):
         run("pwd")
         run("git status")
         run("git describe --dirty", warn_only=True)
-        run("VOLTDIST=../pro/obj/pro/voltdb-ent-%s ant" % version)
+        run(". ~/bin/setjavahome.sh; VOLTDIST=../pro/obj/pro/voltdb-ent-%s ant" % version)
     # Repackage the pro tarball and zip file with the RabbitMQ connector Jar
     with cd("%s/pro/obj/pro" % builddir):
         run("pwd")
@@ -297,7 +297,7 @@ try:
         buildCommunity()
         copyCommunityFilesToReleaseDir(releaseDir, versionMac, "MAC")
         buildPro()
-        buildRabbitMQExport(versionMac)
+        #buildRabbitMQExport(versionMac)
         copyEnterpriseFilesToReleaseDir(releaseDir, versionMac, "MAC")
 except Exception as e:
     print "Could not build MAC kit. Exception: " + str(e) + ", Type: " + str(type(e))
