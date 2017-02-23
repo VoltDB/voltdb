@@ -26,17 +26,17 @@ def checkoutCode(voltdbGit, proGit, rbmqExportGit):
         # do the checkouts, collect checkout errors on both community &
         # pro repos so user gets status on both checkouts
         message = ""
-        run("git clone git@github.com:VoltDB/voltdb.git")
+        run("git clone -q git@github.com:VoltDB/voltdb.git")
         result = run("cd voltdb; git checkout %s" % voltdbGit, warn_only=True)
         if result.failed:
             message = "VoltDB checkout failed. Missing branch %s." % rbmqExportGit
 
-        run("git clone git@github.com:VoltDB/pro.git")
+        run("git clone -q git@github.com:VoltDB/pro.git")
         result = run("cd pro; git checkout %s" % proGit, warn_only=True)
         if result.failed:
             message += "\nPro checkout failed. Missing branch %s." % rbmqExportGit
 
-        run("git clone git@github.com:VoltDB/export-rabbitmq.git")
+        run("git clone -q git@github.com:VoltDB/export-rabbitmq.git")
         result = run("cd export-rabbitmq; git checkout %s" % rbmqExportGit, warn_only=True)
         # Probably ok to use master for export-rabbitmq.
         if result.failed:
@@ -77,7 +77,7 @@ def buildCommunity():
         run("pwd")
         run("git status")
         run("git describe --dirty")
-        run("ant -Djmemcheck=NO_MEMCHECK clean default dist")
+        run(". ~/bin/setjavahome.sh; ant -Djmemcheck=NO_MEMCHECK clean default dist")
 
 ################################################
 # BUILD THE ENTERPRISE VERSION
@@ -88,7 +88,7 @@ def buildPro():
         run("pwd")
         run("git status")
         run("git describe --dirty")
-        run("VOLTCORE=../voltdb ant -f mmt.xml -Djmemcheck=NO_MEMCHECK -Dallowreplication=true -Dlicensedays=%d clean dist.pro" % defaultlicensedays)
+        run(". ~/bin/setjavahome.sh; VOLTCORE=../voltdb ant -f mmt.xml -Djmemcheck=NO_MEMCHECK -Dallowreplication=true -Dlicensedays=%d clean dist.pro" % defaultlicensedays)
 
 ################################################
 # BUILD THE RABBITMQ EXPORT CONNECTOR
@@ -301,53 +301,6 @@ try:
         copyEnterpriseFilesToReleaseDir(releaseDir, versionMac, "MAC")
 except Exception as e:
     print "Could not build MAC kit. Exception: " + str(e) + ", Type: " + str(type(e))
-    build_errors=True
-
-# build debian kit
-try:
-    with settings(user=username,host_string=UbuntuSSHInfo[1],disable_known_hosts=True,key_filename=UbuntuSSHInfo[0]):
-        debbuilddir = "%s/deb_build/" % builddir
-        run("rm -rf " + debbuilddir)
-        run("mkdir -p " + debbuilddir)
-
-        with cd(debbuilddir):
-            put ("tools/voltdb-install.py",".")
-
-            commbld = "%s-voltdb-%s.tar.gz" % ('LINUX', versionCentos)
-            put("%s/%s" % (releaseDir, commbld),".")
-            run ("sudo python voltdb-install.py -D " + commbld)
-            get("voltdb_%s-1_amd64.deb" % (versionCentos), releaseDir)
-
-            entbld = "%s-voltdb-ent-%s.tar.gz" % ('LINUX', versionCentos)
-            put("%s/%s" % (releaseDir, entbld),".")
-            run ("sudo python voltdb-install.py -D " + entbld)
-            get("voltdb-ent_%s-1_amd64.deb" % (versionCentos), releaseDir)
-except Exception as e:
-    print "Could not build debian kit. Exception: " + str(e) + ", Type: " + str(type(e))
-    build_errors=True
-
-try:
-    # build rpm kit
-    with settings(user=username,host_string=CentosSSHInfo[1],disable_known_hosts=True,key_filename=CentosSSHInfo[0]):
-        rpmbuilddir = "%s/rpm_build/" % builddir
-        run("rm -rf " + rpmbuilddir)
-        run("mkdir -p " + rpmbuilddir)
-
-        with cd(rpmbuilddir):
-            put ("tools/voltdb-install.py",".")
-
-            commbld = "%s-voltdb-%s.tar.gz" % ('LINUX', versionCentos)
-            put("%s/%s" % (releaseDir, commbld),".")
-            run ("python2.6 voltdb-install.py -R " + commbld)
-            get("voltdb-%s-1.x86_64.rpm" % (versionCentos), releaseDir)
-
-            entbld = "%s-voltdb-ent-%s.tar.gz" % ('LINUX', versionCentos)
-            put("%s/%s" % (releaseDir, entbld),".")
-            run ("python2.6 voltdb-install.py -R " + entbld)
-            get("voltdb-ent-%s-1.x86_64.rpm" % (versionCentos), releaseDir)
-
-except Exception as e:
-    print "Could not build rpm kit. Exception: " + str(e) + ", Type: " + str(type(e))
     build_errors=True
 
 computeChecksums(releaseDir)
