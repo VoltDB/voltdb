@@ -17,12 +17,14 @@
 
 package org.voltdb;
 
+import org.apache.zookeeper_voltpatches.KeeperException;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.AuthSystem.AuthUser;
 import org.voltdb.client.BatchTimeoutOverrideType;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.SyncCallback;
+import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.compiler.deploymentfile.ResourceMonitorType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.snmp.FaultFacility;
@@ -33,11 +35,15 @@ import org.voltdb.utils.PlatformProperties;
 import org.voltdb.utils.SystemStatsCollector;
 import org.voltdb.utils.SystemStatsCollector.Datum;
 
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.ExecutionException;
+
 /**
  * Used to periodically check if the server's resource utilization is above the configured limits
  * and pause the server.
  */
-public class ResourceUsageMonitor implements Runnable
+public class HealthMonitor implements Runnable, Promotable
 {
     private static final VoltLogger m_logger = new VoltLogger("HOST");
 
@@ -50,8 +56,10 @@ public class ResourceUsageMonitor implements Runnable
     private String m_snmpRssLimitStr;
     private long m_snmpRssLimit;
     private ThresholdType m_snmpRssCriteria;
+    private Map<Byte,Boolean> m_snmpDRTrapSent = new HashMap<>();
+    private boolean m_isLeader;
 
-    public ResourceUsageMonitor(SystemSettingsType systemSettings, SnmpTrapSender snmpTrapSender)
+    public HealthMonitor(SystemSettingsType systemSettings, SnmpTrapSender snmpTrapSender)
     {
         if (systemSettings == null || systemSettings.getResourcemonitor() == null) {
             return;
@@ -123,6 +131,11 @@ public class ResourceUsageMonitor implements Runnable
             return;
         }
 
+        // check DRRole stats if it's responsible
+        if (m_isLeader) {
+            checkDRRole();
+        }
+
         if (isOverMemoryLimit() || m_diskLimitConfig.isOverLimitConfiguration()) {
             SyncCallback cb = new SyncCallback();
             if (getConnectionHadler().callProcedure(getInternalUser(), true, BatchTimeoutOverrideType.NO_TIMEOUT, cb, "@Pause")) {
@@ -130,8 +143,9 @@ public class ResourceUsageMonitor implements Runnable
                     cb.waitForResponse();
                 } catch (InterruptedException e) {
                     m_logger.error("Interrupted while pausing cluster for resource overusage", e);
+                    return;
                 }
-                ClientResponseImpl r = ClientResponseImpl.class.cast(cb.getResponse());
+                ClientResponse r = cb.getResponse();
                 if (r.getStatus() != ClientResponse.SUCCESS) {
                     m_logger.error("Unable to pause cluster for resource overusage: " + r.getStatusString());
                 }
@@ -155,6 +169,53 @@ public class ResourceUsageMonitor implements Runnable
     {
         return VoltDB.instance().getCatalogContext().authSystem.getInternalAdminUser();
     }
+
+    private void checkDRRole() {
+        SyncCallback cb = new SyncCallback();
+        if (getConnectionHadler().callProcedure(getInternalUser(), false, BatchTimeoutOverrideType.NO_TIMEOUT, cb, "@Statistics", "DRROLE",0)) {
+            try {
+                cb.waitForResponse();
+            } catch (InterruptedException e) {
+                m_logger.error("Interrupted while retrieving cluster for DRROLE STATS", e);
+                return;
+            }
+            ClientResponse r = cb.getResponse();
+            if (r.getStatus() != ClientResponse.SUCCESS) { // timeout could happen if hostdown
+                if (m_logger.isDebugEnabled()) {
+                    m_logger.debug("Unable to retrieve DRROLE STATS: " + r.getStatusString());
+                }
+                return;
+            }
+            VoltTable result = r.getResults()[0];
+            while (result.advanceRow()) {
+                DrRoleType drRole = DrRoleType.fromValue(result.getString(DRRoleStats.CN_ROLE).toLowerCase());
+                DRRoleStats.State state = DRRoleStats.State.valueOf(result.getString(DRRoleStats.CN_STATE));
+                byte remoteCluster = (byte) result.getLong(DRRoleStats.CN_REMOTE_CLUSTER_ID);
+                if (m_logger.isDebugEnabled()) {
+                    m_logger.debug("DRROLE stats: Role:" + drRole + " State:" + state + " Remote Cluster ID:" + remoteCluster);
+                }
+                if (drRole == DrRoleType.NONE) {
+                    continue;
+                }
+
+                if (DRRoleStats.State.STOPPED == state) {
+                    if (!m_snmpDRTrapSent.getOrDefault(remoteCluster, false)) {
+                        m_snmpTrapSender.statistics(FaultFacility.DR, String.format("Database Replication ROLE: %s break with Remote Cluster %d.",
+                                drRole, remoteCluster));
+                        m_snmpDRTrapSent.put(remoteCluster, true);
+                    }
+                } else {
+                    // reset
+                    if (m_snmpDRTrapSent.getOrDefault(remoteCluster, false)) {
+                        m_snmpDRTrapSent.put(remoteCluster, false);
+                    }
+                }
+            }
+        } else {
+            m_logger.error("Unable to retrieve DRROLE STATS:: failed to invoke @Statistics DRROLE, 0.");
+        }
+    }
+
 
     private boolean isOverMemoryLimit()
     {
@@ -241,5 +302,10 @@ public class ResourceUsageMonitor implements Runnable
             throw new IllegalArgumentException("Invalid memory limit value " + sizeStr +
                     ". Memory limit must be configued as a percentage of total available memory or as GB value");
         }
+    }
+
+    @Override
+    public void acceptPromotion() throws InterruptedException, ExecutionException, KeeperException {
+        m_isLeader = true;
     }
 }

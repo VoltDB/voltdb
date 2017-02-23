@@ -292,7 +292,7 @@ public class CatalogContext {
 
     /**
      * Given a class name in the catalog jar, loads it from the jar, even if the
-     * jar is served from a url and isn't in the classpath.
+     * jar is served from an URL and isn't in the classpath.
      *
      * @param procedureClassName The name of the class to load.
      * @return A java Class variable associated with the class.
@@ -304,7 +304,7 @@ public class CatalogContext {
 
     public static Class<?> classForProcedure(String procedureClassName, ClassLoader loader)
         throws ClassNotFoundException {
-        // this is a safety mechanism to prevent catalog classes overriding voltdb stuff
+        // this is a safety mechanism to prevent catalog classes overriding VoltDB stuff
         if (procedureClassName.startsWith("org.voltdb.")) {
             return Class.forName(procedureClassName);
         }
@@ -316,45 +316,47 @@ public class CatalogContext {
     // Generate helpful status messages based on configuration present in the
     // catalog.  Used to generated these messages at startup and after an
     // @UpdateApplicationCatalog
-    SortedMap<String, String> getDebuggingInfoFromCatalog()
+    SortedMap<String, String> getDebuggingInfoFromCatalog(boolean verbose)
     {
         SortedMap<String, String> logLines = new TreeMap<>();
 
         // topology
         Deployment deployment = cluster.getDeployment().iterator().next();
         int hostCount = m_dbSettings.getCluster().hostcount();
-        Map<Integer, Integer> sphMap;
-        try {
-            sphMap = m_messenger.getSitesPerHostMapFromZK();
-        } catch (KeeperException | InterruptedException | JSONException e) {
-            hostLog.warn("Failed to get sitesperhost information from Zookeeper", e);
-            sphMap = null;
-        }
-        int kFactor = deployment.getKfactor();
-        if (sphMap == null) {
-            logLines.put("deployment1",
-                    String.format("Cluster has %d hosts with leader hostname: \"%s\". [unknown] local sites count. K = %d.",
-                            hostCount, VoltDB.instance().getConfig().m_leader, kFactor));
-            logLines.put("deployment2", "Unable to retrieve partition information from the cluster.");
-        } else {
-            int localSitesCount = sphMap.get(m_messenger.getHostId());
-            logLines.put("deployment1",
-                    String.format("Cluster has %d hosts with leader hostname: \"%s\". %d local sites count. K = %d.",
-                            hostCount, VoltDB.instance().getConfig().m_leader, localSitesCount, kFactor));
-
-            int totalSitesCount = 0;
-            for (Map.Entry<Integer, Integer> e : sphMap.entrySet()) {
-                totalSitesCount += e.getValue();
+        if (verbose) {
+            Map<Integer, Integer> sphMap;
+            try {
+                sphMap = m_messenger.getSitesPerHostMapFromZK();
+            } catch (KeeperException | InterruptedException | JSONException e) {
+                hostLog.warn("Failed to get sitesperhost information from Zookeeper", e);
+                sphMap = null;
             }
-            int replicas = kFactor + 1;
-            int partitionCount = totalSitesCount / replicas;
-            logLines.put("deployment2",
-                    String.format("The entire cluster has %d %s of%s %d logical partition%s.",
-                            replicas,
-                            replicas > 1 ? "copies" : "copy",
-                                    partitionCount > 1 ? " each of the" : "",
-                                            partitionCount,
-                                            partitionCount > 1 ? "s" : ""));
+            int kFactor = deployment.getKfactor();
+            if (sphMap == null) {
+                logLines.put("deployment1",
+                        String.format("Cluster has %d hosts with leader hostname: \"%s\". [unknown] local sites count. K = %d.",
+                                hostCount, VoltDB.instance().getConfig().m_leader, kFactor));
+                logLines.put("deployment2", "Unable to retrieve partition information from the cluster.");
+            } else {
+                int localSitesCount = sphMap.get(m_messenger.getHostId());
+                logLines.put("deployment1",
+                        String.format("Cluster has %d hosts with leader hostname: \"%s\". %d local sites count. K = %d.",
+                                hostCount, VoltDB.instance().getConfig().m_leader, localSitesCount, kFactor));
+
+                int totalSitesCount = 0;
+                for (Map.Entry<Integer, Integer> e : sphMap.entrySet()) {
+                    totalSitesCount += e.getValue();
+                }
+                int replicas = kFactor + 1;
+                int partitionCount = totalSitesCount / replicas;
+                logLines.put("deployment2",
+                        String.format("The entire cluster has %d %s of%s %d logical partition%s.",
+                                replicas,
+                                replicas > 1 ? "copies" : "copy",
+                                        partitionCount > 1 ? " each of the" : "",
+                                                partitionCount,
+                                                partitionCount > 1 ? "s" : ""));
+            }
         }
 
         // voltdb root
@@ -412,5 +414,9 @@ public class CatalogContext {
     public byte[] getCatalogHash()
     {
         return catalogHash;
+    }
+
+    public InMemoryJarfile getCatalogJar() {
+        return m_jarfile;
     }
 }

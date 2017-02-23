@@ -34,7 +34,7 @@ import org.voltdb.types.JoinType;
 import org.voltdb.types.PlanNodeType;
 import org.voltdb.types.SortDirectionType;
 
-public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
+public abstract class AbstractJoinPlanNode extends AbstractPlanNode implements IndexSortablePlanNode {
 
     public enum Members {
         SORT_DIRECTION,
@@ -54,6 +54,7 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
     protected AbstractExpression m_wherePredicate = null;
 
     protected NodeSchema m_outputSchemaPreInlineAgg = null;
+    private final IndexUseForOrderBy m_indexUse = new IndexUseForOrderBy();
 
     protected AbstractJoinPlanNode() {
         super();
@@ -286,13 +287,8 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
             m_sortDirection = SortDirectionType.INVALID;
             return;
         }
-        if (outerTable.getPlanNodeType() == PlanNodeType.INDEXSCAN) {
-            m_sortDirection = ((IndexScanPlanNode)outerTable).getSortDirection();
-            return;
-        }
-        if (outerTable instanceof AbstractJoinPlanNode) {
-            ((AbstractJoinPlanNode)outerTable).resolveSortDirection();
-            m_sortDirection = ((AbstractJoinPlanNode)outerTable).getSortDirection();
+        if (outerTable instanceof IndexSortablePlanNode) {
+            m_sortDirection = ((IndexSortablePlanNode)outerTable).indexUse().getSortOrderFromIndexScan();
         }
     }
 
@@ -462,4 +458,15 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
     public void adjustDifferentiatorField(TupleValueExpression tve) {
         tve.setDifferentiator(tve.getColumnIndex());
     }
+
+    @Override
+    public IndexUseForOrderBy indexUse() {
+        return m_indexUse;
+    }
+
+    @Override
+    public AbstractPlanNode planNode() {
+        return this;
+    }
+
 }
