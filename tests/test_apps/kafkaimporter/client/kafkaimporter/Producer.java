@@ -56,7 +56,6 @@ public class Producer extends Thread {
     long m_cycles;
     long m_rangemin;
     long m_rangemax;
-    int m_threadfortopic;
     String m_compression;
     boolean m_producerrunning = false;
     JSONObject m_json_obj;
@@ -64,7 +63,7 @@ public class Producer extends Thread {
     // Validated CLI config
     KafkaProducerConfig config;
 
-    public Producer(KafkaProducerConfig config, int topicnum, int rowsforthisthread, int threadfortopic) {
+    public Producer(KafkaProducerConfig config, int topicnum) {
         // TODO: add topic check/create, with appropriate replication & partitioning
         // Meanwhile topic creation is done in kafkautils.py from the runapp.py
         // or if auto-create is enabled in the Kafka cluster properties
@@ -73,7 +72,6 @@ public class Producer extends Thread {
         m_servers = config.brokers;
         m_rate = config.producerrate;
         m_cycletime = config.cycletime;
-        m_threadfortopic = threadfortopic;
         // if (topicnum % 2 == 0)      // alternate compression strategies, if any
         //     m_compression = config.compression;
         // else
@@ -84,14 +82,11 @@ public class Producer extends Thread {
             m_compression = config.compression;
         log.info("Topic " + topicnum + " compression: " + m_compression);
         m_pausetime = (int) (config.pausetime * Math.random()); // let each thread have its own wait time between 0 and pausetime
-        m_rows = rowsforthisthread;
-        // m_rows = config.totalrows;
+        m_rows = config.totalrows;
         long possiblecycles = m_rows / (m_rate * m_cycletime);
         m_cycles = (possiblecycles > config.cycles) ? possiblecycles : config.cycles;
 
-        // offset the start so keys don't overlap and cause constraint violations
-        // -- though only an issue if one Volt table consumes multiple topics
-        m_rangemin = m_rows * topicnum * (m_threadfortopic + 1);
+        m_rangemin = m_rows * topicnum; // offset the start so keys don't overlap and cause constraint violations
 
         // create distinct topic name <m_topic><topicnum>
         m_topic = m_topic + topicnum;
@@ -102,12 +97,11 @@ public class Producer extends Thread {
         props.put(ProducerConfig.COMPRESSION_TYPE_CONFIG, m_compression); // compression.type
         props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
         props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
-        props.put(ProducerConfig.ACKS_CONFIG, "0");
+        props.put(ProducerConfig.ACKS_CONFIG, "all");
 
         m_producer = new KafkaProducer<String,String>(props);
         log.info("Instantiate Producer: " + m_topic + ", " + m_servers + ", " +
-                m_rate + ", " + m_cycletime + ", " + m_threadfortopic + ", " + m_rows);
-        log.info("rangemin: " + m_rangemin);
+                m_rate + ", " + m_cycletime + ", " + m_pausetime + ", " + m_rows);
     }
 
     @Override
@@ -184,12 +178,6 @@ public class Producer extends Thread {
         @Option(desc = "Compression codec: none, gzip, snappy, lz4 or all to cycle through choices.")
         String compression = "all";
 
-        @Option(desc = "Threads per topic (default: 10).")
-        int  threadspertopic = 10;
-
-        @Option(desc = "Statistics file name")
-        String  statsfile = "";
-
         @Override
         public void validate() {
             if (ntopics == 0) ntopics = 1;
@@ -200,7 +188,6 @@ public class Producer extends Thread {
             if (pausetime <= 0) exitWithMessageAndUsage("Pause time must be > 0");
             if (totalrows <= 0) exitWithMessageAndUsage("Total rows must be > 0");
             if (cycles <= 0) exitWithMessageAndUsage("Cycle count must be > 0");
-            if (ntopics < 5) threadspertopic = 50;
             if (! compression_types.contains(compression) && !compression.equals("all"))
                 exitWithMessageAndUsage("Compression value unknown");
         }
@@ -213,11 +200,9 @@ public class Producer extends Thread {
 
         List<Producer>  producers = new ArrayList<Producer>();
         for (int topic = 0; topic < config.ntopics; topic++) {
-            for (int t = 0; t < config.threadspertopic; t++) {
-                Producer producer = new Producer(config, topic, config.totalrows/config.threadspertopic, t);
-                producer.start();
-                producers.add(producer);
-            }
+            Producer producer = new Producer(config, topic);
+            producer.start();
+            producers.add(producer);
         }
         try {
             int t = 0;

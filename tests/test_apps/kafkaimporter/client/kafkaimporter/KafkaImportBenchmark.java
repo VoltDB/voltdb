@@ -45,18 +45,13 @@ package client.kafkaimporter;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.concurrent.atomic.AtomicLong;
-import java.time.Instant;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.CLIConfig;
@@ -230,37 +225,21 @@ public class KafkaImportBenchmark {
      * periodically during a benchmark.
      */
     public synchronized static void printStatistics() {
-        // Write stats to file if requested
         try {
-            if ((config.statsfile != null) && (config.statsfile.length() != 0)) {
-                log.info("Stats file: " + config.statsfile);
-                FileWriter fw = new FileWriter(config.statsfile);
+            ClientStats stats = periodicStatsContext.fetchAndResetBaseline().getStats();
+            long thrup;
 
-                // stats: row count, latest time, earliest time
-                long[] stats  = MatchChecks.getStats(client);
-                log.info("rows: " + stats[0] + ". End timestamp: " + stats[1] + ". Start timestamp: " + stats[2]);
-                // Date date = new Date(stats[2]);
-                //    LocalDateTime.ofInstant(Instant.ofEpochMilli(stats[2]*1000), ZoneId.systemDefault());
-                double tps = (double)stats[0] / ((double)stats[1] - (double)stats[2]);
-                log.info("TPS: " + tps);
-                log.info("Stats string: " + String.format("%d,%d,%d,%d,%d,%d,%d,0,0,0,0,0,0\n",
-                    stats[2], config.duration, 0, 0, 0, 0, (long)tps));
-                fw.append(String.format("%d,%d,%d,%d,%d,%d,%d,0,0,0,0,0,0\n",
-                            stats[2],
-                            (stats[1]-stats[2])*1000,
-                            stats[0],
-                            0,
-                            0,
-                            0,
-                            0
-                            ));
-                fw.close();
-            }
-        } catch (IOException e) {
-            System.err.println("Error writing stats file");
-            e.printStackTrace();
+            thrup = stats.getTxnThroughput();
+            long rows = MatchChecks.getExportRowCount(client);
+            if (rows == VoltType.NULL_BIGINT)
+                rows = 0;
+            log.info("Importer stats: " + MatchChecks.getImportStats(client));
+            log.info(String.format("Export Throughput %d/s, Total Rows %d, Aborts/Failures %d/%d, Avg/95%% Latency %.2f/%.2fms",
+                    thrup, rows, stats.getInvocationAborts(), stats.getInvocationErrors(),
+                    stats.getAverageLatency(), stats.kPercentileLatencyAsDouble(0.95)));
+        } catch (Exception ex) {
+            log.error("Exception in printStatistics", ex);
         }
-
     }
 
     protected static void scheduleCheckTimer() {
@@ -370,7 +349,6 @@ public class KafkaImportBenchmark {
         try {
             Thread.sleep(1 * 1000 * 60);  // wait for 1 minute
         } catch (InterruptedException e) {
-            // TODO Auto-generated catch block
             e.printStackTrace();
         }
         try {
@@ -385,7 +363,36 @@ public class KafkaImportBenchmark {
     }
 
     public static void endTest(boolean testResult) {
-        printStatistics();
+        // Write stats to file if requested
+        try {
+            if ((config.statsfile != null) && (config.statsfile.length() != 0)) {
+                log.info("Stats file: " + config.statsfile);
+                FileWriter fw = new FileWriter(config.statsfile);
+
+                // stats: row count, latest time, earliest time
+                long[] stats  = MatchChecks.getStats(client);
+                log.info("rows: " + stats[0] + ". End timestamp: " + stats[1] + ". Start timestamp: " + stats[2]);
+                // Date date = new Date(stats[2]);
+                //    LocalDateTime.ofInstant(Instant.ofEpochMilli(stats[2]*1000), ZoneId.systemDefault());
+                double tps = stats[0] / ((double)stats[1] - (double)stats[2]);
+                log.info("TPS: " + tps);
+                log.info("Stats string: " + String.format("%d,%d,%d,%d,%d,%d,%d,0,0,0,0,0,0\n",
+                    stats[2], config.duration, 0, 0, 0, 0, (long)tps));
+                fw.append(String.format("%d,%d,%d,%d,%d,%d,%d,0,0,0,0,0,0\n",
+                            stats[2],
+                            (stats[1]-stats[2])*1000,
+                            stats[0],
+                            0,
+                            0,
+                            0,
+                            0
+                            ));
+                fw.close();
+            }
+        } catch (IOException e) {
+            System.err.println("Error writing stats file");
+            e.printStackTrace();
+        }
 
         try {
             client.drain();

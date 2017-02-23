@@ -108,13 +108,13 @@ public class MatchChecks {
     protected static long[] getStats(Client client) {
         // check the start time, end time, and row count to calculate TPS
         long[] stats = new long[3];
-        ClientResponse response = doAdHoc(client, 
+        ClientResponse response = doAdHoc(client,
                 "select count(*), since_epoch(Second, max(insert_time)), since_epoch(Second, min(insert_time)) from KAFKAIMPORTTABLE1;");
         VoltTable countQueryResult = response.getResults()[0];
         countQueryResult.advanceRow();
-        stats[0]  = (long) countQueryResult.get(0, VoltType.BIGINT);
-        stats[1]  = (long) countQueryResult.get(1, VoltType.BIGINT);
-        stats[2]  = (long) countQueryResult.get(2, VoltType.BIGINT);
+        stats[0] = (long) countQueryResult.get(0, VoltType.BIGINT);
+        stats[1] = (long) countQueryResult.get(1, VoltType.BIGINT);
+        stats[2] = (long) countQueryResult.get(2, VoltType.BIGINT);
         // double tps = (double) importRowCount / (double) elapsedMicroSecs;
         return stats;
     }
