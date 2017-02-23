@@ -637,7 +637,7 @@ public class VoltDB {
                     try {
                         m_getOption = GetActionArgument.valueOf(GetActionArgument.class, argument.trim().toUpperCase());
                     } catch (IllegalArgumentException excp) {
-                        System.err.println("FATAL:" + argument + " is not a valid \"get\" command argument. Please provide a valid argument: " + GetActionArgument.supportedVerbs());
+                        System.err.println("FATAL:" + argument + " is not a valid \"get\" command argument. Valid arguments for get command are: " + GetActionArgument.supportedVerbs());
                         referToDocAndExit();
                     }
                     m_getOutput = m_getOption.getDefaultOutput();
@@ -734,8 +734,7 @@ public class VoltDB {
                     m_pathToDeployment = depFH.getAbsolutePath();
                     return;
                 }
-                case SCHEMA:
-                case CLASSES: {
+                case SCHEMA: {
                     File catalogFH = new VoltFile(configInfoDir, "catalog.jar");
                     if (!catalogFH.exists()) {
                         System.out.println("FATAL: Catalog jar file \"" + catalogFH.getAbsolutePath() + "\" not found. "

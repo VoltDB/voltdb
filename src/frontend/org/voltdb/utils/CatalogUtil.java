@@ -58,10 +58,19 @@ import javax.xml.namespace.QName;
 import javax.xml.validation.Schema;
 import javax.xml.validation.SchemaFactory;
 
+import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
+import org.apache.zookeeper_voltpatches.CreateMode;
+import org.apache.zookeeper_voltpatches.KeeperException;
+import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
+import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.json_voltpatches.JSONException;
+import org.mindrot.BCrypt;
+import org.xml.sax.SAXException;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
-
 import org.voltdb.HealthMonitor;
 import org.voltdb.SystemProcedureCatalog;
 import org.voltdb.VoltDB;
@@ -131,17 +140,6 @@ import org.voltdb.settings.DbSettings;
 import org.voltdb.settings.NodeSettings;
 import org.voltdb.snmp.DummySnmpTrapSender;
 import org.voltdb.types.ConstraintType;
-
-import org.apache.commons.lang3.ArrayUtils;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
-import org.apache.zookeeper_voltpatches.CreateMode;
-import org.apache.zookeeper_voltpatches.KeeperException;
-import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
-import org.apache.zookeeper_voltpatches.ZooKeeper;
-import org.json_voltpatches.JSONException;
-import org.mindrot.BCrypt;
-import org.xml.sax.SAXException;
 
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -302,12 +300,12 @@ public abstract class CatalogUtil {
     public static String getAutoGenDDLFromJar(InMemoryJarfile jarfile)
             throws IOException
     {
-        // Read the raw build info bytes.
+        // Read the raw auto generated ddl bytes.
         byte[] ddlBytes = jarfile.get(VoltCompiler.AUTOGEN_DDL_FILE_NAME);
         if (ddlBytes == null) {
             throw new IOException("Auto generated schema DDL not found - please make sure the database is initialized with valid schema.");
         }
-        String ddl = new String(ddlBytes, Constants.UTF8ENCODING);
+        String ddl = new String(ddlBytes, StandardCharsets.UTF_8);
         return ddl.trim();
     }
 

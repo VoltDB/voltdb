@@ -17,36 +17,19 @@
 
 package org.voltdb;
 
+import java.util.Arrays;
+
 public enum GetActionArgument {
 
-    DEPLOYMENT() {
-        @Override
-        public String getDefaultOutput() {
-            return "deployment.xml";
-        }
-    },
-    SCHEMA() {
-        @Override
-        public String getDefaultOutput() {
-            return "schema.sql";
-        }
-    },
-    CLASSES() {
-        @Override
-        public String getDefaultOutput() {
-            return "procedures.jar";
-        }
-    };
+    DEPLOYMENT("deployment.xml"),
+    SCHEMA("schema.sql");
 
-    public String getDefaultOutput() { return ""; }
+    final String m_defaultOutput;
+    public String getDefaultOutput() { return m_defaultOutput; }
 
-    GetActionArgument() { }
+    GetActionArgument(String value) { m_defaultOutput = value; }
 
     public static String supportedVerbs() {
-        StringBuilder verbNames = new StringBuilder();
-        for (GetActionArgument verb: GetActionArgument.values()) {
-            verbNames.append(verb.name().toLowerCase() + " ");
-        }
-        return verbNames.toString();
+        return Arrays.asList(values()).toString().replaceAll("^.|.$", "");
     }
 }

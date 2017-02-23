@@ -24,31 +24,29 @@
 package org.voltdb.regressionsuites;
 
 
-import static junit.framework.Assert.assertEquals;
-import static junit.framework.Assert.assertNotNull;
-import static junit.framework.Assert.assertTrue;
-
 import java.io.File;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 
+import static junit.framework.TestCase.assertEquals;
+import static junit.framework.TestCase.assertNotNull;
 import org.voltdb.BackendTarget;
-import org.voltdb.ServerThread;
-import org.voltdb.VoltDB;
-import org.voltdb.VoltDB.Configuration;
-import org.voltdb.VoltDB.SimulatedExitException;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
-import org.voltdb.client.ClientFactory;
-import org.voltdb.common.Constants;
-import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.compiler.deploymentfile.DeploymentType;
-import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.MiscUtils;
 
+import static junit.framework.TestCase.assertTrue;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import org.voltdb.ServerThread;
+import org.voltdb.VoltDB;
+import org.voltdb.VoltDB.Configuration;
+import org.voltdb.client.ClientFactory;
+import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.deploymentfile.DeploymentType;
+import org.voltdb.utils.CatalogUtil;
 import org.voltdb_testprocs.regressionsuites.failureprocs.CrashJVM;
 import org.voltdb_testprocs.regressionsuites.failureprocs.CrashVoltDBProc;
 
@@ -136,7 +134,7 @@ public class TestInitStartLocalClusterAllOutOfProcess extends JUnit4LocalCluster
 
         try {
             server.cli();
-        } catch (SimulatedExitException ex) {
+        } catch (Throwable ex) {
             //Good
         }
 
@@ -156,14 +154,14 @@ public class TestInitStartLocalClusterAllOutOfProcess extends JUnit4LocalCluster
 
         try {
             server.cli();
-        } catch (SimulatedExitException ex) {
+        } catch (Throwable ex) {
             //Good
         }
 
         byte[] encoded = Files.readAllBytes(Paths.get(schema.getAbsolutePath()));
         assertNotNull(encoded);
         assertTrue(encoded.length > 0);
-        String ddl = new String(encoded, Constants.UTF8ENCODING);
+        String ddl = new String(encoded, StandardCharsets.UTF_8);
         assertTrue(ddl.toLowerCase().contains("create table blah ("));
         assertTrue(ddl.toLowerCase().contains("ival bigint default '0' not null"));
         assertTrue(ddl.toLowerCase().contains("primary key (ival)"));

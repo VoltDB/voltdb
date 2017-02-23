@@ -67,6 +67,22 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.aeonbits.owner.ConfigFactory;
+import org.apache.cassandra_voltpatches.GCInspector;
+import org.apache.log4j.Appender;
+import org.apache.log4j.DailyRollingFileAppender;
+import org.apache.log4j.FileAppender;
+import org.apache.log4j.Logger;
+import org.apache.zookeeper_voltpatches.CreateMode;
+import org.apache.zookeeper_voltpatches.KeeperException;
+import org.apache.zookeeper_voltpatches.WatchedEvent;
+import org.apache.zookeeper_voltpatches.Watcher;
+import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
+import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.apache.zookeeper_voltpatches.data.Stat;
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
+import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
@@ -80,7 +96,6 @@ import org.voltcore.utils.VersionChecker;
 import org.voltcore.zk.CoreZK;
 import org.voltcore.zk.ZKCountdownLatch;
 import org.voltcore.zk.ZKUtil;
-
 import org.voltdb.ProducerDRGateway.MeshMemberInfo;
 import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.VoltDB.Configuration;
@@ -153,23 +168,6 @@ import org.voltdb.utils.SystemStatsCollector;
 import org.voltdb.utils.TopologyZKUtils;
 import org.voltdb.utils.VoltFile;
 import org.voltdb.utils.VoltSampler;
-
-import org.aeonbits.owner.ConfigFactory;
-import org.apache.cassandra_voltpatches.GCInspector;
-import org.apache.log4j.Appender;
-import org.apache.log4j.DailyRollingFileAppender;
-import org.apache.log4j.FileAppender;
-import org.apache.log4j.Logger;
-import org.apache.zookeeper_voltpatches.CreateMode;
-import org.apache.zookeeper_voltpatches.KeeperException;
-import org.apache.zookeeper_voltpatches.WatchedEvent;
-import org.apache.zookeeper_voltpatches.Watcher;
-import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
-import org.apache.zookeeper_voltpatches.ZooKeeper;
-import org.apache.zookeeper_voltpatches.data.Stat;
-import org.json_voltpatches.JSONException;
-import org.json_voltpatches.JSONObject;
-import org.json_voltpatches.JSONStringer;
 
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.base.Joiner;
@@ -656,10 +654,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
     }
 
-    void outputProcedure(Configuration config) {
-    }
-
-
     @Override
     public void cli(Configuration config) {
         if (config.m_startAction != StartAction.GET) {
@@ -686,9 +680,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 break;
             case SCHEMA:
                 outputSchema(config);
-                break;
-            case CLASSES:
-                outputProcedure(config);
                 break;
         }
         VoltDB.exit(0);
