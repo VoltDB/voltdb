@@ -336,7 +336,7 @@ public class ChannelDistributer implements ChannelChangeCallback {
     /**
      * Register channels for the given importer. If they match to what is already registered
      * then nothing is done. Before registering channels, you need to register a callback
-     * handler for channel assignments {@link #registerCallback(String, Object)}
+     * handler for channel assignments {@link #registerCallback(String, ChannelChangeCallback)}
      *
      * @param importer importer designation
      * @param uris list of channel URIs
