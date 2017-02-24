@@ -622,7 +622,8 @@ public class VoltDB {
                         m_voltdbRoot = new VoltFile(m_voltdbRoot, DBROOT);
                     }
                     if (!m_voltdbRoot.exists()) {
-                        System.err.println("FATAL: Database directory \"" + m_voltdbRoot.getPath() + "\" does not exists");
+                        System.err.println("FATAL: " + m_voltdbRoot.getParentFile().getAbsolutePath() + " does not contain a "
+                                + "valid database root directory. Use the --dir option to specify the path to the root.");
                         referToDocAndExit();
                     }
                 } else if (arg.equalsIgnoreCase("get")) {
@@ -723,13 +724,23 @@ public class VoltDB {
         }
 
         private void inspectGetCommand() {
+            String parentPath = ".";
+            // check voltdbroot
+            if (!m_voltdbRoot.exists()) {
+                try {
+                    parentPath = m_voltdbRoot.getCanonicalFile().getParent();
+                } catch (IOException io) {}
+                System.err.println("FATAL: " + parentPath + " does not contain a "
+                        + "valid database root directory. Use the --dir option to specify the path to the root.");
+                referToDocAndExit();
+            }
             File configInfoDir = new VoltFile(m_voltdbRoot, Constants.CONFIG_DIR);
             switch (m_getOption) {
                 case DEPLOYMENT: {
                     File depFH = new VoltFile(configInfoDir, "deployment.xml");
                     if (!depFH.exists()) {
                         System.out.println("FATAL: Deployment file \"" + depFH.getAbsolutePath() + "\" not found.");
-                        exit(-1);
+                        referToDocAndExit();
                     }
                     m_pathToDeployment = depFH.getAbsolutePath();
                     return;
@@ -737,9 +748,12 @@ public class VoltDB {
                 case SCHEMA: {
                     File catalogFH = new VoltFile(configInfoDir, "catalog.jar");
                     if (!catalogFH.exists()) {
-                        System.out.println("FATAL: Catalog jar file \"" + catalogFH.getAbsolutePath() + "\" not found. "
-                                + "Please make sure the database path points to an initialized database");
-                        exit(-1);
+                        try {
+                            parentPath = m_voltdbRoot.getCanonicalFile().getParent();
+                        } catch (IOException io) {}
+                        System.out.println("FATAL: Schema not found in the provided database directory " + parentPath  +
+                                ". Make sure the database has been started ");
+                        referToDocAndExit();
                     }
                     m_pathToCatalog = catalogFH.getAbsolutePath();
                     return;

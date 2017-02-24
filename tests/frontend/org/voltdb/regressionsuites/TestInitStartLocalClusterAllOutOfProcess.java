@@ -65,7 +65,7 @@ public class TestInitStartLocalClusterAllOutOfProcess extends JUnit4LocalCluster
     String listener;
     Client client;
     String voltDbRootPath;
-    String voltDBRootParent;
+    String voltDBRootParentPath;
 
     @Before
     public void setUp() throws Exception {
@@ -93,7 +93,7 @@ public class TestInitStartLocalClusterAllOutOfProcess extends JUnit4LocalCluster
             voltDbRoot = new File(voltDbFilePrefix, builder.getPathToVoltRoot().getPath());
         }
         voltDbRootPath = voltDbRoot.getCanonicalPath();
-        voltDBRootParent = voltDbRoot.getParent();
+        voltDBRootParentPath = voltDbRoot.getParentFile().getCanonicalPath();
         listener = cluster.getListenerAddresses().get(0);
         client = ClientFactory.createClient();
         client.createConnection(listener);
@@ -123,12 +123,18 @@ public class TestInitStartLocalClusterAllOutOfProcess extends JUnit4LocalCluster
     }
 
     @Test
+    // Test get deployment
     public void testGetDeployment() throws Exception {
+        // get command is not supported in legacy cli as voltdbroot
+        // under the parent can't be determined deterministically
+        // using voltdbroot as the root of database directory
+        if (!cluster.isNewCli()) return;
+
         File deployment = File.createTempFile("get_deployment", ".xm");
         if (deployment.exists()) deployment.delete();
 
         Configuration c1 = new VoltDB.Configuration(new String[]{"get", "deployment",
-            "getvoltdbroot", voltDBRootParent,
+            "getvoltdbroot", voltDBRootParentPath,
             "file", deployment.getAbsolutePath() + "l"});
         ServerThread server = new ServerThread(c1);
 
@@ -144,11 +150,17 @@ public class TestInitStartLocalClusterAllOutOfProcess extends JUnit4LocalCluster
     }
 
     @Test
+    // Test get schema
     public void testGetSchema() throws Exception {
+        // get command is not supported in legacy cli as voltdbroot
+        // under the parent can't be determined deterministically
+        // using voltdbroot as the root of database directory
+        if (!cluster.isNewCli()) return;
+
         File schema = File.createTempFile("schema", ".sql");
 
         Configuration c1 = new VoltDB.Configuration(new String[]{"get", "schema",
-            "getvoltdbroot", voltDBRootParent,
+            "getvoltdbroot", voltDBRootParentPath,
             "file", schema.getAbsolutePath(), "forceget"});
         ServerThread server = new ServerThread(c1);
 
