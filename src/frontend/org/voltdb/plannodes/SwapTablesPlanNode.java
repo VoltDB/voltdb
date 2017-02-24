@@ -23,6 +23,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map.Entry;
+import java.util.stream.Collectors;
 
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -47,11 +48,44 @@ public class SwapTablesPlanNode extends AbstractOperationPlanNode {
         static final String OTHER_INDEXES = "OTHER_INDEXES";
     }
 
-    private static final String TRUE_FB_SEPARATOR = "\n";
-
     private String m_otherTargetTableName;
     private List<String> m_theIndexes = new ArrayList<>();
     private List<String> m_otherIndexes = new ArrayList<>();
+
+    private static class FailureMessage {
+        private final List<String> m_failureReasons = new ArrayList<>();
+        private final String m_theTable;
+        private final String m_otherTable;
+
+        public FailureMessage(String theTable, String otherTable) {
+            m_theTable = theTable;
+            m_otherTable = otherTable;
+        }
+
+        public int numFailures() {
+            return m_failureReasons.size();
+        }
+
+        public void addReason(String reason) {
+            m_failureReasons.add(reason);
+        }
+
+        public String getMessage() {
+            if (numFailures() == 0) {
+                return "";
+            }
+
+            StringBuffer sb = new StringBuffer();
+
+            sb.append("Swapping tables " + m_theTable + " and " + m_otherTable + " failed for the following reason(s):");
+
+            for (String reason : m_failureReasons) {
+                sb.append("\n  - " + reason);
+            }
+
+            return sb.toString();
+        }
+    }
 
     public SwapTablesPlanNode() {
         super();
@@ -111,7 +145,7 @@ public class SwapTablesPlanNode extends AbstractOperationPlanNode {
      * execution.
      * @param theTable the catalog definition of the 1st table swap argument
      * @param otherTable the catalog definition of the 2nd table swap argument
-     * @throws PlnnerErrorException if one or more compatibility validations fail
+     * @throws PlannerErrorException if one or more compatibility validations fail
      */
     public void initializeSwapTablesPlanNode(Table theTable, Table otherTable) {
         String theName = theTable.getTypeName();
@@ -119,15 +153,10 @@ public class SwapTablesPlanNode extends AbstractOperationPlanNode {
         String otherName = otherTable.getTypeName();
         m_otherTargetTableName = otherName;
 
-        StringBuilder feedback = new StringBuilder();
-        // This only gets replaced with a true separator, TRUE_FB_SEPARATOR,
-        // after the first line of feedback has been appended.
-        String fbSeparator = "";
+        FailureMessage failureMessage = new FailureMessage(theName, otherName);
 
-        fbSeparator = validateTableCompatibility(theName, otherName,
-                theTable, otherTable, feedback, fbSeparator);
-        fbSeparator = validateColumnCompatibility(theName, otherName,
-                theTable, otherTable, feedback, fbSeparator);
+        validateTableCompatibility(theName, otherName, theTable, otherTable, failureMessage);
+        validateColumnCompatibility(theName, otherName, theTable, otherTable, failureMessage);
 
         // Maintain sets of indexes and index-supported (UNIQUE) constraints
         // and the primary key index found on otherTable.
@@ -197,21 +226,12 @@ public class SwapTablesPlanNode extends AbstractOperationPlanNode {
                 m_otherIndexes.add(otherPrimaryKeyIndex.getTypeName());
             }
             else {
-                feedback.append(fbSeparator)
-                .append("Swapping with table ").append(otherName)
-                .append(" with ").append(theName)
-                .append(" requires that primary key constraints match on both tables.");
-                fbSeparator = TRUE_FB_SEPARATOR;
+                failureMessage.addReason("PRIMARY KEY constraints do not match on both tables");
             }
         }
         else if ((thePrimaryKeyIndex != null && otherPrimaryKeyIndex == null)
                 || (thePrimaryKeyIndex == null && otherPrimaryKeyIndex != null)) {
-            feedback.append(fbSeparator)
-            .append("Swapping table ").append(theName)
-            .append(" with table ").append(otherName)
-            .append(" requires that they have the same primary key")
-            .append(" or that neither have one.");
-            fbSeparator = TRUE_FB_SEPARATOR;
+            failureMessage.addReason("one table has a PRIMARY KEY constraint and the other does not");
         }
 
         // Try to cross-reference each user-defined index on the two tables.
@@ -239,46 +259,27 @@ public class SwapTablesPlanNode extends AbstractOperationPlanNode {
             // convention for the most helpful error message.
             // Otherwise, give a more generic error message.
             String theIndexName = theIndex.getTypeName();
+            String message = "the index " + theIndexName + " on table " + theName
+                    + " has no corresponding index in the other table";
             String otherIndexName = theIndexName.replace(theName, otherName);
             Index otherIndex = candidateIndexes.getIgnoreCase(otherIndexName);
-            if (otherIndex == null) {
-                feedback.append(fbSeparator)
-                .append("Swapping requires the table ").append(otherName)
-                .append(" to define an index ").append(otherIndexName)
-                .append(" corresponding to the index ").append(theIndexName)
-                .append(" on table ").append(theName);
-                fbSeparator = TRUE_FB_SEPARATOR;
+            if (otherIndex != null) {
+                message += "; the closest candidate ("
+                        + otherIndexName + ") has mismatches in the following attributes: "
+                        + String.join(", ", diagnoseIndexMismatch(theIndex, otherIndex));
             }
-            else {
-                feedback.append(fbSeparator)
-                .append("Swapping requires the table ").append(otherName)
-                .append(" to define an index corresponding to the index ").append(theIndexName)
-                .append(" on table ").append(theName)
-                .append(", but the closest candidate index (" + otherIndexName + ")")
-                .append(" has mismatches in the following attributes: ");
-                diagnoseIndexMismatch(theIndex, otherIndex, feedback);
-                fbSeparator = TRUE_FB_SEPARATOR;
-                otherIndexSet.remove(otherIndex);
-            }
+            failureMessage.addReason(message);
         }
 
         // At this point, all of theTable's indexes are matched.
         // All of otherTable's indexes should also have been
         // matched along the way.
         if ( ! otherIndexSet.isEmpty()) {
-            feedback.append(fbSeparator)
-            .append("Swapping with table ").append(otherName)
-            .append(" requires that the table ").append(theName)
-            .append("    define indexes corresponding to ")
-            .append(" all of those defined on table ").append(otherName)
-            .append(" including those with the following index names: (");
-            String separator = "";
-            for (Index remainder : otherIndexSet) {
-                feedback.append(separator).append(remainder.getTypeName());
-                separator = ", ";
-            }
-            feedback.append(")");
-            fbSeparator = TRUE_FB_SEPARATOR;
+            List<String> indexNames = otherIndexSet.stream().map(idx -> idx.getTypeName())
+                    .collect(Collectors.toList());
+            failureMessage.addReason("the table " + otherName + " contains these index(es) "
+                    + "which have no corresponding indexes on " + theName + ": "
+                    + "(" + String.join(", ", indexNames) + ")");
         }
 
         // Try to cross-reference each system-defined index supporting
@@ -312,51 +313,17 @@ public class SwapTablesPlanNode extends AbstractOperationPlanNode {
             }
 
             String theConstraintName = theConstraint.getTypeName();
-            String otherConstraintName = theConstraintName.replace(theName, otherName);
-            Constraint otherConstraint =
-                    candidateConstraints.getIgnoreCase(otherConstraintName);
-            if (otherConstraint == null) {
-                feedback.append(fbSeparator)
-                .append("Swapping table ").append(theName)
-                .append(" with table ").append(otherName)
-                .append(" requires that constraint ")
-                .append(theConstraintName)
-                .append(" match an equivalent constraint on table ")
-                .append(otherName);
-                fbSeparator = TRUE_FB_SEPARATOR;
-            }
-            else {
-                // A named constraint on theTable followed the same naming
-                // convention as one on otherTable but had a dissimilar definition.
-                feedback.append(fbSeparator)
-                .append("Swapping table ").append(theName)
-                .append(" with table ").append(otherName)
-                .append(" requires that constraints named ")
-                .append(theConstraintName).append(" and ")
-                .append(otherConstraint.getTypeName())
-                .append(" have the same definition:\n");
-                fbSeparator = TRUE_FB_SEPARATOR;
-
-                Index otherIndex = theConstraint.getIndex();
-                if (otherIndex != null) {
-                    diagnoseIndexMismatch(theIndex, otherIndex, feedback);
-                    fbSeparator = TRUE_FB_SEPARATOR;
-                    otherConstraintIndexMap.remove(otherIndex);
-                }
-            }
+            failureMessage.addReason("the constraint " + theConstraintName + " on table " + theName + " "
+                    + "has no corresponding constraint on the other table");
         }
 
         // At this point, all of theTable's index-based constraints are matched.
         // All of otherTable's index-based constraints should also have been
         // matched along the way.
         if ( ! otherConstraintIndexMap.isEmpty()) {
-            feedback.append(fbSeparator)
-            .append("Swapping with table ").append(otherName)
-            .append(" requires that the table ").append(theName)
-            .append("\" define constraints corresponding to ")
-            .append(" all of those defined on table ").append(otherName)
-            .append("including those with the following constraint or")
-            .append(" system internal index names: (");
+            StringBuilder sb = new StringBuilder();
+            sb.append("these constraints (or system internal index names) on table " + otherName + " "
+                    + "have no corresponding constraints on the other table: (");
             String separator = "";
             for (Entry<Index, String> remainder : otherConstraintIndexMap.entrySet()) {
                 String constraintName = remainder.getValue();
@@ -365,33 +332,37 @@ public class SwapTablesPlanNode extends AbstractOperationPlanNode {
                                 constraintName :
                                     ("<anonymous with system internal index name: " +
                                             remainder.getKey().getTypeName() + ">");
-                feedback.append(separator).append(description);
+                sb.append(separator).append(description);
                 separator = ", ";
             }
-            feedback.append(")");
-            fbSeparator = TRUE_FB_SEPARATOR;
+            sb.append(")");
+            failureMessage.addReason(sb.toString());
         }
 
 
-        if (feedback.length() > 0) {
-            throw new PlanningErrorException(feedback.toString());
+        if (failureMessage.numFailures() > 0) {
+            throw new PlanningErrorException(failureMessage.getMessage());
         }
     }
 
-    private void diagnoseIndexMismatch(Index theIndex, Index otherIndex,
-            StringBuilder feedback) {
-        String diffSeparator = "";
+    /**
+     * Give two strings, return a list of attributes that do not match
+     * @param theIndex
+     * @param otherIndex
+     * @return list of attributes that do not match
+     */
+    private List<String> diagnoseIndexMismatch(Index theIndex, Index otherIndex) {
+        List<String> mismatchedAttrs = new ArrayList<>();
+
         // Pairs of matching indexes must agree on type (int hash, etc.).
         if (theIndex.getType() != otherIndex.getType()) {
-            feedback.append(diffSeparator).append("index type");
-            diffSeparator = ", ";
+            mismatchedAttrs.add("index type (hash vs tree)");
         }
 
         // Pairs of matching indexes must agree whether they are (assume)unique.
         if (theIndex.getUnique() != otherIndex.getUnique() ||
                 theIndex.getAssumeunique() != otherIndex.getAssumeunique()) {
-            feedback.append(diffSeparator).append("UNIQUE attribute");
-            diffSeparator = ", ";
+            mismatchedAttrs.add("UNIQUE attribute");
         }
 
         // Pairs of matching indexes must agree whether they are partial
@@ -400,13 +371,11 @@ public class SwapTablesPlanNode extends AbstractOperationPlanNode {
         String otherPredicateJSON = otherIndex.getPredicatejson();
         if (thePredicateJSON == null) {
             if (otherPredicateJSON != null) {
-                feedback.append(diffSeparator).append("predicate");
-                diffSeparator = ", ";
+                mismatchedAttrs.add("WHERE predicate");
             }
         }
         else if ( ! thePredicateJSON.equals(otherPredicateJSON)) {
-            feedback.append(diffSeparator).append("predicate");
-            diffSeparator = ", ";
+            mismatchedAttrs.add("WHERE predicate");
         }
 
         // Pairs of matching indexes must agree that they do or do not index
@@ -415,14 +384,13 @@ public class SwapTablesPlanNode extends AbstractOperationPlanNode {
         String otherExprsJSON = otherIndex.getExpressionsjson();
         if (theExprsJSON == null) {
             if (otherExprsJSON != null) {
-                feedback.append(diffSeparator).append("indexed expression");
-                return;
+                mismatchedAttrs.add("indexed expression");
             }
         }
         else if ( ! theExprsJSON.equals(otherExprsJSON)) {
-            feedback.append(diffSeparator).append("indexed expression");
-            return;
+            mismatchedAttrs.add("indexed expression");
         }
+
 
         // Indexes must agree on the columns they are based on,
         // identifiable by the columns' order in the table.
@@ -430,8 +398,7 @@ public class SwapTablesPlanNode extends AbstractOperationPlanNode {
         int theColumnCount = theColumns.size();
         CatalogMap<ColumnRef> otherColumns = otherIndex.getColumns();
         if (theColumnCount != otherColumns.size() ) {
-            feedback.append(diffSeparator).append("indexed expression");
-            return;
+            mismatchedAttrs.add("indexed expression");
         }
 
         Iterator<ColumnRef> theColumnIterator = theColumns.iterator();
@@ -440,10 +407,11 @@ public class SwapTablesPlanNode extends AbstractOperationPlanNode {
             int theColIndex = theColumnIterator.next().getColumn().getIndex();
             int otherColIndex = otherColumnIterator.next().getColumn().getIndex();
             if (theColIndex != otherColIndex) {
-                feedback.append(diffSeparator).append("indexed expression");
-                return;
+                mismatchedAttrs.add("indexed expression");
             }
         }
+
+        return mismatchedAttrs;
     }
 
     /**
@@ -525,90 +493,41 @@ public class SwapTablesPlanNode extends AbstractOperationPlanNode {
      *         it will be == TRUE_FB_SEPARATOR
      *         if the feedback buffer is not empty.
      */
-    private String validateTableCompatibility(String theName, String otherName,
-            Table theTable, Table otherTable,
-            StringBuilder feedback, String fbSeparator) {
-        if (theTable.getIsdred()) {
-            feedback.append(fbSeparator)
-            .append("Swapping table ").append(theName)
-            .append(" is not allowed because it is DR enabled.");
-            fbSeparator = TRUE_FB_SEPARATOR;
-        }
-
-        if (otherTable.getIsdred()) {
-            feedback.append(fbSeparator)
-            .append("Swapping with table ").append(otherName)
-            .append(" is not allowed because it is DR enabled.");
-            fbSeparator = TRUE_FB_SEPARATOR;
+    private void validateTableCompatibility(String theName, String otherName,
+            Table theTable, Table otherTable, FailureMessage failureMessage) {
+        if (theTable.getIsdred() || otherTable.getIsdred()) {
+            failureMessage.addReason("DR is enabled on one or both of the tables");
         }
 
         if (theTable.getIsreplicated() != otherTable.getIsreplicated()) {
-            feedback.append(fbSeparator)
-            .append("Swapping table ").append(theName)
-            .append(" with table ").append(otherName)
-            .append(" requires that both be partitioned or that both be replicated.");
-            fbSeparator = TRUE_FB_SEPARATOR;
+            failureMessage.addReason("one table is partitioned and the other is not");
         }
 
         if (theTable.getTuplelimit() != otherTable.getTuplelimit()) {
-            feedback.append(fbSeparator)
-            .append("Swapping table ").append(theName)
-            .append(" with table ").append(otherName)
-            .append(" requires that they define the same partition tuple limit.");
-            fbSeparator = TRUE_FB_SEPARATOR;
+            failureMessage.addReason("the tables differ in the LIMIT PARTITION ROWS constraint");
         }
 
-        if (theTable.getMaterializer() != null ||
-                ! theTable.getMvhandlerinfo().isEmpty()) {
-            feedback.append(fbSeparator)
-            .append("Swapping the view ").append(theName)
-            .append(" is not allowed.");
-            fbSeparator = TRUE_FB_SEPARATOR;
-        }
-
-        if (otherTable.getMaterializer() != null ||
-                ! otherTable.getMvhandlerinfo().isEmpty()) {
-            feedback.append(fbSeparator)
-            .append("Swapping with the view ").append(otherName)
-            .append(" is not allowed.");
-            fbSeparator = TRUE_FB_SEPARATOR;
+        if ((theTable.getMaterializer() != null ||
+                ! theTable.getMvhandlerinfo().isEmpty()) ||
+                (otherTable.getMaterializer() != null ||
+                ! otherTable.getMvhandlerinfo().isEmpty())) {
+            failureMessage.addReason("one or both of the tables is actually a view");
         }
 
         StringBuilder viewNames = new StringBuilder();
         if (viewsDependOn(theTable, viewNames)) {
-            feedback.append(fbSeparator)
-            .append("Swapping table ").append(theName)
-            .append(" is not allowed because it is referenced in views ")
-            .append(viewNames);
-            fbSeparator = TRUE_FB_SEPARATOR;
+            failureMessage.addReason(theName + " is referenced in views " + viewNames.toString());
         }
 
         viewNames.setLength(0);
         if (viewsDependOn(otherTable, viewNames)) {
-            feedback.append(fbSeparator)
-            .append("Swapping with table ").append(otherName)
-            .append(" is not allowed because it is referenced in views ")
-            .append(viewNames);
-            fbSeparator = TRUE_FB_SEPARATOR;
-
-            listViewNames(otherTable, feedback);
+            failureMessage.addReason(otherName + " is referenced in views " + viewNames.toString());
         }
 
-        if (theTable.getIsdred()) {
-            feedback.append(fbSeparator)
-            .append("Swapping table ").append(theName)
-            .append(" is not allowed because it is DR enabled");
-            fbSeparator = TRUE_FB_SEPARATOR;
+        if (theTable.getIsdred()
+            || otherTable.getIsdred()) {
+            failureMessage.addReason("one or both of the tables has DR enabled");
         }
-
-        if (otherTable.getIsdred()) {
-            feedback.append(fbSeparator)
-            .append("Swapping with table ").append(otherName)
-            .append(" is not allowed because it is DR enabled");
-            fbSeparator = TRUE_FB_SEPARATOR;
-        }
-
-        return fbSeparator;
     }
 
     /**
@@ -624,7 +543,7 @@ public class SwapTablesPlanNode extends AbstractOperationPlanNode {
         for (Table anyTable : ((Database) aTable.getParent()).getTables()) {
             for (MaterializedViewHandlerInfo anyView : anyTable.getMvhandlerinfo()) {
                 if (anyView.getSourcetables().getIgnoreCase(aTable.getTypeName()) != null) {
-                    viewNames.append(separator).append(anyView.getTypeName());
+                    viewNames.append(separator).append(anyView.getDesttable().getTypeName());
                     separator = ", ";
                 }
             }
@@ -649,136 +568,53 @@ public class SwapTablesPlanNode extends AbstractOperationPlanNode {
      *         it will be == TRUE_FB_SEPARATOR
      *         if the feedback buffer is not empty.
      */
-    private String validateColumnCompatibility(String theName, String otherName,
+    private void validateColumnCompatibility(String theName, String otherName,
                 Table theTable, Table otherTable,
-                StringBuilder feedback, String fbSeparator) {
+                FailureMessage failureMessage) {
         CatalogMap<Column> theColumns = theTable.getColumns();
         int theColCount = theColumns.size();
         CatalogMap<Column> otherColumns = otherTable.getColumns();
+
+        if (theColCount != otherColumns.size()) {
+            failureMessage.addReason("the tables have different numbers of columns");
+            return;
+        }
 
         Column[] theColArray = new Column[theColumns.size()];
         for (Column theColumn : theColumns) {
             theColArray[theColumn.getIndex()] = theColumn;
         }
 
-        // The "separator" appended before the description of each
-        // column mismatch starts off as more of a general preamble...
-        String colSeparator = fbSeparator +
-                "Swapping table " + theName +
-                " with table " + otherName +
-                " requires that they define identical lists of columns: ";
-        // ... but quickly settles down to something much simpler.
-        final String TRUE_COL_ISSUE_SEPARATOR = "; ";
-
         // The high water index for matched columns on theTable.
-        int matchedColHighWater = -1;
         for (Column otherColumn : otherColumns) {
             int colIndex = otherColumn.getIndex();
             String colName = otherColumn.getTypeName();
             if (colIndex < theColCount) {
                 Column theColumn = theColArray[colIndex];
                 if (theColumn.getTypeName().equals(colName)) {
-                    if (matchedColHighWater < colIndex) {
-                        matchedColHighWater = colIndex;
-                    }
                     if (theColumn.getType() != otherColumn.getType() ||
                             theColumn.getSize() != otherColumn.getSize() ||
                             theColumn.getInbytes() != otherColumn.getInbytes()) {
-                        feedback.append(colSeparator);
-                        colSeparator = TRUE_COL_ISSUE_SEPARATOR;
-                        fbSeparator = TRUE_FB_SEPARATOR;
-
-                        feedback.append(" columns named ").append(colName)
-                        .append(" have different types or sizes ");
+                        failureMessage.addReason("columns named " + colName + " have different types or sizes");
                     }
                     continue;
                 }
             }
 
-            feedback.append(colSeparator);
-            colSeparator = TRUE_COL_ISSUE_SEPARATOR;
-            fbSeparator = TRUE_FB_SEPARATOR;
-
-            if (colIndex >= theColCount) {
-                // otherTable has too many columns to be compatible
-                feedback.append(" not expecting column ");
+            Column matchedByName = theColumns.get(colName);
+            if (matchedByName != null) {
+                failureMessage.addReason(colName + " is in a different ordinal position in the two tables");
             }
             else {
-                feedback.append(" expecting column ")
-                .append(otherName).append('.')
-                .append(theColArray[colIndex].getTypeName())
-                .append(" at position ").append(colIndex + 1).append(" not ");
+                failureMessage.addReason(colName + " appears in " + otherName + " but not in " + theName);
             }
-            feedback.append(otherName).append('.')
-            .append(otherColumn.getTypeName());
-
-            // Give an additional "heads up" if the column with the matching
-            // name has the wrong type in addition to the wrong position.
-            Column matchedByName = theColumns.get(otherName);
-            if (matchedByName != null) {
-                if (matchedByName.getType() != otherColumn.getType() ||
-                        matchedByName.getSize() != otherColumn.getSize() ||
-                                matchedByName.getInbytes() != otherColumn.getInbytes()) {
-                    feedback.append(colSeparator);
-                    colSeparator = TRUE_COL_ISSUE_SEPARATOR;
-                    fbSeparator = TRUE_FB_SEPARATOR;
-
-                    feedback.append(" columns named ").append(colName)
-                    .append(" have different types or sizes ");
-                }
-            }
-        }
-
-        // If the highest matched colIndex falls short of theTable's last,
-        // (colCount - 1). otherTable has too few columns to be compatible.
-        if (matchedColHighWater < theColCount - 1) {
-            feedback.append(colSeparator)
-            .append(" expected more columns after ")
-            .append(otherName).append('.')
-            .append(theColArray[matchedColHighWater ].getTypeName());
-
-            colSeparator = TRUE_COL_ISSUE_SEPARATOR;
-            fbSeparator = TRUE_FB_SEPARATOR;
-
-            // List the unmatched columns from theTable.
-            String separator = " (";
-            for (int ii = matchedColHighWater + 1; ii < theColCount; ++ii) {
-                feedback.append(separator).append(theColArray[ii]);
-                separator = ", ";
-            }
-            feedback.append(")");
         }
 
         if ( ! theTable.getIsreplicated() && ! otherTable.getIsreplicated() ) {
             if (! theTable.getPartitioncolumn().getTypeName().equals(
                     otherTable.getPartitioncolumn().getTypeName())) {
-                feedback.append(fbSeparator)
-                .append("Swapping the partitioned table ").append(theName)
-                .append(" with the partitioned table ").append(otherName)
-                .append(" requires that both be partitioned by the same column.");
-                fbSeparator = TRUE_FB_SEPARATOR;
+                failureMessage.addReason("the tables are not partitioned on the same column");
             }
         }
-
-        return fbSeparator;
     }
-
-    /**
-     * @param otherTable
-     * @param feedback
-     */
-    private static void listViewNames(Table otherTable, StringBuilder feedback) {
-        // List view names.
-        String separator = "(";
-        for (MaterializedViewHandlerInfo viewInfo : otherTable.getMvhandlerinfo()) {
-            feedback.append(separator).append(viewInfo.getDesttable().getTypeName());
-            separator = ", ";
-        }
-        for (MaterializedViewInfo viewInfo : otherTable.getViews()) {
-            feedback.append(separator).append(viewInfo.getTypeName());
-            separator = ", ";
-        }
-        feedback.append(")");
-    }
-
 }
