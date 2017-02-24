@@ -540,6 +540,8 @@ public final class InvocationDispatcher {
         return catProc;
     }
 
+    public final static String SHUTDOWN_MSG = "Server is shutting down.";
+
     private final static ClientResponseImpl allowPauseModeExecution(
             InvocationClientHandler handler,
             Procedure procedure,
@@ -549,7 +551,7 @@ public final class InvocationDispatcher {
 
         if (voltdb.getMode() == OperationMode.SHUTTINGDOWN) {
             return serverUnavailableResponse(
-                    "Server is shutting down.",
+                    SHUTDOWN_MSG,
                     task.clientHandle);
         }
 
@@ -557,7 +559,7 @@ public final class InvocationDispatcher {
             if (procedure.getAllowedinshutdown()) return null;
 
             return serverUnavailableResponse(
-                    "Server is shutting down.",
+                    SHUTDOWN_MSG,
                     task.clientHandle);
         }
 
