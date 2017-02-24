@@ -31,22 +31,20 @@ RELEASE_MINOR_VERSION = 0
     arguments=(
             VOLT.PathArgument('newKit', 'path to new VoltDB kit directory', absolute=True, optional=False),
             VOLT.PathArgument('newRoot', 'path to the parent of new VoltDB root directory', absolute=True, optional=False),
-            VOLT.StringArgument('newNode', 'hostname or IP of the extra node', optional=True)
+            VOLT.StringArgument('newNode', 'hostname[:PORT] or IP[:PORT] of the extra node. (default PORT=3021)', optional=True)
     )
 )
 
 def plan_upgrade(runner):
-    
     hosts, kfactor = basicCheck(runner)
     
     # first check the existence of root path on all the existing nodes
-    # 1. how to know the nodes information?
-    # 2. how to check path on every node? ( a new system pro0cedure? ) 
-    # 3. how to check the new root is valid?
-    # 4. does the directory contain .initialized file? If it has, then this is a initialized root.
     # runner.call_proc('@UpgradeCheck',[VOLT.FastSerializer.VOLTTYPE_STRING], [runner.opts.newKit, runner.opts.newRoot])
     
-    # assume both newKit and newRoot exist
+    # FIXME: now just assume both newKit and newRoot exist, create newRoot if necessary. 
+    # In the future we need call a non transactional sysproc to check it 
+    if not os.path.exists(runner.opts.newRoot):
+        os.makedirs(runner.opts.newRoot)
     
     # verify the version of new kit is above the feature release version (e.g. 7.3)
     try:
@@ -64,15 +62,10 @@ def plan_upgrade(runner):
         runner.abort("The version of new VoltDB kit is too low. In-service upgrade is supported from V%d.%d" 
                      % (RELEASE_MAJOR_VERSION, RELEASE_MINOR_VERSION));
                      
-    # newRoot should contains a voltdbroot directory
-    if not os.path.isdir(runner.opts.newRoot):
-        runner.abort("New root directory is not initialized. Please noted that NEWROOT should be pointed to the parent of new VoltDB root directory.")
-        
     print 'Pre-upgrade check is passed.'
     
     generateCommands(runner.opts,
                      hosts, 
-                     os.path.isfile(os.path.join(runner.opts.newRoot, 'voltdbroot', '.initialized')), 
                      kfactor)
 
 def basicCheck(runner):
@@ -115,7 +108,7 @@ def basicCheck(runner):
         
     return hosts, kfactor
 
-def generateCommands(opts, hosts, initialized, kfactor):
+def generateCommands(opts, hosts, kfactor):
     halfNodes = len(hosts.hosts_by_id) / 2
     (killSet, surviveSet) = pickNodeToKill(hosts, kfactor, halfNodes)
     
@@ -123,77 +116,101 @@ def generateCommands(opts, hosts, initialized, kfactor):
     survivor = surviveSet[0]
     victim = killSet[0]
     
-    step = 1
-    #1 kill half of the cluster
+    #0 generate deployment file
+    step= 0
     files = {}
+    (et,drId) = updateDeployment(survivor, 
+                                 None, 
+                                 getHostnameOrIp(victim) + ':' + str(victim.drport))
+    cluster_1_deploy = "deployment1.xml"
+    et.write(cluster_1_deploy)
+    
+    (et,drId) = updateDeployment(victim, 
+                                 str(int(drId) + 1), 
+                                 getHostnameOrIp(survivor) + ':' + str(survivor.drport))
+    cluster_2_deploy = "deployment2.xml"
+    et.write(cluster_2_deploy)
+    # copy deployment file to individual node
     for hostId,hostInfo in hosts.hosts_by_id.items():
         file = open("upgradePlan-%s:%s-%s.txt" % (hostInfo.ipaddress, hostInfo.internalport, hostInfo.hostname), 'w+')
-        files[getKey(hostInfo)] = file
         writeHeader(file)
+        files[getKey(hostInfo)] = file
         if hostInfo in killSet:
-            writeCommands(file,
-                          'Step %d: stop node' % step,
-                          'voltadmin stop -H %s:%d %s:%d' % (survivor.hostname, survivor.adminport, getHostnameOrIp(hostInfo), hostInfo.internalport))
-    
-    #2 for the new cluster, initialize the new root path if not being initialized already
-    if not initialized:
-        step += 1
-        for hostInfo in killSet:
+            writeCommands(file, 
+                          'Step %d: copy deployment file' % step,
+                          '#note# copy %s to %s' % (cluster_2_deploy, opts.newRoot))
+        if hostInfo in surviveSet:
+            writeCommands(file, 
+                          'Step %d: copy deployment file' % step, 
+                          '#note# copy %s and %s to %s' % (cluster_1_deploy, cluster_2_deploy, opts.newRoot))
+    if opts.newNode is not None:
+        newNodeF = open("upgradePlan-%s.txt" % (opts.newNode), 'w+')
+        writeHeader(newNodeF)
+        writeCommands(newNodeF, 
+                      'Step %d: copy deployment file' % step,
+                      '#note# copy %s to %s' % (cluster_2_deploy, opts.newRoot))
+        
+    #1 kill half of the cluster
+    step += 1
+    for hostId,hostInfo in hosts.hosts_by_id.items():
+        if hostInfo in killSet:
             writeCommands(files[getKey(hostInfo)],
-                          'Step %d: initialize new cluster' % step,
-                          '%s init --dir=%s --config=%s' % (os.path.join(opts.newKit, 'bin/voltdb'), opts.newRoot, victim.deployment))
+                          'Step %d: stop node' % step,
+                          'voltadmin stop -H %s:%d %s:%d' % (survivor.hostname, 
+                                                             survivor.adminport, 
+                                                             getHostnameOrIp(hostInfo), 
+                                                             hostInfo.internalport))
+    
+    #2 for the new cluster, initialize the new root path 
+    step += 1
+    for hostInfo in killSet:
+        writeCommands(files[getKey(hostInfo)],
+                      'Step %d: initialize new cluster' % step,
+                      '%s init --dir=%s --config=%s' % (os.path.join(opts.newKit, 'bin/voltdb'), 
+                                                        opts.newRoot, 
+                                                        os.path.join(opts.newRoot, cluster_2_deploy)))
     if opts.newNode is not None:
         if step == 1:
             step += 1
-        newNodeF = open("upgradePlan-%s.txt" % (opts.newNode), 'w+')
-        writeHeader(newNodeF)
         writeCommands(newNodeF,
                       'Step %d: initialize new cluster' % step,
-                      '%s init --dir=%s --config=%s' % (os.path.join(opts.newKit, 'bin/voltdb'), opts.newRoot, victim.deployment))
+                      '%s init --dir=%s --config=%s' % (os.path.join(opts.newKit, 'bin/voltdb'), 
+                                                        opts.newRoot, 
+                                                        os.path.join(opts.newRoot, cluster_2_deploy)))
             
     #3 start the new cluster ( need the license path, may need hostname or ip from the extra node )
-    missing = len(surviveSet)
-    if opts.newNode is not None:
-        missing -= 1
-    
+    step += 1
     leadersString = []
     for hostInfo in killSet:
         leadersString.append(getHostnameOrIp(hostInfo) + ':' + str(hostInfo.internalport))
     if opts.newNode is not None:
         leadersString.append(opts.newNode)
         
-    step += 1
     for hostInfo in killSet:
         writeCommands(files[getKey(hostInfo)],
                       'Step %d: start new cluster' % step,
-                      "%s start --dir=%s -H %s --missing=%d" % (os.path.join(opts.newKit, 'bin/voltdb'), opts.newRoot, ','.join(leadersString), missing))
+                      "%s start --dir=%s -H %s -c %d --missing=%d" % (os.path.join(opts.newKit, 'bin/voltdb'), 
+                                                                      opts.newRoot, 
+                                                                      ','.join(leadersString), 
+                                                                      len(hosts.hosts_by_id), 
+                                                                      halfNodes))
     if opts.newNode is not None:
         writeCommands(newNodeF,
                       'Step %d: start new cluster' % step,
-                      "%s start --dir=%s -H %s --missing=%d" % (os.path.join(opts.newKit, 'bin/voltdb'), opts.newRoot, ','.join(leadersString), missing))
+                      "%s start --dir=%s -H %s -c %d --missing=%d" % (os.path.join(opts.newKit, 'bin/voltdb'), 
+                                                                      opts.newRoot, 
+                                                                      ','.join(leadersString), 
+                                                                      len(hosts.hosts_by_id), 
+                                                                      halfNodes))
     
     #4 set up XDCR replication between two clusters (how to generate command for it? call @UAC?)
     # update old cluster's deployment file
     step += 1
-    et = addDrTagToDeployment(survivor, 
-                              '1', 
-                              getHostnameOrIp(victim) + ':' + str(victim.drport))
-    xmlFilename = "deployment-%s:%s-%s.xml" % (survivor.ipaddress, survivor.internalport, survivor.hostname)
-    et.write(xmlFilename)
-    writeCommands(file, 
+    writeCommands(files[getKey(survivor)], 
                   'Step %d: turn XDCR on in the original cluster' % step, 
-                  'voltadmin update -H %s:%d %s' % (survivor.hostname, survivor.adminport, xmlFilename))
-    
-    #5 update new cluster's deployment file
-    step += 1
-    et = addDrTagToDeployment(victim, 
-                              '2', 
-                              getHostnameOrIp(survivor) + ':' + str(survivor.drport))
-    xmlFilename = "deployment-%s:%s-%s.xml" % (victim.ipaddress, victim.internalport, victim.hostname)
-    et.write(xmlFilename)
-    writeCommands(file, 
-                  'Step %d: turn XDCR on' % step, 
-                  'voltadmin update -H %s:%d %s' % (victim.hostname, victim.adminport, xmlFilename))
+                  'voltadmin update -H %s:%d %s' % (survivor.hostname, 
+                                                    survivor.adminport, 
+                                                    os.path.join(opts.newRoot, cluster_1_deploy)))
     
     #6 call 'voltadmin shutdown --wait' on the original cluster
     step += 1
@@ -208,7 +225,9 @@ def generateCommands(opts, hosts, initialized, kfactor):
         initNodes += 1
         writeCommands(files[getKey(hostInfo)],
                       'Step %d: initialize original cluster with new voltdb path' % step,
-                      '%s init --dir=%s --config=%s' % (os.path.join(opts.newKit, 'bin/voltdb'), opts.newRoot, victim.deployment))
+                      '%s init --dir=%s --config=%s' % (os.path.join(opts.newKit, 'bin/voltdb'), 
+                                                        opts.newRoot, 
+                                                        os.path.join(opts.newRoot, cluster_2_deploy)))
         if initNodes == halfNodes:
             break
     
@@ -226,12 +245,13 @@ def generateCommands(opts, hosts, initialized, kfactor):
         file = files[getKey(hostInfo)]
         writeCommands(file, 
                       'Step %d: rejoin the node to new cluster' % step, 
-                      '%s start --dir=%s -H %s' % (os.path.join(opts.newKit, 'voltdb'), opts.newRoot, ','.join(leadersString)))
+                      '%s start --dir=%s -H %s' % (os.path.join(opts.newKit, 'bin/voltdb'), 
+                                                   opts.newRoot, 
+                                                   ','.join(leadersString)))
         if rejoinNodes == halfNodes:
             break
     
-    #10 turn off XDCR (optional), to avoid annoying 'Couldn't connect to host XX' message 
-    
+    # cleanup
     for key, file in files.items():
         file.close()
     if opts.newNode is not None:
@@ -255,17 +275,18 @@ def pickNodeToKill(hosts, kfactor, expectation):
     for hostId, hostInfo in hosts.hosts_by_id.items():
         partitions = hostInfo['partitiongroup']
         partitionGroup[partitions].append(hostInfo)
-    while len(victims) != expectation:
-        for hostInfos in partitionGroup.values():
-            if len(hostInfos) > kfactor:
-                victims.append(hostInfos.pop())
-            if len(victims) == expectation:
-                break;
-    survivors.extend(hostInfos)
+    for hostInfos in partitionGroup.values():
+        count = 0
+        while count < kfactor:
+            victims.append(hostInfos.pop())
+            count += 1
+        survivors.extend(hostInfos)
+        if len(victims) == expectation:
+            break;
     return victims, survivors
 
 def getKey(host):
-    return host.ipaddress + str(host.internalport)
+    return host.ipaddress + str(host.internalport) + host.hostname
 
 def getHostnameOrIp(host):
     if host.hostname is None:
@@ -285,35 +306,31 @@ def writeCommands(file, subject, command):
     delimiter = '*' * 5
     file.write(delimiter + subject + delimiter)
     file.write('\n')
-    file.write(command)
-    file.write('\n\n')
+    if command is not None:
+        file.write(command)
+        file.write('\n\n')
 
-def addDrTagToDeployment(host, drId, drSource):
+def updateDeployment(host, hintDrId, drSource):
     et = ElementTree.parse(host.deployment)
     dr = et.getroot().find('./dr')
     if dr is None:
-        drTag = appendDRTag(et.getroot(), drId)
-        appendConnectionTag(drTag, drSource)
-    else:
-        connection = dr.find('./connection')
-        if connection is None:
-            appendConnectionTag(drTag, drSource)
+        dr = ET.Element('dr')
+        et.getroot().append(dr)
+    if dr.attrib['id'] is None:
+        if hintDrId is None:
+            dr.attrib['id'] = '1' # start from 1
         else:
-            appendDRSource(connection, drSource)
-    return et
-
-def appendDRSource(connectionTag, drSource):
-    connectionTag.attrib['source'] = drSource + ',' + connectionTag.attrib['source']
-    connectionTag.attrib['enabled'] = 'true'
-
-def appendConnectionTag(drTag, drSource):
-    connectionTag = ET.Element('connection')
-    connectionTag.attrib['source'] = drSource
-    connectionTag.attrib['enabled'] = 'true'
-    drTag.append(connectionTag)
-    
-def appendDRTag(root, drId):
-    drTag = ET.Element('dr')
-    drTag.attrib['id'] = drId
-    root.append(drTag)
-    return drTag
+            dr.attrib['id'] = hintDrId
+    else: 
+        if hintDrId is not None:
+            dr.attrib['id'] = hintDrId # override it
+    drId = dr.attrib['id']
+    dr.attrib['role'] = 'xdcr'
+    connection = dr.find('./connection')
+    if connection is None:
+        connection = ET.Element('connection')
+        dr.append(connectionTag)
+        drSource = drSource + ',' + connectionTag.attrib['source']
+    connection.attrib['enabled'] = 'true'
+    connection.attrib['source'] = drSource
+    return et, drId
