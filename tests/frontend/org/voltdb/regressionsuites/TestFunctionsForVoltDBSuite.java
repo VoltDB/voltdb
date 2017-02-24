@@ -39,6 +39,7 @@ import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.utils.Encoder;
 import org.voltdb_testprocs.regressionsuites.failureprocs.BadParamTypesForTimestamp;
 import org.voltdb_testprocs.regressionsuites.fixedsql.GotBadParamCountsInJava;
 
@@ -188,7 +189,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
                 ");" +
                 "CREATE TABLE INET6_TEST ( " +
                 "    PRES         VARCHAR, " +
-                "    BIN          BIGINT " +
+                "    BIN          VARBINARY " +
                 ");" +
                 "";
         try {
@@ -2449,10 +2450,16 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             bytes[2 * idx + 0] = (byte)((addr[idx] >> 8) & 0xFF);
             bytes[2 * idx + 1] = (byte)((addr[idx] >> 0) & 0xFF);
         }
+        String hex_bytes = Encoder.hexEncode(bytes);
         ClientResponse cr;
         VoltTable vt;
         String actual_str;
-        cr = client.callProcedure("@AdHoc", "select inet6_aton(?) from inet_empty", presentation);
+
+        cr = client.callProcedure("@AdHoc", "truncate table inet6_test;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("INET6_TEST.insert", presentation, bytes);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("@AdHoc", "select inet6_aton(pres) from inet6_test;");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         vt = cr.getResults()[0];
         assertTrue(vt.advanceRow());
@@ -2460,23 +2467,21 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertEquals(bytes.length, actual.length);
         assertEqualByteArrays(bytes, actual);
 
-        /*
-        cr = client.callProcedure("@AdHoc", "select inet6_ntoa(?) from inet_empty", bytes);
+        cr = client.callProcedure("@AdHoc", "select inet6_ntoa(bin) from inet6_test;");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         vt = cr.getResults()[0];
         assertTrue(vt.advanceRow());
         actual_str = vt.getString(0);
         assertEquals(presentation, actual_str);
-        */
-        /*
-        cr = client.callProcedure("@AdHoc", "select inet6_ntoa(inet6_aton(?)) from inet_empty", presentation);
+
+        cr = client.callProcedure("@AdHoc", "select inet6_ntoa(inet6_aton(pres)) from inet6_test;");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         vt = cr.getResults()[0];
         assertTrue(vt.advanceRow());
         actual_str = vt.getString(0);
         assertEquals(presentation, actual_str);
-        */
-        cr = client.callProcedure("@AdHoc", "select inet6_aton(inet6_ntoa(?)) from inet_empty", bytes);
+
+        cr = client.callProcedure("@AdHoc", "select inet6_aton(inet6_ntoa(bin)) from inet6_test;");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         vt = cr.getResults()[0];
         assertTrue(vt.advanceRow());

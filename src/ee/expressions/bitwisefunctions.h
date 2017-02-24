@@ -331,13 +331,6 @@ template<> inline NValue NValue::callUnary<FUNC_INET6_NTOA>() const {
     if (addr_len != sizeof(in6_addr)) {
         throw SQLException(SQLException::dynamic_sql_error, "VARBINARY value is the wrong size to hold an IPv6 address.");
     }
-    std::cout << "inet6_ntoa(";
-    std::string sep("");
-    for (int idx = 0; idx < 8; idx += 1) {
-        std::cout << sep << addr->s6_addr16[idx];
-        sep = ":";
-    }
-    std::cout << ")\n";
     // Save enough space for the address string plus a
     // trailing null terminator.
     char dest[INET6_ADDRSTRLEN + 1];
