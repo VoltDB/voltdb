@@ -91,8 +91,8 @@ public class AsyncCompilerAgentHelper
                     newCatalogJar = modifyCatalogClasses(context.catalog, oldJar, work.operationString,
                             newCatalogJar, work.drRole == DrRoleType.XDCR);
                 }
-                catch (IOException e) {
-                    retval.errorMsg = "Unexpected IO exception @UpdateClasses modifying classes " +
+                catch (ClassNotFoundException e) {
+                    retval.errorMsg = "Unexpected error in @UpdateClasses modifying classes " +
                         "from catalog: " + e.getMessage();
                     return retval;
                 }
@@ -270,7 +270,7 @@ public class AsyncCompilerAgentHelper
     }
 
     private InMemoryJarfile modifyCatalogClasses(Catalog catalog, InMemoryJarfile jarfile, String deletePatterns,
-            InMemoryJarfile newJarfile, boolean isXDCR) throws IOException
+            InMemoryJarfile newJarfile, boolean isXDCR) throws ClassNotFoundException
     {
         // modify the old jar in place based on the @UpdateClasses inputs, and then
         // recompile it if necessary
@@ -312,7 +312,7 @@ public class AsyncCompilerAgentHelper
             Database db = VoltCompiler.getCatalogDatabase(catalog);
             for (Procedure proc: db.getProcedures()) {
                 if (! VoltCompilerUtils.containsClassName(jarfile, proc.getClassname())) {
-                    throw new IOException("can not find class " + proc.getClassname() + " after UpdateClasses");
+                    throw new ClassNotFoundException("Cannot load class for procedure " + proc.getClassname());
                 }
             }
         }

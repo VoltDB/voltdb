@@ -8,9 +8,7 @@ Expect to fail as Trivial should have failed proc creation.
 Undefined procedure: Trivial
 Expect to fail because of failure to "redefine" the Trivial proc with its
     underlying class removed. The error message could be better here.
-Unexpected IO exception @UpdateClasses modifying classes from catalog: DDL Error: "Cannot load class for procedure: sqlcmdtest.Trivial
-   caused by:
-   java.lang.ClassNotFoundException: sqlcmdtest.Trivial"
+Unexpected error in @UpdateClasses modifying classes from catalog: Cannot load class for procedure sqlcmdtest.Trivial
 Expect to fail now that class has been successfully removed
 [Ad Hoc DDL Input]: VoltDB DDL Error: "Cannot load class for procedure: sqlcmdtest.Trivial
    caused by:
