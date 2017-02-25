@@ -327,6 +327,12 @@
                           <td>&nbsp;</td>
                         <td>&nbsp;</td>
                       </tr>
+                      <tr id="rowDrRole" class="subLabelRow clsDrType">
+                        <td class="configLabel" >Role</td>
+                        <td align="right" id="lblDrRole"></td>
+                          <td>&nbsp;</td>
+                        <td>&nbsp;</td>
+                      </tr>
                       <tr id="trConnectionSource" class="subLabelRow clsDrType">
                         <td class="configLabel">Connection Source</td>
                         <td align="right"><span id="master-cluster-name"></span></td>
@@ -1335,22 +1341,32 @@ $("[rel=bottom]").tooltip({ placement: 'bottom'});
           <div class="configWrapper-modal">
               <table width="100%" cellpadding="0" cellspacing="0" class="connectionSourceTblPopup">
                 <tr class="showHideDrConfig">
-                  <td width="5%">ID<span class="redC">*</span></td>
-                  <td id="trDrId" width="10%" align="">
+                  <td width="10%">ID<span class="redC">*</span></td>
+                  <td id="trDrId" width="25%" align="">
                     <input id="txtDrId" name="txtDrId" type="text" class="overviewInputTextDR valid" aria-required="true" aria-invalid="false">
                     <label id="errorDrId" for="txtDrId" class="error ccErrorMsg" style="display: none;"></label>
                   </td>
                 </tr>
                 <tr class="showHideDrConfig" id="trDrPort">
                     <td>Port</td>
-                    <td id="tdDrPort" width="10%" align="">
+                    <td id="tdDrPort" width="25%" align="">
                       <input id="txtDrPort" name="txtDrPort" type="text" class="overviewInputTextDR valid" aria-required="true" aria-invalid="false">
                       <label id="errorDrPort" for="txtDrPort" class="error ccErrorMsg" style="display: none;"></label>
                     </td>
                 </tr>
+                <tr class="showHideDrConfig" id="trDrRole">
+                    <td>Role</td>
+                    <td id="tdDrRole" width="25%" align="">
+                      <select id="selectDrRole" class="drSelect">
+                          <option value="master">Master</option>
+                          <option value="replica">Replica</option>
+                          <option value="xdcr">XDCR</option>
+                      </select>
+                    </td>
+                </tr>
                 <tr class="showHideDrConfig">
                   <td><h4>Connection Source</h4></td>
-                  <td width="10%" class="connSource">
+                  <td width="25%" class="connSource">
                      <span id="addConnectionSource" class="plusIconDR"></span>
                   </td>
                 </tr>
@@ -1360,14 +1376,12 @@ $("[rel=bottom]").tooltip({ placement: 'bottom'});
                     <input id="txtDatabase" name="txtDatabase" style="width:125px" type="text" class="overviewInputTextDR valid" aria-required="true" aria-invalid="false">
                     <span id="deleteConnectionSource" class="deleteDR"></span>
                     <label id="errorDatabase" for="txtDatabase" class="error ccErrorMsg" style="display: none;"></label>
-
-
                   </td>
                 </tr>
                 <tr class="showHideDrConfig" style="border-bottom:none;" >
                   <td></td>
                   <td colspan="3">
-                    <label id="drServers-error" class="error" for="drServers" style="display:none">No servers selected.</label>
+                    <label id="drServers-error" class="error" style="display:none">Connection source must be defined for Replica and XDCR role.</label>
                   </td>
                 </tr>
               </table>

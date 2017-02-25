@@ -112,9 +112,6 @@ public class VoltDB {
     static {
         REAL_DEFAULT_TIMEZONE = TimeZone.getDefault();
         setDefaultTimezone();
-        EstTimeUpdater.start();
-        VoltLogger.startAsynchronousLogging();
-        ReverseDNSCache.start();
         ClientFactory.increaseClientCountToOne();
     }
 
@@ -283,6 +280,9 @@ public class VoltDB {
         /** number of hosts that participate in a VoltDB cluster */
         public int m_hostCount = UNDEFINED;
 
+        /** number of hosts that will be missing when the cluster is started up */
+        public int m_missingHostCount = 0;
+
         /** not sites per host actually, number of local sites in this node */
         public int m_sitesperhost = UNDEFINED;
 
@@ -433,7 +433,9 @@ public class VoltDB {
                     m_meshBrokers = sbld.toString();
                 } else if (arg.equals("hostcount")) {
                     m_hostCount = Integer.parseInt(args[++i].trim());
-                } else if (arg.equals("sitesperhost")){
+                } else if (arg.equals("missing")) {
+                    m_missingHostCount = Integer.parseInt(args[++i].trim());
+                }else if (arg.equals("sitesperhost")){
                     m_sitesperhost = Integer.parseInt(args[++i].trim());
                 } else if (arg.equals("publicinterface")) {
                     m_publicInterface = args[++i].trim();

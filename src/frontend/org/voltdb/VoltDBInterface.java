@@ -96,7 +96,7 @@ public interface VoltDBInterface
     /**
      * Check if the host is in prepare-shutting down state.
      */
-    public boolean isShuttingdown();
+    public boolean isPreparingShuttingdown();
 
     /**
      * Set the host to be in shutting down state.When a host is in teh state of being shut down.

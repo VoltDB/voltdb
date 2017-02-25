@@ -434,6 +434,9 @@ def map_deployment(request, database_id):
             else:
                 deployment['dr']['listen'] = True
 
+            if 'role' in request.json['dr']:
+                deployment['dr']['role'] = request.json['dr']['role']
+
             if request.json['dr']:
                 if 'port' in request.json['dr']:
                     deployment['dr']['port'] = request.json['dr']['port']
