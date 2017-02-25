@@ -557,6 +557,15 @@ TEST_F(FunctionTest, NaturalModTest) {
     ASSERT_EQ(sawException, true);
 }
 
+TEST_F(FunctionTest, inet6NtoATest) {
+    in6_addr addr;
+    const char *addrStr = "ab01:cd02:ef03:1ef:2cd:3ab:a0b0:c0d";
+    inet_pton(AF_INET6, addrStr, &addr);
+    ASSERT_EQ(testUnary(FUNC_INET6_NTOA,
+                        &addr,
+                        addrStr),
+              0);
+}
 TEST_F(FunctionTest, HexTest) {
         ASSERT_EQ(testUnary(FUNC_VOLT_HEX,
                             0xffLL,

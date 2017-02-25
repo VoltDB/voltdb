@@ -335,7 +335,7 @@ template<> inline NValue NValue::callUnary<FUNC_INET6_NTOA>() const {
     // trailing null terminator.
     char dest[INET6_ADDRSTRLEN + 1];
     dest[sizeof(dest) - 1] = 0;
-    if (inet_ntop(AF_INET6, (const void *)&addr, dest, sizeof(dest)) == 0) {
+    if (inet_ntop(AF_INET6, (const void *)addr, dest, sizeof(dest)) == 0) {
         throw SQLException(SQLException::dynamic_sql_error,
                            errno,
                            "inet6_ntoa conversion error");
