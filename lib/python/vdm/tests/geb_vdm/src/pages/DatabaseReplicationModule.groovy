@@ -40,6 +40,9 @@ class DatabaseReplicationModule extends Module {
         displayedId         { $("#lblDrId") }
         displayedPort       { $("#lblDrPort") }
         displayedSource     { $("#master-cluster-name") }
+        selectDrRole        { $("#selectDrRole") }
+        drServersError      { $("#drServers-error") }
+        deleteConnectionSource { $("#deleteConnectionSource") }
     }
 
 }

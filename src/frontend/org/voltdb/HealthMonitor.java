@@ -180,8 +180,10 @@ public class HealthMonitor implements Runnable, Promotable
                 return;
             }
             ClientResponse r = cb.getResponse();
-            if (r.getStatus() != ClientResponse.SUCCESS) {
-                m_logger.error("Unable to retrieve DRROLE STATS: " + r.getStatusString());
+            if (r.getStatus() != ClientResponse.SUCCESS) { // timeout could happen if hostdown
+                if (m_logger.isDebugEnabled()) {
+                    m_logger.debug("Unable to retrieve DRROLE STATS: " + r.getStatusString());
+                }
                 return;
             }
             VoltTable result = r.getResults()[0];

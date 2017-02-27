@@ -308,6 +308,33 @@ public class TestStatisticsSuiteDatabaseElementStats extends StatisticsTestSuite
                    avg_parameter_set_size,
                    avg_parameter_set_size < 1000000L);
 
+        // Validate the schema of PROCEDUREDETAIL
+        results = client.callProcedure("@Statistics", "proceduredetail", 0).getResults();
+        assertEquals(1, results.length);
+        expectedSchema = new ColumnInfo[20];
+        expectedSchema[0] = new ColumnInfo("TIMESTAMP", VoltType.BIGINT);
+        expectedSchema[1] = new ColumnInfo("HOST_ID", VoltType.INTEGER);
+        expectedSchema[2] = new ColumnInfo("HOSTNAME", VoltType.STRING);
+        expectedSchema[3] = new ColumnInfo("SITE_ID", VoltType.INTEGER);
+        expectedSchema[4] = new ColumnInfo("PARTITION_ID", VoltType.INTEGER);
+        expectedSchema[5] = new ColumnInfo("PROCEDURE", VoltType.STRING);
+        expectedSchema[6] = new ColumnInfo("STATEMENT", VoltType.STRING);
+        expectedSchema[7] = new ColumnInfo("INVOCATIONS", VoltType.BIGINT);
+        expectedSchema[8] = new ColumnInfo("TIMED_INVOCATIONS", VoltType.BIGINT);
+        expectedSchema[9] = new ColumnInfo("MIN_EXECUTION_TIME", VoltType.BIGINT);
+        expectedSchema[10] = new ColumnInfo("MAX_EXECUTION_TIME", VoltType.BIGINT);
+        expectedSchema[11] = new ColumnInfo("AVG_EXECUTION_TIME", VoltType.BIGINT);
+        expectedSchema[12] = new ColumnInfo("MIN_RESULT_SIZE", VoltType.INTEGER);
+        expectedSchema[13] = new ColumnInfo("MAX_RESULT_SIZE", VoltType.INTEGER);
+        expectedSchema[14] = new ColumnInfo("AVG_RESULT_SIZE", VoltType.INTEGER);
+        expectedSchema[15] = new ColumnInfo("MIN_PARAMETER_SET_SIZE", VoltType.INTEGER);
+        expectedSchema[16] = new ColumnInfo("MAX_PARAMETER_SET_SIZE", VoltType.INTEGER);
+        expectedSchema[17] = new ColumnInfo("AVG_PARAMETER_SET_SIZE", VoltType.INTEGER);
+        expectedSchema[18] = new ColumnInfo("ABORTS", VoltType.BIGINT);
+        expectedSchema[19] = new ColumnInfo("FAILURES", VoltType.BIGINT);
+        expectedTable = new VoltTable(expectedSchema);
+        validateSchema(results[0], expectedTable);
+
         // Validate the PROCEDUREPROFILE aggregation.
         results = client.callProcedure("@Statistics", "procedureprofile", 0).getResults();
         System.out.println("\n\n\n" + results[0].toString() + "\n\n\n");

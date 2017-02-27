@@ -40,6 +40,7 @@ server_list_help = ('{hostname-or-ip[,...]}, '
         VOLT.BooleanOption('-r', '--replica', 'replica', 'start replica cluster (deprecated, please use role="replica" in the deployment file)', default = False),
         VOLT.BooleanOption('-A', '--add', 'enableadd', 'allows the server to elastically expand the cluster if the cluster is already complete', default = False),
         VOLT.IntegerOption('-s', '--sitesperhost', 'sitesperhost', None),
+        VOLT.IntegerOption('-m', '--missing', 'missing', None),
     ),
     description = 'Starts a database, which has been initialized.'
 )
@@ -54,6 +55,8 @@ def start(runner):
         runner.args.extend(['hostcount', runner.opts.hostcount])
     if runner.opts.sitesperhost:
         runner.args.extend(['sitesperhost', runner.opts.sitesperhost])
+    if runner.opts.missing:
+        runner.args.extend(['missing', runner.opts.missing])
     if runner.opts.enableadd:
         runner.args.extend(['enableadd'])
     runner.go()
