@@ -286,7 +286,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     // Are we adding the node to the cluster instead of rejoining?
     volatile boolean m_joining = false;
-    private boolean m_shuttingdown = false;
+    private boolean m_preparingShuttingdown = false;
 
     long m_clusterCreateTime;
     AtomicBoolean m_replicationActive = new AtomicBoolean(false);
@@ -346,12 +346,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
      };
 
     @Override
-    public boolean isShuttingdown() {
-        return m_shuttingdown;
+    public boolean isPreparingShuttingdown() {
+        return m_preparingShuttingdown;
     }
     @Override
-    public void setShuttingdown(boolean shuttingdown) {
-        m_shuttingdown = shuttingdown;
+    public void setShuttingdown(boolean preparingShuttingdown) {
+        m_preparingShuttingdown = preparingShuttingdown;
     }
 
     @Override
