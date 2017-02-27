@@ -234,6 +234,9 @@ public class StatisticsTestSuiteBase extends SaveRestoreBase {
         project.addPartitionInfo("NEW_ORDER", "NO_W_ID");
         project.addProcedures(PROCEDURES);
 
+        // needed for tuple count test
+        project.setUseDDLSchema(true);
+
         // Enable asynchronous logging for test of commandlog test
         if (MiscUtils.isPro() && isCommandLogTest) {
             project.configureLogging(null, null, false, true, FSYNC_INTERVAL_GOLD, null, null);

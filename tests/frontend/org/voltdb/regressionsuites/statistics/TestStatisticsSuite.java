@@ -46,6 +46,8 @@ import org.voltdb_testprocs.regressionsuites.malicious.GoSleep;
 
 public class TestStatisticsSuite extends StatisticsTestSuiteBase {
 
+    private int m_numSitesConfigured = 0; // used and set by testTupleCount
+
     private static final Class<?>[] PROCEDURES =
     {
         GoSleep.class
@@ -320,6 +322,87 @@ public class TestStatisticsSuite extends StatisticsTestSuiteBase {
         Map<String, String> columnTargets = new HashMap<String, String>();
         columnTargets.put("HOSTNAME", results[0].getString("HOSTNAME"));
         validateRowSeenAtAllHosts(results[0], columnTargets, true);
+    }
+
+    /** Queries client for tuple count and ensures "memory" and "table" statistics are consistent.
+     * It is assumed that no other clients/threads are modifying the database when this is called.
+     * @param client VoltDB client handle
+     * @return Current number of tuples
+     * @throws Exception validation failures and bad assumptions
+     */
+    private long getAndValidateTupleCount(Client client) throws Exception {
+
+        // give time to seed the stats cache?
+        Thread.sleep(1000);
+
+        // Get total tuple count from memory statistics
+        final VoltTable[] memoryResults = client.callProcedure("@Statistics", "memory", 0).getResults();
+        assertEquals(1, memoryResults.length);
+        assertEquals(true, memoryResults[0].advanceRow());
+        final long totalTupleCount = memoryResults[0].getLong("TUPLECOUNT");
+
+        // Get total tuple count by summing tables found in the table statistics
+        final VoltTable[] tableResults = client.callProcedure("@Statistics",  "table", 0).getResults();
+        assertEquals(1, tableResults.length);
+        final int siteIndex = tableResults[0].getColumnIndex("SITE_ID");
+        final int partitionIndex = tableResults[0].getColumnIndex("PARTITION_ID");
+        final int tableTypeIndex = tableResults[0].getColumnIndex("TABLE_TYPE");
+        final int tupleCountIndex = tableResults[0].getColumnIndex("TUPLE_COUNT");
+        long accumTupleCount = 0;
+        while (tableResults[0].advanceRow()){
+            // PersistentTable is the only table type that should be included in the statistics
+            // Only count the table once even though it's replicated.
+            final long site = tableResults[0].getLong(siteIndex);
+            m_numSitesConfigured = Math.max(m_numSitesConfigured, (int) site + 1);
+            final boolean scanTable = (site == 0) &&
+                                      (tableResults[0].getLong(partitionIndex) == 0) &&
+                                       tableResults[0].getString(tableTypeIndex).equals("PersistentTable");
+            if (scanTable){
+                accumTupleCount += tableResults[0].getLong(tupleCountIndex);
+            }
+        }
+
+        assertEquals(totalTupleCount, accumTupleCount * m_numSitesConfigured);
+        return totalTupleCount;
+    }
+
+
+    /** Verify that all persistent tables but no streamed or other ephemeral tables are included
+     * in the TUPLECOUNT statistic.
+     * @throws Exception upon error
+     */
+    public void testTupleCount() throws Exception {
+        System.out.println("\n\nTESTING TUPLE COUNT STATISTICS\n\n\n");
+        Client client = getFullyConnectedClient();
+
+        // Don't assume other tests left the DB empty
+        final long INITIAL_TUPLE_COUNT = getAndValidateTupleCount(client);
+
+        client.callProcedure("@AdHoc", "CREATE TABLE tupletest ( foobar SMALLINT NOT NULL );");
+        client.callProcedure("@AdHoc", "CREATE STREAM tupletest_export EXPORT TO TARGET tupleteststream ( foobar SMALLINT NOT NULL );");
+        assertEquals(INITIAL_TUPLE_COUNT, getAndValidateTupleCount(client));
+
+        client.callProcedure("@AdHoc", "INSERT INTO tupletest VALUES ( 2 );");
+        assertNotSame(m_numSitesConfigured, 0);
+        assertEquals(INITIAL_TUPLE_COUNT + 1 * m_numSitesConfigured, getAndValidateTupleCount(client));
+
+        client.callProcedure("@AdHoc", "INSERT INTO tupletest_export VALUES ( 2 );");
+        assertEquals(INITIAL_TUPLE_COUNT + 1 * m_numSitesConfigured, getAndValidateTupleCount(client));
+
+        // Verify export table shows tuples
+        final VoltTable[] tableResults = client.callProcedure("@Statistics", "table", 0).getResults();
+        assertEquals(1, tableResults.length);
+        final int tableNameIndex = tableResults[0].getColumnIndex("TABLE_NAME");
+        final int tupleCountIndex = tableResults[0].getColumnIndex("TUPLE_COUNT");
+        while (tableResults[0].advanceRow()){
+            if (tableResults[0].getString(tableNameIndex).equals("tupletest_export")){
+                assertEquals(tableResults[0].getLong(tupleCountIndex), 1);
+            }
+        }
+
+        client.callProcedure("@AdHoc", "DROP TABLE tupletest;");
+        client.callProcedure("@AdHoc", "DROP STREAM tupletest_export;");
+        assertEquals(INITIAL_TUPLE_COUNT, getAndValidateTupleCount(client));
     }
 
     public void testIOStatistics() throws Exception {
