@@ -153,7 +153,7 @@ public class VoltCompiler {
     private ClassLoader m_classLoader = ClassLoader.getSystemClassLoader();
 
     // this needs to be reset in the main compile func
-    private static final HashSet<Class<?>> cachedAddedClasses = new HashSet<>();
+    private final HashSet<Class<?>> m_cachedAddedClasses = new HashSet<>();
 
     private final boolean m_isXDCR;
 
@@ -349,7 +349,7 @@ public class VoltCompiler {
         this.m_isXDCR = isXDCR;
 
         // reset the cache
-        cachedAddedClasses.clear();
+        m_cachedAddedClasses.clear();
     }
 
     /** Parameterless constructor is for embedded VoltCompiler use only.
@@ -794,9 +794,6 @@ public class VoltCompiler {
             final List<VoltCompilerReader> ddlReaderList,
             final InMemoryJarfile jarOutput)
     {
-        // Compiler instance is reusable. Clear the cache.
-        cachedAddedClasses.clear();
-
         m_catalog = new Catalog();
         // Initialize the catalog for one cluster
         m_catalog.execute("add / clusters cluster");
@@ -1642,10 +1639,10 @@ public class VoltCompiler {
     public boolean addClassToJar(InMemoryJarfile jarOutput, final Class<?> cls)
             throws VoltCompiler.VoltCompilerException
     {
-        if (cachedAddedClasses.contains(cls)) {
+        if (m_cachedAddedClasses.contains(cls)) {
             return false;
         }
-        cachedAddedClasses.add(cls);
+        m_cachedAddedClasses.add(cls);
 
         for (final Class<?> nested : getInnerClasses(cls)) {
             addClassToJar(jarOutput, nested);

@@ -68,8 +68,6 @@ public class AsyncCompilerAgentHelper
             InMemoryJarfile newCatalogJar = null;
             InMemoryJarfile oldJar = context.getCatalogJar().deepCopy();
 
-            context.getCluster().getDatabases().get("database");
-
             String deploymentString = work.operationString;
             if ("@UpdateApplicationCatalog".equals(work.invocationName)) {
                 // Grab the current catalog bytes if @UAC had a null catalog from deployment-only update
