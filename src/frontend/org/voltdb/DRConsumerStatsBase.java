@@ -45,7 +45,6 @@ public class DRConsumerStatsBase {
     }
 
     public static class DRConsumerNodeStatsBase extends StatsSource {
-
         public DRConsumerNodeStatsBase() {
             super(false);
         }
@@ -64,16 +63,9 @@ public class DRConsumerStatsBase {
         protected Iterator<Object> getStatsRowKeyIterator(boolean interval) {
             return ImmutableSet.of().iterator();
         }
-
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) return true;
-            return false;
-        }
     }
 
     public static class DRConsumerPartitionStatsBase extends StatsSource {
-
         public DRConsumerPartitionStatsBase() {
             super(false);
         }
@@ -94,12 +86,6 @@ public class DRConsumerStatsBase {
         @Override
         protected Iterator<Object> getStatsRowKeyIterator(boolean interval) {
             return ImmutableSet.of().iterator();
-        }
-
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) return true;
-            return false;
         }
     }
 
