@@ -49,10 +49,12 @@
 # The VoltDB Latency Logger script
 #
 # Environment Variables
-#   JAVA_HOME        The java implementation to use.  Overrides JAVA_HOME.
-#   JAVA_HEAP_MAX    The maximum amount of heap to use, in MB. Default is 1024.
-#   VOLTDB_OPTS     Extra Java runtime options.
-#   LOG4J_CONFIG_PATH     Path to alternate log4j configuration
+#   JAVA_HOME          The java implementation to use.  Overrides JAVA_HOME.
+#   JAVA_HEAP_MAX      The maximum amount of heap to use, in MB. Default is 1024.
+#   VOLTDB_OPTS        Extra Java runtime options.
+#   LOG4J_CONFIG_PATH  Path to alternate log4j configuration
+#   VOLTDBUSER         Username to connect with
+#   VOLTDBPASSWORD     Password to connect with
 
 # resolve symlinks and canonicalize the path (make it absolute)
 pushd . > /dev/null

@@ -36,6 +36,7 @@ import org.HdrHistogram_voltpatches.Histogram;
 import org.voltcore.utils.CompressionStrategySnappy;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
+import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ProcCallException;
 
@@ -77,8 +78,22 @@ public class LatencyLogger {
             System.exit(0);
         }
         final int duration = dur;
+        // start with an empty password
+        String username = "";
+        String password = "";
 
-        final Client c = ClientFactory.createClient();
+        // if credentials set in env, use them
+        if (System.getenv().containsKey("VOLTDBUSER")) {
+            username = System.getenv("VOLTDBUSER");
+        }
+        if (System.getenv().containsKey("VOLTDBPASSWORD")) {
+            password = System.getenv("VOLTDBPASSWORD");
+        }
+
+        // create the client with our credentials
+        ClientConfig clientConfig = new ClientConfig(username, password);
+        final Client c = ClientFactory.createClient(clientConfig);
+
         int port = 0;
         try {
             port = Integer.valueOf(args[1]);
