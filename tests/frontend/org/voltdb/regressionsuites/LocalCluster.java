@@ -93,6 +93,7 @@ public class LocalCluster extends VoltServerConfig {
     boolean m_compiled = false;
     protected int m_siteCount;
     int m_hostCount;
+    int m_missingHostCount = 0;
     int m_kfactor = 0;
     int m_clusterId;
     protected String m_jarFileName;
@@ -189,6 +190,17 @@ public class LocalCluster extends VoltServerConfig {
     {
         this(jarFileName, siteCount, hostCount, kfactor, target, null);
     }
+
+    public LocalCluster(String jarFileName,
+            int siteCount,
+            int hostCount,
+            int kfactor,
+            BackendTarget target,
+            int inactiveCount)
+{
+       this(jarFileName, siteCount, hostCount, kfactor, target, null);
+       this.m_missingHostCount = inactiveCount;
+}
 
     public LocalCluster(String jarFileName,
                         int siteCount,
@@ -301,6 +313,7 @@ public class LocalCluster extends VoltServerConfig {
             m_sitesperhostOverrides.put(hostId, m_siteCount);
         }
         templateCmdLine.hostCount(hostCount);
+        templateCmdLine.setMissingHostCount(m_missingHostCount);
         templateCmdLine.setNewCli(isNewCli);
         setEnableSSL(isEnableSSL);
         if (kfactor > 0 && !MiscUtils.isPro()) {
@@ -730,7 +743,8 @@ public class LocalCluster extends VoltServerConfig {
         templateCmdLine.coordinators(internalPortGenerator.getCoordinators());
 
         m_eeProcs.clear();
-        for (int ii = 0; ii < m_hostCount; ii++) {
+        int hostCount = m_hostCount - m_missingHostCount;
+        for (int ii = 0; ii < hostCount; ii++) {
             String logfile = "LocalCluster_host_" + ii + ".log";
             m_eeProcs.add(new EEProcess(templateCmdLine.target(), m_siteCount, logfile));
         }
@@ -756,7 +770,7 @@ public class LocalCluster extends VoltServerConfig {
         }
 
         // create all the out-of-process servers
-        for (int i = oopStartIndex; i < m_hostCount; i++) {
+        for (int i = oopStartIndex; i < hostCount; i++) {
             try {
                 if (isNewCli && !skipInit) {
                     initOne(i, clearLocalDataDirectories);
@@ -1061,6 +1075,7 @@ public class LocalCluster extends VoltServerConfig {
                 cmdln.m_sitesperhost = m_sitesperhostOverrides.get(hostId);
             }
 
+            cmdln.setMissingHostCount(m_missingHostCount);
             m_cmdLines.add(cmdln);
             m_procBuilder.command().clear();
             List<String> cmdlnList = cmdln.createCommandLine();
@@ -1123,7 +1138,7 @@ public class LocalCluster extends VoltServerConfig {
             assert (false);
         }
 
-        if (waitForReady && (startAction == StartAction.JOIN || startAction == StartAction.PROBE)) {
+        if (waitForReady && (startAction == StartAction.JOIN || startAction == StartAction.PROBE || startAction == StartAction.REJOIN)) {
             waitOnPTFReady(ptf, true, System.currentTimeMillis(), System.currentTimeMillis(), hostId);
         }
 
@@ -1187,6 +1202,20 @@ public class LocalCluster extends VoltServerConfig {
             throw new RuntimeException(ioe);
         }
     }
+
+    //create a new node and join to the cluster via rejoin
+    public void rejoinOne(int hostId) {
+        try {
+            if (isNewCli && !m_hostRoots.containsKey(Integer.toString(hostId))) {
+                initLocalServer(hostId, true);
+            }
+            startOne(hostId, true, StartAction.REJOIN, true, null);
+        }
+        catch (IOException ioe) {
+            throw new RuntimeException(ioe);
+        }
+    }
+
     /**
      * join multiple nodes to the cluster
      * @param hostIds a set of new host ids
@@ -1966,6 +1995,13 @@ public class LocalCluster extends VoltServerConfig {
                                                   int replicationPort, int remoteReplicationPort, String pathToVoltDBRoot, String jar,
                                                   DrRoleType drRole, boolean hasLocalServer) throws IOException {
         VoltProjectBuilder builder = new VoltProjectBuilder();
+        return createLocalCluster(schemaDDL, siteCount, hostCount, kfactor, clusterId, replicationPort, remoteReplicationPort,
+                pathToVoltDBRoot, jar, drRole, hasLocalServer, builder);
+    }
+
+    public static LocalCluster createLocalCluster(String schemaDDL, int siteCount, int hostCount, int kfactor, int clusterId,
+                                                  int replicationPort, int remoteReplicationPort, String pathToVoltDBRoot, String jar,
+                                                  DrRoleType drRole, boolean hasLocalServer, VoltProjectBuilder builder) throws IOException {
         builder.addLiteralSchema(schemaDDL);
         builder.setDrProducerEnabled();
         if (drRole == DrRoleType.REPLICA) {
@@ -1984,6 +2020,8 @@ public class LocalCluster extends VoltServerConfig {
         System.out.println("Starting local cluster.");
         lc.setHasLocalServer(hasLocalServer);
         lc.overrideAnyRequestForValgrind();
+        lc.setJavaProperty("DR_QUERY_INTERVAL", "5");
+        lc.setJavaProperty("DR_RECV_TIMEOUT", "5000");
         if (!lc.isNewCli()) {
             lc.setDeploymentAndVoltDBRoot(builder.getPathToDeployment(), pathToVoltDBRoot);
             lc.startUp(false);

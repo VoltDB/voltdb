@@ -14,27 +14,19 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
+package org.voltdb.plannodes;
 
-package org.voltdb;
-
-import org.voltdb.catalog.Procedure;
-
-public class ProcedureRunnerFactory {
-
-    protected SiteProcedureConnection m_site;
-    protected SystemProcedureExecutionContext m_context;
-
-    public void configure(SiteProcedureConnection site,
-            SystemProcedureExecutionContext context) {
-        m_site = site;
-        m_context = context;
-    }
-
-    public ProcedureRunner create(
-            VoltProcedure procedure,
-            Procedure catProc,
-            CatalogSpecificPlanner csp) {
-        return new ProcedureRunner(procedure, m_site, m_context, catProc, csp);
-    }
-
+/**
+ * Scan nodes and join nodes may have ordering information
+ * which we can use to avoid creating ORDERBY nodes, and so to
+ * avoid unnecessary sorting.  All the information in these nodes
+ * is carried in m_indexUse members.
+ * The class hierarchy for AbstractJoinPlanNode
+ * and IndexScanPlanNode define such a member to implement this.
+ */
+public interface IndexSortablePlanNode  {
+    // Characterizations of the order provided by the underlying index
+    public IndexUseForOrderBy indexUse();
+    // return "this" index scan or join plan node
+    public AbstractPlanNode planNode();
 }

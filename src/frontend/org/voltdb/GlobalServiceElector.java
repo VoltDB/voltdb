@@ -60,6 +60,12 @@ class GlobalServiceElector implements LeaderNoticeHandler
         }
     }
 
+    /** remove a service */
+    synchronized void unregisterService(Promotable service)
+    {
+        m_services.remove(service);
+    }
+
     /** Kick off the leader election.
      * Will block until all of the acceptPromotion() calls to all of the services return at the initial leader.
      */

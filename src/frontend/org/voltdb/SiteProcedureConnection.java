@@ -167,6 +167,11 @@ public interface SiteProcedureConnection {
      */
     public ProcedureRunner getProcedureRunner(String procedureName);
 
+    /**
+     * @return SystemProcedureExecutionContext
+     */
+    public SystemProcedureExecutionContext getSystemProcedureExecutionContext();
+
     /*
      * This isn't just a simple setter, it has behavior side effects
      * as well because it causes the Site to start replaying log data
