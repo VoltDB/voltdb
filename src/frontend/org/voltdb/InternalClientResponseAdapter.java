@@ -20,7 +20,9 @@ package org.voltdb;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
@@ -66,7 +68,8 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
     private final long m_connectionId;
     private final AtomicLong m_handles = new AtomicLong();
     private final AtomicLong m_failures = new AtomicLong(0);
-    private final ConcurrentMap<Long, InternalCallback> m_callbacks = new ConcurrentHashMap<>(2048, .75f, 128);
+    //private final ConcurrentMap<Long, InternalCallback> m_callbacks = new ConcurrentHashMap<>(2048, .75f, 128);
+    private final Map<Long, InternalCallback> m_callbacks = Collections.synchronizedMap(new HashMap<Long, InternalCallback>());
     private final ConcurrentMap<Integer, ExecutorService> m_partitionExecutor = new NonBlockingHashMap<>();
     // Maintain internal connection ids per caller id. This is useful when collecting statistics
     // so that information can be grouped per user of this Connection.
@@ -191,9 +194,18 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
                     task.setClientHandle(handle);
                     final InternalCallback cb = new InternalCallback(
                             kattrs, catProc, task, procName, partition, proccb, statsCollector, user, handle);
+
+                    System.out.println("ICH::createTransaction handle: " + String.valueOf(handle));
                     m_callbacks.put(handle, cb);
 
-                    ClientResponseImpl r = dispatcher.dispatch(task, kattrs, InternalClientResponseAdapter.this, user, null);
+                    ClientResponseImpl r = null;
+                    try {
+                        r = dispatcher.dispatch(task, kattrs, InternalClientResponseAdapter.this, user, null);
+                    }
+                    catch (Exception e) {
+                        e.printStackTrace();
+                        assert(false);
+                    }
                     boolean bval = r == null || r.getStatus() == ClientResponse.SUCCESS;
                     if (r != null) {
                         try {
@@ -276,7 +288,13 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
         } catch (IOException ex) {
             VoltDB.crashLocalVoltDB("enqueue() in InternalClientResponseAdapter throw an exception", true, ex);
         }
+
+        System.out.println("ICRA::Enqueue resp.getClientHandle(): " + String.valueOf(resp.getClientHandle()));
+
         final Callback callback = m_callbacks.get(resp.getClientHandle());
+        if (callback == null) {
+            throw new IllegalStateException("Callback was null?");
+        }
         if (!m_partitionExecutor.containsKey(callback.getPartitionId())) {
             m_logger.error("Invalid partition response recieved for sending internal client response.");
             return;
@@ -404,8 +422,12 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
     public long connectionId(long clientHandle) {
         InternalCallback callback = m_callbacks.get(clientHandle);
         if (callback==null) {
-            m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.WARN, null,
-                    "Could not find caller details for client handle %d. Using internal adapter level connection id", clientHandle);
+            Throwable t = new Throwable();
+            t.printStackTrace();
+
+            //m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.WARN, null,
+            //        "Could not find caller details for client handle %d. Using internal adapter level connection id", clientHandle);
+            m_logger.warn("Could not find caller details for client handle %d. Using internal adapter level connection id " + String.valueOf(clientHandle));
             return connectionId();
         }
 

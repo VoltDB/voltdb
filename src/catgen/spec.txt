@@ -115,6 +115,7 @@ begin Procedure javaonly    "A stored procedure (transaction) in the system"
   Statement* statements     "The set of SQL statements this procedure may call"
   ProcParameter* parameters "The set of parameters to this stored procedure"
   bool allowedInShutdown    "Whether this procedure is allowed to be executed during shutdown"
+  bool transactional        "Whether the code needs to access state or just run anywhere"
 end
 
 begin Table                                  "A table (relation) in the database"

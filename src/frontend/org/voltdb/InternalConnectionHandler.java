@@ -17,12 +17,14 @@
 
 package org.voltdb;
 
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.AuthSystem.AuthUser;
+import org.voltdb.ProcedureRunnerNT.MyAllHostProcedureCallback;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.BatchTimeoutOverrideType;
@@ -46,6 +48,9 @@ public class InternalConnectionHandler {
     private final AtomicInteger m_backpressureIndication = new AtomicInteger(0);
     private final InternalClientResponseAdapter m_adapter;
     private final ClientInterfaceHandleManager m_cihm;
+
+    public final ConcurrentHashMap<Long, MyAllHostProcedureCallback> m_ntCrossHostCallbacks =
+            new ConcurrentHashMap<>();
 
     public InternalConnectionHandler(InternalClientResponseAdapter adapter, ClientInterfaceHandleManager cihm) {
         m_adapter = adapter;
@@ -86,7 +91,68 @@ public class InternalConnectionHandler {
             String procName,
             Object...args)
     {
+        Procedure catProc = InvocationDispatcher.getProcedureFromName(procName, getCatalogContext());
+        if (catProc == null) {
+            String fmt = "Cannot invoke procedure %s. Procedure not found.";
+            m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.ERROR, null, fmt, procName);
+            m_failedCount.incrementAndGet();
+            return false;
+        }
 
+        //Indicate backpressure or not.
+        boolean b = hasBackPressure();
+        if (b) {
+            applyBackPressure();
+        }
+
+        StoredProcedureInvocation task = new StoredProcedureInvocation();
+        task.setProcName(procName);
+        task.setParams(args);
+
+        try {
+            task = MiscUtils.roundTripForCL(task);
+            task.setClientHandle(m_adapter.connectionId());
+        } catch (Exception e) {
+            String fmt = "Cannot invoke procedure %s. failed to create task.";
+            m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.ERROR, null, fmt, procName);
+            m_failedCount.incrementAndGet();
+            return false;
+        }
+
+        if (timeout != BatchTimeoutOverrideType.NO_TIMEOUT) {
+            task.setBatchTimeout(timeout);
+        }
+
+        int partition = -1;
+        try {
+            partition = InvocationDispatcher.getPartitionForProcedure(catProc, task);
+        } catch (Exception e) {
+            String fmt = "Can not invoke procedure %s. Partition not found.";
+            m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.ERROR, e, fmt, procName);
+            m_failedCount.incrementAndGet();
+            return false;
+        }
+
+        InternalAdapterTaskAttributes kattrs = new InternalAdapterTaskAttributes(
+                DEFAULT_INTERNAL_ADAPTER_NAME, isAdmin, m_adapter.connectionId());
+
+        if (!m_adapter.createTransaction(kattrs, procName, catProc, cb, null, task, user, partition, System.nanoTime())) {
+            m_failedCount.incrementAndGet();
+            return false;
+        }
+        m_submitSuccessCount.incrementAndGet();
+        return true;
+    }
+
+    public boolean callNTProcedureOnHost(
+            long hostId,
+            AuthUser user,
+            boolean isAdmin,
+            int timeout,
+            ProcedureCallback cb,
+            String procName,
+            Object...args)
+    {
         Procedure catProc = InvocationDispatcher.getProcedureFromName(procName, getCatalogContext());
         if (catProc == null) {
             String fmt = "Cannot invoke procedure %s. Procedure not found.";

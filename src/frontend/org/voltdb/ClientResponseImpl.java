@@ -132,6 +132,10 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
         clientHandle = aHandle;
     }
 
+    public void setAppStatusString(String appStatusString) {
+        this.appStatusString = appStatusString;
+    }
+
     public long getClientHandle() {
         return clientHandle;
     }

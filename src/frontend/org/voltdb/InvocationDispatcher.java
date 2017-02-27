@@ -36,6 +36,8 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -142,7 +144,14 @@ public final class InvocationDispatcher {
     // used to decide if we should shortcut reads
     private final Consistency.ReadLevel m_defaultConsistencyReadLevel;
 
+    private final LoadedNTProcedureSet m_loadedNTProcedureSet;
+    private final ExecutorService m_ntProcsService = new ThreadPoolExecutor(2, 2,
+            60L, TimeUnit.SECONDS,
+            new LinkedBlockingQueue<Runnable>());
+
     private final boolean m_isConfiguredForNonVoltDBBackend;
+
+    InternalConnectionHandler m_ich;
 
     public final static class Builder {
 
@@ -154,6 +163,7 @@ public final class InvocationDispatcher {
         SnapshotDaemon m_snapshotDaemon;
         long m_plannerSiteId;
         long m_siteId;
+        InternalConnectionHandler m_ich;
 
         public Builder cartographer(Cartographer cartographer) {
             m_cartographer = checkNotNull(cartographer, "given cartographer is null");
@@ -195,6 +205,11 @@ public final class InvocationDispatcher {
             return this;
         }
 
+        public Builder internalConnectionHandler(InternalConnectionHandler ich) {
+            m_ich = checkNotNull(ich,"internal connection handler is null");;
+            return this;
+        }
+
         public InvocationDispatcher build() {
             return new InvocationDispatcher(
                     m_cartographer,
@@ -204,7 +219,8 @@ public final class InvocationDispatcher {
                     m_snapshotDaemon,
                     m_replicationRole,
                     m_plannerSiteId,
-                    m_siteId
+                    m_siteId,
+                    m_ich
                     );
         }
     }
@@ -221,7 +237,8 @@ public final class InvocationDispatcher {
             SnapshotDaemon snapshotDaemon,
             ReplicationRole replicationRole,
             long plannerSiteId,
-            long siteId)
+            long siteId,
+            InternalConnectionHandler ich)
     {
         m_siteId = siteId;
         m_plannerSiteId = plannerSiteId;
@@ -239,8 +256,17 @@ public final class InvocationDispatcher {
 
         m_snapshotDaemon = checkNotNull(snapshotDaemon,"given snapshot daemon is null");
 
+        m_ich = ich;
+
         // try to get the global default setting for read consistency, but fall back to SAFE
         m_defaultConsistencyReadLevel = VoltDB.Configuration.getDefaultReadConsistencyLevel();
+
+        m_loadedNTProcedureSet = new LoadedNTProcedureSet(m_ich, m_ntProcsService, m_mailbox);
+        notifyOfCatalogUpdate();
+    }
+
+    void notifyOfCatalogUpdate() {
+        m_loadedNTProcedureSet.update(m_catalogContext.get());
     }
 
     /*
@@ -274,6 +300,11 @@ public final class InvocationDispatcher {
 
         });
     }
+
+    //public final void dispatchNTResponse() {
+    //    m_loadedNTProcedureSet
+    //}
+    // TODO
 
     public final ClientResponseImpl dispatch(
             StoredProcedureInvocation task,
@@ -348,6 +379,11 @@ public final class InvocationDispatcher {
                                  "and must not be a system procedure.",
                         task.clientHandle);
             }
+        }
+
+        // handle non-transactional procedures
+        if ((catProc.getTransactional() == false) && (catProc.getHasjava() == true) && (catProc.getSystemproc() == false)) {
+            return dispatchNTProcedure(task, user, ccxn);
         }
 
         if (catProc.getSystemproc()) {
@@ -845,6 +881,18 @@ public final class InvocationDispatcher {
         buf.flip();
         ccxn.writeStream().enqueue(buf);
         return null;
+    }
+
+    private final ClientResponseImpl dispatchNTProcedure(StoredProcedureInvocation task,
+                                                         AuthUser user,
+                                                         Connection ccxn)
+    {
+        ParameterSet paramSet = task.getParams();
+        return m_loadedNTProcedureSet.callProcedureNT(user,
+                                                      ccxn,
+                                                      task.clientHandle,
+                                                      task.getProcName(),
+                                                      paramSet);
     }
 
     private final ClientResponseImpl dispatchAdHoc(StoredProcedureInvocation task, InvocationClientHandler handler,

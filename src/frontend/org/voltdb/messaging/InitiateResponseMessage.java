@@ -145,6 +145,10 @@ public class InitiateResponseMessage extends VoltMessage {
         m_recovering = recovering;
     }
 
+    public void setConnectionId(long connectionId) {
+        m_connectionId = connectionId;
+    }
+
     public boolean isMispartitioned() {
         return m_mispartitioned;
     }

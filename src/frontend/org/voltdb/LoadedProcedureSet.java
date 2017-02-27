@@ -147,6 +147,11 @@ public class LoadedProcedureSet {
                 continue;
             }
 
+            // skip non-transactional procs. Those will be handled by LoadedNTProcedureSet
+            if (proc.getTransactional() == false) {
+                continue;
+            }
+
             VoltProcedure procedure = null;
             // default to Java
             Language lang = Language.JAVA;
