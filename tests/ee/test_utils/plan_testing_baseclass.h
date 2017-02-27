@@ -129,13 +129,15 @@ public:
         m_topend.reset(TOPEND::newInstance());
         m_engine.reset(new voltdb::VoltDBEngine(m_topend.get()));
         m_parameter_buffer.reset(new char [4 * 1024]);
+        m_granular_stats_buffer.reset(new char [4 * 1024]);
         m_result_buffer.reset(new char [1024 * 1024 * 2]);
         m_exception_buffer.reset(new char [4 * 1024]);
         m_engine->setBuffers(m_parameter_buffer.get(), 4 * 1024,
-                             NULL, 0,
+                             m_granular_stats_buffer.get(), 4 * 1024,
                              m_result_buffer.get(), 1024 * 1024 * 2,
                              m_exception_buffer.get(), 4096);
         m_engine->resetReusedResultOutputBuffer();
+        m_engine->resetGranularStatisticsOutputBuffer();
         int partitionCount = 3;
         m_engine->initialize(m_cluster_id, m_site_id, 0, 0, "", 0, 1024, voltdb::DEFAULT_TEMP_TABLE_MEMORY, false);
         m_engine->updateHashinator(voltdb::HASHINATOR_LEGACY, (char*)&partitionCount, NULL, 0);
@@ -303,6 +305,7 @@ protected:
     boost::shared_array<char>m_result_buffer;
     boost::shared_array<char>m_exception_buffer;
     boost::shared_array<char>m_parameter_buffer;
+    boost::shared_array<char>m_granular_stats_buffer;
     bool                     m_isinitialized;
     int                      m_fragmentNumber;
 };
