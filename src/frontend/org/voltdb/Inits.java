@@ -746,18 +746,29 @@ public class Inits {
                     allPartitions[ii] = ii;
                 }
 
-                org.voltdb.catalog.CommandLog cl = m_rvdb.m_catalogContext.cluster.getLogconfig().get("log");
-                if (cl == null || !cl.getEnabled()) return;
                 NodeSettings paths = m_rvdb.m_nodeSettings;
+                org.voltdb.catalog.CommandLog cl = m_rvdb.m_catalogContext.cluster.getLogconfig().get("log");
+                String clPath = null;
+                String clSnapshotPath = null;
+                boolean clenabled = true;
+                if (cl == null || !cl.getEnabled()) {
+                     //We have no durability and no terminus so nothing to restore.
+                     if (m_rvdb.m_terminusNonce == null) return;
+                     //We have terminus so restore.
+                     clenabled = false;
+                 } else {
+                     clPath = paths.resolve(paths.getCommandLog()).getPath();
+                     clSnapshotPath = paths.resolve(paths.getCommandLogSnapshot()).getPath();
+                }
                 try {
                     m_rvdb.m_restoreAgent = new RestoreAgent(
                                                       m_rvdb.m_messenger,
                                                       m_rvdb.getSnapshotCompletionMonitor(),
                                                       m_rvdb,
                                                       m_config.m_startAction,
-                                                      cl.getEnabled(),
-                                                      paths.resolve(paths.getCommandLog()).getPath(),
-                                                      paths.resolve(paths.getCommandLogSnapshot()).getPath(),
+                                                      clenabled,
+                                                      clPath,
+                                                      clSnapshotPath,
                                                       snapshotPath,
                                                       allPartitions,
                                                       paths.getVoltDBRoot().getPath(),

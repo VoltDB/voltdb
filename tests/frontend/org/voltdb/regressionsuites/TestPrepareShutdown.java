@@ -67,7 +67,7 @@ public class TestPrepareShutdown extends RegressionSuite
         } catch (ProcCallException e) {
             //if execution reaches here, it indicates the expected exception was thrown.
             System.out.println("@SystemInformation:" + e.getMessage());
-            assertTrue("Server shutdown in progress - new transactions are not processed.".equals(e.getMessage()));
+            assertTrue("Server is shutting down.".equals(e.getMessage()));
         }
 
         //test query that is not allowed
@@ -77,7 +77,7 @@ public class TestPrepareShutdown extends RegressionSuite
         } catch (ProcCallException e) {
             //if execution reaches here, it indicates the expected exception was thrown.
             System.out.println("ArbitraryDurationProc:" + e.getMessage());
-            assertTrue("Server shutdown in progress - new transactions are not processed.".equals(e.getMessage()));
+            assertTrue("Server is shutting down.".equals(e.getMessage()));
         }
         long sum = Long.MAX_VALUE;
         while (sum > 0) {
