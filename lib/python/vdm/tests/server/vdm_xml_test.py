@@ -292,7 +292,8 @@ class Deployment(unittest.TestCase):
                                           "stream": "test", "property": [{"name": "metadata.broker.list",
                                                                           "value": "test"}]}]},
             "import": {"configuration": [{"enabled": False, "type": "kafka", "module": "test", "format": "test",
-                                          "property": [{"name": "metadata.broker.list", "value": "test"}]}]}
+                                          "property": [{"name": "metadata.broker.list", "value": "test"}]}]},
+            "dr": {"id": 1, "port": 12, "listen": True, "role": "replica", "connection": {"source": "127.0.0.1"}}
         }
 
         response = requests.put(url_dep,
@@ -380,6 +381,13 @@ class UpdateDatabaseDeployment(Deployment):
                         self.assertEqual(child.attrib['provider'], "HASH")
                     if child.tag == "partition-detection":
                         self.assertEqual(child.attrib['enabled'], "true")
+                    if child.tag == "dr":
+                        self.assertEqual(child.attrib['id'], "1")
+                        self.assertEqual(child.attrib['port'], "12")
+                        self.assertEqual(child.attrib['listen'], "true")
+                        self.assertEqual(child.attrib['role'], "replica")
+                        for sub_node in child:
+                            self.assertEqual(sub_node.attrib['source'], "127.0.0.1")
 
 if __name__ == '__main__':
     unittest.main(testRunner=xmlrunner.XMLTestRunner(output='test-reports'))

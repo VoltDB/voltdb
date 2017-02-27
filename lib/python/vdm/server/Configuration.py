@@ -759,6 +759,8 @@ def set_dr_field(deployment, field, new_deployment):
             new_deployment[field]['id'] = int(deployment[field]['id'])
             new_deployment[field]['listen'] = parse_bool_string(deployment[field]
                                                                 ['listen'])
+            if 'role' in deployment[field]:
+                new_deployment[field]['role'] = str(deployment[field]['role'])
             if 'port' in deployment[field]:
                 new_deployment[field]['port'] = int(deployment[field]['port'])
             if 'connection' in deployment[field] and deployment[field]['connection'] \
@@ -954,6 +956,7 @@ def populate_server(servers, databases, log):
     for mem in member_json:
             members.append(mem['id'])
     return members
+
 
 def get_users_from_xml(deployment_xml, is_list):
     """
@@ -1361,6 +1364,12 @@ def check_validation_deployment(req):
                         and ('privacykey' not in req.json['snmp'] or ('privacykey' in req.json['snmp'] and
                                                                               req.json['snmp']['privacykey'] == '')):
                     return {'status': 401, 'statusString': 'SNMP: Invalid or no privacy key.'}
+
+    if 'dr' in req.json and 'role' in req.json['dr']:
+        if req.json['dr']['role'] == 'xdcr' or req.json['dr']['role'] == 'replica':
+            if not ('connection' in req.json['dr'] and 'source' in req.json['dr']['connection']
+                    and req.json['dr']['connection']['source'] != ''):
+                return {'status': 401, 'statusString': 'DR: ' + 'Role replica and xdcr required connection source.'}
 
     return {'status': 200, 'statusString': 'success'}
 
