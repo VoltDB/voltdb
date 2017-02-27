@@ -120,23 +120,28 @@ public class TestInitStartLocalClusterAllOutOfProcess extends JUnit4LocalCluster
         }
         assertTrue(found);
         assertEquals(org.voltcore.common.Constants.DEFAULT_HEARTBEAT_TIMEOUT_SECONDS, timeout);
+
+        if (!cluster.isNewCli()) {
+            // get command is not supported in legacy cli as voltdbroot
+            // under the parent can't be determined deterministically
+            // using voltdbroot as the root of database directory
+            return;
+        }
+
+        // Test get command
+        testGetDeployment();
+        testGetSchema();
     }
 
-    @Test
     // Test get deployment
     public void testGetDeployment() throws Exception {
-        // get command is not supported in legacy cli as voltdbroot
-        // under the parent can't be determined deterministically
-        // using voltdbroot as the root of database directory
-        if (!cluster.isNewCli()) return;
-
         File deployment = File.createTempFile("get_deployment", ".xm");
         if (deployment.exists()) deployment.delete();
 
-        Configuration c1 = new VoltDB.Configuration(new String[]{"get", "deployment",
+        Configuration config = new VoltDB.Configuration(new String[]{"get", "deployment",
             "getvoltdbroot", voltDBRootParentPath,
-            "file", deployment.getAbsolutePath() + "l"});
-        ServerThread server = new ServerThread(c1);
+            "file", deployment.getAbsolutePath() + "l", "forceget"});
+        ServerThread server = new ServerThread(config);
 
         try {
             server.cli();
@@ -149,20 +154,13 @@ public class TestInitStartLocalClusterAllOutOfProcess extends JUnit4LocalCluster
         assertEquals(dt.getPaths().getVoltdbroot().getPath(), voltDbRootPath);
     }
 
-    @Test
     // Test get schema
     public void testGetSchema() throws Exception {
-        // get command is not supported in legacy cli as voltdbroot
-        // under the parent can't be determined deterministically
-        // using voltdbroot as the root of database directory
-        if (!cluster.isNewCli()) return;
-
         File schema = File.createTempFile("schema", ".sql");
-
-        Configuration c1 = new VoltDB.Configuration(new String[]{"get", "schema",
+        Configuration config = new VoltDB.Configuration(new String[]{"get", "schema",
             "getvoltdbroot", voltDBRootParentPath,
             "file", schema.getAbsolutePath(), "forceget"});
-        ServerThread server = new ServerThread(c1);
+        ServerThread server = new ServerThread(config);
 
         try {
             server.cli();
@@ -178,5 +176,4 @@ public class TestInitStartLocalClusterAllOutOfProcess extends JUnit4LocalCluster
         assertTrue(ddl.toLowerCase().contains("ival bigint default '0' not null"));
         assertTrue(ddl.toLowerCase().contains("primary key (ival)"));
     }
-
 }
