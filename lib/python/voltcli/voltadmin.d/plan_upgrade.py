@@ -32,7 +32,8 @@ RELEASE_MINOR_VERSION = 0
             VOLT.PathArgument('newKit', 'path to new VoltDB kit directory', absolute=True, optional=False),
             VOLT.PathArgument('newRoot', 'path to the parent of new VoltDB root directory', absolute=True, optional=False),
             VOLT.StringArgument('newNode', 'hostname[:PORT] or IP[:PORT] of the extra node. (default PORT=3021)', optional=True)
-    )
+    ),
+    hideverb=True
 )
 
 def plan_upgrade(runner):
@@ -78,11 +79,16 @@ def basicCheck(runner):
     for tuple in response.table(0).tuples():
         hosts.update(tuple[0], tuple[1], tuple[2])
     
-    numberOfNodes = len(hosts.hosts_by_id)
-    if numberOfNodes % 2 == 1 and runner.opts.newNode is None:
+    # get current version and root directory from an arbitrary node
+    host = hosts.hosts_by_id.itervalues().next();
+    fullClusterSize = int(host.fullclustersize)
+    if len(hosts.hosts_by_id) < fullClusterSize:
+        runner.abort("Current cluster needs %d more node(s) to achieve full K-safety. In-service upgrade is not recommended in partial K-safety cluster." 
+                     % (fullClusterSize - len(hosts.hosts_by_id)))
+    
+    if fullClusterSize % 2 == 1 and runner.opts.newNode is None:
         runner.abort("The cluster has odd number of nodes, plan_upgrade needs an extra node to generate the instructions")
         
-    # get current version and root directory from an arbitrary node
     host = hosts.hosts_by_id.itervalues().next();
     currentVersion = host.version
     currentVoltDBRoot = host.voltdbroot
@@ -103,7 +109,7 @@ def basicCheck(runner):
         runner.abort("Current cluster doesn't have duplicate partitions to perform in-service upgrade. K-factor: %d" % kfactor)
     
     # N = 1, abort with error message
-    if numberOfNodes == 1: 
+    if fullClusterSize == 1: 
         runner.abort("Current cluster doesn't have enough node to perform in-service upgrade, at least two nodes are required")
         
     return hosts, kfactor

@@ -25,7 +25,7 @@ from voltcli import utility
     bundles = VOLT.AdminBundle(),
     description = 'Stop one host of a running VoltDB cluster.',
     arguments = (
-        VOLT.StringArgument('target_host', 'the target HOST[:PORT] name or address. (default PORT=3021)'),
+        VOLT.StringArgument('target_host', 'the target hostname[:port] or address[:port]. (default port=3021)'),
     ),
 )
 
