@@ -132,6 +132,7 @@ public:
         m_result_buffer.reset(new char [1024 * 1024 * 2]);
         m_exception_buffer.reset(new char [4 * 1024]);
         m_engine->setBuffers(m_parameter_buffer.get(), 4 * 1024,
+                             NULL, 0,
                              m_result_buffer.get(), 1024 * 1024 * 2,
                              m_exception_buffer.get(), 4096);
         m_engine->resetReusedResultOutputBuffer();
