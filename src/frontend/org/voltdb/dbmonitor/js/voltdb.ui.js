@@ -1605,15 +1605,14 @@ var loadPage = function (serverName, portid) {
             }
 
             var content = "<table width='100%' border='0' cellspacing='0' id='tblSP' cellpadding='0' class='storeTbl drTbl no-footer dataTable' aria-describedby='tblSP_info' role='grid'>" +
-                "<thead><tr role='row'><th id='spProcedure' width='25%' data-name='none' class='' tabindex='0' aria-controls='tblSP' rowspan='1' colspan='1' aria-sort='ascending' aria-label='Stored Procedure: activate to sort column descending'>Stored Procedure</th>" +
-                "<th id='spInvocations' width='20%' data-name='none' class='sorting' tabindex='0' aria-controls='tblSP' rowspan='1' colspan='1' >Invocations</th>" +
-                "<th id='spMinLatency' width='20%' data-name='none' class='sorting' tabindex='0' aria-controls='tblSP' rowspan='1' colspan='1' >Min Latency (ms)</th>" +
-                "<th id='spMaxLatency' width='20%' data-name='none' class='sorting' tabindex='0' aria-controls='tblSP' rowspan='1' colspan='1' >Max Latency (ms)</th>" +
-                "<th id='spAvgLatency' width='20%' data-name='none' class='sorting' tabindex='0' aria-controls='tblSP' rowspan='1' colspan='1' >Avg Latency (ms)</th>" +
-                "<th id='spTimeOfExecution' width='20%' data-name='none' class='sorting' tabindex='0' aria-controls='tblSP' rowspan='1' colspan='1' >% Time of Execution</th>" +
+                "<thead><tr role='row'><th id='spProcedure' width='30%' data-name='none' class='' tabindex='0' aria-controls='tblSP' rowspan='1' colspan='1' aria-sort='ascending' aria-label='Stored Procedure: activate to sort column descending'>Stored Procedure</th>" +
+                "<th id='spInvocations' width='10%' data-name='none' class='sorting' tabindex='0' aria-controls='tblSP' rowspan='1' colspan='1' >Invocations</th>" +
+                "<th id='spMinLatency' width='15%' data-name='none' class='sorting' tabindex='0' aria-controls='tblSP' rowspan='1' colspan='1' >Min Latency (ms)</th>" +
+                "<th id='spMaxLatency' width='15%' data-name='none' class='sorting' tabindex='0' aria-controls='tblSP' rowspan='1' colspan='1' >Max Latency (ms)</th>" +
+                "<th id='spAvgLatency' width='15%' data-name='none' class='sorting' tabindex='0' aria-controls='tblSP' rowspan='1' colspan='1' >Avg Latency (ms)</th>" +
+                "<th id='spTimeOfExecution' width='15%' data-name='none' class='sorting' tabindex='0' aria-controls='tblSP' rowspan='1' colspan='1' >% Time of Execution</th>" +
                 "</thead><tbody>";
             $("#tblSP_wrapper").find(".sPContainer").html(content + htmlcontent + "</tbody></table>");
-
             spTable = $("#tblSP").DataTable({
                 stateSave: true,
                 pageLength: 5,
@@ -1839,15 +1838,14 @@ var loadPage = function (serverName, portid) {
             }
 
             var content = "<table width='100%' border='0' cellspacing='0' id='tblDT' cellpadding='0' class='storeTbl drTbl no-footer dataTable' aria-describedby='tblCmdLog_info' role='grid'>" +
-                "<thead><tr role='row'><th id='cmdServer' width='25%' data-name='none' class='' tabindex='0' aria-controls='tblDT' rowspan='1' colspan='1' aria-sort='ascending' aria-label='Server: activate to sort column descending'>Table</th>" +
-                "<th id='cmdPendingBytes' width='20%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDT' rowspan='1' colspan='1' >Row Count</th>" +
-                "<th id='cmdPendingTrans' width='20%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDT' rowspan='1' colspan='1' >Max Rows (per partition)</th>" +
-                "<th id='cmdTotalSegments' width='20%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDT' rowspan='1' colspan='1' >Min Rows (per partition)</th>" +
-                "<th id='cmdSegmentsInUse' width='20%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDT' rowspan='1' colspan='1' >Avg Rows (per partition)</th>" +
-                "<th id='cmdFsyncInterval' width='20%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDT' rowspan='1' colspan='1' >Type</th>" +
+                "<thead><tr role='row'><th id='cmdServer' width='30%' data-name='none' class='' tabindex='0' aria-controls='tblDT' rowspan='1' colspan='1' aria-sort='ascending' aria-label='Server: activate to sort column descending'>Table</th>" +
+                "<th id='cmdPendingBytes' width='10%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDT' rowspan='1' colspan='1' >Row Count</th>" +
+                "<th id='cmdPendingTrans' width='15%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDT' rowspan='1' colspan='1' >Max Rows (per partition)</th>" +
+                "<th id='cmdTotalSegments' width='15%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDT' rowspan='1' colspan='1' >Min Rows (per partition)</th>" +
+                "<th id='cmdSegmentsInUse' width='15%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDT' rowspan='1' colspan='1' >Avg Rows (per partition)</th>" +
+                "<th id='cmdFsyncInterval' width='15%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDT' rowspan='1' colspan='1' >Type</th>" +
                 "</thead><tbody>";
             $("#tblDT_wrapper").find(".dTContainer").html(content + htmlcontent + "</tbody></table>");
-
             dtTable = $("#tblDT").DataTable({
                 stateSave: true,
                 pageLength: 5,
