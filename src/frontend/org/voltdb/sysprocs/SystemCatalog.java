@@ -20,14 +20,14 @@ package org.voltdb.sysprocs;
 import java.util.List;
 import java.util.Map;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.DependencyPair;
-import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
+import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
-import org.voltcore.logging.VoltLogger;
 
 /**
  * Return VoltTable results that correspond to JDBC result sets for selected
@@ -43,7 +43,9 @@ public class SystemCatalog extends VoltSystemProcedure
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
     @Override
-    public void init() {}
+    public long[] getPlanFragmentIds() {
+        return new long[]{};
+    }
 
     @Override
     public DependencyPair executePlanFragment(Map<Integer, List<VoltTable>> dependencies,

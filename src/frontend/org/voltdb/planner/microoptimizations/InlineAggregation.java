@@ -63,8 +63,7 @@ public class InlineAggregation extends MicroOptimization {
 
     AbstractPlanNode inlineAggregationApply(AbstractPlanNode plan) {
         // check for an aggregation of the right form
-        if ((plan instanceof AggregatePlanNode) == false
-                || (plan instanceof WindowFunctionPlanNode)) {
+        if ( ! (plan instanceof AggregatePlanNode) ) {
             return plan;
         }
         assert(plan.getChildCount() == 1);

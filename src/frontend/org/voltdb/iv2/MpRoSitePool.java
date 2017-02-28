@@ -30,7 +30,6 @@ import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.LoadedProcedureSet;
-import org.voltdb.ProcedureRunnerFactory;
 import org.voltdb.StarvationTracker;
 
 /**
@@ -45,11 +44,9 @@ class MpRoSitePool {
     static int INITIAL_POOL_SIZE = 1;
 
     class MpRoSiteContext {
-        final private BackendTarget m_backend;
         final private SiteTaskerQueue m_queue;
         final private MpRoSite m_site;
         final private CatalogContext m_catalogContext;
-        final private ProcedureRunnerFactory m_prf;
         final private LoadedProcedureSet m_loadedProcedures;
         final private Thread m_siteThread;
 
@@ -58,17 +55,13 @@ class MpRoSitePool {
                 InitiatorMailbox initiatorMailbox, CatalogSpecificPlanner csp,
                 ThreadFactory threadFactory)
         {
-            m_backend = backend;
             m_catalogContext = context;
             m_queue = new SiteTaskerQueue();
             // IZZY: Just need something non-null for now
             m_queue.setStarvationTracker(new StarvationTracker(siteId));
             m_site = new MpRoSite(m_queue, siteId, backend, m_catalogContext, partitionId);
-            m_prf = new ProcedureRunnerFactory();
-            m_prf.configure(m_site, m_site.m_sysprocContext);
-            m_loadedProcedures = new LoadedProcedureSet(m_site, m_prf,
-                    initiatorMailbox.getHSId(), 0); // Stale constructor arg, fill with bleh
-            m_loadedProcedures.loadProcedures(m_catalogContext, m_backend, csp);
+            m_loadedProcedures = new LoadedProcedureSet(m_site);
+            m_loadedProcedures.loadProcedures(m_catalogContext, csp);
             m_site.setLoadedProcedures(m_loadedProcedures);
             m_siteThread = threadFactory.newThread(m_site);
             m_siteThread.start();

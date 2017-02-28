@@ -52,9 +52,8 @@ public class PrepareShutdown extends Pause {
     private final static VoltLogger LOG = new VoltLogger("HOST");
 
     @Override
-    public void init() {
-        registerPlanFragment(PF_prepareShutdown);
-        registerPlanFragment(PF_prepareShutdownAggregate);
+    public long[] getPlanFragmentIds() {
+        return new long[]{PF_prepareShutdown, PF_prepareShutdownAggregate};
     }
 
     @Override

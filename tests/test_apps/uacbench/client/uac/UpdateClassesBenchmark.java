@@ -229,24 +229,55 @@ public class UpdateClassesBenchmark {
         // block until all have connected
         connections.await();
     }
+    static public class UACTime {
+        long totalTime = -1;
+        long blockTime = -1;
 
-    static long doUpdateClassesWork(Client client, String prevStmts, byte[] jar, String delPattern, String stmts)
-            throws IOException, NoConnectionsException, ProcCallException {
+        public UACTime(long total, long block) {
+            totalTime = total;
+            blockTime = block;
+        }
+    }
+
+    static long uacBlockTime(Client client, int interval) throws Exception {
+        VoltTable vt = client.callProcedure("@Statistics", "PROCEDURE", interval).getResults()[0];
+        long blockDuration = -1;
+        while(vt.advanceRow()) {
+            if ("org.voltdb.sysprocs.UpdateApplicationCatalog".equals(vt.getString(5))) {
+                blockDuration = vt.getLong(8);
+                break;
+            }
+        }
+        if (blockDuration < 0) {
+            System.err.println(vt);
+            throw new RuntimeException("Negative UpdateApplicationCatalog duration " + blockDuration);
+        }
+
+        return blockDuration;
+    }
+
+    static UACTime doUpdateClassesWork(Client client, String prevStmts, byte[] jar,
+            String delPattern, String stmts) throws Exception {
+        uacBlockTime(client, 0);
+
         long startTS = System.nanoTime();
-
+        long sumBlockTime = 0;
         if (prevStmts != null && prevStmts.length() > 0) {
             client.callProcedure("@AdHoc", prevStmts);
+            sumBlockTime += uacBlockTime(client, 1);
         }
 
         if (jar != null) {
             client.callProcedure("@UpdateClasses", jar, delPattern);
+            sumBlockTime += uacBlockTime(client, 1);
         }
 
         if (stmts != null && stmts.length() > 0) {
             client.callProcedure("@AdHoc", stmts);
+            sumBlockTime += uacBlockTime(client, 1);
         }
 
-        return System.nanoTime() - startTS;
+        return new UACTime(System.nanoTime() - startTS, sumBlockTime);
     }
 
     static byte[] readFileIntoByteArray(String filePath) throws IOException {
@@ -275,10 +306,20 @@ public class UpdateClassesBenchmark {
         long max;
         long sum;
 
+        long bsum;
+
         BenchmarkResult() {
             min = Long.MAX_VALUE;
             max = Long.MIN_VALUE;
             sum = 0;
+        }
+
+        public void updateWithRow(UACTime uacTime) {
+            sum += uacTime.totalTime;
+            if (uacTime.totalTime < min) min = uacTime.totalTime;
+            if (uacTime.totalTime > max) max = uacTime.totalTime;
+
+            bsum += uacTime.blockTime;
         }
     }
 
@@ -292,10 +333,8 @@ public class UpdateClassesBenchmark {
             path = jarPath + "stmts_add_" + base + ".txt";
             String stmts = new String(readFileIntoByteArray(path));
             System.out.println("Invocation " + i + ":" + stmts);
-            long duration = doUpdateClassesWork(client, null, jarBytes, null, stmts);
-            res.sum += duration;
-            if (duration > res.max) res.max = duration;
-            if (duration < res.min) res.min = duration;
+            UACTime uacTime = doUpdateClassesWork(client, null, jarBytes, null, stmts);
+            res.updateWithRow(uacTime);
         }
         return res;
     }
@@ -309,10 +348,8 @@ public class UpdateClassesBenchmark {
             path = jarPath + "stmts_add_batch_" + base + ".txt";
             String stmts = new String(readFileIntoByteArray(path));
             System.out.println("Invocation " + i + ":" + stmts);
-            long duration = doUpdateClassesWork(client, null, jarBytes, null, stmts);
-            res.sum += duration;
-            if (duration > res.max) res.max = duration;
-            if (duration < res.min) res.min = duration;
+            UACTime uacTime = doUpdateClassesWork(client, null, jarBytes, null, stmts);
+            res.updateWithRow(uacTime);
         }
         return res;
     }
@@ -329,10 +366,8 @@ public class UpdateClassesBenchmark {
             String delPattern = readClassDeletePattern(patDelPath);
 
             System.out.println("Invocation " + i + ":" + stmts);
-            long duration = doUpdateClassesWork(client, stmts, null, delPattern, null);
-            res.sum += duration;
-            if (duration > res.max) res.max = duration;
-            if (duration < res.min) res.min = duration;
+            UACTime uacTime = doUpdateClassesWork(client, stmts, null, delPattern, null);
+            res.updateWithRow(uacTime);
         }
         return res;
     }
@@ -349,10 +384,8 @@ public class UpdateClassesBenchmark {
             String delPattern = readClassDeletePattern(patDelPath);
 
             System.out.println("Invocation " + i + ":" + stmts);
-            long duration = doUpdateClassesWork(client, stmts, null, delPattern, null);
-            res.sum += duration;
-            if (duration > res.max) res.max = duration;
-            if (duration < res.min) res.min = duration;
+            UACTime uacTime = doUpdateClassesWork(client, stmts, null, delPattern, null);
+            res.updateWithRow(uacTime);
         }
         return res;
     }
@@ -392,9 +425,9 @@ public class UpdateClassesBenchmark {
         byte[] jarBytes = readFileIntoByteArray(jarPath + "uac_base.jar");
         // setup the base case: 500 tables with 1000 procedures
         String stmts = new String(readFileIntoByteArray(jarPath + "stmts_base.txt"));
-        long duration = doUpdateClassesWork(client, null, jarBytes , null, stmts);
+        UACTime uacTime = doUpdateClassesWork(client, null, jarBytes , null, stmts);
         System.out.println(String.format("Created %d procedure using %f ms",
-                config.procedurecount, toMillis(duration)));
+                config.procedurecount, toMillis(uacTime.totalTime)));
 
         ProcBenchmark bench = fromString(config.name);
         // Benchmark start time
@@ -414,19 +447,21 @@ public class UpdateClassesBenchmark {
         }
 
         double avg = toMillis(res.sum / config.invocations);
-        System.out.printf("\n(Benchmark %s ran %d times in average %f ms, min %f ms, max %f ms)\n",
-                config.name, config.invocations, avg, toMillis(res.min), toMillis(res.max));
+        System.out.printf("\n(Benchmark %s ran %d times in average %f ms, max %f ms, "
+                + "mp block average %f ms)\n",
+                config.name, config.invocations, avg, toMillis(res.max),
+                toMillis(res.bsum / config.invocations));
 
         //retrieve stats
         ClientStats stats = fullStatsContext.fetch().getStats();
         // write stats to file
         //client.writeSummaryCSV(stats, config.statsfile);
 
-        // name, duration,invocations/tps,latmin,latmax,lat95,lat99
+        // name, duration,invocations/tps,avg block time,latmax,lat95,lat99
         fw.append(String.format("%s,-1,%f,0,0,%f,%f,0,0,0,0,0,0\n",
                                 config.name,
                                 avg,
-                                toMillis(res.min),
+                                toMillis(res.bsum / config.invocations),
                                 toMillis(res.max)
                                 ));
 
