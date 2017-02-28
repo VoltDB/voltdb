@@ -30,6 +30,8 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
+import junit.framework.Test;
+
 import org.HdrHistogram_voltpatches.AbstractHistogram;
 import org.HdrHistogram_voltpatches.Histogram;
 import org.voltcore.utils.CompressionStrategySnappy;
@@ -38,13 +40,9 @@ import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.regressionsuites.StatisticsTestSuiteBase;
-import org.voltdb.utils.MiscUtils;
 import org.voltdb_testprocs.regressionsuites.malicious.GoSleep;
-
-import junit.framework.Test;
 
 public class TestStatisticsSuite extends StatisticsTestSuiteBase {
 
@@ -513,13 +511,6 @@ public class TestStatisticsSuite extends StatisticsTestSuiteBase {
     // JUnit magic that uses the regression suite helper classes.
     //
     static public Test suite() throws IOException {
-
-        if (MiscUtils.isPro()){
-            System.setProperty(ExportDataProcessor.EXPORT_TO_TYPE, "org.voltdb.exportclient.SocketExporter");
-            String dexportClientClassName = System.getProperty("exportclass", "");
-            System.out.println("Test System override export class is: " + dexportClientClassName);
-        }
-
         return StatisticsTestSuiteBase.suite(TestStatisticsSuite.class, false);
     }
 }
