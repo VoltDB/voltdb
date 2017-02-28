@@ -160,6 +160,7 @@ import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CatalogUtil.CatalogAndIds;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.HTTPAdminListener;
+import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.PlatformProperties;
@@ -591,66 +592,101 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         return nonEmptyPaths.build();
     }
 
+    private void outputDeployment(Configuration config) {
+        try {
+            File configInfoDir = new VoltFile(config.m_voltdbRoot, Constants.CONFIG_DIR);
+            File depFH = new VoltFile(configInfoDir, "deployment.xml");
+            if (!depFH.isFile() || !depFH.canRead()) {
+                System.out.println("FATAL: Failed to get configuration or deployment configuration is invalid. "
+                        + depFH.getAbsolutePath());
+                VoltDB.exit(-1);
+            }
+            config.m_pathToDeployment = depFH.getCanonicalPath();
+        } catch (IOException e) {
+            System.err.println("FATAL: Failed to read deployment: " + e.getMessage());
+            VoltDB.exit(-1);
+        }
+
+        ReadDeploymentResults readDepl = readPrimedDeployment(config);
+        try {
+            DeploymentType dt = CatalogUtil.updateRuntimeDeploymentPaths(readDepl.deployment);
+            // We don't have catalog context so host count is not there.
+            String out;
+            if ((out = CatalogUtil.getDeployment(dt, true)) != null) {
+                if ((new File(config.m_getOutput)).exists() && !config.m_forceGetCreate) {
+                    System.err.println("FATAL: Failed to save deployment, file already exists: " + config.m_getOutput);
+                    VoltDB.exit(-1);
+                }
+                try (FileOutputStream fos = new FileOutputStream(config.m_getOutput.trim())){
+                    fos.write(out.getBytes());
+                } catch (IOException e) {
+                    System.out.println("FATAL: Failed to write deployment to " + config.m_getOutput
+                            + " : " + e.getMessage());
+                    VoltDB.exit(-1);
+                }
+                System.out.println("Deployment configuration saved at " + config.m_getOutput.trim());
+            } else {
+                System.err.println("FATAL: Failed to get configuration or deployment configuration is invalid.");
+                VoltDB.exit(-1);
+            }
+        } catch (Exception e) {
+            System.out.println("FATAL: Failed to get configuration or deployment configuration is invalid. "
+                    + "Please make sure voltdbroot is a valid directory. " + e.getMessage());
+            VoltDB.exit(-1);
+        }
+    }
+
+    private void outputSchema(Configuration config) {
+        if ((new File(config.m_getOutput)).exists() && !config.m_forceGetCreate) {
+            System.err.println("FATAL: Failed to save schema file, file already exists: " + config.m_getOutput);
+            VoltDB.exit(-1);
+        }
+
+        try {
+            InMemoryJarfile catalogJar = CatalogUtil.loadInMemoryJarFile(MiscUtils.fileToBytes(new File (config.m_pathToCatalog)));
+            String ddl = CatalogUtil.getAutoGenDDLFromJar(catalogJar);
+            try (FileOutputStream fos = new FileOutputStream(config.m_getOutput.trim())){
+                fos.write(ddl.getBytes());
+            } catch (IOException e) {
+                System.out.println("FATAL: Failed to write schema to " + config.m_getOutput
+                        + " : " + e.getMessage());
+                VoltDB.exit(-1);
+            }
+            System.out.println("Schema file saved at " + config.m_getOutput.trim());
+        } catch (IOException e) {
+            System.err.println("FATAL: Failed to load the catalog jar from " + config.m_pathToCatalog
+                    + " : " + e.getMessage());
+            VoltDB.exit(-1);
+        }
+    }
+
     @Override
     public void cli(Configuration config) {
         if (config.m_startAction != StartAction.GET) {
             System.err.println("This can only be called for GET action.");
             VoltDB.exit(-1);
         }
-        // Handle multiple invocations of server thread in the same JVM.
-        // by clearing static variables/properties which ModuleManager,
-        // and Settings depend on
-        ConfigFactory.clearProperty(Settings.CONFIG_DIR);
+
         if (!config.m_voltdbRoot.exists() || !config.m_voltdbRoot.canRead() || !config.m_voltdbRoot.canExecute() || !config.m_voltdbRoot.isDirectory()) {
             try {
-                System.err.println("Invalid Voltdbroot directory: " + config.m_voltdbRoot.getCanonicalPath());
+                System.err.println("FATAL: Invalid Voltdbroot directory: " + config.m_voltdbRoot.getCanonicalPath());
             } catch (IOException ex) {
                 //Ignore;
             }
             VoltDB.exit(-1);
         }
-        try {
-            File configInfoDir = new VoltFile(config.m_voltdbRoot, Constants.CONFIG_DIR);
-            File depFH = new VoltFile(configInfoDir, "deployment.xml");
-            if (!depFH.isFile() || !depFH.canRead()) {
-                System.out.println("Failed to get configuration or deployment configuration is invalid. " + depFH.getCanonicalPath());
-                VoltDB.exit(-1);
-            }
-            config.m_pathToDeployment = depFH.getCanonicalPath();
-        } catch (IOException e) {
-            System.err.println("Failed to read deployment: " + e.getMessage());
-            VoltDB.exit(-1);
-        }
 
-        ReadDeploymentResults readDepl = readPrimedDeployment(config);
-        if (config.m_getOption == GetActionArgument.DEPLOYMENT) {
-            try {
-                DeploymentType dt = CatalogUtil.updateRuntimeDeploymentPaths(readDepl.deployment);
-                //We dont have catalog context so host count is not there.
-                String out;
-                if ((out = CatalogUtil.getDeployment(dt, true)) != null) {
-                    if (config.m_getOutput == null || config.m_getOutput.trim().length() == 0) {
-                        System.out.println(out);
-                    } else {
-                        if (new File(config.m_getOutput).exists()) {
-                            System.err.println("Failed to save deployment: file already exists: " + config.m_getOutput);
-                            VoltDB.exit(-1);
-                        }
-                        try (FileOutputStream fos = new FileOutputStream(config.m_getOutput.trim())){
-                            fos.write(out.getBytes());
-                        } catch (IOException e) {
-                            System.out.println("Failed to write output to " + config.m_getOutput);
-                            VoltDB.exit(-1);
-                        }
-                        System.out.println("Deployment configuration saved in: " + config.m_getOutput.trim());
-                    }
-                } else {
-                    System.err.println("Failed to get configuration or deployment configuration is invalid.");
-                }
-            } catch (Exception e) {
-                System.out.println("Failed to get configuration or deployment configuration is invalid. Please make sure voltdbroot is a valid directory. " + e);
-                VoltDB.exit(-1);
-            }
+        // Handle multiple invocations of server thread in the same JVM.
+        // by clearing static variables/properties which ModuleManager,
+        // and Settings depend on
+        ConfigFactory.clearProperty(Settings.CONFIG_DIR);
+        switch (config.m_getOption) {
+            case DEPLOYMENT:
+                outputDeployment(config);
+                break;
+            case SCHEMA:
+                outputSchema(config);
+                break;
         }
         VoltDB.exit(0);
     }
