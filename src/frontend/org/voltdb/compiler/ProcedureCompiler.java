@@ -771,6 +771,7 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
         procedure.setSystemproc(false);
         procedure.setDefaultproc(procedureDescriptor.m_builtInStmt);
         procedure.setHasjava(false);
+        procedure.setTransactional(true);
 
         // get the annotation
         // first try to get one that has been passed from the compiler
