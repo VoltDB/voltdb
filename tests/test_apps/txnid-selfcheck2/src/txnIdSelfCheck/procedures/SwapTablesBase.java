@@ -29,6 +29,14 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltTableRow;
 import org.voltdb.VoltProcedure.VoltAbortException;
 
+/**
+ * Note: this Stored Procedure base class, and its sub-classes, are not useful
+ * for testing the @SwapTables system stored procedure being added to VoltDB
+ * V7.1; they were written when we planned to add a DML statement of the form
+ * "SWAP TABLE T1 WITH T2" - SQL statementes of that type would have been called
+ * within these stored procedures. They are retained here in case we ever do
+ * support that DML version of Swap Tables, but they are currently not called.
+ */
 public abstract class SwapTablesBase extends VoltProcedure {
     protected final SQLStmt count_tru;
     protected final SQLStmt count_swap;
@@ -36,11 +44,14 @@ public abstract class SwapTablesBase extends VoltProcedure {
     protected final SQLStmt scancount_swap;
 //    protected final SQLStmt swap;
 
-    // TODO: once SWAP TABLES is on master, as ad hoc DML, change this to
-    // false - or remove it and related code completely
+    // TODO: when and if the "SWAP TABLE T1 WITH T2" DML statement (not to be
+    // confused with the @SwapTables system stored procedure) is on master,
+    // change this to false - or remove it and related code completely;
+    // meanwhile, the test code below can itself be tested, with USE_FAKE_SWAP
+    // set to true.
     private final boolean USE_FAKE_SWAP = true;
 
-    // TODO: remove these, after SWAP TABLES is on master (as ad hoc DML)
+    // TODO: remove these, when/if the "SWAP TABLE T1 WITH T2" DML statement is on master
     protected final SQLStmt swap0;
     protected final SQLStmt swap1;
     protected final SQLStmt swap2;
@@ -56,7 +67,9 @@ public abstract class SwapTablesBase extends VoltProcedure {
         this.scancount_tru = null;
         this.scancount_swap = null;
 //        this.swap = null;
-        // TODO: remove these, after SWAP TABLES is on master
+
+        // TODO: remove these, when/if the "SWAP TABLE T1 WITH T2" DML statement
+        // is on master; and uncomment the line above
         this.swap0 = null;
         this.swap1 = null;
         this.swap2 = null;
@@ -76,7 +89,9 @@ public abstract class SwapTablesBase extends VoltProcedure {
         this.scancount_tru = new SQLStmt(scancount_tru);
         this.scancount_swap = new SQLStmt(scancount_swap);
 //        this.swap = new SQLStmt(swap);
-        // TODO: remove these, after SWAP TABLES is on master
+
+        // TODO: remove these, when/if the "SWAP TABLE T1 WITH T2" DML statement
+        // is on master; and uncomment the line above
         this.swap0 = new SQLStmt(swap0);
         this.swap1 = new SQLStmt(swap1);
         this.swap2 = new SQLStmt(swap2);

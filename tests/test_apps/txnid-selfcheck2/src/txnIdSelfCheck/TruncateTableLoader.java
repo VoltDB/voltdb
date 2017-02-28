@@ -42,7 +42,14 @@ import org.voltdb.client.ProcedureCallback;
 
 public class TruncateTableLoader extends BenchmarkThread {
 
+    // Setting this to true ensures that we are testing the @SwapTables system
+    // stored procedure being added to VoltDB V7.1; some of the code below was
+    // instead written when we planned to add a DML statement of the form:
+    //     "SWAP TABLE T1 WITH T2"
+    // This setting makes sure that we are not using that code, which is retained
+    // below in case we ever do support that DML version of Swap Tables.
     final boolean USE_AT_SWAP_TABLES_PROC = true;
+
     final Client client;
     final long targetCount;
     final String tableName;
@@ -145,13 +152,13 @@ public class TruncateTableLoader extends BenchmarkThread {
         // Perform the table-swap
         ClientResponse clientResponse = null;
         String swapProcName = "@SwapTables";
-        if (USE_AT_SWAP_TABLES_PROC) {
+        if (USE_AT_SWAP_TABLES_PROC) {  // Tests @SwapTables stored proc
             if (shouldRollback != 0) {
                 clientResponse = client.callProcedure(swapProcName, tableName.toUpperCase(), "NONEXISTENT_TABLE");
             } else {
                 clientResponse = client.callProcedure(swapProcName, tableName.toUpperCase(), swapTableName.toUpperCase());
             }
-        } else {
+        } else {  // Tests "SWAP TABLE T1 WITH T2" DML - not currently supported
             swapProcName = tableName.toUpperCase() + sp;
             long p = Math.abs(r.nextLong());
             clientResponse = client.callProcedure(swapProcName, p, shouldRollback);

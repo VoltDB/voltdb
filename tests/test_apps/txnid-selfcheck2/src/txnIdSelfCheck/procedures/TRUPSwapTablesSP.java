@@ -29,6 +29,15 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltTableRow;
 import org.voltdb.VoltProcedure.VoltAbortException;
 
+/**
+ * Note: this Stored Procedure class, and its base class (and "siblings"), are
+ * not useful for testing the @SwapTables system stored procedure being added
+ * to VoltDB V7.1; they were written when we planned to add a DML statement of
+ * the form "SWAP TABLE T1 WITH T2" - SQL statementes of that type would have
+ * been called within these stored procedures. They are retained here in case
+ * we ever do support that DML version of Swap Tables, but they are currently
+ * not called.
+ */
 public class TRUPSwapTablesSP extends SwapTablesBase {
 
     // Default Constructor
@@ -37,15 +46,18 @@ public class TRUPSwapTablesSP extends SwapTablesBase {
                 "select count(*) from swapp;",
                 "select count(*) from trup where p >= 0;",
                 "select count(*) from swapp where p >= 0;",
-//                "swap tables trup swapp;",
-                // TODO: remove these, after SWAP TABLES is on master (as ad hoc DML)
+//                "swap table trup with swapp;",
+
+                // TODO: remove these, when/if the "SWAP TABLE T1 WITH T2" DML statement
+                // is on master; and uncomment the line above
                 "truncate table tempp;",
                 "insert into tempp select * from trup;",
                 "truncate table trup;",
                 "insert into trup select * from swapp;",
                 "truncate table swapp;",
                 "insert into swapp select * from tempp;",
-                "select count(*) from tempr;");
+                "select count(*) from tempr;"
+                );
     }
 
     public VoltTable[] run(long p, byte shouldRollback) {
