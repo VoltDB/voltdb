@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.LongBinaryOperator;
 
 import org.voltcore.logging.Level;
 import org.voltdb.client.ClientResponse;
@@ -588,7 +589,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
 
     //Simple tracker used for timed based commit.
     final class SimpleTracker implements CommitTracker {
-        private long m_commitPoint = -1;
+        private final AtomicLong m_commitPoint = new AtomicLong(-1);
         @Override
         public void submit(long offset) {
             //NoOp
@@ -596,14 +597,17 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
 
         @Override
         public long commit(long commit) {
-            if (commit > m_commitPoint)
-                m_commitPoint = commit;
-            return m_commitPoint;
+            return m_commitPoint.accumulateAndGet(commit, new LongBinaryOperator() {
+                @Override
+                public long applyAsLong(long orig, long newval) {
+                    return (orig > newval) ? orig : newval;
+                }
+            });
         }
 
         @Override
         public void resetTo(long offset) {
-            m_commitPoint = offset;
+            m_commitPoint.set(offset);
         }
     }
 
