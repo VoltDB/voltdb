@@ -67,6 +67,7 @@ import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONException;
 import org.mindrot.BCrypt;
+import org.xml.sax.SAXException;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
@@ -139,7 +140,6 @@ import org.voltdb.settings.DbSettings;
 import org.voltdb.settings.NodeSettings;
 import org.voltdb.snmp.DummySnmpTrapSender;
 import org.voltdb.types.ConstraintType;
-import org.xml.sax.SAXException;
 
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -288,6 +288,25 @@ public abstract class CatalogUtil {
         }
 
         return buildInfoLines;
+    }
+
+    /**
+     * Get the auto generated DDL from the catalog jar.
+     *
+     * @param jarfile in-memory catalog jar file
+     * @return Auto generated DDL stored in catalog.jar
+     * @throws IOException If the catalog or the auto generated ddl cannot be loaded.
+     */
+    public static String getAutoGenDDLFromJar(InMemoryJarfile jarfile)
+            throws IOException
+    {
+        // Read the raw auto generated ddl bytes.
+        byte[] ddlBytes = jarfile.get(VoltCompiler.AUTOGEN_DDL_FILE_NAME);
+        if (ddlBytes == null) {
+            throw new IOException("Auto generated schema DDL not found - please make sure the database is initialized with valid schema.");
+        }
+        String ddl = new String(ddlBytes, StandardCharsets.UTF_8);
+        return ddl.trim();
     }
 
     /**
