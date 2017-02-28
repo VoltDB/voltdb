@@ -647,6 +647,8 @@ void PersistentTable::swapTable(PersistentTable* otherTable,
     // having been switched to use each other's table and index names.
     assert(hasNameIntegrity(name(), otherIndexNames));
     assert(hasNameIntegrity(otherTable->name(), theIndexNames));
+
+    ExecutorContext::getEngine()->rebuildTableCollections();
 }
 
 void PersistentTable::swapTableState(PersistentTable* otherTable) {
