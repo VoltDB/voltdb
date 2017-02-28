@@ -26,6 +26,8 @@ import org.voltdb.CatalogContext;
 import org.voltdb.VoltDB;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogDiffEngine;
+import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Procedure;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.ClassMatcher.ClassNameMatchStatus;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
@@ -84,11 +86,11 @@ public class AsyncCompilerAgentHelper
                     newCatalogJar = new InMemoryJarfile(work.operationBytes);
                 }
                 try {
-                    newCatalogJar = modifyCatalogClasses(oldJar, work.operationString,
+                    newCatalogJar = modifyCatalogClasses(context.catalog, oldJar, work.operationString,
                             newCatalogJar, work.drRole == DrRoleType.XDCR);
                 }
-                catch (IOException e) {
-                    retval.errorMsg = "Unexpected IO exception @UpdateClasses modifying classes " +
+                catch (ClassNotFoundException e) {
+                    retval.errorMsg = "Unexpected error in @UpdateClasses modifying classes " +
                         "from catalog: " + e.getMessage();
                     return retval;
                 }
@@ -265,8 +267,8 @@ public class AsyncCompilerAgentHelper
         return jarfile;
     }
 
-    private InMemoryJarfile modifyCatalogClasses(InMemoryJarfile jarfile, String deletePatterns,
-            InMemoryJarfile newJarfile, boolean isXDCR) throws IOException
+    private InMemoryJarfile modifyCatalogClasses(Catalog catalog, InMemoryJarfile jarfile, String deletePatterns,
+            InMemoryJarfile newJarfile, boolean isXDCR) throws ClassNotFoundException
     {
         // modify the old jar in place based on the @UpdateClasses inputs, and then
         // recompile it if necessary
@@ -286,6 +288,7 @@ public class AsyncCompilerAgentHelper
                     deletedClasses = true;
                 }
             }
+
             for (String classname : matcher.getMatchedClassList()) {
                 jarfile.removeClassFromJar(classname);
             }
@@ -302,9 +305,14 @@ public class AsyncCompilerAgentHelper
             }
         }
         if (deletedClasses || foundClasses) {
-            compilerLog.info("Updating java classes available to stored procedures");
-            VoltCompiler compiler = new VoltCompiler(isXDCR);
-            compiler.compileInMemoryJarfile(jarfile);
+            compilerLog.info("Checking java classes available to stored procedures");
+            // TODO: check the jar classes on all nodes
+            Database db = VoltCompiler.getCatalogDatabase(catalog);
+            for (Procedure proc: db.getProcedures()) {
+                if (! VoltCompilerUtils.containsClassName(jarfile, proc.getClassname())) {
+                    throw new ClassNotFoundException("Cannot load class for procedure " + proc.getClassname());
+                }
+            }
         }
         return jarfile;
     }
