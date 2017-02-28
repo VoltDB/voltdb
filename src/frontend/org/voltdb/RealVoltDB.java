@@ -2085,6 +2085,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
     }
 
+    public static final String SECURITY_OFF_WARNING = "User authentication is not enabled."
+            + " The database is accessible and could be modified or shut down by anyone on the network.";
+
     int readDeploymentAndCreateStarterCatalogContext(VoltDB.Configuration config) {
         /*
          * Debate with the cluster what the deployment file should be
@@ -2279,7 +2282,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             // log a warning on console log if security setting is turned off, like durability warning.
             SecurityType securityType = deployment.getSecurity();
             if (securityType == null || !securityType.isEnabled()) {
-                consoleLog.warn("Security is turned off.");
+                consoleLog.warn(SECURITY_OFF_WARNING);
             }
 
             // create a dummy catalog to load deployment info into
