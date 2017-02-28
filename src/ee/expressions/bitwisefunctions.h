@@ -242,7 +242,7 @@ template<> inline NValue NValue::call<FUNC_VOLT_BIT_SHIFT_RIGHT>(const std::vect
 template<> inline NValue NValue::callUnary<FUNC_INET_NTOA>() const {
     if (getValueType() != VALUE_TYPE_BIGINT) {
         // The parser should enforce this for us, but just in case...
-        throw SQLException(SQLException::dynamic_sql_error, "unsupported non-BigInt type for SQL INET_NTOA function");
+        throw SQLException(SQLException::dynamic_sql_error, "Unsupported non-BIGINT type for SQL INET_NTOA function");
     }
 
     if (isNull()) {
@@ -266,7 +266,7 @@ template<> inline NValue NValue::callUnary<FUNC_INET_NTOA>() const {
     if (inet_ntop(AF_INET, &addr, answer, sizeof(answer)) == 0) {
         throw SQLException(SQLException::dynamic_sql_error,
                            errno,
-                           "inet_ntoa conversion error");
+                           "INET_NTOA Conversion error");
     }
     return getTempStringValue(answer, strlen(answer));
 }
@@ -283,7 +283,7 @@ template<> inline NValue NValue::callUnary<FUNC_INET_NTOA>() const {
  */
 template<> inline NValue NValue::callUnary<FUNC_INET_ATON>() const {
     if (getValueType() != VALUE_TYPE_VARCHAR) {
-        throw SQLException(SQLException::dynamic_sql_error, "unsupported non-VARCHAR type for SQL INET_ATON4 function");
+        throw SQLException(SQLException::dynamic_sql_error, "Unsupported non-VARCHAR type for SQL INET_ATON function");
     }
     if (isNull()) {
         return getNullValue(VALUE_TYPE_BIGINT);
@@ -294,7 +294,7 @@ template<> inline NValue NValue::callUnary<FUNC_INET_ATON>() const {
     const char *addr_str = getObject_withoutNull(&addrlen);
     if (INET_ADDRSTRLEN < addrlen) {
         std::stringstream sb;
-        sb << "Address string for inet_aton is too long to be an IPv4 address: "
+        sb << "Address string for INET_ATON is too long to be an IPv4 address: "
            << addrlen;
         throw SQLException(SQLException::dynamic_sql_error, sb.str().c_str());
     }
@@ -305,8 +305,8 @@ template<> inline NValue NValue::callUnary<FUNC_INET_ATON>() const {
     // Let inet_pton do the validation.
     if (inet_pton(AF_INET, (const char *)addrbuf, (void *) &(addr)) == 0) {
         std::stringstream sb;
-        sb << "unrecognized IPv4 address format string: <"
-           << addr_str
+        sb << "Unrecognized format for IPv4 address string: <"
+           << addrbuf
            << ">";
         throw SQLException(SQLException::dynamic_sql_error, sb.str().c_str());
     }
@@ -321,7 +321,7 @@ template<> inline NValue NValue::callUnary<FUNC_INET_ATON>() const {
  */
 template<> inline NValue NValue::callUnary<FUNC_INET6_NTOA>() const {
     if (getValueType() != VALUE_TYPE_VARBINARY) {
-        throw SQLException(SQLException::dynamic_sql_error, "unsupported non-VARBINARY type for SQL INET6_NTOA function");
+        throw SQLException(SQLException::dynamic_sql_error, "Unsupported non-VARBINARY type for SQL INET6_NTOA function");
     }
     if (isNull()) {
         return getNullValue(VALUE_TYPE_VARCHAR);
@@ -329,7 +329,10 @@ template<> inline NValue NValue::callUnary<FUNC_INET6_NTOA>() const {
     int32_t addr_len;
     const in6_addr *addr = (const in6_addr *)getObject_withoutNull(&addr_len);
     if (addr_len != sizeof(in6_addr)) {
-        throw SQLException(SQLException::dynamic_sql_error, "VARBINARY value is the wrong size to hold an IPv6 address.");
+        std::stringstream sb;
+        sb << "VARBINARY value is the wrong size to hold an IPv6 address: "
+           << addr_len;
+        throw SQLException(SQLException::dynamic_sql_error, sb.str().c_str());
     }
     // Save enough space for the address string plus a
     // trailing null terminator.
@@ -338,7 +341,7 @@ template<> inline NValue NValue::callUnary<FUNC_INET6_NTOA>() const {
     if (inet_ntop(AF_INET6, (const void *)addr, dest, sizeof(dest)) == 0) {
         throw SQLException(SQLException::dynamic_sql_error,
                            errno,
-                           "inet6_ntoa conversion error");
+                           "INET6_NTOA Conversion error");
     }
     return getTempStringValue(dest, strlen(dest));
 }
@@ -351,7 +354,7 @@ template<> inline NValue NValue::callUnary<FUNC_INET6_NTOA>() const {
  */
 template<> inline NValue NValue::callUnary<FUNC_INET6_ATON>() const {
     if (getValueType() != VALUE_TYPE_VARCHAR) {
-        throw SQLException(SQLException::dynamic_sql_error, "unsupported non-VARCHAR type for SQL INET6_ATON function");
+        throw SQLException(SQLException::dynamic_sql_error, "Unsupported non-VARCHAR type for SQL INET6_ATON function");
     }
     if (isNull()) {
         return getNullValue(VALUE_TYPE_VARBINARY);
@@ -361,7 +364,7 @@ template<> inline NValue NValue::callUnary<FUNC_INET6_ATON>() const {
     const char *addr_str = getObject_withoutNull(&addrlen);
     if (INET6_ADDRSTRLEN < addrlen) {
         std::stringstream sb;
-        sb << "inet_aton: Argument string is too long to be an IPv6 address: "
+        sb << "INET6_ATON: Argument string is too long to be an IPv6 address: "
            << addrlen;
         throw SQLException(SQLException::dynamic_sql_error, sb.str().c_str());
     }
@@ -372,11 +375,15 @@ template<> inline NValue NValue::callUnary<FUNC_INET6_ATON>() const {
     cbuff[addrlen] = 0;
     in6_addr addr;
     // Let inet_pton do the validation.
-    if (inet_pton(AF_INET6, cbuff, (void*)&addr) != 0) {
-        return NValue::getAllocatedValue(VALUE_TYPE_VARBINARY,
-                (const char*) &addr, sizeof(addr), getTempStringPool());
+    if (inet_pton(AF_INET6, cbuff, (void*)&addr) == 0) {
+        std::stringstream sb;
+        sb << "Unrecognized format for IPv6 address string <"
+           << cbuff
+           << ">";
+        throw SQLException(SQLException::dynamic_sql_error, sb.str().c_str());
     }
-    throw SQLException(SQLException::dynamic_sql_error, "unrecognized ipv6 address format string");
+    return NValue::getAllocatedValue(VALUE_TYPE_VARBINARY,
+                                     (const char*) &addr, sizeof(addr), getTempStringPool());
 }
 
 }
