@@ -25,6 +25,7 @@ package org.voltdb.regressionsuites;
 
 
 import java.io.File;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -36,6 +37,7 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.voltdb.BackendTarget;
+import org.voltdb.SQLStmt;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.utils.MiscUtils;
@@ -43,10 +45,16 @@ import org.voltdb.utils.MiscUtils;
 import org.voltdb.ServerThread;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltDB.Configuration;
+import org.voltdb.VoltProcedure;
 import org.voltdb.client.ClientFactory;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.client.NoConnectionsException;
+import org.voltdb.client.ProcCallException;
+import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.utils.CatalogUtil;
+import org.voltdb.utils.InMemoryJarfile;
 
 
 /**
@@ -73,6 +81,7 @@ public class TestInitStartLocalClusterInProcess extends JUnit4LocalClusterTest {
                 "PRIMARY KEY(ival));";
 
         builder = new VoltProjectBuilder();
+        builder.setUseDDLSchema(true);
         builder.addLiteralSchema(simpleSchema);
 
         cluster = new LocalCluster("collect.jar",
@@ -126,6 +135,7 @@ public class TestInitStartLocalClusterInProcess extends JUnit4LocalClusterTest {
 
         testGetDeployment();
         testGetSchema();
+        testGetClasses();
     }
 
     // Test get deployment
@@ -171,6 +181,94 @@ public class TestInitStartLocalClusterInProcess extends JUnit4LocalClusterTest {
         assertTrue(ddl.toLowerCase().contains("create table blah ("));
         assertTrue(ddl.toLowerCase().contains("ival bigint default '0' not null"));
         assertTrue(ddl.toLowerCase().contains("primary key (ival)"));
+    }
+
+    class RangeCount extends VoltProcedure {
+        SQLStmt sql = new SQLStmt("select count(*) from blah where ival > ? and ival < ?;");
+        public VoltTable[] run(long value1, long value2) {
+            voltQueueSQL(sql, value1, value2);
+            return voltExecuteSQL(true);
+        }
+    }
+
+    static Class<?>[] PROC_CLASSES = { org.voltdb_testprocs.updateclasses.testImportProc.class,
+            org.voltdb_testprocs.updateclasses.testCreateProcFromClassProc.class,
+            org.voltdb_testprocs.updateclasses.InnerClassesTestProc.class };
+
+    void loadAndAddProcs() throws IOException, NoConnectionsException {
+        ClientResponse resp = null;
+        long numberOfClasses = 0;
+        try {
+            resp = client.callProcedure("@SystemCatalog", "CLASSES");
+        } catch (ProcCallException excp) {
+            assert false : "@SystemCatalogClasses failed";
+        }
+        numberOfClasses = resp.getResults()[0].getRowCount();
+
+        InMemoryJarfile jarfile = new InMemoryJarfile();
+        VoltCompiler comp = new VoltCompiler(false);
+        try {
+            comp.addClassToJar(jarfile, org.voltdb_testprocs.updateclasses.testImportProc.class);
+            comp.addClassToJar(jarfile, org.voltdb_testprocs.updateclasses.testCreateProcFromClassProc.class);
+            comp.addClassToJar(jarfile, org.voltdb_testprocs.updateclasses.InnerClassesTestProc.class);
+        } catch (Exception e) {
+            assert false : "Failed add class to jar: " + e.getMessage();
+        }
+
+        try {
+            client.callProcedure("@UpdateClasses", jarfile.getFullJarBytes(), null);
+        } catch (ProcCallException excp) {
+            assert false : "Failed updating the class";
+        }
+
+        try {
+            resp = client.callProcedure("@SystemCatalog", "CLASSES");
+        } catch (ProcCallException excp) {
+            assert false : "@SystemCatalogClasses failed";
+        }
+        //System.out.println(resp.getResults()[0].toString());
+        assertTrue( (numberOfClasses + jarfile.getLoader().getClassNames().size()) == resp.getResults()[0].getRowCount());
+
+    }
+
+    InMemoryJarfile getProcJarFromCatalog() throws IOException {
+        File jar = File.createTempFile("procedure", ".jar");
+        Configuration config = new VoltDB.Configuration(new String[]{"get", "classes",
+            "getvoltdbroot", voltDBRootParentPath,
+            "file", jar.getAbsolutePath(), "forceget"});
+        ServerThread server = new ServerThread(config);
+        try {
+            server.cli();
+        } catch (Throwable ex) {
+            //Good
+        }
+
+        byte[] bytesRead;
+
+        bytesRead = Files.readAllBytes(Paths.get(jar.getAbsolutePath()));
+        assertNotNull(bytesRead);
+        assertTrue(bytesRead.length > 0);
+        return new InMemoryJarfile(bytesRead);
+    }
+
+    public void testGetClasses() throws IOException {
+        // No java stored proc at this time
+        InMemoryJarfile jarFile = getProcJarFromCatalog();
+        org.voltdb.client.ClientResponse resp = null;
+        try {
+            resp = client.callProcedure("@SystemCatalog", "CLASSES");
+        } catch (ProcCallException excp) {
+            assert false : "@SystemCatalogClasses failed";
+        }
+        assertTrue(jarFile.getLoader().getClassNames().size() == resp.getResults()[0].getRowCount());
+        loadAndAddProcs();
+        jarFile = getProcJarFromCatalog();
+        try {
+            resp = client.callProcedure("@SystemCatalog", "CLASSES");
+        } catch (ProcCallException excp) {
+            assert false : "@SystemCatalogClasses failed";
+        }
+        assertTrue(jarFile.getLoader().getClassNames().size() == resp.getResults()[0].getRowCount());
     }
 
 }

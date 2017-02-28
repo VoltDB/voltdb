@@ -40,7 +40,7 @@ output_help = ("Specifies the path and file name for the output file. Defaults a
 def get(runner):
     runner.args.extend(['get'])
 
-    if runner.opts.resource in ('deployment', 'schema'):
+    if runner.opts.resource in ('deployment', 'schema', 'classes'):
         runner.args.extend([runner.opts.resource])
     else:
         utility.abort('Expected arguments for get command are deployment and schema')

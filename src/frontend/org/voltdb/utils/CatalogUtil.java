@@ -310,6 +310,31 @@ public abstract class CatalogUtil {
     }
 
     /**
+     * Extracts classes from the catalog jar and returns a jar containing the classes from
+     * supplied jar. If no classes found in jar, empty jar file is returned
+     *
+     * @param jarfile in-memory catalog jar file
+     * @return In-memory jar file containing classes from the passed in jar file
+     */
+    public static InMemoryJarfile getClassesFromJar(final InMemoryJarfile jarfile) {
+        if (jarfile.getLoader().getClassNames().isEmpty()) {
+            // if no classes, return empty jar
+            return new InMemoryJarfile();
+        }
+        InMemoryJarfile cloneJar = jarfile.deepCopy();
+        Set<String> entriesToDrop = new HashSet<>();
+        for (String value : cloneJar.keySet()) {
+            if (!value.endsWith("class")) {
+                entriesToDrop.add(value);
+            }
+        }
+        for (String entry : entriesToDrop) {
+            cloneJar.remove(entry);
+        }
+        return cloneJar;
+    }
+
+    /**
      * Load an in-memory catalog jar file from jar bytes.
      *
      * @param catalogBytes

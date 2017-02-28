@@ -742,7 +742,11 @@ public class VoltDB {
                     m_pathToDeployment = depFH.getAbsolutePath();
                     return;
                 }
-                case SCHEMA: {
+                case SCHEMA:
+                case CLASSES: {
+                    // catalog.jar contains DDL and proc classes with which the database was
+                    // compiled. Check if catalog.jar as it is needed to fetch ddl ( get schema)
+                    // as well as procedures (get classes)
                     File catalogFH = new VoltFile(configInfoDir, "catalog.jar");
                     if (!catalogFH.exists()) {
                         try {

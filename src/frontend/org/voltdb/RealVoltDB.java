@@ -660,6 +660,27 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
     }
 
+    private void outputProcedures(Configuration config) {
+        File outputFile = new File(config.m_getOutput);
+        if (outputFile.exists() && !config.m_forceGetCreate) {
+            System.err.println("FATAL: Failed to save classes, file already exists: " + config.m_getOutput);
+            VoltDB.exit(-1);
+        }
+        try {
+            InMemoryJarfile catalogJar = CatalogUtil.loadInMemoryJarFile(MiscUtils.fileToBytes(new File (config.m_pathToCatalog)));
+            InMemoryJarfile filteredJar = CatalogUtil.getClassesFromJar(catalogJar);
+//            for (String value : filteredJar.keySet()) {
+//                System.out.println(value);
+//            }
+            filteredJar.writeToFile(outputFile);
+            System.out.println("Classes file in jar file saved at " + outputFile.getPath());
+        } catch (IOException e) {
+            System.err.println("FATAL: Failed to read classes " + config.m_pathToCatalog
+                    + " : " + e.getMessage());
+            VoltDB.exit(-1);
+        }
+    }
+
     @Override
     public void cli(Configuration config) {
         if (config.m_startAction != StartAction.GET) {
@@ -686,6 +707,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 break;
             case SCHEMA:
                 outputSchema(config);
+                break;
+            case CLASSES:
+                outputProcedures(config);
                 break;
         }
         VoltDB.exit(0);
