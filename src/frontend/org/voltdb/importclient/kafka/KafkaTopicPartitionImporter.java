@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.LongBinaryOperator;
 
 import org.voltcore.logging.Level;
 import org.voltdb.client.ClientResponse;
@@ -59,6 +60,7 @@ import kafka.javaapi.consumer.SimpleConsumer;
 import kafka.message.MessageAndOffset;
 import kafka.network.BlockingChannel;
 import org.voltcore.utils.EstTime;
+import org.voltdb.importer.CommitTracker;
 
 /**
  * Implementation that imports from a Kafka topic. This is for a single partition of a Kafka topic.
@@ -78,7 +80,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
     private final AtomicReference<BlockingChannel> m_offsetManager = new AtomicReference<>();
     private SimpleConsumer m_consumer = null;
     private final TopicAndPartition m_topicAndPartition;
-    private final Gap m_gapTracker = new Gap(Integer.getInteger("KAFKA_IMPORT_GAP_LEAD", 32_768));
+    private final CommitTracker m_gapTracker;
     private final int m_gapFullWait = Integer.getInteger("KAFKA_IMPORT_GAP_WAIT", 2_000);
     private final KafkaStreamImporterConfig m_config;
     private HostAndPort m_coordinator;
@@ -93,6 +95,10 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
         m_coordinator = m_config.getPartitionLeader();
         m_topicAndPartition = new TopicAndPartition(config.getTopic(), config.getPartition());
         m_fetchRequestBuilder = new FetchRequestBuilder().clientId(KafkaStreamImporterConfig.CLIENT_ID);
+        if (m_config.getCommitPolicy() == KafkaImporterCommitPolicy.TIME && m_config.getTriggerValue() > 0)
+            m_gapTracker = new SimpleTracker();
+        else
+            m_gapTracker = new DurableTracker(Integer.getInteger("KAFKA_IMPORT_GAP_LEAD", 32_768));
     }
 
     @Override
@@ -451,12 +457,6 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                     if (currentOffset < m_currentOffset.get()) {
                         continue;
                     }
-
-                    if (currentOffset > m_currentOffset.get()) {
-                        if (isDebugEnabled()) {
-                            debug(null, "Kafka messageAndOffset currentOffset %d is ahead of m_currentOffset %d.", currentOffset, m_currentOffset.get());
-                        }
-                    }
                     ByteBuffer payload = messageAndOffset.message().payload();
                     String line = new String(payload.array(),payload.arrayOffset(),payload.limit(),StandardCharsets.UTF_8);
                     try {
@@ -587,20 +587,45 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
         return false;
     }
 
-    final class Gap {
+    //Simple tracker used for timed based commit.
+    final class SimpleTracker implements CommitTracker {
+        private final AtomicLong m_commitPoint = new AtomicLong(-1);
+        @Override
+        public void submit(long offset) {
+            //NoOp
+        }
+
+        @Override
+        public long commit(long commit) {
+            return m_commitPoint.accumulateAndGet(commit, new LongBinaryOperator() {
+                @Override
+                public long applyAsLong(long orig, long newval) {
+                    return (orig > newval) ? orig : newval;
+                }
+            });
+        }
+
+        @Override
+        public void resetTo(long offset) {
+            m_commitPoint.set(offset);
+        }
+    }
+
+    final class DurableTracker implements CommitTracker {
         long c = 0;
         long s = -1L;
         long offer = -1L;
         final long [] lag;
 
-        Gap(int leeway) {
+        DurableTracker(int leeway) {
             if (leeway <= 0) {
                 throw new IllegalArgumentException("leeways is zero or negative");
             }
             lag = new long[leeway];
         }
 
-        synchronized void submit(long offset) {
+        @Override
+        public synchronized void submit(long offset) {
             if (s == -1L && offset >= 0) {
                 lag[idx(offset)] = c = s = offset;
             }
@@ -621,7 +646,8 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
             return (int)(offset % lag.length);
         }
 
-        synchronized void resetTo(long offset) {
+        @Override
+        public synchronized void resetTo(long offset) {
             if (offset < 0) {
                 throw new IllegalArgumentException("offset is negative");
             }
@@ -629,7 +655,8 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
             offer = -1L;
         }
 
-        synchronized long commit(long offset) {
+        @Override
+        public synchronized long commit(long offset) {
             if (offset <= s && offset > c) {
                 int ggap = (int)Math.min(lag.length, offset-c);
                 if (ggap == lag.length) {
@@ -675,13 +702,13 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
     {
         private final long m_offset;
         private final AtomicLong m_cbcnt;
-        private final Gap m_tracker;
+        private final CommitTracker m_tracker;
         private final AtomicBoolean m_dontCommit;
 
         public TopicPartitionInvocationCallback(
                 final long offset,
                 final AtomicLong cbcnt,
-                final Gap tracker,
+                final CommitTracker tracker,
                 final AtomicBoolean dontCommit) {
             m_offset = offset;
             m_cbcnt = cbcnt;
