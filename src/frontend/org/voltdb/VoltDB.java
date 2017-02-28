@@ -39,9 +39,7 @@ import java.util.UUID;
 import org.voltcore.logging.VoltLog4jLogger;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
-import org.voltcore.network.ReverseDNSCache;
 import org.voltcore.utils.CoreUtils;
-import org.voltcore.utils.EstTimeUpdater;
 import org.voltcore.utils.OnDemandBinaryLogger;
 import org.voltcore.utils.PortGenerator;
 import org.voltcore.utils.ShutdownHooks;
@@ -745,14 +743,14 @@ public class VoltDB {
                 case SCHEMA:
                 case CLASSES: {
                     // catalog.jar contains DDL and proc classes with which the database was
-                    // compiled. Check if catalog.jar as it is needed to fetch ddl ( get schema)
-                    // as well as procedures (get classes)
+                    // compiled. Check if catalog.jar exists as it is needed to fetch ddl (get
+                    // schema) as well as procedures (get classes)
                     File catalogFH = new VoltFile(configInfoDir, "catalog.jar");
                     if (!catalogFH.exists()) {
                         try {
                             parentPath = m_voltdbRoot.getCanonicalFile().getParent();
                         } catch (IOException io) {}
-                        System.out.println("FATAL: Schema not found in the provided database directory " + parentPath  +
+                        System.out.println("FATAL: "+ m_getOption.name().toUpperCase() + " not found in the provided database directory " + parentPath  +
                                 ". Make sure the database has been started ");
                         referToDocAndExit();
                     }

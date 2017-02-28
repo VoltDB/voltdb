@@ -21,9 +21,10 @@ dir_spec_help = ('Specifies the root directory for the database. The default is 
 get_resource_help = ('Supported configuration resources for get command are \'deployment\' and \'schema\'.\r\n'
                      '           deployment - gets deployment configuration of current node\n'
                      '           schema     - gets schema of current node\n')
-output_help = ("Specifies the path and file name for the output file. Defaults are: "
-               "Deployment - deployment.xml;\r\n"
-               "Schema - schema.sql;")
+output_help = ('Specifies the path and file name for the output file. Defaults are: '
+               'Deployment - deployment.xml;\r\n'
+               'Schema - schema.sql;\r\n'
+               'Classes - procedures.jar')
 
 @VOLT.Command(
     description = 'Write the selected database resource (deployment or schema) to a file.',
@@ -43,7 +44,7 @@ def get(runner):
     if runner.opts.resource in ('deployment', 'schema', 'classes'):
         runner.args.extend([runner.opts.resource])
     else:
-        utility.abort('Expected arguments for get command are deployment and schema')
+        utility.abort('Invalid arg %s for command. Valid arguments are deployment, schema and classes' % runner.opts.resource)
 
     if runner.opts.output:
         runner.args.extend(['file', runner.opts.output])

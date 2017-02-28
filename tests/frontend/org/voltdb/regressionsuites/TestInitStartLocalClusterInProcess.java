@@ -191,10 +191,6 @@ public class TestInitStartLocalClusterInProcess extends JUnit4LocalClusterTest {
         }
     }
 
-    static Class<?>[] PROC_CLASSES = { org.voltdb_testprocs.updateclasses.testImportProc.class,
-            org.voltdb_testprocs.updateclasses.testCreateProcFromClassProc.class,
-            org.voltdb_testprocs.updateclasses.InnerClassesTestProc.class };
-
     void loadAndAddProcs() throws IOException, NoConnectionsException {
         ClientResponse resp = null;
         long numberOfClasses = 0;
@@ -211,6 +207,7 @@ public class TestInitStartLocalClusterInProcess extends JUnit4LocalClusterTest {
             comp.addClassToJar(jarfile, org.voltdb_testprocs.updateclasses.testImportProc.class);
             comp.addClassToJar(jarfile, org.voltdb_testprocs.updateclasses.testCreateProcFromClassProc.class);
             comp.addClassToJar(jarfile, org.voltdb_testprocs.updateclasses.InnerClassesTestProc.class);
+            comp.addClassToJar(jarfile, RangeCount.class);
         } catch (Exception e) {
             assert false : "Failed add class to jar: " + e.getMessage();
         }
@@ -228,7 +225,6 @@ public class TestInitStartLocalClusterInProcess extends JUnit4LocalClusterTest {
         }
         //System.out.println(resp.getResults()[0].toString());
         assertTrue( (numberOfClasses + jarfile.getLoader().getClassNames().size()) == resp.getResults()[0].getRowCount());
-
     }
 
     InMemoryJarfile getProcJarFromCatalog() throws IOException {
@@ -243,24 +239,25 @@ public class TestInitStartLocalClusterInProcess extends JUnit4LocalClusterTest {
             //Good
         }
 
-        byte[] bytesRead;
-
-        bytesRead = Files.readAllBytes(Paths.get(jar.getAbsolutePath()));
+        byte[] bytesRead = Files.readAllBytes(Paths.get(jar.getAbsolutePath()));
         assertNotNull(bytesRead);
         assertTrue(bytesRead.length > 0);
         return new InMemoryJarfile(bytesRead);
     }
 
     public void testGetClasses() throws IOException {
-        // No java stored proc at this time
         InMemoryJarfile jarFile = getProcJarFromCatalog();
         org.voltdb.client.ClientResponse resp = null;
+
+        // No java stored proc at this time, will give jar with no classes
         try {
             resp = client.callProcedure("@SystemCatalog", "CLASSES");
         } catch (ProcCallException excp) {
             assert false : "@SystemCatalogClasses failed";
         }
         assertTrue(jarFile.getLoader().getClassNames().size() == resp.getResults()[0].getRowCount());
+
+        // load java stored proc classes and verify the retrieved classes count
         loadAndAddProcs();
         jarFile = getProcJarFromCatalog();
         try {

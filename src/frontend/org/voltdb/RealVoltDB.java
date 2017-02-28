@@ -669,9 +669,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         try {
             InMemoryJarfile catalogJar = CatalogUtil.loadInMemoryJarFile(MiscUtils.fileToBytes(new File (config.m_pathToCatalog)));
             InMemoryJarfile filteredJar = CatalogUtil.getClassesFromJar(catalogJar);
-//            for (String value : filteredJar.keySet()) {
-//                System.out.println(value);
-//            }
             filteredJar.writeToFile(outputFile);
             System.out.println("Classes file in jar file saved at " + outputFile.getPath());
         } catch (IOException e) {
