@@ -190,7 +190,7 @@ public class TestShutdownSaveNoCommandLog extends RegressionSuite
         LocalCluster config = new LocalCluster("prepare_shutdown_importer.jar", 4, HOST_COUNT, 0, BackendTarget.NATIVE_EE_JNI,
                 LocalCluster.FailureState.ALL_RUNNING, true, false, additionalEnv);
         config.setHasLocalServer(false);
-        boolean compile = config.compileWithAdminMode(project, -1, false);
+        boolean compile = config.compileWithAdminMode(project, VoltDB.DEFAULT_ADMIN_PORT, false);
         assertTrue(compile);
         builder.addServerConfig(config);
         return builder;
