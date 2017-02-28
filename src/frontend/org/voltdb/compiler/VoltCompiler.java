@@ -67,7 +67,6 @@ import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
 import org.voltdb.common.Constants;
 import org.voltdb.common.Permission;
-import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.compilereport.ReportMaker;
 import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.settings.ClusterSettings;
@@ -152,6 +151,9 @@ public class VoltCompiler {
     private final static String m_emptyDDLComment = "-- This DDL file is a placeholder for starting without a user-supplied catalog.\n";
 
     private ClassLoader m_classLoader = ClassLoader.getSystemClassLoader();
+
+    // this needs to be reset in the main compile func
+    private final HashSet<Class<?>> m_cachedAddedClasses = new HashSet<>();
 
     private final boolean m_isXDCR;
 
@@ -345,6 +347,9 @@ public class VoltCompiler {
     public VoltCompiler(boolean standaloneCompiler, boolean isXDCR) {
         this.standaloneCompiler = standaloneCompiler;
         this.m_isXDCR = isXDCR;
+
+        // reset the cache
+        m_cachedAddedClasses.clear();
     }
 
     /** Parameterless constructor is for embedded VoltCompiler use only.
@@ -725,7 +730,7 @@ public class VoltCompiler {
      */
     HashMap<String, byte[]> getExplainPlans(Catalog catalog) {
         HashMap<String, byte[]> retval = new HashMap<>();
-        Database db = getCatalogDatabase();
+        Database db = getCatalogDatabase(m_catalog);
         assert(db != null);
         for (Procedure proc : db.getProcedures()) {
             for (Statement stmt : proc.getStatements()) {
@@ -789,9 +794,6 @@ public class VoltCompiler {
             final List<VoltCompilerReader> ddlReaderList,
             final InMemoryJarfile jarOutput)
     {
-        // Compiler instance is reusable. Clear the cache.
-        cachedAddedClasses.clear();
-
         m_catalog = new Catalog();
         // Initialize the catalog for one cluster
         m_catalog.execute("add / clusters cluster");
@@ -834,15 +836,20 @@ public class VoltCompiler {
         return m_catalog;
     }
 
+    // TODO: long term to remove it from tests
     public Database getCatalogDatabase() {
         return m_catalog.getClusters().get("cluster").getDatabases().get("database");
     }
 
-    private Database initCatalogDatabase() {
+    public static Database getCatalogDatabase(Catalog catalog) {
+        return catalog.getClusters().get("cluster").getDatabases().get("database");
+    }
+
+    private static Database initCatalogDatabase(Catalog catalog) {
         // create the database in the catalog
-        m_catalog.execute("add /clusters#cluster databases database");
-        addDefaultRoles();
-        return getCatalogDatabase();
+        catalog.execute("add /clusters#cluster databases database");
+        addDefaultRoles(catalog);
+        return getCatalogDatabase(catalog);
     }
 
     /**
@@ -853,16 +860,16 @@ public class VoltCompiler {
      * IF YOU ADD A THIRD ROLE TO THE DEFAULTS, IT'S TIME TO BUST THEM OUT INTO A CENTRAL
      * LOCALE AND DO ALL THIS MAGIC PROGRAMATICALLY --izzy 11/20/2014
      */
-    private void addDefaultRoles()
+    private static void addDefaultRoles(Catalog catalog)
     {
         // admin
-        m_catalog.execute("add /clusters#cluster/databases#database groups administrator");
-        Permission.setPermissionsInGroup(getCatalogDatabase().getGroups().get("administrator"),
+        catalog.execute("add /clusters#cluster/databases#database groups administrator");
+        Permission.setPermissionsInGroup(getCatalogDatabase(catalog).getGroups().get("administrator"),
                                          Permission.getPermissionsFromAliases(Arrays.asList("ADMIN")));
 
         // user
-        m_catalog.execute("add /clusters#cluster/databases#database groups user");
-        Permission.setPermissionsInGroup(getCatalogDatabase().getGroups().get("user"),
+        catalog.execute("add /clusters#cluster/databases#database groups user");
+        Permission.setPermissionsInGroup(getCatalogDatabase(catalog).getGroups().get("user"),
                                          Permission.getPermissionsFromAliases(Arrays.asList("SQL", "ALLPROC")));
     }
 
@@ -888,7 +895,7 @@ public class VoltCompiler {
     {
         m_catalog = new Catalog(); //
         m_catalog.execute("add / clusters cluster");
-        Database db = initCatalogDatabase();
+        Database db = initCatalogDatabase(m_catalog);
         List<VoltCompilerReader> ddlReaderList = DDLPathsToReaderList(ddlFilePaths);
         final VoltDDLElementTracker voltDdlTracker = new VoltDDLElementTracker(this);
         InMemoryJarfile jarOutput = new InMemoryJarfile();
@@ -915,7 +922,7 @@ public class VoltCompiler {
         final ArrayList<Class<?>> classDependencies = new ArrayList<>();
         final VoltDDLElementTracker voltDdlTracker = new VoltDDLElementTracker(this);
 
-        Database db = initCatalogDatabase();
+        Database db = initCatalogDatabase(m_catalog);
 
         // shutdown and make a new hsqldb
         HSQLInterface hsql = HSQLInterface.loadHsqldb();
@@ -1531,10 +1538,6 @@ public class VoltCompiler {
         }
     }
 
-    // this needs to be reset in the main compile func
-    private static final HashSet<Class<?>> cachedAddedClasses = new HashSet<>();
-
-
     public List<Class<?>> getInnerClasses(Class <?> c)
             throws VoltCompilerException {
         ImmutableList.Builder<Class<?>> builder = ImmutableList.builder();
@@ -1636,11 +1639,10 @@ public class VoltCompiler {
     public boolean addClassToJar(InMemoryJarfile jarOutput, final Class<?> cls)
             throws VoltCompiler.VoltCompilerException
     {
-        if (cachedAddedClasses.contains(cls)) {
+        if (m_cachedAddedClasses.contains(cls)) {
             return false;
-        } else {
-            cachedAddedClasses.add(cls);
         }
+        m_cachedAddedClasses.add(cls);
 
         for (final Class<?> nested : getInnerClasses(cls)) {
             addClassToJar(jarOutput, nested);
@@ -1866,7 +1868,7 @@ public class VoltCompiler {
             byte[] buildInfoBytes = StringUtils.join(buildInfoLines, "\n").getBytes();
             outputJar.put(CatalogUtil.CATALOG_BUILDINFO_FILENAME, buildInfoBytes);
 
-            // Gather DDL files for recompilation if not using a project file.
+            // Gather DDL files for re-compilation
             List<VoltCompilerReader> ddlReaderList = new ArrayList<>();
             Entry<String, byte[]> entry = outputJar.firstEntry();
             while (entry != null) {
