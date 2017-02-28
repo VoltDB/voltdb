@@ -121,8 +121,6 @@ public:
     // STATS
     TableStats* getTableStats() {  return &m_stats; };
 
-    virtual int64_t persistentTupleCount() const { return 0; }
-
     // No Op
     std::vector<uint64_t> getBlockAddresses() const {
         return std::vector<uint64_t>();

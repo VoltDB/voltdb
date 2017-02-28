@@ -138,9 +138,6 @@ class TempTable : public Table {
     // ------------------------------------------------------------------
     virtual std::string tableType() const;
     virtual voltdb::TableStats* getTableStats();
-
-    virtual int64_t persistentTupleCount() const { return 0; }
-
     const TempTableLimits* getTempTableLimits() const {
         return m_limits;
     }

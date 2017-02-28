@@ -145,13 +145,6 @@ class Table {
      */
     virtual int64_t activeTupleCount() const { return m_tupleCount; }
 
-    /**
-     * Includes persistent tuples only.
-     * Used for memory statistics calculation
-     */
-    virtual int64_t persistentTupleCount() const { return m_tupleCount; }
-
-
     virtual int64_t allocatedTupleMemory() const {
         return allocatedBlockCount() * m_tableAllocationSize;
     }
