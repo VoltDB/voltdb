@@ -283,8 +283,13 @@ public class KafkaLoader {
             String groupId = "voltdb-" + (m_config.useSuppliedProcedure ? m_config.procedure : m_config.table);
             //TODO: Should get this from properties file or something as override?
             Properties props = new Properties();
+            String zconnect = m_config.zookeeper;
             if (m_config.config.length() > 0) {
                 props.load(new FileInputStream(new File(m_config.config)));
+                //Get GroupId from property if present and use it.
+                groupId = props.getProperty("group.id", groupId);
+                //Get zk connection from props file if present.
+                zconnect = props.getProperty("zookeeper.connect", m_config.zookeeper);
             } else {
                 props.put("zookeeper.session.timeout.ms", "400");
                 props.put("zookeeper.sync.time.ms", "200");
@@ -294,7 +299,7 @@ public class KafkaLoader {
                 props.put("rebalance.backoff.ms", "10000");
             }
             props.put("group.id", groupId);
-            props.put("zookeeper.connect", m_config.zookeeper);
+            props.put("zookeeper.connect", zconnect);
 
             m_consumerConfig = new ConsumerConfig(props);
 
