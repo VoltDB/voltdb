@@ -309,6 +309,9 @@ public class AsyncCompilerAgentHelper
             // TODO: check the jar classes on all nodes
             Database db = VoltCompiler.getCatalogDatabase(catalog);
             for (Procedure proc: db.getProcedures()) {
+                // single statement procedure does not need to check class loading
+                if (proc.getHasjava() == false) continue;
+
                 if (! VoltCompilerUtils.containsClassName(jarfile, proc.getClassname())) {
                     throw new ClassNotFoundException("Cannot load class for procedure " + proc.getClassname());
                 }
