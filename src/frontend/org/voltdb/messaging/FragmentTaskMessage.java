@@ -153,6 +153,8 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
 
     int m_batchTimeout = BatchTimeoutOverrideType.NO_TIMEOUT;
 
+    boolean m_isForReplica = false;
+
     public int getCurrentBatchIndex() {
         return m_currentBatchIndex;
     }
@@ -608,6 +610,9 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         // 1 byte for the timeout flag
         msgsize += 1;
 
+        //for isForReplica
+        msgsize += 1;
+
         msgsize += m_batchTimeout == BatchTimeoutOverrideType.NO_TIMEOUT ? 0 : 4;
 
         // Involved partitions
@@ -706,6 +711,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         buf.put(m_isFinal ? (byte) 1 : (byte) 0);
         buf.put(m_taskType);
         buf.put(m_emptyForRestart ? (byte) 1 : (byte) 0);
+        buf.put(m_isForReplica ? (byte) 1 : (byte) 0);
         buf.put(nOutputDepIds > 0 ? (byte) 1 : (byte) 0);
         buf.put(nInputDepIds  > 0 ? (byte) 1 : (byte) 0);
         if (m_procNameToLoad != null) {
@@ -827,6 +833,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         m_isFinal = buf.get() != 0;
         m_taskType = buf.get();
         m_emptyForRestart = buf.get() != 0;
+        m_isForReplica = buf.get() == 1;
         boolean haveOutputDependencies = buf.get() != 0;
         boolean haveInputDependencies = buf.get() != 0;
         short procNameToLoadBytesLen = buf.getShort();
@@ -1009,4 +1016,13 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
     public boolean isEmpty() {
         return m_items.isEmpty();
     }
+
+    public boolean isForReplica() {
+        return m_isForReplica;
+    }
+
+    public void setForReplica(boolean isForReplica) {
+        m_isForReplica = isForReplica;
+    }
+
 }

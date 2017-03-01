@@ -832,6 +832,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 FragmentTaskMessage replmsg =
                     new FragmentTaskMessage(m_mailbox.getHSId(),
                             m_mailbox.getHSId(), msg);
+                replmsg.setForReplica(true);
                 m_mailbox.send(m_sendToHSIds,
                         replmsg);
                 DuplicateCounter counter;
@@ -1026,8 +1027,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     private void handleCompleteTransactionMessage(CompleteTransactionMessage message)
     {
         CompleteTransactionMessage msg = message;
-        boolean wasCreatedFromLeader = (isSpiBalanceRequested() && msg.wasCreatedFromLeader());
-        if (m_isLeader || wasCreatedFromLeader ) {
+        if (m_isLeader) {
             msg = new CompleteTransactionMessage(m_mailbox.getHSId(), m_mailbox.getHSId(), message);
             // Set the spHandle so that on repair the new master will set the max seen spHandle
             // correctly
@@ -1067,7 +1067,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             // it also means this CompleteTransactionMessage message will be dropped because it's after snapshot.
             final CompleteTransactionResponseMessage resp = new CompleteTransactionResponseMessage(msg);
             resp.m_sourceHSId = m_mailbox.getHSId();
-            resp.setCreatedFromLeader(wasCreatedFromLeader);
             handleCompleteTransactionResponseMessage(resp);
         }
     }
@@ -1106,7 +1105,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         //
         // The SPI uses this response message to track if all replicas have
         // committed the transaction.
-        if (!m_isLeader && !msg.wasCreatedFromLeader()) {
+        if (!m_isLeader) {
             m_mailbox.send(msg.getSPIHSId(), msg);
         }
     }
@@ -1433,4 +1432,5 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             }
         });
     }
+
 }

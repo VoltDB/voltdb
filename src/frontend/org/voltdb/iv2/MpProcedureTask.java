@@ -209,7 +209,6 @@ public class MpProcedureTask extends ProcedureTask
                 m_msg.isForReplay());
 
         complete.setTruncationHandle(m_msg.getTruncationHandle());
-        complete.setCreatedFromLeader(m_createdFromLeader);
         m_initiator.send(com.google_voltpatches.common.primitives.Longs.toArray(m_initiatorHSIds), complete);
         m_txnState.setDone();
         m_queue.flush(getTxnId());

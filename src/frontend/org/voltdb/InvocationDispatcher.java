@@ -455,8 +455,10 @@ public final class InvocationDispatcher {
                     return takeShutdownSaveSnapshot(task, handler, ccxn, user, bypass);
                 }
             } else if ("@BalanceSPI".equals(procName)) {
-                ClientResponseImpl resp = checkParamsForSPIBalance(task);
-                if (resp !=null) return resp;
+                ClientResponseImpl failureResp = checkParamsForSPIBalance(task);
+                //return invalid parameters response message back to client.
+                //Valid SPI balance request will go through as normal transaction.
+                if (failureResp !=null) return failureResp;
             }
             // Verify that admin mode sysprocs are called from a client on the
             // admin port, otherwise return a failure
@@ -508,19 +510,19 @@ public final class InvocationDispatcher {
     private ClientResponseImpl checkParamsForSPIBalance(StoredProcedureInvocation task) {
 
         Object params[] = task.getParams().toArray();
-        if (params.length != 2 || !(params[0] instanceof Integer) ||
-                !(params[1] instanceof Integer)) {
+        if (params.length != 3 || !(params[0] instanceof Integer) ||
+                !(params[1] instanceof Integer || !(params[2] instanceof Integer))) {
             return  gracefulFailureResponse(
-                    "@BalanceSPI: requires integer partition id, target host id.",
+                    "@BalanceSPI: requires integer partition key and id, target host id.",
                     task.clientHandle);
         }
 
-        int pid = (Integer) params[0];
-        int newHostId = (Integer) params[1];
+        int pid = (Integer) params[1];
+        int newHostId = (Integer) params[2];
         Long hsid = VoltDB.instance().getCartograhper().getHSIdForMaster(pid);
         if (newHostId == CoreUtils.getHostIdFromHSId(hsid)) {
             return  gracefulFailureResponse(
-                    "@BalanceSPI: SPI is already the host.", task.clientHandle);
+                    "@BalanceSPI: SPI is already at the host " + newHostId, task.clientHandle);
         }
 
         final HostMessenger messenger = VoltDB.instance().getHostMessenger();
@@ -1811,7 +1813,6 @@ public final class InvocationDispatcher {
                     + "shuts down.");
             return false;
         }
-
         Long initiatorHSId = null;
         boolean isShortCircuitRead = false;
         /*

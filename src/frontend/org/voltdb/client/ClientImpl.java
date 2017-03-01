@@ -690,7 +690,6 @@ public final class ClientImpl implements Client {
         String m_hostName;
         int m_clientPort;
         int m_adminPort;
-        boolean m_initialized = false;
         void setValue(String param, String value) {
             if ("IPADDRESS".equalsIgnoreCase(param)) {
                 m_ipAddress = value;
@@ -700,8 +699,6 @@ public final class ClientImpl implements Client {
                 m_clientPort = Integer.parseInt(value);
             } else if ("ADMINPORT".equalsIgnoreCase(param)) {
                 m_adminPort = Integer.parseInt(value);
-            } else if ("INITIALIZED".equalsIgnoreCase(param)) {
-                m_initialized = "true".equalsIgnoreCase(value);
             }
         }
 
@@ -836,14 +833,12 @@ public final class ClientImpl implements Client {
                     Map<Integer, HostConfig> hosts = listener.buildUnconnectedHostConfigMap(resp.getResults()[0]);
                     for(Map.Entry<Integer, HostConfig> entry : hosts.entrySet()) {
                         HostConfig config = entry.getValue();
-                        if (config.m_initialized) {
-                            try {
-                                createConnection(config.m_ipAddress,config.getPort(listener.m_useAdminPort));
-                                listener.nofifyClientConnectionCreation(config, ClientStatusListenerExt.AutoConnectionStatus.SUCCESS);
-                            } catch (Exception e) {
-                                listener.nofifyClientConnectionCreation(config, ClientStatusListenerExt.AutoConnectionStatus.UNABLE_TO_CONNECT);
-                                failCount++;
-                            }
+                        try {
+                            createConnection(config.m_ipAddress,config.getPort(listener.m_useAdminPort));
+                            listener.nofifyClientConnectionCreation(config, ClientStatusListenerExt.AutoConnectionStatus.SUCCESS);
+                        } catch (Exception e) {
+                            listener.nofifyClientConnectionCreation(config, ClientStatusListenerExt.AutoConnectionStatus.UNABLE_TO_CONNECT);
+                            failCount++;
                         }
                     }
                 } else {

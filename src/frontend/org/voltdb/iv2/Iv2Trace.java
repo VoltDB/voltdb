@@ -221,6 +221,18 @@ public class Iv2Trace
         }
     }
 
+    public static void logMisroutedFragmentTaskMessage(FragmentTaskMessage ftask, long localHSId)
+    {
+        if (IV2_TRACE_ENABLED) {
+            String logmsg = "misRoutedFragMsg %s from %s txnId %s spHandle %s trunc %s readonly %s";
+            iv2log.trace(String.format(logmsg, CoreUtils.hsIdToString(localHSId),
+                        CoreUtils.hsIdToString(ftask.m_sourceHSId),
+                        txnIdToString(ftask.getTxnId()),
+                        txnIdToString(ftask.getSpHandle()),
+                        txnIdToString(ftask.getTruncationHandle()),
+                        ftask.isReadOnly()));
+        }
+    }
     public static void logIv2MultipartSentinel(MultiPartitionParticipantMessage message, long localHSId,
             long txnId)
     {

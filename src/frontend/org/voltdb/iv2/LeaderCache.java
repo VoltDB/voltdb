@@ -39,6 +39,7 @@ import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.zk.ZKUtil;
 import org.voltcore.zk.ZKUtil.ByteArrayCallback;
+import org.voltdb.VoltZK;
 
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -283,8 +284,8 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
             try {
                 byte payload[] = callback.getData();
                 String data = new String(payload, "UTF-8");
-                long HSId = ZKUtil.getHSId(data);
-                boolean isBalanceSpi = ZKUtil.isHSIdFromBalanceSPIRequest(data);
+                long HSId = VoltZK.getHSId(data);
+                boolean isBalanceSpi = VoltZK.isHSIdFromBalanceSPIRequest(data);
                 Integer partitionId = getPartitionIdFromZKPath(callback.getPath());
                 cache.put(partitionId, new LeaderCallBackInfo(HSId, isBalanceSpi));
             } catch (KeeperException.NoNodeException e) {
@@ -310,8 +311,8 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
             // cb.getData() and cb.getPath() throw KeeperException
             byte payload[] = cb.getData();
             String data = new String(payload, "UTF-8");
-            long HSId = ZKUtil.getHSId(data);
-            boolean isBalanceSpi = ZKUtil.isHSIdFromBalanceSPIRequest(data);
+            long HSId = VoltZK.getHSId(data);
+            boolean isBalanceSpi = VoltZK.isHSIdFromBalanceSPIRequest(data);
 
             Integer partitionId = getPartitionIdFromZKPath(cb.getPath());
             cacheCopy.put(partitionId, new LeaderCallBackInfo(HSId, isBalanceSpi));

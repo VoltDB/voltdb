@@ -41,12 +41,13 @@ import java.util.Map;
 import java.util.Set;
 
 import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.json_voltpatches.JSONObject;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
+import org.voltcore.messaging.BinaryPayloadMessage;
 import org.voltcore.messaging.HostMessenger;
-import org.voltcore.messaging.NodeFailureNotificationMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.zk.LeaderElector;
@@ -170,11 +171,12 @@ public class TestCartographer extends ZKTestBase {
         // now change master for part 0
         spwriter.put(0, 3l);
         ArgumentCaptor<Long> hsIdCaptor = ArgumentCaptor.forClass(Long.class);
-        ArgumentCaptor<NodeFailureNotificationMessage> bpmCaptor = ArgumentCaptor.forClass(NodeFailureNotificationMessage.class);
+        ArgumentCaptor<BinaryPayloadMessage> bpmCaptor = ArgumentCaptor.forClass(BinaryPayloadMessage.class);
         verify(hm, timeout(10000)).send(hsIdCaptor.capture(), bpmCaptor.capture());
-        NodeFailureNotificationMessage msg = bpmCaptor.getValue();
-        final int partitionId = msg.getPartitionId();
-        final long initiatorHSId = msg.getInitiatorHsid();
+        JSONObject jsObj = new JSONObject(new String(bpmCaptor.getValue().m_payload, "UTF-8"));
+        System.out.println("BPM: " + jsObj.toString());
+        final int partitionId = jsObj.getInt(Cartographer.JSON_PARTITION_ID);
+        final long initiatorHSId = jsObj.getLong(Cartographer.JSON_INITIATOR_HSID);
         assertEquals(0, partitionId);
         assertEquals(3, initiatorHSId);
         spwriter.shutdown();
@@ -198,11 +200,11 @@ public class TestCartographer extends ZKTestBase {
         // Now change the master
         mpwriter.put(MpInitiator.MP_INIT_PID, 3l);
         ArgumentCaptor<Long> hsIdCaptor = ArgumentCaptor.forClass(Long.class);
-        ArgumentCaptor<NodeFailureNotificationMessage> bpmCaptor = ArgumentCaptor.forClass(NodeFailureNotificationMessage.class);
+        ArgumentCaptor<BinaryPayloadMessage> bpmCaptor = ArgumentCaptor.forClass(BinaryPayloadMessage.class);
         verify(hm, timeout(10000)).send(hsIdCaptor.capture(), bpmCaptor.capture());
-        NodeFailureNotificationMessage msg = bpmCaptor.getValue();
-        final int partitionId = msg.getPartitionId();
-        final long initiatorHSId = msg.getInitiatorHsid();
+        JSONObject jsObj = new JSONObject(new String(bpmCaptor.getValue().m_payload, "UTF-8"));
+        final int partitionId = jsObj.getInt(Cartographer.JSON_PARTITION_ID);
+        final long initiatorHSId = jsObj.getLong(Cartographer.JSON_INITIATOR_HSID);
         assertEquals(MpInitiator.MP_INIT_PID, partitionId);
         assertEquals(3, initiatorHSId);
         mpwriter.shutdown();

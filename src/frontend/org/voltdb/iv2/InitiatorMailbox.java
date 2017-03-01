@@ -24,17 +24,20 @@ import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
 
+import org.apache.zookeeper_voltpatches.KeeperException;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
+import org.voltdb.RealVoltDB;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.DummyTransactionTaskMessage;
 import org.voltdb.messaging.DumpMessage;
+import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
@@ -316,7 +319,12 @@ public class InitiatorMailbox implements Mailbox
             return;
         }
         else if (message instanceof Iv2InitiateTaskMessage) {
-            if (handleMisRoutedTransaction((Iv2InitiateTaskMessage)message)) {
+            if (checkMisroutedIv2IntiateTaskMessage((Iv2InitiateTaskMessage)message)) {
+                return;
+            }
+            startSPIMigrationIfRequested((Iv2InitiateTaskMessage)message);
+        } else if (message instanceof FragmentTaskMessage) {
+            if (checkMisroutedFragmentTaskMessage((FragmentTaskMessage)message)) {
                 return;
             }
         }
@@ -327,7 +335,9 @@ public class InitiatorMailbox implements Mailbox
         }
     }
 
-    private boolean handleMisRoutedTransaction(Iv2InitiateTaskMessage message) {
+    // if the SPI migration has been requested, the site will be immediately treated as non-leader
+    // all the requests will be sent back to the sender if the sender sends requests to leader.
+    private boolean checkMisroutedIv2IntiateTaskMessage(Iv2InitiateTaskMessage message) {
         if (!m_scheduler.isSpiBalanceRequested() || message.isForReplica()) {
             return false;
         }
@@ -337,6 +347,56 @@ public class InitiatorMailbox implements Mailbox
         deliver(response);
         Iv2Trace.logMisroutedTransaction(message, getHSId());
         return true;
+    }
+
+    // if the SPI migration has been requested, the site will be immediately treated as non-leader
+    // all the requests will be sent back to the sender if the sender sends requests to leader.
+    private boolean checkMisroutedFragmentTaskMessage(FragmentTaskMessage message) {
+        if (!m_scheduler.isSpiBalanceRequested() || message.isForReplica()) {
+            return false;
+        }
+        FragmentResponseMessage response = new FragmentResponseMessage(message, getHSId());
+        response.setStatus(FragmentResponseMessage.USER_ERROR, null);
+        response.m_sourceHSId = getHSId();
+        Iv2Trace.logMisroutedFragmentTaskMessage(message, getHSId());
+        deliver(response);
+        return true;
+    }
+
+    // if the request is @BalanceSPI, mark this site as non-leader
+    // and start new leader appoint process
+    private void startSPIMigrationIfRequested(Iv2InitiateTaskMessage message) {
+
+        final String procedureName = message.getStoredProcedureName();
+        if (!"@BalanceSPI".equals(procedureName)) {
+            return;
+        }
+
+        final Object[] params = message.getParameters();
+        int partition = Integer.parseInt(params[1].toString());
+        int hostId = Integer.parseInt(params[2].toString());
+        RealVoltDB db = (RealVoltDB)VoltDB.instance();
+        Long newLeaderHSId = db.getCartograhper().getHSIDForPartitionHost(hostId, partition);
+
+        tmLog.info("[InitiatorMailbox] starting Balance SPI for partition " + partition + " to " +
+                    CoreUtils.hsIdToString(newLeaderHSId));
+
+        String hsidStr = VoltZK.suffixHSIdsWithBalanceSPIRequest(newLeaderHSId);
+        LeaderCache leaderAppointee = new LeaderCache(m_messenger.getZK(), VoltZK.iv2appointees);
+        try {
+            leaderAppointee.start(true);
+            leaderAppointee.put(partition, hsidStr);
+        } catch (InterruptedException | ExecutionException | KeeperException e) {
+            VoltDB.crashLocalVoltDB("fail to start SPI migration",true, e);
+        } finally {
+            try {
+                leaderAppointee.shutdown();
+            } catch (InterruptedException e) {
+            }
+        }
+        m_scheduler.setSpiBalanceRequested(true);
+        m_scheduler.m_isLeader = false;
+        m_repairLog.setLeaderState(false);
     }
 
     @Override

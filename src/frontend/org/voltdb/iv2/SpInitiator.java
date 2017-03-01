@@ -28,7 +28,6 @@ import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.zk.LeaderElector;
-import org.voltcore.zk.ZKUtil;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
@@ -59,7 +58,6 @@ public class SpInitiator extends BaseInitiator implements Promotable
     final private LeaderCache m_leaderCache;
     private boolean m_isBalanceSPIRequested = false;
     private final TickProducer m_tickProducer;
-    private final LeaderCache m_balanceSpiCache;
     private boolean m_promoted = false;
     LeaderCache.Callback m_leadersChangeHandler = new LeaderCache.Callback()
     {
@@ -88,21 +86,11 @@ public class SpInitiator extends BaseInitiator implements Promotable
 
             if (!leaders.contains(getInitiatorHSId())) {
                 m_promoted = false;
+                if (m_term != null) {
+                    m_term.shutdown();
+                }
                 if (tmLog.isDebugEnabled()) {
                     tmLog.debug(CoreUtils.hsIdToString(getInitiatorHSId()) + " is not a partition leader.");
-                }
-            }
-        }
-    };
-
-    LeaderCache.Callback m_balanceSpiHandler = new LeaderCache.Callback() {
-        @Override
-        public void run(ImmutableMap<Integer, LeaderCallBackInfo> cache) {
-            for (Entry<Integer, LeaderCallBackInfo> entry: cache.entrySet()) {
-                //current master partition
-                if (entry.getKey() == m_partitionId && m_scheduler.m_isLeader && entry.getValue().m_isBalanceSPIRequested) {
-                    startBalanceSPI(entry.getKey(), entry.getValue().m_HSID);
-                    break;
                 }
             }
         }
@@ -117,7 +105,6 @@ public class SpInitiator extends BaseInitiator implements Promotable
                 "SP", agent, startAction);
         m_leaderCache = new LeaderCache(messenger.getZK(), VoltZK.iv2appointees, m_leadersChangeHandler);
         m_tickProducer = new TickProducer(m_scheduler.m_tasks);
-        m_balanceSpiCache = new LeaderCache(messenger.getZK(), VoltZK.balancespi_initiator, m_balanceSpiHandler);
     }
 
     @Override
@@ -136,7 +123,6 @@ public class SpInitiator extends BaseInitiator implements Promotable
     {
         try {
             m_leaderCache.start(true);
-            m_balanceSpiCache.start(true);
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Unable to configure SpInitiator.", true, e);
         }
@@ -178,29 +164,6 @@ public class SpInitiator extends BaseInitiator implements Promotable
         });
     }
 
-    private void startBalanceSPI(int partition, long newLeaderHSId) {
-
-        if (tmLog.isDebugEnabled()) {
-            tmLog.debug("[SpInitiator] starting Balance SPI for partition " + partition + " to " +
-                    CoreUtils.hsIdToString(newLeaderHSId));
-        }
-
-        m_scheduler.setSpiBalanceRequested(true);
-        m_scheduler.m_isLeader = false;
-        m_repairLog.setLeaderState(false);
-
-        String hsidStr = ZKUtil.suffixHSIdsWithBalanceSPIRequest(newLeaderHSId);
-        VoltZK.updateLeaderCacheNode(m_messenger.getZK(), VoltZK.iv2appointees, partition, hsidStr, tmLog);
-
-        //remove the indicator
-        try {
-            ZKUtil.asyncDeleteRecursively(m_messenger.getZK(),
-                    ZKUtil.joinZKPath(VoltZK.balancespi_initiator, String.valueOf(partition)));
-        } catch (Exception e) {
-            tmLog.error("Error removing partition info", e);
-        }
-    }
-
     @Override
     public void acceptPromotion()
     {
@@ -226,7 +189,6 @@ public class SpInitiator extends BaseInitiator implements Promotable
                 }
 
                 // term syslogs the start of leader promotion.
-                //do not engage the reprair whne the leader change is from SPI balance.
                 long txnid = Long.MIN_VALUE;
                 RepairAlgo repair =
                         m_initiatorMailbox.constructRepairAlgo(m_term.getInterestingHSIds(), m_whoami, m_isBalanceSPIRequested);
@@ -248,7 +210,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
                             m_zkMailboxNode);
 
                     if (m_isBalanceSPIRequested) {
-                        String hsidStr = ZKUtil.suffixHSIdsWithBalanceSPIRequest(m_initiatorMailbox.getHSId());
+                        String hsidStr = VoltZK.suffixHSIdsWithBalanceSPIRequest(m_initiatorMailbox.getHSId());
                         iv2masters.put(m_partitionId,hsidStr);
                         if (tmLog.isDebugEnabled()) {
                             tmLog.debug("Site " + CoreUtils.hsIdToString(m_initiatorMailbox.getHSId()) +
@@ -312,7 +274,6 @@ public class SpInitiator extends BaseInitiator implements Promotable
     public void shutdown() {
         try {
             m_leaderCache.shutdown();
-            m_balanceSpiCache.shutdown();
         } catch (InterruptedException e) {
             tmLog.info("Interrupted during shutdown", e);
         }

@@ -48,10 +48,11 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.HdrHistogram_voltpatches.AbstractHistogram;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.messaging.BinaryPayloadMessage;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.Mailbox;
-import org.voltcore.messaging.NodeFailureNotificationMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.network.Connection;
 import org.voltcore.network.NIOReadStream;
@@ -1120,8 +1121,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         cihm.connection.writeStream().fastEnqueue(new ClientResponseWork(response, cihm, procedure));
                         Iv2Trace.logFinishTransaction(response, m_mailbox.getHSId());
                     }
-                } else if (message instanceof NodeFailureNotificationMessage) {
-                    handlePartitionFailOver((NodeFailureNotificationMessage)message);
+                } else if (message instanceof BinaryPayloadMessage) {
+                    handlePartitionFailOver((BinaryPayloadMessage)message);
                 } else {
                     m_d.offer(message);
                 }
@@ -1160,10 +1161,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         return m_internalConnectionHandler;
     }
 
-    private void handlePartitionFailOver(NodeFailureNotificationMessage message) {
+    private void handlePartitionFailOver(BinaryPayloadMessage message) {
         try {
-            final int partitionId = message.getPartitionId();
-            final long initiatorHSId = message.getInitiatorHsid();
+            JSONObject jsObj = new JSONObject(new String(message.m_payload, "UTF-8"));
+            final int partitionId = jsObj.getInt(Cartographer.JSON_PARTITION_ID);
+            final long initiatorHSId = jsObj.getLong(Cartographer.JSON_INITIATOR_HSID);
             for (final ClientInterfaceHandleManager cihm : m_cihm.values()) {
                 try {
                     cihm.connection.queueTask(new Runnable() {
@@ -1206,7 +1208,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             ClientResponseImpl.RESPONSE_UNKNOWN,
                             ClientResponse.UNINITIALIZED_APP_STATUS_CODE,
                             null,
-                            new VoltTable[0], DROP_TXN_MASTERSHIP);
+                            new VoltTable[0],
+                            DROP_TXN_MASTERSHIP);
             response.setClientHandle(inFlight.m_clientHandle);
             ByteBuffer buf = ByteBuffer.allocate(response.getSerializedSize() + 4);
             buf.putInt(buf.capacity() - 4);
