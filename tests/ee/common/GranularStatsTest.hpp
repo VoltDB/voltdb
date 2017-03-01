@@ -41,19 +41,21 @@
  * the License.
  */
 
+#include <string>
+
 /*
  * A way to generate this catalog payload string is to use Ethan's branch named
  * "CatalogPayload-sysproc-notest".
  * After executing all the DDLs, run "exec @CatalogPayload;".
  * To generate the JSON string for a query, run "exec @JSONPlan '<query>';".
+ *
+ * DDL:
+ * CREATE TABLE (a INT NOT NULL, b FLOAT NOT NULL, c VARCHAR(10) NOT NULL);
+ *
+ * Note that table T is defined as a replicated table.
+ * But the query plans below are planned with forceSP() because only
+ * one partition will be initialized in the test.
  */
-
-#include <string>
-
-// CREATE TABLE (a INT NOT NULL, b FLOAT NOT NULL, c VARCHAR(10) NOT NULL);
-// Note that table T is defined as a replicated table.
-// But the query plans below are planned with forceSP() because only
-// one partition will be initialized in the test.
 const char *catalogPayload =
     "add / clusters cluster\n"
     "set /clusters#cluster localepoch 1199145600\n"

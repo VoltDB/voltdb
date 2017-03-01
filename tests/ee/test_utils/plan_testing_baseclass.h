@@ -302,12 +302,10 @@ public:
         const voltdb::TupleSchema* resultSchema = result->schema();
         voltdb::TableTuple tuple(resultSchema);
         boost::scoped_ptr<voltdb::TableIterator> iter(result->makeIterator());
-        int32_t count;
-        for (count = 0; iter->next(tuple); count ++) {
-            int64_t actualModifiedTuples = voltdb::ValuePeeker::peekBigInt(tuple.getNValue(0));
-            ASSERT_EQ(expectedModifiedTuples, actualModifiedTuples);
-        }
-        ASSERT_EQ(1, count);
+        ASSERT_TRUE(iter->next(tuple));
+        int64_t actualModifiedTuples = voltdb::ValuePeeker::peekBigInt(tuple.getNValue(0));
+        ASSERT_EQ(expectedModifiedTuples, actualModifiedTuples);
+        ASSERT_FALSE(iter->next(tuple));
     }
 
     void initParamsBuffer() {
