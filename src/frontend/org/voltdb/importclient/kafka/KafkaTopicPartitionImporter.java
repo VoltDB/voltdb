@@ -376,7 +376,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
         long submitCount = 0;
         AtomicLong cbcnt = new AtomicLong(0);
         @SuppressWarnings("unchecked")
-        Formatter<Object> formatter = m_config.getFormatterBuilder().create();
+        Formatter<ByteBuffer> formatter = m_config.getFormatterBuilder().create();
         try {
             //Start with the starting leader.
             resetLeader();

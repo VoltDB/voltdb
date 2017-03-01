@@ -17,6 +17,7 @@
 
 package org.voltdb.importer.formatter.builtin;
 
+import java.nio.ByteBuffer;
 import java.util.Properties;
 
 import org.voltdb.importer.formatter.AbstractFormatterFactory;
@@ -28,7 +29,7 @@ public class VoltCSVFormatterFactory extends AbstractFormatterFactory {
 
 
     @Override
-    public Formatter<String> create(String formatName, Properties props) {
+    public Formatter<ByteBuffer> create(String formatName, Properties props) {
         if(useSuperCsv(props)){
             return new VoltSuperCSVFormatter(formatName, props);
         }
