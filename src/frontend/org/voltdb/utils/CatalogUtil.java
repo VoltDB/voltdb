@@ -681,7 +681,7 @@ public abstract class CatalogUtil {
 
             //Set enable security
             setSecurityEnabled(catalog, deployment.getSecurity());
-            
+
             // set the users info
             // We'll skip this when building the dummy catalog on startup
             // so that we don't spew misleading user/role warnings
