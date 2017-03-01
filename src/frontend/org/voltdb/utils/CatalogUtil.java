@@ -72,6 +72,7 @@ import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
 import org.voltdb.HealthMonitor;
+import org.voltdb.RealVoltDB;
 import org.voltdb.SystemProcedureCatalog;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
@@ -680,6 +681,9 @@ public abstract class CatalogUtil {
 
             //Set enable security
             setSecurityEnabled(catalog, deployment.getSecurity());
+            if (deployment.getSecurity().isEnabled() == false) {
+                hostLog.warn(RealVoltDB.SECURITY_OFF_WARNING);
+            }
 
             // set the users info
             // We'll skip this when building the dummy catalog on startup
