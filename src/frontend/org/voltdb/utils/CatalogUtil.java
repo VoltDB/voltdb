@@ -681,10 +681,7 @@ public abstract class CatalogUtil {
 
             //Set enable security
             setSecurityEnabled(catalog, deployment.getSecurity());
-            if (deployment.getSecurity().isEnabled() == false) {
-                hostLog.warn(RealVoltDB.SECURITY_OFF_WARNING);
-            }
-
+            
             // set the users info
             // We'll skip this when building the dummy catalog on startup
             // so that we don't spew misleading user/role warnings
