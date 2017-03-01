@@ -18,7 +18,6 @@
 #define BINARYLOGSINKWRAPPER_H
 
 #include "storage/BinaryLogSink.h"
-#include "storage/CompatibleBinaryLogSink.h"
 
 #include <boost/unordered_map.hpp>
 #include <boost/shared_ptr.hpp>
@@ -40,7 +39,6 @@ public:
                   Pool *pool, VoltDBEngine *engine, int32_t remoteClusterId);
 private:
     BinaryLogSink m_sink;
-    CompatibleBinaryLogSink m_compatibleSink;
 };
 
 

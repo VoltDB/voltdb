@@ -85,13 +85,6 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
         }
     }
 
-    // all partial MP txns go into SP streams
-    public static final byte DR_NO_MP_START_PROTOCOL_VERSION = 3;
-    // all partial MP txns except those with table truncation record go to MP stream separately without coordination
-    public static final byte DR_UNCOORDINATED_MP_START_PROTOCOL_VERSION = 4;
-    // partial MP txns of the same MP txn coordinated and combined before going to MP stream
-    public static final byte DR_COORDINATED_MP_START_PROTOCOL_VERSION = 6;
-
     /**
      * Load the full subclass if it should, otherwise load the
      * noop stub.
