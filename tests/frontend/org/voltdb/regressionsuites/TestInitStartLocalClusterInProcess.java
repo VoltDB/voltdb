@@ -25,6 +25,10 @@ package org.voltdb.regressionsuites;
 
 
 import java.io.File;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+
 import static junit.framework.TestCase.assertEquals;
 import static junit.framework.TestCase.assertNotNull;
 import static junit.framework.TestCase.assertTrue;
@@ -39,7 +43,6 @@ import org.voltdb.utils.MiscUtils;
 import org.voltdb.ServerThread;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltDB.Configuration;
-import org.voltdb.VoltDB.SimulatedExitException;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
@@ -60,6 +63,7 @@ public class TestInitStartLocalClusterInProcess extends JUnit4LocalClusterTest {
     String listener;
     Client client;
     String voltDbRootPath;
+    String voltDBRootParentPath;
 
     @Before
     public void setUp() throws Exception {
@@ -85,6 +89,7 @@ public class TestInitStartLocalClusterInProcess extends JUnit4LocalClusterTest {
             voltDbRoot = new File(voltDbFilePrefix, builder.getPathToVoltRoot().getPath());
         }
         voltDbRootPath = voltDbRoot.getCanonicalPath();
+        voltDBRootParentPath = voltDbRoot.getParentFile().getCanonicalPath();
         listener = cluster.getListenerAddresses().get(0);
         client = ClientFactory.createClient();
         client.createConnection(listener);
@@ -111,23 +116,61 @@ public class TestInitStartLocalClusterInProcess extends JUnit4LocalClusterTest {
         assertTrue(found);
         assertEquals(org.voltcore.common.Constants.DEFAULT_HEARTBEAT_TIMEOUT_SECONDS, timeout);
 
-        File out = File.createTempFile("get_deployment", ".xm");
 
-        Configuration c1 = new VoltDB.Configuration(new String[]{"get", "deployment",
-            "getvoltdbroot", voltDbRootPath,
-            "file", out.getAbsolutePath() + "l"});
-        ServerThread server = new ServerThread(c1);
+        if (!cluster.isNewCli()) {
+            // get command is not supported in legacy cli as voltdbroot
+            // under the parent can't be determined deterministically
+            // using voltdbroot as the root of database directory
+            return;
+        }
+
+        testGetDeployment();
+        testGetSchema();
+    }
+
+    // Test get deployment
+    public void testGetDeployment() throws Exception {
+
+
+        File deployment = File.createTempFile("get_deployment", ".xm");
+        Configuration config = new VoltDB.Configuration(new String[]{"get", "deployment",
+            "getvoltdbroot", voltDBRootParentPath,
+            "file", deployment.getAbsolutePath() + "l", "forceget"});
+        ServerThread server = new ServerThread(config);
 
         try {
             server.cli();
-        } catch (SimulatedExitException ex) {
+        } catch (Throwable ex) {
             //Good
         }
 
-        DeploymentType dt = CatalogUtil.parseDeployment(out.getAbsolutePath() + "l");
+        DeploymentType dt = CatalogUtil.parseDeployment(deployment.getAbsolutePath() + "l");
         assertNotNull(dt);
         assertEquals(dt.getPaths().getVoltdbroot().getPath(), voltDbRootPath);
+    }
 
+    // Test get schema
+    public void testGetSchema() throws Exception {
+
+        File schema = File.createTempFile("schema", ".sql");
+        Configuration config = new VoltDB.Configuration(new String[]{"get", "schema",
+            "getvoltdbroot", voltDBRootParentPath,
+            "file", schema.getAbsolutePath(), "forceget"});
+        ServerThread server = new ServerThread(config);
+
+        try {
+            server.cli();
+        } catch (Throwable ex) {
+            //Good
+        }
+
+        byte[] encoded = Files.readAllBytes(Paths.get(schema.getAbsolutePath()));
+        assertNotNull(encoded);
+        assertTrue(encoded.length > 0);
+        String ddl = new String(encoded, StandardCharsets.UTF_8);
+        assertTrue(ddl.toLowerCase().contains("create table blah ("));
+        assertTrue(ddl.toLowerCase().contains("ival bigint default '0' not null"));
+        assertTrue(ddl.toLowerCase().contains("primary key (ival)"));
     }
 
 }

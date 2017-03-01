@@ -543,6 +543,8 @@ public final class InvocationDispatcher {
         return catProc;
     }
 
+    public final static String SHUTDOWN_MSG = "Server is shutting down.";
+
     private final static ClientResponseImpl allowPauseModeExecution(
             InvocationClientHandler handler,
             Procedure procedure,
@@ -552,17 +554,15 @@ public final class InvocationDispatcher {
 
         if (voltdb.getMode() == OperationMode.SHUTTINGDOWN) {
             return serverUnavailableResponse(
-                    "Server is shutting down.",
+                    SHUTDOWN_MSG,
                     task.clientHandle);
         }
 
-        if (voltdb.isShuttingdown() && procedure.getAllowedinshutdown()) {
-            return null;
-        }
+        if (voltdb.isPreparingShuttingdown()) {
+            if (procedure.getAllowedinshutdown()) return null;
 
-        if (voltdb.isShuttingdown()) {
             return serverUnavailableResponse(
-                    "Server shutdown in progress - new transactions are not processed.",
+                    SHUTDOWN_MSG,
                     task.clientHandle);
         }
 
@@ -1097,7 +1097,7 @@ public final class InvocationDispatcher {
         }
         VoltDBInterface voltdb = VoltDB.instance();
 
-        if (!voltdb.isShuttingdown()) {
+        if (!voltdb.isPreparingShuttingdown()) {
             log.warn("Ignoring shutdown save snapshot request as VoltDB is not shutting down");
             return unexpectedFailureResponse(
                     "Ignoring shutdown save snapshot request as VoltDB is not shutting down",

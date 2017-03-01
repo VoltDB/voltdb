@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.CountDownLatch;
 
+import org.voltcore.network.ReverseDNSCache;
 import org.voltdb.ServerThread;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltDB.Configuration;
@@ -62,7 +63,15 @@ public class TestClientClose extends TestCase {
             localServer = new ServerThread(config);
             localServer.start();
             localServer.waitForInitialization();
-            ClientFactory.ACTIVE_CLIENT_COUNT.set(0);
+            ClientFactory.m_preserveResources = false;
+            while (ClientFactory.m_activeClientCount > 0) {
+                try {
+                    ClientFactory.decreaseClientNum();
+                }
+                catch (InterruptedException e) {}
+            }
+            // The DNS cache is always initialized in the started state
+            ReverseDNSCache.start();
         }
         catch (Exception e) {
             e.printStackTrace();

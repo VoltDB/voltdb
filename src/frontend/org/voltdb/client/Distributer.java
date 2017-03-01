@@ -949,7 +949,21 @@ class Distributer {
         final int hostId = (int)instanceIdWhichIsTimestampAndLeaderIp[0];
 
         NodeConnection cxn = new NodeConnection(instanceIdWhichIsTimestampAndLeaderIp);
-        Connection c = m_network.registerChannel( aChannel, cxn);
+        Connection c = null;
+        try {
+            if (aChannel != null) {
+                c = m_network.registerChannel(aChannel, cxn);
+            }
+        }
+        catch (Exception e) {
+            // Need to clean up the socket if there was any failure
+            try {
+                aChannel.close();
+            } catch (IOException e1) {
+                //Don't care connection is already lost anyways
+            }
+            Throwables.propagate(e);
+        }
         cxn.m_connection = c;
 
         synchronized (this) {

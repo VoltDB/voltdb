@@ -43,9 +43,9 @@ import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.MiscUtils;
 
-public class TestShutdownSave extends RegressionSuite
+public class TestShutdownSaveNoCommandLog extends RegressionSuite
 {
-    public TestShutdownSave(String name) {
+    public TestShutdownSaveNoCommandLog(String name) {
         super(name);
     }
 
@@ -179,20 +179,14 @@ public class TestShutdownSave extends RegressionSuite
 
     static public junit.framework.Test suite() throws Exception {
 
-        final MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestShutdownSave.class);
+        final MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestShutdownSaveNoCommandLog.class);
         Map<String, String> additionalEnv = new HashMap<String, String>();
-
-        // String bundleLocation = System.getProperty("user.dir") + "/bundles";
-        // additionalEnv.put("voltdbbundlelocation", bundleLocation);
 
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(ArbitraryDurationProc.class.getResource("clientfeatures.sql"));
         project.addProcedures(ArbitraryDurationProc.class);
         project.setUseDDLSchema(true);
         project.addPartitionInfo("indexme", "pkey");
-        if (MiscUtils.isPro()) {
-            project.configureLogging(true, true, 2, 2, 64);
-        }
 
         LocalCluster config = new LocalCluster("prepare_shutdown_importer.jar", 4, HOST_COUNT, 0, BackendTarget.NATIVE_EE_JNI,
                 LocalCluster.FailureState.ALL_RUNNING, true, false, additionalEnv);
