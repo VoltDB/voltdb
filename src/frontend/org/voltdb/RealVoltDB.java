@@ -115,6 +115,7 @@ import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.compiler.deploymentfile.HeartbeatType;
 import org.voltdb.compiler.deploymentfile.PartitionDetectionType;
 import org.voltdb.compiler.deploymentfile.PathsType;
+import org.voltdb.compiler.deploymentfile.SecurityType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.dtxn.InitiatorStats;
 import org.voltdb.dtxn.LatencyHistogramStats;
@@ -2132,6 +2133,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
     }
 
+    public static final String SECURITY_OFF_WARNING = "User authentication is not enabled."
+            + " The database is accessible and could be modified or shut down by anyone on the network.";
+
     boolean readDeploymentAndCreateStarterCatalogContext(VoltDB.Configuration config) {
         /*
          * Debate with the cluster what the deployment file should be
@@ -2321,6 +2325,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                         m_config.m_queryTimeout = 0;
                     }
                 }
+            }
+
+            // log a warning on console log if security setting is turned off, like durability warning.
+            SecurityType securityType = deployment.getSecurity();
+            if (securityType == null || !securityType.isEnabled()) {
+                consoleLog.warn(SECURITY_OFF_WARNING);
             }
 
             // create a dummy catalog to load deployment info into
