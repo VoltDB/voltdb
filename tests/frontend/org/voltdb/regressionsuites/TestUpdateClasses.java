@@ -823,7 +823,7 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
             comp.addClassToJar(boom, org.voltdb_testprocs.updateclasses.testImportProc.class);
             try {
                 resp = m_client.callProcedure("@UpdateClasses", boom.getFullJarBytes(), null);
-                assertEquals(ClientResponse.SUCCESS, resp.getAppStatus());
+                assertEquals(ClientResponse.SUCCESS, resp.getStatus());
             }
             catch (ProcCallException pce) {
                 fail("@UpdateClasses should not fail with message: " + pce.getMessage());
