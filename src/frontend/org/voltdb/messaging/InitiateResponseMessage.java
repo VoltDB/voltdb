@@ -53,9 +53,6 @@ public class InitiateResponseMessage extends VoltMessage {
     private StoredProcedureInvocation m_invocation;
     private Pair<Long, byte[]> m_currentHashinatorConfig;
 
-    // Mis-routed invocation due to SPI change, send back to ClientInterface for restart
-    private boolean m_misrouted;
-
     // a flag used for SPI balance operation, indicating that the task was created
     //when the site was leader partition
     boolean m_createdFromLeader = false;
@@ -166,7 +163,7 @@ public class InitiateResponseMessage extends VoltMessage {
     }
 
     public boolean isMisrouted() {
-        return m_misrouted;
+        return (m_response.getStatus() == ClientResponse.TXN_MISROUTED);
     }
 
     public StoredProcedureInvocation getInvocation() {
@@ -187,11 +184,10 @@ public class InitiateResponseMessage extends VoltMessage {
     }
 
     public void setMisrouted(StoredProcedureInvocation invocation) {
-        m_misrouted = true;
         m_invocation = invocation;
         m_currentHashinatorConfig = TheHashinator.getCurrentVersionedConfig();
         m_commit = false;
-        m_response = new ClientResponseImpl(ClientResponse.TXN_RESTART, new VoltTable[]{}, "Misrouted");
+        m_response = new ClientResponseImpl(ClientResponse.TXN_MISROUTED, new VoltTable[]{}, "Misrouted");
     }
 
     public ClientResponseImpl getClientResponseData() {
@@ -220,11 +216,10 @@ public class InitiateResponseMessage extends VoltMessage {
             + 1 // read only
             + 1 // node recovering indication
             + 1 // mispartitioned invocation
-            + 1 // misrouted
             + 1 // createdFromLeader
             + m_response.getSerializedSize();
 
-        if (m_mispartitioned || m_misrouted) {
+        if (m_mispartitioned || isMisrouted()) {
             msgsize += m_invocation.getSerializedSize()
                        + 8 // current hashinator version
                        + 4 // hashinator config length
@@ -247,10 +242,9 @@ public class InitiateResponseMessage extends VoltMessage {
         buf.put((byte) (m_readOnly == true ? 1 : 0));
         buf.put((byte) (m_recovering == true ? 1 : 0));
         buf.put((byte) (m_mispartitioned == true ? 1 : 0));
-        buf.put((byte) (m_misrouted == true ? 1 : 0));
         buf.put((byte) (m_createdFromLeader == true ? 1 : 0));
         m_response.flattenToBuffer(buf);
-        if (m_mispartitioned || m_misrouted) {
+        if (m_mispartitioned || isMisrouted()) {
             buf.putLong(m_currentHashinatorConfig.getFirst());
             buf.putInt(m_currentHashinatorConfig.getSecond().length);
             buf.put(m_currentHashinatorConfig.getSecond());
@@ -272,12 +266,11 @@ public class InitiateResponseMessage extends VoltMessage {
         m_readOnly = buf.get() == 1;
         m_recovering = buf.get() == 1;
         m_mispartitioned = buf.get() == 1;
-        m_misrouted = buf.get() == 1;
         m_createdFromLeader = buf.get() == 1;
         m_response = new ClientResponseImpl();
         m_response.initFromBuffer(buf);
         m_commit = (m_response.getStatus() == ClientResponseImpl.SUCCESS);
-        if (m_mispartitioned || m_misrouted) {
+        if (m_mispartitioned || isMisrouted()) {
             long hashinatorVersion = buf.getLong();
             byte[] hashinatorBytes = new byte[buf.getInt()];
             buf.get(hashinatorBytes);
@@ -302,7 +295,6 @@ public class InitiateResponseMessage extends VoltMessage {
         sb.append("\n READ-ONLY: ").append(m_readOnly);
         sb.append("\n RECOVERING: ").append(m_recovering);
         sb.append("\n MISPARTITIONED: ").append(m_mispartitioned);
-        sb.append("\n MISROUTED: ").append(m_misrouted);
         if (m_commit)
             sb.append("\n  COMMIT");
         else
