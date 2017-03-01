@@ -217,7 +217,6 @@ public class TestInitStartLocalClusterAllOutOfProcess extends JUnit4LocalCluster
         } catch (ProcCallException excp) {
             assert false : "@SystemCatalogClasses failed";
         }
-        //System.out.println(resp.getResults()[0].toString());
         assertTrue( (numberOfClasses + jarfile.getLoader().getClassNames().size()) == resp.getResults()[0].getRowCount());
     }
 
@@ -250,11 +249,13 @@ public class TestInitStartLocalClusterAllOutOfProcess extends JUnit4LocalCluster
             assert false : "@SystemCatalogClasses failed";
         }
         jarFile = getProcJarFromCatalog();
+        assertTrue(!TestInitStartLocalClusterInProcess.anyCatalogDefaultArtifactsExists(jarFile));
         assertTrue(jarFile.getLoader().getClassNames().size() == resp.getResults()[0].getRowCount());
 
-        // load some additonal java stored proc classes and verify the retrieved classes count
+        // load some additional java stored proc classes and verify the retrieved classes count
         loadAndAddProcs();
         jarFile = getProcJarFromCatalog();
+        assertTrue(!TestInitStartLocalClusterInProcess.anyCatalogDefaultArtifactsExists(jarFile));
         try {
             resp = client.callProcedure("@SystemCatalog", "CLASSES");
         } catch (ProcCallException excp) {

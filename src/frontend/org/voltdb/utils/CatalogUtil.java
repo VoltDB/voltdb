@@ -156,6 +156,8 @@ public abstract class CatalogUtil {
 
     public static final String CATALOG_FILENAME = "catalog.txt";
     public static final String CATALOG_BUILDINFO_FILENAME = "buildinfo.txt";
+    public static final String CATALOG_REPORT_FILENAME = "catalog-report.html";
+    public static final String CATALOG_EMPTY_DDL_FILENAME = "ddl.sql";
 
     public static final String SIGNATURE_TABLE_NAME_SEPARATOR = "|";
     public static final String SIGNATURE_DELIMITER = ",";
@@ -181,6 +183,14 @@ public abstract class CatalogUtil {
 
     public static final String ROW_LENGTH_LIMIT = "row.length.limit";
     public static final int EXPORT_INTERNAL_FIELD_Length = 41; // 8 * 5 + 1;
+
+    public final static String[] CATALOG_DEFAULT_ARTIFCATS = {
+            VoltCompiler.AUTOGEN_DDL_FILE_NAME,
+            CATALOG_BUILDINFO_FILENAME,
+            CATALOG_REPORT_FILENAME,
+            CATALOG_EMPTY_DDL_FILENAME,
+            CATALOG_FILENAME,
+    };
 
     private static boolean m_exportEnabled = false;
 
@@ -310,25 +320,15 @@ public abstract class CatalogUtil {
     }
 
     /**
-     * Extracts classes from the catalog jar and returns a jar containing the classes from
-     * supplied jar. If no classes found in jar, empty jar file is returned
+     * Removes the default voltdb artifact files from catalog and returns the resulltant
+     * jar file. This will contain dependency files needed for generated stored procs
      *
      * @param jarfile in-memory catalog jar file
-     * @return In-memory jar file containing classes from the passed in jar file
+     * @return In-memory jar file containing dependency files for stored procedures
      */
-    public static InMemoryJarfile getClassesFromJar(final InMemoryJarfile jarfile) {
-        if (jarfile.getLoader().getClassNames().isEmpty()) {
-            // if no classes, return empty jar
-            return new InMemoryJarfile();
-        }
+    public static InMemoryJarfile getCatalogJarWithoutDefaultArtifacts(final InMemoryJarfile jarfile) {
         InMemoryJarfile cloneJar = jarfile.deepCopy();
-        Set<String> entriesToDrop = new HashSet<>();
-        for (String value : cloneJar.keySet()) {
-            if (!value.endsWith("class")) {
-                entriesToDrop.add(value);
-            }
-        }
-        for (String entry : entriesToDrop) {
+        for (String entry : CATALOG_DEFAULT_ARTIFCATS) {
             cloneJar.remove(entry);
         }
         return cloneJar;

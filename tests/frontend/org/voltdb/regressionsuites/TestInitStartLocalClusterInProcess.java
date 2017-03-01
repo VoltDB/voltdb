@@ -29,6 +29,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.Set;
 
 import static junit.framework.TestCase.assertEquals;
 import static junit.framework.TestCase.assertNotNull;
@@ -223,7 +224,6 @@ public class TestInitStartLocalClusterInProcess extends JUnit4LocalClusterTest {
         } catch (ProcCallException excp) {
             assert false : "@SystemCatalogClasses failed";
         }
-        //System.out.println(resp.getResults()[0].toString());
         assertTrue( (numberOfClasses + jarfile.getLoader().getClassNames().size()) == resp.getResults()[0].getRowCount());
     }
 
@@ -245,10 +245,20 @@ public class TestInitStartLocalClusterInProcess extends JUnit4LocalClusterTest {
         return new InMemoryJarfile(bytesRead);
     }
 
+    static boolean anyCatalogDefaultArtifactsExists(InMemoryJarfile jarFile) {
+        Set<String> files = jarFile.keySet();
+        // if empty, none
+        if (files.size() == 0) return false;
+        for (String artifacts : CatalogUtil.CATALOG_DEFAULT_ARTIFCATS) {
+            if (files.contains(artifacts)) return true;
+        }
+        return false;
+    }
+
     public void testGetClasses() throws IOException {
         InMemoryJarfile jarFile = getProcJarFromCatalog();
+        assertTrue(!anyCatalogDefaultArtifactsExists(jarFile));
         org.voltdb.client.ClientResponse resp = null;
-
         // No java stored proc at this time, will give jar with no classes
         try {
             resp = client.callProcedure("@SystemCatalog", "CLASSES");
@@ -260,6 +270,7 @@ public class TestInitStartLocalClusterInProcess extends JUnit4LocalClusterTest {
         // load java stored proc classes and verify the retrieved classes count
         loadAndAddProcs();
         jarFile = getProcJarFromCatalog();
+        assertTrue(!anyCatalogDefaultArtifactsExists(jarFile));
         try {
             resp = client.callProcedure("@SystemCatalog", "CLASSES");
         } catch (ProcCallException excp) {

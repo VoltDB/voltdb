@@ -719,7 +719,7 @@ public class VoltDB {
         }
 
         private void inspectGetCommand() {
-            String parentPath = ".";
+            String parentPath = m_voltdbRoot.getParent();
             // check voltdbroot
             if (!m_voltdbRoot.exists()) {
                 try {
@@ -750,7 +750,7 @@ public class VoltDB {
                         try {
                             parentPath = m_voltdbRoot.getCanonicalFile().getParent();
                         } catch (IOException io) {}
-                        System.out.println("FATAL: "+ m_getOption.name().toUpperCase() + " not found in the provided database directory " + parentPath  +
+                        System.err.println("FATAL: "+ m_getOption.name().toUpperCase() + " not found in the provided database directory " + parentPath  +
                                 ". Make sure the database has been started ");
                         referToDocAndExit();
                     }
