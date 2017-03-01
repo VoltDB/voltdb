@@ -85,7 +85,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     private ByteBuffer psetBuffer = null;
 
     /** Create a ByteBuffer (in a container) for the C++ side to share granular statistics
-    with Java. */
+    with the Java topend. */
     private BBContainer granularStatsBufferC = null;
     private ByteBuffer granularStatsBuffer = null;
 
