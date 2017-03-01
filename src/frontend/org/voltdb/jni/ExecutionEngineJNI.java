@@ -254,6 +254,8 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         exceptionBufferOrigin.discard();
         psetBufferC.discard();
         psetBuffer = null;
+        granularStatsBufferC.discard();
+        granularStatsBuffer = null;
         LOG.trace("Released Execution Engine.");
     }
 
