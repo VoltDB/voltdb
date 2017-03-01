@@ -454,12 +454,8 @@ public final class InvocationDispatcher {
                 if (task.getParams().size() == 1) {
                     return takeShutdownSaveSnapshot(task, handler, ccxn, user, bypass);
                 }
-            } else if ("@BalanceSPI".equals(procName)) {
-                ClientResponseImpl failureResp = checkParamsForSPIBalance(task);
-                //return invalid parameters response message back to client.
-                //Valid SPI balance request will go through as normal transaction.
-                if (failureResp !=null) return failureResp;
             }
+
             // Verify that admin mode sysprocs are called from a client on the
             // admin port, otherwise return a failure
             if ((   "@Pause".equals(procName)
@@ -471,7 +467,6 @@ public final class InvocationDispatcher {
                         procName + " is not available to this client",
                         task.clientHandle);
             }
-
         }
         // If you're going to copy and paste something, CnP the pattern
         // up above.  -rtb.
@@ -501,35 +496,6 @@ public final class InvocationDispatcher {
                     "VoltDB failed to create the transaction internally.  It is possible this "
                     + "was caused by a node failure or intentional shutdown. If the cluster recovers, "
                     + "it should be safe to resend the work, as the work was never started.",
-                    task.clientHandle);
-        }
-
-        return null;
-    }
-
-    private ClientResponseImpl checkParamsForSPIBalance(StoredProcedureInvocation task) {
-
-        Object params[] = task.getParams().toArray();
-        if (params.length != 3 || !(params[0] instanceof Integer) ||
-                !(params[1] instanceof Integer || !(params[2] instanceof Integer))) {
-            return  gracefulFailureResponse(
-                    "@BalanceSPI: requires integer partition key and id, target host id.",
-                    task.clientHandle);
-        }
-
-        int pid = (Integer) params[1];
-        int newHostId = (Integer) params[2];
-        Long hsid = VoltDB.instance().getCartograhper().getHSIdForMaster(pid);
-        if (newHostId == CoreUtils.getHostIdFromHSId(hsid)) {
-            return  gracefulFailureResponse(
-                    "@BalanceSPI: SPI is already at the host " + newHostId, task.clientHandle);
-        }
-
-        final HostMessenger messenger = VoltDB.instance().getHostMessenger();
-        Set<Integer> liveHids = messenger.getLiveHostIds();
-        if (!liveHids.contains(newHostId)) {
-            return  gracefulFailureResponse(
-                    String.format("@BalanceSPI: the host %d is not a member of the cluster.", newHostId),
                     task.clientHandle);
         }
 
@@ -1813,6 +1779,7 @@ public final class InvocationDispatcher {
                     + "shuts down.");
             return false;
         }
+
         Long initiatorHSId = null;
         boolean isShortCircuitRead = false;
         /*

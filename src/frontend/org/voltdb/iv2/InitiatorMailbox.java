@@ -31,7 +31,6 @@ import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
-import org.voltdb.RealVoltDB;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 import org.voltdb.messaging.CompleteTransactionMessage;
@@ -322,7 +321,6 @@ public class InitiatorMailbox implements Mailbox
             if (checkMisroutedIv2IntiateTaskMessage((Iv2InitiateTaskMessage)message)) {
                 return;
             }
-            startSPIMigrationIfRequested((Iv2InitiateTaskMessage)message);
         } else if (message instanceof FragmentTaskMessage) {
             if (checkMisroutedFragmentTaskMessage((FragmentTaskMessage)message)) {
                 return;
@@ -336,23 +334,25 @@ public class InitiatorMailbox implements Mailbox
     }
 
     // if the SPI migration has been requested, the site will be immediately treated as non-leader
-    // all the requests will be sent back to the sender if the sender sends requests to leader.
+    // all the requests will be sent back to the sender if these requests are intended for leader
+    // These transactions will be restarted.
     private boolean checkMisroutedIv2IntiateTaskMessage(Iv2InitiateTaskMessage message) {
-        if (!m_scheduler.isSpiBalanceRequested() || message.isForReplica()) {
+        if (!m_scheduler.isSpiBalanceRequested() || message.isForReplica() || message.isReadOnly()) {
             return false;
         }
         InitiateResponseMessage response = new InitiateResponseMessage(message);
         response.setMisrouted(message.getStoredProcedureInvocation());
         response.m_sourceHSId = getHSId();
-        deliver(response);
         Iv2Trace.logMisroutedTransaction(message, getHSId());
+        deliver(response);
         return true;
     }
 
-    // if the SPI migration has been requested, the site will be immediately treated as non-leader
-    // all the requests will be sent back to the sender if the sender sends requests to leader.
+    // if SPI migration has been requested, the site will be immediately treated as non-leader
+    // all the requests will be sent back to the sender if these requests are intended for leader
+    // These transactions will be restarted.
     private boolean checkMisroutedFragmentTaskMessage(FragmentTaskMessage message) {
-        if (!m_scheduler.isSpiBalanceRequested() || message.isForReplica()) {
+        if (!m_scheduler.isSpiBalanceRequested() || message.isForReplica() || message.isReadOnly()) {
             return false;
         }
         FragmentResponseMessage response = new FragmentResponseMessage(message, getHSId());
@@ -363,29 +363,15 @@ public class InitiatorMailbox implements Mailbox
         return true;
     }
 
-    // if the request is @BalanceSPI, mark this site as non-leader
-    // and start new leader appoint process
-    private void startSPIMigrationIfRequested(Iv2InitiateTaskMessage message) {
-
-        final String procedureName = message.getStoredProcedureName();
-        if (!"@BalanceSPI".equals(procedureName)) {
-            return;
-        }
-
-        final Object[] params = message.getParameters();
-        int partition = Integer.parseInt(params[1].toString());
-        int hostId = Integer.parseInt(params[2].toString());
-        RealVoltDB db = (RealVoltDB)VoltDB.instance();
-        Long newLeaderHSId = db.getCartograhper().getHSIDForPartitionHost(hostId, partition);
-
+    // start the process of appointing a new leader for the partition
+    public void startSPIMigration(int partition, long newHSID) {
         tmLog.info("[InitiatorMailbox] starting Balance SPI for partition " + partition + " to " +
-                    CoreUtils.hsIdToString(newLeaderHSId));
+                    CoreUtils.hsIdToString(newHSID));
 
-        String hsidStr = VoltZK.suffixHSIdsWithBalanceSPIRequest(newLeaderHSId);
         LeaderCache leaderAppointee = new LeaderCache(m_messenger.getZK(), VoltZK.iv2appointees);
         try {
             leaderAppointee.start(true);
-            leaderAppointee.put(partition, hsidStr);
+            leaderAppointee.put(partition, VoltZK.suffixHSIdsWithBalanceSPIRequest(newHSID));
         } catch (InterruptedException | ExecutionException | KeeperException e) {
             VoltDB.crashLocalVoltDB("fail to start SPI migration",true, e);
         } finally {

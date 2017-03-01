@@ -1027,7 +1027,11 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     private void handleCompleteTransactionMessage(CompleteTransactionMessage message)
     {
         CompleteTransactionMessage msg = message;
-        if (m_isLeader) {
+
+        //The initial message could intend to be sent to a leader
+        //But the site is marked as non-leader by @BalanceSPI
+        boolean checkBalanceSPI = (msg.getSpHandle() < 0 && !m_isLeader && m_spiBalanceRequested);
+        if (m_isLeader || checkBalanceSPI) {
             msg = new CompleteTransactionMessage(m_mailbox.getHSId(), m_mailbox.getHSId(), message);
             // Set the spHandle so that on repair the new master will set the max seen spHandle
             // correctly
@@ -1047,7 +1051,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         if (txn != null)
         {
             final boolean isSysproc = ((FragmentTaskMessage) txn.getNotice()).isSysProcTask();
-            if (m_sendToHSIds.length > 0 && !msg.isRestart() && (!msg.isReadOnly() || isSysproc)) {
+            if (!checkBalanceSPI && m_sendToHSIds.length > 0 && !msg.isRestart() && (!msg.isReadOnly() || isSysproc)) {
                 DuplicateCounter counter;
                 counter = new DuplicateCounter(msg.getCoordinatorHSId(),
                                                msg.getTxnId(),

@@ -280,6 +280,15 @@ public class Cartographer extends StatsSource
         return m_iv2Masters.get(partitionId);
     }
 
+    /**
+     * validate partition id
+     * @param partitionId  The partition id
+     * @return return true if the partition id is valid
+     */
+    public boolean hasPartition(int partitionId) {
+        return ((LeaderCache)m_iv2Masters).contain(partitionId);
+    }
+
     // This used to be the method to get this on SiteTracker
     public long getHSIdForMultiPartitionInitiator()
     {

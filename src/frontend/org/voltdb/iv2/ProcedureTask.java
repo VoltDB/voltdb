@@ -62,7 +62,13 @@ abstract public class ProcedureTask extends TransactionTask
             SiteProcedureConnection siteConnection)
     {
         final InitiateResponseMessage response = new InitiateResponseMessage(task);
-        response.setCreatedFromLeader(m_createdFromLeader);
+
+        // special case for @BalanceSPI, this site will be marked as non-leader
+        if ("@BalanceSPI".equals(task.getStoredProcedureInvocation().getProcName())) {
+            response.setCreatedFromLeader(false);
+        } else {
+            response.setCreatedFromLeader(m_createdFromLeader);
+        }
         try {
             Object[] callerParams = null;
             /*

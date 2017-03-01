@@ -153,6 +153,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
 
     int m_batchTimeout = BatchTimeoutOverrideType.NO_TIMEOUT;
 
+    // indicate if the fragment is created on partition leader and sent to replicas.
     boolean m_isForReplica = false;
 
     public int getCurrentBatchIndex() {

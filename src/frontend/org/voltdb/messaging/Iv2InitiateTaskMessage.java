@@ -52,6 +52,7 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
     // not serialized.
     AtomicBoolean m_isDurable;
 
+    // indicate if the message is created on partition leader and sent to replicas.
     boolean m_isForReplica = false;
 
     /** Empty constructor for de-serialization */

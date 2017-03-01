@@ -26,6 +26,7 @@ import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.dtxn.SiteTracker;
+import org.voltdb.iv2.InitiatorMailbox;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.settings.NodeSettings;
 
@@ -112,4 +113,6 @@ public interface SystemProcedureExecutionContext {
 
     Pair<Long, int[]> tableStreamSerializeMore(int tableId, TableStreamType type,
                                                List<DBBPool.BBContainer> outputBuffers);
+
+    public InitiatorMailbox getInitiatorMailbox();
 }

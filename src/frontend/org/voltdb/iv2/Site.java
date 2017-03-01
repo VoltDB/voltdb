@@ -583,6 +583,11 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             ProcedureRunner runner = Site.this.m_loadedProcedures.getProcByName(procName);
             return runner.getCatalogProcedure();
         }
+
+        @Override
+        public InitiatorMailbox getInitiatorMailbox() {
+            return m_initiatorMailbox;
+        }
     };
 
     /** Create a new execution site and the corresponding EE */

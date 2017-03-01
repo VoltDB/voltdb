@@ -314,6 +314,11 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         public Procedure ensureDefaultProcLoaded(String procName) {
             throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
         }
+
+        @Override
+        public InitiatorMailbox getInitiatorMailbox() {
+            throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+        }
     };
 
     /** Create a new RO MP execution site */

@@ -153,6 +153,11 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
         }
     }
 
+    // check if the cache contains the partition
+    public boolean contain(int partitionId) {
+        return m_publicCache.containsKey(partitionId);
+    }
+
     private final ZooKeeper m_zk;
     private final AtomicBoolean m_shutdown = new AtomicBoolean(false);
     private final Callback m_cb; // the callback when the cache changes
