@@ -67,6 +67,10 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
     private static final boolean HOST_TRACE_ENABLED;
 
+    // Size of the parameter set buffer and the per-fragment stats buffer.
+    // 256K is a reasonable size for those relatively small buffers.
+    private static final int smallBufferSize = 256 * 1024;
+
     static {
         EE_COMPACTION_THRESHOLD = Integer.getInteger("EE_COMPACTION_THRESHOLD", 95);
         if (EE_COMPACTION_THRESHOLD < 0 || EE_COMPACTION_THRESHOLD > 99) {
@@ -84,10 +88,10 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     private BBContainer psetBufferC = null;
     private ByteBuffer psetBuffer = null;
 
-    /** Create a ByteBuffer (in a container) for the C++ side to share granular statistics
-    with Java. */
-    private BBContainer granularStatsBufferC = null;
-    private ByteBuffer granularStatsBuffer = null;
+    /** Create a ByteBuffer (in a container) for the C++ side to share time measurements and
+        the success / fail status for fragments in a batch. */
+    private BBContainer perFragmentStatsBufferC = null;
+    private ByteBuffer perFragmentStatsBuffer = null;
 
     /**
      * A deserializer backed by a direct byte buffer, for fast access from C++.
@@ -156,8 +160,8 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                     EE_COMPACTION_THRESHOLD);
         checkErrorCode(errorCode);
 
-        setupPsetBuffer(256 * 1024); // 256k seems like a reasonable per-ee number (but is totally pulled from my a**)
-        setupGranularStatsBuffer(256 * 1024); // 256k seems like a reasonable per-ee number (but is totally pulled from my a**)
+        setupPsetBuffer(smallBufferSize);
+        setupPerFragmentStatsBuffer(smallBufferSize);
         updateEEBufferPointers();
 
         updateHashinator(hashinatorConfig);
@@ -167,7 +171,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     final void updateEEBufferPointers() {
         int errorCode = nativeSetBuffers(pointer,
                 psetBuffer, psetBuffer.capacity(),
-                granularStatsBuffer, granularStatsBuffer.capacity(),
+                perFragmentStatsBuffer, perFragmentStatsBuffer.capacity(),
                 deserializer.buffer(), deserializer.buffer().capacity(),
                 exceptionBuffer, exceptionBuffer.capacity());
         checkErrorCode(errorCode);
@@ -183,14 +187,14 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         psetBuffer = psetBufferC.b();
     }
 
-    final void setupGranularStatsBuffer(int size) {
-        if (granularStatsBuffer != null) {
-            granularStatsBufferC.discard();
-            granularStatsBuffer = null;
+    final void setupPerFragmentStatsBuffer(int size) {
+        if (perFragmentStatsBuffer != null) {
+            perFragmentStatsBufferC.discard();
+            perFragmentStatsBuffer = null;
         }
 
-        granularStatsBufferC = DBBPool.allocateDirect(size);
-        granularStatsBuffer = granularStatsBufferC.b();
+        perFragmentStatsBufferC = DBBPool.allocateDirect(size);
+        perFragmentStatsBuffer = perFragmentStatsBufferC.b();
     }
 
     final void clearPsetAndEnsureCapacity(int size) {
@@ -204,18 +208,18 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         }
     }
 
-    final void clearGranularStatsAndEnsureCapacity(int batchSize) {
-        assert(granularStatsBuffer != null);
-        // Determine the required size of the granular stats buffer:
+    final void clearPerFragmentStatsAndEnsureCapacity(int batchSize) {
+        assert(perFragmentStatsBuffer != null);
+        // Determine the required size of the per-fragment stats buffer:
         // int32_t succeededFragmentsCount
         // succeededFragmentsCount * sizeof(int64_t) for duration time numbers.
         int size = 4 + batchSize * 8;
-        if (size > granularStatsBuffer.capacity()) {
-            setupGranularStatsBuffer(size);
+        if (size > perFragmentStatsBuffer.capacity()) {
+            setupPerFragmentStatsBuffer(size);
             updateEEBufferPointers();
         }
         else {
-            granularStatsBuffer.clear();
+            perFragmentStatsBuffer.clear();
         }
     }
 
@@ -254,8 +258,8 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         exceptionBufferOrigin.discard();
         psetBufferC.discard();
         psetBuffer = null;
-        granularStatsBufferC.discard();
-        granularStatsBuffer = null;
+        perFragmentStatsBufferC.discard();
+        perFragmentStatsBuffer = null;
         LOG.trace("Released Execution Engine.");
     }
 
@@ -341,7 +345,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             }
         }
         // checkMaxFsSize();
-        clearGranularStatsAndEnsureCapacity(batchSize);
+        clearPerFragmentStatsAndEnsureCapacity(batchSize);
 
         // Execute the plan, passing a raw pointer to the byte buffers for input and output
         //Clear is destructive, do it before the native call
