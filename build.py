@@ -367,8 +367,6 @@ CTX.INPUT['storage'] = """
  AbstractDRTupleStream.cpp
  BinaryLogSink.cpp
  BinaryLogSinkWrapper.cpp
- CompatibleBinaryLogSink.cpp
- CompatibleDRTupleStream.cpp
  ConstraintFailureException.cpp
  constraintutil.cpp
  CopyOnWriteContext.cpp

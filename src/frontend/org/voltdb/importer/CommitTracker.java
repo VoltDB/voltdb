@@ -15,21 +15,16 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb;
+package org.voltdb.importer;
 
-import java.util.Arrays;
+public interface CommitTracker {
 
-public enum GetActionArgument {
+    //Submit offset as seen
+    void submit(long offset);
 
-    DEPLOYMENT("deployment.xml"),
-    SCHEMA("schema.sql");
+    //Commit offset
+    long commit(long commit);
 
-    final String m_defaultOutput;
-    public String getDefaultOutput() { return m_defaultOutput; }
-
-    GetActionArgument(String value) { m_defaultOutput = value; }
-
-    public static String supportedVerbs() {
-        return Arrays.asList(values()).toString().replaceAll("^.|.$", "");
-    }
+    //Reset offset to
+    void resetTo(long offset);
 }
