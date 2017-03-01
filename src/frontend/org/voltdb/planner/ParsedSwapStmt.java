@@ -22,8 +22,12 @@ import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 
 /**
- *
- *
+ * Subclass of AbstractParsedStmt for a SWAP TABLES statement.
+ * Note that currently SWAP TABLES is not valid DML in VoltDB SQL,
+ * it must be invoked from the @SwapTables system procedure.  Under
+ * the hood this procedure just constructs an instance of this class.
+ * (At some point in the future a SWAP TABLES DML statement may be
+ * supported.)
  */
 public class ParsedSwapStmt extends AbstractParsedStmt {
     /**
@@ -51,24 +55,23 @@ public class ParsedSwapStmt extends AbstractParsedStmt {
         // parseTablesAndParameters may have been called on this
         // SWAP TABLE statement, but the simplified VoltXML representation
         // for SWAP TABLE gave that method nothing to do.
+
         assert(stmtNode.children.isEmpty());
         assert(m_tableList.isEmpty());
 
-        String theName = stmtNode.attributes.get("thetable");
-        assert(theName != null);
-        Table theTable = getTableFromDB(theName);
-        if (theTable == null) {
-            throw new PlanningErrorException("TABLE object not found: " + theName);
-        }
-        m_tableList.add(theTable);
+        addTabletoList(stmtNode, "thetable");
+        addTabletoList(stmtNode, "othertable");
+    }
 
-        String otherName = stmtNode.attributes.get("othertable");
-        assert(otherName != null);
-        Table otherTable = getTableFromDB(otherName);
-        if (otherTable == null) {
-            throw new PlanningErrorException("TABLE object not found: " + otherName);
+    private void addTabletoList(VoltXMLElement stmtNode, String attrName) {
+
+        String name = stmtNode.attributes.get(attrName);
+        assert(name != null);
+        Table table = getTableFromDB(name);
+        if (table == null) {
+            throw new PlanningErrorException("TABLE object not found: " + name);
         }
-        m_tableList.add(otherTable);
+        m_tableList.add(table);
     }
 
     @Override

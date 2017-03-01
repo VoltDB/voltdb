@@ -253,14 +253,6 @@ public class TestSystemProcedureSuite extends RegressionSuite {
                 "  ID INTEGER " +
                 ");\n",
             },
-            { "NONSWAP_CHARS",
-                " (\n" +
-                "  NAME VARCHAR(32) NOT NULL,\n" +
-                "  PRICE FLOAT," +
-                "  NONID INTEGER NOT NULL," +
-                "  ID INTEGER " +
-                ");\n",
-            },
             { "NONSWAP_STRUNG_UP",
                 " (\n" +
                 "  NAME VARCHAR(128 BYTES) NOT NULL,\n" +
@@ -813,21 +805,17 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         }
     }
 
+    private final static Object[][] THE_SWAP_CONTENTS = {{"1", 1.0, 1, 1}};
+    private static Object[][] OTHER_SWAP_CONTENTS = {{"2", null, 2, 2}, {"3", 3.0, 3, 3}};
+
     private void populateSwappyTables(Client client, String thisTable, String thatTable) throws Exception {
-        // Populate the tables with traceable rows.
-        // After each swap, confirm that both tables are populated, that
-        // the total number of rows is unchanged, and that the first table's
-        // column sum HAS changed.
+        for (Object[] row : THE_SWAP_CONTENTS) {
+            client.callProcedure(thisTable + ".insert", row);
+        }
 
-        // One row for THIS table.
-        client.callProcedure(thisTable + ".insert",
-                "1", 1.0, 1, 1);
-
-        // Two rows for THAT table.
-        client.callProcedure(thatTable + ".insert",
-                "2", null, 2, 2);
-        client.callProcedure(thatTable + ".insert",
-                "3", 3.0, 3, 3);
+        for (Object[] row : OTHER_SWAP_CONTENTS) {
+            client.callProcedure(thatTable + ".insert", row);
+        }
     }
 
     public void testSwapTables() throws Exception {
@@ -865,9 +853,6 @@ public class TestSystemProcedureSuite extends RegressionSuite {
 
                     populateSwappyTables(client, theTable, otherTable);
 
-                    results = client.callProcedure("@AdHoc",
-                            "SELECT COUNT(*) FROM " + theTable).getResults();
-                    long preCount = results[0].asScalarLong();
                     results = client.callProcedure("@SwapTables",
                             theTable, otherTable).getResults();
                     //*enable to debug*/ System.out.println(results[0]);
@@ -875,15 +860,11 @@ public class TestSystemProcedureSuite extends RegressionSuite {
                     assertEquals(1, results.length);
                     assertEquals(3, results[0].asScalarLong());
 
-                    results = client.callProcedure("@AdHoc",
-                            "SELECT COUNT(*) FROM " + theTable).getResults();
-                    long postCount = results[0].asScalarLong();
-                    assertNotSame(preCount, postCount);
+                    VoltTable contents = client.callProcedure("@AdHoc", "select * from " + theTable + " order by id").getResults()[0];
+                    assertContentOfTable(OTHER_SWAP_CONTENTS, contents);
 
-                    results = client.callProcedure("@AdHoc",
-                            "SELECT COUNT(*) FROM " + otherTable).getResults();
-                    long totalCount = postCount + results[0].asScalarLong();
-                    assertEquals(3, totalCount);
+                    contents = client.callProcedure("@AdHoc", "select * from " + otherTable + " order by id").getResults()[0];
+                    assertContentOfTable(THE_SWAP_CONTENTS, contents);
 
                     // Swap again to restore the baseline populations.
                     results = client.callProcedure("@SwapTables",
@@ -893,15 +874,12 @@ public class TestSystemProcedureSuite extends RegressionSuite {
                     assertEquals(1, results.length);
                     assertEquals(3, results[0].asScalarLong());
 
-                    results = client.callProcedure("@AdHoc",
-                            "SELECT COUNT(*) FROM " + theTable).getResults();
-                    postCount = results[0].asScalarLong();
-                    assertEquals(preCount, postCount);
+                    // Verify that baseline is restored
+                    contents = client.callProcedure("@AdHoc", "select * from " + theTable + " order by id").getResults()[0];
+                    assertContentOfTable(THE_SWAP_CONTENTS, contents);
 
-                    results = client.callProcedure("@AdHoc",
-                            "SELECT COUNT(*) FROM " + otherTable).getResults();
-                    totalCount = postCount + results[0].asScalarLong();
-                    assertEquals(3, totalCount);
+                    contents = client.callProcedure("@AdHoc", "select * from " + otherTable + " order by id").getResults()[0];
+                    assertContentOfTable(OTHER_SWAP_CONTENTS, contents);
 
                     results = client.callProcedure("@AdHoc",
                             "TRUNCATE TABLE " + theTable).getResults();
@@ -914,19 +892,21 @@ public class TestSystemProcedureSuite extends RegressionSuite {
                     assertEquals(1, results.length);
                     assertEquals(2, results[0].asScalarLong());
 
-                    results = client.callProcedure("@AdHoc",
-                            "SELECT COUNT(*) FROM " + otherTable).getResults();
-                    postCount = results[0].asScalarLong();
-                    assertEquals(0, results[0].asScalarLong());
+                    contents = client.callProcedure("@AdHoc", "select * from " + theTable + " order by id").getResults()[0];
+                    assertContentOfTable(OTHER_SWAP_CONTENTS, contents);
 
-                    results = client.callProcedure("@AdHoc",
-                            "SELECT COUNT(*) FROM " + theTable).getResults();
-                    postCount = results[0].asScalarLong();
-                    assertEquals(2, results[0].asScalarLong());
+                    contents = client.callProcedure("@AdHoc", "select * from " + otherTable + " order by id").getResults()[0];
+                    assertContentOfTable(new Object[][] {}, contents);
 
                     results = client.callProcedure("@AdHoc",
                             "TRUNCATE TABLE " + theTable).getResults();
                     assertEquals(2, results[0].asScalarLong());
+
+                    contents = client.callProcedure("@AdHoc", "select * from " + theTable + " order by id").getResults()[0];
+                    assertContentOfTable(new Object[][] {}, contents);
+
+                    contents = client.callProcedure("@AdHoc", "select * from " + otherTable + " order by id").getResults()[0];
+                    assertContentOfTable(new Object[][] {}, contents);
 
                     // Try a swap with both empty tables.
                     results = client.callProcedure("@SwapTables",
