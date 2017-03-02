@@ -399,6 +399,7 @@ size_t DRTupleStream::computeOffsets(DRRecordType &type,
 void DRTupleStream::beginTransaction(int64_t sequenceNumber, int64_t spHandle, int64_t uniqueId)
 {
     assert(!m_opened);
+    m_eventTxn = false;
 
     if (!m_currBlock) {
          extendBufferChain(m_defaultCapacity);
@@ -545,6 +546,12 @@ void DRTupleStream::endTransaction(int64_t uniqueId)
     if (m_rowTarget >= 0 && bufferRowCount >= m_rowTarget) {
         extendBufferChain(0);
     }
+
+    if (m_eventTxn) {
+        extendBufferChain(0);
+        pushPendingBlocks(); //TODO: extendBufferChain does pushPendingBlocks. So do we need this here again?
+        m_eventTxn = false;
+    }
     m_txnRowCount = 0;
 }
 
@@ -582,7 +589,10 @@ void DRTupleStream::generateDREvent(DREventType type, int64_t lastCommittedSpHan
 {
     assert(!m_opened);
 
-    ++m_openSequenceNumber;
+    if (type != SWAP_TABLE) { // openTxn does this for SWAP_TABLE
+        ++m_openSequenceNumber;
+    }
+    std::cout << m_partitionId << ": Event sequence number: " << m_openSequenceNumber << std::endl;
 
     if (!m_enabled) {
         if (UniqueId::isMpUniqueId(uniqueId)) {
@@ -623,7 +633,20 @@ void DRTupleStream::generateDREvent(DREventType type, int64_t lastCommittedSpHan
 
         extendBufferChain(0);
 
-        pushPendingBlocks();
+        pushPendingBlocks(); //TODO: extendBufferChain does pushPendingBlocks. So do we need this here again?
+        break;
+    }
+    case SWAP_TABLE : {
+        m_eventTxn = true;
+        // Make sure current block is empty
+        extendBufferChain(0);
+        ExportSerializeOutput io(m_currBlock->mutableDataPtr(), m_currBlock->remaining());
+        io.writeBinaryString(payloads.data(), payloads.length());
+        m_currBlock->consumed(io.position());
+        m_uso += io.position();
+
+        m_currBlock->startDRSequenceNumber(m_openSequenceNumber);
+        m_currBlock->markAsEventBuffer(type);
         break;
     }
     default:

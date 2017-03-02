@@ -635,6 +635,7 @@ void PersistentTable::swapTable(PersistentTable* otherTable,
     swapTableIndexes(otherTable,
             compiled.m_theIndexes,
             compiled.m_otherIndexes);
+    ExecutorContext::getEngine()->swapDRActions(this, otherTable);
     if (fallible) {
         UndoQuantum *uq = ExecutorContext::currentUndoQuantum();
         uq->registerUndoAction(
