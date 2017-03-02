@@ -1256,7 +1256,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                     //Assert column index matches name for ENG-4092
                     assert(stats.getColumnName(7).equals("TUPLE_COUNT"));
                     assert(stats.getColumnName(6).equals("TABLE_TYPE"));
-                    if (stats.getString(6).equals("PersistentTable")){
+                    if ("PersistentTable".equals(stats.getString(6))){
                         tupleCount += stats.getLong(7);
                     }
                     assert(stats.getColumnName(8).equals("TUPLE_ALLOCATED_MEMORY"));
