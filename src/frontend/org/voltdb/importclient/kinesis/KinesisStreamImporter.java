@@ -41,7 +41,6 @@ import com.amazonaws.services.kinesis.clientlibrary.types.ProcessRecordsInput;
 import com.amazonaws.services.kinesis.clientlibrary.types.ShutdownInput;
 import com.amazonaws.services.kinesis.clientlibrary.types.ShutdownReason;
 import com.amazonaws.services.kinesis.model.Record;
-import java.nio.ByteBuffer;
 
 import org.voltcore.logging.Level;
 import org.voltdb.client.ClientResponse;
@@ -136,7 +135,7 @@ public class KinesisStreamImporter extends AbstractImporter {
     private class StreamConsumer implements IRecordProcessor {
 
         private String m_shardId;
-        private Formatter<ByteBuffer> m_formatter;
+        private Formatter m_formatter;
         Gap m_gapTracker = new Gap(Integer.getInteger("KINESIS_IMPORT_GAP_LEAD", 32768));
         private BigInteger m_lastFetchCommittedSequenceNumber = BigInteger.ZERO;
 
@@ -187,7 +186,7 @@ public class KinesisStreamImporter extends AbstractImporter {
 
                 Object params[] = null;
                 try {
-                    params = m_formatter.transform(record.getData());
+                    params = m_formatter.transform(record.getData().array());
                     Invocation invocation = new Invocation(m_config.getProcedure(), params);
 
                     StreamProcedureCallback cb = new StreamProcedureCallback(m_gapTracker, offset, seqNum, m_cbcnt);

@@ -376,7 +376,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
         long submitCount = 0;
         AtomicLong cbcnt = new AtomicLong(0);
         @SuppressWarnings("unchecked")
-        Formatter<ByteBuffer> formatter = m_config.getFormatterBuilder().create();
+        Formatter formatter = m_config.getFormatterBuilder().create();
         try {
             //Start with the starting leader.
             resetLeader();
@@ -461,7 +461,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                     Object params[] = null;
                     try {
                         m_gapTracker.submit(messageAndOffset.nextOffset());
-                        params = formatter.transform(payload);
+                        params = formatter.transform(payload.array());
                         Invocation invocation = new Invocation(m_config.getProcedure(), params);
                         TopicPartitionInvocationCallback cb = new TopicPartitionInvocationCallback(
                                 messageAndOffset.nextOffset(), cbcnt, m_gapTracker, m_dead);

@@ -109,13 +109,15 @@ public class ServerSocketImporter extends AbstractImporter {
             try {
                 BufferedReader in = new BufferedReader(
                         new InputStreamReader(m_clientSocket.getInputStream()));
-                Formatter<String> formatter = (Formatter<String>) m_config.getFormatterBuilder().create();
+                Formatter formatter = m_config.getFormatterBuilder().create();
+                Object params[] = null;
                 while (shouldRun()) {
                     String line = in.readLine();
+                    params = formatter.transform(line.getBytes());
                     //You should convert your data to params here.
-                    if (line == null) continue;
+                    if (params == null) continue;
                     try{
-                        Invocation invocation = new Invocation(m_procedure, formatter.transform(line));
+                        Invocation invocation = new Invocation(m_procedure, params);
                         if (!callProcedure(invocation)) {
                             rateLimitedLog(Level.ERROR, null, "Socket importer insertion failed");
                         }
