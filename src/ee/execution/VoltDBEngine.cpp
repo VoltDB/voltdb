@@ -81,7 +81,6 @@
 #include "plannodes/plannodefragment.h"
 
 #include "storage/AbstractDRTupleStream.h"
-#include "storage/CompatibleDRTupleStream.h"
 #include "storage/DRTupleStream.h"
 #include "storage/MaterializedViewHandler.h"
 #include "storage/MaterializedViewTriggerForWrite.h"
@@ -161,8 +160,6 @@ VoltDBEngine::VoltDBEngine(Topend* topend, LogProxy* logProxy)
       m_drReplicatedConflictStreamedTable(NULL),
       m_drStream(NULL),
       m_drReplicatedStream(NULL),
-      m_compatibleDRStream(NULL),
-      m_compatibleDRReplicatedStream(NULL),
       m_currExecutorVec(NULL)
 {
 }
@@ -214,12 +211,10 @@ void VoltDBEngine::initialize(int32_t clusterIndex,
     m_templateSingleLongTable[38] = 1; // row count
     m_templateSingleLongTable[42] = 8; // row size
 
-    // configure DR stream and DR compatible stream
+    // configure DR stream
     m_drStream = new DRTupleStream(partitionId, defaultDrBufferSize);
-    m_compatibleDRStream = new CompatibleDRTupleStream(partitionId, defaultDrBufferSize);
     if (createDrReplicatedStream) {
         m_drReplicatedStream = new DRTupleStream(16383, defaultDrBufferSize);
-        m_compatibleDRReplicatedStream = new CompatibleDRTupleStream(16383, defaultDrBufferSize);
     }
 
     // set the DR version
@@ -276,8 +271,6 @@ VoltDBEngine::~VoltDBEngine() {
 
     delete m_drReplicatedStream;
     delete m_drStream;
-    delete m_compatibleDRStream;
-    delete m_compatibleDRReplicatedStream;
 }
 
 // ------------------------------------------------------------------
@@ -1967,38 +1960,26 @@ void VoltDBEngine::executeTask(TaskType taskType, ReferenceSerializeInputBE &tas
         break;
     }
     case TASK_TYPE_SET_DR_PROTOCOL_VERSION: {
-        uint32_t drVersion = taskInfo.readInt();
-        if (drVersion != DRTupleStream::PROTOCOL_VERSION) {
-            m_executorContext->setDrStream(m_compatibleDRStream);
-            if (m_compatibleDRReplicatedStream) {
-                m_executorContext->setDrReplicatedStream(m_compatibleDRReplicatedStream);
-            }
+        m_drVersion = taskInfo.readInt();
+        m_executorContext->setDrStream(m_drStream);
+        if (m_drReplicatedStream) {
+            m_executorContext->setDrReplicatedStream(m_drReplicatedStream);
         }
-        else {
-            m_executorContext->setDrStream(m_drStream);
-            if (m_drReplicatedStream) {
-                m_executorContext->setDrReplicatedStream(m_drReplicatedStream);
-            }
-        }
-        m_drVersion = drVersion;
         m_resultOutput.writeInt(0);
         break;
     }
     case TASK_TYPE_GENERATE_DR_EVENT: {
-        // we start using in-band CATALOG_UPDATE at version 5
-        if (m_drVersion >= 5) {
-            DREventType type = (DREventType)taskInfo.readInt();
-            int64_t uniqueId = taskInfo.readLong();
-            int64_t lastCommittedSpHandle = taskInfo.readLong();
-            int64_t spHandle = taskInfo.readLong();
-            ByteArray payloads = taskInfo.readBinaryString();
+        DREventType type = (DREventType)taskInfo.readInt();
+        int64_t uniqueId = taskInfo.readLong();
+        int64_t lastCommittedSpHandle = taskInfo.readLong();
+        int64_t spHandle = taskInfo.readLong();
+        ByteArray payloads = taskInfo.readBinaryString();
 
-            m_executorContext->drStream()->generateDREvent(type, lastCommittedSpHandle,
-                    spHandle, uniqueId, payloads);
-            if (m_executorContext->drReplicatedStream()) {
-                m_executorContext->drReplicatedStream()->generateDREvent(type, lastCommittedSpHandle,
-                        spHandle, uniqueId, payloads);
-            }
+        m_executorContext->drStream()->generateDREvent(type, lastCommittedSpHandle,
+                                                       spHandle, uniqueId, payloads);
+        if (m_executorContext->drReplicatedStream()) {
+            m_executorContext->drReplicatedStream()->generateDREvent(type, lastCommittedSpHandle,
+                                                                     spHandle, uniqueId, payloads);
         }
         break;
     }
