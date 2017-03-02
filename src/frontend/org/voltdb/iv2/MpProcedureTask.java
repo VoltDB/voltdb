@@ -64,7 +64,7 @@ public class MpProcedureTask extends ProcedureTask
         super(mailbox, procName,
               new MpTransactionState(mailbox, msg, pInitiators, partitionMasters,
                                      buddyHSId, isRestart),
-              queue, false);
+              queue);
         m_isRestart = isRestart;
         m_msg = msg;
         m_initiatorHSIds.addAll(pInitiators);

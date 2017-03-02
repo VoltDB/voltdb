@@ -154,7 +154,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
     int m_batchTimeout = BatchTimeoutOverrideType.NO_TIMEOUT;
 
     // indicate if the fragment is created on partition leader and sent to replicas.
-    boolean m_isForReplica = false;
+    boolean m_toReplica = false;
 
     public int getCurrentBatchIndex() {
         return m_currentBatchIndex;
@@ -712,7 +712,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         buf.put(m_isFinal ? (byte) 1 : (byte) 0);
         buf.put(m_taskType);
         buf.put(m_emptyForRestart ? (byte) 1 : (byte) 0);
-        buf.put(m_isForReplica ? (byte) 1 : (byte) 0);
+        buf.put(m_toReplica ? (byte) 1 : (byte) 0);
         buf.put(nOutputDepIds > 0 ? (byte) 1 : (byte) 0);
         buf.put(nInputDepIds  > 0 ? (byte) 1 : (byte) 0);
         if (m_procNameToLoad != null) {
@@ -834,7 +834,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         m_isFinal = buf.get() != 0;
         m_taskType = buf.get();
         m_emptyForRestart = buf.get() != 0;
-        m_isForReplica = buf.get() == 1;
+        m_toReplica = buf.get() == 1;
         boolean haveOutputDependencies = buf.get() != 0;
         boolean haveInputDependencies = buf.get() != 0;
         short procNameToLoadBytesLen = buf.getShort();
@@ -1018,12 +1018,12 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         return m_items.isEmpty();
     }
 
-    public boolean isForReplica() {
-        return m_isForReplica;
+    public boolean toReplica() {
+        return m_toReplica;
     }
 
-    public void setForReplica(boolean isForReplica) {
-        m_isForReplica = isForReplica;
+    public void setToReplica(boolean toReplica) {
+        m_toReplica = toReplica;
     }
 
 }

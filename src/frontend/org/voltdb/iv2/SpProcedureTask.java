@@ -49,16 +49,22 @@ public class SpProcedureTask extends ProcedureTask
         HOST_TRACE_ENABLED = hostLog.isTraceEnabled();
     }
 
+    //A flag is used for SPI balance operation, indicating that the SpProcedureTask was created
+    //when the site was the partition leader or not..Scheduler uses it to handle InitiateResponseMessage appropriately.
+    protected final boolean m_createdFromLeader;
+
     public SpProcedureTask(Mailbox initiator, String procName, TransactionTaskQueue queue,
                   Iv2InitiateTaskMessage msg)
     {
-       super(initiator, procName, new SpTransactionState(msg), queue, false);
+       super(initiator, procName, new SpTransactionState(msg), queue);
+       m_createdFromLeader = false;
     }
 
     public SpProcedureTask(Mailbox initiator, String procName, TransactionTaskQueue queue,
-            Iv2InitiateTaskMessage msg, boolean isleader)
+            Iv2InitiateTaskMessage msg, boolean createdFromLeader)
     {
-        super(initiator, procName, new SpTransactionState(msg), queue, isleader);
+        super(initiator, procName, new SpTransactionState(msg), queue);
+        m_createdFromLeader = createdFromLeader;
     }
 
     /** Run is invoked by a run-loop to execute this transaction. */
@@ -99,6 +105,11 @@ public class SpProcedureTask extends ProcedureTask
         }
         completeInitiateTask(siteConnection);
         response.m_sourceHSId = m_initiator.getHSId();
+
+        //Upon @BalanceSPI, this site will be immediately marked as non-leader, so mark it as created from non-leader
+        String procName = txnState.m_initiationMsg.getStoredProcedureInvocation().getProcName();
+        response.setCreatedFromLeader("@BalanceSPI".equals(procName) ? false : m_createdFromLeader);
+
         m_initiator.deliver(response);
         if (EXEC_TRACE_ENABLED) {
             execLog.l7dlog( Level.TRACE, LogKeys.org_voltdb_ExecutionSite_SendingCompletedWUToDtxn.name(), null);

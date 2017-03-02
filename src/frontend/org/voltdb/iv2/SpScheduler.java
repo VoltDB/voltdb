@@ -832,7 +832,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 FragmentTaskMessage replmsg =
                     new FragmentTaskMessage(m_mailbox.getHSId(),
                             m_mailbox.getHSId(), msg);
-                replmsg.setForReplica(true);
+                replmsg.setToReplica(true);
                 m_mailbox.send(m_sendToHSIds,
                         replmsg);
                 DuplicateCounter counter;

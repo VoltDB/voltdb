@@ -53,7 +53,7 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
     AtomicBoolean m_isDurable;
 
     // indicate if the message is created on partition leader and sent to replicas.
-    boolean m_isForReplica = false;
+    boolean m_toReplica = false;
 
     /** Empty constructor for de-serialization */
     Iv2InitiateTaskMessage() {
@@ -72,14 +72,14 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
                         long clientInterfaceHandle,
                         long connectionId,
                         boolean isForReplay,
-                        boolean isForReplica) {
+                        boolean toReplica) {
         super(initiatorHSId, coordinatorHSId, txnId, uniqueId, isReadOnly, isForReplay);
         setTruncationHandle(truncationHandle);
         m_isSinglePartition = isSinglePartition;
         m_invocation = invocation;
         m_clientInterfaceHandle = clientInterfaceHandle;
         m_connectionId = connectionId;
-        m_isForReplica = isForReplica;
+        m_toReplica = toReplica;
     }
 
     // SpScheduler creates messages with truncation handles.
@@ -190,7 +190,7 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
         buf.putLong(m_clientInterfaceHandle);
         buf.putLong(m_connectionId);
         buf.put(m_isSinglePartition ? (byte) 1 : (byte) 0);
-        buf.put(m_isForReplica ? (byte) 1 : (byte) 0);
+        buf.put(m_toReplica ? (byte) 1 : (byte) 0);
         buf.put((byte)0);//Should never generate a response if we have to forward to a replica
         m_invocation.flattenToBuffer(buf);
 
@@ -204,7 +204,7 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
         m_clientInterfaceHandle = buf.getLong();
         m_connectionId = buf.getLong();
         m_isSinglePartition = buf.get() == 1;
-        m_isForReplica = buf.get() == 1;
+        m_toReplica = buf.get() == 1;
         m_shouldReturnResultTables = buf.get() != 0;
         m_invocation = new StoredProcedureInvocation();
         m_invocation.initFromBuffer(buf);
@@ -264,7 +264,7 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
         return m_invocation.getSerializedParams();
     }
 
-    public boolean isForReplica() {
-        return m_isForReplica;
+    public boolean toReplica() {
+        return m_toReplica;
     }
 }

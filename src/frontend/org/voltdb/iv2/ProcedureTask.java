@@ -43,9 +43,9 @@ abstract public class ProcedureTask extends TransactionTask
     final Mailbox m_initiator;
     final String m_procName;
     ProcedureTask(Mailbox initiator, String procName, TransactionState txn,
-                  TransactionTaskQueue queue, boolean isleader)
+                  TransactionTaskQueue queue)
     {
-        super(txn, queue, isleader);
+        super(txn, queue);
         m_initiator = initiator;
         m_procName = procName;
     }
@@ -62,13 +62,6 @@ abstract public class ProcedureTask extends TransactionTask
             SiteProcedureConnection siteConnection)
     {
         final InitiateResponseMessage response = new InitiateResponseMessage(task);
-
-        // special case for @BalanceSPI, this site will be marked as non-leader
-        if ("@BalanceSPI".equals(task.getStoredProcedureInvocation().getProcName())) {
-            response.setCreatedFromLeader(false);
-        } else {
-            response.setCreatedFromLeader(m_createdFromLeader);
-        }
         try {
             Object[] callerParams = null;
             /*

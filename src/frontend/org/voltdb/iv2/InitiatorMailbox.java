@@ -337,7 +337,7 @@ public class InitiatorMailbox implements Mailbox
     // all the requests will be sent back to the sender if these requests are intended for leader
     // These transactions will be restarted.
     private boolean checkMisroutedIv2IntiateTaskMessage(Iv2InitiateTaskMessage message) {
-        if (!m_scheduler.isSpiBalanceRequested() || message.isForReplica() || message.isReadOnly()) {
+        if (!m_scheduler.isSpiBalanceRequested() || message.toReplica() || message.isReadOnly()) {
             return false;
         }
         InitiateResponseMessage response = new InitiateResponseMessage(message);
@@ -352,7 +352,7 @@ public class InitiatorMailbox implements Mailbox
     // all the requests will be sent back to the sender if these requests are intended for leader
     // These transactions will be restarted.
     private boolean checkMisroutedFragmentTaskMessage(FragmentTaskMessage message) {
-        if (!m_scheduler.isSpiBalanceRequested() || message.isForReplica() || message.isReadOnly()) {
+        if (!m_scheduler.isSpiBalanceRequested() || message.toReplica() || message.isReadOnly()) {
             return false;
         }
         FragmentResponseMessage response = new FragmentResponseMessage(message, getHSId());
