@@ -242,6 +242,23 @@ CREATE TABLE trup
 );
 PARTITION TABLE trup ON COLUMN p;
 
+CREATE TABLE swapr
+(
+  p          bigint             NOT NULL
+, id         bigint             NOT NULL
+, value      varbinary(1048576) NOT NULL
+, CONSTRAINT PK_id_sr PRIMARY KEY (p,id)
+);
+
+CREATE TABLE swapp
+(
+  p          bigint             NOT NULL
+, id         bigint             NOT NULL
+, value      varbinary(1048576) NOT NULL
+, CONSTRAINT PK_id_sp PRIMARY KEY (p,id)
+);
+PARTITION TABLE swapp ON COLUMN p;
+
 CREATE TABLE capr
 (
   p          bigint             NOT NULL
@@ -341,6 +358,10 @@ CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TRUPTruncateTableSP;
 PARTITION PROCEDURE TRUPTruncateTableSP ON TABLE trup COLUMN p;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TRUPTruncateTableMP;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TRURTruncateTable;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TRUPSwapTablesSP;
+PARTITION PROCEDURE TRUPSwapTablesSP ON TABLE trup COLUMN p;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TRUPSwapTablesMP;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TRURSwapTables;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TRUPScanAggTableSP;
 PARTITION PROCEDURE TRUPScanAggTableSP ON TABLE trup COLUMN p;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TRUPScanAggTableMP;
