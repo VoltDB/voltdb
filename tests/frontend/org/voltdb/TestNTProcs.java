@@ -23,7 +23,6 @@
 
 package org.voltdb;
 
-import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -37,6 +36,7 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.SyncCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
+import org.voltdb.utils.MiscUtils;
 
 public class TestNTProcs extends TestCase {
 
@@ -118,13 +118,14 @@ public class TestNTProcs extends TestCase {
             "create procedure from class org.voltdb.TestNTProcs$DelayProc;\n" +
             "partition table blah on column pkey;\n";
 
-    private void compile() throws IOException {
+    private void compile() throws Exception {
         VoltProjectBuilder pb = new VoltProjectBuilder();
         pb.addLiteralSchema(SCHEMA);
         assertTrue(pb.compile(Configuration.getPathToCatalogForTest("compileNT.jar")));
+        MiscUtils.copyFile(pb.getPathToDeployment(), Configuration.getPathToCatalogForTest("compileNT.xml"));
     }
 
-    private ServerThread start() throws IOException {
+    private ServerThread start() throws Exception {
         compile();
 
         VoltDB.Configuration config = new VoltDB.Configuration();
@@ -137,7 +138,7 @@ public class TestNTProcs extends TestCase {
         return localServer;
     }
 
-    public void testNTCompile() throws IOException {
+    public void testNTCompile() throws Exception {
         compile();
     }
 
