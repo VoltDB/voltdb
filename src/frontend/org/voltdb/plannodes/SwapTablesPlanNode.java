@@ -497,8 +497,8 @@ public class SwapTablesPlanNode extends AbstractOperationPlanNode {
             Table theTable, Table otherTable, FailureMessage failureMessage) {
 
         if (theTable.getIsdred() != otherTable.getIsdred()) {
-            failureMessage.addReason("Swapping table " + theName + " with table " + otherName +
-            " requires that both be DR enabled or both be not DR enabled.");
+            failureMessage.addReason("To swap table " + theName + " with table " + otherName +
+            " both tables must be DR enabled or both tables must not be DR enabled.");
         }
 
         if (theTable.getIsreplicated() != otherTable.getIsreplicated()) {

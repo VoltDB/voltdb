@@ -547,7 +547,7 @@ void DRTupleStream::endTransaction(int64_t uniqueId)
         extendBufferChain(0);
     }
 
-    if (m_eventTxn) {
+    if (m_eventTxn) { // We need to push the event buffer out.
         extendBufferChain(0);
         pushPendingBlocks(); //TODO: extendBufferChain does pushPendingBlocks. So do we need this here again?
         m_eventTxn = false;
@@ -592,7 +592,6 @@ void DRTupleStream::generateDREvent(DREventType type, int64_t lastCommittedSpHan
     if (type != SWAP_TABLE) { // openTxn does this for SWAP_TABLE
         ++m_openSequenceNumber;
     }
-    std::cout << m_partitionId << ": Event sequence number: " << m_openSequenceNumber << std::endl;
 
     if (!m_enabled) {
         if (UniqueId::isMpUniqueId(uniqueId)) {
@@ -636,7 +635,8 @@ void DRTupleStream::generateDREvent(DREventType type, int64_t lastCommittedSpHan
         pushPendingBlocks(); //TODO: extendBufferChain does pushPendingBlocks. So do we need this here again?
         break;
     }
-    case SWAP_TABLE : {
+    case SWAP_TABLE : { // Similar to other events, except that
+        // this happens within a begin and end transaction, so actions done there are not needed here.
         m_eventTxn = true;
         // Make sure current block is empty
         extendBufferChain(0);
