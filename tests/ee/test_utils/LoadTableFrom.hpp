@@ -76,9 +76,12 @@ TempTable *loadTableFrom(ReferenceSerializeInputBE& result, bool skipMsgHeader =
     // calculations have side effects.  If we
     // define the variables but don't use them the
     // compiler will complain.
+    VOLT_TRACE("\n");
     if (! skipMsgHeader) {
         IF_VOLT_TRACE(int32_t msg_size         = ) result.readInt();  // message length.
         IF_VOLT_TRACE(int8_t  status           = ) result.readByte(); // status
+        VOLT_TRACE("  msg size:              %d\n",   msg_size);
+        VOLT_TRACE("  status:                %hhd\n", status);
     }
     IF_VOLT_TRACE(int32_t icl              = ) result.readInt();  // inter cluster latency
     IF_VOLT_TRACE(int32_t serialized_exp   = ) result.readInt();  // serialized exception
@@ -86,9 +89,6 @@ TempTable *loadTableFrom(ReferenceSerializeInputBE& result, bool skipMsgHeader =
     IF_VOLT_TRACE(int32_t tbl_metadata_len = ) result.readInt();  // table metadata length
     IF_VOLT_TRACE(int8_t  tbl_status       = ) result.readByte();
     int16_t column_count = result.readShort();
-    VOLT_TRACE("\n");
-    VOLT_TRACE("  msg size:              %d\n",   msg_size);
-    VOLT_TRACE("  status:                %hhd\n", status);
     VOLT_TRACE("  inter cluster latency: %d\n",   icl);
     VOLT_TRACE("  serialized exception:  %d\n",   serialized_exp);
     VOLT_TRACE("  table length:          %d\n",   tbl_len);
