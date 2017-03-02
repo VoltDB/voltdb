@@ -584,7 +584,15 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         /** size of parameter_buffer. */
         int m_parameterBufferCapacity;
 
-        /** buffer to pass per-fragment stats to Topend */
+        /** The buffer to pass per-fragment stats to the Topend
+            When executing a batch, this buffer will be populated with the following contents:
+            {
+                int32_t succeededFragmentsCount;
+                int64_t[] fragmentExecutionTimes; // in nanoseconds.
+            }
+            If the batch execution succeeded, fragmentExecutionTimes will contain (succeededFragmentsCount) time measurements.
+            In the case of batch failure, fragmentExecutionTimes will contain (succeededFragmentsCount + 1) time measurements,
+                including the execution time for the failing fragment. */
         char* m_perFragmentStatsBuffer;
 
         /** size of the per-fragment statistics buffer */
