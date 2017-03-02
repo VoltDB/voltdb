@@ -26,10 +26,17 @@ VoltDB = 'org.voltdb.VoltDB'
                           'Specifies the root directory for the database. The default is voltdbroot under the current working directory.',
                           default = None),
         VOLT.BooleanOption('-f', '--force', 'force',
-                           'Start a new, empty database even if the VoltDB managed directories contain files from a previous session that may be overwritten.')
+                           'Start a new, empty database even if the VoltDB managed directories contain files from a previous session that may be overwritten.'),
+        VOLT.StringOption('-s', '--schema', 'schema',
+                           'Specifies a file containing the data definition (as SQL statements) to be loaded when starting the database.'
+                           ' voltdbroot/startup/bootstrap/existing/ddl.sql is used if it exists and no schema is specified, and overwritten with the new schema if provided.'),
+        VOLT.StringOption('-p', '--procedures', 'procedures_jarfile',
+                           'Specifies a .jar file containing stored procedures to be loaded upon starting the database.'
+                           ' The default is voltdbroot/startup/bootstrap/existing/procedures.jar is used if it exists and no file is specified, and overwritten with the new file if provided.')
     ),
     description = 'Initializes a new, empty database.'
 )
+
 def init(runner):
     runner.args.extend(['initialize'])
     if runner.opts.configfile:
@@ -38,5 +45,10 @@ def init(runner):
         runner.args.extend(['voltdbroot', runner.opts.directory_spec])
     if runner.opts.force:
         runner.args.extend(['force'])
+    if runner.opts.schema:
+        runner.args.extend(['user_schema', runner.opts.schema])
+    if runner.opts.procedures_jarfile:
+        runner.args.extend(['user_procedures_jar', runner.opts.procedures_jarfile])
+
     args = runner.args
     runner.java_execute(VoltDB, None, *args)
