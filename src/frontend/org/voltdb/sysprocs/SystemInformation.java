@@ -454,6 +454,10 @@ public class SystemInformation extends VoltSystemProcedure
             vt.addRow(hostId, "LICENSE", VoltDB.instance().getLicenseInformation());
         }
         populatePartitionGroups(hostId, vt);
+
+        // root path
+        vt.addRow(hostId, "VOLTDBROOT", VoltDB.instance().getVoltDBRootPath());
+        vt.addRow(hostId, "FULLCLUSTERSIZE", Integer.toString(VoltDB.instance().getCatalogContext().getClusterSettings().hostcount()));
         return vt;
     }
 
