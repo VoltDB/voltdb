@@ -23,8 +23,6 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.lang.reflect.InvocationTargetException;
-import java.nio.file.Files;
-import java.nio.file.StandardCopyOption;
 import java.text.SimpleDateFormat;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -301,16 +299,9 @@ public class VoltDB {
         /** apply safe mode strategy when recovering */
         public boolean m_safeMode = false;
 
-        /** subdirectory of voltdbroot for staged schema and procedures */
-        public static final String USER_PROCEDURES_SCHEMA_DIR = "starter/bootstrap/existing/";
-
-        /** staged location of user supplied .jar file with stored procedures */
-        public static final String STAGED_PROCEDURES_JAR_NAME = "user-procedures.jar";
         /** location of user supplied .jar file with stored procedures */
         public File m_userProceduresJar = null;
 
-        /** staged location of user supplied DDL */
-        public static final String STAGED_SCHEMA_NAME = "starter/bootstrap/existing/user-ddl.sql";
         /** location of user supplied DDL */
         public File m_userSchema = null;
 
@@ -656,17 +647,17 @@ public class VoltDB {
                     m_getOutput = args[++i].trim();
                 } else if (arg.equalsIgnoreCase("forceget")) {
                     m_forceGetCreate = true;
-                } else if (arg.equalsIgnoreCase("user_schema")){
+                } else if (arg.equalsIgnoreCase("schema")){
                     m_userSchema = new File(args[++i].trim());
                     if (!m_userSchema.isFile()){
-                        System.err.println("FATAL: Supplied schema file " + m_userProceduresJar + " is not a normal file.");
+                        System.err.println("FATAL: Supplied schema file " + m_userSchema + " is not a normal file.");
                         referToDocAndExit();
                     }
                     if (!m_userSchema.canRead()){
-                        System.err.println("FATAL: Supplied schema file " + m_userProceduresJar + " is not readable.");
+                        System.err.println("FATAL: Supplied schema file " + m_userSchema + " is not readable.");
                         referToDocAndExit();
                     }
-                } else if (arg.equalsIgnoreCase("user_procedures_jar")){
+                } else if (arg.equalsIgnoreCase("procedures")){
                     String proceduresJarPath = args[++i].trim();
                     m_userProceduresJar = new File(proceduresJarPath);
                     try {
@@ -731,31 +722,6 @@ public class VoltDB {
                             + "\nUse the start command to start the initialized database or use init --force"
                             + " to overwrite existing files.");
                     referToDocAndExit();
-                }
-                final String stagingDirName = m_voltdbRoot + USER_PROCEDURES_SCHEMA_DIR;
-                File stagingDir = new File(stagingDirName);
-                stagingDir.mkdirs();
-                if (!stagingDir.isDirectory()){
-                    hostLog.fatal(stagingDirName + " could not be created");
-                    referToDocAndExit();
-                }
-                if (m_userSchema != null){
-                    try {
-                        Files.copy(m_userSchema.toPath(), new File(stagingDirName + STAGED_SCHEMA_NAME).toPath(), StandardCopyOption.REPLACE_EXISTING);
-                    } catch (IOException e){
-                        hostLog.fatal("Could not copy staged schema file");
-                        hostLog.fatal(e.getMessage());
-                        referToDocAndExit();
-                    }
-                }
-                if (m_userProceduresJar != null){
-                    try {
-                        Files.copy(m_userProceduresJar.toPath(), new File(stagingDirName + STAGED_PROCEDURES_JAR_NAME).toPath(), StandardCopyOption.REPLACE_EXISTING);
-                    } catch (IOException e){
-                        hostLog.fatal("Could not copy staged procedures file");
-                        hostLog.fatal(e.getMessage());
-                        referToDocAndExit();
-                    }
                 }
             } else if (m_meshBrokers == null || m_meshBrokers.trim().isEmpty()) {
                 if (m_leader != null) {

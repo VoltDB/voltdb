@@ -41,6 +41,9 @@ import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -807,7 +810,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     consoleLog.info(msg);
                     hostLog.info(msg);
                 }
-                stageDeploymemtFileForInitialize(config, readDepl.deployment);
+                stageDeploymentFileForInitialize(config, readDepl.deployment);
+                stageSchemaFiles(config);
                 stageInitializedMarker(config);
                 hostLog.info("Initialized VoltDB root directory " + config.m_voltdbRoot.getPath());
                 consoleLog.info("Initialized VoltDB root directory " + config.m_voltdbRoot.getPath());
@@ -2013,14 +2017,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
      * <p><ul>
      * <li>creates if necessary the voltdbroot directory
      * <li>fail if voltdbroot is already configured and populated with database artifacts
-     * <li>creates command log, dr, snaphot, and export directories
+     * <li>creates command log, DR, snapshot, and export directories
      * <li>creates the config directory under voltdbroot
      * <li>moves the deployment file under the config directory
      * </ul>
      * @param config
      * @param dt a {@link DeploymentType}
      */
-    private void stageDeploymemtFileForInitialize(Configuration config, DeploymentType dt) {
+    private void stageDeploymentFileForInitialize(Configuration config, DeploymentType dt) {
 
         String deprootFN = dt.getPaths().getVoltdbroot().getPath();
         File   deprootFH = new VoltFile(deprootFN);
@@ -2104,6 +2108,51 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
         // Save cluster settings properties derived from the deployment file
         ClusterSettings.create(CatalogUtil.asClusterSettingsMap(dt)).store();
+    }
+
+
+    /**
+     * Takes the schema and stored procedures files given at initialization and performs the following tasks:
+     * <p><ul>
+     * <li>creates if necessary the voltdbroot/starter/bootstrap/existing directory tree
+     * <li>fail if database artifacts already exist and --force was not supplied (this is unexpected due to earlier checks)
+     * <li>moves the specified files to the 'existing' directory
+     * </ul>
+     * @param config VoltDB configuration
+     */
+    private void stageSchemaFiles(Configuration config){
+        final String stagingDirName = config.m_voltdbRoot + Constants.USER_PROCEDURES_SCHEMA_DIR;
+        File stagingDir = new File(stagingDirName);
+        stagingDir.mkdirs();
+        if (!stagingDir.isDirectory()){
+            VoltDB.crashLocalVoltDB(stagingDirName + " could not be created", false, null);
+        }
+        if (config.m_userSchema != null){
+            final Path userSchemaPath = config.m_userSchema.toPath();
+            final Path stagedSchemaPath = new File(stagingDirName + Constants.STAGED_SCHEMA_NAME).toPath();
+            try {
+                if (config.m_forceVoltdbCreate){
+                    Files.copy(userSchemaPath, stagedSchemaPath, StandardCopyOption.REPLACE_EXISTING);
+                } else {
+                    Files.copy(userSchemaPath, stagedSchemaPath);
+                }
+            } catch (IOException e){
+                VoltDB.crashLocalVoltDB("Could not copy staged schema file", false, e);
+            }
+        }
+        if (config.m_userProceduresJar != null){
+            final Path userProceduresPath = config.m_userProceduresJar.toPath();
+            final Path stagedProceduresPath = new File(stagingDirName + Constants.STAGED_PROCEDURES_JAR_NAME).toPath();
+            try {
+                if (config.m_forceVoltdbCreate){
+                    Files.copy(userProceduresPath, stagedProceduresPath, StandardCopyOption.REPLACE_EXISTING);
+                } else {
+                    Files.copy(userProceduresPath, stagedProceduresPath);
+                }
+            } catch (IOException e){
+                VoltDB.crashLocalVoltDB("Could not copy staged procedures file", false, e);
+            }
+        }
     }
 
     private void stageInitializedMarker(Configuration config) {

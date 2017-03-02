@@ -212,4 +212,20 @@ final public class TestInitStartAction {
         EnumSet<StartAction> legacyOnes = EnumSet.complementOf(EnumSet.of(StartAction.INITIALIZE,StartAction.PROBE, StartAction.GET));
         assertTrue(legacyOnes.stream().allMatch(StartAction::isLegacy));
     }
+
+
+    @Test
+    public void testInitWithSchema() throws Exception {
+
+       // File aNonexistentFile = new File("")
+
+        Configuration c1 = new Configuration(
+                new String[]{"initialize", "voltdbroot", rootDH.getPath(), "force", "schema", "/home/bshaw/workspace/voltdb/examples/voter/ddl.sql"});
+        ServerThread server = new ServerThread(c1);
+        server.setUncaughtExceptionHandler(handleUncaught);
+        //c1.m_forceVoltdbCreate = false;
+
+        server.start();
+        server.join();
+    }
 }

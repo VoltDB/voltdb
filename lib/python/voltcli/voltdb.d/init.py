@@ -46,9 +46,9 @@ def init(runner):
     if runner.opts.force:
         runner.args.extend(['force'])
     if runner.opts.schema:
-        runner.args.extend(['user_schema', runner.opts.schema])
+        runner.args.extend(['schema', runner.opts.schema])
     if runner.opts.procedures_jarfile:
-        runner.args.extend(['user_procedures_jar', runner.opts.procedures_jarfile])
+        runner.args.extend(['procedures', runner.opts.procedures_jarfile])
 
     args = runner.args
     runner.java_execute(VoltDB, None, *args)
