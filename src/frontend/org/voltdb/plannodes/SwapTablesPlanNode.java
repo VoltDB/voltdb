@@ -523,11 +523,6 @@ public class SwapTablesPlanNode extends AbstractOperationPlanNode {
         if (viewsDependOn(otherTable, viewNames)) {
             failureMessage.addReason(otherName + " is referenced in views " + viewNames.toString());
         }
-
-        if (theTable.getIsdred()
-            || otherTable.getIsdred()) {
-            failureMessage.addReason("one or both of the tables has DR enabled");
-        }
     }
 
     /**
@@ -585,7 +580,6 @@ public class SwapTablesPlanNode extends AbstractOperationPlanNode {
             theColArray[theColumn.getIndex()] = theColumn;
         }
 
-        // The high water index for matched columns on theTable.
         for (Column otherColumn : otherColumns) {
             int colIndex = otherColumn.getIndex();
             String colName = otherColumn.getTypeName();

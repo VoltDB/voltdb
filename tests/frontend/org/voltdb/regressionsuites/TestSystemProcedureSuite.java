@@ -303,14 +303,11 @@ public class TestSystemProcedureSuite extends RegressionSuite {
                 "CREATE VIEW VIEWING_3B AS SELECT A.ID, COUNT(*), SUM(A.PRICE*B.DISCOUNT) \n" +
                 " FROM NONSWAP_VIEWED_3 A, JOINED_3 B WHERE A.ID = B.ID GROUP BY A.ID;\n",
             },
-//            { "ORIG",
-//              " (\n" +
-//              "  NAME VARCHAR(32 BYTES) NOT NULL," +
-//              "  PRICE FLOAT," +
-//              "  NONID INTEGER NOT NULL," +
-//              "  ID INTEGER " +
-//              ");\n",
-//            },
+            { "NONSWAP_NO_MATCHING_COLUMNS",
+              " (\n" +
+              "  FOO FLOAT NOT NULL " +
+              ");\n",
+            },
 
     };
 
