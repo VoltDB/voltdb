@@ -813,10 +813,22 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             VoltZK.createStartActionNode(m_messenger.getZK(), m_messenger.getHostId(), m_config.m_startAction);
             validateStartAction();
 
-            final int numberOfNodes = readDeploymentAndCreateStarterCatalogContext(config);
+            // durable means commandlogging is enabled.
+            Pair<Boolean, Integer> p = readDeploymentAndCreateStarterCatalogContext(config);
+            final boolean durable = p.getFirst();
+            final int numberOfNodes = p.getSecond();
             if (config.m_isEnterprise && m_config.m_startAction.doesRequireEmptyDirectories()
-                    && !config.m_forceVoltdbCreate) {
-                    managedPathsEmptyCheck(config);
+                    && !config.m_forceVoltdbCreate && durable) {
+                managedPathsEmptyCheck(config);
+            }
+            //If we are not durable and we are not rejoining we backup auto snapshots if present.
+            //If terminus is present we will recover from shutdown save so dont move.
+            if (!durable && m_config.m_startAction.doesRecover() && determination.terminusNonce == null) {
+                if (m_nodeSettings.clean()) {
+                    String msg = "Archived previous snapshot directory to " + m_nodeSettings.getSnapshoth() + ".1";
+                    consoleLog.info(msg);
+                    hostLog.info(msg);
+                }
             }
 
             Map<Integer, String> hostGroups = null;
@@ -997,7 +1009,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             }
 
             // do the many init tasks in the Inits class
-            Inits inits = new Inits(m_statusTracker, this, 1);
+            Inits inits = new Inits(m_statusTracker, this, 1, durable);
             inits.doInitializationWork();
 
             // Need the catalog so that we know how many tables so we can guess at the necessary heap size
@@ -1119,7 +1131,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                             (ProducerDRGateway) ndrgwConstructor.newInstance(
                                     new VoltFile(VoltDB.instance().getDROverflowPath()),
                                     new VoltFile(VoltDB.instance().getSnapshotPath()),
-                                    m_replicationActive.get(),
+                                    (m_config.m_startAction.doesRecover() && (durable || determination.terminusNonce != null)),
+//                                    m_config.m_startAction.doesRejoin(),
+//                                    m_replicationActive.get(),
                                     m_configuredNumberOfPartitions,m_catalogContext.getClusterSettings().hostcount());
                     m_producerDRGateway.start();
                     m_producerDRGateway.blockOnDRStateConvergence();
@@ -1856,7 +1870,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
     }
 
-    int readDeploymentAndCreateStarterCatalogContext(VoltDB.Configuration config) {
+    public static final String SECURITY_OFF_WARNING = "User authentication is not enabled."
+            + " The database is accessible and could be modified or shut down by anyone on the network.";
+
+    Pair<Boolean,Integer> readDeploymentAndCreateStarterCatalogContext(VoltDB.Configuration config) {
         /*
          * Debate with the cluster what the deployment file should be
          */
@@ -2080,8 +2097,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                             null,
                             deploymentBytes,
                             0);
-
-            return m_clusterSettings.get().hostcount();
+            Pair<Boolean, Integer> res = new Pair(((deployment.getCommandlog() != null) && (deployment.getCommandlog().isEnabled())), m_clusterSettings.get().hostcount());
+            return res;
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
