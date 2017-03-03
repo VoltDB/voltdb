@@ -508,11 +508,12 @@ if __name__ == "__main__":
         print "DEBUG: args (all):", args
 
     if options.seed is None:
+        seed_type   = 'random'
         random_seed = randrange(2 ** 63)
-        print "Using random seed: %d" % random_seed
     else:
+        seed_type   = 'supplied'
         random_seed = int(options.seed)
-        print "Using supplied seed: %d" % random_seed
+    print 'Using %s seed: %d' % (seed_type, random_seed)
     seed(random_seed)
 
     # If a maximum number of minutes was specified, compute the time at which
@@ -564,7 +565,7 @@ if __name__ == "__main__":
 
         if options.sqlcmd_summary:
             sqlcmd_summary_file = open(options.sqlcmd_summary, 'w', 0)
-            print >> sqlcmd_summary_file, "Using seed: %d" % random_seed
+            print >> sqlcmd_summary_file, 'Using %s seed: %d' % (seed_type, random_seed)
 
         command = 'sqlcmd --stop-on-error=false'
         if debug > 2:
