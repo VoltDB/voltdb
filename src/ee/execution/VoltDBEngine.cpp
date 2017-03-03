@@ -106,6 +106,7 @@
 #include <sstream>
 #include <locale>
 #include <typeinfo>
+#include <chrono> // For measuring the execution time of each fragment.
 
 ENABLE_BOOST_FOREACH_ON_CONST_MAP(Column);
 ENABLE_BOOST_FOREACH_ON_CONST_MAP(Index);
@@ -374,6 +375,10 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
     m_executorContext->m_progressStats.resetForNewBatch();
     NValueArray &params = m_executorContext->getParameterContainer();
 
+    size_t succeededFragmentsCountOffset = m_perFragmentStatsOutput.reserveBytes(sizeof(int32_t));
+    std::chrono::high_resolution_clock::time_point startTime, endTime;
+    std::chrono::duration<int64_t, std::nano> elapsedNanoseconds;
+
     for (m_currentIndexInBatch = 0; m_currentIndexInBatch < numFragments; ++m_currentIndexInBatch) {
 
         int usedParamcnt = serialInput.readShort();
@@ -388,11 +393,17 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
         }
 
         // success is 0 and error is 1.
+        startTime = std::chrono::high_resolution_clock::now();
         if (executePlanFragment(planfragmentIds[m_currentIndexInBatch],
                                 inputDependencyIds ? inputDependencyIds[m_currentIndexInBatch] : -1,
                                 m_currentIndexInBatch == 0,
                                 m_currentIndexInBatch == (numFragments - 1))) {
             ++failures;
+        }
+        endTime = std::chrono::high_resolution_clock::now();
+        elapsedNanoseconds = std::chrono::duration_cast<std::chrono::nanoseconds>(endTime - startTime);
+        m_perFragmentStatsOutput.writeLong(elapsedNanoseconds.count());
+        if (failures > 0) {
             break;
         }
 
@@ -401,6 +412,7 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
 
         m_stringPool.purge();
     }
+    m_perFragmentStatsOutput.writeIntAt(succeededFragmentsCountOffset, m_currentIndexInBatch);
 
     m_currentIndexInBatch = -1;
 
@@ -1406,11 +1418,15 @@ int VoltDBEngine::getResultsSize() const {
     return static_cast<int>(m_resultOutput.size());
 }
 
-void VoltDBEngine::setBuffers(char* parameterBuffer, int parameterBuffercapacity,
+void VoltDBEngine::setBuffers(char* parameterBuffer, int parameterBufferCapacity,
+        char* perFragmentStatsBuffer, int perFragmentStatsBufferCapacity,
         char* resultBuffer, int resultBufferCapacity,
         char* exceptionBuffer, int exceptionBufferCapacity) {
     m_parameterBuffer = parameterBuffer;
-    m_parameterBufferCapacity = parameterBuffercapacity;
+    m_parameterBufferCapacity = parameterBufferCapacity;
+
+    m_perFragmentStatsBuffer = perFragmentStatsBuffer;
+    m_perFragmentStatsBufferCapacity = perFragmentStatsBufferCapacity;
 
     m_reusedResultBuffer = resultBuffer;
     m_reusedResultCapacity = resultBufferCapacity;

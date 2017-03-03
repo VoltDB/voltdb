@@ -835,13 +835,17 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param pointer
      * @param parameter_buffer
      * @param parameter_buffer_size
+     * @param per_fragment_stats_buffer
+     * @param per_fragment_stats_buffer_size
      * @param resultBuffer
      * @param result_buffer_size
      * @param exceptionBuffer
      * @param exception_buffer_size
      * @return error code
      */
-    protected native int nativeSetBuffers(long pointer, ByteBuffer parameter_buffer, int parameter_buffer_size,
+    protected native int nativeSetBuffers(long pointer,
+                                          ByteBuffer parameter_buffer, int parameter_buffer_size,
+                                          ByteBuffer per_fragment_stats_buffer, int per_fragment_stats_buffer_size,
                                           ByteBuffer resultBuffer, int result_buffer_size,
                                           ByteBuffer exceptionBuffer, int exception_buffer_size);
 

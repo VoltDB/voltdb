@@ -68,30 +68,27 @@ namespace voltdb {
  * The caller owns the table object, and is responsible for
  * deleting it.
  */
-TempTable *loadTableFrom(const char *buffer,
-                         size_t size,
-                         Pool * pool= NULL,
-                         ReferenceSerializeOutput *uniqueViolationOutput = NULL,
-                         bool shouldDRStreamRows = false)
+TempTable *loadTableFrom(ReferenceSerializeInputBE& result, bool skipMsgHeader = false)
 {
-    ReferenceSerializeInputBE result(buffer, size);
     // These varaibles are only used if
     // VOLT_TRACE is defined.  But their
     // values need to be calculated, because the
     // calculations have side effects.  If we
     // define the variables but don't use them the
     // compiler will complain.
-    IF_VOLT_TRACE(int32_t msg_size         = ) result.readInt();  // message length.
-    IF_VOLT_TRACE(int8_t  status           = ) result.readByte(); // status
+    VOLT_TRACE("\n");
+    if (! skipMsgHeader) {
+        IF_VOLT_TRACE(int32_t msg_size         = ) result.readInt();  // message length.
+        IF_VOLT_TRACE(int8_t  status           = ) result.readByte(); // status
+        VOLT_TRACE("  msg size:              %d\n",   msg_size);
+        VOLT_TRACE("  status:                %hhd\n", status);
+    }
     IF_VOLT_TRACE(int32_t icl              = ) result.readInt();  // inter cluster latency
     IF_VOLT_TRACE(int32_t serialized_exp   = ) result.readInt();  // serialized exception
     IF_VOLT_TRACE(int32_t tbl_len          = ) result.readInt();  // table length
     IF_VOLT_TRACE(int32_t tbl_metadata_len = ) result.readInt();  // table metadata length
     IF_VOLT_TRACE(int8_t  tbl_status       = ) result.readByte();
     int16_t column_count = result.readShort();
-    VOLT_TRACE("\n");
-    VOLT_TRACE("  msg size:              %d\n",   msg_size);
-    VOLT_TRACE("  status:                %hhd\n", status);
     VOLT_TRACE("  inter cluster latency: %d\n",   icl);
     VOLT_TRACE("  serialized exception:  %d\n",   serialized_exp);
     VOLT_TRACE("  table length:          %d\n",   tbl_len);
@@ -109,7 +106,15 @@ TempTable *loadTableFrom(const char *buffer,
                     idx,
                     column_count);
         assert(colType != VALUE_TYPE_ARRAY);
-        builder.setColumnAtIndex(idx, colType);
+        if (colType == VALUE_TYPE_VARCHAR
+            || colType == VALUE_TYPE_VARBINARY) {
+            // Note that in the tests we do not have the schema handy, setting this to 256
+            // which seems to be large enough for the cpp unit tests now.
+            builder.setColumnAtIndex(idx, colType, 256);
+        }
+        else {
+            builder.setColumnAtIndex(idx, colType);
+        }
     }
     TupleSchema *schema = builder.build();
     for (int idx = 0; idx < column_count; idx += 1) {
@@ -127,6 +132,13 @@ TempTable *loadTableFrom(const char *buffer,
     table->loadTuplesFromNoHeader(result);
     return table;
 }
+
+TempTable *loadTableFrom(const char *buffer, size_t size)
+{
+    ReferenceSerializeInputBE result(buffer, size);
+    return loadTableFrom(result);
 }
+
+} // namespace voltdb
 
 #endif /* TESTS_EE_TEST_UTILS_LOADTABLEFROM_HPP_ */
