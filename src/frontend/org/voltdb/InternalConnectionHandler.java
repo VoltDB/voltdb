@@ -17,9 +17,11 @@
 
 package org.voltdb;
 
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
+import com.google_voltpatches.common.collect.ImmutableMap;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.AuthSystem.AuthUser;
@@ -44,12 +46,14 @@ public class InternalConnectionHandler {
     private final AtomicLong m_failedCount = new AtomicLong();
     private final AtomicLong m_submitSuccessCount = new AtomicLong();
     private final AtomicInteger m_backpressureIndication = new AtomicInteger(0);
-    private final InternalClientResponseAdapter m_adapter;
-    private final ClientInterfaceHandleManager m_cihm;
+    private volatile Map<Integer, InternalClientResponseAdapter> m_adapters = ImmutableMap.of();
 
-    public InternalConnectionHandler(InternalClientResponseAdapter adapter, ClientInterfaceHandleManager cihm) {
-        m_adapter = adapter;
-        m_cihm = cihm;
+    public void addAdapter(int pid, InternalClientResponseAdapter adapter)
+    {
+        final ImmutableMap.Builder<Integer, InternalClientResponseAdapter> builder = ImmutableMap.builder();
+        builder.putAll(m_adapters);
+        builder.put(pid, adapter);
+        m_adapters = builder.build();
     }
 
     /**
@@ -58,10 +62,6 @@ public class InternalConnectionHandler {
     public boolean hasTable(String name) {
         Table table = getCatalogContext().tables.get(name);
         return (table!=null);
-    }
-
-    public ClientInterfaceHandleManager getClientInterfaceHandleManager() {
-        return m_cihm;
     }
 
     public class NullCallback implements ProcedureCallback {
@@ -107,7 +107,6 @@ public class InternalConnectionHandler {
 
         try {
             task = MiscUtils.roundTripForCL(task);
-            task.setClientHandle(m_adapter.connectionId());
         } catch (Exception e) {
             String fmt = "Cannot invoke procedure %s. failed to create task.";
             m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.ERROR, null, fmt, procName);
@@ -129,10 +128,11 @@ public class InternalConnectionHandler {
             return false;
         }
 
+        final InternalClientResponseAdapter adapter = m_adapters.get(partition);
         InternalAdapterTaskAttributes kattrs = new InternalAdapterTaskAttributes(
-                DEFAULT_INTERNAL_ADAPTER_NAME, isAdmin, m_adapter.connectionId());
+                DEFAULT_INTERNAL_ADAPTER_NAME, isAdmin, adapter.connectionId());
 
-        if (!m_adapter.createTransaction(kattrs, procName, catProc, cb, null, task, user, partition, System.nanoTime())) {
+        if (!adapter.createTransaction(kattrs, procName, catProc, cb, null, task, user, partition, System.nanoTime())) {
             m_failedCount.incrementAndGet();
             return false;
         }
@@ -164,7 +164,6 @@ public class InternalConnectionHandler {
         task.setParams(fieldList);
         try {
             task = MiscUtils.roundTripForCL(task);
-            task.setClientHandle(m_adapter.connectionId());
         } catch (Exception e) {
             String fmt = "Cannot invoke procedure %s from streaming interface %s. failed to create task.";
             m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.ERROR, null, fmt, proc, caller);
@@ -181,11 +180,12 @@ public class InternalConnectionHandler {
             return false;
         }
 
-        InternalAdapterTaskAttributes kattrs = new InternalAdapterTaskAttributes(caller,  m_adapter.connectionId());
+        final InternalClientResponseAdapter adapter = m_adapters.get(partition);
+        InternalAdapterTaskAttributes kattrs = new InternalAdapterTaskAttributes(caller,  adapter.connectionId());
 
         final AuthUser user = getCatalogContext().authSystem.getImporterUser();
 
-        if (!m_adapter.createTransaction(kattrs, proc, catProc, procCallback, statsCollector, task, user, partition, System.nanoTime())) {
+        if (!adapter.createTransaction(kattrs, proc, catProc, procCallback, statsCollector, task, user, partition, System.nanoTime())) {
             m_failedCount.incrementAndGet();
             return false;
         }
@@ -194,7 +194,7 @@ public class InternalConnectionHandler {
     }
 
     private boolean hasBackPressure() {
-        final boolean b = m_adapter.hasBackPressure();
+        final boolean b = m_adapters.values().stream().anyMatch(InternalClientResponseAdapter::hasBackPressure);
         int prev = m_backpressureIndication.get();
         int delta = b ? 1 : -(prev > 1 ? prev >> 1 : 1);
         int next = prev + delta;
