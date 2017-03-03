@@ -1,0 +1,25 @@
+create table swapper_table_foo (
+  i integer,
+  j varchar(32),
+  primary key (i)
+);
+
+create table swapper_table_bar (
+  i integer,
+  j varchar(32),
+  primary key (i)
+);
+
+insert into swapper_table_foo values (0, 'dog');
+insert into swapper_table_foo values (1, 'cat');
+
+exec @SwapTables Swapper_Table_Foo, Swapper_Table_BAR;
+
+select * from swapper_table_foo order by i;
+select * from swapper_table_bar order by i;
+
+exec @SwapTables nonexistent_table, Swapper_Table_BAR;
+exec @SwapTables Swapper_Table_Foo, nonexistent_table;
+
+drop table swapper_table_foo;
+drop table swapper_table_bar;
