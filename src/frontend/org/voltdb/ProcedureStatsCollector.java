@@ -30,7 +30,7 @@ import org.voltdb.catalog.Procedure;
  * Derivation of StatsSource to expose timing information of procedure invocations.
  *
  */
-class ProcedureStatsCollector extends SiteStatsSource {
+public class ProcedureStatsCollector extends SiteStatsSource {
 
     private static final VoltLogger log = new VoltLogger("HOST");
 
@@ -145,26 +145,28 @@ class ProcedureStatsCollector extends SiteStatsSource {
     private final String m_procName;
     private final int m_partitionId;
 
-    private Map<SQLStmt, ProcedureStmtStat> m_stats;
+    private Map<String, ProcedureStmtStat> m_stats;
     private ProcedureStmtStat m_procStat;
 
     /**
      * Constructor requires no args because it has access to the enclosing classes members.
      */
     public ProcedureStatsCollector(long siteId, int partitionId, Procedure catProc,
-                                   Map<SQLStmt, String> reversedStmtMap) {
+                                   ArrayList<String> stmtNames) {
         super(siteId, false);
         m_partitionId = partitionId;
         m_procName = catProc.getClassname();
         // Use LinkedHashMap to have a fixed element order.
-        m_stats = new LinkedHashMap<SQLStmt, ProcedureStmtStat>();
+        m_stats = new LinkedHashMap<String, ProcedureStmtStat>();
         // Use one ProcedureStmtStat instance to hold the procedure-wide statistics.
         m_procStat = new ProcedureStmtStat("<ALL>");
         // The NULL key entry is reserved for the procedure-wide statistics.
         m_stats.put(null, m_procStat);
         // Add statistics for the individual SQL statements.
-        for (Entry<SQLStmt, String> entry : reversedStmtMap.entrySet()) {
-            m_stats.put(entry.getKey(), new ProcedureStmtStat(entry.getValue()));
+        if (stmtNames != null) {
+            for (String stmtName : stmtNames) {
+                m_stats.put(stmtName, new ProcedureStmtStat(stmtName));
+            }
         }
     }
 
@@ -177,6 +179,68 @@ class ProcedureStatsCollector extends SiteStatsSource {
         }
     }
 
+    public final boolean recording() {
+        return m_procStat.m_currentStartTime > 0;
+    }
+
+    public final void finishStatement(String stmtName,
+                                      boolean granularStatsRequested,
+                                      boolean failed,
+                                      long duration,
+                                      VoltTable result,
+                                      ParameterSet parameterSet) {
+        ProcedureStmtStat stat = m_stats.get(stmtName);
+        if (stat == null) {
+            return;
+        }
+        if (granularStatsRequested) {
+            // This is a sampled invocation.
+            // Update timings and size statistics.
+            if (duration < 0)
+            {
+                if (Math.abs(duration) > 1000000000)
+                {
+                    log.info("Statement: " + stat.m_stmtName + " in procedure: " + m_procName +
+                             " recorded a negative execution time larger than one second: " +
+                             duration);
+                }
+            }
+            else
+            {
+                stat.m_totalTimedExecutionTime += duration;
+                stat.m_timedInvocations++;
+
+                // sampled timings
+                stat.m_minExecutionTime = Math.min( duration, stat.m_minExecutionTime);
+                stat.m_maxExecutionTime = Math.max( duration, stat.m_maxExecutionTime);
+                stat.m_lastMinExecutionTime = Math.min( duration, stat.m_lastMinExecutionTime);
+                stat.m_lastMaxExecutionTime = Math.max( duration, stat.m_lastMaxExecutionTime);
+
+                // sampled size statistics
+                int resultSize = 0;
+                if (result != null) {
+                    resultSize = result.getSerializedSize();
+                }
+                stat.m_totalResultSize += resultSize;
+                stat.m_minResultSize = Math.min(resultSize, stat.m_minResultSize);
+                stat.m_maxResultSize = Math.max(resultSize, stat.m_maxResultSize);
+                stat.m_lastMinResultSize = Math.min(resultSize, stat.m_lastMinResultSize);
+                stat.m_lastMaxResultSize = Math.max(resultSize, stat.m_lastMaxResultSize);
+                int parameterSetSize = (
+                        parameterSet != null ? parameterSet.getSerializedSize() : 0);
+                stat.m_totalParameterSetSize += parameterSetSize;
+                stat.m_minParameterSetSize = Math.min(parameterSetSize, stat.m_minParameterSetSize);
+                stat.m_maxParameterSetSize = Math.max(parameterSetSize, stat.m_maxParameterSetSize);
+                stat.m_lastMinParameterSetSize = Math.min(parameterSetSize, stat.m_lastMinParameterSetSize);
+                stat.m_lastMaxParameterSetSize = Math.max(parameterSetSize, stat.m_lastMaxParameterSetSize);
+            }
+        }
+        if (failed) {
+            stat.m_failureCount++;
+        }
+        stat.m_invocations++;
+    }
+
     /**
      * Called after a procedure is finished executing. Compares the start and end time and calculates
      * the statistics.
@@ -186,7 +250,7 @@ class ProcedureStatsCollector extends SiteStatsSource {
             boolean failed,
             VoltTable[] results,
             ParameterSet parameterSet) {
-        if (m_procStat.m_currentStartTime > 0) {
+        if (recording()) {
             // This is a sampled invocation.
             // Update timings and size statistics.
             final long endTime = System.nanoTime();
@@ -357,23 +421,41 @@ class ProcedureStatsCollector extends SiteStatsSource {
     protected Iterator<Object> getStatsRowKeyIterator(boolean interval) {
         m_interval = interval;
         return new Iterator<Object>() {
-            Iterator<Entry<SQLStmt, ProcedureStmtStat>> iter = m_stats.entrySet().iterator();
+            Iterator<Entry<String, ProcedureStmtStat>> iter = m_stats.entrySet().iterator();
+            ProcedureStmtStat nextToReturn = null;
             @Override
             public boolean hasNext() {
-                if (!getInterval()) {
-                    if (getInvocations() == 0) {
-                        return false;
-                    }
+                if (nextToReturn != null) {
+                    return true;
                 }
-                else if (getInvocations() - getLastInvocations() == 0) {
+                if ( ! iter.hasNext()) {
                     return false;
                 }
-                return iter.hasNext();
+                // Find the next element to return.
+                do {
+                    nextToReturn = iter.next().getValue();
+                    if (getInterval()) {
+                        if (nextToReturn.m_timedInvocations - nextToReturn.m_lastTimedInvocations == 0) {
+                            nextToReturn = null;
+                            continue;
+                        }
+                    }
+                    else {
+                        if (nextToReturn.m_timedInvocations == 0) {
+                            nextToReturn = null;
+                            continue;
+                        }
+                    }
+                } while (nextToReturn == null && iter.hasNext());
+                return nextToReturn != null;
             }
 
             @Override
             public Object next() {
-                return iter.next().getValue();
+                hasNext();
+                Object ret = nextToReturn;
+                nextToReturn = null;
+                return ret;
             }
 
             @Override
@@ -393,22 +475,6 @@ class ProcedureStatsCollector extends SiteStatsSource {
      */
     public boolean getInterval() {
         return m_interval;
-    }
-
-    /**
-     * Accessor
-     * @return the m_invocations
-     */
-    public long getInvocations() {
-        return m_procStat.m_invocations;
-    }
-
-    /**
-     * Accessor
-     * @return the m_lastInvocations
-     */
-    public long getLastInvocations() {
-        return m_procStat.m_lastInvocations;
     }
 
     public int getPartitionId() {

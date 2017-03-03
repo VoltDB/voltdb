@@ -288,6 +288,22 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         checkErrorCode(errorCode);
     }
 
+    public int extractPerFragmentStats(long[] durationsOut) {
+        perFragmentStatsBuffer.clear();
+        int succeededFragmentsCount = perFragmentStatsBuffer.getInt();
+        if (durationsOut != null) {
+            assert(durationsOut.length >= succeededFragmentsCount);
+            for (int i = 0; i < succeededFragmentsCount; i++) {
+                durationsOut[i] = perFragmentStatsBuffer.getLong();
+            }
+            // This is the time for the failed fragment.
+            if (succeededFragmentsCount < durationsOut.length) {
+                durationsOut[succeededFragmentsCount] = perFragmentStatsBuffer.getLong();
+            }
+        }
+        return succeededFragmentsCount;
+    }
+
     /**
      * @param undoToken Token identifying undo quantum for generated undo info
      */

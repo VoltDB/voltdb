@@ -34,6 +34,7 @@ import org.voltdb.client.BatchTimeoutOverrideType;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.InterruptException;
 import org.voltdb.exceptions.SQLException;
+import org.voltdb.jni.ExecutionEngineJNI;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.planner.ActivePlanRepository;
@@ -230,6 +231,13 @@ public class FragmentTask extends TransactionTask
             return currentFragResponse;
         }
 
+        ProcedureRunner currRunner = siteConnection.getProcedureRunner(m_fragmentMsg.getProcedureName());
+        long[] durations = null;
+        int succeededFragmentsCount = 0;
+        if (m_fragmentMsg.isGranularStatsRequested()) {
+            durations = new long[1];
+        }
+
         for (int frag = 0; frag < m_fragmentMsg.getFragmentCount(); frag++)
         {
             byte[] planHash = m_fragmentMsg.getPlanHash(frag);
@@ -252,8 +260,8 @@ public class FragmentTask extends TransactionTask
              * I am pretty sure what we don't support is partial rollback.
              * The entire procedure will roll back successfully on failure
              */
+            VoltTable dependency = null;
             try {
-                VoltTable dependency;
                 fragmentPlan = m_fragmentMsg.getFragmentPlan(frag);
                 String stmtText = null;
 
@@ -324,6 +332,20 @@ public class FragmentTask extends TransactionTask
                 // ensure adhoc plans are unloaded
                 if (fragmentPlan != null) {
                     ActivePlanRepository.decrefPlanFragmentById(fragmentId);
+                }
+                if (currRunner != null) {
+                    if (currRunner.getEngine() instanceof ExecutionEngineJNI) {
+                        succeededFragmentsCount = ((ExecutionEngineJNI)currRunner.getEngine()).extractPerFragmentStats(durations);
+                    }
+                    else {
+                         // IPC
+                    }
+                    currRunner.getStatsCollector().finishStatement(m_fragmentMsg.getStmtName(frag),
+                                                                   m_fragmentMsg.isGranularStatsRequested(),
+                                                                   succeededFragmentsCount == 0,
+                                                                   durations == null ? 0 : durations[0],
+                                                                   dependency,
+                                                                   params);
                 }
             }
         }

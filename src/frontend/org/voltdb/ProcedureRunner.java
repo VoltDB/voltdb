@@ -27,7 +27,6 @@ import java.lang.reflect.Modifier;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -57,7 +56,10 @@ import org.voltdb.exceptions.SerializableException;
 import org.voltdb.exceptions.SpecifiedException;
 import org.voltdb.groovy.GroovyScriptProcedureDelegate;
 import org.voltdb.iv2.MpInitiator;
+import org.voltdb.iv2.Site;
 import org.voltdb.iv2.UniqueIdGenerator;
+import org.voltdb.jni.ExecutionEngine;
+import org.voltdb.jni.ExecutionEngineJNI;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.planner.ActivePlanRepository;
 import org.voltdb.sysprocs.AdHocBase;
@@ -120,6 +122,7 @@ public class ProcedureRunner {
     // hooks into other parts of voltdb
     //
     protected final SiteProcedureConnection m_site;
+    protected final ExecutionEngine m_ee;
     protected final SystemProcedureExecutionContext m_systemProcedureContext;
     protected CatalogSpecificPlanner m_csp;
 
@@ -205,6 +208,12 @@ public class ProcedureRunner {
             m_partitionColumnType = null;
         }
         m_site = site;
+        if (site instanceof Site) {
+            m_ee = ((Site)site).getEngine();
+        }
+        else {
+            m_ee = null;
+        }
         m_systemProcedureContext = sysprocContext;
         m_csp = csp;
 
@@ -212,7 +221,7 @@ public class ProcedureRunner {
 
         // Map each statement that was defined in the stored procedure with its SQLStmt variable name.
         // The variable name is used in the granular statistics for stored procedures.
-        Map<SQLStmt, String> reversedStmtMap = reflect();
+        ArrayList<String> stmtList = reflect();
 
         // Normally m_statsCollector is returned as it is and there is no affect to assign it to itself.
         // Sometimes when this procedure statistics needs to reuse the existing one, the old stats gets returned.
@@ -222,8 +231,12 @@ public class ProcedureRunner {
                         m_site.getCorrespondingSiteId(),
                         m_site.getCorrespondingPartitionId(),
                         m_catProc,
-                        reversedStmtMap)
+                        stmtList)
                 );
+    }
+
+    public ExecutionEngine getEngine() {
+        return m_ee;
     }
 
     public void reInitSysProc(CatalogContext catalogContext, CatalogSpecificPlanner csp) {
@@ -237,6 +250,10 @@ public class ProcedureRunner {
                 catalogContext.getNodeSettings());
 
         m_csp = csp;
+    }
+
+    public ProcedureStatsCollector getStatsCollector() {
+        return m_statsCollector;
     }
 
     public Procedure getCatalogProcedure() {
@@ -1032,10 +1049,8 @@ public class ProcedureRunner {
         }
     }
 
-    // Returns a reversed map from the statement to the variable name that was defined in the java code.
-    //   - for single statement stored procedure, it is named as VoltDB.ANON_STMT_NAME (sql)
-    //   - it should return an empty map for system stored procedures.
-    protected Map<SQLStmt, String> reflect() {
+    // Returns a list that contains the names of the statements that are defined in the stored procedure.
+    protected ArrayList<String> reflect() {
         Map<String, SQLStmt> stmtMap;
 
         // fill in the sql for single statement procs
@@ -1104,10 +1119,11 @@ public class ProcedureRunner {
             stmtMap = m_language.accept(sqlStatementsRetriever, this);
         }
 
-        Map<SQLStmt, String> reversedStmtMap = new HashMap<SQLStmt, String>();
+        ArrayList<String> stmtNames = new ArrayList<String>(stmtMap.entrySet().size());
         for (final Entry<String, SQLStmt> entry : stmtMap.entrySet()) {
             String name = entry.getKey();
-            reversedStmtMap.put(entry.getValue(), name);
+            stmtNames.add(name);
+            entry.getValue().setStmtName(name);
             Statement s = m_catProc.getStatements().get(name);
             if (s != null) {
                 /*
@@ -1122,7 +1138,7 @@ public class ProcedureRunner {
                 //LOG.fine("Found statement " + name);
             }
         }
-        return reversedStmtMap;
+        return stmtNames;
     }
 
     private final static Language.Visitor<Class<?>[], ProcedureRunner> parametersTypeRetriever =
@@ -1435,7 +1451,8 @@ public class ProcedureRunner {
                   long siteId,
                   boolean finalTask,
                   String procedureName,
-                  byte[] procToLoad) {
+                  byte[] procToLoad,
+                  boolean granularStatsReqeusted) {
            m_batchSize = batchSize;
            m_txnState = txnState;
 
@@ -1453,6 +1470,7 @@ public class ProcedureRunner {
                                                  txnState.isForReplay());
            m_localTask.setProcedureName(procedureName);
            m_localTask.setBatchTimeout(m_txnState.getInvocation().getBatchTimeout());
+           m_localTask.setGranularStatsRequested(granularStatsReqeusted);
 
            // the data and message for all sites in the transaction
            m_distributedTask = new FragmentTaskMessage(m_txnState.initiatorHSId,
@@ -1466,6 +1484,7 @@ public class ProcedureRunner {
            // this works fine if procToLoad is NULL
            m_distributedTask.setProcNameToLoad(procToLoad);
            m_distributedTask.setBatchTimeout(m_txnState.getInvocation().getBatchTimeout());
+           m_distributedTask.setGranularStatsRequested(granularStatsReqeusted);
        }
 
        /*
@@ -1486,7 +1505,7 @@ public class ProcedureRunner {
                m_depsForLocalTask[index] = -1;
                // Add the local fragment data.
                if (stmt.inCatalog) {
-                   m_localTask.addFragment(stmt.aggregator.planHash, m_depsToResume[index], params);
+                   m_localTask.addFragment(stmt.aggregator.planHash, stmt.getStmtName(), m_depsToResume[index], params);
                }
                else {
                    byte[] planBytes = ActivePlanRepository.planForFragmentId(stmt.aggregator.id);
@@ -1504,8 +1523,8 @@ public class ProcedureRunner {
                m_depsForLocalTask[index] = outputDepId;
                // Add local and distributed fragments.
                if (stmt.inCatalog) {
-                   m_localTask.addFragment(stmt.aggregator.planHash, m_depsToResume[index], params);
-                   m_distributedTask.addFragment(stmt.collector.planHash, outputDepId, params);
+                   m_localTask.addFragment(stmt.aggregator.planHash, stmt.getStmtName(), m_depsToResume[index], params);
+                   m_distributedTask.addFragment(stmt.collector.planHash, stmt.getStmtName(), outputDepId, params);
                }
                else {
                    byte[] planBytes = ActivePlanRepository.planForFragmentId(stmt.aggregator.id);
@@ -1527,7 +1546,8 @@ public class ProcedureRunner {
                                          m_site.getCorrespondingSiteId(),
                                          finalTask,
                                          m_procedureName,
-                                         m_procNameToLoadForFragmentTasks);
+                                         m_procNameToLoadForFragmentTasks,
+                                         m_statsCollector.recording());
 
        // iterate over all sql in the batch, filling out the above data structures
        for (int i = 0; i < batch.size(); ++i) {
@@ -1616,6 +1636,7 @@ public class ProcedureRunner {
        Object[] params = new Object[batchSize];
        long[] fragmentIds = new long[batchSize];
        String[] sqlTexts = new String[batchSize];
+       int succeededFragmentsCount = 0;
 
        int i = 0;
        for (final QueuedSQL qs : batch) {
@@ -1654,7 +1675,30 @@ public class ProcedureRunner {
 
            throw ex;
        }
-
+       finally {
+           long[] durations = null;
+           if (m_statsCollector.recording()) {
+               durations = new long[batchSize];
+           }
+           if (m_ee instanceof ExecutionEngineJNI) {
+               succeededFragmentsCount = ((ExecutionEngineJNI)m_ee).extractPerFragmentStats(durations);
+           }
+           else {
+                // IPC
+           }
+           for (i = 0; i < batchSize; i++) {
+               QueuedSQL qs = batch.get(i);
+               m_statsCollector.finishStatement(qs.stmt.getStmtName(),
+                                                m_statsCollector.recording(),
+                                                i == succeededFragmentsCount,
+                                                durations == null ? 0 : durations[i],
+                                                results == null ? null : results[i],
+                                                qs.params);
+               if (i == succeededFragmentsCount) {
+                   break;
+               }
+           }
+       }
        return results;
     }
 }
