@@ -597,13 +597,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             File configInfoDir = new VoltFile(config.m_voltdbRoot, Constants.CONFIG_DIR);
             File depFH = new VoltFile(configInfoDir, "deployment.xml");
             if (!depFH.isFile() || !depFH.canRead()) {
-                hostLog.fatal("Failed to get configuration or deployment configuration is invalid. "
+                consoleLog.fatal("Failed to get configuration or deployment configuration is invalid. "
                         + depFH.getAbsolutePath());
                 return -1;
             }
             config.m_pathToDeployment = depFH.getCanonicalPath();
         } catch (IOException e) {
-            hostLog.fatal("Failed to read deployment: " + e.getMessage());
+            consoleLog.fatal("Failed to read deployment: " + e.getMessage());
             return -1;
         }
 
@@ -614,23 +614,23 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             String out;
             if ((out = CatalogUtil.getDeployment(dt, true)) != null) {
                 if ((new File(config.m_getOutput)).exists() && !config.m_forceGetCreate) {
-                    hostLog.fatal("Failed to save deployment, file already exists: " + config.m_getOutput);
+                    consoleLog.fatal("Failed to save deployment, file already exists: " + config.m_getOutput);
                     return -1;
                 }
                 try (FileOutputStream fos = new FileOutputStream(config.m_getOutput.trim())){
                     fos.write(out.getBytes());
                 } catch (IOException e) {
-                    hostLog.fatal("Failed to write deployment to " + config.m_getOutput
+                    consoleLog.fatal("Failed to write deployment to " + config.m_getOutput
                             + " : " + e.getMessage());
                     return -1;
                 }
-                hostLog.info("Deployment configuration saved at " + config.m_getOutput.trim());
+                consoleLog.info("Deployment configuration saved at " + config.m_getOutput.trim());
             } else {
-                hostLog.fatal("Failed to get configuration or deployment configuration is invalid.");
+                consoleLog.fatal("Failed to get configuration or deployment configuration is invalid.");
                 return -1;
             }
         } catch (Exception e) {
-            hostLog.fatal("Failed to get configuration or deployment configuration is invalid. "
+            consoleLog.fatal("Failed to get configuration or deployment configuration is invalid. "
                     + "Please make sure voltdbroot is a valid directory. " + e.getMessage());
             return -1;
         }
@@ -639,7 +639,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     private int outputSchema(Configuration config) {
         if ((new File(config.m_getOutput)).exists() && !config.m_forceGetCreate) {
-            hostLog.fatal("Failed to save schema file, file already exists: " + config.m_getOutput);
+            consoleLog.fatal("Failed to save schema file, file already exists: " + config.m_getOutput);
             return -1;
         }
 
@@ -649,12 +649,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             try (FileOutputStream fos = new FileOutputStream(config.m_getOutput.trim())){
                 fos.write(ddl.getBytes());
             } catch (IOException e) {
-                hostLog.fatal("Failed to write schema to " + config.m_getOutput + " : " + e.getMessage());
+                consoleLog.fatal("Failed to write schema to " + config.m_getOutput + " : " + e.getMessage());
                 return -1;
             }
-            hostLog.info("Schema file saved at " + config.m_getOutput.trim());
+            consoleLog.info("Schema file saved at " + config.m_getOutput.trim());
         } catch (IOException e) {
-            hostLog.fatal("Failed to load the catalog jar from " + config.m_pathToCatalog
+            consoleLog.fatal("Failed to load the catalog jar from " + config.m_pathToCatalog
                     + " : " + e.getMessage());
             return -1;
         }
@@ -664,16 +664,16 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     private int outputProcedures(Configuration config) {
         File outputFile = new File(config.m_getOutput);
         if (outputFile.exists() && !config.m_forceGetCreate) {
-            hostLog.fatal("Failed to save classes, file already exists: " + config.m_getOutput);
+            consoleLog.fatal("Failed to save classes, file already exists: " + config.m_getOutput);
             return -1;
         }
         try {
             InMemoryJarfile catalogJar = CatalogUtil.loadInMemoryJarFile(MiscUtils.fileToBytes(new File (config.m_pathToCatalog)));
             InMemoryJarfile filteredJar = CatalogUtil.getCatalogJarWithoutDefaultArtifacts(catalogJar);
             filteredJar.writeToFile(outputFile);
-            hostLog.info("Classes file in jar file saved at " + outputFile.getPath());
+            consoleLog.info("Classes file in jar file saved at " + outputFile.getPath());
         } catch (IOException e) {
-            hostLog.fatal("Failed to read classes " + config.m_pathToCatalog
+            consoleLog.fatal("Failed to read classes " + config.m_pathToCatalog
                     + " : " + e.getMessage());
             return -1;
         }
