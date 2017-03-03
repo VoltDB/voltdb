@@ -38,9 +38,9 @@ import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.MiscUtils;
+import org.voltdb.utils.VoltFile;
 
 import junit.framework.TestCase;
-import org.voltdb.utils.VoltFile;
 
 public class TestCatalogDiffs extends TestCase {
     static final String m_dir = "/tmp" + File.separator + System.getProperty("user.name");
@@ -84,7 +84,8 @@ public class TestCatalogDiffs extends TestCase {
 
     public static Catalog catalogForJar(String pathToJar) throws IOException {
         byte[] bytes = MiscUtils.fileToBytes(new File(pathToJar));
-        String serializedCatalog = CatalogUtil.getSerializedCatalogStringFromJar(CatalogUtil.loadAndUpgradeCatalogFromJar(bytes, false).getFirst());
+        String serializedCatalog = CatalogUtil.getSerializedCatalogStringFromJar(
+                CatalogUtil.loadAndUpgradeCatalogFromJar(bytes, false).getFirst());
         assertNotNull(serializedCatalog);
         Catalog c = new Catalog();
         c.execute(serializedCatalog);

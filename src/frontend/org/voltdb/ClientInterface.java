@@ -49,6 +49,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.HdrHistogram_voltpatches.AbstractHistogram;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONObject;
+import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.BinaryPayloadMessage;
 import org.voltcore.messaging.HostMessenger;
@@ -66,6 +67,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
+import org.voltcore.utils.RateLimitedLogger;
 import org.voltdb.AuthSystem.AuthProvider;
 import org.voltdb.AuthSystem.AuthUser;
 import org.voltdb.CatalogContext.ProcedurePartitionInfo;
@@ -92,8 +94,6 @@ import com.google_voltpatches.common.base.Predicate;
 import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
-import org.voltcore.logging.Level;
-import org.voltcore.utils.RateLimitedLogger;
 
 /**
  * Represents VoltDB's connection to client libraries outside the cluster.
@@ -657,7 +657,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 /*
                  * Authenticate the user.
                  */
-                boolean authenticated = arq.authenticate(hashScheme);
+                boolean authenticated = arq.authenticate(hashScheme, socket.socket().getRemoteSocketAddress().toString());
 
                 if (!authenticated) {
                     Exception faex = arq.getAuthenticationFailureException();

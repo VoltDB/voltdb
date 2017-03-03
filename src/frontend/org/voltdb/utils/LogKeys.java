@@ -60,12 +60,9 @@ public enum LogKeys {
     host_Initialiazion_InvalidDDL,
 
     //AUTH
-    auth_ClientInterface_ProcedureNotFound,
     auth_ClientInterface_LackingPermissionForProcedure,
     auth_ClientInterface_LackingPermissionForSql,
     auth_ClientInterface_LackingPermissionForSysproc,
-    auth_ClientInterface_LackingPermissionForDefaultproc,
-    auth_AuthSystem_NoSuchAlgorithm,
     auth_AuthSystem_NoSuchUser,
     auth_AuthSystem_AuthFailedPasswordMistmatch,
 

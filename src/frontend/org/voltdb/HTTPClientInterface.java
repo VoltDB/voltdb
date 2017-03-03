@@ -431,7 +431,7 @@ public class HTTPClientInterface {
         if (m_spnegoEnabled) {
             final String principal = spnegoLogin(token);
             AuthenticationRequest authReq = getAuthSystem().new SpnegoPassthroughRequest(principal);
-            if (!authReq.authenticate(ClientAuthScheme.SPNEGO)) {
+            if (!authReq.authenticate(ClientAuthScheme.SPNEGO, request.getRemoteAddr())) {
                 return new AuthenticationResult(
                         false, null, adminMode, principal,
                         "User " + principal + " failed to authorize"
@@ -443,7 +443,7 @@ public class HTTPClientInterface {
             ClientAuthScheme scheme = hashedPasswordBytes != null ?
                     ClientAuthScheme.getByUnencodedLength(hashedPasswordBytes.length)
                     : ClientAuthScheme.HASH_SHA256;
-            if (!authReq.authenticate(scheme)) {
+            if (!authReq.authenticate(scheme, request.getRemoteAddr())) {
                 return new AuthenticationResult(
                         false, null, adminMode, username,
                         "User " + username + " failed to authorize"

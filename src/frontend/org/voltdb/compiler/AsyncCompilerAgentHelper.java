@@ -221,6 +221,7 @@ public class AsyncCompilerAgentHelper
             }
 
             String commands = diff.commands();
+            compilerLog.info(diff.getDescriptionOfChanges());
 
             // since diff commands can be stupidly big, compress them here
             retval.encodedDiffCommands = Encoder.compressAndBase64Encode(commands);
