@@ -17,7 +17,6 @@
 
 package org.voltdb.plannodes;
 
-import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
@@ -26,11 +25,11 @@ import org.voltdb.types.PlanNodeType;
 
 public class InsertPlanNode extends AbstractOperationPlanNode {
 
-    public enum Members {
-        MULTI_PARTITION,
-        FIELD_MAP,
-        UPSERT,
-        SOURCE_IS_PARTITIONED
+    private static class Members {
+        static final String MULTI_PARTITION = "MULTI_PARTITION";
+        static final String FIELD_MAP = "FIELD_MAP";
+        static final String UPSERT = "UPSERT";
+        static final String SOURCE_IS_PARTITIONED = "SOURCE_IS_PARTITIONED";
     }
 
     protected boolean m_multiPartition = false;
@@ -83,44 +82,25 @@ public class InsertPlanNode extends AbstractOperationPlanNode {
     @Override
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
-        stringer.keySymbolValuePair(Members.MULTI_PARTITION.name(), m_multiPartition);
-        stringer.key(Members.FIELD_MAP.name()).array();
-        for (int i : m_fieldMap) {
-            stringer.value(i);
-        }
-        stringer.endArray();
+        stringer.keySymbolValuePair(Members.MULTI_PARTITION, m_multiPartition);
+        toJSONIntArrayString(stringer, Members.FIELD_MAP, m_fieldMap);
 
         if (m_isUpsert) {
-            stringer.keySymbolValuePair(Members.UPSERT.name(), true);
+            stringer.keySymbolValuePair(Members.UPSERT, true);
         }
 
         if (m_sourceIsPartitioned) {
-            stringer.keySymbolValuePair(Members.SOURCE_IS_PARTITIONED.name(), true);
+            stringer.keySymbolValuePair(Members.SOURCE_IS_PARTITIONED, true);
         }
     }
 
     @Override
     public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
         super.loadFromJSONObject(jobj, db);
-        m_multiPartition = jobj.getBoolean( Members.MULTI_PARTITION.name() );
-        if (!jobj.isNull(Members.FIELD_MAP.name())) {
-            JSONArray jarray = jobj.getJSONArray(Members.FIELD_MAP.name());
-            int numFields = jarray.length();
-            m_fieldMap = new int[numFields];
-            for (int i = 0; i < numFields; ++i) {
-                m_fieldMap[i] = jarray.getInt(i);
-            }
-        }
-
-        m_isUpsert = false;
-        if (jobj.has(Members.UPSERT.name())) {
-            m_isUpsert = true;
-        }
-
-        m_sourceIsPartitioned = false;
-        if (jobj.has(Members.SOURCE_IS_PARTITIONED.name())) {
-            m_sourceIsPartitioned = true;
-        }
+        m_multiPartition = jobj.getBoolean(Members.MULTI_PARTITION);
+        m_fieldMap = loadIntArrayMemberFromJSON(jobj, Members.FIELD_MAP);
+        m_isUpsert = jobj.has(Members.UPSERT);
+        m_sourceIsPartitioned = jobj.has(Members.SOURCE_IS_PARTITIONED);
     }
 
     @Override

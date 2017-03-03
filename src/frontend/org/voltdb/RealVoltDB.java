@@ -977,10 +977,20 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             VoltZK.createStartActionNode(m_messenger.getZK(), m_messenger.getHostId(), m_config.m_startAction);
             validateStartAction();
 
-            readDeploymentAndCreateStarterCatalogContext(config);
+            // durable means commandlogging is enabled.
+            boolean durable = readDeploymentAndCreateStarterCatalogContext(config);
             if (config.m_isEnterprise && m_config.m_startAction.doesRequireEmptyDirectories()
-                    && !config.m_forceVoltdbCreate) {
-                    managedPathsEmptyCheck(config);
+                    && !config.m_forceVoltdbCreate && durable) {
+                managedPathsEmptyCheck(config);
+            }
+            //If we are not durable and we are not rejoining we backup auto snapshots if present.
+            //If terminus is present we will recover from shutdown save so dont move.
+            if (!durable && m_config.m_startAction.doesRecover() && determination.terminusNonce == null) {
+                if (m_nodeSettings.clean()) {
+                    String msg = "Archived previous snapshot directory to " + m_nodeSettings.getSnapshoth() + ".1";
+                    consoleLog.info(msg);
+                    hostLog.info(msg);
+                }
             }
 
             // wait to make sure every host actually *see* each other's ZK node state.
@@ -1157,7 +1167,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             }
 
             // do the many init tasks in the Inits class
-            Inits inits = new Inits(m_statusTracker, this, 1);
+            Inits inits = new Inits(m_statusTracker, this, 1, durable);
             inits.doInitializationWork();
 
             // Need the catalog so that we know how many tables so we can guess at the necessary heap size
@@ -1277,11 +1287,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 try {
                     Class<?> ndrgwClass = null;
                     ndrgwClass = Class.forName("org.voltdb.dr2.DRProducer");
-                    Constructor<?> ndrgwConstructor = ndrgwClass.getConstructor(File.class, File.class, boolean.class, int.class, int.class);
+                    Constructor<?> ndrgwConstructor = ndrgwClass.getConstructor(File.class, File.class, boolean.class, boolean.class, boolean.class, int.class, int.class);
                     m_producerDRGateway =
                             (ProducerDRGateway) ndrgwConstructor.newInstance(
                                     new VoltFile(VoltDB.instance().getDROverflowPath()),
                                     new VoltFile(VoltDB.instance().getSnapshotPath()),
+                                    (m_config.m_startAction.doesRecover() && (durable || determination.terminusNonce != null)),
+                                    m_config.m_startAction.doesRejoin(),
                                     m_replicationActive.get(),
                                     m_configuredNumberOfPartitions,
                                     (m_catalogContext.getClusterSettings().hostcount()-m_config.m_missingHostCount));
@@ -2124,7 +2136,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     public static final String SECURITY_OFF_WARNING = "User authentication is not enabled."
             + " The database is accessible and could be modified or shut down by anyone on the network.";
 
-    int readDeploymentAndCreateStarterCatalogContext(VoltDB.Configuration config) {
+    boolean readDeploymentAndCreateStarterCatalogContext(VoltDB.Configuration config) {
         /*
          * Debate with the cluster what the deployment file should be
          */
@@ -2345,7 +2357,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                             0,
                             m_messenger);
 
-            return m_clusterSettings.get().hostcount();
+            return ((deployment.getCommandlog() != null) && (deployment.getCommandlog().isEnabled()));
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
