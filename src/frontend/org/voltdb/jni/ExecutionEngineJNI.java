@@ -219,7 +219,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             setupPsetBuffer(size);
             updateEEBufferPointers();
         }
-        else if (size < MAX_PSETBUFFER_SIZE && m_psetBuffer.capacity() > MAX_PSETBUFFER_SIZE) {
+        else if (m_psetBuffer.capacity() > MAX_PSETBUFFER_SIZE && size < MAX_PSETBUFFER_SIZE) {
             // The last request was a batch that was greater than max network buffer size,
             // so let's not hang on to all that memory
             setupPsetBuffer(MAX_PSETBUFFER_SIZE);
@@ -387,12 +387,13 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         clearPsetAndEnsureCapacity(allPsetSize);
         for (int i = 0; i < batchSize; ++i) {
             int paramStart = m_psetBuffer.position();
-            if (parameterSets[i] instanceof ByteBuffer) {
-                ByteBuffer buf = (ByteBuffer) parameterSets[i];
+            Object param = parameterSets[i];
+            if (param instanceof ByteBuffer) {
+                ByteBuffer buf = (ByteBuffer) param;
                 m_psetBuffer.put(buf);
             }
             else {
-                ParameterSet pset = (ParameterSet) parameterSets[i];
+                ParameterSet pset = (ParameterSet) param;
                 try {
                     pset.flattenToBuffer(m_psetBuffer);
                 }
@@ -408,7 +409,6 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                 m_psetBuffer.position(paramStart);
                 writeCRC.update(m_psetBuffer);
                 assert(m_psetBuffer.remaining() == 0);
-                m_psetBuffer.limit(allPsetSize);
             }
         }
         // checkMaxFsSize();

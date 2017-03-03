@@ -937,26 +937,20 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         final FastSerializer fser = new FastSerializer();
         try {
             for (int i = 0; i < numFragmentIds; ++i) {
+                Object params = parameterSets[i];
                 // pset can be ByteBuffer or ParameterSet instance
-                if (parameterSets[i] instanceof ByteBuffer) {
-                    ByteBuffer buf = (ByteBuffer) parameterSets[i];
-                    int paramStart = buf.position();
-                    fser.write((ByteBuffer) parameterSets[i]);
-                    if (isWriteFrag[i]) {
-                        buf.position(paramStart);
-                        writeCRC.update(buf);
-                    }
+                int paramStart = fser.getPosition();
+                if (params instanceof ByteBuffer) {
+                    ByteBuffer buf = (ByteBuffer) params;
+                    fser.write(buf);
                 }
                 else {
-                    ParameterSet pset = (ParameterSet) parameterSets[i];
-                    ByteBuffer buf = ByteBuffer.allocate(pset.getSerializedSize());
-                    pset.flattenToBuffer(buf);
-                    buf.flip();
-                    fser.write(buf);
-                    if (isWriteFrag[i]) {
-                        buf.position(0);
-                        writeCRC.update(buf);
-                    }
+                    ParameterSet pset = (ParameterSet) params;
+                    fser.writeParameterSet(pset);
+                }
+                if (isWriteFrag[i]) {
+                    fser.setPosition(paramStart);
+                    writeCRC.update(fser.getBuffer());
                 }
             }
         } catch (final IOException exception) {
