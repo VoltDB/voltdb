@@ -22,7 +22,8 @@ import java.util.Arrays;
 public enum GetActionArgument {
 
     DEPLOYMENT("deployment.xml"),
-    SCHEMA("schema.sql");
+    SCHEMA("schema.sql"),
+    CLASSES("procedures.jar");
 
     final String m_defaultOutput;
     public String getDefaultOutput() { return m_defaultOutput; }

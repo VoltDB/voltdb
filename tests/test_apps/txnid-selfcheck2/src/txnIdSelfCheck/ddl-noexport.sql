@@ -153,6 +153,42 @@ CREATE TABLE trup
 );
 PARTITION TABLE trup ON COLUMN p;
 
+CREATE TABLE swapr
+(
+  p          bigint             NOT NULL
+, id         bigint             NOT NULL
+, value      varbinary(1048576) NOT NULL
+, CONSTRAINT PK_id_SWAPR PRIMARY KEY (p,id)
+);
+
+CREATE TABLE swapp
+(
+  p          bigint             NOT NULL
+, id         bigint             NOT NULL
+, value      varbinary(1048576) NOT NULL
+, CONSTRAINT PK_id_SWAPP PRIMARY KEY (p,id)
+);
+PARTITION TABLE swapp ON COLUMN p;
+
+-- TODO: these two temp tables (tempr, tempp) will no longer be needed,
+-- once SWAP TABLES, as ad hoc DML, is fully supported on master:
+CREATE TABLE tempr
+(
+  p          bigint             NOT NULL
+, id         bigint             NOT NULL
+, value      varbinary(1048576) NOT NULL
+, CONSTRAINT PK_id_TEMPR PRIMARY KEY (p,id)
+);
+
+CREATE TABLE tempp
+(
+  p          bigint             NOT NULL
+, id         bigint             NOT NULL
+, value      varbinary(1048576) NOT NULL
+, CONSTRAINT PK_id_TEMPP PRIMARY KEY (p,id)
+);
+PARTITION TABLE tempp ON COLUMN p;
+
 
 -- base procedures you shouldn't call
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.UpdateBaseProc;
@@ -200,6 +236,10 @@ CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TRUPTruncateTableSP;
 PARTITION PROCEDURE TRUPTruncateTableSP ON TABLE trup COLUMN p;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TRUPTruncateTableMP;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TRURTruncateTable;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TRUPSwapTablesSP;
+PARTITION PROCEDURE TRUPSwapTablesSP ON TABLE trup COLUMN p;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TRUPSwapTablesMP;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TRURSwapTables;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TRUPScanAggTableSP;
 PARTITION PROCEDURE TRUPScanAggTableSP ON TABLE trup COLUMN p;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TRUPScanAggTableMP;
