@@ -39,7 +39,6 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.stream.Collectors;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.KeeperException.NodeExistsException;
@@ -96,7 +95,6 @@ import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.base.Preconditions;
-import com.google_voltpatches.common.base.Splitter;
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
@@ -360,10 +358,9 @@ public final class InvocationDispatcher {
             if ("@Ping".equals(procName)) {
                 return new ClientResponseImpl(ClientResponseImpl.SUCCESS, new VoltTable[0], "", task.clientHandle);
             }
-            // ExecuteTask is an internal procedure, not for public use.
-            else if ("@ExecuteTask".equals(procName)) {
-                return unexpectedFailureResponse(
-                        "@ExecuteTask is a reserved procedure only for VoltDB internal use", task.clientHandle);
+            else if ("@AdHoc".equals(procName)) {
+                dispatchAdHoc(task, handler, ccxn, ExplainMode.NONE, user);
+                return null;
             }
             else if ("@GetPartitionKeys".equals(procName)) {
                 return dispatchGetPartitionKeys(task);
@@ -381,13 +378,15 @@ public final class InvocationDispatcher {
                 return dispatchStatistics(OpsSelector.SYSTEMINFORMATION, task, ccxn);
             }
             else if ("@GC".equals(procName)) {
-                return dispatchSystemGC(handler, task);
+                dispatchSystemGC(handler, task);
+                return null;
             }
             else if ("@StopNode".equals(procName)) {
                 return dispatchStopNode(task);
             }
             else if ("@Explain".equals(procName)) {
-                return dispatchAdHoc(task, handler, ccxn, true, user);
+                dispatchAdHoc(task, handler, ccxn, ExplainMode.EXPLAIN_ADHOC, user);
+                return null;
             }
             else if ("@ExplainProc".equals(procName)) {
                 return dispatchExplainProcedure(task, handler, ccxn, user);
@@ -395,15 +394,21 @@ public final class InvocationDispatcher {
             else if ("@ExplainView".equals(procName)) {
                 return dispatchExplainView(task, ccxn);
             }
-            else if ("@AdHoc".equals(procName)) {
-                return dispatchAdHoc(task, handler, ccxn, false, user);
-            }
             else if ("@AdHocSpForTest".equals(procName)) {
                 return dispatchAdHocSpForTest(task, handler, ccxn, false, user);
             }
             else if ("@LoadSinglepartitionTable".equals(procName)) {
                 // FUTURE: When we get rid of the legacy hashinator, this should go away
                 return dispatchLoadSinglepartitionTable(catProc, task, handler, ccxn);
+            }
+            else if ("@SwapTables".equals(procName)) {
+                dispatchSwapTables(task, handler, ccxn, user);
+                return null;
+            }
+            // ExecuteTask is an internal procedure, not for public use.
+            else if ("@ExecuteTask".equals(procName)) {
+                return unexpectedFailureResponse(
+                        "@ExecuteTask is a reserved procedure only for VoltDB internal use", task.clientHandle);
             }
 
             // ERROR MESSAGE FOR PRO SYSPROC USE IN COMMUNITY
@@ -457,9 +462,7 @@ public final class InvocationDispatcher {
                     return takeShutdownSaveSnapshot(task, handler, ccxn, user, bypass);
                 }
             }
-            else if ("@Rebalance".equals(procName)) {
-                return dispatchRebalance(task);
-            }
+
             // Verify that admin mode sysprocs are called from a client on the
             // admin port, otherwise return a failure
             if ((   "@Pause".equals(procName)
@@ -540,6 +543,8 @@ public final class InvocationDispatcher {
         return catProc;
     }
 
+    public final static String SHUTDOWN_MSG = "Server is shutting down.";
+
     private final static ClientResponseImpl allowPauseModeExecution(
             InvocationClientHandler handler,
             Procedure procedure,
@@ -549,17 +554,15 @@ public final class InvocationDispatcher {
 
         if (voltdb.getMode() == OperationMode.SHUTTINGDOWN) {
             return serverUnavailableResponse(
-                    "Server is shutting down.",
+                    SHUTDOWN_MSG,
                     task.clientHandle);
         }
 
-        if (voltdb.isShuttingdown() && procedure.getAllowedinshutdown()) {
-            return null;
-        }
+        if (voltdb.isPreparingShuttingdown()) {
+            if (procedure.getAllowedinshutdown()) return null;
 
-        if (voltdb.isShuttingdown()) {
             return serverUnavailableResponse(
-                    "Server shutdown in progress - new transactions are not processed.",
+                    SHUTDOWN_MSG,
                     task.clientHandle);
         }
 
@@ -672,7 +675,7 @@ public final class InvocationDispatcher {
     private final ExecutorService m_systemGCThread =
             CoreUtils.getCachedSingleThreadExecutor("System.gc() invocation thread", 1000);
 
-    private final ClientResponseImpl dispatchSystemGC(final InvocationClientHandler handler, final StoredProcedureInvocation task) {
+    private final void dispatchSystemGC(final InvocationClientHandler handler, final StoredProcedureInvocation task) {
         m_systemGCThread.execute(new Runnable() {
             @Override
             public void run() {
@@ -698,57 +701,7 @@ public final class InvocationDispatcher {
                 cihm.connection.writeStream().enqueue(buf);
             }
         });
-        return null;
-
     }
-
-    private ClientResponseImpl dispatchRebalance(StoredProcedureInvocation task) {
-
-        Set<Integer> ihids = null;
-        int kfactor = -1;
-        int hostcount = -1;
-         try {
-             JSONObject jsObj = new JSONObject(task.getParams().getParam(0).toString());
-             hostLog.info(jsObj.toString());
-             if (jsObj.has("kfactor")) {
-                 kfactor = jsObj.getInt("kfactor");
-             }
-             if (jsObj.has("hostcount")) {
-                 hostcount = jsObj.getInt("hostcount");
-             }
-             if (jsObj.has("hosts")) {
-                 Splitter splitter = Splitter.on("-").omitEmptyStrings().trimResults();
-                 List<String> hosts = splitter.splitToList(jsObj.getString("hosts"));
-                 ihids = hosts.stream().map(Integer::parseInt).collect(Collectors.toSet());
-             }
-         } catch (JSONException e) {
-             return gracefulFailureResponse( "@Rebalance:" + e.getMessage(),task.clientHandle);
-         }
-
-         final HostMessenger hostMessenger = VoltDB.instance().getHostMessenger();
-         Set<Integer> liveHids = hostMessenger.getLiveHostIds();
-         if (!liveHids.containsAll(ihids)) {
-             return gracefulFailureResponse("Invalid Host Ids not member of cluster: ", task.clientHandle);
-         }
-
-         VoltTable[] tbls = new VoltTable[1];
-         tbls[0]= new VoltTable(new VoltTable.ColumnInfo( "PARAM", VoltType.STRING),
-                 new VoltTable.ColumnInfo( "VALUE", VoltType.STRING));
-
-         if (kfactor > -1) {
-             tbls[0].addRow("KFACTOR", Integer.toString(kfactor));
-         }
-
-         if (hostcount > -1) {
-             tbls[0].addRow("HOSTCOUNT", Integer.toString(hostcount));
-         }
-         if (ihids != null) {
-             for (Integer hid : ihids) {
-                 tbls[0].addRow("HOST ID", Integer.toString(hid));
-             }
-         }
-         return new ClientResponseImpl(ClientResponse.SUCCESS, tbls, "SUCCESS", task.clientHandle);
-     }
 
     private ClientResponseImpl dispatchStopNode(StoredProcedureInvocation task) {
         Object params[] = task.getParams().toArray();
@@ -899,8 +852,8 @@ public final class InvocationDispatcher {
         return null;
     }
 
-    private final ClientResponseImpl dispatchAdHoc(StoredProcedureInvocation task, InvocationClientHandler handler,
-            Connection ccxn, boolean isExplain, AuthSystem.AuthUser user) {
+    private final void dispatchAdHoc(StoredProcedureInvocation task, InvocationClientHandler handler,
+            Connection ccxn, ExplainMode explainMode, AuthSystem.AuthUser user) {
         ParameterSet params = task.getParams();
         Object[] paramArray = params.toArray();
         String sql = (String) paramArray[0];
@@ -908,9 +861,20 @@ public final class InvocationDispatcher {
         if (params.size() > 1) {
             userParams = Arrays.copyOfRange(paramArray, 1, paramArray.length);
         }
-        ExplainMode explainMode = isExplain ? ExplainMode.EXPLAIN_ADHOC : ExplainMode.NONE;
         dispatchAdHocCommon(task, handler, ccxn, explainMode, sql, userParams, null, user);
-        return null;
+    }
+
+    private void dispatchSwapTables(StoredProcedureInvocation task,
+            InvocationClientHandler handler,
+            Connection ccxn, AuthSystem.AuthUser user) {
+        ParameterSet params = task.getParams();
+        Object[] paramArray = params.toArray();
+        String theTable = (String) paramArray[0];
+        String otherTable = (String) paramArray[1];
+        String sql = "@SwapTables " + theTable + " " + otherTable;
+        Object[] userParams = null;
+        dispatchAdHocCommon(task, handler, ccxn, ExplainMode.NONE, sql,
+                userParams, null, user);
     }
 
    /**
@@ -1133,7 +1097,7 @@ public final class InvocationDispatcher {
         }
         VoltDBInterface voltdb = VoltDB.instance();
 
-        if (!voltdb.isShuttingdown()) {
+        if (!voltdb.isPreparingShuttingdown()) {
             log.warn("Ignoring shutdown save snapshot request as VoltDB is not shutting down");
             return unexpectedFailureResponse(
                     "Ignoring shutdown save snapshot request as VoltDB is not shutting down",
@@ -1860,10 +1824,6 @@ public final class InvocationDispatcher {
             if (isReadOnly) {
                 isShortCircuitRead = true;
             }
-        }
-        if (initiatorHSId == null) {
-            hostLog.error("Failed to find master initiator for partition: " + partition + ". Transaction not initiated.");
-            return false;
         }
 
         long handle = cihm.getHandle(isSinglePartition, partition, invocation.getClientHandle(),

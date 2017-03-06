@@ -646,10 +646,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         AbstractDRTupleStream* m_drReplicatedStream;
 
-        AbstractDRTupleStream* m_compatibleDRStream;
-
-        AbstractDRTupleStream* m_compatibleDRReplicatedStream;
-
         uint32_t m_drVersion;
 
         //Sink for applying DR binary logs

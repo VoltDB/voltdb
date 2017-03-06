@@ -80,6 +80,7 @@ public class Inits {
     final VoltDB.Configuration m_config;
     final boolean m_isRejoin;
     DeploymentType m_deployment = null;
+    final boolean m_durable;
 
     final Map<Class<? extends InitWork>, InitWork> m_jobs = new HashMap<>();
     final PriorityBlockingQueue<InitWork> m_readyJobs = new PriorityBlockingQueue<>();
@@ -120,7 +121,7 @@ public class Inits {
         }
     }
 
-    Inits(NodeStateTracker statusTracker, RealVoltDB rvdb, int threadCount) {
+    Inits(NodeStateTracker statusTracker, RealVoltDB rvdb, int threadCount, boolean durable) {
         m_rvdb = rvdb;
         m_statusTracker = statusTracker;
         m_config = rvdb.getConfig();
@@ -128,6 +129,7 @@ public class Inits {
         // (used for license check and later the actual rejoin)
         m_isRejoin = m_config.m_startAction.doesRejoin();
         m_threadCount = threadCount;
+        m_durable = durable;
         m_deployment = rvdb.m_catalogContext.getDeployment();
 
         // find all the InitWork subclasses using reflection and load them up
@@ -662,7 +664,8 @@ public class Inits {
                         m_rvdb.m_myHostId,
                         m_rvdb.m_catalogContext,
                         m_isRejoin,
-                        (m_config.m_startAction==StartAction.CREATE && m_config.m_forceVoltdbCreate),
+                        //If durability is off and we are told not to join but create by mesh clear overflow.
+                        (m_config.m_startAction==StartAction.CREATE && (m_config.m_forceVoltdbCreate || !m_durable)),
                         m_rvdb.m_messenger,
                         m_rvdb.m_partitionsToSitesAtStartupForExportInit
                         );
@@ -746,18 +749,29 @@ public class Inits {
                     allPartitions[ii] = ii;
                 }
 
-                org.voltdb.catalog.CommandLog cl = m_rvdb.m_catalogContext.cluster.getLogconfig().get("log");
-                if (cl == null || !cl.getEnabled()) return;
                 NodeSettings paths = m_rvdb.m_nodeSettings;
+                org.voltdb.catalog.CommandLog cl = m_rvdb.m_catalogContext.cluster.getLogconfig().get("log");
+                String clPath = null;
+                String clSnapshotPath = null;
+                boolean clenabled = true;
+                if (cl == null || !cl.getEnabled()) {
+                     //We have no durability and no terminus so nothing to restore.
+                     if (m_rvdb.m_terminusNonce == null) return;
+                     //We have terminus so restore.
+                     clenabled = false;
+                 } else {
+                     clPath = paths.resolve(paths.getCommandLog()).getPath();
+                     clSnapshotPath = paths.resolve(paths.getCommandLogSnapshot()).getPath();
+                }
                 try {
                     m_rvdb.m_restoreAgent = new RestoreAgent(
                                                       m_rvdb.m_messenger,
                                                       m_rvdb.getSnapshotCompletionMonitor(),
                                                       m_rvdb,
                                                       m_config.m_startAction,
-                                                      cl.getEnabled(),
-                                                      paths.resolve(paths.getCommandLog()).getPath(),
-                                                      paths.resolve(paths.getCommandLogSnapshot()).getPath(),
+                                                      clenabled,
+                                                      clPath,
+                                                      clSnapshotPath,
                                                       snapshotPath,
                                                       allPartitions,
                                                       paths.getVoltDBRoot().getPath(),

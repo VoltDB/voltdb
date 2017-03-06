@@ -19,12 +19,13 @@
 
 from voltcli.hostinfo import Host
 from voltcli.hostinfo import Hosts
+from voltcli import utility
 
 @VOLT.Command(
     bundles = VOLT.AdminBundle(),
     description = 'Stop one host of a running VoltDB cluster.',
     arguments = (
-        VOLT.StringArgument('target_host', 'the target HOST name or address'),
+        VOLT.StringArgument('target_host', 'the target hostname[:port] or address[:port]. (default port=3021)'),
     ),
 )
 
@@ -41,9 +42,13 @@ def stop(runner):
         hosts.update(tuple[0], tuple[1], tuple[2])
 
     # Connect to an arbitrary host that isn't being stopped.
-    (thost, chost) = hosts.get_target_and_connection_host(runner.opts.target_host)
+    defaultport = 3021
+    min_hosts = 1
+    max_hosts = 1
+    target_host = utility.parse_hosts(runner.opts.target_host, min_hosts, max_hosts, defaultport)[0]
+    (thost, chost) = hosts.get_target_and_connection_host(target_host.host, target_host.port)
     if thost is None:
-        runner.abort('Host not found in cluster: %s' % runner.opts.target_host)
+        runner.abort('Host not found in cluster: %s:%d' % (target_host.host, target_host.port))
     if chost is None:
         runner.abort('The entire cluster is being stopped, use "shutdown" instead.')
 
@@ -57,7 +62,7 @@ def stop(runner):
                           runner.opts.username, runner.opts.password)
 
     # Stop the requested host using exec @StopNode HOST_ID
-    runner.info('Stopping host %d: %s' % (thost.id, thost.hostname))
+    runner.info('Stopping host %d: %s:%s' % (thost.id, thost.hostname, thost.internalport))
     if not runner.opts.dryrun:
         response = runner.call_proc('@StopNode',
                                     [VOLT.FastSerializer.VOLTTYPE_INTEGER],

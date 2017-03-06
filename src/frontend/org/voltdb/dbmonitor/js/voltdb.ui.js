@@ -395,6 +395,7 @@ $(document).ready(function () {
             shortcut.remove("f5");
             shortcut.remove("f6");
         }
+        $("#overlay").hide();
     });
 
     //Attach the login popup to the page.
@@ -1257,13 +1258,14 @@ var loadPage = function (serverName, portid) {
                                                 }
                                                 if(isDrGraphVisible || isMasterDataVisible || isReplicaDataVisible){
                                                     var curTab = VoltDbUI.getCookie("current-tab");
-                                                    if (curTab == NavigationTabs.DR){
+                                                    if (curTab == NavigationTabs.DR && !$("#navDR").hasClass('active') && VoltDbUI.isFirstDRLoad){
                                                         $("#overlay").show();
                                                         setTimeout(function () { $("#navDR > a").trigger("click"); }, 100);
                                                     }
 
                                                     $('#navDR').show();
                                                 }
+                                                VoltDbUI.isFirstDRLoad = false;
                                             } else {
                                                 hideDrInformation()
                                             }
@@ -1582,7 +1584,9 @@ var loadPage = function (serverName, portid) {
             $("#divDrReplication").hide();
             $("#divDrWrapperAdmin").hide();
             showHideDrGraph(false);
-       }
+            VoltDbUI.isFirstDRLoad = false;
+        }
+
 
        var loadProcedureInformations = function (procedureMetadata) {
             var response = procedureMetadata;
@@ -2591,7 +2595,7 @@ var adjustGraphSpacing = function () {
         this.drReplicationRole = "NONE";
         this.isDRInfoRequired = false;
         this.isCommandLogEnabled = false;
-
+        this.isFirstDRLoad = true;
         this.DASHBOARD_PROGRESS_STATES = {
             REFRESHMEMORY: 0,
             REFRESHMEMORY_NONE: 1,

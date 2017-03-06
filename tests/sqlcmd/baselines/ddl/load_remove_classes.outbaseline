@@ -84,6 +84,7 @@ Command succeeded.
 @SnapshotStatus           
 @Statistics               	statisticscomponent, bit
 @StopNode                 	int
+@SwapTables               	varchar, varchar
 @SystemCatalog            	metadataselector
 @SystemInformation        	sysinfoselector
 @UpdateApplicationCatalog 	varchar, varchar
@@ -122,6 +123,7 @@ Command succeeded.
 @SnapshotStatus           
 @Statistics               	statisticscomponent, bit
 @StopNode                 	int
+@SwapTables               	varchar, varchar
 @SystemCatalog            	metadataselector
 @SystemInformation        	sysinfoselector
 @UpdateApplicationCatalog 	varchar, varchar
@@ -224,6 +226,7 @@ Command succeeded.
 @SnapshotStatus           
 @Statistics               	statisticscomponent, bit
 @StopNode                 	int
+@SwapTables               	varchar, varchar
 @SystemCatalog            	metadataselector
 @SystemInformation        	sysinfoselector
 @UpdateApplicationCatalog 	varchar, varchar

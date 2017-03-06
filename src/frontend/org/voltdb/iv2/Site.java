@@ -1255,7 +1255,10 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 while (stats.advanceRow()) {
                     //Assert column index matches name for ENG-4092
                     assert(stats.getColumnName(7).equals("TUPLE_COUNT"));
-                    tupleCount += stats.getLong(7);
+                    assert(stats.getColumnName(6).equals("TABLE_TYPE"));
+                    if ("PersistentTable".equals(stats.getString(6))){
+                        tupleCount += stats.getLong(7);
+                    }
                     assert(stats.getColumnName(8).equals("TUPLE_ALLOCATED_MEMORY"));
                     tupleAllocatedMem += stats.getLong(8);
                     assert(stats.getColumnName(9).equals("TUPLE_DATA_MEMORY"));
@@ -1460,7 +1463,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         m_context = context;
         m_ee.setBatchTimeout(m_context.cluster.getDeployment().get("deployment").
                 getSystemsettings().get("systemsettings").getQuerytimeout());
-        m_loadedProcedures.loadProcedures(m_context, csp);
+        m_loadedProcedures.loadProcedures(m_context, csp, false);
 
         if (isMPI) {
             // the rest of the work applies to sites with real EEs

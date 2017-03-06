@@ -48,7 +48,7 @@ public class DRCatalogDiffEngine extends CatalogDiffEngine {
         Database db = cluster.getDatabases().get("database");
         StringBuilder sb = new StringBuilder();
 
-        if (protocolVersion == -1 || protocolVersion >= DRProtocol.MUTLICLUSTER_PROTOCOL_VERSION) {
+        if (protocolVersion == -1 || protocolVersion >= DRProtocol.MULTICLUSTER_PROTOCOL_VERSION) {
             cluster.writeCommandForField(sb, "drRole", true);
         } else {
             // The compatibility mode will not understand the new drRole field,

@@ -50,7 +50,7 @@ class DatabaseTest extends TestBase {
         String[] extractedValue = ["random_input", "random_input"]
         int newValue = 0
         boolean foundStatus = false
-
+        int numberOfTrials = 5
         expect: 'Expect the add database button'
         waitFor { buttonDatabase.isDisplayed() }
 
@@ -131,12 +131,12 @@ class DatabaseTest extends TestBase {
         for(count=0; count<numberOfTrials; count++) {
             try {
                 popupAddDatabaseButtonOk.click()
-                for(nextCount=0; nextCount<=newValue; nextCount++){
-                    new_string = $(".btnDbList", nextCount).text()
-                    if(new_string.equals(nameValue)) {
-                        foundStatus = true
-                        break
-                    }
+                waitFor(10){ $("#dbInfo_" + newValue).isDisplayed() }
+                new_string = $("#dbInfo_" + newValue).text()
+                nextCount =  newValue - 1
+                if(new_string.equals(nameValue)) {
+                    foundStatus = true
+                    break
                 }
             } catch (geb.error.RequiredPageContentNotPresent e) {
                 println("Unable to find the Ok button - Retrying")
@@ -262,12 +262,15 @@ class DatabaseTest extends TestBase {
         for(count=0; count<numberOfTrials; count++) {
             try {
                 popupDeleteDatabaseButtonOk.click()
-                for(nextCount=0; nextCount<=newValue; nextCount++){
-                    new_string = $(".btnDbList", nextCount).text()
-                    if(new_string.equals(nameValue)) {
-                        foundStatus = true
-                        break
-                    }
+                try {
+                    waitFor(10) { 1==0 }
+                } catch(geb.waiting.WaitTimeoutException e) {
+
+                }
+                if($("#dbInfo_" + newValue).displayed){
+                    foundStatus = true
+                } else {
+                    foundStatus = false
                 }
             } catch (geb.error.RequiredPageContentNotPresent e) {
                 println("Unable to find the Ok button - Retrying")

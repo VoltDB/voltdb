@@ -39,12 +39,11 @@ import java.util.UUID;
 import org.voltcore.logging.VoltLog4jLogger;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
-import org.voltcore.network.ReverseDNSCache;
 import org.voltcore.utils.CoreUtils;
-import org.voltcore.utils.EstTimeUpdater;
 import org.voltcore.utils.OnDemandBinaryLogger;
 import org.voltcore.utils.PortGenerator;
 import org.voltcore.utils.ShutdownHooks;
+
 import org.voltdb.client.ClientFactory;
 import org.voltdb.common.Constants;
 import org.voltdb.probe.MeshProber;
@@ -112,9 +111,6 @@ public class VoltDB {
     static {
         REAL_DEFAULT_TIMEZONE = TimeZone.getDefault();
         setDefaultTimezone();
-        EstTimeUpdater.start();
-        VoltLogger.startAsynchronousLogging();
-        ReverseDNSCache.start();
         ClientFactory.increaseClientCountToOne();
     }
 
@@ -239,8 +235,16 @@ public class VoltDB {
         public boolean m_isPaused = false;
 
         /** GET option */
-        public GetActionArgument m_getOption = GetActionArgument.DEPLOYMENT;
+        public GetActionArgument m_getOption = null;
+        /**
+         * Name of output file in which get command will store it's result
+         */
         public String m_getOutput = null;
+        /**
+         * Flag to indicate whether to force store the result even if there is already an existing
+         * file with same name
+         */
+        public boolean m_forceGetCreate = false;
 
         private final static void referToDocAndExit() {
             System.out.println("Please refer to VoltDB documentation for command line usage.");
@@ -282,6 +286,9 @@ public class VoltDB {
 
         /** number of hosts that participate in a VoltDB cluster */
         public int m_hostCount = UNDEFINED;
+
+        /** number of hosts that will be missing when the cluster is started up */
+        public int m_missingHostCount = 0;
 
         /** not sites per host actually, number of local sites in this node */
         public int m_sitesperhost = UNDEFINED;
@@ -433,7 +440,9 @@ public class VoltDB {
                     m_meshBrokers = sbld.toString();
                 } else if (arg.equals("hostcount")) {
                     m_hostCount = Integer.parseInt(args[++i].trim());
-                } else if (arg.equals("sitesperhost")){
+                } else if (arg.equals("missing")) {
+                    m_missingHostCount = Integer.parseInt(args[++i].trim());
+                }else if (arg.equals("sitesperhost")){
                     m_sitesperhost = Integer.parseInt(args[++i].trim());
                 } else if (arg.equals("publicinterface")) {
                     m_publicInterface = args[++i].trim();
@@ -604,23 +613,45 @@ public class VoltDB {
                 } else if (arg.equalsIgnoreCase("getvoltdbroot")) {
                     //Can not use voltdbroot which creates directory we dont intend to create for get deployment etc.
                     m_voltdbRoot = new VoltFile(args[++i]);
+                    if (!DBROOT.equals(m_voltdbRoot.getName())) {
+                        m_voltdbRoot = new VoltFile(m_voltdbRoot, DBROOT);
+                    }
+                    if (!m_voltdbRoot.exists()) {
+                        System.err.println("FATAL: " + m_voltdbRoot.getParentFile().getAbsolutePath() + " does not contain a "
+                                + "valid database root directory. Use the --dir option to specify the path to the root.");
+                        referToDocAndExit();
+                    }
                 } else if (arg.equalsIgnoreCase("get")) {
                     m_startAction = StartAction.GET;
-                    GetActionArgument.valueOf(args[++i].trim().toUpperCase());
+                    String argument = args[++i];
+                    if (argument == null || argument.trim().length() == 0) {
+                        System.err.println("FATAL: Supply a valid non-null argument for \"get\" command. "
+                                + "Supported arguments for get are: " + GetActionArgument.supportedVerbs());
+                        referToDocAndExit();
+                    }
+
+                    try {
+                        m_getOption = GetActionArgument.valueOf(GetActionArgument.class, argument.trim().toUpperCase());
+                    } catch (IllegalArgumentException excp) {
+                        System.err.println("FATAL:" + argument + " is not a valid \"get\" command argument. Valid arguments for get command are: " + GetActionArgument.supportedVerbs());
+                        referToDocAndExit();
+                    }
+                    m_getOutput = m_getOption.getDefaultOutput();
                 } else if (arg.equalsIgnoreCase("file")) {
                     m_getOutput = args[++i].trim();
-                } else {
+                } else if (arg.equalsIgnoreCase("forceget")) {
+                    m_forceGetCreate = true;
+                }
+                else {
                     System.err.println("FATAL: Unrecognized option to VoltDB: " + arg);
                     referToDocAndExit();
                 }
             }
-            //I am a get
+            // Get command
             if (m_startAction == StartAction.GET) {
-                //We dont want crash file created.
+                // We dont want crash file created.
                 VoltDB.exitAfterMessage = true;
-                File configInfoDir = new VoltFile(m_voltdbRoot, Constants.CONFIG_DIR);
-                File depFH = new VoltFile(configInfoDir, "deployment.xml");
-                m_pathToDeployment = depFH.getAbsolutePath();
+                inspectGetCommand();
                 return;
             }
             // set file logger root file directory. From this point on you can use loggers
@@ -685,6 +716,48 @@ public class VoltDB {
         private boolean isInitialized() {
             File inzFH = new VoltFile(m_voltdbRoot, VoltDB.INITIALIZED_MARKER);
             return inzFH.exists() && inzFH.isFile() && inzFH.canRead();
+        }
+
+        private void inspectGetCommand() {
+            String parentPath = m_voltdbRoot.getParent();
+            // check voltdbroot
+            if (!m_voltdbRoot.exists()) {
+                try {
+                    parentPath = m_voltdbRoot.getCanonicalFile().getParent();
+                } catch (IOException io) {}
+                System.err.println("FATAL: " + parentPath + " does not contain a "
+                        + "valid database root directory. Use the --dir option to specify the path to the root.");
+                referToDocAndExit();
+            }
+            File configInfoDir = new VoltFile(m_voltdbRoot, Constants.CONFIG_DIR);
+            switch (m_getOption) {
+                case DEPLOYMENT: {
+                    File depFH = new VoltFile(configInfoDir, "deployment.xml");
+                    if (!depFH.exists()) {
+                        System.out.println("FATAL: Deployment file \"" + depFH.getAbsolutePath() + "\" not found.");
+                        referToDocAndExit();
+                    }
+                    m_pathToDeployment = depFH.getAbsolutePath();
+                    return;
+                }
+                case SCHEMA:
+                case CLASSES: {
+                    // catalog.jar contains DDL and proc classes with which the database was
+                    // compiled. Check if catalog.jar exists as it is needed to fetch ddl (get
+                    // schema) as well as procedures (get classes)
+                    File catalogFH = new VoltFile(configInfoDir, "catalog.jar");
+                    if (!catalogFH.exists()) {
+                        try {
+                            parentPath = m_voltdbRoot.getCanonicalFile().getParent();
+                        } catch (IOException io) {}
+                        System.err.println("FATAL: "+ m_getOption.name().toUpperCase() + " not found in the provided database directory " + parentPath  +
+                                ". Make sure the database has been started ");
+                        referToDocAndExit();
+                    }
+                    m_pathToCatalog = catalogFH.getAbsolutePath();
+                    return;
+                }
+            }
         }
 
         public Map<String,String> asClusterSettingsMap() {

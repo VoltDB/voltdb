@@ -15,25 +15,16 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb;
+package org.voltdb.importer;
 
-import org.voltdb.catalog.Procedure;
+public interface CommitTracker {
 
-public class ProcedureRunnerFactory {
+    //Submit offset as seen
+    void submit(long offset);
 
-    protected SiteProcedureConnection m_site;
-    protected SystemProcedureExecutionContext m_context;
+    //Commit offset
+    long commit(long commit);
 
-    public ProcedureRunnerFactory(SiteProcedureConnection site, SystemProcedureExecutionContext context) {
-        m_site = site;
-        m_context = context;
-    }
-
-    public ProcedureRunner create(
-            VoltProcedure procedure,
-            Procedure catProc,
-            CatalogSpecificPlanner csp) {
-        return new ProcedureRunner(procedure, m_site, m_context, catProc, csp);
-    }
-
+    //Reset offset to
+    void resetTo(long offset);
 }

@@ -86,9 +86,6 @@ public abstract class AbstractOperationPlanNode extends AbstractPlanNode {
         // of one column, which is the number of modified tuples
         // Delete nodes have a special case with no child node when they
         // are truncating the entire table
-        assert(m_children.size() == 1 ||
-               ((this instanceof DeletePlanNode) &&
-                (((DeletePlanNode)this).m_truncate)));
         if (m_children.size() == 1) {
             m_children.get(0).generateOutputSchema(db);
         }
@@ -116,17 +113,9 @@ public abstract class AbstractOperationPlanNode extends AbstractPlanNode {
 
     @Override
     public void resolveColumnIndexes() {
-        assert(m_children.size() == 1 ||
-               ((this instanceof DeletePlanNode) &&
-                (((DeletePlanNode)this).m_truncate)));
         if (m_children.size() == 1) {
             m_children.get(0).resolveColumnIndexes();
         }
-        // No operation plan node (INSERT/UPDATE/DELETE) currently
-        // has any care about column indexes.  I think that updates may
-        // (should) eventually care about a mapping of input schema
-        // to columns in the target table that doesn't rely on matching
-        // column names in the EE. --izzy
     }
 
     @Override
