@@ -285,7 +285,6 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
                                      InMemoryJarfile jarOutput)
                                              throws VoltCompiler.VoltCompilerException
     {
-
         final String className = procedureDescriptor.m_className;
         final Language lang = procedureDescriptor.m_language;
 

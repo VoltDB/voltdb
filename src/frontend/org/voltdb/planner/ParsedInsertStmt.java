@@ -86,17 +86,17 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
         m_tableList.add(table);
 
         for (VoltXMLElement node : stmtNode.children) {
-            if (node.name.equalsIgnoreCase("columns")) {
+            if (node.name.equals("columns")) {
                 parseTargetColumns(node, table, m_columns);
             }
-            else if (node.name.equalsIgnoreCase(SELECT_NODE_NAME)) {
+            else if (node.name.equals(SELECT_NODE_NAME)) {
                 m_subquery = new StmtSubqueryScan (parseSubquery(node), "__VOLT_INSERT_SUBQUERY__");
                 // Until scalar subqueries are allowed in INSERT ... VALUES statements,
                 // The top-level SELECT subquery in an INSERT ... SELECT statement
                 // is the only possible subselect in an INSERT statement.
                 m_scans.add(m_subquery);
             }
-            else if (node.name.equalsIgnoreCase(UNION_NODE_NAME)) {
+            else if (node.name.equals(UNION_NODE_NAME)) {
                 throw new PlanningErrorException(
                         "INSERT INTO ... SELECT is not supported for UNION or other set operations.");
             }

@@ -80,11 +80,14 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
                 assert(idx < m_children.size());
                 AbstractParsedStmt nextStmt = m_children.get(idx++);
                 nextStmt.parse(child);
-            } else if (child.name.equalsIgnoreCase("limit")) {
+            }
+            else if (child.name.equals("limit")) {
                 limitElement = child;
-            } else if (child.name.equalsIgnoreCase("offset")) {
+            }
+            else if (child.name.equals("offset")) {
                 offsetElement = child;
-            } else if (child.name.equalsIgnoreCase("ordercolumns")) {
+            }
+            else if (child.name.equals("ordercolumns")) {
                 orderbyElement = child;
             }
 
@@ -118,18 +121,20 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
         assert(stmtNode.children.size() > 1);
         AbstractParsedStmt childStmt = null;
         for (VoltXMLElement childSQL : stmtNode.children) {
-            if (childSQL.name.equalsIgnoreCase(SELECT_NODE_NAME)) {
+            if (childSQL.name.equals(SELECT_NODE_NAME)) {
                 childStmt = new ParsedSelectStmt(m_paramValues, m_db);
                 // Assign every child a unique ID
                 childStmt.m_stmtId = AbstractParsedStmt.NEXT_STMT_ID++;
                 childStmt.m_parentStmt = m_parentStmt;
                 childStmt.setParentAsUnionClause();
 
-            } else if (childSQL.name.equalsIgnoreCase(UNION_NODE_NAME)) {
+            }
+            else if (childSQL.name.equals(UNION_NODE_NAME)) {
                 childStmt = new ParsedUnionStmt(m_paramValues, m_db);
                 // Set the parent before recursing to children.
                 childStmt.m_parentStmt = m_parentStmt;
-            } else {
+            }
+            else {
                 // skip Order By, Limit/Offset. They will be processed later
                 // by the 'parse' method
                 continue;

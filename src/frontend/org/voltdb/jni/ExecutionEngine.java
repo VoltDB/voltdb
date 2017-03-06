@@ -1085,7 +1085,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param startSequenceNumber the starting sequence number of DR buffers
      * @return payload bytes (only txns with no InvocationBuffer header)
      */
-    public native static byte[] getTestDRBuffer(boolean compatible, int partitionId, int partitionKeyValues[], int flags[],
+    public native static byte[] getTestDRBuffer(int partitionId, int partitionKeyValues[], int flags[],
             long startSequenceNumber);
 
     /**
