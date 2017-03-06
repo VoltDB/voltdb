@@ -507,12 +507,12 @@ if __name__ == "__main__":
         print "DEBUG: options (all):\n", options
         print "DEBUG: args (all):", args
 
-    if options.seed is None:
-        seed_type   = 'random'
-        random_seed = randrange(2 ** 63)
-    else:
+    if options.seed:
         seed_type   = 'supplied'
         random_seed = int(options.seed)
+    else:
+        seed_type   = 'random'
+        random_seed = randrange(2 ** 63)
     print 'Using %s seed: %d' % (seed_type, random_seed)
     seed(random_seed)
 
