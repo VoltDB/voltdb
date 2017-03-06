@@ -1611,6 +1611,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                                                 "As a result, the rejoin operation has been canceled. " +
                                                 "Please try again.");
                     }
+
+                    // let the client interface know host(s) have failed to clean up any outstanding work
+                    // especially non-transactional work
+                    m_clientInterface.handleFailedHosts(failedHosts);
                 }
             });
         }

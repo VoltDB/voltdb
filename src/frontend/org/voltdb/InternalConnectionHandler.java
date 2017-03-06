@@ -17,14 +17,12 @@
 
 package org.voltdb;
 
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.AuthSystem.AuthUser;
-import org.voltdb.ProcedureRunnerNT.MyAllHostProcedureCallback;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.BatchTimeoutOverrideType;
@@ -48,9 +46,6 @@ public class InternalConnectionHandler {
     private final AtomicInteger m_backpressureIndication = new AtomicInteger(0);
     private final InternalClientResponseAdapter m_adapter;
     private final ClientInterfaceHandleManager m_cihm;
-
-    public final ConcurrentHashMap<Long, MyAllHostProcedureCallback> m_ntCrossHostCallbacks =
-            new ConcurrentHashMap<>();
 
     public InternalConnectionHandler(InternalClientResponseAdapter adapter, ClientInterfaceHandleManager cihm) {
         m_adapter = adapter;

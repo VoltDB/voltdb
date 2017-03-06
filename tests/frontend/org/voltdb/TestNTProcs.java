@@ -33,6 +33,7 @@ import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ProcCallException;
 import org.voltdb.client.SyncCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
@@ -92,6 +93,17 @@ public class TestNTProcs extends TestCase {
         }
     }
 
+    public static class DelayProcNT extends VoltProcedureNT {
+        public long run(int millis) throws InterruptedException {
+            System.out.println("Starting delay proc");
+            System.out.flush();
+            Thread.sleep(millis);
+            System.out.println("Done with delay proc");
+            System.out.flush();
+            return -1;
+        }
+    }
+
     public static class NTProcWithFutures extends VoltProcedureNT {
 
         public Long secondPart(ClientResponse response) {
@@ -107,6 +119,20 @@ public class TestNTProcs extends TestCase {
         }
     }
 
+    public static class RunEverywhereNTProcWithDelay extends VoltProcedureNT {
+        public long run() throws InterruptedException, ExecutionException {
+            System.out.println("Running on one!");
+
+            // you can't have two of these outstanding so this is expected to fail
+            CompletableFuture<Map<Integer,ClientResponse>> pf1 = callAllNodeNTProcedure("TestNTProcs$DelayProc", 100);
+            callAllNodeNTProcedure("TestNTProcs$DelayProcNT", 100);
+
+            Map<Integer,ClientResponse> cr = pf1.get();
+            System.out.println("Got responses!");
+            return -1;
+        }
+    }
+
     final String SCHEMA =
             "create table blah (pkey integer not null, strval varchar(200), PRIMARY KEY(pkey));\n" +
             "partition table blah on column pkey;\n" +
@@ -116,6 +142,8 @@ public class TestNTProcs extends TestCase {
             "create procedure from class org.voltdb.TestNTProcs$RunEverywhereNTProc;\n" +
             "create procedure from class org.voltdb.TestNTProcs$NTProcWithFutures;\n" +
             "create procedure from class org.voltdb.TestNTProcs$DelayProc;\n" +
+            "create procedure from class org.voltdb.TestNTProcs$DelayProcNT;\n" +
+            "create procedure from class org.voltdb.TestNTProcs$RunEverywhereNTProcWithDelay;\n" +
             "partition table blah on column pkey;\n";
 
     private void compile() throws Exception {
@@ -218,6 +246,9 @@ public class TestNTProcs extends TestCase {
         cluster.shutDown();
     }
 
+    //
+    // This should stress the callbacks, handles and futures for NT procs
+    //
     public void testOverlappingNT() throws Exception {
         ServerThread localServer = start();
 
@@ -248,4 +279,31 @@ public class TestNTProcs extends TestCase {
         localServer.join();
     }
 
+    //
+    // Make sure you can only run one all host NT proc at a time from a single calling proc
+    // (It's ok to run them from multiple calling procs)
+    //
+    public void testRunOnAllHostsSerialness() throws Exception {
+        ServerThread localServer = start();
+
+        Client client = ClientFactory.createClient();
+        client.createConnection("localhost");
+
+        ClientResponseImpl response;
+
+        try {
+            response = (ClientResponseImpl) client.callProcedure("TestNTProcs$RunEverywhereNTProcWithDelay");
+        }
+        catch (ProcCallException e) {
+            response = (ClientResponseImpl) e.getClientResponse();
+        }
+        assertEquals(ClientResponse.USER_ABORT, response.getStatus());
+        assertTrue(response.getStatusString().contains("can be running at a time"));
+
+        System.out.println("Client got trivial response");
+        System.out.println(response.toJSONString());
+
+        localServer.shutdown();
+        localServer.join();
+    }
 }

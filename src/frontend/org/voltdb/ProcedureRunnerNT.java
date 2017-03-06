@@ -48,7 +48,7 @@ import org.voltdb.messaging.Iv2InitiateTaskMessage;
 public class ProcedureRunnerNT {
 
     protected final ExecutorService m_executorService;
-    protected final InternalConnectionHandler m_ich;
+    protected final LoadedNTProcedureSet m_procSet;
     protected final Mailbox m_mailbox;
 
     protected final long m_id;
@@ -78,7 +78,7 @@ public class ProcedureRunnerNT {
                       Method procMethod,
                       Class<?>[] paramTypes,
                       ExecutorService executorService,
-                      InternalConnectionHandler ich,
+                      LoadedNTProcedureSet procSet,
                       Mailbox mailbox)
     {
         m_id = id;
@@ -90,7 +90,7 @@ public class ProcedureRunnerNT {
         m_procMethod = procMethod;
         m_paramTypes = paramTypes;
         m_executorService = executorService;
-        m_ich = ich;
+        m_procSet = procSet;
         m_mailbox = mailbox;
     }
 
@@ -108,6 +108,7 @@ public class ProcedureRunnerNT {
                     if (response == null) {
                         return;
                     }
+                    m_procSet.m_outstanding.remove(m_id);
                     response.setClientHandle(m_clientHandle);
                     ByteBuffer buf = ByteBuffer.allocate(response.getSerializedSize() + 4);
                     buf.putInt(buf.capacity() - 4);
@@ -118,6 +119,8 @@ public class ProcedureRunnerNT {
 
         }
         catch (RejectedExecutionException e) {
+            m_procSet.m_outstanding.remove(m_id);
+            // todo!
             e.printStackTrace();
         }
         return null;
@@ -131,33 +134,26 @@ public class ProcedureRunnerNT {
         }
     }
 
-    public class MyAllHostProcedureCallback implements ProcedureCallback {
-        int countRemaining;
-        final Map<Integer,ClientResponse> results = new HashMap<>();
-        final CompletableFuture<Map<Integer,ClientResponse>> fut = new CompletableFuture<>();
+    Object m_allHostCallbackLock = new Object();
+    Set<Integer> m_outstandingAllHostProcedureHostIds;
+    Map<Integer,ClientResponse> m_allHostResponses;
+    CompletableFuture<Map<Integer,ClientResponse>> m_allHostFut;
 
-        MyAllHostProcedureCallback(int count) {
-            countRemaining = count;
-        }
+    public synchronized void allHostNTProcedureCallback(ClientResponse clientResponse) {
+        int hostId = Integer.parseInt(clientResponse.getAppStatusString());
+        boolean removed = m_outstandingAllHostProcedureHostIds.remove(hostId);
+        assert(removed); // just while developing -- should handle this
 
-        @Override
-        public synchronized void clientCallback(ClientResponse clientResponse) throws Exception {
-            int hostId = Integer.parseInt(clientResponse.getAppStatusString());
-            results.put(hostId, clientResponse);
-            if (--countRemaining == 0) {
-                m_outstandingAllHostProc.set(false);
-                fut.complete(results);
-            }
-        }
-
-        public synchronized boolean isSatisfied() {
-            return countRemaining == 0;
+        m_allHostResponses.put(hostId, clientResponse);
+        if (m_outstandingAllHostProcedureHostIds.size() == 0) {
+            m_outstandingAllHostProc.set(false);
+            m_allHostFut.complete(m_allHostResponses);
         }
     }
 
     protected CompletableFuture<ClientResponse> callProcedure(String procName, Object... params) {
         MyProcedureCallback cb = new MyProcedureCallback();
-        boolean success = m_ich.callProcedure(m_user, false, 1000 * 120, cb, procName, params);
+        boolean success = m_procSet.m_ich.callProcedure(m_user, false, 1000 * 120, cb, procName, params);
         assert(success);
         return cb.fut;
     }
@@ -165,23 +161,16 @@ public class ProcedureRunnerNT {
     protected CompletableFuture<Map<Integer,ClientResponse>> callAllNodeNTProcedure(String procName, Object... params) {
         // only one of these at a time
         if (m_outstandingAllHostProc.get()) {
-            return null;
+            throw new VoltAbortException(new IllegalStateException("Only one AllNodeNTProcedure operation can be running at a time."));
         }
         m_outstandingAllHostProc.set(true);
-
-        // collect the set of live client interface mailbox ids
-        Set<Integer> liveHostIds = VoltDB.instance().getHostMessenger().getLiveHostIds();
-        long[] hsids = liveHostIds.stream()
-                .map(hostId -> CoreUtils.getHSIdFromHostAndSite(hostId, HostMessenger.CLIENT_INTERFACE_SITE_ID))
-                .mapToLong(x -> x)
-                .toArray();
 
         StoredProcedureInvocation invocation = new StoredProcedureInvocation();
         invocation.setProcName(procName);
         invocation.setParams(params);
         invocation.setClientHandle(m_id);
 
-        Iv2InitiateTaskMessage workRequest =
+        final Iv2InitiateTaskMessage workRequest =
                 new Iv2InitiateTaskMessage(m_mailbox.getHSId(),
                         m_mailbox.getHSId(),
                         Iv2InitiateTaskMessage.UNUSED_TRUNC_HANDLE,
@@ -194,14 +183,28 @@ public class ProcedureRunnerNT {
                         ClientInterface.NT_REMOTE_PROC_CID,
                         false);
 
-        MyAllHostProcedureCallback cb = new MyAllHostProcedureCallback(hsids.length);
-        m_ich.m_ntCrossHostCallbacks.put(m_id, cb);
+        m_allHostFut = new CompletableFuture<>();
+        m_allHostResponses = new HashMap<>();
 
-        for (long id : hsids) {
-            m_mailbox.send(id, workRequest);
+        Set<Integer> liveHostIds = null;
+
+        // hold this lock while getting the count of live nodes
+        // also held when
+        synchronized(m_allHostCallbackLock) {
+            // collect the set of live client interface mailbox ids
+            liveHostIds = VoltDB.instance().getHostMessenger().getLiveHostIds();
+            m_outstandingAllHostProcedureHostIds = liveHostIds;
         }
 
-        return cb.fut;
+        liveHostIds.stream()
+                .map(hostId -> CoreUtils.getHSIdFromHostAndSite(hostId, HostMessenger.CLIENT_INTERFACE_SITE_ID))
+                .mapToLong(x -> x)
+                .forEach(hsid -> {
+                    int hostid = CoreUtils.getHostIdFromHSId(hsid);
+                    m_mailbox.send(hsid, workRequest);
+                });
+
+        return m_allHostFut;
     }
 
     protected ClientResponseImpl call(Object... paramListIn) {
@@ -266,6 +269,9 @@ public class ProcedureRunnerNT {
                                 }
                                 response = responseFromTableArray(results);
                             }
+
+                            m_procSet.m_outstanding.remove(m_id);
+
                             response.setClientHandle(m_clientHandle);
                             ByteBuffer buf = ByteBuffer.allocate(response.getSerializedSize() + 4);
                             buf.putInt(buf.capacity() - 4);
@@ -445,5 +451,31 @@ public class ProcedureRunnerNT {
         String simpleName = stel.getClassName().substring(lastPeriodPos);
         return simpleName.equals(m_procedureName)
             || (simpleName.startsWith(m_procedureName) && simpleName.charAt(m_procedureName.length()) == '$');
+    }
+
+    public void processAnyCallbacksFromFailedHosts(Set<Integer> failedHosts) {
+        synchronized(m_allHostCallbackLock) {
+            failedHosts.stream()
+                .forEach(i -> {
+                    if (m_outstandingAllHostProcedureHostIds.contains(i)) {
+                        ClientResponseImpl cri = new ClientResponseImpl(
+                                ClientResponse.CONNECTION_LOST,
+                                new VoltTable[0],
+                                "");
+                        // embed the hostid as a string in app status string
+                        // because the recipient expects this hack
+                        cri.setAppStatusString(String.valueOf(i));
+
+
+                        try {
+                            allHostNTProcedureCallback(cri);
+                        } catch (Exception e) {
+                            // TODO Auto-generated catch block
+                            e.printStackTrace();
+                            assert(false); // temporary
+                        }
+                    }
+                });
+        }
     }
 }

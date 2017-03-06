@@ -31,6 +31,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -49,6 +50,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.HdrHistogram_voltpatches.AbstractHistogram;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONObject;
+import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.BinaryPayloadMessage;
 import org.voltcore.messaging.HostMessenger;
@@ -66,11 +68,11 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
+import org.voltcore.utils.RateLimitedLogger;
 import org.voltdb.AuthSystem.AuthProvider;
 import org.voltdb.AuthSystem.AuthUser;
 import org.voltdb.CatalogContext.ProcedurePartitionInfo;
 import org.voltdb.ClientInterfaceHandleManager.Iv2InFlight;
-import org.voltdb.ProcedureRunnerNT.MyAllHostProcedureCallback;
 import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.SnapshotSchedule;
@@ -94,8 +96,6 @@ import com.google_voltpatches.common.base.Predicate;
 import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
-import org.voltcore.logging.Level;
-import org.voltcore.utils.RateLimitedLogger;
 
 /**
  * Represents VoltDB's connection to client libraries outside the cluster.
@@ -189,8 +189,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
     private final Cartographer m_cartographer;
 
-    //Dispatched strore procedure invocations
-    private final InvocationDispatcher m_dispatcher;
+    //Dispatched stored procedure invocations
+    final InvocationDispatcher m_dispatcher;
 
     /*
      * This list of ACGs is iterated to retrieve initiator statistics in IV2.
@@ -1108,22 +1108,13 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     InitiateResponseMessage response = (InitiateResponseMessage)message;
                     StoredProcedureInvocation invocation = response.getInvocation();
 
+                    // handle all host NT procedure callbacks
                     if (response.getClientConnectionId() == NT_REMOTE_PROC_CID) {
-                        long handle = response.getClientResponseData().getClientHandle();
+                        //int hostId = VoltDB.instance().getHostMessenger().getHostId();
+                        //System.out.printf("HostID %d got a response from an all-host NT proc\n", hostId);
+                        //System.out.flush();
 
-                        MyAllHostProcedureCallback cb = m_internalConnectionHandler.m_ntCrossHostCallbacks.get(handle);
-                        if (cb != null) {
-                            try {
-                                cb.clientCallback(response.getClientResponseData());
-                                if (cb.isSatisfied()) {
-                                    m_internalConnectionHandler.m_ntCrossHostCallbacks.remove(handle);
-                                }
-                            } catch (Exception e) {
-                                // TODO Auto-generated catch block
-                                e.printStackTrace();
-                                System.exit(-1);
-                            }
-                        }
+                        m_dispatcher.handleAllHostNTProcedureResponse(response.getClientResponseData());
                         return;
                     }
 
@@ -1167,6 +1158,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             m_mailbox.send(itm.m_sourceHSId, responseMessage);
                         }
                     };
+
+                    System.out.printf("HostID %d got a request for an all-host NT proc\n", hostId);
+                    System.out.flush();
 
                     m_internalConnectionHandler.callProcedure(m_catalogContext.get().authSystem.getInternalAdminUser(),
                                                               true,
@@ -2005,5 +1999,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
     public AuthUser getInternalUser() {
         return m_catalogContext.get().authSystem.getInternalAdminUser();
+    }
+
+    void handleFailedHosts(Set<Integer> failedHosts) {
+        m_dispatcher.handleFailedHosts(failedHosts);
     }
 }

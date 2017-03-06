@@ -1962,4 +1962,19 @@ public final class InvocationDispatcher {
     private final static ClientResponseImpl serverUnavailableResponse(String msg, long handle) {
         return new ClientResponseImpl(ClientResponseImpl.SERVER_UNAVAILABLE, new VoltTable[0], msg, handle);
     }
+
+    void handleFailedHosts(Set<Integer> failedHosts) {
+        m_loadedNTProcedureSet.handleCallbacksForFailedHosts(failedHosts);
+    }
+
+    public void handleAllHostNTProcedureResponse(ClientResponseImpl clientResponseData) {
+        long handle = clientResponseData.getClientHandle();
+        ProcedureRunnerNT runner = m_loadedNTProcedureSet.m_outstanding.get(handle);
+        runner.allHostNTProcedureCallback(clientResponseData);
+    }
+
+    /** test only */
+    long countNTWaitingProcs() {
+        return m_loadedNTProcedureSet.m_outstanding.size();
+    }
 }

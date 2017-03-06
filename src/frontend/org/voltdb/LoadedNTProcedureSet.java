@@ -20,6 +20,7 @@ package org.voltdb;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
@@ -97,7 +98,7 @@ public class LoadedNTProcedureSet {
                                                              m_procMethod,
                                                              m_paramTypes,
                                                              m_executorService,
-                                                             m_ich,
+                                                             LoadedNTProcedureSet.this,
                                                              m_mailbox);
             m_outstanding.put(id, runner);
             return runner;
@@ -151,5 +152,11 @@ public class LoadedNTProcedureSet {
         ProcedureRunnerNTGenerator prntg = m_procs.get(procName);
         ProcedureRunnerNT runner = prntg.generateProcedureRunnerNT(user, ccxn, clientHandle);
         return runner.submitCall(paramListIn);
+    }
+
+    void handleCallbacksForFailedHosts(final Set<Integer> failedHosts) {
+        for (ProcedureRunnerNT runner : m_outstanding.values()) {
+            runner.processAnyCallbacksFromFailedHosts(failedHosts);
+        }
     }
 }
