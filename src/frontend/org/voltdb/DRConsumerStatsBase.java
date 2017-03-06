@@ -45,7 +45,6 @@ public class DRConsumerStatsBase {
     }
 
     public static class DRConsumerNodeStatsBase extends StatsSource {
-
         public DRConsumerNodeStatsBase() {
             super(false);
         }
@@ -67,7 +66,6 @@ public class DRConsumerStatsBase {
     }
 
     public static class DRConsumerPartitionStatsBase extends StatsSource {
-
         public DRConsumerPartitionStatsBase() {
             super(false);
         }
