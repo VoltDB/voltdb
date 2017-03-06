@@ -103,7 +103,9 @@ def launch_and_wait_on_voltdb(reportout):
         sqlcmdenv["ENABLE_SSL"] = "false"
         sqlcmdopts = ["-J" + prop_pfx + "trustStore=" + keystore]
         sqlcmdopts = sqlcmdopts + ["-J" + prop_pfx + "trustStorePassword=password", "--ssl"]
-    subprocess.Popen(['../../bin/voltdb', 'create', '--force'], shell=False, env=voltenv)
+    print "Initializing directory..."
+    subprocess.call(['../../bin/voltdb', 'init', '--force'], shell=False)
+    subprocess.Popen(['../../bin/voltdb', 'start'], shell=False)
     # give server a little startup time.
     time.sleep(5)
 

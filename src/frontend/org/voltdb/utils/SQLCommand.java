@@ -761,9 +761,10 @@ public class SQLCommand
             m_startTime = System.nanoTime();
             SQLParser.ExecuteCallResults execCallResults = SQLParser.parseExecuteCall(statement, Procedures);
             if (execCallResults != null) {
+                String procName = execCallResults.procedure;
                 Object[] objectParams = execCallResults.getParameterObjects();
 
-                if (execCallResults.procedure.equals("@UpdateApplicationCatalog")) {
+                if (procName.equals("@UpdateApplicationCatalog")) {
                     File catfile = null;
                     if (objectParams[0] != null) {
                         catfile = new File((String)objectParams[0]);
@@ -777,7 +778,7 @@ public class SQLCommand
                     // Need to update the stored procedures after a catalog change (could have added/removed SPs!).  ENG-3726
                     loadStoredProcedures(Procedures, Classlist);
                 }
-                else if (execCallResults.procedure.equals("@UpdateClasses")) {
+                else if (procName.equals("@UpdateClasses")) {
                     File jarfile = null;
                     if (objectParams[0] != null) {
                         jarfile = new File((String)objectParams[0]);
@@ -788,11 +789,14 @@ public class SQLCommand
                 }
                 else {
                     // @SnapshotDelete needs array parameters.
-                    if (execCallResults.procedure.equals("@SnapshotDelete")) {
+                    if (procName.equals("@SnapshotDelete")) {
                         objectParams[0] = new String[] { (String)objectParams[0] };
                         objectParams[1] = new String[] { (String)objectParams[1] };
                     }
-                    printResponse(callProcedureHelper(execCallResults.procedure, objectParams));
+
+                    boolean suppressTableOutputForDML = ! procName.equals("@SwapTables");
+
+                    printResponse(callProcedureHelper(execCallResults.procedure, objectParams), suppressTableOutputForDML);
                 }
                 return;
             }
@@ -801,7 +805,7 @@ public class SQLCommand
             if (explainStatement != null) {
                 // We've got a statement that starts with "explain", send the statement to
                 // @Explain (after parseExplainCall() strips "explain").
-                printResponse(m_client.callProcedure("@Explain", explainStatement));
+                printResponse(m_client.callProcedure("@Explain", explainStatement), false);
                 return;
             }
 
@@ -809,7 +813,7 @@ public class SQLCommand
             if (explainProcName != null) {
                 // We've got a statement that starts with "explainproc", send the statement to
                 // @ExplainProc (now that parseExplainProcCall() has stripped out "explainproc").
-                printResponse(m_client.callProcedure("@ExplainProc", explainProcName));
+                printResponse(m_client.callProcedure("@ExplainProc", explainProcName), false);
                 return;
             }
 
@@ -817,7 +821,7 @@ public class SQLCommand
             if (explainViewName != null) {
                 // We've got a statement that starts with "explainview", send the statement to
                 // @ExplainView (now that parseExplainViewCall() has stripped out "explainview").
-                printResponse(m_client.callProcedure("@ExplainView", explainViewName));
+                printResponse(m_client.callProcedure("@ExplainView", explainViewName), false);
                 return;
             }
 
@@ -848,7 +852,7 @@ public class SQLCommand
             }
 
             // All other commands get forwarded to @AdHoc
-            printResponse(callProcedureHelper("@AdHoc", statement));
+            printResponse(callProcedureHelper("@AdHoc", statement), true);
 
         } catch (Exception exc) {
             stopOrContinue(exc);
@@ -886,7 +890,7 @@ public class SQLCommand
                  table.getRowCount() == 1 && table.getColumnCount() == 1 && table.getColumnType(0) == VoltType.BIGINT);
     }
 
-    private static void printResponse(ClientResponse response) throws Exception
+    private static void printResponse(ClientResponse response, boolean suppressTableOutputForDML) throws Exception
     {
         if (response.getStatus() != ClientResponse.SUCCESS) {
             throw new Exception("Execution Error: " + response.getStatusString());
@@ -895,14 +899,14 @@ public class SQLCommand
         long elapsedTime = System.nanoTime() - m_startTime;
         for (VoltTable t : response.getResults()) {
             long rowCount;
-            if (!isUpdateResult(t)) {
+            if (suppressTableOutputForDML && isUpdateResult(t)) {
+                rowCount = t.fetchRow(0).getLong(0);
+            }
+            else {
                 rowCount = t.getRowCount();
                 // Run it through the output formatter.
                 m_outputFormatter.printTable(System.out, t, m_outputShowMetadata);
                 //System.out.println("printable");
-            }
-            else {
-                rowCount = t.fetchRow(0).getLong(0);
             }
             if (m_outputShowMetadata) {
                 System.out.printf("(Returned %d rows in %.2fs)\n",
@@ -983,6 +987,8 @@ public class SQLCommand
                 ImmutableMap.<Integer, List<String>>builder().put( 0, new ArrayList<String>()).build());
         Procedures.put("@ResetDR",
                 ImmutableMap.<Integer, List<String>>builder().put( 0, new ArrayList<String>()).build());
+        Procedures.put("@SwapTables",
+                ImmutableMap.<Integer, List<String>>builder().put( 2, Arrays.asList("varchar", "varchar")).build());
     }
 
     private static Client getClient(ClientConfig config, String[] servers, int port) throws Exception
