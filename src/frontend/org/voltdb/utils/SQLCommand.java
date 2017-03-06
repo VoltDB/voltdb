@@ -988,8 +988,6 @@ public class SQLCommand
                 ImmutableMap.<Integer, List<String>>builder().put( 0, new ArrayList<String>()).build());
         Procedures.put("@ResetDR",
                 ImmutableMap.<Integer, List<String>>builder().put( 0, new ArrayList<String>()).build());
-        Procedures.put("@BalanceSPI",
-                ImmutableMap.<Integer, List<String>>builder().put( 4, Arrays.asList("int","int","int","int")).build());
         Procedures.put("@SwapTables",
                 ImmutableMap.<Integer, List<String>>builder().put( 2, Arrays.asList("varchar", "varchar")).build());
     }

@@ -63,7 +63,6 @@ create table EMPLOYEE (
 primary key (ID));
 Command succeeded.
 --- System Procedures --------------------------------------
-@BalanceSPI               	int, int, int, int
 @Explain                  	varchar
 @ExplainProc              	varchar
 @ExplainView              	varchar
@@ -103,7 +102,6 @@ EMPLOYEE.upsert           	integer, varchar, varchar, varchar
 create procedure from class sqlcmdtest.InsertEmployee;
 Command succeeded.
 --- System Procedures --------------------------------------
-@BalanceSPI               	int, int, int, int
 @Explain                  	varchar
 @ExplainProc              	varchar
 @ExplainView              	varchar
@@ -207,7 +205,6 @@ C1
 drop procedure InsertEmployee;
 Command succeeded.
 --- System Procedures --------------------------------------
-@BalanceSPI               	int, int, int, int
 @Explain                  	varchar
 @ExplainProc              	varchar
 @ExplainView              	varchar
