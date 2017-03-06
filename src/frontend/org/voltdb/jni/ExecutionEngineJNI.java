@@ -20,12 +20,12 @@ package org.voltdb.jni;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.List;
-import java.util.zip.CRC32;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
+import org.voltdb.HybridCrc32;
 import org.voltdb.ParameterSet;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.StatsSelector;
@@ -354,7 +354,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             final long[] inputDepIds,
             final Object[] parameterSets,
             boolean[] isWriteFrag,
-            CRC32 writeCRC,
+            HybridCrc32 writeCRC,
             final long txnId,
             final long spHandle,
             final long lastCommittedSpHandle,
@@ -409,6 +409,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                 m_psetBuffer.position(paramStart);
                 writeCRC.update(m_psetBuffer);
                 assert(m_psetBuffer.remaining() == 0);
+                m_psetBuffer.limit(m_psetBuffer.capacity());
             }
         }
         // checkMaxFsSize();

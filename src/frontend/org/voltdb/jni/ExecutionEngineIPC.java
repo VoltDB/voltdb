@@ -27,11 +27,11 @@ import java.nio.channels.SocketChannel;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.util.zip.CRC32;
 
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
 import org.voltdb.BackendTarget;
+import org.voltdb.HybridCrc32;
 import org.voltdb.ParameterSet;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.StatsSelector;
@@ -926,7 +926,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             long[] inputDepIdsIn,
             final Object[] parameterSets,
             boolean[] isWriteFrag,
-            CRC32 writeCRC,
+            HybridCrc32 writeCRC,
             final long txnId,
             final long spHandle,
             final long lastCommittedSpHandle,
@@ -1002,7 +1002,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             final long[] inputDepIds,
             final Object[] parameterSets,
             boolean[] isWriteFrag,
-            CRC32 writeCRC,
+            HybridCrc32 writeCRC,
             final long txnId,
             final long spHandle,
             final long lastCommittedSpHandle,

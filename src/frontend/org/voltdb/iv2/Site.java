@@ -29,7 +29,6 @@ import java.util.ListIterator;
 import java.util.Map;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.zip.CRC32;
 
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
@@ -47,6 +46,7 @@ import org.voltdb.DRLogSegmentId;
 import org.voltdb.DependencyPair;
 import org.voltdb.ExtensibleSnapshotDigestData;
 import org.voltdb.HsqlBackend;
+import org.voltdb.HybridCrc32;
 import org.voltdb.IndexStats;
 import org.voltdb.LoadedProcedureSet;
 import org.voltdb.MemoryStats;
@@ -1435,7 +1435,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             long[] inputDepIds,
             Object[] parameterSets,
             boolean[] isWriteFrag,
-            CRC32 writeCRC,
+            HybridCrc32 writeCRC,
             String[] sqlTexts,
             long txnId,
             long spHandle,

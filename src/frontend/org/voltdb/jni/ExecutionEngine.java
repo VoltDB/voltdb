@@ -24,13 +24,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.zip.CRC32;
 
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.Pair;
+import org.voltdb.HybridCrc32;
 import org.voltdb.PlannerStatsCollector;
 import org.voltdb.PlannerStatsCollector.CacheUse;
 import org.voltdb.PrivateVoltTableFactory;
@@ -631,7 +631,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             long[] inputDepIds,
             Object[] parameterSets,
             boolean[] isWriteFrag,
-            CRC32 writeCRC,
+            HybridCrc32 writeCRC,
             String[] sqlTexts,
             long txnId,
             long spHandle,
@@ -693,7 +693,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             long[] inputDepIds,
             Object[] parameterSets,
             boolean[] isWriteFrag,
-            CRC32 writeCRC,
+            HybridCrc32 writeCRC,
             long txnId,
             long spHandle,
             long lastCommittedSpHandle,

@@ -20,7 +20,6 @@ package org.voltdb.iv2;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Future;
-import java.util.zip.CRC32;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
@@ -33,6 +32,7 @@ import org.voltdb.DRConsumerDrIdTracker;
 import org.voltdb.DRIdempotencyResult;
 import org.voltdb.DependencyPair;
 import org.voltdb.HsqlBackend;
+import org.voltdb.HybridCrc32;
 import org.voltdb.LoadedProcedureSet;
 import org.voltdb.NonVoltDBBackend;
 import org.voltdb.ParameterSet;
@@ -578,7 +578,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
             long[] inputDepIds,
             Object[] parameterSets,
             boolean[] isWriteFrag,
-            CRC32 writeCRC,
+            HybridCrc32 writeCRC,
             String[] sqlTexts,
             long txnId,
             long spHandle,
