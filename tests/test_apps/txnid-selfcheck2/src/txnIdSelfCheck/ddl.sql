@@ -295,8 +295,7 @@ CREATE TABLE importr
   )
 , UNIQUE ( cid )
 );
-PARTITION TABLE importr ON COLUMN cid;
-CREATE INDEX R_IMPORTCIDINDEX ON importp (cid);
+CREATE INDEX R_IMPORTCIDINDEX ON importr (cid);
 
 -- base procedures you shouldn't call
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.UpdateBaseProc;
@@ -356,6 +355,5 @@ PARTITION PROCEDURE CAPPCountPartitionRows ON TABLE capp COLUMN p;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.ImportInsertP;
 PARTITION PROCEDURE ImportInsertP ON TABLE importp COLUMN cid PARAMETER 3;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.ImportInsertR;
-PARTITION PROCEDURE ImportInsertR ON TABLE importr COLUMN cid PARAMETER 3;
 
 END_OF_BATCH
