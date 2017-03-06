@@ -22,6 +22,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Constructor;
+import java.nio.charset.StandardCharsets;
 
 import java.util.HashMap;
 import java.util.List;
@@ -185,7 +186,7 @@ public class KafkaLoader {
         @Option(desc = "Use upsert instead of insert", hasArg = false)
         boolean update = false;
 
-        Formatter<String> iformatter = null;
+        Formatter iformatter = null;
         /**
          * Validate command line options.
          */
@@ -322,9 +323,9 @@ public class KafkaLoader {
         private final KafkaStream m_stream;
         private final CSVDataLoader m_loader;
         private final CSVParser m_csvParser;
-        private final Formatter<String> m_formatter;
+        private final Formatter m_formatter;
 
-        public KafkaConsumer(KafkaStream a_stream, CSVDataLoader loader, Formatter<String> formatter) {
+        public KafkaConsumer(KafkaStream a_stream, CSVDataLoader loader, Formatter formatter) {
             m_stream = a_stream;
             m_loader = loader;
             m_csvParser = new CSVParser();
@@ -343,7 +344,7 @@ public class KafkaLoader {
                     Object params[];
                     if (m_formatter != null) {
                         try {
-                            params = m_formatter.transform(smsg);
+                            params = m_formatter.transform(smsg.getBytes(StandardCharsets.UTF_8));
                         } catch (FormatException fe) {
                             continue;
                         }
@@ -421,7 +422,7 @@ public class KafkaLoader {
                 Class[] ctorParmTypes = new Class[]{ String.class, Properties.class };
                 Constructor ctor = classz.getDeclaredConstructor(ctorParmTypes);
                 Object[] ctorParms = new Object[]{ format, p };
-                cfg.iformatter = (Formatter<String>) ctor.newInstance(ctorParms);
+                cfg.iformatter = (Formatter ) ctor.newInstance(ctorParms);
             }
             KafkaLoader kloader = new KafkaLoader(cfg);
             kloader.processKafkaMessages();
