@@ -73,6 +73,7 @@ placementgroup = Opt('placement-group', 'placementgroup', str, 1)
 host = Opt('host', 'host', str, 1)
 licensefile = Opt('license', 'license', str, 1)
 pause = Opt('pause', 'paused', None, 1)
+missing = Opt('missing', 'missing', str, 1)
 # 'replica' should be immediately after verb
 replica = Opt('replica', 'replica', None, 1)
 # 'blocking' is only for rejoin, does not have corresponding java optional name, change verb 'live rejoin' to 'rejoin'
@@ -165,6 +166,7 @@ volt_opts = {'create': [admin,
                        placementgroup,
                        mesh,
                        licensefile,
+                       missing,
                        pause,
                        replica,
                        add]
