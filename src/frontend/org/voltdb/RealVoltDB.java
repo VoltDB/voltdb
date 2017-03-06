@@ -41,9 +41,6 @@ import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -111,6 +108,7 @@ import org.voltdb.common.Constants;
 import org.voltdb.common.NodeState;
 import org.voltdb.compiler.AdHocCompilerCache;
 import org.voltdb.compiler.AsyncCompilerAgent;
+import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.deploymentfile.ClusterType;
 import org.voltdb.compiler.deploymentfile.ConsistencyType;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
@@ -528,6 +526,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         return m_nodeSettings.resolve(m_nodeSettings.getDROverflow()).getPath();
     }
 
+    private String getStagedCatalogPath(){
+        return getVoltDBRootPath() + File.separator + Constants.CONFIG_DIR + File.separator + Constants.STAGED_CATALOG_FILE_NAME;
+    }
+
     private String managedPathEmptyCheck(String voltDbRoot, String path) {
         VoltFile managedPath;
         if (new File(path).isAbsolute())
@@ -560,12 +562,17 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     private List<String> managedPathsWithFiles(Configuration config, DeploymentType deployment) {
         ImmutableList.Builder<String> nonEmptyPaths = ImmutableList.builder();
-        if (!config.m_isEnterprise) {
-            return nonEmptyPaths.build();
-        }
         PathsType paths = deployment.getPaths();
         String voltDbRoot = getVoltDBRootPath(paths.getVoltdbroot());
         String path;
+
+        if ((path = managedPathEmptyCheck(voltDbRoot, getStagedCatalogPath())) != null){
+            nonEmptyPaths.add(path);
+        }
+
+        if (!config.m_isEnterprise) {
+            return nonEmptyPaths.build();
+        }
         if ((path = managedPathEmptyCheck(voltDbRoot, getSnapshotPath(paths.getSnapshots()))) != null)
             nonEmptyPaths.add(path);
         if ((path = managedPathEmptyCheck(voltDbRoot, getExportOverflowPath(paths.getExportoverflow()))) != null)
@@ -2146,7 +2153,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         ClusterSettings.create(CatalogUtil.asClusterSettingsMap(dt)).store();
     }
 
-
     /**
      * Takes the schema and stored procedures files given at initialization and performs the following tasks:
      * <p><ul>
@@ -2157,37 +2163,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
      * @param config VoltDB configuration
      */
     private void stageSchemaFiles(Configuration config){
-        final String stagingDirName = config.m_voltdbRoot + Constants.USER_PROCEDURES_SCHEMA_DIR;
-        File stagingDir = new File(stagingDirName);
-        stagingDir.mkdirs();
-        if (!stagingDir.isDirectory()){
-            VoltDB.crashLocalVoltDB(stagingDirName + " could not be created", false, null);
+        if (config.m_userSchema == null){
+            return; // nothing to do
         }
-        if (config.m_userSchema != null){
-            final Path userSchemaPath = config.m_userSchema.toPath();
-            final Path stagedSchemaPath = new File(stagingDirName + Constants.STAGED_SCHEMA_NAME).toPath();
-            try {
-                if (config.m_forceVoltdbCreate){
-                    Files.copy(userSchemaPath, stagedSchemaPath, StandardCopyOption.REPLACE_EXISTING);
-                } else {
-                    Files.copy(userSchemaPath, stagedSchemaPath);
-                }
-            } catch (IOException e){
-                VoltDB.crashLocalVoltDB("Could not copy staged schema file", false, e);
-            }
-        }
-        if (config.m_userProceduresJar != null){
-            final Path userProceduresPath = config.m_userProceduresJar.toPath();
-            final Path stagedProceduresPath = new File(stagingDirName + Constants.STAGED_PROCEDURES_JAR_NAME).toPath();
-            try {
-                if (config.m_forceVoltdbCreate){
-                    Files.copy(userProceduresPath, stagedProceduresPath, StandardCopyOption.REPLACE_EXISTING);
-                } else {
-                    Files.copy(userProceduresPath, stagedProceduresPath);
-                }
-            } catch (IOException e){
-                VoltDB.crashLocalVoltDB("Could not copy staged procedures file", false, e);
-            }
+        File stagedCatalogFH = new VoltFile(getStagedCatalogPath());
+        final boolean standalone = true;
+        final boolean isXCDR = false;
+        VoltCompiler compiler = new VoltCompiler(standalone, isXCDR);
+        if (!compiler.compileFromDDL(stagedCatalogFH.getAbsolutePath(), config.m_userSchema.getAbsolutePath())){
+            VoltDB.crashLocalVoltDB("Could not compile specified schema " + config.m_userSchema, false, null);
         }
     }
 

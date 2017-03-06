@@ -79,10 +79,6 @@ public class Constants
 
     public static final String DBROOT = "voltdbroot";
     public static final String CONFIG_DIR = "config";
-    /** subdirectory of voltdbroot for staged schema and procedures */
-    public static final String USER_PROCEDURES_SCHEMA_DIR = "/starter/bootstrap/existing/";
-    /** staged location of user supplied .jar file with stored procedures */
-    public static final String STAGED_PROCEDURES_JAR_NAME = "procedures.jar";
-    /** staged location of user supplied DDL */
-    public static final String STAGED_SCHEMA_NAME = "schema.sql";
+    public static final String CATALOG_FILE_NAME = "catalog.jar";
+    public static final String STAGED_CATALOG_FILE_NAME = "staged-catalog.jar";
 }

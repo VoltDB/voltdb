@@ -47,8 +47,11 @@ def init(runner):
         runner.args.extend(['force'])
     if runner.opts.schema:
         runner.args.extend(['schema', runner.opts.schema])
-    if runner.opts.procedures_jarfile:
-        runner.args.extend(['procedures', runner.opts.procedures_jarfile])
 
     args = runner.args
-    runner.java_execute(VoltDB, None, *args)
+
+    if runner.opts.procedures_jarfile:
+        kwargs = dict(classpath=runner.opts.procedures_jarfile)
+        runner.java_execute(VoltDB, None, *args, **kwargs)
+    else:
+        runner.java_execute(VoltDB, None, *args)

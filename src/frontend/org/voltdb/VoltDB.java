@@ -35,7 +35,6 @@ import java.util.NavigableSet;
 import java.util.Queue;
 import java.util.TimeZone;
 import java.util.UUID;
-import java.util.jar.JarFile;
 
 import org.voltcore.logging.VoltLog4jLogger;
 import org.voltcore.logging.VoltLogger;
@@ -44,6 +43,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.OnDemandBinaryLogger;
 import org.voltcore.utils.PortGenerator;
 import org.voltcore.utils.ShutdownHooks;
+
 import org.voltdb.client.ClientFactory;
 import org.voltdb.common.Constants;
 import org.voltdb.probe.MeshProber;
@@ -298,9 +298,6 @@ public class VoltDB {
 
         /** apply safe mode strategy when recovering */
         public boolean m_safeMode = false;
-
-        /** location of user supplied .jar file with stored procedures */
-        public File m_userProceduresJar = null;
 
         /** location of user supplied DDL */
         public File m_userSchema = null;
@@ -648,6 +645,8 @@ public class VoltDB {
                 } else if (arg.equalsIgnoreCase("forceget")) {
                     m_forceGetCreate = true;
                 } else if (arg.equalsIgnoreCase("schema")){
+                    // TODO: remove warning once ENG-11953 is complete
+                    System.err.println("WARNING: Specified schema file is being ignored in this release.");
                     m_userSchema = new File(args[++i].trim());
                     if (!m_userSchema.isFile()){
                         System.err.println("FATAL: Supplied schema file " + m_userSchema + " is not a normal file.");
@@ -655,17 +654,6 @@ public class VoltDB {
                     }
                     if (!m_userSchema.canRead()){
                         System.err.println("FATAL: Supplied schema file " + m_userSchema + " is not readable.");
-                        referToDocAndExit();
-                    }
-                } else if (arg.equalsIgnoreCase("procedures")){
-                    String proceduresJarPath = args[++i].trim();
-                    m_userProceduresJar = new File(proceduresJarPath);
-                    try {
-                        JarFile jar = new JarFile(proceduresJarPath);
-                        jar.close();
-                    } catch (IOException e){
-                        System.err.println("FATAL: Supplied jar file " + m_userProceduresJar + " is not a valid .jar file.");
-                        System.err.println(e.getMessage());
                         referToDocAndExit();
                     }
                 } else {
@@ -771,7 +759,7 @@ public class VoltDB {
                     // catalog.jar contains DDL and proc classes with which the database was
                     // compiled. Check if catalog.jar exists as it is needed to fetch ddl (get
                     // schema) as well as procedures (get classes)
-                    File catalogFH = new VoltFile(configInfoDir, "catalog.jar");
+                    File catalogFH = new VoltFile(configInfoDir, Constants.CATALOG_FILE_NAME);
                     if (!catalogFH.exists()) {
                         try {
                             parentPath = m_voltdbRoot.getCanonicalFile().getParent();

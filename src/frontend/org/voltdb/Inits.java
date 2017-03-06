@@ -284,6 +284,7 @@ public class Inits {
 
         @Override
         public void run() {
+            // FIXME - will need to compare catalog with leader's if we aren't the leader
             // if I'm the leader, send out the catalog
             if (m_rvdb.m_myHostId == m_rvdb.m_hostIdWithStartupCatalog) {
 

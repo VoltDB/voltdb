@@ -216,8 +216,21 @@ final public class TestInitStartAction {
 
     @Test
     public void testInitWithSchema() throws Exception {
+        /**
+         * Tests:
+         * 1. Positive test with valid schema and procedures files
+         * 2. Negative test with valid files but not "init --force"
+         * 3. Negative test with an unreadable schema
+         * 4. Negative test with a .jar file that isn't actually a jar file
+         *
+         * CAVEAT: Until ENG-11953 is complete, the files will be installed but not honored.
+         * The only verification performed during init are sanity checks.
+         * More comprehensive checks will be added during 'start', since 'init' has no way to verify that the entire cluster has the same schema.
+         */
 
-       // File aNonexistentFile = new File("")
+        // FIXME unfinished test
+        //File validSchema = File.createTempFile("valid", ".sql");
+        //File validJar =
 
         Configuration c1 = new Configuration(
                 new String[]{"initialize", "voltdbroot", rootDH.getPath(), "force", "schema", "/home/bshaw/workspace/voltdb/examples/voter/ddl.sql"});
