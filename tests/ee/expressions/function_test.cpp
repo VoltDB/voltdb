@@ -182,6 +182,11 @@ static NValue getSomeValue(const Boolean value)
     return ValueFactory::getBooleanValue(static_cast<bool>(value));
 }
 
+static NValue getSomeValue(const in6_addr *addr)
+{
+    return ValueFactory::getTempBinaryValue((const char *)addr, sizeof(in6_addr));
+}
+
 static NValue& getSomeValue(NValue &val)
 {
     return val;
@@ -253,6 +258,7 @@ int FunctionTest::testUnary(int operation, INPUT_TYPE input, OUTPUT_TYPE output,
         std::cout << "\n *** *** ***\n";
         std::cout << "operation:     " << operation << std::endl;
         std::cout << "Operand:       " << input << std::endl;
+
         std::cout << "Expected out:  " << output << std::endl;
     }
     std::vector<AbstractExpression *> *argument = new std::vector<AbstractExpression *>();
@@ -551,6 +557,15 @@ TEST_F(FunctionTest, NaturalModTest) {
     ASSERT_EQ(sawException, true);
 }
 
+TEST_F(FunctionTest, inet6NtoATest) {
+    in6_addr addr;
+    const char *addrStr = "ab01:cd02:ef03:1ef:2cd:3ab:a0b0:c0d";
+    inet_pton(AF_INET6, addrStr, &addr);
+    ASSERT_EQ(testUnary(FUNC_INET6_NTOA,
+                        &addr,
+                        addrStr),
+              0);
+}
 TEST_F(FunctionTest, HexTest) {
         ASSERT_EQ(testUnary(FUNC_VOLT_HEX,
                             0xffLL,
