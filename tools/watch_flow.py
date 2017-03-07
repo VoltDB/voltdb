@@ -263,6 +263,16 @@ def agg_cpu(table):
         cnt += 1
     return cpu_level/cnt
 
+def agg_liveclients(table):
+    outstanding_tx = 0
+    connections = 0
+    for row in table.tuples:
+        outstanding_tx += row[8]
+        connections += 1
+    return connections, outstanding_tx
+
+
+
 def print_metrics(data):
     # get variables from data dictionary (separate entries from different sources)
     incr_successes, incr_failures, outstanding, incr_retries = data["importer"]
@@ -270,14 +280,15 @@ def print_metrics(data):
     new_tuples, new_alloc = data["PersistentTable"]
     streamrows, buffered = data["StreamedTable"]
     invs, tps, exec_millis, c_svrs, mbin, mbout = data["PROCEDURE"]
+    connections, outstanding_tx = data["LIVECLIENTS"]
 
     if (invs >= 0):
-        print '%19s %3d %10d %10d %10d %11d %7d %5.2f %10d %10d %10d %8.3f %8.3f' % (
-            utc_now, cpu, incr_successes, incr_failures, outstanding, invs, tps, c_svrs, new_tuples, streamrows, buffered, mbin, mbout)
+        print '%19s %3d %10d %10d %10d %7d %10d %11d %7d %5.2f %10d %10d %10d %8.3f %8.3f' % (
+            utc_now, cpu, incr_successes, incr_failures, outstanding, connections, outstanding_tx, invs, tps, c_svrs, new_tuples, streamrows, buffered, mbin, mbout)
 
 def print_header():
-    print "           utc_time cpu   imported   failures    pending invocations txn/sec     c new_tuples   streamed   buffered   inMB/s  outMB/s"
-    print "------------------- --- ---------- ---------- ---------- ----------- ------- ----- ---------- ---------- ---------- -------- --------"
+    print "           utc_time cpu   imported   failures im pending clients cl pending invocations txn/sec     c new_tuples   streamed   buffered   inMB/s  outMB/s"
+    print "------------------- --- ---------- ---------- ---------- ------- ---------- ----------- ------- ----- ---------- ---------- ---------- -------- --------"
     #      2017-03-03 15:54:51
 
 
@@ -308,6 +319,7 @@ while end_time > time.time():
     cpu_tables = caller.call_stats("CPU")
     table_tables = caller.call_stats("TABLE")
     proc_tables = caller.call_stats("PROCEDURE")
+    liveclients_tables = caller.call_stats("LIVECLIENTS")
 
     data = imp_keeper.process(imp_tables[0])
 
@@ -319,6 +331,9 @@ while end_time > time.time():
 
     cpu_level = agg_cpu(cpu_tables[0])
     data["CPU"] = cpu_level
+
+    client_data = agg_liveclients(liveclients_tables[0])
+    data["LIVECLIENTS"] = client_data
 
     #print data
     print_metrics(data)
