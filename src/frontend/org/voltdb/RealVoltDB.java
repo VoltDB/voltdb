@@ -527,7 +527,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     private String getStagedCatalogPath(){
-        return getVoltDBRootPath() + File.separator + Constants.CONFIG_DIR + File.separator + Constants.STAGED_CATALOG_FILE_NAME;
+        return getStagedCatalogPath(getVoltDBRootPath());
+    }
+
+    public static String getStagedCatalogPath(String voltDbRoot){
+        return voltDbRoot + File.separator + Constants.CONFIG_DIR + File.separator + Constants.STAGED_CATALOG_FILE_NAME;
     }
 
     private String managedPathEmptyCheck(String voltDbRoot, String path) {

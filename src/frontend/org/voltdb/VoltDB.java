@@ -645,15 +645,9 @@ public class VoltDB {
                 } else if (arg.equalsIgnoreCase("forceget")) {
                     m_forceGetCreate = true;
                 } else if (arg.equalsIgnoreCase("schema")){
-                    // TODO: remove warning once ENG-11953 is complete
-                    System.err.println("WARNING: Specified schema file is being ignored in this release.");
                     m_userSchema = new File(args[++i].trim());
-                    if (!m_userSchema.isFile()){
-                        System.err.println("FATAL: Supplied schema file " + m_userSchema + " is not a normal file.");
-                        referToDocAndExit();
-                    }
-                    if (!m_userSchema.canRead()){
-                        System.err.println("FATAL: Supplied schema file " + m_userSchema + " is not readable.");
+                    if (!m_userSchema.isFile() || !m_userSchema.canRead()){
+                        System.err.println("FATAL: Supplied schema file " + m_userSchema + " is not a readable file.");
                         referToDocAndExit();
                     }
                 } else {
@@ -1172,7 +1166,7 @@ public class VoltDB {
         wasCrashCalled = true;
         crashMessage = errMsg;
         if (ignoreCrash) {
-            throw new AssertionError("Faux crash of VoltDB successful.");
+            throw new CrashCalledException();
         }
         if (CoreUtils.isJunitTest()) {
             VoltLogger log = new VoltLogger("HOST");
@@ -1303,7 +1297,7 @@ public class VoltDB {
         wasCrashCalled = true;
         crashMessage = errMsg;
         if (ignoreCrash) {
-            throw new AssertionError("Faux crash of VoltDB successful.");
+            throw new CrashCalledException();
         }
         // end test code
 
@@ -1444,6 +1438,15 @@ public class VoltDB {
             throw new SimulatedExitException(status);
         }
         System.exit(status);
+    }
+
+    // extend AssertionError to ensure behavioral compatibility
+    public static class CrashCalledException extends AssertionError {
+        private static final long serialVersionUID = 1L;
+
+        public CrashCalledException(){
+            super("Faux crash of VoltDB successful.");
+        }
     }
 
     private static VoltDB.Configuration m_config = new VoltDB.Configuration();
