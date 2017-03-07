@@ -168,6 +168,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
             m_drReplicatedConflictStreamedTable = replicatedConflictTable;
         }
 
+        void swapDRActions(PersistentTable* table1, PersistentTable* table2);
+
         ExecutorContext* getExecutorContext() { return m_executorContext; }
 
         int getCurrentIndexInBatch() const { return m_currentIndexInBatch; }

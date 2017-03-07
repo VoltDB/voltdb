@@ -399,6 +399,7 @@ size_t DRTupleStream::computeOffsets(DRRecordType &type,
 void DRTupleStream::beginTransaction(int64_t sequenceNumber, int64_t spHandle, int64_t uniqueId)
 {
     assert(!m_opened);
+    m_eventTxn = false;
 
     if (!m_currBlock) {
          extendBufferChain(m_defaultCapacity);
@@ -545,6 +546,12 @@ void DRTupleStream::endTransaction(int64_t uniqueId)
     if (m_rowTarget >= 0 && bufferRowCount >= m_rowTarget) {
         extendBufferChain(0);
     }
+
+    if (m_eventTxn) { // We need to push the event buffer out.
+        extendBufferChain(0);
+        pushPendingBlocks(); //TODO: extendBufferChain does pushPendingBlocks. So do we need this here again?
+        m_eventTxn = false;
+    }
     m_txnRowCount = 0;
 }
 
@@ -582,7 +589,9 @@ void DRTupleStream::generateDREvent(DREventType type, int64_t lastCommittedSpHan
 {
     assert(!m_opened);
 
-    ++m_openSequenceNumber;
+    if (type != SWAP_TABLE) { // openTxn does this for SWAP_TABLE
+        ++m_openSequenceNumber;
+    }
 
     if (!m_enabled) {
         if (UniqueId::isMpUniqueId(uniqueId)) {
@@ -599,14 +608,7 @@ void DRTupleStream::generateDREvent(DREventType type, int64_t lastCommittedSpHan
     switch (type) {
     case CATALOG_UPDATE:
     case DR_STREAM_START: {
-        // Make sure current block is empty
-        extendBufferChain(0);
-        ExportSerializeOutput io(m_currBlock->mutableDataPtr(), m_currBlock->remaining());
-        io.writeBinaryString(payloads.data(), payloads.length());
-        m_currBlock->consumed(io.position());
-        m_uso += io.position();
-
-        m_currBlock->startDRSequenceNumber(m_openSequenceNumber);
+        writeEventData(type, payloads);
         m_currBlock->recordCompletedSequenceNumForDR(m_openSequenceNumber);
         if (UniqueId::isMpUniqueId(uniqueId)) {
             m_lastCommittedMpUniqueId = uniqueId;
@@ -615,7 +617,6 @@ void DRTupleStream::generateDREvent(DREventType type, int64_t lastCommittedSpHan
             m_lastCommittedSpUniqueId = uniqueId;
             m_currBlock->recordCompletedSpTxnForDR(uniqueId);
         }
-        m_currBlock->markAsEventBuffer(type);
 
         m_committedUso = m_uso;
         openTransactionCommon(spHandle, uniqueId);
@@ -623,12 +624,30 @@ void DRTupleStream::generateDREvent(DREventType type, int64_t lastCommittedSpHan
 
         extendBufferChain(0);
 
-        pushPendingBlocks();
+        pushPendingBlocks(); //TODO: extendBufferChain does pushPendingBlocks. So do we need this here again?
+        break;
+    }
+    case SWAP_TABLE : { // Similar to other events, except that
+        // this happens within a begin and end transaction, so actions done there are not needed here.
+        m_eventTxn = true;
+        writeEventData(type, payloads);
         break;
     }
     default:
         assert(false);
     }
+}
+
+void DRTupleStream::writeEventData(DREventType type, ByteArray payloads) {
+    // Make sure current block is empty
+    extendBufferChain(0);
+    ExportSerializeOutput io(m_currBlock->mutableDataPtr(), m_currBlock->remaining());
+    io.writeBinaryString(payloads.data(), payloads.length());
+    m_currBlock->consumed(io.position());
+    m_uso += io.position();
+
+    m_currBlock->startDRSequenceNumber(m_openSequenceNumber);
+    m_currBlock->markAsEventBuffer(type);
 }
 
 int32_t DRTupleStream::getTestDRBuffer(int32_t partitionId,
