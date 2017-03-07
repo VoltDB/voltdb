@@ -24,6 +24,7 @@
 package org.voltdb_testprocs.regressionsuites.proceduredetail;
 
 import org.voltdb.ProcInfo;
+import org.voltdb.ProcStatsOption;
 import org.voltdb.VoltTable;
 
 /* This Java stored procedure is used to test the PROCEDUREDETAIL selector in @Statistics.
@@ -32,9 +33,13 @@ import org.voltdb.VoltTable;
 @ProcInfo (
     singlePartition = false
 )
+@ProcStatsOption (
+    samplingInterval = 1
+)
 public class ProcedureDetailTestMP extends ProcedureDetailTestSP {
     // Nothing to change here, I just want to have a separate class that does the same thing as
     // ProcedureDetailTestSP but I can load it as a multi-partition stored procedure.
+    @Override
     public VoltTable[] run(int id, String arg) throws VoltAbortException {
         return super.run(id, arg);
     }
