@@ -231,5 +231,83 @@ template<> inline NValue NValue::call<FUNC_VOLT_BIT_SHIFT_RIGHT>(const std::vect
     return getBigIntValue(result);
 }
 
+#include <arpa/inet.h>
+template<> inline NValue NValue::callUnary<FUNC_MY_INET_NTOA>() const {
+    if (getValueType() != VALUE_TYPE_BIGINT && 
+        getValueType() != VALUE_TYPE_VARBINARY) {
+        // The parser should enforce this for us, but just in case...
+        throw SQLException(SQLException::dynamic_sql_error, "unsupported non-BigInt/VarBinary type for SQL INET_NTOA function");
+    }
+
+    if (isNull()) {
+        return getNullStringValue();
+    }
+    if(getValueType() == VALUE_TYPE_BIGINT){
+        uint32_t v = static_cast<uint32_t> (getBigInt());
+        std::stringstream ss;
+        ss << ((v&0xff000000)>>24) << "." << ((v&0xff0000)>>16) << "."
+           << ((v&0xff00)>>8) << "." << (v&0xff) ;
+        std::string res (ss.str());
+        return getTempStringValue(res.c_str(), res.length());
+    }
+    if(getValueType() == VALUE_TYPE_VARBINARY){
+        std::string token = toString();
+        std::size_t sz = token.length();
+        if(sz==8){
+            uint32_t v;
+            catalog::Catalog::hexDecodeString(token, (char *) &v);
+            std::stringstream ss;
+            ss << ((v&0xff000000)>>24) << "." << ((v&0xff0000)>>16) << "."
+               << ((v&0xff00)>>8) << "." << (v&0xff) ;
+            std::string res (ss.str());
+            return getTempStringValue(res.c_str(),res.length());
+        }else if(sz==32){
+            const size_t IPV6BINLEN = 16;
+            char ipv6bin[IPV6BINLEN];
+            char str[INET6_ADDRSTRLEN];
+
+            catalog::Catalog::hexDecodeString(toString(),ipv6bin);
+            inet_ntop(AF_INET6, ipv6bin, str, INET6_ADDRSTRLEN);
+
+            std::string res(str);
+            return getTempStringValue(res.c_str(), res.length());
+        } else {
+            throw SQLException(SQLException::dynamic_sql_error, "SQL INET_NTOA function requires 4 or 16 bytes with VARBINARY");
+        }
+    }
+    return getNullStringValue();
+}
+template<> inline NValue NValue::callUnary<FUNC_MY_INET_ATON4>() const {
+    if (getValueType() != VALUE_TYPE_VARCHAR) {
+        throw SQLException(SQLException::dynamic_sql_error, "unsupported non-VARCHAR type for SQL INET_ATON4 function");
+    }
+
+    std::string token = toString();
+    // TODO check for input ipaddress string more, over octet value...
+    if (token.find('.') != std::string::npos){
+        uint32_t addr;
+        if(inet_pton(AF_INET, token.c_str(), (void*) &(addr))==1){
+            return NValue::getBigIntValue(static_cast<int64_t>(ntohl(addr)));
+        }
+    }
+    throw SQLException(SQLException::dynamic_sql_error, "unrecognize ipv4 address format string");
+}
+template<> inline NValue NValue::callUnary<FUNC_MY_INET_ATON6>() const {
+    if (getValueType() != VALUE_TYPE_VARCHAR) {
+        throw SQLException(SQLException::dynamic_sql_error, "unsupported non-VARCHAR type for SQL INET_ATON6 function");
+    }
+
+    std::string token = toString();
+    // TODO check for input ip-address string more strictly
+    if(token.find(':') != std::string::npos){
+        const size_t IPV6BINLEN = 16;
+        unsigned char addr[IPV6BINLEN];
+        if(inet_pton(AF_INET6, token.c_str(), (void*) addr)==1){
+            return NValue::getAllocatedValue(VALUE_TYPE_VARBINARY,
+                    (const char*) addr, IPV6BINLEN, getTempStringPool());
+        }
+    }
+    throw SQLException(SQLException::dynamic_sql_error, "unrecognize ipv6 address format string");
+}
 
 }

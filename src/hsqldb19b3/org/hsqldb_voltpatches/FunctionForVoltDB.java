@@ -154,6 +154,11 @@ public class FunctionForVoltDB extends FunctionSQL {
         static final int FUNC_VOLT_ROUND                  = 20042;
         static final int FUNC_VOLT_STR                    = 20043;
 
+        // our local functions for networking
+        static final int FUNC_MY_INET_NTOA                = 20044;
+        static final int FUNC_MY_INET_ATON4               = 20045;
+        static final int FUNC_MY_INET_ATON6               = 20046;
+
         // Geospatial functions
         static final int FUNC_VOLT_POINTFROMTEXT                = 21000;
         static final int FUNC_VOLT_POLYGONFROMTEXT              = 21001;
@@ -378,6 +383,19 @@ public class FunctionForVoltDB extends FunctionSQL {
             new FunctionId("is_valid_timestamp", Type.SQL_BOOLEAN, FUNC_VOLT_IS_VALID_TIMESTAMP, -1,
                     new Type[] { Type.SQL_TIMESTAMP },
                     singleParamList),
+
+            new FunctionId("inet_ntoa", Type.SQL_VARCHAR, FUNC_MY_INET_NTOA, -1,
+                    new Type[] { Type.SQL_ALL_TYPES },
+                    singleParamList),
+
+            new FunctionId("inet_aton4", Type.SQL_BIGINT, FUNC_MY_INET_ATON4, -1,
+                    new Type[] { Type.SQL_VARCHAR },
+                    singleParamList),
+
+            new FunctionId("inet_aton6", Type.SQL_VARBINARY, FUNC_MY_INET_ATON6, -1,
+                    new Type[] { Type.SQL_VARCHAR },
+                    singleParamList),
+
         };
 
         private static Map<String, FunctionId> by_LC_name = new HashMap<String, FunctionId>();
@@ -660,6 +678,32 @@ public class FunctionForVoltDB extends FunctionSQL {
                 throw Error.error(ErrorCode.X_42565,
                         "The asText function accepts only GEOGRAPHY and GEOGRAPHY_POINT types.");
             }
+            break;
+
+        // our networking specified functions
+        case FunctionId.FUNC_MY_INET_NTOA:
+            if (nodes[0].dataType != null &&
+                !nodes[0].dataType.isNumberType() &&
+                !nodes[0].dataType.isBinaryType()) {
+                throw Error.error(ErrorCode.X_42561);
+            }
+            dataType = Type.SQL_VARCHAR;
+            break;
+
+        case FunctionId.FUNC_MY_INET_ATON4:
+            if (nodes[0].dataType != null &&
+                !nodes[0].dataType.isCharacterType()) {
+                throw Error.error(ErrorCode.X_42561);
+            }
+            dataType = Type.SQL_BIGINT;
+            break;
+
+        case FunctionId.FUNC_MY_INET_ATON6:
+            if (nodes[0].dataType != null &&
+                !nodes[0].dataType.isCharacterType()) {
+                throw Error.error(ErrorCode.X_42561);
+            }
+            dataType = Type.SQL_VARBINARY;
             break;
 
         default:
