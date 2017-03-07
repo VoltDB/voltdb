@@ -46,7 +46,7 @@ public class ProcedureStatsCollector extends SiteStatsSource {
     /**
      * Record statistics for each statement in the stored procedure.
      */
-    class ProcedureStmtStat {
+    private class ProcedureStmtStat {
         /**
          * The name of the statement.
          * If it's for the statistics of the whole procedure, the name will be <ALL>.

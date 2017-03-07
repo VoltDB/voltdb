@@ -22,7 +22,8 @@ import org.voltcore.utils.CoreUtils;
 import org.voltdb.VoltTable.ColumnInfo;
 
 /**
- * Super class of sources of statistical information that are tied to an ExecutionSite.
+ * Super class of sources of statistical information that are tied to an
+ * ExecutionSite.
  */
 public abstract class SiteStatsSource extends StatsSource {
 
@@ -54,11 +55,14 @@ public abstract class SiteStatsSource extends StatsSource {
 
     @Override
     public boolean equals(Object obj) {
-        if(super.equals(obj) == false) return false;
-        if (obj instanceof SiteStatsSource == false) return false;
+        if (super.equals(obj) == false)
+            return false;
+        if (obj instanceof SiteStatsSource == false)
+            return false;
 
         SiteStatsSource stats = (SiteStatsSource) obj;
-        if (stats.getSiteId() != m_siteId) return false;
+        if (stats.getSiteId() != m_siteId)
+            return false;
         return true;
     }
 
