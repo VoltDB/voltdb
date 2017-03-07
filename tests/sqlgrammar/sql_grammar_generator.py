@@ -178,7 +178,8 @@ def get_one_sql_statement(grammar, sql_statement_type='sql-statement', max_depth
 
 def print_file_tail(from_file, to_file, number_of_lines=50):
     """Print a tail of the last 'number_of_lines' of the 'from_file', to the
-    'to_file' (typically the summary file).
+    'to_file' (typically the summary file); and a grep of the number of various
+    types of error messages.
     """
     command = 'tail -n ' + str(number_of_lines) + ' ' + from_file
     if debug > 2:
@@ -187,6 +188,23 @@ def print_file_tail(from_file, to_file, number_of_lines=50):
     tail_proc = Popen(command, shell=True, stdin=PIPE, stdout=PIPE, stderr=STDOUT)
     tail_message = '\n\nLast ' + str(number_of_lines) + ' lines of ' + from_file + ':\n' \
                  + tail_proc.communicate()[0].replace('\\n', '\n')
+
+    error_types = ['Error compiling query', 'ERROR: IN: NodeSchema', 'ERROR']
+    error_count = 0
+    for e in error_types:
+        command = 'grep -c "' + e + '" ' + from_file
+        if debug > 2:
+            print 'DEBUG: grep command:', command
+            sys.stdout.flush()
+        grep_proc = Popen(command, shell=True, stdin=PIPE, stdout=PIPE, stderr=STDOUT)
+        num_errors = int(grep_proc.communicate()[0].replace('\\n', ''))
+        if e is 'ERROR':
+            tail_message += "\nNumber of all other 'ERROR' messages    : " + str(num_errors - error_count)
+            tail_message += "\nTotal Number of all 'ERROR' messages    : " + str(num_errors)
+        else:
+            error_count  += num_errors
+            tail_message += "\nNumber of '"+e+"' errors: " + str(num_errors)
+
     print >> to_file, tail_message
 
 
@@ -421,7 +439,8 @@ if __name__ == "__main__":
                       help="a file path/name, or comma-separated list of files, that defines the SQL grammar "
                          + "[default: sql-grammar.txt]")
     parser.add_option("-r", "--seed", dest="seed",
-                      help="seed for random number generator")
+                      help="seed for random number generator; a blank string, or None, means that the seed "
+                          + "should itself be randomly generated [default: None]")
     parser.add_option("-i", "--initial_type", dest="initial_type", default="insert-statement",
                       help="a type, or comma-separated list of types, of SQL statements to generate initially; typically "
                           + "used to initialize the database using INSERT statements [default: insert-statement]")
