@@ -121,7 +121,7 @@ public class ProcedureRunner {
     // hooks into other parts of voltdb
     //
     protected final SiteProcedureConnection m_site;
-    protected final ExecutionEngine m_ee;
+    protected ExecutionEngine m_ee;
     protected final SystemProcedureExecutionContext m_systemProcedureContext;
     protected CatalogSpecificPlanner m_csp;
 
@@ -207,12 +207,6 @@ public class ProcedureRunner {
             m_partitionColumnType = null;
         }
         m_site = site;
-        if (site instanceof Site) {
-            m_ee = ((Site)site).getEngine();
-        }
-        else {
-            m_ee = null;
-        }
         m_systemProcedureContext = sysprocContext;
         m_csp = csp;
 
@@ -239,7 +233,14 @@ public class ProcedureRunner {
     }
 
     public ExecutionEngine getEngine() {
-        return m_ee;
+        if (m_ee != null) {
+            return m_ee;
+        }
+        if (m_site instanceof Site) {
+            m_ee = ((Site)m_site).getEngine();
+            return m_ee;
+        }
+        return null;
     }
 
     public void reInitSysProc(CatalogContext catalogContext, CatalogSpecificPlanner csp) {
@@ -1683,7 +1684,7 @@ public class ProcedureRunner {
            if (m_statsCollector.recording()) {
                durations = new long[batchSize];
            }
-           succeededFragmentsCount = m_ee.extractPerFragmentStats(batchSize, durations);
+           succeededFragmentsCount = getEngine().extractPerFragmentStats(batchSize, durations);
 
            for (i = 0; i < batchSize; i++) {
                QueuedSQL qs = batch.get(i);
