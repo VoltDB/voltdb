@@ -44,12 +44,9 @@ function alertNodeClicked(obj) {
     var iVoltDbRenderer = (function () {
         this.hostNames = [];
         this.currentHost = "";
+
         this.isHost = false;
         this.userPreferences = {};
-        this.serverIPs = {};
-        this.tupleMaxCount = {};
-        this.tupleMinCount = {};
-        this.maxVisibleRows = 5;
         var totalServerCount = 0;
         var kFactor = 0;
         var procedureData = {};
