@@ -152,10 +152,7 @@ public class ProcedureDetailResultTable {
 
         @Override
         public int compareTo(ProcedureDetailResultRow other) {
-            long diff = other.m_timestamp - m_timestamp;
-            if (diff != 0) return Long.signum(diff);
-
-            diff = m_procedure.compareTo(other.m_procedure);
+            long diff = m_procedure.compareTo(other.m_procedure);
             if (diff != 0) return Long.signum(diff);
 
             diff = m_statement.compareTo(other.m_statement);
@@ -168,6 +165,9 @@ public class ProcedureDetailResultTable {
             if (diff != 0) return Long.signum(diff);
 
             diff = m_partitionId - other.m_partitionId;
+            if (diff != 0) return Long.signum(diff);
+
+            diff = other.m_timestamp - m_timestamp;
             if (diff != 0) return Long.signum(diff);
 
             return 0;
