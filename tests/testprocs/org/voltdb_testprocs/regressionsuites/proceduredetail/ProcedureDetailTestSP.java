@@ -55,15 +55,17 @@ public class ProcedureDetailTestSP extends VoltProcedure {
          * For multi-partition stored procedures, there are different code paths for
          * homogeneous batches (pure read or pure write) and
          * heterogeneous batches (has both read and write). */
-        boolean hasReadWrite = arg.contains("rw");
-        // err: option to queue a batch that has a query that can cause an error.
-        boolean hasError = arg.contains("err");
+        boolean hasReadWrite = arg.contains("readwrite");
+        // failure: throw an exception to cause the procedure to fail.
+        boolean hasFailure = arg.contains("failure");
+        // abort: option to queue a batch with a query which can cause the procedure to abort.
+        boolean hasAbort = arg.contains("abort");
         /* 2batch: option to issue two batches in the stored procedure.
          * if the "err" option is enabled, the failing statement will be queued in the
          * first batch and the exception will be caught and extinguished.
          * So you will see in the procedure detail statistics that the procedure
          * succeeded but one of the statements has the failure count = 1 :) */
-        boolean twoBatches = arg.contains("2batch");
+        boolean twoBatches = arg.contains("twobatch");
 
         // Start to queue the first batch:
         voltQueueSQL(anInsert, id, String.valueOf(id));
@@ -71,18 +73,17 @@ public class ProcedureDetailTestSP extends VoltProcedure {
         if (hasReadWrite) {
             voltQueueSQL(aSelect, id);
         }
-        if (hasError) {
+        if (hasAbort) {
             voltQueueSQL(anInsert, id, "012345678910"); // overflow
         }
         voltQueueSQL(aDelete, id);
-        VoltTable[] result = null;
         try {
-            result = voltExecuteSQL(! twoBatches);
+            voltExecuteSQL(! twoBatches);
         }
         catch (SQLException ex) {
-            if (twoBatches) {
-                System.out.println("Caught exception:\n" + ex.getMessage());
-                System.out.print("This procedure is configured to execute another batch, ");
+            if (twoBatches || hasFailure) {
+                System.out.println("\nCaught exception as expected:\n" + ex.getMessage());
+                System.out.print("This procedure is configured to execute another batch or needs to fail later, ");
                 System.out.println("so this exception is extinguished.");
             }
             else {
@@ -90,8 +91,12 @@ public class ProcedureDetailTestSP extends VoltProcedure {
             }
         }
 
+        if (hasFailure) {
+            throw new RuntimeException("Procedure failed as requested in the parameter.");
+        }
+
         if (! twoBatches) {
-            return result;
+            return null;
         }
         // Start to queue the second batch, if asked:
         voltQueueSQL(anInsert, id, String.valueOf(id));
@@ -100,7 +105,7 @@ public class ProcedureDetailTestSP extends VoltProcedure {
             voltQueueSQL(aSelect, id);
         }
         voltQueueSQL(aDelete, id);
-        result = voltExecuteSQL(true);
-        return result;
+        voltExecuteSQL(true);
+        return null;
     }
 }
