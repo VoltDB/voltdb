@@ -164,13 +164,29 @@ public class MpTransactionState extends TransactionState
             m_remoteWork = task;
             m_remoteWork.setTruncationHandle(m_initiationMsg.getTruncationHandle());
             // Distribute fragments to remote destinations.
-            long[] non_local_hsids = new long[m_useHSIds.size()];
-            for (int i = 0; i < m_useHSIds.size(); i++) {
-                non_local_hsids[i] = m_useHSIds.get(i);
-            }
-            // send to all non-local sites
-            if (non_local_hsids.length > 0) {
-                m_mbox.send(non_local_hsids, m_remoteWork);
+            if (m_useHSIds.size() > 0) {
+                // For all SP sites other than site *m_buddyHSId*,
+                // send the FragmentTaskMessage with commitPerFragmentStats = true (default).
+                // Those sites does not need to execute another coordinator task,
+                // so they should immediately commit their statistics changes.
+                long[] non_local_hsids = new long[m_useHSIds.size() - 1];
+                int i = 0;
+                for (Long non_local_hsid : m_useHSIds) {
+                    if (non_local_hsid != m_buddyHSId) {
+                        non_local_hsids[i++] = non_local_hsid;
+                    }
+                }
+                // send to all non-local sites
+                if (non_local_hsids.length > 0) {
+                    m_mbox.send(non_local_hsids, m_remoteWork);
+                }
+                // For site *m_buddyHSId*, postpone committing the statistics changes,
+                // wait for the statistics for the coordinator task.
+                // Need to make a copy of this message in order to change the commitPerFragmentStats flag.
+                m_remoteWork = new FragmentTaskMessage(m_remoteWork.getInitiatorHSId(),
+                                                       m_remoteWork.getCoordinatorHSId(), m_remoteWork);
+                m_remoteWork.setCommitPerFragmentStats(false);
+                m_mbox.send(new long[] {m_buddyHSId}, m_remoteWork);
             }
         }
         else {

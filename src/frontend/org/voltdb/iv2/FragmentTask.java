@@ -34,7 +34,6 @@ import org.voltdb.client.BatchTimeoutOverrideType;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.InterruptException;
 import org.voltdb.exceptions.SQLException;
-import org.voltdb.jni.ExecutionEngineJNI;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.planner.ActivePlanRepository;
@@ -234,7 +233,7 @@ public class FragmentTask extends TransactionTask
         ProcedureRunner currRunner = siteConnection.getProcedureRunner(m_fragmentMsg.getProcedureName());
         long[] durations = null;
         int succeededFragmentsCount = 0;
-        if (m_fragmentMsg.isGranularStatsRequested()) {
+        if (m_fragmentMsg.isPerFragmentStatsRecording() && currRunner != null) {
             durations = new long[1];
         }
 
@@ -333,15 +332,14 @@ public class FragmentTask extends TransactionTask
                 if (fragmentPlan != null) {
                     ActivePlanRepository.decrefPlanFragmentById(fragmentId);
                 }
+                // If the executed fragment comes from a stored procedure, we need to update the per-fragment stats for it.
+                // Notice that this code path is used to handle multi-partition stored procedures.
+                // The single-partition stored procedure handler is in the ProcedureRunner.
                 if (currRunner != null) {
-                    if (currRunner.getEngine() instanceof ExecutionEngineJNI) {
-                        succeededFragmentsCount = ((ExecutionEngineJNI)currRunner.getEngine()).extractPerFragmentStats(durations);
-                    }
-                    else {
-                         // IPC
-                    }
+                    succeededFragmentsCount = currRunner.getEngine().extractPerFragmentStats(1, durations);
                     currRunner.getStatsCollector().finishStatement(m_fragmentMsg.getStmtName(frag),
-                                                                   m_fragmentMsg.isGranularStatsRequested(),
+                                                                   m_fragmentMsg.commitPerFragmentStats(),
+                                                                   m_fragmentMsg.isPerFragmentStatsRecording(),
                                                                    succeededFragmentsCount == 0,
                                                                    durations == null ? 0 : durations[0],
                                                                    dependency,

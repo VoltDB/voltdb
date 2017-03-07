@@ -648,6 +648,18 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
                                                             long uniqueId,
                                                             long undoQuantumToken) throws EEException;
 
+    // Extract the per-fragment stats from the buffer.
+    // This is totally faked, only ExecutionJNI has the real implementation.
+    public int extractPerFragmentStats(int batchSize, long[] durationsOut) {
+        if (durationsOut != null) {
+            for (int i = 0; i < durationsOut.length; i++) {
+                durationsOut[i] = 100;
+            }
+            return durationsOut.length;
+        }
+        return batchSize;
+    }
+
     /** Used for test code only (AFAIK jhugg) */
     public abstract VoltTable serializeTable(int tableId) throws EEException;
 

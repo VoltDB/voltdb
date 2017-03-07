@@ -149,7 +149,14 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
     // desired output dep ID, but no real work to do.
     boolean m_emptyForRestart = false;
 
-    boolean m_granularStatsRequested = false;
+    // If this flag = true, it means the current execution is being sampled.
+    boolean m_perFragmentStatsRecording = false;
+    // If this flag = true, the per-fragment stats for the current SQL statement
+    // will be immediately updated after this task is finished, without waiting
+    // for another fragment execution.
+    // For multi-partition stored procedures that have worker fragments and
+    // coordinator fragments, we report the statistics for them together as one.
+    boolean m_commitPerFragmentStats = true;
 
     int m_inputDepCount = 0;
     Iv2InitiateTaskMessage m_initiateTask;
@@ -170,12 +177,20 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
 
     int m_batchTimeout = BatchTimeoutOverrideType.NO_TIMEOUT;
 
-    public void setGranularStatsRequested(boolean value) {
-        m_granularStatsRequested = value;
+    public void setPerFragmentStatsRecording(boolean value) {
+        m_perFragmentStatsRecording = value;
     }
 
-    public boolean isGranularStatsRequested() {
-        return m_granularStatsRequested;
+    public boolean isPerFragmentStatsRecording() {
+        return m_perFragmentStatsRecording;
+    }
+
+    public void setCommitPerFragmentStats(boolean value) {
+        m_commitPerFragmentStats = value;
+    }
+
+    public boolean commitPerFragmentStats() {
+        return m_commitPerFragmentStats;
     }
 
     public int getCurrentBatchIndex() {
@@ -233,7 +248,8 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         m_involvedPartitions = ftask.m_involvedPartitions;
         m_procNameToLoad = ftask.m_procNameToLoad;
         m_batchTimeout = ftask.m_batchTimeout;
-        m_granularStatsRequested = ftask.m_granularStatsRequested;
+        m_perFragmentStatsRecording = ftask.m_perFragmentStatsRecording;
+        m_commitPerFragmentStats = ftask.m_commitPerFragmentStats;
         if (ftask.m_initiateTaskBuffer != null) {
             m_initiateTaskBuffer = ftask.m_initiateTaskBuffer.duplicate();
         }
@@ -633,8 +649,10 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
             msgsize += m_procNameToLoad.length;
         }
 
-        // granularStatsRequested.
-        msgsize += 1;
+        // perFragmentStatsRecording and commitPerFragmentStats.
+        // TODO: We could use only one byte and bitmasks to represent all the
+        // boolean values used in this class, it can save a little bit space.
+        msgsize += 2;
 
         // Fragment ID block (20 bytes per sha1-hash)
         msgsize += 20 * m_items.size();
@@ -764,7 +782,8 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         else {
             buf.putShort((short) -1);
         }
-        buf.put(m_granularStatsRequested ? (byte) 1 : (byte) 0);
+        buf.put(m_perFragmentStatsRecording ? (byte) 1 : (byte) 0);
+        buf.put(m_commitPerFragmentStats ? (byte) 1 : (byte) 0);
 
         // Plan Hash block
         for (FragmentData item : m_items) {
@@ -896,7 +915,8 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
             m_procNameToLoad = new byte[procNameToLoadBytesLen];
             buf.get(m_procNameToLoad);
         }
-        m_granularStatsRequested = buf.get() != 0;
+        m_perFragmentStatsRecording = buf.get() != 0;
+        m_commitPerFragmentStats = buf.get() != 0;
 
         m_items = new ArrayList<FragmentData>(fragCount);
 
@@ -1038,9 +1058,14 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         sb.append(" FOR REPLAY ").append(isForReplay());
         sb.append(", SP HANDLE: ").append(TxnEgo.txnIdToString(getSpHandle()));
         sb.append("\n");
-        if (m_granularStatsRequested) {
-            sb.append("GRANULAR STATS REQUESTED.\n");
+        if (m_perFragmentStatsRecording) {
+            sb.append("PER FRAGMENT STATS RECORDING\n");
         }
+        sb.append("PER FRAGMENT STATS SHOULD ");
+        if (! m_commitPerFragmentStats) {
+            sb.append("NOT ");
+        }
+        sb.append("COMMIT IMMEDIATELY\n");
         if (m_isReadOnly)
             sb.append("  READ, COORD ");
         else

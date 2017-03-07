@@ -37,7 +37,7 @@ public class ProcedureStatsCollector extends SiteStatsSource {
     /**
      * Record procedure execution time every N invocations
      */
-    final int timeCollectionInterval = 20;
+    private int timeCollectionInterval = 20;
 
     /**
      * Record statistics for each statement in the stored procedure.
@@ -81,6 +81,7 @@ public class ProcedureStatsCollector extends SiteStatsSource {
 
         /**
          * Time the procedure was last started
+         * (Not used by per-fragment stats)
          */
         private long m_currentStartTime = -1;
 
@@ -131,6 +132,24 @@ public class ProcedureStatsCollector extends SiteStatsSource {
          */
         private long m_totalParameterSetSize = 0;
         private long m_lastTotalParameterSetSize = 0;
+
+        /**
+         * >>> Cache uncommitted statistics <<<
+         * SQLStmts in multi-partition stored procedures can have worker fragments and
+         * coordinator fragments.
+         * The worker fragments will first be sent to all the participating SP (single partition)
+         * sites for execution.
+         * Then we will select one SP site to execute the coordinator fragment.
+         * Every MpTransactionState has a m_buddyHSId to indicate which SP site is selected.
+         *
+         * Therefore, on the SP site *m_buddyHSId*, the per-fragment statistics include the statistics
+         * from two fragments (worker + coordinator).
+         * On this site, the worker fragment statistics will be cached and the calculations will be postponed.
+         * We will then do the calculation when we receive the coordinator fragment statistics.
+         */
+        private long m_cachedExecutionTime = 0;
+        private int m_cachedResultSize = 0;
+        private int m_cachedParameterSetSize = 0;
 
         public ProcedureStmtStat(String stmtName) {
             m_stmtName = stmtName;
@@ -183,8 +202,11 @@ public class ProcedureStatsCollector extends SiteStatsSource {
         return m_procStat.m_currentStartTime > 0;
     }
 
+    // Called when a statement finish running.
+    // Maintain the more granular statistics for stored procedures.
     public final void finishStatement(String stmtName,
-                                      boolean granularStatsRequested,
+                                      boolean commitPerFragmentStats,
+                                      boolean perFragmentStatsRecording,
                                       boolean failed,
                                       long duration,
                                       VoltTable result,
@@ -193,52 +215,62 @@ public class ProcedureStatsCollector extends SiteStatsSource {
         if (stat == null) {
             return;
         }
-        if (granularStatsRequested) {
+        if (perFragmentStatsRecording) {
             // This is a sampled invocation.
             // Update timings and size statistics.
-            if (duration < 0)
-            {
-                if (Math.abs(duration) > 1000000000)
-                {
+            if (duration < 0) {
+                if (Math.abs(duration) > 1000000000) {
                     log.info("Statement: " + stat.m_stmtName + " in procedure: " + m_procName +
                              " recorded a negative execution time larger than one second: " +
                              duration);
                 }
             }
-            else
-            {
-                stat.m_totalTimedExecutionTime += duration;
-                stat.m_timedInvocations++;
-
-                // sampled timings
-                stat.m_minExecutionTime = Math.min( duration, stat.m_minExecutionTime);
-                stat.m_maxExecutionTime = Math.max( duration, stat.m_maxExecutionTime);
-                stat.m_lastMinExecutionTime = Math.min( duration, stat.m_lastMinExecutionTime);
-                stat.m_lastMaxExecutionTime = Math.max( duration, stat.m_lastMaxExecutionTime);
-
-                // sampled size statistics
-                int resultSize = 0;
+            else {
+                stat.m_cachedExecutionTime += duration;
                 if (result != null) {
-                    resultSize = result.getSerializedSize();
+                    stat.m_cachedResultSize += result.getSerializedSize();
                 }
-                stat.m_totalResultSize += resultSize;
-                stat.m_minResultSize = Math.min(resultSize, stat.m_minResultSize);
-                stat.m_maxResultSize = Math.max(resultSize, stat.m_maxResultSize);
-                stat.m_lastMinResultSize = Math.min(resultSize, stat.m_lastMinResultSize);
-                stat.m_lastMaxResultSize = Math.max(resultSize, stat.m_lastMaxResultSize);
-                int parameterSetSize = (
-                        parameterSet != null ? parameterSet.getSerializedSize() : 0);
-                stat.m_totalParameterSetSize += parameterSetSize;
-                stat.m_minParameterSetSize = Math.min(parameterSetSize, stat.m_minParameterSetSize);
-                stat.m_maxParameterSetSize = Math.max(parameterSetSize, stat.m_maxParameterSetSize);
-                stat.m_lastMinParameterSetSize = Math.min(parameterSetSize, stat.m_lastMinParameterSetSize);
-                stat.m_lastMaxParameterSetSize = Math.max(parameterSetSize, stat.m_lastMaxParameterSetSize);
+                if (parameterSet != null) {
+                    stat.m_cachedParameterSetSize += parameterSet.getSerializedSize();
+                }
+                // If the worker task failed, the coordinator task will not be executed.
+                // In this case, ignore the commitPerFragmentStats flag, commit changes anyway.
+                if (commitPerFragmentStats || failed) {
+                    stat.m_totalTimedExecutionTime += stat.m_cachedExecutionTime;
+                    stat.m_timedInvocations++;
+
+                    // sampled timings
+                    stat.m_minExecutionTime = Math.min(stat.m_cachedExecutionTime, stat.m_minExecutionTime);
+                    stat.m_maxExecutionTime = Math.max(stat.m_cachedExecutionTime, stat.m_maxExecutionTime);
+                    stat.m_lastMinExecutionTime = Math.min(stat.m_cachedExecutionTime, stat.m_lastMinExecutionTime);
+                    stat.m_lastMaxExecutionTime = Math.max(stat.m_cachedExecutionTime, stat.m_lastMaxExecutionTime);
+
+                    // sampled size statistics
+                    stat.m_totalResultSize += stat.m_cachedResultSize;
+                    stat.m_minResultSize = Math.min(stat.m_cachedResultSize, stat.m_minResultSize);
+                    stat.m_maxResultSize = Math.max(stat.m_cachedResultSize, stat.m_maxResultSize);
+                    stat.m_lastMinResultSize = Math.min(stat.m_cachedResultSize, stat.m_lastMinResultSize);
+                    stat.m_lastMaxResultSize = Math.max(stat.m_cachedResultSize, stat.m_lastMaxResultSize);
+
+                    stat.m_totalParameterSetSize += stat.m_cachedParameterSetSize;
+                    stat.m_minParameterSetSize = Math.min(stat.m_cachedParameterSetSize, stat.m_minParameterSetSize);
+                    stat.m_maxParameterSetSize = Math.max(stat.m_cachedParameterSetSize, stat.m_maxParameterSetSize);
+                    stat.m_lastMinParameterSetSize = Math.min(stat.m_cachedParameterSetSize, stat.m_lastMinParameterSetSize);
+                    stat.m_lastMaxParameterSetSize = Math.max(stat.m_cachedParameterSetSize, stat.m_lastMaxParameterSetSize);
+
+                    // clear the cache after committing the statistics.
+                    stat.m_cachedExecutionTime = 0;
+                    stat.m_cachedResultSize = 0;
+                    stat.m_cachedParameterSetSize = 0;
+                }
             }
         }
         if (failed) {
             stat.m_failureCount++;
         }
-        stat.m_invocations++;
+        if (commitPerFragmentStats || failed) {
+            stat.m_invocations++;
+        }
     }
 
     /**
@@ -255,17 +287,14 @@ public class ProcedureStatsCollector extends SiteStatsSource {
             // Update timings and size statistics.
             final long endTime = System.nanoTime();
             final long delta = endTime - m_procStat.m_currentStartTime;
-            if (delta < 0)
-            {
-                if (Math.abs(delta) > 1000000000)
-                {
+            if (delta < 0) {
+                if (Math.abs(delta) > 1000000000) {
                     log.info("Procedure: " + m_procName +
                              " recorded a negative execution time larger than one second: " +
                              delta);
                 }
             }
-            else
-            {
+            else {
                 m_procStat.m_totalTimedExecutionTime += delta;
                 m_procStat.m_timedInvocations++;
 

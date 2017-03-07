@@ -59,7 +59,6 @@ import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.Site;
 import org.voltdb.iv2.UniqueIdGenerator;
 import org.voltdb.jni.ExecutionEngine;
-import org.voltdb.jni.ExecutionEngineJNI;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.planner.ActivePlanRepository;
 import org.voltdb.sysprocs.AdHocBase;
@@ -1452,7 +1451,7 @@ public class ProcedureRunner {
                   boolean finalTask,
                   String procedureName,
                   byte[] procToLoad,
-                  boolean granularStatsReqeusted) {
+                  boolean perFragmentStatsRecording) {
            m_batchSize = batchSize;
            m_txnState = txnState;
 
@@ -1470,7 +1469,7 @@ public class ProcedureRunner {
                                                  txnState.isForReplay());
            m_localTask.setProcedureName(procedureName);
            m_localTask.setBatchTimeout(m_txnState.getInvocation().getBatchTimeout());
-           m_localTask.setGranularStatsRequested(granularStatsReqeusted);
+           m_localTask.setPerFragmentStatsRecording(perFragmentStatsRecording);
 
            // the data and message for all sites in the transaction
            m_distributedTask = new FragmentTaskMessage(m_txnState.initiatorHSId,
@@ -1484,7 +1483,7 @@ public class ProcedureRunner {
            // this works fine if procToLoad is NULL
            m_distributedTask.setProcNameToLoad(procToLoad);
            m_distributedTask.setBatchTimeout(m_txnState.getInvocation().getBatchTimeout());
-           m_distributedTask.setGranularStatsRequested(granularStatsReqeusted);
+           m_distributedTask.setPerFragmentStatsRecording(perFragmentStatsRecording);
        }
 
        /*
@@ -1680,15 +1679,14 @@ public class ProcedureRunner {
            if (m_statsCollector.recording()) {
                durations = new long[batchSize];
            }
-           if (m_ee instanceof ExecutionEngineJNI) {
-               succeededFragmentsCount = ((ExecutionEngineJNI)m_ee).extractPerFragmentStats(durations);
-           }
-           else {
-                // IPC
-           }
+           succeededFragmentsCount = m_ee.extractPerFragmentStats(batchSize, durations);
+
            for (i = 0; i < batchSize; i++) {
                QueuedSQL qs = batch.get(i);
                m_statsCollector.finishStatement(qs.stmt.getStmtName(),
+                                                // No coordinator task for single partition procedure.
+                                                // Should directly commit per-fragment stats once completed.
+                                                true,
                                                 m_statsCollector.recording(),
                                                 i == succeededFragmentsCount,
                                                 durations == null ? 0 : durations[i],

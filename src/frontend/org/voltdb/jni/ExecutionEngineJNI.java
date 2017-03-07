@@ -288,7 +288,9 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         checkErrorCode(errorCode);
     }
 
-    public int extractPerFragmentStats(long[] durationsOut) {
+    // Extract the per-fragment stats from the buffer.
+    @Override
+    public int extractPerFragmentStats(int batchSize, long[] durationsOut) {
         perFragmentStatsBuffer.clear();
         int succeededFragmentsCount = perFragmentStatsBuffer.getInt();
         if (durationsOut != null) {
