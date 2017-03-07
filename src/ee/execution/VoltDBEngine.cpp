@@ -1227,12 +1227,19 @@ void VoltDBEngine::swapDRActions(PersistentTable* table1, PersistentTable* table
     assert(!tcd2->materialized());
     // Point the Map from signature hash point to the correct persistent tables
     int64_t hash1 = *reinterpret_cast<const int64_t*>(tcd1->signatureHash());
-    m_tablesBySignatureHash[hash1] = table2;
     int64_t hash2 = *reinterpret_cast<const int64_t*>(tcd2->signatureHash());
-    m_tablesBySignatureHash[hash2] = table1;
+    // Most swap action is already done.
+    // But hash(tcd1) is still pointing to old persistent table1, which is now table2.
+    assert(m_tablesBySignatureHash[hash1] == table2);
+    assert(m_tablesBySignatureHash[hash2] == table1);
+    m_tablesBySignatureHash[hash1] = table1;
+    m_tablesBySignatureHash[hash2] = table2;
+    table1->signature(tcd1->signatureHash());
+    table2->signature(tcd2->signatureHash());
 
     // Generate swap table DREvent
-    //TODO: Do this only if the tables are drEnabled
+    assert(table1->isDREnabled() == table2.isDREnabled());
+    assert(table1->isDREnabled()); // This is checked before calling this method.
     int64_t lastCommittedSpHandle = m_executorContext->lastCommittedSpHandle();
     int64_t spHandle = m_executorContext->currentSpHandle();
     int64_t uniqueId = m_executorContext->currentUniqueId();
