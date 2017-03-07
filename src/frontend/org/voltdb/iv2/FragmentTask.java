@@ -233,8 +233,11 @@ public class FragmentTask extends TransactionTask
         ProcedureRunner currRunner = siteConnection.getProcedureRunner(m_fragmentMsg.getProcedureName());
         long[] durations = null;
         int succeededFragmentsCount = 0;
-        if (m_fragmentMsg.isPerFragmentStatsRecording() && currRunner != null) {
-            durations = new long[1];
+        if (currRunner != null) {
+            currRunner.getEngine().setPerFragmentTimingEnabled(m_fragmentMsg.isPerFragmentStatsRecording());
+            if (m_fragmentMsg.isPerFragmentStatsRecording()) {
+                durations = new long[1];
+            }
         }
 
         for (int frag = 0; frag < m_fragmentMsg.getFragmentCount(); frag++)

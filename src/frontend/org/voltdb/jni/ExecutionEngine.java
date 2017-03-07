@@ -648,6 +648,9 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
                                                             long uniqueId,
                                                             long undoQuantumToken) throws EEException;
 
+    public void setPerFragmentTimingEnabled(boolean enabled) {
+    }
+
     // Extract the per-fragment stats from the buffer.
     // This is totally faked, only ExecutionJNI has the real implementation.
     public int extractPerFragmentStats(int batchSize, long[] durationsOut) {

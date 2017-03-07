@@ -1658,6 +1658,7 @@ public class ProcedureRunner {
        }
 
        VoltTable[] results = null;
+       getEngine().setPerFragmentTimingEnabled(m_statsCollector.recording());
        try {
            results = m_site.executePlanFragments(
                    batchSize,

@@ -375,9 +375,15 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
     m_executorContext->m_progressStats.resetForNewBatch();
     NValueArray &params = m_executorContext->getParameterContainer();
 
+    // The first byte is a flag indicating whether the timing is enabled.
+    // This byte shuld not be overwritten.
+    m_perFragmentStatsOutput.reserveBytes(sizeof(int8_t));
     size_t succeededFragmentsCountOffset = m_perFragmentStatsOutput.reserveBytes(sizeof(int32_t));
     std::chrono::high_resolution_clock::time_point startTime, endTime;
     std::chrono::duration<int64_t, std::nano> elapsedNanoseconds;
+    ReferenceSerializeInputBE perFragmentStatsBufferIn(m_perFragmentStatsBuffer,
+                                                       m_perFragmentStatsBufferCapacity);
+    bool perFragmentTimingEnabled = perFragmentStatsBufferIn.readByte() > 0;
 
     for (m_currentIndexInBatch = 0; m_currentIndexInBatch < numFragments; ++m_currentIndexInBatch) {
 
@@ -392,17 +398,21 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
             params[j].deserializeFromAllocateForStorage(serialInput, &m_stringPool);
         }
 
+        if (perFragmentTimingEnabled) {
+            startTime = std::chrono::high_resolution_clock::now();
+        }
         // success is 0 and error is 1.
-        startTime = std::chrono::high_resolution_clock::now();
         if (executePlanFragment(planfragmentIds[m_currentIndexInBatch],
                                 inputDependencyIds ? inputDependencyIds[m_currentIndexInBatch] : -1,
                                 m_currentIndexInBatch == 0,
                                 m_currentIndexInBatch == (numFragments - 1))) {
             ++failures;
         }
-        endTime = std::chrono::high_resolution_clock::now();
-        elapsedNanoseconds = std::chrono::duration_cast<std::chrono::nanoseconds>(endTime - startTime);
-        m_perFragmentStatsOutput.writeLong(elapsedNanoseconds.count());
+        if (perFragmentTimingEnabled) {
+            endTime = std::chrono::high_resolution_clock::now();
+            elapsedNanoseconds = std::chrono::duration_cast<std::chrono::nanoseconds>(endTime - startTime);
+            m_perFragmentStatsOutput.writeLong(elapsedNanoseconds.count());
+        }
         if (failures > 0) {
             break;
         }

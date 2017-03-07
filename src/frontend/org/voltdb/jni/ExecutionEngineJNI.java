@@ -288,10 +288,20 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         checkErrorCode(errorCode);
     }
 
+    // Tell EE that we need the time measurements for the next fragment.
+    // The timing is off by default.
+    @Override
+    public void setPerFragmentTimingEnabled(boolean enabled) {
+        perFragmentStatsBuffer.clear();
+        perFragmentStatsBuffer.put((byte)(enabled ? 1 : 0));
+    }
+
     // Extract the per-fragment stats from the buffer.
     @Override
     public int extractPerFragmentStats(int batchSize, long[] durationsOut) {
         perFragmentStatsBuffer.clear();
+        // Discard the first byte since it is the timing on/off switch.
+        perFragmentStatsBuffer.get();
         int succeededFragmentsCount = perFragmentStatsBuffer.getInt();
         if (durationsOut != null) {
             assert(durationsOut.length >= succeededFragmentsCount);
