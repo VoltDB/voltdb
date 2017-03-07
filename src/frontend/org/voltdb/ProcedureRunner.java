@@ -232,6 +232,10 @@ public class ProcedureRunner {
                         m_catProc,
                         stmtList)
                 );
+        ProcStatsOption statsOption = m_procedure.getClass().getAnnotation(ProcStatsOption.class);
+        if (statsOption != null) {
+            m_statsCollector.setStatsSamplingInterval(statsOption.samplingInterval());
+        }
     }
 
     public ExecutionEngine getEngine() {

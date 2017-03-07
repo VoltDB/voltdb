@@ -35,9 +35,13 @@ public class ProcedureStatsCollector extends SiteStatsSource {
     private static final VoltLogger log = new VoltLogger("HOST");
 
     /**
-     * Record procedure execution time every N invocations
+     * Record statistics of procedure execution every N invocations.
      */
-    private int timeCollectionInterval = 20;
+    private int m_statsSamplingInterval = 20;
+
+    protected void setStatsSamplingInterval(int timeCollectionInterval) {
+        m_statsSamplingInterval = timeCollectionInterval;
+    }
 
     /**
      * Record statistics for each statement in the stored procedure.
@@ -193,7 +197,7 @@ public class ProcedureStatsCollector extends SiteStatsSource {
      * Called when a procedure begins executing. Caches the time the procedure starts.
      */
     public final void beginProcedure(boolean isSystemProc) {
-        if (m_procStat.m_invocations % timeCollectionInterval == 0 || (isSystemProc && isProcedureUAC())) {
+        if (m_procStat.m_invocations % m_statsSamplingInterval == 0 || (isSystemProc && isProcedureUAC())) {
             m_procStat.m_currentStartTime = System.nanoTime();
         }
     }
