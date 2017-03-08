@@ -55,9 +55,10 @@ public class TestProcedureDetails extends RegressionSuite {
          */
         public ProcedureDetailTestConfig(int configValue) {
             boolean twoBatch = (configValue & m_option2BATCHMask) > 0;
-            boolean rw = (configValue & m_optionRWMask) > 0;
+            boolean readwrite = (configValue & m_optionRWMask) > 0;
             boolean singlePartition = (configValue & m_singlePartitionMask) > 0;
-            boolean err = (configValue & m_optionERRMask) > 0;
+            boolean failure = (configValue & m_optionFAILMask) > 0;
+            boolean abort = (configValue & m_optionABORTMask) > 0;
             if (singlePartition) {
                 // Run the single partition procedure.
                 m_nameOfProcedureToCall = "ProcedureDetailTestSP";
@@ -68,16 +69,24 @@ public class TestProcedureDetails extends RegressionSuite {
             }
             StringBuilder argBuilder = new StringBuilder();
             if (twoBatch) {
-                argBuilder.append("2batch ");
+                argBuilder.append("twobatch ");
             }
-            if (rw) {
-                argBuilder.append("rw ");
+            if (readwrite) {
+                argBuilder.append("readwrite ");
             }
-            if (err) {
-                argBuilder.append("err");
+            if (failure) {
+                argBuilder.append("failure ");
+            }
+            if (abort) {
+                argBuilder.append("abort ");
             }
             m_argString = argBuilder.toString();
-            m_expectsException = err && ! (singlePartition && twoBatch);
+            // If both "abort" and "twobatch" are present, the abort exception in the first
+            // batch will be handled so that the second batch can still run.
+            // But if the first batch in a multi-partition procedure failed, the procedure will abort
+            // anyway even if the exception is being handled:
+            // Multi-partition procedure xxx attempted to execute new batch after hitting EE exception in a previous batch
+            m_expectsException = failure || (abort && ! (singlePartition && twoBatch));
         }
 
         public String getNameOfProcedureToCall() {
@@ -95,11 +104,13 @@ public class TestProcedureDetails extends RegressionSuite {
         private String m_nameOfProcedureToCall;
         private String m_argString;
         private boolean m_expectsException;
-        static final int m_singlePartitionMask = 1 << 3;
-        static final int m_option2BATCHMask = 1 << 2;
-        static final int m_optionRWMask = 1 << 1;
-        static final int m_optionERRMask = 1 << 0;
-        static final int m_optionCount = 4;
+
+        static final int m_singlePartitionMask = 1 << 4;
+        static final int m_option2BATCHMask = 1 << 3;
+        static final int m_optionRWMask = 1 << 2;
+        static final int m_optionFAILMask = 1 << 1;
+        static final int m_optionABORTMask = 1 << 0;
+        static final int m_optionCount = 5;
     }
 
     private void validateProcedureDetail(ProcedureDetailTestConfig testConfig, VoltTable procedureDetail) {
@@ -108,37 +119,41 @@ public class TestProcedureDetails extends RegressionSuite {
 
     public void testProcedureDetail() throws Exception {
         Client client = getClient();
-        // Exhaust all the combinatorial possibilities of the m_optionCount options.
+        // Exhaust all the combinatorial possibilities of the *m_optionCount* options.
+        // In total, 32 (2^5) different scenarios are being tested here.
         int maxConfigValue = 1 << ProcedureDetailTestConfig.m_optionCount;
         for (int configValue = 0; configValue < maxConfigValue; configValue++) {
             ProcedureDetailTestConfig testConfig = new ProcedureDetailTestConfig(configValue);
-            System.out.println("========================================================================================");
+            System.out.println("\n========================================================================================");
             System.out.println(String.format("exec %s %d '%s'",
-                testConfig.getNameOfProcedureToCall(),
-                configValue, testConfig.getArgumentString()));
+                    testConfig.getNameOfProcedureToCall(),
+                    configValue, testConfig.getArgumentString()));
             try {
                 client.callProcedure(testConfig.getNameOfProcedureToCall(),
-                        configValue, testConfig.getArgumentString());
+                                     configValue, testConfig.getArgumentString());
             }
             catch (ProcCallException pce) {
                 if (! testConfig.expectsException()) {
                     throw pce;
                 }
+                System.out.println("\nCaught exception as expected:\n" + pce.getMessage());
                 continue;
             }
             finally {
+                // Note that pass 1 as the second parameter to get incremental statistics.
                 VoltTable procedureDetail = client.callProcedure("@Statistics", "PROCEDUREDETAIL", 1).getResults()[0];
                 System.out.println(procedureDetail.toFormattedString());
                 validateProcedureDetail(testConfig, procedureDetail);
             }
+            // The test configuration says an exception is expected, but we did not get it.
             if (testConfig.expectsException()) {
                 throw new Exception(String.format("Expects an exception from exec %s %d '%s', but did not get it.",
-                                                    testConfig.getNameOfProcedureToCall(),
-                                                    configValue, testConfig.getArgumentString()));
+                                                  testConfig.getNameOfProcedureToCall(),
+                                                  configValue, testConfig.getArgumentString()));
             }
         }
         VoltTable procedureDetail = client.callProcedure("@Statistics", "PROCEDUREDETAIL", 0).getResults()[0];
-        System.out.println(procedureDetail.toFormattedString());
+//        System.out.println(procedureDetail.toFormattedString());
     }
 
     /**
@@ -158,6 +173,8 @@ public class TestProcedureDetails extends RegressionSuite {
         project.setUseDDLSchema(true);
         project.addLiteralSchema("CREATE TABLE ENG11890 (a INTEGER NOT NULL, b VARCHAR(10));");
         project.addPartitionInfo("ENG11890", "a");
+        // Note that those two stored procedures have @ProcStatsOption annotations,
+        // every invocation of them will be sampled in the procedure detail table.
         project.addProcedures(ProcedureDetailTestSP.class, ProcedureDetailTestMP.class);
 
         // 2-node cluster, 2 sites per host, k = 0 running on the JNI backend
@@ -166,13 +183,6 @@ public class TestProcedureDetails extends RegressionSuite {
         assertTrue(config.compile(project));
         // add this config to the set of tests to run
         builder.addServerConfig(config);
-
-        // 2-node cluster, 2 sites per host, k = 0 running on the IPC backend
-//        config = new LocalCluster("proceduredetail-ipc.jar", 2, 2, 0, BackendTarget.NATIVE_EE_IPC);
-//        // build the jarfile
-//        assertTrue(config.compile(project));
-//        // add this config to the set of tests to run
-//        builder.addServerConfig(config);
 
         return builder;
     }
