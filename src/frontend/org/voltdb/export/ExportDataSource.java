@@ -455,13 +455,13 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             }
         } catch (RejectedExecutionException e) {
             return 0;
+        } catch (IOException e){
+            assert e.getMessage().contains("has been closed") : e.getMessage();
+            return 0;
         } catch (Throwable t) {
             // IOException is expected if the committed buffer was closed when stats are requested.
-            if (!(Throwables.getRootCause(t) instanceof IOException)){
-                Throwables.throwIfUnchecked(t);
-                throw new RuntimeException(t);
-            }
-            return 0;
+            Throwables.throwIfUnchecked(t);
+            throw new RuntimeException(t);
         }
     }
 
@@ -774,7 +774,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     }
                 }
             } catch (RuntimeException e) {
-                if (Throwables.getRootCause(e) instanceof IOException) {
+                if (e.getCause() instanceof IOException) {
                     VoltDB.crashLocalVoltDB("Error attempting to find unpolled export data", true, e);
                 } else {
                     throw e;
