@@ -147,7 +147,7 @@ public class TestNTProcs extends TestCase {
             assertTrue(Thread.currentThread().getName().startsWith(NTProcedureService.NTPROC_THREADPOOL_NAMEPREFIX));
 
             System.out.println("Did it NT1!");
-            return callProcedure("TestNTProcs$DelayProc", 1).thenApplyAsync(this::secondPart, m_runner.m_executorService);
+            return callProcedure("TestNTProcs$DelayProc", 1).thenApply(this::secondPart);
         }
     }
 
@@ -189,7 +189,7 @@ public class TestNTProcs extends TestCase {
             assertTrue(Thread.currentThread().getName().startsWith(NTProcedureService.NTPROC_THREADPOOL_NAMEPREFIX));
 
             System.out.println("Did it NT1!");
-            return callProcedure("TestNTProcs$DelayProc", 1).thenApplyAsync(this::secondPart, m_runner.m_executorService);
+            return callProcedure("TestNTProcs$DelayProc", 1).thenApply(this::secondPart);
         }
     }
 
