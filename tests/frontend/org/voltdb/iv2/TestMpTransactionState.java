@@ -211,6 +211,18 @@ public class TestMpTransactionState extends TestCase
         return non_local;
     }
 
+    private long[] configureHSIdsForMailbox(int count, long buddyHSId)
+    {
+        long[] non_local = new long[count - 1];
+        int index = 0;
+        for (long i = 0; i < count; i++) {
+            if (i != buddyHSId) {
+                non_local[index++] = i;
+            }
+        }
+        return non_local;
+    }
+
     @Test
     public void testOneSitePartitionedRead() throws IOException
     {
@@ -303,8 +315,10 @@ public class TestMpTransactionState extends TestCase
 
         // This will be passed a FragmentTaskMessage with no deps
         dut.createAllParticipatingFragmentWork(plan.remoteWork);
+        non_local = configureHSIdsForMailbox(hsids, buddyHSId);
         // we should send 6 messages
         verify(mailbox).send(eq(non_local), (VoltMessage)any());
+        verify(mailbox).send(eq(new long[] {buddyHSId}), (VoltMessage)any());
 
         // to simplify, offer messages first
         // offer all the necessary fragment responses to satisfy deps
@@ -576,8 +590,10 @@ public class TestMpTransactionState extends TestCase
 
         // This will be passed a FragmentTaskMessage with no deps
         dut.createAllParticipatingFragmentWork(plan.remoteWork);
+        non_local = configureHSIdsForMailbox(hsids, buddyHSId);
         // we should send 6 messages
         verify(mailbox).send(eq(non_local), (VoltMessage)any());
+        verify(mailbox).send(eq(new long[] {buddyHSId}), (VoltMessage)any());
 
         // to simplify, offer messages first
         // offer all the necessary fragment responses to satisfy deps
