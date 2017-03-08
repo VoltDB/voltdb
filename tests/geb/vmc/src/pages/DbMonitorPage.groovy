@@ -77,8 +77,8 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         filterStoredProcedure           { $("#filterStoredProc") }
         filterDatabaseTable             { $("#filterDT") }
 
-        databaseTableCurrentPage        { $("#lblPreviousTable") }
-        databaseTableTotalPage          { $("#lblTotalPagesofTables") }
+        databaseTableCurrentPage        { $("#tblDT_paginate > div > span.pageIndex") }
+        databaseTableTotalPage          { $("#tblDT_paginate > div > span.totalPages") }
 
         displayPreference               { $("#showMyPreference") }
         graphView                       { $('#graphView') }
