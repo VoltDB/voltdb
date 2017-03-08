@@ -96,27 +96,6 @@ public class SSLConfiguration {
             .add("TLS_DHE_DSS_WITH_AES_128_GCM_SHA256")
             .build();
 
-    // override the specified values using any provided system properties
-    public static void applySystemProperties(SslConfig sslConfig) {
-
-        String keyStorePath = System.getProperty("javax.net.ssl.keyStore");
-        if (keyStorePath != null) {
-            sslConfig.keyStorePath = keyStorePath;
-        }
-        String keyStorePassword = System.getProperty("javax.net.ssl.keyStorePassword");
-        if (keyStorePassword != null) {
-            sslConfig.keyStorePassword = keyStorePassword;
-        }
-        String trustStorePath = System.getProperty("javax.net.ssl.trustStore");
-        if (trustStorePath != null) {
-            sslConfig.trustStorePath = trustStorePath;
-        }
-        String trustStorePassword = System.getProperty("javax.net.ssl.trustStorePassword");
-        if (trustStorePassword != null) {
-            sslConfig.trustStorePassword = trustStorePassword;
-        }
-    }
-
     public static SSLContext initializeSslContext(SslConfig sslConfig)
             throws NoSuchAlgorithmException, KeyStoreException, IOException, FileNotFoundException, CertificateException, UnrecoverableKeyException, KeyManagementException {
         SSLContext sslContext = SSLContext.getInstance("TLS");
@@ -176,17 +155,32 @@ public class SSLConfiguration {
     }
 
     public static class SslConfig {
-        String keyStorePath = null;
-        String keyStorePassword = null;
-        String trustStorePath = null;
-        String trustStorePassword = null;
+        public final String keyStorePath;
+        public final String keyStorePassword;
+        public final String trustStorePath;
+        public final String trustStorePassword;
 
         public SslConfig(String keyStorePath, String keyStorePassword, String trustStorePath, String trustStorePassword) {
+            String pval = System.getProperty("javax.net.ssl.keyStore");
+            if (pval != null) {
+                keyStorePath = pval;
+            }
+            pval = System.getProperty("javax.net.ssl.keyStorePassword");
+            if (pval != null) {
+                keyStorePassword = pval;
+            }
+            pval = System.getProperty("javax.net.ssl.trustStore");
+            if (pval != null) {
+                trustStorePath = pval;
+            }
+            pval = System.getProperty("javax.net.ssl.trustStorePassword");
+            if (pval != null) {
+                trustStorePassword = pval;
+            }
             this.keyStorePath = keyStorePath;
             this.keyStorePassword = keyStorePassword;
             this.trustStorePath = trustStorePath;
             this.trustStorePassword = trustStorePassword;
         }
-
     }
 }

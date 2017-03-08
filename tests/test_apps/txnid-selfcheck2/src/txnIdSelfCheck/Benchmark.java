@@ -361,7 +361,11 @@ public class Benchmark {
         log.info(config.getConfigDumpString());
 
         Boolean ssl = (config.sslfile.length() > 0);
-        ClientConfig clientConfig = new ClientConfig("", "", new StatusListener(), ssl, config.sslfile);
+        ClientConfig clientConfig = new ClientConfig("", "", new StatusListener());
+        if (ssl) {
+            clientConfig.setTrustStore(config.sslfile);
+            clientConfig.enableSSL();
+        }
 
         if (config.topologyaware) {
             clientConfig.setTopologyChangeAware(true);

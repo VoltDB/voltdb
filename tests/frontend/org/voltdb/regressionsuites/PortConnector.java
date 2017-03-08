@@ -91,7 +91,6 @@ public class PortConnector {
                         sslProperties.getProperty(SSLConfiguration.KEYSTORE_PASSWORD_CONFIG_PROP),
                         sslProperties.getProperty(SSLConfiguration.TRUSTSTORE_CONFIG_PROP),
                         sslProperties.getProperty(SSLConfiguration.TRUSTSTORE_PASSWORD_CONFIG_PROP));
-                SSLConfiguration.applySystemProperties(sslConfig);
 
             } catch (IOException ioe) {
                 throw new IllegalArgumentException("Unable to access SSL configuration.", ioe);

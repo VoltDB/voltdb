@@ -27,7 +27,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.voltcore.utils.ssl.SSLConfiguration;
-
 import org.voltdb.client.BatchTimeoutOverrideType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
@@ -189,7 +188,7 @@ public class JDBC4ClientConnection implements Closeable {
         boolean enableSSL = (sslConfig != null) ? true : false;
 
         // Create configuration
-        this.config = new ClientConfig(user, password, enableSSL);
+        this.config = new ClientConfig(user, password);
         config.setHeavyweight(isHeavyWeight);
         if (maxOutstandingTxns > 0)
             config.setMaxOutstandingTxns(maxOutstandingTxns);
@@ -197,7 +196,8 @@ public class JDBC4ClientConnection implements Closeable {
         this.config.setReconnectOnConnectionLoss(reconnectOnConnectionLoss);
 
         if (enableSSL) {
-            config.setSSLConfig(sslConfig);
+            config.setTrustStore(sslConfig.trustStorePath, sslConfig.trustStorePassword);
+            config.enableSSL();
         }
 
         // Create client and connect.

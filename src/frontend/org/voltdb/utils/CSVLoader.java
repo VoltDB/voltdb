@@ -431,10 +431,14 @@ public class CSVLoader implements BulkLoaderErrorHandler {
         final String[] serverlist = config.servers.split(",");
 
         // If we need to prompt the user for a password, do so.
-        config.password = cfg.readPasswordIfNeeded(config.user, config.password, "Enter password: ");
+        config.password = CLIConfig.readPasswordIfNeeded(config.user, config.password, "Enter password: ");
 
         // Create connection
-        final ClientConfig c_config = new ClientConfig(config.user, config.password, null, (config.ssl != null && config.ssl.length() > 0), config.ssl);
+        final ClientConfig c_config = new ClientConfig(config.user, config.password, null);
+        if (config.ssl != null && !config.ssl.trim().isEmpty()) {
+            c_config.setTrustStore(config.ssl);
+            c_config.enableSSL();
+        }
         c_config.setProcedureCallTimeout(0); // Set procedure all to infinite
         Client csvClient = null;
         try {

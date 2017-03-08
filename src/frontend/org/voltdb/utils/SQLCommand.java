@@ -48,10 +48,6 @@ import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import jline.console.CursorBuffer;
-import jline.console.KeyMap;
-import jline.console.history.FileHistory;
-
 import org.voltdb.CLIConfig;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -68,6 +64,10 @@ import org.voltdb.parser.SQLParser.FileOption;
 import org.voltdb.parser.SQLParser.ParseRecallResults;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
+
+import jline.console.CursorBuffer;
+import jline.console.KeyMap;
+import jline.console.history.FileHistory;
 
 public class SQLCommand
 {
@@ -1399,7 +1399,11 @@ public class SQLCommand
         }
 
         // Create connection
-        ClientConfig config = new ClientConfig(user, password, null, enableSSL, sslConfigFile);
+        ClientConfig config = new ClientConfig(user, password, null);
+        if (enableSSL && sslConfigFile != null && !sslConfigFile.trim().isEmpty()) {
+            config.setTrustStore(sslConfigFile);
+            config.enableSSL();
+        }
         config.setProcedureCallTimeout(0);  // Set procedure all to infinite timeout, see ENG-2670
         try {
             // if specified enable kerberos

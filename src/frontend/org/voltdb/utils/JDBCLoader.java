@@ -325,10 +325,14 @@ public class JDBCLoader implements BulkLoaderErrorHandler {
         final String[] serverlist = m_config.servers.split(",");
 
         // If we need to prompt the user for a VoltDB password, do so.
-        m_config.password = cfg.readPasswordIfNeeded(m_config.user, m_config.password, "Enter VoltDB password: ");
+        m_config.password = CLIConfig.readPasswordIfNeeded(m_config.user, m_config.password, "Enter VoltDB password: ");
 
         // Create connection
-        final ClientConfig c_config = new ClientConfig(m_config.user, m_config.password, null, (m_config.ssl != null && m_config.ssl.length() > 0), m_config.ssl);
+        final ClientConfig c_config = new ClientConfig(m_config.user, m_config.password, null);
+        if (m_config.ssl != null && !m_config.ssl.trim().isEmpty()) {
+            c_config.setTrustStore(m_config.ssl);
+            c_config.enableSSL();
+        }
         c_config.setProcedureCallTimeout(0); // Set procedure all to infinite
         Client csvClient = null;
         try {
@@ -357,7 +361,7 @@ public class JDBCLoader implements BulkLoaderErrorHandler {
             }
 
             // If we need to prompt the user for a JDBC datasource password, do so.
-            m_config.jdbcpassword = cfg.readPasswordIfNeeded(m_config.jdbcuser, m_config.jdbcpassword, "Enter JDBC source database password: ");
+            m_config.jdbcpassword = CLIConfig.readPasswordIfNeeded(m_config.jdbcuser, m_config.jdbcpassword, "Enter JDBC source database password: ");
 
             //Created Source reader
             JDBCStatementReader.initializeReader(cfg, csvClient);

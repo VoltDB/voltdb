@@ -289,8 +289,11 @@ public class SyncBenchmark {
     public SyncBenchmark(KVConfig config) {
         this.config = config;
 
-        Boolean ssl = (config.sslfile.length() > 0); // could put below as expression in the call but this seems clearer
-        ClientConfig clientConfig = new ClientConfig("", "", null, ssl, config.sslfile);
+        ClientConfig clientConfig = new ClientConfig("", "", null);
+        if (config.sslfile != null && !config.sslfile.trim().isEmpty()) {
+            clientConfig.setTrustStore(config.sslfile);
+            clientConfig.enableSSL();
+        }
 
         clientConfig.setReconnectOnConnectionLoss(true);
         clientConfig.setClientAffinity(true);
