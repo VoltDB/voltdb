@@ -219,61 +219,64 @@ public class ProcedureStatsCollector extends SiteStatsSource {
         if (stat == null) {
             return;
         }
-        if (perFragmentStatsRecording) {
-            // This is a sampled invocation.
-            // Update timings and size statistics.
-            if (duration < 0) {
-                if (Math.abs(duration) > 1000000000) {
-                    log.info("Statement: " + stat.m_stmtName + " in procedure: " + m_procName +
-                             " recorded a negative execution time larger than one second: " +
-                             duration);
-                }
-            }
-            else {
-                stat.m_cachedExecutionTime += duration;
-                if (result != null) {
-                    stat.m_cachedResultSize += result.getSerializedSize();
-                }
-                if (parameterSet != null) {
-                    stat.m_cachedParameterSetSize += parameterSet.getSerializedSize();
-                }
-                // If the worker task failed, the coordinator task will not be executed.
-                // In this case, ignore the commitPerFragmentStats flag, commit changes anyway.
-                if (commitPerFragmentStats || failed) {
-                    stat.m_totalTimedExecutionTime += stat.m_cachedExecutionTime;
-                    stat.m_timedInvocations++;
-
-                    // sampled timings
-                    stat.m_minExecutionTime = Math.min(stat.m_cachedExecutionTime, stat.m_minExecutionTime);
-                    stat.m_maxExecutionTime = Math.max(stat.m_cachedExecutionTime, stat.m_maxExecutionTime);
-                    stat.m_lastMinExecutionTime = Math.min(stat.m_cachedExecutionTime, stat.m_lastMinExecutionTime);
-                    stat.m_lastMaxExecutionTime = Math.max(stat.m_cachedExecutionTime, stat.m_lastMaxExecutionTime);
-
-                    // sampled size statistics
-                    stat.m_totalResultSize += stat.m_cachedResultSize;
-                    stat.m_minResultSize = Math.min(stat.m_cachedResultSize, stat.m_minResultSize);
-                    stat.m_maxResultSize = Math.max(stat.m_cachedResultSize, stat.m_maxResultSize);
-                    stat.m_lastMinResultSize = Math.min(stat.m_cachedResultSize, stat.m_lastMinResultSize);
-                    stat.m_lastMaxResultSize = Math.max(stat.m_cachedResultSize, stat.m_lastMaxResultSize);
-
-                    stat.m_totalParameterSetSize += stat.m_cachedParameterSetSize;
-                    stat.m_minParameterSetSize = Math.min(stat.m_cachedParameterSetSize, stat.m_minParameterSetSize);
-                    stat.m_maxParameterSetSize = Math.max(stat.m_cachedParameterSetSize, stat.m_maxParameterSetSize);
-                    stat.m_lastMinParameterSetSize = Math.min(stat.m_cachedParameterSetSize, stat.m_lastMinParameterSetSize);
-                    stat.m_lastMaxParameterSetSize = Math.max(stat.m_cachedParameterSetSize, stat.m_lastMaxParameterSetSize);
-
-                    // clear the cache after committing the statistics.
-                    stat.m_cachedExecutionTime = 0;
-                    stat.m_cachedResultSize = 0;
-                    stat.m_cachedParameterSetSize = 0;
-                }
-            }
-        }
+        // m_failureCount and m_invocations need to updated even if the current invocation is not sampled.
         if (failed) {
             stat.m_failureCount++;
         }
+        // If the worker task failed, the coordinator task will not be executed.
+        // In this case, ignore the commitPerFragmentStats flag, commit changes anyway.
+        // Same for the checks below.
         if (commitPerFragmentStats || failed) {
             stat.m_invocations++;
+        }
+        // If the current invocation is not sampled, we can stop now.
+        if (! perFragmentStatsRecording) {
+            return;
+        }
+        // This is a sampled invocation.
+        // Update timings and size statistics below.
+        if (duration < 0) {
+            if (Math.abs(duration) > 1000000000) {
+                log.info("Statement: " + stat.m_stmtName + " in procedure: " + m_procName +
+                         " recorded a negative execution time larger than one second: " + duration);
+            }
+            return;
+        }
+        stat.m_cachedExecutionTime += duration;
+        if (result != null) {
+            stat.m_cachedResultSize += result.getSerializedSize();
+        }
+        if (parameterSet != null) {
+            stat.m_cachedParameterSetSize += parameterSet.getSerializedSize();
+        }
+        if (commitPerFragmentStats || failed) {
+            // Commit changes for the stats numbers
+            stat.m_totalTimedExecutionTime += stat.m_cachedExecutionTime;
+            stat.m_timedInvocations++;
+
+            // sampled timings
+            stat.m_minExecutionTime = Math.min(stat.m_cachedExecutionTime, stat.m_minExecutionTime);
+            stat.m_maxExecutionTime = Math.max(stat.m_cachedExecutionTime, stat.m_maxExecutionTime);
+            stat.m_lastMinExecutionTime = Math.min(stat.m_cachedExecutionTime, stat.m_lastMinExecutionTime);
+            stat.m_lastMaxExecutionTime = Math.max(stat.m_cachedExecutionTime, stat.m_lastMaxExecutionTime);
+
+            // sampled size statistics
+            stat.m_totalResultSize += stat.m_cachedResultSize;
+            stat.m_minResultSize = Math.min(stat.m_cachedResultSize, stat.m_minResultSize);
+            stat.m_maxResultSize = Math.max(stat.m_cachedResultSize, stat.m_maxResultSize);
+            stat.m_lastMinResultSize = Math.min(stat.m_cachedResultSize, stat.m_lastMinResultSize);
+            stat.m_lastMaxResultSize = Math.max(stat.m_cachedResultSize, stat.m_lastMaxResultSize);
+
+            stat.m_totalParameterSetSize += stat.m_cachedParameterSetSize;
+            stat.m_minParameterSetSize = Math.min(stat.m_cachedParameterSetSize, stat.m_minParameterSetSize);
+            stat.m_maxParameterSetSize = Math.max(stat.m_cachedParameterSetSize, stat.m_maxParameterSetSize);
+            stat.m_lastMinParameterSetSize = Math.min(stat.m_cachedParameterSetSize, stat.m_lastMinParameterSetSize);
+            stat.m_lastMaxParameterSetSize = Math.max(stat.m_cachedParameterSetSize, stat.m_lastMaxParameterSetSize);
+
+            // clear the cache after committing the statistics.
+            stat.m_cachedExecutionTime = 0;
+            stat.m_cachedResultSize = 0;
+            stat.m_cachedParameterSetSize = 0;
         }
     }
 
