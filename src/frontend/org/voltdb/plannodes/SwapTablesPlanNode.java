@@ -495,8 +495,10 @@ public class SwapTablesPlanNode extends AbstractOperationPlanNode {
      */
     private void validateTableCompatibility(String theName, String otherName,
             Table theTable, Table otherTable, FailureMessage failureMessage) {
-        if (theTable.getIsdred() || otherTable.getIsdred()) {
-            failureMessage.addReason("DR is enabled on one or both of the tables");
+
+        if (theTable.getIsdred() != otherTable.getIsdred()) {
+            failureMessage.addReason("To swap table " + theName + " with table " + otherName +
+            " both tables must be DR enabled or both tables must not be DR enabled.");
         }
 
         if (theTable.getIsreplicated() != otherTable.getIsreplicated()) {
