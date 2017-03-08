@@ -88,6 +88,9 @@ public class StatsAgent extends OpsAgent
     }
 
     private VoltTable[] sortProcedureDetail(VoltTable[] baseStats) {
+        if (baseStats == null || baseStats.length != 1) {
+            return baseStats;
+        }
         ProcedureDetailResultTable result = new ProcedureDetailResultTable(baseStats[0]);
         return result.getSortedResultTable();
     }

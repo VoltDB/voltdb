@@ -76,6 +76,8 @@ protected:
 
     void validatePerFragmentStatsBuffer(int32_t expectedSucceededFragmentsCount, int32_t batchSize) {
         voltdb::ReferenceSerializeInputBE perFragmentStatsBuffer(m_per_fragment_stats_buffer.get(), m_smallBufferSize);
+        // Skip the perFragmentTimingEnabled flag.
+        perFragmentStatsBuffer.readByte();
         int32_t actualSucceededFragmentsCount = perFragmentStatsBuffer.readInt();
         ASSERT_EQ(expectedSucceededFragmentsCount, actualSucceededFragmentsCount);
         int32_t numOfValuesToCheck = expectedSucceededFragmentsCount;
@@ -97,6 +99,10 @@ protected:
 TEST_F(PerFragmentStatsTest, TestPerFragmentStatsBuffer) {
     // catalogPayload, anInsertPlan, and aSelectPlan are defined in PerFragmentStatsTest.hpp
     initialize(catalogPayload);
+    // Set perFragmentTimingEnabled bit to true, all the fragments will be timed.
+    voltdb::ReferenceSerializeOutput perFragmentStatsOutput;
+    perFragmentStatsOutput.initializeWithPosition(m_per_fragment_stats_buffer.get(), m_smallBufferSize, 0);
+    perFragmentStatsOutput.writeByte(static_cast<int8_t>(1));
     // Add query plans.
     fragmentId_t insertPlanId = 100;
     fragmentId_t selectPlanId = 200;
@@ -117,8 +123,8 @@ TEST_F(PerFragmentStatsTest, TestPerFragmentStatsBuffer) {
     // Fragment #4: SELECT * FROM T WHERE a = 1 and b >= 4.0 and C like 'str%';
     addParameters(1, 4.0, "str%%");
     voltdb::ReferenceSerializeInputBE params(m_parameter_buffer.get(), m_smallBufferSize);
-    // This batch should succeed and return 0.
     m_engine->resetPerFragmentStatsOutputBuffer();
+    // This batch should succeed and return 0.
     ASSERT_EQ(0, m_engine->executePlanFragments(4, planfragmentIds, NULL, params, 1000, 1000, 1000, 1000, 1));
     // Fetch the results. We have forced them to be written
     // to our own buffer in the local engine.  But we don't

@@ -375,9 +375,6 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
     m_executorContext->m_progressStats.resetForNewBatch();
     NValueArray &params = m_executorContext->getParameterContainer();
 
-    // The first byte is a flag indicating whether the timing is enabled.
-    // This byte shuld not be overwritten.
-    m_perFragmentStatsOutput.reserveBytes(sizeof(int8_t));
     size_t succeededFragmentsCountOffset = m_perFragmentStatsOutput.reserveBytes(sizeof(int32_t));
     std::chrono::high_resolution_clock::time_point startTime, endTime;
     std::chrono::duration<int64_t, std::nano> elapsedNanoseconds;

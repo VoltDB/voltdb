@@ -262,7 +262,9 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         void resetPerFragmentStatsOutputBuffer() {
             m_perFragmentStatsOutput.initializeWithPosition(m_perFragmentStatsBuffer,
                                                             m_perFragmentStatsBufferCapacity,
-                                                            0);
+                                                            sizeof(int8_t));
+            // The first byte is a flag indicating whether the timing is enabled.
+            // This byte shuld not be overwritten.
         }
 
         ReferenceSerializeOutput* getExceptionOutputSerializer() { return &m_exceptionOutput; }
