@@ -96,7 +96,6 @@ public class PersistentBinaryDeque implements BinaryDeque {
         public BBContainer poll(OutputContainerFactory ocf) throws IOException {
             synchronized (PersistentBinaryDeque.this) {
                 if (m_closed) {
-                    // ENG-12011 debug
                     throw new IOException("PBD.ReadCursor.poll(): " + m_cursorId + " - Reader has been closed");
                 }
                 assertions();
@@ -139,7 +138,6 @@ public class PersistentBinaryDeque implements BinaryDeque {
         public int getNumObjects() throws IOException {
             synchronized(PersistentBinaryDeque.this) {
                 if (m_closed) {
-                    // ENG-12011 debug
                     throw new IOException("Cannot compute object count of " + m_cursorId + " - Reader has been closed");
                 }
                 return m_numObjects - m_numObjectsDeleted - m_numRead;
@@ -155,7 +153,6 @@ public class PersistentBinaryDeque implements BinaryDeque {
         public long sizeInBytes() throws IOException {
             synchronized(PersistentBinaryDeque.this) {
                 if (m_closed) {
-                    // ENG-12011 debug
                     throw new IOException("Cannot compute size of " + m_cursorId + " - Reader has been closed");
                 }
                 assertions();
