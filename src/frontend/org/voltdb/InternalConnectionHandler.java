@@ -45,7 +45,6 @@ public class InternalConnectionHandler {
     // Atomically allows the catalog reference to change between access
     private final AtomicLong m_failedCount = new AtomicLong();
     private final AtomicLong m_submitSuccessCount = new AtomicLong();
-    private final AtomicInteger m_backpressureIndication = new AtomicInteger(0);
     private volatile Map<Integer, InternalClientResponseAdapter> m_adapters = ImmutableMap.of();
 
     public void addAdapter(int pid, InternalClientResponseAdapter adapter)
@@ -93,12 +92,6 @@ public class InternalConnectionHandler {
             m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.ERROR, null, fmt, procName);
             m_failedCount.incrementAndGet();
             return false;
-        }
-
-        //Indicate backpressure or not.
-        boolean b = hasBackPressure();
-        if (b) {
-            applyBackPressure();
         }
 
         StoredProcedureInvocation task = new StoredProcedureInvocation();
@@ -151,13 +144,6 @@ public class InternalConnectionHandler {
             return false;
         }
 
-        //Indicate backpressure or not.
-        boolean b = hasBackPressure();
-        caller.setBackPressure(b);
-        if (b) {
-            applyBackPressure();
-        }
-
         StoredProcedureInvocation task = new StoredProcedureInvocation();
 
         task.setProcName(proc);
@@ -191,35 +177,5 @@ public class InternalConnectionHandler {
         }
         m_submitSuccessCount.incrementAndGet();
         return true;
-    }
-
-    private boolean hasBackPressure() {
-        final boolean b = m_adapters.values().stream().anyMatch(InternalClientResponseAdapter::hasBackPressure);
-        int prev = m_backpressureIndication.get();
-        int delta = b ? 1 : -(prev > 1 ? prev >> 1 : 1);
-        int next = prev + delta;
-        while (next >= 0 && next <= 8 && !m_backpressureIndication.compareAndSet(prev, next)) {
-            prev = m_backpressureIndication.get();
-            delta = b ? 1 : -(prev > 1 ? prev >> 1 : 1);
-            next = prev + delta;
-        }
-        return b;
-    }
-
-    private void applyBackPressure() {
-        final int count = m_backpressureIndication.get();
-        if (count > 0) {
-            try { // increase sleep time exponentially to a max of 256ms
-                if (count > 8) {
-                    Thread.sleep(256);
-                } else {
-                    Thread.sleep(1<<count);
-                }
-            } catch(InterruptedException e) {
-                if (m_logger.isDebugEnabled()) {
-                    m_logger.debug("Sleep for back pressure interrupted", e);
-                }
-            }
-        }
     }
 }
