@@ -61,7 +61,7 @@ public class StatsAgent extends OpsAgent
         StatsSelector subselector = StatsSelector.valueOf(request.subselector);
         switch (subselector) {
         case PROCEDUREDETAIL:
-            request.aggregateTables = sortProcedureDetail(request.aggregateTables);
+            request.aggregateTables = sortProcedureDetailStats(request.aggregateTables);
             break;
         // For PROCEDURE-series tables, they are all based on the procedure detail table.
         case PROCEDURE:
@@ -87,7 +87,7 @@ public class StatsAgent extends OpsAgent
         }
     }
 
-    private VoltTable[] sortProcedureDetail(VoltTable[] baseStats) {
+    private VoltTable[] sortProcedureDetailStats(VoltTable[] baseStats) {
         if (baseStats == null || baseStats.length != 1) {
             return baseStats;
         }

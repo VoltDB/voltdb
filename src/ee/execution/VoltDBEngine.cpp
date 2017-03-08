@@ -375,15 +375,19 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
     m_executorContext->m_progressStats.resetForNewBatch();
     NValueArray &params = m_executorContext->getParameterContainer();
 
+    // Reserve the space to track the number of succeeded fragments.
     size_t succeededFragmentsCountOffset = m_perFragmentStatsOutput.reserveBytes(sizeof(int32_t));
+    // All the time measurements use nanoseconds.
     std::chrono::high_resolution_clock::time_point startTime, endTime;
     std::chrono::duration<int64_t, std::nano> elapsedNanoseconds;
-    ReferenceSerializeInputBE perFragmentStatsBufferIn(m_perFragmentStatsBuffer,
-                                                       m_perFragmentStatsBufferCapacity);
+    ReferenceSerializeInputBE perFragmentStatsBufferIn(getPerFragmentStatsBuffer(),
+                                                       getPerFragmentStatsBufferCapacity());
+    // There is a byte at the very begining of the per-fragment stats buffer indicating
+    // whether the time measurements should be enabled for the current batch.
+    // If the current procedure invocation is not sampled, all its batches will not be timed.
     bool perFragmentTimingEnabled = perFragmentStatsBufferIn.readByte() > 0;
 
     for (m_currentIndexInBatch = 0; m_currentIndexInBatch < numFragments; ++m_currentIndexInBatch) {
-
         int usedParamcnt = serialInput.readShort();
         m_executorContext->setUsedParameterCount(usedParamcnt);
         if (usedParamcnt < 0) {
@@ -408,6 +412,7 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
         if (perFragmentTimingEnabled) {
             endTime = std::chrono::high_resolution_clock::now();
             elapsedNanoseconds = std::chrono::duration_cast<std::chrono::nanoseconds>(endTime - startTime);
+            // Write the execution time to the per-fragment stats buffer.
             m_perFragmentStatsOutput.writeLong(elapsedNanoseconds.count());
         }
         if (failures > 0) {

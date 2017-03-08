@@ -264,7 +264,9 @@ class __attribute__((visibility("default"))) VoltDBEngine {
                                                             m_perFragmentStatsBufferCapacity,
                                                             sizeof(int8_t));
             // The first byte is a flag indicating whether the timing is enabled.
-            // This byte shuld not be overwritten.
+            // We let m_perFragmentStatsOutput skip the space reserved for this flag
+            // so this byte is preserved for the entire batch and the Java top end does
+            // not need to set this byte for each fragment individually.
         }
 
         ReferenceSerializeOutput* getExceptionOutputSerializer() { return &m_exceptionOutput; }
@@ -294,6 +296,9 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         /** Returns the size of buffer for receiving result tables from EE. */
         int getReusedResultBufferCapacity() const { return m_reusedResultCapacity; }
+
+        char* getPerFragmentStatsBuffer() const { return m_perFragmentStatsBuffer; }
+        int getPerFragmentStatsBufferCapacity() const { return m_perFragmentStatsBufferCapacity; }
 
         int64_t* getBatchFragmentIdsContainer() { return m_batchFragmentIdsContainer; }
 

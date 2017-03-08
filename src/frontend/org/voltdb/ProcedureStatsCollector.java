@@ -202,7 +202,7 @@ public class ProcedureStatsCollector extends SiteStatsSource {
         }
     }
 
-    public final boolean recording() {
+    public final boolean isRecording() {
         return m_procStat.m_currentStartTime > 0;
     }
 
@@ -289,50 +289,6 @@ public class ProcedureStatsCollector extends SiteStatsSource {
             boolean failed,
             VoltTable[] results,
             ParameterSet parameterSet) {
-        if (recording()) {
-            // This is a sampled invocation.
-            // Update timings and size statistics.
-            final long endTime = System.nanoTime();
-            final long delta = endTime - m_procStat.m_currentStartTime;
-            if (delta < 0) {
-                if (Math.abs(delta) > 1000000000) {
-                    log.info("Procedure: " + m_procName +
-                             " recorded a negative execution time larger than one second: " +
-                             delta);
-                }
-            }
-            else {
-                m_procStat.m_totalTimedExecutionTime += delta;
-                m_procStat.m_timedInvocations++;
-
-                // sampled timings
-                m_procStat.m_minExecutionTime = Math.min( delta, m_procStat.m_minExecutionTime);
-                m_procStat.m_maxExecutionTime = Math.max( delta, m_procStat.m_maxExecutionTime);
-                m_procStat.m_lastMinExecutionTime = Math.min( delta, m_procStat.m_lastMinExecutionTime);
-                m_procStat.m_lastMaxExecutionTime = Math.max( delta, m_procStat.m_lastMaxExecutionTime);
-
-                // sampled size statistics
-                int resultSize = 0;
-                if (results != null) {
-                    for (VoltTable result : results ) {
-                        resultSize += result.getSerializedSize();
-                    }
-                }
-                m_procStat.m_totalResultSize += resultSize;
-                m_procStat.m_minResultSize = Math.min(resultSize, m_procStat.m_minResultSize);
-                m_procStat.m_maxResultSize = Math.max(resultSize, m_procStat.m_maxResultSize);
-                m_procStat.m_lastMinResultSize = Math.min(resultSize, m_procStat.m_lastMinResultSize);
-                m_procStat.m_lastMaxResultSize = Math.max(resultSize, m_procStat.m_lastMaxResultSize);
-                int parameterSetSize = (
-                        parameterSet != null ? parameterSet.getSerializedSize() : 0);
-                m_procStat.m_totalParameterSetSize += parameterSetSize;
-                m_procStat.m_minParameterSetSize = Math.min(parameterSetSize, m_procStat.m_minParameterSetSize);
-                m_procStat.m_maxParameterSetSize = Math.max(parameterSetSize, m_procStat.m_maxParameterSetSize);
-                m_procStat.m_lastMinParameterSetSize = Math.min(parameterSetSize, m_procStat.m_lastMinParameterSetSize);
-                m_procStat.m_lastMaxParameterSetSize = Math.max(parameterSetSize, m_procStat.m_lastMaxParameterSetSize);
-            }
-            m_procStat.m_currentStartTime = -1;
-        }
         if (aborted) {
             m_procStat.m_abortCount++;
         }
@@ -340,6 +296,49 @@ public class ProcedureStatsCollector extends SiteStatsSource {
             m_procStat.m_failureCount++;
         }
         m_procStat.m_invocations++;
+        if (! isRecording()) {
+            return;
+        }
+        // This is a sampled invocation.
+        // Update timings and size statistics.
+        final long endTime = System.nanoTime();
+        final long delta = endTime - m_procStat.m_currentStartTime;
+        if (delta < 0) {
+            if (Math.abs(delta) > 1000000000) {
+                log.info("Procedure: " + m_procName +
+                         " recorded a negative execution time larger than one second: " +
+                         delta);
+            }
+            return;
+        }
+        m_procStat.m_totalTimedExecutionTime += delta;
+        m_procStat.m_timedInvocations++;
+
+        // sampled timings
+        m_procStat.m_minExecutionTime = Math.min( delta, m_procStat.m_minExecutionTime);
+        m_procStat.m_maxExecutionTime = Math.max( delta, m_procStat.m_maxExecutionTime);
+        m_procStat.m_lastMinExecutionTime = Math.min( delta, m_procStat.m_lastMinExecutionTime);
+        m_procStat.m_lastMaxExecutionTime = Math.max( delta, m_procStat.m_lastMaxExecutionTime);
+
+        // sampled size statistics
+        int resultSize = 0;
+        if (results != null) {
+            for (VoltTable result : results ) {
+                resultSize += result.getSerializedSize();
+            }
+        }
+        m_procStat.m_totalResultSize += resultSize;
+        m_procStat.m_minResultSize = Math.min(resultSize, m_procStat.m_minResultSize);
+        m_procStat.m_maxResultSize = Math.max(resultSize, m_procStat.m_maxResultSize);
+        m_procStat.m_lastMinResultSize = Math.min(resultSize, m_procStat.m_lastMinResultSize);
+        m_procStat.m_lastMaxResultSize = Math.max(resultSize, m_procStat.m_lastMaxResultSize);
+        int parameterSetSize = (parameterSet != null ? parameterSet.getSerializedSize() : 0);
+        m_procStat.m_totalParameterSetSize += parameterSetSize;
+        m_procStat.m_minParameterSetSize = Math.min(parameterSetSize, m_procStat.m_minParameterSetSize);
+        m_procStat.m_maxParameterSetSize = Math.max(parameterSetSize, m_procStat.m_maxParameterSetSize);
+        m_procStat.m_lastMinParameterSetSize = Math.min(parameterSetSize, m_procStat.m_lastMinParameterSetSize);
+        m_procStat.m_lastMaxParameterSetSize = Math.max(parameterSetSize, m_procStat.m_lastMaxParameterSetSize);
+        m_procStat.m_currentStartTime = -1;
     }
 
     /**

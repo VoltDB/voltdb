@@ -226,18 +226,34 @@ public class ProcedureRunner {
                         m_catProc,
                         stmtList)
                 );
+
+        // Read the ProcStatsOption annotation from the procedure class.
+        // Basically, it is about setting the sampling interval for this stored procedure.
         ProcStatsOption statsOption = m_procedure.getClass().getAnnotation(ProcStatsOption.class);
         if (statsOption != null) {
             m_statsCollector.setStatsSamplingInterval(statsOption.samplingInterval());
         }
     }
 
-    public ExecutionEngine getEngine() {
+    /**
+     * This function returns the ExecutionEngine for this site.
+     * ProcedureRunner needs the access to the ExecutionEngine for two purposes:
+     *     - Telling the C++ side to turn on/off the per-fragment time measurement.
+     *     - Collecting the time measurements and the failure indicator from
+     *       the per-fragment stats shared buffer.
+     * The ExecutionEngine may not have been initialized when a ProcedureRunner is created,
+     *     (See BaseInitiator.java, the configureCommon() function)
+     * so we do not find this engine in the constructor.
+     */
+    public ExecutionEngine getExecutionEngine() {
         if (m_ee != null) {
             return m_ee;
         }
+        // m_site is declared as SiteProcedureConnection here.
+        // SiteProcedureConnection only has two implementations: Site and MpRoSite.
+        // Only SP site has an underlying ExecutionEngine, MpRoSite does not.
         if (m_site instanceof Site) {
-            m_ee = ((Site)m_site).getEngine();
+            m_ee = ((Site)m_site).getExecutionEngine();
             return m_ee;
         }
         return null;
@@ -1053,7 +1069,7 @@ public class ProcedureRunner {
         }
     }
 
-    // Returns a list that contains the names of the statements that are defined in the stored procedure.
+    // Returns a list that contains the names of the statements which are defined in the stored procedure.
     protected ArrayList<String> reflect() {
         Map<String, SQLStmt> stmtMap;
 
@@ -1127,6 +1143,11 @@ public class ProcedureRunner {
         for (final Entry<String, SQLStmt> entry : stmtMap.entrySet()) {
             String name = entry.getKey();
             stmtNames.add(name);
+            // Label the SQLStmts with its variable name.
+            // This is useful for multi-partition stored procedures.
+            // When a statement is sent to another site for execution,
+            // that SP site can use this name to find the correct place to
+            // update the statistics numbers.
             entry.getValue().setStmtName(name);
             Statement s = m_catProc.getStatements().get(name);
             if (s != null) {
@@ -1551,7 +1572,7 @@ public class ProcedureRunner {
                                          finalTask,
                                          m_procedureName,
                                          m_procNameToLoadForFragmentTasks,
-                                         m_statsCollector.recording());
+                                         m_statsCollector.isRecording());
 
        // iterate over all sql in the batch, filling out the above data structures
        for (int i = 0; i < batch.size(); ++i) {
@@ -1658,7 +1679,8 @@ public class ProcedureRunner {
        }
 
        VoltTable[] results = null;
-       getEngine().setPerFragmentTimingEnabled(m_statsCollector.recording());
+       // Before executing the fragments, tell the EE if this batch should be timed.
+       getExecutionEngine().setPerFragmentTimingEnabled(m_statsCollector.isRecording());
        try {
            results = m_site.executePlanFragments(
                    batchSize,
@@ -1681,24 +1703,29 @@ public class ProcedureRunner {
            throw ex;
        }
        finally {
-           long[] durations = null;
-           if (m_statsCollector.recording()) {
-               durations = new long[batchSize];
+           long[] executionTimes = null;
+           if (m_statsCollector.isRecording()) {
+               executionTimes = new long[batchSize];
            }
-           succeededFragmentsCount = getEngine().extractPerFragmentStats(batchSize, durations);
+           succeededFragmentsCount = getExecutionEngine().extractPerFragmentStats(batchSize, executionTimes);
 
            for (i = 0; i < batchSize; i++) {
                QueuedSQL qs = batch.get(i);
+               // No coordinator task for a single partition procedure.
+               // Should directly commit per-fragment stats once the execution is completed.
+               boolean commitPerFragmentStats = true;
+               // If all the fragments in this batch are executed successfully, succeededFragmentsCount == batchSize.
+               // Otherwise, the fragment whose index equals succeededFragmentsCount is the one that failed.
+               boolean failed = i == succeededFragmentsCount;
                m_statsCollector.finishStatement(qs.stmt.getStmtName(),
-                                                // No coordinator task for single partition procedure.
-                                                // Should directly commit per-fragment stats once completed.
-                                                true,
-                                                m_statsCollector.recording(),
-                                                i == succeededFragmentsCount,
-                                                durations == null ? 0 : durations[i],
+                                                commitPerFragmentStats,
+                                                m_statsCollector.isRecording(),
+                                                failed,
+                                                executionTimes == null ? 0 : executionTimes[i],
                                                 results == null ? null : results[i],
                                                 qs.params);
-               if (i == succeededFragmentsCount) {
+               // If this fragment failed, no subsequent fragments will be executed.
+               if (failed) {
                    break;
                }
            }

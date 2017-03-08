@@ -169,6 +169,8 @@ public class MpTransactionState extends TransactionState
                 // send the FragmentTaskMessage with commitPerFragmentStats = true (default).
                 // Those sites does not need to execute another coordinator task,
                 // so they should immediately commit their statistics changes.
+                // For some system stored procedures, the m_buddyHSId may not be present in m_useHSIds.
+                // So we need to handle that differently.
                 int buddyHSIdExists = m_useHSIds.contains(Long.valueOf(m_buddyHSId)) ? 1 : 0;
                 long[] non_local_hsids = new long[m_useHSIds.size() - buddyHSIdExists];
                 int i = 0;

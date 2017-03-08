@@ -653,12 +653,12 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
 
     // Extract the per-fragment stats from the buffer.
     // This is totally faked, only ExecutionJNI has the real implementation.
-    public int extractPerFragmentStats(int batchSize, long[] durationsOut) {
-        if (durationsOut != null) {
-            for (int i = 0; i < durationsOut.length; i++) {
-                durationsOut[i] = 100;
+    public int extractPerFragmentStats(int batchSize, long[] executionTimesOut) {
+        if (executionTimesOut != null) {
+            for (int i = 0; i < executionTimesOut.length; i++) {
+                executionTimesOut[i] = 100;
             }
-            return durationsOut.length;
+            return executionTimesOut.length;
         }
         return batchSize;
     }

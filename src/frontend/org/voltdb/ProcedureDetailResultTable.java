@@ -23,6 +23,11 @@ import java.util.Comparator;
 
 import org.voltdb.VoltTable.ColumnInfo;
 
+/**
+ * This class is used to re-arrange the output of the PROCEDUREDETAIL selector.
+ * It orders the output by: 
+ *     procedure_name, statement_name, host_id, site_id, partition_id, timestamp (descending);
+ */
 public class ProcedureDetailResultTable {
 
     private ArrayList<ProcedureDetailResultRow> m_rows;
@@ -54,72 +59,68 @@ public class ProcedureDetailResultTable {
         table.resetRowPosition();
         while (table.advanceRow()) {
             m_rows.add(new ProcedureDetailResultRow(
-                table.getLong("TIMESTAMP"),
-                table.getLong(VoltSystemProcedure.CNAME_HOST_ID),
-                table.getString("HOSTNAME"),
-                table.getLong(VoltSystemProcedure.CNAME_SITE_ID),
-                table.getLong("PARTITION_ID"),
-                table.getString("PROCEDURE"),
-                table.getString("STATEMENT"),
-                table.getLong("INVOCATIONS"),
-                table.getLong("TIMED_INVOCATIONS"),
-                table.getLong("MIN_EXECUTION_TIME"),
-                table.getLong("MAX_EXECUTION_TIME"),
-                table.getLong("AVG_EXECUTION_TIME"),
-                table.getLong("MIN_RESULT_SIZE"),
-                table.getLong("MAX_RESULT_SIZE"),
-                table.getLong("AVG_RESULT_SIZE"),
-                table.getLong("MIN_PARAMETER_SET_SIZE"),
-                table.getLong("MAX_PARAMETER_SET_SIZE"),
-                table.getLong("AVG_PARAMETER_SET_SIZE"),
-                table.getLong("ABORTS"),
-                table.getLong("FAILURES")));
+                    table.getLong("TIMESTAMP"),
+                    table.getLong(VoltSystemProcedure.CNAME_HOST_ID),
+                    table.getString("HOSTNAME"),
+                    table.getLong(VoltSystemProcedure.CNAME_SITE_ID),
+                    table.getLong("PARTITION_ID"),
+                    table.getString("PROCEDURE"),
+                    table.getString("STATEMENT"),
+                    table.getLong("INVOCATIONS"),
+                    table.getLong("TIMED_INVOCATIONS"),
+                    table.getLong("MIN_EXECUTION_TIME"),
+                    table.getLong("MAX_EXECUTION_TIME"),
+                    table.getLong("AVG_EXECUTION_TIME"),
+                    table.getLong("MIN_RESULT_SIZE"),
+                    table.getLong("MAX_RESULT_SIZE"),
+                    table.getLong("AVG_RESULT_SIZE"),
+                    table.getLong("MIN_PARAMETER_SET_SIZE"),
+                    table.getLong("MAX_PARAMETER_SET_SIZE"),
+                    table.getLong("AVG_PARAMETER_SET_SIZE"),
+                    table.getLong("ABORTS"),
+                    table.getLong("FAILURES")));
         }
         Collections.sort(m_rows, new Comparator<ProcedureDetailResultRow>() {
             @Override
             public int compare(ProcedureDetailResultRow o1, ProcedureDetailResultRow o2) {
-                // TODO Auto-generated method stub
                 return o1.compareTo(o2);
             }
         });
         for (ProcedureDetailResultRow row : m_rows) {
             m_sortedResultTable.addRow(row.m_timestamp,
-                                 row.m_hostId,
-                                 row.m_hostName,
-                                 row.m_siteId,
-                                 row.m_partitionId,
-                                 row.m_procedure,
-                                 row.m_statement,
-                                 row.m_invocations,
-                                 row.m_timedInvocations,
-                                 row.m_minExecutionTime,
-                                 row.m_maxExecutionTime,
-                                 row.m_avgExecutionTime,
-                                 row.m_minResultSize,
-                                 row.m_maxResultSize,
-                                 row.m_avgResultSize,
-                                 row.m_minParameterSetSize,
-                                 row.m_maxParameterSetSize,
-                                 row.m_avgParameterSetSize,
-                                 row.m_aborts,
-                                 row.m_failures);
+                                       row.m_hostId,
+                                       row.m_hostName,
+                                       row.m_siteId,
+                                       row.m_partitionId,
+                                       row.m_procedure,
+                                       row.m_statement,
+                                       row.m_invocations,
+                                       row.m_timedInvocations,
+                                       row.m_minExecutionTime,
+                                       row.m_maxExecutionTime,
+                                       row.m_avgExecutionTime,
+                                       row.m_minResultSize,
+                                       row.m_maxResultSize,
+                                       row.m_avgResultSize,
+                                       row.m_minParameterSetSize,
+                                       row.m_maxParameterSetSize,
+                                       row.m_avgParameterSetSize,
+                                       row.m_aborts,
+                                       row.m_failures);
         }
     }
 
     public VoltTable[] getSortedResultTable() {
-        return new VoltTable[] {m_sortedResultTable};
+        return new VoltTable[] { m_sortedResultTable };
     }
 
     private static class ProcedureDetailResultRow implements Comparable<ProcedureDetailResultRow> {
-        long m_timestamp;
-        long m_hostId; String m_hostName;
-        long m_siteId, m_partitionId;
-        String m_procedure, m_statement;
-        long m_invocations, m_timedInvocations;
+        long m_timestamp, m_hostId, m_siteId, m_partitionId;
+        String m_hostName, m_procedure, m_statement;
+        long m_invocations, m_timedInvocations, m_aborts, m_failures;
         long m_minExecutionTime, m_maxExecutionTime, m_avgExecutionTime;
         long m_minResultSize, m_maxResultSize, m_avgResultSize;
         long m_minParameterSetSize, m_maxParameterSetSize, m_avgParameterSetSize;
-        long m_aborts, m_failures;
 
         public ProcedureDetailResultRow(long timestamp, long hostId, String hostName,
                                         long siteId, long partitionId, String procedure, String statement,

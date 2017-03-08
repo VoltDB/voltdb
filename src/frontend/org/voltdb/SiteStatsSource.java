@@ -22,8 +22,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltdb.VoltTable.ColumnInfo;
 
 /**
- * Super class of sources of statistical information that are tied to an
- * ExecutionSite.
+ * Super class of sources of statistical information that are tied to an ExecutionSite.
  */
 public abstract class SiteStatsSource extends StatsSource {
 

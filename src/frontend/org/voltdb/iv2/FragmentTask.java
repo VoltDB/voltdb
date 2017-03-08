@@ -231,12 +231,13 @@ public class FragmentTask extends TransactionTask
         }
 
         ProcedureRunner currRunner = siteConnection.getProcedureRunner(m_fragmentMsg.getProcedureName());
-        long[] durations = null;
+        long[] executionTimes = null;
         int succeededFragmentsCount = 0;
         if (currRunner != null) {
-            currRunner.getEngine().setPerFragmentTimingEnabled(m_fragmentMsg.isPerFragmentStatsRecording());
+            currRunner.getExecutionEngine().setPerFragmentTimingEnabled(m_fragmentMsg.isPerFragmentStatsRecording());
             if (m_fragmentMsg.isPerFragmentStatsRecording()) {
-                durations = new long[1];
+                // At this point, we will execute the fragments one by one.
+                executionTimes = new long[1];
             }
         }
 
@@ -339,12 +340,12 @@ public class FragmentTask extends TransactionTask
                 // Notice that this code path is used to handle multi-partition stored procedures.
                 // The single-partition stored procedure handler is in the ProcedureRunner.
                 if (currRunner != null) {
-                    succeededFragmentsCount = currRunner.getEngine().extractPerFragmentStats(1, durations);
+                    succeededFragmentsCount = currRunner.getExecutionEngine().extractPerFragmentStats(1, executionTimes);
                     currRunner.getStatsCollector().finishStatement(m_fragmentMsg.getStmtName(frag),
                                                                    m_fragmentMsg.commitPerFragmentStats(),
                                                                    m_fragmentMsg.isPerFragmentStatsRecording(),
                                                                    succeededFragmentsCount == 0,
-                                                                   durations == null ? 0 : durations[0],
+                                                                   executionTimes == null ? 0 : executionTimes[0],
                                                                    dependency,
                                                                    params);
                 }
