@@ -639,17 +639,20 @@ void PersistentTable::swapTable(PersistentTable* otherTable,
             compiled.m_otherIndexes);
     assert(isDREnabled() == otherTable->isDREnabled());
 
+    AbstractDRTupleStream* drStream;
+    size_t drMark = 0;
     if (!isUndo && isDREnabled()) { // Also called as undo action. Generate DR event if it isn't undo.
+        ExecutorContext* ec = ExecutorContext::getExecutorContext();
+        drStream = getDRTupleStream(ec);
+        drMark = drStream->m_uso;
         ExecutorContext::getEngine()->swapDRActions(otherTable, this);
     }
 
     if (fallible) {
+        assert(!isUndo);
         DRTupleStreamUndoAction *drUndo = NULL;
         UndoQuantum *uq = ExecutorContext::currentUndoQuantum();
         if (isDREnabled()) {
-            ExecutorContext* ec = ExecutorContext::getExecutorContext();
-            AbstractDRTupleStream* drStream = getDRTupleStream(ec);
-            size_t drMark = drStream->m_uso - DRTupleStream::BEGIN_RECORD_SIZE;
             drUndo = new (*uq) DRTupleStreamUndoAction(drStream, drMark, 0);
         }
         uq->registerUndoAction(
