@@ -568,7 +568,7 @@ public class TestSqlDeleteSuite extends RegressionSuite {
 
             // delete rows where ID is IN 0..3
             VoltTable vt = client.callProcedure("@AdHoc",
-                    "DELETE FROM " + table + " WHERE ID IN (SELECT ID FROM R1)")
+                    "DELETE FROM " + table + " WHERE ID IN (SELECT NUM FROM R1)")
                     .getResults()[0];
             validateTableOfScalarLongs(vt, new long[] { 4 });
 
