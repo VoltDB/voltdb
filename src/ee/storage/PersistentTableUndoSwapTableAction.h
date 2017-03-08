@@ -28,11 +28,13 @@ public:
             PersistentTable *theTable,
             PersistentTable *otherTable,
             std::vector<std::string> const& theIndexNames,
-            std::vector<std::string> const& otherIndexNames)
+            std::vector<std::string> const& otherIndexNames,
+            DRTupleStreamUndoAction *drUndoAction)
         : m_theTable(theTable)
         , m_otherTable(otherTable)
         , m_theIndexNames(theIndexNames)
         , m_otherIndexNames(otherIndexNames)
+        , m_drUndoAction(drUndoAction)
     { }
 
 private:
@@ -46,19 +48,28 @@ private:
         m_otherTable->swapTable
                (m_theTable,
                 m_theIndexNames, m_otherIndexNames,
-                false);
+                false,
+                true);
+        if (m_drUndoAction) {
+            m_drUndoAction->undo();
+        }
     }
 
     /*
      * Release any resources held by the undo action. It will not need to be undone.
      */
-    virtual void release() { }
+    virtual void release() {
+        if (m_drUndoAction) {
+            m_drUndoAction->release();
+        }
+    }
 
 private:
     PersistentTable * const m_theTable;
     PersistentTable * const m_otherTable;
     std::vector<std::string> const m_theIndexNames;
     std::vector<std::string> const m_otherIndexNames;
+    DRTupleStreamUndoAction * const m_drUndoAction;
 };
 
 }// namespace voltdb
