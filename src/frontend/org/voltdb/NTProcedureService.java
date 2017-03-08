@@ -19,11 +19,16 @@ package org.voltdb;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.nio.ByteBuffer;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.Semaphore;
 
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.network.Connection;
@@ -32,26 +37,36 @@ import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Procedure;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
+import com.google_voltpatches.common.util.concurrent.ThreadFactoryBuilder;
 
-public class LoadedNTProcedureSet {
+public class NTProcedureService {
 
     // user procedures.
     ImmutableMap<String, ProcedureRunnerNTGenerator> m_procs = ImmutableMap.<String, ProcedureRunnerNTGenerator>builder().build();
     ConcurrentHashMap<Long, ProcedureRunnerNT> m_outstanding = new ConcurrentHashMap<>();
     final InternalConnectionHandler m_ich;
-    final ExecutorService m_executorService;
     final Mailbox m_mailbox;
+
+    final ConcurrentLinkedQueue<Runnable> m_pendingInvocations = new ConcurrentLinkedQueue<>();
+    final Semaphore m_outstandingNTProcSemaphore = new Semaphore(10);
+
+    final static String NTPROC_THREADPOOL_NAMEPREFIX = "NTProcServiceThread-";
+
+    private final ExecutorService m_executorService = Executors.newCachedThreadPool(
+            new ThreadFactoryBuilder()
+                .setNameFormat(NTPROC_THREADPOOL_NAMEPREFIX + "%d")
+                .build());
 
     long nextProcedureRunnerId = 0;
 
     class ProcedureRunnerNTGenerator {
 
         protected final String m_procedureName;
-        protected final Class<? extends VoltProcedureNT> m_procClz;
+        protected final Class<? extends VoltNTProcedure> m_procClz;
         protected final Method m_procMethod;
         protected final Class<?>[] m_paramTypes;
 
-        ProcedureRunnerNTGenerator(Class<? extends VoltProcedureNT> clz) {
+        ProcedureRunnerNTGenerator(Class<? extends VoltNTProcedure> clz) {
             m_procClz = clz;
             m_procedureName = m_procClz.getSimpleName();
 
@@ -76,19 +91,13 @@ public class LoadedNTProcedureSet {
             m_paramTypes = paramTypes;
         }
 
-        ProcedureRunnerNT generateProcedureRunnerNT(AuthUser user, Connection ccxn, long clientHandle) {
+        ProcedureRunnerNT generateProcedureRunnerNT(AuthUser user, Connection ccxn, long clientHandle)
+                throws InstantiationException, IllegalAccessException
+        {
             long id = nextProcedureRunnerId++;
 
-            VoltProcedureNT procedure = null;
-            try {
-                procedure = m_procClz.newInstance();
-            } catch (InstantiationException e) {
-                // TODO Auto-generated catch block
-                e.printStackTrace();
-            } catch (IllegalAccessException e) {
-                // TODO Auto-generated catch block
-                e.printStackTrace();
-            }
+            VoltNTProcedure procedure = null;
+            procedure = m_procClz.newInstance();
             ProcedureRunnerNT runner = new ProcedureRunnerNT(id,
                                                              user,
                                                              ccxn,
@@ -98,21 +107,18 @@ public class LoadedNTProcedureSet {
                                                              m_procMethod,
                                                              m_paramTypes,
                                                              m_executorService,
-                                                             LoadedNTProcedureSet.this,
+                                                             NTProcedureService.this,
                                                              m_mailbox);
-            m_outstanding.put(id, runner);
             return runner;
         }
 
     }
 
-    LoadedNTProcedureSet(InternalConnectionHandler ich,
-                         ExecutorService executorService,
+    NTProcedureService(InternalConnectionHandler ich,
                          Mailbox mailbox)
     {
         assert(ich != null);
         m_ich = ich;
-        m_executorService = executorService;
         m_mailbox = mailbox;
     }
 
@@ -128,13 +134,18 @@ public class LoadedNTProcedureSet {
             }
 
             String className = procedure.getClassname();
-            Class<? extends VoltProcedureNT> clz = null;
+            Class<? extends VoltNTProcedure> clz = null;
             try {
-                clz = (Class<? extends VoltProcedureNT>) catalogContext.classForProcedure(className);
-            }
-            catch (Exception e) {
-                // TODO Auto-generated catch block
-                e.printStackTrace();
+                clz = (Class<? extends VoltNTProcedure>) catalogContext.classForProcedure(className);
+            } catch (ClassNotFoundException e) {
+                if (className.startsWith("org.voltdb.")) {
+                    String msg = String.format(LoadedProcedureSet.ORGVOLTDB_PROCNAME_ERROR_FMT, className);
+                    VoltDB.crashLocalVoltDB(msg, false, null);
+                }
+                else {
+                    String msg = String.format(LoadedProcedureSet.UNABLETOLOAD_ERROR_FMT, className);
+                    VoltDB.crashLocalVoltDB(msg, false, null);
+                }
             }
 
             ProcedureRunnerNTGenerator prntg = new ProcedureRunnerNTGenerator(clz);
@@ -144,14 +155,63 @@ public class LoadedNTProcedureSet {
         m_procs = ImmutableMap.<String, ProcedureRunnerNTGenerator>builder().putAll(runnerGeneratorMap).build();
     }
 
-    ClientResponseImpl callProcedureNT(AuthUser user,
+    ClientResponseImpl callProcedureNT(final AuthUser user,
                                        final Connection ccxn,
                                        final long clientHandle,
-                                       String procName,
-                                       ParameterSet paramListIn) {
-        ProcedureRunnerNTGenerator prntg = m_procs.get(procName);
-        ProcedureRunnerNT runner = prntg.generateProcedureRunnerNT(user, ccxn, clientHandle);
-        return runner.submitCall(paramListIn);
+                                       final String procName,
+                                       final ParameterSet paramListIn)
+    {
+        final ProcedureRunnerNTGenerator prntg = m_procs.get(procName);
+
+        ProcedureRunnerNT tempRunner = null;
+        try {
+            tempRunner = prntg.generateProcedureRunnerNT(user, ccxn, clientHandle);
+        } catch (InstantiationException | IllegalAccessException e1) {
+            return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
+                    new VoltTable[0],
+                    "Could not create running context for " + procName + ".",
+                    clientHandle);
+        }
+        final ProcedureRunnerNT runner = tempRunner;
+        m_outstanding.put(runner.m_id, runner);
+
+        Runnable invocationRunnable = new Runnable() {
+            @Override
+            public void run() {
+                ClientResponseImpl response = runner.call(paramListIn.toArray());
+                // continuation
+                if (response == null) {
+                    return;
+                }
+
+                // send the response to caller
+                response.setClientHandle(clientHandle);
+                ByteBuffer buf = ByteBuffer.allocate(response.getSerializedSize() + 4);
+                buf.putInt(buf.capacity() - 4);
+                response.flattenToBuffer(buf).flip();
+                ccxn.writeStream().enqueue(buf);
+
+                handleNTProcEnd(runner);
+            }
+        };
+
+        try {
+            m_executorService.submit(invocationRunnable);
+        }
+        catch (RejectedExecutionException e) {
+            handleNTProcEnd(runner);
+
+            return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
+                    new VoltTable[0],
+                    "Could not submit NT procedure " + procName + " to exec service for .",
+                    clientHandle);
+        }
+
+        return null;
+    }
+
+    void handleNTProcEnd(ProcedureRunnerNT runner) {
+        m_outstanding.remove(runner.m_id);
     }
 
     void handleCallbacksForFailedHosts(final Set<Integer> failedHosts) {

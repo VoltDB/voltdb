@@ -37,6 +37,14 @@ import com.google_voltpatches.common.collect.ImmutableMap;
 
 public class LoadedProcedureSet {
 
+    public static final String ORGVOLTDB_PROCNAME_ERROR_FMT =
+            "VoltDB does not support procedures with package names " +
+            "that are prefixed with \"org.voltdb\". Please use a different " +
+            "package name and retry. Procedure name was %s.";
+    public static final String UNABLETOLOAD_ERROR_FMT =
+            "VoltDB was unable to load a procedure (%s) it expected to be " +
+            "in the catalog jarfile and will now exit.";
+
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
     private static Language.CheckedExceptionVisitor<VoltProcedure, Class<?>, Exception> procedureInstantiator =
@@ -169,15 +177,12 @@ public class LoadedProcedureSet {
                 }
                 catch (final ClassNotFoundException e) {
                     if (className.startsWith("org.voltdb.")) {
-                        VoltDB.crashLocalVoltDB("VoltDB does not support procedures with package names " +
-                                                        "that are prefixed with \"org.voltdb\". Please use a different " +
-                                                        "package name and retry. Procedure name was " + className + ".",
-                                                        false, null);
+                        String msg = String.format(LoadedProcedureSet.ORGVOLTDB_PROCNAME_ERROR_FMT, className);
+                        VoltDB.crashLocalVoltDB(msg, false, null);
                     }
                     else {
-                        VoltDB.crashLocalVoltDB("VoltDB was unable to load a procedure (" +
-                                                 className + ") it expected to be in the " +
-                                                "catalog jarfile and will now exit.", false, null);
+                        String msg = String.format(LoadedProcedureSet.UNABLETOLOAD_ERROR_FMT, className);
+                        VoltDB.crashLocalVoltDB(msg, false, null);
                     }
                 }
                 try {

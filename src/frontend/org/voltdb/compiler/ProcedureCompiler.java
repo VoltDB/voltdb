@@ -32,7 +32,7 @@ import org.voltdb.ProcInfoData;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltProcedure;
-import org.voltdb.VoltProcedureNT;
+import org.voltdb.VoltNTProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.VoltTypeException;
@@ -367,7 +367,7 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
         }
 
         // if the procedure is non-transactional, then take this special path here
-        if (VoltProcedureNT.class.isAssignableFrom(procClass)) {
+        if (VoltNTProcedure.class.isAssignableFrom(procClass)) {
             compileNTProcedure(compiler, procClass, procedure, jarOutput);
             return;
         }
@@ -581,9 +581,9 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
          // get the short name of the class (no package)
         String shortName = deriveShortProcedureName(procClass.getName());
 
-        VoltProcedureNT procInstance;
+        VoltNTProcedure procInstance;
         try {
-            procInstance = (VoltProcedureNT)procClass.newInstance();
+            procInstance = (VoltNTProcedure)procClass.newInstance();
         } catch (InstantiationException e) {
             throw new RuntimeException("Error instantiating procedure \"%s\"" + procClass.getName(), e);
         } catch (IllegalAccessException e) {

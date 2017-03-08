@@ -36,8 +36,6 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -144,10 +142,7 @@ public final class InvocationDispatcher {
     // used to decide if we should shortcut reads
     private final Consistency.ReadLevel m_defaultConsistencyReadLevel;
 
-    private final LoadedNTProcedureSet m_loadedNTProcedureSet;
-    private final ExecutorService m_ntProcsService = new ThreadPoolExecutor(2, 2,
-            60L, TimeUnit.SECONDS,
-            new LinkedBlockingQueue<Runnable>());
+    private final NTProcedureService m_NTProcedureService;
 
     private final boolean m_isConfiguredForNonVoltDBBackend;
 
@@ -261,12 +256,12 @@ public final class InvocationDispatcher {
         // try to get the global default setting for read consistency, but fall back to SAFE
         m_defaultConsistencyReadLevel = VoltDB.Configuration.getDefaultReadConsistencyLevel();
 
-        m_loadedNTProcedureSet = new LoadedNTProcedureSet(m_ich, m_ntProcsService, m_mailbox);
+        m_NTProcedureService = new NTProcedureService(m_ich, m_mailbox);
         notifyOfCatalogUpdate();
     }
 
     void notifyOfCatalogUpdate() {
-        m_loadedNTProcedureSet.update(m_catalogContext.get());
+        m_NTProcedureService.update(m_catalogContext.get());
     }
 
     /*
@@ -300,11 +295,6 @@ public final class InvocationDispatcher {
 
         });
     }
-
-    //public final void dispatchNTResponse() {
-    //    m_loadedNTProcedureSet
-    //}
-    // TODO
 
     public final ClientResponseImpl dispatch(
             StoredProcedureInvocation task,
@@ -893,7 +883,7 @@ public final class InvocationDispatcher {
                                                          Connection ccxn)
     {
         ParameterSet paramSet = task.getParams();
-        return m_loadedNTProcedureSet.callProcedureNT(user,
+        return m_NTProcedureService.callProcedureNT(user,
                                                       ccxn,
                                                       task.clientHandle,
                                                       task.getProcName(),
@@ -1964,17 +1954,17 @@ public final class InvocationDispatcher {
     }
 
     void handleFailedHosts(Set<Integer> failedHosts) {
-        m_loadedNTProcedureSet.handleCallbacksForFailedHosts(failedHosts);
+        m_NTProcedureService.handleCallbacksForFailedHosts(failedHosts);
     }
 
     public void handleAllHostNTProcedureResponse(ClientResponseImpl clientResponseData) {
         long handle = clientResponseData.getClientHandle();
-        ProcedureRunnerNT runner = m_loadedNTProcedureSet.m_outstanding.get(handle);
+        ProcedureRunnerNT runner = m_NTProcedureService.m_outstanding.get(handle);
         runner.allHostNTProcedureCallback(clientResponseData);
     }
 
     /** test only */
     long countNTWaitingProcs() {
-        return m_loadedNTProcedureSet.m_outstanding.size();
+        return m_NTProcedureService.m_outstanding.size();
     }
 }

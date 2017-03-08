@@ -22,7 +22,7 @@ import java.util.concurrent.CompletableFuture;
 
 import org.voltdb.client.ClientResponse;
 
-public class VoltProcedureNT {
+public class VoltNTProcedure {
 
     ProcedureRunnerNT m_runner = null;
 

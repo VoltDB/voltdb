@@ -30,7 +30,6 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.voltcore.messaging.HostMessenger;
@@ -48,7 +47,7 @@ import org.voltdb.messaging.Iv2InitiateTaskMessage;
 public class ProcedureRunnerNT {
 
     protected final ExecutorService m_executorService;
-    protected final LoadedNTProcedureSet m_procSet;
+    protected final NTProcedureService m_procSet;
     protected final Mailbox m_mailbox;
 
     protected final long m_id;
@@ -59,7 +58,7 @@ public class ProcedureRunnerNT {
     protected final long m_clientHandle;
 
     protected final String m_procedureName;
-    protected final VoltProcedureNT m_procedure;
+    protected final VoltNTProcedure m_procedure;
     protected final Method m_procMethod;
     protected final Class<?>[] m_paramTypes;
 
@@ -73,12 +72,12 @@ public class ProcedureRunnerNT {
                       AuthUser user,
                       Connection ccxn,
                       long clientHandle,
-                      VoltProcedureNT procedure,
+                      VoltNTProcedure procedure,
                       String procName,
                       Method procMethod,
                       Class<?>[] paramTypes,
                       ExecutorService executorService,
-                      LoadedNTProcedureSet procSet,
+                      NTProcedureService procSet,
                       Mailbox mailbox)
     {
         m_id = id;
@@ -92,38 +91,6 @@ public class ProcedureRunnerNT {
         m_executorService = executorService;
         m_procSet = procSet;
         m_mailbox = mailbox;
-    }
-
-    ClientResponseImpl submitCall(final ParameterSet params) {
-
-        //System.out.printf("Submit call with clientHandle: %d\n", clientHandle);
-        //System.out.flush();
-
-        try {
-            m_executorService.submit(new Runnable() {
-                @Override
-                public void run() {
-                    ClientResponseImpl response = call(params.toArray());
-                    // continuation
-                    if (response == null) {
-                        return;
-                    }
-                    m_procSet.m_outstanding.remove(m_id);
-                    response.setClientHandle(m_clientHandle);
-                    ByteBuffer buf = ByteBuffer.allocate(response.getSerializedSize() + 4);
-                    buf.putInt(buf.capacity() - 4);
-                    response.flattenToBuffer(buf).flip();
-                    m_ccxn.writeStream().enqueue(buf);
-                }
-            });
-
-        }
-        catch (RejectedExecutionException e) {
-            m_procSet.m_outstanding.remove(m_id);
-            // todo!
-            e.printStackTrace();
-        }
-        return null;
     }
 
     static class MyProcedureCallback implements ProcedureCallback {
@@ -198,9 +165,7 @@ public class ProcedureRunnerNT {
 
         liveHostIds.stream()
                 .map(hostId -> CoreUtils.getHSIdFromHostAndSite(hostId, HostMessenger.CLIENT_INTERFACE_SITE_ID))
-                .mapToLong(x -> x)
                 .forEach(hsid -> {
-                    int hostid = CoreUtils.getHostIdFromHSId(hsid);
                     m_mailbox.send(hsid, workRequest);
                 });
 
@@ -247,14 +212,13 @@ public class ProcedureRunnerNT {
                             ClientResponseImpl response = null;
                             try {
                                 rawResult = fut.get();
-                            } catch (InterruptedException
-                                    | ExecutionException e) {
-                                // TODO Auto-generated catch block
-                                e.printStackTrace();
-                                System.exit(-1);
+                            } catch (InterruptedException | ExecutionException e) {
+                                // this is a bad place to be, but it's hard to know if it's crash bad...
+                                rawResult = new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
+                                        new VoltTable[0],
+                                        "Future returned from NTProc " + m_procedureName + " failed to complete.",
+                                        m_clientHandle);
                             }
-
-                            // TODO Better error message if user returns future with invalid type
 
                             if (rawResult instanceof ClientResponseImpl) {
                                 response = (ClientResponseImpl) rawResult;
@@ -263,20 +227,26 @@ public class ProcedureRunnerNT {
                                 VoltTable[] results = null;
                                 try {
                                     results = ParameterConverter.getResultsFromRawResults(rawResult);
-                                } catch (InvocationTargetException e) {
-                                    // TODO Auto-generated catch block
-                                    e.printStackTrace();
+                                    response = responseFromTableArray(results);
+                                } catch (Exception e) {
+                                    // this is a bad place to be, but it's hard to know if it's crash bad...
+                                    response = new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
+                                            new VoltTable[0],
+                                            "Type " + rawResult.getClass().getName() +
+                                                " returned from NTProc \"" + m_procedureName +
+                                                "\" was not an acceptible VoltDB return type.",
+                                            m_clientHandle);
                                 }
-                                response = responseFromTableArray(results);
                             }
 
-                            m_procSet.m_outstanding.remove(m_id);
-
+                            // send the response to the caller
                             response.setClientHandle(m_clientHandle);
                             ByteBuffer buf = ByteBuffer.allocate(response.getSerializedSize() + 4);
                             buf.putInt(buf.capacity() - 4);
                             response.flattenToBuffer(buf).flip();
                             m_ccxn.writeStream().enqueue(buf);
+
+                            m_procSet.handleNTProcEnd(ProcedureRunnerNT.this);
                         }
                     });
 
@@ -466,14 +436,7 @@ public class ProcedureRunnerNT {
                         // because the recipient expects this hack
                         cri.setAppStatusString(String.valueOf(i));
 
-
-                        try {
-                            allHostNTProcedureCallback(cri);
-                        } catch (Exception e) {
-                            // TODO Auto-generated catch block
-                            e.printStackTrace();
-                            assert(false); // temporary
-                        }
+                        allHostNTProcedureCallback(cri);
                     }
                 });
         }

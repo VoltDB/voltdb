@@ -41,17 +41,24 @@ import org.voltdb.utils.MiscUtils;
 
 public class TestNTProcs extends TestCase {
 
-    public static class TrivialNTProc extends VoltProcedureNT {
+    public static class TrivialNTProc extends VoltNTProcedure {
         public long run() throws InterruptedException, ExecutionException {
+            assertTrue(Thread.currentThread().getName().startsWith(NTProcedureService.NTPROC_THREADPOOL_NAMEPREFIX));
+
             System.out.println("Ran trivial proc!");
             return -1;
         }
     }
 
-    public static class NestedNTProc extends VoltProcedureNT {
+    public static class NestedNTProc extends VoltNTProcedure {
         public long run() throws InterruptedException, ExecutionException {
+            assertTrue(Thread.currentThread().getName().startsWith(NTProcedureService.NTPROC_THREADPOOL_NAMEPREFIX));
+
             System.out.println("Did it!");
             CompletableFuture<ClientResponse> pf = callProcedure("@AdHoc", "select * from blah");
+
+            // NB: blocking on a response keeps the thread in the pool wasted.
+            // don't do this in prod
             ClientResponseImpl cr = (ClientResponseImpl) pf.get();
             System.out.println("Got response!");
             System.out.println(cr.toJSONString());
@@ -59,24 +66,37 @@ public class TestNTProcs extends TestCase {
         }
     }
 
-    public static class AsyncNTProc extends VoltProcedureNT {
+    public static class AsyncNTProc extends VoltNTProcedure {
         long nextStep(ClientResponse cr) {
+            System.out.printf("AsyncNTProc.nextStep running in thread: %s\n", Thread.currentThread().getName());
+            System.out.flush();
+
+            assertTrue(Thread.currentThread().getName().startsWith(NTProcedureService.NTPROC_THREADPOOL_NAMEPREFIX));
+
             System.out.println("Got to nextStep!");
             return 0;
         }
 
         public CompletableFuture<Long> run() throws InterruptedException, ExecutionException {
+            assertTrue(Thread.currentThread().getName().startsWith(NTProcedureService.NTPROC_THREADPOOL_NAMEPREFIX));
+
             System.out.println("Did it!");
             CompletableFuture<ClientResponse> pf = callProcedure("@AdHoc", "select * from blah");
             return pf.thenApply(this::nextStep);
         }
     }
 
-    public static class RunEverywhereNTProc extends VoltProcedureNT {
+    public static class RunEverywhereNTProc extends VoltNTProcedure {
         public long run() throws InterruptedException, ExecutionException {
+            assertTrue(Thread.currentThread().getName().startsWith(NTProcedureService.NTPROC_THREADPOOL_NAMEPREFIX));
+
             System.out.println("Running on one!");
             CompletableFuture<Map<Integer,ClientResponse>> pf = callAllNodeNTProcedure("TestNTProcs$TrivialNTProc");
             Map<Integer,ClientResponse> cr = pf.get();
+            cr.entrySet().stream()
+                .forEach(e -> {
+                    assertEquals(ClientResponse.SUCCESS, e.getValue().getStatus());
+                });
             System.out.println("Got responses!");
             return -1;
         }
@@ -84,6 +104,9 @@ public class TestNTProcs extends TestCase {
 
     public static class DelayProc extends VoltProcedure {
         public long run(int millis) throws InterruptedException {
+            // This comment is left here to remind people this is not an NT proc..
+            //assertTrue(Thread.currentThread().getName().startsWith(NTProcedureService.NTPROC_THREADPOOL_NAMEPREFIX));
+
             System.out.println("Starting delay proc");
             System.out.flush();
             Thread.sleep(millis);
@@ -93,20 +116,27 @@ public class TestNTProcs extends TestCase {
         }
     }
 
-    public static class DelayProcNT extends VoltProcedureNT {
+    public static class DelayProcNT extends VoltNTProcedure {
         public long run(int millis) throws InterruptedException {
-            System.out.println("Starting delay proc");
+            assertTrue(Thread.currentThread().getName().startsWith(NTProcedureService.NTPROC_THREADPOOL_NAMEPREFIX));
+
+            System.out.println("Starting delaynt proc");
             System.out.flush();
             Thread.sleep(millis);
-            System.out.println("Done with delay proc");
+            System.out.println("Done with delaynt proc");
             System.out.flush();
             return -1;
         }
     }
 
-    public static class NTProcWithFutures extends VoltProcedureNT {
+    public static class NTProcWithFutures extends VoltNTProcedure {
 
         public Long secondPart(ClientResponse response) {
+            System.out.printf("NTProcWithFutures.secondPart running in thread: %s\n", Thread.currentThread().getName());
+            System.out.flush();
+
+            assertTrue(Thread.currentThread().getName().startsWith(NTProcedureService.NTPROC_THREADPOOL_NAMEPREFIX));
+
             System.out.println("Did it NT2!");
             ClientResponseImpl cr = (ClientResponseImpl) response;
             System.out.println(cr.toJSONString());
@@ -114,13 +144,17 @@ public class TestNTProcs extends TestCase {
         }
 
         public CompletableFuture<Long> run() throws InterruptedException, ExecutionException {
+            assertTrue(Thread.currentThread().getName().startsWith(NTProcedureService.NTPROC_THREADPOOL_NAMEPREFIX));
+
             System.out.println("Did it NT1!");
-            return callProcedure("TestNTProcs$DelayProc", 1).thenApply(this::secondPart);
+            return callProcedure("TestNTProcs$DelayProc", 1).thenApplyAsync(this::secondPart, m_runner.m_executorService);
         }
     }
 
-    public static class RunEverywhereNTProcWithDelay extends VoltProcedureNT {
+    public static class RunEverywhereNTProcWithDelay extends VoltNTProcedure {
         public long run() throws InterruptedException, ExecutionException {
+            assertTrue(Thread.currentThread().getName().startsWith(NTProcedureService.NTPROC_THREADPOOL_NAMEPREFIX));
+
             System.out.println("Running on one!");
 
             // you can't have two of these outstanding so this is expected to fail
@@ -128,8 +162,34 @@ public class TestNTProcs extends TestCase {
             callAllNodeNTProcedure("TestNTProcs$DelayProcNT", 100);
 
             Map<Integer,ClientResponse> cr = pf1.get();
+            cr.entrySet().stream()
+                .forEach(e -> {
+                    assertEquals(ClientResponse.SUCCESS, e.getValue().getStatus());
+                });
             System.out.println("Got responses!");
             return -1;
+        }
+    }
+
+    // This class returns CompletableFuture<String> from run(), which is both invalid, and hard to
+    // check statically. Verify we at least get a runtime error.
+    public static class NTProcWithBadTypeFuture extends VoltNTProcedure {
+
+        public String secondPart(ClientResponse response) {
+            System.out.printf("NTProcWithBadTypeFuture.secondPart running in thread: %s\n", Thread.currentThread().getName());
+            System.out.flush();
+
+            assertTrue(Thread.currentThread().getName().startsWith(NTProcedureService.NTPROC_THREADPOOL_NAMEPREFIX));
+
+            System.out.println("Did it NT2!");
+            return "This is spinal tap!";
+        }
+
+        public CompletableFuture<String> run() throws InterruptedException, ExecutionException {
+            assertTrue(Thread.currentThread().getName().startsWith(NTProcedureService.NTPROC_THREADPOOL_NAMEPREFIX));
+
+            System.out.println("Did it NT1!");
+            return callProcedure("TestNTProcs$DelayProc", 1).thenApplyAsync(this::secondPart, m_runner.m_executorService);
         }
     }
 
@@ -144,6 +204,7 @@ public class TestNTProcs extends TestCase {
             "create procedure from class org.voltdb.TestNTProcs$DelayProc;\n" +
             "create procedure from class org.voltdb.TestNTProcs$DelayProcNT;\n" +
             "create procedure from class org.voltdb.TestNTProcs$RunEverywhereNTProcWithDelay;\n" +
+            "create procedure from class org.voltdb.TestNTProcs$NTProcWithBadTypeFuture;\n" +
             "partition table blah on column pkey;\n";
 
     private void compile() throws Exception {
@@ -301,6 +362,28 @@ public class TestNTProcs extends TestCase {
         assertTrue(response.getStatusString().contains("can be running at a time"));
 
         System.out.println("Client got trivial response");
+        System.out.println(response.toJSONString());
+
+        localServer.shutdown();
+        localServer.join();
+    }
+
+    public void testBadFutureType() throws Exception {
+        ServerThread localServer = start();
+
+        Client client = ClientFactory.createClient();
+        client.createConnection("localhost");
+
+        ClientResponseImpl response = null;
+
+        try {
+            response = (ClientResponseImpl) client.callProcedure("TestNTProcs$NTProcWithBadTypeFuture");
+        }
+        catch (ProcCallException e) {
+            response = (ClientResponseImpl) e.getClientResponse();
+        }
+        assertEquals(ClientResponse.GRACEFUL_FAILURE, response.getStatus());
+        System.out.println("Client got failure response");
         System.out.println(response.toJSONString());
 
         localServer.shutdown();
