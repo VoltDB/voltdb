@@ -123,9 +123,6 @@ public class SyncBenchmark {
         @Option(desc = "Number of concurrent threads synchronously calling procedures.")
         int threads = 40;
 
-        @Option(desc = "Enable SSL")
-        boolean ssl = false;
-
         @Option(desc = "SSL Configuration file")
         String ssl_config = "";
 
@@ -164,7 +161,10 @@ public class SyncBenchmark {
     public SyncBenchmark(VoterConfig config) {
         this.config = config;
 
-        ClientConfig clientConfig = new ClientConfig("", "", new StatusListener(), config.ssl, config.ssl_config);
+        ClientConfig clientConfig = new ClientConfig("", "", new StatusListener());
+        if (config.ssl_config.trim().length() > 0) {
+            clientConfig.setTrustStore(config.ssl_config);
+        }
 
         client = ClientFactory.createClient(clientConfig);
 

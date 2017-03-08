@@ -185,8 +185,10 @@ public class SyncBenchmark {
     public SyncBenchmark(KVConfig config) {
         this.config = config;
 
-        Boolean ssl = (config.sslfile.length() > 0);
-        ClientConfig clientConfig = new ClientConfig("", "", new StatusListener(), ssl, config.sslfile);
+        ClientConfig clientConfig = new ClientConfig("", "", new StatusListener());
+        if (config.sslfile.trim().length() > 0) {
+            clientConfig.setTrustStore(config.sslfile);
+        }
         client = ClientFactory.createClient(clientConfig);
 
         periodicStatsContext = client.createStatsContext();
