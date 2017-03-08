@@ -443,6 +443,39 @@ public abstract class AbstractParsedStmt {
             }
             if ( ! needParameter && vt != VoltType.NULL) {
                 String valueStr = exprNode.attributes.get("value");
+                // Verify that this string can represent the
+                // desired type, by converting it into the
+                // given type.
+                switch (vt) {
+                case INVALID:
+                    throw new PlanningErrorException("ConstantValueExpression.toJSONString(): value_type should never be VoltType.INVALID");
+                case NULL:
+                    break;
+                case TINYINT:
+                    Long.valueOf(valueStr);
+                    break;
+                case SMALLINT:
+                    Long.valueOf(valueStr);
+                    break;
+                case INTEGER:
+                    Long.valueOf(valueStr);
+                    break;
+                case BIGINT:
+                case TIMESTAMP:
+                    Long.valueOf(valueStr);
+                    break;
+                case FLOAT:
+                    Double.valueOf(valueStr);
+                    break;
+                case STRING:
+                case VARBINARY:
+                    break;
+                case BOOLEAN:
+                    Boolean.valueOf(valueStr);
+                    break;
+                default:
+                    throw new PlanningErrorException("ConstantValueExpression.toJSONString(): Unrecognized value_type " + valueStr);
+                }
                 cve.setValue(valueStr);
             }
         }
