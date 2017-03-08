@@ -25,6 +25,7 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -53,8 +54,6 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
 
     private static final VoltLogger m_logger = new VoltLogger("HOST");
     public final static long SUPPRESS_INTERVAL = 120;
-    public static final long MAX_PENDING_TRANSACTIONS_PER_PARTITION =
-            Integer.getInteger("INTERNAL_MAX_PENDING_TRANSACTION_PER_PARTITION", 500);
 
     public interface Callback {
         public void handleResponse(ClientResponse response) throws Exception;
@@ -63,6 +62,8 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
         public InternalConnectionContext getInternalContext();
     }
 
+    public final Semaphore m_permits =
+        new Semaphore(Integer.getInteger("INTERNAL_MAX_PENDING_TRANSACTION_PER_PARTITION", 500));
     private final long m_connectionId;
     private final AtomicLong m_handles = new AtomicLong();
     private final AtomicLong m_failures = new AtomicLong(0);
@@ -147,15 +148,6 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
         }
     }
 
-    public long getPendingCount() {
-        return m_callbacks.size();
-    }
-
-    public boolean hasBackPressure() {
-        // 500 default per partition.
-        return (m_callbacks.size() > (m_partitionExecutor.size() * MAX_PENDING_TRANSACTIONS_PER_PARTITION));
-    }
-
     public ClientInterface getClientInterface() {
         return VoltDB.instance().getClientInterface();
     }
@@ -168,6 +160,9 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
             final StoredProcedureInvocation task,
             final AuthSystem.AuthUser user,
             final int partition, final long nowNanos) {
+        try {
+            m_permits.acquire();
+        } catch (InterruptedException e) {}
 
         if (!m_partitionExecutor.containsKey(partition)) {
             m_partitionExecutor.putIfAbsent(partition, CoreUtils.getSingleThreadExecutor("InternalHandlerExecutor - " + partition));
@@ -180,7 +175,6 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
             executor.submit(new Runnable() {
                 @Override
                 public void run() {
-                    kattrs.setBackPressure(hasBackPressure());
                     if (!m_internalConnectionIds.containsKey(kattrs.getName())) {
                         m_internalConnectionIds.putIfAbsent(kattrs.getName(), VoltProtocolHandler.getNextConnectionId());
                     }
@@ -202,6 +196,7 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
                             m_logger.error("failed to process dispatch response " + r.getStatusString(), e);
                         } finally {
                             m_callbacks.remove(handle);
+                            m_permits.release();
                         }
                         return bval;
                     }
@@ -212,6 +207,7 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
                         // Hence it is OK that this is not getting reported to callbacks.
                         m_logger.error("Failed to submit transaction.");
                         m_callbacks.remove(handle);
+                        m_permits.release();
                     }
                     return bval;
                 }
@@ -286,7 +282,6 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
             executor.submit(new Runnable() {
                 @Override
                 public void run() {
-                    callback.getInternalContext().setBackPressure(hasBackPressure());
                     handle();
                 }
 
@@ -297,6 +292,7 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
                         m_logger.error("Failed to process callback.", ex);
                     } finally {
                         m_callbacks.remove(resp.getClientHandle());
+                        m_permits.release();
                     }
                 }
             });
