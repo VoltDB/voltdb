@@ -75,7 +75,7 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         dataTablesCheckbox              { $("#DatabaseTables") }
 
         filterStoredProcedure           { $("#filterStoredProc") }
-        filterDatabaseTable             { $("#filterDatabaseTable") }
+        filterDatabaseTable             { $("#filterDT") }
 
         databaseTableCurrentPage        { $("#lblPreviousTable") }
         databaseTableTotalPage          { $("#lblTotalPagesofTables") }
