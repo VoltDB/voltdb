@@ -18,7 +18,6 @@
 package org.voltdb.importer;
 
 import java.net.URI;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
@@ -53,7 +52,6 @@ public abstract class AbstractImporter
     private final VoltLogger m_logger;
     private ImporterServerAdapter m_importServerAdapter;
     private volatile boolean m_stopping;
-    private AtomicInteger m_backPressureCount = new AtomicInteger(0);
 
     protected AbstractImporter() {
         m_logger = new VoltLogger(getName());
@@ -104,44 +102,11 @@ public abstract class AbstractImporter
         try {
             boolean result = m_importServerAdapter.callProcedure(this, callback, invocation.getProcedure(), invocation.getParams());
             reportStat(result, invocation.getProcedure());
-            applyBackPressureAsNeeded();
             return result;
         } catch (Exception ex) {
             rateLimitedLog(Level.ERROR, ex, "%s: Error trying to import", getName());
             reportFailureStat(invocation.getProcedure());
             return false;
-        }
-    }
-
-    private void applyBackPressureAsNeeded()
-    {
-        int count = m_backPressureCount.get();
-        if (count > 0) {
-            try { // increase sleep time exponentially to a max of 256ms
-                if (count > 8) {
-                    Thread.sleep(256);
-                } else {
-                    Thread.sleep(1<<count);
-                }
-            } catch(InterruptedException e) {
-                if (m_logger.isDebugEnabled()) {
-                    m_logger.debug("Sleep for back pressure interrupted", e);
-                }
-            }
-        }
-    }
-
-    /**
-     * Called by the internal framework code to indicate if back pressure must
-     * be applied on the importer because the server is busy.
-     */
-    @Override
-    public void setBackPressure(boolean hasBackPressure)
-    {
-        if (hasBackPressure) {
-            m_backPressureCount.incrementAndGet();
-        } else {
-            m_backPressureCount.set(0);
         }
     }
 
