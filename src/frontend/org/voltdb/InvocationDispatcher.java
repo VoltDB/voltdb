@@ -1807,7 +1807,12 @@ public final class InvocationDispatcher {
                 task.setProcName("@AdHoc_RO_MP");
             }
             else {
-                task.setProcName("@AdHoc_RW_MP");
+                if ("@SwapTables".equals(plannedStmtBatch.work.invocationName)) {
+                    task.setProcName("@SwapTables");
+                }
+                else {
+                    task.setProcName("@AdHoc_RW_MP");
+                }
             }
             task.setParams(buf.array());
         }
