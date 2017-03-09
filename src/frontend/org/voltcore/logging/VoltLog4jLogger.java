@@ -179,10 +179,11 @@ public class VoltLog4jLogger implements CoreVoltLogger {
      * Static method to change the Log4j config globally.
      * @param xmlConfig The text of a Log4j config file.
      */
-    public static void configure(String xmlConfig) {
+    public static void configure(String xmlConfig, File voltroot) {
         DOMConfigurator configurator = new DOMConfigurator();
         StringReader sr = new StringReader(xmlConfig.trim());
         configurator.doConfigure(sr, LogManager.getLoggerRepository());
+        setFileLoggerRoot(voltroot);
     }
 
     /**
