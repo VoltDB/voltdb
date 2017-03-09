@@ -27,6 +27,8 @@ public abstract class AuthenticationRequest {
 
     /**
      * Perform the authentication request
+     * @param scheme is the type of Hash scheme
+     * @param fromAddress is the remote IP address of this authenticate request
      * @return true if authenticated, false if not
      * @throws {@link IllegalStateException} if this request was already made
      */

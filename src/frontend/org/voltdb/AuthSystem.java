@@ -741,14 +741,13 @@ public class AuthSystem {
 
     private static void logAuthSuccess(String user, String fromAddress) {
         //Make sure its logged per user
-        if (fromAddress == null)
-            fromAddress = "";
-        else
-            fromAddress = " from " + fromAddress;
-        String format = "Authenticated user " + user + "%s. This message is rate limited to once every 60 seconds.";
+        if (fromAddress == null) {
+            fromAddress = "NULL";
+        }
+        String format = "Authenticated user %s from %s. This message is rate limited to once every 60 seconds.";
 
         RateLimitedLogger.tryLogForMessage(System.currentTimeMillis(), 60, TimeUnit.SECONDS,
-            authLogger, Level.INFO, format, fromAddress);
+            authLogger, Level.INFO, format, user, fromAddress);
     }
 
     private static void logAuthFails(String key, String user, String fromAddress) {
