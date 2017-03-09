@@ -63,15 +63,16 @@ public:
          * from Java. These do not exist in ExecutionEngine.java since they are IPC specific.
          * These constants are mirrored in ExecutionEngine.java.
          */
-        kErrorCode_RetrieveDependency = 100,       // Request for dependency
-        kErrorCode_DependencyFound = 101,          // Response to 100
-        kErrorCode_DependencyNotFound = 102,       // Also response to 100
-        kErrorCode_pushExportBuffer = 103,         // Indication that el buffer is next
-        kErrorCode_CrashVoltDB = 104,              // Crash with reason string
-        kErrorCode_getQueuedExportBytes = 105,     // Retrieve value for stats
-        kErrorCode_needPlan = 110,                 // fetch a plan from java for a fragment
-        kErrorCode_progressUpdate = 111,           // Update Java on execution progress
-        kErrorCode_decodeBase64AndDecompress = 112 // Decode base64, compressed data
+        kErrorCode_RetrieveDependency = 100,           // Request for dependency
+        kErrorCode_DependencyFound = 101,              // Response to 100
+        kErrorCode_DependencyNotFound = 102,           // Also response to 100
+        kErrorCode_pushExportBuffer = 103,             // Indication that export buffer is next
+        kErrorCode_CrashVoltDB = 104,                  // Crash with reason string
+        kErrorCode_getQueuedExportBytes = 105,         // Retrieve value for stats
+        kErrorCode_pushPerFragmentStatsBuffer = 106,   // Indication that per-fragment statistics buffer is next
+        kErrorCode_needPlan = 110,                     // fetch a plan from java for a fragment
+        kErrorCode_progressUpdate = 111,               // Update Java on execution progress
+        kErrorCode_decodeBase64AndDecompress = 112     // Decode base64, compressed data
     };
 
     VoltDBIPC(int fd);
@@ -182,6 +183,8 @@ private:
 
     void executeTask(struct ipc_command*);
 
+    void sendPerFragmentStatsBuffer();
+
     void sendException( int8_t errorCode);
 
     int8_t activateTableStream(struct ipc_command *cmd);
@@ -221,6 +224,7 @@ typedef struct {
     int64_t lastCommittedSpHandle;
     int64_t uniqueId;
     int64_t undoToken;
+    int8_t perFragmentTimingEnabled;
     int32_t numFragmentIds;
     char data[0];
 }__attribute__((packed)) querypfs;
@@ -786,8 +790,9 @@ void VoltDBIPC::executePlanFragments(struct ipc_command *cmd) {
     ReferenceSerializeInputBE serialize_in(offset, sz);
 
     // and reset to space for the results output
-    m_engine->resetReusedResultOutputBuffer(1);//1 byte to add status code
-    m_engine->resetPerFragmentStatsOutputBuffer();
+    m_engine->resetReusedResultOutputBuffer(1); // 1 byte to add status code
+    cout << "perFragmentTimingEnabled " << queryCommand->perFragmentTimingEnabled << endl;
+    m_engine->resetPerFragmentStatsOutputBuffer(queryCommand->perFragmentTimingEnabled);
 
     try {
         errors = m_engine->executePlanFragments(numFrags,
@@ -804,6 +809,8 @@ void VoltDBIPC::executePlanFragments(struct ipc_command *cmd) {
         crashVoltDB(e);
     }
 
+    sendPerFragmentStatsBuffer();
+
     // write the results array back across the wire
     if (errors == 0) {
         // write the results array back across the wire
@@ -814,6 +821,16 @@ void VoltDBIPC::executePlanFragments(struct ipc_command *cmd) {
     } else {
         sendException(kErrorCode_Error);
     }
+}
+
+void VoltDBIPC::sendPerFragmentStatsBuffer() {
+    int8_t statusCode = static_cast<int8_t>(kErrorCode_pushPerFragmentStatsBuffer);
+    writeOrDie(m_fd, (unsigned char*)&statusCode, sizeof(int8_t));
+    // write the per-fragment stats back across the wire
+    char *perFragmentStatsBuffer = m_engine->getPerFragmentStatsBuffer();
+    int32_t perFragmentStatsBufferSizeToSend = htonl(m_engine->getPerFragmentStatsSize());
+    writeOrDie(m_fd, (unsigned char*)&perFragmentStatsBufferSizeToSend, sizeof(int32_t));
+    writeOrDie(m_fd, (unsigned char*)perFragmentStatsBuffer, m_engine->getPerFragmentStatsSize());
 }
 
 void VoltDBIPC::sendException(int8_t errorCode) {

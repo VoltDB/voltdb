@@ -211,9 +211,10 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     final void clearPerFragmentStatsAndEnsureCapacity(int batchSize) {
         assert(perFragmentStatsBuffer != null);
         // Determine the required size of the per-fragment stats buffer:
+        // int8_t perFragmentTimingEnabled
         // int32_t succeededFragmentsCount
         // succeededFragmentsCount * sizeof(int64_t) for duration time numbers.
-        int size = 4 + batchSize * 8;
+        int size = 1 + 4 + batchSize * 8;
         if (size > perFragmentStatsBuffer.capacity()) {
             setupPerFragmentStatsBuffer(size);
             updateEEBufferPointers();
@@ -298,19 +299,19 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
     // Extract the per-fragment stats from the buffer.
     @Override
-    public int extractPerFragmentStats(int batchSize, long[] durationsOut) {
+    public int extractPerFragmentStats(int batchSize, long[] executionTimesOut) {
         perFragmentStatsBuffer.clear();
         // Discard the first byte since it is the timing on/off switch.
         perFragmentStatsBuffer.get();
         int succeededFragmentsCount = perFragmentStatsBuffer.getInt();
-        if (durationsOut != null) {
-            assert(durationsOut.length >= succeededFragmentsCount);
+        if (executionTimesOut != null) {
+            assert(executionTimesOut.length >= succeededFragmentsCount);
             for (int i = 0; i < succeededFragmentsCount; i++) {
-                durationsOut[i] = perFragmentStatsBuffer.getLong();
+                executionTimesOut[i] = perFragmentStatsBuffer.getLong();
             }
             // This is the time for the failed fragment.
-            if (succeededFragmentsCount < durationsOut.length) {
-                durationsOut[succeededFragmentsCount] = perFragmentStatsBuffer.getLong();
+            if (succeededFragmentsCount < executionTimesOut.length) {
+                executionTimesOut[succeededFragmentsCount] = perFragmentStatsBuffer.getLong();
             }
         }
         return succeededFragmentsCount;

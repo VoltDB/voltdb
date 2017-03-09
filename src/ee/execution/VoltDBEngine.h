@@ -259,14 +259,22 @@ class __attribute__((visibility("default"))) VoltDBEngine {
                 voltdb::VOLT_EE_EXCEPTION_TYPE_NONE;
         }
 
-        void resetPerFragmentStatsOutputBuffer() {
+        void resetPerFragmentStatsOutputBuffer(int8_t perFragmentTimingEnabled = -1) {
+            // The first byte in this buffer is a flag indicating whether the timing is
+            // enabled for the current batch.
+            // For VoltDB JNI, this byte is set by the Java top end.
+            // In this case, we let m_perFragmentStatsOutput initialize skipping this byte,
+            // so this byte will not be overwritten by VoltDBEngine.
+            // For VoltDB IPC, the per-fragment stats buffer is not shared with the top end.
+            // We have to write this byte in EE. This function will help to do that as well.
+            // IPC calls will pass 0 or 1 into here instead of sticking with the default -1.
+            int headerSize = perFragmentTimingEnabled > -1 ? 0 : sizeof(int8_t);
             m_perFragmentStatsOutput.initializeWithPosition(m_perFragmentStatsBuffer,
                                                             m_perFragmentStatsBufferCapacity,
-                                                            sizeof(int8_t));
-            // The first byte is a flag indicating whether the timing is enabled.
-            // We let m_perFragmentStatsOutput skip the space reserved for this flag
-            // so this byte is preserved for the entire batch and the Java top end does
-            // not need to set this byte for each fragment individually.
+                                                            headerSize);
+            if (perFragmentTimingEnabled > -1) {
+                m_perFragmentStatsOutput.writeByte(perFragmentTimingEnabled);
+            }
         }
 
         ReferenceSerializeOutput* getExceptionOutputSerializer() { return &m_exceptionOutput; }
@@ -297,6 +305,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         /** Returns the size of buffer for receiving result tables from EE. */
         int getReusedResultBufferCapacity() const { return m_reusedResultCapacity; }
 
+        int getPerFragmentStatsSize() const;
         char* getPerFragmentStatsBuffer() const { return m_perFragmentStatsBuffer; }
         int getPerFragmentStatsBufferCapacity() const { return m_perFragmentStatsBufferCapacity; }
 
@@ -594,6 +603,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         /** The buffer to pass per-fragment stats to the Topend
             When executing a batch, this buffer will be populated with the following contents:
             {
+                int8_t perFragmentTimingEnabled;
                 int32_t succeededFragmentsCount;
                 int64_t[] fragmentExecutionTimes; // in nanoseconds.
             }

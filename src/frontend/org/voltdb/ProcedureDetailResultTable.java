@@ -25,7 +25,7 @@ import org.voltdb.VoltTable.ColumnInfo;
 
 /**
  * This class is used to re-arrange the output of the PROCEDUREDETAIL selector.
- * It orders the output by: 
+ * It orders the output by:
  *     procedure_name, statement_name, host_id, site_id, partition_id, timestamp (descending);
  */
 public class ProcedureDetailResultTable {

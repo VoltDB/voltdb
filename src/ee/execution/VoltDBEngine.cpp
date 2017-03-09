@@ -1430,6 +1430,10 @@ int VoltDBEngine::getResultsSize() const {
     return static_cast<int>(m_resultOutput.size());
 }
 
+int32_t VoltDBEngine::getPerFragmentStatsSize() const {
+    return static_cast<int32_t>(m_perFragmentStatsOutput.size());
+}
+
 void VoltDBEngine::setBuffers(char* parameterBuffer, int parameterBufferCapacity,
         char* perFragmentStatsBuffer, int perFragmentStatsBufferCapacity,
         char* resultBuffer, int resultBufferCapacity,
