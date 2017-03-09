@@ -488,8 +488,7 @@ public:
             // Likewise, the swapTable call to undo a SWAP TABLES statement.
             unsetTableForStreamIndexing();
         }
-        m_tableForStreamIndexing = (tbForStreamIndexing == NULL) ?
-            tb : tbForStreamIndexing;
+        m_tableForStreamIndexing = tbForStreamIndexing;
         m_tableForStreamIndexing->incrementRefcount();
     }
 
