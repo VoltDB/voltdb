@@ -456,10 +456,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         } catch (RejectedExecutionException e) {
             return 0;
         } catch (IOException e){
+            // IOException is expected if the committed buffer was closed when stats are requested.
             assert e.getMessage().contains("has been closed") : e.getMessage();
+            exportLog.warn("IOException thrown while querying ExportDataSource.sizeInBytes(): " + e.getMessage());
             return 0;
         } catch (Throwable t) {
-            // IOException is expected if the committed buffer was closed when stats are requested.
             Throwables.throwIfUnchecked(t);
             throw new RuntimeException(t);
         }
