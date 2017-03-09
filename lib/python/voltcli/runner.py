@@ -334,7 +334,6 @@ class VerbRunner(object):
         parser = VoltCLIParser(self.verbspace)
         sys.stdout.write('\n')
         parser.print_help()
-        sys.stdout.write('\n')
 
     def get_usage(self):
         """
@@ -349,7 +348,6 @@ class VerbRunner(object):
         if self.verb:
             sys.stdout.write('\n')
             self._print_verb_help(self.verb.name)
-            sys.stdout.write('\n')
 
     def set_default_func(self, default_func):
         """
@@ -487,7 +485,6 @@ class VerbRunner(object):
         parser = VoltCLIParser(self.verbspace)
         parser.initialize_verb(verb_name)
         parser.print_help()
-        sys.stdout.write('\n')
 
     def _create_package(self, output_dir, name, version, description, force):
         # Internal method to create a runnable Python package.

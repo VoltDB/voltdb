@@ -285,6 +285,10 @@ public class KafkaLoader {
             Properties props = new Properties();
             if (m_config.config.length() > 0) {
                 props.load(new FileInputStream(new File(m_config.config)));
+                //Get GroupId from property if present and use it.
+                groupId = props.getProperty("group.id", groupId);
+                //Get zk connection from props file if present.
+                m_config.zookeeper = props.getProperty("zookeeper.connect", m_config.zookeeper);
             } else {
                 props.put("zookeeper.session.timeout.ms", "400");
                 props.put("zookeeper.sync.time.ms", "200");

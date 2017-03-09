@@ -75,7 +75,6 @@ public enum TxnId2Utils {;
                 else if (ss.matches("(?s).*No response received in the allotted time.*") ||
                          ss.matches(".*Server is currently unavailable; try again later.*") ||
                          ss.matches(".*Server is paused.*") ||
-                         ss.matches("(?s).*Server shutdown in progress.*") ||
                          ss.matches("(?s).*Server is shutting down.*")
                         ) {
                     sleep = true;

@@ -46,7 +46,7 @@
 </import>
 <security enabled="true" provider="hash"/>
 <partition-detection enabled="true"/>
-<dr id="6" listen="true" port="12112">
+<dr id="6" listen="true" port="12112" role="master">
 <connection source="uuuu"/>
 </dr>
 </deployment>

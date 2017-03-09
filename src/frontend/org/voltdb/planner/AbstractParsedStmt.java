@@ -120,11 +120,12 @@ public abstract class AbstractParsedStmt {
     // mark whether the statement's parent is UNION clause or not
     private boolean m_isChildOfUnion = false;
 
-    static final String INSERT_NODE_NAME = "insert";
-    static final String UPDATE_NODE_NAME = "update";
-    static final String DELETE_NODE_NAME = "delete";
+    private static final String INSERT_NODE_NAME = "insert";
+    private static final String UPDATE_NODE_NAME = "update";
+    private static final String DELETE_NODE_NAME = "delete";
     static final String SELECT_NODE_NAME = "select";
     static final String UNION_NODE_NAME  = "union";
+    private static final String SWAP_NODE_NAME = "swap";
 
     /**
     * Class constructor
@@ -167,17 +168,20 @@ public abstract class AbstractParsedStmt {
                 retval.m_isUpsert = true;
             }
         }
-        else if (stmtTypeElement.name.equalsIgnoreCase(UPDATE_NODE_NAME)) {
+        else if (stmtTypeElement.name.equals(UPDATE_NODE_NAME)) {
             retval = new ParsedUpdateStmt(paramValues, db);
         }
-        else if (stmtTypeElement.name.equalsIgnoreCase(DELETE_NODE_NAME)) {
+        else if (stmtTypeElement.name.equals(DELETE_NODE_NAME)) {
             retval = new ParsedDeleteStmt(paramValues, db);
         }
-        else if (stmtTypeElement.name.equalsIgnoreCase(SELECT_NODE_NAME)) {
+        else if (stmtTypeElement.name.equals(SELECT_NODE_NAME)) {
             retval = new ParsedSelectStmt(paramValues, db);
         }
-        else if (stmtTypeElement.name.equalsIgnoreCase(UNION_NODE_NAME)) {
+        else if (stmtTypeElement.name.equals(UNION_NODE_NAME)) {
             retval = new ParsedUnionStmt(paramValues, db);
+        }
+        else if (stmtTypeElement.name.equals(SWAP_NODE_NAME)) {
+            retval = new ParsedSwapStmt(paramValues, db);
         }
         else {
             throw new RuntimeException("Unexpected Element: " + stmtTypeElement.name);

@@ -87,7 +87,7 @@ public class MatchChecks {
                         )) {}
                 else if (ss.matches(".*Server is currently unavailable; try again later.*") ||
                          ss.matches(".*Server is paused.*") ||
-                         ss.matches("(?s).*Server shutdown in progress.*")) {
+                         ss.matches("(?s).*Server is shutting down.*")) {
                     sleep = true;
                 }
                 else {

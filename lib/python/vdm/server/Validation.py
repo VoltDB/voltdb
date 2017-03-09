@@ -746,6 +746,11 @@ schema = {
                     "minimum": 0,
                     "maximum": 2147483647
                 },
+                "role": {
+                    "id": "role",
+                    "type": "string",
+                    "enum": ["master", "replica", "xdcr"]
+                },
                 "listen": {
                     "id": "listen",
                     "type": "boolean"
