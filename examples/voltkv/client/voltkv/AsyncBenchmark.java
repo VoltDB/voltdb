@@ -196,7 +196,8 @@ public class AsyncBenchmark {
 
         ClientConfig clientConfig = new ClientConfig("", "", new StatusListener());
         if (config.sslfile.trim().length() > 0) {
-            clientConfig.setTrustStore(config.sslfile);
+            clientConfig.setTrustStoreConfigFromPropertyFile(config.sslfile);
+            clientConfig.enableSSL();
         }
         clientConfig.setMaxTransactionsPerSecond(config.ratelimit);
 

@@ -187,7 +187,8 @@ public class SyncBenchmark {
 
         ClientConfig clientConfig = new ClientConfig("", "", new StatusListener());
         if (config.sslfile.trim().length() > 0) {
-            clientConfig.setTrustStore(config.sslfile);
+            clientConfig.setTrustStoreConfigFromPropertyFile(config.sslfile);
+            clientConfig.enableSSL();
         }
         client = ClientFactory.createClient(clientConfig);
 
