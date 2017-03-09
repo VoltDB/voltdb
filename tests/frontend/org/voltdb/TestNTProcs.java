@@ -86,7 +86,7 @@ public class TestNTProcs extends TestCase {
         }
     }
 
-    public static class RunEverywhereNTProc extends VoltNTProcedure {
+    public static class RunEverywhereNTProc extends VoltNTSystemProcedure {
         public long run() throws InterruptedException, ExecutionException {
             assertTrue(Thread.currentThread().getName().startsWith(NTProcedureService.NTPROC_THREADPOOL_NAMEPREFIX));
 
@@ -151,7 +151,7 @@ public class TestNTProcs extends TestCase {
         }
     }
 
-    public static class RunEverywhereNTProcWithDelay extends VoltNTProcedure {
+    public static class RunEverywhereNTProcWithDelay extends VoltNTSystemProcedure {
         public long run() throws InterruptedException, ExecutionException {
             assertTrue(Thread.currentThread().getName().startsWith(NTProcedureService.NTPROC_THREADPOOL_NAMEPREFIX));
 
@@ -385,6 +385,21 @@ public class TestNTProcs extends TestCase {
         assertEquals(ClientResponse.GRACEFUL_FAILURE, response.getStatus());
         System.out.println("Client got failure response");
         System.out.println(response.toJSONString());
+
+        localServer.shutdown();
+        localServer.join();
+    }
+
+    // @GC is the fist (to be coded) NT sysproc
+    public void testGCSysproc() throws Exception {
+        ServerThread localServer = start();
+
+        Client client = ClientFactory.createClient();
+        client.createConnection("localhost");
+
+        ClientResponseImpl response = (ClientResponseImpl) client.callProcedure("@GC");
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        System.out.println(response.getResults()[0].toFormattedString());
 
         localServer.shutdown();
         localServer.join();

@@ -210,7 +210,8 @@ public class LoadedProcedureSet {
     private ImmutableMap<String, ProcedureRunner> loadSystemProcedures(
             CatalogContext catalogContext,
             SiteProcedureConnection site,
-            CatalogSpecificPlanner csp) {
+            CatalogSpecificPlanner csp)
+    {
         // clean up all the registered system plan fragments before reloading system procedures
         m_registeredSysProcPlanFragments.clear();
         ImmutableMap.Builder<String, ProcedureRunner> builder = ImmutableMap.<String, ProcedureRunner>builder();
@@ -219,6 +220,11 @@ public class LoadedProcedureSet {
         for (Entry<String, Config> entry : entrySet) {
             Config sysProc = entry.getValue();
             Procedure proc = sysProc.asCatalogProcedure();
+
+            // NT sysprocs handled by NTProcedureService
+            if (!sysProc.transactional) {
+                continue;
+            }
 
             VoltSystemProcedure procedure = null;
 

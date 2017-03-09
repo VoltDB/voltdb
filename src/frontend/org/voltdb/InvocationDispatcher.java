@@ -34,7 +34,6 @@ import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -62,7 +61,6 @@ import org.voltdb.AuthSystem.AuthUser;
 import org.voltdb.ClientInterface.ExplainMode;
 import org.voltdb.Consistency.ReadLevel;
 import org.voltdb.SystemProcedureCatalog.Config;
-import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
@@ -371,8 +369,8 @@ public final class InvocationDispatcher {
             }
         }
 
-        // handle non-transactional procedures
-        if ((catProc.getTransactional() == false) && (catProc.getHasjava() == true) && (catProc.getSystemproc() == false)) {
+        // handle non-transactional procedures (INCLUDING NT SYSPROCS)
+        if ((catProc.getTransactional() == false) && (catProc.getHasjava() == true)) {
             return dispatchNTProcedure(task, user, ccxn);
         }
 
@@ -402,10 +400,6 @@ public final class InvocationDispatcher {
             }
             else if ("@SystemInformation".equals(procName)) {
                 return dispatchStatistics(OpsSelector.SYSTEMINFORMATION, task, ccxn);
-            }
-            else if ("@GC".equals(procName)) {
-                dispatchSystemGC(handler, task);
-                return null;
             }
             else if ("@StopNode".equals(procName)) {
                 return dispatchStopNode(task);
@@ -693,40 +687,6 @@ public final class InvocationDispatcher {
         } catch (Exception e) {
             return errorResponse( ccxn, task.clientHandle, ClientResponse.UNEXPECTED_FAILURE, null, e, true);
         }
-    }
-
-    //Run System.gc() in it's own thread because it will block
-    //until collection is complete and we don't want to do that from an application thread
-    //because the collector is partially concurrent and we can still make progress
-    private final ExecutorService m_systemGCThread =
-            CoreUtils.getCachedSingleThreadExecutor("System.gc() invocation thread", 1000);
-
-    private final void dispatchSystemGC(final InvocationClientHandler handler, final StoredProcedureInvocation task) {
-        m_systemGCThread.execute(new Runnable() {
-            @Override
-            public void run() {
-                final long start = System.nanoTime();
-                System.gc();
-                final long duration = System.nanoTime() - start;
-                VoltTable vt = new VoltTable(
-                        new ColumnInfo[] { new ColumnInfo("SYSTEM_GC_DURATION_NANOS", VoltType.BIGINT) });
-                vt.addRow(duration);
-                final ClientResponseImpl response = new ClientResponseImpl(
-                        ClientResponseImpl.SUCCESS,
-                        new VoltTable[] { vt },
-                        null,
-                        task.clientHandle);
-                ByteBuffer buf = ByteBuffer.allocate(response.getSerializedSize() + 4);
-                buf.putInt(buf.capacity() - 4);
-                response.flattenToBuffer(buf).flip();
-
-                ClientInterfaceHandleManager cihm = m_cihm.get(handler.connectionId());
-                if (cihm == null) {
-                    return;
-                }
-                cihm.connection.writeStream().enqueue(buf);
-            }
-        });
     }
 
     private ClientResponseImpl dispatchStopNode(StoredProcedureInvocation task) {

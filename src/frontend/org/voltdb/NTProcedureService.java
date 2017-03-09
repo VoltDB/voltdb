@@ -21,6 +21,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.nio.ByteBuffer;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
@@ -33,6 +34,7 @@ import java.util.concurrent.Semaphore;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.network.Connection;
 import org.voltdb.AuthSystem.AuthUser;
+import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Procedure;
 
@@ -43,6 +45,7 @@ public class NTProcedureService {
 
     // user procedures.
     ImmutableMap<String, ProcedureRunnerNTGenerator> m_procs = ImmutableMap.<String, ProcedureRunnerNTGenerator>builder().build();
+    ImmutableMap<String, ProcedureRunnerNTGenerator> m_sysProcs = ImmutableMap.<String, ProcedureRunnerNTGenerator>builder().build();
     ConcurrentHashMap<Long, ProcedureRunnerNT> m_outstanding = new ConcurrentHashMap<>();
     final InternalConnectionHandler m_ich;
     final Mailbox m_mailbox;
@@ -120,6 +123,55 @@ public class NTProcedureService {
         assert(ich != null);
         m_ich = ich;
         m_mailbox = mailbox;
+
+        m_sysProcs = loadSystemProcedures();
+    }
+
+    @SuppressWarnings("unchecked")
+    private ImmutableMap<String, ProcedureRunnerNTGenerator> loadSystemProcedures() {
+        ImmutableMap.Builder<String, ProcedureRunnerNTGenerator> builder =
+                ImmutableMap.<String, ProcedureRunnerNTGenerator>builder();
+
+        Set<Entry<String,Config>> entrySet = SystemProcedureCatalog.listing.entrySet();
+        for (Entry<String, Config> entry : entrySet) {
+            String procName = entry.getKey();
+            Config sysProc = entry.getValue();
+
+            // transactional sysprocs handled by LoadedProcedureSet
+            if (sysProc.transactional) {
+                continue;
+            }
+
+            final String className = sysProc.getClassname();
+            Class<? extends VoltNTProcedure> procClass = null;
+
+            // this check is for sysprocs that don't have a procedure class
+            if (className != null) {
+                try {
+                    procClass = (Class<? extends VoltNTProcedure>) Class.forName(className);
+                }
+                catch (final ClassNotFoundException e) {
+                    if (sysProc.commercial) {
+                        continue;
+                    }
+                    VoltDB.crashLocalVoltDB("Missing Java class for NT System Procedure: " + procName);
+                }
+
+                // This is a startup-time check to make sure we can instantiate
+                try {
+                    if ((procClass.newInstance() instanceof VoltNTSystemProcedure) == false) {
+                        VoltDB.crashLocalVoltDB("NT System Procedure is incorrect class type: " + procName);
+                    }
+                }
+                catch (InstantiationException | IllegalAccessException e) {
+                    VoltDB.crashLocalVoltDB("Unable to instantiate NT System Procedure: " + procName);
+                }
+
+                ProcedureRunnerNTGenerator prntg = new ProcedureRunnerNTGenerator(procClass);
+                builder.put(procName, prntg);
+            }
+        }
+        return builder.build();
     }
 
     @SuppressWarnings("unchecked")
@@ -161,7 +213,13 @@ public class NTProcedureService {
                                        final String procName,
                                        final ParameterSet paramListIn)
     {
-        final ProcedureRunnerNTGenerator prntg = m_procs.get(procName);
+        final ProcedureRunnerNTGenerator prntg;
+        if (procName.startsWith("@")) {
+            prntg = m_sysProcs.get(procName);
+        }
+        else {
+            prntg = m_procs.get(procName);
+        }
 
         ProcedureRunnerNT tempRunner = null;
         try {

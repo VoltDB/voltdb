@@ -15,17 +15,25 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb;
+package org.voltdb.sysprocs;
 
-import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 
-import org.voltdb.client.ClientResponse;
+import org.voltdb.VoltNTSystemProcedure;
+import org.voltdb.VoltTable;
+import org.voltdb.VoltTable.ColumnInfo;
+import org.voltdb.VoltType;
 
-public class VoltNTProcedure {
+public class GC extends VoltNTSystemProcedure {
+    public VoltTable run() throws InterruptedException, ExecutionException {
+        final long start = System.nanoTime();
+        System.gc();
+        final long duration = System.nanoTime() - start;
 
-    ProcedureRunnerNT m_runner = null;
+        VoltTable vt = new VoltTable(
+                new ColumnInfo[] { new ColumnInfo("SYSTEM_GC_DURATION_NANOS", VoltType.BIGINT) });
+        vt.addRow(duration);
 
-    protected CompletableFuture<ClientResponse> callProcedure(String procName, Object... params) {
-        return m_runner.callProcedure(procName, params);
+        return vt;
     }
 }
