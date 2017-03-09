@@ -190,6 +190,38 @@ public class TruncateTableLoader extends BenchmarkThread {
         return rowCounts;
     }
 
+    private void truncateTable(byte shouldRollback, String tp) throws IOException, ProcCallException {
+        long p = Math.abs(r.nextLong());
+
+        // Perform the truncate
+        ClientResponse clientResponse = client.callProcedure(tableName.toUpperCase() + tp, p, shouldRollback);
+        if (isStatusSuccess(clientResponse, shouldRollback, "truncate", tableName)) {
+            Benchmark.txnCount.incrementAndGet();
+            nTruncates++;
+        }
+
+        // Confirm that the truncate worked correctly, by checking the row count
+        // (even though the stored procedures themselves also check this)
+        long rowCount = -1;
+        try {
+            rowCount = TxnId2Utils.getRowCount(client, tableName);
+        } catch (Exception e) {
+            hardStop("getrowcount exception", e);
+        }
+        if (rowCount != 0) {
+            String truncateProcName = tableName.toUpperCase() + tp;
+            String message = "Table '"+tableName+"' has "+rowCount+" rows after truncate "
+                    + "(by stored proc "+truncateProcName+"): non-zero";
+            if ("TRUPTruncateTableSP".equals(truncateProcName)) {
+                // TRUPTruncateTableSP, being SP, does not truncate the entire
+                // table, so this situation is expected, and not fatal
+                log.warn(message + " (OK for SP)");
+            } else {
+                hardStop("TruncateTableLoader: " + message + "!");
+            }
+        }
+    }
+
     @Override
     public void run() {
         byte[] data = new byte[rowSize];
@@ -233,12 +265,12 @@ public class TruncateTableLoader extends BenchmarkThread {
             }
             catch (Exception e) {
                 // on exception, log and end the thread, but don't kill the process
-                log.error("TruncateTableLoader failed a TableInsert procedure call for table '" + tableName + "' " + e.getMessage());
+                log.error("TruncateTableLoader failed a TableInsert procedure call for table '" + tableName + "': " + e.getMessage());
                 try { Thread.sleep(3000); } catch (Exception e2) {}
             }
 
 
-            // truncate the table, check for zero rows
+            // check the initial table counts, prior to truncate and/or swap
             try {
                 currentRowCount = TxnId2Utils.getRowCount(client, tableName);
                 swapRowCount = TxnId2Utils.getRowCount(client, swapTableName);
@@ -249,8 +281,6 @@ public class TruncateTableLoader extends BenchmarkThread {
             try {
                 log.debug(tableName + " current row count is " + currentRowCount
                          + "; " + swapTableName + " row count is " + swapRowCount);
-                long p = 0;
-                ClientResponse clientResponse = null;
                 String tp = this.truncateProcedure;
                 String sp = this.swapProcedure;
                 if (tableName == "trup") {
@@ -275,12 +305,7 @@ public class TruncateTableLoader extends BenchmarkThread {
                     currentRowCount = TxnId2Utils.getRowCount(client, tableName);
                     swapRowCount = TxnId2Utils.getRowCount(client, swapTableName);
                 }
-                p = Math.abs(r.nextLong());
-                clientResponse = client.callProcedure(tableName.toUpperCase() + tp, p, shouldRollback);
-                if (isStatusSuccess(clientResponse, shouldRollback, "truncate", tableName)) {
-                    Benchmark.txnCount.incrementAndGet();
-                    nTruncates++;
-                }
+                truncateTable(shouldRollback, tp);
 
                 // perhaps swap tables, after truncating (why? see comment above)
                 if (r.nextInt(100) < swapRatio * 100.) {
@@ -303,23 +328,26 @@ public class TruncateTableLoader extends BenchmarkThread {
                     if ((cri.getStatus() == ClientResponse.GRACEFUL_FAILURE) ||
                             (cri.getStatus() == ClientResponse.USER_ABORT)) {
                         // on exception, log and end the thread, but don't kill the process
-                        hardStop("TruncateTableLoader failed a TruncateTable or SwapTable ProcCallException call for table '" + tableName + "' " + e.getMessage());
+                        hardStop("TruncateTableLoader failed a TruncateTable or SwapTable ProcCallException call for table '"
+                                + tableName + "': " + e.getMessage());
                     }
                 }
-                long newRowCount = -1;
-                try {
-                    newRowCount = TxnId2Utils.getRowCount(client, tableName);
-                } catch (Exception e2) {
-                    hardStop("getrowcount exception", e2);
-                }
-                if (newRowCount != currentRowCount) {
-                    hardStop("TruncateTableLoader call to TruncateTable or SwapTable changed row count from " + currentRowCount
-                            + " to "+newRowCount+", despite rollback, for table '" + tableName + "' " + e.getMessage());
+                if (!TxnId2Utils.isConnectionTransactionCatalogOrServerUnavailableIssue(e.getClientResponse().getStatusString())) {
+                    long newRowCount = -1;
+                    try {
+                        newRowCount = TxnId2Utils.getRowCount(client, tableName);
+                    } catch (Exception e2) {
+                        hardStop("getrowcount exception", e2);
+                    }
+                    if (newRowCount != currentRowCount) {
+                        hardStop("TruncateTableLoader call to TruncateTable or SwapTable changed row count from " + currentRowCount
+                                + " to "+newRowCount+", despite rollback, for table '" + tableName + "': " + e.getMessage());
+                    }
                 }
             }
             catch (NoConnectionsException e) {
                 // on exception, log and end the thread, but don't kill the process
-                log.warn("TruncateTableLoader failed a non-proc call exception for table '" + tableName + "' " + e.getMessage());
+                log.warn("TruncateTableLoader failed a non-proc call exception for table '" + tableName + "': " + e.getMessage());
                 try { Thread.sleep(3000); } catch (Exception e2) {}
             }
             catch (IOException e) {
@@ -357,13 +385,13 @@ public class TruncateTableLoader extends BenchmarkThread {
                     if ((cri.getStatus() == ClientResponse.GRACEFUL_FAILURE) ||
                             (cri.getStatus() == ClientResponse.USER_ABORT)) {
                         // on exception, log and end the thread, but don't kill the process
-                        hardStop("TruncateTableLoader failed a ScanAgg ProcCallException call for table '" + tableName + "' " + e.getMessage());
+                        hardStop("TruncateTableLoader failed a ScanAgg ProcCallException call for table '" + tableName + "': " + e.getMessage());
                     }
                 }
             }
             catch (NoConnectionsException e) {
                 // on exception, log and end the thread, but don't kill the process
-                log.warn("TruncateTableLoader failed a non-proc call exception for table '" + tableName + "' " + e.getMessage());
+                log.warn("TruncateTableLoader failed a non-proc call exception for table '" + tableName + "': " + e.getMessage());
                 try { Thread.sleep(3000); } catch (Exception e2) {}
             }
             catch (IOException e) {
