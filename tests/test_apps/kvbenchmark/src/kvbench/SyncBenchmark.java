@@ -290,7 +290,7 @@ public class SyncBenchmark {
         this.config = config;
 
         ClientConfig clientConfig = new ClientConfig("", "", null);
-        if (config.sslfile != null && !config.sslfile.trim().isEmpty()) {
+        if (config.sslfile.trim().length() > 0) {
             clientConfig.setTrustStoreConfigFromPropertyFile(config.sslfile);
             clientConfig.enableSSL();
         }

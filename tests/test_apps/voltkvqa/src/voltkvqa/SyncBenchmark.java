@@ -188,8 +188,11 @@ public class SyncBenchmark {
     public SyncBenchmark(KVConfig config) {
         this.config = config;
 
-        Boolean ssl = (config.sslfile.length() > 0);
-        ClientConfig clientConfig = new ClientConfig(config.username, config.password, null, ssl, config.sslfile);
+        ClientConfig clientConfig = new ClientConfig("", "");
+        if (config.sslfile.trim().length() > 0) {
+            clientConfig.setTrustStoreConfigFromPropertyFile(config.sslfile);
+            clientConfig.enableSSL();
+        }
         clientConfig.setReconnectOnConnectionLoss(true);
         clientConfig.setClientAffinity(!config.noclientaffinity);
         client = ClientFactory.createClient(clientConfig);

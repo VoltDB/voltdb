@@ -311,8 +311,11 @@ public class AsyncBenchmark {
     public AsyncBenchmark(KVConfig config) {
         this.config = config;
 
-        Boolean ssl = (config.sslfile.length() > 0);
-        ClientConfig clientConfig = new ClientConfig("", "", new StatusListener(), ssl, config.sslfile);
+		ClientConfig clientConfig = new ClientConfig("", "", new StatusListener());
+        if (config.sslfile.trim().length() > 0) {
+            clientConfig.setTrustStoreConfigFromPropertyFile(config.sslfile);
+            clientConfig.enableSSL();
+        }
         clientConfig.setReconnectOnConnectionLoss(config.recover);
 
         if (config.topologyaware) {
