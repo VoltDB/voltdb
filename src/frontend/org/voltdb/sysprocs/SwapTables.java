@@ -39,11 +39,8 @@ public class SwapTables extends AdHocBase {
      * System procedure run hook.
      * Use the base class implementation.
      *
-     * @param ctx  execution context
-     * @param aggregatorFragments  aggregator plan fragments
-     * @param collectorFragments  collector plan fragments
-     * @param sqlStatements  source SQL statements
-     * @param replicatedTableDMLFlags  flags set to 1 when replicated
+     * @param ctx execution context
+     * @param serializedBatchData serialized batch data
      *
      * @return  results as VoltTable array
      */

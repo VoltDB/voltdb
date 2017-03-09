@@ -42,23 +42,12 @@ public class AdHoc_RW_MP extends AdHocBase {
      * System procedure run hook.
      * Use the base class implementation.
      *
-     * @param ctx  execution context
-     * @param aggregatorFragments  aggregator plan fragments
-     * @param collectorFragments  collector plan fragments
-     * @param sqlStatements  source SQL statements
-     * @param replicatedTableDMLFlags  flags set to 1 when replicated
+     * @param ctx execution context
+     * @param serializedBatchData serialized batch data
      *
      * @return  results as VoltTable array
      */
     public VoltTable[] run(SystemProcedureExecutionContext ctx, byte[] serializedBatchData) {
-        AdHocPlannedStatement[] statements = decodeSerializedBatchData(serializedBatchData).getSecond();
-        if (statements.length == 1) {
-            String sqlStmt = new String(statements[0].sql, Constants.UTF8ENCODING);
-            if (sqlStmt.startsWith("@SwapTables ")) {
-                String[] args = sqlStmt.split(" ");
-                VoltDB.instance().swapTables(args[1], args[2]);
-            }
-        }
         return runAdHoc(ctx, serializedBatchData);
     }
 
