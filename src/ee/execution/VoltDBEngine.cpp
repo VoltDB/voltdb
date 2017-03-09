@@ -1262,7 +1262,7 @@ void VoltDBEngine::swapDRActions(PersistentTable* table1, PersistentTable* table
     table2->signature(tcd2->signatureHash());
 
     // Generate swap table DREvent
-    assert(table1->isDREnabled() == table2.isDREnabled());
+    assert(table1->isDREnabled() == table2->isDREnabled());
     assert(table1->isDREnabled()); // This is checked before calling this method.
     int64_t lastCommittedSpHandle = m_executorContext->lastCommittedSpHandle();
     int64_t spHandle = m_executorContext->currentSpHandle();

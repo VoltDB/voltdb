@@ -4378,20 +4378,19 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     @Override
     public void swapTables(String oneTable, String otherTable) {
         System.out.println("Notifying RealVoltDB with swapping of " + oneTable + " and " + otherTable);
-        Table tableA = m_catalogContext.tables.get(oneTable);
-        Table tableB = m_catalogContext.tables.get(otherTable);
-        if (tableA != null && tableB != null) {
-            if (tableA.getIsdred() && tableB.getIsdred()) {
-                System.out.println("Notifying ConsumerDRGateway as both tables are valid and DR enabled");
-                long signatureHashA = Hashing.sha1().hashString(tableA.getSignature(), Charsets.UTF_8).asLong();
-                long signatureHashB = Hashing.sha1().hashString(tableB.getSignature(), Charsets.UTF_8).asLong();
-                if (m_consumerDRGateway != null) {
+        if (m_consumerDRGateway != null) {
+            Table tableA = m_catalogContext.tables.get(oneTable);
+            Table tableB = m_catalogContext.tables.get(otherTable);
+            if (tableA != null && tableB != null) {
+                if (tableA.getIsdred() && tableB.getIsdred()) {
+                    System.out.println("Notifying ConsumerDRGateway as both tables are valid and DR enabled");
+                    long signatureHashA = Hashing.sha1().hashString(tableA.getSignature(), Charsets.UTF_8).asLong();
+                    long signatureHashB = Hashing.sha1().hashString(tableB.getSignature(), Charsets.UTF_8).asLong();
                     m_consumerDRGateway.swapTables(Pair.of(oneTable, signatureHashA), Pair.of(otherTable, signatureHashB));
                 }
+            } else {
+                System.out.println("Error finding tables being swapped in catalog");
             }
-        }
-        else {
-            System.out.println("Error finding tables being swapped in catalog");
         }
     }
 }
