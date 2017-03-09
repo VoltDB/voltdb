@@ -60,8 +60,7 @@ public abstract class ClientFactory {
                 ReverseDNSCache.start();
             }
         }
-        config.enableSSL();
-        client = new ClientImpl(config, config.getSslContext());
+        client = new ClientImpl(config);
         return client;
     }
 

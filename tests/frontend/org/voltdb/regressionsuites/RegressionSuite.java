@@ -39,7 +39,11 @@ import java.util.Properties;
 import java.util.Random;
 import java.util.regex.Pattern;
 
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLEngine;
+
 import org.apache.commons.lang3.StringUtils;
+import org.voltcore.utils.ssl.SSLConfiguration;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -60,8 +64,6 @@ import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.Encoder;
 
 import com.google_voltpatches.common.net.HostAndPort;
-import javax.net.ssl.SSLContext;
-import javax.net.ssl.SSLEngine;
 
 import junit.framework.TestCase;
 
@@ -344,6 +346,7 @@ public class RegressionSuite extends TestCase {
     public SocketChannel getClientChannel() throws IOException {
         return getClientChannel(false);
     }
+
     public SocketChannel getClientChannel(final boolean noTearDown) throws IOException {
         final List<String> listeners = m_config.getListenerAddresses();
         final Random r = new Random();
@@ -358,9 +361,7 @@ public class RegressionSuite extends TestCase {
         SSLEngine sslEngine = null;
         boolean sslEnabled = Boolean.valueOf(System.getenv("ENABLE_SSL") == null ? Boolean.toString(Boolean.getBoolean("ENABLE_SSL")) : System.getenv("ENABLE_SSL"));
          if (sslEnabled) {
-             ClientConfig config = new ClientConfig();
-             config.enableSSL();
-             SSLContext sslContext = config.getSslContext();
+             SSLContext sslContext = SSLConfiguration.createSslContext(new SSLConfiguration.SslConfig());
              sslEngine = sslContext.createSSLEngine("client", port);
              sslEngine.setUseClientMode(true);
          }

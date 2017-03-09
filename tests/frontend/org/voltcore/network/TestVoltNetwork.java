@@ -281,7 +281,7 @@ public class TestVoltNetwork extends TestCase {
     }
 
     public void testInstallInterestsSSLMode() throws Exception {
-        SSLEngine sslEngine = SSLConfiguration.initializeSslContext(null).createSSLEngine("client", 21212);
+        SSLEngine sslEngine = SSLConfiguration.createSslContext(null).createSSLEngine("client", 21212);
 
         VoltNetwork voltNetwork = new VoltNetwork( 0, null, "Test");
         MockSSLVoltPort sslVoltPort = new MockSSLVoltPort(voltNetwork, new MockInputHandler(), CipherExecutor.CLIENT, sslEngine);
@@ -321,7 +321,7 @@ public class TestVoltNetwork extends TestCase {
 
 
     public void testInvokeCallbacksSSL() throws Exception {
-        SSLEngine sslEngine = SSLConfiguration.initializeSslContext(null).createSSLEngine("client", 21212);
+        SSLEngine sslEngine = SSLConfiguration.createSslContext(null).createSSLEngine("client", 21212);
 
         MockSelector selector = new MockSelector();
         VoltNetwork vn = new VoltNetwork(selector);

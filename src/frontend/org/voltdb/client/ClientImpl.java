@@ -37,7 +37,10 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Logger;
 
+import javax.net.ssl.SSLContext;
+
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.ssl.SSLConfiguration;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
 import org.voltdb.client.HashinatorLite.HashinatorLiteType;
@@ -48,8 +51,6 @@ import org.voltdb.common.Constants;
 import org.voltdb.utils.Encoder;
 
 import com.google_voltpatches.common.collect.ImmutableSet;
-
-import javax.net.ssl.SSLContext;
 
 /**
  *  A client that connects to one or more nodes in a VoltCluster
@@ -117,13 +118,18 @@ public final class ClientImpl implements Client {
      * most outgoing procedure invocations. This helps size initial allocations
      * for serializing network writes
      */
-    ClientImpl(ClientConfig config, SSLContext sslContext) {
+    ClientImpl(ClientConfig config) {
 
         if (config.m_topologyChangeAware && !config.m_useClientAffinity) {
             throw new IllegalArgumentException("The client affinity must be enabled to enable topology awareness.");
         }
 
-        m_sslContext = sslContext;
+        if (config.m_enableSSL) {
+            m_sslContext = SSLConfiguration.createSslContext(config.m_sslConfig);
+        } else {
+            m_sslContext = null;
+        }
+
         m_distributer = new Distributer(
                 config.m_heavyweight,
                 config.m_procedureCallTimeoutNanos,
@@ -208,6 +214,10 @@ public final class ClientImpl implements Client {
 
     public int getPasswordHashCode() {
         return m_passwordHashCode;
+    }
+
+    public SSLContext getSSLContext() {
+        return m_sslContext;
     }
 
     public void createConnectionWithHashedCredentials(

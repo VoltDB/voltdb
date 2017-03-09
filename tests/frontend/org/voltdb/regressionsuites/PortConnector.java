@@ -27,11 +27,6 @@ import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
-import java.security.KeyManagementException;
-import java.security.KeyStoreException;
-import java.security.NoSuchAlgorithmException;
-import java.security.UnrecoverableKeyException;
-import java.security.cert.CertificateException;
 import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -96,11 +91,8 @@ public class PortConnector {
                 throw new IllegalArgumentException("Unable to access SSL configuration.", ioe);
             }
             SSLContext sslContext;
-            try {
-                sslContext = SSLConfiguration.initializeSslContext(sslConfig);
-            } catch (NoSuchAlgorithmException | KeyStoreException | IOException | CertificateException | UnrecoverableKeyException | KeyManagementException ex) {
-                throw new IllegalArgumentException(ex.getMessage(), ex);
-            }
+            sslContext = SSLConfiguration.createSslContext(sslConfig);
+
             SSLEngine sslEngine = sslContext.createSSLEngine("client", m_port);
             sslEngine.setUseClientMode(true);
             TLSHandshaker handshaker = new TLSHandshaker(m_socket, sslEngine);

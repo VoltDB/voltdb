@@ -20,19 +20,12 @@ package org.voltdb.client;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
-import java.io.InputStream;
 import java.math.RoundingMode;
-import java.security.KeyManagementException;
-import java.security.KeyStoreException;
-import java.security.NoSuchAlgorithmException;
 import java.security.Principal;
-import java.security.UnrecoverableKeyException;
-import java.security.cert.CertificateException;
 import java.util.Iterator;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 
-import javax.net.ssl.SSLContext;
 import javax.security.auth.Subject;
 import javax.security.auth.login.LoginContext;
 import javax.security.auth.login.LoginException;
@@ -40,9 +33,6 @@ import javax.security.auth.login.LoginException;
 import org.voltcore.utils.ssl.SSLConfiguration;
 import org.voltcore.utils.ssl.SSLConfiguration.SslConfig;
 import org.voltdb.types.VoltDecimalHelper;
-
-import com.google_voltpatches.common.base.Supplier;
-import com.google_voltpatches.common.base.Suppliers;
 
 /**
  * Container for configuration settings for a Client
@@ -82,8 +72,6 @@ public class ClientConfig {
             System.getenv("ENABLE_SSL") == null ?
                     Boolean.toString(Boolean.getBoolean("ENABLE_SSL"))
                   : System.getenv("ENABLE_SSL"));
-
-    private static final String DEFAULT_SSL_PROPS_FILE = "ssl-config";
 
     final static String getUserNameFromSubject(Subject subject) {
         if (subject == null || subject.getPrincipals() == null || subject.getPrincipals().isEmpty()) {
@@ -212,19 +200,6 @@ public class ClientConfig {
         m_listener = listener;
         m_cleartext = cleartext;
         m_hashScheme = scheme;
-        //For testing
-        if (ENABLE_SSL_FOR_TEST) {
-            m_enableSSL = true;
-            try (InputStream is = this.getClass().getResourceAsStream(DEFAULT_SSL_PROPS_FILE)) {
-                Properties sslProperties = new Properties();
-                sslProperties.load(is);
-                String trustStore = sslProperties.getProperty(SSLConfiguration.TRUSTSTORE_CONFIG_PROP);
-                String trustStorePassword = sslProperties.getProperty(SSLConfiguration.TRUSTSTORE_PASSWORD_CONFIG_PROP);
-                m_sslConfig = new SSLConfiguration.SslConfig(null, null, trustStore, trustStorePassword);
-            } catch (IOException e) {
-                throw new IllegalArgumentException("Unable to access SSL configuration.", e);
-            }
-        }
     }
 
     /**
@@ -468,24 +443,23 @@ public class ClientConfig {
     /**
      * Configure trustore
      *
-     * @param trustStore file spec for the trustore
+     * @param pathToTrustStore file spec for the trustore
      * @param trustStorePassword trustore keyfile password
      */
-    public void setTrustStore(String trustStore, String trustStorePassword) {
-        File tsFD = new File(trustStore != null && !trustStore.trim().isEmpty() ? trustStore : "");
+    public void setTrustStore(String pathToTrustStore, String trustStorePassword) {
+        File tsFD = new File(pathToTrustStore != null && !pathToTrustStore.trim().isEmpty() ? pathToTrustStore : "");
         if (!tsFD.exists() || !tsFD.isFile() || !tsFD.canRead()) {
-            throw new IllegalArgumentException("Trust store " + trustStore + " is not read accessible");
+            throw new IllegalArgumentException("Trust store " + pathToTrustStore + " is not read accessible");
         }
-        m_sslConfig = new SSLConfiguration.SslConfig(null, null, trustStore, trustStorePassword);
+        m_sslConfig = new SSLConfiguration.SslConfig(null, null, pathToTrustStore, trustStorePassword);
     }
-
 
     /**
      * Configure trustore
      *
      * @param propFN property file name containing trustore properties
      */
-    public void setTrustStore(String propFN) {
+    public void setTrustStoreConfigFromPropertyFile(String propFN) {
         File propFD = new File(propFN != null && !propFN.trim().isEmpty() ? propFN : "");
         if (!propFD.exists() || !propFD.isFile() || !propFD.canRead()) {
             throw new IllegalArgumentException("Properties file " + propFN + " is not read accessible");
@@ -508,27 +482,7 @@ public class ClientConfig {
     public void enableSSL() {
         m_enableSSL = true;
         if (m_sslConfig == null) {
-            m_sslConfig = new SSLConfiguration.SslConfig(null, null, null, null);
+            m_sslConfig = new SSLConfiguration.SslConfig();
         }
-    }
-
-    Supplier<SSLContext> m_sslContextSupplier = Suppliers.memoize(new Supplier<SSLContext>() {
-        @Override
-        public SSLContext get() {
-            if (!m_enableSSL || m_sslConfig == null) {
-                throw new IllegalStateException("TLS is not enabled in this instance of ClientConfig");
-            }
-            synchronized(ClientConfig.this) {
-                try {
-                    return SSLConfiguration.initializeSslContext(m_sslConfig);
-                } catch (IOException | NoSuchAlgorithmException | KeyStoreException | CertificateException | UnrecoverableKeyException | KeyManagementException ex) {
-                    throw new IllegalArgumentException("Failed to initialize SSL from config file: " + m_sslPropsFile, ex);
-                }
-            }
-        }
-    });
-
-    public SSLContext getSslContext() {
-        return m_sslContextSupplier.get();
     }
 }

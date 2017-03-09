@@ -1401,7 +1401,7 @@ public class SQLCommand
         // Create connection
         ClientConfig config = new ClientConfig(user, password, null);
         if (enableSSL && sslConfigFile != null && !sslConfigFile.trim().isEmpty()) {
-            config.setTrustStore(sslConfigFile);
+            config.setTrustStoreConfigFromPropertyFile(sslConfigFile);
             config.enableSSL();
         }
         config.setProcedureCallTimeout(0);  // Set procedure all to infinite timeout, see ENG-2670

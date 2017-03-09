@@ -436,7 +436,7 @@ public class CSVLoader implements BulkLoaderErrorHandler {
         // Create connection
         final ClientConfig c_config = new ClientConfig(config.user, config.password, null);
         if (config.ssl != null && !config.ssl.trim().isEmpty()) {
-            c_config.setTrustStore(config.ssl);
+            c_config.setTrustStoreConfigFromPropertyFile(config.ssl);
             c_config.enableSSL();
         }
         c_config.setProcedureCallTimeout(0); // Set procedure all to infinite

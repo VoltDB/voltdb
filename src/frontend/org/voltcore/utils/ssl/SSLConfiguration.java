@@ -28,6 +28,7 @@ import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.security.UnrecoverableKeyException;
 import java.security.cert.CertificateException;
+import java.util.Properties;
 import java.util.Set;
 
 import javax.net.ssl.KeyManager;
@@ -36,12 +37,16 @@ import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
 
+import org.voltdb.client.ClientConfig;
+
 import com.google_voltpatches.common.collect.ImmutableSet;
 
 /**
  * Code common to ServerSSLEngineFactory and ClientSSLEngineFactory.
  */
 public class SSLConfiguration {
+
+    private static final String DEFAULT_SSL_PROPS_FILE = "ssl-config";
 
     public static final String KEYSTORE_CONFIG_PROP = "keyStore";
     public static final String KEYSTORE_PASSWORD_CONFIG_PROP = "keyStorePassword";
@@ -96,22 +101,28 @@ public class SSLConfiguration {
             .add("TLS_DHE_DSS_WITH_AES_128_GCM_SHA256")
             .build();
 
-    public static SSLContext initializeSslContext(SslConfig sslConfig)
-            throws NoSuchAlgorithmException, KeyStoreException, IOException, FileNotFoundException, CertificateException, UnrecoverableKeyException, KeyManagementException {
-        SSLContext sslContext = SSLContext.getInstance("TLS");
+    public static SSLContext createSslContext(SslConfig sslConfig) {
+        if (sslConfig == null) {
+            throw new IllegalArgumentException("sslConfig is null");
+        }
+
         KeyManager[] keyManagers = null;
         TrustManager[] trustManagers = null;
-        if (sslConfig != null) {
+        try {
+            SSLContext sslContext = SSLContext.getInstance("TLS");
+
             if (sslConfig.keyStorePath != null && sslConfig.keyStorePassword != null) {
                 keyManagers = createKeyManagers(sslConfig.keyStorePath, sslConfig.keyStorePassword, sslConfig.keyStorePassword);
             }
             if (sslConfig.trustStorePath != null && sslConfig.trustStorePassword != null) {
                 trustManagers = createTrustManagers(sslConfig.trustStorePath, sslConfig.trustStorePassword);
             }
-        }
+            sslContext.init(keyManagers,trustManagers, new SecureRandom());
 
-        sslContext.init(keyManagers,trustManagers, new SecureRandom());
-        return sslContext;
+            return sslContext;
+        } catch (IOException | NoSuchAlgorithmException | KeyStoreException | CertificateException | UnrecoverableKeyException | KeyManagementException ex) {
+            throw new IllegalArgumentException("Failed to initialize SSL using " + sslConfig, ex);
+        }
     }
 
     /**
@@ -155,32 +166,64 @@ public class SSLConfiguration {
     }
 
     public static class SslConfig {
+
         public final String keyStorePath;
         public final String keyStorePassword;
         public final String trustStorePath;
         public final String trustStorePassword;
 
+        public SslConfig() {
+            this(null,null,null,null);
+        }
+
         public SslConfig(String keyStorePath, String keyStorePassword, String trustStorePath, String trustStorePassword) {
-            String pval = System.getProperty("javax.net.ssl.keyStore");
-            if (pval != null) {
-                keyStorePath = pval;
+
+            if (ClientConfig.ENABLE_SSL_FOR_TEST) {
+
+                try (InputStream is = ClientConfig.class.getResourceAsStream(DEFAULT_SSL_PROPS_FILE)) {
+                    Properties sslProperties = new Properties();
+                    sslProperties.load(is);
+                    trustStorePath = sslProperties.getProperty(TRUSTSTORE_CONFIG_PROP);
+                    trustStorePassword = sslProperties.getProperty(TRUSTSTORE_PASSWORD_CONFIG_PROP);
+                } catch (IOException e) {
+                    throw new IllegalArgumentException("Unable to access SSL configuration.", e);
+                }
+                this.keyStorePath = null;
+                this.keyStorePassword = null;
+                this.trustStorePath = trustStorePath;
+                this.trustStorePassword = trustStorePassword;
+
+            } else {
+
+                String pval = System.getProperty("javax.net.ssl.keyStore");
+                if (pval != null) {
+                    keyStorePath = pval;
+                }
+                pval = System.getProperty("javax.net.ssl.keyStorePassword");
+                if (pval != null) {
+                    keyStorePassword = pval;
+                }
+                pval = System.getProperty("javax.net.ssl.trustStore");
+                if (pval != null) {
+                    trustStorePath = pval;
+                }
+                pval = System.getProperty("javax.net.ssl.trustStorePassword");
+                if (pval != null) {
+                    trustStorePassword = pval;
+                }
+                this.keyStorePath = keyStorePath;
+                this.keyStorePassword = keyStorePassword;
+                this.trustStorePath = trustStorePath;
+                this.trustStorePassword = trustStorePassword;
             }
-            pval = System.getProperty("javax.net.ssl.keyStorePassword");
-            if (pval != null) {
-                keyStorePassword = pval;
-            }
-            pval = System.getProperty("javax.net.ssl.trustStore");
-            if (pval != null) {
-                trustStorePath = pval;
-            }
-            pval = System.getProperty("javax.net.ssl.trustStorePassword");
-            if (pval != null) {
-                trustStorePassword = pval;
-            }
-            this.keyStorePath = keyStorePath;
-            this.keyStorePassword = keyStorePassword;
-            this.trustStorePath = trustStorePath;
-            this.trustStorePassword = trustStorePassword;
+        }
+
+        @Override
+        public String toString() {
+            return "SslConfig [keyStorePath=" + keyStorePath
+                    + ", trustStorePath=" + trustStorePath + "]";
         }
     }
+
+
 }

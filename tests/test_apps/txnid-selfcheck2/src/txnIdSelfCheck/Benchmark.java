@@ -363,7 +363,7 @@ public class Benchmark {
         Boolean ssl = (config.sslfile.length() > 0);
         ClientConfig clientConfig = new ClientConfig("", "", new StatusListener());
         if (ssl) {
-            clientConfig.setTrustStore(config.sslfile);
+            clientConfig.setTrustStoreConfigFromPropertyFile(config.sslfile);
             clientConfig.enableSSL();
         }
 

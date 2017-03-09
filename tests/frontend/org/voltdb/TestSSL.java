@@ -141,7 +141,7 @@ public class TestSSL extends TestCase {
 
     private void checkAdminAndClient(int adminPort, int clientPort, String sslPropsFile) throws Exception {
         ClientConfig clientConfig = new ClientConfig("", "", null);
-        clientConfig.setTrustStore(getResourcePath(sslPropsFile));
+        clientConfig.setTrustStoreConfigFromPropertyFile(getResourcePath(sslPropsFile));
         clientConfig.enableSSL();
         //Add long loopy test
         for (int i = 0; i < 100;  i++) {
@@ -227,7 +227,7 @@ public class TestSSL extends TestCase {
         m_cluster.startUp();
 
         ClientConfig clientConfig = new ClientConfig("", "", null);
-        clientConfig.setTrustStore(getResourcePath(SSL_PROPS_FILE));
+        clientConfig.setTrustStoreConfigFromPropertyFile(getResourcePath(SSL_PROPS_FILE));
         clientConfig.enableSSL();
 
         ClientResponse response;

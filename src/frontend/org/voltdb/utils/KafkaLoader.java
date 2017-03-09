@@ -103,7 +103,7 @@ public class KafkaLoader {
         // Create connection
         final ClientConfig c_config = new ClientConfig(m_config.user, m_config.password, null);
         if (m_config.ssl != null && !m_config.ssl.trim().isEmpty()) {
-            c_config.setTrustStore(m_config.ssl);
+            c_config.setTrustStoreConfigFromPropertyFile(m_config.ssl);
             c_config.enableSSL();
         }
         c_config.setProcedureCallTimeout(0); // Set procedure all to infinite

@@ -31,6 +31,7 @@ import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
+import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ConnectionUtil;
 import org.voltdb.client.ProcCallException;
@@ -199,7 +200,7 @@ public class TestAdminMode extends RegressionSuite
         ClientConfig config = new ClientConfig();
         config.setProcedureCallTimeout(600000);
         final Client adminclient = ClientFactory.createClient(config);
-        if (config.getSslContext() != null) {
+        if (((ClientImpl)adminclient).getSSLContext() != null) {
             return;
         }
 

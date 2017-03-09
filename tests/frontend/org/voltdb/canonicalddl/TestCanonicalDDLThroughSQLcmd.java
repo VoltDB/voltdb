@@ -45,9 +45,11 @@ import java.net.URL;
 import java.net.URLDecoder;
 
 import javax.net.ssl.HttpsURLConnection;
+import javax.net.ssl.SSLContext;
 
 import org.junit.Test;
 import org.voltcore.utils.PortGenerator;
+import org.voltcore.utils.ssl.SSLConfiguration;
 import org.voltdb.AdhocDDLTestBase;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltDB.Configuration;
@@ -219,11 +221,10 @@ public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase {
         URL ddlURL;
         HttpURLConnection conn;
         if (ClientConfig.ENABLE_SSL_FOR_TEST) {
-            ClientConfig cc = new ClientConfig();
-            cc.enableSSL();
+            SSLContext sslCtx = SSLConfiguration.createSslContext(new SSLConfiguration.SslConfig());
             ddlURL = new URL(String.format("https://localhost:%d/ddl/", httpdPort));
             HttpsURLConnection connection = (HttpsURLConnection)ddlURL.openConnection();
-            connection.setSSLSocketFactory(cc.getSslContext().getSocketFactory());
+            connection.setSSLSocketFactory(sslCtx.getSocketFactory());
             connection.setHostnameVerifier(new javax.net.ssl.HostnameVerifier() {
                         @Override
                         public boolean verify(String hostname, javax.net.ssl.SSLSession sslSession) {
