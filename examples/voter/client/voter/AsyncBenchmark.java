@@ -180,8 +180,10 @@ public class AsyncBenchmark {
         ClientConfig clientConfig = null;
         if (config.sslfile.length() > 0) {
             try {
-                clientConfig = new ClientConfig(config.user, config.password, new StatusListener(), true, config.sslfile);
-                clientConfig.enableSSL();
+                clientConfig = new ClientConfig(config.user, config.password, new StatusListener());
+                if (config.sslfile.trim().length() > 0) {
+                    clientConfig.setTrustStore(config.sslfile);
+                }
             } catch (Exception e) {
                 System.err.println("Failed to configure ssl, exiting");
                 e.printStackTrace();

@@ -194,8 +194,10 @@ public class AsyncBenchmark {
     public AsyncBenchmark(KVConfig config) {
         this.config = config;
 
-        Boolean ssl = (config.sslfile.length() > 0);
-        ClientConfig clientConfig = new ClientConfig("", "", new StatusListener(), ssl, config.sslfile);
+        ClientConfig clientConfig = new ClientConfig("", "", new StatusListener());
+        if (config.sslfile.trim().length() > 0) {
+            clientConfig.setTrustStore(config.sslfile);
+        }
         clientConfig.setMaxTransactionsPerSecond(config.ratelimit);
 
         if (config.topologyaware) {
