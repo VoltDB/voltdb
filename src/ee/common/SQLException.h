@@ -49,6 +49,7 @@ public:
     static const char* volt_decimal_serialization_error;
 
     SQLException(std::string sqlState, std::string message);
+    SQLException(std::string sqlState, int error_no, std::string message);
     SQLException(std::string sqlState, std::string message, VoltEEExceptionType type);
     SQLException(std::string sqlState, std::string message, int internalFlags);
     virtual ~SQLException() {}

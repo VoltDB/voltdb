@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.regex.Pattern;
 
 import javax.servlet.http.HttpServletResponse;
 
@@ -56,6 +57,7 @@ public class HTTPClientInterface {
 
     public static final String QUERY_TIMEOUT_PARAM = "Querytimeout";
     public static final String JSONP = "jsonp";
+    public static final Pattern JSONP_PATTERN = Pattern.compile("^[a-zA-Z0-9_$]*$");
     private static final VoltLogger m_log = new VoltLogger("HOST");
     private static final RateLimitedLogger m_rate_limited_log = new RateLimitedLogger(10 * 1000, m_log, Level.WARN);
 
@@ -194,13 +196,22 @@ public class HTTPClientInterface {
         simpleJsonResponse(jsonp, message, rsp, HttpServletResponse.SC_OK);
     }
 
+    public static boolean validateJSONP(String jsonp, Request request, HttpServletResponse response) {
+        if (jsonp != null && !JSONP_PATTERN.matcher(jsonp).matches()) {
+            badRequest(null, "Invalid jsonp callback function name", response);
+            request.setHandled(true);
+            return false;
+        }
+        return true;
+    }
+
     public void process(Request request, HttpServletResponse response) {
         AuthenticationResult authResult = null;
         boolean suspended = false;
 
         String jsonp = request.getHeader(JSONP);
-        if (jsonp != null && jsonp.trim().isEmpty()) {
-            jsonp = null;
+        if (!validateJSONP(jsonp, request, response)) {
+            return;
         }
         String authHeader = request.getHeader(HttpHeader.AUTHORIZATION.asString());
         if (m_spnegoEnabled && (authHeader == null || !authHeader.startsWith(HttpHeader.NEGOTIATE.asString()))) {
@@ -258,6 +269,9 @@ public class HTTPClientInterface {
             }
             if (jsonp == null) {
                 jsonp = request.getParameter(JSONP);
+                if (!validateJSONP(jsonp, request, response)) {
+                    return;
+                }
             }
             String procName = request.getParameter("Procedure");
             String params = request.getParameter("Parameters");
