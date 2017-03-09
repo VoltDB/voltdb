@@ -483,7 +483,7 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
         // There is Elastic Index work going on and
         // it should continue to access the old table.
         // Add one reference count to keep the original table.
-        emptyTable->setTableForStreamIndexing(this);
+        emptyTable->setTableForStreamIndexing(this, this->tableForStreamIndexing());
     }
 
     // add matView
@@ -668,9 +668,16 @@ void PersistentTable::swapTableState(PersistentTable* otherTable) {
 
     std::swap(m_name, otherTable->m_name);
 
-    auto heldStreamIndexingTable = tableForStreamIndexing();
-    setTableForStreamIndexing(otherTable->tableForStreamIndexing());
-    otherTable->setTableForStreamIndexing(heldStreamIndexingTable);
+    if (m_tableStreamer &&
+            m_tableStreamer->hasStreamType(TABLE_STREAM_ELASTIC_INDEX)) {
+        // There is Elastic Index work going on and
+        // it should continue to access the old table.
+        // Add one reference count to keep the original table.
+        auto heldStreamIndexingTable = tableForStreamIndexing();
+        auto heldOtherStreamIndexingTable = otherTable->tableForStreamIndexing();
+        setTableForStreamIndexing(otherTable, heldOtherStreamIndexingTable);
+        otherTable->setTableForStreamIndexing(this, heldStreamIndexingTable);
+    }
 
     // NOTE: do not swap m_tableStreamers here... we want them to
     // stick to their original tables, so that if a swap occurs during
