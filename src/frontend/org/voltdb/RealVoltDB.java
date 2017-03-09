@@ -3176,7 +3176,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
      * execution site threads */
     private static Long lastLogUpdate_txnId = 0L;
     @Override
-    synchronized public void logUpdate(String xmlConfig, long currentTxnId)
+    synchronized public void logUpdate(String xmlConfig, long currentTxnId, File voltroot)
     {
         // another site already did this work.
         if (currentTxnId == lastLogUpdate_txnId) {
@@ -3190,7 +3190,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         hostLog.info("Updating RealVoltDB logging config from txnid: " +
                 lastLogUpdate_txnId + " to " + currentTxnId);
         lastLogUpdate_txnId = currentTxnId;
-        VoltLogger.configure(xmlConfig);
+        VoltLogger.configure(xmlConfig, voltroot);
     }
 
     /** Struct to associate a context with a counter of served sites */
