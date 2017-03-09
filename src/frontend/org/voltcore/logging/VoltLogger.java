@@ -355,7 +355,7 @@ public class VoltLogger {
         try {
             Class<?> loggerClz = Class.forName("org.voltcore.logging.VoltLog4jLogger");
             assert(loggerClz != null);
-            Method configureMethod = loggerClz.getMethod("configure", String.class);
+            Method configureMethod = loggerClz.getMethod("configure", String.class, File.class);
             configureMethod.invoke(null, xmlConfig, voltroot);
         } catch (Exception e) {}
     }
