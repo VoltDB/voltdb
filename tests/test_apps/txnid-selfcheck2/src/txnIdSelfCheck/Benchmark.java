@@ -167,7 +167,7 @@ public class Benchmark {
         float mpratio = (float)0.20;
 
         @Option(desc = "Allow set ratio of swap to truncate table workload.")
-        float swapratio = (float)0.0;
+        float swapratio = (float)0.50;
 
         @Option(desc = "Allow set ratio of upsert to insert workload.")
         float upsertratio = (float)0.50;
