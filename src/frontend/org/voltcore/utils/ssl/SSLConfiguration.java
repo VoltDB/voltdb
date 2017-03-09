@@ -188,8 +188,18 @@ public class SSLConfiguration {
                 } catch (IOException e) {
                     throw new IllegalArgumentException("Unable to access SSL configuration.", e);
                 }
-                this.keyStorePath = null;
-                this.keyStorePassword = null;
+
+                String pval = System.getProperty("javax.net.ssl.keyStore");
+                if (pval != null) {
+                    keyStorePath = pval;
+                }
+                pval = System.getProperty("javax.net.ssl.keyStorePassword");
+                if (pval != null) {
+                    keyStorePassword = pval;
+                }
+
+                this.keyStorePath = keyStorePath;
+                this.keyStorePassword = keyStorePassword;
                 this.trustStorePath = trustStorePath;
                 this.trustStorePassword = trustStorePassword;
 

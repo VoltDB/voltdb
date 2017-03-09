@@ -96,7 +96,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
         public BBContainer poll(OutputContainerFactory ocf) throws IOException {
             synchronized (PersistentBinaryDeque.this) {
                 if (m_closed) {
-                    throw new IOException("Reader " + m_cursorId + " has been closed");
+                    throw new IOException("PBD.ReadCursor.poll(): " + m_cursorId + " - Reader has been closed");
                 }
                 assertions();
 
@@ -138,7 +138,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
         public int getNumObjects() throws IOException {
             synchronized(PersistentBinaryDeque.this) {
                 if (m_closed) {
-                    throw new IOException("Reader " + m_cursorId + " has been closed");
+                    throw new IOException("Cannot compute object count of " + m_cursorId + " - Reader has been closed");
                 }
                 return m_numObjects - m_numObjectsDeleted - m_numRead;
             }
@@ -153,7 +153,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
         public long sizeInBytes() throws IOException {
             synchronized(PersistentBinaryDeque.this) {
                 if (m_closed) {
-                    throw new IOException("Reader " + m_cursorId + " has been closed");
+                    throw new IOException("Cannot compute size of " + m_cursorId + " - Reader has been closed");
                 }
                 assertions();
 
@@ -406,7 +406,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
     @Override
     public synchronized void parseAndTruncate(BinaryDequeTruncator truncator) throws IOException {
         if (m_closed) {
-            throw new IOException("PBD has been closed");
+            throw new IOException("Cannot parseAndTruncate(): PBD has been closed");
         }
 
         assertions();
@@ -561,7 +561,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
     public synchronized int offer(DeferredSerialization ds) throws IOException {
         assertions();
         if (m_closed) {
-            throw new IOException("Closed");
+            throw new IOException("Cannot offer(): PBD has been Closed");
         }
 
         PBDSegment tail = peekLastSegment();
@@ -607,7 +607,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
     public synchronized void push(BBContainer objects[]) throws IOException {
         assertions();
         if (m_closed) {
-            throw new IOException("Closed");
+            throw new IOException("Cannot push(): PBD has been Closed");
         }
 
         ArrayDeque<ArrayDeque<BBContainer>> segments = new ArrayDeque<ArrayDeque<BBContainer>>();
@@ -681,7 +681,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
     @Override
     public synchronized BinaryDequeReader openForRead(String cursorId) throws IOException {
         if (m_closed) {
-            throw new IOException("Closed");
+            throw new IOException("Cannot openForRead(): PBD has been Closed");
         }
 
         ReadCursor reader = m_readCursors.get(cursorId);
@@ -758,7 +758,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
     @Override
     public synchronized void sync() throws IOException {
         if (m_closed) {
-            throw new IOException("Closed");
+            throw new IOException("Cannot sync(): PBD has been Closed");
         }
         for (PBDSegment segment : m_segments.values()) {
             if (!segment.isClosed()) {
