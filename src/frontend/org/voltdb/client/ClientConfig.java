@@ -20,6 +20,7 @@ package org.voltdb.client;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
+import java.io.InputStream;
 import java.math.RoundingMode;
 import java.security.Principal;
 import java.util.Iterator;
@@ -38,6 +39,8 @@ import org.voltdb.types.VoltDecimalHelper;
  * Container for configuration settings for a Client
  */
 public class ClientConfig {
+
+    private static final String DEFAULT_SSL_PROPS_FILE = "ssl-config";
 
     static final long DEFAULT_PROCEDURE_TIMOUT_NANOS = TimeUnit.MINUTES.toNanos(2);// default timeout is 2 minutes;
     static final long DEFAULT_CONNECTION_TIMOUT_MS = 2 * 60 * 1000; // default timeout is 2 minutes;
@@ -187,6 +190,20 @@ public class ClientConfig {
      * @param scheme Client password hash scheme
      */
     public ClientConfig(String username, String password, boolean cleartext, ClientStatusListenerExt listener, ClientAuthScheme scheme) {
+
+        if (ClientConfig.ENABLE_SSL_FOR_TEST) {
+            try (InputStream is = ClientConfig.class.getResourceAsStream(DEFAULT_SSL_PROPS_FILE)) {
+                Properties sslProperties = new Properties();
+                sslProperties.load(is);
+                String trustStorePath = sslProperties.getProperty(SSLConfiguration.TRUSTSTORE_CONFIG_PROP);
+                String trustStorePassword = sslProperties.getProperty(SSLConfiguration.TRUSTSTORE_PASSWORD_CONFIG_PROP);
+                setTrustStore(trustStorePath, trustStorePassword);
+                enableSSL();
+            } catch (IOException e) {
+                throw new IllegalArgumentException("Unable to access SSL configuration.", e);
+            }
+        }
+
         if (username == null) {
             m_username = "";
         } else {

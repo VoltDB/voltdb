@@ -28,7 +28,6 @@ import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.security.UnrecoverableKeyException;
 import java.security.cert.CertificateException;
-import java.util.Properties;
 import java.util.Set;
 
 import javax.net.ssl.KeyManager;
@@ -37,16 +36,12 @@ import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
 
-import org.voltdb.client.ClientConfig;
-
 import com.google_voltpatches.common.collect.ImmutableSet;
 
 /**
  * Code common to ServerSSLEngineFactory and ClientSSLEngineFactory.
  */
 public class SSLConfiguration {
-
-    private static final String DEFAULT_SSL_PROPS_FILE = "ssl-config";
 
     public static final String KEYSTORE_CONFIG_PROP = "keyStore";
     public static final String KEYSTORE_PASSWORD_CONFIG_PROP = "keyStorePassword";
@@ -178,54 +173,26 @@ public class SSLConfiguration {
 
         public SslConfig(String keyStorePath, String keyStorePassword, String trustStorePath, String trustStorePassword) {
 
-            if (ClientConfig.ENABLE_SSL_FOR_TEST) {
-
-                try (InputStream is = ClientConfig.class.getResourceAsStream(DEFAULT_SSL_PROPS_FILE)) {
-                    Properties sslProperties = new Properties();
-                    sslProperties.load(is);
-                    trustStorePath = sslProperties.getProperty(TRUSTSTORE_CONFIG_PROP);
-                    trustStorePassword = sslProperties.getProperty(TRUSTSTORE_PASSWORD_CONFIG_PROP);
-                } catch (IOException e) {
-                    throw new IllegalArgumentException("Unable to access SSL configuration.", e);
-                }
-
-                String pval = System.getProperty("javax.net.ssl.keyStore");
-                if (pval != null) {
-                    keyStorePath = pval;
-                }
-                pval = System.getProperty("javax.net.ssl.keyStorePassword");
-                if (pval != null) {
-                    keyStorePassword = pval;
-                }
-
-                this.keyStorePath = keyStorePath;
-                this.keyStorePassword = keyStorePassword;
-                this.trustStorePath = trustStorePath;
-                this.trustStorePassword = trustStorePassword;
-
-            } else {
-
-                String pval = System.getProperty("javax.net.ssl.keyStore");
-                if (pval != null) {
-                    keyStorePath = pval;
-                }
-                pval = System.getProperty("javax.net.ssl.keyStorePassword");
-                if (pval != null) {
-                    keyStorePassword = pval;
-                }
-                pval = System.getProperty("javax.net.ssl.trustStore");
-                if (pval != null) {
-                    trustStorePath = pval;
-                }
-                pval = System.getProperty("javax.net.ssl.trustStorePassword");
-                if (pval != null) {
-                    trustStorePassword = pval;
-                }
-                this.keyStorePath = keyStorePath;
-                this.keyStorePassword = keyStorePassword;
-                this.trustStorePath = trustStorePath;
-                this.trustStorePassword = trustStorePassword;
+            String pval = System.getProperty("javax.net.ssl.keyStore");
+            if (pval != null) {
+                keyStorePath = pval;
             }
+            pval = System.getProperty("javax.net.ssl.keyStorePassword");
+            if (pval != null) {
+                keyStorePassword = pval;
+            }
+            pval = System.getProperty("javax.net.ssl.trustStore");
+            if (pval != null) {
+                trustStorePath = pval;
+            }
+            pval = System.getProperty("javax.net.ssl.trustStorePassword");
+            if (pval != null) {
+                trustStorePassword = pval;
+            }
+            this.keyStorePath = keyStorePath;
+            this.keyStorePassword = keyStorePassword;
+            this.trustStorePath = trustStorePath;
+            this.trustStorePassword = trustStorePassword;
         }
 
         @Override
