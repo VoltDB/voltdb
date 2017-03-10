@@ -121,7 +121,7 @@ public class TestCatalogDiffs extends TestCase {
         String updatedOriginalSerialized = catOriginal.serialize();
         assertEquals(updatedOriginalSerialized, catUpdated.serialize());
 
-        String desc = diff.getDescriptionOfChanges();
+        String desc = diff.getDescriptionOfChanges(false);
 
         System.out.println("========================");
         System.out.println(desc);

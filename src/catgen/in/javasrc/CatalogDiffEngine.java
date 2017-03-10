@@ -1621,7 +1621,7 @@ public class CatalogDiffEngine {
      * This currently handles just the basics, but much of the plumbing is
      * in place to give a lot more detail, with a bit more work.
      */
-    public String getDescriptionOfChanges() {
+    public String getDescriptionOfChanges(boolean updatedClass) {
         StringBuilder sb = new StringBuilder();
 
         sb.append("Catalog Difference Report\n");
@@ -1705,7 +1705,11 @@ public class CatalogDiffEngine {
         }
 
         if (!wroteChanges) {
-            sb.append("  No changes detected.\n");
+            if (updatedClass) {
+                sb.append("  Update classes detected.\n");
+            } else {
+                sb.append("  No changes detected.\n");
+            }
         }
 
         // trim the last newline
