@@ -184,7 +184,7 @@ public class TestSqlUpdateSuite extends RegressionSuite {
             validateTableOfScalarLongs(client, stmt, new long[] { 4, 5, 6, 7, 8, 9, 20, 21, 22, 23 });
 
             vt = client.callProcedure("@AdHoc",
-                    "UPDATE " + table + " SET NUM = (SELECT NUM FROM R2 WHERE ID = 3)")
+                    "UPDATE " + table + " SET NUM = (SELECT MAX(NUM) FROM R2)")
                     .getResults()[0];
             validateTableOfScalarLongs(vt, new long[] { 10 });
 

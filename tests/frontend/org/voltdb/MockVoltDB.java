@@ -509,7 +509,7 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
-    public void logUpdate(String xmlConfig, long currentTxnId)
+    public void logUpdate(String xmlConfig, long currentTxnId, File voltroot)
     {
     }
 
