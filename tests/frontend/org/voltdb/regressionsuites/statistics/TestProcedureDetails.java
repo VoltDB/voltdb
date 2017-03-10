@@ -45,14 +45,18 @@ public class TestProcedureDetails extends RegressionSuite {
     }
 
     private final class ProcedureDetailTestConfig {
-        /* Meaning of the bits in the configuration byte:
-         * x, x, x, x, s, b, r, e
-         * x: not used;
-         * s: single partition?
-         * b: queue two batches?
-         * r: read + write?
-         * e: generate an error?
-         */
+
+        private String m_nameOfProcedureToCall;
+        private String m_argString;
+        private boolean m_expectsException;
+
+        static final int m_singlePartitionMask = 1 << 4;
+        static final int m_option2BATCHMask = 1 << 3;
+        static final int m_optionRWMask = 1 << 2;
+        static final int m_optionFAILMask = 1 << 1;
+        static final int m_optionABORTMask = 1 << 0;
+        static final int m_optionCount = 5;
+
         public ProcedureDetailTestConfig(int configValue) {
             boolean twoBatch = (configValue & m_option2BATCHMask) > 0;
             boolean readwrite = (configValue & m_optionRWMask) > 0;
@@ -100,17 +104,6 @@ public class TestProcedureDetails extends RegressionSuite {
         public boolean expectsException() {
             return m_expectsException;
         }
-
-        private String m_nameOfProcedureToCall;
-        private String m_argString;
-        private boolean m_expectsException;
-
-        static final int m_singlePartitionMask = 1 << 4;
-        static final int m_option2BATCHMask = 1 << 3;
-        static final int m_optionRWMask = 1 << 2;
-        static final int m_optionFAILMask = 1 << 1;
-        static final int m_optionABORTMask = 1 << 0;
-        static final int m_optionCount = 5;
     }
 
     private void validateProcedureDetail(ProcedureDetailTestConfig testConfig, VoltTable procedureDetail) {
@@ -125,8 +118,7 @@ public class TestProcedureDetails extends RegressionSuite {
         for (int configValue = 0; configValue < maxConfigValue; configValue++) {
             ProcedureDetailTestConfig testConfig = new ProcedureDetailTestConfig(configValue);
             System.out.println("\n========================================================================================");
-            System.out.println(String.format("exec %s %d '%s'",
-                    testConfig.getNameOfProcedureToCall(),
+            System.out.println(String.format("exec %s %d '%s'", testConfig.getNameOfProcedureToCall(),
                     configValue, testConfig.getArgumentString()));
             try {
                 client.callProcedure(testConfig.getNameOfProcedureToCall(),
@@ -147,9 +139,9 @@ public class TestProcedureDetails extends RegressionSuite {
             }
             // The test configuration says an exception is expected, but we did not get it.
             if (testConfig.expectsException()) {
-                throw new Exception(String.format("Expects an exception from exec %s %d '%s', but did not get it.",
-                                                  testConfig.getNameOfProcedureToCall(),
-                                                  configValue, testConfig.getArgumentString()));
+                fail(String.format("Expects an exception from exec %s %d '%s', but did not get it.",
+                        testConfig.getNameOfProcedureToCall(),
+                        configValue, testConfig.getArgumentString()));
             }
         }
         VoltTable procedureDetail = client.callProcedure("@Statistics", "PROCEDUREDETAIL", 0).getResults()[0];

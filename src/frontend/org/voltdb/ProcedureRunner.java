@@ -212,8 +212,9 @@ public class ProcedureRunner {
 
         m_procedure.init(this);
 
-        // Map each statement that was defined in the stored procedure with its SQLStmt variable name.
-        // The variable name is used in the granular statistics for stored procedures.
+        // Analyze and process the stored procedure, return a list of variable names of
+        // the SQLStmts defined in the stored procedure.
+        // The variable names are used in the granular statistics.
         ArrayList<String> stmtList = reflect();
 
         // Normally m_statsCollector is returned as it is and there is no affect to assign it to itself.
