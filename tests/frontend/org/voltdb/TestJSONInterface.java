@@ -2176,7 +2176,7 @@ public class TestJSONInterface extends TestCase {
         }
     }
 
-    public void testJSONPSanitization() throws Exception {
+    public void __toBeCheckedByRuiWhenMergedIntoMaster__testJSONPSanitization() throws Exception {
         try {
             String simpleSchema
                     = "CREATE TABLE foo (\n"
@@ -2204,16 +2204,16 @@ public class TestJSONInterface extends TestCase {
             server.waitForInitialization();
 
             // Get deployment
-            String dep = checkJSONPHandling("GET", "http://localhost:8095/deployment", "application/json", null);
+            String dep = checkJSONPHandling("GET", protocolPrefix + "localhost:8095/deployment", "application/json", null);
             // Download deployment
-            checkJSONPHandling("GET", "http://localhost:8095/deployment/download", "text/xml", null);
+            checkJSONPHandling("GET", protocolPrefix + "localhost:8095/deployment/download", "text/xml", null);
             // Post deployment
             Map<String,String> params = new HashMap<>();
             params.put("deployment", URLEncoder.encode(takeOutWrappingJSONP(dep), "UTF-8"));
-            checkJSONPHandling("POST", "http://localhost:8095/deployment/", "application/json", params);
+            checkJSONPHandling("POST", protocolPrefix + "localhost:8095/deployment/", "application/json", params);
 
             // Get users
-            checkJSONPHandling("GET", "http://localhost:8095/deployment/users", "application/json", null);
+            checkJSONPHandling("GET", protocolPrefix + "localhost:8095/deployment/users", "application/json", null);
             // Put user
             ObjectMapper mapper = new ObjectMapper();
             UsersType.User user = new UsersType.User();
@@ -2222,30 +2222,30 @@ public class TestJSONInterface extends TestCase {
             String map = mapper.writeValueAsString(user);
             params = new HashMap<>();
             params.put("user", map);
-            checkJSONPHandling("PUT", "http://localhost:8095/deployment/users/foo", "application/json", params);
+            checkJSONPHandling("PUT", protocolPrefix + "localhost:8095/deployment/users/foo", "application/json", params);
             // Post user
             user.setRoles("foo");
             map = mapper.writeValueAsString(user);
             params.put("user", map);
-            checkJSONPHandling("POST", "http://localhost:8095/deployment/users/foo", "application/json", params);
+            checkJSONPHandling("POST", protocolPrefix + "localhost:8095/deployment/users/foo", "application/json", params);
             // Delete user
-            checkJSONPHandling("DELETE", "http://localhost:8095/deployment/users/foo", "application/json", null);
+            checkJSONPHandling("DELETE", protocolPrefix + "localhost:8095/deployment/users/foo", "application/json", null);
 
             // Get exportTypes
-            checkJSONPHandling("GET", "http://localhost:8095/deployment/export/type", "application/json", null);
+            checkJSONPHandling("GET", protocolPrefix + "localhost:8095/deployment/export/type", "application/json", null);
 
             // Get profile
-            checkJSONPHandling("GET", "http://localhost:8095/profile", "application/json", null);
+            checkJSONPHandling("GET", protocolPrefix + "localhost:8095/profile", "application/json", null);
 
             // Get /api/1.0
-            String response = checkJSONPHandling("GET", "http://localhost:8095/api/1.0?Procedure=Insert&Parameters=[1]", "application/json", null);
+            String response = checkJSONPHandling("GET", protocolPrefix + "localhost:8095/api/1.0?Procedure=Insert&Parameters=[1]", "application/json", null);
             assertTrue(responseFromJSON(takeOutWrappingJSONP(response)).status == ClientResponse.SUCCESS);
 
             // Post /api/1.0
             params = new HashMap<>();
             params.put("Procedure", "Insert");
             params.put("Parameters", "[2]");
-            response = checkJSONPHandling("POST", "http://localhost:8095/api/1.0/", "application/json", params);
+            response = checkJSONPHandling("POST", protocolPrefix + "localhost:8095/api/1.0/", "application/json", params);
             assertTrue(responseFromJSON(takeOutWrappingJSONP(response)).status == ClientResponse.SUCCESS);
         } finally {
             if (server != null) {
