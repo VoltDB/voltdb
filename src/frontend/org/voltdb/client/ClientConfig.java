@@ -458,28 +458,32 @@ public class ClientConfig {
     }
 
     /**
-     * Configure trustore
+     * Configure trust store
      *
-     * @param pathToTrustStore file spec for the trustore
-     * @param trustStorePassword trustore keyfile password
+     * @param pathToTrustStore file specification for the trust store
+     * @param trustStorePassword trust store key file password
      */
     public void setTrustStore(String pathToTrustStore, String trustStorePassword) {
         File tsFD = new File(pathToTrustStore != null && !pathToTrustStore.trim().isEmpty() ? pathToTrustStore : "");
         if (!tsFD.exists() || !tsFD.isFile() || !tsFD.canRead()) {
-            throw new IllegalArgumentException("Trust store " + pathToTrustStore + " is not read accessible");
+            throw new IllegalArgumentException("Trust store " + pathToTrustStore + " is not a read accessible file");
         }
         m_sslConfig = new SSLConfiguration.SslConfig(null, null, pathToTrustStore, trustStorePassword);
     }
 
     /**
-     * Configure trustore
+     * Configure trust store
      *
-     * @param propFN property file name containing trustore properties
+     * @param propFN property file name containing trust store properties:
+     * <p><ul>
+     * <li>{@code trustStore} trust store file specification
+     * <li>{@code trustStorePassword} trust store password
+     * </ul><p>
      */
     public void setTrustStoreConfigFromPropertyFile(String propFN) {
         File propFD = new File(propFN != null && !propFN.trim().isEmpty() ? propFN : "");
         if (!propFD.exists() || !propFD.isFile() || !propFD.canRead()) {
-            throw new IllegalArgumentException("Properties file " + propFN + " is not read accessible");
+            throw new IllegalArgumentException("Properties file " + propFN + " is not a read accessible file");
         }
         Properties props = new Properties();
         try (FileReader fr = new FileReader(propFD)) {
