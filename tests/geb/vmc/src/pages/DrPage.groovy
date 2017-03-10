@@ -35,6 +35,8 @@ class DrPage extends VoltDBManagementCenterPage {
         drArrow             { $('#drArrow_0') }
         drArrowParagraph    { $('#drArrow_0 p') }
         drMode              { $('#drModeName') }
+        dRHeaderName        { $('#dRHeaderName_0') }
+        dRRemoteHeaderName  { $('#dRRemoteHeaderName_0') }
 
         divDrReplication    { $("#divDrReplication") }
         drSection           { $("#drSection") }
@@ -242,6 +244,10 @@ class DrPage extends VoltDBManagementCenterPage {
         String minute = string.substring(3, string.length()-3)
         int minuteInt = Integer.parseInt(minute)
         return minuteInt
+    }
+
+    def boolean isDrHeaderExpandedOrCollapsed(divId){
+        return $("#showHideDrBlock_" + divId).displayed
     }
 
 }
