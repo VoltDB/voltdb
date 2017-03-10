@@ -35,11 +35,20 @@ public class ProcedureStatsCollector extends SiteStatsSource {
     private static final VoltLogger log = new VoltLogger("HOST");
 
     /**
-     * Record statistics of procedure execution every N invocations.
+     * Record statistics of procedure execution every N procedure invocations.
      */
-    private int m_statsSamplingInterval = 20;
-    protected void setStatsSamplingInterval(int timeCollectionInterval) {
-        m_statsSamplingInterval = timeCollectionInterval;
+    private int m_procSamplingInterval = 20;
+    /**
+     * Record statistics of procedure statement execution every N procedure invocations.
+     */
+    private int m_stmtSamplingInterval = 100;
+
+    protected void setProcSamplingInterval(int timeCollectionInterval) {
+        m_procSamplingInterval = timeCollectionInterval;
+    }
+
+    protected void setStmtSamplingInterval(int timeCollectionInterval) {
+        m_stmtSamplingInterval = timeCollectionInterval;
     }
 
     /**
@@ -81,7 +90,7 @@ public class ProcedureStatsCollector extends SiteStatsSource {
      * Called when a procedure begins executing. Caches the time the procedure starts.
      */
     public final void beginProcedure(boolean isSystemProc) {
-        if (m_procStatsData.m_invocations % m_statsSamplingInterval == 0
+        if (m_procStatsData.m_invocations % m_procSamplingInterval == 0
                 || (isSystemProc && isProcedureUAC())) {
             m_procStatsData.m_currentStartTime = System.nanoTime();
         }
@@ -90,8 +99,12 @@ public class ProcedureStatsCollector extends SiteStatsSource {
     /**
      * @return a boolean values indicating whether the current running procedure is sampled.
      */
-    public final boolean isRecording() {
+    public final boolean isProcRecording() {
         return m_procStatsData.m_currentStartTime > 0;
+    }
+
+    public final boolean isStmtRecording() {
+        return m_procStatsData.m_invocations % m_stmtSamplingInterval == 0;
     }
 
     /**
@@ -168,7 +181,7 @@ public class ProcedureStatsCollector extends SiteStatsSource {
             m_procStatsData.m_failureCount++;
         }
         m_procStatsData.m_invocations++;
-        if (! isRecording()) {
+        if (! isProcRecording()) {
             return;
         }
         // This is a sampled invocation.

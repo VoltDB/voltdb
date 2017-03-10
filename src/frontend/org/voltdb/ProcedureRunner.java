@@ -232,7 +232,8 @@ public class ProcedureRunner {
         // Basically, it is about setting the sampling interval for this stored procedure.
         ProcStatsOption statsOption = m_procedure.getClass().getAnnotation(ProcStatsOption.class);
         if (statsOption != null) {
-            m_statsCollector.setStatsSamplingInterval(statsOption.samplingInterval());
+            m_statsCollector.setProcSamplingInterval(statsOption.procSamplingInterval());
+            m_statsCollector.setStmtSamplingInterval(statsOption.stmtSamplingInterval());
         }
     }
 
@@ -1573,7 +1574,7 @@ public class ProcedureRunner {
                                          finalTask,
                                          m_procedureName,
                                          m_procNameToLoadForFragmentTasks,
-                                         m_statsCollector.isRecording());
+                                         m_statsCollector.isStmtRecording());
 
        // iterate over all sql in the batch, filling out the above data structures
        for (int i = 0; i < batch.size(); ++i) {
@@ -1681,7 +1682,7 @@ public class ProcedureRunner {
 
        VoltTable[] results = null;
        // Before executing the fragments, tell the EE if this batch should be timed.
-       getExecutionEngine().setPerFragmentTimingEnabled(m_statsCollector.isRecording());
+       getExecutionEngine().setPerFragmentTimingEnabled(m_statsCollector.isStmtRecording());
        try {
            results = m_site.executePlanFragments(
                    batchSize,
@@ -1705,7 +1706,7 @@ public class ProcedureRunner {
        }
        finally {
            long[] executionTimes = null;
-           if (m_statsCollector.isRecording()) {
+           if (m_statsCollector.isStmtRecording()) {
                executionTimes = new long[batchSize];
            }
            succeededFragmentsCount = getExecutionEngine().extractPerFragmentStats(batchSize, executionTimes);
@@ -1719,7 +1720,7 @@ public class ProcedureRunner {
                boolean failed = i == succeededFragmentsCount;
                m_statsCollector.finishStatement(qs.stmt.getStmtName(),
                                                 hasCoordinatorTask,
-                                                m_statsCollector.isRecording(),
+                                                m_statsCollector.isStmtRecording(),
                                                 failed,
                                                 executionTimes == null ? 0 : executionTimes[i],
                                                 results == null ? null : results[i],

@@ -26,8 +26,14 @@ import java.lang.annotation.Target;
 @Target(ElementType.TYPE)
 public @interface ProcStatsOption {
     /**
-     * Record statistics of procedure execution every N invocations.
-     * @return The sampling rate of this stored procedure.
+     * Record statistics of procedure execution every N procedure invocations.
+     * @return The sampling interval of this stored procedure.
      */
-    int samplingInterval() default 20;
+    int procSamplingInterval() default 20;
+
+    /**
+     * Record statistics of statements in a procedure execution every N procedure invocations.
+     * @return The sampling interval for the statements in this stored procedure.
+     */
+    int stmtSamplingInterval() default 100;
 }

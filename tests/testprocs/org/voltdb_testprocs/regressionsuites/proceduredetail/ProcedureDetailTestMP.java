@@ -34,7 +34,8 @@ import org.voltdb.VoltTable;
     singlePartition = false
 )
 @ProcStatsOption (
-    samplingInterval = 1
+    procSamplingInterval = 1,
+    stmtSamplingInterval = 1
 )
 public class ProcedureDetailTestMP extends ProcedureDetailTestSP {
     // Nothing to change here, I just want to have a separate class that does the same thing as

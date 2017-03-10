@@ -38,7 +38,8 @@ import org.voltdb.exceptions.SQLException;
     singlePartition = true
 )
 @ProcStatsOption (
-    samplingInterval = 1
+    procSamplingInterval = 1,
+    stmtSamplingInterval = 1
 )
 public class ProcedureDetailTestSP extends VoltProcedure {
 
