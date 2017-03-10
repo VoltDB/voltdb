@@ -177,21 +177,11 @@ public class AsyncBenchmark {
     public AsyncBenchmark(VoterConfig config) {
         this.config = config;
 
-        ClientConfig clientConfig = null;
-        if (config.sslfile.length() > 0) {
-            try {
-                clientConfig = new ClientConfig(config.user, config.password, new StatusListener());
-                if (config.sslfile.trim().length() > 0) {
-                    clientConfig.setTrustStoreConfigFromPropertyFile(config.sslfile);
-                    clientConfig.enableSSL();
-                }
-            } catch (Exception e) {
-                System.err.println("Failed to configure ssl, exiting");
-                e.printStackTrace();
-                System.exit(-1);
-            }
-        } else
-            clientConfig = new ClientConfig(config.user, config.password, new StatusListener());
+        ClientConfig clientConfig = new ClientConfig(config.user, config.password, new StatusListener());
+        if (!config.sslfile.trim().isEmpty()) {
+            clientConfig.setTrustStoreConfigFromPropertyFile(config.sslfile);
+            clientConfig.enableSSL();
+        }
 
         if (config.topologyaware) {
             clientConfig.setTopologyChangeAware(true);

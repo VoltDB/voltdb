@@ -35,10 +35,6 @@ import java.nio.channels.spi.SelectorProvider;
 import java.util.HashSet;
 import java.util.Set;
 
-import javax.net.ssl.SSLEngine;
-
-import org.voltcore.utils.ssl.SSLConfiguration;
-
 import jsr166y.ThreadLocalRandom;
 import junit.framework.TestCase;
 
@@ -48,17 +44,6 @@ public class TestVoltNetwork extends TestCase {
     private static class MockVoltPort extends VoltPort {
         MockVoltPort(VoltNetwork vn, InputHandler handler) throws UnknownHostException {
             super (vn, handler, new InetSocketAddress(InetAddress.getByName("127.0.0.1"), 21212), vn.m_pool);
-        }
-
-        @Override
-        public void run() {
-            m_running = false;
-        }
-    }
-
-    private static class MockSSLVoltPort extends TLSVoltPort {
-        MockSSLVoltPort(VoltNetwork vn, InputHandler handler, CipherExecutor encryptSrvc, SSLEngine engine) throws UnknownHostException {
-            super (vn, handler, new InetSocketAddress(InetAddress.getByName("127.0.0.1"), 21212), vn.m_pool, engine, encryptSrvc);
         }
 
         @Override
@@ -280,14 +265,6 @@ public class TestVoltNetwork extends TestCase {
         runInstallInterests(vn, vp);
     }
 
-    public void testInstallInterestsSSLMode() throws Exception {
-        SSLEngine sslEngine = SSLConfiguration.createSslContext(null).createSSLEngine("client", 21212);
-
-        VoltNetwork voltNetwork = new VoltNetwork( 0, null, "Test");
-        MockSSLVoltPort sslVoltPort = new MockSSLVoltPort(voltNetwork, new MockInputHandler(), CipherExecutor.CLIENT, sslEngine);
-        runInstallInterests(voltNetwork, sslVoltPort);
-    }
-
     private void runInvokeCallbacks(MockSelector baseSelector, VoltNetwork vn, VoltPort vp) throws Exception {
         MockSelectionKey selectionKey = new MockSelectionKey();   // fake selection key
 
@@ -316,16 +293,6 @@ public class TestVoltNetwork extends TestCase {
         MockSelector selector = new MockSelector();
         VoltNetwork vn = new VoltNetwork(selector);               // network with fake selector
         MockVoltPort vp = new MockVoltPort(vn, new MockInputHandler());             // implement abstract run()
-        runInvokeCallbacks(selector, vn, vp);
-    }
-
-
-    public void testInvokeCallbacksSSL() throws Exception {
-        SSLEngine sslEngine = SSLConfiguration.createSslContext(null).createSSLEngine("client", 21212);
-
-        MockSelector selector = new MockSelector();
-        VoltNetwork vn = new VoltNetwork(selector);
-        MockSSLVoltPort vp = new MockSSLVoltPort(vn, new MockInputHandler(), CipherExecutor.CLIENT, sslEngine);
         runInvokeCallbacks(selector, vn, vp);
     }
 
