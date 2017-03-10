@@ -1706,7 +1706,7 @@ public class CatalogDiffEngine {
 
         if (!wroteChanges) {
             if (updatedClass) {
-                sb.append("  Update classes detected.\n");
+                sb.append("  Changes have been made to user code (procedures, supporting classes, etc).\n");
             } else {
                 sb.append("  No changes detected.\n");
             }
