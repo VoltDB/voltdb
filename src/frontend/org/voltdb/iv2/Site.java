@@ -546,8 +546,23 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             m_lastLocalMpUniqueId = -1L;
         }
 
+        @Override
         public void resetDrAppliedTracker(byte clusterId) {
             m_maxSeenDrLogsBySrcPartition.remove((int) clusterId);
+        }
+
+        @Override
+        public boolean hasRealDrAppliedTracker(byte clusterId) {
+            boolean has = false;
+            if (m_maxSeenDrLogsBySrcPartition.containsKey((int) clusterId)) {
+                for (DRConsumerDrIdTracker tracker: m_maxSeenDrLogsBySrcPartition.get((int) clusterId).values()) {
+                    if (tracker.isRealTracker()) {
+                        has = true;
+                        break;
+                    }
+                }
+            }
+            return has;
         }
 
         @Override
