@@ -791,7 +791,6 @@ void VoltDBIPC::executePlanFragments(struct ipc_command *cmd) {
 
     // and reset to space for the results output
     m_engine->resetReusedResultOutputBuffer(1); // 1 byte to add status code
-    cout << "perFragmentTimingEnabled " << queryCommand->perFragmentTimingEnabled << endl;
     m_engine->resetPerFragmentStatsOutputBuffer(queryCommand->perFragmentTimingEnabled);
 
     try {
