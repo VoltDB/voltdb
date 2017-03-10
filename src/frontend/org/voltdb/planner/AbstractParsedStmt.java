@@ -469,7 +469,10 @@ public abstract class AbstractParsedStmt {
                         // We're happy with these.
                         throw ex;
                     } catch (NumberFormatException ex) {
-                        throw new PlanningErrorException("Numeric conversion error to type " + vt.name() + ex.getMessage().toLowerCase());
+                        throw new PlanningErrorException("Numeric conversion error to type "
+                                                            + vt.name()
+                                                            + " "
+                                                            + ex.getMessage().toLowerCase());
                     } catch (Exception ex) {
                         throw new PlanningErrorException(ex.getMessage());
                     }
