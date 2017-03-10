@@ -6,12 +6,12 @@
     </httpd>
 
     <export>
-        <configuration enabled="true" type="file" stream="partstream">
+        <configuration enabled="true" type="file" target="partstream">
             <property name="type">csv</property>
             <property name="nonce">PartStream</property>
             <property name="skipinternals">true</property>
         </configuration>
-        <configuration enabled="true" type="file" stream="replstream">
+        <configuration enabled="true" type="file" target="replstream">
             <property name="type">csv</property>
             <property name="nonce">ReplStream</property>
             <property name="skipinternals">true</property>

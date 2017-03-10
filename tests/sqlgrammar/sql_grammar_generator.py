@@ -27,7 +27,7 @@ import re
 import sys
 from datetime import timedelta
 from optparse import OptionParser
-from random import randrange
+from random import randrange, seed
 from subprocess import Popen, PIPE, STDOUT
 from time import time
 from traceback import print_exc
@@ -178,15 +178,33 @@ def get_one_sql_statement(grammar, sql_statement_type='sql-statement', max_depth
 
 def print_file_tail(from_file, to_file, number_of_lines=50):
     """Print a tail of the last 'number_of_lines' of the 'from_file', to the
-    'to_file' (typically the summary file).
+    'to_file' (typically the summary file); and a grep of the number of various
+    types of error messages.
     """
     command = 'tail -n ' + str(number_of_lines) + ' ' + from_file
     if debug > 2:
         print 'DEBUG: tail command:', command
         sys.stdout.flush()
     tail_proc = Popen(command, shell=True, stdin=PIPE, stdout=PIPE, stderr=STDOUT)
-    tail_message = 'Last ' + str(number_of_lines) + ' lines of ' + from_file + ':\n' \
-                 + tail_proc.communicate()[0].replace('\\n', '\n') + '\n'
+    tail_message = '\n\nLast ' + str(number_of_lines) + ' lines of ' + from_file + ':\n' \
+                 + tail_proc.communicate()[0].replace('\\n', '\n')
+
+    error_types = ['Error compiling query', 'ERROR: IN: NodeSchema', 'ERROR']
+    error_count = 0
+    for e in error_types:
+        command = 'grep -c "' + e + '" ' + from_file
+        if debug > 2:
+            print 'DEBUG: grep command:', command
+            sys.stdout.flush()
+        grep_proc = Popen(command, shell=True, stdin=PIPE, stdout=PIPE, stderr=STDOUT)
+        num_errors = int(grep_proc.communicate()[0].replace('\\n', ''))
+        if e is 'ERROR':
+            tail_message += "\nNumber of all other 'ERROR' messages    : " + str(num_errors - error_count)
+            tail_message += "\nTotal Number of all 'ERROR' messages    : " + str(num_errors)
+        else:
+            error_count  += num_errors
+            tail_message += "\nNumber of '"+e+"' errors: " + str(num_errors)
+
     print >> to_file, tail_message
 
 
@@ -206,7 +224,7 @@ def print_summary(error_message=''):
 
     # Generate the summary message (to be printed below)
     try:
-        last_sql_message = 'Last ' + str(len(last_n_sql_statements)) + ' SQL statements sent to sqlcmd:\n' \
+        last_sql_message = '\n\nLast ' + str(len(last_n_sql_statements)) + ' SQL statements sent to sqlcmd:\n' \
                          + '\n'.join(sql for sql in last_n_sql_statements) + '\n'
         seconds = time() - start_time
         summary_message  = '\n\nSUMMARY: in ' + re.sub('^0:', '', str(timedelta(0, round(seconds))), 1) \
@@ -251,7 +269,7 @@ def print_summary(error_message=''):
                 print_file_tail(log_file, sqlcmd_summary_file, options.log_number)
         print >> sqlcmd_summary_file, last_sql_message, summary_message, error_message
         sqlcmd_summary_file.close()
-    print '\n\n', last_sql_message, summary_message, error_message
+    print last_sql_message, summary_message, error_message
 
 
 def increment_sql_statement_indexes(index1, index2):
@@ -420,6 +438,9 @@ if __name__ == "__main__":
     parser.add_option("-g", "--grammar", dest="grammar_files", default="sql-grammar.txt",
                       help="a file path/name, or comma-separated list of files, that defines the SQL grammar "
                          + "[default: sql-grammar.txt]")
+    parser.add_option("-r", "--seed", dest="seed",
+                      help="seed for random number generator; a blank string, or None, means that the seed "
+                          + "should itself be randomly generated [default: None]")
     parser.add_option("-i", "--initial_type", dest="initial_type", default="insert-statement",
                       help="a type, or comma-separated list of types, of SQL statements to generate initially; typically "
                           + "used to initialize the database using INSERT statements [default: insert-statement]")
@@ -484,6 +505,7 @@ if __name__ == "__main__":
         print "DEBUG: all arguments:", " ".join(sys.argv)
         print "DEBUG: options.path          :", options.path
         print "DEBUG: options.grammar_files :", options.grammar_files
+        print "DEBUG: options.seed          :", options.seed
         print "DEBUG: options.initial_type  :", options.initial_type
         print "DEBUG: options.initial_number:", options.initial_number
         print "DEBUG: options.type          :", options.type
@@ -503,6 +525,15 @@ if __name__ == "__main__":
         print "DEBUG: options.debug         :", options.debug
         print "DEBUG: options (all):\n", options
         print "DEBUG: args (all):", args
+
+    if options.seed:
+        seed_type   = 'supplied'
+        random_seed = int(options.seed)
+    else:
+        seed_type   = 'random'
+        random_seed = randrange(2 ** 63)
+    print 'Using %s seed: %d' % (seed_type, random_seed)
+    seed(random_seed)
 
     # If a maximum number of minutes was specified, compute the time at which
     # to stop execution
@@ -553,6 +584,7 @@ if __name__ == "__main__":
 
         if options.sqlcmd_summary:
             sqlcmd_summary_file = open(options.sqlcmd_summary, 'w', 0)
+            print >> sqlcmd_summary_file, 'Using %s seed: %d' % (seed_type, random_seed)
 
         command = 'sqlcmd --stop-on-error=false'
         if debug > 2:

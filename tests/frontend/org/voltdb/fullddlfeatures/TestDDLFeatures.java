@@ -290,7 +290,7 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
 
         // Test for T22
         assertTrue(findTableInSystemCatalogResults("T22"));
-        assertEquals(indexedColumnCount("T22"), 4);
+        assertEquals(8, indexedColumnCount("T22"));
 
         // Test for T23
         assertTrue(findTableInSystemCatalogResults("T23"));
@@ -765,6 +765,16 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
         assertTrue(isColumnPartitionColumn("T61", "C3"));
         assertTrue(verifyTableColumnType("T61", "C3", "INTEGER"));
         assertFalse(isDRedTable("T61"));
+    }
+
+    @Test
+    public void testINETFunctions() throws Exception {
+        assertTrue(findTableInSystemCatalogResults("T22"));
+
+        assertTrue(findIndexInSystemCatalogResults("ENG_8168_INDEX_USES_INET_ATON"));
+        assertTrue(findIndexInSystemCatalogResults("ENG_8168_INDEX_USES_INET_NTOA"));
+        assertTrue(findIndexInSystemCatalogResults("ENG_8168_INDEX_USES_INET6_ATON"));
+        assertTrue(findIndexInSystemCatalogResults("ENG_8168_INDEX_USES_INET6_NTOA"));
     }
 
     @Test
