@@ -133,7 +133,7 @@ public class TestFunctions extends PlannerTestCase {
     }
 
     public void testLongConstants() {
-        failToCompile("SELECT  LN(MOD(17004989843871566923468, MOD(10, -73))) FROM ENG10749",
+        failToCompile("SELECT  LN(MOD(17004989843871566923468, MOD(10, -73))) FROM ENG12089",
                       "Numeric conversion error to type BIGINT");
     }
 }
