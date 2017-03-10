@@ -342,7 +342,7 @@ public class FragmentTask extends TransactionTask
                 if (currRunner != null) {
                     succeededFragmentsCount = currRunner.getExecutionEngine().extractPerFragmentStats(1, executionTimes);
                     currRunner.getStatsCollector().finishStatement(m_fragmentMsg.getStmtName(frag),
-                                                                   m_fragmentMsg.commitPerFragmentStats(),
+                                                                   m_fragmentMsg.isCoordinatorTask(),
                                                                    m_fragmentMsg.isPerFragmentStatsRecording(),
                                                                    succeededFragmentsCount == 0,
                                                                    executionTimes == null ? 0 : executionTimes[0],

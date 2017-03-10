@@ -1712,13 +1712,12 @@ public class ProcedureRunner {
            for (i = 0; i < batchSize; i++) {
                QueuedSQL qs = batch.get(i);
                // No coordinator task for a single partition procedure.
-               // Should directly commit per-fragment stats once the execution is completed.
-               boolean commitPerFragmentStats = true;
+               boolean hasCoordinatorTask = false;
                // If all the fragments in this batch are executed successfully, succeededFragmentsCount == batchSize.
                // Otherwise, the fragment whose index equals succeededFragmentsCount is the one that failed.
                boolean failed = i == succeededFragmentsCount;
                m_statsCollector.finishStatement(qs.stmt.getStmtName(),
-                                                commitPerFragmentStats,
+                                                hasCoordinatorTask,
                                                 m_statsCollector.isRecording(),
                                                 failed,
                                                 executionTimes == null ? 0 : executionTimes[i],

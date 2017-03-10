@@ -151,12 +151,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
 
     // If this flag = true, it means the current execution is being sampled.
     boolean m_perFragmentStatsRecording = false;
-    // If this flag = true, the per-fragment stats for the current SQL statement
-    // will be immediately updated after this task is finished, without waiting
-    // for another fragment execution.
-    // For multi-partition stored procedures that have worker fragments and
-    // coordinator fragments, we report the statistics for them together as one.
-    boolean m_commitPerFragmentStats = true;
+    boolean m_coordinatorTask = false;
 
     int m_inputDepCount = 0;
     Iv2InitiateTaskMessage m_initiateTask;
@@ -185,12 +180,12 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         return m_perFragmentStatsRecording;
     }
 
-    public void setCommitPerFragmentStats(boolean value) {
-        m_commitPerFragmentStats = value;
+    public void setCoordinatorTask(boolean value) {
+        m_coordinatorTask = value;
     }
 
-    public boolean commitPerFragmentStats() {
-        return m_commitPerFragmentStats;
+    public boolean isCoordinatorTask() {
+        return m_coordinatorTask;
     }
 
     public int getCurrentBatchIndex() {
@@ -249,7 +244,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         m_procNameToLoad = ftask.m_procNameToLoad;
         m_batchTimeout = ftask.m_batchTimeout;
         m_perFragmentStatsRecording = ftask.m_perFragmentStatsRecording;
-        m_commitPerFragmentStats = ftask.m_commitPerFragmentStats;
+        m_coordinatorTask = ftask.m_coordinatorTask;
         if (ftask.m_initiateTaskBuffer != null) {
             m_initiateTaskBuffer = ftask.m_initiateTaskBuffer.duplicate();
         }
@@ -606,6 +601,10 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
      *     output dependencies flag (outdep): byte: 1
      *     input dependencies flag (indep): byte: 1
      *
+     * Procedure name to load string (if any).
+     *
+     * perFragmentStatsRecording and coordinatorTask flag: byte: 2
+     *
      * Fragment ID block (1 per item):
      *     fragment ID: long: 8 * nitems
      *
@@ -649,7 +648,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
             msgsize += m_procNameToLoad.length;
         }
 
-        // perFragmentStatsRecording and commitPerFragmentStats.
+        // perFragmentStatsRecording and coordinatorTask.
         // TODO: We could use only one byte and bitmasks to represent all the
         // boolean values used in this class, it can save a little bit space.
         msgsize += 2;
@@ -783,7 +782,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
             buf.putShort((short) -1);
         }
         buf.put(m_perFragmentStatsRecording ? (byte) 1 : (byte) 0);
-        buf.put(m_commitPerFragmentStats ? (byte) 1 : (byte) 0);
+        buf.put(m_coordinatorTask ? (byte) 1 : (byte) 0);
 
         // Plan Hash block
         for (FragmentData item : m_items) {
@@ -916,7 +915,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
             buf.get(m_procNameToLoad);
         }
         m_perFragmentStatsRecording = buf.get() != 0;
-        m_commitPerFragmentStats = buf.get() != 0;
+        m_coordinatorTask = buf.get() != 0;
 
         m_items = new ArrayList<FragmentData>(fragCount);
 
@@ -1058,14 +1057,12 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         sb.append(" FOR REPLAY ").append(isForReplay());
         sb.append(", SP HANDLE: ").append(TxnEgo.txnIdToString(getSpHandle()));
         sb.append("\n");
+        sb.append("THIS IS A ");
+        sb.append(m_coordinatorTask ? "COORDINATOR" : "WORKER");
+        sb.append(" TASK.\n");
         if (m_perFragmentStatsRecording) {
             sb.append("PER FRAGMENT STATS RECORDING\n");
         }
-        sb.append("PER FRAGMENT STATS SHOULD ");
-        if (! m_commitPerFragmentStats) {
-            sb.append("NOT ");
-        }
-        sb.append("COMMIT IMMEDIATELY\n");
         if (m_isReadOnly)
             sb.append("  READ, COORD ");
         else
