@@ -1154,7 +1154,7 @@ void PersistentTable::updateTupleForUndo(char* tupleWithUnwantedValues,
 
 void PersistentTable::deleteTuple(TableTuple& target, bool fallible) {
     UndoQuantum* uq = ExecutorContext::currentUndoQuantum();
-    bool createUndoAction = fallible & (uq != NULL);
+    bool createUndoAction = fallible && (uq != NULL);
 
     // May not delete an already deleted tuple.
     assert(target.isActive());
