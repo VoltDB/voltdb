@@ -133,7 +133,16 @@ public class TestJSONInterface extends TestCase {
     final static ContentType utf8ApplicationFormUrlEncoded =
             ContentType.create("application/x-www-form-urlencoded","UTF-8");
     private static final String VALID_JSONP = "good_$123";
-    private static final String INVALID_JSONP = "jQuery111106314619798213243_1487039392105\"'></XSS/*-*/STYLE=xss:e/**/xpression(try{a=firstTime}catch(e){firstTime=1;alert(9096)})>";
+    private static final String INVALID_JSONP;
+
+    static {
+        String pval = "jQuery111106314619798213243_1487039392105\"'></XSS/*-*/STYLE=xss:e/**/xpression(try{a=firstTime}catch(e){firstTime=1;alert(9096)})>";
+        try {
+            pval = URLEncoder.encode("jQuery111106314619798213243_1487039392105\"'></XSS/*-*/STYLE=xss:e/**/xpression(try{a=firstTime}catch(e){firstTime=1;alert(9096)})>", "UTF-8");
+        } catch (UnsupportedEncodingException e) {
+        }
+        INVALID_JSONP = pval;
+    }
 
     ServerThread server;
     Client client;
@@ -2176,7 +2185,7 @@ public class TestJSONInterface extends TestCase {
         }
     }
 
-    public void __toBeCheckedByRuiWhenMergedIntoMaster__testJSONPSanitization() throws Exception {
+    public void testJSONPSanitization() throws Exception {
         try {
             String simpleSchema
                     = "CREATE TABLE foo (\n"
