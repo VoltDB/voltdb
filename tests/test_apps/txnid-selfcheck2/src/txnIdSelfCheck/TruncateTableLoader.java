@@ -236,12 +236,12 @@ public class TruncateTableLoader extends BenchmarkThread {
             } catch (Exception e) {
                 hardStop("getrowcount exception", e);
             }
-
+            CountDownLatch latch = new CountDownLatch(0);
             try {
                 // insert some batches...
                 int tc = batchSize * r.nextInt(99);
                 while ((currentRowCount < tc) && (m_shouldContinue.get())) {
-                    CountDownLatch latch = new CountDownLatch(batchSize);
+                    latch = new CountDownLatch(batchSize);
                     // try to insert batchSize random rows
                     for (int i = 0; i < batchSize; i++) {
                         long p = Math.abs(r.nextLong());
@@ -249,7 +249,7 @@ public class TruncateTableLoader extends BenchmarkThread {
                         insertsTried++;
                         client.callProcedure(new InsertCallback(latch), tableName.toUpperCase() + "TableInsert", p, data);
                     }
-                    latch.await(10, TimeUnit.SECONDS);
+                    latch.await();
                     long nextRowCount = -1;
                     try {
                         nextRowCount = TxnId2Utils.getRowCount(client, tableName);
@@ -269,6 +269,9 @@ public class TruncateTableLoader extends BenchmarkThread {
                 try { Thread.sleep(3000); } catch (Exception e2) {}
             }
 
+            if (latch.getCount() != 0) {
+                hardStop("latch not zero " + latch.getCount());
+            }
 
             // check the initial table counts, prior to truncate and/or swap
             try {
