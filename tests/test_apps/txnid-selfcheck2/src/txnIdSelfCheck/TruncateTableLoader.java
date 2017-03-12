@@ -39,6 +39,7 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class TruncateTableLoader extends BenchmarkThread {
 
@@ -102,9 +103,9 @@ public class TruncateTableLoader extends BenchmarkThread {
 
     class InsertCallback implements ProcedureCallback {
 
-        CountDownLatch latch;
+        AtomicInteger latch;
 
-        InsertCallback(CountDownLatch latch) {
+        InsertCallback(AtomicInteger latch) {
             this.latch = latch;
         }
 
@@ -114,7 +115,7 @@ public class TruncateTableLoader extends BenchmarkThread {
                 Benchmark.txnCount.incrementAndGet();
                 rowsLoaded++;
             }
-            latch.countDown();
+            latch.decrementAndGet();
         }
     }
 
@@ -236,20 +237,31 @@ public class TruncateTableLoader extends BenchmarkThread {
             } catch (Exception e) {
                 hardStop("getrowcount exception", e);
             }
-            CountDownLatch latch = new CountDownLatch(0);
+            AtomicInteger latch = new AtomicInteger(0);
             try {
                 // insert some batches...
                 int tc = batchSize * r.nextInt(99);
                 while ((currentRowCount < tc) && (m_shouldContinue.get())) {
-                    latch = new CountDownLatch(batchSize);
+                    latch = new AtomicInteger(0);
                     // try to insert batchSize random rows
                     for (int i = 0; i < batchSize; i++) {
                         long p = Math.abs(r.nextLong());
                         m_permits.acquire();
                         insertsTried++;
-                        client.callProcedure(new InsertCallback(latch), tableName.toUpperCase() + "TableInsert", p, data);
+                        try {
+                            client.callProcedure(new InsertCallback(latch), tableName.toUpperCase() + "TableInsert", p, data);
+                            latch.incrementAndGet();
+                        } catch (Exception e) {
+                            // on exception, log and end the thread, but don't kill the process
+                            log.error("TruncateTableLoader failed a TableInsert procedure call for table '" + tableName + "': " + e.getMessage());
+                            try {
+                                Thread.sleep(3000);
+                            } catch (Exception e2) {
+                            }
+                        }
                     }
-                    latch.await();
+                    while (latch.get() > 0)
+                        Thread.sleep(10);
                     long nextRowCount = -1;
                     try {
                         nextRowCount = TxnId2Utils.getRowCount(client, tableName);
@@ -262,15 +274,13 @@ public class TruncateTableLoader extends BenchmarkThread {
                     }
                     currentRowCount = nextRowCount;
                 }
-            }
-            catch (Exception e) {
-                // on exception, log and end the thread, but don't kill the process
-                log.error("TruncateTableLoader failed a TableInsert procedure call for table '" + tableName + "': " + e.getMessage());
-                try { Thread.sleep(3000); } catch (Exception e2) {}
+            } catch (Exception e) {
+                hardStop(e);
             }
 
-            if (latch.getCount() != 0) {
-                hardStop("latch not zero " + latch.getCount());
+
+            if (latch.get() != 0) {
+                hardStop("latch not zero " + latch.get());
             }
 
             // check the initial table counts, prior to truncate and/or swap
