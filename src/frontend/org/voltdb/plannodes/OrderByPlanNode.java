@@ -140,7 +140,6 @@ public class OrderByPlanNode extends AbstractPlanNode {
 
     @Override
     public void computeCostEstimates(long childOutputTupleCountEstimate,
-                                     Database db,
                                      DatabaseEstimates estimates,
                                      ScalarValueHints[] paramHints) {
         // This method doesn't do anything besides what the parent method does,

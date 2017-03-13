@@ -78,7 +78,7 @@ public class TableCountPlanNode extends AbstractScanPlanNode {
     }
 
     @Override
-    public void computeCostEstimates(long childOutputTupleCountEstimate, Database db, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
+    public void computeCostEstimates(long childOutputTupleCountEstimate, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
         m_estimatedProcessedTupleCount = 1;
         m_estimatedOutputTupleCount = 1;
     }

@@ -22,7 +22,6 @@ import java.io.File;
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
-import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.DeterminismMode;
 import org.voltdb.compiler.ScalarValueHints;
@@ -39,8 +38,6 @@ import org.voltdb.utils.BuildDirectoryUtils;
  *
  */
 public class PlanSelector implements Cloneable {
-    /** pointer to the database object in the catalog */
-    final Database m_db;
     /** pointer to the database estimates */
     DatabaseEstimates m_estimates;
     /** The name of the sql statement to be planned */
@@ -81,12 +78,11 @@ public class PlanSelector implements Cloneable {
      * @param quietPlanner Controls the output.
      * @param fullDebug Controls the debug output.
      */
-    public PlanSelector(Database db, DatabaseEstimates estimates,
+    public PlanSelector(DatabaseEstimates estimates,
             String stmtName, String procName, String sql,
             AbstractCostModel costModel, ScalarValueHints[] paramHints,
             DeterminismMode detMode, boolean quietPlanner)
     {
-        m_db = db;
         m_estimates = estimates;
         m_stmtName = stmtName;
         m_procName = procName;
@@ -103,7 +99,7 @@ public class PlanSelector implements Cloneable {
      */
     @Override
     public Object clone() {
-        return new PlanSelector(m_db, m_estimates, m_stmtName, m_procName, m_sql,
+        return new PlanSelector(m_estimates, m_stmtName, m_procName, m_sql,
                 m_costModel, m_paramHints, m_detMode, m_quietPlanner);
     }
 
@@ -155,7 +151,7 @@ public class PlanSelector implements Cloneable {
         AbstractPlanNode planGraph = plan.rootPlanGraph;
 
         // compute statistics about a plan
-        planGraph.computeEstimatesRecursively(m_stats, m_db, m_estimates, m_paramHints);
+        planGraph.computeEstimatesRecursively(m_stats, m_estimates, m_paramHints);
 
         // compute the cost based on the resources using the current cost model
         plan.cost = m_costModel.getPlanCost(m_stats);

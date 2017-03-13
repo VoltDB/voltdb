@@ -125,7 +125,7 @@ public class QueryPlanner {
         m_paramHints = paramHints;
         m_joinOrder = joinOrder;
         m_detMode = detMode;
-        m_planSelector = new PlanSelector(m_db, m_estimates, m_stmtName,
+        m_planSelector = new PlanSelector(m_estimates, m_stmtName,
                 m_procName, m_sql, m_costModel, m_paramHints, m_detMode,
                 suppressDebugOutput);
         m_isUpsert = false;

@@ -392,7 +392,6 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
      * TODO(XIN): It takes at least 14% planner CPU. Optimize it.
      */
     public final void computeEstimatesRecursively(PlanStatistics stats,
-                                                  Database db,
                                                   DatabaseEstimates estimates,
                                                   ScalarValueHints[] paramHints)
     {
@@ -404,7 +403,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         // recursively compute and collect stats from children
         long childOutputTupleCountEstimate = 0;
         for (AbstractPlanNode child : m_children) {
-            child.computeEstimatesRecursively(stats, db, estimates, paramHints);
+            child.computeEstimatesRecursively(stats, estimates, paramHints);
             m_outputColumnHints.addAll(child.m_outputColumnHints);
             childOutputTupleCountEstimate += child.m_estimatedOutputTupleCount;
         }
@@ -413,11 +412,11 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         for (Entry<PlanNodeType, AbstractPlanNode> entry : m_inlineNodes.entrySet()) {
             AbstractPlanNode inlineNode = entry.getValue();
             if (inlineNode instanceof AbstractScanPlanNode) {
-                inlineNode.computeCostEstimates(0, db, estimates, paramHints);
+                inlineNode.computeCostEstimates(0, estimates, paramHints);
             }
         }
 
-        computeCostEstimates(childOutputTupleCountEstimate, db, estimates, paramHints);
+        computeCostEstimates(childOutputTupleCountEstimate, estimates, paramHints);
         stats.incrementStatistic(0, StatsField.TUPLES_READ, m_estimatedProcessedTupleCount);
     }
 
@@ -428,7 +427,6 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
      * {@see AbstractPlanNode#computeEstimatesRecursively(PlanStatistics, Cluster, Database, DatabaseEstimates, ScalarValueHints[])}.
      */
     protected void computeCostEstimates(long childOutputTupleCountEstimate,
-                                        Database db,
                                         DatabaseEstimates estimates,
                                         ScalarValueHints[] paramHints)
     {

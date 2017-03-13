@@ -223,7 +223,7 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
     }
 
     @Override
-    public void computeCostEstimates(long childOutputTupleCountEstimate, Database db, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
+    public void computeCostEstimates(long childOutputTupleCountEstimate, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
 
         // Add the cost of the inlined index scan to the cost of processing the input tuples.
         // This isn't really a fair representation of what's going on, as the index is scanned once

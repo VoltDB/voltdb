@@ -376,7 +376,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
     public void resolveColumnIndexes(){}
 
     @Override
-    public void computeCostEstimates(long childOutputTupleCountEstimate, Database db, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
+    public void computeCostEstimates(long childOutputTupleCountEstimate, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
         // Cost counting index scans as constant, almost negligible work.
         // This might be unfair, as the tree has O(logn) complexity, but we
         // really want to pick this kind of search over others.

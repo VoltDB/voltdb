@@ -588,7 +588,6 @@ public class IndexScanPlanNode extends AbstractScanPlanNode implements IndexSort
 
     @Override
     public void computeCostEstimates(long unusedChildOutputTupleCountEstimate,
-                                     Database unusedDb,
                                      DatabaseEstimates estimates,
                                      ScalarValueHints[] unusedParamHints) {
 

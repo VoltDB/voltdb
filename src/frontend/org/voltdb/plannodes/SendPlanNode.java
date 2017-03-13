@@ -66,7 +66,7 @@ public class SendPlanNode extends AbstractPlanNode {
 
     @Override
     public void computeCostEstimates(long childOutputTupleCountEstimate,
-            Database db, DatabaseEstimates estimates,
+            DatabaseEstimates estimates,
             ScalarValueHints[] paramHints) {
         assert(estimates != null);
         // Recursively compute and collect stats from the child node,
