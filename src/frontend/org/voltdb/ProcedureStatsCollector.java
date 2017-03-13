@@ -118,6 +118,9 @@ public class ProcedureStatsCollector extends SiteStatsSource {
                                       long duration,
                                       VoltTable result,
                                       ParameterSet parameterSet) {
+        if (stmtName == null) {
+            return;
+        }
         StatementStats stmtStats = m_stmtStatsMap.get(stmtName);
         if (stmtStats == null) {
             return;
