@@ -104,6 +104,11 @@ public class ProcedureStatsCollector extends SiteStatsSource {
     }
 
     public final boolean isStmtRecording() {
+        // If we only have procedure-wide statistics in the map,
+        // no need to time any statements in any case.
+        if (m_stmtStatsMap.size() == 1) {
+            return false;
+        }
         return m_procStatsData.m_invocations % m_stmtSamplingInterval == 0;
     }
 
