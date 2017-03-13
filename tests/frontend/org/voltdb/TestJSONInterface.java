@@ -124,6 +124,8 @@ import org.voltdb.compiler.deploymentfile.SnmpType;
 public class TestJSONInterface extends TestCase {
     final static ContentType utf8ApplicationFormUrlEncoded =
             ContentType.create("application/x-www-form-urlencoded","UTF-8");
+    private static final String VALID_JSONP = "good_$123";
+    private static final String INVALID_JSONP = "jQuery111106314619798213243_1487039392105\"'></XSS/*-*/STYLE=xss:e/**/xpression(try{a=firstTime}catch(e){firstTime=1;alert(9096)})>";
 
     ServerThread server;
     Client client;
@@ -2003,7 +2005,7 @@ public class TestJSONInterface extends TestCase {
 
             //Get users
             String json = getUrlOverJSON("http://localhost:8095/deployment/users/", null, null, null, 200,  "application/json");
-            assertEquals(json, "");
+            assertEquals(json, "[]");
             getUrlOverJSON("http://localhost:8095/deployment/users/foo", null, null, null, 404,  "application/json");
 
             //Put users
@@ -2042,7 +2044,7 @@ public class TestJSONInterface extends TestCase {
 
             //Get users
             json = getUrlOverJSON("http://localhost:8095/deployment/users/", null, null, null, 200,  "application/json");
-            assertEquals(json, "");
+            assertEquals(json, "[]");
         } finally {
             if (server != null) {
                 server.shutdown();
@@ -2194,6 +2196,120 @@ public class TestJSONInterface extends TestCase {
             }
             server = null;
         }
+    }
+
+    public void testJSONPSanitization() throws Exception {
+        try {
+            String simpleSchema
+                    = "CREATE TABLE foo (\n"
+                    + "    bar BIGINT NOT NULL,\n"
+                    + "    PRIMARY KEY (bar)\n"
+                    + ");";
+
+            File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
+            String schemaPath = schemaFile.getPath();
+            schemaPath = URLEncoder.encode(schemaPath, "UTF-8");
+
+            VoltProjectBuilder builder = new VoltProjectBuilder();
+            builder.addSchema(schemaPath);
+            builder.addPartitionInfo("foo", "bar");
+            builder.addStmtProcedure("Insert", "insert into foo values(?);");
+            builder.setHTTPDPort(8095);
+            boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
+            assertTrue(success);
+
+            VoltDB.Configuration config = new VoltDB.Configuration();
+            config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
+            config.m_pathToDeployment = builder.getPathToDeployment();
+            server = new ServerThread(config);
+            server.start();
+            server.waitForInitialization();
+
+            // Get deployment
+            String dep = checkJSONPHandling("GET", "http://localhost:8095/deployment", "application/json", null);
+            // Download deployment
+            checkJSONPHandling("GET", "http://localhost:8095/deployment/download", "text/xml", null);
+            // Post deployment
+            Map<String,String> params = new HashMap<>();
+            params.put("deployment", URLEncoder.encode(takeOutWrappingJSONP(dep), "UTF-8"));
+            checkJSONPHandling("POST", "http://localhost:8095/deployment/", "application/json", params);
+
+            // Get users
+            checkJSONPHandling("GET", "http://localhost:8095/deployment/users", "application/json", null);
+            // Put user
+            ObjectMapper mapper = new ObjectMapper();
+            UsersType.User user = new UsersType.User();
+            user.setName("foo");
+            user.setPassword("foo");
+            String map = mapper.writeValueAsString(user);
+            params = new HashMap<>();
+            params.put("user", map);
+            checkJSONPHandling("PUT", "http://localhost:8095/deployment/users/foo", "application/json", params);
+            // Post user
+            user.setRoles("foo");
+            map = mapper.writeValueAsString(user);
+            params.put("user", map);
+            checkJSONPHandling("POST", "http://localhost:8095/deployment/users/foo", "application/json", params);
+            // Delete user
+            checkJSONPHandling("DELETE", "http://localhost:8095/deployment/users/foo", "application/json", null);
+
+            // Get exportTypes
+            checkJSONPHandling("GET", "http://localhost:8095/deployment/export/type", "application/json", null);
+
+            // Get profile
+            checkJSONPHandling("GET", "http://localhost:8095/profile", "application/json", null);
+
+            // Get /api/1.0
+            String response = checkJSONPHandling("GET", "http://localhost:8095/api/1.0?Procedure=Insert&Parameters=[1]", "application/json", null);
+            assertTrue(responseFromJSON(takeOutWrappingJSONP(response)).status == ClientResponse.SUCCESS);
+
+            // Post /api/1.0
+            params = new HashMap<>();
+            params.put("Procedure", "Insert");
+            params.put("Parameters", "[2]");
+            response = checkJSONPHandling("POST", "http://localhost:8095/api/1.0/", "application/json", params);
+            assertTrue(responseFromJSON(takeOutWrappingJSONP(response)).status == ClientResponse.SUCCESS);
+        } finally {
+            if (server != null) {
+                server.shutdown();
+                server.join();
+            }
+            server = null;
+        }
+    }
+
+    private static String takeOutWrappingJSONP(String s) {
+        return s.substring(s.indexOf('(') + 1, s.lastIndexOf(')')).trim();
+    }
+
+    private static String checkJSONPHandling(String method, String baseUrl,
+                                    String expectedCt, Map<String, String> params) throws Exception {
+        String jsonpKeyString = baseUrl.contains("?") ? "&jsonp=" : "?jsonp=";
+        String urlWithValidJSONP = baseUrl + jsonpKeyString + VALID_JSONP;
+        String urlWithInvalidJSONP= baseUrl + jsonpKeyString + INVALID_JSONP;
+        String validJSONPResponse = null;
+        String invalidJSONPResponse = null;
+
+        switch (method) {
+            case "GET":
+                validJSONPResponse = getUrlOverJSON(urlWithValidJSONP, null, null, null, 200, expectedCt);
+                invalidJSONPResponse = getUrlOverJSON(urlWithInvalidJSONP, null, null, null, 400, "application/json");
+                break;
+            case "POST":
+                validJSONPResponse = postUrlOverJSON(urlWithValidJSONP, null, null, null, 200, expectedCt, params);
+                invalidJSONPResponse = postUrlOverJSON(urlWithInvalidJSONP, null, null, null, 400, "application/json", params);
+                break;
+            case "PUT":
+                validJSONPResponse = putUrlOverJSON(urlWithValidJSONP, null, null, null, 201, expectedCt, params);
+                invalidJSONPResponse = putUrlOverJSON(urlWithInvalidJSONP, null, null, null, 400, "application/json", params);
+                break;
+            case "DELETE":
+                validJSONPResponse = deleteUrlOverJSON(urlWithValidJSONP, null, null, null, 204, expectedCt);
+                invalidJSONPResponse = deleteUrlOverJSON(urlWithInvalidJSONP, null, null, null, 400, "application/json");
+                break;
+        }
+        assertTrue(invalidJSONPResponse != null && invalidJSONPResponse.contains("Invalid jsonp callback function name"));
+        return validJSONPResponse;
     }
 
     private static class TestWorker implements Runnable {

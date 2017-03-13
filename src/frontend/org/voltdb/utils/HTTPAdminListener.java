@@ -365,10 +365,13 @@ public class HTTPAdminListener {
             super.handle(target, baseRequest, request, response);
             if (baseRequest.isHandled()) return;
             //jsonp is specified when response is expected to go to javascript function.
-            String jsonp = request.getParameter("jsonp");
+            String jsonp = request.getParameter(HTTPClientInterface.JSONP);
             AuthenticationResult authResult = null;
             try {
                 response.setContentType(jsonContentType);
+                if (!HTTPClientInterface.validateJSONP(jsonp, baseRequest, response)) {
+                    return;
+                }
                 response.setStatus(HttpServletResponse.SC_OK);
                 authResult = authenticate(baseRequest);
                 if (!authResult.isAuthenticated()) {
@@ -494,10 +497,13 @@ public class HTTPAdminListener {
             if (baseRequest.isHandled()) return;
 
             //jsonp is specified when response is expected to go to javascript function.
-            String jsonp = request.getParameter("jsonp");
+            String jsonp = request.getParameter(HTTPClientInterface.JSONP);
             AuthenticationResult authResult = null;
             try {
                 response.setContentType(jsonContentType);
+                if (!HTTPClientInterface.validateJSONP(jsonp, baseRequest, response)) {
+                    return;
+                }
                 response.setStatus(HttpServletResponse.SC_OK);
 
                 //Requests require authentication.
@@ -808,7 +814,7 @@ public class HTTPAdminListener {
                     }
                     mapper.writeValue(response.getWriter(), id);
                 } else {
-                    response.getWriter().write("");
+                    response.getWriter().write("[]");
                 }
                 if (jsonp != null) {
                     response.getWriter().write(")");
