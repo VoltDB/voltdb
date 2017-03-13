@@ -34,6 +34,8 @@ import org.apache.commons_voltpatches.cli.HelpFormatter;
 import org.apache.commons_voltpatches.cli.Options;
 import org.apache.commons_voltpatches.cli.PosixParser;
 
+import javax.net.ssl.SSLContext;
+
 public abstract class CLIConfig {
 
     @Retention(RetentionPolicy.RUNTIME) // Make this annotation accessible at runtime via reflection.
@@ -62,6 +64,15 @@ public abstract class CLIConfig {
 
     protected String configDump;
     protected String usage;
+    protected SSLContext m_sslContext;
+
+    public void setSSLContext(SSLContext sslContext) {
+        m_sslContext = sslContext;
+    }
+
+    public SSLContext getSSLContext() {
+        return m_sslContext;
+    }
 
     public void exitWithMessageAndUsage(String msg) {
         System.err.println(msg);

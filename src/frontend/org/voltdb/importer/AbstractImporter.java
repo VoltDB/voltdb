@@ -18,6 +18,7 @@
 package org.voltdb.importer;
 
 import java.net.URI;
+import java.util.function.Function;
 
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
@@ -52,6 +53,7 @@ public abstract class AbstractImporter
     private final VoltLogger m_logger;
     private ImporterServerAdapter m_importServerAdapter;
     private volatile boolean m_stopping;
+    private final Function<Integer, Boolean> m_backPressurePredicate = (x) -> shouldRun();
 
     protected AbstractImporter() {
         m_logger = new VoltLogger(getName());
@@ -100,7 +102,9 @@ public abstract class AbstractImporter
     protected final boolean callProcedure(Invocation invocation, ProcedureCallback callback)
     {
         try {
-            boolean result = m_importServerAdapter.callProcedure(this, callback, invocation.getProcedure(), invocation.getParams());
+            boolean result = m_importServerAdapter.callProcedure(this,
+                                                                 m_backPressurePredicate,
+                                                                 callback, invocation.getProcedure(), invocation.getParams());
             reportStat(result, invocation.getProcedure());
             return result;
         } catch (Exception ex) {

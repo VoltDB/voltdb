@@ -51,6 +51,7 @@ import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
 import com.google_voltpatches.common.collect.Maps;
+import org.voltdb.common.Constants;
 
 /**
  * Implementation of a VoltServerConfig for a multi-process
@@ -100,7 +101,7 @@ public class LocalCluster extends VoltServerConfig {
     private final boolean m_debug;
     FailureState m_failureState;
     int m_nextIPCPort = 10000;
-    ArrayList<Process> m_cluster = new ArrayList<Process>();
+    ArrayList<Process> m_cluster = new ArrayList<>();
     int perLocalClusterExtProcessIndex = 0;
     VoltProjectBuilder m_builder;
     private boolean m_expectedToCrash = false;
@@ -109,7 +110,7 @@ public class LocalCluster extends VoltServerConfig {
 
     Map<String, String> m_hostRoots = new HashMap<>();
     // Dedicated paths in the filesystem to be used as a root for each process
-    ArrayList<File> m_subRoots = new ArrayList<File>();
+    ArrayList<File> m_subRoots = new ArrayList<>();
     public ArrayList<File> getSubRoots() {
         return m_subRoots;
     }
@@ -129,7 +130,7 @@ public class LocalCluster extends VoltServerConfig {
     //cluster
     private long m_deplayBetweenNodeStartupMS = 0;
 
-    private final ArrayList<EEProcess> m_eeProcs = new ArrayList<EEProcess>();
+    private final ArrayList<EEProcess> m_eeProcs = new ArrayList<>();
     //This is additional process invironment variables that can be passed.
     // This is used to pass JMX port. Any additional use cases can use this too.
     private Map<String, String> m_additionalProcessEnv = null;
@@ -164,8 +165,22 @@ public class LocalCluster extends VoltServerConfig {
         templateCmdLine.startCommand("create");
     };
 
+    private boolean isEnableSSL = Boolean.valueOf(System.getenv("ENABLE_SSL") == null ? Boolean.toString(Boolean.getBoolean("ENABLE_SSL")) : System.getenv("ENABLE_SSL"));
+    public boolean isEnableSSL() { return isEnableSSL; };
+    public void setEnableSSL(boolean flag) {
+        isEnableSSL = flag;
+        templateCmdLine.m_sslEnable = flag;
+        templateCmdLine.m_sslExternal = flag;
+    };
+
     private String m_prefix = null;
     private boolean m_isPaused = false;
+
+    private int m_httpOverridePort = -1;
+    public void setHttpOverridePort(int port) {
+        m_httpOverridePort = port;
+    }
+    public int getHttpOverridePort() { return m_httpOverridePort; };
 
     public LocalCluster(String jarFileName,
                         int siteCount,
@@ -265,7 +280,7 @@ public class LocalCluster extends VoltServerConfig {
         numberOfCoordinators = hostCount <= 2 ? hostCount : hostCount <= 4 ? 2 : 3;
         internalPortGenerator = new InternalPortGeneratorForTest(portGenerator, numberOfCoordinators);
 
-        m_additionalProcessEnv = env==null ? new HashMap<String, String>() : env;
+        m_additionalProcessEnv = env==null ? new HashMap<>() : env;
         if (Boolean.getBoolean(EELibraryLoader.USE_JAVA_LIBRARY_PATH)) {
             // set use.javalib for LocalCluster so that Eclipse runs will be OK.
             m_additionalProcessEnv.put(EELibraryLoader.USE_JAVA_LIBRARY_PATH, "true");
@@ -300,6 +315,7 @@ public class LocalCluster extends VoltServerConfig {
         templateCmdLine.hostCount(hostCount);
         templateCmdLine.setMissingHostCount(m_missingHostCount);
         templateCmdLine.setNewCli(isNewCli);
+        setEnableSSL(isEnableSSL);
         if (kfactor > 0 && !MiscUtils.isPro()) {
             m_kfactor = 0;
         }
@@ -310,8 +326,8 @@ public class LocalCluster extends VoltServerConfig {
         m_debug = debug;
         m_jarFileName = jarFileName;
         m_failureState = m_kfactor < 1 ? FailureState.ALL_RUNNING : failureState;
-        m_pipes = new ArrayList<PipeToFile>();
-        m_cmdLines = new ArrayList<CommandLine>();
+        m_pipes = new ArrayList<>();
+        m_cmdLines = new ArrayList<>();
 
         // if the user wants valgrind and it makes sense, give it to 'em
         // For now only one host works.
@@ -652,7 +668,7 @@ public class LocalCluster extends VoltServerConfig {
                     continue;
                 }
                 synchronized(pipeToFile) {
-                    // if process is dead, no point in waiting around
+                    // if prtests/frontend/org/voltdb/regressionsuites/LocalCluster.javaocess is dead, no point in waiting around
                     if (isProcessDead(pipeToFile.getProcess())) {
                         // dead process means the other pipes won't start,
                         // so bail here
@@ -968,6 +984,8 @@ public class LocalCluster extends VoltServerConfig {
             cmdln.setForceVoltdbCreate(clearLocalDataDirectories);
         }
 
+
+
         if (this.m_additionalProcessEnv != null) {
             for (String name : this.m_additionalProcessEnv.keySet()) {
                 cmdln.setJavaProperty(name, this.m_additionalProcessEnv.get(name));
@@ -1000,7 +1018,8 @@ public class LocalCluster extends VoltServerConfig {
 
             cmdln.port(portGenerator.nextClient());
             cmdln.adminPort(portGenerator.nextAdmin());
-            cmdln.httpPort(portGenerator.nextHttp());
+            if (cmdln.m_httpPort != Constants.HTTP_PORT_DISABLED)
+                cmdln.httpPort(portGenerator.nextHttp());
             cmdln.timestampSalt(getRandomTimestampSalt());
             cmdln.setPlacementGroup(placementGroup);
             if (m_debug) {
@@ -1613,7 +1632,7 @@ public class LocalCluster extends VoltServerConfig {
         if (!m_running) {
             return null;
         }
-        ArrayList<String> listeners = new ArrayList<String>();
+        ArrayList<String> listeners = new ArrayList<>();
         for (int i = 0; i < m_cmdLines.size(); i++) {
             CommandLine cl = m_cmdLines.get(i);
             Process p = m_cluster.get(i);
@@ -1874,7 +1893,7 @@ public class LocalCluster extends VoltServerConfig {
 
     @Override
     public ArrayList<File> listFiles(File path) throws IOException {
-        ArrayList<File> files = new ArrayList<File>();
+        ArrayList<File> files = new ArrayList<>();
         for (File root : m_subRoots) {
             File actualPath = new File(root, path.getPath());
             for (File f : actualPath.listFiles()) {

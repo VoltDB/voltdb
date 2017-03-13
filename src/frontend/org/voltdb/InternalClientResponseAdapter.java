@@ -28,6 +28,7 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Function;
 
 import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashMap;
 import org.voltcore.logging.Level;
@@ -44,6 +45,8 @@ import org.voltdb.catalog.Procedure;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
+
 /**
  * A very simple adapter for import handler that deserializes bytes into client responses.
  * For each partition it creates a single thread executor to sequence per partition transaction submission.
@@ -54,6 +57,7 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
 
     private static final VoltLogger m_logger = new VoltLogger("HOST");
     public final static long SUPPRESS_INTERVAL = 120;
+    private static final int BACK_PRESSURE_WAIT_TIME = Integer.getInteger("INTERNAL_BACK_PRESSURE_WAIT_TIME", 50);
 
     public interface Callback {
         public void handleResponse(ClientResponse response) throws Exception;
@@ -72,6 +76,8 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
     // Maintain internal connection ids per caller id. This is useful when collecting statistics
     // so that information can be grouped per user of this Connection.
     private final ConcurrentMap<String, Long> m_internalConnectionIds = new NonBlockingHashMap<>();
+    public final Semaphore m_permits =
+        new Semaphore(Integer.getInteger("INTERNAL_MAX_PENDING_TRANSACTION_PER_PARTITION", 500));
 
     private class InternalCallback implements Callback {
 
@@ -128,7 +134,7 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
                         m_task,
                         m_user,
                         m_partition,
-                        System.nanoTime());
+                        null);
             }
         }
 
@@ -159,13 +165,20 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
             final InternalConnectionStatsCollector statsCollector,
             final StoredProcedureInvocation task,
             final AuthSystem.AuthUser user,
-            final int partition, final long nowNanos) {
-        try {
-            m_permits.acquire();
-        } catch (InterruptedException e) {}
-
+            final int partition,
+            final Function<Integer, Boolean> backPressurePredicate) {
         if (!m_partitionExecutor.containsKey(partition)) {
             m_partitionExecutor.putIfAbsent(partition, CoreUtils.getSingleThreadExecutor("InternalHandlerExecutor - " + partition));
+        }
+
+        if (backPressurePredicate != null) {
+            try {
+                do {
+                    if (m_permits.tryAcquire(BACK_PRESSURE_WAIT_TIME, MILLISECONDS)) {
+                        break;
+                    }
+                } while (backPressurePredicate.apply(partition));
+            } catch (InterruptedException e) {}
         }
 
         final InvocationDispatcher dispatcher = getClientInterface().getDispatcher();
@@ -188,7 +201,6 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
                     m_callbacks.put(handle, cb);
 
                     ClientResponseImpl r = dispatcher.dispatch(task, kattrs, InternalClientResponseAdapter.this, user, null);
-                    boolean bval = r == null || r.getStatus() == ClientResponse.SUCCESS;
                     if (r != null) {
                         try {
                             cb.handleResponse(r);
@@ -198,22 +210,15 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
                             m_callbacks.remove(handle);
                             m_permits.release();
                         }
-                        return bval;
+                        return r.getStatus() == ClientResponse.SUCCESS;
                     }
 
-                    //Submit the transaction.
-                    if (!bval) {
-                        // Supposedly this will never happen and is OK to ignore from stats collection perspective.
-                        // Hence it is OK that this is not getting reported to callbacks.
-                        m_logger.error("Failed to submit transaction.");
-                        m_callbacks.remove(handle);
-                        m_permits.release();
-                    }
-                    return bval;
+                    return true;
                 }
             });
         } catch (RejectedExecutionException ex) {
             m_logger.error("Failed to submit transaction to the partition queue.", ex);
+            m_permits.release();
             return false;
         }
 

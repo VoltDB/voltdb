@@ -48,6 +48,7 @@ public final class DBBPool {
 #ifndef NO_MEMCHECK
 
     static {
+        System.setProperty("io.netty.leakDetection.level", "ADVANCED");
         final String msg = "Strict java memory checking is enabled, don't do release builds " +
                      "or performance runs with this enabled. Invoke \"ant clean\" and \"ant -Djmemcheck=NO_MEMCHECK\" to disable.";
         HOST.warn(msg);

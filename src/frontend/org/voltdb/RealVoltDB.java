@@ -88,6 +88,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.HostMessenger.HostInfo;
 import org.voltcore.messaging.SiteMailbox;
+import org.voltcore.network.CipherExecutor;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.OnDemandBinaryLogger;
 import org.voltcore.utils.Pair;
@@ -625,7 +626,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                             + " : " + e.getMessage());
                     return -1;
                 }
-                consoleLog.info("Deployment configuration saved at " + config.m_getOutput.trim());
+                consoleLog.info("Deployment configuration saved in " + config.m_getOutput.trim());
             } else {
                 consoleLog.fatal("Failed to get configuration or deployment configuration is invalid.");
                 return -1;
@@ -653,7 +654,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 consoleLog.fatal("Failed to write schema to " + config.m_getOutput + " : " + e.getMessage());
                 return -1;
             }
-            consoleLog.info("Schema file saved at " + config.m_getOutput.trim());
+            consoleLog.info("Schema saved in " + config.m_getOutput.trim());
         } catch (IOException e) {
             consoleLog.fatal("Failed to load the catalog jar from " + config.m_pathToCatalog
                     + " : " + e.getMessage());
@@ -672,7 +673,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             InMemoryJarfile catalogJar = CatalogUtil.loadInMemoryJarFile(MiscUtils.fileToBytes(new File (config.m_pathToCatalog)));
             InMemoryJarfile filteredJar = CatalogUtil.getCatalogJarWithoutDefaultArtifacts(catalogJar);
             filteredJar.writeToFile(outputFile);
-            consoleLog.info("Classes file in jar file saved at " + outputFile.getPath());
+            consoleLog.info("Classes saved in " + outputFile.getPath());
         } catch (IOException e) {
             consoleLog.fatal("Failed to read classes " + config.m_pathToCatalog
                     + " : " + e.getMessage());
@@ -731,6 +732,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             // and Settings depend on
             ConfigFactory.clearProperty(Settings.CONFIG_DIR);
             ModuleManager.resetCacheRoot();
+            CipherExecutor.SERVER.shutdown();
 
             m_isRunningWithOldVerb = config.m_startAction.isLegacy();
 
@@ -1301,7 +1303,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                         clientIntf,
                         config.m_port,
                         adminIntf,
-                        config.m_adminPort);
+                        config.m_adminPort,
+                        m_config.m_sslContext);
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
             }
@@ -3131,6 +3134,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 }
                 m_messenger = null;
 
+                // shutdown the cipher service
+                CipherExecutor.SERVER.shutdown();
+
                 //Also for test code that expects a fresh stats agent
                 if (m_opsRegistrar != null) {
                     try {
@@ -3176,7 +3182,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
      * execution site threads */
     private static Long lastLogUpdate_txnId = 0L;
     @Override
-    synchronized public void logUpdate(String xmlConfig, long currentTxnId)
+    synchronized public void logUpdate(String xmlConfig, long currentTxnId, File voltroot)
     {
         // another site already did this work.
         if (currentTxnId == lastLogUpdate_txnId) {
@@ -3190,7 +3196,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         hostLog.info("Updating RealVoltDB logging config from txnid: " +
                 lastLogUpdate_txnId + " to " + currentTxnId);
         lastLogUpdate_txnId = currentTxnId;
-        VoltLogger.configure(xmlConfig);
+        VoltLogger.configure(xmlConfig, voltroot);
     }
 
     /** Struct to associate a context with a counter of served sites */

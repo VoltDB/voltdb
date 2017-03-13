@@ -20,6 +20,7 @@ package org.voltdb;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Function;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
 import org.voltcore.logging.Level;
@@ -45,7 +46,6 @@ public class InternalConnectionHandler {
     // Atomically allows the catalog reference to change between access
     private final AtomicLong m_failedCount = new AtomicLong();
     private final AtomicLong m_submitSuccessCount = new AtomicLong();
-    private final AtomicInteger m_backpressureIndication = new AtomicInteger(0);
     private volatile Map<Integer, InternalClientResponseAdapter> m_adapters = ImmutableMap.of();
 
     public void addAdapter(int pid, InternalClientResponseAdapter adapter)
@@ -68,10 +68,6 @@ public class InternalConnectionHandler {
         @Override
         public void clientCallback(ClientResponse response) throws Exception {
         }
-    }
-
-    public boolean callProcedure(InternalConnectionContext caller, InternalConnectionStatsCollector statsCollector, String proc, Object... fieldList) {
-        return callProcedure(caller, statsCollector, new NullCallback(), proc, fieldList);
     }
 
     private CatalogContext getCatalogContext() {
@@ -126,7 +122,7 @@ public class InternalConnectionHandler {
         InternalAdapterTaskAttributes kattrs = new InternalAdapterTaskAttributes(
                 DEFAULT_INTERNAL_ADAPTER_NAME, isAdmin, adapter.connectionId());
 
-        if (!adapter.createTransaction(kattrs, procName, catProc, cb, null, task, user, partition, System.nanoTime())) {
+        if (!adapter.createTransaction(kattrs, procName, catProc, cb, null, task, user, partition, null)) {
             m_failedCount.incrementAndGet();
             return false;
         }
@@ -135,8 +131,10 @@ public class InternalConnectionHandler {
     }
 
     // Use backPressureTimeout value <= 0  for no back pressure timeout
-    public boolean callProcedure(InternalConnectionContext caller, InternalConnectionStatsCollector statsCollector,
-            ProcedureCallback procCallback, String proc, Object... fieldList) {
+    public boolean callProcedure(InternalConnectionContext caller,
+                                 Function<Integer, Boolean> backPressurePredicate,
+                                 InternalConnectionStatsCollector statsCollector,
+                                 ProcedureCallback procCallback, String proc, Object... fieldList) {
         Procedure catProc = InvocationDispatcher.getProcedureFromName(proc, getCatalogContext());
         if (catProc == null) {
             String fmt = "Cannot invoke procedure %s from streaming interface %s. Procedure not found.";
@@ -172,7 +170,7 @@ public class InternalConnectionHandler {
 
         final AuthUser user = getCatalogContext().authSystem.getImporterUser();
 
-        if (!adapter.createTransaction(kattrs, proc, catProc, procCallback, statsCollector, task, user, partition, System.nanoTime())) {
+        if (!adapter.createTransaction(kattrs, proc, catProc, procCallback, statsCollector, task, user, partition, backPressurePredicate)) {
             m_failedCount.incrementAndGet();
             return false;
         }

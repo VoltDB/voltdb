@@ -58,7 +58,6 @@ import org.voltdb.compiler.deploymentfile.FeatureNameType;
 import org.voltdb.compiler.deploymentfile.HeartbeatType;
 import org.voltdb.compiler.deploymentfile.HttpdType;
 import org.voltdb.compiler.deploymentfile.HttpdType.Jsonapi;
-import org.voltdb.compiler.deploymentfile.HttpsType;
 import org.voltdb.compiler.deploymentfile.ImportConfigurationType;
 import org.voltdb.compiler.deploymentfile.ImportType;
 import org.voltdb.compiler.deploymentfile.KeyOrTrustStoreType;
@@ -74,6 +73,7 @@ import org.voltdb.compiler.deploymentfile.SecurityType;
 import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.compiler.deploymentfile.ServerImportEnum;
 import org.voltdb.compiler.deploymentfile.SnapshotType;
+import org.voltdb.compiler.deploymentfile.SslType;
 import org.voltdb.compiler.deploymentfile.SnmpType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType.Temptables;
@@ -255,7 +255,9 @@ public class VoltProjectBuilder {
     // be omitted from the deployment XML.
     int m_httpdPortNo = -1;
     boolean m_jsonApiEnabled = true;
-    boolean m_httpsEnabled = false;
+    boolean m_sslEnabled = false;
+    boolean m_sslExternal = false;
+
     String m_keystore;
     String m_keystorePassword;
     String m_certstore;
@@ -604,17 +606,21 @@ public class VoltProjectBuilder {
         m_jsonApiEnabled = enabled;
     }
 
-    public void setHttpsEnabled(final boolean enabled) {
-        m_httpsEnabled = enabled;
+    public void setSslEnabled(final boolean enabled) {
+        m_sslEnabled = enabled;
+    }
+
+    public void setSslExternal(final boolean enabled) {
+        m_sslExternal = enabled;
     }
 
     public void setKeyStoreInfo(final String path, final String password) {
-        m_keystore = path;
+        m_keystore = getResourcePath(path);
         m_keystorePassword = password;
     }
 
     public void setCertStoreInfo(final String path, final String password) {
-        m_certstore = path;
+        m_certstore = getResourcePath(path);;
         m_certstorePassword = password;
     }
 
@@ -1121,6 +1127,23 @@ public class VoltProjectBuilder {
             }
         }
 
+        SslType ssl = factory.createSslType();
+        deployment.setSsl(ssl);
+        ssl.setEnabled(m_sslEnabled);
+        ssl.setExternal(m_sslExternal);
+        if (m_keystore!=null) {
+            KeyOrTrustStoreType store = factory.createKeyOrTrustStoreType();
+            store.setPath(m_keystore);
+            store.setPassword(m_keystorePassword);
+            ssl.setKeystore(store);
+        }
+        if (m_certstore!=null) {
+            KeyOrTrustStoreType store = factory.createKeyOrTrustStoreType();
+            store.setPath(m_certstore);
+            store.setPassword(m_certstorePassword);
+            ssl.setTruststore(store);
+        }
+
         // <httpd>. Disabled unless port # is configured by a testcase
         // Omit element(s) when null.
         HttpdType httpd = factory.createHttpdType();
@@ -1130,23 +1153,6 @@ public class VoltProjectBuilder {
         Jsonapi json = factory.createHttpdTypeJsonapi();
         httpd.setJsonapi(json);
         json.setEnabled(m_jsonApiEnabled);
-        if (m_httpsEnabled) {
-            HttpsType httpsType = factory.createHttpsType();
-            httpsType.setEnabled(m_httpsEnabled);
-            if (m_keystore!=null) {
-                KeyOrTrustStoreType store = factory.createKeyOrTrustStoreType();
-                store.setPath(m_keystore);
-                store.setPassword(m_keystorePassword);
-                httpsType.setKeystore(store);
-            }
-            if (m_certstore!=null) {
-                KeyOrTrustStoreType store = factory.createKeyOrTrustStoreType();
-                store.setPath(m_certstore);
-                store.setPassword(m_certstorePassword);
-                httpsType.setTruststore(store);
-            }
-            httpd.setHttps(httpsType);
-        }
 
         //SNMP
         SnmpType snmpType = factory.createSnmpType();
@@ -1363,6 +1369,11 @@ public class VoltProjectBuilder {
         List<String> result = m_diagnostics;
         m_diagnostics = null;
         return result;
+    }
+
+    private String getResourcePath(String resource) {
+        URL res = this.getClass().getResource(resource);
+        return res == null ? resource : res.getPath();
     }
 
 }
