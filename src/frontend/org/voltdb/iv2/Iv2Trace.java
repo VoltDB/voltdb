@@ -256,13 +256,14 @@ public class Iv2Trace
                 iv2log.error("FragmentTaskMessage SP HANDLE conflict.  Message: " + ftask.getSpHandle() +
                         ", locally held: " + spHandle);
             }
-            String logmsg = "%s %s from %s txnId %s spHandle %s trunc %s readonly %s";
+            String logmsg = "%s %s from %s txnId %s spHandle %s trunc %s readonly %s, batchindex %d";
             iv2log.trace(String.format(logmsg, label, CoreUtils.hsIdToString(localHSId),
                         CoreUtils.hsIdToString(ftask.m_sourceHSId),
                         txnIdToString(ftask.getTxnId()),
                         txnIdToString(spHandle),
                         txnIdToString(ftask.getTruncationHandle()),
-                        ftask.isReadOnly()));
+                        ftask.isReadOnly(),
+                        ftask.getCurrentBatchIndex()));
         }
     }
 
