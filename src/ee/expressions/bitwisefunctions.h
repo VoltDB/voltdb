@@ -14,6 +14,7 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
+#include <arpa/inet.h>
 #include <sstream>
 #include <string>
 #include <limits.h>
@@ -231,5 +232,158 @@ template<> inline NValue NValue::call<FUNC_VOLT_BIT_SHIFT_RIGHT>(const std::vect
     return getBigIntValue(result);
 }
 
+/**
+ * Given a 64-bit BIGINT value, translate the lower 32 bits of this
+ * value into the presentation format of an IPv4 address.  The upper
+ * 32 bits must be zero.  The lower 32 bits must be in the host byte
+ * order.  The translation is done with the library
+ * function inet_ntop.
+ */
+template<> inline NValue NValue::callUnary<FUNC_INET_NTOA>() const {
+    if (getValueType() != VALUE_TYPE_BIGINT) {
+        // The parser should enforce this for us, but just in case...
+        throw SQLException(SQLException::dynamic_sql_error, "Unsupported non-BIGINT type for SQL INET_NTOA function");
+    }
+
+    if (isNull()) {
+        return getNullStringValue();
+    }
+    // Get the bigint value and mask off the
+    // top and bottom half.
+    const uint64_t mask32 = (1L << 32)-1;
+    uint64_t v = getBigInt();
+    struct in_addr addr;
+    // We've got a number in our host byte format.
+    // We want to store in an address structure so
+    // that inet_ntop can work on it.  This needs to be
+    // in the network byte order.  So we translate it
+    // using htonl.
+    addr.s_addr = htonl(v & mask32);
+    // Save space for the address string,
+    // plus one more for a null terminator.
+    char answer[INET_ADDRSTRLEN + 1];
+    answer[sizeof(answer)-1] = 0;
+    if (inet_ntop(AF_INET, &addr, answer, sizeof(answer)) == 0) {
+        throw SQLException(SQLException::dynamic_sql_error,
+                           errno,
+                           "INET_NTOA Conversion error");
+    }
+    return getTempStringValue(answer, strlen(answer));
+}
+
+/**
+ * Given a string containing the presentation format of an IPv4 address, return the
+ * address as a BIGINT value.  The address is in the lower 32 bit of
+ * the 64 bit BIGINT value, and the upper 32 bits will be zero.  The
+ * number will be in the host byte order.  If the string
+ * cannot be parsed, throw a SQLException.  Note that this is
+ * the inverse of FUNC_INET_NTOA.  The translation is done
+ * using inet_pton.  See the manual page for inet_pton(3) for
+ * restrictions on the function.
+ */
+template<> inline NValue NValue::callUnary<FUNC_INET_ATON>() const {
+    if (getValueType() != VALUE_TYPE_VARCHAR) {
+        throw SQLException(SQLException::dynamic_sql_error, "Unsupported non-VARCHAR type for SQL INET_ATON function");
+    }
+    if (isNull()) {
+        return getNullValue(VALUE_TYPE_BIGINT);
+    }
+
+    in_addr addr;
+    int32_t addrlen;
+    const char *addr_str = getObject_withoutNull(&addrlen);
+    if (INET_ADDRSTRLEN < addrlen) {
+        std::stringstream sb;
+        sb << "Address string for INET_ATON is too long to be an IPv4 address: "
+           << addrlen;
+        throw SQLException(SQLException::dynamic_sql_error, sb.str().c_str());
+    }
+    // We have to copy this to null terminate it.
+    char addrbuf[INET_ADDRSTRLEN + 1];
+    memcpy(addrbuf, addr_str, addrlen);
+    addrbuf[addrlen] = 0;
+    // Let inet_pton do the validation.
+    if (inet_pton(AF_INET, (const char *)addrbuf, (void *) &(addr)) == 0) {
+        std::stringstream sb;
+        sb << "Unrecognized format for IPv4 address string: <"
+           << addrbuf
+           << ">";
+        throw SQLException(SQLException::dynamic_sql_error, sb.str().c_str());
+    }
+    return NValue::getBigIntValue(static_cast<int64_t>(ntohl(addr.s_addr)));
+}
+
+/**
+ * Given a VARBINARY value containing an IPv6 address in network byte order,
+ * convert the address to presentation form using inet_ntop.  The input should
+ * be a 16 byte varbinary value.  This is the inverse of the function INET6_ATON
+ * below.
+ */
+template<> inline NValue NValue::callUnary<FUNC_INET6_NTOA>() const {
+    if (getValueType() != VALUE_TYPE_VARBINARY) {
+        throw SQLException(SQLException::dynamic_sql_error, "Unsupported non-VARBINARY type for SQL INET6_NTOA function");
+    }
+    if (isNull()) {
+        return getNullValue(VALUE_TYPE_VARCHAR);
+    }
+    int32_t addr_len;
+    const in6_addr *addr = (const in6_addr *)getObject_withoutNull(&addr_len);
+    if (addr_len != sizeof(in6_addr)) {
+        std::stringstream sb;
+        sb << "VARBINARY value is the wrong size to hold an IPv6 address: "
+           << addr_len;
+        throw SQLException(SQLException::dynamic_sql_error, sb.str().c_str());
+    }
+    // Save enough space for the address string plus a
+    // trailing null terminator.
+    char dest[INET6_ADDRSTRLEN + 1];
+    dest[sizeof(dest) - 1] = 0;
+    if (inet_ntop(AF_INET6, (const void *)addr, dest, sizeof(dest)) == 0) {
+        throw SQLException(SQLException::dynamic_sql_error,
+                           errno,
+                           "INET6_NTOA Conversion error");
+    }
+    return getTempStringValue(dest, strlen(dest));
+}
+
+/**
+ * Given a string representing an IPv6 address, return the
+ * address as a VARBINARY.  The address will be represented as
+ * host format IPv6 adress.  This is a sequence of 8 bit
+ * less significant bits in the output.
+ */
+template<> inline NValue NValue::callUnary<FUNC_INET6_ATON>() const {
+    if (getValueType() != VALUE_TYPE_VARCHAR) {
+        throw SQLException(SQLException::dynamic_sql_error, "Unsupported non-VARCHAR type for SQL INET6_ATON function");
+    }
+    if (isNull()) {
+        return getNullValue(VALUE_TYPE_VARBINARY);
+    }
+
+    int32_t addrlen;
+    const char *addr_str = getObject_withoutNull(&addrlen);
+    if (INET6_ADDRSTRLEN < addrlen) {
+        std::stringstream sb;
+        sb << "INET6_ATON: Argument string is too long to be an IPv6 address: "
+           << addrlen;
+        throw SQLException(SQLException::dynamic_sql_error, sb.str().c_str());
+    }
+    // Copy the string out to cbuff so we can
+    // null terminate it for inet_pton.
+    char cbuff[INET6_ADDRSTRLEN + 1];
+    memcpy(cbuff, addr_str, addrlen);
+    cbuff[addrlen] = 0;
+    in6_addr addr;
+    // Let inet_pton do the validation.
+    if (inet_pton(AF_INET6, cbuff, (void*)&addr) == 0) {
+        std::stringstream sb;
+        sb << "Unrecognized format for IPv6 address string <"
+           << cbuff
+           << ">";
+        throw SQLException(SQLException::dynamic_sql_error, sb.str().c_str());
+    }
+    return NValue::getAllocatedValue(VALUE_TYPE_VARBINARY,
+                                     (const char*) &addr, sizeof(addr), getTempStringPool());
+}
 
 }
