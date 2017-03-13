@@ -110,17 +110,17 @@ public class TestSqlInsertSuite extends RegressionSuite {
         // clean-up R1
         validateTableOfLongs(client, "delete from r1;", new long[][] {{1}});
         validateTableOfLongs(client, "insert into r1 (ccc, bbb, aaa, zzz, yyy, xxx) " +
-                "select (select max(ccc) from r2), 3, 3, 3, 3, 3 from r2;",
+                "select (select max(aaa) from r2), 3, 3, 3, 3, 3 from r2;",
                 new long[][] {{2}});
-        expected = new long[][] {{2}, {2}};
+        expected = new long[][] {{4}, {4}};
         validateTableOfLongs(client, "select ccc from r1 order by ccc", expected);
 
         // clean-up R1
         validateTableOfLongs(client, "delete from r1;", new long[][] {{2}});
         validateTableOfLongs(client, "insert into r1 (ccc, bbb, aaa, zzz, yyy, xxx) " +
-                "values ((select max(ccc) from r2), 3, 3, 3, 3, 3);",
+                "values ((select max(aaa) from r2), 3, 3, 3, 3, 3);",
                 new long[][] {{1}});
-        expected = new long[][] {{2}};
+        expected = new long[][] {{4}};
         validateTableOfLongs(client, "select ccc from r1 order by ccc", expected);
 
         // clean-up R1
