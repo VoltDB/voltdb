@@ -99,6 +99,7 @@ public final class StatementStats {
         long retval = m_workerTask.m_lastTotalTimedExecutionTime;
         m_workerTask.m_lastTotalTimedExecutionTime = m_workerTask.m_totalTimedExecutionTime;
         if (m_coordinatorTask != null) {
+            retval += m_coordinatorTask.m_lastTotalTimedExecutionTime;
             m_coordinatorTask.m_lastTotalTimedExecutionTime = m_coordinatorTask.m_totalTimedExecutionTime;
         }
         return retval;
@@ -167,9 +168,6 @@ public final class StatementStats {
     }
 
     public int getMinResultSize() {
-        if (isCoordinatorStatsUsable(false)) {
-            return m_coordinatorTask.m_minResultSize;
-        }
         return m_workerTask.m_minResultSize;
     }
 
@@ -178,16 +176,12 @@ public final class StatementStats {
         int retval = m_workerTask.m_incrMinResultSize;
         m_workerTask.m_incrMinResultSize = Integer.MAX_VALUE;
         if (isCoordinatorStatsUsable(true)) {
-            retval = m_coordinatorTask.m_incrMinResultSize;
             m_coordinatorTask.m_incrMinResultSize = Integer.MAX_VALUE;
         }
         return retval;
     }
 
     public int getMaxResultSize() {
-        if (isCoordinatorStatsUsable(false)) {
-            return m_coordinatorTask.m_maxResultSize;
-        }
         return m_workerTask.m_maxResultSize;
     }
 
@@ -195,16 +189,12 @@ public final class StatementStats {
         int retval = m_workerTask.m_incrMaxResultSize;
         m_workerTask.m_incrMaxResultSize = Integer.MIN_VALUE;
         if (isCoordinatorStatsUsable(true)) {
-            retval = m_coordinatorTask.m_incrMaxResultSize;
             m_coordinatorTask.m_incrMaxResultSize = Integer.MIN_VALUE;
         }
         return retval;
     }
 
     public long getTotalResultSize() {
-        if (isCoordinatorStatsUsable(false)) {
-            return m_coordinatorTask.m_totalResultSize;
-        }
         return m_workerTask.m_totalResultSize;
     }
 
@@ -212,7 +202,6 @@ public final class StatementStats {
         long retval = m_workerTask.m_lastTotalResultSize;
         m_workerTask.m_lastTotalResultSize = m_workerTask.m_totalResultSize;
         if (isCoordinatorStatsUsable(true)) {
-            retval = m_coordinatorTask.m_lastTotalResultSize;
             m_coordinatorTask.m_lastTotalResultSize = m_coordinatorTask.m_totalResultSize;
         }
         return retval;

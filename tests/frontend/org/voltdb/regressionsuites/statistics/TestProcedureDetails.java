@@ -49,6 +49,14 @@ public class TestProcedureDetails extends RegressionSuite {
         private String m_nameOfProcedureToCall;
         private String m_argString;
         private boolean m_expectsException;
+        private boolean m_singlePartition;
+        private boolean m_abort;
+        private boolean m_failure;
+        private long m_workingPartition = 0;
+        private int m_insertCount = 1;
+        private int m_updateCount = 1;
+        private int m_deleteCount = 1;
+        private int m_selectCount = 0;
 
         static final int m_singlePartitionMask = 1 << 4;
         static final int m_option2BATCHMask = 1 << 3;
@@ -59,11 +67,11 @@ public class TestProcedureDetails extends RegressionSuite {
 
         public ProcedureDetailTestConfig(int configValue) {
             boolean twoBatch = (configValue & m_option2BATCHMask) > 0;
-            boolean readwrite = (configValue & m_optionRWMask) > 0;
-            boolean singlePartition = (configValue & m_singlePartitionMask) > 0;
-            boolean failure = (configValue & m_optionFAILMask) > 0;
-            boolean abort = (configValue & m_optionABORTMask) > 0;
-            if (singlePartition) {
+            boolean readWrite = (configValue & m_optionRWMask) > 0;
+            m_singlePartition = (configValue & m_singlePartitionMask) > 0;
+            m_failure = (configValue & m_optionFAILMask) > 0;
+            m_abort = (configValue & m_optionABORTMask) > 0;
+            if (m_singlePartition) {
                 // Run the single partition procedure.
                 m_nameOfProcedureToCall = "ProcedureDetailTestSP";
             }
@@ -71,26 +79,37 @@ public class TestProcedureDetails extends RegressionSuite {
                 // Run the multi-partition procedure.
                 m_nameOfProcedureToCall = "ProcedureDetailTestMP";
             }
-            StringBuilder argBuilder = new StringBuilder();
-            if (twoBatch) {
-                argBuilder.append("twobatch ");
-            }
-            if (readwrite) {
-                argBuilder.append("readwrite ");
-            }
-            if (failure) {
-                argBuilder.append("failure ");
-            }
-            if (abort) {
-                argBuilder.append("abort ");
-            }
-            m_argString = argBuilder.toString();
             // If both "abort" and "twobatch" are present, the abort exception in the first
             // batch will be handled so that the second batch can still run.
             // But if the first batch in a multi-partition procedure failed, the procedure will abort
             // anyway even if the exception is being handled:
             // Multi-partition procedure xxx attempted to execute new batch after hitting EE exception in a previous batch
-            m_expectsException = failure || (abort && ! (singlePartition && twoBatch));
+            m_expectsException = m_failure || (m_abort && ! (m_singlePartition && twoBatch));
+            StringBuilder argBuilder = new StringBuilder();
+            if (twoBatch) {
+                argBuilder.append("twobatch ");
+                if (! m_expectsException) {
+                    m_insertCount++;
+                    m_deleteCount++;
+                    m_updateCount++;
+                    if (readWrite) {
+                        m_selectCount++;
+                    }
+                }
+            }
+            if (readWrite) {
+                argBuilder.append("readwrite ");
+                m_selectCount++;
+            }
+            if (m_failure) {
+                argBuilder.append("failure ");
+            }
+            if (m_abort) {
+                argBuilder.append("abort ");
+                m_insertCount++;
+                m_deleteCount--;
+            }
+            m_argString = argBuilder.toString();
         }
 
         public String getNameOfProcedureToCall() {
@@ -104,10 +123,129 @@ public class TestProcedureDetails extends RegressionSuite {
         public boolean expectsException() {
             return m_expectsException;
         }
+
+        public boolean hasStatementFailure() {
+            return m_abort;
+        }
+
+        public boolean hasProcedureFailure() {
+            return m_failure;
+        }
+
+        public boolean isSinglePartition() {
+            return m_singlePartition;
+        }
+
+        public long getWorkingPartition() {
+            return m_workingPartition;
+        }
+
+        public void setWorkingPartition(long value) {
+            m_workingPartition = value;
+        }
+
+        public int getInsertCount() {
+            return m_insertCount;
+        }
+
+        public int getUpdateCount() {
+            return m_updateCount;
+        }
+
+        public int getDeleteCount() {
+            return m_deleteCount;
+        }
+
+        public int getSelectCount() {
+            return m_selectCount;
+        }
     }
 
-    private void validateProcedureDetail(ProcedureDetailTestConfig testConfig, VoltTable procedureDetail) {
+    private void trivialVerification(VoltTable procedureDetail) {
+        assertTrue(procedureDetail.getLong("TIMESTAMP") > 0);
+        assertTrue(procedureDetail.getLong("MIN_EXECUTION_TIME") > 0);
+        assertTrue(procedureDetail.getLong("MAX_EXECUTION_TIME") > 0);
+        assertTrue(procedureDetail.getLong("AVG_EXECUTION_TIME") > 0);
+        assertTrue(procedureDetail.getLong("MIN_RESULT_SIZE") >= 0);
+        assertTrue(procedureDetail.getLong("MAX_RESULT_SIZE") >= 0);
+        assertTrue(procedureDetail.getLong("AVG_RESULT_SIZE") >= 0);
+        assertTrue(procedureDetail.getLong("MIN_PARAMETER_SET_SIZE") >= 0);
+        assertTrue(procedureDetail.getLong("MAX_PARAMETER_SET_SIZE") >= 0);
+        assertTrue(procedureDetail.getLong("AVG_PARAMETER_SET_SIZE") >= 0);
+    }
 
+    private void verifyRowsForStatement(String stmtName, long expectedInvocationCount,
+                        ProcedureDetailTestConfig testConfig, VoltTable procedureDetail) {
+        for (long i = 0; i < 4; i++) {
+            assertTrue(procedureDetail.advanceRow());
+            trivialVerification(procedureDetail);
+            long hostId = procedureDetail.getLong("HOST_ID");
+            long siteId = procedureDetail.getLong("SITE_ID");
+            long partitionId = procedureDetail.getLong("PARTITION_ID");
+            assertEquals(hostId * 2 + siteId, partitionId);
+            assertEquals(procedureDetail.getLong("INVOCATIONS"), expectedInvocationCount);
+            assertEquals(procedureDetail.getLong("TIMED_INVOCATIONS"), expectedInvocationCount);
+            assertEquals(procedureDetail.getLong("ABORTS"), 0);
+            if (stmtName.equals("anInsert") && testConfig.hasStatementFailure()) {
+                assertEquals(procedureDetail.getLong("FAILURES"), 1);
+            }
+            else {
+                assertEquals(procedureDetail.getLong("FAILURES"), 0);
+            }
+
+            if (testConfig.isSinglePartition()) {
+                assertEquals(partitionId, testConfig.getWorkingPartition());
+                assertEquals(procedureDetail.getString("PROCEDURE"),
+                        "org.voltdb_testprocs.regressionsuites.proceduredetail.ProcedureDetailTestSP");
+                break;
+            }
+            assertEquals(procedureDetail.getString("PROCEDURE"),
+                    "org.voltdb_testprocs.regressionsuites.proceduredetail.ProcedureDetailTestMP");
+        }
+    }
+
+    private void verifyProcedureDetailResult(ProcedureDetailTestConfig testConfig, VoltTable procedureDetail) {
+        assertNotNull(procedureDetail);
+        procedureDetail.resetRowPosition();
+
+        assertTrue(procedureDetail.advanceRow());
+        // The first row is the <ALL> row.
+        trivialVerification(procedureDetail);
+        long hostId = procedureDetail.getLong("HOST_ID");
+        long siteId = procedureDetail.getLong("SITE_ID");
+        long partitionId = procedureDetail.getLong("PARTITION_ID");
+        if (testConfig.isSinglePartition()) {
+            assertEquals(procedureDetail.getString("PROCEDURE"),
+                    "org.voltdb_testprocs.regressionsuites.proceduredetail.ProcedureDetailTestSP");
+            assertEquals(hostId * 2 + siteId, partitionId);
+            // See which partition this query went to.
+            testConfig.setWorkingPartition(partitionId);
+        }
+        else {
+            assertEquals(procedureDetail.getString("PROCEDURE"),
+                    "org.voltdb_testprocs.regressionsuites.proceduredetail.ProcedureDetailTestMP");
+            assertEquals(hostId, 0);
+            assertEquals(siteId, 2);
+            assertEquals(partitionId, 16383);
+        }
+        assertEquals(procedureDetail.getString("STATEMENT"), "<ALL>");
+        assertEquals(procedureDetail.getLong("INVOCATIONS"), 1);
+        assertEquals(procedureDetail.getLong("TIMED_INVOCATIONS"), 1);
+        assertEquals(procedureDetail.getLong("FAILURES"), testConfig.hasProcedureFailure() ? 1 : 0);
+        if (testConfig.expectsException() && ! testConfig.hasProcedureFailure()) {
+            assertEquals(procedureDetail.getLong("ABORTS"), 1);
+        }
+        else {
+            assertEquals(procedureDetail.getLong("ABORTS"), 0);
+        }
+        if (testConfig.getDeleteCount() > 0) {
+            verifyRowsForStatement("aDelete", testConfig.getDeleteCount(), testConfig, procedureDetail);
+        }
+        if (testConfig.getSelectCount() > 0) {
+            verifyRowsForStatement("aSelect", testConfig.getSelectCount(), testConfig, procedureDetail);
+        }
+        verifyRowsForStatement("anInsert", testConfig.getInsertCount(), testConfig, procedureDetail);
+        verifyRowsForStatement("anUpdate", testConfig.getUpdateCount(), testConfig, procedureDetail);
     }
 
     public void testProcedureDetail() throws Exception {
@@ -120,6 +258,7 @@ public class TestProcedureDetails extends RegressionSuite {
             System.out.println("\n========================================================================================");
             System.out.println(String.format("exec %s %d '%s'", testConfig.getNameOfProcedureToCall(),
                     configValue, testConfig.getArgumentString()));
+            boolean caughtException = false;
             try {
                 client.callProcedure(testConfig.getNameOfProcedureToCall(),
                                      configValue, testConfig.getArgumentString());
@@ -129,23 +268,21 @@ public class TestProcedureDetails extends RegressionSuite {
                     throw pce;
                 }
                 System.out.println("\nCaught exception as expected:\n" + pce.getMessage());
-                continue;
+                caughtException = true;
             }
             finally {
                 // Note that pass 1 as the second parameter to get incremental statistics.
                 VoltTable procedureDetail = client.callProcedure("@Statistics", "PROCEDUREDETAIL", 1).getResults()[0];
                 System.out.println(procedureDetail.toFormattedString());
-                validateProcedureDetail(testConfig, procedureDetail);
+                verifyProcedureDetailResult(testConfig, procedureDetail);
             }
             // The test configuration says an exception is expected, but we did not get it.
-            if (testConfig.expectsException()) {
+            if (testConfig.expectsException() && ! caughtException) {
                 fail(String.format("Expects an exception from exec %s %d '%s', but did not get it.",
                         testConfig.getNameOfProcedureToCall(),
                         configValue, testConfig.getArgumentString()));
             }
         }
-        VoltTable procedureDetail = client.callProcedure("@Statistics", "PROCEDUREDETAIL", 0).getResults()[0];
-//        System.out.println(procedureDetail.toFormattedString());
     }
 
     /**
