@@ -41,7 +41,7 @@ public class ProcedureStatsCollector extends SiteStatsSource {
     /**
      * Record statistics of procedure statement execution every N procedure invocations.
      */
-    private int m_stmtSamplingInterval = 100;
+    private int m_stmtSamplingInterval = 200;
 
     protected void setProcSamplingInterval(int timeCollectionInterval) {
         m_procSamplingInterval = timeCollectionInterval;
