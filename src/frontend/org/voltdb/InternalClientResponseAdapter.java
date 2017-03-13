@@ -66,8 +66,6 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
         public InternalConnectionContext getInternalContext();
     }
 
-    public final Semaphore m_permits =
-        new Semaphore(Integer.getInteger("INTERNAL_MAX_PENDING_TRANSACTION_PER_PARTITION", 500));
     private final long m_connectionId;
     private final AtomicLong m_handles = new AtomicLong();
     private final AtomicLong m_failures = new AtomicLong(0);
