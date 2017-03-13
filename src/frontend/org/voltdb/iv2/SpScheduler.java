@@ -189,7 +189,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         m_snapMonitor.addInterest(this);
     }
 
-    //@Override
     @Override
     public void setMaxSeenTxnId(long maxSeenTxnId)
     {
@@ -439,7 +438,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
              * it does looser tracking of client handles since it can't be
              * partitioned from the local replica.
              */
-            if (!m_isLeader && !isSpiBalanceRequested() &&
+            //if (!m_isLeader && !isSpiBalanceRequested() &&
+            if (!m_isLeader &&
                     CoreUtils.getHostIdFromHSId(msg.getInitiatorHSId()) !=
                     CoreUtils.getHostIdFromHSId(m_mailbox.getHSId())) {
                 VoltDB.crashLocalVoltDB("Only allowed to do short circuit reads locally", true, null);
@@ -577,7 +577,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         final boolean shortcutRead = msg.isReadOnly() && (m_defaultConsistencyReadLevel == ReadLevel.FAST);
         final String procedureName = msg.getStoredProcedureName();
         final SpProcedureTask task =
-            new SpProcedureTask(m_mailbox, procedureName, m_pendingTasks, msg, m_isLeader);
+            new SpProcedureTask(m_mailbox, procedureName, m_pendingTasks, msg);
         if (!shortcutRead) {
             ListenableFuture<Object> durabilityBackpressureFuture =
                     m_cl.log(msg, msg.getSpHandle(), null, m_durabilityListener, task);
@@ -711,7 +711,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
             if (m_defaultConsistencyReadLevel == ReadLevel.SAFE) {
                 // InvocationDispatcher routes SAFE reads to SPI only
-                assert(m_isLeader || (!message.wasCreatedFromLeader() && isSpiBalanceRequested()));
+                //assert(m_isLeader || (!message.wasCreatedFromLeader() && isSpiBalanceRequested()));
                 assert(m_bufferedReadLog != null);
                 m_bufferedReadLog.offer(m_mailbox, message, m_repairLogTruncationHandle);
                 return;
@@ -794,8 +794,16 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     // doesn't matter, it isn't going to be used for anything.
     void handleFragmentTaskMessage(FragmentTaskMessage message)
     {
+        if (tmLog.isDebugEnabled()) {
+            tmLog.info("[SpScheduler]local site:" + CoreUtils.hsIdToString(m_mailbox.getHSId())
+                 + "MSG:" + message + " isLeader:" + m_isLeader
+                    );
+        }
         FragmentTaskMessage msg = message;
         long newSpHandle;
+
+        //TODO: there will be a race condition here. FragmentTaskMessage could arrive right in the middle
+        // of @BalanceSPI and the site sees the first fragment as leader but the site is marked as non-leader.
         if (m_isLeader) {
             // Quick hack to make progress...we need to copy the FragmentTaskMessage
             // before we start mucking with its state (SPHANDLE).  We need to revisit
@@ -859,6 +867,10 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             }
         }
         else {
+            if (tmLog.isDebugEnabled() && TxnEgo.getSequence(msg.getSpHandle())< TxnEgo.SEQUENCE_ZERO) {
+                tmLog.debug("INVALID SEQUENCE[handleFragmentTaskMessage]:" + msg + "\nisLeader:" + m_isLeader);
+            }
+
             newSpHandle = msg.getSpHandle();
             setMaxSeenTxnId(newSpHandle);
         }
@@ -1027,11 +1039,24 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     private void handleCompleteTransactionMessage(CompleteTransactionMessage message)
     {
         CompleteTransactionMessage msg = message;
+        TransactionState txn = m_outstandingTxns.get(msg.getTxnId());
 
-        //The initial message could intend to be sent to a leader
-        //But the site is marked as non-leader by @BalanceSPI
-        boolean checkBalanceSPI = (msg.getSpHandle() < 0 && !m_isLeader && m_spiBalanceRequested);
-        if (m_isLeader || checkBalanceSPI) {
+        if (tmLog.isDebugEnabled()) {
+            tmLog.debug("[SpScheduler]local site:" + CoreUtils.hsIdToString(m_mailbox.getHSId())
+                  + " MSG: " + msg + "\nTxn:" + (txn != null ? txn.getNotice() : "") + "\nisLeader:" + m_isLeader
+                   );
+        }
+
+        // The site has not seen any fragment of the transaction yet but has been marked
+        // as non-leader. Nothing to process.
+        if (!m_isLeader && txn == null && !message.requiresAck()) {
+            return;
+        }
+
+        // The site may have seen fragment messages in a multiple-part transaction but it has been marked as non-leader.
+        // In this case, The transaction is restarted, triggered either from mis-routed fragment or via master change repair process.
+        // This message is used to clean up the site before transaction restart.
+        if (m_isLeader || message.isRestartCleanup()) {
             msg = new CompleteTransactionMessage(m_mailbox.getHSId(), m_mailbox.getHSId(), message);
             // Set the spHandle so that on repair the new master will set the max seen spHandle
             // correctly
@@ -1042,16 +1067,20 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 m_mailbox.send(m_sendToHSIds, msg);
             }
         } else {
+            if (tmLog.isDebugEnabled() && TxnEgo.getSequence(msg.getSpHandle())< TxnEgo.SEQUENCE_ZERO) {
+                tmLog.debug("INVALID SEQUENCE:" + msg + "\nTxn:" + (txn != null ? txn.getNotice() : "") + "\nisLeader:" + m_isLeader);
+            }
             setMaxSeenTxnId(msg.getSpHandle());
         }
-        TransactionState txn = m_outstandingTxns.get(msg.getTxnId());
+
         // We can currently receive CompleteTransactionMessages for multipart procedures
         // which only use the buddy site (replicated table read).  Ignore them for
         // now, fix that later.
         if (txn != null)
         {
             final boolean isSysproc = ((FragmentTaskMessage) txn.getNotice()).isSysProcTask();
-            if (!checkBalanceSPI && m_sendToHSIds.length > 0 && !msg.isRestart() && (!msg.isReadOnly() || isSysproc)) {
+            if (m_sendToHSIds.length > 0 && !msg.isRestart() && (!msg.isReadOnly() || isSysproc)) {
+
                 DuplicateCounter counter;
                 counter = new DuplicateCounter(msg.getCoordinatorHSId(),
                                                msg.getTxnId(),

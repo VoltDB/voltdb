@@ -31,8 +31,10 @@ import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
+import org.voltdb.RealVoltDB;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
+import org.voltdb.exceptions.TransactionRestartException;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.DummyTransactionTaskMessage;
 import org.voltdb.messaging.DumpMessage;
@@ -321,6 +323,7 @@ public class InitiatorMailbox implements Mailbox
             if (checkMisroutedIv2IntiateTaskMessage((Iv2InitiateTaskMessage)message)) {
                 return;
             }
+            handleSPIBalanceIfRequested((Iv2InitiateTaskMessage)message);
         } else if (message instanceof FragmentTaskMessage) {
             if (checkMisroutedFragmentTaskMessage((FragmentTaskMessage)message)) {
                 return;
@@ -333,11 +336,38 @@ public class InitiatorMailbox implements Mailbox
         }
     }
 
+    private void handleSPIBalanceIfRequested(Iv2InitiateTaskMessage msg) {
+
+        if (!"@BalanceSPI".equals(msg.getStoredProcedureName())) {
+            return;
+        }
+
+        final Object[] params = msg.getParameters();
+        int pid = Integer.parseInt(params[1].toString());
+        if (pid != m_partitionId) {
+            tmLog.warn(String.format("@BalanceSPI executed at a wrong partition %d for partition %d.", m_partitionId, pid));
+            return;
+        }
+
+        RealVoltDB db = (RealVoltDB)VoltDB.instance();
+        int hostId = Integer.parseInt(params[2].toString());
+        Long newLeaderHSId = db.getCartograhper().getHSIDForPartitionHost(hostId, pid);
+        if (newLeaderHSId == m_hsId) {
+            tmLog.warn(String.format("@BalanceSPI the partition leader is already on the host %d.", hostId));
+            return;
+        }
+
+        startSPIMigration(pid, newLeaderHSId);
+        if (tmLog.isDebugEnabled()) {
+            tmLog.debug(VoltZK.debugLeadersInfo(m_messenger.getZK()));
+        }
+    }
+
     // if the SPI migration has been requested, the site will be immediately treated as non-leader
     // all the requests will be sent back to the sender if these requests are intended for leader
     // These transactions will be restarted.
     private boolean checkMisroutedIv2IntiateTaskMessage(Iv2InitiateTaskMessage message) {
-        if (!m_scheduler.isSpiBalanceRequested() || message.toReplica() || message.isReadOnly()) {
+        if (m_scheduler.isLeader() || message.toReplica()) {
             return false;
         }
         InitiateResponseMessage response = new InitiateResponseMessage(message);
@@ -352,11 +382,13 @@ public class InitiatorMailbox implements Mailbox
     // all the requests will be sent back to the sender if these requests are intended for leader
     // These transactions will be restarted.
     private boolean checkMisroutedFragmentTaskMessage(FragmentTaskMessage message) {
-        if (!m_scheduler.isSpiBalanceRequested() || message.toReplica() || message.isReadOnly()) {
+        if (m_scheduler.isLeader() || message.toReplica() || message.getCurrentBatchIndex() > 0) {
             return false;
         }
         FragmentResponseMessage response = new FragmentResponseMessage(message, getHSId());
-        response.setStatus(FragmentResponseMessage.USER_ERROR, null);
+        TransactionRestartException restart = new TransactionRestartException(
+                "Transaction being restarted due to SPI migration.", message.getTxnId());
+        response.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, restart);
         response.m_sourceHSId = getHSId();
         Iv2Trace.logMisroutedFragmentTaskMessage(message, getHSId());
         deliver(response);
@@ -365,9 +397,6 @@ public class InitiatorMailbox implements Mailbox
 
     // start the process of appointing a new leader for the partition
     public void startSPIMigration(int partition, long newHSID) {
-        tmLog.info("[InitiatorMailbox] starting Balance SPI for partition " + partition + " to " +
-                    CoreUtils.hsIdToString(newHSID));
-
         LeaderCache leaderAppointee = new LeaderCache(m_messenger.getZK(), VoltZK.iv2appointees);
         try {
             leaderAppointee.start(true);
@@ -380,9 +409,10 @@ public class InitiatorMailbox implements Mailbox
             } catch (InterruptedException e) {
             }
         }
-        m_scheduler.setSpiBalanceRequested(true);
         m_scheduler.m_isLeader = false;
         m_repairLog.setLeaderState(false);
+        tmLog.info("[InitiatorMailbox] starting Balance SPI for partition " + partition + " to " +
+                CoreUtils.hsIdToString(newHSID) + ". isLeader:" + m_scheduler.m_isLeader);
     }
 
     @Override

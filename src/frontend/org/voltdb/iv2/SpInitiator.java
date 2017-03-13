@@ -56,7 +56,6 @@ import com.google_voltpatches.common.collect.Sets;
 public class SpInitiator extends BaseInitiator implements Promotable
 {
     final private LeaderCache m_leaderCache;
-    private boolean m_isBalanceSPIRequested = false;
     private final TickProducer m_tickProducer;
     private boolean m_promoted = false;
     LeaderCache.Callback m_leadersChangeHandler = new LeaderCache.Callback()
@@ -76,8 +75,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
                 leaders.add(HSId);
                 if (HSId == getInitiatorHSId()){
                     if (!m_promoted) {
-                        m_isBalanceSPIRequested = entry.getValue().m_isBalanceSPIRequested;
-                        acceptPromotion();
+                        acceptPromotionImpl(entry.getValue().m_isBalanceSPIRequested);
                         m_promoted = true;
                     }
                     break;
@@ -165,7 +163,11 @@ public class SpInitiator extends BaseInitiator implements Promotable
     }
 
     @Override
-    public void acceptPromotion()
+    public void acceptPromotion() {
+        acceptPromotionImpl(false);
+    }
+
+    private void acceptPromotionImpl(boolean balanceSPI)
     {
         try {
             long startTime = System.currentTimeMillis();
@@ -191,7 +193,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
                 // term syslogs the start of leader promotion.
                 long txnid = Long.MIN_VALUE;
                 RepairAlgo repair =
-                        m_initiatorMailbox.constructRepairAlgo(m_term.getInterestingHSIds(), m_whoami, m_isBalanceSPIRequested);
+                        m_initiatorMailbox.constructRepairAlgo(m_term.getInterestingHSIds(), m_whoami, balanceSPI);
                 try {
                     RepairResult res = repair.start().get();
                     txnid = res.m_txnId;
@@ -209,7 +211,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
                     LeaderCacheWriter iv2masters = new LeaderCache(m_messenger.getZK(),
                             m_zkMailboxNode);
 
-                    if (m_isBalanceSPIRequested) {
+                    if (balanceSPI) {
                         String hsidStr = VoltZK.suffixHSIdsWithBalanceSPIRequest(m_initiatorMailbox.getHSId());
                         iv2masters.put(m_partitionId,hsidStr);
                         if (tmLog.isDebugEnabled()) {
@@ -230,14 +232,14 @@ public class SpInitiator extends BaseInitiator implements Promotable
                             + (System.currentTimeMillis() - startTime) + " ms. of "
                             + "trying. Retrying.");
                 }
-                m_scheduler.setSpiBalanceRequested(false);
+             //   m_scheduler.setSpiBalanceRequested(false);
             }
             // Tag along and become the export master too
             // leave the export on the former leader, now a replica
-            if (!m_isBalanceSPIRequested) {
+            if (!balanceSPI) {
                 ExportManager.instance().acceptMastership(m_partitionId);
             }
-            m_isBalanceSPIRequested = false;
+            //m_isBalanceSPIRequested = false;
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Terminally failed leader promotion.", true, e);
         }

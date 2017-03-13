@@ -81,9 +81,6 @@ abstract public class Scheduler implements InitiatorMessageHandler
     // helper class to put command log work in order
     protected final ReplaySequencer m_replaySequencer = new ReplaySequencer();
 
-    //used for SPI balance
-    protected boolean m_spiBalanceRequested = false;
-
     /*
      * This lock is extremely dangerous to use without known the pattern.
      * It is the intrinsic lock on the InitiatorMailbox. For an SpInitiator
@@ -206,12 +203,4 @@ abstract public class Scheduler implements InitiatorMessageHandler
     abstract public void enableWritingIv2FaultLog();
 
     abstract public boolean sequenceForReplay(VoltMessage m);
-
-    public boolean isSpiBalanceRequested() {
-        return m_spiBalanceRequested;
-    }
-
-    public void setSpiBalanceRequested(boolean status) {
-        m_spiBalanceRequested = status;
-    }
 }

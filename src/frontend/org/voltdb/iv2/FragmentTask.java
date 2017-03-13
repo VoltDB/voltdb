@@ -222,6 +222,19 @@ public class FragmentTask extends TransactionTask
         if (m_inputDeps != null) {
             siteConnection.stashWorkUnitDependencies(m_inputDeps);
         }
+        if (hostLog.isDebugEnabled()) {
+            hostLog.debug("[Fragment Task]START: input dependecy check:" + this);
+            if (m_inputDeps == null || m_inputDeps.isEmpty()){
+                hostLog.debug("[Fragment Task] No input dependency.");
+            } else {
+                for (List<VoltTable> vts : m_inputDeps.values()) {
+                    for (VoltTable vt : vts) {
+                        hostLog.debug("[Fragment Task]" + vt.toFormattedString());
+                    }
+                }
+            }
+            hostLog.debug("[Fragment Task]END: input dependecy check.");
+        }
 
         if (m_fragmentMsg.isEmptyForRestart()) {
             int outputDepId = m_fragmentMsg.getOutputDepId(0);
@@ -274,6 +287,9 @@ public class FragmentTask extends TransactionTask
                 // set up the batch context for the fragment set
                 siteConnection.setBatch(m_fragmentMsg.getCurrentBatchIndex());
 
+                if (hostLog.isDebugEnabled()) {
+                    hostLog.debug("[Fragment Task] dependency. sql text:" + stmtText + " input dep ids: " + inputDepId);
+                }
                 dependency = siteConnection.executePlanFragments(
                         1,
                         new long[] { fragmentId },

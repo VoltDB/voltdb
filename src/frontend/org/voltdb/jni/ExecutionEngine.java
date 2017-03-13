@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import org.apache.commons.lang.StringUtils;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
@@ -297,6 +298,13 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
                 return vtstack.pop();
             }
             else if (vtstack == null) {
+                if (hostLog.isDebugEnabled()) {
+                    String msg = "[ExecutionEngine] no tracked dependecy. partition:" + m_partitionId +
+                            ",site:" + CoreUtils.hsIdToString(m_siteId)+ ",sql:" + StringUtils.join(m_sqlTexts) +
+                            ",batch index:" + m_currentBatchIndex + ", proc name:" + m_currentProcedureName;
+                    hostLog.debug(msg);
+                }
+
                 assert(false) : "receive without associated tracked dependency.";
                 return null;
             }

@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.voltcore.logging.Level;
@@ -38,6 +39,7 @@ import org.voltdb.rejoin.TaskLog;
 import org.voltdb.utils.LogKeys;
 
 import com.google_voltpatches.common.collect.Maps;
+import com.google_voltpatches.common.collect.Sets;
 
 /**
  * Implements the Multi-partition procedure ProcedureTask.
@@ -46,7 +48,8 @@ import com.google_voltpatches.common.collect.Maps;
  */
 public class MpProcedureTask extends ProcedureTask
 {
-
+    //initiators before master changes
+    final List<Long> m_priorInitiatorHSIds = new ArrayList<Long>();
     final List<Long> m_initiatorHSIds = new ArrayList<Long>();
     // Need to store the new masters list so that we can update the list of masters
     // when we requeue this Task to for restart
@@ -68,6 +71,7 @@ public class MpProcedureTask extends ProcedureTask
         m_isRestart = isRestart;
         m_msg = msg;
         m_initiatorHSIds.addAll(pInitiators);
+        m_priorInitiatorHSIds.addAll(pInitiators);
         m_restartMasters.set(new ArrayList<Long>());
         m_restartMastersMap.set(new HashMap<Integer, Long>());
     }
@@ -79,6 +83,8 @@ public class MpProcedureTask extends ProcedureTask
      */
     public void updateMasters(List<Long> masters, Map<Integer, Long> partitionMasters)
     {
+        m_priorInitiatorHSIds.clear();
+        m_priorInitiatorHSIds.addAll(m_initiatorHSIds);
         m_initiatorHSIds.clear();
         m_initiatorHSIds.addAll(masters);
         ((MpTransactionState)getTransactionState()).updateMasters(masters, partitionMasters);
@@ -102,7 +108,10 @@ public class MpProcedureTask extends ProcedureTask
     @Override
     public void run(SiteProcedureConnection siteConnection)
     {
-        hostLog.debug("STARTING: " + this);
+        if ( hostLog.isDebugEnabled()) {
+            hostLog.debug("STARTING: " + this + "\nLeaders:" +
+                    CoreUtils.hsIdCollectionToString(m_initiatorHSIds));
+        }
         // Cast up. Could avoid ugliness with Iv2TransactionClass baseclass
         MpTransactionState txn = (MpTransactionState)m_txnState;
         // Check for restarting sysprocs
@@ -133,7 +142,10 @@ public class MpProcedureTask extends ProcedureTask
             completeInitiateTask(siteConnection);
             errorResp.m_sourceHSId = m_initiator.getHSId();
             m_initiator.deliver(errorResp);
-            hostLog.debug("SYSPROCFAIL: " + this);
+
+            if (hostLog.isDebugEnabled()) {
+                hostLog.debug("SYSPROCFAIL: " + this);
+            }
             return;
         }
 
@@ -152,7 +164,17 @@ public class MpProcedureTask extends ProcedureTask
                     m_msg.isForReplay());
 
             restart.setTruncationHandle(m_msg.getTruncationHandle());
-            m_initiator.send(com.google_voltpatches.common.primitives.Longs.toArray(m_initiatorHSIds), restart);
+            restart.setRestartCleanup(true);
+
+            //Any previous attempts on new masters are flushed. The old masters must also be flushed.
+            Set<Long> initiatorHSIDs = Sets.newHashSet();
+            initiatorHSIDs.addAll(m_priorInitiatorHSIds);
+            initiatorHSIDs.addAll(m_initiatorHSIds);
+            if (hostLog.isDebugEnabled()) {
+                hostLog.debug("[MpProcedureTask]send CompleteTransactionMessage to: " + CoreUtils.hsIdCollectionToString(initiatorHSIDs) +
+                        " for MP transaction cleanup.");
+            }
+            m_initiator.send(com.google_voltpatches.common.primitives.Longs.toArray(initiatorHSIDs), restart);
         }
         final InitiateResponseMessage response = processInitiateTask(txn.m_initiationMsg, siteConnection);
         // We currently don't want to restart read-only MP transactions because:
@@ -173,11 +195,14 @@ public class MpProcedureTask extends ProcedureTask
             response.m_sourceHSId = m_initiator.getHSId();
             m_initiator.deliver(response);
             execLog.l7dlog( Level.TRACE, LogKeys.org_voltdb_ExecutionSite_SendingCompletedWUToDtxn.name(), null);
-            hostLog.debug("COMPLETE: " + this);
-        }
-        else {
+            if (hostLog.isDebugEnabled()) {
+                hostLog.debug("[MpProcedureTask]COMPLETE: " + this);
+            }
+        } else {
             restartTransaction();
-            hostLog.debug("RESTART: " + this);
+            if (hostLog.isDebugEnabled()) {
+                hostLog.debug("[MpProcedureTask]RESTART: " + this);
+            }
         }
     }
 

@@ -990,6 +990,8 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
 
         if (m_isFinal)
             sb.append("\n  THIS IS THE FINAL TASK");
+        if (m_toReplica)
+            sb.append("\n  THIS IS SENT TO REPLICA");
 
         if (m_taskType == USER_PROC)
         {
@@ -1007,6 +1009,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         {
             sb.append("\n  UNKNOWN FRAGMENT TASK TYPE");
         }
+        sb.append("\nBatch index:" + m_currentBatchIndex + " Dep count:" + m_inputDepCount);
 
         if (m_emptyForRestart)
             sb.append("\n  THIS IS A NULL FRAGMENT TASK USED FOR RESTART");
