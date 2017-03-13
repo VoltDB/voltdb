@@ -131,4 +131,9 @@ public class TestFunctions extends PlannerTestCase {
         // This test comes from ENG-10749 and ENG-10750
         compile("SELECT SINCE_EPOCH(MICROSECOND, '1812-10-28 07:30:43') FROM ENG10749 WHERE '2080-05-24 11:18:38' <> TIME OR '4253-02-25 00:20:34' IS NULL;");
     }
+
+    public void testLongConstants() {
+        failToCompile("SELECT  LN(MOD(17004989843871566923468, MOD(10, -73))) FROM ENG12089",
+                      "Numeric conversion error to type BIGINT for input string: \"17004989843871566923468\"");
+    }
 }
