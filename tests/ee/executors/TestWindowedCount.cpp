@@ -102,7 +102,7 @@ const char *T_ColumnNames[] = {
     "B",
     "C",
 };
-const char *count_output_ColumnNames[] = {
+const char *COUNT_OUTPUT_ColumnNames[] = {
     "A",
     "B",
     "C",
@@ -118,7 +118,7 @@ const voltdb::ValueType T_Types[] = {
     voltdb::VALUE_TYPE_INTEGER,
     voltdb::VALUE_TYPE_INTEGER,
 };
-const voltdb::ValueType count_output_Types[] = {
+const voltdb::ValueType COUNT_OUTPUT_Types[] = {
     voltdb::VALUE_TYPE_INTEGER,
     voltdb::VALUE_TYPE_INTEGER,
     voltdb::VALUE_TYPE_INTEGER,
@@ -134,7 +134,7 @@ const int32_t T_Sizes[] = {
     4,
     4,
 };
-const int32_t count_output_Sizes[] = {
+const int32_t COUNT_OUTPUT_Sizes[] = {
     4,
     4,
     4,
@@ -149,8 +149,8 @@ const int32_t count_output_Sizes[] = {
 int32_t num_T_strings = 0;
 const char *T_Strings[] = {
 };
-int32_t num_count_output_strings = 0;
-const char *count_output_Strings[] = {
+int32_t num_COUNT_OUTPUT_strings = 0;
+const char *COUNT_OUTPUT_Strings[] = {
 };
 
 
@@ -179,7 +179,7 @@ const int TData[NUM_TABLE_ROWS_T * NUM_TABLE_COLS_T] = {
 
 const int NUM_TABLE_ROWS_COUNT_OUTPUT = 15;
 const int NUM_TABLE_COLS_COUNT_OUTPUT = 4;
-const int count_outputData[NUM_TABLE_ROWS_COUNT_OUTPUT * NUM_TABLE_COLS_COUNT_OUTPUT] = {
+const int COUNT_OUTPUTData[NUM_TABLE_ROWS_COUNT_OUTPUT * NUM_TABLE_COLS_COUNT_OUTPUT] = {
       1,  1,101,  2,
       1,  1,102,  2,
       1,  2,201,  4,
@@ -216,16 +216,16 @@ const TableConfig TConfig = {
     T_Strings,
     num_T_strings
 };
-const TableConfig count_outputConfig = {
-    "count_output",
-    count_output_ColumnNames,
-    count_output_Types,
-    count_output_Sizes,
+const TableConfig COUNT_OUTPUTConfig = {
+    "COUNT_OUTPUT",
+    COUNT_OUTPUT_ColumnNames,
+    COUNT_OUTPUT_Types,
+    COUNT_OUTPUT_Sizes,
     NUM_TABLE_ROWS_COUNT_OUTPUT,
     NUM_TABLE_COLS_COUNT_OUTPUT,
-    count_outputData,
-    count_output_Strings,
-    num_count_output_strings
+    COUNT_OUTPUTData,
+    COUNT_OUTPUT_Strings,
+    num_COUNT_OUTPUT_strings
 };
 
 
@@ -234,7 +234,7 @@ const TableConfig count_outputConfig = {
  */
 const TableConfig *allTables[] = {
     &TConfig,
-    &count_outputConfig,
+    &COUNT_OUTPUTConfig,
 };
 
 
@@ -451,7 +451,7 @@ TestConfig allTests[2] = {
         "        }\n"
         "    ]\n"
         "}",
-        &count_outputConfig
+        &COUNT_OUTPUTConfig
     },
     {
         // SQL Statement
@@ -678,7 +678,7 @@ TestConfig allTests[2] = {
         "        }\n"
         "    ]\n"
         "}",
-        &count_outputConfig
+        &COUNT_OUTPUTConfig
     },
 };
 
@@ -783,7 +783,6 @@ DBConfig TestWindowedCount::m_testDB =
     "  C integer,\n"
     "  R integer\n"
     ");\n"
-    "  \n"
     "",
     //
     // Catalog String

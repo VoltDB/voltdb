@@ -106,7 +106,7 @@ const char *T_ColumnNames[] = {
     "B",
     "C",
 };
-const char *test_output_ColumnNames[] = {
+const char *TEST_OUTPUT_ColumnNames[] = {
     "A",
     "B",
     "C",
@@ -121,7 +121,7 @@ const voltdb::ValueType T_Types[] = {
     voltdb::VALUE_TYPE_INTEGER,
     voltdb::VALUE_TYPE_INTEGER,
 };
-const voltdb::ValueType test_output_Types[] = {
+const voltdb::ValueType TEST_OUTPUT_Types[] = {
     voltdb::VALUE_TYPE_INTEGER,
     voltdb::VALUE_TYPE_INTEGER,
     voltdb::VALUE_TYPE_INTEGER,
@@ -136,7 +136,7 @@ const int32_t T_Sizes[] = {
     4,
     4,
 };
-const int32_t test_output_Sizes[] = {
+const int32_t TEST_OUTPUT_Sizes[] = {
     4,
     4,
     4,
@@ -150,8 +150,8 @@ const int32_t test_output_Sizes[] = {
 int32_t num_T_strings = 0;
 const char *T_Strings[] = {
 };
-int32_t num_test_output_strings = 0;
-const char *test_output_Strings[] = {
+int32_t num_TEST_OUTPUT_strings = 0;
+const char *TEST_OUTPUT_Strings[] = {
 };
 
 
@@ -195,7 +195,7 @@ const int TData[NUM_TABLE_ROWS_T * NUM_TABLE_COLS_T] = {
 
 const int NUM_TABLE_ROWS_TEST_OUTPUT = 30;
 const int NUM_TABLE_COLS_TEST_OUTPUT = 3;
-const int test_outputData[NUM_TABLE_ROWS_TEST_OUTPUT * NUM_TABLE_COLS_TEST_OUTPUT] = {
+const int TEST_OUTPUTData[NUM_TABLE_ROWS_TEST_OUTPUT * NUM_TABLE_COLS_TEST_OUTPUT] = {
       1,  1,  0,
       1,  1,  0,
       1,  1,  0,
@@ -247,16 +247,16 @@ const TableConfig TConfig = {
     T_Strings,
     num_T_strings
 };
-const TableConfig test_outputConfig = {
-    "test_output",
-    test_output_ColumnNames,
-    test_output_Types,
-    test_output_Sizes,
+const TableConfig TEST_OUTPUTConfig = {
+    "TEST_OUTPUT",
+    TEST_OUTPUT_ColumnNames,
+    TEST_OUTPUT_Types,
+    TEST_OUTPUT_Sizes,
     NUM_TABLE_ROWS_TEST_OUTPUT,
     NUM_TABLE_COLS_TEST_OUTPUT,
-    test_outputData,
-    test_output_Strings,
-    num_test_output_strings
+    TEST_OUTPUTData,
+    TEST_OUTPUT_Strings,
+    num_TEST_OUTPUT_strings
 };
 
 
@@ -265,7 +265,7 @@ const TableConfig test_outputConfig = {
  */
 const TableConfig *allTables[] = {
     &TConfig,
-    &test_outputConfig,
+    &TEST_OUTPUTConfig,
 };
 
 
@@ -487,7 +487,7 @@ TestConfig allTests[3] = {
         "        }\n"
         "    ]\n"
         "}",
-        &test_outputConfig
+        &TEST_OUTPUTConfig
     },
     {
         // SQL Statement
@@ -706,7 +706,7 @@ TestConfig allTests[3] = {
         "        }\n"
         "    ]\n"
         "}",
-        &test_outputConfig
+        &TEST_OUTPUTConfig
     },
     {
         // SQL Statement
@@ -925,7 +925,7 @@ TestConfig allTests[3] = {
         "        }\n"
         "    ]\n"
         "}",
-        &test_outputConfig
+        &TEST_OUTPUTConfig
     },
 };
 
@@ -1030,7 +1030,6 @@ DBConfig TestWindowedMin::m_testDB =
     "  C integer,\n"
     "  R integer\n"
     ");\n"
-    "  \n"
     "",
     //
     // Catalog String

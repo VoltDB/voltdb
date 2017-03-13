@@ -174,7 +174,7 @@ public class EEPlanTestGenerator extends EEPlanGenerator {
     private TableConfig makeCCC(Database db) {
         final TableConfig CCCConfig = new TableConfig("CCC",
                                                       db,
-                                                      10000000);
+                                                      10000);
         return CCCConfig;
     }
     public void generatedPlannerTest() throws Exception {

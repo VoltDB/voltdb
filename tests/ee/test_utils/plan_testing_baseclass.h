@@ -216,6 +216,12 @@ public:
                          const char                    **strings,
                          int                             num_strings) {
         voltdb::PersistentTable *pTable = getPersistentTableAndId(tableName.c_str(), tableId, table);
+        if (pTable == NULL) {
+            std::cout << "Cannot find table "
+                      << tableName
+                      << " in the schema."
+                      << std::endl;
+        }
         assert(pTable != NULL);
         std::cout << "Initializing table "
                   << tableName

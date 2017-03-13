@@ -98,7 +98,7 @@ const char *T_ColumnNames[] = {
     "B",
     "C",
 };
-const char *test_sum_output_ColumnNames[] = {
+const char *TEST_SUM_OUTPUT_ColumnNames[] = {
     "A",
     "B",
     "C",
@@ -113,7 +113,7 @@ const voltdb::ValueType T_Types[] = {
     voltdb::VALUE_TYPE_INTEGER,
     voltdb::VALUE_TYPE_INTEGER,
 };
-const voltdb::ValueType test_sum_output_Types[] = {
+const voltdb::ValueType TEST_SUM_OUTPUT_Types[] = {
     voltdb::VALUE_TYPE_INTEGER,
     voltdb::VALUE_TYPE_INTEGER,
     voltdb::VALUE_TYPE_INTEGER,
@@ -128,7 +128,7 @@ const int32_t T_Sizes[] = {
     4,
     4,
 };
-const int32_t test_sum_output_Sizes[] = {
+const int32_t TEST_SUM_OUTPUT_Sizes[] = {
     4,
     4,
     4,
@@ -142,8 +142,8 @@ const int32_t test_sum_output_Sizes[] = {
 int32_t num_T_strings = 0;
 const char *T_Strings[] = {
 };
-int32_t num_test_sum_output_strings = 0;
-const char *test_sum_output_Strings[] = {
+int32_t num_TEST_SUM_OUTPUT_strings = 0;
+const char *TEST_SUM_OUTPUT_Strings[] = {
 };
 
 
@@ -187,7 +187,7 @@ const int TData[NUM_TABLE_ROWS_T * NUM_TABLE_COLS_T] = {
 
 const int NUM_TABLE_ROWS_TEST_SUM_OUTPUT = 30;
 const int NUM_TABLE_COLS_TEST_SUM_OUTPUT = 3;
-const int test_sum_outputData[NUM_TABLE_ROWS_TEST_SUM_OUTPUT * NUM_TABLE_COLS_TEST_SUM_OUTPUT] = {
+const int TEST_SUM_OUTPUTData[NUM_TABLE_ROWS_TEST_SUM_OUTPUT * NUM_TABLE_COLS_TEST_SUM_OUTPUT] = {
       1,  1, 20,
       1,  1, 20,
       1,  1, 20,
@@ -239,16 +239,16 @@ const TableConfig TConfig = {
     T_Strings,
     num_T_strings
 };
-const TableConfig test_sum_outputConfig = {
-    "test_sum_output",
-    test_sum_output_ColumnNames,
-    test_sum_output_Types,
-    test_sum_output_Sizes,
+const TableConfig TEST_SUM_OUTPUTConfig = {
+    "TEST_SUM_OUTPUT",
+    TEST_SUM_OUTPUT_ColumnNames,
+    TEST_SUM_OUTPUT_Types,
+    TEST_SUM_OUTPUT_Sizes,
     NUM_TABLE_ROWS_TEST_SUM_OUTPUT,
     NUM_TABLE_COLS_TEST_SUM_OUTPUT,
-    test_sum_outputData,
-    test_sum_output_Strings,
-    num_test_sum_output_strings
+    TEST_SUM_OUTPUTData,
+    TEST_SUM_OUTPUT_Strings,
+    num_TEST_SUM_OUTPUT_strings
 };
 
 
@@ -257,7 +257,7 @@ const TableConfig test_sum_outputConfig = {
  */
 const TableConfig *allTables[] = {
     &TConfig,
-    &test_sum_outputConfig,
+    &TEST_SUM_OUTPUTConfig,
 };
 
 
@@ -471,7 +471,7 @@ TestConfig allTests[1] = {
         "        }\n"
         "    ]\n"
         "}",
-        &test_sum_outputConfig
+        &TEST_SUM_OUTPUTConfig
     },
 };
 
@@ -576,7 +576,6 @@ DBConfig TestWindowedSum::m_testDB =
     "  C integer,\n"
     "  R integer\n"
     ");\n"
-    "  \n"
     "",
     //
     // Catalog String

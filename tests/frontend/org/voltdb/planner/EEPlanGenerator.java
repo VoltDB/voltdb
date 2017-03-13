@@ -277,10 +277,8 @@ public class EEPlanGenerator extends PlannerTestCase {
         Table dbTable = db.getTables().get(tableName);
         assert(dbTable != null);
         ColumnConfig[] cols = new ColumnConfig[dbTable.getColumns().size()];
-        int idx = 0;
         for (Column col : dbTable.getColumns()) {
-            cols[idx] = new ColumnConfig(col);
-            idx += 1;
+            cols[col.getIndex()] = new ColumnConfig(col);
         }
         return new SchemaConfig(cols);
     }
@@ -301,6 +299,7 @@ public class EEPlanGenerator extends PlannerTestCase {
         public TableConfig(String tableName,
                            Database db,
                            Object[][] data) {
+            tableName = tableName.toUpperCase();
             SchemaConfig schema = makeSchemaConfig(tableName, db);
             m_tableName   = tableName;
             m_schema      = schema;
@@ -434,6 +433,7 @@ public class EEPlanGenerator extends PlannerTestCase {
         int m_rowCount;
     }
 
+    @Override
     protected Database getDatabase() {
         Database db = getCatalog().getClusters().get("cluster").getDatabases().get("database");
         return db;

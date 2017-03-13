@@ -112,20 +112,20 @@ const char *BBB_ColumnNames[] = {
     "C",
 };
 const char *CCC_ColumnNames[] = {
-    "DATA",
     "ID",
     "NAME",
+    "DATA",
 };
 const char *XXX_ColumnNames[] = {
-    "DATA",
     "ID",
     "NAME",
+    "DATA",
 };
-const char *test_order_by_ColumnNames[] = {
+const char *TEST_ORDER_BY_ColumnNames[] = {
     "A",
     "B",
 };
-const char *test_join_ColumnNames[] = {
+const char *TEST_JOIN_ColumnNames[] = {
     "A",
     "B",
     "C",
@@ -146,20 +146,20 @@ const voltdb::ValueType BBB_Types[] = {
     voltdb::VALUE_TYPE_INTEGER,
 };
 const voltdb::ValueType CCC_Types[] = {
-    voltdb::VALUE_TYPE_VARCHAR,
     voltdb::VALUE_TYPE_INTEGER,
+    voltdb::VALUE_TYPE_VARCHAR,
     voltdb::VALUE_TYPE_VARCHAR,
 };
 const voltdb::ValueType XXX_Types[] = {
-    voltdb::VALUE_TYPE_VARCHAR,
     voltdb::VALUE_TYPE_INTEGER,
     voltdb::VALUE_TYPE_VARCHAR,
+    voltdb::VALUE_TYPE_VARCHAR,
 };
-const voltdb::ValueType test_order_by_Types[] = {
+const voltdb::ValueType TEST_ORDER_BY_Types[] = {
     voltdb::VALUE_TYPE_INTEGER,
     voltdb::VALUE_TYPE_INTEGER,
 };
-const voltdb::ValueType test_join_Types[] = {
+const voltdb::ValueType TEST_JOIN_Types[] = {
     voltdb::VALUE_TYPE_INTEGER,
     voltdb::VALUE_TYPE_INTEGER,
     voltdb::VALUE_TYPE_INTEGER,
@@ -180,20 +180,20 @@ const int32_t BBB_Sizes[] = {
     4,
 };
 const int32_t CCC_Sizes[] = {
-    1024,
     4,
     32,
+    1024,
 };
 const int32_t XXX_Sizes[] = {
-    1024,
     4,
     32,
+    1024,
 };
-const int32_t test_order_by_Sizes[] = {
+const int32_t TEST_ORDER_BY_Sizes[] = {
     4,
     4,
 };
-const int32_t test_join_Sizes[] = {
+const int32_t TEST_JOIN_Sizes[] = {
     4,
     4,
     4,
@@ -220,11 +220,11 @@ const char *XXX_Strings[] = {
     "gamma",
     "delta",
 };
-int32_t num_test_order_by_strings = 0;
-const char *test_order_by_Strings[] = {
+int32_t num_TEST_ORDER_BY_strings = 0;
+const char *TEST_ORDER_BY_Strings[] = {
 };
-int32_t num_test_join_strings = 0;
-const char *test_join_Strings[] = {
+int32_t num_TEST_JOIN_strings = 0;
+const char *TEST_JOIN_Strings[] = {
 };
 
 
@@ -271,7 +271,7 @@ const int BBBData[NUM_TABLE_ROWS_BBB * NUM_TABLE_COLS_BBB] = {
       3, 30,301,
 };
 
-const int NUM_TABLE_ROWS_CCC = 10000000;
+const int NUM_TABLE_ROWS_CCC = 10000;
 const int NUM_TABLE_COLS_CCC = 3;
 ;
 const int NUM_TABLE_ROWS_XXX = 2;
@@ -283,7 +283,7 @@ const int XXXData[NUM_TABLE_ROWS_XXX * NUM_TABLE_COLS_XXX] = {
 
 const int NUM_TABLE_ROWS_TEST_ORDER_BY = 15;
 const int NUM_TABLE_COLS_TEST_ORDER_BY = 2;
-const int test_order_byData[NUM_TABLE_ROWS_TEST_ORDER_BY * NUM_TABLE_COLS_TEST_ORDER_BY] = {
+const int TEST_ORDER_BYData[NUM_TABLE_ROWS_TEST_ORDER_BY * NUM_TABLE_COLS_TEST_ORDER_BY] = {
       1, 10,
       1, 10,
       1, 20,
@@ -303,7 +303,7 @@ const int test_order_byData[NUM_TABLE_ROWS_TEST_ORDER_BY * NUM_TABLE_COLS_TEST_O
 
 const int NUM_TABLE_ROWS_TEST_JOIN = 45;
 const int NUM_TABLE_COLS_TEST_JOIN = 3;
-const int test_joinData[NUM_TABLE_ROWS_TEST_JOIN * NUM_TABLE_COLS_TEST_JOIN] = {
+const int TEST_JOINData[NUM_TABLE_ROWS_TEST_JOIN * NUM_TABLE_COLS_TEST_JOIN] = {
       1, 10,101,
       1, 10,101,
       1, 10,101,
@@ -403,27 +403,27 @@ const TableConfig XXXConfig = {
     XXX_Strings,
     num_XXX_strings
 };
-const TableConfig test_order_byConfig = {
-    "test_order_by",
-    test_order_by_ColumnNames,
-    test_order_by_Types,
-    test_order_by_Sizes,
+const TableConfig TEST_ORDER_BYConfig = {
+    "TEST_ORDER_BY",
+    TEST_ORDER_BY_ColumnNames,
+    TEST_ORDER_BY_Types,
+    TEST_ORDER_BY_Sizes,
     NUM_TABLE_ROWS_TEST_ORDER_BY,
     NUM_TABLE_COLS_TEST_ORDER_BY,
-    test_order_byData,
-    test_order_by_Strings,
-    num_test_order_by_strings
+    TEST_ORDER_BYData,
+    TEST_ORDER_BY_Strings,
+    num_TEST_ORDER_BY_strings
 };
-const TableConfig test_joinConfig = {
-    "test_join",
-    test_join_ColumnNames,
-    test_join_Types,
-    test_join_Sizes,
+const TableConfig TEST_JOINConfig = {
+    "TEST_JOIN",
+    TEST_JOIN_ColumnNames,
+    TEST_JOIN_Types,
+    TEST_JOIN_Sizes,
     NUM_TABLE_ROWS_TEST_JOIN,
     NUM_TABLE_COLS_TEST_JOIN,
-    test_joinData,
-    test_join_Strings,
-    num_test_join_strings
+    TEST_JOINData,
+    TEST_JOIN_Strings,
+    num_TEST_JOIN_strings
 };
 
 
@@ -435,8 +435,8 @@ const TableConfig *allTables[] = {
     &BBBConfig,
     &CCCConfig,
     &XXXConfig,
-    &test_order_byConfig,
-    &test_joinConfig,
+    &TEST_ORDER_BYConfig,
+    &TEST_JOINConfig,
 };
 
 
@@ -534,7 +534,7 @@ TestConfig allTests[3] = {
         "        }\n"
         "    ]\n"
         "}",
-        &test_order_byConfig
+        &TEST_ORDER_BYConfig
     },
     {
         // SQL Statement
@@ -733,7 +733,7 @@ TestConfig allTests[3] = {
         "        }\n"
         "    ]\n"
         "}",
-        &test_joinConfig
+        &TEST_JOINConfig
     },
     {
         // SQL Statement
@@ -895,7 +895,6 @@ DBConfig TestGeneratedPlans::m_testDB =
     "  C integer,\n"
     "  R integer\n"
     ");\n"
-    "  \n"
     "",
     //
     // Catalog String

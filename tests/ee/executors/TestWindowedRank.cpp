@@ -102,13 +102,13 @@ const char *T_ColumnNames[] = {
     "B",
     "C",
 };
-const char *rank_output_ColumnNames[] = {
+const char *RANK_OUTPUT_ColumnNames[] = {
     "A",
     "B",
     "C",
     "R",
 };
-const char *rank_dense_output_ColumnNames[] = {
+const char *RANK_DENSE_OUTPUT_ColumnNames[] = {
     "A",
     "B",
     "C",
@@ -124,13 +124,13 @@ const voltdb::ValueType T_Types[] = {
     voltdb::VALUE_TYPE_INTEGER,
     voltdb::VALUE_TYPE_INTEGER,
 };
-const voltdb::ValueType rank_output_Types[] = {
+const voltdb::ValueType RANK_OUTPUT_Types[] = {
     voltdb::VALUE_TYPE_INTEGER,
     voltdb::VALUE_TYPE_INTEGER,
     voltdb::VALUE_TYPE_INTEGER,
     voltdb::VALUE_TYPE_INTEGER,
 };
-const voltdb::ValueType rank_dense_output_Types[] = {
+const voltdb::ValueType RANK_DENSE_OUTPUT_Types[] = {
     voltdb::VALUE_TYPE_INTEGER,
     voltdb::VALUE_TYPE_INTEGER,
     voltdb::VALUE_TYPE_INTEGER,
@@ -146,13 +146,13 @@ const int32_t T_Sizes[] = {
     4,
     4,
 };
-const int32_t rank_output_Sizes[] = {
+const int32_t RANK_OUTPUT_Sizes[] = {
     4,
     4,
     4,
     4,
 };
-const int32_t rank_dense_output_Sizes[] = {
+const int32_t RANK_DENSE_OUTPUT_Sizes[] = {
     4,
     4,
     4,
@@ -167,11 +167,11 @@ const int32_t rank_dense_output_Sizes[] = {
 int32_t num_T_strings = 0;
 const char *T_Strings[] = {
 };
-int32_t num_rank_output_strings = 0;
-const char *rank_output_Strings[] = {
+int32_t num_RANK_OUTPUT_strings = 0;
+const char *RANK_OUTPUT_Strings[] = {
 };
-int32_t num_rank_dense_output_strings = 0;
-const char *rank_dense_output_Strings[] = {
+int32_t num_RANK_DENSE_OUTPUT_strings = 0;
+const char *RANK_DENSE_OUTPUT_Strings[] = {
 };
 
 
@@ -200,7 +200,7 @@ const int TData[NUM_TABLE_ROWS_T * NUM_TABLE_COLS_T] = {
 
 const int NUM_TABLE_ROWS_RANK_OUTPUT = 15;
 const int NUM_TABLE_COLS_RANK_OUTPUT = 4;
-const int rank_outputData[NUM_TABLE_ROWS_RANK_OUTPUT * NUM_TABLE_COLS_RANK_OUTPUT] = {
+const int RANK_OUTPUTData[NUM_TABLE_ROWS_RANK_OUTPUT * NUM_TABLE_COLS_RANK_OUTPUT] = {
       1,  1,101,  1,
       1,  1,102,  1,
       1,  2,201,  3,
@@ -220,7 +220,7 @@ const int rank_outputData[NUM_TABLE_ROWS_RANK_OUTPUT * NUM_TABLE_COLS_RANK_OUTPU
 
 const int NUM_TABLE_ROWS_RANK_DENSE_OUTPUT = 15;
 const int NUM_TABLE_COLS_RANK_DENSE_OUTPUT = 4;
-const int rank_dense_outputData[NUM_TABLE_ROWS_RANK_DENSE_OUTPUT * NUM_TABLE_COLS_RANK_DENSE_OUTPUT] = {
+const int RANK_DENSE_OUTPUTData[NUM_TABLE_ROWS_RANK_DENSE_OUTPUT * NUM_TABLE_COLS_RANK_DENSE_OUTPUT] = {
       1,  1,101,  1,
       1,  1,102,  1,
       1,  2,201,  2,
@@ -257,27 +257,27 @@ const TableConfig TConfig = {
     T_Strings,
     num_T_strings
 };
-const TableConfig rank_outputConfig = {
-    "rank_output",
-    rank_output_ColumnNames,
-    rank_output_Types,
-    rank_output_Sizes,
+const TableConfig RANK_OUTPUTConfig = {
+    "RANK_OUTPUT",
+    RANK_OUTPUT_ColumnNames,
+    RANK_OUTPUT_Types,
+    RANK_OUTPUT_Sizes,
     NUM_TABLE_ROWS_RANK_OUTPUT,
     NUM_TABLE_COLS_RANK_OUTPUT,
-    rank_outputData,
-    rank_output_Strings,
-    num_rank_output_strings
+    RANK_OUTPUTData,
+    RANK_OUTPUT_Strings,
+    num_RANK_OUTPUT_strings
 };
-const TableConfig rank_dense_outputConfig = {
-    "rank_dense_output",
-    rank_dense_output_ColumnNames,
-    rank_dense_output_Types,
-    rank_dense_output_Sizes,
+const TableConfig RANK_DENSE_OUTPUTConfig = {
+    "RANK_DENSE_OUTPUT",
+    RANK_DENSE_OUTPUT_ColumnNames,
+    RANK_DENSE_OUTPUT_Types,
+    RANK_DENSE_OUTPUT_Sizes,
     NUM_TABLE_ROWS_RANK_DENSE_OUTPUT,
     NUM_TABLE_COLS_RANK_DENSE_OUTPUT,
-    rank_dense_outputData,
-    rank_dense_output_Strings,
-    num_rank_dense_output_strings
+    RANK_DENSE_OUTPUTData,
+    RANK_DENSE_OUTPUT_Strings,
+    num_RANK_DENSE_OUTPUT_strings
 };
 
 
@@ -286,8 +286,8 @@ const TableConfig rank_dense_outputConfig = {
  */
 const TableConfig *allTables[] = {
     &TConfig,
-    &rank_outputConfig,
-    &rank_dense_outputConfig,
+    &RANK_OUTPUTConfig,
+    &RANK_DENSE_OUTPUTConfig,
 };
 
 
@@ -504,7 +504,7 @@ TestConfig allTests[2] = {
         "        }\n"
         "    ]\n"
         "}",
-        &rank_outputConfig
+        &RANK_OUTPUTConfig
     },
     {
         // SQL Statement
@@ -718,7 +718,7 @@ TestConfig allTests[2] = {
         "        }\n"
         "    ]\n"
         "}",
-        &rank_dense_outputConfig
+        &RANK_DENSE_OUTPUTConfig
     },
 };
 
@@ -823,7 +823,6 @@ DBConfig TestWindowedRank::m_testDB =
     "  C integer,\n"
     "  R integer\n"
     ");\n"
-    "  \n"
     "",
     //
     // Catalog String
