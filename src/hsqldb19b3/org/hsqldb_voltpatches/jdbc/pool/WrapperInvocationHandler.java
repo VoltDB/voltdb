@@ -566,10 +566,10 @@ public class WrapperInvocationHandler implements InvocationHandler {
 
     /**
      * @todo: - Synchronization can be made more granular if performance suffers.
-     *      - Requires some private lock objects and synchronized blocks in
-     *        certain methods.
-     *      - This was the obvious and easy synchronization point to pick
-     *        initially for prototyping purposes
+     *        - Requires some private lock objects and synchronized blocks in
+     *          certain methods.
+     *        - This was the obvious and easy synchronization point to pick
+     *          initially for prototyping purposes
      */
     public synchronized Object invoke(final Object proxy, final Method method,
                                       final Object[] args) throws Throwable {

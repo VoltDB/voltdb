@@ -252,6 +252,12 @@ public class ExecutionEngineIPC extends ExecutionEngine {
          */
         static final int kErrorCode_getQueuedExportBytes = 105;
 
+        /**
+         * An error code that can be sent at any time indicating that
+         * a per-fragment statistics buffer follows
+         */
+        static final int kErrorCode_pushPerFragmentStatsBuffer = 106;
+
         ByteBuffer getBytes(int size) throws IOException {
             ByteBuffer header = ByteBuffer.allocate(size);
             while (header.hasRemaining()) {
@@ -262,6 +268,36 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             }
             header.flip();
             return header;
+        }
+
+        // Read per-fragment stats from the wire.
+        void extractPerFragmentStatsInternal() {
+            try {
+                int bufferSize = m_connection.readInt();
+                final ByteBuffer perFragmentStatsBuffer = ByteBuffer.allocate(bufferSize);
+                while (perFragmentStatsBuffer.hasRemaining()) {
+                    int read = m_socketChannel.read(perFragmentStatsBuffer);
+                    if (read == -1) {
+                        throw new EOFException();
+                    }
+                }
+                perFragmentStatsBuffer.flip();
+                // Skip the perFragmentTimingEnabled flag.
+                perFragmentStatsBuffer.get();
+                m_succeededFragmentsCount = perFragmentStatsBuffer.getInt();
+                if (m_perFragmentTimingEnabled) {
+                    for (int i = 0; i < m_succeededFragmentsCount; i++) {
+                        m_executionTimes[i] = perFragmentStatsBuffer.getLong();
+                    }
+                    // This is the time for the failed fragment.
+                    if (m_succeededFragmentsCount < m_executionTimes.length) {
+                        m_executionTimes[m_succeededFragmentsCount] = perFragmentStatsBuffer.getLong();
+                    }
+                }
+            }
+            catch (IOException e) {
+                throw new RuntimeException(e);
+            }
         }
 
         /**
@@ -424,6 +460,10 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
                     ExecutionEngine.crashVoltDB(message, traces, filename, lineno);
                 }
+                else if (status == kErrorCode_pushPerFragmentStatsBuffer) {
+                    // The per-fragment stats are in the very beginning.
+                    extractPerFragmentStatsInternal();
+                }
                 else {
                     break;
                 }
@@ -555,7 +595,26 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         }
 
         /**
-         * Read and deserialize a int from the wire.
+         * Read and deserialize a byte from the wire.
+         */
+        public byte readByte() throws IOException {
+            final ByteBuffer bytes = ByteBuffer.allocate(1);
+
+            //resultTablesLengthBytes.order(ByteOrder.LITTLE_ENDIAN);
+            while (bytes.hasRemaining()) {
+                int read = m_socketChannel.read(bytes);
+                if (read == -1) {
+                    throw new EOFException();
+                }
+            }
+            bytes.flip();
+
+            final byte retval = bytes.get();
+            return retval;
+        }
+
+        /**
+         * Read and deserialize a string from the wire.
          */
         public String readString(int size) throws IOException {
             final ByteBuffer stringBytes = ByteBuffer.allocate(size);
@@ -865,6 +924,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         m_data.putLong(lastCommittedSpHandle);
         m_data.putLong(uniqueId);
         m_data.putLong(undoToken);
+        m_data.put((m_perFragmentTimingEnabled ? (byte)1 : (byte)0));
         m_data.putInt(numFragmentIds);
         for (int i = 0; i < numFragmentIds; ++i) {
             m_data.putLong(planFragmentIds[i]);
@@ -899,6 +959,9 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                 numFragmentIds, planFragmentIds, inputDepIds, parameterSets, txnId,
                 spHandle, lastCommittedSpHandle, uniqueId, undoToken);
         int result = ExecutionEngine.ERRORCODE_ERROR;
+        if (m_perFragmentTimingEnabled) {
+            m_executionTimes = new long[numFragmentIds];
+        }
 
         while (true) {
             try {
@@ -1570,5 +1633,30 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     @Override
     public ByteBuffer getParamBufferForExecuteTask(int requiredCapacity) {
         return ByteBuffer.allocate(requiredCapacity);
+    }
+
+    private boolean m_perFragmentTimingEnabled = false;
+
+    @Override
+    public void setPerFragmentTimingEnabled(boolean enabled) {
+        m_perFragmentTimingEnabled = enabled;
+    }
+
+    private int m_succeededFragmentsCount = 0;
+    private long[] m_executionTimes = null;
+
+    @Override
+    public int extractPerFragmentStats(int batchSize, long[] executionTimesOut) {
+        if (executionTimesOut != null) {
+            assert(executionTimesOut.length >= m_succeededFragmentsCount);
+            for (int i = 0; i < m_succeededFragmentsCount; i++) {
+                executionTimesOut[i] = m_executionTimes[i];
+            }
+            // This is the time for the failed fragment.
+            if (m_succeededFragmentsCount < executionTimesOut.length) {
+                executionTimesOut[m_succeededFragmentsCount] = m_executionTimes[m_succeededFragmentsCount];
+            }
+        }
+        return m_succeededFragmentsCount;
     }
 }
