@@ -37,8 +37,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import junit.framework.TestCase;
-
 import org.junit.Test;
 import org.voltcore.network.Connection;
 import org.voltcore.network.QueueMonitor;
@@ -49,6 +47,8 @@ import org.voltdb.ClientResponseImpl;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
+
+import junit.framework.TestCase;
 
 public class TestDistributer extends TestCase {
 
@@ -243,7 +243,7 @@ public class TestDistributer extends TestCase {
                         client.configureBlocking(false);
                         channels.add(client);
                         if (handleConnection) {
-                            network.registerChannel( client, handler);
+                            network.registerChannel( client, handler, null, null);
                         }
                     }
                     Thread.yield();
@@ -321,6 +321,9 @@ public class TestDistributer extends TestCase {
 
     @Test
     public void testCreateConnection() throws Exception {
+        // TODO: write a mock server that can grock ssl
+        if (ClientConfig.ENABLE_SSL_FOR_TEST) return;
+
         MockVolt volt0 = null;
         MockVolt volt1 = null;
         try {
@@ -355,6 +358,9 @@ public class TestDistributer extends TestCase {
 
     @Test
     public void testCreateConnectionSha256() throws Exception {
+        // TODO: write a mock server that can grock ssl
+        if (ClientConfig.ENABLE_SSL_FOR_TEST) return;
+
         MockVolt volt0 = null;
         MockVolt volt1 = null;
         try {
@@ -389,6 +395,9 @@ public class TestDistributer extends TestCase {
 
     @Test
     public void testCreateConnectionMixHashed() throws Exception {
+        // TODO: write a mock server that can grock ssl
+        if (ClientConfig.ENABLE_SSL_FOR_TEST) return;
+
         MockVolt volt0 = null;
         MockVolt volt1 = null;
         try {
@@ -423,6 +432,8 @@ public class TestDistributer extends TestCase {
 
     @Test
     public void testQueue() throws Exception {
+        // TODO: write a mock server that can grock ssl
+        if (ClientConfig.ENABLE_SSL_FOR_TEST) return;
 
         // Uncongested connections get round-robin use.
         MockVolt volt0, volt1, volt2;
@@ -441,7 +452,7 @@ public class TestDistributer extends TestCase {
             Distributer dist = new Distributer(false,
                     ClientConfig.DEFAULT_PROCEDURE_TIMOUT_NANOS,
                     ClientConfig.DEFAULT_CONNECTION_TIMOUT_MS,
-                    false, false, null /* subject */);
+                    false, false, null /* subject */, null);
             dist.addClientStatusListener(csl);
             dist.createConnection("localhost", "", "", 20000, ClientAuthScheme.HASH_SHA1);
             dist.createConnection("localhost", "", "", 20001, ClientAuthScheme.HASH_SHA1);
@@ -491,6 +502,8 @@ public class TestDistributer extends TestCase {
 
     @Test
     public void testQueueMixed() throws Exception {
+        // TODO: write a mock server that can grock ssl
+        if (ClientConfig.ENABLE_SSL_FOR_TEST) return;
 
         // Uncongested connections get round-robin use.
         MockVolt volt0, volt1, volt2;
@@ -509,7 +522,7 @@ public class TestDistributer extends TestCase {
             Distributer dist = new Distributer(false,
                     ClientConfig.DEFAULT_PROCEDURE_TIMOUT_NANOS,
                     ClientConfig.DEFAULT_CONNECTION_TIMOUT_MS,
-                    false, false, null /* subject */);
+                    false, false, null /* subject */, null);
             dist.addClientStatusListener(csl);
             dist.createConnection("localhost", "", "", 20000, ClientAuthScheme.HASH_SHA1);
             dist.createConnection("localhost", "", "", 20001, ClientAuthScheme.HASH_SHA256);
@@ -567,6 +580,9 @@ public class TestDistributer extends TestCase {
      */
     @Test
     public void testResponseTimeout() throws Exception {
+        // TODO: write a mock server that can grock ssl
+        if (ClientConfig.ENABLE_SSL_FOR_TEST) return;
+
 
         final CountDownLatch latch = new CountDownLatch(2);
 
@@ -594,7 +610,7 @@ public class TestDistributer extends TestCase {
         Distributer dist = new Distributer(false,
                 ClientConfig.DEFAULT_PROCEDURE_TIMOUT_NANOS,
                 1000 /* One second connection timeout */,
-                false, false, null /* subject */);
+                false, false, null /* subject */, null);
         dist.addClientStatusListener(new TimeoutMonitorCSL());
         dist.createConnection("localhost", "", "", 20000, ClientAuthScheme.HASH_SHA1);
 
@@ -639,6 +655,9 @@ public class TestDistributer extends TestCase {
      */
     @Test
     public void testPrematureTimeout() throws Exception {
+        // TODO: write a mock server that can grock ssl
+        if (ClientConfig.ENABLE_SSL_FOR_TEST) return;
+
         final AtomicBoolean failed = new AtomicBoolean(false);
         class TimeoutMonitorCSL extends ClientStatusListenerExt {
             @Override
@@ -658,7 +677,7 @@ public class TestDistributer extends TestCase {
         Distributer dist = new Distributer(false,
                 ClientConfig.DEFAULT_PROCEDURE_TIMOUT_NANOS,
                 2000 /* Two seconds connection timeout */,
-                false, false, null /* subject */);
+                false, false, null /* subject */, null);
         dist.addClientStatusListener(new TimeoutMonitorCSL());
         dist.createConnection("localhost", "", "", 20000, ClientAuthScheme.HASH_SHA1);
 
@@ -704,6 +723,9 @@ public class TestDistributer extends TestCase {
      */
     @Test
     public void testQueryTimeout() throws Exception {
+        // TODO: write a mock server that can grock ssl
+        if (ClientConfig.ENABLE_SSL_FOR_TEST) return;
+
 
         final CountDownLatch latch = new CountDownLatch(1);
 
@@ -725,7 +747,7 @@ public class TestDistributer extends TestCase {
         Distributer dist = new Distributer(false,
                 ClientConfig.DEFAULT_PROCEDURE_TIMOUT_NANOS,
                 30000 /* thirty second connection timeout */,
-                false, false, null /* subject */);
+                false, false, null /* subject */, null);
         dist.createConnection("localhost", "", "", 20000, ClientAuthScheme.HASH_SHA1);
 
         // make sure it connected
@@ -758,6 +780,9 @@ public class TestDistributer extends TestCase {
      */
     @Test
     public void testResponseNoEarlyTimeout() throws IOException, InterruptedException {
+        // TODO: write a mock server that can grock ssl
+        if (ClientConfig.ENABLE_SSL_FOR_TEST) return;
+
         final CountDownLatch latch = new CountDownLatch(1);
 
         final long CONNECTION_TIMEOUT = 6000;
@@ -778,7 +803,7 @@ public class TestDistributer extends TestCase {
         Distributer dist = new Distributer( false,
                 ClientConfig.DEFAULT_PROCEDURE_TIMOUT_NANOS,
                 CONNECTION_TIMEOUT /* six second connection timeout */,
-                false, false, null /* subject */);
+                false, false, null /* subject */, null);
         dist.addClientStatusListener(new TimeoutMonitorCSL());
         long start = System.currentTimeMillis();
         dist.createConnection("localhost", "", "", 20000, ClientAuthScheme.HASH_SHA1);
@@ -809,6 +834,8 @@ public class TestDistributer extends TestCase {
     }
 
     public void testClient() throws Exception {
+       if (ClientConfig.ENABLE_SSL_FOR_TEST) return;
+       // TODO: write a mock server that can grock ssl
        MockVolt volt = null;
 
        try {
@@ -837,6 +864,9 @@ public class TestDistributer extends TestCase {
 
     @Test
     public void testClientBlockedOnMaxOutstanding() throws Exception {
+        // TODO: write a mock server that can grock ssl
+        if (ClientConfig.ENABLE_SSL_FOR_TEST) return;
+
         // create a fake server and connect to it.
         MockVolt volt0 = new MockVolt(20000);
         volt0.handleConnection = false;
@@ -884,6 +914,9 @@ public class TestDistributer extends TestCase {
     }
 
     public void testUnresolvedHost() throws IOException {
+        // TODO: write a mock server that can grock ssl
+        if (ClientConfig.ENABLE_SSL_FOR_TEST) return;
+
         final String hostname = "doesnotexist";
         boolean threwException = false;
         try {
@@ -896,6 +929,9 @@ public class TestDistributer extends TestCase {
     }
 
     public void testSubscription() throws Exception {
+        // TODO: write a mock server that can grock ssl
+        if (ClientConfig.ENABLE_SSL_FOR_TEST) return;
+
         Distributer.RESUBSCRIPTION_DELAY_MS = 1;
         MockVolt volt0 = new MockVolt(20000);
         MockVolt volt1 = new MockVolt(20001);
@@ -934,6 +970,9 @@ public class TestDistributer extends TestCase {
     }
 
     public void testSubscribeConnectionLost() throws Exception {
+        // TODO: write a mock server that can grock ssl
+        if (ClientConfig.ENABLE_SSL_FOR_TEST) return;
+
         Distributer.RESUBSCRIPTION_DELAY_MS = 1;
         MockVolt volt0 = new MockVolt(20000);
         volt0.handleConnection = false;
@@ -1008,6 +1047,9 @@ public class TestDistributer extends TestCase {
     }
 
     public void testParallelClientConnections() throws Exception {
+        // TODO: write a mock server that can grock ssl
+        if (ClientConfig.ENABLE_SSL_FOR_TEST) return;
+
         Thread t1 = new threadedClient();
         t1.start();
         Thread t2 = new threadedClient();

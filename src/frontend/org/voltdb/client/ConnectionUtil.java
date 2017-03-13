@@ -35,6 +35,7 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
+import javax.net.ssl.SSLEngine;
 import javax.security.auth.Subject;
 
 import org.ietf.jgss.GSSContext;
@@ -44,6 +45,7 @@ import org.ietf.jgss.GSSName;
 import org.ietf.jgss.MessageProp;
 import org.ietf.jgss.Oid;
 import org.voltcore.network.ReverseDNSCache;
+import org.voltcore.utils.ssl.MessagingChannel;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.common.Constants;
 import org.voltdb.utils.SerializationHelper;
@@ -51,7 +53,6 @@ import org.voltdb.utils.SerializationHelper;
 import com.google_voltpatches.common.base.Function;
 import com.google_voltpatches.common.base.Optional;
 import com.google_voltpatches.common.base.Predicates;
-import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.FluentIterable;
 
 /**
@@ -61,7 +62,6 @@ import com.google_voltpatches.common.collect.FluentIterable;
  *
  */
 public class ConnectionUtil {
-
 
     private static class TF implements ThreadFactory {
         @Override
@@ -129,7 +129,7 @@ public class ConnectionUtil {
      * Create a connection to a Volt server and authenticate the connection.
      * @param host
      * @param username
-     * @param password
+     * @param hashedPassword
      * @param port
      * @param subject
      * @throws IOException
@@ -142,15 +142,22 @@ public class ConnectionUtil {
                                                       byte[] hashedPassword, int port,
                                                       final Subject subject, ClientAuthScheme scheme) throws IOException {
         String service = subject == null ? "database" : Constants.KERBEROS;
-        return getAuthenticatedConnection(service, host, username, hashedPassword, port, subject, scheme);
+        return getAuthenticatedConnection(service, host, username, hashedPassword, port, subject, scheme, null);
+    }
+
+    public static Object[] getAuthenticatedConnection(String host, String username,
+                                                      byte[] hashedPassword, int port,
+                                                      final Subject subject, ClientAuthScheme scheme, SSLEngine sslEngine) throws IOException {
+        String service = subject == null ? "database" : Constants.KERBEROS;
+        return getAuthenticatedConnection(service, host, username, hashedPassword, port, subject, scheme, sslEngine);
     }
 
     private static Object[] getAuthenticatedConnection(
             String service, String host,
-            String username, byte[] hashedPassword, int port, final Subject subject, ClientAuthScheme scheme)
+            String username, byte[] hashedPassword, int port, final Subject subject, ClientAuthScheme scheme, SSLEngine sslEngine)
     throws IOException {
         InetSocketAddress address = new InetSocketAddress(host, port);
-        return getAuthenticatedConnection(service, address, username, hashedPassword, subject, scheme);
+        return getAuthenticatedConnection(service, address, username, hashedPassword, subject, scheme, sslEngine);
     }
 
     private final static Function<Principal, DelegatePrincipal> narrowPrincipal = new Function<Principal, DelegatePrincipal>() {
@@ -171,7 +178,7 @@ public class ConnectionUtil {
 
     private static Object[] getAuthenticatedConnection(
             String service, InetSocketAddress addr, String username,
-            byte[] hashedPassword, final Subject subject, ClientAuthScheme scheme)
+            byte[] hashedPassword, final Subject subject, ClientAuthScheme scheme, SSLEngine sslEngine)
     throws IOException {
         Object returnArray[] = new Object[3];
         boolean success = false;
@@ -185,14 +192,38 @@ public class ConnectionUtil {
             // TODO Can open() be asynchronous if configureBlocking(true)?
             throw new IOException("Failed to open host " + ReverseDNSCache.hostnameOrAddress(addr.getAddress()));
         }
+
+        synchronized(aChannel.blockingLock()) {
+            aChannel.configureBlocking(false);
+            aChannel.socket().setTcpNoDelay(true);
+        }
+
+        if (sslEngine != null) {
+            TLSHandshaker handshaker = new TLSHandshaker(aChannel, sslEngine);
+            boolean shookHands = false;
+            try {
+                shookHands = handshaker.handshake();
+            } catch (IOException e) {
+                aChannel.close();
+                throw new IOException("SSL handshake failed", e);
+            }
+            if (! shookHands) {
+                aChannel.close();
+                throw new IOException("SSL handshake failed");
+            }
+        }
+
         final long retvals[] = new long[4];
         returnArray[1] = retvals;
+        MessagingChannel messagingChannel = MessagingChannel.get(aChannel, sslEngine);
         try {
             /*
              * Send login info
              */
-            aChannel.configureBlocking(true);
-            aChannel.socket().setTcpNoDelay(true);
+            synchronized(aChannel.blockingLock()) {
+                aChannel.configureBlocking(true);
+                aChannel.socket().setTcpNoDelay(true);
+            }
 
             // encode strings
             byte[] serviceBytes = service == null ? null : service.getBytes(Constants.UTF8ENCODING);
@@ -216,52 +247,22 @@ public class ConnectionUtil {
             b.put(hashedPassword);
             b.flip();
 
-            boolean successfulWrite = false;
-            IOException writeException = null;
             try {
-                for (int ii = 0; ii < 4 && b.hasRemaining(); ii++) {
-                    aChannel.write(b);
-                }
-                if (!b.hasRemaining()) {
-                    successfulWrite = true;
-                }
+                messagingChannel.writeMessage(b);
             } catch (IOException e) {
-                writeException = e;
+                throw new IOException("Failed to write authentication message to server.", e);
+            }
+            if (b.hasRemaining()) {
+                throw new IOException("Failed to write authentication message to server.");
             }
 
-            int read = 0;
-            ByteBuffer lengthBuffer = ByteBuffer.allocate(4);
-            while (lengthBuffer.hasRemaining()) {
-                read = aChannel.read(lengthBuffer);
-                if (read == -1) {
-                    if (writeException != null) {
-                        throw writeException;
-                    }
-                    if (!successfulWrite) {
-                        throw new IOException("Unable to write authentication info to server");
-                    }
-                    throw new IOException("Authentication rejected");
-                }
+            ByteBuffer loginResponse;
+            try {
+                loginResponse = messagingChannel.readMessage();
+            } catch (IOException e) {
+                throw new IOException("Authentication rejected", e);
             }
-            lengthBuffer.flip();
 
-            int len = lengthBuffer.getInt();
-            ByteBuffer loginResponse = ByteBuffer.allocate(len);//Read version and length etc.
-
-            while (loginResponse.hasRemaining()) {
-                read = aChannel.read(loginResponse);
-
-                if (read == -1) {
-                    if (writeException != null) {
-                        throw writeException;
-                    }
-                    if (!successfulWrite) {
-                        throw new IOException("Unable to write authentication info to server");
-                    }
-                    throw new IOException("Authentication rejected");
-                }
-            }
-            loginResponse.flip();
             byte version = loginResponse.get();
             byte loginResponseCode = loginResponse.get();
 
@@ -307,10 +308,13 @@ public class ConnectionUtil {
             loginResponse.get(buildStringBytes);
             returnArray[2] = new String(buildStringBytes, Constants.UTF8ENCODING);
 
-            aChannel.configureBlocking(false);
-            aChannel.socket().setKeepAlive(true);
+            synchronized(aChannel.blockingLock()) {
+                aChannel.configureBlocking(false);
+                aChannel.socket().setKeepAlive(true);
+            }
             success = true;
         } finally {
+            messagingChannel.cleanUp();
             if (!success) {
                 aChannel.close();
             }
@@ -443,9 +447,9 @@ public class ConnectionUtil {
                         context.dispose();
                         context = null;
                     } catch (GSSException ex) {
-                        Throwables.propagate(ex);
+                        throw new RuntimeException(ex);
                     } catch (IOException ex) {
-                        Throwables.propagate(ex);
+                        throw new RuntimeException(ex);
                     } finally {
                         if (context != null) try { context.dispose(); } catch (Exception ignoreIt) {}
                     }

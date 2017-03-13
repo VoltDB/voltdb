@@ -1,3 +1,5 @@
+LOAD CLASSES kvbenchmark.jar;
+
 CREATE TABLE store
 (
   key      varchar(250) not null

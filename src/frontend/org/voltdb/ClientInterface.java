@@ -23,7 +23,6 @@ import java.io.StringWriter;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
-import java.nio.channels.AsynchronousCloseException;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
@@ -31,6 +30,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -46,14 +46,19 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLEngine;
+
 import org.HdrHistogram_voltpatches.AbstractHistogram;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONObject;
+import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.BinaryPayloadMessage;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
+import org.voltcore.network.CipherExecutor;
 import org.voltcore.network.Connection;
 import org.voltcore.network.NIOReadStream;
 import org.voltcore.network.QueueMonitor;
@@ -66,6 +71,9 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
+import org.voltcore.utils.RateLimitedLogger;
+import org.voltcore.utils.ssl.MessagingChannel;
+import org.voltcore.utils.ssl.SSLConfiguration;
 import org.voltdb.AuthSystem.AuthProvider;
 import org.voltdb.AuthSystem.AuthUser;
 import org.voltdb.CatalogContext.ProcedurePartitionInfo;
@@ -75,6 +83,7 @@ import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.client.ClientAuthScheme;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.TLSHandshaker;
 import org.voltdb.common.Constants;
 import org.voltdb.dtxn.InitiatorStats.InvocationInfo;
 import org.voltdb.iv2.Cartographer;
@@ -91,9 +100,9 @@ import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.base.Predicate;
 import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.common.base.Throwables;
+import com.google_voltpatches.common.collect.ImmutableSet;
+import com.google_voltpatches.common.collect.Sets;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
-import org.voltcore.logging.Level;
-import org.voltcore.utils.RateLimitedLogger;
 
 /**
  * Represents VoltDB's connection to client libraries outside the cluster.
@@ -248,6 +257,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         private Thread m_thread = null;
         private final boolean m_isAdmin;
         private final InetAddress m_interface;
+        private final SSLContext m_sslContext;
 
         /**
          * Used a cached thread pool to accept new connections.
@@ -255,7 +265,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         private final ExecutorService m_executor = CoreUtils.getBoundedThreadPoolExecutor(128, 10L, TimeUnit.SECONDS,
                         CoreUtils.getThreadFactory("Client authentication threads", "Client authenticator"));
 
-        ClientAcceptor(InetAddress intf, int port, VoltNetworkPool network, boolean isAdmin)
+        ClientAcceptor(InetAddress intf, int port, VoltNetworkPool network, boolean isAdmin, SSLContext sslContext)
         {
             m_interface = intf;
             m_network = network;
@@ -276,6 +286,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 throw new RuntimeException(e);
             }
             m_serverSocket = socket;
+            m_sslContext = sslContext;
         }
 
         public void start() throws IOException {
@@ -326,21 +337,120 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             @Override
             public void run() {
                 if (m_socket != null) {
-                    boolean success = false;
-                    //Populated on timeout
-                    AtomicReference<String> timeoutRef = new AtomicReference<String>();
-                    try {
-                        final ClientInputHandler handler = authenticate(m_socket, timeoutRef);
-                        if (handler != null) {
-                            m_socket.configureBlocking(false);
+
+                    SSLEngine sslEngine = null;
+                    ByteBuffer remnant = ByteBuffer.wrap(new byte[0]);
+
+                    if (m_sslContext != null) {
+                        try {
+                            sslEngine = m_sslContext.createSSLEngine();
+                        } catch (Exception e) {
+                            networkLog.warn("Rejected accepting new connection, failed to create SSLEngine; " +
+                                    "indicates problem with SSL configuration: " + e.getMessage());
+                            return;
+                        }
+                        sslEngine.setUseClientMode(false);
+                        sslEngine.setNeedClientAuth(false);
+
+                        Set<String> enabled = ImmutableSet.copyOf(sslEngine.getEnabledCipherSuites());
+                        Set<String> intersection = Sets.intersection(SSLConfiguration.PREFERRED_CIPHERS, enabled);
+                        if (intersection.isEmpty()) {
+                            hostLog.warn("Preferred cipher suites are not available");
+                            intersection = enabled;
+                        }
+                        sslEngine.setEnabledCipherSuites(intersection.toArray(new String[0]));
+                        // blocking needs to be false for handshaking.
+                        boolean handshakeStatus;
+
+                        try {
+                            // m_socket.configureBlocking(false);
                             m_socket.socket().setTcpNoDelay(true);
-                            m_socket.socket().setKeepAlive(true);
+                            TLSHandshaker handshaker = new TLSHandshaker(m_socket, sslEngine);
+                            handshakeStatus = handshaker.handshake();
+                            /*
+                             * The JDK caches SSL sessions when the participants are the same (i.e.
+                             * multiple connection requests from the same peer). Once a session is cached
+                             * the client side ends its handshake session quickly, and is able to send
+                             * the login Volt message before the server finishes its handshake. This message
+                             * is caught in the servers last handshake network read.
+                             */
+                            remnant = handshaker.getRemnant();
+
+                        } catch (IOException e) {
+                            try {
+                                m_socket.close();
+                            } catch (IOException e1) {
+                                hostLog.warn("failed to close channel",e1);
+                            }
+                            networkLog.warn("Rejected accepting new connection, SSL handshake failed: " + e.getMessage(), e);
+                            return;
+                        }
+                        if (!handshakeStatus) {
+                            try {
+                                m_socket.close();
+                            } catch (IOException e) {
+                            }
+                            networkLog.warn("Rejected accepting new connection, SSL handshake failed.");
+                            return;
+                        }
+                        networkLog.info("SSL enabled on connection " + m_socket.socket().getRemoteSocketAddress() +
+                                " with protocol " + sslEngine.getSession().getProtocol() + " and with cipher " + sslEngine.getSession().getCipherSuite());
+                    }
+
+                    boolean success = false;
+                    MessagingChannel messagingChannel = MessagingChannel.get(m_socket, sslEngine);
+                    AtomicReference<String> timeoutRef = null;
+                    try {
+
+                    /*
+                     * Enforce a limit on the maximum number of connections
+                     */
+                        if (m_numConnections.get() >= MAX_CONNECTIONS.get()) {
+                            networkLog.warn("Rejected connection from " +
+                                    m_socket.socket().getRemoteSocketAddress() +
+                                    " because the connection limit of " + MAX_CONNECTIONS + " has been reached");
+                            try {
+                            /*
+                             * Send rejection message with reason code
+                             */
+                                ByteBuffer b = ByteBuffer.allocate(1);
+                                b.put(MAX_CONNECTIONS_LIMIT_ERROR);
+                                b.flip();
+                                synchronized(m_socket.blockingLock()) {
+                                    m_socket.configureBlocking(true);
+                                }
+                                for (int ii = 0; ii < 4 && b.hasRemaining(); ii++) {
+                                    messagingChannel.writeMessage(b);
+                                }
+                                m_socket.close();
+                            } catch (IOException e) {}//don't care keep running
+                            return;
+                        }
+
+                    /*
+                     * Increment the number of connections even though this one hasn't been authenticated
+                     * so that a flood of connection attempts (with many doomed) will not result in
+                     * successful authentication of connections that would put us over the limit.
+                     */
+                        m_numConnections.incrementAndGet();
+
+                        //Populated on timeout
+                        timeoutRef = new AtomicReference<String>();
+                        final ClientInputHandler handler = authenticate(m_socket, messagingChannel, timeoutRef, remnant);
+                        if (handler != null) {
+                            synchronized(m_socket.blockingLock()) {
+                                m_socket.configureBlocking(false);
+                                m_socket.socket().setTcpNoDelay(true);
+                                m_socket.socket().setKeepAlive(true);
+                            }
 
                             m_network.registerChannel(
-                                            m_socket,
-                                            handler,
-                                            0,
-                                            ReverseDNSPolicy.ASYNCHRONOUS);
+                                    m_socket,
+                                    handler,
+                                    0,
+                                    ReverseDNSPolicy.ASYNCHRONOUS,
+                                    CipherExecutor.SERVER,
+                                    sslEngine);
                             /*
                              * If IV2 is enabled the logic initially enabling read is
                              * in the started method of the InputHandler
@@ -362,6 +472,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             }
                         }
                     } finally {
+                        messagingChannel.cleanUp();
                         if (!success) {
                             m_numConnections.decrementAndGet();
                         }
@@ -392,36 +503,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             throw ioe;
                         }
                     }
-
-                    /*
-                     * Enforce a limit on the maximum number of connections
-                     */
-                    if (m_numConnections.get() >= MAX_CONNECTIONS.get()) {
-                        networkLog.warn("Rejected connection from " +
-                                socket.socket().getRemoteSocketAddress() +
-                                " because the connection limit of " + MAX_CONNECTIONS + " has been reached");
-                        try {
-                            /*
-                             * Send rejection message with reason code
-                             */
-                            final ByteBuffer b = ByteBuffer.allocate(1);
-                            b.put(MAX_CONNECTIONS_LIMIT_ERROR);
-                            b.flip();
-                            socket.configureBlocking(true);
-                            for (int ii = 0; ii < 4 && b.hasRemaining(); ii++) {
-                                socket.write(b);
-                            }
-                            socket.close();
-                        } catch (IOException e) {}//don't care keep running
-                        continue;
-                    }
-
-                    /*
-                     * Increment the number of connections even though this one hasn't been authenticated
-                     * so that a flood of connection attempts (with many doomed) will not result in
-                     * successful authentication of connections that would put us over the limit.
-                     */
-                    m_numConnections.incrementAndGet();
 
                     final AuthRunnable authRunnable = new AuthRunnable(socket);
                     while (true) {
@@ -462,11 +543,16 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
          * Attempt to authenticate the user associated with this socket connection
          * @param socket
          * @param timeoutRef Populated with error on timeout
+         * @param remnant The JDK caches SSL sessions when the participants are the same (i.e.
+         *   multiple connection requests from the same peer). Once a session is cached
+         *   the client side ends its handshake session quickly, and is able to send
+         *   the login Volt message before the server finishes its handshake. This message
+         *   is caught in the servers last handshake network read.
          * @return AuthUser a set of user permissions or null if authentication fails
          * @throws IOException
          */
         private ClientInputHandler
-        authenticate(final SocketChannel socket, final AtomicReference<String> timeoutRef) throws IOException
+        authenticate(final SocketChannel socket, MessagingChannel messagingChannel, final AtomicReference<String> timeoutRef, ByteBuffer remnant) throws IOException
         {
             ByteBuffer responseBuffer = ByteBuffer.allocate(6);
             byte version = (byte)0;
@@ -477,9 +563,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
              * The login message is a length preceded name string followed by a length preceded
              * SHA-1 single hash of the password.
              */
-            socket.configureBlocking(true);
-            socket.socket().setTcpNoDelay(true);//Greatly speeds up requests hitting the wire
-            final ByteBuffer lengthBuffer = ByteBuffer.allocate(4);
+            synchronized (socket.blockingLock()) {
+                socket.configureBlocking(true);
+                socket.socket().setTcpNoDelay(true);//Greatly speeds up requests hitting the wire
+            }
+
+            if (remnant.hasRemaining() && remnant.remaining() <= 4 && remnant.getInt() < remnant.remaining()) {
+                throw new IOException("SSL Handshake remnant is not a valit VoltDB message: " + remnant);
+            }
 
             /*
              * Schedule a timeout to close the socket in case there is no response for the timeout
@@ -505,74 +596,30 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         }
                     }, AUTH_TIMEOUT_MS, 0, TimeUnit.MILLISECONDS);
 
-            try {
-                while (lengthBuffer.hasRemaining()) {
-                    int read = socket.read(lengthBuffer);
-                    if (read == -1) {
-                        socket.close();
-                        timeoutFuture.cancel(false);
-                        return null;
-                    }
-                }
-            } catch (AsynchronousCloseException e) {}//This is the timeout firing and closing the channel
-
-            //Didn't get the value. Client isn't going to get anymore time.
-            if (lengthBuffer.hasRemaining()) {
-                timeoutFuture.cancel(false);
-                authLog.debug("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
-                              "): wire protocol violation (timeout reading message length).");
-                //Send negative response
-                responseBuffer.put(WIRE_PROTOCOL_TIMEOUT_ERROR).flip();
-                socket.write(responseBuffer);
-                socket.close();
-                return null;
+            ByteBuffer message = remnant.hasRemaining() ? remnant : null;
+            if (message != null) {
+                byte [] todigest = new byte[message.limit()];
+                message.position(0);
+                message.get(todigest).position(4);
             }
-            lengthBuffer.flip();
-
-            final int messageLength = lengthBuffer.getInt();
-            if (messageLength < 0) {
-                timeoutFuture.cancel(false);
-                authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
-                             "): wire protocol violation (message length " + messageLength + " is negative).");
-                //Send negative response
-                responseBuffer.put(WIRE_PROTOCOL_FORMAT_ERROR).flip();
-                socket.write(responseBuffer);
-                socket.close();
-                return null;
-            }
-            if (messageLength > ((1024 * 1024) * 2)) {
-                timeoutFuture.cancel(false);
-                authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
-                             "): wire protocol violation (message length " + messageLength + " is too large).");
-                //Send negative response
-                responseBuffer.put(WIRE_PROTOCOL_FORMAT_ERROR).flip();
-                socket.write(responseBuffer);
-                socket.close();
-                return null;
-              }
-
-            final ByteBuffer message = ByteBuffer.allocate(messageLength);
-
+            long beforeRead = 0;
             try {
-                while (message.hasRemaining()) {
-                    int read = socket.read(message);
-                    if (read == -1) {
-                        socket.close();
-                        timeoutFuture.cancel(false);
-                        return null;
-                    }
+                while (message == null) {
+                    beforeRead = EstTime.currentTimeMillis();
+                    message = messagingChannel.readMessage();
                 }
-            } catch (AsynchronousCloseException e) {}//This is the timeout firing and closing the channel
-
-            //Didn't get the whole message. Client isn't going to get anymore time.
-            if (message.hasRemaining()) {
-                timeoutFuture.cancel(false);
-                authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
-                             "): wire protocol violation (timeout reading authentication strings).");
-                //Send negative response
-                responseBuffer.put(WIRE_PROTOCOL_TIMEOUT_ERROR).flip();
-                socket.write(responseBuffer);
-                socket.close();
+            } catch (IOException e) {
+                long opduration = EstTime.currentTimeMillis() - beforeRead;
+                if (opduration > (AUTH_TIMEOUT_MS - (AUTH_TIMEOUT_MS/20))) {
+                    e = null;
+                }
+                try {
+                    socket.close();
+                } catch (IOException e1) {
+                }
+                if (e != null) {
+                    throw e;
+                }
                 return null;
             }
 
@@ -584,7 +631,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 return null;
             }
 
-            message.flip();
             int aversion = message.get(); //Get version
             ClientAuthScheme hashScheme = ClientAuthScheme.HASH_SHA1;
             //If auth version is more than zero we read auth hashing scheme.
@@ -595,7 +641,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     authLog.warn("Failure to authenticate connection Invalid Hash Scheme presented.");
                     //Send negative response
                     responseBuffer.put(WIRE_PROTOCOL_FORMAT_ERROR).flip();
-                    socket.write(responseBuffer);
+                    messagingChannel.writeMessage(responseBuffer);
                     socket.close();
                     return null;
                 }
@@ -616,7 +662,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         + "): user " + username + " failed authentication.");
                 //Send negative response
                 responseBuffer.put(AUTHENTICATION_FAILURE).flip();
-                socket.write(responseBuffer);
+                messagingChannel.writeMessage(responseBuffer);
                 socket.close();
                 return null;
             }
@@ -634,7 +680,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             if (ap == null) {
                 //Send negative response
                 responseBuffer.put(EXPORT_DISABLED_REJECTION).flip();
-                socket.write(responseBuffer);
+                messagingChannel.writeMessage(responseBuffer);
                 socket.close();
                 authLog.warn("Rejected user " + username +
                         " attempting to use disabled or unconfigured service " +
@@ -677,7 +723,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     //Send negative response
                     if (!isItIo) {
                         responseBuffer.put(AUTHENTICATION_FAILURE).flip();
-                        socket.write(responseBuffer);
+                        messagingChannel.writeMessage(responseBuffer);
                     }
                     socket.close();
                     return null;
@@ -687,7 +733,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         "): user " + username + " because this node is rejoining.");
                 //Send negative response
                 responseBuffer.put(AUTHENTICATION_FAILURE_DUE_TO_REJOIN).flip();
-                socket.write(responseBuffer);
+                messagingChannel.writeMessage(responseBuffer);
                 socket.close();
                 return null;
             }
@@ -710,7 +756,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             responseBuffer.putInt(VoltDB.instance().getHostMessenger().getInstanceId().getCoord());
             responseBuffer.putInt(buildString.length);
             responseBuffer.put(buildString).flip();
-            socket.write(responseBuffer);
+            messagingChannel.writeMessage(responseBuffer);
             return handler;
         }
     }
@@ -949,7 +995,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         /**
          * Checks if the transaction needs to be restarted, if so, restart it.
          * @param messageSize the original message size when the invocation first came in
-         * @param now the current timestamp
          * @return true if the transaction is restarted successfully, false otherwise.
          */
         private boolean restartTransaction(int messageSize, long nowNanos)
@@ -1069,29 +1114,36 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             InetAddress clientIntf,
             int clientPort,
             InetAddress adminIntf,
-            int adminPort) throws Exception {
+            int adminPort,
+            SSLContext sslContext) throws Exception {
 
         /*
          * Construct the runnables so they have access to the list of connections
          */
         final ClientInterface ci = new ClientInterface(
-                clientIntf, clientPort, adminIntf, adminPort, context, messenger, replicationRole, cartographer);
+                clientIntf, clientPort, adminIntf, adminPort, context, messenger, replicationRole, cartographer, sslContext);
 
         return ci;
     }
 
     ClientInterface(InetAddress clientIntf, int clientPort, InetAddress adminIntf, int adminPort,
+                    CatalogContext context, HostMessenger messenger, ReplicationRole replicationRole,
+                    Cartographer cartographer) throws Exception {
+        this(clientIntf, clientPort, adminIntf, adminPort, context, messenger, replicationRole, cartographer, null);
+    }
+
+    ClientInterface(InetAddress clientIntf, int clientPort, InetAddress adminIntf, int adminPort,
             CatalogContext context, HostMessenger messenger, ReplicationRole replicationRole,
-            Cartographer cartographer) throws Exception {
+            Cartographer cartographer, SSLContext sslContext) throws Exception {
         m_catalogContext.set(context);
         m_snapshotDaemon = new SnapshotDaemon(context);
         m_snapshotDaemonAdapter = new SnapshotDaemonAdapter();
         m_cartographer = cartographer;
 
         // pre-allocate single partition array
-        m_acceptor = new ClientAcceptor(clientIntf, clientPort, messenger.getNetwork(), false);
+        m_acceptor = new ClientAcceptor(clientIntf, clientPort, messenger.getNetwork(), false, sslContext);
         m_adminAcceptor = null;
-        m_adminAcceptor = new ClientAcceptor(adminIntf, adminPort, messenger.getNetwork(), true);
+        m_adminAcceptor = new ClientAcceptor(adminIntf, adminPort, messenger.getNetwork(), true, sslContext);
 
         m_mailbox = new LocalMailbox(messenger,  messenger.getHSIdForLocalSite(HostMessenger.CLIENT_INTERFACE_SITE_ID)) {
             LinkedBlockingQueue<VoltMessage> m_d = new LinkedBlockingQueue<VoltMessage>();
@@ -1335,7 +1387,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
     /**
      *
-     * @param port
      * * return True if an error was generated and needs to be returned to the client
      */
     final ClientResponseImpl handleRead(ByteBuffer buf, ClientInputHandler handler, Connection ccxn) {

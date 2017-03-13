@@ -36,6 +36,9 @@ import java.util.Queue;
 import java.util.TimeZone;
 import java.util.UUID;
 
+import javax.net.ssl.SSLContext;
+
+import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.voltcore.logging.VoltLog4jLogger;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
@@ -154,6 +157,18 @@ public class VoltDB {
         public int m_adminPort = DISABLED_PORT;
         public String m_adminInterface = "";
 
+        /** ssl context factory */
+        public SslContextFactory m_sslContextFactory = null;
+
+        /** ssl context for client and admin ports */
+        public SSLContext m_sslContext = null;
+
+        /** enable ssl */
+        public boolean m_sslEnable = Boolean.valueOf(System.getenv("ENABLE_SSL") == null ? Boolean.toString(Boolean.getBoolean("ENABLE_SSL")) : System.getenv("ENABLE_SSL"));
+
+        /** enable ssl for external (https, client and admin port*/
+        public boolean m_sslExternal = Boolean.valueOf(System.getenv("ENABLE_SSL") == null ? Boolean.toString(Boolean.getBoolean("ENABLE_SSL")) : System.getenv("ENABLE_SSL"));
+
         /** consistency level for reads */
         public Consistency.ReadLevel m_consistencyReadLevel = Consistency.ReadLevel.SAFE;
 
@@ -215,9 +230,9 @@ public class VoltDB {
         /** true if we're running the rejoin tests. Not used in production. */
         public boolean m_isRejoinTest = false;
 
-        public final Queue<String> m_networkCoreBindings = new ArrayDeque<String>();
-        public final Queue<String> m_computationCoreBindings = new ArrayDeque<String>();
-        public final Queue<String> m_executionCoreBindings = new ArrayDeque<String>();
+        public final Queue<String> m_networkCoreBindings = new ArrayDeque<>();
+        public final Queue<String> m_computationCoreBindings = new ArrayDeque<>();
+        public final Queue<String> m_executionCoreBindings = new ArrayDeque<>();
         public String m_commandLogBinding = null;
 
         /**
@@ -369,7 +384,7 @@ public class VoltDB {
                     String portStr = args[++i];
                     if (portStr.indexOf(':') != -1) {
                         HostAndPort hap = MiscUtils.getHostAndPortFromHostnameColonPort(portStr, m_port);
-                        m_clientInterface = hap.getHostText();
+                        m_clientInterface = hap.getHost();
                         m_port = hap.getPort();
                     } else {
                         m_port = Integer.parseInt(portStr);
@@ -378,7 +393,7 @@ public class VoltDB {
                     String portStr = args[++i];
                     if (portStr.indexOf(':') != -1) {
                         HostAndPort hap = MiscUtils.getHostAndPortFromHostnameColonPort(portStr, VoltDB.DEFAULT_ADMIN_PORT);
-                        m_adminInterface = hap.getHostText();
+                        m_adminInterface = hap.getHost();
                         m_adminPort = hap.getPort();
                     } else {
                         m_adminPort = Integer.parseInt(portStr);
@@ -387,7 +402,7 @@ public class VoltDB {
                     String portStr = args[++i];
                     if (portStr.indexOf(':') != -1) {
                         HostAndPort hap = MiscUtils.getHostAndPortFromHostnameColonPort(portStr, m_internalPort);
-                        m_internalInterface = hap.getHostText();
+                        m_internalInterface = hap.getHost();
                         m_internalPort = hap.getPort();
                     } else {
                         m_internalPort = Integer.parseInt(portStr);
@@ -396,7 +411,7 @@ public class VoltDB {
                     String portStr = args[++i];
                     if (portStr.indexOf(':') != -1) {
                         HostAndPort hap = MiscUtils.getHostAndPortFromHostnameColonPort(portStr, VoltDB.DEFAULT_DR_PORT);
-                        m_drInterface = hap.getHostText();
+                        m_drInterface = hap.getHost();
                         m_drAgentPortStart = hap.getPort();
                     } else {
                         m_drAgentPortStart = Integer.parseInt(portStr);
@@ -405,7 +420,7 @@ public class VoltDB {
                     String portStr = args[++i];
                     if (portStr.indexOf(':') != -1) {
                         HostAndPort hap = MiscUtils.getHostAndPortFromHostnameColonPort(portStr, VoltDB.DEFAULT_HTTP_PORT);
-                        m_httpPortInterface = hap.getHostText();
+                        m_httpPortInterface = hap.getHost();
                         m_httpPort = hap.getPort();
                     } else {
                         m_httpPort = Integer.parseInt(portStr);
@@ -415,7 +430,7 @@ public class VoltDB {
                     String portStr = args[++i];
                     if (portStr.indexOf(':') != -1) {
                         HostAndPort hap = MiscUtils.getHostAndPortFromHostnameColonPort(portStr, org.voltcore.common.Constants.DEFAULT_ZK_PORT);
-                        m_zkInterface = hap.getHostText() + ":" + hap.getPort();
+                        m_zkInterface = hap.getHost() + ":" + hap.getPort();
                     } else {
                         m_zkInterface = "127.0.0.1:" + portStr.trim();
                     }
@@ -610,6 +625,10 @@ public class VoltDB {
                         System.err.println("FATAL: " + e.getMessage());
                         referToDocAndExit();
                     }
+                } else if (arg.equalsIgnoreCase("enableSSL")) {
+                    m_sslEnable = true;
+                } else if (arg.equalsIgnoreCase("externalSSL")) {
+                    m_sslExternal = true;
                 } else if (arg.equalsIgnoreCase("getvoltdbroot")) {
                     //Can not use voltdbroot which creates directory we dont intend to create for get deployment etc.
                     m_voltdbRoot = new VoltFile(args[++i]);
@@ -1062,7 +1081,7 @@ public class VoltDB {
      */
     public static void printStackTraces(PrintWriter writer, List<String> currentStacktrace) {
         if (currentStacktrace == null) {
-            currentStacktrace = new ArrayList<String>();
+            currentStacktrace = new ArrayList<>();
         }
 
         Map<Thread, StackTraceElement[]> traces = Thread.getAllStackTraces();
@@ -1181,7 +1200,7 @@ public class VoltDB {
 
                 // Even if the logger is null, don't stop.  We want to log the stack trace and
                 // any other pertinent information to a .dmp file for crash diagnosis
-                List<String> currentStacktrace = new ArrayList<String>();
+                List<String> currentStacktrace = new ArrayList<>();
                 currentStacktrace.add("Stack trace from crashLocalVoltDB() method:");
 
                 // Create a special dump file to hold the stack trace

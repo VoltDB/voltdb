@@ -91,10 +91,20 @@ def launch_and_wait_on_voltdb(reportout):
     # Launch a single local voltdb server to serve all scripted sqlcmd runs.
     # The scripts are expected to clean up after themselves  -- and/or defensively
     # drop and create all of their tables up front.
-
+    voltenv=os.environ.copy()
+    sqlcmdenv=os.environ.copy()
+    sqlcmdopts=[]
+    if os.environ.has_key("ENABLE_SSL") and os.environ["ENABLE_SSL"].lower() == "true":
+        prop_pfx="-Djavax.net.ssl."
+        keystore=os.path.realpath("../../tests/frontend/org/voltdb/keystore")
+        voltenv["VOLTDB_OPTS"] = (prop_pfx + "keyStore=" + keystore + " " + prop_pfx +
+                                  "keyStorePassword=password " + prop_pfx + "trustStore=" +
+                                  keystore + " " + prop_pfx + "trustStorePassword=password")
+        sqlcmdenv["ENABLE_SSL"] = "false"
+        sqlcmdopts = ["-J" + prop_pfx + "trustStore=" + keystore]
+        sqlcmdopts = sqlcmdopts + ["-J" + prop_pfx + "trustStorePassword=password", "--ssl"]
     print "Initializing directory..."
     subprocess.call(['../../bin/voltdb', 'init', '--force'], shell=False)
-
     subprocess.Popen(['../../bin/voltdb', 'start'], shell=False)
     # give server a little startup time.
     time.sleep(5)
@@ -108,7 +118,7 @@ def launch_and_wait_on_voltdb(reportout):
     # that could connect later in response to a directive.
     for waited in xrange(0, 19):
         empty_input.seek(0)
-        waiting = subprocess.call(['../../bin/sqlcmd'], stdin=empty_input)
+        waiting = subprocess.call(['../../bin/sqlcmd'] + sqlcmdopts, stdin=empty_input, env=sqlcmdenv)
         if not waiting:
             break
         if waited == 19:

@@ -139,6 +139,9 @@ public class SyncBenchmark {
         @Option(desc = "Filename to write raw summary statistics to.")
         String statsfile = "";
 
+        @Option(desc = "Enable SSL, Optionally provide configuration file.")
+        String sslfile = "";
+
         @Override
         public void validate() {
             if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
@@ -183,6 +186,10 @@ public class SyncBenchmark {
         this.config = config;
 
         ClientConfig clientConfig = new ClientConfig("", "", new StatusListener());
+        if (config.sslfile.trim().length() > 0) {
+            clientConfig.setTrustStoreConfigFromPropertyFile(config.sslfile);
+            clientConfig.enableSSL();
+        }
         client = ClientFactory.createClient(clientConfig);
 
         periodicStatsContext = client.createStatsContext();

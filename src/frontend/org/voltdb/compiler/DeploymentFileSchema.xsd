@@ -38,6 +38,7 @@
       <xs:element name="paths" minOccurs="0" maxOccurs="1" type="pathsType" />
       <xs:element name="partition-detection" minOccurs="0" type="partitionDetectionType"/>
       <xs:element name="heartbeat" minOccurs="0" maxOccurs="1" type="heartbeatType"/>
+      <xs:element name="ssl" minOccurs="0" maxOccurs="1" type="sslType"/>
       <xs:element name="httpd" minOccurs="0" maxOccurs="1" type="httpdType"/>
       <xs:element name="snapshot" type="snapshotType" minOccurs="0" maxOccurs="1" />
       <xs:element name="export" minOccurs="0" maxOccurs="1" type="exportType"/>
@@ -316,24 +317,24 @@
           <xs:attribute name="enabled" type="xs:boolean" default="true"/>
         </xs:complexType>
       </xs:element>
-      <xs:element name="https" minOccurs="0" maxOccurs="1" type="httpsType"/>
     </xs:sequence>
     <xs:attribute name="port" type="xs:int"/>
     <xs:attribute name="enabled" type="xs:boolean" default="true"/>
   </xs:complexType>
 
-  <!-- configuration for HTTPS -->
-  <xs:complexType name="httpsType">
+  <xs:complexType name="keyOrTrustStoreType">
+      <xs:attribute name="path" type="xs:string" use="required"/>
+      <xs:attribute name="password" type="xs:string"/>
+  </xs:complexType>
+
+  <!-- ssl -->
+  <xs:complexType name="sslType">
     <xs:sequence>
       <xs:element name="keystore" minOccurs="0" maxOccurs="1" type="keyOrTrustStoreType"/>
       <xs:element name="truststore" minOccurs="0" maxOccurs="1" type="keyOrTrustStoreType"/>
     </xs:sequence>
     <xs:attribute name="enabled" type="xs:boolean" default="false"/>
-  </xs:complexType>
-
-  <xs:complexType name="keyOrTrustStoreType">
-      <xs:attribute name="path" type="xs:string" use="required"/>
-      <xs:attribute name="password" type="xs:string"/>
+    <xs:attribute name="external" type="xs:boolean" default="false"/>
   </xs:complexType>
 
   <!-- <snapshot> -->
