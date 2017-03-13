@@ -88,6 +88,7 @@ import org.voltdb.common.Constants;
 import org.voltdb.dtxn.InitiatorStats.InvocationInfo;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.Iv2Trace;
+import org.voltdb.iv2.MpInitiator;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2EndOfLogMessage;
@@ -136,7 +137,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     public static final long SNAPSHOT_UTIL_CID          = Long.MIN_VALUE + 2;
     public static final long ELASTIC_JOIN_CID           = Long.MIN_VALUE + 3;
     // public static final long UNUSED_CID (was DR)     = Long.MIN_VALUE + 4;
-    public static final long INTERNAL_CID               = Long.MIN_VALUE + 5;
+    // public static final long UNUSED_CID              = Long.MIN_VALUE + 5;
     public static final long EXECUTE_TASK_CID           = Long.MIN_VALUE + 6;
     public static final long DR_DISPATCHER_CID          = Long.MIN_VALUE + 7;
     public static final long RESTORE_SCHEMAS_CID        = Long.MIN_VALUE + 8;
@@ -149,6 +150,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     public static final long DR_REPLICATION_SNAPSHOT_BASE_CID  = Long.MIN_VALUE + setBaseValue(2);
     public static final long DR_REPLICATION_NORMAL_BASE_CID    = Long.MIN_VALUE + setBaseValue(3);
     public static final long DR_REPLICATION_MP_BASE_CID        = Long.MIN_VALUE + setBaseValue(4);
+    public static final long INTERNAL_CID                      = Long.MIN_VALUE + setBaseValue(5);
 
     private static final VoltLogger log = new VoltLogger(ClientInterface.class.getName());
     private static final VoltLogger authLog = new VoltLogger("AUTH");
@@ -1197,12 +1199,16 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 .siteId(m_siteId)
                 .build();
 
-        InternalClientResponseAdapter internalAdapter = new InternalClientResponseAdapter(INTERNAL_CID);
-        ClientInterfaceHandleManager ichm = bindAdapter(internalAdapter, null, true);
-        m_internalConnectionHandler = new InternalConnectionHandler(internalAdapter, ichm);
+        m_internalConnectionHandler = new InternalConnectionHandler();
 
         m_executeTaskAdpater = new SimpleClientResponseAdapter(ClientInterface.EXECUTE_TASK_CID, "ExecuteTaskAdapter", true);
         bindAdapter(m_executeTaskAdpater, null);
+    }
+
+    private InternalClientResponseAdapter createInternalAdapter(int pid) {
+        InternalClientResponseAdapter internalAdapter = new InternalClientResponseAdapter(INTERNAL_CID + pid);
+        bindAdapter(internalAdapter, null, true);
+        return internalAdapter;
     }
 
     public InternalConnectionHandler getInternalConnectionHandler() {
@@ -1227,6 +1233,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     failOverConnection(partitionId, initiatorHSId, cihm.connection);
                 }
             }
+
+            // Create adapters here so that it works for both startup and elastic add.
+            m_internalConnectionHandler.addAdapter(partitionId, createInternalAdapter(partitionId));
         } catch (Exception e) {
             hostLog.warn("Error handling partition fail over at ClientInterface, continuing anyways", e);
         }
@@ -1632,10 +1641,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
     public boolean isAcceptingConnections() {
         return m_isAcceptingConnections.get();
-    }
-
-    static final int getPartitionForProcedure(Procedure procedure, StoredProcedureInvocation task) throws Exception {
-        return InvocationDispatcher.getPartitionForProcedure(procedure, task);
     }
 
     @Override
