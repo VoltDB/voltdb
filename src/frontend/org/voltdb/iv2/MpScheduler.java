@@ -113,12 +113,17 @@ public class MpScheduler extends Scheduler
         // the deliver lock held to be correct. The null task should
         // never run; the site thread is expected to be told to stop.
         m_pendingTasks.shutdown();
-        m_pendingTasks.repair(m_nullTask, m_iv2Masters, m_partitionMasters);
+        m_pendingTasks.repair(m_nullTask, m_iv2Masters, m_partitionMasters, false);
     }
-
 
     @Override
     public void updateReplicas(final List<Long> replicas, final Map<Integer, Long> partitionMasters)
+    {
+        updateReplicas(replicas, partitionMasters, false);
+    }
+
+
+    public void updateReplicas(final List<Long> replicas, final Map<Integer, Long> partitionMasters,  boolean balanceSPI)
     {
         // Handle startup and promotion semi-gracefully
         m_iv2Masters.clear();
@@ -162,7 +167,7 @@ public class MpScheduler extends Scheduler
         }
 
         MpRepairTask repairTask = new MpRepairTask((InitiatorMailbox)m_mailbox, replicas);
-        m_pendingTasks.repair(repairTask, replicas, partitionMasters);
+        m_pendingTasks.repair(repairTask, replicas, partitionMasters, balanceSPI);
     }
 
     /**

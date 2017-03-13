@@ -239,6 +239,22 @@ public class MpInitiatorMailbox extends InitiatorMailbox
         });
     }
 
+    public void updateReplicas(final List<Long> replicas, final Map<Integer, Long> partitionMasters, boolean balanceSPI) {
+        m_taskQueue.offer(new Runnable() {
+            @Override
+            public void run() {
+                assert(lockingVows());
+                Iv2Trace.logTopology(getHSId(), replicas, m_partitionId);
+                // If a replica set has been configured and it changed during
+                // promotion, must cancel the term
+                if (m_algo != null) {
+                    m_algo.cancel();
+                }
+                m_scheduler.updateReplicas(replicas, partitionMasters);
+            }
+        });
+    }
+
     @Override
     public void deliver(final VoltMessage message) {
         m_taskQueue.offer(new Runnable() {

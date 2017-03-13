@@ -96,7 +96,7 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
     // SiteTaskerQueue.  Before it does this, it unblocks the MP transaction
     // that may be running in the Site thread and causes it to rollback by
     // faking an unsuccessful FragmentResponseMessage.
-    synchronized void repair(SiteTasker task, List<Long> masters, Map<Integer, Long> partitionMasters)
+    synchronized void repair(SiteTasker task, List<Long> masters, Map<Integer, Long> partitionMasters, boolean balanceSPI)
     {
         // We know that every Site assigned to the MPI (either the main writer or
         // any of the MP read pool) will only have one active transaction at a time,
@@ -105,34 +105,44 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
         Map<Long, TransactionTask> currentSet;
         if (!m_currentReads.isEmpty()) {
             assert(m_currentWrites.isEmpty());
-            tmLog.debug("MpTTQ: repairing reads");
+            if (tmLog.isDebugEnabled()) {
+                tmLog.debug("MpTTQ: repairing reads");
+            }
             for (Long txnId : m_currentReads.keySet()) {
                 m_sitePool.repair(txnId, task);
             }
             currentSet = m_currentReads;
         }
         else {
-            tmLog.debug("MpTTQ: repairing writes");
+            if (tmLog.isDebugEnabled()) {
+                tmLog.debug("MpTTQ: repairing writes");
+            }
             m_taskQueue.offer(task);
             currentSet = m_currentWrites;
         }
         for (Entry<Long, TransactionTask> e : currentSet.entrySet()) {
             if (e.getValue() instanceof MpProcedureTask) {
                 MpProcedureTask next = (MpProcedureTask)e.getValue();
-                tmLog.debug("MpTTQ: poisoning task: " + next);
+                if (tmLog.isDebugEnabled()) {
+                    tmLog.debug("MpTTQ: poisoning task: " + next);
+                }
                 next.doRestart(masters, partitionMasters);
-                MpTransactionState txn = (MpTransactionState)next.getTransactionState();
-                // inject poison pill
-                FragmentTaskMessage dummy = new FragmentTaskMessage(0L, 0L, 0L, 0L, false, false, false);
-                FragmentResponseMessage poison =
-                    new FragmentResponseMessage(dummy, 0L); // Don't care about source HSID here
-                // Provide a TransactionRestartException which will be converted
-                // into a ClientResponse.RESTART, so that the MpProcedureTask can
-                // detect the restart and take the appropriate actions.
-                TransactionRestartException restart = new TransactionRestartException(
-                        "Transaction being restarted due to fault recovery or shutdown.", next.getTxnId());
-                poison.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, restart);
-                txn.offerReceivedFragmentResponse(poison);
+
+                // Transactions will be rerouted and restarted if the master change is triggered via @BalanceSPI
+                if (!balanceSPI) {
+                    MpTransactionState txn = (MpTransactionState)next.getTransactionState();
+                    // inject poison pill
+                    FragmentTaskMessage dummy = new FragmentTaskMessage(0L, 0L, 0L, 0L, false, false, false);
+                    FragmentResponseMessage poison =
+                            new FragmentResponseMessage(dummy, 0L); // Don't care about source HSID here
+                    // Provide a TransactionRestartException which will be converted
+                    // into a ClientResponse.RESTART, so that the MpProcedureTask can
+                    // detect the restart and take the appropriate actions.
+                    TransactionRestartException restart = new TransactionRestartException(
+                            "Transaction being restarted due to fault recovery or shutdown.", next.getTxnId());
+                    poison.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, restart);
+                    txn.offerReceivedFragmentResponse(poison);
+                }
             }
             else {
                 // Don't think that EveryPartitionTasks need to do anything here, since they
@@ -147,12 +157,16 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
             TransactionTask tt = iter.next();
             if (tt instanceof MpProcedureTask) {
                 MpProcedureTask next = (MpProcedureTask)tt;
-                tmLog.debug("Repair updating task: " + next + " with masters: " + masters);
+                if (tmLog.isDebugEnabled()) {
+                    tmLog.debug("Repair updating task: " + next + " with masters: " + masters);
+                }
                 next.updateMasters(masters, partitionMasters);
             }
             else if (tt instanceof EveryPartitionTask) {
                 EveryPartitionTask next = (EveryPartitionTask)tt;
-                tmLog.debug("Repair updating EPT task: " + next + " with masters: " + masters);
+                if (tmLog.isDebugEnabled())  {
+                    tmLog.debug("Repair updating EPT task: " + next + " with masters: " + masters);
+                }
                 next.updateMasters(masters);
             }
         }

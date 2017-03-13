@@ -67,14 +67,14 @@ public class InitiatorMailbox implements Mailbox
     VoltLogger hostLog = new VoltLogger("HOST");
     VoltLogger tmLog = new VoltLogger("TM");
 
-    private final int m_partitionId;
+    protected final int m_partitionId;
     protected final Scheduler m_scheduler;
     protected final HostMessenger m_messenger;
     protected final RepairLog m_repairLog;
     private final JoinProducerBase m_joinProducer;
     private final LeaderCacheReader m_masterLeaderCache;
     private long m_hsId;
-    private RepairAlgo m_algo;
+    protected RepairAlgo m_algo;
 
     /*
      * Hacky global map of initiator mailboxes to support assertions
