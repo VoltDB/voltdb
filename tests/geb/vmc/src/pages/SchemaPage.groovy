@@ -329,7 +329,7 @@ class SchemaPage extends VoltDBManagementCenterPage {
         while((line = br.readLine()) != "#view") {
         }
 
-        while ((line = br.readLine()) != null) {
+        while ((line = br.readLine()) != "#createStoredProcedure") {
             query = query + line + "\n"
         }
 

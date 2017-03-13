@@ -23,3 +23,15 @@ CREATE VIEW registrations_by_zipcode (
     zipcode, registered_voters
 ) AS
 SELECT zipcode, count(*) from voters where registration=1 GROUP BY zipcode;
+
+#createStoredProcedure
+CREATE PROCEDURE procedureVotersA AS SELECT * FROM voters;
+
+#executeStoredProcedure
+exec procedureVotersA;
+
+#dropStoredProcedure
+DROP PROCEDURE procedureVotersA;
+
+#procedureName
+procedureVotersA
