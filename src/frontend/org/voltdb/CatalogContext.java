@@ -107,7 +107,10 @@ public class CatalogContext {
             byte[] catalogBytesHash,
             byte[] deploymentBytes,
             int version,
-            HostMessenger messenger)
+            HostMessenger messenger,
+            boolean hasSchemaChange,
+            DefaultProcedureManager defaultProcManager,
+            PlannerTool plannerTool)
     {
         m_transactionId = transactionId;
         m_uniqueId = uniqueId;
@@ -159,10 +162,16 @@ public class CatalogContext {
         this.deploymentHashForConfig = CatalogUtil.makeDeploymentHashForConfig(deploymentBytes);
         m_memoizedDeployment = null;
 
-        m_defaultProcs = new DefaultProcedureManager(database);
+        if (hasSchemaChange) {
+            m_defaultProcs = new DefaultProcedureManager(database);
+            m_ptool = new PlannerTool(database, catalogHash);
+        } else {
+            m_defaultProcs = defaultProcManager;
+            m_ptool = plannerTool.updateWhenNoSchemaChange(database, catalogBytesHash);;
+        }
 
         m_jdbc = new JdbcDatabaseMetaDataGenerator(catalog, m_defaultProcs, m_jarfile);
-        m_ptool = new PlannerTool(cluster, database, catalogHash);
+
         catalogVersion = version;
         m_messenger = messenger;
 
@@ -174,6 +183,21 @@ public class CatalogContext {
                 }
             }
         }
+    }
+
+    public CatalogContext(
+            long transactionId,
+            long uniqueId,
+            Catalog catalog,
+            DbSettings settings,
+            byte[] catalogBytes,
+            byte[] catalogBytesHash,
+            byte[] deploymentBytes,
+            int version,
+            HostMessenger messenger)
+    {
+        this(transactionId, uniqueId, catalog, settings, catalogBytes, catalogBytesHash, deploymentBytes,
+                version, messenger, true, null, null);
     }
 
     public Cluster getCluster() {
@@ -196,7 +220,8 @@ public class CatalogContext {
             String diffCommands,
             boolean incrementVersion,
             byte[] deploymentBytes,
-            HostMessenger messenger)
+            HostMessenger messenger,
+            boolean hasSchemaChange)
     {
         Catalog newCatalog = catalog.deepCopy();
         newCatalog.execute(diffCommands);
@@ -227,7 +252,10 @@ public class CatalogContext {
                     catalogBytesHash,
                     depbytes,
                     catalogVersion + incValue,
-                    messenger);
+                    messenger,
+                    hasSchemaChange,
+                    m_defaultProcs,
+                    m_ptool);
         return retval;
     }
 

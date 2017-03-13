@@ -87,7 +87,7 @@ public abstract class StatementCompiler {
      * @param  partitioning Partition info for statement
     */
     static boolean compileStatementAndUpdateCatalog(VoltCompiler compiler, HSQLInterface hsql,
-            Catalog catalog, Database db, DatabaseEstimates estimates,
+            Database db, DatabaseEstimates estimates,
             Statement catalogStmt, VoltXMLElement xml, String stmt, String joinOrder,
             DeterminismMode detMode, StatementPartitioning partitioning)
     throws VoltCompiler.VoltCompilerException {
@@ -177,7 +177,7 @@ public abstract class StatementCompiler {
 
         CompiledPlan plan = null;
         QueryPlanner planner = new QueryPlanner(
-                sql, stmtName, procName,  catalog.getClusters().get("cluster"), db,
+                sql, stmtName, procName,  db,
                 partitioning, hsql, estimates, false, DEFAULT_MAX_JOIN_TABLES,
                 costModel, null, joinOrder, detMode);
         try {
@@ -310,11 +310,11 @@ public abstract class StatementCompiler {
     }
 
     static boolean compileFromSqlTextAndUpdateCatalog(VoltCompiler compiler, HSQLInterface hsql,
-            Catalog catalog, Database db, DatabaseEstimates estimates,
+            Database db, DatabaseEstimates estimates,
             Statement catalogStmt, String sqlText, String joinOrder,
             DeterminismMode detMode, StatementPartitioning partitioning)
     throws VoltCompiler.VoltCompilerException {
-        return compileStatementAndUpdateCatalog(compiler, hsql, catalog, db, estimates, catalogStmt,
+        return compileStatementAndUpdateCatalog(compiler, hsql, db, estimates, catalogStmt,
                 null, sqlText, joinOrder, detMode, partitioning);
     }
 

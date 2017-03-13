@@ -1041,7 +1041,6 @@ public class VoltCompiler {
             // if we generated a plan that is content-non-deterministic.
             StatementCompiler.compileStatementAndUpdateCatalog(this,
                     hsql,
-                    db.getCatalog(),
                     db,
                     m_estimates,
                     stmt,
@@ -1147,7 +1146,7 @@ public class VoltCompiler {
             else {
                 m_currentFilename = procedureName;
             }
-            ProcedureCompiler.compile(this, hsql, m_estimates, m_catalog, db, procedureDescriptor, jarOutput);
+            ProcedureCompiler.compile(this, hsql, m_estimates, db, procedureDescriptor, jarOutput);
         }
         // done handling files
         m_currentFilename = NO_FILENAME;

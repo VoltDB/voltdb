@@ -49,13 +49,13 @@ public class ReplicaInvocationAcceptancePolicy extends InvocationValidationPolic
 
         if (isReadOnly) {
             return null;
-        } else {
-            return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
-                    new VoltTable[0],
-                    "Write procedure " + invocation.getProcName() +
-                    " is not allowed in replica cluster",
-                    invocation.clientHandle);
         }
+
+        return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
+                new VoltTable[0],
+                "Write procedure " + invocation.getProcName() +
+                " is not allowed in replica cluster",
+                invocation.clientHandle);
     }
 
     @Override

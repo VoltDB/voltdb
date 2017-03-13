@@ -293,7 +293,7 @@ public class LoadedProcedureSet {
         if (pr == null) {
             Procedure catProc = m_defaultProcManager.checkForDefaultProcedure(procName);
             if (catProc != null) {
-                String sqlText = m_defaultProcManager.sqlForDefaultProc(catProc);
+                String sqlText = DefaultProcedureManager.sqlForDefaultProc(catProc);
                 Procedure newCatProc = StatementCompiler.compileDefaultProcedure(m_plannerTool, catProc, sqlText);
                 VoltProcedure voltProc = new ProcedureRunner.StmtProcedure();
                 pr = new ProcedureRunner(null, voltProc, m_site, newCatProc, m_csp);

@@ -161,7 +161,8 @@ public interface VoltDBInterface
             long currentTxnId,
             long currentTxnTimestamp,
             byte[] deploymentBytes,
-            byte[] deploymentHash);
+            byte[] deploymentHash,
+            boolean hasSchemaChange);
 
     /**
      * Updates the cluster setting of this VoltDB
