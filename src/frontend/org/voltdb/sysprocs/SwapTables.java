@@ -21,6 +21,7 @@ import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
 import org.voltdb.SystemProcedureExecutionContext;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.catalog.Database;
 import org.voltdb.common.Constants;
@@ -57,9 +58,9 @@ public class SwapTables extends AdHocBase {
         dummy.addRow(STATUS_OK);
 
         if (fragmentId == SysProcFragmentId.PF_swapTables) {
-            String oneTable = (String) params.getParam(0);
-            String otherTable = (String) params.getParam(1);
-            System.out.println(oneTable + " & " + otherTable + " called in " + context.getHostId() + ":" + context.getSiteId());
+            if (context.isLowestSiteId()) {
+                VoltDB.instance().swapTables((String) params.getParam(0), (String) params.getParam(1));
+            }
             return new DependencyPair(DEP_swapTables, dummy);
         }
         else if (fragmentId == SysProcFragmentId.PF_swapTablesAggregate) {
@@ -81,13 +82,15 @@ public class SwapTables extends AdHocBase {
      * @return  results as VoltTable array
      */
     public VoltTable[] run(SystemProcedureExecutionContext ctx, byte[] serializedBatchData) {
+        VoltTable[] result = runAdHoc(ctx, serializedBatchData);
+
         String stmt = new String(
                 decodeSerializedBatchData(serializedBatchData).getSecond()[0].sql,
                 Constants.UTF8ENCODING);
         String[] stmtParams = stmt.split(" ");
         performSwapTablesCallback(stmtParams[1], stmtParams[2]);
 
-        return runAdHoc(ctx, serializedBatchData);
+        return result;
     }
 
     private VoltTable[] performSwapTablesCallback(String oneTable, String otherTable)
