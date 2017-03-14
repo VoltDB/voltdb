@@ -791,12 +791,13 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             if (first_unpolled_block == null) {
                 m_pollFuture = fut;
             } else {
+                final AckingContainer ackingContainer = new AckingContainer(first_unpolled_block.unreleasedContainer(),
+                                                                            first_unpolled_block.uso() + first_unpolled_block.totalUso());
                 try {
-                    fut.set(
-                            new AckingContainer(first_unpolled_block.unreleasedContainer(),
-                                    first_unpolled_block.uso() + first_unpolled_block.totalUso()));
+                    fut.set(ackingContainer);
                 } catch (RejectedExecutionException reex) {
                     //We are closing source.
+                    ackingContainer.discard();
                 }
                 m_pollFuture = null;
             }
