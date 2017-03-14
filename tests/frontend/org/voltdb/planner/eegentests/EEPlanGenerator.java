@@ -80,7 +80,7 @@
  * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
  * License for the specific language governing permissions and limitations under
  * the License.
- */package org.voltdb.planner;
+ */package org.voltdb.planner.eegentests;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -98,6 +98,8 @@ import org.voltdb.VoltType;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
+import org.voltdb.planner.PlanSelector;
+import org.voltdb.planner.PlannerTestCase;
 import org.voltdb.plannodes.AbstractPlanNode;
 
 /**
@@ -433,7 +435,6 @@ public class EEPlanGenerator extends PlannerTestCase {
         int m_rowCount;
     }
 
-    @Override
     protected Database getDatabase() {
         Database db = getCatalog().getClusters().get("cluster").getDatabases().get("database");
         return db;
@@ -443,7 +444,7 @@ public class EEPlanGenerator extends PlannerTestCase {
      * Define a database.
      */
     protected class DBConfig {
-        DBConfig(Class<? extends PlannerTestCase>    klass,
+        public DBConfig(Class<? extends PlannerTestCase>    klass,
                  URL                                 ddlURL,
                  String                              catalogString,
                  TableConfig ...                     tables) {
@@ -745,7 +746,7 @@ public class EEPlanGenerator extends PlannerTestCase {
             m_expectedOutput = expectedOutput;
         }
 
-        TestConfig(String testName,
+        public TestConfig(String testName,
                    String sqlString) {
             this(testName, sqlString, null);
         }

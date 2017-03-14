@@ -43,7 +43,7 @@
 /******************************************************************************************
  *
  * NOTA BENE: This file is automagically generated from the source class named
- *                org.voltdb.planner.EEPlanTestGenerator.
+ *                org.voltdb.planner.eegentests.EEPlanTestGenerator.
  *            Please do not edit it unless you abandon all hope of regenerating it.
  *
  ******************************************************************************************/

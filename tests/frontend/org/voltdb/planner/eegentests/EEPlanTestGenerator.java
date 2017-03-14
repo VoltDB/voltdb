@@ -41,65 +41,33 @@
  * the License.
  */
 
-package org.voltdb.planner;
+package org.voltdb.planner.eegentests;
 
 import org.voltdb.catalog.Database;
 
 /**
- * This is not a jUnit test, though it looks a little bit like one.  It's
- * an example of a Java application which generates EE Unit tests.  To
- * run this run the Java class EEPlanTestGenerator as a java application.
+ * This is not a jUnit test, it's a Java application, which generates EE
+ * Unit tests.  To run the application, run this Java class as a
+ * java application.  All tests generated from this class use the same
+ * DDL definitions.  In this class the DDL file is testplans-ee-geneators.sql,
+ * set in the function setUp defined in this class.  Any other way of
+ * getting a URL to a DDL definition is possible.  All the schema definitions
+ * from any of the tables used in these files will be from this DDL file.
  *
- * The idea is pretty simple.  You set up for a jUnit test as usual, loading
- * a schema from a file or from Java code.  But instead of running the SQL
- * compiler and looking for plans or error messages, follow these steps.
- * <ul>
- *   <li>
- *     Create a database.  This is a set of tables and their contents.
- *     A table schema is an array of column names, and a table is an
- *     array of arrays if ints, where the inner arrays all have the same
- *     number of elements as the array of column names.  So, each outer
- *     array is a row.  Right now we can only create tables with int values,
- *     though we intend to expand that.
- *   </li>
- *   <li>
- *     Create some tests.  Each of these are given by
- *     <ul>
- *       <li>
- *         A test name.  This will be the name of the unit test function,
- *         so it should be a legal C identifier.
- *       </li>
- *       <li>
- *         A SQL query string.
- *       </li>
- *       <li>
- *         An expected output table.  This will be a two dimensional
- *         array of ints, where the outer dimensions are rows.  Again,
- *         we can only have tables of integers here.
- *       </li>
- *     </ul>
- *     Each of these tests are added to the database created in the first
- *     step.
- *   </li>
- *   <li>
- *     Create the test by calling generateTests(category, testname, db).
- *     This will create a C++ file named category/testname.cpp which will
- *     execute the plan for the test and compare the result with the expected
- *     result.  Note that non-deterministic tests will be problematic here.
- *     So, use order by and limit judiciously.
- *   </li>
- * </ul>
- * Follow the example below.  All the possibilities are in the test
- * generatedPlannerTest.
+ * After setting up the schema, follow the example below.  All the
+ * possibilities are in the test generatedPlannerTest, where there is more
+ * documentation.
  *
- * @author bwhite
+ * Finally, after defining member functions to generate the tests,
+ * in the main() function, create a test generator object and call
+ * the generator member functions, as is done in this file.
  *
  */
 public class EEPlanTestGenerator extends EEPlanGenerator {
     private static final String DDL_FILENAME = "testplans-ee-generators.sql";
 
     @Override
-    protected void setUp() throws Exception {
+    public void setUp() throws Exception {
         setupSchema(EEPlanTestGenerator.class.getResource(DDL_FILENAME),
                     "testplanseegenerator",
                     false);
@@ -177,12 +145,31 @@ public class EEPlanTestGenerator extends EEPlanGenerator {
                                                       10000);
         return CCCConfig;
     }
+
     public void generatedPlannerTest() throws Exception {
+        //
+        // First, get the database.  This is the database
+        // which contains the catalog, with contains the
+        // processed definitions from the DDL file.
+        //
         Database db = getDatabase();
+        //
+        // Create some table configurations.  These are the parts of
+        // the catalog we need to generate tests, cached for easy use.
+        //
+        // It's often more helpful to create a member function which
+        // makes a table configuration, rather than creating a table
+        // configuration as a static object.  This is because the
+        // table configuration depends on the schema, which is in
+        // the Database, and we won't have the Database until run time.
+        //
         final TableConfig AAAConfig = makeAAA(db);
         final TableConfig BBBConfig = makeBBB(db);
         final TableConfig XXXConfig = makeXXX(db);
-        final TableConfig CCCConfig = makeCCC(db);
+        // This is another way of making a TableConfig.  As we can see,
+        // a TableConfig is given by a table name, the schema extracted from
+        // the database db and some data.
+        //
         final TableConfig orderByOutput = new TableConfig("test_order_by",
                                                           db,
                                                           new Object[][] {
@@ -249,9 +236,20 @@ public class EEPlanTestGenerator extends EEPlanGenerator {
                                                            { 3,  30,  301},
                                                            { 3,  30,  301},
                                                            { 3,  30,  301} } );
+        //
+        // This a third kind of configuration creates a table whose contents
+        // are generated randomly.  It will have 10000 rows, with random
+        // values of the right type for each of the columns.
+        //
+        final TableConfig CCCConfig = new TableConfig("CCC",
+                                                      db,
+                                                      10000);
+        //
         // Create a DB config, which contains all the tables.
-        // Note that result tables, like orderByOutput or
-        // joinOutput need to be added.
+        // Note that input tables, like AAAConfig or BBBConfig,
+        // and result tables, like orderByOutput or
+        // joinOutput, need to be added.  Any number of tables
+        // can be added.
         DBConfig dbc = new DBConfig(getClass(),
                                    EEPlanTestGenerator.class.getResource(DDL_FILENAME),
                                    getCatalogString(),
@@ -367,6 +365,7 @@ public class EEPlanTestGenerator extends EEPlanGenerator {
                                                      {  2,  3,    0} } );
         return testOutput;
     }
+
     public void generatedMaxPlan() throws Exception {
         Database db = getDatabase();
         TableConfig TConfig = makeTConfig(db);

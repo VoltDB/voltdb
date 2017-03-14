@@ -83,6 +83,8 @@
  */package org.voltdb.planner;
 
 import org.voltdb.VoltType;
+import org.voltdb.planner.eegentests.EEPlanGenerator;
+import org.voltdb.planner.eegentests.EEPlanTestGenerator;
 
 public class EECachePlanTester extends EEPlanGenerator {
     private static final String DDL_FILENAME = "testplans-ee-generators.sql";
