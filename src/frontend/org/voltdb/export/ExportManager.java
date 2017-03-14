@@ -210,6 +210,7 @@ public class ExportManager
                         newProcessor.setProcessorConfig(m_processorConfig);
                         newProcessor.readyForData(false);
                     } else {
+                        exportLog.info("NOT Creating connector generation drained is unknown: " + nextGeneration.m_timestamp);
                         //Just set the next generation.
                         m_processor.get().setExportGeneration(nextGeneration);
                         //make sure so that we can re acquire.
