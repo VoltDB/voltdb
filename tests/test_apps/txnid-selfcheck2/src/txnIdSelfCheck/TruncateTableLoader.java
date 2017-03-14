@@ -161,6 +161,8 @@ public class TruncateTableLoader extends BenchmarkThread {
         }
 
         // Confirm that the table-swap worked correctly, by checking the row counts
+        // nb. swap is not supported with DR yet, with XDCR this check is likeley to fail
+        // unless we take other action or change the test.
         try {
             rowCounts[0] = TxnId2Utils.getRowCount(client, tableName);
             rowCounts[1] = TxnId2Utils.getRowCount(client, swapTableName);
@@ -199,6 +201,8 @@ public class TruncateTableLoader extends BenchmarkThread {
             nSwaps++;
         }
         // Confirm that the table-swap worked correctly, by checking the row counts
+        // nb. swap is not supported with DR yet, with XDCR this check is likeley to fail
+        // unless we take other action or change the test.
         try {
             rowCounts[0] = TxnId2Utils.getRowCount(client, tableName);
             rowCounts[1] = TxnId2Utils.getRowCount(client, swapTableName);
@@ -230,27 +234,8 @@ public class TruncateTableLoader extends BenchmarkThread {
             Benchmark.txnCount.incrementAndGet();
             nTruncates++;
         }
-
-        // Confirm that the truncate worked correctly, by checking the row count
-        // (even though the stored procedures themselves also check this)
-        long rowCount = -1;
-        try {
-            rowCount = TxnId2Utils.getRowCount(client, tableName);
-        } catch (Exception e) {
-            hardStop("getrowcount exception", e);
-        }
-        if (rowCount != 0) {
-            String truncateProcName = tableName.toUpperCase() + tp;
-            String message = "Table '"+tableName+"' has "+rowCount+" rows after truncate "
-                    + "(by stored proc "+truncateProcName+"): non-zero";
-            if ("TRUPTruncateTableSP".equals(truncateProcName)) {
-                // TRUPTruncateTableSP, being SP, does not truncate the entire
-                // table, so this situation is expected, and not fatal
-                log.warn(message + " (OK for SP)");
-            } else {
-                hardStop("TruncateTableLoader: " + message + "!");
-            }
-        }
+        // while we would like to check for zero rows in the table outside the txn this test will fail
+        // if, for example, with XDCR rows may be replicated from another cluster after the truncate txn.
     }
 
     @Override
