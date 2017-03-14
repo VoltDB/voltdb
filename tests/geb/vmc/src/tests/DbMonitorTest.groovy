@@ -3353,8 +3353,8 @@ class DbMonitorTest extends TestBase {
         page.savePreferencesBtn.click()
         report 'savePreferencesBtn'
 
-        when: 'wait for filter in stored procedure'
-        waitFor(waitTime) { page.filterStoredProcedure.isDisplayed() }
+        // when: 'wait for filter in stored procedure'
+        // waitFor(waitTime) { page.filterStoredProcedure.isDisplayed() }
         then: 'enter the stored procedure name'
         page.filterStoredProcedure.value(storedProcedureName)
 
