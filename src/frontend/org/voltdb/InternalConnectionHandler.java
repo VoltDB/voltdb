@@ -55,6 +55,11 @@ public class InternalConnectionHandler {
         m_adapters = builder.build();
     }
 
+    public boolean hasAdapter(int pid)
+    {
+        return m_adapters.containsKey(pid);
+    }
+
     /**
      * Returns true if a table with the given name exists in the server catalog.
      */
