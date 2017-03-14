@@ -156,11 +156,14 @@ public class ExportManager
                     exportLog.info("Generation already drained: " + m_generation);
                     return;
                 }
+                if (m_generations.isEmpty()) {
+                    exportLog.info(m_generation + " generations empty");
+                }
             }
             //After all generations drained processors can not be null as above check should kick you out.
             ExportDataProcessor proc = m_processor.get();
             if (proc == null) {
-                VoltDB.crashLocalVoltDB("No export data processor found", true, null);
+                VoltDB.crashLocalVoltDB("No export data processor found, generation " + m_generation, true, null);
             }
             proc.queueWork(new Runnable() {
                 @Override
@@ -202,7 +205,7 @@ public class ExportManager
                     //Pick next generation.
                     ExportGeneration nextGeneration = m_generations.firstEntry().getValue();
                     if (installNewProcessor) {
-                        exportLog.info("Creating connector " + m_loaderClass);
+                        exportLog.info("Creating connector for next generation" + m_loaderClass);
                         final Class<?> loaderClass = Class.forName(m_loaderClass);
                         newProcessor = (ExportDataProcessor) loaderClass.newInstance();
                         newProcessor.addLogger(exportLog);
@@ -255,6 +258,7 @@ public class ExportManager
          * The old processor should shutdown if we installed a new processor.
          */
         if (oldProcessor != null && installNewProcessor) {
+            exportLog.info("Shutdown older processor, drained generation ts: " + drainedGeneration.m_timestamp);
             oldProcessor.shutdown();
         }
         try {

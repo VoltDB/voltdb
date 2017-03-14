@@ -109,6 +109,7 @@ public class ExportGeneration implements Generation {
             exportLog.info("Drained source in generation " + m_timestamp + " with " + numSourcesDrained + " of " + m_numSources + " drained");
             if (numSourcesDrained == m_numSources) {
                 if (m_partitionLeaderZKName.isEmpty()) {
+                    exportLog.info("All sources drained " + m_timestamp);
                     m_onAllSourcesDrained.run();
                 } else {
                     ListenableFuture<?> removeLeadership = m_childUpdatingThread.submit(new Runnable() {
@@ -198,6 +199,7 @@ public class ExportGeneration implements Generation {
     }
 
     //This checks if the on disk generation is a catalog generation.
+    @Override
     public boolean isContinueingGeneration() {
         return m_isContinueingGeneration;
     }
@@ -245,6 +247,7 @@ public class ExportGeneration implements Generation {
      * start consuming the export data.
      *
      */
+    @Override
     public void kickOffLeaderElection(final HostMessenger messenger) {
         m_childUpdatingThread.submit(new Runnable() {
             @Override
@@ -606,6 +609,7 @@ public class ExportGeneration implements Generation {
         };
     }
 
+    @Override
     public long getQueuedExportBytes(int partitionId, String signature) {
         //assert(m_dataSourcesByPartition.containsKey(partitionId));
         //assert(m_dataSourcesByPartition.get(partitionId).containsKey(delegateId));
@@ -720,6 +724,7 @@ public class ExportGeneration implements Generation {
         }
     }
 
+    @Override
     public void pushExportBuffer(int partitionId, String signature, long uso, ByteBuffer buffer, boolean sync, boolean endOfStream) {
         //        System.out.println("In generation " + m_timestamp + " partition " + partitionId + " signature " + signature + (buffer == null ? " null buffer " : (" buffer length " + buffer.remaining())));
         //        for (Integer i : m_dataSourcesByPartition.keySet()) {
@@ -791,6 +796,7 @@ public class ExportGeneration implements Generation {
     /*
      * Returns true if the generatino was completely truncated away
      */
+    @Override
     public void truncateExportToTxnId(long txnId, long[] perPartitionTxnIds) {
         // create an easy partitionId:txnId lookup.
         HashMap<Integer, Long> partitionToTxnId = new HashMap<Integer, Long>();
@@ -836,6 +842,7 @@ public class ExportGeneration implements Generation {
         }
     }
 
+    @Override
     public void close(final HostMessenger messenger) {
         List<ListenableFuture<?>> tasks = new ArrayList<ListenableFuture<?>>();
         for (Map<String, ExportDataSource> sources : m_dataSourcesByPartition.values()) {
@@ -860,6 +867,7 @@ public class ExportGeneration implements Generation {
      * mastership role for the given partition id
      * @param partitionId
      */
+    @Override
     public void acceptMastershipTask( int partitionId) {
         Map<String, ExportDataSource> partitionDataSourceMap = m_dataSourcesByPartition.get(partitionId);
 
