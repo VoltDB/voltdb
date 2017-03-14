@@ -23,22 +23,13 @@
 
 package txnIdSelfCheck;
 
-import java.io.IOException;
-import java.io.InterruptedIOException;
-import java.util.Random;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Semaphore;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
-
-import org.voltcore.logging.Level;
 import org.voltdb.ClientResponseImpl;
-import org.voltdb.VoltTable;
-import org.voltdb.client.Client;
-import org.voltdb.client.ClientResponse;
-import org.voltdb.client.NoConnectionsException;
-import org.voltdb.client.ProcCallException;
-import org.voltdb.client.ProcedureCallback;
+import org.voltdb.client.*;
+
+import java.io.IOException;
+import java.util.Random;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class TruncateTableLoader extends BenchmarkThread {
@@ -49,7 +40,7 @@ public class TruncateTableLoader extends BenchmarkThread {
     //     "SWAP TABLE T1 WITH T2"
     // This setting makes sure that we are not using that code, which is retained
     // below in case we ever do support that DML version of Swap Tables.
-    final boolean USE_AT_SWAP_TABLES_PROC = true;
+    final boolean USE_SWAP_TABLES_SYSPROC = true;
 
     final Client client;
     final long targetCount;
@@ -138,6 +129,13 @@ public class TruncateTableLoader extends BenchmarkThread {
     }
 
     private long[] swapTables(byte shouldRollback, String sp) throws IOException, ProcCallException {
+        if (USE_SWAP_TABLES_SYSPROC)
+            return swapTables_adhoc(shouldRollback, sp);
+        else
+            return swapTables_dml(shouldRollback, sp);
+    }
+
+    private long[] swapTables_adhoc(byte shouldRollback, String sp) throws IOException, ProcCallException {
         long[] rowCounts = new long[2];
 
         // Get the row counts, before doing the table-swap
@@ -153,17 +151,10 @@ public class TruncateTableLoader extends BenchmarkThread {
         // Perform the table-swap
         ClientResponse clientResponse = null;
         String swapProcName = "@SwapTables";
-        if (USE_AT_SWAP_TABLES_PROC) {  // Tests @SwapTables stored proc
-            if (shouldRollback != 0) {
-                clientResponse = client.callProcedure(swapProcName, tableName.toUpperCase(), "NONEXISTENT_TABLE");
-            } else {
-                clientResponse = client.callProcedure(swapProcName, tableName.toUpperCase(), swapTableName.toUpperCase());
-            }
-        } else {  // Tests "SWAP TABLE T1 WITH T2" DML - not currently supported
-            swapProcName = tableName.toUpperCase() + sp;
-            long p = Math.abs(r.nextLong());
-            clientResponse = client.callProcedure(swapProcName, p, shouldRollback);
-        }
+        // swaptables sysproc is ALWAYS MP
+        clientResponse = TxnId2Utils.doAdHoc(client, swapProcName + " "
+                + tableName.toUpperCase() + " "
+                + (shouldRollback == 0 ? swapTableName.toUpperCase() : "NONEXISTENT_TABLE"));
         if (isStatusSuccess(clientResponse, shouldRollback, "swap", tableName)) {
             Benchmark.txnCount.incrementAndGet();
             nSwaps++;
@@ -177,6 +168,45 @@ public class TruncateTableLoader extends BenchmarkThread {
             hardStop("getrowcount exception", e);
         }
         if (rowCounts[0] != swapRowCount || rowCounts[1] != tableRowCount) {
+            String message = swapProcName+" on "+tableName+", "+swapTableName
+                    + " failed to swap row counts correctly: went from " + tableRowCount
+                    + ", " + swapRowCount + " to " + rowCounts[0] + ", " + rowCounts[1];
+            hardStop("TruncateTableLoader: " + message);
+        }
+        return rowCounts;
+    }
+
+    private long[] swapTables_dml(byte shouldRollback, String sp) throws IOException, ProcCallException {
+        long[] rowCounts = new long[2];
+        // Tests "SWAP TABLE T1 WITH T2" DML - NYI
+        // Get the row counts, before doing the table-swap
+        long tableRowCount = -1;
+        long swapRowCount  = -1;
+        try {
+            tableRowCount = TxnId2Utils.getRowCount(client, tableName);
+            swapRowCount  = TxnId2Utils.getRowCount(client, swapTableName);
+        } catch (Exception e) {
+            hardStop("getrowcount exception", e);
+        }
+
+        // Perform the table-swap
+        ClientResponse clientResponse = null;
+        String swapProcName = tableName.toUpperCase() + sp;
+        long p = Math.abs(r.nextLong());
+        clientResponse = client.callProcedure(sp, p, shouldRollback);
+        if (isStatusSuccess(clientResponse, shouldRollback, "swap", tableName)) {
+            Benchmark.txnCount.incrementAndGet();
+            nSwaps++;
+        }
+        // Confirm that the table-swap worked correctly, by checking the row counts
+        try {
+            rowCounts[0] = TxnId2Utils.getRowCount(client, tableName);
+            rowCounts[1] = TxnId2Utils.getRowCount(client, swapTableName);
+        } catch (Exception e) {
+            hardStop("getrowcount exception", e);
+        }
+        if (rowCounts[0] != swapRowCount || rowCounts[1] != tableRowCount) {
+            // XXX should check the row counts by partition in the SP case using select count(*) from ... where p=...
             String message = swapProcName+" on "+tableName+", "+swapTableName
                     + " failed to swap row counts correctly: went from " + tableRowCount
                     + ", " + swapRowCount + " to " + rowCounts[0] + ", " + rowCounts[1];
@@ -278,7 +308,6 @@ public class TruncateTableLoader extends BenchmarkThread {
                 hardStop(e);
             }
 
-
             if (latch.get() != 0) {
                 hardStop("latch not zero " + latch.get());
             }
@@ -301,10 +330,8 @@ public class TruncateTableLoader extends BenchmarkThread {
                     sp += r.nextInt(100) < mpRatio * 100. ? "MP" : "SP";
                 }
 
-                // perhaps swap tables, before truncating: we swap both before
-                // and/or after truncating (but not always), so that we are
-                // sometimes swapping two empty tables, sometimes two "full"
-                // (non-empty) tables, and sometimes one of each
+                // maybe swap tables before truncating
+                // sinc @SwapTables is inherintly MP doesn't make much sense to do this in the MP thread
                 if (r.nextInt(100) < swapRatio * 100.) {
                     shouldRollback = (byte) (r.nextInt(10) == 0 ? 1 : 0);
                     long[] rowCounts = swapTables(shouldRollback, sp);
@@ -319,18 +346,6 @@ public class TruncateTableLoader extends BenchmarkThread {
                     swapRowCount = TxnId2Utils.getRowCount(client, swapTableName);
                 }
                 truncateTable(shouldRollback, tp);
-
-                // perhaps swap tables, after truncating (why? see comment above)
-                if (r.nextInt(100) < swapRatio * 100.) {
-                    shouldRollback = (byte) (r.nextInt(10) == 0 ? 1 : 0);
-                    if (shouldRollback != 0) {
-                        currentRowCount = TxnId2Utils.getRowCount(client, tableName);
-                        swapRowCount = TxnId2Utils.getRowCount(client, swapTableName);
-                    }
-                    long[] rowCounts = swapTables(shouldRollback, sp);
-                    currentRowCount = rowCounts[0];
-                    swapRowCount = rowCounts[1];
-                }
 
                 shouldRollback = 0;
             }
@@ -409,7 +424,7 @@ public class TruncateTableLoader extends BenchmarkThread {
             }
             catch (IOException e) {
                 // just need to fall through and get out
-                throw new RuntimeException(e);
+                hardStop(e);
             }
             log.info("table: " + tableName + "; rows sent: " + insertsTried + "; inserted: "
                     + rowsLoaded + "; truncates: " + nTruncates + "; swaps: " + nSwaps);

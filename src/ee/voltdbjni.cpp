@@ -488,9 +488,11 @@ int deserializeParameterSet(const char* serialized_parameterset, jint serialized
 /**
  * Sets (or re-sets) the buffer shared between java and the EE. This is for reducing
  * cost of GetDirectBufferAddress().
- * @param pointer the VoltDBEngine pointer
+ * @param engine_ptr the VoltDBEngine pointer
  * @param parameter_buffer direct byte buffer to be set
- * @param m_parameterBuffersize size of the buffer
+ * @param parameter_buffer_size size of the buffer
+ * @param per_fragment_stats_buffer direct byte buffer to be set
+ * @param per_fragment_stats_buffer_size size of the buffer
  * @param result_buffer direct byte buffer to be set
  * @param result_buffer_size size of the buffer
  * @param exception_buffer direct byte buffer to be set
@@ -498,7 +500,9 @@ int deserializeParameterSet(const char* serialized_parameterset, jint serialized
  * @return error code
 */
 SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeSetBuffers
-  (JNIEnv *env, jobject obj, jlong engine_ptr, jobject parameter_buffer, jint parameter_buffer_size,
+  (JNIEnv *env, jobject obj, jlong engine_ptr,
+   jobject parameter_buffer, jint parameter_buffer_size,
+   jobject per_fragment_stats_buffer, jint per_fragment_stats_buffer_size,
    jobject result_buffer, jint result_buffer_size,
    jobject exception_buffer, jint exception_buffer_size)
 {
@@ -515,6 +519,10 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeSetBu
                 env->GetDirectBufferAddress(parameter_buffer));
         int parameterBufferCapacity = parameter_buffer_size;
 
+        char *perFragmentStatsBuffer = reinterpret_cast<char*>(
+                env->GetDirectBufferAddress(per_fragment_stats_buffer));
+        int perFragmentStatsBufferCapacity = per_fragment_stats_buffer_size;
+
         char *reusedResultBuffer = reinterpret_cast<char*>(
                 env->GetDirectBufferAddress(result_buffer));
         int reusedResultBufferCapacity = result_buffer_size;
@@ -524,6 +532,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeSetBu
         int exceptionBufferCapacity = exception_buffer_size;
 
         engine->setBuffers(parameterBuffer, parameterBufferCapacity,
+            perFragmentStatsBuffer, perFragmentStatsBufferCapacity,
             reusedResultBuffer, reusedResultBufferCapacity,
             exceptionBuffer, exceptionBufferCapacity);
     } catch (const FatalException &e) {
@@ -563,6 +572,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExecu
     try {
         updateJNILogProxy(engine); //JNIEnv pointer can change between calls, must be updated
         engine->resetReusedResultOutputBuffer();
+        engine->resetPerFragmentStatsOutputBuffer();
         static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
 
         // fragment info

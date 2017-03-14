@@ -110,6 +110,11 @@ public class ModuleManager {
     public static void resetCacheRoot() {
         File cacheRoot = CACHE_ROOT.get();
         if (cacheRoot != null && CACHE_ROOT.compareAndSet(cacheRoot, null)) {
+            try {
+                m_self.m_framework.stop();
+            } catch (BundleException bex) {
+                //Ignore
+            }
             m_self = null;
         }
     }

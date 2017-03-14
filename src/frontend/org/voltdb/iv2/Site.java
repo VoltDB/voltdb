@@ -1668,4 +1668,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     public SystemProcedureExecutionContext getSystemProcedureExecutionContext() {
         return m_sysprocContext;
     }
+
+    public ExecutionEngine getExecutionEngine() {
+        return m_ee;
+    }
 }

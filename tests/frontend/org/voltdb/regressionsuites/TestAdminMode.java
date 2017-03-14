@@ -25,19 +25,20 @@ package org.voltdb.regressionsuites;
 import java.io.IOException;
 import java.nio.channels.SocketChannel;
 
-import junit.framework.Test;
-
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
+import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ConnectionUtil;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
+
+import junit.framework.Test;
 
 public class TestAdminMode extends RegressionSuite
 {
@@ -199,6 +200,10 @@ public class TestAdminMode extends RegressionSuite
         ClientConfig config = new ClientConfig();
         config.setProcedureCallTimeout(600000);
         final Client adminclient = ClientFactory.createClient(config);
+        if (((ClientImpl)adminclient).getSSLContext() != null) {
+            return;
+        }
+
         SocketChannel channel = getClientChannel();
 
         try {

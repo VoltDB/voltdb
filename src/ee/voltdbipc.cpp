@@ -63,15 +63,16 @@ public:
          * from Java. These do not exist in ExecutionEngine.java since they are IPC specific.
          * These constants are mirrored in ExecutionEngine.java.
          */
-        kErrorCode_RetrieveDependency = 100,       // Request for dependency
-        kErrorCode_DependencyFound = 101,          // Response to 100
-        kErrorCode_DependencyNotFound = 102,       // Also response to 100
-        kErrorCode_pushExportBuffer = 103,         // Indication that el buffer is next
-        kErrorCode_CrashVoltDB = 104,              // Crash with reason string
-        kErrorCode_getQueuedExportBytes = 105,     // Retrieve value for stats
-        kErrorCode_needPlan = 110,                 // fetch a plan from java for a fragment
-        kErrorCode_progressUpdate = 111,           // Update Java on execution progress
-        kErrorCode_decodeBase64AndDecompress = 112 // Decode base64, compressed data
+        kErrorCode_RetrieveDependency = 100,           // Request for dependency
+        kErrorCode_DependencyFound = 101,              // Response to 100
+        kErrorCode_DependencyNotFound = 102,           // Also response to 100
+        kErrorCode_pushExportBuffer = 103,             // Indication that export buffer is next
+        kErrorCode_CrashVoltDB = 104,                  // Crash with reason string
+        kErrorCode_getQueuedExportBytes = 105,         // Retrieve value for stats
+        kErrorCode_pushPerFragmentStatsBuffer = 106,   // Indication that per-fragment statistics buffer is next
+        kErrorCode_needPlan = 110,                     // fetch a plan from java for a fragment
+        kErrorCode_progressUpdate = 111,               // Update Java on execution progress
+        kErrorCode_decodeBase64AndDecompress = 112     // Decode base64, compressed data
     };
 
     VoltDBIPC(int fd);
@@ -182,6 +183,8 @@ private:
 
     void executeTask(struct ipc_command*);
 
+    void sendPerFragmentStatsBuffer();
+
     void sendException( int8_t errorCode);
 
     int8_t activateTableStream(struct ipc_command *cmd);
@@ -194,6 +197,7 @@ private:
     void setupSigHandler(void) const;
 
     int m_fd;
+    char *m_perFragmentStatsBuffer;
     char *m_reusedResultBuffer;
     char *m_exceptionBuffer;
     bool m_terminate;
@@ -220,6 +224,7 @@ typedef struct {
     int64_t lastCommittedSpHandle;
     int64_t uniqueId;
     int64_t undoToken;
+    int8_t perFragmentTimingEnabled;
     int32_t numFragmentIds;
     char data[0];
 }__attribute__((packed)) querypfs;
@@ -397,6 +402,7 @@ VoltDBIPC::VoltDBIPC(int fd) : m_fd(fd) {
     m_engine = NULL;
     m_counter = 0;
     m_reusedResultBuffer = NULL;
+    m_perFragmentStatsBuffer = NULL;
     m_tupleBuffer = NULL;
     m_tupleBufferSize = 0;
     m_terminate = false;
@@ -412,6 +418,7 @@ VoltDBIPC::~VoltDBIPC() {
     if (m_engine != NULL) {
         delete m_engine;
         delete [] m_reusedResultBuffer;
+        delete [] m_perFragmentStatsBuffer;
         delete [] m_tupleBuffer;
         delete [] m_exceptionBuffer;
     }
@@ -628,10 +635,12 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
         m_engine = new VoltDBEngine(this, new voltdb::StdoutLogProxy());
         m_engine->getLogManager()->setLogLevels(cs->logLevels);
         m_reusedResultBuffer = new char[MAX_MSG_SZ];
+        m_perFragmentStatsBuffer = new char[MAX_MSG_SZ];
         std::memset(m_reusedResultBuffer, 0, MAX_MSG_SZ);
         m_exceptionBuffer = new char[MAX_MSG_SZ];
-        m_engine->setBuffers(NULL, 0, m_reusedResultBuffer, MAX_MSG_SZ,
-                             m_exceptionBuffer, MAX_MSG_SZ);
+        m_engine->setBuffers(NULL, 0, m_perFragmentStatsBuffer, MAX_MSG_SZ,
+                                      m_reusedResultBuffer, MAX_MSG_SZ,
+                                      m_exceptionBuffer, MAX_MSG_SZ);
         // The tuple buffer gets expanded (doubled) as needed, but never compacted.
         m_tupleBufferSize = MAX_MSG_SZ;
         m_tupleBuffer = new char[m_tupleBufferSize];
@@ -781,7 +790,8 @@ void VoltDBIPC::executePlanFragments(struct ipc_command *cmd) {
     ReferenceSerializeInputBE serialize_in(offset, sz);
 
     // and reset to space for the results output
-    m_engine->resetReusedResultOutputBuffer(1);//1 byte to add status code
+    m_engine->resetReusedResultOutputBuffer(1); // 1 byte to add status code
+    m_engine->resetPerFragmentStatsOutputBuffer(queryCommand->perFragmentTimingEnabled);
 
     try {
         errors = m_engine->executePlanFragments(numFrags,
@@ -798,6 +808,8 @@ void VoltDBIPC::executePlanFragments(struct ipc_command *cmd) {
         crashVoltDB(e);
     }
 
+    sendPerFragmentStatsBuffer();
+
     // write the results array back across the wire
     if (errors == 0) {
         // write the results array back across the wire
@@ -808,6 +820,16 @@ void VoltDBIPC::executePlanFragments(struct ipc_command *cmd) {
     } else {
         sendException(kErrorCode_Error);
     }
+}
+
+void VoltDBIPC::sendPerFragmentStatsBuffer() {
+    int8_t statusCode = static_cast<int8_t>(kErrorCode_pushPerFragmentStatsBuffer);
+    writeOrDie(m_fd, (unsigned char*)&statusCode, sizeof(int8_t));
+    // write the per-fragment stats back across the wire
+    char *perFragmentStatsBuffer = m_engine->getPerFragmentStatsBuffer();
+    int32_t perFragmentStatsBufferSizeToSend = htonl(m_engine->getPerFragmentStatsSize());
+    writeOrDie(m_fd, (unsigned char*)&perFragmentStatsBufferSizeToSend, sizeof(int32_t));
+    writeOrDie(m_fd, (unsigned char*)perFragmentStatsBuffer, m_engine->getPerFragmentStatsSize());
 }
 
 void VoltDBIPC::sendException(int8_t errorCode) {

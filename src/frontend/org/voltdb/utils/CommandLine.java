@@ -124,10 +124,12 @@ public class CommandLine extends VoltDB.Configuration
         cl.m_enableAdd = m_enableAdd;
         cl.m_voltdbRoot = m_voltdbRoot;
         cl.m_newCli = m_newCli;
+        cl.m_sslEnable = m_sslEnable;
+        cl.m_sslExternal = m_sslExternal;
         cl.m_placementGroup = m_placementGroup;
         // deep copy the property map if it exists
         if (javaProperties != null) {
-            cl.javaProperties = new TreeMap<String, String>();
+            cl.javaProperties = new TreeMap<>();
             for (Entry<String, String> e : javaProperties.entrySet()) {
                 cl.javaProperties.put(e.getKey(), e.getValue());
             }
@@ -470,7 +472,7 @@ public class CommandLine extends VoltDB.Configuration
     public CommandLine setJavaProperty(String property, String value)
     {
         if (javaProperties == null) {
-            javaProperties = new TreeMap<String, String>();
+            javaProperties = new TreeMap<>();
         }
         javaProperties.put(property, value);
         return this;
@@ -519,7 +521,7 @@ public class CommandLine extends VoltDB.Configuration
 
     // Return a command line list compatible with ProcessBuilder.command()
     public List<String> createCommandLine() {
-        List<String> cmdline = new ArrayList<String>(50);
+        List<String> cmdline = new ArrayList<>(50);
         cmdline.add(javaExecutable);
         cmdline.add("-XX:+HeapDumpOnOutOfMemoryError");
         cmdline.add("-Dsun.net.inetaddr.ttl=300");
@@ -596,6 +598,15 @@ public class CommandLine extends VoltDB.Configuration
             cmdline.add("-Dvolt.rmi.server.hostname=" + jmxHost);
         }
 
+        // add default keystore, truststore
+        if (m_sslEnable) {
+            cmdline.add("-Djavax.net.ssl.keyStore=keystore");
+            cmdline.add("-Djavax.net.ssl.keyStorePassword=password");
+            cmdline.add("-Djavax.net.ssl.trustStore=keystore");
+            cmdline.add("-Djavax.net.ssl.trustStorePassword=password");
+        }
+
+
         if (javaProperties != null) {
             for (Entry<String, String> e : javaProperties.entrySet()) {
                 if (e.getValue() != null) {
@@ -611,13 +622,16 @@ public class CommandLine extends VoltDB.Configuration
             cmdline.add("-Xdebug");
             cmdline.add("-agentlib:jdwp=transport=dt_socket,address=" + debugPort + ",server=y,suspend=n");
         }
+
+
         //
         // Process JVM options passed through the VOLTDB_OPTS environment variable
         //
-        List<String> additionalJvmOptions = new ArrayList<String>();
+        List<String> additionalJvmOptions = new ArrayList<>();
         String nonJvmOptions = AdditionalJvmOptionsProcessor
                 .getJvmOptionsFromVoltDbOptsEnvironmentVariable(additionalJvmOptions);
         cmdline.addAll(additionalJvmOptions);
+
 
         //
         // VOLTDB main() parameters
@@ -631,6 +645,14 @@ public class CommandLine extends VoltDB.Configuration
 
         if (m_startAction == StartAction.PROBE && m_enableAdd) {
             cmdline.add("enableadd");
+        }
+
+        if (m_sslEnable) {
+            cmdline.add("enableSSL");
+        }
+
+        if (m_sslExternal) {
+            cmdline.add("externalSSL");
         }
 
         cmdline.add("host");
@@ -813,7 +835,7 @@ public class CommandLine extends VoltDB.Configuration
          * @return an argument array representing the specified command line.
          */
         public static String[] tokenize(String commandLine) {
-            List<String> resultBuffer = new java.util.ArrayList<String>();
+            List<String> resultBuffer = new java.util.ArrayList<>();
 
             if (commandLine != null) {
                 int z = commandLine.length();
@@ -876,7 +898,7 @@ public class CommandLine extends VoltDB.Configuration
         /**
          * Options which may not be specified in VOLTDB_OPTS
          */
-        static final Set<String> mayNotSpecify = new HashSet<String>(
+        static final Set<String> mayNotSpecify = new HashSet<>(
                 Arrays.<String>asList(
                         "-cp",
                         "-classpath",
@@ -893,7 +915,7 @@ public class CommandLine extends VoltDB.Configuration
          * Options that may be otherwise specified though documented
          * VoltDB options
          */
-        static final Set<String> mayOtherwiseSpecify = new HashSet<String>(
+        static final Set<String> mayOtherwiseSpecify = new HashSet<>(
                 Arrays.<String>asList(
                         "-Dlog4j.configuration",
                         "-Xm",
@@ -905,7 +927,7 @@ public class CommandLine extends VoltDB.Configuration
         /**
          * Options that have a follow up that needs to be also ignored
          */
-        static final Set<String> requiresSkipNext = new HashSet<String>(
+        static final Set<String> requiresSkipNext = new HashSet<>(
                 Arrays.<String>asList(
                         "-cp",
                         "-classpath"
@@ -961,7 +983,7 @@ public class CommandLine extends VoltDB.Configuration
             }
 
             boolean skipNext = false;
-            List<String> nonJvmOptions = new ArrayList<String>();
+            List<String> nonJvmOptions = new ArrayList<>();
 
             for( String option: CommandLineTokenizer.tokenize(voltDbOpts)) {
                 if( skipNext) {
