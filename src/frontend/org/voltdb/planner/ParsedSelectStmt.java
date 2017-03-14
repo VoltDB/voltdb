@@ -938,7 +938,10 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 throw new PlanningErrorException(
                         "Only one windowed function call may appear in a selection list.");
             }
-
+            if (m_hasAggregateExpression) {
+                throw new PlanningErrorException(
+                        "Use of both a windowed function call and aggregate operators in a single query is not supported.");
+            }
             //
             // This could be an if statement, but I think it's better to
             // leave this as a pattern in case we decide to implement more
