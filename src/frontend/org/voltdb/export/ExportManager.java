@@ -29,7 +29,6 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.voltcore.logging.Level;
@@ -137,15 +136,6 @@ public class ExportManager
 
     private int m_connCount = 0;
 
-    /*
-     * Issue a permit when a generation is drained so that when we are truncating if a generation
-     * is completely truncated we can wait for the on generation drained task to finish.
-     *
-     * This eliminates a race with CL replay where it may do catalog updates and such while truncation
-     * is still running on generation drained.
-     */
-    private final Semaphore m_onGenerationDrainedForTruncation = new Semaphore(0);
-
     public class GenerationDrainRunnable implements Runnable {
 
         private final ExportGeneration m_generation;
@@ -181,8 +171,6 @@ public class ExportManager
                         exportLog.error("Error rolling to next export generation", e);
                     } catch (Exception e) {
                         exportLog.error("Error rolling to next export generation", e);
-                    } finally {
-                        m_onGenerationDrainedForTruncation.release();
                     }
                 }
 
@@ -743,15 +731,8 @@ public class ExportManager
     public void truncateExportToTxnId(long snapshotTxnId, long[] perPartitionTxnIds) {
         exportLog.info("Truncating export data after txnId " + snapshotTxnId);
         for (ExportGeneration generation : m_generations.values()) {
-            //If the generation was completely drained, wait for the task to finish running
-            //by waiting for the permit that will be generated
-            if (generation.truncateExportToTxnId(snapshotTxnId, perPartitionTxnIds)) {
-                try {
-                    m_onGenerationDrainedForTruncation.acquire();
-                } catch (InterruptedException e) {
-                    VoltDB.crashLocalVoltDB("Interrupted truncating export data", true, e);
-                }
-            }
+            //This just registers the tuncation point for data sources.
+            generation.truncateExportToTxnId(snapshotTxnId, perPartitionTxnIds);
         }
     }
 
