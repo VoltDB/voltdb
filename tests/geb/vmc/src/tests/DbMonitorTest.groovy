@@ -3351,6 +3351,7 @@ class DbMonitorTest extends TestBase {
         page.storedProceduresCheckbox.click()
         then: 'Save Preference'
         page.savePreferencesBtn.click()
+        report 'savePreferencesBtn'
 
         when: 'wait for filter in stored procedure'
         waitFor(waitTime) { page.filterStoredProcedure.isDisplayed() }
@@ -3388,11 +3389,13 @@ class DbMonitorTest extends TestBase {
 
         when: 'check deleted status'
         try {
-          waitFor(waitTime) { !$("#storeProcedureBody > tr > td:nth-child(1)").text().equals(storedProcedureName) }
+          //waitFor(waitTime) { !$("#storeProcedureBody > tr > td:nth-child(1)").text().equals(storedProcedureName) }
           waitFor(waitTime) { $("#storeProcedureBody > tr > td").isDisplayed() }
           deletedStatus = true
         } catch (geb.waiting.WaitTimeoutException e) {
         }
+        println(createdStatus)
+        println(deletedStatus)
         then: 'display final result'
         if (createdStatus == true && deletedStatus == true) {
           println("addProcedureAndCheck - PASS")
