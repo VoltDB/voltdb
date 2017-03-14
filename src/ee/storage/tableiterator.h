@@ -72,6 +72,7 @@ class TableIterator : public TupleIterator {
 
     friend class TempTable;
     friend class PersistentTable;
+    friend class LargeTempTable;
 
 public:
 
