@@ -36,15 +36,17 @@ import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.voltdb.BackendTarget;
+import org.voltdb.ServerThread;
+import org.voltdb.VoltDB.Configuration;
+import org.voltdb.client.ClientConfig;
+import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.utils.MiscUtils;
+
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
-import org.voltdb.BackendTarget;
-import org.voltdb.ServerThread;
-import org.voltdb.VoltDB.Configuration;
-import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.utils.MiscUtils;
 
 public class TestJDBCStreamQueries {
     private static final String TEST_XML = "jdbcstreamstest.xml";
@@ -100,7 +102,12 @@ public class TestJDBCStreamQueries {
         server.waitForInitialization();
 
         Class.forName("org.voltdb.jdbc.Driver");
-        conn = DriverManager.getConnection("jdbc:voltdb://localhost:21212");
+        if (ClientConfig.ENABLE_SSL_FOR_TEST) {
+            conn = DriverManager.getConnection("jdbc:voltdb://localhost:21212?" + JDBCTestCommons.SSL_URL_SUFFIX);
+        }
+        else {
+            conn = DriverManager.getConnection("jdbc:voltdb://localhost:21212");
+        }
     }
 
     private static void stopServer() throws SQLException {

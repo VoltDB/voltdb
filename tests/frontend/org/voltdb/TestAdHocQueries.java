@@ -614,7 +614,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
         m_client = ClientFactory.createClient();
         m_client.createConnection("localhost", config.m_port);
 
-        String sql = getQueryForLongQueryTable(750);
+        String sql = getQueryForLongQueryTable(1200);
         try {
             m_client.callProcedure("@AdHoc", sql);
             fail("Query was expected to generate stack overflow error");
@@ -897,7 +897,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
                 fail("Compilation should have failed.");
             }
             catch(ProcCallException e) {
-                assertTrue(e.getMessage().contains("Error compiling"));
+                assertTrue(e.getMessage().contains("invalid format for a constant timestamp value"));
             }
             String sql = String.format("INSERT INTO TS_CONSTRAINT_EXCEPTION VALUES ('%s','{}');",
                     new TimestampType().toString());

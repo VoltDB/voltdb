@@ -794,4 +794,43 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
             teardownSystem();
         }
     }
+
+    @Test
+    public void testCreateProceduresBeforeUpdateClasses() throws Exception {
+        System.out.println("\n\n-----\n testCreateProceduresBeforeUpdateClasses \n-----\n\n");
+
+        String pathToCatalog = Configuration.getPathToCatalogForTest("updateclasses.jar");
+        String pathToDeployment = Configuration.getPathToCatalogForTest("updateclasses.xml");
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema(
+                "create table t1 (a int, b int); \n" +
+                "create procedure proc1 as select a from t1 where b = ?;");
+        builder.setUseDDLSchema(true);
+        boolean success = builder.compile(pathToCatalog, 2, 1, 0);
+        assertTrue("Schema compilation failed", success);
+        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
+
+        try {
+            VoltDB.Configuration config = new VoltDB.Configuration();
+            config.m_pathToCatalog = pathToCatalog;
+            config.m_pathToDeployment = pathToDeployment;
+            startSystem(config);
+
+            ClientResponse resp;
+            InMemoryJarfile boom = new InMemoryJarfile();
+            VoltCompiler comp = new VoltCompiler(false);
+            comp.addClassToJar(boom, org.voltdb_testprocs.updateclasses.NoMeaningClass.class);
+            comp.addClassToJar(boom, org.voltdb_testprocs.updateclasses.testImportProc.class);
+            try {
+                resp = m_client.callProcedure("@UpdateClasses", boom.getFullJarBytes(), null);
+                assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+            }
+            catch (ProcCallException pce) {
+                fail("@UpdateClasses should not fail with message: " + pce.getMessage());
+            }
+        }
+        finally {
+            teardownSystem();
+        }
+    }
 }

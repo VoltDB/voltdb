@@ -49,11 +49,14 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.LockSupport;
 
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLEngine;
 import javax.security.auth.Subject;
 
 import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashMap;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
+import org.voltcore.network.CipherExecutor;
 import org.voltcore.network.Connection;
 import org.voltcore.network.QueueMonitor;
 import org.voltcore.network.VoltNetworkPool;
@@ -61,6 +64,7 @@ import org.voltcore.network.VoltNetworkPool.IOStatsIntf;
 import org.voltcore.network.VoltProtocolHandler;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
+import org.voltcore.utils.ssl.SSLConfiguration;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
 import org.voltdb.client.ClientStatusListenerExt.DisconnectCause;
@@ -71,6 +75,7 @@ import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableSet;
 import com.google_voltpatches.common.collect.Maps;
+import com.google_voltpatches.common.collect.Sets;
 
 import jsr166y.ThreadLocalRandom;
 
@@ -99,6 +104,8 @@ class Distributer {
 
     //Selector and connection handling, does all work in blocking selection thread
     private final VoltNetworkPool m_network;
+
+    private final SSLContext m_sslContext;
 
     // Temporary until a distribution/affinity algorithm is written
     private int m_nextConnection = 0;
@@ -176,6 +183,9 @@ class Distributer {
      * JAAS Authentication Subject
      */
     private final Subject m_subject;
+
+    // executor service for ssl encryption/decryption, if ssl is enabled.
+    private CipherExecutor m_cipherService;
 
     /**
      * Handles topology updates for client affinity
@@ -594,7 +604,6 @@ class Distributer {
         /**
          * Update the procedures statistics
          * @param procName Name of procedure being updated
-         * @param roundTrip round trip from client queued to client response callback invocation
          * @param clusterRoundTrip round trip measured within the VoltDB cluster
          * @param abort true of the procedure was aborted
          * @param failure true if the procedure failed
@@ -907,7 +916,7 @@ class Distributer {
         this( false,
                 ClientConfig.DEFAULT_PROCEDURE_TIMOUT_NANOS,
                 ClientConfig.DEFAULT_CONNECTION_TIMOUT_MS,
-                false, false, null);
+                false, false, null, null);
     }
 
     Distributer(
@@ -916,8 +925,16 @@ class Distributer {
             long connectionResponseTimeoutMS,
             boolean useClientAffinity,
             boolean sendReadsToReplicasBytDefault,
-            Subject subject) {
+            Subject subject,
+            SSLContext sslContext) {
         m_useMultipleThreads = useMultipleThreads;
+        m_sslContext = sslContext;
+        if (m_sslContext != null) {
+            m_cipherService = CipherExecutor.CLIENT;
+            m_cipherService.startup();
+        } else {
+            m_cipherService = null;
+        }
         m_network = new VoltNetworkPool(
                 m_useMultipleThreads ? Math.max(1, CoreUtils.availableProcessors() / 4 ) : 1,
                 1, null, "Client");
@@ -942,14 +959,45 @@ class Distributer {
     void createConnectionWithHashedCredentials(String host, String program, byte[] hashedPassword, int port, ClientAuthScheme scheme)
     throws UnknownHostException, IOException
     {
+        SSLEngine sslEngine = null;
+
+        if (m_sslContext != null) {
+            sslEngine = m_sslContext.createSSLEngine("client", port);
+            sslEngine.setUseClientMode(true);
+
+            Set<String> enabled = ImmutableSet.copyOf(sslEngine.getEnabledCipherSuites());
+            Set<String> intersection = Sets.intersection(SSLConfiguration.GCM_CIPHERS, enabled);
+            if (intersection.isEmpty()) {
+                intersection = Sets.intersection(SSLConfiguration.PREFERRED_CIPHERS, enabled);
+            }
+            if (intersection.isEmpty()) {
+                intersection = enabled;
+            }
+            sslEngine.setEnabledCipherSuites(intersection.toArray(new String[0]));
+        }
+
         final Object socketChannelAndInstanceIdAndBuildString[] =
-            ConnectionUtil.getAuthenticatedConnection(host, program, hashedPassword, port, m_subject, scheme);
+            ConnectionUtil.getAuthenticatedConnection(host, program, hashedPassword, port, m_subject, scheme, sslEngine);
         final SocketChannel aChannel = (SocketChannel)socketChannelAndInstanceIdAndBuildString[0];
         final long instanceIdWhichIsTimestampAndLeaderIp[] = (long[])socketChannelAndInstanceIdAndBuildString[1];
         final int hostId = (int)instanceIdWhichIsTimestampAndLeaderIp[0];
 
         NodeConnection cxn = new NodeConnection(instanceIdWhichIsTimestampAndLeaderIp);
-        Connection c = m_network.registerChannel( aChannel, cxn);
+        Connection c = null;
+        try {
+            if (aChannel != null) {
+                c = m_network.registerChannel(aChannel, cxn, m_cipherService, sslEngine);
+            }
+        }
+        catch (Exception e) {
+            // Need to clean up the socket if there was any failure
+            try {
+                aChannel.close();
+            } catch (IOException e1) {
+                //Don't care connection is already lost anyways
+            }
+            Throwables.propagate(e);
+        }
         cxn.m_connection = c;
 
         synchronized (this) {
@@ -1222,6 +1270,10 @@ class Distributer {
         }
 
         m_network.shutdown();
+        if (m_cipherService != null) {
+            m_cipherService.shutdown();
+            m_cipherService = null;
+        }
     }
 
     void uncaughtException(ProcedureCallback cb, ClientResponse r, Throwable t) {

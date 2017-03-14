@@ -42,7 +42,9 @@ public class Resume extends VoltSystemProcedure {
 
     private final static OperationMode RUNNING = OperationMode.RUNNING;
     @Override
-    public void init() {}
+    public long[] getPlanFragmentIds() {
+        return new long[]{};
+    }
 
     @Override
     public DependencyPair executePlanFragment(

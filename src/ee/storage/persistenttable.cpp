@@ -483,7 +483,7 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
         // There is Elastic Index work going on and
         // it should continue to access the old table.
         // Add one reference count to keep the original table.
-        emptyTable->setTableForStreamIndexing(this);
+        emptyTable->setTableForStreamIndexing(this, this->tableForStreamIndexing());
     }
 
     // add matView
@@ -647,6 +647,8 @@ void PersistentTable::swapTable(PersistentTable* otherTable,
     // having been switched to use each other's table and index names.
     assert(hasNameIntegrity(name(), otherIndexNames));
     assert(hasNameIntegrity(otherTable->name(), theIndexNames));
+
+    ExecutorContext::getEngine()->rebuildTableCollections();
 }
 
 void PersistentTable::swapTableState(PersistentTable* otherTable) {
@@ -666,11 +668,21 @@ void PersistentTable::swapTableState(PersistentTable* otherTable) {
 
     std::swap(m_name, otherTable->m_name);
 
-    auto heldStreamIndexingTable = tableForStreamIndexing();
-    setTableForStreamIndexing(otherTable->tableForStreamIndexing());
-    otherTable->setTableForStreamIndexing(heldStreamIndexingTable);
+    if (m_tableStreamer &&
+            m_tableStreamer->hasStreamType(TABLE_STREAM_ELASTIC_INDEX)) {
+        // There is Elastic Index work going on and
+        // it should continue to access the old table.
+        // Add one reference count to keep the original table.
+        auto heldStreamIndexingTable = tableForStreamIndexing();
+        auto heldOtherStreamIndexingTable = otherTable->tableForStreamIndexing();
+        setTableForStreamIndexing(otherTable, heldOtherStreamIndexingTable);
+        otherTable->setTableForStreamIndexing(this, heldStreamIndexingTable);
+    }
 
-    std::swap(m_tableStreamer, otherTable->m_tableStreamer);
+    // NOTE: do not swap m_tableStreamers here... we want them to
+    // stick to their original tables, so that if a swap occurs during
+    // an ongoing snapshot, subsequent changes to the table notify the
+    // right TableStreamer instance.
 }
 
 void PersistentTable::swapTableIndexes(PersistentTable* otherTable,
@@ -1148,6 +1160,9 @@ void PersistentTable::updateTupleForUndo(char* tupleWithUnwantedValues,
 }
 
 void PersistentTable::deleteTuple(TableTuple& target, bool fallible) {
+    UndoQuantum* uq = ExecutorContext::currentUndoQuantum();
+    bool createUndoAction = fallible && (uq != NULL);
+
     // May not delete an already deleted tuple.
     assert(target.isActive());
 
@@ -1165,14 +1180,21 @@ void PersistentTable::deleteTuple(TableTuple& target, bool fallible) {
         size_t drMark = drStream->appendTuple(lastCommittedSpHandle, m_signature, m_partitionColumn, currentSpHandle,
                                               currentUniqueId, target, DR_RECORD_DELETE);
 
-        UndoQuantum* uq = ExecutorContext::currentUndoQuantum();
-        if (uq && fallible) {
+        if (createUndoAction) {
             uq->registerUndoAction(new (*uq) DRTupleStreamUndoAction(drStream, drMark, rowCostForDRRecord(DR_RECORD_DELETE)));
         }
     }
 
     // Just like insert, we want to remove this tuple from all of our indexes
     deleteFromAllIndexes(&target);
+
+    if (createUndoAction) {
+        target.setPendingDeleteOnUndoReleaseTrue();
+        ++m_tuplesPinnedByUndo;
+        ++m_invisibleTuplesPendingDeleteCount;
+        // Create and register an undo action.
+        uq->registerUndoAction(new (*uq) PersistentTableUndoDeleteAction(target.address(), &m_surgeon), this);
+    }
 
     // handle any materialized views, insert the tuple into delta table,
     // then hide the tuple from the scan temporarily.
@@ -1194,16 +1216,8 @@ void PersistentTable::deleteTuple(TableTuple& target, bool fallible) {
         }
     }
 
-    if (fallible) {
-        UndoQuantum* uq = ExecutorContext::currentUndoQuantum();
-        if (uq) {
-            target.setPendingDeleteOnUndoReleaseTrue();
-            ++m_tuplesPinnedByUndo;
-            ++m_invisibleTuplesPendingDeleteCount;
-            // Create and register an undo action.
-            uq->registerUndoAction(new (*uq) PersistentTableUndoDeleteAction(target.address(), &m_surgeon), this);
-            return;
-        }
+    if (createUndoAction) {
+        return;
     }
 
     // Here, for reasons of infallibility or no active UndoLog, there is no undo, there is only DO.

@@ -34,6 +34,7 @@ public enum StatsSelector {
     SNAPSHOTSTATUS,
     PROCEDUREINPUT,
     PROCEDUREOUTPUT,
+    PROCEDUREDETAIL,  // provides more granular statistics for procedure calls at a per-statement level.
 
     /*
      * DRPRODUCERPARTITION and DRPRODUCERNODE are internal names

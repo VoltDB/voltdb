@@ -79,7 +79,7 @@ function async-benchmark-help() {
 function async-benchmark() {
     jars-ifneeded
     java -ea -classpath txnid.jar:$CLASSPATH: -Dlog4j.configuration=file://$CLIENTLOG4J \
-        txnIdSelfCheck.Benchmark \
+        txnIdSelfCheck.Benchmark $ARGS \
         --displayinterval=1 \
         --duration=100 \
         --servers=localhost \
@@ -96,6 +96,7 @@ function async-benchmark() {
         --allowinprocadhoc=false
         # --disabledthreads=ddlt,partBiglt,replBiglt,partCappedlt,replCappedlt,replLoadlt,partLoadlt,adHocMayhemThread,idpt,partTrunclt,replTrunclt
 #ddlt,clients,partBiglt,replBiglt,partCappedlt,replCappedlt,replLoadlt,partLoadlt,adHocMayhemThread,idpt,readThread,partTrunclt,replTrunclt
+        # --sslfile=./keystore.props
 }
 
 function init() {
@@ -109,5 +110,13 @@ function help() {
 
 # Run the target passed as the first arg on the command line
 # If no first arg, run server
-if [ $# -gt 1 ]; then help; exit; fi
-if [ $# = 1 ]; then $1; else server; fi
+# If more than one arg, pass the rest to the client (async-benchmark)
+ARGS=""
+if [ $# -gt 1 ]; then
+    if [ $1 = "client" ] || [ $1 = "async-benchmark" ]; then
+        ARGS="${@:2}";
+    else
+        help; exit;
+    fi;
+fi
+if [ $# -ge 1 ]; then $1; else server; fi

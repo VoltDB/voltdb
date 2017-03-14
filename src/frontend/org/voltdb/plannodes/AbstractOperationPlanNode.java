@@ -23,6 +23,7 @@ import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Database;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.planner.AbstractParsedStmt;
 
 public abstract class AbstractOperationPlanNode extends AbstractPlanNode {
 
@@ -85,9 +86,6 @@ public abstract class AbstractOperationPlanNode extends AbstractPlanNode {
         // of one column, which is the number of modified tuples
         // Delete nodes have a special case with no child node when they
         // are truncating the entire table
-        assert(m_children.size() == 1 ||
-               ((this instanceof DeletePlanNode) &&
-                (((DeletePlanNode)this).m_truncate)));
         if (m_children.size() == 1) {
             m_children.get(0).generateOutputSchema(db);
         }
@@ -101,12 +99,12 @@ public abstract class AbstractOperationPlanNode extends AbstractPlanNode {
             // This TVE is magic and repeats unfortunately like this
             // throughout the planner.  Consolidate at some point --izzy
             TupleValueExpression tve = new TupleValueExpression(
-                    "VOLT_TEMP_TABLE", "VOLT_TEMP_TABLE",
+                    AbstractParsedStmt.TEMP_TABLE_NAME, AbstractParsedStmt.TEMP_TABLE_NAME,
                     "modified_tuples", "modified_tuples", 0);
             tve.setValueType(VoltType.BIGINT);
             tve.setValueSize(VoltType.BIGINT.getLengthInBytesForFixedTypes());
             m_outputSchema.addColumn(
-                    "VOLT_TEMP_TABLE", "VOLT_TEMP_TABLE",
+                    AbstractParsedStmt.TEMP_TABLE_NAME, AbstractParsedStmt.TEMP_TABLE_NAME,
                     "modified_tuples", "modified_tuples",
                     tve);
         }
@@ -115,17 +113,9 @@ public abstract class AbstractOperationPlanNode extends AbstractPlanNode {
 
     @Override
     public void resolveColumnIndexes() {
-        assert(m_children.size() == 1 ||
-               ((this instanceof DeletePlanNode) &&
-                (((DeletePlanNode)this).m_truncate)));
         if (m_children.size() == 1) {
             m_children.get(0).resolveColumnIndexes();
         }
-        // No operation plan node (INSERT/UPDATE/DELETE) currently
-        // has any care about column indexes.  I think that updates may
-        // (should) eventually care about a mapping of input schema
-        // to columns in the target table that doesn't rely on matching
-        // column names in the EE. --izzy
     }
 
     @Override

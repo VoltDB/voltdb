@@ -145,9 +145,14 @@ class ParameterizationInfo {
                 break;
             }
         }
-        assert(paramsNode != null);
 
-        // don't optimize plans with params yet
+        // Some plans, like for SWAP TABLE can't use parameters
+        if (paramsNode == null) {
+            return;
+        }
+
+        // For the current implementation, to avoid confusion,
+        // don't optimize plans that have user-supplied params.
         if (paramsNode.children.size() > 0) {
             return;
         }

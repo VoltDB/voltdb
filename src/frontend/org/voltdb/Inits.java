@@ -38,17 +38,20 @@ import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
+import org.voltcore.network.CipherExecutor;
 import org.voltcore.utils.Pair;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.common.Constants;
 import org.voltdb.common.NodeState;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
+import org.voltdb.compiler.deploymentfile.KeyOrTrustStoreType;
+import org.voltdb.compiler.deploymentfile.SslType;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
-import org.voltdb.compiler.deploymentfile.HttpsType;
 import org.voltdb.export.ExportManager;
 import org.voltdb.importer.ImportManager;
 import org.voltdb.iv2.MpInitiator;
@@ -80,6 +83,7 @@ public class Inits {
     final VoltDB.Configuration m_config;
     final boolean m_isRejoin;
     DeploymentType m_deployment = null;
+    final boolean m_durable;
 
     final Map<Class<? extends InitWork>, InitWork> m_jobs = new HashMap<>();
     final PriorityBlockingQueue<InitWork> m_readyJobs = new PriorityBlockingQueue<>();
@@ -120,7 +124,7 @@ public class Inits {
         }
     }
 
-    Inits(NodeStateTracker statusTracker, RealVoltDB rvdb, int threadCount) {
+    Inits(NodeStateTracker statusTracker, RealVoltDB rvdb, int threadCount, boolean durable) {
         m_rvdb = rvdb;
         m_statusTracker = statusTracker;
         m_config = rvdb.getConfig();
@@ -128,6 +132,7 @@ public class Inits {
         // (used for license check and later the actual rejoin)
         m_isRejoin = m_config.m_startAction.doesRejoin();
         m_threadCount = threadCount;
+        m_durable = durable;
         m_deployment = rvdb.m_catalogContext.getDeployment();
 
         // find all the InitWork subclasses using reflection and load them up
@@ -471,6 +476,107 @@ public class Inits {
         }
     }
 
+    class SetupSSL extends InitWork {
+        private static final String DEFAULT_KEYSTORE_RESOURCE = "keystore";
+        private static final String DEFAULT_KEYSTORE_PASSWD = "password";
+
+        @Override
+        public void run() {
+            SslType sslType = m_deployment.getSsl();
+            if ((sslType != null && sslType.isEnabled()) || (m_config.m_sslEnable)) {
+                try {
+                    m_config.m_sslContextFactory = getSSLContextFactory(sslType);
+                    m_config.m_sslContextFactory.start();
+                    hostLog.info("SSL Enabled for HTTP. Please point browser to HTTPS URL.");
+                    if ((sslType != null && sslType.isExternal()) || m_config.m_sslExternal) {
+                        m_config.m_sslContext = m_config.m_sslContextFactory.getSslContext();
+                        hostLog.info("SSL enabled for admin and client port. Please enable SSL on client.");
+                    }
+                    CipherExecutor.SERVER.startup();
+                } catch (Exception e) {
+                    VoltDB.crashLocalVoltDB("Unable to configure SSL", true, e);
+                }
+            }
+        }
+
+        private String getResourcePath(String resource) {
+            URL res = this.getClass().getResource(resource);
+            return res == null ? resource : res.getPath();
+        }
+
+        private SslContextFactory getSSLContextFactory(SslType sslType) {
+            SslContextFactory sslContextFactory = new SslContextFactory();
+            String keyStorePath = getKeyTrustStoreAttribute("javax.net.ssl.keyStore", sslType.getKeystore(), "path");
+            keyStorePath = null == keyStorePath  ? getResourcePath(DEFAULT_KEYSTORE_RESOURCE):getResourcePath(keyStorePath);
+            if (keyStorePath == null || keyStorePath.trim().isEmpty()) {
+                throw new IllegalArgumentException("A path for the SSL keystore file was not specified.");
+            }
+            if (! new File(keyStorePath).exists()) {
+                throw new IllegalArgumentException("The specified SSL keystore file " + keyStorePath + " was not found.");
+            }
+            sslContextFactory.setKeyStorePath(keyStorePath);
+
+            String keyStorePassword = getKeyTrustStoreAttribute("javax.net.ssl.keyStorePassword", sslType.getKeystore(), "password");
+            if (m_config.m_sslEnable && null == keyStorePassword) {
+                keyStorePassword = DEFAULT_KEYSTORE_PASSWD;
+            }
+            if (keyStorePassword == null) {
+                throw new IllegalArgumentException("An SSL keystore password was not specified.");
+            }
+            sslContextFactory.setKeyStorePassword(keyStorePassword);
+
+            String trustStorePath = getKeyTrustStoreAttribute("javax.net.ssl.trustStore", sslType.getTruststore(), "path");
+            if (sslType.isEnabled() || m_config.m_sslEnable) {
+                trustStorePath = null == trustStorePath  ? getResourcePath(DEFAULT_KEYSTORE_RESOURCE):getResourcePath(trustStorePath);
+            }
+            if (trustStorePath == null || trustStorePath.trim().isEmpty()) {
+                throw new IllegalArgumentException("A path for the SSL truststore file was not specified.");
+            }
+            if (! new File(trustStorePath).exists()) {
+                throw new IllegalArgumentException("The specified SSL truststore file " + trustStorePath + " was not found.");
+            }
+            sslContextFactory.setTrustStorePath(trustStorePath);
+
+            String trustStorePassword = getKeyTrustStoreAttribute("javax.net.ssl.trustStorePassword", sslType.getTruststore(), "password");
+            if (m_config.m_sslEnable && null == trustStorePassword) {
+                trustStorePassword = DEFAULT_KEYSTORE_PASSWD;
+            }
+            if (trustStorePassword == null) {
+                throw new IllegalArgumentException("An SSL truststore password was not specified.");
+            }
+            sslContextFactory.setTrustStorePassword(trustStorePassword);
+            // exclude weak ciphers
+            sslContextFactory.setExcludeCipherSuites("SSL_RSA_WITH_DES_CBC_SHA",
+                    "SSL_DHE_RSA_WITH_DES_CBC_SHA", "SSL_DHE_DSS_WITH_DES_CBC_SHA",
+                    "SSL_RSA_EXPORT_WITH_RC4_40_MD5",
+                    "SSL_RSA_EXPORT_WITH_DES40_CBC_SHA",
+                    "SSL_DHE_RSA_EXPORT_WITH_DES40_CBC_SHA",
+                    "SSL_DHE_DSS_EXPORT_WITH_DES40_CBC_SHA");
+            sslContextFactory.setKeyManagerPassword(keyStorePassword);
+            return sslContextFactory;
+        }
+
+        private String getKeyTrustStoreAttribute(String sysPropName, KeyOrTrustStoreType store, String valueType) {
+            String sysProp = System.getProperty(sysPropName, "");
+
+            // allow leading/trailing blanks for password, not otherwise
+            if (!sysProp.isEmpty()) {
+                if ("password".equals(valueType)) {
+                    return sysProp;
+                } else {
+                    if (!sysProp.trim().isEmpty()) {
+                        return sysProp.trim();
+                    }
+                }
+            }
+            String value = null;
+            if (store != null) {
+                value = "path".equals(valueType) ? store.getPath() : store.getPassword();
+            }
+            return value;
+        }
+    }
+
     class SetupSNMP extends InitWork {
         SetupSNMP() {
         }
@@ -498,6 +604,7 @@ public class Inits {
 
     class StartHTTPServer extends InitWork {
         StartHTTPServer() {
+            dependsOn(SetupSSL.class);
         }
 
         //Setup http server with given port and interface
@@ -506,23 +613,20 @@ public class Inits {
 
             boolean success = false;
             int httpPort = httpPortStart;
-            HttpsType httpsType = ((m_deployment.getHttpd() != null) && (m_deployment.getHttpd().isEnabled())) ?
-                    m_deployment.getHttpd().getHttps() : null;
             for (; true; httpPort++) {
                 try {
                     m_rvdb.m_adminListener = new HTTPAdminListener(
-                            m_rvdb.m_jsonEnabled, httpInterface, publicInterface, httpPort, httpsType, mustListen
+                            m_rvdb.m_jsonEnabled, httpInterface, publicInterface, httpPort, m_config.m_sslContextFactory, mustListen
                             );
                     success = true;
                     break;
                 } catch (Exception e1) {
                     if (mustListen) {
-                        if (httpsType != null && httpsType.isEnabled()) {
+                        if (m_config.m_sslContextFactory != null) {
                             hostLog.fatal("HTTP service unable to bind to port " + httpPort + " or SSL Configuration is invalid. Exiting.", e1);
                         } else {
                             hostLog.fatal("HTTP service unable to bind to port " + httpPort + ". Exiting.", e1);
                         }
-                        System.exit(-1);
                     }
                 }
                 if (!findAny) {
@@ -548,13 +652,13 @@ public class Inits {
             // by the deployment.xml configuration.
             int httpPort = -1;
             m_rvdb.m_jsonEnabled = false;
-            boolean httpsEnabled = false;
+            boolean sslEnabled = false;
             if ((m_deployment.getHttpd() != null) && (m_deployment.getHttpd().isEnabled())) {
-                if (m_deployment.getHttpd().getHttps()!=null && m_deployment.getHttpd().getHttps().isEnabled()) {
-                    httpsEnabled = true;
+                if (m_config.m_sslContextFactory != null) {
+                    sslEnabled = true;
                 }
                 httpPort = (m_deployment.getHttpd().getPort()==null) ?
-                        (httpsEnabled ? VoltDB.DEFAULT_HTTPS_PORT : VoltDB.DEFAULT_HTTP_PORT) :
+                        (sslEnabled ? VoltDB.DEFAULT_HTTPS_PORT : VoltDB.DEFAULT_HTTP_PORT) :
                         m_deployment.getHttpd().getPort();
                 if (m_deployment.getHttpd().getJsonapi() != null) {
                     m_rvdb.m_jsonEnabled = m_deployment.getHttpd().getJsonapi().isEnabled();
@@ -566,7 +670,7 @@ public class Inits {
                 // if not set by the user, just find a free port
             } else if (httpPort == Constants.HTTP_PORT_AUTO) {
                 // if not set scan for an open port starting with the default
-                httpPort = httpsEnabled ? VoltDB.DEFAULT_HTTPS_PORT : VoltDB.DEFAULT_HTTP_PORT;
+                httpPort = sslEnabled ? VoltDB.DEFAULT_HTTPS_PORT : VoltDB.DEFAULT_HTTP_PORT;
                 setupHttpServer("", "", httpPort, true, false);
             } else if (httpPort != Constants.HTTP_PORT_DISABLED) {
                 if (!m_deployment.getHttpd().isEnabled()) {
@@ -662,7 +766,8 @@ public class Inits {
                         m_rvdb.m_myHostId,
                         m_rvdb.m_catalogContext,
                         m_isRejoin,
-                        (m_config.m_startAction==StartAction.CREATE && m_config.m_forceVoltdbCreate),
+                        //If durability is off and we are told not to join but create by mesh clear overflow.
+                        (m_config.m_startAction==StartAction.CREATE && (m_config.m_forceVoltdbCreate || !m_durable)),
                         m_rvdb.m_messenger,
                         m_rvdb.m_partitionsToSitesAtStartupForExportInit
                         );
@@ -746,18 +851,29 @@ public class Inits {
                     allPartitions[ii] = ii;
                 }
 
-                org.voltdb.catalog.CommandLog cl = m_rvdb.m_catalogContext.cluster.getLogconfig().get("log");
-                if (cl == null || !cl.getEnabled()) return;
                 NodeSettings paths = m_rvdb.m_nodeSettings;
+                org.voltdb.catalog.CommandLog cl = m_rvdb.m_catalogContext.cluster.getLogconfig().get("log");
+                String clPath = null;
+                String clSnapshotPath = null;
+                boolean clenabled = true;
+                if (cl == null || !cl.getEnabled()) {
+                     //We have no durability and no terminus so nothing to restore.
+                     if (m_rvdb.m_terminusNonce == null) return;
+                     //We have terminus so restore.
+                     clenabled = false;
+                 } else {
+                     clPath = paths.resolve(paths.getCommandLog()).getPath();
+                     clSnapshotPath = paths.resolve(paths.getCommandLogSnapshot()).getPath();
+                }
                 try {
                     m_rvdb.m_restoreAgent = new RestoreAgent(
                                                       m_rvdb.m_messenger,
                                                       m_rvdb.getSnapshotCompletionMonitor(),
                                                       m_rvdb,
                                                       m_config.m_startAction,
-                                                      cl.getEnabled(),
-                                                      paths.resolve(paths.getCommandLog()).getPath(),
-                                                      paths.resolve(paths.getCommandLogSnapshot()).getPath(),
+                                                      clenabled,
+                                                      clPath,
+                                                      clSnapshotPath,
                                                       snapshotPath,
                                                       allPartitions,
                                                       paths.getVoltDBRoot().getPath(),

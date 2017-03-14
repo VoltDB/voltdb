@@ -42,6 +42,126 @@ class ClusterConfigurationDRTest extends TestBase {
         }
     }
 
+
+    def checkDrRoleValidation(){
+        int countNext = 0
+        int indexOfNewDatabase = 0
+        String newDatabaseName = ""
+        when: 'Create database'
+        for(count=0; count<numberOfTrials; count++) {
+            try {
+                indexOfNewDatabase = createNewDatabase(create_DatabaseTest_File)
+                break
+            } catch(Exception e) {
+                deleteDatabase(create_DatabaseTest_File)
+            } catch(org.codehaus.groovy.runtime.powerassert.PowerAssertionError e) {
+                //Do nothing
+            }
+        }
+        newDatabaseName = "name_src"
+        then: 'Choose new database'
+        //chooseDatabase(indexOfNewDatabase, "name_src")
+        for (count = 0; count < numberOfTrials; count++) {
+            try {
+                for(countNext=0; countNext<numberOfTrials; countNext++) {
+                    try {
+                        waitFor { buttonAddDatabase.isDisplayed() }
+                        break
+                    } catch(geb.waiting.WaitTimeoutException exception) {
+                        currentDatabase.click()
+                    }
+                }
+                $(id:getIdOfDatabase(String.valueOf(indexOfNewDatabase))).click()
+                waitFor { currentDatabase.text().equals(newDatabaseName) }
+                break
+            } catch (geb.waiting.WaitTimeoutException exception) {
+                println("Waiting - Retrying")
+            } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                println("Stale Element exception - Retrying")
+            } catch(org.openqa.selenium.ElementNotVisibleException exception) {
+                try {
+                    waitFor { currentDatabase.text().equals(newDatabaseName) }
+                    break
+                } catch (geb.waiting.WaitTimeoutException exc) {
+                    println("Waiting - Retrying")
+                }
+            }
+        }
+
+        // Create a DR configuration
+        when: 'Open popup for DR'
+        for(count=0; count<numberOfTrials; count++) {
+            if(dr.editButton.isDisplayed()) {
+                try {
+                    dr.editButton.click()
+                    waitFor { dr.editPopupSave.isDisplayed() }
+                    break
+                } catch (geb.waiting.WaitTimeoutException exception) {
+                    println("Waiting - Retrying")
+                } catch (org.openqa.selenium.ElementNotVisibleException exception) {
+                    try {
+                        waitFor { dr.editPopupSave.isDisplayed() }
+                        break
+                    } catch (geb.waiting.WaitTimeoutException exc) {
+                        println("Waiting - Retrying")
+                    }
+                } catch (org.openqa.selenium.WebDriverException exception) {
+                    try {
+                        waitFor { dr.editPopupSave.isDisplayed() }
+                        break
+                    } catch (geb.waiting.WaitTimeoutException exc) {
+                        println("Waiting - Retrying")
+                    }
+                }
+            }
+        }
+        then: 'Check if id is displayed.'
+        for(count=0; count<numberOfTrials; count++) {
+            try {
+                waitFor { dr.idField.isDisplayed() }
+                break
+            } catch(geb.waiting.WaitTimeoutException exception) {
+                println("Waiting - Retrying")
+            }
+        }
+
+        when: 'Fill form for replica.'
+        dr.idField.value(masterId)
+        dr.databasePort.value(portValue)
+        dr.selectDrRole.click()
+        dr.selectDrRole.find("option").find{ it.value() == "replica" }.click()
+        then: 'Validation Error is displayed'
+        waitFor(10){ dr.drServersError.isDisplayed() }
+
+        when: 'Fill form for mater'
+        dr.selectDrRole.click()
+        dr.selectDrRole.find("option").find{ it.value() == "master" }.click()
+        then:
+        assert dr.drServersError.displayed == false
+
+        when: 'Fill form for xdcr.'
+        dr.idField.value(masterId)
+        dr.databasePort.value(portValue)
+        dr.selectDrRole.click()
+        dr.selectDrRole.find("option").find{ it.value() == "xdcr" }.click()
+        then: 'Validation Error is displayed'
+        waitFor(10){ dr.drServersError.isDisplayed() }
+
+        when: 'Add connection source.'
+        waitFor(10){ dr.addConnectionSource.isDisplayed() }
+        dr.addConnectionSource.click()
+        dr.sourceField.value("rr")
+        then: 'Validation error should disappear'
+        assert dr.drServersError.displayed == false
+
+        when: 'Remove connection source.'
+        waitFor(10){ dr.addConnectionSource.isDisplayed() }
+        dr.addConnectionSource.click()
+        dr.deleteConnectionSource.click()
+        then: 'Validation error should disappear'
+        assert dr.drServersError.displayed == true
+    }
+
     def createAndDelete() {
         int countNext = 0
         int indexOfNewDatabase = 0
@@ -186,6 +306,8 @@ class ClusterConfigurationDRTest extends TestBase {
         for(count=0; count<numberOfTrials; count++) {
             try {
                 dr.sourceField.value("something")
+                dr.selectDrRole.click()
+                dr.selectDrRole.find("option").find{ it.value() == "replica" }.click()
                 dr.editPopupSave.click()
                 break
             } catch(org.openqa.selenium.StaleElementReferenceException e) {

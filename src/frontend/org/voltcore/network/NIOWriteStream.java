@@ -48,9 +48,9 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
     /**
      * Reference to the port for changing interest ops
      */
-    private final VoltPort m_port;
+    protected final VoltPort m_port;
 
-    private static final VoltLogger networkLog = new VoltLogger("NETWORK");
+    protected static final VoltLogger networkLog = new VoltLogger("NETWORK");
 
     /**
      * Contains messages waiting to be serialized and written to the socket
@@ -61,20 +61,20 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
     private final ArrayDeque<DeferredSerialization> m_queuedWrites2 =
         new ArrayDeque<DeferredSerialization>();
 
-    private ArrayDeque<DeferredSerialization> m_queuedWrites = m_queuedWrites1;
+    protected ArrayDeque<DeferredSerialization> m_queuedWrites = m_queuedWrites1;
 
-    private final int m_maxQueuedWritesBeforeBackpressure = 100;
+    protected final int m_maxQueuedWritesBeforeBackpressure = 100;
 
     private final Runnable m_offBackPressureCallback;
     private final Runnable m_onBackPressureCallback;
 
-    private final QueueMonitor m_monitor;
+    protected final QueueMonitor m_monitor;
 
     /**
      * Set to -1 when there are no pending writes. If there is a pending write it is set to the time
      * of the last successful write or the time the oldest pending write was queued.
      */
-    private long m_lastPendingWriteTime = -1;
+    protected long m_lastPendingWriteTime = -1;
 
     NIOWriteStream(VoltPort port) {
         this(port, null, null, null);
@@ -171,7 +171,7 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
      * Boolean used to store the latest back pressure state
      * Does this need to be volatile?
      */
-    private volatile boolean m_hadBackPressure = false;
+    protected volatile boolean m_hadBackPressure = false;
 
     /**
      * Queue a message and defer the serialization of the message until later. This is the ideal mechanism
@@ -191,10 +191,9 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
             m_queuedWrites.offer(ds);
             m_port.setInterests( SelectionKey.OP_WRITE, 0);
         }
-        return;
     }
 
-    /*
+    /**
      * For the server we run everything backpressure
      * related on the network thread, so the entire thing can just
      * go in the queue directly without acquiring any additional locks
@@ -266,7 +265,6 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
             });
             m_port.setInterests( SelectionKey.OP_WRITE, 0);
         }
-        return;
     }
 
     /**

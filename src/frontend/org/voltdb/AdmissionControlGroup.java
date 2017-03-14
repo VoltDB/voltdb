@@ -183,7 +183,7 @@ public class AdmissionControlGroup implements org.voltcore.network.QueueMonitor
                     networkLog.error(
                             "Backpressure reports a negative outstanding transaction byte count (" +
                             m_pendingTxnBytes +
-                            "). No action required.");
+                            "). No action required.", new RuntimeException("for stack trace purposes"));
                 }
             }
 

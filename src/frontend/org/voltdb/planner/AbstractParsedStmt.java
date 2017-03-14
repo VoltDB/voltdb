@@ -17,6 +17,8 @@
 
 package org.voltdb.planner;
 
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -63,6 +65,7 @@ import org.voltdb.types.ExpressionType;
 import org.voltdb.types.JoinType;
 import org.voltdb.types.QuantifierType;
 import org.voltdb.types.SortDirectionType;
+import org.voltdb.types.VoltDecimalHelper;
 
 public abstract class AbstractParsedStmt {
 
@@ -120,11 +123,12 @@ public abstract class AbstractParsedStmt {
     // mark whether the statement's parent is UNION clause or not
     private boolean m_isChildOfUnion = false;
 
-    static final String INSERT_NODE_NAME = "insert";
-    static final String UPDATE_NODE_NAME = "update";
-    static final String DELETE_NODE_NAME = "delete";
+    private static final String INSERT_NODE_NAME = "insert";
+    private static final String UPDATE_NODE_NAME = "update";
+    private static final String DELETE_NODE_NAME = "delete";
     static final String SELECT_NODE_NAME = "select";
     static final String UNION_NODE_NAME  = "union";
+    private static final String SWAP_NODE_NAME = "swap";
 
     /**
     * Class constructor
@@ -167,17 +171,20 @@ public abstract class AbstractParsedStmt {
                 retval.m_isUpsert = true;
             }
         }
-        else if (stmtTypeElement.name.equalsIgnoreCase(UPDATE_NODE_NAME)) {
+        else if (stmtTypeElement.name.equals(UPDATE_NODE_NAME)) {
             retval = new ParsedUpdateStmt(paramValues, db);
         }
-        else if (stmtTypeElement.name.equalsIgnoreCase(DELETE_NODE_NAME)) {
+        else if (stmtTypeElement.name.equals(DELETE_NODE_NAME)) {
             retval = new ParsedDeleteStmt(paramValues, db);
         }
-        else if (stmtTypeElement.name.equalsIgnoreCase(SELECT_NODE_NAME)) {
+        else if (stmtTypeElement.name.equals(SELECT_NODE_NAME)) {
             retval = new ParsedSelectStmt(paramValues, db);
         }
-        else if (stmtTypeElement.name.equalsIgnoreCase(UNION_NODE_NAME)) {
+        else if (stmtTypeElement.name.equals(UNION_NODE_NAME)) {
             retval = new ParsedUnionStmt(paramValues, db);
+        }
+        else if (stmtTypeElement.name.equals(SWAP_NODE_NAME)) {
+            retval = new ParsedSwapStmt(paramValues, db);
         }
         else {
             throw new RuntimeException("Unexpected Element: " + stmtTypeElement.name);
@@ -439,6 +446,37 @@ public abstract class AbstractParsedStmt {
             }
             if ( ! needParameter && vt != VoltType.NULL) {
                 String valueStr = exprNode.attributes.get("value");
+                // Verify that this string can represent the
+                // desired type, by converting it into the
+                // given type.
+                if (valueStr != null) {
+                    try {
+                        switch (vt) {
+                        case BIGINT:
+                        case TIMESTAMP:
+                            Long.valueOf(valueStr);
+                            break;
+                        case FLOAT:
+                            Double.valueOf(valueStr);
+                            break;
+                        case DECIMAL:
+                            VoltDecimalHelper.stringToDecimal(valueStr);
+                            break;
+                        default:
+                            break;
+                        }
+                    } catch (PlanningErrorException ex) {
+                        // We're happy with these.
+                        throw ex;
+                    } catch (NumberFormatException ex) {
+                        throw new PlanningErrorException("Numeric conversion error to type "
+                                                            + vt.name()
+                                                            + " "
+                                                            + ex.getMessage().toLowerCase());
+                    } catch (Exception ex) {
+                        throw new PlanningErrorException(ex.getMessage());
+                    }
+                }
                 cve.setValue(valueStr);
             }
         }
@@ -729,7 +767,7 @@ public abstract class AbstractParsedStmt {
         // If there is no usable alias because the subquery is inside an expression,
         // generate a unique one for internal use.
         if (tableAlias == null) {
-            tableAlias = "VOLT_TEMP_TABLE_" + subquery.m_stmtId;
+            tableAlias = AbstractParsedStmt.TEMP_TABLE_NAME + "_" + subquery.m_stmtId;
         }
         StmtSubqueryScan subqueryScan =
                 new StmtSubqueryScan(subquery, tableAlias, m_stmtId);
@@ -769,7 +807,7 @@ public abstract class AbstractParsedStmt {
         int tableCount = 0;
         StmtTargetTableScan simpler = null;
         for (Map.Entry<String, StmtTableScan> entry : selectSubquery.m_tableAliasMap.entrySet()) {
-            if (entry.getKey().contains("VOLT_TEMP_TABLE")) {
+            if (entry.getKey().startsWith(AbstractParsedStmt.TEMP_TABLE_NAME)) {
                 // This is an artificial table for a subquery expression
                 continue;
             }
@@ -1975,6 +2013,13 @@ public abstract class AbstractParsedStmt {
         return null;
     }
 
+    /**
+     * Return the number of window function expressions.  This
+     * is non-zero for ParsedSelectStmt only.
+     */
+    public int getWindowFunctionExpressionCount() {
+        return m_windowFunctionExpressions.size();
+    }
     /*
      *  Extract all subexpressions of a given expression class from this statement
      */

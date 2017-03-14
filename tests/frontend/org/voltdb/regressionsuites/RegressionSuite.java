@@ -39,7 +39,11 @@ import java.util.Properties;
 import java.util.Random;
 import java.util.regex.Pattern;
 
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLEngine;
+
 import org.apache.commons.lang3.StringUtils;
+import org.voltcore.utils.ssl.SSLConfiguration;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -48,6 +52,7 @@ import org.voltdb.client.ClientAuthScheme;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientConfigForTest;
 import org.voltdb.client.ClientFactory;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ConnectionUtil;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
@@ -337,9 +342,11 @@ public class RegressionSuite extends TestCase {
      *
      * @return A SocketChannel that is already authenticated with the server
      */
+
     public SocketChannel getClientChannel() throws IOException {
         return getClientChannel(false);
     }
+
     public SocketChannel getClientChannel(final boolean noTearDown) throws IOException {
         final List<String> listeners = m_config.getListenerAddresses();
         final Random r = new Random();
@@ -350,9 +357,19 @@ public class RegressionSuite extends TestCase {
         if (hNp.hasPort()) {
             port = hNp.getPort();
         }
+
+        SSLEngine sslEngine = null;
+        boolean sslEnabled = Boolean.valueOf(System.getenv("ENABLE_SSL") == null ? Boolean.toString(Boolean.getBoolean("ENABLE_SSL")) : System.getenv("ENABLE_SSL"));
+         if (sslEnabled) {
+             SSLContext sslContext = SSLConfiguration.createSslContext(new SSLConfiguration.SslConfig());
+             sslEngine = sslContext.createSSLEngine("client", port);
+             sslEngine.setUseClientMode(true);
+         }
+
         final SocketChannel channel = (SocketChannel)
             ConnectionUtil.getAuthenticatedConnection(
-                    hNp.getHostText(), m_username, hashedPassword, port, null, ClientAuthScheme.getByUnencodedLength(hashedPassword.length))[0];
+                    hNp.getHostText(), m_username, hashedPassword, port, null,
+                    ClientAuthScheme.getByUnencodedLength(hashedPassword.length), sslEngine)[0];
         channel.configureBlocking(true);
         if (!noTearDown) {
             synchronized (m_clientChannels) {
@@ -361,7 +378,6 @@ public class RegressionSuite extends TestCase {
         }
         return channel;
     }
-
     /**
      * Protected method used by MultiConfigSuiteBuilder to set the VoltServerConfig
      * instance a particular test will run with.
@@ -549,24 +565,24 @@ public class RegressionSuite extends TestCase {
     }
 
     /**
-     * Given a two dimensional array of longs, randomly permute the rows, but
+     * Given a two dimensional array, randomly permute the rows, but
      * leave the columns alone.  This is used to generate test cases for kinds
      * of sorts.
      *
      * @param input
      */
-    static protected void shuffleArrayOfLongs(long [][] input) {
+    static protected <T> T[][] shuffleArray(T [][] input) {
+        T[][] output = input.clone();
         Integer [] indices = new Integer[input.length];
         for (int idx = 0; idx < indices.length; idx += 1) {
             indices[idx] = Integer.valueOf(idx);
         }
         List<Integer> permutation = Arrays.asList(indices);
         Collections.shuffle(permutation);
-        long[] tmp = input[permutation.get(0)];
-        for (int idx = 0; idx < input.length-1; idx += 1) {
-            input[permutation.get(idx)] = input[permutation.get(idx + 1)];
+        for (int idx = 0; idx < input.length; idx += 1) {
+            output[idx] = input[permutation.get(idx)];
         }
-        input[permutation.get(input.length-1)] = tmp;
+        return output;
     }
 
     static protected void validateTableColumnOfScalarLong(VoltTable vt, int col, long[] expected) {
@@ -986,8 +1002,11 @@ public class RegressionSuite extends TestCase {
                 }
             }
             else if (expectedObj instanceof BigDecimal) {
-                BigDecimal val = (BigDecimal)expectedObj;
-                assertEquals(msg, val, actualRow.getDecimalAsBigDecimal(i));
+                BigDecimal exp = (BigDecimal)expectedObj;
+                BigDecimal got = actualRow.getDecimalAsBigDecimal(i);
+                // Either both are null or neither are null.
+                assertEquals(exp == null, got == null);
+                assertEquals(msg, exp.doubleValue(), got.doubleValue(), epsilon);
             }
             else if (expectedObj instanceof String) {
                 String val = (String)expectedObj;
@@ -1211,6 +1230,20 @@ public class RegressionSuite extends TestCase {
         client.callProcedure("@AdHoc", "Truncate table " + tb);
         validateTableOfScalarLongs(client, "select count(*) from " + tb, new long[]{0});
     }
+
+    protected static void truncateAllTables(Client client) throws Exception {
+        ClientResponse cr;
+        cr = client.callProcedure("@SystemCatalog", "TABLES");
+        assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
+        VoltTable vt = cr.getResults()[0];
+        String allTables[] = new String[vt.getRowCount()];
+        int idx = 0;
+        while (vt.advanceRow()) {
+            allTables[idx++] = vt.getString("TABLE_NAME");
+        }
+        truncateTables(client, allTables);
+    }
+
 
     /**
      * A convenience method to build a Properties object initialized with an

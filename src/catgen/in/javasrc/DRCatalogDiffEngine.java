@@ -23,6 +23,7 @@ package org.voltdb.catalog;
 
 import java.util.List;
 
+import com.google_voltpatches.common.collect.Sets;
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
@@ -47,7 +48,7 @@ public class DRCatalogDiffEngine extends CatalogDiffEngine {
         Database db = cluster.getDatabases().get("database");
         StringBuilder sb = new StringBuilder();
 
-        if (protocolVersion == -1 || protocolVersion >= DRProtocol.MUTLICLUSTER_PROTOCOL_VERSION) {
+        if (protocolVersion == -1 || protocolVersion >= DRProtocol.MULTICLUSTER_PROTOCOL_VERSION) {
             cluster.writeCommandForField(sb, "drRole", true);
         } else {
             // The compatibility mode will not understand the new drRole field,
@@ -60,7 +61,7 @@ public class DRCatalogDiffEngine extends CatalogDiffEngine {
             if (t.getIsdred() && t.getMaterializer() == null && !CatalogUtil.isTableExportOnly(db, t)) {
                 t.writeCreationCommand(sb);
                 t.writeFieldCommands(sb);
-                t.writeChildCommands(sb);
+                t.writeChildCommands(sb, Sets.newHashSet(Column.class, Index.class, Constraint.class, Statement.class));
             }
         }
         String catalogCommands = sb.toString();

@@ -38,7 +38,9 @@ import org.voltdb.VoltTable;
 public class UpdateLogging extends VoltSystemProcedure
 {
     @Override
-    public void init() {}
+    public long[] getPlanFragmentIds() {
+        return new long[]{};
+    }
 
     @Override
     public DependencyPair executePlanFragment(
@@ -59,7 +61,8 @@ public class UpdateLogging extends VoltSystemProcedure
     public VoltTable[] run(SystemProcedureExecutionContext ctx,
                            String xmlConfig)
     {
-        VoltDB.instance().logUpdate(xmlConfig, DeprecatedProcedureAPIAccess.getVoltPrivateRealTransactionId(this));
+        VoltDB.instance().logUpdate(xmlConfig, DeprecatedProcedureAPIAccess.getVoltPrivateRealTransactionId(this),
+                ctx.getPaths().getVoltDBRoot());
         ctx.updateBackendLogLevels();
 
         VoltTable t = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);

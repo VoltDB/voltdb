@@ -17,18 +17,20 @@
 
 package org.voltdb;
 
+import java.util.Arrays;
+
 public enum GetActionArgument {
 
-    DEPLOYMENT("deployment"),
-    DDL("ddl");
+    DEPLOYMENT("deployment.xml"),
+    SCHEMA("schema.sql"),
+    CLASSES("procedures.jar");
 
-    final String m_verb;
+    final String m_defaultOutput;
+    public String getDefaultOutput() { return m_defaultOutput; }
 
-    GetActionArgument() {
-        m_verb = name().toLowerCase();
-    }
+    GetActionArgument(String value) { m_defaultOutput = value; }
 
-    GetActionArgument(String verb) {
-        m_verb = verb;
+    public static String supportedVerbs() {
+        return Arrays.asList(values()).toString().replaceAll("^.|.$", "");
     }
 }

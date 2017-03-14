@@ -166,6 +166,9 @@ public class Benchmark {
         @Option(desc = "Allow set ratio of mp to sp workload.")
         float mpratio = (float)0.20;
 
+        @Option(desc = "Allow set ratio of swap to truncate table workload.")
+        float swapratio = (float)0.50;
+
         @Option(desc = "Allow set ratio of upsert to insert workload.")
         float upsertratio = (float)0.50;
 
@@ -178,6 +181,10 @@ public class Benchmark {
 
         @Option(desc = "Enable topology awareness")
         boolean topologyaware = false;
+
+        @Option(desc = "File with SSL properties")
+        String sslfile = "";
+
 
         @Override
         public void validate() {
@@ -193,7 +200,8 @@ public class Benchmark {
             if (maxvaluesize <= 0) exitWithMessageAndUsage("maxvaluesize must be > 0");
             if (entropy <= 0) exitWithMessageAndUsage("entropy must be > 0");
             if (entropy > 127) exitWithMessageAndUsage("entropy must be <= 127");
-            if (mpratio < 0.0 || mpratio > 1.0) exitWithMessageAndUsage("mpRatio must be between 0.0 and 1.0");
+            if (mpratio < 0.0 || mpratio > 1.0) exitWithMessageAndUsage("mpratio must be between 0.0 and 1.0");
+            if (swapratio < 0.0 || swapratio > 1.0) exitWithMessageAndUsage("swapratio must be between 0.0 and 1.0");
             if (upsertratio < 0.0 || upsertratio > 1.0) exitWithMessageAndUsage("upsertratio must be between 0.0 and 1.0");
             if (upserthitratio < 0.0 || upserthitratio > 1.0) exitWithMessageAndUsage("upserthitratio must be between 0.0 and 1.0");
         }
@@ -352,8 +360,12 @@ public class Benchmark {
         log.info(HORIZONTAL_RULE);
         log.info(config.getConfigDumpString());
 
-        StatusListener statusListener = new StatusListener();
-        ClientConfig clientConfig = new ClientConfig("", "", statusListener);
+        ClientConfig clientConfig = new ClientConfig("", "", new StatusListener());
+        if (config.sslfile.trim().length() > 0) {
+            clientConfig.setTrustStoreConfigFromPropertyFile(config.sslfile);
+            clientConfig.enableSSL();
+        }
+
         if (config.topologyaware) {
             clientConfig.setTopologyChangeAware(true);
         }
@@ -668,13 +680,13 @@ public class Benchmark {
 
         if (!config.disabledThreads.contains("partTrunclt")) {
             partTrunclt = new TruncateTableLoader(client, "trup",
-                (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 50, permits, config.mpratio);
+                    (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 50, permits, config.mpratio, config.swapratio);
             partTrunclt.start();
         }
         replTrunclt = null;
         if (config.mpratio > 0.0 && !config.disabledThreads.contains("replTrunclt")) {
             replTrunclt = new TruncateTableLoader(client, "trur",
-                    (config.replfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 3, permits, config.mpratio);
+                    (config.replfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 3, permits, config.mpratio, config.swapratio);
             replTrunclt.start();
         }
 

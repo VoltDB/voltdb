@@ -855,7 +855,8 @@ class UpdateDeployment(Deployment):
             self.assertEqual(value['statusString'][0], u'5555555555555555 is greater than the maximum of 2147483647')
             self.assertEqual(response.status_code, 200)
 
-    def test_validate_dr_enabled_empty_and_boolean(self):
+
+    def test_validate_dr_role_for_valid_value(self):
         """ensure dr enabled  is not empty and is boolean"""
         response = requests.get(__db_url__)
         value = response.json()
@@ -864,11 +865,68 @@ class UpdateDeployment(Deployment):
             last_db_id = value['databases'][db_length - 1]['id']
             dep_url = __db_url__ + str(last_db_id) + '/deployment/'
             headers = {'Content-Type': 'application/json; charset=UTF-8'}
-            response = requests.put(dep_url, json={'dr': {'enabled': ''}}, headers=headers)
+            response = requests.put(dep_url, json={'dr': {'id': 1, 'role': '333'}}, headers=headers)
             value = response.json()
-            # FIXME
-            #self.assertEqual(value['statusString'][0], "u'' is not of type 'boolean'")
+            self.assertEqual(value['statusString'][0], "u'333' is not one of ['master', 'replica', 'xdcr']")
             self.assertEqual(response.status_code, 200)
+
+            response = requests.put(dep_url, json={'dr': {'id': 1, 'role': 'master'}}, headers=headers)
+            value = response.json()
+            self.assertEqual(value['statusString'], u'Ok')
+            self.assertEqual(response.status_code, 200)
+
+    def test_validate_dr_role_for_master(self):
+        """ensure dr enabled  is not empty and is boolean"""
+        response = requests.get(__db_url__)
+        value = response.json()
+        if value:
+            db_length = len(value['databases'])
+            last_db_id = value['databases'][db_length - 1]['id']
+            dep_url = __db_url__ + str(last_db_id) + '/deployment/'
+            headers = {'Content-Type': 'application/json; charset=UTF-8'}
+            response = requests.put(dep_url, json={'dr': {'id': 1, 'role': 'master'}}, headers=headers)
+            value = response.json()
+            self.assertEqual(value['statusString'], u'Ok')
+            self.assertEqual(response.status_code, 200)
+
+    def test_validate_dr_role_for_replica(self):
+        """ensure dr enabled  is not empty and is boolean"""
+        response = requests.get(__db_url__)
+        value = response.json()
+        if value:
+            db_length = len(value['databases'])
+            last_db_id = value['databases'][db_length - 1]['id']
+            dep_url = __db_url__ + str(last_db_id) + '/deployment/'
+            headers = {'Content-Type': 'application/json; charset=UTF-8'}
+            response = requests.put(dep_url, json={'dr': {'id': 1, 'role': 'replica'}}, headers=headers)
+            value = response.json()
+            self.assertEqual(value['statusString'], u'DR: Role replica and xdcr required connection source.')
+            self.assertEqual(response.status_code, 200)
+
+            response = requests.put(dep_url, json={'dr': {'id': 1, 'role': 'replica', 'connection':{'source': '127.0.0.1'}}}, headers=headers)
+            value = response.json()
+            self.assertEqual(value['statusString'], u'Ok')
+            self.assertEqual(response.status_code, 200)
+
+    def test_validate_dr_role_for_xdcr(self):
+        """ensure dr enabled  is not empty and is boolean"""
+        response = requests.get(__db_url__)
+        value = response.json()
+        if value:
+            db_length = len(value['databases'])
+            last_db_id = value['databases'][db_length - 1]['id']
+            dep_url = __db_url__ + str(last_db_id) + '/deployment/'
+            headers = {'Content-Type': 'application/json; charset=UTF-8'}
+            response = requests.put(dep_url, json={'dr': {'id': 1, 'role': 'xdcr'}}, headers=headers)
+            value = response.json()
+            self.assertEqual(value['statusString'], u'DR: Role replica and xdcr required connection source.')
+            self.assertEqual(response.status_code, 200)
+
+            response = requests.put(dep_url, json={'dr': {'id': 1, 'role': 'xdcr', 'connection':{'source': '127.0.0.1'}}}, headers=headers)
+            value = response.json()
+            self.assertEqual(value['statusString'], u'Ok')
+            self.assertEqual(response.status_code, 200)
+
 
     def test_update_deployment(self):
         """ensure update deployment is working properly"""
@@ -908,12 +966,13 @@ class UpdateDeployment(Deployment):
                                                                            "value": "test"}]}]},
                 "import": {"configuration": [{"enabled":False,"type":"kafka", "module": "test", "format": "test",
                                                                       "property":[{"name":"metadata.broker.list","value":"test"}]}]},
-                # "dr": {"id": 33, "type": "Master", "enabled": True, "connection": {"source": "testttt", "servers": []}}
+                "dr": {"id": 33, "role": "master", "port": 2, "listen": True, "connection": {"source": "127.0.0.1"}}
             }
             headers = {'Content-Type': 'application/json; charset=UTF-8'}
             response = requests.put(dep_url,
                                     json=json_data, headers=headers)
             value = response.json()
+            self.assertEqual(value['statusString'], u'Ok')
             self.assertEqual(value['status'], 200)
             self.assertEqual(response.status_code, 200)
 
@@ -1271,7 +1330,6 @@ class UpdateDeployment(Deployment):
             value = response.json()
             self.assertEqual(str(value['statusString'][0]), "u'test' is not one of ['AES', 'DES', 'NoPriv', '3DES', 'AES192', 'AES256']")
             self.assertEqual(response.status_code, 200)
-
 
     def test_delete_snmp_configuration(self):
         """ensure snmp configuration can be reset properly"""

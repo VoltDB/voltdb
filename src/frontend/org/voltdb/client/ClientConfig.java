@@ -17,21 +17,30 @@
 
 package org.voltdb.client;
 
+import java.io.File;
+import java.io.FileReader;
+import java.io.IOException;
+import java.io.InputStream;
 import java.math.RoundingMode;
 import java.security.Principal;
 import java.util.Iterator;
+import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 
 import javax.security.auth.Subject;
 import javax.security.auth.login.LoginContext;
 import javax.security.auth.login.LoginException;
 
+import org.voltcore.utils.ssl.SSLConfiguration;
+import org.voltcore.utils.ssl.SSLConfiguration.SslConfig;
 import org.voltdb.types.VoltDecimalHelper;
 
 /**
  * Container for configuration settings for a Client
  */
 public class ClientConfig {
+
+    private static final String DEFAULT_SSL_PROPS_FILE = "ssl-config";
 
     static final long DEFAULT_PROCEDURE_TIMOUT_NANOS = TimeUnit.MINUTES.toNanos(2);// default timeout is 2 minutes;
     static final long DEFAULT_CONNECTION_TIMOUT_MS = 2 * 60 * 1000; // default timeout is 2 minutes;
@@ -56,8 +65,16 @@ public class ClientConfig {
     long m_initialConnectionRetryIntervalMS = DEFAULT_INITIAL_CONNECTION_RETRY_INTERVAL_MS;
     long m_maxConnectionRetryIntervalMS = DEFAULT_MAX_CONNECTION_RETRY_INTERVAL_MS;
     boolean m_sendReadsToReplicasBytDefaultIfCAEnabled = false;
+    SslConfig m_sslConfig;
     boolean m_topologyChangeAware = false;
+    boolean m_enableSSL = false;
+    String m_sslPropsFile = null;
 
+    //For unit testing. This should really be in Environment class we should assemble all such there.
+    public static final boolean ENABLE_SSL_FOR_TEST = Boolean.valueOf(
+            System.getenv("ENABLE_SSL") == null ?
+                    Boolean.toString(Boolean.getBoolean("ENABLE_SSL"))
+                  : System.getenv("ENABLE_SSL"));
 
     final static String getUserNameFromSubject(Subject subject) {
         if (subject == null || subject.getPrincipals() == null || subject.getPrincipals().isEmpty()) {
@@ -81,11 +98,7 @@ public class ClientConfig {
      * work with a server with security disabled. Also specifies no status listener.</p>
      */
     public ClientConfig() {
-        m_username = "";
-        m_password = "";
-        m_listener = null;
-        m_cleartext = true;
-        m_hashScheme = ClientAuthScheme.HASH_SHA256;
+        this("", "", true, (ClientStatusListenerExt) null, ClientAuthScheme.HASH_SHA256);
     }
 
 
@@ -165,6 +178,7 @@ public class ClientConfig {
         this(getUserNameFromSubject(subject), "", true, listener, ClientAuthScheme.HASH_SHA256);
         m_subject = subject;
     }
+
     /**
      * <p>Configuration for a client that specifies authentication credentials. The username and
      * password can be null or the empty string. Also specifies a status listener.</p>
@@ -176,6 +190,20 @@ public class ClientConfig {
      * @param scheme Client password hash scheme
      */
     public ClientConfig(String username, String password, boolean cleartext, ClientStatusListenerExt listener, ClientAuthScheme scheme) {
+
+        if (ClientConfig.ENABLE_SSL_FOR_TEST) {
+            try (InputStream is = ClientConfig.class.getResourceAsStream(DEFAULT_SSL_PROPS_FILE)) {
+                Properties sslProperties = new Properties();
+                sslProperties.load(is);
+                String trustStorePath = sslProperties.getProperty(SSLConfiguration.TRUSTSTORE_CONFIG_PROP);
+                String trustStorePassword = sslProperties.getProperty(SSLConfiguration.TRUSTSTORE_PASSWORD_CONFIG_PROP);
+                setTrustStore(trustStorePath, trustStorePassword);
+                enableSSL();
+            } catch (IOException e) {
+                throw new IllegalArgumentException("Unable to access SSL configuration.", e);
+            }
+        }
+
         if (username == null) {
             m_username = "";
         } else {
@@ -413,9 +441,7 @@ public class ClientConfig {
            LoginContext lc = new LoginContext(loginContextEntryKey);
            lc.login();
            m_subject = lc.getSubject();
-       } catch (SecurityException ex) {
-           throw new IllegalArgumentException("Cannot determine client consumer's credentials", ex);
-       } catch (LoginException ex) {
+       } catch (SecurityException | LoginException ex) {
            throw new IllegalArgumentException("Cannot determine client consumer's credentials", ex);
        }
     }
@@ -429,5 +455,55 @@ public class ClientConfig {
      */
     public static void setRoundingConfig(boolean isEnabled, RoundingMode mode) {
         VoltDecimalHelper.setRoundingConfig(isEnabled, mode);
+    }
+
+    /**
+     * Configure trust store
+     *
+     * @param pathToTrustStore file specification for the trust store
+     * @param trustStorePassword trust store key file password
+     */
+    public void setTrustStore(String pathToTrustStore, String trustStorePassword) {
+        File tsFD = new File(pathToTrustStore != null && !pathToTrustStore.trim().isEmpty() ? pathToTrustStore : "");
+        if (!tsFD.exists() || !tsFD.isFile() || !tsFD.canRead()) {
+            throw new IllegalArgumentException("Trust store " + pathToTrustStore + " is not a read accessible file");
+        }
+        m_sslConfig = new SSLConfiguration.SslConfig(null, null, pathToTrustStore, trustStorePassword);
+    }
+
+    /**
+     * Configure trust store
+     *
+     * @param propFN property file name containing trust store properties:
+     * <p><ul>
+     * <li>{@code trustStore} trust store file specification
+     * <li>{@code trustStorePassword} trust store password
+     * </ul><p>
+     */
+    public void setTrustStoreConfigFromPropertyFile(String propFN) {
+        File propFD = new File(propFN != null && !propFN.trim().isEmpty() ? propFN : "");
+        if (!propFD.exists() || !propFD.isFile() || !propFD.canRead()) {
+            throw new IllegalArgumentException("Properties file " + propFN + " is not a read accessible file");
+        }
+        Properties props = new Properties();
+        try (FileReader fr = new FileReader(propFD)) {
+            props.load(fr);
+        } catch (IOException e) {
+            throw new IllegalArgumentException("Faile to read properties file " + propFN, e);
+        }
+        String trustStore = props.getProperty(SSLConfiguration.TRUSTSTORE_CONFIG_PROP);
+        String trustStorePassword = props.getProperty(SSLConfiguration.TRUSTSTORE_PASSWORD_CONFIG_PROP);
+
+        m_sslConfig = new SSLConfiguration.SslConfig(null, null, trustStore, trustStorePassword);
+    }
+
+    /**
+     * Configure ssl from the provided properties file. if file is not provided we configure without keystore and truststore manager.
+     */
+    public void enableSSL() {
+        m_enableSSL = true;
+        if (m_sslConfig == null) {
+            m_sslConfig = new SSLConfiguration.SslConfig();
+        }
     }
 }

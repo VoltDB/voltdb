@@ -123,6 +123,7 @@ class UploadConfiguration(Database):
                 self.assertEqual(value['deployment']['dr']['id'], 6)
                 self.assertEqual(value['deployment']['dr']['listen'], True)
                 self.assertEqual(value['deployment']['dr']['port'], 12112)
+                self.assertEqual(value['deployment']['dr']['role'], 'master')
                 self.assertEqual(value['deployment']['snapshot']['enabled'], True)
                 self.assertEqual(value['deployment']['snapshot']['frequency'], '24h')
                 self.assertEqual(value['deployment']['snapshot']['retain'], 2)

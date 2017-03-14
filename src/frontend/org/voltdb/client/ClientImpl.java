@@ -37,7 +37,10 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Logger;
 
+import javax.net.ssl.SSLContext;
+
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.ssl.SSLConfiguration;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
 import org.voltdb.client.HashinatorLite.HashinatorLiteType;
@@ -86,6 +89,7 @@ public final class ClientImpl implements Client {
     private final String m_username;
     private final byte m_passwordHash[];
     private final ClientAuthScheme m_hashScheme;
+    private final SSLContext m_sslContext;
 
 
     /**
@@ -113,14 +117,17 @@ public final class ClientImpl implements Client {
      * Also provide a hint indicating the expected serialized size of
      * most outgoing procedure invocations. This helps size initial allocations
      * for serializing network writes
-     * @param expectedOutgoingMessageSize Expected size of procedure invocations in bytes
-     * @param maxArenaSizes Maximum size arenas in the memory pool should grow to
-     * @param heavyweight Whether to use multiple or a single thread
      */
     ClientImpl(ClientConfig config) {
 
         if (config.m_topologyChangeAware && !config.m_useClientAffinity) {
             throw new IllegalArgumentException("The client affinity must be enabled to enable topology awareness.");
+        }
+
+        if (config.m_enableSSL) {
+            m_sslContext = SSLConfiguration.createSslContext(config.m_sslConfig);
+        } else {
+            m_sslContext = null;
         }
 
         m_distributer = new Distributer(
@@ -129,7 +136,8 @@ public final class ClientImpl implements Client {
                 config.m_connectionResponseTimeoutMS,
                 config.m_useClientAffinity,
                 config.m_sendReadsToReplicasBytDefaultIfCAEnabled,
-                config.m_subject);
+                config.m_subject,
+                m_sslContext);
         m_distributer.addClientStatusListener(m_listener);
         String username = config.m_username;
         if (config.m_subject != null) {
@@ -208,6 +216,10 @@ public final class ClientImpl implements Client {
         return m_passwordHashCode;
     }
 
+    public SSLContext getSSLContext() {
+        return m_sslContext;
+    }
+
     public void createConnectionWithHashedCredentials(
             String host,
             int port,
@@ -237,13 +249,11 @@ public final class ClientImpl implements Client {
      * @throws NoConnectionsException
      */
     @Override
-    public final ClientResponse callProcedure(
-            String procName,
-            Object... parameters)
-                    throws IOException, NoConnectionsException, ProcCallException
+    public final ClientResponse callProcedure(String procName, Object... parameters)
+            throws IOException, NoConnectionsException, ProcCallException
     {
-        return callProcedureWithClientTimeout(BatchTimeoutOverrideType.NO_TIMEOUT, procName,
-                Distributer.USE_DEFAULT_CLIENT_TIMEOUT, TimeUnit.SECONDS, parameters);
+        return callProcedureWithClientTimeout(BatchTimeoutOverrideType.NO_TIMEOUT, false,
+                procName, Distributer.USE_DEFAULT_CLIENT_TIMEOUT, TimeUnit.SECONDS, parameters);
     }
 
     /**
@@ -302,9 +312,11 @@ public final class ClientImpl implements Client {
             Object... parameters)
                     throws IOException, NoConnectionsException, ProcCallException
     {
+        long handle = m_handle.getAndIncrement();
         ProcedureInvocation invocation
-            = new ProcedureInvocation(m_handle.getAndIncrement(), batchTimeout, allPartition, procName, parameters);
-        return internalSyncCallProcedure(unit.toNanos(clientTimeout), invocation);
+            = new ProcedureInvocation(handle, batchTimeout, allPartition, procName, parameters);
+        long nanos = unit.toNanos(clientTimeout);
+        return internalSyncCallProcedure(nanos, invocation);
     }
 
     /**
@@ -395,8 +407,17 @@ public final class ClientImpl implements Client {
             ((ProcedureArgumentCacher) callback).setArgs(parameters);
         }
 
+        long handle = m_handle.getAndIncrement();
         ProcedureInvocation invocation
-                = new ProcedureInvocation(m_handle.getAndIncrement(), batchTimeout, allPartition, procName, parameters);
+                = new ProcedureInvocation(handle, batchTimeout, allPartition, procName, parameters);
+
+        if (m_isShutdown) {
+            return false;
+        }
+
+        if (callback == null) {
+            callback = NULL_CALLBACK;
+        }
 
         return internalAsyncCallProcedure(callback, clientTimeoutUnit.toNanos(clientTimeout), invocation);
     }
@@ -466,57 +487,46 @@ public final class ClientImpl implements Client {
             long clientTimeoutNanos,
             ProcedureInvocation invocation)
             throws IOException, NoConnectionsException {
-
-        if (m_isShutdown) {
-            return false;
-        }
-
-        if (callback == null) {
-            callback = NULL_CALLBACK;
-        }
+        assert( ! m_isShutdown);
+        assert(callback != null);
 
         final long nowNanos = System.nanoTime();
         //Blessed threads (the ones that invoke callbacks) are not subject to backpressure
         boolean isBlessed = m_blessedThreadIds.contains(Thread.currentThread().getId());
-        if (m_blockingQueue) {
-            while (!m_distributer.queue(
-                    invocation,
-                    callback,
-                    isBlessed, nowNanos, clientTimeoutNanos)) {
+        while (!m_distributer.queue(invocation, callback, isBlessed, nowNanos, clientTimeoutNanos)) {
+            if ( ! m_blockingQueue) {
+                return false;
+            }
 
-                /*
-                 * Wait on backpressure honoring the timeout settings
-                 */
-                final long delta = Math.max(1, System.nanoTime() - nowNanos);
-                final long timeout =
-                        clientTimeoutNanos == Distributer.USE_DEFAULT_CLIENT_TIMEOUT ?
-                                m_distributer.getProcedureTimeoutNanos() : clientTimeoutNanos;
-                try {
-                    if (backpressureBarrier(nowNanos, timeout - delta)) {
-                        final ClientResponseImpl r = new ClientResponseImpl(
-                                ClientResponse.CONNECTION_TIMEOUT,
-                                ClientResponse.UNINITIALIZED_APP_STATUS_CODE,
-                                "",
-                                new VoltTable[0],
-                                String.format("No response received in the allotted time (set to %d ms).",
-                                        TimeUnit.NANOSECONDS.toMillis(clientTimeoutNanos)));
-                        try {
-                            callback.clientCallback(r);
-                        } catch (Throwable t) {
-                            m_distributer.uncaughtException(callback, r, t);
-                        }
+            /*
+             * Wait on backpressure honoring the timeout settings
+             */
+            final long delta = Math.max(1, System.nanoTime() - nowNanos);
+            final long timeout =
+                    clientTimeoutNanos == Distributer.USE_DEFAULT_CLIENT_TIMEOUT ?
+                            m_distributer.getProcedureTimeoutNanos() : clientTimeoutNanos;
+            try {
+                if (backpressureBarrier(nowNanos, timeout - delta)) {
+                    final ClientResponse response = new ClientResponseImpl(
+                            ClientResponse.CONNECTION_TIMEOUT,
+                            ClientResponse.UNINITIALIZED_APP_STATUS_CODE,
+                            "",
+                            new VoltTable[0],
+                            String.format("No response received in the allotted time (set to %d ms).",
+                                    TimeUnit.NANOSECONDS.toMillis(clientTimeoutNanos)));
+                    try {
+                        callback.clientCallback(response);
                     }
-                } catch (InterruptedException e) {
-                    throw new java.io.InterruptedIOException("Interrupted while invoking procedure asynchronously");
+                    catch (Throwable thrown) {
+                        m_distributer.uncaughtException(callback, response, thrown);
+                    }
                 }
             }
-            return true;
-        } else {
-            return m_distributer.queue(
-                    invocation,
-                    callback,
-                    isBlessed, nowNanos, clientTimeoutNanos);
+            catch (InterruptedException e) {
+                throw new java.io.InterruptedIOException("Interrupted while invoking procedure asynchronously");
+            }
         }
+        return true;
     }
 
     /**
@@ -1123,7 +1133,6 @@ public final class ClientImpl implements Client {
 
         /**
          * Callback initialization
-         * @param responseWaiter The count down latch
          * @param partitionKey  The partition where the call back works on
          * @param index  The index for PartitionClientResponse
          * @param responses The final result array

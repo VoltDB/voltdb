@@ -61,8 +61,8 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         partitionIdleTime               { $("#chartPartitionIdleTime") }
         commandLogStatistics            { $("#chartCommandLogging") }
         databaseReplication             { $("#ChartDrReplicationRate") }
-        storedProcedures                { $("#tblStoredProcedures") }
-        dataTables                      { $("#tblDataTables") }
+        storedProcedures                { $("#divSPSection") }
+        dataTables                      { $("#tblDT") }
 
         serverCpuCheckbox               { $("#ServerCPU") }
         serverRamCheckbox               { $("#ServerRAM") }
@@ -75,10 +75,10 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         dataTablesCheckbox              { $("#DatabaseTables") }
 
         filterStoredProcedure           { $("#filterStoredProc") }
-        filterDatabaseTable             { $("#filterDatabaseTable") }
+        filterDatabaseTable             { $("#filterDT") }
 
-        databaseTableCurrentPage        { $("#lblPreviousTable") }
-        databaseTableTotalPage          { $("#lblTotalPagesofTables") }
+        databaseTableCurrentPage        { $("#tblDT_paginate > div > span.pageIndex") }
+        databaseTableTotalPage          { $("#tblDT_paginate > div > span.totalPages") }
 
         displayPreference               { $("#showMyPreference") }
         graphView                       { $('#graphView') }
@@ -170,8 +170,8 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         clusterwide                     { $("#chartPartitionIdleTime > div.legend > ul > li:nth-child(2)")}
         multipartition                  { $("#chartPartitionIdleTime > div.legend > ul > li:nth-child(3)")}
 
-        storedProceduresMsg             { $("#storeProcedureBody") }
-        databaseTableMsg                { $("#tablesBody") }
+        storedProceduresMsg             { $("#tblSP > tbody > tr > td") }
+        databaseTableMsg                { $("#tblDT > tbody > tr > td") }
 
         header                          { module Header }
         footer                          { module Footer }
@@ -183,7 +183,6 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
 
         drSection {$("#drSection")}
 
-        divDrReplication {$("#divDrReplication")}
 
         //DR Master Columns
 
@@ -191,16 +190,13 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
 
         status {$("#status")}
 
-        mbOnDisk  {$("#mbOnDisk")}
 
-        replicaLatencyMs {$("#replicaLatencyMs")}
 
-        replicaLatencyTrans {$("#replicaLatencyTrans")}
 
         ascendingDT                 { $(class:"sorting_asc") }
         descendingDT                { $(class:"sorting_desc") }
 
-        drMasterSection {$("#drMasterSection")}
+
 
         dbDrMode {$("#dbDrMode")}
 
@@ -213,9 +209,6 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
 
         //Dr Replica Section
 
-        drReplicaSection {$("#drReplicaSection")}
-
-        replicaServer{$("#replicaServer")}
         replicaStatus{$("#replicaStatus")}
         replicationRate1 {$("#replicationRate1")}
         replicationRate5 {$("#replicationRate5")}
@@ -533,13 +526,9 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
 
 
 
-    def boolean isDrMasterSectionOpen() {
-        return drMasterSection.displayed
-    }
 
-    def boolean isDrReplicaSectionOpen() {
-        return drReplicaSection.displayed
-    }
+
+
 
 
     def boolean isCmdLogSectionOpen() {
@@ -966,7 +955,7 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
      *  to check ascending order, check the class "sorttable_sorted" displayed
      */
     def boolean tableInAscendingOrder() {
-        if ( ascending.displayed )
+        if ( ascendingDT.displayed )
             return true
         else
             return false
@@ -977,22 +966,13 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
      *  to check ascending order, check the class "sorttable_sorted" displayed
      */
     def boolean tableInDescendingOrder() {
-        if ( descending.displayed )
+        if ( descendingDT.displayed )
             return true
         else
             return false
     }
 
-    /*
-    *   return true if table is in ascending order
-    *  to check ascending order, check the class "sorting_asc" displayed
-    */
-    def boolean tableInAscendingOrderDT() {
-        if ( ascendingDT.displayed )
-            return true
-        else
-            return false
-    }
+
 
     /*
      *  return true if table is in descending order
@@ -1040,33 +1020,12 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         status.click()
     }
 
-    /*
-     *  click the status column in DR MAster table
-     */
-    def boolean clickMbOnDisk() {
-        mbOnDisk.click()
-    }
 
-    /*
-     *  click the replicaLatencyMs column in DR MAster table
-     */
-    def boolean clickReplicaLatencyMs() {
-        replicaLatencyMs.click()
-    }
 
-    /*
-     *  click the replicaLatencyTrans column in DR MAster table
-     */
-    def boolean clickReplicaLatencyTrans() {
-        replicaLatencyTrans.click()
-    }
 
-    /*
-     *  click the server column in DR Replica table
-     */
-    def boolean clickReplicaServer() {
-        replicaServer.click()
-    }
+
+
+
 
     /*
      *  click the status column in DR Replica table

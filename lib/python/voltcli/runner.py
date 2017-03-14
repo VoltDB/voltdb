@@ -334,7 +334,6 @@ class VerbRunner(object):
         parser = VoltCLIParser(self.verbspace)
         sys.stdout.write('\n')
         parser.print_help()
-        sys.stdout.write('\n')
 
     def get_usage(self):
         """
@@ -349,7 +348,6 @@ class VerbRunner(object):
         if self.verb:
             sys.stdout.write('\n')
             self._print_verb_help(self.verb.name)
-            sys.stdout.write('\n')
 
     def set_default_func(self, default_func):
         """
@@ -454,7 +452,7 @@ class VerbRunner(object):
             utility.abort('Resource file "%s" is missing.' % name)
         return None
 
-    def voltdb_connect(self, host, port, username=None, password=None):
+    def voltdb_connect(self, host, port, username=None, password=None, ssl_config=None):
         """
         Create a VoltDB client connection.
         """
@@ -470,6 +468,10 @@ class VerbRunner(object):
                     If a username was specified and a password was not, prompt the user for the pwd.
                     """
                     kwargs['password'] = getpass('Enter your password: ')
+            if ssl_config:
+                kwargs['usessl'] = True
+                kwargs['ssl_config_file'] = ssl_config
+
             self.client = FastSerializer(host, port, **kwargs)
         except Exception, e:
             utility.abort(e)
@@ -487,7 +489,6 @@ class VerbRunner(object):
         parser = VoltCLIParser(self.verbspace)
         parser.initialize_verb(verb_name)
         parser.print_help()
-        sys.stdout.write('\n')
 
     def _create_package(self, output_dir, name, version, description, force):
         # Internal method to create a runnable Python package.

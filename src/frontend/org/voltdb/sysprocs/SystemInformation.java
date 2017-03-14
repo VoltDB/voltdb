@@ -91,12 +91,14 @@ public class SystemInformation extends VoltSystemProcedure
     };
 
     @Override
-    public void init()
+    public long[] getPlanFragmentIds()
     {
-        registerPlanFragment(SysProcFragmentId.PF_systemInformationOverview);
-        registerPlanFragment(SysProcFragmentId.PF_systemInformationOverviewAggregate);
-        registerPlanFragment(SysProcFragmentId.PF_systemInformationDeployment);
-        registerPlanFragment(SysProcFragmentId.PF_systemInformationAggregate);
+        return new long[]{
+            SysProcFragmentId.PF_systemInformationOverview,
+            SysProcFragmentId.PF_systemInformationOverviewAggregate,
+            SysProcFragmentId.PF_systemInformationDeployment,
+            SysProcFragmentId.PF_systemInformationAggregate
+        };
     }
 
     @Override
@@ -452,6 +454,10 @@ public class SystemInformation extends VoltSystemProcedure
             vt.addRow(hostId, "LICENSE", VoltDB.instance().getLicenseInformation());
         }
         populatePartitionGroups(hostId, vt);
+
+        // root path
+        vt.addRow(hostId, "VOLTDBROOT", VoltDB.instance().getVoltDBRootPath());
+        vt.addRow(hostId, "FULLCLUSTERSIZE", Integer.toString(VoltDB.instance().getCatalogContext().getClusterSettings().hostcount()));
         return vt;
     }
 

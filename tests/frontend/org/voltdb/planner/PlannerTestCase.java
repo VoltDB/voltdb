@@ -503,6 +503,26 @@ public class PlannerTestCase extends TestCase {
         assertEquals(replicatedTable, seqScan.getTargetTableName().toUpperCase());
     }
 
+    // Print a tree of plan nodes by type.
+    protected void printPlanNodes(AbstractPlanNode root, int fragmentNumber, int numberOfFragments) {
+        System.out.printf("  Plan for fragment %d of %d\n",
+                          fragmentNumber,
+                          numberOfFragments);
+        String lines[] = root.toExplainPlanString().split("\n");
+        System.out.printf("    Explain:\n");
+        for (String line : lines) {
+            System.out.printf("      %s\n", line);
+        }
+        System.out.printf("    Nodes:\n");
+        for (;root != null;
+                root = (root.getChildCount() > 0) ? root.getChild(0) : null) {
+            System.out.printf("      Node type %s\n", root.getPlanNodeType());
+            for (int idx = 1; idx < root.getChildCount(); idx += 1) {
+                System.out.printf("        Child %d: %s\n", idx, root.getChild(idx).getPlanNodeType());
+            }
+        }
+    }
+
     /**
      * Assert that an expression tree contains the expected types of expressions
      * in the order listed, assuming a top-down left-to-right depth-first
@@ -597,6 +617,76 @@ public class PlannerTestCase extends TestCase {
         assertTrue("Extra plan node(s) (" + stack.size() +
                 ") were found in the tree with no node type to match",
                 stack.isEmpty());
+    }
+
+    /**
+     * Validate a plan, ignoring inline nodes.  This is kind of like
+     * PlannerTestCase.compileToTopDownTree.  The differences are
+     * <ol>
+     *   <li>We only look out out-of-line nodes,</li>
+     *   <li>We can compile MP plans and SP plans, and</li>
+     *   <li>The boundaries between fragments in MP plans
+     *       are marked with PlanNodeType.INVALID.</li>
+     *   <li>We can describe inline nodes pretty easily.</li>
+     * </ol>
+     *
+     * See TestWindowFunctions.testWindowFunctionWithIndex for examples
+     * of the use of this function.
+     *
+     * @param SQL The statement text.
+     * @param numberOfFragments The number of expected fragments.
+     * @param types The plan node types of the inline and out-of-line nodes.
+     *              If types[idx] is a PlanNodeType, then the node should
+     *              have no inline children.  If types[idx] is an array of
+     *              PlanNodeType values then the node has the type types[idx][0],
+     *              and it should have types[idx][1..] as inline children.
+     */
+    protected void validatePlan(String SQL,
+                                int numberOfFragments,
+                                Object ...types) {
+        List<AbstractPlanNode> fragments = compileToFragments(SQL);
+        assertEquals(String.format("Expected %d fragments, not %d",
+                                   numberOfFragments,
+                                   fragments.size()),
+                     numberOfFragments,
+                     fragments.size());
+        int idx = 0;
+        int fragment = 1;
+        // The index of the last PlanNodeType in types.
+        int nchildren = types.length;
+        System.out.printf("Plan for <%s>\n", SQL);
+        for (AbstractPlanNode plan : fragments) {
+            printPlanNodes(plan, fragment, numberOfFragments);
+            // The boundaries between fragments are
+            // marked with PlanNodeType.INVALID.
+            if (fragment > 1) {
+                assertEquals("Expected a fragment to start here",
+                             PlanNodeType.INVALID,
+                             types[idx]);
+                idx += 1;
+            }
+            fragment += 1;
+            for (;plan != null; idx += 1) {
+                if (types.length <= idx) {
+                    fail(String.format("Expected %d plan nodes, but found more.", types.length));
+                }
+                if (types[idx] instanceof PlanNodeType) {
+                    assertEquals(types[idx], plan.getPlanNodeType());
+                } else if (types[idx] instanceof PlanNodeType[]) {
+                    PlanNodeType childTypes[] = (PlanNodeType[])(types[idx]);
+                    assertEquals(childTypes[0], plan.getPlanNodeType());
+                    for (int tidx = 1; tidx < childTypes.length; tidx += 1) {
+                        PlanNodeType childType = childTypes[tidx];
+                        assertTrue(String.format("Expected inline node of type %s", childType),
+                                   plan.getInlinePlanNode(childType) != null);
+                    }
+                } else {
+                    fail("Expected a PlanNodeType or an array of PlanNodeTypes here.");
+                }
+                plan = (plan.getChildCount() > 0) ? plan.getChild(0) : null;
+            }
+        }
+        assertEquals(nchildren, idx);
     }
 
 }
