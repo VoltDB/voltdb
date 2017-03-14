@@ -17,10 +17,18 @@
 
 package org.voltdb.sysprocs;
 
+import org.voltdb.DependencyPair;
+import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltTable;
 import org.voltdb.catalog.Database;
+import org.voltdb.common.Constants;
+import org.voltdb.dtxn.DtxnConstants;
+import org.voltdb.utils.VoltTableUtil;
+
+import java.util.List;
+import java.util.Map;
 
 /**
  * Execute a SwapTables as an multi-partition SQL statement.
@@ -35,6 +43,34 @@ public class SwapTables extends AdHocBase {
 
     Database m_db = null;
 
+    private static final int DEP_swapTables = (int) SysProcFragmentId.PF_swapTables | DtxnConstants.MULTIPARTITION_DEPENDENCY;
+    private static final int DEP_swapTablesAggregate = (int) SysProcFragmentId.PF_swapTablesAggregate;
+
+    @Override
+    public long[] getPlanFragmentIds() {
+        return new long[] { SysProcFragmentId.PF_swapTables, SysProcFragmentId.PF_swapTablesAggregate };
+    }
+
+    @Override
+    public DependencyPair executePlanFragment(Map<Integer, List<VoltTable>> dependencies, long fragmentId, ParameterSet params, SystemProcedureExecutionContext context) {
+        VoltTable dummy = new VoltTable(STATUS_SCHEMA);
+        dummy.addRow(STATUS_OK);
+
+        if (fragmentId == SysProcFragmentId.PF_swapTables) {
+            String oneTable = (String) params.getParam(0);
+            String otherTable = (String) params.getParam(1);
+            System.out.println(oneTable + " & " + otherTable + " called in " + context.getHostId() + ":" + context.getSiteId());
+            return new DependencyPair(DEP_swapTables, dummy);
+        }
+        else if (fragmentId == SysProcFragmentId.PF_swapTablesAggregate) {
+            return new DependencyPair(DEP_swapTablesAggregate,
+                    VoltTableUtil.unionTables(dependencies.get(DEP_swapTables)));
+        }
+
+        assert false;
+        return null;
+    }
+
     /**
      * System procedure run hook.
      * Use the base class implementation.
@@ -45,7 +81,33 @@ public class SwapTables extends AdHocBase {
      * @return  results as VoltTable array
      */
     public VoltTable[] run(SystemProcedureExecutionContext ctx, byte[] serializedBatchData) {
+        String stmt = new String(
+                decodeSerializedBatchData(serializedBatchData).getSecond()[0].sql,
+                Constants.UTF8ENCODING);
+        String[] stmtParams = stmt.split(" ");
+        performSwapTablesCallback(stmtParams[1], stmtParams[2]);
+
         return runAdHoc(ctx, serializedBatchData);
     }
 
+    private VoltTable[] performSwapTablesCallback(String oneTable, String otherTable)
+    {
+        SynthesizedPlanFragment pfs[] = new SynthesizedPlanFragment[2];
+
+        pfs[0] = new SynthesizedPlanFragment();
+        pfs[0].fragmentId = SysProcFragmentId.PF_swapTables;
+        pfs[0].outputDepId = DEP_swapTables;
+        pfs[0].inputDepIds = new int[]{};
+        pfs[0].multipartition = true;
+        pfs[0].parameters = ParameterSet.fromArrayNoCopy(oneTable, otherTable);
+
+        pfs[1] = new SynthesizedPlanFragment();
+        pfs[1].fragmentId = SysProcFragmentId.PF_swapTablesAggregate;
+        pfs[1].outputDepId = DEP_swapTablesAggregate;
+        pfs[1].inputDepIds = new int[]{DEP_swapTables};
+        pfs[1].multipartition = false;
+        pfs[1].parameters = ParameterSet.emptyParameterSet();
+
+        return executeSysProcPlanFragments(pfs, DEP_swapTablesAggregate);
+    }
 }
