@@ -158,7 +158,11 @@ public class TestJSONInterface extends TestCase {
     }
 
     public static String callProcOverJSONRaw(String varString, final int expectedCode) throws Exception {
-        URI jsonAPIURI = URI.create("http://localhost:8095/api/1.0/");
+        return callProcOverJSONRaw(varString, 8095, expectedCode);
+    }
+
+    public static String callProcOverJSONRaw(String varString, int httpPort, final int expectedCode) throws Exception {
+        URI jsonAPIURI = URI.create("http://localhost:" + httpPort + "/api/1.0/");
         try (CloseableHttpClient httpclient = HttpClients.createDefault()) {
             HttpPost post = new HttpPost(jsonAPIURI);
             // play nice by using HTTP 1.1 continue requests where the client sends the request headers first
@@ -317,10 +321,10 @@ public class TestJSONInterface extends TestCase {
     }
 
     public static String callProcOverJSON(String procName, ParameterSet pset, String username, String password, boolean preHash, boolean admin, int expectedCode, ClientAuthScheme scheme) throws Exception {
-        return callProcOverJSON(procName, pset, username, password, preHash, admin, expectedCode /* HTTP_OK */, scheme, -1);
+        return callProcOverJSON(procName, pset, 8095, username, password, preHash, admin, expectedCode /* HTTP_OK */, scheme, -1);
     }
 
-    public static String callProcOverJSON(String procName, ParameterSet pset, String username, String password, boolean preHash, boolean admin, int expectedCode, ClientAuthScheme scheme, int procCallTimeout) throws Exception {
+    public static String callProcOverJSON(String procName, ParameterSet pset, int httpPort, String username, String password, boolean preHash, boolean admin, int expectedCode, ClientAuthScheme scheme, int procCallTimeout) throws Exception {
         // Call insert
         String paramsInJSON = pset.toJSONString();
         //System.out.println(paramsInJSON);
@@ -348,14 +352,14 @@ public class TestJSONInterface extends TestCase {
 
         varString = getHTTPVarString(params);
 
-        String ret = callProcOverJSONRaw(varString, expectedCode);
+        String ret = callProcOverJSONRaw(varString, httpPort, expectedCode);
         if (preHash) {
             //If prehash make same call with SHA1 to check expected code.
             params.put("Hashedpassword", getHashedPasswordForHTTPVar(password, ClientAuthScheme.HASH_SHA1));
             varString = getHTTPVarString(params);
 
             varString = getHTTPVarString(params);
-            callProcOverJSONRaw(varString, expectedCode);
+            callProcOverJSONRaw(varString, httpPort, expectedCode);
         }
         return ret;
     }
@@ -1344,7 +1348,7 @@ public class TestJSONInterface extends TestCase {
             }
 
             pset = ParameterSet.fromArrayNoCopy(100000);
-            String response = callProcOverJSON("TestJSONInterface$LongReadProc", pset, null, null, false, false, 200, ClientAuthScheme.HASH_SHA256, 1);
+            String response = callProcOverJSON("TestJSONInterface$LongReadProc", pset, 8095, null, null, false, false, 200, ClientAuthScheme.HASH_SHA256, 1);
             Response r = responseFromJSON(response);
             assertEquals(ClientResponse.GRACEFUL_FAILURE, r.status);
             assertTrue(r.statusString.contains("Transaction Interrupted"));
