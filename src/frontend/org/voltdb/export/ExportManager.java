@@ -190,7 +190,7 @@ public class ExportManager
                 m_generationGhosts.add(drainedGeneration.m_timestamp);
                 //If I am draining current generation create new processor. Otherwise its just older on disk generations
                 // that are getting drained.
-                installNewProcessor = (m_processor.get().getExportGeneration() == drainedGeneration);
+                installNewProcessor = true;
                 exportLog.info("Finished draining generation " + drainedGeneration.m_timestamp);
             } else {
                 installNewProcessor = false;
@@ -617,13 +617,13 @@ public class ExportManager
         final CatalogMap<Connector> connectors = db.getConnectors();
 
         updateProcessorConfig(connectors);
-        if (m_processorConfig.size() == 0) {
+        if (m_processorConfig.isEmpty()) {
+            exportLog.info("No Export configuration exists no generation will be created.");
             m_lastNonEnabledGeneration = catalogContext.m_uniqueId;
             return;
         }
 
         File exportOverflowDirectory = new File(VoltDB.instance().getExportOverflowPath());
-        final int numOfReplicas = catalogContext.getDeployment().getCluster().getKfactor();
 
         ExportGeneration newGeneration = null;
         try {
