@@ -112,7 +112,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private volatile ListeningExecutorService m_executor;
     private final Integer m_executorLock = new Integer(0);
     private final LinkedTransferQueue<RunnableWithES> m_queuedActions = new LinkedTransferQueue<>();
-    private RunnableWithES m_firstAction = null;
+    private Runnable m_truncationTask = null;
 
     /**
      * Create a new data source.
@@ -602,28 +602,8 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         return m_generation;
     }
 
-    public ListenableFuture<?> truncateExportToTxnId(final long txnId) {
-        RunnableWithES runnable = new RunnableWithES("truncateExportToTxnId") {
-            @Override
-            public void run() {
-                try {
-                    m_committedBuffers.truncateToTxnId(txnId, m_nullArrayLength);
-                    if (m_committedBuffers.isEmpty() && m_endOfStream) {
-                        if (m_pollFuture != null) {
-                            m_pollFuture.set(null);
-                            m_pollFuture = null;
-                        }
-                        if (m_onDrain != null) {
-                            m_onDrain.run();
-                        }
-                    }
-                } catch (Throwable t) {
-                    VoltDB.crashLocalVoltDB("Error while trying to truncate export to txnid " + txnId, true, t);
-                }
-            }
-        };
-        //This is a setup task when stashed tasks are run this is run first.
-        return stashOrSubmitTask(runnable, false, true);
+    public void truncateExportToTxnId(final long txnId) {
+        m_truncationTask = new TruncationRunnable(txnId);
     }
 
     private class SyncRunnable implements Runnable {
@@ -641,6 +621,30 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             }
         }
     }
+    private class TruncationRunnable implements Runnable {
+        private final long m_truncaionPont;
+        TruncationRunnable(final long truncationPoint) {
+            this.m_truncaionPont = truncationPoint;
+        }
+
+        @Override
+        public void run() {
+            try {
+                m_committedBuffers.truncateToTxnId(m_truncaionPont, m_nullArrayLength);
+                if (m_committedBuffers.isEmpty() && m_endOfStream) {
+                    if (m_pollFuture != null) {
+                        m_pollFuture.set(null);
+                        m_pollFuture = null;
+                    }
+                    if (m_onDrain != null) {
+                        m_onDrain.run();
+                    }
+                }
+            } catch (Throwable t) {
+                VoltDB.crashLocalVoltDB("Error while trying to truncate export to txnid " + m_truncaionPont, true, t);
+            }
+        }
+    }
 
     public ListenableFuture<?> sync(final boolean nofsync) {
         RunnableWithES runnable = new RunnableWithES("sync") {
@@ -650,7 +654,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             }
         };
 
-        return stashOrSubmitTask(runnable, false, false);
+        return stashOrSubmitTask(runnable, false);
     }
 
     public boolean isClosed() {
@@ -672,7 +676,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 }
             }
         };
-        return stashOrSubmitTask(runnable, false, false);
+        return stashOrSubmitTask(runnable, false);
     }
 
     public ListenableFuture<?> close() {
@@ -693,7 +697,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             }
         };
 
-        return stashOrSubmitTask(runnable, false, false);
+        return stashOrSubmitTask(runnable, false);
     }
 
     public ListenableFuture<BBContainer> poll() {
@@ -721,7 +725,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 }
             }
         };
-        stashOrSubmitTask(runnable, true, false);
+        stashOrSubmitTask(runnable, true);
         return fut;
     }
 
@@ -836,7 +840,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     }
                 }
             };
-            stashOrSubmitTask(runnable, true, false);
+            stashOrSubmitTask(runnable, true);
         }
     }
 
@@ -901,7 +905,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             }
         };
 
-        stashOrSubmitTask(runnable, true, false);
+        stashOrSubmitTask(runnable, true);
     }
 
      private void ackImpl(long uso) {
@@ -970,7 +974,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 }
             }
         };
-        stashOrSubmitTask(runnable, true, false);
+        stashOrSubmitTask(runnable, true);
         return m_mastershipAccepted.get();
     }
 
@@ -995,7 +999,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         m_runEveryWhere = runEveryWhere;
     }
 
-    private ListenableFuture<?> stashOrSubmitTask(RunnableWithES runnable, final boolean callExecute, final boolean setupTask) {
+    private ListenableFuture<?> stashOrSubmitTask(RunnableWithES runnable, final boolean callExecute) {
         if (m_executor==null) {
             synchronized (m_executorLock) {
                 if (m_executor==null) {
@@ -1015,11 +1019,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
                         return Futures.immediateFuture(null);
                     }
-                    if (setupTask) {
-                        m_firstAction = runnable;
-                    } else {
-                        m_queuedActions.add(runnable);
-                    }
+                    m_queuedActions.add(runnable);
                     return Futures.immediateFuture(null);
                 }
             }
@@ -1050,10 +1050,10 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                             "ExportDataSource gen " + m_generation
                             + " table " + m_tableName + " partition " + m_partitionId, 1);
                 //If we have a truncate task do that first.
-                if (m_firstAction != null) {
+                if (m_truncationTask != null) {
                     exportLog.info("Submitting truncate task for ExportDataSource gen " + m_generation
                             + " table " + m_tableName + " partition " + m_partitionId);
-                    es.submit(m_firstAction);
+                    es.submit(m_truncationTask);
                 }
                 if (m_queuedActions.size()>0) {
                     for (RunnableWithES queuedR : m_queuedActions) {

@@ -791,14 +791,12 @@ public class ExportGeneration implements Generation {
     /*
      * Returns true if the generatino was completely truncated away
      */
-    public boolean truncateExportToTxnId(long txnId, long[] perPartitionTxnIds) {
+    public void truncateExportToTxnId(long txnId, long[] perPartitionTxnIds) {
         // create an easy partitionId:txnId lookup.
         HashMap<Integer, Long> partitionToTxnId = new HashMap<Integer, Long>();
         for (long tid : perPartitionTxnIds) {
             partitionToTxnId.put(TxnEgo.getPartitionId(tid), tid);
         }
-
-        List<ListenableFuture<?>> tasks = new ArrayList<ListenableFuture<?>>();
 
         // pre-iv2, the truncation point is the snapshot transaction id.
         // In iv2, truncation at the per-partition txn id recorded in the snapshot.
@@ -813,21 +811,11 @@ public class ExportGeneration implements Generation {
                 else {
                     //If this was drained and closed we may not have truncation point and we dont want to reopen PBDs
                     if (!source.isClosed()) {
-                        tasks.add(source.truncateExportToTxnId(truncationPoint));
+                        source.truncateExportToTxnId(truncationPoint);
                     }
                 }
             }
         }
-
-        try {
-            Futures.allAsList(tasks).get();
-        } catch (Exception e) {
-            VoltDB.crashLocalVoltDB("Unexpected exception truncating export data during snapshot restore. " +
-                                    "You can back up export overflow data and start the " +
-                                    "DB without it to get past this error", true, e);
-        }
-
-        return m_drainedSources.get() == m_numSources;
     }
 
     public void sync(final boolean nofsync) {
