@@ -51,6 +51,7 @@ import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.base.Throwables;
+import org.voltdb.utils.CatalogUtil;
 
 /**
  * Bridges the connection to an OLAP system and the buffers passed
@@ -622,22 +623,26 @@ public class ExportManager
         return m_connCount;
     }
 
-    public synchronized void updateCatalog(CatalogContext catalogContext, List<Integer> partitions)
+    public synchronized void updateCatalog(CatalogContext catalogContext, String diffCommands, List<Integer> partitions)
     {
         final Cluster cluster = catalogContext.catalog.getClusters().get("cluster");
         final Database db = cluster.getDatabases().get("database");
         final CatalogMap<Connector> connectors = db.getConnectors();
 
         updateProcessorConfig(connectors);
-        if (m_processorConfig.size() == 0) {
+        if (m_processorConfig.isEmpty()) {
             m_lastNonEnabledGeneration = catalogContext.m_uniqueId;
             return;
         }
 
+        if (CatalogUtil.getDiffCommandsForEE(diffCommands).length() == 0) {
+            // empty diff cmds means java specific catalog changes EE not touched.
+            exportLog.info("Skipped rolling generations as catalog was not updated in EE.");
+            return;
+        }
         File exportOverflowDirectory = new File(VoltDB.instance().getExportOverflowPath());
-        final int numOfReplicas = catalogContext.getDeployment().getCluster().getKfactor();
 
-        ExportGeneration newGeneration = null;
+        ExportGeneration newGeneration;
         try {
             newGeneration = new ExportGeneration(catalogContext.m_uniqueId, exportOverflowDirectory, false);
             newGeneration.setGenerationDrainRunnable(new GenerationDrainRunnable(newGeneration));
