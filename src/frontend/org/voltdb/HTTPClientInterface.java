@@ -451,7 +451,7 @@ public class HTTPClientInterface {
             if (!authReq.authenticate(ClientAuthScheme.SPNEGO, fromAddress)) {
                 return new AuthenticationResult(
                         false, null, adminMode, principal,
-                        "User " + principal + " from " + fromAddress + " failed to authorize"
+                        "User " + principal + " from " + fromAddress + " failed to authenticate"
                         );
             }
             return new AuthenticationResult(true, ClientAuthScheme.SPNEGO, adminMode, principal, "");
@@ -463,7 +463,7 @@ public class HTTPClientInterface {
             if (!authReq.authenticate(scheme, fromAddress)) {
                 return new AuthenticationResult(
                         false, null, adminMode, username,
-                        "User " + username + " from " + fromAddress + " failed to authorize"
+                        "User " + username + " from " + fromAddress + " failed to authenticate"
                         );
             }
             return new AuthenticationResult(true, scheme, adminMode, username, "");
