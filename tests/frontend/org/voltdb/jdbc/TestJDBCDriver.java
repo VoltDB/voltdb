@@ -48,18 +48,20 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.regex.Pattern;
 
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Test;
 import org.voltdb.BackendTarget;
 import org.voltdb.ServerThread;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltType;
 import org.voltdb.client.ArbitraryDurationProc;
+import org.voltdb.client.ClientConfig;
 import org.voltdb.client.TestClientFeatures;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.MiscUtils;
+
+import org.junit.AfterClass;
+import org.junit.BeforeClass;
+import org.junit.Test;
 
 public class TestJDBCDriver {
     static String testjar;
@@ -67,6 +69,8 @@ public class TestJDBCDriver {
     static Connection conn;
     static Connection myconn;
     static VoltProjectBuilder pb;
+
+
 
     @BeforeClass
     public static void setUp() throws Exception {
@@ -148,14 +152,14 @@ public class TestJDBCDriver {
         server.waitForInitialization();
 
         Class.forName("org.voltdb.jdbc.Driver");
-        conn = DriverManager.getConnection("jdbc:voltdb://localhost:21212");
-        myconn = null;
-    }
+        if(ClientConfig.ENABLE_SSL_FOR_TEST) {
+            conn = DriverManager.getConnection("jdbc:voltdb://localhost:21212?" + JDBCTestCommons.SSL_URL_SUFFIX);
+        }
+        else {
+            conn = DriverManager.getConnection("jdbc:voltdb://localhost:21212");
+        }
 
-    private static Connection getJdbcConnection(String url, Properties props) throws Exception
-    {
-        Class.forName("org.voltdb.jdbc.Driver");
-        return DriverManager.getConnection(url, props);
+        myconn = null;
     }
 
     private static void stopServer() throws SQLException {
@@ -767,7 +771,7 @@ public class TestJDBCDriver {
     public void testQueryTimeout() throws Exception {
         Properties props = new Properties();
         // Check default setting, timeout unit should be TimeUnit.SECONDS
-        myconn = getJdbcConnection("jdbc:voltdb://localhost:21212", props);
+        myconn = JDBCTestCommons.getJdbcConnection("jdbc:voltdb://localhost:21212", props);
         assertTrue(runQueryWithTimeout(7000, 1));
         assertFalse(runQueryWithTimeout(7000, 30));
         assertTrue(runQueryWithTimeout(7000, -1));
@@ -775,7 +779,7 @@ public class TestJDBCDriver {
 
         // Check set time unit to MILLISECONDS
         // through url
-        myconn = getJdbcConnection(
+        myconn = JDBCTestCommons.getJdbcConnection(
                 "jdbc:voltdb://localhost:21212?jdbc.querytimeout.unit=milliseconds",
                 props);
         assertTrue(runQueryWithTimeout(7000, 1));
@@ -786,7 +790,7 @@ public class TestJDBCDriver {
         // Check set time unit to MILLISECONDS
         // through Java Propeties
         props.setProperty(JDBC4Connection.QUERYTIMEOUT_UNIT, "milliseconds");
-        myconn = getJdbcConnection("jdbc:voltdb://localhost:21212", props);
+        myconn = JDBCTestCommons.getJdbcConnection("jdbc:voltdb://localhost:21212", props);
         assertTrue(runQueryWithTimeout(7000, 1));
         assertTrue(runQueryWithTimeout(7000, 30));
         assertTrue(runQueryWithTimeout(7000, -1));
@@ -795,7 +799,7 @@ public class TestJDBCDriver {
         // Check set time unit to other unsupported unit, should by default
         // still use TimeUnit.SECONDS
         props.setProperty(JDBC4Connection.QUERYTIMEOUT_UNIT, "nanoseconds");
-        myconn = getJdbcConnection("jdbc:voltdb://localhost:21212", props);
+        myconn = JDBCTestCommons.getJdbcConnection("jdbc:voltdb://localhost:21212", props);
         assertTrue(runQueryWithTimeout(7000, 1));
         assertFalse(runQueryWithTimeout(7000, 30));
         assertTrue(runQueryWithTimeout(7000, -1));
@@ -881,20 +885,20 @@ public class TestJDBCDriver {
     {
         Properties props = new Properties();
         // Check default behavior
-        myconn = getJdbcConnection("jdbc:voltdb://localhost:21212", props);
+        myconn = JDBCTestCommons.getJdbcConnection("jdbc:voltdb://localhost:21212", props);
         checkSafeMode(myconn);
         myconn.close();
 
         // Check commit and setAutoCommit
         props.setProperty(JDBC4Connection.COMMIT_THROW_EXCEPTION, "true");
         props.setProperty(JDBC4Connection.ROLLBACK_THROW_EXCEPTION, "true");
-        myconn = getJdbcConnection("jdbc:voltdb://localhost:21212", props);
+        myconn = JDBCTestCommons.getJdbcConnection("jdbc:voltdb://localhost:21212", props);
         checkSafeMode(myconn);
         myconn.close();
 
         props.setProperty(JDBC4Connection.COMMIT_THROW_EXCEPTION, "false");
         props.setProperty(JDBC4Connection.ROLLBACK_THROW_EXCEPTION, "false");
-        myconn = getJdbcConnection("jdbc:voltdb://localhost:21212", props);
+        myconn = JDBCTestCommons.getJdbcConnection("jdbc:voltdb://localhost:21212", props);
         checkCarlosDanger(myconn);
         myconn.close();
     }
@@ -904,18 +908,18 @@ public class TestJDBCDriver {
     {
         Properties props = new Properties();
         // Check default behavior
-        myconn = getJdbcConnection("jdbc:voltdb://localhost:21212", props);
+        myconn = JDBCTestCommons.getJdbcConnection("jdbc:voltdb://localhost:21212", props);
         checkSafeMode(myconn);
         myconn.close();
 
         // Check commit and setAutoCommit
-        myconn = getJdbcConnection("jdbc:voltdb://localhost:21212?" +
+        myconn = JDBCTestCommons.getJdbcConnection("jdbc:voltdb://localhost:21212?" +
                 JDBC4Connection.COMMIT_THROW_EXCEPTION + "=true" + "&" +
                 JDBC4Connection.ROLLBACK_THROW_EXCEPTION + "=true", props);
         checkSafeMode(myconn);
         myconn.close();
 
-        myconn = getJdbcConnection("jdbc:voltdb://localhost:21212?" +
+        myconn = JDBCTestCommons.getJdbcConnection("jdbc:voltdb://localhost:21212?" +
                 JDBC4Connection.COMMIT_THROW_EXCEPTION + "=false" + "&" +
                 JDBC4Connection.ROLLBACK_THROW_EXCEPTION + "=false", props);
         checkCarlosDanger(myconn);
@@ -953,7 +957,7 @@ public class TestJDBCDriver {
 
             System.setProperty(Driver.JDBC_PROP_FILE_PROP, propfile);
             props = new Properties();
-            myconn = getJdbcConnection("jdbc:voltdb://localhost:21212", props);
+            myconn = JDBCTestCommons.getJdbcConnection("jdbc:voltdb://localhost:21212", props);
             checkCarlosDanger(myconn);
             myconn.close();
         }
@@ -963,5 +967,19 @@ public class TestJDBCDriver {
                 tmp.delete();
             }
         }
+    }
+
+    @Test
+    public void testSSLPropertiesFromURL() {
+        String url = "jdbc:voltdb://server1:21212,server2?"
+                + "ssl=true&truststore=/tmp/xyz&truststorepassword=password";
+        String[] servers = Driver.getServersFromURL(url);
+        assertEquals("server1:21212", servers[0]);
+        assertEquals("server2", servers[1]);
+        Map<String, String> propMap = Driver.getPropsFromURL(url);
+        assertEquals(3, propMap.size());
+        assertEquals("true", propMap.get(Driver.SSL_PROP));
+        assertEquals("/tmp/xyz", propMap.get(Driver.TRUSTSTORE_CONFIG_PROP));
+        assertEquals("password", propMap.get(Driver.TRUSTSTORE_PASSWORD_PROP));
     }
 }

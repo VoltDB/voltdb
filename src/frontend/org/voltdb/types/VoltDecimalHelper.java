@@ -26,7 +26,9 @@ import java.nio.ByteBuffer;
 import java.util.Arrays;
 
 /**
- * A class for serializing and deserializing Volt's 16-byte fixed precision and scale decimal format. The decimal's
+ * A class for VoltDB decimal numbers.
+ *
+ * The main task of this class is serializing and deserializing Volt's 16-byte fixed precision and scale decimal format. The decimal's
  * are converted to/from Java's {@link java.math.BigDecimal BigDecimal} class. <code>BigDecimal</code> stores values
  * as an unscaled (unscaled means no trailing 0s) fixed point {@link java.math.BigInteger BigInteger} and a separate
  * scale value. An exception (either {@link java.lang.RuntimeException RuntimeException} or
@@ -34,6 +36,8 @@ import java.util.Arrays;
  * 38 is used. {@link java.math.BigDecimal#setScale(int) BigDecimal.setScale(int)} can be used to reduce the scale of
  * a value before serialization.
  *
+ * There is also a static method, stringToDecimal, to convert a string value to an acceptable BigDecimal value
+ * for VoltDB's DECIMAL type.
  */
 public class VoltDecimalHelper {
     /**
@@ -308,4 +312,19 @@ public class VoltDecimalHelper {
     public static BigDecimal setDefaultScale(BigDecimal bd) {
         return bd.setScale(kDefaultScale, getRoundingMode());
     }
+
+    /**
+     * Convert a string to a VoltDB DECIMAL number with the default
+     * (and only possible) scale.
+     *
+     * @param valueStr
+     */
+    public static BigDecimal stringToDecimal(String valueStr) {
+        BigInteger bi = new BigInteger(valueStr);
+        BigDecimal bd = new BigDecimal(bi);
+        bd = VoltDecimalHelper.setDefaultScale(bd);
+        return bd;
+    }
+
+
 }

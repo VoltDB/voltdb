@@ -67,6 +67,10 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
     private static final boolean HOST_TRACE_ENABLED;
 
+    // Size of the parameter set buffer and the per-fragment stats buffer.
+    // 256K is a reasonable size for those relatively small buffers.
+    private static final int smallBufferSize = 256 * 1024;
+
     static {
         EE_COMPACTION_THRESHOLD = Integer.getInteger("EE_COMPACTION_THRESHOLD", 95);
         if (EE_COMPACTION_THRESHOLD < 0 || EE_COMPACTION_THRESHOLD > 99) {
@@ -83,6 +87,11 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     ByteBuffer as it will be passed directly to the C++ code. */
     private BBContainer psetBufferC = null;
     private ByteBuffer psetBuffer = null;
+
+    /** Create a ByteBuffer (in a container) for the C++ side to share time measurements and
+        the success / fail status for fragments in a batch. */
+    private BBContainer perFragmentStatsBufferC = null;
+    private ByteBuffer perFragmentStatsBuffer = null;
 
     /**
      * A deserializer backed by a direct byte buffer, for fast access from C++.
@@ -151,10 +160,21 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                     EE_COMPACTION_THRESHOLD);
         checkErrorCode(errorCode);
 
-        setupPsetBuffer(256 * 1024); // 256k seems like a reasonable per-ee number (but is totally pulled from my a**)
+        setupPsetBuffer(smallBufferSize);
+        setupPerFragmentStatsBuffer(smallBufferSize);
+        updateEEBufferPointers();
 
         updateHashinator(hashinatorConfig);
         //LOG.info("Initialized Execution Engine");
+    }
+
+    final void updateEEBufferPointers() {
+        int errorCode = nativeSetBuffers(pointer,
+                psetBuffer, psetBuffer.capacity(),
+                perFragmentStatsBuffer, perFragmentStatsBuffer.capacity(),
+                deserializer.buffer(), deserializer.buffer().capacity(),
+                exceptionBuffer, exceptionBuffer.capacity());
+        checkErrorCode(errorCode);
     }
 
     final void setupPsetBuffer(int size) {
@@ -165,21 +185,42 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
         psetBufferC = DBBPool.allocateDirect(size);
         psetBuffer = psetBufferC.b();
+    }
 
-        int errorCode = nativeSetBuffers(pointer, psetBuffer,
-                psetBuffer.capacity(),
-                deserializer.buffer(), deserializer.buffer().capacity(),
-                exceptionBuffer, exceptionBuffer.capacity());
-        checkErrorCode(errorCode);
+    final void setupPerFragmentStatsBuffer(int size) {
+        if (perFragmentStatsBuffer != null) {
+            perFragmentStatsBufferC.discard();
+            perFragmentStatsBuffer = null;
+        }
+
+        perFragmentStatsBufferC = DBBPool.allocateDirect(size);
+        perFragmentStatsBuffer = perFragmentStatsBufferC.b();
     }
 
     final void clearPsetAndEnsureCapacity(int size) {
         assert(psetBuffer != null);
         if (size > psetBuffer.capacity()) {
             setupPsetBuffer(size);
+            updateEEBufferPointers();
         }
         else {
             psetBuffer.clear();
+        }
+    }
+
+    final void clearPerFragmentStatsAndEnsureCapacity(int batchSize) {
+        assert(perFragmentStatsBuffer != null);
+        // Determine the required size of the per-fragment stats buffer:
+        // int8_t perFragmentTimingEnabled
+        // int32_t succeededFragmentsCount
+        // succeededFragmentsCount * sizeof(int64_t) for duration time numbers.
+        int size = 1 + 4 + batchSize * 8;
+        if (size > perFragmentStatsBuffer.capacity()) {
+            setupPerFragmentStatsBuffer(size);
+            updateEEBufferPointers();
+        }
+        else {
+            perFragmentStatsBuffer.clear();
         }
     }
 
@@ -218,6 +259,8 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         exceptionBufferOrigin.discard();
         psetBufferC.discard();
         psetBuffer = null;
+        perFragmentStatsBufferC.discard();
+        perFragmentStatsBuffer = null;
         LOG.trace("Released Execution Engine.");
     }
 
@@ -244,6 +287,34 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         int errorCode = 0;
         errorCode = nativeUpdateCatalog(pointer, timestamp, getStringBytes(catalogDiffs));
         checkErrorCode(errorCode);
+    }
+
+    // Tell EE that we need the time measurements for the next fragment.
+    // The timing is off by default.
+    @Override
+    public void setPerFragmentTimingEnabled(boolean enabled) {
+        perFragmentStatsBuffer.clear();
+        perFragmentStatsBuffer.put((byte)(enabled ? 1 : 0));
+    }
+
+    // Extract the per-fragment stats from the buffer.
+    @Override
+    public int extractPerFragmentStats(int batchSize, long[] executionTimesOut) {
+        perFragmentStatsBuffer.clear();
+        // Discard the first byte since it is the timing on/off switch.
+        perFragmentStatsBuffer.get();
+        int succeededFragmentsCount = perFragmentStatsBuffer.getInt();
+        if (executionTimesOut != null) {
+            assert(executionTimesOut.length >= succeededFragmentsCount);
+            for (int i = 0; i < succeededFragmentsCount; i++) {
+                executionTimesOut[i] = perFragmentStatsBuffer.getLong();
+            }
+            // This is the time for the failed fragment.
+            if (succeededFragmentsCount < executionTimesOut.length) {
+                executionTimesOut[succeededFragmentsCount] = perFragmentStatsBuffer.getLong();
+            }
+        }
+        return succeededFragmentsCount;
     }
 
     /**
@@ -303,6 +374,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             }
         }
         // checkMaxFsSize();
+        clearPerFragmentStatsAndEnsureCapacity(batchSize);
 
         // Execute the plan, passing a raw pointer to the byte buffers for input and output
         //Clear is destructive, do it before the native call

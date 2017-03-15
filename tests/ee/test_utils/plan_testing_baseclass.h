@@ -44,9 +44,13 @@
 #ifndef TESTS_EE_TEST_UTILS_PLAN_TESTING_BASECLASS_H_
 #define TESTS_EE_TEST_UTILS_PLAN_TESTING_BASECLASS_H_
 
-#include "execution/VoltDBEngine.h"
-#include "common/ValueFactory.hpp"
+#include "catalog/cluster.h"
+#include "catalog/constraint.h"
+#include "catalog/table.h"
 #include "common/SerializableEEException.h"
+#include "common/ValueFactory.hpp"
+#include "execution/VoltDBEngine.h"
+#include "storage/temptable.h"
 
 #include "test_utils/LoadTableFrom.hpp"
 #include "test_utils/plan_testing_config.h"
@@ -99,7 +103,8 @@ public:
         m_database(NULL),
         m_constraint(NULL),
         m_isinitialized(false),
-        m_fragmentNumber(100)
+        m_fragmentNumber(100),
+        m_paramCount(0)
     { }
 
     void initialize(const char   *catalogString,
@@ -128,13 +133,16 @@ public:
          */
         m_topend.reset(TOPEND::newInstance());
         m_engine.reset(new voltdb::VoltDBEngine(m_topend.get()));
-        m_parameter_buffer.reset(new char [4 * 1024]);
-        m_result_buffer.reset(new char [1024 * 1024 * 2]);
-        m_exception_buffer.reset(new char [4 * 1024]);
-        m_engine->setBuffers(m_parameter_buffer.get(), 4 * 1024,
-                             m_result_buffer.get(), 1024 * 1024 * 2,
-                             m_exception_buffer.get(), 4096);
+        m_parameter_buffer.reset(new char[m_smallBufferSize]);
+        m_per_fragment_stats_buffer.reset(new char[m_smallBufferSize]);
+        m_result_buffer.reset(new char[m_resultBufferSize]);
+        m_exception_buffer.reset(new char[m_smallBufferSize]);
+        m_engine->setBuffers(m_parameter_buffer.get(), m_smallBufferSize,
+                             m_per_fragment_stats_buffer.get(), m_smallBufferSize,
+                             m_result_buffer.get(), m_resultBufferSize,
+                             m_exception_buffer.get(), m_smallBufferSize);
         m_engine->resetReusedResultOutputBuffer();
+        m_engine->resetPerFragmentStatsOutputBuffer();
         int partitionCount = 3;
         m_engine->initialize(m_cluster_id, m_site_id, 0, 0, "", 0, 1024, voltdb::DEFAULT_TEMP_TABLE_MEMORY, false);
         m_engine->updateHashinator(voltdb::HASHINATOR_LEGACY, (char*)&partitionCount, NULL, 0);
@@ -231,8 +239,8 @@ public:
             // Make sure the parameter buffer is filled
             // with healthful zeros, and then create an input
             // deserializer.
-            memset(m_parameter_buffer.get(), 0, 4 * 1024);
-            voltdb::ReferenceSerializeInputBE emptyParams(m_parameter_buffer.get(), 4 * 1024);
+            memset(m_parameter_buffer.get(), 0, m_smallBufferSize);
+            voltdb::ReferenceSerializeInputBE emptyParams(m_parameter_buffer.get(), m_smallBufferSize);
 
             //
             // Execute the plan.  You'd think this would be more
@@ -288,22 +296,98 @@ public:
         }
         ASSERT_FALSE(failed);
     }
+
+    void validateDMLResultTable(voltdb::TempTable *result, int64_t expectedModifiedTuples = 1) {
+        ASSERT_TRUE(result);
+        const voltdb::TupleSchema* resultSchema = result->schema();
+        voltdb::TableTuple tuple(resultSchema);
+        boost::scoped_ptr<voltdb::TableIterator> iter(result->makeIterator());
+        ASSERT_TRUE(iter->next(tuple));
+        int64_t actualModifiedTuples = voltdb::ValuePeeker::peekBigInt(tuple.getNValue(0));
+        ASSERT_EQ(expectedModifiedTuples, actualModifiedTuples);
+        ASSERT_FALSE(iter->next(tuple));
+    }
+
+    void initParamsBuffer() {
+        m_paramsOutput.initializeWithPosition(m_parameter_buffer.get(),
+                                              m_smallBufferSize,
+                                              0);
+    }
+
+    void prepareParamsBufferForNextFragment() {
+        m_paramCount = 0;
+        m_paramCountOffset = m_paramsOutput.reserveBytes(sizeof(int16_t));
+        m_paramsOutput.writeShortAt(m_paramCountOffset, m_paramCount);
+    }
+
+    void addParameterToBuffer(voltdb::ValueType type, const void *buf, int32_t length = OBJECTLENGTH_NULL) {
+        m_paramsOutput.writeByte(static_cast<int8_t>(type));
+        switch (type) {
+            case voltdb::VALUE_TYPE_VARCHAR:
+            case voltdb::VALUE_TYPE_VARBINARY:
+                if (buf == NULL) {
+                    m_paramsOutput.writeInt(OBJECTLENGTH_NULL);
+                    break;
+                }
+                if (length <= OBJECTLENGTH_NULL) {
+                    // Attempted to serialize a value with a negative length
+                    ASSERT_TRUE(false);
+                }
+                m_paramsOutput.writeInt(length);
+                m_paramsOutput.writeBytes(buf, length);
+                break;
+            case voltdb::VALUE_TYPE_TINYINT:
+                m_paramsOutput.writeByte(*static_cast<const int8_t*>(buf));
+                break;
+            case voltdb::VALUE_TYPE_SMALLINT:
+                m_paramsOutput.writeShort(*static_cast<const int16_t*>(buf));
+                break;
+            case voltdb::VALUE_TYPE_INTEGER:
+                m_paramsOutput.writeInt(*static_cast<const int32_t*>(buf));
+                break;
+            case voltdb::VALUE_TYPE_TIMESTAMP:
+                m_paramsOutput.writeLong(*static_cast<const int64_t*>(buf));
+                break;
+            case voltdb::VALUE_TYPE_BIGINT:
+                m_paramsOutput.writeLong(*static_cast<const int64_t*>(buf));
+                break;
+            case voltdb::VALUE_TYPE_DOUBLE:
+                m_paramsOutput.writeDouble(*static_cast<const double*>(buf));
+                break;
+            default:
+                // Unsupported type.
+                ASSERT_TRUE(false);
+        }
+        m_paramCount++;
+        m_paramsOutput.writeShortAt(m_paramCountOffset, m_paramCount);
+    }
+
 protected:
-    voltdb::CatalogId m_cluster_id;
-    voltdb::CatalogId m_database_id;
-    voltdb::CatalogId m_site_id;
-    std::string m_catalog_string;
-    catalog::Catalog *m_catalog; //This is not the real catalog that the VoltDBEngine uses. It is a duplicate made locally to get GUIDs
-    catalog::Cluster *m_cluster;
-    catalog::Database *m_database;
-    catalog::Constraint *m_constraint;
-    boost::scoped_ptr<voltdb::VoltDBEngine>     m_engine;
-    boost::scoped_ptr<TOPEND> m_topend;
-    boost::shared_array<char>m_result_buffer;
-    boost::shared_array<char>m_exception_buffer;
-    boost::shared_array<char>m_parameter_buffer;
-    bool                     m_isinitialized;
-    int                      m_fragmentNumber;
+    voltdb::CatalogId    m_cluster_id;
+    voltdb::CatalogId    m_database_id;
+    voltdb::CatalogId    m_site_id;
+    std::string          m_catalog_string;
+    // This is not the real catalog that the VoltDBEngine uses.
+    // It is a duplicate made locally to get GUIDs
+    catalog::Catalog     *m_catalog;
+    catalog::Cluster     *m_cluster;
+    catalog::Database    *m_database;
+    catalog::Constraint  *m_constraint;
+    boost::scoped_ptr<voltdb::VoltDBEngine>  m_engine;
+    boost::scoped_ptr<TOPEND>                m_topend;
+    boost::shared_array<char>                m_result_buffer;
+    boost::shared_array<char>                m_exception_buffer;
+    boost::shared_array<char>                m_parameter_buffer;
+    boost::shared_array<char>                m_per_fragment_stats_buffer;
+    bool                                     m_isinitialized;
+    int                                      m_fragmentNumber;
+    size_t                                   m_paramCountOffset;
+    int16_t                                  m_paramCount;
+    voltdb::ReferenceSerializeOutput         m_paramsOutput;
+    // The size for all the synthetic buffers except the result buffer.
+    static const size_t  m_smallBufferSize = 4 * 1024;
+    // The size of the result buffer.
+    static const size_t m_resultBufferSize = 1024 * 1024 * 2;
 };
 
 #endif /* TESTS_EE_TEST_UTILS_PLAN_TESTING_BASECLASS_H_ */

@@ -77,7 +77,7 @@
         </javac>
     </target>
 
-	<target name="formatter" depends="formatter-compile">
+    <target name="formatter" depends="formatter-compile">
         <copy file="${external.jars}/json-simple-1.1.1.jar" todir="${formatterclasses.dir}"/>
         <jar destfile="formatter.jar" basedir="${formatterclasses.dir}">
             <manifest>

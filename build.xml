@@ -1197,6 +1197,8 @@ JAR BUILDING
             <include name="org/HdrHistogram_voltpatches/**" />
             <include name="org/mindrot/**" />
             <include name="org/spearce_voltpatches/**" />
+            <include name="io/netty_voltpatches/**" />
+            <include name="org/jctools_voltpatches/**" />
         </fileset>
         <fileset dir="${build.test.dir}" defaultexcludes="yes" >
             <include name="org/voltdb/ServerThread.class" />
@@ -1291,6 +1293,8 @@ JAR BUILDING
             <include name="vanilla/**" />
             <include name="javax/annotation_voltpatches/**" />
             <include name="com/google_voltpatches/**" />
+            <include name="io/netty_voltpatches/**" />
+            <include name="org/jctools_voltpatches/**" />
         </fileset>
         <fileset dir="${build.test.dir}" defaultexcludes="no" >
             <include name="org/voltdb/**" />
@@ -1407,8 +1411,16 @@ JAVA COMPILATION
         <fileset dir="${src.test.dir}">
             <include name="**/*.sql"/>
             <include name="**/keystore"/>
+            <include name="**/ssl-config"/>
+            <include name="**/ssl-config-invalid"/>
         </fileset>
     </copy>
+    <copy flatten='false' todir='${build.prod.dir}'>
+		<fileset dir="${src.gpl.dir}">
+             <include name="**/keystore"/>
+            <include name="**/ssl-config"/>
+        </fileset>
+	</copy>
     <copy flatten='false' todir='${build.testproc.dir}'>
         <fileset dir="${src.testproc.dir}">
             <include name="**/*.sql"/>
@@ -1456,7 +1468,9 @@ JAVA COMPILATION
                   com/google_voltpatches/**/*.java
                   org/cliffc_voltpatches/**
                   groovy_voltpatches/**
-                  org/supercsv_voltpatches/tokenizer/*.java"/>
+                  org/supercsv_voltpatches/tokenizer/*.java
+                  io/netty_voltpatches/**/*.java
+                  org/jctools_voltpatches/**/*.java"/>
     <!-- non-voltcore voltdb code -->
     <invoke-javac srcdir="${src.gpl.dir}" excludes="org/voltcore/**/*.java" />
 

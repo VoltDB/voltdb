@@ -61,9 +61,6 @@
 
 package org.voltcore.network;
 
-import com.google_voltpatches.common.util.concurrent.SettableFuture;
-import io.netty_voltpatches.NinjaKeySet;
-
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.channels.AsynchronousCloseException;
@@ -84,12 +81,17 @@ import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import jsr166y.ThreadLocalRandom;
+import javax.net.ssl.SSLEngine;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.VoltNetworkPool.IOStatsIntf;
 import org.voltcore.utils.LatencyWatchdog;
 import org.voltcore.utils.Pair;
+
+import com.google_voltpatches.common.util.concurrent.SettableFuture;
+
+import io.netty_voltpatches.NinjaKeySet;
+import jsr166y.ThreadLocalRandom;
 
 /** Produces work for registered ports that are selected for read, write */
 class VoltNetwork implements Runnable, IOStatsIntf
@@ -152,6 +154,13 @@ class VoltNetwork implements Runnable, IOStatsIntf
     }
 
     /**
+     * Helps {@link VoltPort} discern cases when the network is shutting down
+     */
+    boolean isStopping() {
+        return m_shouldStop;
+    }
+
+    /**
      * Register a channel with the selector and create a Connection that will pass incoming events
      * to the provided handler.
      * @param channel
@@ -162,19 +171,26 @@ class VoltNetwork implements Runnable, IOStatsIntf
             final SocketChannel channel,
             final InputHandler handler,
             final int interestOps,
-            final ReverseDNSPolicy dns) throws IOException {
-        channel.configureBlocking (false);
-        channel.socket().setKeepAlive(true);
+            final ReverseDNSPolicy dns,
+            final CipherExecutor cipherService,
+            final SSLEngine sslEngine) throws IOException {
+
+        synchronized(channel.blockingLock()) {
+            channel.configureBlocking (false);
+            channel.socket().setKeepAlive(true);
+        }
 
         Callable<Connection> registerTask = new Callable<Connection>() {
             @Override
             public Connection call() throws Exception {
-                final VoltPort port =
-                        new VoltPort(
+                final VoltPort port = VoltPortFactory.createVoltPort(
+                                channel,
                                 VoltNetwork.this,
                                 handler,
                                 (InetSocketAddress)channel.socket().getRemoteSocketAddress(),
-                                m_pool);
+                                m_pool,
+                                cipherService,
+                                sslEngine);
                 port.registering();
 
                 /*
@@ -368,7 +384,7 @@ class VoltNetwork implements Runnable, IOStatsIntf
     void installInterests(VoltPort port) {
         try {
             if (port.isRunning()) {
-                assert(false); //Shouldn't be running since it is all single threaded now?
+                assert(false) : "Shouldn't be running since it is all single threaded now?";
                 return;
             }
 

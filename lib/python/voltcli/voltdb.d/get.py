@@ -44,7 +44,7 @@ def get(runner):
     if runner.opts.resource in ('deployment', 'schema', 'classes'):
         runner.args.extend([runner.opts.resource])
     else:
-        utility.abort('Invalid arg %s for command. Valid arguments are deployment, schema and classes' % runner.opts.resource)
+        utility.abort('Invalid argument \'%s\' for Get command. Valid arguments are deployment, schema and classes' % runner.opts.resource)
 
     if runner.opts.output:
         runner.args.extend(['file', runner.opts.output])

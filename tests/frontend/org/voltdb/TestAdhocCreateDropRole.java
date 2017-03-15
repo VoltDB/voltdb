@@ -97,6 +97,7 @@ public class TestAdhocCreateDropRole extends AdhocDDLTestBase {
                 userClient.createConnection("localhost");
             }
             catch (IOException ioe) {
+                ioe.printStackTrace();
                 threw = true;
                 assertTrue(ioe.getMessage().contains("Authentication rejected"));
             }
