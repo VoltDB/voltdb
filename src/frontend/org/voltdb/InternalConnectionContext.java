@@ -24,5 +24,4 @@ package org.voltdb;
 public interface InternalConnectionContext
 {
     public String getName();
-    public void setBackPressure(boolean hasBackPressure);
 }

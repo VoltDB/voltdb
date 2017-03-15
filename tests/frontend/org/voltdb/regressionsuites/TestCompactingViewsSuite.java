@@ -137,7 +137,7 @@ public class TestCompactingViewsSuite extends RegressionSuite {
                     "CREATE TABLE PP(id INTEGER NOT NULL, value VARCHAR(63), " +
                     "e1 VARCHAR(63), e2 VARCHAR(63), e3 VARCHAR(63), e4 VARCHAR(63)," +
                     "e5 VARCHAR(63), e6 VARCHAR(63), e7 VARCHAR(63), e8 VARCHAR(63)," +
-                    "PRIMARY KEY (id)); "
+                    "PRIMARY KEY (id)); PARTITION TABLE PP ON COLUMN id;"
             );
             project.addLiteralSchema(
                     "CREATE INDEX FOO ON PP (value, e1, e2, e3, e4, e5, e6, e7, e8);"
@@ -147,7 +147,7 @@ public class TestCompactingViewsSuite extends RegressionSuite {
                     "AS SELECT id, value, e1, e2, e3, e4, e5, e6, e7, e8, COUNT(*) " +
                     "FROM PP GROUP BY id, value, e1, e2, e3, e4, e5, e6, e7, e8;"
             );
-            project.addPartitionInfo("pp", "id");
+            // project.addPartitionInfo("pp", "id");
 
             // replicated
             project.addLiteralSchema(

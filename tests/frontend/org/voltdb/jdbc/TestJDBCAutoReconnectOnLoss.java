@@ -34,23 +34,25 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Properties;
 
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
 import org.voltdb.BackendTarget;
 import org.voltdb.ServerThread;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.ArbitraryDurationProc;
+import org.voltdb.client.ClientConfig;
 import org.voltdb.client.TestClientFeatures;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltFile;
 
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
+
 public class TestJDBCAutoReconnectOnLoss {
 
     String m_testjar;
 
-    static final String  DRIVER_URL="jdbc:voltdb://localhost:21212?autoreconnect=true";
+    static String driverUrl ="jdbc:voltdb://localhost:21212?autoreconnect=true";
     static final String  TEST_SQL = "select  count(*) from TT";
 
     VoltProjectBuilder m_builder;
@@ -81,7 +83,9 @@ public class TestJDBCAutoReconnectOnLoss {
 
         MiscUtils.copyFile(m_builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("jdbcreconnecttest.xml"));
         m_testjar = Configuration.getPathToCatalogForTest("jdbcreconnecttest.jar");
-
+        if (ClientConfig.ENABLE_SSL_FOR_TEST) {
+            driverUrl = driverUrl + JDBCTestCommons.SSL_URL_SUFFIX;
+        }
         startServer();
         connect();
     }
@@ -113,7 +117,7 @@ public class TestJDBCAutoReconnectOnLoss {
     private void connect() throws ClassNotFoundException, SQLException
     {
         Class.forName("org.voltdb.jdbc.Driver");
-        m_connection =  DriverManager.getConnection(DRIVER_URL, new Properties());
+        m_connection =  DriverManager.getConnection(driverUrl, new Properties());
     }
 
     @Test
@@ -152,7 +156,7 @@ public class TestJDBCAutoReconnectOnLoss {
 
         org.apache.tomcat.jdbc.pool.DataSource ds = new org.apache.tomcat.jdbc.pool.DataSource();
         ds.setDriverClassName("org.voltdb.jdbc.Driver");
-        ds.setUrl(DRIVER_URL);
+        ds.setUrl(driverUrl);
         ds.setInitialSize(5);
         ds.setMaxActive(10);
         ds.setMaxIdle(5);

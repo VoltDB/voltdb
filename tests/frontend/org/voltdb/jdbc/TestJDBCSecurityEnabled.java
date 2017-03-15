@@ -37,17 +37,19 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Properties;
 
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Test;
 import org.voltdb.BackendTarget;
 import org.voltdb.ServerThread;
 import org.voltdb.VoltDB.Configuration;
+import org.voltdb.client.ClientConfig;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.VoltProjectBuilder.ProcedureInfo;
 import org.voltdb.compiler.VoltProjectBuilder.RoleInfo;
 import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
 import org.voltdb.utils.MiscUtils;
+
+import org.junit.AfterClass;
+import org.junit.BeforeClass;
+import org.junit.Test;
 import org.voltdb_testprocs.regressionsuites.securityprocs.DoNothing1;
 import org.voltdb_testprocs.regressionsuites.securityprocs.DoNothing2;
 import org.voltdb_testprocs.regressionsuites.securityprocs.DoNothing3;
@@ -148,7 +150,14 @@ public class TestJDBCSecurityEnabled {
         server.waitForInitialization();
 
         Class.forName("org.voltdb.jdbc.Driver");
-        conn = DriverManager.getConnection("jdbc:voltdb://localhost:21212", "defaultadmin", "admin");
+
+        if (ClientConfig.ENABLE_SSL_FOR_TEST) {
+            conn = DriverManager.getConnection("jdbc:voltdb://localhost:21212?" + JDBCTestCommons.SSL_URL_SUFFIX,
+                    "defaultadmin", "admin");
+        }
+        else {
+            conn = DriverManager.getConnection("jdbc:voltdb://localhost:21212", "defaultadmin", "admin");
+        }
         myconn = null;
     }
 
@@ -178,14 +187,6 @@ public class TestJDBCSecurityEnabled {
         }
     }
 
-
-    private static Connection getJdbcConnection(String url, Properties props)
-            throws Exception {
-        Class.forName("org.voltdb.jdbc.Driver");
-        return DriverManager.getConnection(url, props);
-    }
-
-
     @Test
     public void testAuthentication(){
         Properties props = new Properties();
@@ -195,7 +196,7 @@ public class TestJDBCSecurityEnabled {
         props.setProperty("password", "wrongpassword");
         threw = false;
         try {
-            myconn = getJdbcConnection("jdbc:voltdb://localhost:21212", props);
+            myconn = JDBCTestCommons.getJdbcConnection("jdbc:voltdb://localhost:21212", props);
             CloseUserConnection();
         }
         catch (Exception e) {
@@ -209,7 +210,7 @@ public class TestJDBCSecurityEnabled {
         props.setProperty("password", "wrongpassword");
         threw = false;
         try {
-            myconn = getJdbcConnection("jdbc:voltdb://localhost:21212", props);
+            myconn = JDBCTestCommons.getJdbcConnection("jdbc:voltdb://localhost:21212", props);
             CloseUserConnection();
         }
         catch (Exception e) {
@@ -222,7 +223,7 @@ public class TestJDBCSecurityEnabled {
         props.setProperty("user", "userWithAdminPerm");
         props.setProperty("password", "password");
         try {
-            myconn = getJdbcConnection("jdbc:voltdb://localhost:21212", props);
+            myconn = JDBCTestCommons.getJdbcConnection("jdbc:voltdb://localhost:21212", props);
             CloseUserConnection();
         }catch (Exception e) {
             e.printStackTrace();
@@ -239,7 +240,7 @@ public class TestJDBCSecurityEnabled {
             String userName = entry.getKey();
             Boolean[] expectedRet = entry.getValue();
             props.setProperty("user", userName);
-            myconn = getJdbcConnection("jdbc:voltdb://localhost:21212", props);
+            myconn = JDBCTestCommons.getJdbcConnection("jdbc:voltdb://localhost:21212", props);
             assertEquals(userName + " has wrong perms", expectedRet, processProc());
             //close connection
             CloseUserConnection();

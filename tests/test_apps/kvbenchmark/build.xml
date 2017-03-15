@@ -1,0 +1,45 @@
+<!-- Simple build file to build KV Benchmark -->
+<project name="kvbenchmark" basedir="." default="all">
+
+    <property name="clientsrc.dir"     value="${basedir}/src/kvbench"/>
+
+    <property name="build.dir"   value="build"/>
+    <property name="classes.dir" value="${build.dir}/classes"/>
+    <property name="clientclasses.dir" value="${build.dir}/cclasses"/>
+    <property name="jar.dir"     value="${basedir}"/>
+    <property name="voltdbroot.dir"     value="${basedir}/voltdbroot"/>
+    <property name="log.dir"     value="${basedir}/log"/>
+
+    <target name="all" depends="client"/>
+
+    <target name="clean">
+        <delete dir="${build.dir}"/>
+        <delete dir="${log.dir}"/>
+        <delete dir="${voltdbroot.dir}"/>
+        <delete dir="${basedir}/felix-cache"/>
+        <delete file="${jar.dir}/client.jar"/>
+        <delete file="${basedir}/catalog-report.html"/>
+    </target>
+
+    <path id="build-classpath">
+       <fileset dir="${basedir}/../../../voltdb">
+           <!-- <include name="voltdbclient*.jar"/> -->
+         <include name="voltdb*.jar"/>
+       </fileset>
+       <fileset dir="${basedir}/../../../lib">
+           <include name="*.jar"/>
+       </fileset>
+    </path>
+
+    <target name="client-compile">
+        <mkdir dir="${clientclasses.dir}"/>
+        <javac debug="on" srcdir="${clientsrc.dir}" destdir="${clientclasses.dir}" >
+            <classpath refid="build-classpath"/>
+        </javac>
+    </target>
+
+    <target name="client" depends="client-compile">
+        <jar destfile="${basedir}/kvbenchmark.jar" basedir="${clientclasses.dir}">
+        </jar>
+    </target>
+</project>

@@ -72,5 +72,6 @@
 	<classpathentry kind="lib" path="lib/tomcat-juli.jar"/>
 	<classpathentry kind="lib" path="lib/scala-parser-combinators_2.11-1.0.2.jar"/>
 	<classpathentry kind="lib" path="lib/scala-xml_2.11-1.0.2.jar"/>
+	<classpathentry kind="lib" path="third_party/java/jars/javassist-3.20.0-GA.jar"/>
 	<classpathentry kind="output" path="obj/eclipse"/>
 </classpath>

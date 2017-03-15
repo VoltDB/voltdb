@@ -452,7 +452,7 @@ class VerbRunner(object):
             utility.abort('Resource file "%s" is missing.' % name)
         return None
 
-    def voltdb_connect(self, host, port, username=None, password=None):
+    def voltdb_connect(self, host, port, username=None, password=None, ssl_config=None):
         """
         Create a VoltDB client connection.
         """
@@ -468,6 +468,10 @@ class VerbRunner(object):
                     If a username was specified and a password was not, prompt the user for the pwd.
                     """
                     kwargs['password'] = getpass('Enter your password: ')
+            if ssl_config:
+                kwargs['usessl'] = True
+                kwargs['ssl_config_file'] = ssl_config
+
             self.client = FastSerializer(host, port, **kwargs)
         except Exception, e:
             utility.abort(e)

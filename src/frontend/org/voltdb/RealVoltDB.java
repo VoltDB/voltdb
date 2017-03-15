@@ -88,6 +88,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.HostMessenger.HostInfo;
 import org.voltcore.messaging.SiteMailbox;
+import org.voltcore.network.CipherExecutor;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.OnDemandBinaryLogger;
 import org.voltcore.utils.Pair;
@@ -731,6 +732,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             // and Settings depend on
             ConfigFactory.clearProperty(Settings.CONFIG_DIR);
             ModuleManager.resetCacheRoot();
+            CipherExecutor.SERVER.shutdown();
 
             m_isRunningWithOldVerb = config.m_startAction.isLegacy();
 
@@ -1301,7 +1303,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                         clientIntf,
                         config.m_port,
                         adminIntf,
-                        config.m_adminPort);
+                        config.m_adminPort,
+                        m_config.m_sslContext);
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
             }
@@ -3131,6 +3134,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 }
                 m_messenger = null;
 
+                // shutdown the cipher service
+                CipherExecutor.SERVER.shutdown();
+
                 //Also for test code that expects a fresh stats agent
                 if (m_opsRegistrar != null) {
                     try {
@@ -3953,27 +3959,36 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     private void prepareReplication() {
-        try {
-            boolean okToStartDR = true;
-            if (m_consumerDRGateway != null) {
-                if (m_config.m_startAction == StartAction.RECOVER) {
-                    Pair<Byte, List<MeshMemberInfo>> expectedClusterMembers = m_producerDRGateway.getInitialConversations();
-                    okToStartDR = m_consumerDRGateway.isSyncSnapshotComplete(expectedClusterMembers.getFirst(),
-                            expectedClusterMembers.getSecond());
-                }
-                if (okToStartDR) {
-                    m_consumerDRGateway.initialize(m_config.m_startAction != StartAction.CREATE);
+        Runnable t = new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                // Warning: This is called on the site thread if this host is rejoining
+                try {
+                    boolean okToStartDR = true;
+                    if (m_consumerDRGateway != null) {
+                        if (m_config.m_startAction != StartAction.CREATE) {
+                            Pair<Byte, List<MeshMemberInfo>> expectedClusterMembers = m_producerDRGateway.getInitialConversations();
+                            okToStartDR = m_consumerDRGateway.isSyncSnapshotComplete(expectedClusterMembers.getFirst(),
+                                    expectedClusterMembers.getSecond());
+                        }
+                        if (okToStartDR) {
+                            m_consumerDRGateway.initialize(m_config.m_startAction != StartAction.CREATE);
+                        }
+                    }
+                    if (m_producerDRGateway != null && okToStartDR) {
+                        m_producerDRGateway.startListening(m_catalogContext.cluster.getDrproducerenabled(),
+                                                           VoltDB.getReplicationPort(m_catalogContext.cluster.getDrproducerport()),
+                                                           VoltDB.getDefaultReplicationInterface());
+                    }
+                } catch (Exception ex) {
+                    CoreUtils.printPortsInUse(hostLog);
+                    VoltDB.crashLocalVoltDB("Failed to initialize DR", false, ex);
                 }
             }
-            if (m_producerDRGateway != null && okToStartDR) {
-                m_producerDRGateway.startListening(m_catalogContext.cluster.getDrproducerenabled(),
-                                                   VoltDB.getReplicationPort(m_catalogContext.cluster.getDrproducerport()),
-                                                   VoltDB.getDefaultReplicationInterface());
-            }
-        } catch (Exception ex) {
-            CoreUtils.printPortsInUse(hostLog);
-            VoltDB.crashLocalVoltDB("Failed to initialize DR", false, ex);
-        }
+        };
+        m_periodicPriorityWorkThread.submit(t);
     }
 
     private boolean shouldInitiatorCreateMPDRGateway(Initiator initiator) {
