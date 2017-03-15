@@ -3355,11 +3355,15 @@ class DbMonitorTest extends TestBase {
 
         when: 'wait for filter in stored procedure'
         try {
-          waitFor(waitTime) { 1==0 }
+          waitFor(waitTime) { page.filterStoredProcedure.isDisplayed() }
+          page.filterStoredProcedure.value(storedProcedureName)
         } catch (geb.waiting.WaitTimeoutException e) {
-
+          try {
+            $("#filterSP").isDisplayed()
+            $("#filterSP").value(storedProcedureName)
+          } catch (geb.waiting.WaitTimeoutException exp) {
+          }
         }
-        //waitFor(waitTime) { page.filterStoredProcedure.isDisplayed() }
         then: 'enter the stored procedure name'
         $("#filterStoredProc").value(storedProcedureName)
 
