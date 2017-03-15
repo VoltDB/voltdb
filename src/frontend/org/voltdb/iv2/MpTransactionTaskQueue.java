@@ -103,10 +103,11 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
         // and that we either have active reads or active writes, but never both.
         // Figure out which we're doing, and then poison all of the appropriate sites.
         Map<Long, TransactionTask> currentSet;
+        boolean readonly = true;
         if (!m_currentReads.isEmpty()) {
             assert(m_currentWrites.isEmpty());
             if (tmLog.isDebugEnabled()) {
-                tmLog.debug("MpTTQ: repairing reads");
+                tmLog.debug("MpTTQ: repairing reads. balance spi:" + balanceSPI);
             }
             for (Long txnId : m_currentReads.keySet()) {
                 m_sitePool.repair(txnId, task);
@@ -115,10 +116,11 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
         }
         else {
             if (tmLog.isDebugEnabled()) {
-                tmLog.debug("MpTTQ: repairing writes");
+                tmLog.debug("MpTTQ: repairing writes. balance spi:" + balanceSPI);
             }
             m_taskQueue.offer(task);
             currentSet = m_currentWrites;
+            readonly = false;
         }
         for (Entry<Long, TransactionTask> e : currentSet.entrySet()) {
             if (e.getValue() instanceof MpProcedureTask) {
@@ -128,8 +130,9 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
                 }
                 next.doRestart(masters, partitionMasters);
 
-                // Transactions will be rerouted and restarted if the master change is triggered via @BalanceSPI
-                if (!balanceSPI) {
+                // Write transactions will be rerouted and restarted if the master change is triggered via @BalanceSPI
+                // Let readonly txn go as restart.
+                if (!balanceSPI || readonly) {
                     MpTransactionState txn = (MpTransactionState)next.getTransactionState();
                     // inject poison pill
                     FragmentTaskMessage dummy = new FragmentTaskMessage(0L, 0L, 0L, 0L, false, false, false);
@@ -140,6 +143,7 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
                     // detect the restart and take the appropriate actions.
                     TransactionRestartException restart = new TransactionRestartException(
                             "Transaction being restarted due to fault recovery or shutdown.", next.getTxnId());
+                   // restart.setMisrouted(balanceSPI);
                     poison.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, restart);
                     txn.offerReceivedFragmentResponse(poison);
                 }

@@ -176,22 +176,43 @@ public class MpProcedureTask extends ProcedureTask
         // anyway, so not restarting the read is currently harmless.
         // We could actually restart this here, since we have the invocation, but let's be consistent?
         int status = response.getClientResponseData().getStatus();
-        if (status != ClientResponse.TXN_RESTART || (status == ClientResponse.TXN_RESTART && m_msg.isReadOnly())) {
-            if (!response.shouldCommit()) {
-                txn.setNeedsRollback(true);
-            }
-            completeInitiateTask(siteConnection);
-            // Set the source HSId (ugh) to ourselves so we track the message path correctly
-            response.m_sourceHSId = m_initiator.getHSId();
-            m_initiator.deliver(response);
-            execLog.l7dlog( Level.TRACE, LogKeys.org_voltdb_ExecutionSite_SendingCompletedWUToDtxn.name(), null);
-            if (hostLog.isDebugEnabled()) {
-                hostLog.debug("[MpProcedureTask]COMPLETE: " + this);
+        if (status == ClientResponse.TXN_MISROUTED) {
+            if (m_msg.isReadOnly()) {
+                if (!response.shouldCommit()) {
+                    txn.setNeedsRollback(true);
+                }
+                completeInitiateTask(siteConnection);
+                // Set the source HSId (ugh) to ourselves so we track the message path correctly
+                response.m_sourceHSId = m_initiator.getHSId();
+                response.setMisrouted(m_msg.getStoredProcedureInvocation());
+                m_initiator.deliver(response);
+                if (hostLog.isDebugEnabled()) {
+                    hostLog.debug("[MpProcedureTask]COMPLETE: " + this);
+                }
+            } else {
+                restartTransaction();
+                if (hostLog.isDebugEnabled()) {
+                    hostLog.debug("[MpProcedureTask]RESTART: " + this);
+                }
             }
         } else {
-            restartTransaction();
-            if (hostLog.isDebugEnabled()) {
-                hostLog.debug("[MpProcedureTask]RESTART: " + this);
+            if (status != ClientResponse.TXN_RESTART || (status == ClientResponse.TXN_RESTART && m_msg.isReadOnly())) {
+                if (!response.shouldCommit()) {
+                    txn.setNeedsRollback(true);
+                }
+                completeInitiateTask(siteConnection);
+                // Set the source HSId (ugh) to ourselves so we track the message path correctly
+                response.m_sourceHSId = m_initiator.getHSId();
+                m_initiator.deliver(response);
+                execLog.l7dlog( Level.TRACE, LogKeys.org_voltdb_ExecutionSite_SendingCompletedWUToDtxn.name(), null);
+                if (hostLog.isDebugEnabled()) {
+                    hostLog.debug("[MpProcedureTask]COMPLETE: " + this);
+                }
+            } else {
+                restartTransaction();
+                if (hostLog.isDebugEnabled()) {
+                    hostLog.debug("[MpProcedureTask]RESTART: " + this);
+                }
             }
         }
     }

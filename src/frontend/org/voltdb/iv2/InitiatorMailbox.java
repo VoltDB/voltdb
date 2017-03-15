@@ -388,6 +388,7 @@ public class InitiatorMailbox implements Mailbox
         FragmentResponseMessage response = new FragmentResponseMessage(message, getHSId());
         TransactionRestartException restart = new TransactionRestartException(
                 "Transaction being restarted due to SPI migration.", message.getTxnId());
+        restart.setMisrouted(true);
         response.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, restart);
         response.m_sourceHSId = getHSId();
         Iv2Trace.logMisroutedFragmentTaskMessage(message, getHSId());

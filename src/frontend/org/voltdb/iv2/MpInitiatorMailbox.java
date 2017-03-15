@@ -250,7 +250,7 @@ public class MpInitiatorMailbox extends InitiatorMailbox
                 if (m_algo != null) {
                     m_algo.cancel();
                 }
-                m_scheduler.updateReplicas(replicas, partitionMasters);
+                ((MpScheduler)m_scheduler).updateReplicas(replicas, partitionMasters, balanceSPI);
             }
         });
     }

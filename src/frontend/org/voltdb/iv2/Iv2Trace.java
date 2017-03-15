@@ -224,13 +224,14 @@ public class Iv2Trace
     public static void logMisroutedFragmentTaskMessage(FragmentTaskMessage ftask, long localHSId)
     {
         if (IV2_TRACE_ENABLED) {
-            String logmsg = "misRoutedFragMsg %s from %s txnId %s spHandle %s trunc %s readonly %s";
+            String logmsg = "misRoutedFragMsg %s from %s txnId %s spHandle %s trunc %s readonly %s  batch index %d";
             iv2log.trace(String.format(logmsg, CoreUtils.hsIdToString(localHSId),
                         CoreUtils.hsIdToString(ftask.m_sourceHSId),
                         txnIdToString(ftask.getTxnId()),
                         txnIdToString(ftask.getSpHandle()),
                         txnIdToString(ftask.getTruncationHandle()),
-                        ftask.isReadOnly()));
+                        ftask.isReadOnly(),
+                        ftask.getCurrentBatchIndex()));
         }
     }
     public static void logIv2MultipartSentinel(MultiPartitionParticipantMessage message, long localHSId,
