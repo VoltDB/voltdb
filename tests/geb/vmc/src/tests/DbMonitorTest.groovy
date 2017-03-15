@@ -3367,7 +3367,11 @@ class DbMonitorTest extends TestBase {
         }
 
         when: 'save the value of resultingStoredProcedureName'
-        resultingStoredProcedureName = String.valueOf($("#storeProcedureBody > tr > td:nth-child(1)").text())
+        try {
+          resultingStoredProcedureName = $("#storeProcedureBody > tr > td:nth-child(1)").text()
+        } catch(geb.error.RequiredPageContentNotPresent e) {
+          resultingStoredProcedureName = $("#tblSP > tbody > tr > td.sorting_1").text()
+        }
         then: 'set created status'
         if(resultingStoredProcedureName.trim().equals(storedProcedureName)) {
             createdStatus = true
@@ -3382,6 +3386,7 @@ class DbMonitorTest extends TestBase {
         page.setQueryText(dropProcedureQuery)
         and: 'run the query'
         page.runQuery()
+        report 'checking'
         then: 'refresh the page'
         page.refreshquery.click()
 
@@ -3407,6 +3412,12 @@ class DbMonitorTest extends TestBase {
         try {
           waitFor(waitTime) { !$("#storeProcedureBody > tr > td:nth-child(1)").text().equals(storedProcedureName) }
           waitFor(waitTime) { $("#storeProcedureBody > tr > td").isDisplayed() }
+          deletedStatus = true
+        } catch (geb.waiting.WaitTimeoutException e) {
+        }
+        try {
+          waitFor(waitTime) { !$("#tblSP > tbody > tr > td.sorting_1").text().equals(storedProcedureName) }
+          waitFor(waitTime) { $("#tblSP > tbody > tr > td").isDisplayed() }
           deletedStatus = true
         } catch (geb.waiting.WaitTimeoutException e) {
         }
