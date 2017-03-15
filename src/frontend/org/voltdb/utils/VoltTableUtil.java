@@ -28,10 +28,11 @@ import java.util.TimeZone;
 import org.voltcore.utils.Pair;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltTableRow;
 import org.voltdb.VoltType;
 import org.voltdb.common.Constants;
-import org.voltdb.types.GeographyValue;
 import org.voltdb.types.GeographyPointValue;
+import org.voltdb.types.GeographyValue;
 import org.voltdb.types.TimestampType;
 
 import au.com.bytecode.opencsv_voltpatches.CSVWriter;
@@ -232,5 +233,42 @@ public class VoltTableUtil {
                     vt.getColumnType(ii));
         }
         return columns;
+    }
+
+    /**
+     * Return true if any string field in the table contains param s.
+     */
+    public static boolean tableContainsString(VoltTable t, String s, boolean caseSenstive) {
+        if (t.getRowCount() == 0) return false;
+        if (!caseSenstive) {
+            s = s.toLowerCase();
+        }
+
+        VoltTableRow row = t.fetchRow(0);
+        do {
+            for (int i = 0; i < t.getColumnCount(); i++) {
+                if (t.getColumnType(i) == VoltType.STRING) {
+                    String value = row.getString(i);
+                    if (value == null) continue;
+                    if (!caseSenstive) {
+                        value = value.toLowerCase();
+                    }
+                    if (value.contains(s)) {
+                            return true;
+                    }
+                }
+            }
+
+        } while (row.advanceRow());
+
+        return false;
+    }
+
+    public static Object[] tableRowAsObjects(VoltTableRow row) {
+        Object[] result = new Object[row.getColumnCount()];
+        for (int i = 0; i < row.getColumnCount(); i++) {
+            result[i] = row.get(i, row.getColumnType(i));
+        }
+        return result;
     }
 }

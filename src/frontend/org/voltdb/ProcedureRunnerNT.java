@@ -49,6 +49,7 @@ public class ProcedureRunnerNT {
     protected final ExecutorService m_executorService;
     protected final NTProcedureService m_procSet;
     protected final Mailbox m_mailbox;
+    ProcedureStatsCollector m_statsCollector;
 
     protected final long m_id;
     protected final AtomicBoolean m_outstandingAllHostProc = new AtomicBoolean(false);
@@ -78,7 +79,8 @@ public class ProcedureRunnerNT {
                       Class<?>[] paramTypes,
                       ExecutorService executorService,
                       NTProcedureService procSet,
-                      Mailbox mailbox)
+                      Mailbox mailbox,
+                      ProcedureStatsCollector statsCollector)
     {
         m_id = id;
         m_user = user;
@@ -91,6 +93,7 @@ public class ProcedureRunnerNT {
         m_executorService = executorService;
         m_procSet = procSet;
         m_mailbox = mailbox;
+        m_statsCollector = statsCollector;
     }
 
     class MyProcedureCallback implements ProcedureCallback {
@@ -194,6 +197,8 @@ public class ProcedureRunnerNT {
 
         // use local var to avoid warnings about reassigning method argument
         Object[] paramList = paramListIn;
+
+        m_statsCollector.beginProcedure(m_procedureName.startsWith("@"));
 
         try {
             if (paramList.length != m_paramTypes.length) {

@@ -21,7 +21,6 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 
-import com.google_voltpatches.common.collect.ImmutableMap;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.AuthSystem.AuthUser;
@@ -31,6 +30,8 @@ import org.voltdb.client.BatchTimeoutOverrideType;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.utils.MiscUtils;
+
+import com.google_voltpatches.common.collect.ImmutableMap;
 
 /**
  * This class packs the parameters and dispatches the transactions.
@@ -94,19 +95,12 @@ public class InternalConnectionHandler {
             return false;
         }
 
-        //Indicate backpressure or not.
-        boolean b = hasBackPressure();
-        if (b) {
-            applyBackPressure();
-        }
-
         StoredProcedureInvocation task = new StoredProcedureInvocation();
         task.setProcName(procName);
         task.setParams(args);
 
         try {
             task = MiscUtils.roundTripForCL(task);
-            task.setClientHandle(m_adapter.connectionId());
         } catch (Exception e) {
             String fmt = "Cannot invoke procedure %s. failed to create task.";
             m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.ERROR, null, fmt, procName);
@@ -128,10 +122,11 @@ public class InternalConnectionHandler {
             return false;
         }
 
+        final InternalClientResponseAdapter adapter = m_adapters.get(partition);
         InternalAdapterTaskAttributes kattrs = new InternalAdapterTaskAttributes(
-                DEFAULT_INTERNAL_ADAPTER_NAME, isAdmin, m_adapter.connectionId());
+                DEFAULT_INTERNAL_ADAPTER_NAME, isAdmin, adapter.connectionId());
 
-        if (!m_adapter.createTransaction(kattrs, procName, catProc, cb, null, task, user, partition, System.nanoTime())) {
+        if (!adapter.createTransaction(kattrs, procName, catProc, cb, null, task, user, partition, null)) {
             m_failedCount.incrementAndGet();
             return false;
         }

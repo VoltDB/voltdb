@@ -33,6 +33,7 @@ import java.util.concurrent.Semaphore;
 
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.network.Connection;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.AuthSystem.AuthUser;
 import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.catalog.CatalogMap;
@@ -68,6 +69,7 @@ public class NTProcedureService {
         protected final Class<? extends VoltNTProcedure> m_procClz;
         protected final Method m_procMethod;
         protected final Class<?>[] m_paramTypes;
+        protected final ProcedureStatsCollector m_statsCollector;
 
         ProcedureRunnerNTGenerator(Class<? extends VoltNTProcedure> clz) {
             m_procClz = clz;
@@ -92,6 +94,17 @@ public class NTProcedureService {
 
             m_procMethod = procMethod;
             m_paramTypes = paramTypes;
+
+            m_statsCollector = VoltDB.instance().getStatsAgent().registerProcedureStatsSource(
+                    CoreUtils.getSiteIdFromHSId(m_mailbox.getHSId()),
+                    new ProcedureStatsCollector(
+                            CoreUtils.getSiteIdFromHSId(m_mailbox.getHSId()),
+                            0,
+                            m_procClz.getName(),
+                            false,
+                            null,
+                            false)
+                    );
         }
 
         ProcedureRunnerNT generateProcedureRunnerNT(AuthUser user, Connection ccxn, long clientHandle)
@@ -111,14 +124,14 @@ public class NTProcedureService {
                                                              m_paramTypes,
                                                              m_executorService,
                                                              NTProcedureService.this,
-                                                             m_mailbox);
+                                                             m_mailbox,
+                                                             m_statsCollector);
             return runner;
         }
 
     }
 
-    NTProcedureService(InternalConnectionHandler ich,
-                         Mailbox mailbox)
+    NTProcedureService(InternalConnectionHandler ich, Mailbox mailbox)
     {
         assert(ich != null);
         m_ich = ich;
@@ -270,6 +283,7 @@ public class NTProcedureService {
 
     void handleNTProcEnd(ProcedureRunnerNT runner) {
         m_outstanding.remove(runner.m_id);
+        runner.m_statsCollector.endProcedure(false, false, new VoltTable[0], ParameterSet.emptyParameterSet());
     }
 
     void handleCallbacksForFailedHosts(final Set<Integer> failedHosts) {

@@ -1238,9 +1238,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         m_zk = messenger.getZK();
         m_siteId = m_mailbox.getHSId();
 
-        InternalClientResponseAdapter internalAdapter = new InternalClientResponseAdapter(INTERNAL_CID);
-        ClientInterfaceHandleManager ichm = bindAdapter(internalAdapter, null, true);
-        m_internalConnectionHandler = new InternalConnectionHandler(internalAdapter, ichm);
+        m_internalConnectionHandler = new InternalConnectionHandler();
+        for (int pid : m_cartographer.getPartitions()) {
+            m_internalConnectionHandler.addAdapter(pid, createInternalAdapter(pid));
+        }
 
         m_executeTaskAdpater = new SimpleClientResponseAdapter(ClientInterface.EXECUTE_TASK_CID, "ExecuteTaskAdapter", true);
         bindAdapter(m_executeTaskAdpater, null);
@@ -1256,14 +1257,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 .siteId(m_siteId)
                 .internalConnectionHandler(m_internalConnectionHandler)
                 .build();
-
-        m_internalConnectionHandler = new InternalConnectionHandler();
-        for (int pid : m_cartographer.getPartitions()) {
-            m_internalConnectionHandler.addAdapter(pid, createInternalAdapter(pid));
-        }
-
-        m_executeTaskAdpater = new SimpleClientResponseAdapter(ClientInterface.EXECUTE_TASK_CID, "ExecuteTaskAdapter", true);
-        bindAdapter(m_executeTaskAdpater, null);
     }
 
     private InternalClientResponseAdapter createInternalAdapter(int pid) {

@@ -23,6 +23,8 @@
 
 package org.voltdb;
 
+import java.io.IOException;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -38,6 +40,7 @@ import org.voltdb.client.SyncCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.utils.MiscUtils;
+import org.voltdb.utils.VoltTableUtil;
 
 public class TestNTProcs extends TestCase {
 
@@ -193,6 +196,58 @@ public class TestNTProcs extends TestCase {
         }
     }
 
+    // get the first stats table for any selector
+    final VoltTable getStats(Client client, String selector) {
+        ClientResponse response = null;
+        try {
+            response = client.callProcedure("@Statistics", selector);
+        } catch (IOException | ProcCallException e) {
+            fail();
+        }
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        return response.getResults()[0];
+    }
+
+    // get the first stats table for any selector
+    // Note this needs to be the FULL proc name from class.getName
+    final Map<String, Long> aggregateProcRow(Client client, final String procName) {
+        VoltTable raw = getStats(client, "PROCEDURE");
+
+        long[] rawResult = raw.stream()
+            // find matching rows
+            .filter(r -> r.getString("PROCEDURE").equals(procName))
+            // filter to six columns of interest
+            .map(r -> new long[] {
+                    r.getLong("INVOCATIONS"),
+                    r.getLong("MAX_RESULT_SIZE"),
+                    r.getLong("MAX_PARAMETER_SET_SIZE"),
+                    r.getLong("ABORTS"),
+                    r.getLong("FAILURES"),
+                    r.getLong("TRANSACTIONAL")
+                    })
+            // aggregate (sum, max, max, sum, sum, identity)
+            .reduce(new long[] {0, 0, 0, 0, 0}, (a, b) ->
+                new long[] {
+                        a[0] + b[0],
+                        Math.max(a[1], b[1]),
+                        Math.max(a[2], b[2]),
+                        a[3] + b[3],
+                        a[4] + b[4],
+                        b[5]
+                        }
+            );
+
+        Map<String, Long> retval = new HashMap<>();
+        retval.put("INVOCATIONS", rawResult[0]);
+        retval.put("MAX_RESULT_SIZE", rawResult[1]);
+        retval.put("MAX_PARAMETER_SET_SIZE", rawResult[2]);
+        retval.put("ABORTS", rawResult[3]);
+        retval.put("FAILURES", rawResult[4]);
+        retval.put("TRANSACTIONAL", rawResult[5]);
+
+        return retval;
+    }
+
     final String SCHEMA =
             "create table blah (pkey integer not null, strval varchar(200), PRIMARY KEY(pkey));\n" +
             "partition table blah on column pkey;\n" +
@@ -244,11 +299,17 @@ public class TestNTProcs extends TestCase {
         System.out.println("Client got trivial response");
         System.out.println(response.toJSONString());
 
+        // CHECK STATS
+        VoltTable statsT = getStats(client, "PROCEDURE");
+        assertTrue(VoltTableUtil.tableContainsString(statsT, "TrivialNTProc", true));
+        Map<String, Long> stats = aggregateProcRow(client, TrivialNTProc.class.getName());
+        assertEquals(1, stats.get("INVOCATIONS").longValue());
+
         localServer.shutdown();
         localServer.join();
     }
 
-    public void testNestedNTRoundTrip() throws Exception {
+    /*public void testNestedNTRoundTrip() throws Exception {
         ServerThread localServer = start();
 
         Client client = ClientFactory.createClient();
@@ -261,9 +322,18 @@ public class TestNTProcs extends TestCase {
         System.out.println("Client got trivial response");
         System.out.println(response.toJSONString());
 
+        // CHECK STATS
+        VoltTable statsT = getStats(client, "PROCEDURE");
+        assertTrue(VoltTableUtil.tableContainsString(statsT, "NestedNTProc", true));
+        assertTrue(VoltTableUtil.tableContainsString(statsT, "adhoc", false));
+        Map<String, Long> stats = aggregateProcRow(client, NestedNTProc.class.getName());
+        assertEquals(1, stats.get("INVOCATIONS").longValue());
+        stats = aggregateProcRow(client, AdHoc_RO_MP.class.getName());
+        assertEquals(1, stats.get("INVOCATIONS").longValue());
+
         localServer.shutdown();
         localServer.join();
-    }
+    }*/
 
     public void testRunEverywhereNTRoundTripOneNode() throws Exception {
         ServerThread localServer = start();
@@ -277,6 +347,15 @@ public class TestNTProcs extends TestCase {
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
         System.out.println("Client got trivial response");
         System.out.println(response.toJSONString());
+
+        // CHECK STATS
+        VoltTable statsT = getStats(client, "PROCEDURE");
+        assertTrue(VoltTableUtil.tableContainsString(statsT, "RunEverywhereNTProc", true));
+        assertTrue(VoltTableUtil.tableContainsString(statsT, "TrivialNTProc", true));
+        Map<String, Long> stats = aggregateProcRow(client, RunEverywhereNTProc.class.getName());
+        assertEquals(1, stats.get("INVOCATIONS").longValue());
+        stats = aggregateProcRow(client, TrivialNTProc.class.getName());
+        assertEquals(1, stats.get("INVOCATIONS").longValue());
 
         localServer.shutdown();
         localServer.join();
@@ -303,6 +382,15 @@ public class TestNTProcs extends TestCase {
         System.out.println("Client got trivial response");
         System.out.println(response.toJSONString());
 
+        // CHECK STATS
+        VoltTable statsT = getStats(client, "PROCEDURE");
+        assertTrue(VoltTableUtil.tableContainsString(statsT, "RunEverywhereNTProc", true));
+        assertTrue(VoltTableUtil.tableContainsString(statsT, "TrivialNTProc", true));
+        Map<String, Long> stats = aggregateProcRow(client, RunEverywhereNTProc.class.getName());
+        assertEquals(1, stats.get("INVOCATIONS").longValue());
+        stats = aggregateProcRow(client, TrivialNTProc.class.getName());
+        assertEquals(3, stats.get("INVOCATIONS").longValue());
+
         client.close();
         cluster.shutDown();
     }
@@ -316,7 +404,7 @@ public class TestNTProcs extends TestCase {
         Client client = ClientFactory.createClient();
         client.createConnection("localhost");
 
-        final int CALL_COUNT = 500;
+        final int CALL_COUNT = 400;
 
         ClientResponseImpl response;
         SyncCallback[] cb = new SyncCallback[CALL_COUNT];
@@ -335,6 +423,17 @@ public class TestNTProcs extends TestCase {
             response = (ClientResponseImpl) cb[i].getResponse();
             System.out.println("2: " + response.toJSONString());
         }
+
+        Thread.sleep(3000);
+
+        // CHECK STATS
+        VoltTable statsT = getStats(client, "PROCEDURE");
+        assertTrue(VoltTableUtil.tableContainsString(statsT, "NTProcWithFutures", true));
+
+        System.out.println(statsT.toFormattedString());
+
+        Map<String, Long> stats = aggregateProcRow(client, NTProcWithFutures.class.getName());
+        assertEquals(CALL_COUNT + 1, stats.get("INVOCATIONS").longValue());
 
         localServer.shutdown();
         localServer.join();

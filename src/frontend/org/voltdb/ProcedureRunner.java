@@ -225,7 +225,8 @@ public class ProcedureRunner {
                         m_site.getCorrespondingSiteId(),
                         m_site.getCorrespondingPartitionId(),
                         m_catProc,
-                        stmtList)
+                        stmtList,
+                        true)
                 );
 
         // Read the ProcStatsOption annotation from the procedure class.

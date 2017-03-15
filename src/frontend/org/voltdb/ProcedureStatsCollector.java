@@ -61,12 +61,27 @@ public class ProcedureStatsCollector extends SiteStatsSource {
     // Mapping from the variable name of the user-defined SQLStmts to its stats.
     private final Map<String, StatementStats> m_stmtStatsMap;
     private final StatsData m_procStatsData;
+    private boolean m_isTransactional;
 
-    public ProcedureStatsCollector(long siteId, int partitionId, Procedure catProc,
-                                   ArrayList<String> stmtNames) {
+    public ProcedureStatsCollector(long siteId,
+                                   int partitionId,
+                                   Procedure catProc,
+                                   ArrayList<String> stmtNames,
+                                   boolean isTransactional)
+    {
+        this(siteId, partitionId, catProc.getClassname(), catProc.getSinglepartition(), stmtNames, isTransactional);
+    }
+
+    public ProcedureStatsCollector(long siteId,
+                                   int partitionId,
+                                   String procName,
+                                   boolean singlePartition,
+                                   ArrayList<String> stmtNames,
+                                   boolean isTransactional)
+    {
         super(siteId, false);
         m_partitionId = partitionId;
-        m_procName = catProc.getClassname();
+        m_procName = procName;
 
         m_stmtStatsMap = new HashMap<String, StatementStats>();
         // Use one StatementStats instance to hold the procedure-wide statistics.
@@ -80,10 +95,11 @@ public class ProcedureStatsCollector extends SiteStatsSource {
         if (stmtNames != null) {
             for (String stmtName : stmtNames) {
                 // If the procedure is a multi-partition one, its statements will have coordinator tasks.
-                boolean hasCoordinatorTask = ! catProc.getSinglepartition();
+                boolean hasCoordinatorTask = ! singlePartition;
                 m_stmtStatsMap.put(stmtName, new StatementStats(stmtName, hasCoordinatorTask));
             }
         }
+        m_isTransactional = isTransactional;
     }
 
     /**
@@ -304,6 +320,7 @@ public class ProcedureStatsCollector extends SiteStatsSource {
         rowValues[columnNameToIndex.get("MAX_RESULT_SIZE")] = maxResultSize;
         rowValues[columnNameToIndex.get("MIN_PARAMETER_SET_SIZE")] = minParameterSetSize;
         rowValues[columnNameToIndex.get("MAX_PARAMETER_SET_SIZE")] = maxParameterSetSize;
+        rowValues[columnNameToIndex.get("TRANSACTIONAL")] = (byte) (m_isTransactional ? 1 : 0);
     }
 
     /**
@@ -329,6 +346,7 @@ public class ProcedureStatsCollector extends SiteStatsSource {
         columns.add(new VoltTable.ColumnInfo("AVG_PARAMETER_SET_SIZE", VoltType.INTEGER));
         columns.add(new VoltTable.ColumnInfo("ABORTS", VoltType.BIGINT));
         columns.add(new VoltTable.ColumnInfo("FAILURES", VoltType.BIGINT));
+        columns.add(new VoltTable.ColumnInfo("TRANSACTIONAL", VoltType.TINYINT));
     }
 
     @Override
