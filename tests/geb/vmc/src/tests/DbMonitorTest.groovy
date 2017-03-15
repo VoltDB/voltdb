@@ -3352,20 +3352,19 @@ class DbMonitorTest extends TestBase {
         then: 'Save Preference'
         page.savePreferencesBtn.click()
         report 'savePreferencesBtn'
-
-        when: 'wait for filter in stored procedure'
+        then: 'wait for filter in stored procedure and insert filter term'
         try {
           waitFor(waitTime) { page.filterStoredProcedure.isDisplayed() }
           page.filterStoredProcedure.value(storedProcedureName)
+          report "1"
         } catch (geb.waiting.WaitTimeoutException e) {
           try {
             $("#filterSP").isDisplayed()
             $("#filterSP").value(storedProcedureName)
+            report "2"
           } catch (geb.waiting.WaitTimeoutException exp) {
           }
         }
-        then: 'enter the stored procedure name'
-        $("#filterStoredProc").value(storedProcedureName)
 
         when: 'save the value of resultingStoredProcedureName'
         resultingStoredProcedureName = String.valueOf($("#storeProcedureBody > tr > td:nth-child(1)").text())
@@ -3390,15 +3389,23 @@ class DbMonitorTest extends TestBase {
         page.gotoDbMonitor()
         then: 'at DbMonitor Page'
         at DbMonitorPage
-
-        when: 'wait for filter in stored procedure'
-        waitFor(waitTime) { page.filterStoredProcedure.isDisplayed() }
-        then: 'enter the stored procedure name'
-        page.filterStoredProcedure.value(storedProcedureName)
+        then: 'wait for filter in stored procedure  and insert filter term'
+        try {
+          waitFor(waitTime) { page.filterStoredProcedure.isDisplayed() }
+          page.filterStoredProcedure.value(storedProcedureName)
+          report "3"
+        } catch (geb.waiting.WaitTimeoutException e) {
+          try {
+            $("#filterSP").isDisplayed()
+            $("#filterSP").value(storedProcedureName)
+            report "4"
+          } catch (geb.waiting.WaitTimeoutException exp) {
+          }
+        }
 
         when: 'check deleted status'
         try {
-          //waitFor(waitTime) { !$("#storeProcedureBody > tr > td:nth-child(1)").text().equals(storedProcedureName) }
+          waitFor(waitTime) { !$("#storeProcedureBody > tr > td:nth-child(1)").text().equals(storedProcedureName) }
           waitFor(waitTime) { $("#storeProcedureBody > tr > td").isDisplayed() }
           deletedStatus = true
         } catch (geb.waiting.WaitTimeoutException e) {
