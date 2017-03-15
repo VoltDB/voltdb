@@ -20,8 +20,10 @@ package org.voltdb.planner;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.catalog.Database;
@@ -39,6 +41,12 @@ import org.voltdb.types.ExpressionType;
 
 public class ParsedUnionStmt extends AbstractParsedStmt {
 
+    /**
+     * This is set to false.  When ENG6821 is fixed finally, we
+     * probably want to eliminate this variable and all its uses.
+     */
+    final public static boolean ENG6281_FIXED = false;
+
     public enum UnionType {
         NOUNION,
         UNION,
@@ -52,9 +60,9 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
     // Limit plan node information.
     private final LimitOffset m_limitOffset = new LimitOffset();
     // Order by
-    private final ArrayList<ParsedColInfo> m_orderColumns = new ArrayList<ParsedColInfo>();
+    private final ArrayList<ParsedColInfo> m_orderColumns = new ArrayList<>();
 
-    public ArrayList<AbstractParsedStmt> m_children = new ArrayList<AbstractParsedStmt>();
+    public ArrayList<AbstractParsedStmt> m_children = new ArrayList<>();
     public UnionType m_unionType = UnionType.NOUNION;
 
     /**
@@ -231,7 +239,7 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
 
         if (stmt instanceof ParsedSelectStmt) {
             ParsedSelectStmt selectStmt = (ParsedSelectStmt) stmt;
-            ArrayList<AbstractExpression> nonOrdered = new ArrayList<AbstractExpression>();
+            ArrayList<AbstractExpression> nonOrdered = new ArrayList<>();
             return selectStmt.orderByColumnsDetermineAllDisplayColumns(selectStmt.displayColumns(), orderColumns, nonOrdered);
         }
         else {
@@ -290,7 +298,7 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
                 // find a new unique name for the key
                 // the value in the map are more interesting
                 alias += "_" + System.currentTimeMillis();
-                HashMap<String, StmtTableScan> duplicates = new HashMap<String, StmtTableScan>();
+                HashMap<String, StmtTableScan> duplicates = new HashMap<>();
                 duplicates.put(alias, tableScan);
 
                 addStmtTablesFromChildren(duplicates);
@@ -365,6 +373,15 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
     @Override
     public boolean hasOrderByColumns() {
         return ! m_orderColumns.isEmpty();
+    }
+
+    @Override
+    public Set<AbstractExpression> findAllSubexpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
+        Set<AbstractExpression> exprs = new HashSet<>();
+        for (AbstractParsedStmt childStmt : m_children) {
+            exprs.addAll(childStmt.findAllSubexpressionsOfClass(aeClass));
+        }
+        return exprs;
     }
 
     /**
@@ -447,8 +464,8 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
     }
 
     private void placeTVEsForOrderby () {
-        Map <AbstractExpression, Integer> displayIndexMap = new HashMap <AbstractExpression,Integer>();
-        Map <Integer, ParsedColInfo> displayIndexToColumnMap = new HashMap <Integer, ParsedColInfo>();
+        Map <AbstractExpression, Integer> displayIndexMap = new HashMap <>();
+        Map <Integer, ParsedColInfo> displayIndexToColumnMap = new HashMap <>();
 
         int orderByIndex = 0;
         ParsedSelectStmt leftmostSelectChild = getLeftmostSelectStmt();

@@ -25,6 +25,7 @@ import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.Database;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AbstractSubqueryExpression;
+import org.voltdb.planner.ParsedUnionStmt;
 import org.voltdb.types.PlanNodeType;
 
 public class MaterializePlanNode extends ProjectionPlanNode {
@@ -52,14 +53,16 @@ public class MaterializePlanNode extends ProjectionPlanNode {
     public void generateOutputSchema(Database db) {
         // MaterializePlanNodes have no children
         assert(m_children.size() == 0);
-        // MaterializePlanNode's output schema is pre-determined, don't touch
-        // except when its output column(s) has a scalar subquery expression
-        // Generate the output schema for subqueries if any
-        Collection<AbstractExpression> exprs = findAllSubquerySubexpressions();
-        for (AbstractExpression expr: exprs) {
-            ((AbstractSubqueryExpression) expr).generateOutputSchema(db);
+        // MaterializePlanNode's output schema is pre-determined.  For now, don't touch it.
+        //
+        // When ENG6281 is fixed, and  its output column(s) has a scalar subquery expression,
+        // we must generate the output schema for subqueries if any.
+        if (ParsedUnionStmt.ENG6281_FIXED) {
+            Collection<AbstractExpression> exprs = findAllSubquerySubexpressions();
+            for (AbstractExpression expr: exprs) {
+                ((AbstractSubqueryExpression) expr).generateOutputSchema(db);
+            }
         }
-
         return;
     }
 

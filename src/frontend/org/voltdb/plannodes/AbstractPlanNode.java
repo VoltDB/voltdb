@@ -44,6 +44,7 @@ import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AbstractSubqueryExpression;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.planner.ParsedUnionStmt;
 import org.voltdb.planner.PlanStatistics;
 import org.voltdb.planner.StatsField;
 import org.voltdb.planner.parseinfo.StmtTableScan;
@@ -318,12 +319,14 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
      */
     protected void getTablesAndIndexesFromSubqueries(Map<String, StmtTargetTableScan> tablesRead,
             Collection<String> indexes) {
-        for(AbstractExpression expr : findAllSubquerySubexpressions()) {
-            assert(expr instanceof AbstractSubqueryExpression);
-            AbstractSubqueryExpression subquery = (AbstractSubqueryExpression) expr;
-            AbstractPlanNode subqueryNode = subquery.getSubqueryNode();
-            assert(subqueryNode != null);
-            subqueryNode.getTablesAndIndexes(tablesRead, indexes);
+        if (ParsedUnionStmt.ENG6281_FIXED) {
+            for(AbstractExpression expr : findAllSubquerySubexpressions()) {
+                assert(expr instanceof AbstractSubqueryExpression);
+                AbstractSubqueryExpression subquery = (AbstractSubqueryExpression) expr;
+                AbstractPlanNode subqueryNode = subquery.getSubqueryNode();
+                assert(subqueryNode != null);
+                subqueryNode.getTablesAndIndexes(tablesRead, indexes);
+            }
         }
     }
 
