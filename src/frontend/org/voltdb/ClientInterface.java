@@ -1146,6 +1146,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         m_adminAcceptor = null;
         m_adminAcceptor = new ClientAcceptor(adminIntf, adminPort, messenger.getNetwork(), true, sslContext);
 
+        // Create the per-partition adapters before creating the mailbox. Once
+        // the mailbox is created, the master promotion notification may race
+        // with this.
+        m_internalConnectionHandler = new InternalConnectionHandler();
+        for (int pid : m_cartographer.getPartitions()) {
+            m_internalConnectionHandler.addAdapter(pid, createInternalAdapter(pid));
+        }
+
         m_mailbox = new LocalMailbox(messenger,  messenger.getHSIdForLocalSite(HostMessenger.CLIENT_INTERFACE_SITE_ID)) {
             LinkedBlockingQueue<VoltMessage> m_d = new LinkedBlockingQueue<VoltMessage>();
             @Override
@@ -1197,11 +1205,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 .plannerSiteId(m_plannerSiteId)
                 .siteId(m_siteId)
                 .build();
-
-        m_internalConnectionHandler = new InternalConnectionHandler();
-        for (int pid : m_cartographer.getPartitions()) {
-            m_internalConnectionHandler.addAdapter(pid, createInternalAdapter(pid));
-        }
 
         m_executeTaskAdpater = new SimpleClientResponseAdapter(ClientInterface.EXECUTE_TASK_CID, "ExecuteTaskAdapter", true);
         bindAdapter(m_executeTaskAdpater, null);
