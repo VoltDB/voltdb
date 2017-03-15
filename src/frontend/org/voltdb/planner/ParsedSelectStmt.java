@@ -940,7 +940,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             }
             if (m_hasAggregateExpression) {
                 throw new PlanningErrorException(
-                        "Use of both a windowed function call and aggregate operators in a single query is not supported.");
+                        "Use of window functions (in an OVER clause) isn't supported with other aggregate functions on the SELECT list.");
             }
             //
             // This could be an if statement, but I think it's better to
