@@ -61,6 +61,8 @@ import java.security.cert.X509Certificate;
 
 import javax.net.ssl.SSLContext;
 
+import junit.framework.TestCase;
+
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
 import org.apache.http.HttpVersion;
@@ -70,11 +72,11 @@ import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.config.Registry;
 import org.apache.http.config.RegistryBuilder;
-import org.apache.http.conn.ssl.TrustStrategy;
 import org.apache.http.conn.socket.ConnectionSocketFactory;
 import org.apache.http.conn.socket.PlainConnectionSocketFactory;
 import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
 import org.apache.http.conn.ssl.SSLContextBuilder;
+import org.apache.http.conn.ssl.TrustStrategy;
 import org.apache.http.entity.ContentType;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
@@ -83,8 +85,6 @@ import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.apache.http.util.EntityUtils;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.compiler.VoltProjectBuilder;
-
-import junit.framework.TestCase;
 
 public class TestJSONOverHttps extends TestCase {
     private static final ContentType utf8ApplicationFormUrlEncoded =
@@ -104,6 +104,7 @@ public class TestJSONOverHttps extends TestCase {
     private String callProcOverJSON(String varString, final int expectedCode) throws Exception {
         URI uri = URI.create("https://localhost:" + m_port + "/api/1.0/");
         SSLContext sslContext = new SSLContextBuilder().loadTrustMaterial(null, new TrustStrategy() {
+            @Override
             public boolean isTrusted(X509Certificate[] arg0, String arg1) throws CertificateException {
                 return true;
             }
@@ -168,7 +169,8 @@ public class TestJSONOverHttps extends TestCase {
             builder.addStmtProcedure("fooinsert", "insert into foo values (?, ?);");
             builder.addStmtProcedure("foocount", "select count(*) from foo;");
             builder.setHTTPDPort(port);
-            builder.setHttpsEnabled(true);
+            builder.setSslEnabled(true);
+            builder.setSslExternal(true);
             if (keyStorePath != null) {
                 String keystore = getResourcePath(keyStorePath);
                 builder.setKeyStoreInfo(keystore, keyStorePasswd);
@@ -190,7 +192,7 @@ public class TestJSONOverHttps extends TestCase {
 
     private String getResourcePath(String resource) {
         URL res = this.getClass().getResource(resource);
-        return res==null ? resource : res.toExternalForm();
+        return res==null ? resource : res.getPath();
     }
 
     /* To obtain the obfuscated password, use jetty utility as shown below:
@@ -207,7 +209,7 @@ public class TestJSONOverHttps extends TestCase {
             System.setProperty(KEYSTORE_PASSWD_SYSPROP, "");
             System.setProperty(TRUSTSTORE_SYSPROP, "");
             System.setProperty(TRUSTSTORE_PASSWD_SYSPROP, "");
-            startServer(KEYSTORE_RESOURCE, KEYSTORE_PASSWD_OBFUSCATED, null, null);
+            startServer(KEYSTORE_RESOURCE, KEYSTORE_PASSWD_OBFUSCATED, KEYSTORE_RESOURCE, KEYSTORE_PASSWD_OBFUSCATED);
 
             String varString = "Procedure=foocount";
             TestJSONInterface.Response response =
@@ -230,7 +232,7 @@ public class TestJSONOverHttps extends TestCase {
             System.setProperty(KEYSTORE_PASSWD_SYSPROP, "");
             System.setProperty(TRUSTSTORE_SYSPROP, "");
             System.setProperty(TRUSTSTORE_PASSWD_SYSPROP, "");
-            startServer(KEYSTORE_RESOURCE, KEYSTORE_PASSWD, null, null);
+            startServer(KEYSTORE_RESOURCE, KEYSTORE_PASSWD, KEYSTORE_RESOURCE, KEYSTORE_PASSWD);
 
             String varString = "Procedure=foocount";
             TestJSONInterface.Response response =
@@ -254,7 +256,7 @@ public class TestJSONOverHttps extends TestCase {
             System.setProperty(TRUSTSTORE_SYSPROP, "");
             System.setProperty(TRUSTSTORE_PASSWD_SYSPROP, "");
             m_port = VoltDB.DEFAULT_HTTPS_PORT;
-            startServer(KEYSTORE_RESOURCE, KEYSTORE_PASSWD, null, null, 0);
+            startServer(KEYSTORE_RESOURCE, KEYSTORE_PASSWD, KEYSTORE_RESOURCE, KEYSTORE_PASSWD, 0);
 
             String varString = "Procedure=foocount";
             TestJSONInterface.Response response =

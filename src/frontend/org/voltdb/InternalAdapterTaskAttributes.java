@@ -53,13 +53,6 @@ final class InternalAdapterTaskAttributes implements InvocationClientHandler, In
         return m_name;
     }
 
-    @Override
-    final public void setBackPressure(boolean hasBackPressure) {
-        if (m_proxy != null) {
-            m_proxy.setBackPressure(hasBackPressure);
-        }
-    }
-
     final public InvocationClientHandler asHandler() {
         return this;
     }

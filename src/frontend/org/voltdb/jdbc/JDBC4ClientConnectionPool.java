@@ -19,6 +19,8 @@ package org.voltdb.jdbc;
 
 import java.util.HashMap;
 
+import org.voltcore.utils.ssl.SSLConfiguration;
+
 /**
  * Provides support for database connection pooling, allowing for optimal application performance.
  * From benchmarking results, optimal TCP socket usage is attained when 50 threads share the same
@@ -67,13 +69,50 @@ public class JDBC4ClientConnectionPool {
      * @param reconnectOnConnectionLoss
      *            Attempts to reconnect to a node with retry after connection loss
      * @return the client connection object the caller should use to post requests.
-     * @see #get(String servers, int port)
-     * @see #get(String[] servers, int port)
-     * @see #get(String servers, int port, String user, String password, boolean isHeavyWeight, int
-     *      maxOutstandingTxns)
      */
     public static JDBC4ClientConnection get(String[] servers, String user,
             String password, boolean isHeavyWeight, int maxOutstandingTxns, boolean reconnectOnConnectionLoss) throws Exception {
+        return get(servers, user, password, isHeavyWeight, maxOutstandingTxns, reconnectOnConnectionLoss, null);
+    }
+
+    /**
+     * Gets a client connection to the given VoltDB server(s).
+     *
+     * @param servers
+     *            the list of VoltDB servers to connect to.
+     * @param port
+     *            the VoltDB native protocol port to connect to (usually 21212).
+     * @param user
+     *            the user name to use when connecting to the server(s).
+     * @param password
+     *            the password to use when connecting to the server(s).
+     * @param isHeavyWeight
+     *            the flag indicating callback processes on this connection will be heavy (long
+     *            running callbacks). By default the connection only allocates one background
+     *            processing thread to process callbacks. If those callbacks run for a long time,
+     *            the network stack can get clogged with pending responses that have yet to be
+     *            processed, at which point the server will disconnect the application, thinking it
+     *            died and is not reading responses as fast as it is pushing requests. When the flag
+     *            is set to 'true', an additional 2 processing thread will deal with processing
+     *            callbacks, thus mitigating the issue.
+     * @param maxOutstandingTxns
+     *            the number of transactions the client application may push against a specific
+     *            connection before getting blocked on back-pressure. By default the connection
+     *            allows 3,000 open transactions before preventing the client from posting more
+     *            work, thus preventing server fire-hosing. In some cases however, with very fast,
+     *            small transactions, this limit can be raised.
+     * @param reconnectOnConnectionLoss
+     *            Attempts to reconnect to a node with retry after connection loss
+     * @param sslConfig
+     *            Contains properties - trust store path and password, key store path and password,
+     *            used for connecting with server over SSL. For unencrypted connection, passed in ssl
+     *            config is null
+     * @return the client connection object the caller should use to post requests.
+     * @see #get(String servers, int port, String user, String password, boolean isHeavyWeight, int
+     *      maxOutstandingTxns, reconnectOnConnectionLoss)
+     */
+    public static JDBC4ClientConnection get(String[] servers, String user, String password, boolean isHeavyWeight,
+            int maxOutstandingTxns, boolean reconnectOnConnectionLoss, SSLConfiguration.SslConfig sslConfig) throws Exception {
         String clientConnectionKeyBase = getClientConnectionKeyBase(servers, user, password,
                 isHeavyWeight, maxOutstandingTxns, reconnectOnConnectionLoss);
         String clientConnectionKey = clientConnectionKeyBase;
@@ -82,7 +121,8 @@ public class JDBC4ClientConnectionPool {
             if (!ClientConnections.containsKey(clientConnectionKey))
                 ClientConnections.put(clientConnectionKey, new JDBC4ClientConnection(
                         clientConnectionKeyBase, clientConnectionKey, servers, user,
-                        password, isHeavyWeight, maxOutstandingTxns, reconnectOnConnectionLoss));
+                        password, isHeavyWeight, maxOutstandingTxns, reconnectOnConnectionLoss,
+                        sslConfig));
             return ClientConnections.get(clientConnectionKey).use();
         }
     }

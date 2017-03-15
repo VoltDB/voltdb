@@ -22,6 +22,8 @@ import org.voltdb.importer.AbstractImporter;
 import org.voltdb.importer.ImporterServerAdapter;
 import org.voltdb.importer.ImporterStatsCollector;
 
+import java.util.function.Function;
+
 /**
  * Implementation that uses the server internal classes to execute procedures and
  * to report information for statistics collection.
@@ -41,14 +43,9 @@ public class ImporterServerAdapterImpl implements ImporterServerAdapter {
     }
 
     @Override
-    public boolean callProcedure(AbstractImporter importer, String proc, Object... fieldList) {
-        return callProcedure(importer, null, proc, fieldList);
-    }
-
-    @Override
-    public boolean callProcedure(AbstractImporter importer, ProcedureCallback procCallback, String proc, Object... fieldList) {
+    public boolean callProcedure(AbstractImporter importer, Function<Integer, Boolean> backPressurePredicate, ProcedureCallback procCallback, String proc, Object... fieldList) {
         return getInternalConnectionHandler()
-                .callProcedure(importer, m_statsCollector, procCallback, proc, fieldList);
+                .callProcedure(importer, backPressurePredicate, m_statsCollector, procCallback, proc, fieldList);
     }
 
     private InternalConnectionHandler getInternalConnectionHandler() {

@@ -74,6 +74,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         ByteBuffer m_parameterSet = null;
         Integer m_outputDepId = null;
         ArrayList<Integer> m_inputDepIds = null;
+        byte[] m_stmtName = null;
         // For unplanned item
         byte[] m_fragmentPlan = null;
         byte[] m_stmtText = null;
@@ -85,6 +86,11 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         public String toString() {
             StringBuilder sb = new StringBuilder();
             sb.append(String.format("FRAGMENT PLAN HASH: %s\n", Encoder.hexEncode(m_planHash)));
+            if (m_stmtName != null) {
+                sb.append("\n");
+                sb.append("  STATEMENT NAME: ");
+                sb.append(getStmtName());
+            }
             if (m_parameterSet != null) {
                 ParameterSet pset = null;
                 try {
@@ -119,6 +125,15 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
             }
             return sb.toString();
         }
+
+        public String getStmtName() {
+            if (m_stmtName != null) {
+                return new String(m_stmtName, Charsets.UTF_8);
+            }
+            else {
+                return null;
+            }
+        }
     }
 
     List<FragmentData> m_items = new ArrayList<FragmentData>();
@@ -133,6 +148,10 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
     // If this flag is set, the message should contain a single fragment with the
     // desired output dep ID, but no real work to do.
     boolean m_emptyForRestart = false;
+
+    // If this flag = true, it means the current execution is being sampled.
+    boolean m_perFragmentStatsRecording = false;
+    boolean m_coordinatorTask = false;
 
     int m_inputDepCount = 0;
     Iv2InitiateTaskMessage m_initiateTask;
@@ -152,6 +171,22 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
     int m_currentBatchIndex = 0;
 
     int m_batchTimeout = BatchTimeoutOverrideType.NO_TIMEOUT;
+
+    public void setPerFragmentStatsRecording(boolean value) {
+        m_perFragmentStatsRecording = value;
+    }
+
+    public boolean isPerFragmentStatsRecording() {
+        return m_perFragmentStatsRecording;
+    }
+
+    public void setCoordinatorTask(boolean value) {
+        m_coordinatorTask = value;
+    }
+
+    public boolean isCoordinatorTask() {
+        return m_coordinatorTask;
+    }
 
     public int getCurrentBatchIndex() {
         return m_currentBatchIndex;
@@ -208,6 +243,8 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         m_involvedPartitions = ftask.m_involvedPartitions;
         m_procNameToLoad = ftask.m_procNameToLoad;
         m_batchTimeout = ftask.m_batchTimeout;
+        m_perFragmentStatsRecording = ftask.m_perFragmentStatsRecording;
+        m_coordinatorTask = ftask.m_coordinatorTask;
         if (ftask.m_initiateTaskBuffer != null) {
             m_initiateTaskBuffer = ftask.m_initiateTaskBuffer.duplicate();
         }
@@ -236,8 +273,15 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
      * @param parameterSet
      */
     public void addFragment(byte[] planHash, int outputDepId, ByteBuffer parameterSet) {
+        addFragment(planHash, null, outputDepId, parameterSet);
+    }
+
+    public void addFragment(byte[] planHash, String stmtName, int outputDepId, ByteBuffer parameterSet) {
         FragmentData item = new FragmentData();
         item.m_planHash = planHash;
+        if (stmtName != null) {
+            item.m_stmtName = stmtName.getBytes(Charsets.UTF_8);
+        }
         item.m_outputDepId = outputDepId;
         item.m_parameterSet = parameterSet;
         m_items.add(item);
@@ -531,6 +575,13 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         return item.m_fragmentPlan;
     }
 
+    public String getStmtName(int index) {
+        assert(index >= 0 && index < m_items.size());
+        FragmentData item = m_items.get(index);
+        assert(item != null);
+        return item.getStmtName();
+    }
+
     public String getStmtText(int index) {
         assert(index >= 0 && index < m_items.size());
         FragmentData item = m_items.get(index);
@@ -549,6 +600,10 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
      *     should undo flag: byte: 1
      *     output dependencies flag (outdep): byte: 1
      *     input dependencies flag (indep): byte: 1
+     *
+     * Procedure name to load string (if any).
+     *
+     * perFragmentStatsRecording and coordinatorTask flag: byte: 2
      *
      * Fragment ID block (1 per item):
      *     fragment ID: long: 8 * nitems
@@ -593,6 +648,11 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
             msgsize += m_procNameToLoad.length;
         }
 
+        // perFragmentStatsRecording and coordinatorTask.
+        // TODO: We could use only one byte and bitmasks to represent all the
+        // boolean values used in this class, it can save a little bit space.
+        msgsize += 2;
+
         // Fragment ID block (20 bytes per sha1-hash)
         msgsize += 20 * m_items.size();
 
@@ -626,6 +686,12 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         for (FragmentData item : m_items) {
             // Account for parameter sets
             msgsize += 4 + item.m_parameterSet.remaining();
+
+            // short + str for stmt name
+            msgsize += 2;
+            if (item.m_stmtName != null) {
+                msgsize += item.m_stmtName.length;
+            }
 
             // Account for the optional output dependency block, if needed.
             if (!foundOutputDepId && item.m_outputDepId != null) {
@@ -715,10 +781,24 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         else {
             buf.putShort((short) -1);
         }
+        buf.put(m_perFragmentStatsRecording ? (byte) 1 : (byte) 0);
+        buf.put(m_coordinatorTask ? (byte) 1 : (byte) 0);
 
         // Plan Hash block
         for (FragmentData item : m_items) {
             buf.put(item.m_planHash);
+        }
+
+        for (FragmentData item : m_items) {
+            // write statement name
+            if (item.m_stmtName == null) {
+                buf.putShort((short) -1);
+            }
+            else {
+                assert(item.m_stmtName.length <= Short.MAX_VALUE);
+                buf.putShort((short) item.m_stmtName.length);
+                buf.put(item.m_stmtName);
+            }
         }
 
         // Parameter set block
@@ -834,6 +914,8 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
             m_procNameToLoad = new byte[procNameToLoadBytesLen];
             buf.get(m_procNameToLoad);
         }
+        m_perFragmentStatsRecording = buf.get() != 0;
+        m_coordinatorTask = buf.get() != 0;
 
         m_items = new ArrayList<FragmentData>(fragCount);
 
@@ -843,6 +925,18 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
             item.m_planHash = new byte[20]; // sha1 is 20b
             buf.get(item.m_planHash);
             m_items.add(item);
+        }
+
+        // Statement names block
+        for (FragmentData item : m_items) {
+            short stmtNameLen = buf.getShort();
+            if (stmtNameLen >= 0) {
+                item.m_stmtName = new byte[stmtNameLen];
+                buf.get(item.m_stmtName);
+            }
+            else {
+                item.m_stmtName = null;
+            }
         }
 
         // Parameter set block
@@ -963,6 +1057,12 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         sb.append(" FOR REPLAY ").append(isForReplay());
         sb.append(", SP HANDLE: ").append(TxnEgo.txnIdToString(getSpHandle()));
         sb.append("\n");
+        sb.append("THIS IS A ");
+        sb.append(m_coordinatorTask ? "COORDINATOR" : "WORKER");
+        sb.append(" TASK.\n");
+        if (m_perFragmentStatsRecording) {
+            sb.append("PER FRAGMENT STATS RECORDING\n");
+        }
         if (m_isReadOnly)
             sb.append("  READ, COORD ");
         else

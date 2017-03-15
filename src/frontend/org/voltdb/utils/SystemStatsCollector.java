@@ -35,7 +35,7 @@ import org.voltdb.processtools.ShellTools;
  * Generating a sample is a manually instigated process that must be done
  * periodically.
  * It stored history in three buckets, each with a fixed size.
- * Each bucket should me more granular than the last.
+ * Each bucket should be more granular than the last.
  *
  */
 public class SystemStatsCollector {

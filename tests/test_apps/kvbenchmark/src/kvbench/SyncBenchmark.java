@@ -46,9 +46,6 @@ import java.util.Random;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -60,7 +57,6 @@ import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ClientStats;
 import org.voltdb.client.ClientStatsContext;
-import org.voltdb.client.ClientStatusListenerExt;
 import org.voltdb.client.NullCallback;
 
 import com.google_voltpatches.common.base.Preconditions;
@@ -103,6 +99,7 @@ public class SyncBenchmark {
     final AtomicLong failedGets = new AtomicLong(0);
     final AtomicLong rawGetData = new AtomicLong(0);
     final AtomicLong networkGetData = new AtomicLong(0);
+    final AtomicLong allOps = new AtomicLong(0);
 
     final AtomicLong successfulPuts = new AtomicLong(0);
     final AtomicLong failedPuts = new AtomicLong(0);
@@ -164,6 +161,12 @@ public class SyncBenchmark {
 
         @Option(desc = "Filename to write periodic stat infomation in CSV format")
         String csvfile = "";
+
+        @Option(desc = "File with SSL properties")
+        String sslfile = "";
+
+        @Option(desc = "Number of get/puts to perform")
+        long maxops = -1L;
 
         @Override
         public void validate() {
@@ -286,7 +289,12 @@ public class SyncBenchmark {
     public SyncBenchmark(KVConfig config) {
         this.config = config;
 
-        ClientConfig clientConfig = new ClientConfig("", "");
+        ClientConfig clientConfig = new ClientConfig("", "", null);
+        if (config.sslfile.trim().length() > 0) {
+            clientConfig.setTrustStoreConfigFromPropertyFile(config.sslfile);
+            clientConfig.enableSSL();
+        }
+
         clientConfig.setReconnectOnConnectionLoss(true);
         clientConfig.setClientAffinity(true);
         client = ClientFactory.createClient(clientConfig);
@@ -482,6 +490,11 @@ public class SyncBenchmark {
      */
     class KVThread implements Runnable {
 
+        private boolean keepRunning(boolean countops) {
+            if (countops) return allOps.incrementAndGet() <= config.maxops;
+            else return !benchmarkComplete.get();
+        }
+
         @Override
         public void run() {
             while (warmupComplete.get() == false) {
@@ -503,7 +516,9 @@ public class SyncBenchmark {
                 }
             }
 
-            while (benchmarkComplete.get() == false) {
+            final boolean countops = config.maxops > 0;
+            while (keepRunning(countops)) {
+
                 // Decide whether to perform a GET or PUT operation
                 if (rand.nextDouble() < config.getputratio) {
                     // Get a key/value pair, synchronously
@@ -602,7 +617,14 @@ public class SyncBenchmark {
 
         // Run the benchmark loop for the requested warmup time
         System.out.println("\nRunning benchmark...");
-        Thread.sleep(1000l * config.duration);
+
+        if (config.maxops > 0) {
+           while(allOps.get() < config.maxops) {
+               Thread.sleep(5_000);
+           }
+        } else {
+            Thread.sleep(1000l * config.duration);
+        }
 
         // stop the threads
         benchmarkComplete.set(true);

@@ -182,6 +182,10 @@ public class Benchmark {
         @Option(desc = "Enable topology awareness")
         boolean topologyaware = false;
 
+        @Option(desc = "File with SSL properties")
+        String sslfile = "";
+
+
         @Override
         public void validate() {
             if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
@@ -356,8 +360,12 @@ public class Benchmark {
         log.info(HORIZONTAL_RULE);
         log.info(config.getConfigDumpString());
 
-        StatusListener statusListener = new StatusListener();
-        ClientConfig clientConfig = new ClientConfig("", "", statusListener);
+        ClientConfig clientConfig = new ClientConfig("", "", new StatusListener());
+        if (config.sslfile.trim().length() > 0) {
+            clientConfig.setTrustStoreConfigFromPropertyFile(config.sslfile);
+            clientConfig.enableSSL();
+        }
+
         if (config.topologyaware) {
             clientConfig.setTopologyChangeAware(true);
         }

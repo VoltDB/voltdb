@@ -235,42 +235,42 @@ public class TestVoltNetwork extends TestCase {
         }
     }
 
-    public void testInstallInterests() throws Exception {
-        new MockSelector();
-        VoltNetwork vn = new VoltNetwork( 0, null, "Test");
-        MockVoltPort vp = new MockVoltPort(vn, new MockInputHandler());
-        MockSelectionKey selectionKey = new MockSelectionKey();
-        vp.m_selectionKey = selectionKey;
+    private void runInstallInterests (VoltNetwork voltNetwork, VoltPort voltPort) {
+        SelectionKey sk = new MockSelectionKey();
+        voltPort.m_selectionKey = sk;
 
         // add the port to the changelist set and run install interests.
         // the ports desired ops should be set to the selection key.
-        vn.addToChangeList(vp);
-        vn.installInterests(vp);
-        assertEquals(selectionKey.interestOps(), vp.interestOps());
+        voltNetwork.addToChangeList(voltPort);
+        voltNetwork.installInterests(voltPort);
+        assertEquals(sk.interestOps(), voltPort.interestOps());
 
         // should be able to wash, rinse and repeat this a few times.
         // interesting as voltnetwork recycles some lists underneath
         // the covers.
-        vp.setInterests(SelectionKey.OP_WRITE, 0);
-        vn.addToChangeList(vp);
-        vn.installInterests(vp);
-        assertEquals(selectionKey.interestOps(), SelectionKey.OP_WRITE);
+        voltPort.setInterests(SelectionKey.OP_WRITE, 0);
+        voltNetwork.addToChangeList(voltPort);
+        voltNetwork.installInterests(voltPort);
+        assertEquals(sk.interestOps(), SelectionKey.OP_WRITE);
 
-        vp.setInterests(SelectionKey.OP_WRITE | SelectionKey.OP_READ, 0);
-        vn.addToChangeList(vp);
-        vn.installInterests(vp);
-        assertEquals(selectionKey.interestOps(), vp.interestOps());
+        voltPort.setInterests(SelectionKey.OP_WRITE | SelectionKey.OP_READ, 0);
+        voltNetwork.addToChangeList(voltPort);
+        voltNetwork.installInterests(voltPort);
+        assertEquals(sk.interestOps(), voltPort.interestOps());
     }
 
-    public void testInvokeCallbacks() throws Exception{
-        MockSelector selector = new MockSelector();
-        VoltNetwork vn = new VoltNetwork(selector);               // network with fake selector
-        MockVoltPort vp = new MockVoltPort(vn, new MockInputHandler());             // implement abstract run()
+    public void testInstallInterests() throws Exception {
+        VoltNetwork vn = new VoltNetwork( 0, null, "Test");
+        MockVoltPort vp = new MockVoltPort(vn, new MockInputHandler());
+        runInstallInterests(vn, vp);
+    }
+
+    private void runInvokeCallbacks(MockSelector baseSelector, VoltNetwork vn, VoltPort vp) throws Exception {
         MockSelectionKey selectionKey = new MockSelectionKey();   // fake selection key
 
         // glue the key, the selector and the port together.
         selectionKey.interestOps(SelectionKey.OP_WRITE);
-        selector.setFakeKey(selectionKey);
+        baseSelector.setFakeKey(selectionKey);
         vp.m_selectionKey = selectionKey;
         selectionKey.attach(vp);
         selectionKey.readyOps(SelectionKey.OP_WRITE);
@@ -288,4 +288,12 @@ public class TestVoltNetwork extends TestCase {
         vn.shutdown();
         assertEquals(SelectionKey.OP_ACCEPT, vp.readyOps());
     }
+
+    public void testInvokeCallbacks() throws Exception {
+        MockSelector selector = new MockSelector();
+        VoltNetwork vn = new VoltNetwork(selector);               // network with fake selector
+        MockVoltPort vp = new MockVoltPort(vn, new MockInputHandler());             // implement abstract run()
+        runInvokeCallbacks(selector, vn, vp);
+    }
+
 }

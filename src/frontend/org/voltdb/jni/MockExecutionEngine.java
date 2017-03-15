@@ -237,4 +237,13 @@ public class MockExecutionEngine extends ExecutionEngine {
     public ByteBuffer getParamBufferForExecuteTask(int requiredCapacity) {
         throw new UnsupportedOperationException();
     }
+
+    @Override
+    public void setPerFragmentTimingEnabled(boolean enabled) {
+    }
+
+    @Override
+    public int extractPerFragmentStats(int batchSize, long[] executionTimesOut) {
+        return 0;
+    }
 }

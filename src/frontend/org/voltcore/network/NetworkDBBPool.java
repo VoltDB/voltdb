@@ -17,14 +17,15 @@
 
 package org.voltcore.network;
 
-import java.util.ArrayDeque;
+import java.util.Deque;
 
+import java.util.concurrent.ConcurrentLinkedDeque;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 
 public class NetworkDBBPool {
 
-    private final ArrayDeque<BBContainer> m_buffers = new ArrayDeque<BBContainer>();
+    private final Deque<BBContainer> m_buffers = new ConcurrentLinkedDeque<BBContainer>();
     private static final int LIMIT = Integer.getInteger("NETWORK_DBB_LIMIT", 512);
     private static final int SIZE = Integer.getInteger("NETWORK_DBB_SIZE", (1024 * 32));
 
@@ -47,7 +48,7 @@ public class NetworkDBBPool {
 
     BBContainer acquire() {
        final BBContainer cont = m_buffers.poll();
-       if (cont == null) {
+        if (cont == null) {
            final BBContainer originContainer = DBBPool.allocateDirect(m_allocationSize);
            return new BBContainer(originContainer.b()) {
                 @Override
@@ -66,6 +67,10 @@ public class NetworkDBBPool {
            @Override
            public void discard() {
                checkDoubleFree();
+               if (m_buffers.size() > m_numBuffers) {
+                   cont.discard();
+                   return;
+               }
                m_buffers.push(cont);
            }
        };

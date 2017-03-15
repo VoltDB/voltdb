@@ -21,7 +21,6 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.net.URISyntaxException;
 import java.net.URL;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -36,6 +35,8 @@ import java.util.Properties;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
 
+import org.voltcore.utils.ssl.SSLConfiguration;
+
 public class Driver implements java.sql.Driver
 {
     public static final String JDBC_PROP_FILE_ENV = "VOLTDB_JDBC_PROPERTIES";
@@ -43,6 +44,10 @@ public class Driver implements java.sql.Driver
     public static final String DEFAULT_PROP_FILENAME = "voltdb.properties";
     //Driver URL prefix.
     private static final String URL_PREFIX = "jdbc:voltdb:";
+
+    static final String SSL_PROP= "ssl";
+    static final String TRUSTSTORE_CONFIG_PROP = "truststore";
+    static final String TRUSTSTORE_PASSWORD_PROP = "truststorepassword";
 
     // Static so it's unit-testable, yes, lazy me
     static String[] getServersFromURL(String url) {
@@ -134,6 +139,10 @@ public class Driver implements java.sql.Driver
                 boolean heavyweight = false;
                 int maxoutstandingtxns = 0;
                 boolean reconnectOnConnectionLoss = false;
+                boolean enableSSL = false;
+                String truststorePath = null;
+                String truststorePassword = null;
+
                 for (Enumeration<?> e = info.propertyNames(); e.hasMoreElements();)
                 {
                     String key = (String) e.nextElement();
@@ -147,15 +156,30 @@ public class Driver implements java.sql.Driver
                                 value.toLowerCase().equals("1"));
                     else if (key.toLowerCase().equals("maxoutstandingtxns"))
                         maxoutstandingtxns = Integer.parseInt(value);
-                    else if ("autoreconnect".equals(key)){
+                    else if ("autoreconnect".equals(key)) {
                         reconnectOnConnectionLoss = ("true".equalsIgnoreCase(value) || "yes".equalsIgnoreCase(value) || "1".equals(value));
                     }
+                    else if (key.toLowerCase().equals(SSL_PROP)) {
+                        enableSSL = value.toLowerCase().equals("true");
+                    }
+                    else if (key.toLowerCase().equals(TRUSTSTORE_CONFIG_PROP)) {
+                        if ((value != null) && value.trim().length() > 0) {
+                            truststorePath = value.trim();
+                        }
+                    }
+                    else if (key.toLowerCase().equals(TRUSTSTORE_PASSWORD_PROP)) {
+                        truststorePassword = value;
+                    }
                     // else - unknown; ignore
+                }
+                SSLConfiguration.SslConfig sslConfig = null;
+                if (enableSSL) {
+                    sslConfig = new SSLConfiguration.SslConfig(null, null, truststorePath, truststorePassword);
                 }
 
                 // Return JDBC connection wrapper for the client
                 return  new JDBC4Connection(JDBC4ClientConnectionPool.get(servers, user, password,
-                            heavyweight, maxoutstandingtxns, reconnectOnConnectionLoss),
+                            heavyweight, maxoutstandingtxns, reconnectOnConnectionLoss, sslConfig),
                         info);
 
             } catch (Exception x) {

@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.GatheringByteChannel;
 import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.concurrent.TimeUnit;
 
 import org.voltcore.logging.Level;
@@ -36,7 +37,7 @@ import org.voltcore.utils.RateLimitedLogger;
 * is queuing writes which have different locking and backpressure policies
 */
 public abstract class NIOWriteStreamBase {
-    private static final VoltLogger networkLog = new VoltLogger("NETWORK");
+    protected static final VoltLogger networkLog = new VoltLogger("NETWORK");
 
     protected boolean m_isShutdown = false;
 
@@ -87,7 +88,7 @@ public abstract class NIOWriteStreamBase {
 
     abstract int drainTo (final GatheringByteChannel channel) throws IOException;
 
-    protected abstract ArrayDeque<DeferredSerialization> getQueuedWrites();
+    protected abstract Deque<DeferredSerialization> getQueuedWrites();
 
     /**
      * Serialize all queued writes into the queue of pending buffers, which are allocated from
@@ -95,9 +96,9 @@ public abstract class NIOWriteStreamBase {
      * @return number of queued writes processed
      * @throws IOException
      */
-    final int serializeQueuedWrites(final NetworkDBBPool pool) throws IOException {
+    int serializeQueuedWrites(final NetworkDBBPool pool) throws IOException {
         int processedWrites = 0;
-        final ArrayDeque<DeferredSerialization> oldlist = getQueuedWrites();
+        final Deque<DeferredSerialization> oldlist = getQueuedWrites();
         if (oldlist.isEmpty()) return 0;
 
         DeferredSerialization ds = null;
@@ -168,7 +169,7 @@ public abstract class NIOWriteStreamBase {
      * Validate that serialization is accurately reporting the amount of data necessary
      * to serialize the message
      */
-    private void checkSloppySerialization(ByteBuffer buf, DeferredSerialization ds) {
+    protected void checkSloppySerialization(ByteBuffer buf, DeferredSerialization ds) {
         if (buf.limit() != buf.capacity()) {
             if (ASSERT_ON) {
                 networkLog.fatal("Sloppy serialization size for message class " + ds);
