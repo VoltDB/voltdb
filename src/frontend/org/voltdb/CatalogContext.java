@@ -98,6 +98,23 @@ public class CatalogContext {
     // database settings. contains both cluster and path settings
     private final DbSettings m_dbSettings;
 
+    /**
+     * Constructor especially used during @CatalogContext update when @param hasSchemaChange is false.
+     * When @param hasSchemaChange is true, @param defaultProcManager and @param plannerTool will be created as new.
+     * Otherwise, it will try to use the ones passed in to save CPU cycles for performance reason.
+     * @param transactionId
+     * @param uniqueId
+     * @param catalog
+     * @param settings
+     * @param catalogBytes
+     * @param catalogBytesHash
+     * @param deploymentBytes
+     * @param version
+     * @param messenger
+     * @param hasSchemaChange
+     * @param defaultProcManager
+     * @param plannerTool
+     */
     public CatalogContext(
             long transactionId,
             long uniqueId,
@@ -162,6 +179,11 @@ public class CatalogContext {
         this.deploymentHashForConfig = CatalogUtil.makeDeploymentHashForConfig(deploymentBytes);
         m_memoizedDeployment = null;
 
+
+        // If there is no schema change, default procedures will not be changed.
+        // Also, the planner tool can be almost reused except updating the catalog hash string.
+        // When there is schema change, we just reload every default procedure and create new planner tool
+        // by applying the existing schema, which are costly in the UAC MP blocking path.
         if (hasSchemaChange) {
             m_defaultProcs = new DefaultProcedureManager(database);
             m_ptool = new PlannerTool(database, catalogHash);
@@ -185,6 +207,18 @@ public class CatalogContext {
         }
     }
 
+    /**
+     * Constructor of @CatalogConext used when creating brand-new instances.
+     * @param transactionId
+     * @param uniqueId
+     * @param catalog
+     * @param settings
+     * @param catalogBytes
+     * @param catalogBytesHash
+     * @param deploymentBytes
+     * @param version
+     * @param messenger
+     */
     public CatalogContext(
             long transactionId,
             long uniqueId,

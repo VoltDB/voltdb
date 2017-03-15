@@ -83,9 +83,7 @@ public class PlannerTool {
                 throw new RuntimeException("Error creating hsql: " + e.getMessage() + " in DDL statement: " + decoded_cmd);
             }
         }
-        if (hostLog.isDebugEnabled()) {
-            hostLog.debug("hsql loaded");
-        }
+        hostLog.debug("hsql loaded");
 
         // Create and register a singleton planner stats collector, if this is the first time.
         if (m_plannerStats == null) {
