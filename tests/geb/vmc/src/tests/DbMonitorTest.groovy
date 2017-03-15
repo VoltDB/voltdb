@@ -3353,10 +3353,15 @@ class DbMonitorTest extends TestBase {
         page.savePreferencesBtn.click()
         report 'savePreferencesBtn'
 
-        // when: 'wait for filter in stored procedure'
-        // waitFor(waitTime) { page.filterStoredProcedure.isDisplayed() }
+        when: 'wait for filter in stored procedure'
+        try {
+          waitFor(waitTime) { 1==0 }
+        } catch (geb.waiting.WaitTimeoutException e) {
+
+        }
+        //waitFor(waitTime) { page.filterStoredProcedure.isDisplayed() }
         then: 'enter the stored procedure name'
-        page.filterStoredProcedure.value(storedProcedureName)
+        $("#filterStoredProc").value(storedProcedureName)
 
         when: 'save the value of resultingStoredProcedureName'
         resultingStoredProcedureName = String.valueOf($("#storeProcedureBody > tr > td:nth-child(1)").text())
