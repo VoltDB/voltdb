@@ -193,7 +193,7 @@ public class ExportManager
                 m_generationGhosts.add(drainedGeneration.m_timestamp);
                 //If I am draining current generation create new processor. Otherwise its just older on disk generations
                 // that are getting drained.
-                installNewProcessor = true;
+                installNewProcessor = (m_processor.get().getExportGeneration() == drainedGeneration);
                 exportLog.info("Finished draining generation " + drainedGeneration.m_timestamp);
             } else {
                 installNewProcessor = false;
