@@ -19,11 +19,7 @@ package org.voltdb.sysprocs;
 
 import org.voltdb.ProcInfo;
 import org.voltdb.SystemProcedureExecutionContext;
-import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
-import org.voltdb.catalog.Database;
-import org.voltdb.common.Constants;
-import org.voltdb.compiler.AdHocPlannedStatement;
 
 /**
  * Execute a user-provided read-write multi-partition SQL statement.
@@ -35,8 +31,6 @@ import org.voltdb.compiler.AdHocPlannedStatement;
  */
 @ProcInfo(singlePartition = false)
 public class AdHoc_RW_MP extends AdHocBase {
-
-    Database m_db = null;
 
     /**
      * System procedure run hook.

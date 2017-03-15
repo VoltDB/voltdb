@@ -23,7 +23,6 @@ import org.voltdb.ProcInfo;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
-import org.voltdb.catalog.Database;
 import org.voltdb.common.Constants;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.utils.VoltTableUtil;
@@ -42,8 +41,6 @@ import java.util.Map;
 @ProcInfo(singlePartition = false)
 public class SwapTables extends AdHocBase {
 
-    Database m_db = null;
-
     private static final int DEP_swapTables = (int) SysProcFragmentId.PF_swapTables | DtxnConstants.MULTIPARTITION_DEPENDENCY;
     private static final int DEP_swapTablesAggregate = (int) SysProcFragmentId.PF_swapTablesAggregate;
 
@@ -58,6 +55,7 @@ public class SwapTables extends AdHocBase {
         dummy.addRow(STATUS_OK);
 
         if (fragmentId == SysProcFragmentId.PF_swapTables) {
+            // issue the callback once on each node
             if (context.isLowestSiteId()) {
                 VoltDB.instance().swapTables((String) params.getParam(0), (String) params.getParam(1));
             }
@@ -87,6 +85,7 @@ public class SwapTables extends AdHocBase {
         String stmt = new String(
                 decodeSerializedBatchData(serializedBatchData).getSecond()[0].sql,
                 Constants.UTF8ENCODING);
+        // stmt is of the format "@SwapTables <table1> <table2>"
         String[] stmtParams = stmt.split(" ");
         performSwapTablesCallback(stmtParams[1], stmtParams[2]);
 
