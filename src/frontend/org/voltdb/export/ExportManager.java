@@ -262,6 +262,7 @@ public class ExportManager
             oldProcessor.shutdown();
         }
         try {
+            exportLog.info("Delete files for generation: " + drainedGeneration.m_timestamp);
             //We close and delete regardless
             drainedGeneration.closeAndDelete(m_messenger);
         } catch (IOException e) {
