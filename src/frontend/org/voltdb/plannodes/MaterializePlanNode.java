@@ -67,7 +67,6 @@ public class MaterializePlanNode extends ProjectionPlanNode {
     public void resolveColumnIndexes() {
         // MaterializePlanNodes have no children
         assert(m_children.size() == 0);
-        resolveSubqueryColumnIndexes();
     }
 
     @Override
