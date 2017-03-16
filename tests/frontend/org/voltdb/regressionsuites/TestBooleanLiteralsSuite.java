@@ -48,7 +48,6 @@ public class TestBooleanLiteralsSuite extends RegressionSuite {
     }
 
     public void testBooleanLiteralsInQueries() throws Exception {
-        String sqlBody;
         Client client = getClient();
         for (int i=1; i<=4; i++) {
             populateTable(i, client);
@@ -58,8 +57,8 @@ public class TestBooleanLiteralsSuite extends RegressionSuite {
         Object[][] tableResult = {{1}, {3}, {5}};
         Object[][] joinResult = {{1,1}, {1,3}, {1,5}, {3,1}, {3,3}, {3,5}, {5,1}, {5,3}, {5,5}};
         Object[][] caseWhenFalseResult = {{-1}, {-1}, {-1}};
-        String whereQuery = "SELECT AINT FROM T%d WHERE %%s";
-        String joinQuery = "SELECT * FROM T%d a JOIN T%d b ON %%s";
+        String whereQuery = "SELECT AINT FROM T%d WHERE %%s ORDER BY AINT";
+        String joinQuery = "SELECT * FROM T%d a JOIN T%d b ON %%s ORDER BY a.AINT, b.AINT";
         String caseWhenQuery = "SELECT CASE WHEN %%s THEN AINT ELSE -1 END FROM T%d ORDER BY AINT";
         subTestBooleanLiteralsInQuery(String.format(whereQuery, 1),
                                       tableResult, emptyTable, client); // replicated
