@@ -47,7 +47,8 @@ public class InternalConnectionHandler {
     private final AtomicLong m_submitSuccessCount = new AtomicLong();
     private volatile Map<Integer, InternalClientResponseAdapter> m_adapters = ImmutableMap.of();
 
-    public void addAdapter(int pid, InternalClientResponseAdapter adapter)
+    // Synchronized in case multiple partitions are added concurrently.
+    public synchronized void addAdapter(int pid, InternalClientResponseAdapter adapter)
     {
         final ImmutableMap.Builder<Integer, InternalClientResponseAdapter> builder = ImmutableMap.builder();
         builder.putAll(m_adapters);
