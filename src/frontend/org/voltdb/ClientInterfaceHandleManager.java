@@ -28,6 +28,7 @@ import java.util.Map;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.Connection;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.iv2.MpInitiator;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -340,8 +341,9 @@ public class ClientInterfaceHandleManager
             if (inFlight.m_ciHandle < ciHandle) {
                 if (tmLog.isDebugEnabled()) {
                     tmLog.debug(
-                      String.format("Found dropped txn with handle %d for partition %d while searching for handle %d.",
-                              inFlight.m_ciHandle, partitionId, ciHandle));
+                      String.format("Found dropped txn with handle %d for partition %d while searching for handle %d (%s), proc name: %s",
+                              inFlight.m_ciHandle, partitionId, ciHandle,
+                              CoreUtils.hsIdToString(targetInFlight.m_initiatorHSId), targetInFlight.m_procName));
                 }
                 ClientResponseImpl errorResponse = new ClientResponseImpl(
                                 ClientResponseImpl.RESPONSE_UNKNOWN,

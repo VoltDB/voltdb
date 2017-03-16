@@ -88,6 +88,7 @@ import org.voltdb.common.Constants;
 import org.voltdb.dtxn.InitiatorStats.InvocationInfo;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.Iv2Trace;
+import org.voltdb.iv2.MpInitiator;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2EndOfLogMessage;
@@ -1025,16 +1026,18 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     return false;
                 }
 
-                boolean isReadonly = catProc.getReadonly();
                 try {
                     ProcedurePartitionInfo ppi = (ProcedurePartitionInfo)catProc.getAttachment();
-                    int partition = InvocationDispatcher.getPartitionForProcedure(ppi.index,
-                            ppi.type, response.getInvocation());
+                    int partition = MpInitiator.MP_INIT_PID;
+                    if (ppi != null) {
+                        partition = InvocationDispatcher.getPartitionForProcedure(ppi.index,
+                                                        ppi.type, response.getInvocation());
+                    }
                     createTransaction(cihm.connection.connectionId(),
                             response.getInvocation(),
-                            isReadonly,
-                            true, // Only SP could be mis-partitioned
-                            false, // Only SP could be mis-partitioned
+                            catProc.getReadonly(),
+                            partition != MpInitiator.MP_INIT_PID,
+                            catProc.getEverysite(),
                             partition,
                             messageSize,
                             nowNanos);

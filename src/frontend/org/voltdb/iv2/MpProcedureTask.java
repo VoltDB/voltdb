@@ -186,14 +186,11 @@ public class MpProcedureTask extends ProcedureTask
                 response.m_sourceHSId = m_initiator.getHSId();
                 response.setMisrouted(m_msg.getStoredProcedureInvocation());
                 m_initiator.deliver(response);
-                if (hostLog.isDebugEnabled()) {
-                    hostLog.debug("[MpProcedureTask]COMPLETE: " + this);
-                }
             } else {
                 restartTransaction();
-                if (hostLog.isDebugEnabled()) {
-                    hostLog.debug("[MpProcedureTask]RESTART: " + this);
-                }
+            }
+            if (hostLog.isDebugEnabled()) {
+                hostLog.debug("[MpProcedureTask]RESTART: " + this);
             }
         } else {
             if (status != ClientResponse.TXN_RESTART || (status == ClientResponse.TXN_RESTART && m_msg.isReadOnly())) {

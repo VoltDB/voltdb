@@ -397,7 +397,7 @@ public class InitiatorMailbox implements Mailbox
     }
 
     // start the process of appointing a new leader for the partition
-    public void startSPIMigration(int partition, long newHSID) {
+    private void startSPIMigration(int partition, long newHSID) {
         LeaderCache leaderAppointee = new LeaderCache(m_messenger.getZK(), VoltZK.iv2appointees);
         try {
             leaderAppointee.start(true);
