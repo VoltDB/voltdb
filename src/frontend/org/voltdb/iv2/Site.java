@@ -1239,6 +1239,23 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             return true;
         }
 
+        diffCmds = CatalogUtil.getDiffCommandsForEE(diffCmds);
+        if (diffCmds.length() == 0) {
+            // empty diff cmds for the EE to apply, so skip the JNI call
+            hostLog.info("Skipped applying diff commands on EE.");
+            return true;
+        }
+
+        boolean DRCatalogChange = false;
+        CatalogMap<Table> tables = m_context.catalog.getClusters().get("cluster").getDatabases().get("database").getTables();
+        for (Table t : tables) {
+            if (t.getIsdred()) {
+                DRCatalogChange |= diffCmds.contains("tables#" + t.getTypeName());
+                if (DRCatalogChange) {
+                    break;
+                }
+            }
+        }
         // if a snapshot is in process, wait for it to finish
         // don't bother if this isn't a schema change
         //

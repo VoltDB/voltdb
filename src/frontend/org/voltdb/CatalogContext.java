@@ -350,4 +350,8 @@ public class CatalogContext {
     {
         return catalogHash;
     }
+
+    public InMemoryJarfile getCatalogJar() {
+        return m_jarfile;
+    }
 }
