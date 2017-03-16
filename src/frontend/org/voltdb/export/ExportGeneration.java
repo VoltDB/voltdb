@@ -109,7 +109,6 @@ public class ExportGeneration implements Generation {
             exportLog.info("Drained source in generation " + m_timestamp + " with " + numSourcesDrained + " of " + m_numSources + " drained");
             if (numSourcesDrained == m_numSources) {
                 if (m_partitionLeaderZKName.isEmpty()) {
-                    exportLog.info("All sources drained " + m_timestamp);
                     m_onAllSourcesDrained.run();
                 } else {
                     ListenableFuture<?> removeLeadership = m_childUpdatingThread.submit(new Runnable() {
@@ -794,7 +793,7 @@ public class ExportGeneration implements Generation {
     }
 
     /*
-     * Returns true if the generatino was completely truncated away
+     * Sets truncation point for the export data sources in current generation
      */
     @Override
     public void truncateExportToTxnId(long txnId, long[] perPartitionTxnIds) {
@@ -815,7 +814,8 @@ public class ExportGeneration implements Generation {
                             source.getPartitionId());
                 }
                 else {
-                    //If this was drained and closed we may not have truncation point and we dont want to reopen PBDs
+                    //If this was drained and closed we may not have truncation point and we don't want to
+                    // reopen PBDs for those data sources
                     if (!source.isClosed()) {
                         source.truncateExportToTxnId(truncationPoint);
                     }

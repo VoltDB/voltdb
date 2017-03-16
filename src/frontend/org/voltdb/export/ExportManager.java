@@ -157,14 +157,11 @@ public class ExportManager
                     exportLog.info("Generation already drained: " + m_generation);
                     return;
                 }
-                if (m_generations.isEmpty()) {
-                    exportLog.info(m_generation + " generations empty");
-                }
             }
             //After all generations drained processors can not be null as above check should kick you out.
             ExportDataProcessor proc = m_processor.get();
             if (proc == null) {
-                VoltDB.crashLocalVoltDB("No export data processor found, generation " + m_generation, true, null);
+                VoltDB.crashLocalVoltDB("No export data processor found, generation drained:" + m_generation, true, null);
             }
             proc.queueWork(new Runnable() {
                 @Override
@@ -214,7 +211,6 @@ public class ExportManager
                         newProcessor.setProcessorConfig(m_processorConfig);
                         newProcessor.readyForData(false);
                     } else {
-                        exportLog.info("NOT Creating connector generation drained is unknown: " + nextGeneration.m_timestamp);
                         //Just set the next generation.
                         m_processor.get().setExportGeneration(nextGeneration);
                         //make sure so that we can re acquire.
@@ -259,11 +255,10 @@ public class ExportManager
          * The old processor should shutdown if we installed a new processor.
          */
         if (oldProcessor != null && installNewProcessor) {
-            exportLog.info("Shutdown older processor, drained generation ts: " + drainedGeneration.m_timestamp);
             oldProcessor.shutdown();
         }
         try {
-            exportLog.info("Delete files for generation: " + drainedGeneration.m_timestamp);
+            exportLog.info("Cleanup files for generation: " + drainedGeneration.m_timestamp);
             //We close and delete regardless
             drainedGeneration.closeAndDelete(m_messenger);
         } catch (IOException e) {
@@ -630,9 +625,13 @@ public class ExportManager
             return;
         }
 
+        /**
+         * This checks if the catalogUpdate was done in EE or not. If catalog update is skipped for @UpdateClasses and such
+         * EE does not roll to new generation and thus we need to ignore creating new generation roll with the current generation.
+         * If anything changes in getDiffCommandsForEE or design changes pay attention to fix this.
+         */
         if (CatalogUtil.getDiffCommandsForEE(diffCommands).length() == 0) {
-            // empty diff cmds means java specific catalog changes EE not touched.
-            exportLog.info("Skipped rolling generations as catalog was not updated in EE.");
+            exportLog.info("Skipped rolling generations as generation not created in EE.");
             return;
         }
         File exportOverflowDirectory = new File(VoltDB.instance().getExportOverflowPath());
