@@ -3372,10 +3372,10 @@ class DbMonitorTest extends TestBase {
           resultingStoredProcedureName = $("#storeProcedureBody > tr > td:nth-child(1)").text()
         } catch(geb.error.RequiredPageContentNotPresent e) {
           waitFor(waitTime) { $("#tblSP > tbody > tr > td.sorting_1").isDisplayed() }
-          resultingStoredProcedureName = $("#tblSP > tbody > tr > td.sorting_1").text()
+          resultingStoredProcedureName = $(class:"sorting_1", 0).text()
         } catch(geb.waiting.WaitTimeoutException e) {
           waitFor(waitTime) { $("#tblSP > tbody > tr > td.sorting_1").isDisplayed() }
-          resultingStoredProcedureName = $("#tblSP > tbody > tr > td.sorting_1").text()
+          resultingStoredProcedureName = $(class:"sorting_1", 0).text()
         }
         then: 'set created status'
         println("The resultingStoredProcedureName is " + resultingStoredProcedureName)
