@@ -149,7 +149,10 @@ public class TimestampType implements JSONString, Comparable<TimestampType> {
      * similar to ISO-8601.  The format is yyyy-MM-dd HH:mm:ss.SSSSSS.
      * Here, unlike the Java SimpleDateFormat formatter, the SSSSSS part
      * is the number of microseconds.  The timezone is the default
-     * timezone of the server.
+     * timezone of the JVM.  This will be the timezone of the application,
+     * which may not match the timezone of the database server.  See the overload
+     * of this function which accepts a time zone for more control
+     * over the specification of the timezone.
      */
     @Override
     public String toString() {
