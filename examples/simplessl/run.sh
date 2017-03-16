@@ -69,76 +69,21 @@ function init() {
     sqlcmd < ddl.sql
 }
 
-# run the client that drives the example
+# be consistent with other examples by mapping 'client' to the viewer app
 function client() {
-    async-benchmark
+    scoreboard
 }
 
-# Asynchronous benchmark sample
-# Use this target for argument help
-function async-benchmark-help() {
-    jars-ifneeded
-    java -classpath simplessl-client.jar:$CLIENTCLASSPATH simplessl.AsyncBenchmark --help
-}
-
-# latencyreport: default is OFF
-# ratelimit: must be a reasonable value if lantencyreport is ON
-# Disable the comments to get latency report
-function async-benchmark() {
-    jars-ifneeded
-    java -classpath simplessl-client.jar:$CLIENTCLASSPATH simplessl.AsyncBenchmark \
-        --displayinterval=5 \
-        --warmup=5 \
-        --duration=120 \
-        --servers=$SERVERS \
-        --contestants=6 \
-        --maxvotes=2
-}
-
-# trivial client code for illustration purposes
-function simple-benchmark() {
+function referee() {
     jars-ifneeded
     java -classpath simplessl-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
-        simplessl.SimpleBenchmark $SERVERS
+        simplessl.RefereeClient $SERVERS
 }
 
-# Multi-threaded synchronous benchmark sample
-# Use this target for argument help
-function sync-benchmark-help() {
-    jars-ifneeded
-    java -classpath simplessl-client.jar:$CLIENTCLASSPATH simplessl.SyncBenchmark --help
-}
-
-function sync-benchmark() {
+function scoreboard() {
     jars-ifneeded
     java -classpath simplessl-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
-        simplessl.SyncBenchmark \
-        --displayinterval=5 \
-        --warmup=5 \
-        --duration=120 \
-        --servers=$SERVERS \
-        --contestants=6 \
-        --maxvotes=2 \
-        --threads=40
-}
-
-# JDBC benchmark sample
-# Use this target for argument help
-function jdbc-benchmark-help() {
-    jars-ifneeded
-    java -classpath simplessl-client.jar:$CLIENTCLASSPATH simplessl.JDBCBenchmark --help
-}
-
-function jdbc-benchmark() {
-    jars-ifneeded
-    java -classpath simplessl-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
-        simplessl.JDBCBenchmark \
-        --displayinterval=5 \
-        --duration=120 \
-        --servers=$SERVERS \
-        --maxvotes=2 \
-        --contestants=6 \
-        --threads=40
+        simplessl.RefereeClient $SERVERS
 }
 
 function help() {

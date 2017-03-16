@@ -3,12 +3,17 @@ file -inlinebatch END_OF_DROP_BATCH
 DROP VIEW  v_final_scores IF EXISTS;
 DROP TABLE athletes       IF EXISTS;
 DROP TABLE scores         IF EXISTS;
+DROP ROLE referee         IF EXISTS;
+DROP ROLE viewer          IF EXISTS;
 
 END_OF_DROP_BATCH
 
 -- Tell sqlcmd to batch the following commands together,
 -- so that the schema loads quickly.
 file -inlinebatch END_OF_BATCH
+
+CREATE ROLE referee;
+CREATE ROLE viewer WITH SQLREAD;
 
 -- Stores the list of athletes
 CREATE TABLE athletes
@@ -37,6 +42,8 @@ CREATE TABLE scores
 --;
 
 END_OF_BATCH
+
+CREATE PROCEDURE provide_score ALLOW referee AS INSERT INTO scores VALUES (?,?,?);
 
 INSERT INTO athletes VALUES ('Adam');
 INSERT INTO athletes VALUES ('Bob');
