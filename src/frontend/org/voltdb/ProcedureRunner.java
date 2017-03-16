@@ -27,7 +27,6 @@ import java.lang.reflect.Modifier;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -57,7 +56,9 @@ import org.voltdb.exceptions.SerializableException;
 import org.voltdb.exceptions.SpecifiedException;
 import org.voltdb.groovy.GroovyScriptProcedureDelegate;
 import org.voltdb.iv2.MpInitiator;
+import org.voltdb.iv2.Site;
 import org.voltdb.iv2.UniqueIdGenerator;
+import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.planner.ActivePlanRepository;
 import org.voltdb.sysprocs.AdHocBase;
@@ -120,6 +121,7 @@ public class ProcedureRunner {
     // hooks into other parts of voltdb
     //
     protected final SiteProcedureConnection m_site;
+    protected ExecutionEngine m_ee;
     protected final SystemProcedureExecutionContext m_systemProcedureContext;
     protected CatalogSpecificPlanner m_csp;
 
@@ -210,9 +212,10 @@ public class ProcedureRunner {
 
         m_procedure.init(this);
 
-        // Map each statement that was defined in the stored procedure with its SQLStmt variable name.
-        // The variable name is used in the granular statistics for stored procedures.
-        Map<SQLStmt, String> reversedStmtMap = reflect();
+        // Analyze and process the stored procedure, return a list of variable names of
+        // the SQLStmts defined in the stored procedure.
+        // The variable names are used in the granular statistics.
+        ArrayList<String> stmtList = reflect();
 
         // Normally m_statsCollector is returned as it is and there is no affect to assign it to itself.
         // Sometimes when this procedure statistics needs to reuse the existing one, the old stats gets returned.
@@ -222,8 +225,40 @@ public class ProcedureRunner {
                         m_site.getCorrespondingSiteId(),
                         m_site.getCorrespondingPartitionId(),
                         m_catProc,
-                        reversedStmtMap)
+                        stmtList)
                 );
+
+        // Read the ProcStatsOption annotation from the procedure class.
+        // Basically, it is about setting the sampling interval for this stored procedure.
+        ProcStatsOption statsOption = m_procedure.getClass().getAnnotation(ProcStatsOption.class);
+        if (statsOption != null) {
+            m_statsCollector.setProcSamplingInterval(statsOption.procSamplingInterval());
+            m_statsCollector.setStmtSamplingInterval(statsOption.stmtSamplingInterval());
+        }
+    }
+
+    /**
+     * This function returns the ExecutionEngine for this site.
+     * ProcedureRunner needs the access to the ExecutionEngine for two purposes:
+     *     - Telling the C++ side to turn on/off the per-fragment time measurement.
+     *     - Collecting the time measurements and the failure indicator from
+     *       the per-fragment stats shared buffer.
+     * The ExecutionEngine may not have been initialized when a ProcedureRunner is created,
+     *     (See BaseInitiator.java, the configureCommon() function)
+     * so we do not find this engine in the constructor.
+     */
+    public ExecutionEngine getExecutionEngine() {
+        if (m_ee != null) {
+            return m_ee;
+        }
+        // m_site is declared as SiteProcedureConnection here.
+        // SiteProcedureConnection only has two implementations: Site and MpRoSite.
+        // Only SP site has an underlying ExecutionEngine, MpRoSite does not.
+        if (m_site instanceof Site) {
+            m_ee = ((Site)m_site).getExecutionEngine();
+            return m_ee;
+        }
+        return null;
     }
 
     public void reInitSysProc(CatalogContext catalogContext, CatalogSpecificPlanner csp) {
@@ -237,6 +272,10 @@ public class ProcedureRunner {
                 catalogContext.getNodeSettings());
 
         m_csp = csp;
+    }
+
+    public ProcedureStatsCollector getStatsCollector() {
+        return m_statsCollector;
     }
 
     public Procedure getCatalogProcedure() {
@@ -1032,10 +1071,8 @@ public class ProcedureRunner {
         }
     }
 
-    // Returns a reversed map from the statement to the variable name that was defined in the java code.
-    //   - for single statement stored procedure, it is named as VoltDB.ANON_STMT_NAME (sql)
-    //   - it should return an empty map for system stored procedures.
-    protected Map<SQLStmt, String> reflect() {
+    // Returns a list that contains the names of the statements which are defined in the stored procedure.
+    protected ArrayList<String> reflect() {
         Map<String, SQLStmt> stmtMap;
 
         // fill in the sql for single statement procs
@@ -1104,10 +1141,16 @@ public class ProcedureRunner {
             stmtMap = m_language.accept(sqlStatementsRetriever, this);
         }
 
-        Map<SQLStmt, String> reversedStmtMap = new HashMap<SQLStmt, String>();
+        ArrayList<String> stmtNames = new ArrayList<String>(stmtMap.entrySet().size());
         for (final Entry<String, SQLStmt> entry : stmtMap.entrySet()) {
             String name = entry.getKey();
-            reversedStmtMap.put(entry.getValue(), name);
+            stmtNames.add(name);
+            // Label the SQLStmts with its variable name.
+            // This is useful for multi-partition stored procedures.
+            // When a statement is sent to another site for execution,
+            // that SP site can use this name to find the correct place to
+            // update the statistics numbers.
+            entry.getValue().setStmtName(name);
             Statement s = m_catProc.getStatements().get(name);
             if (s != null) {
                 /*
@@ -1122,7 +1165,7 @@ public class ProcedureRunner {
                 //LOG.fine("Found statement " + name);
             }
         }
-        return reversedStmtMap;
+        return stmtNames;
     }
 
     private final static Language.Visitor<Class<?>[], ProcedureRunner> parametersTypeRetriever =
@@ -1435,7 +1478,8 @@ public class ProcedureRunner {
                   long siteId,
                   boolean finalTask,
                   String procedureName,
-                  byte[] procToLoad) {
+                  byte[] procToLoad,
+                  boolean perFragmentStatsRecording) {
            m_batchSize = batchSize;
            m_txnState = txnState;
 
@@ -1453,6 +1497,7 @@ public class ProcedureRunner {
                                                  txnState.isForReplay());
            m_localTask.setProcedureName(procedureName);
            m_localTask.setBatchTimeout(m_txnState.getInvocation().getBatchTimeout());
+           m_localTask.setPerFragmentStatsRecording(perFragmentStatsRecording);
 
            // the data and message for all sites in the transaction
            m_distributedTask = new FragmentTaskMessage(m_txnState.initiatorHSId,
@@ -1466,6 +1511,7 @@ public class ProcedureRunner {
            // this works fine if procToLoad is NULL
            m_distributedTask.setProcNameToLoad(procToLoad);
            m_distributedTask.setBatchTimeout(m_txnState.getInvocation().getBatchTimeout());
+           m_distributedTask.setPerFragmentStatsRecording(perFragmentStatsRecording);
        }
 
        /*
@@ -1486,7 +1532,7 @@ public class ProcedureRunner {
                m_depsForLocalTask[index] = -1;
                // Add the local fragment data.
                if (stmt.inCatalog) {
-                   m_localTask.addFragment(stmt.aggregator.planHash, m_depsToResume[index], params);
+                   m_localTask.addFragment(stmt.aggregator.planHash, stmt.getStmtName(), m_depsToResume[index], params);
                }
                else {
                    byte[] planBytes = ActivePlanRepository.planForFragmentId(stmt.aggregator.id);
@@ -1504,8 +1550,8 @@ public class ProcedureRunner {
                m_depsForLocalTask[index] = outputDepId;
                // Add local and distributed fragments.
                if (stmt.inCatalog) {
-                   m_localTask.addFragment(stmt.aggregator.planHash, m_depsToResume[index], params);
-                   m_distributedTask.addFragment(stmt.collector.planHash, outputDepId, params);
+                   m_localTask.addFragment(stmt.aggregator.planHash, stmt.getStmtName(), m_depsToResume[index], params);
+                   m_distributedTask.addFragment(stmt.collector.planHash, stmt.getStmtName(), outputDepId, params);
                }
                else {
                    byte[] planBytes = ActivePlanRepository.planForFragmentId(stmt.aggregator.id);
@@ -1527,7 +1573,8 @@ public class ProcedureRunner {
                                          m_site.getCorrespondingSiteId(),
                                          finalTask,
                                          m_procedureName,
-                                         m_procNameToLoadForFragmentTasks);
+                                         m_procNameToLoadForFragmentTasks,
+                                         m_statsCollector.isStmtRecording());
 
        // iterate over all sql in the batch, filling out the above data structures
        for (int i = 0; i < batch.size(); ++i) {
@@ -1616,6 +1663,7 @@ public class ProcedureRunner {
        Object[] params = new Object[batchSize];
        long[] fragmentIds = new long[batchSize];
        String[] sqlTexts = new String[batchSize];
+       int succeededFragmentsCount = 0;
 
        int i = 0;
        for (final QueuedSQL qs : batch) {
@@ -1633,6 +1681,8 @@ public class ProcedureRunner {
        }
 
        VoltTable[] results = null;
+       // Before executing the fragments, tell the EE if this batch should be timed.
+       getExecutionEngine().setPerFragmentTimingEnabled(m_statsCollector.isStmtRecording());
        try {
            results = m_site.executePlanFragments(
                    batchSize,
@@ -1654,7 +1704,33 @@ public class ProcedureRunner {
 
            throw ex;
        }
+       finally {
+           long[] executionTimes = null;
+           if (m_statsCollector.isStmtRecording()) {
+               executionTimes = new long[batchSize];
+           }
+           succeededFragmentsCount = getExecutionEngine().extractPerFragmentStats(batchSize, executionTimes);
 
+           for (i = 0; i < batchSize; i++) {
+               QueuedSQL qs = batch.get(i);
+               // No coordinator task for a single partition procedure.
+               boolean hasCoordinatorTask = false;
+               // If all the fragments in this batch are executed successfully, succeededFragmentsCount == batchSize.
+               // Otherwise, the fragment whose index equals succeededFragmentsCount is the one that failed.
+               boolean failed = i == succeededFragmentsCount;
+               m_statsCollector.finishStatement(qs.stmt.getStmtName(),
+                                                hasCoordinatorTask,
+                                                m_statsCollector.isStmtRecording(),
+                                                failed,
+                                                executionTimes == null ? 0 : executionTimes[i],
+                                                results == null ? null : results[i],
+                                                qs.params);
+               // If this fragment failed, no subsequent fragments will be executed.
+               if (failed) {
+                   break;
+               }
+           }
+       }
        return results;
     }
 }

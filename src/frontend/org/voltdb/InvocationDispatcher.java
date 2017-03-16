@@ -83,6 +83,7 @@ import org.voltdb.compiler.deploymentfile.DrRoleType;
 import org.voltdb.compilereport.ViewExplainer;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.Iv2Trace;
+import org.voltdb.iv2.MpInitiator;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
@@ -1854,7 +1855,7 @@ public final class InvocationDispatcher {
             // break out the Hashinator and calculate the appropriate partition
             return getPartitionForProcedure( ppi.index, ppi.type, task);
         } else {
-            return -1;
+            return MpInitiator.MP_INIT_PID;
         }
     }
 

@@ -54,11 +54,14 @@ public abstract class SiteStatsSource extends StatsSource {
 
     @Override
     public boolean equals(Object obj) {
-        if(super.equals(obj) == false) return false;
-        if (obj instanceof SiteStatsSource == false) return false;
+        if (super.equals(obj) == false)
+            return false;
+        if (obj instanceof SiteStatsSource == false)
+            return false;
 
         SiteStatsSource stats = (SiteStatsSource) obj;
-        if (stats.getSiteId() != m_siteId) return false;
+        if (stats.getSiteId() != m_siteId)
+            return false;
         return true;
     }
 

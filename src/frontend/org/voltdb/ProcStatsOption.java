@@ -17,11 +17,23 @@
 
 package org.voltdb;
 
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 
-/**
- * This should give information about the caller of InternalConnectionHandler.
- */
-public interface InternalConnectionContext
-{
-    public String getName();
+@Retention(RetentionPolicy.RUNTIME)
+@Target(ElementType.TYPE)
+public @interface ProcStatsOption {
+    /**
+     * Record statistics of procedure execution every N procedure invocations.
+     * @return The sampling interval of this stored procedure.
+     */
+    int procSamplingInterval() default 20;
+
+    /**
+     * Record statistics of statements in a procedure execution every N procedure invocations.
+     * @return The sampling interval for the statements in this stored procedure.
+     */
+    int stmtSamplingInterval() default 200;
 }

@@ -136,7 +136,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     public static final long SNAPSHOT_UTIL_CID          = Long.MIN_VALUE + 2;
     public static final long ELASTIC_JOIN_CID           = Long.MIN_VALUE + 3;
     // public static final long UNUSED_CID (was DR)     = Long.MIN_VALUE + 4;
-    public static final long INTERNAL_CID               = Long.MIN_VALUE + 5;
+    // public static final long UNUSED_CID              = Long.MIN_VALUE + 5;
     public static final long EXECUTE_TASK_CID           = Long.MIN_VALUE + 6;
     public static final long DR_DISPATCHER_CID          = Long.MIN_VALUE + 7;
     public static final long RESTORE_SCHEMAS_CID        = Long.MIN_VALUE + 8;
@@ -149,6 +149,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     public static final long DR_REPLICATION_SNAPSHOT_BASE_CID  = Long.MIN_VALUE + setBaseValue(2);
     public static final long DR_REPLICATION_NORMAL_BASE_CID    = Long.MIN_VALUE + setBaseValue(3);
     public static final long DR_REPLICATION_MP_BASE_CID        = Long.MIN_VALUE + setBaseValue(4);
+    public static final long INTERNAL_CID                      = Long.MIN_VALUE + setBaseValue(5);
 
     private static final VoltLogger log = new VoltLogger(ClientInterface.class.getName());
     private static final VoltLogger authLog = new VoltLogger("AUTH");
@@ -1145,6 +1146,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         m_adminAcceptor = null;
         m_adminAcceptor = new ClientAcceptor(adminIntf, adminPort, messenger.getNetwork(), true, sslContext);
 
+        // Create the per-partition adapters before creating the mailbox. Once
+        // the mailbox is created, the master promotion notification may race
+        // with this.
+        m_internalConnectionHandler = new InternalConnectionHandler();
+        for (int pid : m_cartographer.getPartitions()) {
+            m_internalConnectionHandler.addAdapter(pid, createInternalAdapter(pid));
+        }
+
         m_mailbox = new LocalMailbox(messenger,  messenger.getHSIdForLocalSite(HostMessenger.CLIENT_INTERFACE_SITE_ID)) {
             LinkedBlockingQueue<VoltMessage> m_d = new LinkedBlockingQueue<VoltMessage>();
             @Override
@@ -1197,12 +1206,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 .siteId(m_siteId)
                 .build();
 
-        InternalClientResponseAdapter internalAdapter = new InternalClientResponseAdapter(INTERNAL_CID);
-        ClientInterfaceHandleManager ichm = bindAdapter(internalAdapter, null, true);
-        m_internalConnectionHandler = new InternalConnectionHandler(internalAdapter, ichm);
-
         m_executeTaskAdpater = new SimpleClientResponseAdapter(ClientInterface.EXECUTE_TASK_CID, "ExecuteTaskAdapter", true);
         bindAdapter(m_executeTaskAdpater, null);
+    }
+
+    private InternalClientResponseAdapter createInternalAdapter(int pid) {
+        InternalClientResponseAdapter internalAdapter = new InternalClientResponseAdapter(INTERNAL_CID + pid);
+        bindAdapter(internalAdapter, null, true);
+        return internalAdapter;
     }
 
     public InternalConnectionHandler getInternalConnectionHandler() {
@@ -1226,6 +1237,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     // In case some internal connections don't implement queueTask()
                     failOverConnection(partitionId, initiatorHSId, cihm.connection);
                 }
+            }
+
+            // Create adapters here so that it works for elastic add.
+            if (!m_internalConnectionHandler.hasAdapter(partitionId)) {
+                m_internalConnectionHandler.addAdapter(partitionId, createInternalAdapter(partitionId));
             }
         } catch (Exception e) {
             hostLog.warn("Error handling partition fail over at ClientInterface, continuing anyways", e);
@@ -1632,10 +1648,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
     public boolean isAcceptingConnections() {
         return m_isAcceptingConnections.get();
-    }
-
-    static final int getPartitionForProcedure(Procedure procedure, StoredProcedureInvocation task) throws Exception {
-        return InvocationDispatcher.getPartitionForProcedure(procedure, task);
     }
 
     @Override

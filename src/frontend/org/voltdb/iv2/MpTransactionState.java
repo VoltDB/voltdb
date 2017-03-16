@@ -179,8 +179,7 @@ public class MpTransactionState extends TransactionState
     }
 
     private static Map<Integer, Set<Long>>
-    createTrackedDependenciesFromTask(FragmentTaskMessage task,
-                                      List<Long> expectedHSIds)
+        createTrackedDependenciesFromTask(FragmentTaskMessage task, List<Long> expectedHSIds)
     {
         Map<Integer, Set<Long>> depMap = new HashMap<Integer, Set<Long>>();
         for (int i = 0; i < task.getFragmentCount(); i++) {
@@ -251,6 +250,7 @@ public class MpTransactionState extends TransactionState
         m_remoteWork = null;
 
         BorrowTaskMessage borrowmsg = new BorrowTaskMessage(m_localWork);
+        m_localWork.setCoordinatorTask(true);
         m_localWork.m_sourceHSId = m_mbox.getHSId();
         // if we created a bogus fragment to distribute to serialize restart and borrow tasks,
         // don't include the empty dependencies we got back in the borrow fragment.
