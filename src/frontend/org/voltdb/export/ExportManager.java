@@ -635,9 +635,13 @@ public class ExportManager
             return;
         }
 
+        /**
+         * This checks if the catalogUpdate was done in EE or not. If catalog update is skipped for @UpdateClasses and such
+         * EE does not roll to new generation and thus we need to ignore creating new generation roll with the current generation.
+         * If anything changes in getDiffCommandsForEE or design changes pay attention to fix this.
+         */
         if (CatalogUtil.getDiffCommandsForEE(diffCommands).length() == 0) {
-            // empty diff cmds means java specific catalog changes EE not touched.
-            exportLog.info("Skipped rolling generations as catalog was not updated in EE.");
+            exportLog.info("Skipped rolling generations as generation not created in EE.");
             return;
         }
         File exportOverflowDirectory = new File(VoltDB.instance().getExportOverflowPath());
