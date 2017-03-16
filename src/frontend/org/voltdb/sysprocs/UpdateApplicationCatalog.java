@@ -74,11 +74,12 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
             SysProcFragmentId.PF_updateCatalogAggregate;
 
     @Override
-    public void init() {
-        registerPlanFragment(SysProcFragmentId.PF_updateCatalogPrecheckAndSync);
-        registerPlanFragment(SysProcFragmentId.PF_updateCatalogPrecheckAndSyncAggregate);
-        registerPlanFragment(SysProcFragmentId.PF_updateCatalog);
-        registerPlanFragment(SysProcFragmentId.PF_updateCatalogAggregate);
+    public long[] getPlanFragmentIds() {
+        return new long[]{
+            SysProcFragmentId.PF_updateCatalogPrecheckAndSync,
+            SysProcFragmentId.PF_updateCatalogPrecheckAndSyncAggregate,
+            SysProcFragmentId.PF_updateCatalog,
+            SysProcFragmentId.PF_updateCatalogAggregate};
     }
 
     /**

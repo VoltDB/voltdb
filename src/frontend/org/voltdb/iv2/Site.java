@@ -1232,7 +1232,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         m_context = context;
         m_ee.setBatchTimeout(m_context.cluster.getDeployment().get("deployment").
                 getSystemsettings().get("systemsettings").getQuerytimeout());
-        m_loadedProcedures.loadProcedures(m_context, m_backend, csp);
+        m_loadedProcedures.loadProcedures(m_context, csp, false);
 
         if (isMPI) {
             // the rest of the work applies to sites with real EEs
@@ -1381,5 +1381,10 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     @Override
     public int getBatchTimeout() {
         return m_ee.getBatchTimeout();
+    }
+
+    @Override
+    public SystemProcedureExecutionContext getSystemProcedureExecutionContext() {
+        return m_sysprocContext;
     }
 }
