@@ -46,6 +46,7 @@ import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.ConnectorProperty;
 import org.voltdb.catalog.ConnectorTableInfo;
 import org.voltdb.catalog.Database;
+import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.VoltFile;
 
@@ -574,22 +575,31 @@ public class ExportManager
         m_processorConfig = config;
     }
 
-    public synchronized void updateCatalog(CatalogContext catalogContext, List<Integer> partitions)
+    public synchronized void updateCatalog(CatalogContext catalogContext, String diffCommands, List<Integer> partitions)
     {
         final Cluster cluster = catalogContext.catalog.getClusters().get("cluster");
         final Database db = cluster.getDatabases().get("database");
         final CatalogMap<Connector> connectors = db.getConnectors();
 
         updateProcessorConfig(connectors);
-        if (m_processorConfig.size() == 0) {
+        if (m_processorConfig.isEmpty()) {
             m_lastNonEnabledGeneration = catalogContext.m_uniqueId;
             return;
         }
 
-        File exportOverflowDirectory = new File(catalogContext.cluster.getExportoverflow());
-        final int numOfReplicas = catalogContext.getDeployment().getCluster().getKfactor();
+        /**
+         * This checks if the catalogUpdate was done in EE or not. If catalog update is skipped for @UpdateClasses and such
+         * EE does not roll to new generation and thus we need to ignore creating new generation roll with the current generation.
+         * If anything changes in getDiffCommandsForEE or design changes pay attention to fix this.
+         */
+        if (CatalogUtil.getDiffCommandsForEE(diffCommands).length() == 0) {
+            exportLog.info("Skipped rolling generations as generation not created in EE.");
+            return;
+        }
 
-        ExportGeneration newGeneration = null;
+        File exportOverflowDirectory = new File(catalogContext.cluster.getExportoverflow());
+
+        ExportGeneration newGeneration;
         try {
             newGeneration = new ExportGeneration(catalogContext.m_uniqueId, exportOverflowDirectory, false);
             newGeneration.setGenerationDrainRunnable(new GenerationDrainRunnable(newGeneration));
