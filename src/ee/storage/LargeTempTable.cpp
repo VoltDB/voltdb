@@ -31,6 +31,8 @@ bool LargeTempTable::insertTuple(TableTuple& tuple) {
     tuple.serializeTo(output);
     m_currPosition = output.position();
 
+    ++m_numTuples;
+
     return true;
 }
 

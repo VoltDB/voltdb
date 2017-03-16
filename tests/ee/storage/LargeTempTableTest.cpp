@@ -53,11 +53,17 @@ NValue nvalueFromNative(int val) {
     return nvalueFromNative(static_cast<int64_t>(val));
 }
 
+template<>
+NValue nvalueFromNative(std::string val) {
+    return ValueFactory::getTempStringValue(val);
+}
 
 template<>
 NValue nvalueFromNative(const char* val) {
     return ValueFactory::getTempStringValue(val, strlen(val));
 }
+
+
 
 template<>
 NValue nvalueFromNative(double val) {
@@ -79,14 +85,63 @@ void setTupleValues(TableTuple* tuple, Args... args) {
     setTupleValuesHelper(tuple, 0, args...);
 }
 
+
+void buildSchemaHelper(std::vector<ValueType>* columnTypes,
+                       std::vector<int32_t>* columnSizes) {
+    return;
+}
+
+template<typename... Args>
+void buildSchemaHelper(std::vector<ValueType>* columnTypes,
+                       std::vector<int32_t>* columnSizes,
+                       ValueType valueType,
+                       Args... args);
+template<typename... Args>
+void buildSchemaHelper(std::vector<ValueType>* columnTypes,
+                       std::vector<int32_t>* columnSizes,
+                       std::pair<ValueType, int> typeAndSize,
+                       Args... args);
+
+template<typename... Args>
+void buildSchemaHelper(std::vector<ValueType>* columnTypes,
+                       std::vector<int32_t>* columnSizes,
+                       ValueType valueType,
+                       Args... args) {
+    assert(! isVariableLengthType(valueType));
+    columnTypes->push_back(valueType);
+    columnSizes->push_back(NValue::getTupleStorageSize(valueType));
+    buildSchemaHelper(columnTypes, columnSizes, args...);
+}
+
+template<typename... Args>
+void buildSchemaHelper(std::vector<ValueType>* columnTypes,
+                       std::vector<int32_t>* columnSizes,
+                       std::pair<ValueType, int> typeAndSize,
+                       Args... args) {
+    assert(isVariableLengthType(typeAndSize.first));
+    columnTypes->push_back(typeAndSize.first);
+    columnSizes->push_back(typeAndSize.second);
+    buildSchemaHelper(columnTypes, columnSizes, args...);
+}
+
+template<typename... Args>
+TupleSchema* buildSchema(Args... args) {
+    std::vector<ValueType> columnTypes;
+    std::vector<int32_t> columnSizes;
+
+    buildSchemaHelper(&columnTypes, &columnSizes, args...);
+
+    std::vector<bool> allowNull(columnTypes.size(), true);
+    std::vector<bool> inBytes(columnTypes.size(), false);
+
+    return TupleSchema::createTupleSchema(columnTypes, columnSizes, allowNull, inBytes);
+}
+
+
 TEST_F(LargeTempTableTest, Basic) {
-    TupleSchemaBuilder schemaBuilder(3);
-
-    schemaBuilder.setColumnAtIndex(0, VALUE_TYPE_BIGINT);
-    schemaBuilder.setColumnAtIndex(1, VALUE_TYPE_DOUBLE);
-    schemaBuilder.setColumnAtIndex(2, VALUE_TYPE_VARCHAR, 128);
-
-    TupleSchema* schema = schemaBuilder.build();
+    TupleSchema* schema = buildSchema(VALUE_TYPE_BIGINT,
+                                      VALUE_TYPE_DOUBLE,
+                                      std::make_pair(VALUE_TYPE_VARCHAR, 128));
 
     std::vector<std::string> names{"pk", "val", "text"};
 
@@ -101,27 +156,24 @@ TEST_F(LargeTempTableTest, Basic) {
 
     TableTuple tuple = tupleWrapper.tuple();
 
-    setTupleValues(&tuple, 66, 3.14, "foo");
-    ltt->insertTuple(tuple);
+    std::vector<int> pkVals{66, 67, 68};
+    std::vector<double> floatVals{3.14, 6.28, 7.77};
+    std::vector<std::string> textVals{"foo", "bar", "baz"};
 
-    setTupleValues(&tuple, 67, 6.28, "bar");
-    ltt->insertTuple(tuple);
-
-    setTupleValues(&tuple, 68, 7.77, "baz");
-    ltt->insertTuple(tuple);
+    for (int i = 0; i < pkVals.size(); ++i) {
+        setTupleValues(&tuple, pkVals[i], floatVals[i], textVals[i]);
+        ltt->insertTuple(tuple);
+    }
 
     LargeTableIterator iter = ltt->largeIterator();
-    (void)iter;
-    // TableTuple iterTuple(ltt->schema());
-
-    // while (iter.hasNext(iterTuple)) {
-
-    // }
-
-    // tuple.setNValue(0, ValueFactory::getBigIntValue(66));
-    // tuple.setNValue(1, ValueFactory::getDoubleValue(3.14));
-    // tuple.setNValue(2, ValueFactory::getTempStringValue("foo"));
-
+    TableTuple iterTuple(ltt->schema());
+    int i = 0;
+    while (iter.next(iterTuple)) {
+        ASSERT_EQ(0, nvalueFromNative(pkVals[i]).compare(iterTuple.getNValue(0)));
+        ASSERT_EQ(0, nvalueFromNative(floatVals[i]).compare(iterTuple.getNValue(1)));
+        ASSERT_EQ(0, nvalueFromNative(textVals[i]).compare(iterTuple.getNValue(2)));
+        ++i;
+    }
 
     ltt->decrementRefcount();
 }

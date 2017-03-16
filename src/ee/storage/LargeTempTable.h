@@ -71,6 +71,10 @@ public:
 
     }
 
+    int64_t numTuples() const {
+        return m_numTuples;
+    }
+
     static const int BLOCKSIZE = 131072;
 
  protected:
@@ -80,6 +84,7 @@ public:
         , m_iter(this)
         , m_data(new char[BLOCKSIZE])
         , m_currPosition(0)
+        , m_numTuples(0)
     {
     }
 
@@ -93,6 +98,7 @@ private:
 
     boost::scoped_array<char> m_data;
     size_t m_currPosition;
+    int64_t m_numTuples; // redundant with base class?? xxx
 };
 
 }
