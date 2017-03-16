@@ -109,9 +109,38 @@ public class Catalog extends CatalogType {
         }
     }
 
-    void executeOne(String stmt) {
-        // command comes before the first space (add or set)
+    public static class CatalogCmd {
+        public char cmd;
+        public String path;
+        public String arg1;
+        public String arg2;
 
+        public CatalogCmd(char c, String p, String a1, String a2) {
+            cmd = c;
+            path = p;
+            arg1 = a1;
+            arg2 = a2;
+        }
+
+        public boolean isProcedureRelatedCmd() {
+            if (path.indexOf("procedures#") != -1) return true;
+            if ("procedures".equals(arg1) && path.endsWith("#database")) return true;
+
+            return false;
+        }
+    }
+
+    public static char parseStmtCmd(String stmt) {
+        // command comes before the first space (add or set)
+        int pos = 0;
+        while (Character.isWhitespace(stmt.charAt(pos))) {
+            ++pos;
+        }
+        return stmt.charAt(pos++);
+    }
+
+    public static CatalogCmd parseStmt(String stmt) {
+        // command comes before the first space (add or set)
         int pos = 0;
         while (Character.isWhitespace(stmt.charAt(pos))) {
             ++pos;
@@ -130,18 +159,28 @@ public class Catalog extends CatalogType {
         String arg1 = stmt.substring(argStart, pos - 1);
         String arg2 = stmt.substring(pos);
 
+        return new CatalogCmd(cmd, ref, arg1, arg2);
+    }
+
+    void executeOne(String stmt) {
+        CatalogCmd catCmd = parseStmt(stmt);
+        char cmd = catCmd.cmd;
+        String path = catCmd.path;
+        String arg1 = catCmd.arg1;
+        String arg2 = catCmd.arg2;
+
         // resolve the ref to a node in the catalog
         CatalogType resolved = null;
-        if (ref.startsWith("$")) { // $PREV
+        if (path.startsWith("$")) { // $PREV
             if (m_prevUsedPath == null) {
                 throw new CatalogException("$PREV reference was not preceded by a cached reference.");
             }
             resolved = m_prevUsedPath;
         }
         else {
-            resolved = getItemForRef(ref);
+            resolved = getItemForPath(path);
             if (resolved == null) {
-                throw new CatalogException("Unable to find reference for catalog item '" + ref + "'");
+                throw new CatalogException("Unable to find reference for catalog item '" + path + "'");
             }
             m_prevUsedPath = resolved;
         }
@@ -152,22 +191,12 @@ public class Catalog extends CatalogType {
         }
         else if (cmd == 'd') { // delete
             resolved.getCollection(arg1).delete(arg2);
-            String toDelete = ref + "/" + arg1 + MAP_SEPARATOR + arg2;
+            String toDelete = path + "/" + arg1 + MAP_SEPARATOR + arg2;
             m_pathCache.invalidate(toDelete);
         }
         else if (cmd == 's') { // set
             resolved.set(arg1, arg2);
         }
-    }
-
-    CatalogType getItemForRef(final String ref) {
-        // if it's a path
-        CatalogType retval = null; // m_pathCache.getIfPresent(ref);
-        if (retval == null) {
-            retval = getItemForPath(ref);
-        }
-        //m_pathCache.put(ref, retval);
-        return retval;
     }
 
     CatalogType getItemForPath(final String path) {
@@ -194,7 +223,7 @@ public class Catalog extends CatalogType {
         return getItemForPathPart(immediateParent, subPath);
     }
 
-    CatalogType getItemForPathPart(CatalogType parent, String path) {
+    static CatalogType getItemForPathPart(CatalogType parent, String path) {
         if (path.length() == 0) return parent;
 
         boolean hasStartSlash = path.charAt(0) == '/';
