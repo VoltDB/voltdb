@@ -60,7 +60,7 @@ public:
 
     /// Constructs a value copied into long-lived pooled memory (or the heap)
     /// that will require an explicit NValue::free.
-    static NValue getStringValue(const std::string value, Pool* pool = NULL) {
+    static NValue getStringValue(const std::string& value, Pool* pool = NULL) {
         return NValue::getAllocatedValue(VALUE_TYPE_VARCHAR, value.c_str(), value.length(), NULL);
     }
 

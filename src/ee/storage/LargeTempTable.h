@@ -27,6 +27,8 @@
 
 namespace voltdb {
 
+class LargeTableIterator;
+
 class LargeTempTable : public Table {
 
     friend class TableFactory;
@@ -37,6 +39,8 @@ public:
         return m_iter;
     }
 
+    LargeTableIterator largeIterator() const;
+
     TableIterator& iteratorDeletingAsWeGo() {
         return m_iter;
     }
@@ -45,9 +49,7 @@ public:
         return;
     }
 
-    bool insertTuple(TableTuple& tuple) {
-        return true;
-    }
+    bool insertTuple(TableTuple& tuple);
 
     size_t allocatedBlockCount() const {
         return 0;
@@ -69,19 +71,28 @@ public:
 
     }
 
-protected:
+    static const int BLOCKSIZE = 131072;
+
+ protected:
 
     LargeTempTable()
         : Table(BLOCKSIZE)
         , m_iter(this)
+        , m_data(new char[BLOCKSIZE])
+        , m_currPosition(0)
     {
     }
 
 private:
 
-    static const int BLOCKSIZE = 131072;
+    void* dataBlock() {
+        return static_cast<void*>(m_data.get());
+    }
 
     TableIterator m_iter;
+
+    boost::scoped_array<char> m_data;
+    size_t m_currPosition;
 };
 
 }

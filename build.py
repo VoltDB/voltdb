@@ -377,6 +377,7 @@ CTX.INPUT['storage'] = """
  ElasticIndexReadContext.cpp
  ElasticScanner.cpp
  ExportTupleStream.cpp
+ LargeTempTable.cpp
  MaterializedViewHandler.cpp
  MaterializedViewTriggerForInsert.cpp
  MaterializedViewTriggerForWrite.cpp
