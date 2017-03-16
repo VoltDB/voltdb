@@ -46,7 +46,7 @@ public interface ConsumerDRGateway extends Promotable {
      * @return false if this cluster is a joiner and the sync snapshot did not finish loading form the
      *         leader cluster
      */
-    boolean isSyncSnapshotComplete(byte dataSourceCluster, List<MeshMemberInfo> expectedClusterMembers);
+    void setInitialConversationMembership(byte dataSourceCluster, List<MeshMemberInfo> expectedClusterMembers);
 
     void initialize(boolean resumeReplication);
 
