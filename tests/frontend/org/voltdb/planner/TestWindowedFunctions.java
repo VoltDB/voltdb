@@ -497,6 +497,14 @@ public class TestWindowedFunctions extends PlannerTestCase {
     public void testRankFailures() {
         failToCompile("SELECT RANK() OVER (PARTITION BY A ORDER BY B ) FROM AAA GROUP BY A;",
                       "Use of both a windowed function call and GROUP BY in a single query is not supported.");
+        failToCompile("SELECT RANK() OVER (ORDER BY B), COUNT(*) FROM AAA;",
+                      "Use of window functions (in an OVER clause) isn't supported with other aggregate functions on the SELECT list.");
+        failToCompile("SELECT RANK() OVER (ORDER BY B), COUNT(B) FROM AAA;",
+                      "Use of window functions (in an OVER clause) isn't supported with other aggregate functions on the SELECT list.");
+        failToCompile("SELECT RANK() OVER (ORDER BY B), MAX(B) FROM AAA;",
+                      "Use of window functions (in an OVER clause) isn't supported with other aggregate functions on the SELECT list.");
+        failToCompile("SELECT RANK() OVER (ORDER BY B), AVG(B) FROM AAA;",
+                      "Use of window functions (in an OVER clause) isn't supported with other aggregate functions on the SELECT list.");
         failToCompile("SELECT RANK() OVER (PARTITION BY A ORDER BY B ) AS R1, " +
                       "       RANK() OVER (PARTITION BY B ORDER BY A ) AS R2  " +
                       "FROM AAA;",
