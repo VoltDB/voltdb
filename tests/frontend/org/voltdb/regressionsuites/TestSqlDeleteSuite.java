@@ -29,6 +29,7 @@ import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.planner.ParsedUnionStmt;
 import org.voltdb_testprocs.regressionsuites.delete.DeleteOrderByLimit;
 import org.voltdb_testprocs.regressionsuites.delete.DeleteOrderByLimitOffset;
 import org.voltdb_testprocs.regressionsuites.fixedsql.Insert;
@@ -556,27 +557,28 @@ public class TestSqlDeleteSuite extends RegressionSuite {
         }
     }
 
-    public void testDeleteWithExpresionSubquery()  throws Exception {
-        Client client = getClient();
-        String tables[] = {"P3", "R3"};
-        // insert rows where ID is 0..3
-        insertRows(client, "R1", 4);
+    public void DEFERREDtestDeleteWithExpressionSubquery()  throws Exception {
+        if (ParsedUnionStmt.ENG6281_FIXED) {
+            Client client = getClient();
+            String tables[] = {"P3", "R3"};
+            // insert rows where ID is 0..3
+            insertRows(client, "R1", 4);
 
-        for (String table : tables) {
-            // insert rows where ID is 0 and num is 0..9
-            insertRows(client, table, 10);
+            for (String table : tables) {
+                // insert rows where ID is 0 and num is 0..9
+                insertRows(client, table, 10);
 
-            // delete rows where ID is IN 0..3
-            VoltTable vt = client.callProcedure("@AdHoc",
-                    "DELETE FROM " + table + " WHERE ID IN (SELECT NUM FROM R1)")
-                    .getResults()[0];
-            validateTableOfScalarLongs(vt, new long[] { 4 });
+                // delete rows where ID is IN 0..3
+                VoltTable vt = client.callProcedure("@AdHoc",
+                        "DELETE FROM " + table + " WHERE ID IN (SELECT NUM FROM R1)")
+                        .getResults()[0];
+                validateTableOfScalarLongs(vt, new long[] { 4 });
 
-            String stmt = "SELECT ID FROM " + table + " ORDER BY ID";
-            validateTableOfScalarLongs(client, stmt, new long[] { 4, 5, 6, 7, 8, 9 });
+                String stmt = "SELECT ID FROM " + table + " ORDER BY ID";
+                validateTableOfScalarLongs(client, stmt, new long[] { 4, 5, 6, 7, 8, 9 });
 
+            }
         }
-
     }
 
     //

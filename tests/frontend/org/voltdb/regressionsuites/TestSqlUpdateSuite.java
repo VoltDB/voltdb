@@ -28,6 +28,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.planner.ParsedUnionStmt;
 import org.voltdb_testprocs.regressionsuites.fixedsql.Insert;
 
 /**
@@ -60,7 +61,9 @@ public class TestSqlUpdateSuite extends RegressionSuite {
     public void testUpdate() throws Exception {
         subtestUpdateBasic();
         subtestENG11918();
-        subtestUpdateWithSubquery();
+        if (ParsedUnionStmt.ENG6281_FIXED) {
+            subtestUpdateWithSubquery();
+        }
         subtestUpdateWithCaseWhen();
     }
 
@@ -164,6 +167,9 @@ public class TestSqlUpdateSuite extends RegressionSuite {
         verifyStmtFails(client, "UPDATE P1 SET NUM = 1 WHERE COUNT(*) IS NULL", "invalid WHERE expression");
     }
 
+    /*
+     * Note: This will not be called if ENG6281 is not fixed.
+     */
     public void subtestUpdateWithSubquery() throws Exception {
         Client client = getClient();
         String tables[] = {"P1", "R1"};

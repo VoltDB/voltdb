@@ -52,7 +52,6 @@ import org.voltdb.planner.parseinfo.BranchNode;
 import org.voltdb.planner.parseinfo.JoinNode;
 import org.voltdb.planner.parseinfo.StmtSubqueryScan;
 import org.voltdb.planner.parseinfo.StmtTableScan;
-import org.voltdb.plannodes.IndexSortablePlanNode;
 import org.voltdb.plannodes.AbstractJoinPlanNode;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractReceivePlanNode;
@@ -61,6 +60,7 @@ import org.voltdb.plannodes.AggregatePlanNode;
 import org.voltdb.plannodes.DeletePlanNode;
 import org.voltdb.plannodes.HashAggregatePlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
+import org.voltdb.plannodes.IndexSortablePlanNode;
 import org.voltdb.plannodes.IndexUseForOrderBy;
 import org.voltdb.plannodes.InsertPlanNode;
 import org.voltdb.plannodes.LimitPlanNode;
@@ -492,7 +492,10 @@ public class PlanAssembler {
         // Get the best plans for the expression subqueries ( IN/EXISTS (SELECT...) )
         Set<AbstractExpression> subqueryExprs = parsedStmt.findSubquerySubexpressions();
         if ( ! subqueryExprs.isEmpty() ) {
-
+            if (! ParsedUnionStmt.ENG6281_FIXED && ! (parsedStmt instanceof ParsedSelectStmt)) {
+                m_recentErrorMsg = "Subquery expressions are only supported in SELECT statements";
+                return null;
+            }
             // guards against IN/EXISTS/Scalar subqueries
             if ( ! m_partitioning.wasSpecifiedAsSingle() ) {
                 // Don't allow partitioned tables in subqueries.

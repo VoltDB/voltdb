@@ -46,6 +46,7 @@ import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.AsyncCompilerAgent;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.planner.ParsedUnionStmt;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.MiscUtils;
@@ -825,7 +826,14 @@ public class TestAdHocQueries extends AdHocQueryTester {
                 env.m_client.callProcedure("@AdHoc", adHocQuery);
             }
             catch (ProcCallException pcex) {
-                fail("did fail on subquery In/Exists in UPDATE statement");
+                // When ENG6281 is fixed, this should never happen.
+                // Until then, we need to check for subqueries in the
+                // wrong place.
+                if (ParsedUnionStmt.ENG6281_FIXED) {
+                    fail("did fail on subquery In/Exists in UPDATE statement");
+                } else {
+                    assertTrue(pcex.getMessage().indexOf("Subquery expressions are only supported in SELECT statements") > 0);
+                }
             }
 
             adHocQuery = "     SELECT 'ZZ', EMPNUM, EMPNAME, -99 \n" +
@@ -924,8 +932,8 @@ public class TestAdHocQueries extends AdHocQueryTester {
      */
     private static class Batcher {
         private final TestEnv m_env;
-        private final List<Integer> m_expectedCounts = new ArrayList<Integer>();
-        private final List<String> m_queries = new ArrayList<String>();
+        private final List<Integer> m_expectedCounts = new ArrayList<>();
+        private final List<String> m_queries = new ArrayList<>();
 
         public Batcher(final TestEnv env) {
             m_env = env;
