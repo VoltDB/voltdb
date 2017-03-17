@@ -872,6 +872,116 @@ public class TestSetOpSuite extends RegressionSuite {
     }
 
     /**
+     * Forced MP F union E .
+     * @throws NoConnectionsException
+     * @throws IOException
+     * @throws ProcCallException
+     */
+    public void testForceMPSetOperations1() throws NoConnectionsException, IOException, ProcCallException {
+        Client client = this.getClient();
+        VoltTable vt;
+
+        // Set Op in each fragment
+        String sql = "(SELECT I FROM F WHERE PC = 2 UNION "
+                + "SELECT I FROM E WHERE PC = 3) ORDER BY I;";
+
+        client.callProcedure("InsertE", 0, 0); // out
+        client.callProcedure("InsertE", 3, 2); // in
+        client.callProcedure("InsertE", 3, 2); // out
+        client.callProcedure("InsertF", 1, 2); // out
+        client.callProcedure("InsertF", 2, 3); // in
+        client.callProcedure("InsertF", 2, 3); // out
+        client.callProcedure("InsertF", 2, 2); // out
+
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        assertEquals(2, vt.getRowCount());
+        validateTableOfScalarLongs(vt, new long[]{2, 3});
+
+        // Set Op pushed down
+        sql = "(SELECT PC FROM F WHERE PC = 2 UNION "
+                + "SELECT PC FROM E WHERE PC = 3) ORDER BY PC;";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        assertEquals(2, vt.getRowCount());
+        validateTableOfScalarLongs(vt, new long[]{2, 3});
+
+    }
+
+    /**
+     * Forced MP F except all E .
+     * @throws NoConnectionsException
+     * @throws IOException
+     * @throws ProcCallException
+     */
+    public void testForceMPSetOperations2() throws NoConnectionsException, IOException, ProcCallException {
+        Client client = this.getClient();
+        VoltTable vt;
+
+        // Set Op in each fragment
+        String sql = "(SELECT I FROM F WHERE PC = 2 INTERSECT ALL "
+                + "SELECT I FROM E) ORDER BY I;";
+
+        client.callProcedure("InsertE", 0, 3); // in matches f (2, 3)
+        client.callProcedure("InsertE", 1, 3); // in matches f(2,3)
+        client.callProcedure("InsertE", 2, 4); // in matches f(2,4)
+        client.callProcedure("InsertE", 3, 4); // in matches f(2,4)
+        client.callProcedure("InsertE", 4, 4); // out not match
+        client.callProcedure("InsertF", 1, 2); // out where clause
+        client.callProcedure("InsertF", 2, 3); // in matches e (0, 3)
+        client.callProcedure("InsertF", 2, 3); // in matches e (1, 3)
+        client.callProcedure("InsertF", 2, 4); // in matches e (2, 4)
+        client.callProcedure("InsertF", 2, 4); // in matches e (3, 4)
+
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        assertEquals(4, vt.getRowCount());
+        validateTableOfScalarLongs(vt, new long[]{3, 3, 4, 4});
+
+        // Reverse the order
+        sql = "(SELECT I FROM F WHERE PC = 2 INTERSECT ALL "
+                + "SELECT I FROM E) ORDER BY I;";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        assertEquals(4, vt.getRowCount());
+        validateTableOfScalarLongs(vt, new long[]{3, 3, 4, 4});
+
+    }
+
+  /**
+  * Force MP A intersect E intersect F. No partitioning columns in the output
+  * @throws NoConnectionsException
+  * @throws IOException
+  * @throws ProcCallException
+  */
+ public void testForceMPSetOperations3() throws NoConnectionsException, IOException, ProcCallException {
+     Client client = this.getClient();
+     VoltTable vt;
+
+     String sql = "(SELECT I FROM A INTERSECT "
+             + "SELECT ABS(I) FROM E WHERE PC = 2 INTERSECT SELECT I FROM F) ORDER BY I;";
+
+     // 0 x 2, 2 x 1, 3 x 3  -  2 x 1 - 0 x 2, 9 x 1 = 0 x 1, 3 x 1
+
+     client.callProcedure("InsertA", 0, 0); // out not in E
+     client.callProcedure("InsertA", 1, 0); // out not in E
+     client.callProcedure("InsertA", 2, 2); // out not in E
+     client.callProcedure("InsertA", 3, 3); // out not in E
+     client.callProcedure("InsertA", 4, 3); // out not in E
+     client.callProcedure("InsertA", 5, 3); // out not in E
+     client.callProcedure("InsertE", 0, 2); // out WHERE clause
+     client.callProcedure("InsertE", 1, 0); // out WHERE clause
+     client.callProcedure("InsertE", 2, 3); // in A(3, 3) and E(2, 3) and F(2, 3)
+     client.callProcedure("InsertE", 4, 3); // out WHERE clause
+     client.callProcedure("InsertF", 0, 9); // out not in E
+     client.callProcedure("InsertF", 1, 0); // out not in E
+     client.callProcedure("InsertF", 3, 0); // out not in E
+     client.callProcedure("InsertF", 2, 3); // in A(3, 3) and E(2, 3) and F(2, 3)
+     client.callProcedure("InsertF", 5, 3); // out not in E
+
+     vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+     assertEquals(1, vt.getRowCount());
+     validateTableOfScalarLongs(vt, new long[]{3});
+
+ }
+
+    /**
      * (E.PC, C.PKEY WHERE E.PC = C.PKEY) union (F.PC)
      * PC is a partitioning column for E, and F tables. C is repliacte
      * @throws NoConnectionsException

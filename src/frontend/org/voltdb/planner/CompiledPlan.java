@@ -46,6 +46,9 @@ public class CompiledPlan {
     /** A complete plan graph for SP plans and the top part of MP plans */
     public AbstractPlanNode rootPlanGraph;
 
+    /** A status of the plan graph */
+    public PlanStatus rootPlanStatus;
+
     /** A "collector" fragment for two-part MP plans */
     public AbstractPlanNode subPlanGraph;
 
@@ -352,5 +355,15 @@ public class CompiledPlan {
 
     public void setNondeterminismDetail(String contentDeterminismMessage) {
         m_contentDeterminismDetail = contentDeterminismMessage;
+    }
+
+    public boolean hasValidRootPlan() {
+        return rootPlanGraph != null && rootPlanStatus == PlanStatus.SUCCESS;
+    }
+
+    public void setRootPlan(AbstractPlanNode planGraph, PlanStatus planStatus) {
+        assert(planGraph != null || planStatus != PlanStatus.SUCCESS);
+        rootPlanGraph = planGraph;
+        rootPlanStatus = planStatus;
     }
 }

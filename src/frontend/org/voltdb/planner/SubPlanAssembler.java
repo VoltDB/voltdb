@@ -109,7 +109,7 @@ public abstract class SubPlanAssembler {
      *
      * @return The next plan to solve the subselect or null if no more plans.
      */
-    abstract AbstractPlanNode nextPlan();
+    abstract PlanAssemblerResult nextPlan();
 
     /**
      * Generate all possible access paths for given sets of join and filter

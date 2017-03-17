@@ -47,6 +47,8 @@ import org.voltdb.types.SetOpType;
  */
 class SetOpSubPlanAssembler extends SubPlanAssembler {
 
+    private static final String TOO_COMPEXT_STMT_ERROR = "Statements are too complex in set operation using multiple partitioned tables.";
+
     private final Cluster m_catalogCluster;
     private final PlanSelector m_planSelector;
     // Common partitioning across all the children
@@ -72,7 +74,7 @@ class SetOpSubPlanAssembler extends SubPlanAssembler {
      * Build best plans for the children queries and add them to a final Set Op plan
      */
     @Override
-    AbstractPlanNode nextPlan() {
+    PlanAssemblerResult nextPlan() {
         assert(m_parsedStmt instanceof ParsedSetOpStmt);
         ParsedSetOpStmt parsedSetOpStmt = (ParsedSetOpStmt) m_parsedStmt;
         SetOpPlanNode setOpPlanNode = new SetOpPlanNode(parsedSetOpStmt.m_unionType);
@@ -97,16 +99,17 @@ class SetOpSubPlanAssembler extends SubPlanAssembler {
             PlanAssembler assembler = new PlanAssembler(
                     m_catalogCluster, m_db, partitioning, planSelector);
             CompiledPlan bestChildPlan = assembler.getBestCostPlan(parsedChildStmt);
+            assert(bestChildPlan != null);
             // Reset the partitioning because it may change if the child itself a Set Op plan
             partitioning = assembler.getPartitioning();
 
             // make sure we got a winner
-            if (bestChildPlan == null) {
+            if (bestChildPlan.rootPlanStatus != PlanStatus.SUCCESS) {
                 m_recentErrorMsg = assembler.getErrorMessage();
                 if (m_recentErrorMsg == null) {
                     m_recentErrorMsg = "Unable to plan for statement. Error unknown.";
                 }
-                return null;
+                return new PlanAssemblerResult(bestChildPlan.rootPlanStatus);
             }
             childrenPlans.add(bestChildPlan);
             // Remember the content non-determinism message for the
@@ -119,16 +122,16 @@ class SetOpSubPlanAssembler extends SubPlanAssembler {
             planId = planSelector.m_planId;
 
             // Evaluate whether the SetOP node can be safely pushed down below the Send/Receive pair
-            // in case of multi partitioned query. For this to happen all children  must
+            // in case of a multi partitioned query. For this to happen all children  must
             // satisfy the following conditions:
-            //  - each statement must be a MP statement with a trivial coordinator fragment
+            //  - each statement must be a MP or a SP with inferred partitioning statement with a trivial coordinator fragment
             //  - each statement output must contain at least one partitioning column from its distributed tables
             //  - all statements must agree on the position of at least one partitioning column
             //    in their respective output schemas
             // The above requirements guarantee that the given set op can be run disjointly on each
             // individual partition and the results can be simply aggregated at the coordinator
             // If the statements fail to find a consensus on the partitioning column position but do have
-            // trivial coordinator fragments the plan must have two Set Op nodes for each fragment.
+            // a trivial coordinator fragments the plan must have two Set Op nodes for each fragment.
             if (canMPSetOp) {
                 // Is statement MP and has a trivial  coordinator?
                 canMPSetOp = partitioning.requiresTwoFragments() && hasTrivialCoordinator(bestChildPlan.rootPlanGraph);
@@ -160,17 +163,26 @@ class SetOpSubPlanAssembler extends SubPlanAssembler {
 
             AbstractExpression statementPartitionExpression = partitioning.singlePartitioningExpression();
             if (m_setOpPrtitioning.requiresTwoFragments()) {
-                if ((partitioning.requiresTwoFragments() && !(canPushSetOpDown || canMPSetOp))
-                        || statementPartitionExpression != null) {
-                    // If two child statements need to use a second fragment,
-                    // the set op node must be pushed down to the partition fragments.
-                    // Otherwise, the coordinator expects a single-table result from each partition.
-                    // Also, currently the coordinator of a two-fragment plan is not allowed to
-                    // target a particular partition, so neither can the union of the coordinator
-                    // and a statement that wants to run single-partition.
-                    throw new PlanningErrorException(
-                            "Statements are too complex in set operation using multiple partitioned tables.");
-                }
+                if (partitioning.requiresTwoFragments()) {
+                    if (!(canPushSetOpDown || canMPSetOp)) {
+                        // If two child statements need to use a second fragment,
+                        // the set op node must be either pushed down to the partition fragments (canPushSetOpDown == TRUE) or
+                        // two set op for each fragment are required (canMPSetOp == TRUE).
+                        // Otherwise, the coordinator expects a single-table result from each partition.
+                        // Also, currently the coordinator of a two-fragment plan is not allowed to
+                        // target a particular partition, so neither can the union of the coordinator
+                        // and a statement that wants to run single-partition.
+                        throw new PlanningErrorException(TOO_COMPEXT_STMT_ERROR);
+                    }
+                    // Optimization is possible
+                    continue;
+                } else if (statementPartitionExpression != null) {
+                        // Distributed table with inferred partitioning
+                        // Need to re-plan using force MP
+                        assert(!partitioning.wasSpecifiedAsSingle());
+                        m_recentErrorMsg = TOO_COMPEXT_STMT_ERROR;
+                        return new PlanAssemblerResult(PlanStatus.RETRY_FORCE_MP);
+                    }
                 // the new statement is apparently a replicated read and has no effect on partitioning
                 continue;
             }
@@ -182,20 +194,21 @@ class SetOpSubPlanAssembler extends SubPlanAssembler {
                 continue;
             }
             if (partitioning.requiresTwoFragments()) {
-                // Again, currently the coordinator of a two-fragment plan is not allowed to
-                // target a particular partition, so neither can the union of the coordinator
-                // and a statement that wants to run single-partition.
-                assert(!(canPushSetOpDown || canMPSetOp));
-                throw new PlanningErrorException(
-                        "Statements are too complex in set operation using multiple partitioned tables.");
+                // Prior subquery was an inferred SP read - commonPartitionExpression is not NULL
+                // Need to re-plan using force MP
+                assert(!partitioning.wasSpecifiedAsSingle());
+                m_recentErrorMsg = TOO_COMPEXT_STMT_ERROR;
+                return new PlanAssemblerResult(PlanStatus.RETRY_FORCE_MP);
             }
             if (statementPartitionExpression == null) {
                 // the new statement is apparently a replicated read and has no effect on partitioning
                 continue;
             }
             if ( ! commonPartitionExpression.equals(statementPartitionExpression)) {
-                throw new PlanningErrorException(
-                        "Statements use conflicting partitioned table filters in set operation or sub-query.");
+                // Prior subquery was an inferred SP read - commonPartitionExpression and statementPartitionExpression are not NULL
+                // Need to re-plan using force MP
+                m_recentErrorMsg = TOO_COMPEXT_STMT_ERROR;
+                return new PlanAssemblerResult(PlanStatus.RETRY_FORCE_MP);
             }
         }
 
@@ -297,7 +310,7 @@ class SetOpSubPlanAssembler extends SubPlanAssembler {
      *
      * @return The final combined plan
      */
-    private AbstractPlanNode buildSetOpPlan(SetOpPlanNode setOpPlanNode, List<CompiledPlan> childrenPlans, boolean needPushSetOpDown, boolean needTwoSetOps) {
+    private PlanAssemblerResult buildSetOpPlan(SetOpPlanNode setOpPlanNode, List<CompiledPlan> childrenPlans, boolean needPushSetOpDown, boolean needTwoSetOps) {
         AbstractPlanNode rootNode = setOpPlanNode;
         if (needPushSetOpDown) {
             // Add a Send/Receive pair on top of the current root node
@@ -344,7 +357,8 @@ class SetOpSubPlanAssembler extends SubPlanAssembler {
                 rootNode.addAndLinkChild(selectPlan.rootPlanGraph);
             }
         }
-        return rootNode;
+        assert(rootNode != null);
+        return new PlanAssemblerResult(rootNode, PlanStatus.SUCCESS);
     }
 
     StatementPartitioning getSetOpPartitioning() {

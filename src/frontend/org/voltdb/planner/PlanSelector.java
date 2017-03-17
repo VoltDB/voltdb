@@ -147,6 +147,9 @@ public class PlanSelector implements Cloneable {
      * @param rawplan
      */
     public void considerCandidatePlan(CompiledPlan plan, AbstractParsedStmt parsedStmt) {
+        assert(plan.rootPlanGraph != null);
+        assert(plan.rootPlanStatus == PlanStatus.SUCCESS);
+
         //System.out.println(String.format("[Raw plan]:%n%s", rawplan.rootPlanGraph.toExplainPlanString()));
 
         // run the set of microptimizations, which may return many plans (or not)

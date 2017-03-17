@@ -30,6 +30,7 @@ import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
 import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.CompiledPlan;
+import org.voltdb.planner.PlanStatus;
 import org.voltdb.planner.parseinfo.StmtSubqueryScan;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.types.ExpressionType;
@@ -71,7 +72,7 @@ public class SelectSubqueryExpression extends AbstractSubqueryExpression {
         m_subquery = subquery;
         assert(m_subquery.getSubqueryStmt() != null);
         m_subqueryId = m_subquery.getSubqueryStmt().m_stmtId;
-        if (m_subquery.getBestCostPlan() != null && m_subquery.getBestCostPlan().rootPlanGraph != null) {
+        if (m_subquery.getBestCostPlan() != null && m_subquery.getBestCostPlan().hasValidRootPlan()) {
             m_subqueryNode = m_subquery.getBestCostPlan().rootPlanGraph;
             m_subqueryNodeId = m_subqueryNode.getPlanNodeId();
         }
@@ -134,6 +135,7 @@ public class SelectSubqueryExpression extends AbstractSubqueryExpression {
         m_subqueryNode = subqueryNode;
         if (m_subquery != null && m_subquery.getBestCostPlan() != null) {
             m_subquery.getBestCostPlan().rootPlanGraph = m_subqueryNode;
+            m_subquery.getBestCostPlan().rootPlanStatus = PlanStatus.SUCCESS;
         }
         resetSubqueryNodeId();
     }

@@ -264,6 +264,7 @@ public class StmtSubqueryScan extends StmtTableScan {
     }
 
     public void setBestCostPlan(CompiledPlan costPlan) {
+        assert(costPlan != null);
         m_bestCostPlan = costPlan;
     }
 

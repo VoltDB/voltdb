@@ -164,53 +164,29 @@ public class TestPlansSetOp extends PlannerTestCase {
 
     public void testNonSupportedUnions()
     {
-        // Query hangs from SQL coverage
-        failToCompile("select A from T1 UNION select A from T1 INTERSECT select B from T2");
 
-        // If ONE side is single-partitioned, it would theoretically be possible to satisfy
-        // the query with a 2-fragment plan IFF the coordinator fragment could be forced to
-        // execute on the designated single partition.
-        // At this point, coordinator designation is only supported for single-fragment plans.
-        // So, this case must also error out.
-        failToCompile("select DESC from T1 WHERE A = 1 UNION select TEXT from T5");
-
-        // If BOTH sides are single-partitioned, but for different partitions,
-        // it would theoretically be possible to satisfy
-        // the query with a 2-fragment plan IFF the coordinator fragment could be forced to
-        // execute on one of the designated single partitions.
-        // At this point, coordinator designation is only supported for single-fragment plans.
-        failToCompile("select DESC from T1 WHERE A = 1 UNION select TEXT from T5 WHERE E = 2");
-
-        // If ONE side is single-partitioned, it would theoretically be possible to satisfy
-        // the query with a 2-fragment plan IFF the coordinator fragment could be forced to
-        // execute on the designated single partition.
-        // At this point, coordinator designation is only supported for single-fragment plans.
-        // So, this case must also error out.
-        failToCompile("select DESC from T1 WHERE A = 1 UNION select TEXT from T5");
-
-        // If BOTH sides are single-partitioned, but for different partitions,
-        // it would theoretically be possible to satisfy
-        // the query with a 2-fragment plan IFF the coordinator fragment could be forced to
-        // execute on one of the designated single partitions.
-        // At this point, coordinator designation is only supported for single-fragment plans.
-        failToCompile("select DESC from T1 WHERE A = 1 UNION select TEXT from T5 WHERE E = 2");
+            // UNION as FROM subqueries to add
+        // Query hangs from SQL coverage. Two MP and one SP tables
+        failToCompile("select A from T1 UNION select A from T1 INTERSECT select B from T2",
+                SetOpSubPlanAssembler.TOO_COMPEXT_STMT_ERROR);
 
         // Multiple Set operations in a single statement with multiple partitioned tables
-        failToCompile("select F from T1 UNION select G from T6 INTERSECT select F from T1");
+        failToCompile("select F from T1 UNION select G from T6 INTERSECT select F from T1",
+                SetOpSubPlanAssembler.TOO_COMPEXT_STMT_ERROR);
 
         // Column types must match.
-        failToCompile("select A, DESC from T1 UNION select B from T2");
-        failToCompile("select B from T2 EXCEPT select A, DESC from T1");
-        failToCompile("select B from T2 EXCEPT select F from T1");
+        failToCompile("select A, DESC from T1 UNION select B from T2", "column number mismatch detected");
+        failToCompile("select B from T2 EXCEPT select A, DESC from T1", "column number mismatch detected");
+        failToCompile("select B from T2 EXCEPT select F from T1", "Incompatible data types in UNION");
 
         // nonsense syntax in place of union ops (trying various internal symbol names meaning n/a)
-        failToCompile("select A from T1 NOUNION select B from T2");
-        failToCompile("select A from T1 TERM select B from T2");
+        failToCompile("select A from T1 NOUNION select B from T2", "unexpected token");
+        failToCompile("select A from T1 TERM select B from T2", "unexpected token");
 
         // 1. one SP and two compatible MP - fail
         // one SP plus MP select with Partkey = 4 - fail
         // invalid syntax - the WHERE clause is illegal
-        failToCompile("(select A from T1 UNION select B from T2) where A in (select A from T2)");
+        failToCompile("(select A from T1 UNION select B from T2) where A in (select A from T2)", "unexpected token: WHERE");
 
         // Union with a child having an invalid subquery expression (T1 is distributed)
         failToCompile("(select B from T2 where B in (select A from T1 where T1.A > T2.B) UNION select B from T2) limit 1", PlanAssembler.IN_EXISTS_SCALAR_ERROR_MESSAGE);
@@ -219,6 +195,24 @@ public class TestPlansSetOp extends PlannerTestCase {
         // T1.A and T4.D are partitioning columns
         failToCompile("(select T1.F, T4.D from T1, T4 where T4.D = T1.F UNION select F, A from T1) order by 1",
                 "The planner cannot guarantee that all rows would be in a single partition.");
+
+        // Failed even with the FORCE_MP partitioning because the plan for the set op INTERSECT does not have
+        // a trivial coordinator fragment (SetOpReceive) and the top set op (UNION) can't pushed down
+        failToCompile(" ( select desc from T1 ) union ( select text from T5 where e = 10) intersect select desc from t1",
+                SetOpSubPlanAssembler.TOO_COMPEXT_STMT_ERROR);
+
+        // Failed even with the FORCE_MP partitioning because the plan for the set op INTERSECT does not have
+        // a trivial coordinator fragment (SetOpReceive) and the top set op (UNION) can't pushed down
+        failToCompile(" ( select desc from T1 where a = 1) union ( select text from T5 where e = 10) intersect select desc from t1 where a = 2",
+                SetOpSubPlanAssembler.TOO_COMPEXT_STMT_ERROR);
+
+        // Fails even with the FORCE_MP partitioning because of the distributed table T2
+        failToCompile(" ( select b from T2 ) intersect ( select e from T5 where e = 10) union select a from t1",
+                SetOpSubPlanAssembler.TOO_COMPEXT_STMT_ERROR);
+
+        // Failed SetOp as a FROM subquery
+        failToCompile(" select * from ( ( select b from T2 ) intersect ( select e from T5 where e = 10) union select a from t1 ) UT",
+                SetOpSubPlanAssembler.TOO_COMPEXT_STMT_ERROR);
 
     }
 
@@ -243,12 +237,6 @@ public class TestPlansSetOp extends PlannerTestCase {
         pn = compile("select F from T1 WHERE T1.A = 2 UNION select F from T1 WHERE T1.A = 2");
         assertTrue(pn.getChild(0) instanceof SetOpPlanNode);
 
-        // If BOTH sides are single-partitioned, but for different partitions,
-        // it would theoretically be possible to satisfy
-        // the query with a 2-fragment plan IFF the coordinator fragment could be forced to
-        // execute on one of the designated single partitions.
-        // At this point, coordinator designation is only supported for single-fragment plans.
-        failToCompile("select DESC from T1 WHERE A = 1 UNION select DESC from T1 WHERE A = 2");
     }
 
     public void testSubqueryUnionWithParamENG7783() {
@@ -669,17 +657,42 @@ public class TestPlansSetOp extends PlannerTestCase {
       setOpChildren = new PlanNodeType[] {PlanNodeType.NESTLOOP, PlanNodeType.SEQSCAN};
       checkPushedDownSetOp(pns, coordinatorTypes, SetOpType.UNION, setOpChildren);
 
+      // One side (T1) is single-partitioned, the other one (T5) is distributed
+      pns = compileToFragments("select T1.A from T1 where T1.A = 3 union select T5.E from T5");
+      coordinatorTypes = new PlanNodeType[] {PlanNodeType.RECEIVE};
+      setOpChildren = new PlanNodeType[] {PlanNodeType.SEQSCAN, PlanNodeType.SEQSCAN};
+      checkPushedDownSetOp(pns, coordinatorTypes, SetOpType.UNION, setOpChildren);
+
+      // Multiple set ops with MP and inferred SP table. Plans compile with FORCE_MP option
+      pns = compileToFragments(
+              " ( select a from T1 ) intersect ( select e from T5 where e = 10) except select a from t1");
+      coordinatorTypes = new PlanNodeType[] {PlanNodeType.RECEIVE};
+      setOpChildren = new PlanNodeType[] {PlanNodeType.SETOP, PlanNodeType.SEQSCAN};
+      checkPushedDownSetOp(pns, coordinatorTypes, SetOpType.EXCEPT, setOpChildren);
+
+      // Multiple set ops with MP and inferred SP table. Plans compile with FORCE_MP option
+      // Different table order
+      pns = compileToFragments(
+              " ( select e from T5 where e = 10) union ( select a from T1 ) except select a from t1 where a = 1");
+      coordinatorTypes = new PlanNodeType[] {PlanNodeType.RECEIVE};
+      setOpChildren = new PlanNodeType[] {PlanNodeType.SETOP, PlanNodeType.SEQSCAN};
+      checkPushedDownSetOp(pns, coordinatorTypes, SetOpType.EXCEPT, setOpChildren);
+
+      // Multiple set ops with inferred SP tables. Plans compile with FORCE_MP option
+      pns = compileToFragments(
+              " ( select e from T5 where e = 10) union ( select a from T1 where a = 3) except select a from t1 where a = 1");
+      coordinatorTypes = new PlanNodeType[] {PlanNodeType.RECEIVE};
+      setOpChildren = new PlanNodeType[] {PlanNodeType.SETOP, PlanNodeType.SEQSCAN};
+      checkPushedDownSetOp(pns, coordinatorTypes, SetOpType.EXCEPT, setOpChildren);
+
       // FROM subquery - non-trivial coordinator fragment - SEQSCAN
       failToCompile("select A, B from (select T9.A, T10.B from T9, T10 where T9.A = T10.A limit 10) T union select A, B from T9",
-              "Statements are too complex in set operation using multiple partitioned tables.");
+              SetOpSubPlanAssembler.TOO_COMPEXT_STMT_ERROR);
       failToCompile("SELECT COUNT(*) FROM T1 UNION SELECT D FROM T4",
-              "Statements are too complex in set operation using multiple partitioned tables.");
-      // Select from distributed T1 does not require a MP plan
-      failToCompile("select T1.A from T1 where T1.A = 3 union select T5.E from T5",
-              "Statements are too complex in set operation using multiple partitioned tables.");
+              SetOpSubPlanAssembler.TOO_COMPEXT_STMT_ERROR);
       // Union of distributed select and distributed set op. The latter has non-trivial coordinator
       failToCompile("select A from T9 union (select A from T10 except select A1 from T1)",
-              "Statements are too complex in set operation using multiple partitioned tables.");
+              SetOpSubPlanAssembler.TOO_COMPEXT_STMT_ERROR);
     }
 
     public void testMultiPartitionedSetOpsTwoLevel() {
@@ -757,6 +770,46 @@ public class TestPlansSetOp extends PlannerTestCase {
         setOpChildren = new PlanNodeType[] {PlanNodeType.INDEXSCAN, PlanNodeType.INDEXSCAN};
         checkPushedDownSetOp(pns, coordinatorTypes, SetOpType.UNION, setOpChildren);
 
+        // If BOTH sides are single-partitioned, but for different partitions,
+        // the plan must have set op nodes in each fragment
+        pns = compileToFragments("select DESC from T1 WHERE A = 1 UNION select TEXT from T5 WHERE E = 2");
+        coordinatorTypes = new PlanNodeType[] {PlanNodeType.SETOPRECEIVE};
+        setOpChildren = new PlanNodeType[] {PlanNodeType.SEQSCAN, PlanNodeType.SEQSCAN};
+        checkPushedDownSetOp(pns, coordinatorTypes, SetOpType.UNION, setOpChildren);
+
+        // If ONE side is single-partitioned, and another one is distributed,
+        // the plan must have set op nodes in each fragment
+        pns = compileToFragments("select DESC from T1 WHERE A = 1 UNION select TEXT from T5");
+        coordinatorTypes = new PlanNodeType[] {PlanNodeType.SETOPRECEIVE};
+        setOpChildren = new PlanNodeType[] {PlanNodeType.SEQSCAN, PlanNodeType.SEQSCAN};
+        checkPushedDownSetOp(pns, coordinatorTypes, SetOpType.UNION, setOpChildren);
+
+        // If ONE side is single-partitioned, and another one is distributed,
+        // the plan must have set op nodes in each fragment
+        // The table order is reversed
+        pns = compileToFragments("select DESC from T1 UNION select TEXT from T5  WHERE E = 1");
+        coordinatorTypes = new PlanNodeType[] {PlanNodeType.SETOPRECEIVE};
+        setOpChildren = new PlanNodeType[] {PlanNodeType.SEQSCAN, PlanNodeType.SEQSCAN};
+        checkPushedDownSetOp(pns, coordinatorTypes, SetOpType.UNION, setOpChildren);
+
+        // Multiple set ops with MP and inferred SP tables. The plan compiles with the FORCE_MP partitioning
+        // and only because all set ops can be collapsed into a single set op. A similar plan containing set ops that
+        // can not be combined into a single node would fail because of non-trivial coordinator fragments for
+        // children plans (SetOpReceive instead of Receive or MergeReceive)
+        pns = compileToFragments(
+                " ( select desc from T1 ) union ( select text from T5 where e = 10) union select desc from t1");
+        coordinatorTypes = new PlanNodeType[] {PlanNodeType.SETOPRECEIVE};
+        setOpChildren = new PlanNodeType[] {PlanNodeType.SEQSCAN, PlanNodeType.SEQSCAN, PlanNodeType.SEQSCAN};
+        checkPushedDownSetOp(pns, coordinatorTypes, SetOpType.UNION, setOpChildren);
+
+        // Distributed Set Op as a FROM subquery
+        pns = compileToFragments(
+                " select * from ( select desc from T1  union select text from T5 where e = 10 ) UT");
+        AbstractPlanNode mainQuery = pns.get(0);
+        assertEquals(PlanNodeType.SETOPRECEIVE, mainQuery.getChild(0).getChild(0).getPlanNodeType());
+        setOpChildren = new PlanNodeType[] {PlanNodeType.SEQSCAN, PlanNodeType.SEQSCAN};
+        checkPushedDownSetOp(pns.get(1).getChild(0), SetOpType.UNION, setOpChildren);
+
     }
 
     private void verifyOutputSchema(AbstractPlanNode coordinatorRootNode, int columnCount) {
@@ -777,6 +830,10 @@ public class TestPlansSetOp extends PlannerTestCase {
 
         // Partition fragment
         pn = pns.get(1).getChild(0);
+        checkPushedDownSetOp(pns.get(1).getChild(0), setOpType, setOpChildren);
+    }
+
+    private void checkPushedDownSetOp(AbstractPlanNode pn, SetOpType setOpType, PlanNodeType[] setOpChildren) {
         assertEquals(PlanNodeType.SETOP, pn.getPlanNodeType());
         SetOpPlanNode setOpNode = (SetOpPlanNode) pn;
         assertEquals(setOpType, setOpNode.getSetOpType());

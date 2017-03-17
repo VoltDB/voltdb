@@ -402,13 +402,20 @@ public class QueryPlanner {
                 m_partitioning, planSelector);
         // find the plan with minimal cost
         CompiledPlan bestPlan = assembler.getBestCostPlan(parsedStmt);
+        assert(bestPlan != null);
+        if (bestPlan.rootPlanStatus == PlanStatus.RETRY_FORCE_MP) {
+            assembler = new PlanAssembler(m_cluster, m_db,
+                  StatementPartitioning.forceMP(), planSelector);
+            bestPlan = assembler.getBestCostPlan(parsedStmt);
+            assert(bestPlan != null);
+        }
 
         // This processing of bestPlan outside/after getBestCostPlan
         // allows getBestCostPlan to be called both here and
         // in PlanAssembler.getNextUnion on each branch of a union.
 
         // make sure we got a winner
-        if (bestPlan == null) {
+        if (bestPlan.rootPlanStatus != PlanStatus.SUCCESS) {
             if (m_debuggingStaticModeToRetryOnError) {
                 assembler.getBestCostPlan(parsedStmt);
             }

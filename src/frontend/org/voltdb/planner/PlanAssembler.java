@@ -97,6 +97,7 @@ public class PlanAssembler {
         public final boolean m_orderIsDeterministic;
         public final boolean m_hasLimitOrOffset;
         public final String m_isContentDeterministic;
+        public final PlanStatus m_planStatus;
 
         public ParsedResultAccumulator(boolean orderIsDeterministic,
                                        boolean hasLimitOrOffset,
@@ -105,7 +106,16 @@ public class PlanAssembler {
             m_orderIsDeterministic = orderIsDeterministic;
             m_hasLimitOrOffset  = hasLimitOrOffset;
             m_isContentDeterministic = isContentDeterministic;
+            m_planStatus = PlanStatus.SUCCESS;
         }
+        public ParsedResultAccumulator(PlanStatus planStatus)
+        {
+            m_orderIsDeterministic = false;
+            m_hasLimitOrOffset  = false;
+            m_isContentDeterministic = null;
+            m_planStatus = planStatus;
+        }
+
     }
 
     /** convenience pointer to the cluster object in the catalog */
@@ -465,14 +475,18 @@ public class PlanAssembler {
             + "single partition procedures and AdHoc queries referencing only replicated tables.";
 
     CompiledPlan getBestCostPlan(AbstractParsedStmt parsedStmt) {
+        CompiledPlan retval = new CompiledPlan();
+
         // parse any subqueries that the statement contains
         List<StmtSubqueryScan> subqueryNodes = parsedStmt.getSubqueryScans();
         ParsedResultAccumulator fromSubqueryResult = null;
         if (! subqueryNodes.isEmpty()) {
             fromSubqueryResult = getBestCostPlanForFromSubQueries(subqueryNodes);
-            if (fromSubqueryResult == null) {
+            assert(fromSubqueryResult != null);
+            if (fromSubqueryResult.m_planStatus != PlanStatus.SUCCESS) {
                 // There was at least one sub-query and we should have a compiled plan for it
-                return null;
+                retval.setRootPlan(null, fromSubqueryResult.m_planStatus);
+                return retval;
             }
         }
 
@@ -492,29 +506,32 @@ public class PlanAssembler {
                     SelectSubqueryExpression subExpr = (SelectSubqueryExpression)e;
                     if (! subExpr.getSubqueryScan().getIsReplicated()) {
                         m_recentErrorMsg = IN_EXISTS_SCALAR_ERROR_MESSAGE;
-                        return null;
+                        retval.setRootPlan(null, PlanStatus.FAILURE);
+                        return retval;
                     }
                 }
             }
 
-            if (!getBestCostPlanForExpressionSubQueries(subqueryExprs)) {
+            PlanStatus subqueryExprStatus = getBestCostPlanForExpressionSubQueries(subqueryExprs);
+            if (subqueryExprStatus != PlanStatus.SUCCESS) {
                 // There was at least one sub-query and we should have a compiled plan for it
-                return null;
+                retval.setRootPlan(null, subqueryExprStatus);
+                return retval;
             }
         }
 
         // set up the plan assembler for this statement
         setupForNewPlans(parsedStmt);
 
-        // get ready to find the plan with minimal cost
-        CompiledPlan rawplan = null;
-
         // loop over all possible plans
+        PlanStatus planStatus = PlanStatus.FAILURE;
         while (true) {
-            rawplan = getNextPlan();
+            CompiledPlan rawplan = getNextPlan();
+            assert(rawplan != null);
 
             // stop this while loop when no more plans are generated
-            if (rawplan == null) {
+            if (rawplan.rootPlanStatus != PlanStatus.SUCCESS) {
+                planStatus = rawplan.rootPlanStatus;
                 break;
             }
 
@@ -522,10 +539,13 @@ public class PlanAssembler {
             m_planSelector.considerCandidatePlan(rawplan, parsedStmt);
         }
 
-        CompiledPlan retval = m_planSelector.m_bestPlan;
-        if (retval == null) {
-            return null;
+        CompiledPlan bestPlan = m_planSelector.m_bestPlan;
+        if (bestPlan == null || bestPlan.rootPlanStatus != PlanStatus.SUCCESS) {
+            planStatus = (bestPlan == null) ? planStatus : bestPlan.rootPlanStatus;
+            retval.setRootPlan(null, planStatus);
+            return retval;
         }
+        retval = bestPlan;
 
         if (fromSubqueryResult != null) {
             // Calculate the combined state of determinism for the parent and child statements
@@ -552,7 +572,7 @@ public class PlanAssembler {
             // Need to re-attach the sub-queries plans to the best parent plan. The same best plan for each
             // sub-query is reused with all parent candidate plans and needs to be reconnected with
             // the final best parent plan
-            retval.rootPlanGraph = connectChildrenBestPlans(retval.rootPlanGraph);
+            retval.setRootPlan(connectChildrenBestPlans(retval.rootPlanGraph), PlanStatus.SUCCESS);
         }
 
         /*
@@ -593,8 +613,9 @@ public class PlanAssembler {
         for (StmtSubqueryScan subqueryScan : subqueryNodes) {
             nextPlanId = planForParsedSubquery(subqueryScan, nextPlanId);
             CompiledPlan subqueryBestPlan = subqueryScan.getBestCostPlan();
-            if (subqueryBestPlan == null) {
-                throw new PlanningErrorException(m_recentErrorMsg);
+            assert(subqueryBestPlan != null);
+            if (subqueryBestPlan.rootPlanStatus != PlanStatus.SUCCESS) {
+                return new ParsedResultAccumulator(subqueryBestPlan.rootPlanStatus);
             }
             orderIsDeterministic &= subqueryBestPlan.isOrderDeterministic();
             if (isContentDeterministic != null && !subqueryBestPlan.isContentDeterministic()) {
@@ -620,7 +641,7 @@ public class PlanAssembler {
      * @param subqueryExprs - list of subquery expressions
      * @return true if a best plan was generated for each subquery, false otherwise
      */
-    private boolean getBestCostPlanForExpressionSubQueries(Set<AbstractExpression> subqueryExprs) {
+    private PlanStatus getBestCostPlanForExpressionSubQueries(Set<AbstractExpression> subqueryExprs) {
         int nextPlanId = m_planSelector.m_planId;
 
         for (AbstractExpression expr : subqueryExprs) {
@@ -634,7 +655,9 @@ public class PlanAssembler {
             nextPlanId = planForParsedSubquery(subqueryScan, nextPlanId);
             CompiledPlan bestPlan = subqueryScan.getBestCostPlan();
             if (bestPlan == null) {
-                return false;
+                return PlanStatus.FAILURE;
+            } else if (bestPlan.rootPlanStatus != PlanStatus.SUCCESS) {
+                return bestPlan.rootPlanStatus;
             }
 
             subqueryExpr.setSubqueryNode(bestPlan.rootPlanGraph);
@@ -643,13 +666,13 @@ public class PlanAssembler {
             if (bestPlan.rootPlanGraph.hasAnyNodeOfType(PlanNodeType.SEND)) {
                 // fail the whole plan
                 m_recentErrorMsg = IN_EXISTS_SCALAR_ERROR_MESSAGE;
-                return false;
+                return PlanStatus.FAILURE;
             }
         }
         // need to reset plan id for the entire SQL
         m_planSelector.m_planId = nextPlanId;
 
-        return true;
+        return PlanStatus.SUCCESS;
     }
 
 
@@ -691,8 +714,9 @@ public class PlanAssembler {
                     "setupForNewPlans encountered unsupported statement type.");
         }
 
-        if (retval == null || retval.rootPlanGraph == null) {
-            return null;
+        assert(retval != null);
+        if (retval.rootPlanStatus != PlanStatus.SUCCESS) {
+            return retval;
         }
 
         assert (nextStmt != null);
@@ -710,18 +734,22 @@ public class PlanAssembler {
     private CompiledPlan getNextSetOpPlan() {
         assert(m_subAssembler != null);
         assert(m_subAssembler instanceof SetOpSubPlanAssembler);
+        CompiledPlan retval = new CompiledPlan();
         // Since only the one "best" plan is considered,
         // this method should be called only once.
         if (m_bestAndOnlyPlanWasGenerated) {
-            return null;
+            retval.setRootPlan(null, PlanStatus.DONE);
+            return retval;
         }
 
         m_bestAndOnlyPlanWasGenerated = true;
-        CompiledPlan retval = new CompiledPlan();
 
         // Simply return a setop plan node with a corresponding type set
-        AbstractPlanNode rootNode = m_subAssembler.nextPlan();
-        if (rootNode != null) {
+        PlanAssemblerResult planResult = m_subAssembler.nextPlan();
+        assert(planResult != null);
+        if (planResult.getStatus() == PlanStatus.SUCCESS) {
+            AbstractPlanNode rootNode = planResult.getPlan();
+            assert(rootNode != null);
             // reset the partitioning from the common partitioning for all setop children
             m_partitioning = ((SetOpSubPlanAssembler)m_subAssembler).getSetOpPartitioning();
             assert(m_partitioning != null);
@@ -735,18 +763,17 @@ public class PlanAssembler {
             if (m_parsedSetop.hasLimitOrOffset()) {
                 rootNode = handleSetopLimitOperator(rootNode);
             }
-            retval.rootPlanGraph = rootNode;
+            retval.setRootPlan(rootNode, PlanStatus.SUCCESS);
             retval.setReadOnly(true);
             retval.sql = m_planSelector.m_sql;
             boolean orderIsDeterministic = m_parsedSetop.isOrderDeterministic();
             boolean hasLimitOrOffset = m_parsedSetop.hasLimitOrOffset();
             String isContentDeterministic = ((SetOpSubPlanAssembler)m_subAssembler).getIsContentDeterministic();
             retval.statementGuaranteesDeterminism(hasLimitOrOffset, orderIsDeterministic, isContentDeterministic);
-
         } else {
             // Failed to produce a valid Set Op plan
             m_recentErrorMsg = m_subAssembler.m_recentErrorMsg;
-            retval.rootPlanGraph = null;
+            retval.setRootPlan(null,  planResult.getStatus());
         }
         return retval;
     }
@@ -760,11 +787,13 @@ public class PlanAssembler {
         PlanAssembler assembler = new PlanAssembler(
                 m_catalogCluster, m_catalogDb, currentPartitioning, planSelector);
         CompiledPlan compiledPlan = assembler.getBestCostPlan(subQuery);
+        assert(compiledPlan != null);
         // make sure we got a winner
-        if (compiledPlan == null) {
+        if (compiledPlan.rootPlanStatus != PlanStatus.SUCCESS) {
             String tbAlias = subqueryScan.getTableAlias();
             m_recentErrorMsg = "Subquery statement for table " + tbAlias
                     + " has error: " + assembler.getErrorMessage();
+            subqueryScan.setBestCostPlan(compiledPlan);
             return planSelector.m_planId;
         }
 
@@ -870,6 +899,7 @@ public class PlanAssembler {
 
     private CompiledPlan getNextSelectPlan() {
         assert (m_subAssembler != null);
+        CompiledPlan retval = new CompiledPlan();
 
         // A matview reaggregation template plan may have been initialized
         // with a post-predicate expression moved from the statement's
@@ -895,7 +925,8 @@ public class PlanAssembler {
                 // use of subquery expressions in MP queries on partitioned data.
                 // That special case was going undetected when we didn't flag it here.
                 m_recentErrorMsg = IN_EXISTS_SCALAR_ERROR_MESSAGE;
-                return null;
+                retval.setRootPlan(null, PlanStatus.FAILURE);
+                return retval;
             }
 
             // // Something more along these lines would have to be enabled
@@ -907,14 +938,17 @@ public class PlanAssembler {
             // }
         }
 
-        AbstractPlanNode subSelectRoot = m_subAssembler.nextPlan();
+        PlanAssemblerResult planResult = m_subAssembler.nextPlan();
+        assert(planResult != null);
 
-        if (subSelectRoot == null) {
+        if (planResult.getStatus() != PlanStatus.SUCCESS) {
             m_recentErrorMsg = m_subAssembler.m_recentErrorMsg;
-            return null;
+            retval.setRootPlan(null, PlanStatus.FAILURE);
+            return retval;
         }
 
-        AbstractPlanNode root = subSelectRoot;
+        AbstractPlanNode root = planResult.getPlan();
+        assert(root != null);
 
         boolean mvFixNeedsProjection = false;
         /*
@@ -940,7 +974,7 @@ public class PlanAssembler {
                     mvFixInfoCoordinatorNeeded = false;
                     AbstractPlanNode receiveNode = receivers.get(0);
                     if (receiveNode.getParent(0) instanceof NestLoopPlanNode) {
-                        if (subSelectRoot.hasInlinedIndexScanOfTable(m_parsedSelect.m_mvFixInfo.getMVTableName())) {
+                        if (root.hasInlinedIndexScanOfTable(m_parsedSelect.m_mvFixInfo.getMVTableName())) {
                             return getNextSelectPlan();
                         }
 
@@ -970,7 +1004,7 @@ public class PlanAssembler {
                     m_parsedSelect.switchOptimalSuiteForAvgPushdown();
                 }
                 if (m_parsedSelect.m_tableList.size() > 1 && m_parsedSelect.m_mvFixInfo.needed()
-                        && subSelectRoot.hasInlinedIndexScanOfTable(m_parsedSelect.m_mvFixInfo.getMVTableName())) {
+                        && planResult.getPlan().hasInlinedIndexScanOfTable(m_parsedSelect.m_mvFixInfo.getMVTableName())) {
                     // MV partitioned joined query needs reAggregation work on coordinator.
                     // Index scan on MV table can not be supported.
                     // So, in-lined index scan of Nested loop index join can not be possible.
@@ -1052,19 +1086,18 @@ public class PlanAssembler {
             root = handleSelectLimitOperator(root);
         }
 
-        CompiledPlan plan = new CompiledPlan();
-        plan.rootPlanGraph = root;
-        plan.setReadOnly(true);
+        retval.setRootPlan(root, PlanStatus.SUCCESS);
+        retval.setReadOnly(true);
         boolean orderIsDeterministic = m_parsedSelect.isOrderDeterministic();
         boolean hasLimitOrOffset = m_parsedSelect.hasLimitOrOffset();
         String contentDeterminismMessage = m_parsedSelect.getContentDeterminismMessage();
-        plan.statementGuaranteesDeterminism(hasLimitOrOffset, orderIsDeterministic, contentDeterminismMessage);
+        retval.statementGuaranteesDeterminism(hasLimitOrOffset, orderIsDeterministic, contentDeterminismMessage);
 
         // Apply the micro-optimization:
         // LIMIT push down, Table count / Counting Index, Optimized Min/Max
-        MicroOptimizationRunner.applyAll(plan, m_parsedSelect);
+        MicroOptimizationRunner.applyAll(retval, m_parsedSelect);
 
-        return plan;
+        return retval;
     }
 
     /**
@@ -1134,15 +1167,21 @@ public class PlanAssembler {
 
     private CompiledPlan getNextDeletePlan() {
         assert (m_subAssembler != null);
+        CompiledPlan retval = new CompiledPlan();
 
         // figure out which table we're deleting from
         assert (m_parsedDelete.m_tableList.size() == 1);
         Table targetTable = m_parsedDelete.m_tableList.get(0);
 
-        AbstractPlanNode subSelectRoot = m_subAssembler.nextPlan();
-        if (subSelectRoot == null) {
-            return null;
+        PlanAssemblerResult planResult = m_subAssembler.nextPlan();
+        assert(planResult != null);
+        if (planResult.getStatus() != PlanStatus.SUCCESS) {
+            retval.setRootPlan(null, planResult.getStatus());
+            return retval;
         }
+
+        AbstractPlanNode subSelectRoot = planResult.getPlan();
+        assert(subSelectRoot != null);
 
         // ENG-4909 Bug: currently disable NESTLOOPINDEX plan for IN
         if (disableNestedLoopIndexJoinForInComparison(subSelectRoot, m_parsedDelete)) {
@@ -1156,7 +1195,6 @@ public class PlanAssembler {
         // generate the delete node with the right target table
         DeletePlanNode deleteNode = new DeletePlanNode();
         deleteNode.setTargetTableName(targetTable.getTypeName());
-
 
         assert(subSelectRoot instanceof AbstractScanPlanNode);
 
@@ -1213,19 +1251,19 @@ public class PlanAssembler {
             deleteNode.addAndLinkChild(root);
         }
 
-        CompiledPlan plan = new CompiledPlan();
         if (isSinglePartitionPlan) {
-            plan.rootPlanGraph = deleteNode;
+            retval.setRootPlan(deleteNode, PlanStatus.SUCCESS);
         }
         else {
             // Send the local result counts to the coordinator.
             AbstractPlanNode recvNode = SubPlanAssembler.addSendReceivePair(deleteNode);
             // add a sum or a limit and send on top of the union
-            plan.rootPlanGraph = addSumOrLimitAndSendToDMLNode(recvNode, targetTable.getIsreplicated());
+            retval.setRootPlan(addSumOrLimitAndSendToDMLNode(recvNode, targetTable.getIsreplicated()),
+                    PlanStatus.SUCCESS);
         }
 
         // check non-determinism status
-        plan.setReadOnly(false);
+        retval.setReadOnly(false);
 
         // treat this as deterministic for reporting purposes:
         // delete statements produce just one row that is the
@@ -1236,18 +1274,24 @@ public class PlanAssembler {
 
         // The delete statement cannot be inherently content non-deterministic.
         // So, the last parameter is always null.
-        plan.statementGuaranteesDeterminism(hasLimitOrOffset, orderIsDeterministic, null);
+        retval.statementGuaranteesDeterminism(hasLimitOrOffset, orderIsDeterministic, null);
 
-        return plan;
+        return retval;
     }
 
     private CompiledPlan getNextUpdatePlan() {
         assert (m_subAssembler != null);
 
-        AbstractPlanNode subSelectRoot = m_subAssembler.nextPlan();
-        if (subSelectRoot == null) {
-            return null;
+        CompiledPlan retval = new CompiledPlan();
+        PlanAssemblerResult planResult = m_subAssembler.nextPlan();
+        assert(planResult != null);
+        if (planResult.getStatus() != PlanStatus.SUCCESS) {
+            retval.setRootPlan(null, planResult.getStatus());
+            return retval;
         }
+
+        AbstractPlanNode subSelectRoot = planResult.getPlan();
+        assert(subSelectRoot != null);
 
         if (disableNestedLoopIndexJoinForInComparison(subSelectRoot, m_parsedUpdate)) {
             // Recursion here, now that subAssembler.nextPlan() has been called,
@@ -1328,8 +1372,7 @@ public class PlanAssembler {
             planRoot = addSumOrLimitAndSendToDMLNode(recvNode, targetTable.getIsreplicated());
         }
 
-        CompiledPlan retval = new CompiledPlan();
-        retval.rootPlanGraph = planRoot;
+        retval.setRootPlan(planRoot, PlanStatus.SUCCESS);
         retval.setReadOnly (false);
 
         if (targetTable.getIsreplicated()) {
@@ -1374,10 +1417,13 @@ public class PlanAssembler {
      * @return The next plan for a given insert statement.
      */
     private CompiledPlan getNextInsertPlan() {
+        CompiledPlan retval = new CompiledPlan();
         // there's really only one way to do an insert, so just
         // do it the right way once, then return null after that
-        if (m_bestAndOnlyPlanWasGenerated)
-            return null;
+        if (m_bestAndOnlyPlanWasGenerated) {
+            retval.setRootPlan(null, PlanStatus.DONE);
+            return retval;
+        }
         m_bestAndOnlyPlanWasGenerated = true;
 
         // The child of the insert node produces rows containing values
@@ -1390,7 +1436,6 @@ public class PlanAssembler {
         assert (m_parsedInsert.m_tableList.size() == 1);
         Table targetTable = m_parsedInsert.m_tableList.get(0);
         StmtSubqueryScan subquery = m_parsedInsert.getSubqueryScan();
-        CompiledPlan retval = null;
         String isContentDeterministic = null;
         if (subquery != null) {
             isContentDeterministic = subquery.calculateContentDeterminismMessage();
@@ -1406,8 +1451,8 @@ public class PlanAssembler {
             InsertSubPlanAssembler subPlanAssembler =
                     new InsertSubPlanAssembler(m_catalogDb, m_parsedInsert, m_partitioning,
                             targetIsExportTable);
-            AbstractPlanNode subplan = subPlanAssembler.nextPlan();
-            if (subplan == null) {
+            PlanAssemblerResult subplanResult = subPlanAssembler.nextPlan();
+            if (subplanResult.getStatus() != PlanStatus.SUCCESS) {
                 throw new PlanningErrorException(subPlanAssembler.m_recentErrorMsg);
             }
 
@@ -1547,7 +1592,7 @@ public class PlanAssembler {
 
         if (m_partitioning.wasSpecifiedAsSingle() || m_partitioning.isInferredSingle()) {
             insertNode.setMultiPartition(false);
-            retval.rootPlanGraph = insertNode;
+            retval.setRootPlan(insertNode, PlanStatus.SUCCESS);
             return retval;
         }
 
@@ -1555,7 +1600,8 @@ public class PlanAssembler {
         AbstractPlanNode recvNode = SubPlanAssembler.addSendReceivePair(insertNode);
 
         // add a count or a limit and send on top of the union
-        retval.rootPlanGraph = addSumOrLimitAndSendToDMLNode(recvNode, targetTable.getIsreplicated());
+        retval.setRootPlan(addSumOrLimitAndSendToDMLNode(recvNode, targetTable.getIsreplicated()),
+                PlanStatus.SUCCESS);
         return retval;
     }
 

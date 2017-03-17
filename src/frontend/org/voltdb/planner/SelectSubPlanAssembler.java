@@ -258,7 +258,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
      * for that join order, then append them to the computed plans deque.
      */
     @Override
-    protected AbstractPlanNode nextPlan() {
+    protected PlanAssemblerResult nextPlan() {
 
         // repeat (usually run once) until plans are created
         // or no more plans can be created
@@ -268,7 +268,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
 
             // no more join orders => no more plans to generate
             if (joinTree == null) {
-                return null;
+                return new PlanAssemblerResult(PlanStatus.DONE);
             }
 
             // Analyze join and filter conditions
@@ -312,7 +312,8 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
 
             generateMorePlansForJoinTree(joinTree);
         }
-        return m_plans.poll();
+        AbstractPlanNode nextPlan = m_plans.poll();
+        return (nextPlan != null) ? new PlanAssemblerResult(nextPlan) : new PlanAssemblerResult(PlanStatus.DONE);
     }
 
     /**

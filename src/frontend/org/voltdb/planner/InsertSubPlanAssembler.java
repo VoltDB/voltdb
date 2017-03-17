@@ -31,7 +31,6 @@ import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.parseinfo.StmtSubqueryScan;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
-import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.types.PlanNodeType;
 
@@ -47,9 +46,9 @@ public class InsertSubPlanAssembler extends SubPlanAssembler {
     }
 
     @Override
-    AbstractPlanNode nextPlan() {
+    PlanAssemblerResult nextPlan() {
         if (m_bestAndOnlyPlanWasGenerated) {
-            return null;
+            return new PlanAssemblerResult(PlanStatus.DONE);
         }
 
         // We may generate a few different plans for the subquery, but by the time
@@ -94,7 +93,7 @@ public class InsertSubPlanAssembler extends SubPlanAssembler {
                 // What is the appropriate level of detail for this message?
                 m_recentErrorMsg = getSqlType() +" INTO ... SELECT statement subquery is too complex.  " +
                     "Please either simplify the subquery or use a SELECT followed by an INSERT.";
-                return null;
+                return new PlanAssemblerResult(PlanStatus.FAILURE);
             }
 
             Column partitioningCol = targetTable.getPartitioncolumn();
@@ -104,7 +103,7 @@ public class InsertSubPlanAssembler extends SubPlanAssembler {
                         + "stream with no partitioning column defined.  "
                         + "This is not currently supported.  Please define a "
                         + "partitioning column for this stream to use it with INSERT INTO ... SELECT.";
-                return null;
+                return new PlanAssemblerResult(PlanStatus.FAILURE);
             }
 
             List<StmtTableScan> tables = new ArrayList<>();
@@ -143,7 +142,7 @@ public class InsertSubPlanAssembler extends SubPlanAssembler {
                 // partitioning column of target table is not being set from value produced by the subquery.
                 m_recentErrorMsg = "Partitioning column must be assigned a value " +
                     "produced by the subquery in an "+ getSqlType() +" INTO ... SELECT statement.";
-                return null;
+                return new PlanAssemblerResult(PlanStatus.FAILURE);
             }
 
             m_partitioning.analyzeForMultiPartitionAccess(tables, valueEquivalence);
@@ -152,12 +151,12 @@ public class InsertSubPlanAssembler extends SubPlanAssembler {
                 m_recentErrorMsg = "Partitioning could not be determined for "+ getSqlType() +" INTO ... SELECT statement.  " +
                     "Please ensure that statement does not attempt to copy row data from one partition to another, " +
                     "which is unsupported.";
-                return null;
+                return new PlanAssemblerResult(PlanStatus.FAILURE);
             }
         }
 
-
-        return subquery.getBestCostPlan().rootPlanGraph;
+        CompiledPlan subqueryPlan = subquery.getBestCostPlan();
+        return new PlanAssemblerResult(subqueryPlan.rootPlanGraph, subqueryPlan.rootPlanStatus);
     }
 
     public String getSqlType() {

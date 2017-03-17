@@ -63,7 +63,7 @@ public class WriterSubPlanAssembler extends SubPlanAssembler {
      * for that join order, then append them to the computed plans deque.
      */
     @Override
-    AbstractPlanNode nextPlan() {
+    PlanAssemblerResult nextPlan() {
         if (!m_generatedPlans) {
             assert (m_parsedStmt.m_joinTree != null);
             // Clone the node to make make sure that analyze expression is called
@@ -92,7 +92,8 @@ public class WriterSubPlanAssembler extends SubPlanAssembler {
             }
 
         }
-        return m_plans.poll();
+        AbstractPlanNode nextPlan = m_plans.poll();
+        return (nextPlan != null) ? new PlanAssemblerResult(nextPlan) : new PlanAssemblerResult(PlanStatus.DONE);
     }
 
 }
