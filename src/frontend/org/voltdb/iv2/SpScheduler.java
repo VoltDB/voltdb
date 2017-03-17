@@ -438,7 +438,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
              * it does looser tracking of client handles since it can't be
              * partitioned from the local replica.
              */
-            if (!m_isLeader &&
+            boolean balanceSPI = (message.getStoredProcedureInvocation() != null &&
+                    "@BalanceSPI".equals(message.getStoredProcedureName()));
+            if (!m_isLeader && !balanceSPI &&
                     CoreUtils.getHostIdFromHSId(msg.getInitiatorHSId()) !=
                     CoreUtils.getHostIdFromHSId(m_mailbox.getHSId())) {
                 if (tmLog.isDebugEnabled()) {
