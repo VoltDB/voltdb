@@ -32,9 +32,9 @@ except ImportError:
 try:
     import ssl
     ssl_available = True
-except ImportError:
-    print "Cannot import ssl module, operate in non-ssl mode"
+except ImportError, e:
     ssl_available = False
+    ssl_exception = e
 
 
 decimal.getcontext().prec = 38
@@ -187,8 +187,12 @@ class FastSerializer:
         self.socket = None
         if self.host != None and self.port != None:
             ss = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            if (self.usessl and ssl_available):
-                self.socket = self.__wrap_socket(ss)
+            if (self.usessl):
+                if (ssl_available):
+                    self.socket = self.__wrap_socket(ss)
+                else:
+                    print "ERROR: To use SSL functionality please Install the Python ssl module."
+                    raise ssl_exception
             else:
                 self.socket = ss
             self.socket.setblocking(1)
