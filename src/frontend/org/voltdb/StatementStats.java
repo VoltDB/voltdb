@@ -254,44 +254,53 @@ public final class StatementStats {
             final String stmtName;
             final boolean isCoordinatorTask;
             final boolean stmtFailed;
-            final long stmtDuration;
-            final int stmtResultSize;
-            final int stmtParameterSetSize;
+            final MeasuredStmtStats measurements;
 
             PerStmtStats(String stmtName,
-                         boolean isCoordinatorTask,
-                         boolean failed,
-                         long duration,
-                         int resultSize,
-                         int paramSetSize)
+                    boolean isCoordinatorTask,
+                    boolean failed,
+                    MeasuredStmtStats measurements)
             {
                 this.stmtName = stmtName;
                 this.isCoordinatorTask = isCoordinatorTask;
                 this.stmtFailed = failed;
+                this.measurements = measurements;
+            }
+        }
+
+        class MeasuredStmtStats {
+            final long stmtDuration;
+            final int stmtResultSize;
+            final int stmtParameterSetSize;
+
+            MeasuredStmtStats(long duration,
+                              int resultSize,
+                              int paramSetSize)
+            {
                 this.stmtDuration = duration;
                 this.stmtResultSize = resultSize;
                 this.stmtParameterSetSize = paramSetSize;
             }
         }
 
-        final long starttime;
-        private final List<PerStmtStats> stmtStats;
+        final long startTimeNanos;
+        final boolean samplingStatements;
+        List<PerStmtStats> stmtStats = null;
 
         int parameterSetSize = 0;
         int resultSize = 0;
 
-        public SingleCallStatsToken(boolean samplingStatements) {
-            this.starttime = System.nanoTime();
-            if (samplingStatements) {
-                stmtStats = new ArrayList<>();
-            }
-            else {
-                stmtStats = null;
-            }
+        public SingleCallStatsToken(long startTimeNanos, boolean samplingStatements) {
+            this.startTimeNanos = startTimeNanos;
+            this.samplingStatements = samplingStatements;
         }
 
-        public boolean recordingStmts() {
-            return stmtStats != null;
+        public boolean samplingProcedure() {
+            return startTimeNanos != 0;
+        }
+
+        public boolean samplingStmts() {
+            return samplingStatements;
         }
 
         public void setParameterSize(int size) {
@@ -300,13 +309,6 @@ public final class StatementStats {
 
         public void setResultSize(int size) {
             resultSize = size;
-        }
-
-        public void setResultSize(VoltTable result) {
-            resultSize = 0;
-            if (result != null) {
-                resultSize += result.getSerializedSize();
-            }
         }
 
         public void setResultSize(VoltTable[] results) {
@@ -325,21 +327,27 @@ public final class StatementStats {
                                          VoltTable result,
                                          ParameterSet parameterSet)
         {
-            int stmtResultSize = 0;
-            if (result != null) {
-                stmtResultSize = result.getSerializedSize();
+            if (stmtStats == null) {
+                stmtStats = new ArrayList<>();
             }
-            int stmtParamSize = 0;
-            if (parameterSet != null) {
-                stmtParamSize += parameterSet.getSerializedSize();
+
+            MeasuredStmtStats measuredStmtStats = null;
+            if (samplingStatements) {
+                int stmtResultSize = 0;
+                if (result != null) {
+                    stmtResultSize = result.getSerializedSize();
+                }
+                int stmtParamSize = 0;
+                if (parameterSet != null) {
+                    stmtParamSize += parameterSet.getSerializedSize();
+                }
+                measuredStmtStats = new MeasuredStmtStats(duration, stmtResultSize, stmtParamSize);
             }
 
             stmtStats.add(new PerStmtStats(stmtName,
                                            isCoordinatorTask,
                                            failed,
-                                           duration,
-                                           stmtResultSize,
-                                           stmtParamSize));
+                                           measuredStmtStats));
         }
     }
 

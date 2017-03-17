@@ -121,78 +121,13 @@ public class ProcedureStatsCollector extends SiteStatsSource {
     public final SingleCallStatsToken beginProcedure() {
         long invocations = fuzzyInvocationCounter.getAndIncrement();
 
-        if ((invocations % m_procSamplingInterval == 0) || m_isUAC) {
-            boolean sampleStmts = invocations % m_stmtSamplingInterval == 0;
-            return new SingleCallStatsToken(sampleStmts);
-        }
-        else {
-            return null;
-        }
+        boolean samplingProcedure = (invocations % m_procSamplingInterval == 0) || m_isUAC;
+        boolean samplingStmts = invocations % m_stmtSamplingInterval == 0;
+
+        long startTimeNanos = samplingProcedure ? System.nanoTime() : 0;
+
+        return new SingleCallStatsToken(startTimeNanos, samplingStmts);
     }
-
-    /**
-     * This function will be called after a statement finish running.
-     * It updates the data structures to maintain the statistics.
-     */
-    /*public final void finishStatement(String stmtName,
-                                      boolean isCoordinatorTask,
-                                      boolean perFragmentStatsRecording,
-                                      boolean failed,
-                                      long duration,
-                                      VoltTable result,
-                                      ParameterSet parameterSet) {
-        if (stmtName == null) {
-            return;
-        }
-        StatementStats stmtStats = m_stmtStatsMap.get(stmtName);
-        if (stmtStats == null) {
-            return;
-        }
-        StatsData dataToUpdate = isCoordinatorTask ? stmtStats.m_coordinatorTask : stmtStats.m_workerTask;
-        // m_failureCount and m_invocations need to be updated even if the current invocation is not sampled.
-        if (failed) {
-            dataToUpdate.m_failureCount++;
-        }
-        dataToUpdate.m_invocations++;
-        // If the current invocation is not sampled, we can stop now.
-        // Notice that this function can be called by a FragmentTask from a multi-partition procedure.
-        // Cannot use the isRecording() value here because SP sites can have values different from the MP Site.
-        if (! perFragmentStatsRecording) {
-            return;
-        }
-        // This is a sampled invocation.
-        // Update timings and size statistics below.
-        if (duration < 0) {
-            if (Math.abs(duration) > 1000000000) {
-                log.info("Statement: " + stmtStats.m_stmtName + " in procedure: " + m_procName +
-                         " recorded a negative execution time larger than one second: " + duration);
-            }
-            return;
-        }
-
-        dataToUpdate.m_timedInvocations++;
-        // sampled timings
-        dataToUpdate.m_totalTimedExecutionTime += duration;
-        dataToUpdate.m_minExecutionTime = Math.min(duration, dataToUpdate.m_minExecutionTime);
-        dataToUpdate.m_maxExecutionTime = Math.max(duration, dataToUpdate.m_maxExecutionTime);
-        dataToUpdate.m_incrMinExecutionTime = Math.min(duration, dataToUpdate.m_incrMinExecutionTime);
-        dataToUpdate.m_incrMaxExecutionTime = Math.max(duration, dataToUpdate.m_incrMaxExecutionTime);
-
-        // sampled size statistics
-        int resultSize = result == null ? 0 : result.getSerializedSize();
-        dataToUpdate.m_totalResultSize += resultSize;
-        dataToUpdate.m_minResultSize = Math.min(resultSize, dataToUpdate.m_minResultSize);
-        dataToUpdate.m_maxResultSize = Math.max(resultSize, dataToUpdate.m_maxResultSize);
-        dataToUpdate.m_incrMinResultSize = Math.min(resultSize, dataToUpdate.m_incrMinResultSize);
-        dataToUpdate.m_incrMaxResultSize = Math.max(resultSize, dataToUpdate.m_incrMaxResultSize);
-
-        int parameterSetSize = parameterSet == null ? 0 : parameterSet.getSerializedSize();
-        dataToUpdate.m_totalParameterSetSize += parameterSetSize;
-        dataToUpdate.m_minParameterSetSize = Math.min(parameterSetSize, dataToUpdate.m_minParameterSetSize);
-        dataToUpdate.m_maxParameterSetSize = Math.max(parameterSetSize, dataToUpdate.m_maxParameterSetSize);
-        dataToUpdate.m_incrMinParameterSetSize = Math.min(parameterSetSize, dataToUpdate.m_incrMinParameterSetSize);
-        dataToUpdate.m_incrMaxParameterSetSize = Math.max(parameterSetSize, dataToUpdate.m_incrMaxParameterSetSize);
-    }*/
 
     /**
      * Called after a procedure is finished executing. Compares the start and end time and calculates
@@ -208,14 +143,14 @@ public class ProcedureStatsCollector extends SiteStatsSource {
         m_procStatsData.m_invocations++;
 
         // this means additional stats were not recorded
-        if (statsToken == null) {
+        if (!statsToken.samplingProcedure()) {
             return;
         }
 
         // This is a sampled invocation.
         // Update timings and size statistics.
         final long endTime = System.nanoTime();
-        final long duration = endTime - statsToken.starttime;
+        final long duration = endTime - statsToken.startTimeNanos;
         if (duration < 0) {
             if (Math.abs(duration) > 1000000000) {
                 log.info("Procedure: " + m_procName +
@@ -243,6 +178,95 @@ public class ProcedureStatsCollector extends SiteStatsSource {
         m_procStatsData.m_maxParameterSetSize = Math.max(statsToken.parameterSetSize, m_procStatsData.m_maxParameterSetSize);
         m_procStatsData.m_incrMinParameterSetSize = Math.min(statsToken.parameterSetSize, m_procStatsData.m_incrMinParameterSetSize);
         m_procStatsData.m_incrMaxParameterSetSize = Math.max(statsToken.parameterSetSize, m_procStatsData.m_incrMaxParameterSetSize);
+
+        // stop here if no statements
+        if (statsToken.stmtStats == null) {
+            return;
+        }
+
+        for (SingleCallStatsToken.PerStmtStats pss : statsToken.stmtStats) {
+            long stmtDuration = 0;
+            int stmtResultSize = 0;
+            int stmtParameterSetSize = 0;
+            if (pss.measurements != null) {
+                stmtDuration = pss.measurements.stmtDuration;
+                stmtResultSize = pss.measurements.stmtResultSize;
+                stmtParameterSetSize = pss.measurements.stmtParameterSetSize;
+            }
+
+            endFragment(pss.stmtName,
+                        pss.isCoordinatorTask,
+                        pss.stmtFailed,
+                        pss.measurements != null,
+                        stmtDuration,
+                        stmtResultSize,
+                        stmtParameterSetSize);
+        }
+    }
+
+    /**
+     * This function will be called after a statement finish running.
+     * It updates the data structures to maintain the statistics.
+     */
+    public final synchronized void endFragment(String stmtName,
+                                               boolean isCoordinatorTask,
+                                               boolean failed,
+                                               boolean sampledStmt,
+                                               long duration,
+                                               int resultSize,
+                                               int parameterSetSize)
+    {
+        if (stmtName == null) {
+            return;
+        }
+        StatementStats stmtStats = m_stmtStatsMap.get(stmtName);
+        if (stmtStats == null) {
+            return;
+        }
+        StatsData dataToUpdate = isCoordinatorTask ? stmtStats.m_coordinatorTask : stmtStats.m_workerTask;
+        // m_failureCount and m_invocations need to be updated even if the current invocation is not sampled.
+        if (failed) {
+            dataToUpdate.m_failureCount++;
+        }
+        dataToUpdate.m_invocations++;
+
+        // If the current invocation is not sampled, we can stop now.
+        // Notice that this function can be called by a FragmentTask from a multi-partition procedure.
+        // Cannot use the isRecording() value here because SP sites can have values different from the MP Site.
+        if (!sampledStmt) {
+            return;
+        }
+        // This is a sampled invocation.
+        // Update timings and size statistics below.
+        if (duration < 0) {
+            if (Math.abs(duration) > 1000000000) {
+                log.info("Statement: " + stmtStats.m_stmtName + " in procedure: " + m_procName +
+                         " recorded a negative execution time larger than one second: " +
+                         duration);
+            }
+            return;
+        }
+
+        dataToUpdate.m_timedInvocations++;
+        // sampled timings
+        dataToUpdate.m_totalTimedExecutionTime += duration;
+        dataToUpdate.m_minExecutionTime = Math.min(duration, dataToUpdate.m_minExecutionTime);
+        dataToUpdate.m_maxExecutionTime = Math.max(duration, dataToUpdate.m_maxExecutionTime);
+        dataToUpdate.m_incrMinExecutionTime = Math.min(duration, dataToUpdate.m_incrMinExecutionTime);
+        dataToUpdate.m_incrMaxExecutionTime = Math.max(duration, dataToUpdate.m_incrMaxExecutionTime);
+
+        // sampled size statistics
+        dataToUpdate.m_totalResultSize += resultSize;
+        dataToUpdate.m_minResultSize = Math.min(resultSize, dataToUpdate.m_minResultSize);
+        dataToUpdate.m_maxResultSize = Math.max(resultSize, dataToUpdate.m_maxResultSize);
+        dataToUpdate.m_incrMinResultSize = Math.min(resultSize, dataToUpdate.m_incrMinResultSize);
+        dataToUpdate.m_incrMaxResultSize = Math.max(resultSize, dataToUpdate.m_incrMaxResultSize);
+
+        dataToUpdate.m_totalParameterSetSize += parameterSetSize;
+        dataToUpdate.m_minParameterSetSize = Math.min(parameterSetSize, dataToUpdate.m_minParameterSetSize);
+        dataToUpdate.m_maxParameterSetSize = Math.max(parameterSetSize, dataToUpdate.m_maxParameterSetSize);
+        dataToUpdate.m_incrMinParameterSetSize = Math.min(parameterSetSize, dataToUpdate.m_incrMinParameterSetSize);
+        dataToUpdate.m_incrMaxParameterSetSize = Math.max(parameterSetSize, dataToUpdate.m_incrMaxParameterSetSize);
     }
 
     /**

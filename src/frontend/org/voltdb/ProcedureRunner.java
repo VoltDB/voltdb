@@ -1596,7 +1596,7 @@ public class ProcedureRunner {
                                          finalTask,
                                          m_procedureName,
                                          m_procNameToLoadForFragmentTasks,
-                                         m_perCallStats != null && m_perCallStats.recordingStmts());
+                                         m_perCallStats.samplingStmts());
 
        // iterate over all sql in the batch, filling out the above data structures
        for (int i = 0; i < batch.size(); ++i) {
@@ -1704,7 +1704,7 @@ public class ProcedureRunner {
 
        VoltTable[] results = null;
        // Before executing the fragments, tell the EE if this batch should be timed.
-       getExecutionEngine().setPerFragmentTimingEnabled(m_perCallStats != null && m_perCallStats.recordingStmts());
+       getExecutionEngine().setPerFragmentTimingEnabled(m_perCallStats.samplingStmts());
        try {
            results = m_site.executePlanFragments(
                    batchSize,
@@ -1728,7 +1728,7 @@ public class ProcedureRunner {
        }
        finally {
            long[] executionTimes = null;
-           if (m_perCallStats != null && m_perCallStats.recordingStmts()) {
+           if (m_perCallStats.samplingStmts()) {
                executionTimes = new long[batchSize];
            }
            succeededFragmentsCount = getExecutionEngine().extractPerFragmentStats(batchSize, executionTimes);
@@ -1740,14 +1740,14 @@ public class ProcedureRunner {
                // If all the fragments in this batch are executed successfully, succeededFragmentsCount == batchSize.
                // Otherwise, the fragment whose index equals succeededFragmentsCount is the one that failed.
                boolean failed = i == succeededFragmentsCount;
-               if (m_perCallStats != null) {
-                   m_perCallStats.recordStatementStats(qs.stmt.getStmtName(),
-                                                       hasCoordinatorTask,
-                                                       failed,
-                                                       executionTimes == null ? 0 : executionTimes[i],
-                                                       results == null ? null : results[i],
-                                                       qs.params);
-               }
+
+               m_perCallStats.recordStatementStats(qs.stmt.getStmtName(),
+                                                   hasCoordinatorTask,
+                                                   failed,
+                                                   executionTimes == null ? 0 : executionTimes[i],
+                                                   results[i],
+                                                   qs.params);
+
                // If this fragment failed, no subsequent fragments will be executed.
                if (failed) {
                    break;

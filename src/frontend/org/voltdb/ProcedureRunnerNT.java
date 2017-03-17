@@ -196,7 +196,7 @@ public class ProcedureRunnerNT {
         m_perCallStats = m_statsCollector.beginProcedure();
 
         // if we're keeping track, calculate parameter size
-        if (m_perCallStats != null) {
+        if (m_perCallStats.samplingProcedure()) {
             ParameterSet params = ParameterSet.fromArrayNoCopy(paramListIn);
             m_perCallStats.setParameterSize(params.getSerializedSize());
         }
@@ -206,7 +206,7 @@ public class ProcedureRunnerNT {
         // if the whole call is done (no async bits)
         if (result != null) {
             // if we're keeping track, calculate result size
-            if (m_perCallStats != null) {
+            if (m_perCallStats.samplingProcedure()) {
                 m_perCallStats.setResultSize(result.getResults());
             }
             m_statsCollector.endProcedure(result.getStatus() == ClientResponse.USER_ABORT,
@@ -292,7 +292,7 @@ public class ProcedureRunnerNT {
                             }
 
                             // if we're keeping track, calculate result size
-                            if (m_perCallStats != null) {
+                            if (m_perCallStats.samplingProcedure()) {
                                 m_perCallStats.setResultSize(response.getResults());
                             }
                             m_statsCollector.endProcedure(response.getStatus() == ClientResponse.USER_ABORT,
