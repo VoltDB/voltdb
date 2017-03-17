@@ -469,10 +469,6 @@ public class ProcedureRunner {
                 }
             }
 
-            // Record statistics for procedure call.
-            StoredProcedureInvocation invoc = (m_txnState != null ? m_txnState.getInvocation() : null);
-            ParameterSet paramSet = (invoc != null ? invoc.getParams() : null);
-
             // don't leave empty handed
             if (results == null) {
                 results = new VoltTable[0];
@@ -792,7 +788,7 @@ public class ProcedureRunner {
             // should check whether the batch is read only or not
             // e.g. read only query may have timed out...
             if (!m_isSinglePartition && m_txnState.needsRollback()) {
-                throw new VoltAbortException("Multi-partition procedure " + m_procedureName +
+                throw new SerializableException("Multi-partition procedure " + m_procedureName +
                         " attempted to execute new batch after hitting EE exception in a previous batch");
             }
 
@@ -1745,7 +1741,7 @@ public class ProcedureRunner {
                                                    hasCoordinatorTask,
                                                    failed,
                                                    executionTimes == null ? 0 : executionTimes[i],
-                                                   results[i],
+                                                   results == null ? null : results[i],
                                                    qs.params);
 
                // If this fragment failed, no subsequent fragments will be executed.
