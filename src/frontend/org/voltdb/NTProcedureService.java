@@ -19,7 +19,6 @@ package org.voltdb;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
-import java.nio.ByteBuffer;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
@@ -255,13 +254,6 @@ public class NTProcedureService {
                     return;
                 }
 
-                // send the response to caller
-                response.setClientHandle(clientHandle);
-                ByteBuffer buf = ByteBuffer.allocate(response.getSerializedSize() + 4);
-                buf.putInt(buf.capacity() - 4);
-                response.flattenToBuffer(buf).flip();
-                ccxn.writeStream().enqueue(buf);
-
                 handleNTProcEnd(runner);
             }
         };
@@ -283,7 +275,6 @@ public class NTProcedureService {
 
     void handleNTProcEnd(ProcedureRunnerNT runner) {
         m_outstanding.remove(runner.m_id);
-        runner.m_statsCollector.endProcedure(false, false, new VoltTable[0], ParameterSet.emptyParameterSet());
     }
 
     void handleCallbacksForFailedHosts(final Set<Integer> failedHosts) {

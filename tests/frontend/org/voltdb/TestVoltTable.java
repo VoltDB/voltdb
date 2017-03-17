@@ -39,6 +39,7 @@ import org.voltdb.types.GeographyValue;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.CompressionService;
+import org.voltdb.utils.VoltTableUtil;
 
 public class TestVoltTable extends TestCase {
     private VoltTable LONG_FIVE;
@@ -1445,9 +1446,9 @@ public class TestVoltTable extends TestCase {
             VoltTable t1 = th.getTotallyRandomTable("foo", true).table;
             th.randomFill(t1, rowCount, 100);
 
-            assertEquals(rowCount, t1.stream().count());
+            assertEquals(rowCount, VoltTableUtil.stream(t1).count());
 
-            t1.stream()
+            VoltTableUtil.stream(t1)
                 .map(r -> r.get(0, r.getColumnType(0)))
                 .map(x -> String.valueOf(x))
                 .map(s -> "Hello:" + s)

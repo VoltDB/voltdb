@@ -37,6 +37,7 @@ import org.apache.hadoop_voltpatches.util.PureJavaCrc32C;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.CatalogContext.ProcedurePartitionInfo;
+import org.voltdb.StatementStats.SingleCallStatsToken;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.catalog.PlanFragment;
 import org.voltdb.catalog.ProcParameter;
@@ -128,6 +129,7 @@ public class ProcedureRunner {
     // per procedure state and catalog info
     //
     protected ProcedureStatsCollector m_statsCollector;
+    protected SingleCallStatsToken m_perCallStats;
     protected final Procedure m_catProc;
     protected final boolean m_isSysProc;
     protected final boolean m_isSinglePartition;
@@ -303,8 +305,33 @@ public class ProcedureRunner {
         return m_cachedRNG;
     }
 
-    @SuppressWarnings("finally")
     public ClientResponseImpl call(Object... paramListIn) {
+        m_perCallStats = m_statsCollector.beginProcedure();
+
+        // if we're keeping track, calculate parameter size
+        if (m_perCallStats != null) {
+            StoredProcedureInvocation invoc = (m_txnState != null ? m_txnState.getInvocation() : null);
+            ParameterSet params = (invoc != null ? invoc.getParams() : ParameterSet.fromArrayNoCopy(paramListIn));
+            m_perCallStats.setParameterSize(params.getSerializedSize());
+        }
+
+        ClientResponseImpl result = coreCall(paramListIn);
+
+        // if we're keeping track, calculate result size
+        if (m_perCallStats != null) {
+            m_perCallStats.setResultSize(result.getResults());
+        }
+
+        m_statsCollector.endProcedure(result.getStatus() == ClientResponse.USER_ABORT,
+                                      (result.getStatus() != ClientResponse.USER_ABORT) &&
+                                      (result.getStatus() != ClientResponse.SUCCESS),
+                                      m_perCallStats);
+
+        return result;
+    }
+
+    @SuppressWarnings("finally")
+    private ClientResponseImpl coreCall(Object... paramListIn) {
         // verify per-txn state has been reset
         assert(m_statusCode == ClientResponse.SUCCESS);
         assert(m_statusString == null);
@@ -332,8 +359,6 @@ public class ProcedureRunner {
         assert(m_batch.size() == 0);
 
         try {
-            m_statsCollector.beginProcedure(isSystemProcedure());
-
             VoltTable[] results = null;
 
             // inject sysproc execution context as the first parameter.
@@ -348,7 +373,6 @@ public class ProcedureRunner {
             }
 
             if (paramList.length != m_paramTypes.length) {
-                m_statsCollector.endProcedure(false, true, null, null);
                 String msg = "PROCEDURE " + m_procedureName + " EXPECTS " + String.valueOf(m_paramTypes.length) +
                     " PARAMS, BUT RECEIVED " + String.valueOf(paramList.length);
                 m_statusCode = ClientResponse.GRACEFUL_FAILURE;
@@ -361,7 +385,6 @@ public class ProcedureRunner {
                     // check the result type in an assert
                     assert(ParameterConverter.verifyParameterConversion(paramList[i], m_paramTypes[i]));
                 } catch (Exception e) {
-                    m_statsCollector.endProcedure(false, true, null, null);
                     String msg = "PROCEDURE " + m_procedureName + " TYPE ERROR FOR PARAMETER " + i +
                             ": " + e.toString();
                     m_statusCode = ClientResponse.GRACEFUL_FAILURE;
@@ -411,7 +434,7 @@ public class ProcedureRunner {
                         // a missing object that results in an error, throw the error and let the server deal with
                         // the condition as best as it can (usually a crashLocalVoltDB).
                         try {
-                            m_statsCollector.endProcedure(false, true, null, null);
+                            m_statsCollector.endProcedure(false, true, m_perCallStats);
                         }
                         finally {
                             // Ensure that ex is always re-thrown even if endProcedure throws an exception.
@@ -449,7 +472,6 @@ public class ProcedureRunner {
             // Record statistics for procedure call.
             StoredProcedureInvocation invoc = (m_txnState != null ? m_txnState.getInvocation() : null);
             ParameterSet paramSet = (invoc != null ? invoc.getParams() : null);
-            m_statsCollector.endProcedure(abort, error, results, paramSet);
 
             // don't leave empty handed
             if (results == null) {
@@ -463,7 +485,6 @@ public class ProcedureRunner {
                         new VoltTable[0],
                         statusString);
             }
-
 
             if (retval == null) {
                 retval = new ClientResponseImpl(
@@ -1575,7 +1596,7 @@ public class ProcedureRunner {
                                          finalTask,
                                          m_procedureName,
                                          m_procNameToLoadForFragmentTasks,
-                                         m_statsCollector.isStmtRecording());
+                                         m_perCallStats != null && m_perCallStats.recordingStmts());
 
        // iterate over all sql in the batch, filling out the above data structures
        for (int i = 0; i < batch.size(); ++i) {
@@ -1683,7 +1704,7 @@ public class ProcedureRunner {
 
        VoltTable[] results = null;
        // Before executing the fragments, tell the EE if this batch should be timed.
-       getExecutionEngine().setPerFragmentTimingEnabled(m_statsCollector.isStmtRecording());
+       getExecutionEngine().setPerFragmentTimingEnabled(m_perCallStats != null && m_perCallStats.recordingStmts());
        try {
            results = m_site.executePlanFragments(
                    batchSize,
@@ -1707,7 +1728,7 @@ public class ProcedureRunner {
        }
        finally {
            long[] executionTimes = null;
-           if (m_statsCollector.isStmtRecording()) {
+           if (m_perCallStats != null && m_perCallStats.recordingStmts()) {
                executionTimes = new long[batchSize];
            }
            succeededFragmentsCount = getExecutionEngine().extractPerFragmentStats(batchSize, executionTimes);
@@ -1719,13 +1740,14 @@ public class ProcedureRunner {
                // If all the fragments in this batch are executed successfully, succeededFragmentsCount == batchSize.
                // Otherwise, the fragment whose index equals succeededFragmentsCount is the one that failed.
                boolean failed = i == succeededFragmentsCount;
-               m_statsCollector.finishStatement(qs.stmt.getStmtName(),
-                                                hasCoordinatorTask,
-                                                m_statsCollector.isStmtRecording(),
-                                                failed,
-                                                executionTimes == null ? 0 : executionTimes[i],
-                                                results == null ? null : results[i],
-                                                qs.params);
+               if (m_perCallStats != null) {
+                   m_perCallStats.recordStatementStats(qs.stmt.getStmtName(),
+                                                       hasCoordinatorTask,
+                                                       failed,
+                                                       executionTimes == null ? 0 : executionTimes[i],
+                                                       results == null ? null : results[i],
+                                                       qs.params);
+               }
                // If this fragment failed, no subsequent fragments will be executed.
                if (failed) {
                    break;

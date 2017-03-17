@@ -22,10 +22,13 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltcore.logging.VoltLogger;
+import org.voltdb.StatementStats.SingleCallStatsToken;
 import org.voltdb.StatementStats.StatsData;
 import org.voltdb.catalog.Procedure;
+import org.voltdb.sysprocs.UpdateApplicationCatalog;
 
 /**
  * Derivation of StatsSource to expose timing information of procedure invocations.
@@ -61,7 +64,8 @@ public class ProcedureStatsCollector extends SiteStatsSource {
     // Mapping from the variable name of the user-defined SQLStmts to its stats.
     private final Map<String, StatementStats> m_stmtStatsMap;
     private final StatsData m_procStatsData;
-    private boolean m_isTransactional;
+    private final boolean m_isTransactional;
+    private final boolean m_isUAC;
 
     public ProcedureStatsCollector(long siteId,
                                    int partitionId,
@@ -100,39 +104,37 @@ public class ProcedureStatsCollector extends SiteStatsSource {
             }
         }
         m_isTransactional = isTransactional;
+
+        // check if this proc is UpdateApplicationCatalog for 100% sampling rate
+        m_isUAC = (m_procName != null) && (m_procName.startsWith(UpdateApplicationCatalog.class.getName()));
     }
+
+
+
+    // This is not the *real* invocation count, but a fuzzy one we keep to sample 5% of
+    // calls without modifying any state. We *only* modify state when a procedure completes.
+    AtomicLong fuzzyInvocationCounter = new AtomicLong(0);
 
     /**
      * Called when a procedure begins executing. Caches the time the procedure starts.
      */
-    public final void beginProcedure(boolean isSystemProc) {
-        if (m_procStatsData.m_invocations % m_procSamplingInterval == 0
-                || (isSystemProc && isProcedureUAC())) {
-            m_procStatsData.m_currentStartTime = System.nanoTime();
-        }
-    }
+    public final SingleCallStatsToken beginProcedure() {
+        long invocations = fuzzyInvocationCounter.getAndIncrement();
 
-    /**
-     * @return a boolean values indicating whether the current running procedure is sampled.
-     */
-    public final boolean isProcRecording() {
-        return m_procStatsData.m_currentStartTime > 0;
-    }
-
-    public final boolean isStmtRecording() {
-        // If we only have procedure-wide statistics in the map,
-        // no need to time any statements in any case.
-        if (m_stmtStatsMap.size() == 1) {
-            return false;
+        if ((invocations % m_procSamplingInterval == 0) || m_isUAC) {
+            boolean sampleStmts = invocations % m_stmtSamplingInterval == 0;
+            return new SingleCallStatsToken(sampleStmts);
         }
-        return m_procStatsData.m_invocations % m_stmtSamplingInterval == 0;
+        else {
+            return null;
+        }
     }
 
     /**
      * This function will be called after a statement finish running.
      * It updates the data structures to maintain the statistics.
      */
-    public final void finishStatement(String stmtName,
+    /*public final void finishStatement(String stmtName,
                                       boolean isCoordinatorTask,
                                       boolean perFragmentStatsRecording,
                                       boolean failed,
@@ -190,14 +192,13 @@ public class ProcedureStatsCollector extends SiteStatsSource {
         dataToUpdate.m_maxParameterSetSize = Math.max(parameterSetSize, dataToUpdate.m_maxParameterSetSize);
         dataToUpdate.m_incrMinParameterSetSize = Math.min(parameterSetSize, dataToUpdate.m_incrMinParameterSetSize);
         dataToUpdate.m_incrMaxParameterSetSize = Math.max(parameterSetSize, dataToUpdate.m_incrMaxParameterSetSize);
-    }
+    }*/
 
     /**
      * Called after a procedure is finished executing. Compares the start and end time and calculates
      * the statistics.
      */
-    public final void endProcedure(boolean aborted, boolean failed,
-                                   VoltTable[] results, ParameterSet parameterSet) {
+    public final synchronized void endProcedure(boolean aborted, boolean failed, SingleCallStatsToken statsToken) {
         if (aborted) {
             m_procStatsData.m_abortCount++;
         }
@@ -205,13 +206,16 @@ public class ProcedureStatsCollector extends SiteStatsSource {
             m_procStatsData.m_failureCount++;
         }
         m_procStatsData.m_invocations++;
-        if (! isProcRecording()) {
+
+        // this means additional stats were not recorded
+        if (statsToken == null) {
             return;
         }
+
         // This is a sampled invocation.
         // Update timings and size statistics.
         final long endTime = System.nanoTime();
-        final long duration = endTime - m_procStatsData.m_currentStartTime;
+        final long duration = endTime - statsToken.starttime;
         if (duration < 0) {
             if (Math.abs(duration) > 1000000000) {
                 log.info("Procedure: " + m_procName +
@@ -228,26 +232,17 @@ public class ProcedureStatsCollector extends SiteStatsSource {
         m_procStatsData.m_incrMinExecutionTime = Math.min(duration, m_procStatsData.m_incrMinExecutionTime);
         m_procStatsData.m_incrMaxExecutionTime = Math.max(duration, m_procStatsData.m_incrMaxExecutionTime);
 
-        // sampled size statistics
-        int resultSize = 0;
-        if (results != null) {
-            for (VoltTable result : results ) {
-                resultSize += result.getSerializedSize();
-            }
-        }
-        m_procStatsData.m_totalResultSize += resultSize;
-        m_procStatsData.m_minResultSize = Math.min(resultSize, m_procStatsData.m_minResultSize);
-        m_procStatsData.m_maxResultSize = Math.max(resultSize, m_procStatsData.m_maxResultSize);
-        m_procStatsData.m_incrMinResultSize = Math.min(resultSize, m_procStatsData.m_incrMinResultSize);
-        m_procStatsData.m_incrMaxResultSize = Math.max(resultSize, m_procStatsData.m_incrMaxResultSize);
+        m_procStatsData.m_totalResultSize += statsToken.resultSize;
+        m_procStatsData.m_minResultSize = Math.min(statsToken.resultSize, m_procStatsData.m_minResultSize);
+        m_procStatsData.m_maxResultSize = Math.max(statsToken.resultSize, m_procStatsData.m_maxResultSize);
+        m_procStatsData.m_incrMinResultSize = Math.min(statsToken.resultSize, m_procStatsData.m_incrMinResultSize);
+        m_procStatsData.m_incrMaxResultSize = Math.max(statsToken.resultSize, m_procStatsData.m_incrMaxResultSize);
 
-        int parameterSetSize = (parameterSet != null ? parameterSet.getSerializedSize() : 0);
-        m_procStatsData.m_totalParameterSetSize += parameterSetSize;
-        m_procStatsData.m_minParameterSetSize = Math.min(parameterSetSize, m_procStatsData.m_minParameterSetSize);
-        m_procStatsData.m_maxParameterSetSize = Math.max(parameterSetSize, m_procStatsData.m_maxParameterSetSize);
-        m_procStatsData.m_incrMinParameterSetSize = Math.min(parameterSetSize, m_procStatsData.m_incrMinParameterSetSize);
-        m_procStatsData.m_incrMaxParameterSetSize = Math.max(parameterSetSize, m_procStatsData.m_incrMaxParameterSetSize);
-        m_procStatsData.m_currentStartTime = -1;
+        m_procStatsData.m_totalParameterSetSize += statsToken.parameterSetSize;
+        m_procStatsData.m_minParameterSetSize = Math.min(statsToken.parameterSetSize, m_procStatsData.m_minParameterSetSize);
+        m_procStatsData.m_maxParameterSetSize = Math.max(statsToken.parameterSetSize, m_procStatsData.m_maxParameterSetSize);
+        m_procStatsData.m_incrMinParameterSetSize = Math.min(statsToken.parameterSetSize, m_procStatsData.m_incrMinParameterSetSize);
+        m_procStatsData.m_incrMaxParameterSetSize = Math.max(statsToken.parameterSetSize, m_procStatsData.m_incrMaxParameterSetSize);
     }
 
     /**
@@ -430,17 +425,12 @@ public class ProcedureStatsCollector extends SiteStatsSource {
      */
     public boolean resetAfterCatalogChange() {
         // UpdateApplicationCatalog system procedure statistics should be kept
-        if (isProcedureUAC()) {
+        if (m_isUAC) {
             return false;
         }
 
         // TODO: we want want to keep other system procedure statistics ?
         // TODO: we may want to only reset updated user procedure statistics but keeping others.
         return true;
-    }
-
-    private boolean isProcedureUAC() {
-        if (m_procName == null) return false;
-        return m_procName.startsWith("org.voltdb.sysprocs.UpdateApplicationCatalog");
     }
 }

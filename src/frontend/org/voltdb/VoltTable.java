@@ -23,10 +23,6 @@ import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.util.Arrays;
-import java.util.Spliterator;
-import java.util.function.Consumer;
-import java.util.stream.Stream;
-import java.util.stream.StreamSupport;
 
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
 import org.json_voltpatches.JSONArray;
@@ -1951,69 +1947,5 @@ public final class VoltTable extends VoltTableRow implements JSONString {
             schema[i] = col;
         }
         return schema;
-    }
-
-    private class VoltTableSpliterator implements Spliterator<VoltTableRow> {
-        VoltTableRow m_row;
-        int m_fence;
-
-        VoltTableSpliterator(int origin, int fence) {
-            System.out.printf("New VTS %d -> %d in Table with %d rows\n", origin, fence, getRowCount());
-            System.out.flush();
-            assert(origin < fence);
-            m_row = VoltTable.this.fetchRow(origin);
-            m_fence = fence;
-        }
-
-        @Override
-        public boolean tryAdvance(Consumer<? super VoltTableRow> action) {
-            if (m_row.getActiveRowIndex() < m_fence) {
-                 action.accept(m_row);
-                 m_row = m_row.cloneRow();
-                 m_row.advanceRow();
-                 return true;
-             }
-             else { // cannot advance
-                 return false;
-             }
-        }
-
-        @Override
-        public Spliterator<VoltTableRow> trySplit() {
-            int lo = m_row.getActiveRowIndex(); // divide range in half
-            int mid = ((lo + m_fence) >>> 1) & ~1; // force midpoint to be even
-            if (lo < mid) { // split out left half
-                System.out.printf("Old VTS %d -> %d in Table with %d rows\n", mid, m_fence, getRowCount());
-                System.out.flush();
-                //m_row.advanceToRow(mid); // reset this Spliterator's origin
-                try {
-                    m_row = fetchRow(mid);
-                }
-                catch (Exception e) {
-                    e.printStackTrace();
-                    System.exit(-1);
-                }
-                return new VoltTableSpliterator(lo, mid);
-            }
-            else { // too small to split
-                return null;
-            }
-        }
-
-        @Override
-        public long estimateSize() {
-            return m_fence - m_row.getActiveRowIndex();
-        }
-
-        @Override
-        public int characteristics() {
-            return ORDERED | SIZED | IMMUTABLE | SUBSIZED;
-        }
-
-    }
-
-    /** Not yet public API for VoltTable and Java 8 streams */
-    Stream<VoltTableRow> stream() {
-        return StreamSupport.stream(new VoltTableSpliterator(0, getRowCount()), false);
     }
 }

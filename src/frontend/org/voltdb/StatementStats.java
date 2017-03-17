@@ -17,6 +17,9 @@
 
 package org.voltdb;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * Record statistics for each statement in the stored procedure.
  */
@@ -246,6 +249,100 @@ public final class StatementStats {
         return retval;
     }
 
+    public static final class SingleCallStatsToken {
+        class PerStmtStats {
+            final String stmtName;
+            final boolean isCoordinatorTask;
+            final boolean stmtFailed;
+            final long stmtDuration;
+            final int stmtResultSize;
+            final int stmtParameterSetSize;
+
+            PerStmtStats(String stmtName,
+                         boolean isCoordinatorTask,
+                         boolean failed,
+                         long duration,
+                         int resultSize,
+                         int paramSetSize)
+            {
+                this.stmtName = stmtName;
+                this.isCoordinatorTask = isCoordinatorTask;
+                this.stmtFailed = failed;
+                this.stmtDuration = duration;
+                this.stmtResultSize = resultSize;
+                this.stmtParameterSetSize = paramSetSize;
+            }
+        }
+
+        final long starttime;
+        private final List<PerStmtStats> stmtStats;
+
+        int parameterSetSize = 0;
+        int resultSize = 0;
+
+        public SingleCallStatsToken(boolean samplingStatements) {
+            this.starttime = System.nanoTime();
+            if (samplingStatements) {
+                stmtStats = new ArrayList<>();
+            }
+            else {
+                stmtStats = null;
+            }
+        }
+
+        public boolean recordingStmts() {
+            return stmtStats != null;
+        }
+
+        public void setParameterSize(int size) {
+            parameterSetSize = size;
+        }
+
+        public void setResultSize(int size) {
+            resultSize = size;
+        }
+
+        public void setResultSize(VoltTable result) {
+            resultSize = 0;
+            if (result != null) {
+                resultSize += result.getSerializedSize();
+            }
+        }
+
+        public void setResultSize(VoltTable[] results) {
+            resultSize = 0;
+            if (results != null) {
+                for (VoltTable result : results ) {
+                    resultSize += result.getSerializedSize();
+                }
+            }
+        }
+
+        public void recordStatementStats(String stmtName,
+                                         boolean isCoordinatorTask,
+                                         boolean failed,
+                                         long duration,
+                                         VoltTable result,
+                                         ParameterSet parameterSet)
+        {
+            int stmtResultSize = 0;
+            if (result != null) {
+                stmtResultSize = result.getSerializedSize();
+            }
+            int stmtParamSize = 0;
+            if (parameterSet != null) {
+                stmtParamSize += parameterSet.getSerializedSize();
+            }
+
+            stmtStats.add(new PerStmtStats(stmtName,
+                                           isCoordinatorTask,
+                                           failed,
+                                           duration,
+                                           stmtResultSize,
+                                           stmtParamSize));
+        }
+    }
+
     static final class StatsData {
         /**
          * Number of times this procedure has been invoked.
@@ -276,12 +373,6 @@ public final class StatementStats {
          */
         long m_maxExecutionTime = Long.MIN_VALUE;
         long m_incrMaxExecutionTime = Long.MIN_VALUE;
-
-        /**
-         * Time the procedure was last started
-         * (Not used by per-fragment stats)
-         */
-        long m_currentStartTime = -1;
 
         /**
          * Count of the number of aborts (user initiated or DB initiated)

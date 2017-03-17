@@ -39,6 +39,7 @@ import org.voltdb.client.ProcCallException;
 import org.voltdb.client.SyncCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
+import org.voltdb.sysprocs.AdHoc_RO_MP;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltTableUtil;
 
@@ -213,7 +214,7 @@ public class TestNTProcs extends TestCase {
     final Map<String, Long> aggregateProcRow(Client client, final String procName) {
         VoltTable raw = getStats(client, "PROCEDURE");
 
-        long[] rawResult = raw.stream()
+        long[] rawResult = VoltTableUtil.stream(raw)
             // find matching rows
             .filter(r -> r.getString("PROCEDURE").equals(procName))
             // filter to six columns of interest
@@ -309,7 +310,7 @@ public class TestNTProcs extends TestCase {
         localServer.join();
     }
 
-    /*public void testNestedNTRoundTrip() throws Exception {
+    public void testNestedNTRoundTrip() throws Exception {
         ServerThread localServer = start();
 
         Client client = ClientFactory.createClient();
@@ -324,6 +325,8 @@ public class TestNTProcs extends TestCase {
 
         // CHECK STATS
         VoltTable statsT = getStats(client, "PROCEDURE");
+        System.out.println("STATS: " + statsT.toFormattedString());
+
         assertTrue(VoltTableUtil.tableContainsString(statsT, "NestedNTProc", true));
         assertTrue(VoltTableUtil.tableContainsString(statsT, "adhoc", false));
         Map<String, Long> stats = aggregateProcRow(client, NestedNTProc.class.getName());
@@ -333,7 +336,7 @@ public class TestNTProcs extends TestCase {
 
         localServer.shutdown();
         localServer.join();
-    }*/
+    }
 
     public void testRunEverywhereNTRoundTripOneNode() throws Exception {
         ServerThread localServer = start();
@@ -428,6 +431,8 @@ public class TestNTProcs extends TestCase {
 
         // CHECK STATS
         VoltTable statsT = getStats(client, "PROCEDURE");
+        System.out.println("STATS: " + statsT.toFormattedString());
+
         assertTrue(VoltTableUtil.tableContainsString(statsT, "NTProcWithFutures", true));
 
         System.out.println(statsT.toFormattedString());

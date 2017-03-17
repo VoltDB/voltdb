@@ -50,6 +50,7 @@ public class ProcedureRunnerNT {
     protected final NTProcedureService m_procSet;
     protected final Mailbox m_mailbox;
     ProcedureStatsCollector m_statsCollector;
+    StatementStats.SingleCallStatsToken m_perCallStats = null;
 
     protected final long m_id;
     protected final AtomicBoolean m_outstandingAllHostProc = new AtomicBoolean(false);
@@ -192,13 +193,43 @@ public class ProcedureRunnerNT {
     }
 
     protected ClientResponseImpl call(Object... paramListIn) {
+        m_perCallStats = m_statsCollector.beginProcedure();
 
+        // if we're keeping track, calculate parameter size
+        if (m_perCallStats != null) {
+            ParameterSet params = ParameterSet.fromArrayNoCopy(paramListIn);
+            m_perCallStats.setParameterSize(params.getSerializedSize());
+        }
+
+        ClientResponseImpl result = coreCall(paramListIn);
+
+        // if the whole call is done (no async bits)
+        if (result != null) {
+            // if we're keeping track, calculate result size
+            if (m_perCallStats != null) {
+                m_perCallStats.setResultSize(result.getResults());
+            }
+            m_statsCollector.endProcedure(result.getStatus() == ClientResponse.USER_ABORT,
+                                          (result.getStatus() != ClientResponse.USER_ABORT) &&
+                                          (result.getStatus() != ClientResponse.SUCCESS),
+                                          m_perCallStats);
+
+            // send the response to caller
+            result.setClientHandle(m_clientHandle);
+            ByteBuffer buf = ByteBuffer.allocate(result.getSerializedSize() + 4);
+            buf.putInt(buf.capacity() - 4);
+            result.flattenToBuffer(buf).flip();
+            m_ccxn.writeStream().enqueue(buf);
+        }
+
+        return result;
+    }
+
+    private ClientResponseImpl coreCall(Object... paramListIn) {
         VoltTable[] results = null;
 
         // use local var to avoid warnings about reassigning method argument
         Object[] paramList = paramListIn;
-
-        m_statsCollector.beginProcedure(m_procedureName.startsWith("@"));
 
         try {
             if (paramList.length != m_paramTypes.length) {
@@ -259,6 +290,15 @@ public class ProcedureRunnerNT {
                                             m_clientHandle);
                                 }
                             }
+
+                            // if we're keeping track, calculate result size
+                            if (m_perCallStats != null) {
+                                m_perCallStats.setResultSize(response.getResults());
+                            }
+                            m_statsCollector.endProcedure(response.getStatus() == ClientResponse.USER_ABORT,
+                                                          (response.getStatus() != ClientResponse.USER_ABORT) &&
+                                                          (response.getStatus() != ClientResponse.SUCCESS),
+                                                          m_perCallStats);
 
                             // send the response to the caller
                             response.setClientHandle(m_clientHandle);

@@ -23,7 +23,11 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Spliterator;
 import java.util.TimeZone;
+import java.util.function.Consumer;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
 import org.voltcore.utils.Pair;
 import org.voltdb.VoltDB;
@@ -270,5 +274,53 @@ public class VoltTableUtil {
             result[i] = row.get(i, row.getColumnType(i));
         }
         return result;
+    }
+
+    private static class VoltTableSpliterator implements Spliterator<VoltTableRow> {
+        VoltTableRow m_row;
+        int m_fence;
+
+        VoltTableSpliterator(VoltTable table, int origin, int fence) {
+            System.out.printf("New VTS %d -> %d in Table with %d rows\n", origin, fence, table.getRowCount());
+            System.out.flush();
+            assert(origin < fence);
+            m_row = table.fetchRow(origin);
+            m_fence = fence;
+        }
+
+        @Override
+        public boolean tryAdvance(Consumer<? super VoltTableRow> action) {
+            if (m_row.getActiveRowIndex() < m_fence) {
+                 action.accept(m_row);
+                 m_row = m_row.cloneRow();
+                 m_row.advanceRow();
+                 return true;
+             }
+             else { // cannot advance
+                 return false;
+             }
+        }
+
+        @Override
+        public Spliterator<VoltTableRow> trySplit() {
+            // no splitting until we have thread safety
+            return null;
+        }
+
+        @Override
+        public long estimateSize() {
+            return m_fence - m_row.getActiveRowIndex();
+        }
+
+        @Override
+        public int characteristics() {
+            return ORDERED | SIZED | IMMUTABLE | SUBSIZED;
+        }
+
+    }
+
+    /** Not yet public API for VoltTable and Java 8 streams */
+    public static Stream<VoltTableRow> stream(VoltTable table) {
+        return StreamSupport.stream(new VoltTableSpliterator(table, 0, table.getRowCount()), false);
     }
 }
