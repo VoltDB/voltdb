@@ -315,9 +315,11 @@ window-function         ::= {window-agg-func-expr} 4| COUNT(*) | RANK() | DENSE_
 window-agg-func-expr    ::= {non-num-aggregate-func}({column-expression}) 3| \
                             {num-only-aggregate-func}({numeric-expression})
 
-# It is possible for this to be empty, but that is less interesting, so we make it less likely
-partition-or-order-by   ::=  PARTITION BY {partition-by-list}   ORDER BY {window-order-by-list} 2| \
-                            [PARTITION BY {partition-by-list}]  ORDER BY {window-order-by-list}  | \
+# This is somewhat redundant, but since some window functions (RANK, DENSE_RANK)
+# require an ORDER BY, we make that more likely; and while other window functions
+# do allow this to be empty, that is less interesting, even when legal, so we
+# make it less likely
+partition-or-order-by   ::= [PARTITION BY {partition-by-list}]  ORDER BY {window-order-by-list} | \
                             [PARTITION BY {partition-by-list}] [ORDER BY {window-order-by-list}]
 partition-by-list       ::= {column-expression} [[, {partition-by-list}]]
 
