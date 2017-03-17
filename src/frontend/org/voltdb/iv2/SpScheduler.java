@@ -441,6 +441,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             if (!m_isLeader &&
                     CoreUtils.getHostIdFromHSId(msg.getInitiatorHSId()) !=
                     CoreUtils.getHostIdFromHSId(m_mailbox.getHSId())) {
+                if (tmLog.isDebugEnabled()) {
+                    tmLog.debug("[handleIv2InitiateTaskMessage]ShortCircuit read error:" + message);
+                }
                 VoltDB.crashLocalVoltDB("Only allowed to do short circuit reads locally", true, null);
             }
 
