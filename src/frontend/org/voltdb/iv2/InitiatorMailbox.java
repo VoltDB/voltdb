@@ -382,7 +382,7 @@ public class InitiatorMailbox implements Mailbox
     // all the requests will be sent back to the sender if these requests are intended for leader
     // These transactions will be restarted.
     private boolean checkMisroutedFragmentTaskMessage(FragmentTaskMessage message) {
-        if (m_scheduler.isLeader() || message.toReplica() || message.getCurrentBatchIndex() > 0) {
+        if (m_scheduler.isLeader() || message.toReplica()) {
             return false;
         }
         FragmentResponseMessage response = new FragmentResponseMessage(message, getHSId());
