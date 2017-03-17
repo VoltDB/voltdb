@@ -20,6 +20,7 @@ package org.voltdb;
 import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -30,8 +31,6 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.Connection;
 import org.voltdb.iv2.MpInitiator;
 
-import com.google_voltpatches.common.collect.ImmutableMap;
-import com.google_voltpatches.common.collect.ImmutableMap.Builder;
 
 /**
  * This manages per-partition handles used to identify responses for
@@ -63,9 +62,9 @@ public class ClientInterfaceHandleManager
 
     private volatile boolean m_wantsTopologyUpdates = false;
 
-    private HandleGenerator m_shortCircuitHG = new HandleGenerator(SHORT_CIRCUIT_PART_ID);
+    private final HandleGenerator m_shortCircuitHG = new HandleGenerator(SHORT_CIRCUIT_PART_ID);
 
-    private final Map<Long, Iv2InFlight> m_shortCircuitReads = new HashMap<Long, Iv2InFlight>();
+    private final Map<Long, Iv2InFlight> m_shortCircuitReads = Collections.synchronizedMap(new HashMap<>());
 
     private static class HandleGenerator
     {
@@ -77,7 +76,7 @@ public class ClientInterfaceHandleManager
             m_partitionId = partitionId;
         }
 
-        public long getNextHandle()
+        public synchronized long getNextHandle()
         {
             if (m_sequence > SEQNUM_MAX) {
                 m_sequence = 0;
@@ -123,16 +122,25 @@ public class ClientInterfaceHandleManager
 
     static class PartitionData {
         private final HandleGenerator m_generator;
-        private final Deque<Iv2InFlight> m_reads = new ArrayDeque<Iv2InFlight>();
-        private final Deque<Iv2InFlight> m_writes = new ArrayDeque<Iv2InFlight>();
+        private final Deque<Iv2InFlight> m_reads = new ArrayDeque<>();
+        private final Deque<Iv2InFlight> m_writes = new ArrayDeque<>();
 
         private PartitionData(int partitionId) {
             m_generator = new HandleGenerator(partitionId);
         }
+
+        public synchronized void offerRead(Iv2InFlight infl) {
+            m_reads.offer(infl);
+
+        }
+
+        public synchronized void offerWrite(Iv2InFlight infl) {
+            m_writes.offer(infl);
+        }
+
     }
 
-    private ImmutableMap<Integer, PartitionData> m_partitionStuff =
-            new Builder<Integer, PartitionData>().build();
+    private final Map<Integer, PartitionData> m_partitionStuff = Collections.synchronizedMap(new HashMap<Integer, PartitionData>());
 
     ClientInterfaceHandleManager(boolean isAdmin, Connection connection, ClientInterfaceRepairCallback repairCallback, AdmissionControlGroup acg)
     {
@@ -152,7 +160,7 @@ public class ClientInterfaceHandleManager
     {
         return new ClientInterfaceHandleManager(isAdmin, connection, callback, acg) {
             @Override
-            synchronized long getHandle(boolean isSinglePartition, int partitionId,
+            long getHandle(boolean isSinglePartition, int partitionId,
                     long clientHandle, int messageSize, long creationTimeNanos, String procName, long initiatorHSId,
                     boolean readOnly, boolean isShortCircuitRead) {
                 return super.getHandle(isSinglePartition, partitionId,
@@ -214,16 +222,13 @@ public class ClientInterfaceHandleManager
 
         PartitionData partitionStuff = m_partitionStuff.get(partitionId);
         if (partitionStuff == null) {
-            partitionStuff = new PartitionData(partitionId);
-            m_partitionStuff =
-                    new Builder<Integer, PartitionData>().
-                        putAll(m_partitionStuff).
-                        put(partitionId, partitionStuff).build();
+            m_partitionStuff.putIfAbsent(partitionId, new PartitionData(partitionId));
+            partitionStuff = m_partitionStuff.get(partitionId);
         }
 
         long ciHandle =
                 isShortCircuitRead ? m_shortCircuitHG.getNextHandle() : partitionStuff.m_generator.getNextHandle();
-        Iv2InFlight inFlight =
+        final Iv2InFlight inFlight =
                 new Iv2InFlight(ciHandle, clientHandle, messageSize, creationTimeNanos, procName, initiatorHSId);
 
         if (isShortCircuitRead) {
@@ -243,9 +248,9 @@ public class ClientInterfaceHandleManager
                  * Encode the read only-ness into the handle
                  */
                 ciHandle = setReadBit(ciHandle);
-                partitionStuff.m_reads.offer(inFlight);
+                partitionStuff.offerRead(inFlight);
             } else {
-                partitionStuff.m_writes.offer(inFlight);
+                partitionStuff.offerWrite(inFlight);
             }
         }
 
