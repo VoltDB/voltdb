@@ -84,6 +84,7 @@
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintWriter;
 import java.net.URL;
@@ -204,6 +205,8 @@ public class EEPlanGenerator extends PlannerTestCase {
         "int main() {\n" +
         "     return TestSuite::globalInstance()->runAll();\n" +
         "}\n";
+
+    private String m_sourceDir = "tests/ee";
 
     protected String getPlanString(String sqlStmt) throws JSONException {
         AbstractPlanNode node = compile(sqlStmt);
@@ -877,6 +880,20 @@ public class EEPlanGenerator extends PlannerTestCase {
         }
     }
 
+    protected void processArgs(String args[]) {
+        for (int idx = 0; idx < args.length; idx += 1) {
+            String arg = args[idx];
+            if ("--srcDir".equals(arg)) {
+                idx += 1;
+                if (idx < args.length) {
+                    m_sourceDir = args[idx];
+                } else {
+                    throw new IllegalArgumentException("No argument for --sourceDir.");
+                }
+            }
+        }
+    }
+
     private void writeTestFile(String testFolder, String testClassName, Map<String, String> params) throws Exception {
         String template = TESTFILE_TEMPLATE;
         for (Map.Entry<String, String> entry : params.entrySet()) {
@@ -884,6 +901,15 @@ public class EEPlanGenerator extends PlannerTestCase {
             String value   = params.get(entry.getKey());
             template = template.replace(pattern, value);
         }
-        writeFile(new File(String.format("tests/ee/%s/%s.cpp", testFolder, testClassName)), template);
+        File outputDir = new File(String.format("%s/%s", m_sourceDir, testFolder));
+        if (! outputDir.exists() && !outputDir.mkdirs()) {
+            throw new IOException("Cannot make test source folder \"" + outputDir + "\"");
+        }
+        File outputFile = new File(outputDir, testClassName + ".cpp");
+        writeFile(outputFile, template);
+    }
+
+    public void setUp(URL ddlURL, String basename, boolean planForSinglePartition) throws Exception {
+        setupSchema(ddlURL, basename, planForSinglePartition);
     }
 }

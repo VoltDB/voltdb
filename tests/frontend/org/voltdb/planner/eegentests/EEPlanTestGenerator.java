@@ -68,9 +68,9 @@ public class EEPlanTestGenerator extends EEPlanGenerator {
 
     @Override
     public void setUp() throws Exception {
-        setupSchema(EEPlanTestGenerator.class.getResource(DDL_FILENAME),
-                    "testplanseegenerator",
-                    false);
+        super.setUp(EEPlanTestGenerator.class.getResource(DDL_FILENAME),
+                    "testplansgenerator",
+                    true);
     }
 
 
@@ -693,6 +693,7 @@ public class EEPlanTestGenerator extends EEPlanGenerator {
 
     public static void main(String args[]) {
         EEPlanTestGenerator tg = new EEPlanTestGenerator();
+        tg.processArgs(args);
         try {
             tg.setUp();
             tg.generatedPlannerTest();

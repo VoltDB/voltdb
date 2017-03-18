@@ -497,12 +497,6 @@ if whichtests in ("${eetestsuite}", "executors"):
     CTX.TESTS['executors'] = """
     OptimizedProjectorTest
     MergeReceiveExecutorTest
-    TestGeneratedPlans
-    TestWindowedRank
-    TestWindowedCount
-    TestWindowedMin
-    TestWindowedMax
-    TestWindowedSum
     """
 
 if whichtests in ("${eetestsuite}", "expressions"):

@@ -177,6 +177,40 @@ def formatList(list):
         indent += len(name) + 1
     return str
 
+def buildGeneratedTests(CTX, makefile):
+    makefile.write("########################################################################\n")
+    makefile.write("#\n")
+    makefile.write("# Generating C++ Tests.\n")
+    makefile.write("#\n")
+    makefile.write("########################################################################\n")
+    makefile.write("GENERATED_DIR=${OBJDIR}/generated\n")
+    makefile.write('GENERATED_TIMESTAMP=$(GENERATED_DIR)/timestamp.txt\n')
+    makefile.write("GENERATED_SRC=$(GENERATED_DIR)/src\n")
+    makefile.write("GENERATED_OBJ=$(GENERATED_DIR)/obj\n")
+    makefile.write("GENERATED_BIN=$(GENERATED_DIR)/bin\n")
+    makefile.write("\n")
+    makefile.write("GENERATED_FILES=$(shell echo ${GENERATED_SRC}/*/*.cpp)\n")
+    makefile.write("GENERATED_OBJS=$(subst $(GENERATED_SRC),$(GENERATED_OBJ),$(patsubst %.cpp,%.o,${GENERATED_FILES}))\n")
+    makefile.write("GENERATED_TESTS=$(subst $(GENERATED_SRC),$(GENERATED_BIN),$(patsubst %.cpp,%,${GENERATED_FILES}))\n")
+    makefile.write("\n")
+    makefile.write('${GENERATED_TESTS}: ${GENERATED_TIMESTAMP}\n')
+    makefile.write('\n')
+    makefile.write('${GENERATED_TIMESTAMP}:\n')
+    makefile.write('\t@mkdir -p $(shell dirname ${GENERATED_TIMESTAMP})\n')
+    makefile.write('\t@touch $(GENERATED_TIMESTAMP)\n')
+    makefile.write('\n');
+    makefile.write("${GENERATED_BIN}/%: ${GENERATED_OBJ}/%.o objects/harness.o objects/volt.a | build-third-party-tools\n")
+    makefile.write('\t@mkdir -p $(shell dirname "$@")\n')
+    makefile.write("\t$(LINK.cpp) -o $@ $< objects/harness.o objects/volt.a $(LASTLDFLAGS)\n")
+    makefile.write("\n")
+    makefile.write('${GENERATED_OBJ}/%.o: ${GENERATED_SRC}/%.cpp\n')
+    makefile.write('\t@mkdir -p $(shell dirname "$@")\n')
+    makefile.write("\t$(CCACHE) $(COMPILE.cpp) -I$(ROOTDIR)/$(TEST_PREFIX) -MMD -MP -o $@ $<\n")
+    makefile.write("\n")
+    makefile.write("build-generated-tests: ${GENERATED_TESTS}\n")
+    makefile.write("clean-generated-tests:\n")
+    makefile.write("\trm -rf ${GENERATED_DIR}\n")
+    
 def buildThirdPartyTools(CTX, makefile):
     makefile.write("########################################################################\n")
     makefile.write("#\n")
@@ -233,6 +267,7 @@ def buildThirdPartyTools(CTX, makefile):
     makefile.write('\t@echo "OPENSSL_SRC       = $(OPENSSL_SRC)"\n')
     makefile.write('\t@echo "OPENSSL_INSTALL   = $(OPENSSL_INSTALL)"\n')
     makefile.write('\t@echo "OPENSSL_VERSION   = $(OPENSSL_VERSION)"\n')
+    makefile.write('\t@echo "GENERATED_TESTS   = $(GENERATED_TESTS)"\n')
 
     #
     # start to build third party tools now
@@ -384,7 +419,10 @@ def buildMakefile(CTX):
     os.system("mkdir -p %s" % (OUTPUT_PREFIX + "/static_objects"))
     os.system("mkdir -p %s" % (OUTPUT_PREFIX + "/cpptests"))
     os.system("mkdir -p %s" % (OUTPUT_PREFIX + "/prod"))
-
+    os.system("mkdir -p %s" % (OUTPUT_PREFIX + "/generated"))
+    os.system("mkdir -p %s" % (OUTPUT_PREFIX + "/generated/src"))
+    os.system("mkdir -p %s" % (OUTPUT_PREFIX + "/generated/obj"))
+    os.system("mkdir -p %s" % (OUTPUT_PREFIX + "/generated/bin"))
     input_paths = []
     for dir in CTX.INPUT.keys():
         input = CTX.INPUT[dir].split()
@@ -407,6 +445,8 @@ def buildMakefile(CTX):
     makefile.write("VOLT_LOG_LEVEL = %s\n" % CTX.LOG_LEVEL)
     makefile.write("CPPFLAGS += %s\n" % (MAKECPPFLAGS))
     makefile.write("LDFLAGS += %s\n" % (CTX.LDFLAGS))
+    makefile.write("LASTLDFLAGS += %s\n" % (CTX.LASTLDFLAGS))
+    makefile.write("LASTIPCLDFLAGS += %s\n" % (CTX.LASTIPCLDFLAGS))
     makefile.write("JNILIBFLAGS += %s\n" % (JNILIBFLAGS))
     makefile.write("JNIBINFLAGS += %s\n" % (JNIBINFLAGS))
     makefile.write("JNIEXT = %s\n" % (JNIEXT))
@@ -421,6 +461,7 @@ def buildMakefile(CTX):
     makefile.write('ROOTDIR=$(shell (cd ../..; /bin/pwd))\n')
     makefile.write('OBJDIR=$(ROOTDIR)/obj/${BUILD}\n')
     makefile.write('INSTALL_DIR=$(ROOTDIR)/%s\n' % THIRD_PARTY_INSTALL_DIR)
+    makefile.write("TEST_PREFIX=%s\n" % TEST_PREFIX)
     makefile.write('#\n')
     makefile.write('# This is the root of the cpp sources.\n')
     makefile.write('#\n')
@@ -433,7 +474,7 @@ def buildMakefile(CTX):
 
     if CTX.TARGET == "CLEAN":
         makefile.write(".PHONY: clean\n")
-        makefile.write("clean: \n")
+        makefile.write("clean:\n")
         makefile.write('\t${RM} "${PCRE2_SRC}"\n')
         makefile.write('\t(cd "${OPENSSL_SRC}"; make clean)\n')
         makefile.write('\trm -rf "${OBJDIR}"\n')
@@ -475,27 +516,22 @@ def buildMakefile(CTX):
 
     makefile.write("# main jnilib target\n")
     makefile.write("%s: %s\n" % (jnilibname, formatList(jni_objects)))
-    makefile.write("\t$(LINK.cpp) $(JNILIBFLAGS) -o $@ $^ %s \n" % ( CTX.LASTLDFLAGS ) )
+    makefile.write("\t$(LINK.cpp) $(JNILIBFLAGS) -o $@ $^ $(LASTLDFLAGS) \n")
     makefile.write("\n")
     cleanobjs += [ jnilibname ]
 
     makefile.write("# voltdb instance that loads the jvm from C++\n")
     makefile.write("prod/voltrun: $(SRCDIR)/voltrun.cpp " + formatList(static_objects) + "\n")
-    makefile.write("\t$(LINK.cpp) $(JNIBINFLAGS) -o $@ $^ %s\n" % ( CTX.LASTLDFLAGS ))
+    makefile.write("\t$(LINK.cpp) $(JNIBINFLAGS) -o $@ $^ $(LASTLDFLAGS)\n")
     makefile.write("\n")
     cleanobjs += ["prod/voltrun"]
 
     makefile.write("# voltdb execution engine that accepts work on a tcp socket (vs. jni)\n")
     makefile.write("prod/voltdbipc: $(SRCDIR)/voltdbipc.cpp " + " objects/volt.a\n")
-    makefile.write("\t$(LINK.cpp) -o $@ $^ %s %s\n" % (CTX.LASTLDFLAGS, CTX.LASTIPCLDFLAGS))
+    makefile.write("\t$(LINK.cpp) -o $@ $^ $(LASTLDFLAGS) $(LASTIPCLDFLAGS)\n")
     makefile.write("\n")
     cleanobjs += ["prod/voltdbipc"]
 
-    makefile.write(".PHONY: test\n")
-    makefile.write("test: ")
-    for test in tests:
-        binname, objectname, sourcename = namesForTestCode(test)
-        makefile.write(binname + " ")
     if CTX.LEVEL == "MEMCHECK":
         makefile.write("prod/voltdbipc")
     if CTX.LEVEL == "MEMCHECK_NOFREELIST":
@@ -571,6 +607,17 @@ def buildMakefile(CTX):
     makefile.write('# Tests\n')
     makefile.write('#\n')
     makefile.write('########################################################################\n')
+    
+    # build the generated tests.
+    buildGeneratedTests(CTX, makefile)
+    makefile.write("\n")
+    makefile.write(".PHONY: test\n")
+    makefile.write("test: ")
+    for test in tests:
+        binname, objectname, sourcename = namesForTestCode(test)
+        makefile.write(binname + " \\\n        ")
+    makefile.write("${GENERATED_TESTS}\n")
+    makefile.write("\n\n")
     for test in tests:
         binname, objectname, sourcename = namesForTestCode(test)
 
@@ -581,7 +628,7 @@ def buildMakefile(CTX):
         makefile.write("#\n")
         makefile.write("########################################################################\n")
         makefile.write("%s: $(ROOTDIR)/%s | build-third-party-tools \n" % (objectname, sourcename))
-        makefile.write("\t$(CCACHE) $(COMPILE.cpp) -I$(ROOTDIR)/%s -MMD -MP -o $@ $(ROOTDIR)/%s\n" % (TEST_PREFIX, sourcename))
+        makefile.write("\t$(CCACHE) $(COMPILE.cpp) -I$(ROOTDIR)/${TEST_PREFIX) -MMD -MP -o $@ $(ROOTDIR)/%s\n" % sourcename)
         makefile.write("-include %s\n" % replaceSuffix(objectname, ".d"))
         # link the test
         makefile.write("%s: objects/harness.o %s objects/volt.a  | build-third-party-tools \n" % (binname, objectname))
@@ -601,7 +648,7 @@ def buildMakefile(CTX):
     makefile.write("#\n")
     makefile.write("########################################################################\n")
     makefile.write("\n")
-    makefile.write("clean: clean-s2-geometry clean-openssl clean-3pty-install\n")
+    makefile.write("clean: clean-s2-geometry clean-openssl clean-3pty-install clean-generated-tests\n")
     makefile.write("\t${RM} %s\n" % formatList(cleanobjs))
     makefile.write("\n")
     makefile.write(".PHONY: clean-3pty-install\n")
