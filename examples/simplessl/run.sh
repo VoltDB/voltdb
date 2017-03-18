@@ -46,14 +46,14 @@ function jars() {
 
 # compile the procedure and client jarfiles if they don't exist
 function jars-ifneeded() {
-    if [ ! -e simplessl-procs.jar ] || [ ! -e simplessl-client.jar ]; then
+    if [ ! -e simplessl-client.jar ]; then
         jars;
     fi
 }
 
 # Init to directory voltdbroot
 function voltinit-ifneeded() {
-    voltdb init --force
+    voltdb init --force -C deployment.xml
 }
 
 # run the voltdb server locally
@@ -66,29 +66,18 @@ function server() {
 # load schema and procedures
 function init() {
     jars-ifneeded
-    sqlcmd < ddl.sql
+    sqlcmd --ssl=SSL.properties < ddl.sql
 }
 
-# be consistent with other examples by mapping 'client' to the viewer app
+# run the client that drives the example
 function client() {
-    scoreboard
-}
-
-function referee() {
     jars-ifneeded
     java -classpath simplessl-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
-        simplessl.RefereeClient $SERVERS
-}
-
-function scoreboard() {
-    jars-ifneeded
-    java -classpath simplessl-client.jar:$CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
-        simplessl.RefereeClient $SERVERS
+        simplessl.ExampleClient --servers=$SERVERS --sslFile=SSL.properties
 }
 
 function help() {
-    echo "Usage: ./run.sh {clean|cleanall|jars|server|init|client|async-benchmark|aysnc-benchmark-help|...}"
-    echo "       {...|sync-benchmark|sync-benchmark-help|jdbc-benchmark|jdbc-benchmark-help|simple-benchmark}"
+	echo "Usage: ./run.sh {clean|cleanall|jars|server|init|client}"
 }
 
 # Run the targets pass on the command line

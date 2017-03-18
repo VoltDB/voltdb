@@ -1,49 +1,6 @@
-file -inlinebatch END_OF_DROP_BATCH
+DROP TABLE people IF EXISTS;
 
-DROP VIEW  v_final_scores IF EXISTS;
-DROP TABLE athletes       IF EXISTS;
-DROP TABLE scores         IF EXISTS;
-DROP ROLE referee         IF EXISTS;
-DROP ROLE viewer          IF EXISTS;
-
-END_OF_DROP_BATCH
-
--- Tell sqlcmd to batch the following commands together,
--- so that the schema loads quickly.
-file -inlinebatch END_OF_BATCH
-
-CREATE ROLE referee;
-CREATE ROLE viewer WITH SQLREAD;
-
--- Stores the list of athletes
-CREATE TABLE athletes
+CREATE TABLE people
 (
-  name varchar(50) NOT NULL,
+    name varchar(50) NOT NULL PRIMARY KEY,
 );
-
--- Stores the scores submitted by each referee for each athlete.
-CREATE TABLE scores
-(
-  referee_name  varchar(50) NOT NULL,
-  athlete_name  varchar(50) NOT NULL,
-  athlete_score integer     NOT NULL, CHECK(athlete_score >= 0 and athlete_score <= 10), -- FIXME VoltDB ignores CHECK() constraints
-);
-
--- calculates official results by combining scores from each referee
--- CREATE VIEW v_final_scores
--- (
---   athlete_name
--- , total_score
--- )
--- AS
---    SUM( SELECT athlete_score, COUNT(*) )
---      FROM scores
--- GROUP BY athlete_name
---;
-
-END_OF_BATCH
-
-CREATE PROCEDURE provide_score ALLOW referee AS INSERT INTO scores VALUES (?,?,?);
-
-INSERT INTO athletes VALUES ('Adam');
-INSERT INTO athletes VALUES ('Bob');

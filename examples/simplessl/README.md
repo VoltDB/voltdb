@@ -1,10 +1,32 @@
 # SimpleSSL Application
 
-This example application demonstrates how to configure and run VoltDB with SSL. 
+This example application demonstrates how to configure and run VoltDB with SSL and basic authentication.
 
-Clients represent referees of a sporting event where individual athletes are scored from 0 to 10. Once each "referee" is authenticated, they submit scores for each athlete and print the results thus far.
+VoltDB servers using SSL must be provided with a private key and a certificate which establishes trust for that key. Clients are provided a one or more certificates that establishes that the server can be trusted. 'sqlcmd' must also be provided with certificates in order to load the DDL.
+
+Clients represent ...
+
+
 
 The "SimpleSSL" application is not designed for performance assessments. SSL support is present in the "Voter" and "VoltKV" examples, both of which provide benchmarking applications.
+
+
+Preparation
+---------------------------
+
+The first time you run this example, you will need to configure your key and certificate stores. Both the key store and trust store must be in Java's 'Java Keystore' format for VoltDB and its clients to use them. Generating these stores requires access to a JDK (Java Development Kit), though a JRE is sufficient for running VoltDB. The paths to these files are kept in a Java 'properties' file. 
+
+Verify that both your JVM and your client support the encryption protocol you are looking to use. This is essential to ensure that VoltDB clients connect to the server in a fast and secure manner, since there are known limitations with Java and other key tools. Oracle Java (as of Java 8) requires the "Unlimited Strength Java(TM) Cryptography Extension Policy" package to use more secure encryption schemes, or a comparable substitute such as Bouncy Castle. Python 2 is also known not to support TLS 1.2, which has many advantages over prior versions. It is your responsibility to respect your government's regulations on the use and import of cryptography. 
+
+The Internet has many more thorough guides, but here's a quick way to generate a self-signed certificate for testing using Linux. This is not recommended for production use.
+
+
+
+
+
+Many attributes of the application are customizable through arguments passed to the client. These attributes can be adjusted by modifying the arguments to the "client" target in run.sh.
+
+
 
 
 Quickstart
@@ -17,27 +39,16 @@ Make sure "bin" inside the VoltDB kit is in your PATH.  Then open a shell and go
 Wait until you see "Server completed initialization."
 Open a new shell in the same directory and run the following to load the schema:
 
-    sqlcmd < ddl.sql
+    ./run.sh init
 
-In the same shell, run the following script to preload some data and run the demo client application:
+In the same shell, run the following script several times. This will run the demo client application:
 
     ./run.sh client
 
-Open up the index.html file the "web" directory to view the status dashboard.
 
-If you're running the example on a VoltDB cluster, rather than your local desktop or laptop, run `./run.sh webserver` in a new shell on one of the machines in the cluster, then connect to your dashboard from your browser at [http://servername:8081](http://servername:8081).
+You can stop the server, running client, or webserver at any time with `Ctrl-c` or `SIGINT`. When running VoltDB in the background using the -B option, you can stop it with the `voltadmin shutdown` command.
 
-You can stop the server, running client, or webserver at any time with `Ctrl-c` or `SIGINT`.  Of course VoltDB can also run in the background using the -B option, in which case you can stop it with the `voltadmin shutdown` command.
-
-Note that the downloaded VoltDB kits include pre-compiled stored procedures and client code as jarfiles. To run the example from a source build, it may be necessary to compile the Java source code by typing "run.sh jars" before step 3 above. Note that this step requires a full Java JDK.
-
-
-Configuration
----------------------------
-
-Many attributes of the application are customizable through arguments passed to the client. These attributes can be adjusted by modifying the arguments to the "client" target in run.sh.
-
-
+Note that the downloaded VoltDB kits include pre-compiled client code as jarfiles. To run the example from a source build, it may be necessary to compile the Java source code by typing "run.sh jars" before step 3 above. This requires a full Java JDK.
 
 
 Using the run.sh script
@@ -53,31 +64,6 @@ VoltDB examples come with a run.sh shell script that simplifies compiling and ru
 
 If you change the client or procedure Java code, you must recompile the jars by deleting them in the shell or using `./run.sh jars`.
 
-Client Behavior Options
----------------------------
-You can control various characteristics of the demo by modifying the parameters passed into the java application in the "client" function of the run.sh script.
-
-**Speed & Duration:**
-
-    --displayinterval=5           (seconds between status reports)
-    --warmup=5                    (how long to warm up before measuring
-                                   benchmark performance.)
-    --duration=120                (benchmark duration in seconds)
-    --ratelimit=20000             (run up to this rate of requests/second)
-
-**Cluster Info:**
-
-    --servers=$SERVERS            (host(s) client connect to, e.g.
-                                   =localhost
-                                   =localhost:21212
-                                   =volt9a,volt9b,volt9c
-                                   =foo.example.com:21212,bar.example.com:21212)
-
-**Parameters Affecting Simulation:**
-
-    --contestants=6               (number of contestants to vote on)
-    --maxvotes=2                  (max votes per phone number)
-    --threads=100                 (number of parallel client threads [only in sync or jdbc])
 
 Customizing this Example
 ---------------------------
