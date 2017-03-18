@@ -346,18 +346,6 @@ public class TruncateTableLoader extends BenchmarkThread {
                                 + tableName + "': " + e.getMessage());
                     }
                 }
-                if (!TxnId2Utils.isConnectionTransactionCatalogOrServerUnavailableIssue(e.getClientResponse().getStatusString())) {
-                    long newRowCount = -1;
-                    try {
-                        newRowCount = TxnId2Utils.getRowCount(client, tableName);
-                    } catch (Exception e2) {
-                        hardStop("getrowcount exception", e2);
-                    }
-                    if (newRowCount != currentRowCount) {
-                        hardStop("TruncateTableLoader call to TruncateTable or SwapTable changed row count from " + currentRowCount
-                                + " to "+newRowCount+", despite rollback, for table '" + tableName + "': " + e.getMessage());
-                    }
-                }
             }
             catch (NoConnectionsException e) {
                 // on exception, log and end the thread, but don't kill the process
