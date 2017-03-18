@@ -169,10 +169,11 @@ public class TruncateTableLoader extends BenchmarkThread {
         } catch (Exception e) {
             hardStop("getrowcount exception", e);
         }
-        if (rowCounts[0] != swapRowCount || rowCounts[1] != tableRowCount) {
+        int z = shouldRollback == 0 ? 0 : 1;
+        if (rowCounts[(z+0)&1] != swapRowCount || rowCounts[(z+1)&1] != tableRowCount) {
             String message = swapProcName+" on "+tableName+", "+swapTableName
                     + " failed to swap row counts correctly: went from " + tableRowCount
-                    + ", " + swapRowCount + " to " + rowCounts[0] + ", " + rowCounts[1];
+                    + ", " + swapRowCount + " to " + rowCounts[0] + ", " + rowCounts[1] + ", rollback: " + shouldRollback;
             hardStop("TruncateTableLoader: " + message);
         }
         return rowCounts;
