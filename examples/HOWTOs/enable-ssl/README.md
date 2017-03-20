@@ -1,10 +1,10 @@
-# SimpleSSL Application
+# Demo: How to Enable SSL
 
-This example application demonstrates how to configure and run VoltDB while using SSL to secure connections to the database.
+This example demonstrates how to configure and run VoltDB while using SSL to secure connections to the database.
 
 VoltDB servers using SSL must be provided with a private key and a certificate which establishes trust for that key. Clients, including 'sqlcmd', are provided a one or more certificates that establishes that the server can be trusted.
 
-The "SimpleSSL" application is not designed for performance assessments. SSL support is present in the "Voter" and "VoltKV" examples, both of which provide benchmarking applications.
+This application is not designed for performance assessments. SSL support is present in the "Voter" and "VoltKV" examples, both of which provide benchmarking applications.
 
 
 Preparation
@@ -22,7 +22,7 @@ Here's a quick way to generate a self-signed certificate for testing this exampl
 For a more detailed description of the process, see the following:
 https://docs.oracle.com/cd/E19509-01/820-3503/6nf1il6er/index.html
 
-The supplied SSL.properties and deployment.xml assume all files are in the 'simplessl' directory and all passwords are 'example'. Modify them if this is not true.
+The supplied SSL.properties and deployment.xml assume all files are in this directory and all passwords are 'example'. Modify them if this is not true.
 
 > keytool -genkey  -keystore example.keystore -storepass example -alias example -keyalg rsa -validity 365 -keysize 2048
 
