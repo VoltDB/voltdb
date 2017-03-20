@@ -20,8 +20,10 @@ package org.voltdb.planner;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.catalog.Database;
@@ -365,6 +367,15 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
     @Override
     public boolean hasOrderByColumns() {
         return ! m_orderColumns.isEmpty();
+    }
+
+    @Override
+    public Set<AbstractExpression> findAllSubexpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
+        Set<AbstractExpression> exprs = new HashSet<AbstractExpression>();
+        for (AbstractParsedStmt childStmt : m_children) {
+            exprs.addAll(childStmt.findAllSubexpressionsOfClass(aeClass));
+        }
+        return exprs;
     }
 
     /**

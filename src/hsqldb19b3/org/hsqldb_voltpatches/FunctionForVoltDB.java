@@ -154,6 +154,12 @@ public class FunctionForVoltDB extends FunctionSQL {
         static final int FUNC_VOLT_ROUND                  = 20042;
         static final int FUNC_VOLT_STR                    = 20043;
 
+        // our local functions for networking
+        static final int FUNC_INET_NTOA                   = 20044;
+        static final int FUNC_INET_ATON                   = 20045;
+        static final int FUNC_INET6_NTOA                  = 20046;
+        static final int FUNC_INET6_ATON                  = 20047;
+
         // Geospatial functions
         static final int FUNC_VOLT_POINTFROMTEXT                = 21000;
         static final int FUNC_VOLT_POLYGONFROMTEXT              = 21001;
@@ -378,9 +384,26 @@ public class FunctionForVoltDB extends FunctionSQL {
             new FunctionId("is_valid_timestamp", Type.SQL_BOOLEAN, FUNC_VOLT_IS_VALID_TIMESTAMP, -1,
                     new Type[] { Type.SQL_TIMESTAMP },
                     singleParamList),
+
+            new FunctionId("inet_ntoa", Type.SQL_VARCHAR, FUNC_INET_NTOA, -1,
+                    new Type[] { Type.SQL_BIGINT },
+                    singleParamList),
+
+            new FunctionId("inet_aton", Type.SQL_BIGINT, FUNC_INET_ATON, -1,
+                    new Type[] { Type.SQL_VARCHAR },
+                    singleParamList),
+
+            new FunctionId("inet6_aton", Type.SQL_VARBINARY, FUNC_INET6_ATON, -1,
+                    new Type[] { Type.SQL_VARCHAR },
+                    singleParamList),
+
+            new FunctionId("inet6_ntoa", Type.SQL_VARCHAR, FUNC_INET6_NTOA, -1,
+                    new Type[] { Type.SQL_VARBINARY },
+                    singleParamList),
+
         };
 
-        private static Map<String, FunctionId> by_LC_name = new HashMap<String, FunctionId>();
+        private static Map<String, FunctionId> by_LC_name = new HashMap<>();
 
         static {
             for (FunctionId fn : instances) {
@@ -660,6 +683,39 @@ public class FunctionForVoltDB extends FunctionSQL {
                 throw Error.error(ErrorCode.X_42565,
                         "The asText function accepts only GEOGRAPHY and GEOGRAPHY_POINT types.");
             }
+            break;
+
+        // our networking specified functions
+        case FunctionId.FUNC_INET_NTOA:
+            if (nodes[0].dataType != null &&
+                !nodes[0].dataType.isNumberType()) {
+                throw Error.error(ErrorCode.X_42561);
+            }
+            dataType = Type.SQL_VARCHAR;
+            break;
+
+        case FunctionId.FUNC_INET_ATON:
+            if (nodes[0].dataType != null &&
+                !nodes[0].dataType.isCharacterType()) {
+                throw Error.error(ErrorCode.X_42561);
+            }
+            dataType = Type.SQL_BIGINT;
+            break;
+
+        case FunctionId.FUNC_INET6_ATON:
+            if (nodes[0].dataType != null &&
+                !nodes[0].dataType.isCharacterType()) {
+                throw Error.error(ErrorCode.X_42561);
+            }
+            dataType = Type.SQL_VARBINARY;
+            break;
+
+        case FunctionId.FUNC_INET6_NTOA:
+            if (nodes[0].dataType != null &&
+                !nodes[0].dataType.isBinaryType()) {
+                throw Error.error(ErrorCode.X_42561);
+            }
+            dataType = Type.SQL_VARCHAR;
             break;
 
         default:

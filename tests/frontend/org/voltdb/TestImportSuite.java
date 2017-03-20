@@ -232,26 +232,32 @@ public class TestImportSuite extends RegressionSuite {
         }
         assertTrue(error, success);
 
-       ClientResponse response = client.callProcedure("@Statistics", "Initiator", 0);
-       VoltTable stats = response.getResults()[0];
-       int foundCount = 0;
-       for (int i=0; i<stats.getRowCount(); i++) {
-           VoltTableRow row = stats.fetchRow(i);
-           String name = row.getString(CONN_HOST_COL);
-           if (!expectedStatRows.containsKey(name)) {
-               continue;
-           }
-           foundCount++;
-           assertEquals(expectedStatRows.get(name), row.getString(PROC_NAME_COL));
-           long invocations = row.getLong(INVOCATIONS_COL);
-           if (min<0) {
-               assertEquals(count, invocations);
-           } else {
-               assertTrue(invocations>=min && invocations <= count);
-           }
-       }
+        ClientResponse response = client.callProcedure("@Statistics", "Initiator", 0);
+        VoltTable stats = response.getResults()[0];
+        Map<String, Long> statsRollup = new HashMap<>();
+        for (int i=0; i<stats.getRowCount(); i++) {
+            VoltTableRow row = stats.fetchRow(i);
+            String name = row.getString(CONN_HOST_COL);
+            if (!expectedStatRows.containsKey(name)) {
+                continue;
+            }
+            assertEquals(expectedStatRows.get(name), row.getString(PROC_NAME_COL));
+            long invocations = row.getLong(INVOCATIONS_COL);
 
-       assertEquals(expectedStatRows.size(), foundCount);
+            // Importers use more than one internal adapters, they'll show up as multiple rows.
+            if (statsRollup.computeIfPresent(name, (k, v) -> v + invocations) == null) {
+                statsRollup.put(name, invocations);
+            }
+        }
+
+        assertEquals(expectedStatRows.size(), statsRollup.size());
+        for (long invocations : statsRollup.values()) {
+            if (min<0) {
+                assertEquals(count, invocations);
+            } else {
+                assertTrue(invocations>=min && invocations <= count);
+            }
+        }
     }
 
     public void testImportSimpleData() throws Exception {

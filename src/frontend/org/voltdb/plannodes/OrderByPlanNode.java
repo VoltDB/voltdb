@@ -24,7 +24,6 @@ import java.util.Set;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
-import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
@@ -141,8 +140,6 @@ public class OrderByPlanNode extends AbstractPlanNode {
 
     @Override
     public void computeCostEstimates(long childOutputTupleCountEstimate,
-                                     Cluster cluster,
-                                     Database db,
                                      DatabaseEstimates estimates,
                                      ScalarValueHints[] paramHints) {
         // This method doesn't do anything besides what the parent method does,

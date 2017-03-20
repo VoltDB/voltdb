@@ -44,6 +44,7 @@ import org.voltdb.compiler.deploymentfile.SchemaType;
 import org.voltdb.compiler.deploymentfile.SecurityProviderString;
 import org.voltdb.compiler.deploymentfile.SecurityType;
 import org.voltdb.compiler.deploymentfile.SnapshotType;
+import org.voltdb.compiler.deploymentfile.SslType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType.Temptables;
 import org.voltdb.compiler.deploymentfile.UsersType;
@@ -411,6 +412,10 @@ public class DeploymentBuilder {
                 }
             }
         }
+
+        SslType ssl = factory.createSslType();
+        deployment.setSsl(ssl);
+        ssl.setEnabled(false);
 
         // <httpd>. Disabled unless port # is configured by a testcase
         HttpdType httpd = factory.createHttpdType();

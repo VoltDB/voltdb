@@ -37,7 +37,6 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.xml.bind.annotation.XmlAttribute;
 
-import org.apache.commons.lang3.StringUtils;
 import org.apache.http.entity.ContentType;
 import org.codehaus.jackson.JsonFactory;
 import org.codehaus.jackson.JsonGenerator;
@@ -81,8 +80,6 @@ import org.voltdb.client.SyncCallback;
 import org.voltdb.common.Permission;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.ExportType;
-import org.voltdb.compiler.deploymentfile.HttpsType;
-import org.voltdb.compiler.deploymentfile.KeyOrTrustStoreType;
 import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.compiler.deploymentfile.UsersType;
@@ -365,10 +362,13 @@ public class HTTPAdminListener {
             super.handle(target, baseRequest, request, response);
             if (baseRequest.isHandled()) return;
             //jsonp is specified when response is expected to go to javascript function.
-            String jsonp = request.getParameter("jsonp");
+            String jsonp = request.getParameter(HTTPClientInterface.JSONP);
             AuthenticationResult authResult = null;
             try {
                 response.setContentType(jsonContentType);
+                if (!HTTPClientInterface.validateJSONP(jsonp, baseRequest, response)) {
+                    return;
+                }
                 response.setStatus(HttpServletResponse.SC_OK);
                 authResult = authenticate(baseRequest);
                 if (!authResult.isAuthenticated()) {
@@ -494,10 +494,13 @@ public class HTTPAdminListener {
             if (baseRequest.isHandled()) return;
 
             //jsonp is specified when response is expected to go to javascript function.
-            String jsonp = request.getParameter("jsonp");
+            String jsonp = request.getParameter(HTTPClientInterface.JSONP);
             AuthenticationResult authResult = null;
             try {
                 response.setContentType(jsonContentType);
+                if (!HTTPClientInterface.validateJSONP(jsonp, baseRequest, response)) {
+                    return;
+                }
                 response.setStatus(HttpServletResponse.SC_OK);
 
                 //Requests require authentication.
@@ -808,7 +811,7 @@ public class HTTPAdminListener {
                     }
                     mapper.writeValue(response.getWriter(), id);
                 } else {
-                    response.getWriter().write("");
+                    response.getWriter().write("[]");
                 }
                 if (jsonp != null) {
                     response.getWriter().write(")");
@@ -937,7 +940,7 @@ public class HTTPAdminListener {
 
     public HTTPAdminListener(
             boolean jsonEnabled, String intf, String publicIntf, int port,
-            HttpsType httpsType, boolean mustListen
+            SslContextFactory sslContextFactory, boolean mustListen
             ) throws Exception {
         int poolsize = Integer.getInteger("HTTP_POOL_SIZE", 50);
         int timeout = Integer.getInteger("HTTP_REQUEST_TIMEOUT_SECONDS", 15);
@@ -978,7 +981,7 @@ public class HTTPAdminListener {
         // NOW START SocketConnector and create Jetty server but dont start.
         ServerConnector connector = null;
         try {
-            if (httpsType == null || !httpsType.isEnabled()) { // basic HTTP
+            if (sslContextFactory == null) { // basic HTTP
                 // The socket channel connector seems to be faster for our use
                 //SelectChannelConnector connector = new SelectChannelConnector();
                 connector = new ServerConnector(m_server);
@@ -992,7 +995,7 @@ public class HTTPAdminListener {
                 connector.open();
                 m_server.addConnector(connector);
             } else { // HTTPS
-                m_server.addConnector(getSSLServerConnector(httpsType, intf, port));
+                m_server.addConnector(getSSLServerConnector(sslContextFactory, intf, port));
             }
 
             //m_server.setConnectors(new Connector[] { connector, sslConnector });
@@ -1048,54 +1051,13 @@ public class HTTPAdminListener {
         }
     }
 
-    private String getKeyTrustStoreAttribute(String sysPropName, KeyOrTrustStoreType store, String valueType, boolean throwForNull) {
-        String sysProp = System.getProperty(sysPropName);
-        if (StringUtils.isNotBlank(sysProp)) {
-            return sysProp.trim();
-        } else {
-            String value = null;
-            if (store!=null) {
-                value = "path".equals(valueType) ? store.getPath() : store.getPassword();
-            }
-            if (StringUtils.isBlank(value) && throwForNull) {
-                    throw new IllegalArgumentException(
-                        "To enable HTTPS, keystore must be configured with password in deployment file or using system property. " + sysPropName);
-            } else {
-                return value;
-            }
-        }
-    }
-
-    private ServerConnector getSSLServerConnector(HttpsType httpsType, String intf, int port)
+    private ServerConnector getSSLServerConnector(SslContextFactory sslContextFactory, String intf, int port)
         throws IOException {
-        SslContextFactory sslContextFactory = new SslContextFactory();
-        String value = getKeyTrustStoreAttribute("javax.net.ssl.keyStore", httpsType.getKeystore(), "path", true);
-        sslContextFactory.setKeyStorePath(value);
-        sslContextFactory.setKeyStorePassword(getKeyTrustStoreAttribute("javax.net.ssl.keyStorePassword", httpsType.getKeystore(), "password", true));
-        value = getKeyTrustStoreAttribute("javax.net.ssl.trustStore", httpsType.getTruststore(), "path", false);
-        if (value!=null) {
-            sslContextFactory.setTrustStorePath(value);
-        }
-        value = getKeyTrustStoreAttribute("javax.net.ssl.trustStorePassword", httpsType.getTruststore(), "password", false);
-        if (value!=null) {
-            sslContextFactory.setTrustStorePassword(value);
-        }
-        // exclude weak ciphers
-        sslContextFactory.setExcludeCipherSuites("SSL_RSA_WITH_DES_CBC_SHA",
-                "SSL_DHE_RSA_WITH_DES_CBC_SHA", "SSL_DHE_DSS_WITH_DES_CBC_SHA",
-                "SSL_RSA_EXPORT_WITH_RC4_40_MD5",
-                "SSL_RSA_EXPORT_WITH_DES40_CBC_SHA",
-                "SSL_DHE_RSA_EXPORT_WITH_DES40_CBC_SHA",
-                "SSL_DHE_DSS_EXPORT_WITH_DES40_CBC_SHA");
-        /* More configurable things that we are not using for now.
-        sslContextFactory.setKeyManagerPassword("password");
-                */
-
         // SSL HTTP Configuration
         HttpConfiguration httpsConfig = new HttpConfiguration();
-        httpsConfig.setSecureScheme("https");
+        httpsConfig.setSecureScheme("ssl");
         httpsConfig.setSecurePort(port);
-        //Add this customizer to indicate we are in https land
+        //Add this customizer to indicate we are in ssl land
         httpsConfig.addCustomizer(new SecureRequestCustomizer());
         HttpConnectionFactory factory = new HttpConnectionFactory(httpsConfig);
 

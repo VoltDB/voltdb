@@ -16,6 +16,7 @@
  */
 package org.voltdb;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ScheduledExecutorService;
@@ -134,8 +135,9 @@ public interface VoltDBInterface
      *
      * @param xmlConfig The xml string containing the new logging configuration
      * @param currentTxnId  The transaction ID at which this method is called
+     * @param voltroot The VoltDB root path
      */
-    void logUpdate(String xmlConfig, long currentTxnId);
+    void logUpdate(String xmlConfig, long currentTxnId, File voltroot);
 
     /**
      * Updates the catalog context stored by this VoltDB without destroying the old one,
@@ -159,7 +161,8 @@ public interface VoltDBInterface
             long currentTxnId,
             long currentTxnTimestamp,
             byte[] deploymentBytes,
-            byte[] deploymentHash);
+            byte[] deploymentHash,
+            boolean hasSchemaChange);
 
     /**
      * Updates the cluster setting of this VoltDB

@@ -37,7 +37,10 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Logger;
 
+import javax.net.ssl.SSLContext;
+
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.ssl.SSLConfiguration;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
 import org.voltdb.client.HashinatorLite.HashinatorLiteType;
@@ -86,6 +89,7 @@ public final class ClientImpl implements Client {
     private final String m_username;
     private final byte m_passwordHash[];
     private final ClientAuthScheme m_hashScheme;
+    private final SSLContext m_sslContext;
 
 
     /**
@@ -113,14 +117,17 @@ public final class ClientImpl implements Client {
      * Also provide a hint indicating the expected serialized size of
      * most outgoing procedure invocations. This helps size initial allocations
      * for serializing network writes
-     * @param expectedOutgoingMessageSize Expected size of procedure invocations in bytes
-     * @param maxArenaSizes Maximum size arenas in the memory pool should grow to
-     * @param heavyweight Whether to use multiple or a single thread
      */
     ClientImpl(ClientConfig config) {
 
         if (config.m_topologyChangeAware && !config.m_useClientAffinity) {
             throw new IllegalArgumentException("The client affinity must be enabled to enable topology awareness.");
+        }
+
+        if (config.m_enableSSL) {
+            m_sslContext = SSLConfiguration.createSslContext(config.m_sslConfig);
+        } else {
+            m_sslContext = null;
         }
 
         m_distributer = new Distributer(
@@ -129,7 +136,8 @@ public final class ClientImpl implements Client {
                 config.m_connectionResponseTimeoutMS,
                 config.m_useClientAffinity,
                 config.m_sendReadsToReplicasBytDefaultIfCAEnabled,
-                config.m_subject);
+                config.m_subject,
+                m_sslContext);
         m_distributer.addClientStatusListener(m_listener);
         String username = config.m_username;
         if (config.m_subject != null) {
@@ -206,6 +214,10 @@ public final class ClientImpl implements Client {
 
     public int getPasswordHashCode() {
         return m_passwordHashCode;
+    }
+
+    public SSLContext getSSLContext() {
+        return m_sslContext;
     }
 
     public void createConnectionWithHashedCredentials(
@@ -1121,7 +1133,6 @@ public final class ClientImpl implements Client {
 
         /**
          * Callback initialization
-         * @param responseWaiter The count down latch
          * @param partitionKey  The partition where the call back works on
          * @param index  The index for PartitionClientResponse
          * @param responses The final result array

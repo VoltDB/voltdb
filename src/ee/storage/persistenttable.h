@@ -481,15 +481,14 @@ public:
         return this;
     }
 
-    void setTableForStreamIndexing(PersistentTable* tb) {
+    void setTableForStreamIndexing(PersistentTable* tb, PersistentTable* tbForStreamIndexing) {
         if (this == tb) {
             // For example, two identical swap statements in the same XA
             // should restore the status quo.
             // Likewise, the swapTable call to undo a SWAP TABLES statement.
             unsetTableForStreamIndexing();
         }
-        m_tableForStreamIndexing = (tb->m_tableForStreamIndexing == NULL) ?
-            tb : tb->m_tableForStreamIndexing;
+        m_tableForStreamIndexing = tbForStreamIndexing;
         m_tableForStreamIndexing->incrementRefcount();
     }
 

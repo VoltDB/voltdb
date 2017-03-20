@@ -39,6 +39,26 @@ public enum TxnId2Utils {;
         return doProcCall(client, "@AdHoc", query);
     }
 
+    static boolean isConnectionTransactionOrCatalogIssue(String statusString) {
+        return statusString.matches("(?s).*AdHoc transaction -?[0-9]+ wasn.t planned against the current catalog version.*") ||
+                statusString.matches(".*Connection to database host \\(.*\\) was lost before a response was received.*") ||
+                statusString.matches(".*Transaction dropped due to change in mastership. It is possible the transaction was committed.*") ||
+                statusString.matches("(?s).*Transaction being restarted due to fault recovery or shutdown.*") ||
+                statusString.matches("(?s).*Invalid catalog update.  Catalog or deployment change was planned against one version of the cluster configuration but that version was no longer live.*");
+    }
+
+    static boolean isServerUnavailableIssue(String statusString) {
+        return statusString.matches("(?s).*No response received in the allotted time.*") ||
+                statusString.matches(".*Server is currently unavailable; try again later.*") ||
+                statusString.matches(".*Server is paused.*") ||
+                statusString.matches("(?s).*Server is shutting down.*");
+    }
+
+    static boolean isConnectionTransactionCatalogOrServerUnavailableIssue(String statusString) {
+        return isConnectionTransactionOrCatalogIssue(statusString) ||
+                isServerUnavailableIssue(statusString);
+    }
+
     static ClientResponse doProcCall(Client client, String proc, Object... parms) throws ProcCallException {
         Boolean sleep = false;
         Boolean noConnections = false;
@@ -66,17 +86,9 @@ public enum TxnId2Utils {;
                 String ss = cr.getStatusString();
                 log.debug(ss);
                 if (/*cr.getStatus() == ClientResponse.USER_ABORT &&*/
-                    (ss.matches("(?s).*AdHoc transaction -?[0-9]+ wasn.t planned against the current catalog version.*") ||
-                     ss.matches(".*Connection to database host \\(.*\\) was lost before a response was received.*") ||
-                     ss.matches(".*Transaction dropped due to change in mastership. It is possible the transaction was committed.*") ||
-                     ss.matches("(?s).*Transaction being restarted due to fault recovery or shutdown.*") ||
-                     ss.matches("(?s).*Invalid catalog update.  Catalog or deployment change was planned against one version of the cluster configuration but that version was no longer live.*")
-                    )) {}
-                else if (ss.matches("(?s).*No response received in the allotted time.*") ||
-                         ss.matches(".*Server is currently unavailable; try again later.*") ||
-                         ss.matches(".*Server is paused.*") ||
-                         ss.matches("(?s).*Server is shutting down.*")
-                        ) {
+                    isConnectionTransactionOrCatalogIssue(ss)
+                    ) {}
+                else if (isServerUnavailableIssue(ss)) {
                     sleep = true;
                 }
                 else {

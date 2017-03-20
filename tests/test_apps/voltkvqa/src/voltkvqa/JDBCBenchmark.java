@@ -21,8 +21,8 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 /*
- * This samples uses multiple threads to post synchronous requests to the
- * VoltDB server, simulating multiple client application posting
+ * This sample uses multiple threads to post synchronous requests to the
+ * VoltDB server, simulating multiple client applications posting
  * synchronous requests to the database, using the standard JDBC interface
  * available for VoltDB.
  *
@@ -132,6 +132,10 @@ public class JDBCBenchmark
 
         @Option(desc = "Use External Connection Pool, c3p0, tomcat, bonecp or hikari")
         String externalConnectionPool = "";
+
+        // TODO: setup SSL properties for JDBC
+        @Option(desc = "Enable SSL with configuration file.")
+        String sslfile = "";
 
         @Override
         public void validate() {

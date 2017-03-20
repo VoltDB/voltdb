@@ -62,7 +62,7 @@ public class JDBCLoader implements BulkLoaderErrorHandler {
      */
     static String pathLogfile = "jdbcloaderLog.log";
     private static final VoltLogger m_log = new VoltLogger("JDBCLOADER");
-    private static JDBCLoaderConfig config = null;
+    private static JDBCLoaderConfig m_config = null;
     private static long start = 0;
     private static BufferedWriter out_invaliderowfile;
     private static BufferedWriter out_logfile;
@@ -110,7 +110,7 @@ public class JDBCLoader implements BulkLoaderErrorHandler {
                     m_errorCount.incrementAndGet();
 
                 } catch (FileNotFoundException e) {
-                    m_log.error("JDBC Loader report directory '" + config.reportdir
+                    m_log.error("JDBC Loader report directory '" + m_config.reportdir
                             + "' does not exist.",e);
                 } catch (Exception x) {
                     m_log.error(x);
@@ -144,7 +144,7 @@ public class JDBCLoader implements BulkLoaderErrorHandler {
     @Override
     public boolean handleError(RowWithMetaData metaData, ClientResponse response, String error) {
         //Dont collect more than we want to report.
-        if (m_errorCount.get() + m_errorInfo.size() >= config.maxerrors) {
+        if (m_errorCount.get() + m_errorInfo.size() >= m_config.maxerrors) {
             return true;
         }
 
@@ -179,7 +179,7 @@ public class JDBCLoader implements BulkLoaderErrorHandler {
 
     @Override
     public boolean hasReachedErrorLimit() {
-        return m_errorCount.get() + m_errorInfo.size() >= config.maxerrors;
+        return m_errorCount.get() + m_errorInfo.size() >= m_config.maxerrors;
     }
 
     /**
@@ -241,6 +241,9 @@ public class JDBCLoader implements BulkLoaderErrorHandler {
 
         @Option(desc = "Use upsert instead of insert", hasArg = false)
         boolean update = false;
+
+        @Option(desc = "Enable SSL, Optionally provide configuration file.")
+        String ssl = "";
 
         /**
          * Validate command line options.
@@ -316,23 +319,27 @@ public class JDBCLoader implements BulkLoaderErrorHandler {
         final JDBCLoaderConfig cfg = new JDBCLoaderConfig();
         cfg.parse(JDBCLoader.class.getName(), args);
 
-        config = cfg;
+        m_config = cfg;
         configuration();
         // Split server list
-        final String[] serverlist = config.servers.split(",");
+        final String[] serverlist = m_config.servers.split(",");
 
         // If we need to prompt the user for a VoltDB password, do so.
-        config.password = cfg.readPasswordIfNeeded(config.user, config.password, "Enter VoltDB password: ");
+        m_config.password = CLIConfig.readPasswordIfNeeded(m_config.user, m_config.password, "Enter VoltDB password: ");
 
         // Create connection
-        final ClientConfig c_config = new ClientConfig(config.user, config.password);
+        final ClientConfig c_config = new ClientConfig(m_config.user, m_config.password, null);
+        if (m_config.ssl != null && !m_config.ssl.trim().isEmpty()) {
+            c_config.setTrustStoreConfigFromPropertyFile(m_config.ssl);
+            c_config.enableSSL();
+        }
         c_config.setProcedureCallTimeout(0); // Set procedure all to infinite
         Client csvClient = null;
         try {
-            csvClient = JDBCLoader.getClient(c_config, serverlist, config.port);
+            csvClient = JDBCLoader.getClient(c_config, serverlist, m_config.port);
         } catch (Exception e) {
             m_log.error("Error connecting to the servers: "
-                    + config.servers, e);
+                    + m_config.servers, e);
             System.exit(-1);
         }
         assert (csvClient != null);
@@ -347,14 +354,14 @@ public class JDBCLoader implements BulkLoaderErrorHandler {
             errHandler.launchErrorFlushProcessor();
 
 
-            if (config.useSuppliedProcedure) {
-                dataLoader = new CSVTupleDataLoader((ClientImpl) csvClient, config.procedure, errHandler);
+            if (m_config.useSuppliedProcedure) {
+                dataLoader = new CSVTupleDataLoader((ClientImpl) csvClient, m_config.procedure, errHandler);
             } else {
-                dataLoader = new CSVBulkDataLoader((ClientImpl) csvClient, config.table, config.batch, config.update, errHandler);
+                dataLoader = new CSVBulkDataLoader((ClientImpl) csvClient, m_config.table, m_config.batch, m_config.update, errHandler);
             }
 
             // If we need to prompt the user for a JDBC datasource password, do so.
-            config.jdbcpassword = cfg.readPasswordIfNeeded(config.jdbcuser, config.jdbcpassword, "Enter JDBC source database password: ");
+            m_config.jdbcpassword = CLIConfig.readPasswordIfNeeded(m_config.jdbcuser, m_config.jdbcpassword, "Enter JDBC source database password: ");
 
             //Created Source reader
             JDBCStatementReader.initializeReader(cfg, csvClient);
@@ -380,7 +387,7 @@ public class JDBCLoader implements BulkLoaderErrorHandler {
 
             if (errHandler.hasReachedErrorLimit()) {
                 m_log.warn("The number of failed rows exceeds the configured maximum failed rows: "
-                           + config.maxerrors);
+                           + m_config.maxerrors);
             }
 
             if (m_log.isDebugEnabled()) {
@@ -404,16 +411,16 @@ public class JDBCLoader implements BulkLoaderErrorHandler {
 
     private static void configuration() {
         String insertProcedure;
-        if (!config.table.equals("")) {
-            insertProcedure = config.table.toUpperCase() + ".insert";
+        if (!m_config.table.equals("")) {
+            insertProcedure = m_config.table.toUpperCase() + ".insert";
         } else {
-            insertProcedure = config.procedure;
+            insertProcedure = m_config.procedure;
         }
-        if (!config.reportdir.endsWith("/")) {
-            config.reportdir += "/";
+        if (!m_config.reportdir.endsWith("/")) {
+            m_config.reportdir += "/";
         }
         try {
-            File dir = new File(config.reportdir);
+            File dir = new File(m_config.reportdir);
             if (!dir.exists()) {
                 dir.mkdirs();
             }
@@ -423,11 +430,11 @@ public class JDBCLoader implements BulkLoaderErrorHandler {
         }
 
         insertProcedure = insertProcedure.replaceAll("\\.", "_");
-        pathInvalidrowfile = config.reportdir + "jdbcloader_" + insertProcedure + "_"
+        pathInvalidrowfile = m_config.reportdir + "jdbcloader_" + insertProcedure + "_"
                 + "invalidrows.csv";
-        pathLogfile = config.reportdir + "jdbcloader_" + insertProcedure + "_"
+        pathLogfile = m_config.reportdir + "jdbcloader_" + insertProcedure + "_"
                 + "log.log";
-        pathReportfile = config.reportdir + "jdbcloader_" + insertProcedure + "_"
+        pathReportfile = m_config.reportdir + "jdbcloader_" + insertProcedure + "_"
                 + "report.log";
 
         try {
@@ -493,7 +500,7 @@ public class JDBCLoader implements BulkLoaderErrorHandler {
             out_logfile.flush();
             out_reportfile.flush();
         } catch (FileNotFoundException e) {
-            m_log.error("JDBC Loader report directory '" + config.reportdir
+            m_log.error("JDBC Loader report directory '" + m_config.reportdir
                     + "' does not exist.",e);
         } catch (Exception x) {
             m_log.error(x);

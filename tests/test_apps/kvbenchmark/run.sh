@@ -31,6 +31,7 @@ APPCLASSPATH=$CLASSPATH:$({ \
     \ls -1 "$VOLTDB_VOLTDB"/voltdb-*.jar; \
     \ls -1 "$VOLTDB_LIB"/*.jar; \
     \ls -1 "$VOLTDB_LIB"/extension/*.jar; \
+    \ls -1 *.jar; \
 } 2> /dev/null | paste -sd ':' - )
 VOLTDB="$VOLTDB_BIN/voltdb"
 LOG4J="$VOLTDB_VOLTDB/log4j.xml"
@@ -65,10 +66,26 @@ function catalog() {
     if [ $? != 0 ]; then exit; fi
 }
 
+# remove everything from "clean" as well as the jarfiles
+function cleanall() {
+    ant clean
+}
+
+# compile the source code for procedures and the client into jarfiles
+function jars() {
+    ant
+}
+
+# compile the procedure and client jarfiles if they don't exist
+function jars-ifneeded() {
+    if [ ! -e kvbenchmark.jar ]; then
+        jars;
+    fi
+}
+
 # run the voltdb server locally
 function server() {
-    # if a catalog doesn't exist, build one
-    if [ ! -f $APPNAME.jar ]; then catalog; fi
+    jars-ifneeded
     # only on Oracle jdk...
     if  java -version 2>&1 | grep -q 'Java HotSpot' ; then
         FR_TEMP=/tmp/${USER}/fr
@@ -99,13 +116,13 @@ function client() {
 # Multi-threaded synchronous benchmark sample
 # Use this target for argument help
 function sync-benchmark-help() {
-    srccompile
+    jars-ifneeded
     java -classpath obj:$APPCLASSPATH:obj kvbench.SyncBenchmark --help
 }
 
 function sync-benchmark() {
-    srccompile
-    java -classpath obj:$APPCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
+    jars-ifneeded
+    java -classpath kvbenchmark.jar:$APPCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
         kvbench.SyncBenchmark \
         --displayinterval=5 \
         --duration=120 \
@@ -122,7 +139,7 @@ function sync-benchmark() {
 }
 
 function http-benchmark() {
-    srccompile
+    jars-ifneeded
     java -classpath obj:$APPCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
         kvbench.HTTPBenchmark \
         --displayinterval=5 \
@@ -137,6 +154,11 @@ function http-benchmark() {
         --usecompression=false \
         --threads=40 \
         --csvfile=periodic.csv.gz
+}
+
+function init() {
+    jars-ifneeded
+    sqlcmd < ddl.sql
 }
 
 function help() {

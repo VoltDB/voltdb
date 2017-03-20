@@ -124,6 +124,7 @@ import org.voltdb.compiler.deploymentfile.SchemaType;
 import org.voltdb.compiler.deploymentfile.SecurityType;
 import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.compiler.deploymentfile.SnapshotType;
+import org.voltdb.compiler.deploymentfile.SslType;
 import org.voltdb.compiler.deploymentfile.SnmpType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.compiler.deploymentfile.UsersType;
@@ -715,7 +716,7 @@ public abstract class CatalogUtil {
             }
 
             // set the HTTPD info
-            setHTTPDInfo(catalog, deployment.getHttpd());
+            setHTTPDInfo(catalog, deployment.getHttpd(), deployment.getSsl());
 
             setDrInfo(catalog, deployment.getDr(), deployment.getCluster());
 
@@ -868,6 +869,12 @@ public abstract class CatalogUtil {
         if (deployment.getHeartbeat() == null) {
             HeartbeatType hb = new HeartbeatType();
             deployment.setHeartbeat(hb);
+        }
+
+        SslType ssl = deployment.getSsl();
+        if (ssl == null) {
+            ssl = new SslType();
+            deployment.setSsl(ssl);
         }
         //httpd
         HttpdType httpd = deployment.getHttpd();
@@ -1898,12 +1905,12 @@ public abstract class CatalogUtil {
         return roles;
     }
 
-    private static void setHTTPDInfo(Catalog catalog, HttpdType httpd) {
+    private static void setHTTPDInfo(Catalog catalog, HttpdType httpd, SslType ssl) {
         Cluster cluster = catalog.getClusters().get("cluster");
 
         // set the catalog info
         int defaultPort = VoltDB.DEFAULT_HTTP_PORT;
-        if (httpd.getHttps()!=null && httpd.getHttps().isEnabled()) {
+        if (ssl !=null && ssl.isEnabled()) {
             defaultPort = VoltDB.DEFAULT_HTTPS_PORT;
         }
         cluster.setHttpdportno(httpd.getPort()==null ? defaultPort : httpd.getPort());
@@ -2568,6 +2575,7 @@ public abstract class CatalogUtil {
         paths.setCommandlogsnapshot(prev.getCommandlogsnapshot());
 
         clone.setPaths(paths);
+        clone.setSsl(o.getSsl());
 
         clone.setSnmp(o.getSnmp());
         return clone;

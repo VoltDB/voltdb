@@ -20,12 +20,12 @@ package org.voltdb.plannodes;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
-import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.types.PlanNodeType;
 
 public class SendPlanNode extends AbstractPlanNode {
@@ -47,10 +47,12 @@ public class SendPlanNode extends AbstractPlanNode {
         childNode.resolveColumnIndexes();
         NodeSchema inputSchema = childNode.getOutputSchema();
         if (!(inputSchema.equalsOnlyNames(m_outputSchema))) {
-            System.out.println("ERROR: IN: " + inputSchema + " OUT: " + m_outputSchema);
+            throw new PlanningErrorException("Internal Error: Send Node input schema differs from output schema");
         }
-        assert(inputSchema.equalsOnlyNames(m_outputSchema));
-
+        //
+        // This assert should be reenabled when ENG-12116 is fixed for trulio true.
+        // assert(inputSchema.equalsOnlyNames(m_outputSchema));
+        //
         for (SchemaColumn col : m_outputSchema.getColumns()) {
             AbstractExpression colExpr = col.getExpression();
             // At this point, they'd better all be TVEs.
@@ -64,7 +66,7 @@ public class SendPlanNode extends AbstractPlanNode {
 
     @Override
     public void computeCostEstimates(long childOutputTupleCountEstimate,
-            Cluster cluster, Database db, DatabaseEstimates estimates,
+            DatabaseEstimates estimates,
             ScalarValueHints[] paramHints) {
         assert(estimates != null);
         // Recursively compute and collect stats from the child node,

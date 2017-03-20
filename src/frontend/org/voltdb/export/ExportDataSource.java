@@ -24,14 +24,17 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.lang.management.ManagementFactory;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.concurrent.Callable;
 import java.util.concurrent.LinkedTransferQueue;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -40,6 +43,7 @@ import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.BinaryPayloadMessage;
 import org.voltcore.messaging.Mailbox;
+import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
@@ -59,10 +63,6 @@ import com.google_voltpatches.common.util.concurrent.Futures;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
-import java.nio.charset.StandardCharsets;
-import java.util.concurrent.atomic.AtomicBoolean;
-import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
-import org.voltcore.utils.CoreUtils;
 
 /**
  *  Allows an ExportDataProcessor to access underlying table queues
@@ -455,9 +455,14 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             }
         } catch (RejectedExecutionException e) {
             return 0;
-        } catch (Throwable t) {
-            Throwables.propagate(t);
+        } catch (IOException e){
+            // IOException is expected if the committed buffer was closed when stats are requested.
+            assert e.getMessage().contains("has been closed") : e.getMessage();
+            exportLog.warn("IOException thrown while querying ExportDataSource.sizeInBytes(): " + e.getMessage());
             return 0;
+        } catch (Throwable t) {
+            Throwables.throwIfUnchecked(t);
+            throw new RuntimeException(t);
         }
     }
 
@@ -786,12 +791,13 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
             if (first_unpolled_block == null) {
                 m_pollFuture = fut;
             } else {
+                final AckingContainer ackingContainer = new AckingContainer(first_unpolled_block.unreleasedContainer(),
+                                                                            first_unpolled_block.uso() + first_unpolled_block.totalUso());
                 try {
-                    fut.set(
-                            new AckingContainer(first_unpolled_block.unreleasedContainer(),
-                                    first_unpolled_block.uso() + first_unpolled_block.totalUso()));
+                    fut.set(ackingContainer);
                 } catch (RejectedExecutionException reex) {
                     //We are closing source.
+                    ackingContainer.discard();
                 }
                 m_pollFuture = null;
             }

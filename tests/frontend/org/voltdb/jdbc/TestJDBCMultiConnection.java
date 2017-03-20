@@ -41,9 +41,12 @@ import org.voltdb.BackendTarget;
 import org.voltdb.ServerThread;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.ArbitraryDurationProc;
+import org.voltdb.client.ClientConfig;
 import org.voltdb.client.TestClientFeatures;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.MiscUtils;
+
+import org.hsqldb_voltpatches.jdbc.JDBCDriver;
 
 public class TestJDBCMultiConnection {
     static String m_testJar;
@@ -101,7 +104,12 @@ public class TestJDBCMultiConnection {
     {
         Class.forName("org.voltdb.jdbc.Driver");
         for (int i = 0; i < m_connections.length; ++i) {
-            m_connections[i] = DriverManager.getConnection("jdbc:voltdb://localhost:21212");
+            if (ClientConfig.ENABLE_SSL_FOR_TEST) {
+                m_connections[i] = DriverManager.getConnection("jdbc:voltdb://localhost:21212?" + JDBCTestCommons.SSL_URL_SUFFIX);
+            }
+            else {
+                m_connections[i] = DriverManager.getConnection("jdbc:voltdb://localhost:21212");
+            }
         }
     }
 

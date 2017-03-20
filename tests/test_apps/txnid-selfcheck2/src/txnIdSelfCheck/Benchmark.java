@@ -167,7 +167,7 @@ public class Benchmark {
         float mpratio = (float)0.20;
 
         @Option(desc = "Allow set ratio of swap to truncate table workload.")
-        float swapratio = (float)0.0;
+        float swapratio = (float)0.50;
 
         @Option(desc = "Allow set ratio of upsert to insert workload.")
         float upsertratio = (float)0.50;
@@ -181,6 +181,10 @@ public class Benchmark {
 
         @Option(desc = "Enable topology awareness")
         boolean topologyaware = false;
+
+        @Option(desc = "File with SSL properties")
+        String sslfile = "";
+
 
         @Override
         public void validate() {
@@ -356,8 +360,12 @@ public class Benchmark {
         log.info(HORIZONTAL_RULE);
         log.info(config.getConfigDumpString());
 
-        StatusListener statusListener = new StatusListener();
-        ClientConfig clientConfig = new ClientConfig("", "", statusListener);
+        ClientConfig clientConfig = new ClientConfig("", "", new StatusListener());
+        if (config.sslfile.trim().length() > 0) {
+            clientConfig.setTrustStoreConfigFromPropertyFile(config.sslfile);
+            clientConfig.enableSSL();
+        }
+
         if (config.topologyaware) {
             clientConfig.setTopologyChangeAware(true);
         }

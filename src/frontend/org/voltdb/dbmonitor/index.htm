@@ -286,70 +286,68 @@
                                 <h1 id="ShowHideBlock">Show/Hide Data</h1>
                             </div>
                             <div class="menu_body" style="display: block;">
-                                <div id="tblStoredProcedures" class="storedProcWrapper">
-                                    <div class="tabs-filter-wrapper">
-                                        <div class="tableTitle icon-procedures">Stored Procedures (Cluster)</div>
-                                        <div class="filter">
-                                            <input name="filter" id="filterStoredProc" type="text" class="search-box" onBlur="this.value=!this.value?'Search Stored Procedures':this.value;" value="Search Stored Procedures" placeholder="Search Stored Procedures" />
-                                            <a id="searchStoredProc" href="javascript:void(0)" class="icon-search" title="Search">search</a>
-                                        </div>
-                                        <div class="pagination">
-                                            <a id="previousProcedures" href="javascript:void(0)" class="prev" title="Previous Page">Prev</a>Page
-                                            <label id="lblPrevious"></label>
-                                            of
-                                            <label id="lblTotalPages"></label>
-                                            <a id="nextProcedures" href="javascript:void(0)" class="next" title="Next Page">Next</a>
+                                <div id="divSPSection" class="sPShowHide" style="display:none;">
+                                    <div id="tblSP_wrapper" class="dataTables_wrapper no-footer">
+                                        <div class="tabs-filter-wrapperDR">
+                                            <div class="drTitle icon-procedures" id="SPTitle">Stored Procedures (Cluster)</div>
+                                            <div class="filter"><input name="filter" id="filterSP" type="text" class="search-box" onBlur="" placeholder="Search Stored Procedures"><a id="searchSP" href="javascript:void(0)" class="icon-search drIcon" title="Search">search</a></div>
+                                            <div class="clear"></div>
                                         </div>
                                         <div class="clear"></div>
-                                    </div>
-                                    <div class="tblScroll">
-                                        <table width="100%" border="0" cellspacing="0" cellpadding="0" class="storeTbl">
-                                            <thead>
-                                                <tr>
-                                                    <th id="PROCEDURE" width="30%" data-name="ascending" class="sorttable_sorted">Stored Procedure</th>
-                                                    <th id="INVOCATIONS" width="10%" data-name="none">Invocations</th>
-                                                    <th id="MIN_LATENCY" width="15%" data-name="none">Min Latency (ms)</th>
-                                                    <th id="MAX_LATENCY" width="15%" data-name="none">Max Latency (ms)</th>
-                                                    <th id="AVG_LATENCY" width="15%" data-name="none">Avg Latency (ms)</th>
-                                                    <th id="PERC_EXECUTION" width="15%" data-name="none">% Time of Execution</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody id="storeProcedureBody"></tbody>
-                                        </table>
+                                        <div class="dataTables_paginate paging_extStyleLF paginationDefault" id="tblSP_paginate">
+                                            <span class="paginate_disabled_previous paginate_button" title="Previous Page">Prev</span>
+                                            <div class="navigationLabel">Page <span class="pageIndex"> 0 </span> of <span class="totalPages">0</span></div>
+                                            <span class="paginate_enabled_next paginate_button" title="Next Page">Next</span>
+                                        </div>
+                                        <div class="sPContainer tblScroll">
+                                            <table width="100%" border="0" cellspacing="0" id="tblSP" cellpadding="0" class="storeTbl drTbl no-footer dataTable" aria-describedby="tblSP_info" role="grid">
+                                                <thead>
+                                                    <tr role="row">
+                                                        <th id="Th4" width="10%" data-name="none" class="sorting" tabindex="0" aria-controls="tblSP" rowspan="1" colspan="1" aria-label="Stored Procedure: activate to sort column ascending">Stored Procedure</th>
+                                                        <th id="Th5" width="15%" data-name="none" class="sorting" tabindex="0" aria-controls="tblSP" rowspan="1" colspan="1" aria-label="Invocations: activate to sort column ascending">Invocations</th>
+                                                        <th id="Th5" width="15%" data-name="none" class="sorting" tabindex="0" aria-controls="tblSP" rowspan="1" colspan="1" aria-label="Min Latency (ms): activate to sort column ascending">Min Latency (ms)</th>
+                                                        <th id="Th5" width="15%" data-name="none" class="sorting" tabindex="0" aria-controls="tblSP" rowspan="1" colspan="1" aria-label="Max Latency (ms): activate to sort column ascending">Max Latency (ms)</th>
+                                                        <th id="Th5" width="15%" data-name="none" class="sorting" tabindex="0" aria-controls="tblSP" rowspan="1" colspan="1" aria-label="Avg Latency (ms): activate to sort column ascending">Avg Latency (ms)</th>
+                                                        <th id="Th5" width="15%" data-name="none" class="sorting" tabindex="0" aria-controls="tblSP" rowspan="1" colspan="1" aria-label="% Time of Execution: activate to sort column ascending">% Time of Execution</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody><tr><td colspan="6"> No data to be displayed</td></tr></tbody>
+                                            </table>
+                                        </div>
                                     </div>
                                 </div>
-                                <div id="tblDataTables" class="dataTablesWrapper">
-                                    <div class="tabs-filter-wrapper">
-                                        <div class="tableTitle icon-tables">Database Tables</div>
-                                        <div class="filter">
-                                            <input name="filter" id="filterDatabaseTable" type="text" class="search-box" onBlur="this.value=!this.value?'Search Database Tables':this.value;" value="Search Database Tables" placeholder="Search Database Tables" />
-                                            <a id="searchDataTable" href="javascript:void(0)" class="icon-search" title="Search">search</a>
-                                        </div>
-                                        <div class="pagination">
-                                            <a id="previousTables" href="javascript:void(0)" class="prev" title="Previous Page">Prev</a>Page
-                                            <label id="lblPreviousTable"></label>
-                                            of
-                                            <label id="lblTotalPagesofTables"></label>
-                                            <a id="nextTables" href="javascript:void(0)" class="next" title="Next Page">Next</a>
+
+                                <div id="divDTSection" class="dTShowHide" style="display:none;">
+                                    <div id="tblDT_wrapper" class="dataTables_wrapper no-footer">
+                                        <div class="tabs-filter-wrapperDR">
+                                            <div class="drTitle icon-tables" id="dTTitle">Database Tables</div>
+                                            <div class="filter"><input name="filter" id="filterDT" type="text" class="search-box" onBlur="" placeholder="Search Database Tables"><a id="searchDT" href="javascript:void(0)" class="icon-search drIcon" title="Search">search</a></div>
+                                            <div class="clear"></div>
                                         </div>
                                         <div class="clear"></div>
-                                    </div>
-                                    <div class="tblScroll">
-                                        <table width="100%" border="0" cellspacing="0" cellpadding="0" class="storeTbl">
-                                            <thead>
-                                                <tr>
-                                                    <th id="TABLE_NAME" width="30%" data-name="ascending" class="sorttable_sorted">Table</th>
-                                                    <th id="TUPLE_COUNT" width="10%" data-name="none">Row Count</th>
-                                                    <th id="MAX_ROWS" width="15%" data-name="none">Max Rows (per partition)</th>
-                                                    <th id="MIN_ROWS" width="15%" data-name="none">Min Rows (per partition)</th>
-                                                    <th id="AVG_ROWS" width="15%" data-name="none">Avg Rows (per partition)</th>
-                                                    <th id="TABLE_TYPE" width="15%" data-name="none">Type</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody id="tablesBody"></tbody>
-                                        </table>
+                                        <div class="dataTables_paginate paging_extStyleLF paginationDefault" id="tblDT_paginate">
+                                            <span class="paginate_disabled_previous paginate_button" title="Previous Page">Prev</span>
+                                            <div class="navigationLabel">Page <span class="pageIndex"> 0 </span> of <span class="totalPages">0</span></div>
+                                            <span class="paginate_enabled_next paginate_button" title="Next Page">Next</span>
+                                        </div>
+                                        <div class="dTContainer tblScroll">
+                                            <table width="100%" border="0" cellspacing="0" id="tblDT" cellpadding="0" class="storeTbl drTbl no-footer dataTable" aria-describedby="tblCmdLog_info" role="grid">
+                                                <thead>
+                                                    <tr role="row">
+                                                        <th id="Th4" width="10%" data-name="none" class="sorting" tabindex="0" aria-controls="tblDT" rowspan="1" colspan="1" aria-label="Table: activate to sort column ascending">Table</th>
+                                                        <th id="Th5" width="15%" data-name="none" class="sorting" tabindex="0" aria-controls="tblDT" rowspan="1" colspan="1" aria-label="Row Count: activate to sort column ascending">Row Count</th>
+                                                        <th id="Th5" width="15%" data-name="none" class="sorting" tabindex="0" aria-controls="tblDT" rowspan="1" colspan="1" aria-label="Max Rows (per partition): activate to sort column ascending">Max Rows (per partition)</th>
+                                                        <th id="Th5" width="15%" data-name="none" class="sorting" tabindex="0" aria-controls="tblDT" rowspan="1" colspan="1" aria-label="Min Rows (per partition): activate to sort column ascending">Min Rows (per partition)</th>
+                                                        <th id="Th5" width="15%" data-name="none" class="sorting" tabindex="0" aria-controls="tblDT" rowspan="1" colspan="1" aria-label="Avg Rows (per partition): activate to sort column ascending">Avg Rows (per partition)</th>
+                                                        <th id="Th5" width="15%" data-name="none" class="sorting" tabindex="0" aria-controls="tblDT" rowspan="1" colspan="1" aria-label="Type: activate to sort column ascending">Type</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody><tr><td colspan="6"> No data to be displayed</td></tr></tbody>
+                                            </table>
+                                        </div>
                                     </div>
                                 </div>
+
                             </div>
                         </div>
                     </div>

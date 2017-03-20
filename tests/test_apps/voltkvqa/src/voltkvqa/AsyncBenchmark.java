@@ -202,6 +202,9 @@ public class AsyncBenchmark {
         @Option(desc = "Enable topology awareness")
         boolean topologyaware = false;
 
+        @Option(desc = "Enable SSL with configuration file.")
+        String sslfile = "";
+
         @Override
         public void validate() {
             if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
@@ -308,7 +311,11 @@ public class AsyncBenchmark {
     public AsyncBenchmark(KVConfig config) {
         this.config = config;
 
-        ClientConfig clientConfig = new ClientConfig("", "", new StatusListener());
+                ClientConfig clientConfig = new ClientConfig("", "", new StatusListener());
+        if (config.sslfile.trim().length() > 0) {
+            clientConfig.setTrustStoreConfigFromPropertyFile(config.sslfile);
+            clientConfig.enableSSL();
+        }
         clientConfig.setReconnectOnConnectionLoss(config.recover);
 
         if (config.topologyaware) {

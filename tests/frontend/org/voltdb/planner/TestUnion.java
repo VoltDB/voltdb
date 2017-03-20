@@ -57,14 +57,6 @@ public class TestUnion extends PlannerTestCase {
         assertTrue(unionPN.getChildCount() == 3);
    }
 
-    public void testUnionWithExpressionSubquery() {
-        AbstractPlanNode pn = compile("select B from T2 union select A from T1 where A in (select B from T2 where T1.A > B)");
-        assertTrue(pn.getChild(0) instanceof UnionPlanNode);
-        UnionPlanNode unionPN = (UnionPlanNode) pn.getChild(0);
-        assertTrue(unionPN.getUnionType() == ParsedUnionStmt.UnionType.UNION);
-        assertTrue(unionPN.getChildCount() == 2);
-    }
-
     public void testPartitioningMixes() {
         // Sides are identically single-partitioned.
         AbstractPlanNode pn = compile("select DESC from T1 WHERE A = 1 UNION select TEXT from T5 WHERE E = 1");
@@ -214,11 +206,6 @@ public class TestUnion extends PlannerTestCase {
         // nonsense syntax in place of union ops (trying various internal symbol names meaning n/a)
         failToCompile("select A from T1 NOUNION select B from T2");
         failToCompile("select A from T1 TERM select B from T2");
-        // invalid syntax - the WHERE clause is illegal
-        failToCompile("(select A from T1 UNION select B from T2) where A in (select A from T2)");
-
-        // Union with a child having an invalid subquery expression (T1 is distributed)
-        failToCompile("select B from T2 where B in (select A from T1 where T1.A > T2.B) UNION select B from T2", PlanAssembler.IN_EXISTS_SCALAR_ERROR_MESSAGE);
     }
 
     public void testSelfUnion() {

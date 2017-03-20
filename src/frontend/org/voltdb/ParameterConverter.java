@@ -472,9 +472,7 @@ public class ParameterConverter {
         }
         else if (expectedClz == BigDecimal.class) {
             if (numberParam != null) {
-                BigInteger bi = new BigInteger(param.toString());
-                BigDecimal bd = new BigDecimal(bi);
-                bd = VoltDecimalHelper.setDefaultScale(bd);
+                BigDecimal bd = VoltDecimalHelper.stringToDecimal(param.toString());
                 return bd;
             }
             if (inputClz == BigDecimal.class) {
