@@ -47,13 +47,18 @@
 
 ################################################################################
 # Table and view names pre-defined in the DDL associated with this test
-table-name              ::= P1 | R1 | P2 | R2
-view-name               ::= VP1 | VR1 | VP2 | VR2
+# (and very occasionally, a nonexistent table name, view name, or, below,
+# column name is used)
+legit-table-name        ::= P1  | R1  | P2  | R2
+legit-view-name         ::= VP1 | VR1 | VP2 | VR2
+table-name              ::= {legit-table-name} 199| NONEXISTENT_TABLE
+view-name               ::= {legit-view-name}  199| NONEXISTENT_VIEW
 
 # TODO: also pre-define some Indexes & Stored Procedures
 
 # Column names used in the pre-defined DDL, of every possible data type ...
 int-column-name         ::= ID | TINY | SMALL | INT | BIG
+byte-column-name        ::= TINY
 
 # The "5" before the "|" makes the "int-column-name" option 5 times as likely
 # as the other options, making each numeric column name equally likely
@@ -70,7 +75,8 @@ non-int-str-column-name ::= {geo-column-name} 2| {timestamp-column-name} | {varb
 table-column-name       ::= {numeric-column-name} 2| {string-column-name} | {non-int-str-column-name}
 view-column-name        ::= {table-column-name} | {table-column-name}_COUNT | TOTAL_COUNT | \
                             {numeric-column-name}_SUM | {numeric-column-name}_AVG
-column-name             ::= {table-column-name} 9| {view-column-name}
+legit-column-name       ::= {table-column-name} 9| {view-column-name}
+column-name             ::= {legit-column-name} 399| NONEXISTENT_COLUMN
 column-list             ::= {column-name} [, {column-list}]
 
 # These are obviously not the complete lists of all possible table and column
@@ -182,11 +188,16 @@ simple-upsert-select    ::= UP{in-or-up-sert-select}
 ################################################################################
 # Grammar rules for an UPDATE statement:
 ################################################################################
-update-statement        ::= UPDATE {table-name} SET {column-updates} \
-                            [{where-clause}]
+update-statement        ::= UPDATE {table-name} SET {column-updates} [{where-clause}]
 
-column-update           ::= {column-name} = {value-expression}
 column-updates          ::= {column-update} [, {column-updates}]
+column-update           ::= {column-name}           = {value-expression}     | \
+                            {numeric-column-name}   = {numeric-expression}  7| \
+                            {string-column-name}    = {string-expression}   3| \
+                            {timestamp-column-name} = {timestamp-expression} | \
+                            {varbinary-column-name} = {varbinary-expression} | \
+                            {point-column-name}     = {point-expression}     | \
+                            {polygon-column-name}   = {polygon-expression}
 
 ################################################################################
 # Grammar rules for a DELETE (or TRUNCATE) statement:
@@ -197,27 +208,29 @@ column-updates          ::= {column-update} [, {column-updates}]
 #
 delete-statement        ::= {basic-delete-statement} 9| {truncate-statement}
 
-basic-delete-statement  ::= DELETE FROM {table-name} \
-                            [{where-clause}] [{sort-clause}]
+basic-delete-statement  ::= DELETE FROM {table-name} [{where-clause}] [{sort-clause}]
 
 truncate-statement      ::= TRUNCATE TABLE {table-name}
 
 ################################################################################
 # Grammar rules for a SELECT statement (lots of these!):
 ################################################################################
-select-statement        ::= {basic-select-statement} 4| {select-statement} {set-operator} {select-statement}
+select-statement        ::= {basic-select-statement} 9| {select-statement} {set-operator} {select-statement}
 set-operator            ::= UNION [ALL] | INTERSECT [ALL] | EXCEPT
 
 # Putting the "top-clause" and "all-or-distinct" in more than one set of
 # brackets makes them less likely
-basic-select-statement  ::= SELECT [[[{top-clause}]]] [[{all-or-distinct}]] {select-list} FROM {table-references} \
-                            [[{join-clause}]] [[{where-clause}]] [[{group-clause}]] [{sort-clause}]
+basic-select-statement  ::= SELECT {top-all-or-distinct} {select-list} FROM {from-clause}
+top-all-or-distinct     ::= [[[{top-clause}]]] [[{all-or-distinct}]]
+from-clause             ::= {table-references} [[{join-clause}]] [[{where-clause}]] [[{group-clause}]] [{sort-clause}]
+from-clause-no-limit    ::= {table-references} [[{join-clause}]] [[{where-clause}]] [[{group-clause}]] [{order-by-clause}]
 
 all-or-distinct         ::= ALL | DISTINCT
-select-list             ::= {select-list-item} [, {select-list}]
-select-list-item        ::= {star} | {column-expression} [[AS] {column-alias}]
-column-expression       ::= {column-name} | {selection-expression}
-column-reference        ::= {column-name} | {column-alias}
+select-list             ::= {select-list-item} [[, {select-list}]]
+select-list-item        ::= {star} 5| {column-expression} [[AS] {column-alias}] 14| {window-function-expr} [[AS] {column-alias}]
+column-expression       ::= {column-name} 2| {selection-expression}
+column-reference        ::= {column-name} 2| {column-alias}
+column-ref-or-expr      ::= {column-reference} | {column-expression}
 
 # Putting the ", {table-references}" in more than one set of brackets makes it less likely
 table-references        ::= {table-reference} [[, {table-references}]]
@@ -226,44 +239,105 @@ table-references        ::= {table-reference} [[, {table-references}]]
 # before the "view-name..." option, makes them more likely than the "sub-query..."
 # option, making simple, valid statements more likely
 table-reference         ::= {table-name} [[AS] {table-alias}] 3| {view-name} [[AS] {table-alias}] 2| {sub-query} [AS] {table-alias}
-sub-query               ::= ({select-statement})
 
 # Defining these separately so that they can optionally be overridden, for use
 # with SQLCoverage, to avoid syntax (TOP) not supported by PostgreSQL, and
 # issues with Geospatial types (point & polygon), where using * can be a problem
 top-clause              ::= TOP {non-negative-int-value}
+top-one                 ::= TOP 1
 star                    ::= *
 
 where-clause            ::= WHERE {boolean-expression}
-# TODO: simplified, non-recursive, for now:
-#boolean-expression      ::= [NOT] {boolean-type-expr} [{and-or} {boolean-expression}]
-boolean-expression      ::= [NOT] {boolean-type-expr} [{and-or} {boolean-type-expr}]
+boolean-expression      ::=   [NOT ] {boolean-type-expr}   [[{and-or} {boolean-expression}]] 3| \
+                            ([[NOT ]]{boolean-expression}) [[{and-or} {boolean-expression}]]
 and-or                  ::= AND | OR
 
 # TODO: allow for multi-joins (on more than 2 tables)
 join-clause             ::= [{join-type}] JOIN {table-reference} [{join-condition}]
 join-type               ::= INNER | {left-or-right} [OUTER]
 left-or-right           ::= LEFT | RIGHT | FULL
-join-condition          ::= ON {join-expression} | USING {column-reference}
+join-condition          ::= ON {join-expression} | USING ({column-reference})
 # TODO: probably should be more specific (e.g. equi-join)
 join-expression         ::= {boolean-expression}
 
 group-clause            ::= GROUP BY  {group-by-list}  [HAVING {boolean-expression}]
-sort-clause             ::= [ORDER BY {order-by-list}] [LIMIT {non-negative-int-value}] [OFFSET {non-negative-int-value}]
-group-by-list           ::= {column-reference}                 [, {group-by-list}]
-order-by-list           ::= {column-reference} [{asc-or-desc}] [, {order-by-list}]
+order-by-clause         ::= [ORDER BY {order-by-list}]
+sort-clause             ::= {order-by-clause} [LIMIT {non-negative-int-value}] [OFFSET {non-negative-int-value}]
+group-by-list           ::= {column-ref-or-expr}                 [, {group-by-list}]
+order-by-list           ::= {column-ref-or-expr} [{asc-or-desc}] [, {order-by-list}]
 asc-or-desc             ::= ASC | DESC
 
 # TODO: add more expression types, and boolean expression types,
 # using different data types (varbinary, point, polygon)
 value-expression        ::= {numeric-expression} | {string-expression} | {timestamp-expression}
 selection-expression    ::= {value-expression} 9| COUNT(*)
-boolean-type-expr       ::= {column-expression} IS [NOT ]NULL | {boolean-numeric-expr} | {boolean-string-expr} | \
-                            {boolean-timestamp-expr}
-boolean-numeric-expr    ::= {numeric-expression} {comparison-operator} {numeric-expression}
-boolean-string-expr     ::= {string-expression} {comparison-operator} {string-expression}
-boolean-timestamp-expr  ::= {timestamp-expression} {comparison-operator} {timestamp-expression}
+boolean-type-expr       ::= {column-expression} IS [NOT ]NULL | {sub-query} | \
+                            {boolean-numeric-expr} 7| {boolean-string-expr} 3| {boolean-timestamp-expr} | \
+                            EXISTS {sub-query}
+boolean-numeric-expr    ::= {numeric-expression}   {comparison-operator} {numeric-expression}   4| \
+                            {numeric-column-name}   IN {numeric-sub-query}
+boolean-string-expr     ::= {string-expression}    {comparison-operator} {string-expression}    4| \
+                            {string-column-name}    IN {string-sub-query}
+boolean-timestamp-expr  ::= {timestamp-expression} {comparison-operator} {timestamp-expression} 4| \
+                            {timestamp-column-name} IN {timestamp-sub-query}
 comparison-operator     ::= = | <> | != | < | > | <= | >=
+
+################################################################################
+# Sub-queries, scalar and otherwise, of various types
+#
+sub-query               ::= ({select-statement}) 3| {scalar-sub-query}
+scalar-sub-query        ::= {numeric-scalar-sub-q} 7| {string-scalar-sub-q} 3| \
+                            {timestamp-scalar-sub-q}
+
+numeric-sub-query       ::= (SELECT {top-all-or-distinct}   {numeric-expression} FROM {from-clause})
+string-sub-query        ::= (SELECT {top-all-or-distinct}    {string-expression} FROM {from-clause})
+timestamp-sub-query     ::= (SELECT {top-all-or-distinct} {timestamp-expression} FROM {from-clause})
+numeric-scalar-sub-q    ::= (SELECT  {aggregate-function}({numeric-expression})  FROM {from-clause}) 3| \
+                            (SELECT {num-result-aggr-func}({column-expression})  FROM {from-clause}) 3| \
+                            (SELECT COUNT(*)                                     FROM {from-clause})  | \
+                            (SELECT {top-one}   {numeric-expression} FROM {from-clause-no-limit})     | \
+                            (SELECT             {numeric-expression} FROM {from-clause-no-limit} LIMIT 1)
+string-scalar-sub-q     ::= (SELECT {min-or-max-aggr-func}({string-expression})  FROM {from-clause}) 6| \
+                            (SELECT {top-one}    {string-expression} FROM {from-clause-no-limit})     | \
+                            (SELECT              {string-expression} FROM {from-clause-no-limit} LIMIT 1)
+timestamp-scalar-sub-q  ::= (SELECT {min-or-max-aggr-func}({timestamp-expression}) FROM {from-clause}) 6| \
+                            (SELECT {top-one} {timestamp-expression} FROM {from-clause-no-limit})       | \
+                            (SELECT           {timestamp-expression} FROM {from-clause-no-limit} LIMIT 1)
+
+################################################################################
+# Window functions - a.k.a. analytic functions
+#
+window-function-expr    ::= {window-function} OVER ({partition-or-order-by})
+window-function         ::= {window-agg-func-expr} 4| COUNT(*) | RANK() | DENSE_RANK()
+
+# SUM can only take numeric argument; others can take any type;
+# (AVG not actually supported here, but it should not crash)
+window-agg-func-expr    ::= {non-num-aggregate-func}({column-expression}) 3| \
+                            {num-only-aggregate-func}({numeric-expression})
+
+# This is somewhat redundant, but since some window functions (RANK, DENSE_RANK)
+# require an ORDER BY, we make that more likely; and while other window functions
+# do allow this to be empty, that is less interesting, even when legal, so we
+# make it less likely
+partition-or-order-by   ::= [PARTITION BY {partition-by-list}]  ORDER BY {window-order-by-list} | \
+                            [PARTITION BY {partition-by-list}] [ORDER BY {window-order-by-list}]
+partition-by-list       ::= {column-expression} [[, {partition-by-list}]]
+
+# Some window functions (RANK, DENSE_RANK) only allow a single int or timestamp
+# expression in the ORDER BY clause, so we make those options more likely
+window-order-by-list    ::= {window-order-by-item} [{asc-or-desc}] [[, {window-order-by-list}]]
+window-order-by-item    ::= {column-expression} 2| {int-expression} | {timestamp-expression}
+
+################################################################################
+# Aggregate functions - used with various data types defined below
+# (and in the window functions and scalar sub-queries above)
+#
+# TODO: More use of these in GROUP BY queries
+num-only-aggregate-func ::= SUM | AVG
+num-result-aggr-func    ::= COUNT 3| APPROX_COUNT_DISTINCT
+min-or-max-aggr-func    ::= MIN | MAX
+non-num-aggregate-func  ::= {min-or-max-aggr-func} 2| {num-result-aggr-func}
+aggregate-function      ::= {non-num-aggregate-func} 2| {num-only-aggregate-func}
 
 ################################################################################
 # Numeric constant values, functions, operators and expressions
@@ -284,18 +358,23 @@ byte-value              ::= {byte-non-null-value}    3| NULL
 integer-value           ::= {integer-non-null-value} 3| NULL
 numeric-value           ::= {numeric-non-null-value} 3| NULL
 
-int-expression          ::= {integer-value} |     {int-column-name} |     {int-function-expr}
-numeric-expression      ::= {numeric-value} | {numeric-column-name} | {numeric-function-expr} | {int-expression}
+int-expression          ::= {integer-value}  2|     {int-column-name}  5|     {int-function-expr}  2| \
+                            {aggregate-function}({int-expression})
+byte-expression         ::= {byte-value}      |    {byte-column-name}  3|    {byte-function-expr}
+numeric-expression      ::= {numeric-value} 20| {numeric-column-name} 30| {numeric-function-expr} 20| {int-expression} 20| \
+                            {aggregate-function}({numeric-expression}) 9| {numeric-scalar-sub-q}
 
 int-function-expr       ::= {int-expression} {math-operator} {int-expression} | \
                             {int-function-2args}({int-expression}, {int-expression}) | \
                             {int-valued-string-expr} | {int-valued-time-expr} | {int-valued-t-unit-expr}
+byte-function-expr      ::= {byte-expression} {math-operator} {byte-expression} | \
+                            {int-function-2args}({byte-expression}, {byte-expression})
 numeric-function-expr   ::= {numeric-expression} {math-operator} {numeric-expression} | \
                             {math-function-0args}[()] | \
                             {math-function-1arg}({numeric-expression}) 14| \
                             {math-function-2args}({numeric-expression}, {numeric-expression}) | \
                             {num-valued-time-expr}
-math-operator           ::= + | - | * | / | %
+math-operator           ::= + | - | * | /
 math-function-0args     ::= PI
 math-function-1arg      ::= ABS | CEILING | EXP | FLOOR | LN | LOG | LOG10 | SQRT | SIN | COS | TAN | CSC | SEC | COT
 math-function-2args     ::= POWER
@@ -314,7 +393,8 @@ string-non-null-value   ::= '{characters}'
 # likely as the NULL option, making NULL values less likely
 string-value            ::= {string-non-null-value} 3| NULL
 
-string-expression       ::= {string-value} | {string-column-name} | {string-function-expr}
+string-expression       ::= {string-value} 20| {string-column-name} 50| {string-function-expr} 20| \
+                            {non-num-aggregate-func}({string-expression}) 9| {string-scalar-sub-q}
 string-function-expr    ::= {string-expression} {string-operator} {string-expression} | \
                             {string-function-1arg} ({string-expression}) | \
                             {string-function-2args}({string-expression}, {string-expression}) | \
@@ -324,7 +404,7 @@ string-function-expr    ::= {string-expression} {string-operator} {string-expres
                             {string-valued-int-expr}  | {string-val-str-int-expr} | \
                             {string-val-num-int-expr} | {string-special-func-expr}
 string-operator         ::= || | +
-string-function-1arg    ::= CONCAT | LOWER | TRIM | UPPER
+string-function-1arg    ::= LOWER  | TRIM | UPPER
 string-function-2args   ::= CONCAT | REGEXP_POSITION
 string-function-3args   ::= CONCAT | REPLACE
 string-function-4args   ::= CONCAT
@@ -341,10 +421,14 @@ string-valued-int-func  ::= BIN | CHAR | HEX | SPACE
 string-valued-int-expr  ::= {string-valued-int-func}({int-expression})
 
 # Some functions of a string and an integer (or 2) produce a string value
-string-val-str-int-func ::= LEFT | RIGHT | REPEAT | SUBSTRING
+string-val-str-int-func ::= LEFT | RIGHT | SUBSTRING
+# We only allow byte values in the REPEAT function, because giving it large values can
+# freeze VoltDB, consume all CPU time, and slow down your machine to a crawl; see ENG-12118
+string-val-str-byte-fun ::= REPEAT
 string-val-str-2int-fun ::= SUBSTRING
-string-val-str-int-expr ::= {string-val-str-int-func}({string-expression}, {int-expression}) | \
-                            {string-val-str-2int-fun}({string-expression}, {int-expression}, {int-expression})
+string-val-str-int-expr ::= {string-val-str-int-func}({string-expression}, {int-expression})  3| \
+                            {string-val-str-byte-fun}({string-expression}, {byte-expression})  | \
+                            {string-val-str-2int-fun}({string-expression}, {int-expression},  {int-expression})
 
 # One function of 2 numbers (1 decimal and 1 integer) produces string values
 string-val-num-int-func ::= FORMAT_CURRENCY
@@ -358,7 +442,7 @@ string-val-num-int-expr ::= {string-val-num-int-func}({numeric-expression}, {int
 # Some string functions use special keywords (e.g. PLACING, FROM, FOR)
 string-special-func-expr::= OVERLAY({string-expression} PLACING {string-expression} FROM {int-expression} [FOR {int-expression}]) | \
                             SUBSTRING({string-expression} FROM {int-expression} [FOR {int-expression}]) | \
-                            TRIM([[{trim-keyword}] [{character} FROM ]{string-expression})
+                            TRIM([[{trim-keyword} ]['{character}'] FROM ]{string-expression})
 trim-keyword            ::= LEADING | TRAILING | BOTH
 
 ################################################################################
@@ -382,7 +466,8 @@ timestamp-non-null-value::= '{year}-{month}-{day} {hour}:{minute-or-second}:{min
 # likely as the NULL option, making NULL values less likely
 timestamp-value         ::= {timestamp-non-null-value} 3| NULL
 
-timestamp-expression    ::= {timestamp-value} | {timestamp-column-name} | {timestamp-function-expr}
+timestamp-expression    ::= {timestamp-value} 20| {timestamp-column-name} 50| {timestamp-function-expr} 20| \
+                            {non-num-aggregate-func}({timestamp-expression}) 9| {timestamp-scalar-sub-q}
 timestamp-function-expr ::= CURRENT_TIMESTAMP[()] | NOW[()] | \
                             FROM_UNIXTIME({int-expression}) | \
                             TO_TIMESTAMP({short-time-unit}, {int-expression}) | \
@@ -426,14 +511,19 @@ varbin-non-null-value   ::= x'{even-num-of-hex-digits}'
 varbinary-value         ::= {varbin-non-null-value} 3| NULL
 
 # TODO: flesh this part out, with varbinary functions, expressions ...
+#varbinary-expression    ::= {varbinary-value} 20| {varbinary-column-name} 50| {varbinary-function-expr} 20| \
+#                            {non-num-aggregate-func}({varbinary-expression}) 9| {varbinary-scalar-sub-q}
+# This will do for now:
+varbinary-expression    ::= {varbinary-column-name} 3| {varbinary-value}
 
 ################################################################################
 # Geospatial Point constant values, functions, operators and expressions
 #
 # TODO: flesh this part out ...
-number-less-than-100    ::= {digit}[{digit}][.{non-negative-int-value}]
+
 # Latitude is a number between -100 and 100 (exclusive); longitude is between
 # -200 and 200 (exclusive); these include some illegal values, which is OK
+number-less-than-100    ::= {digit}[{digit}][.{non-negative-int-value}]
 latitude                ::= [-]{number-less-than-100}
 longitude               ::= [-][1]{number-less-than-100}
 point-non-null-value    ::= pointFromText('POINT({longitude} {latitude})')
@@ -443,6 +533,10 @@ point-non-null-value    ::= pointFromText('POINT({longitude} {latitude})')
 point-value             ::= {point-non-null-value} 3| NULL
 
 # TODO: flesh this part out, with point functions, expressions ...
+#point-expression        ::= {point-value} 20| {point-column-name} 50| {point-function-expr} 20| \
+#                            {non-num-aggregate-func}({point-expression}) 9| {point-scalar-sub-q}
+# This will do for now:
+point-expression        ::= {point-column-name} 3| {point-value}
 
 ################################################################################
 # Geospatial Polygon constant values, functions, operators and expressions
@@ -458,6 +552,10 @@ polygon-non-null-value  ::= polygonFromText('POLYGON((0 0, {longitude} 0, 0 {lat
 polygon-value           ::= {polygon-non-null-value} 3| NULL
 
 # TODO: flesh this part out, with polygon functions, expressions ...
+#polygon-expression      ::= {polygon-value} 20| {polygon-column-name} 50| {polygon-function-expr} 20| \
+#                            {non-num-aggregate-func}({polygon-expression}) 9| {polygon-scalar-sub-q}
+# This will do for now:
+polygon-expression      ::= {polygon-column-name} 3| {polygon-value}
 
 ################################################################################
 # Non-geospatial (ng-) alternative values of some of the above definitions, for
@@ -503,9 +601,3 @@ ng-star                    ::= ID, TINY, SMALL, INT, BIG, NUM, DEC, VCHAR, VCHAR
 ng-point-value             ::= NULL
 ng-polygon-value           ::= NULL
 
-
-
-# TODO: More expression & function types TBD:
-num-only-aggregate-func ::= SUM | AVG
-non-num-aggregate-func  ::= COUNT | APPROX_COUNT_DISTINCT | MAX | MIN
-aggregate-function      ::= {non-num-aggregate-func} 2| {num-only-aggregate-func}
