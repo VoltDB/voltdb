@@ -22,6 +22,7 @@
 #ifndef VOLTDB_LARGETEMPTABLE_H
 #define VOLTDB_LARGETEMPTABLE_H
 
+#include "common/LargeTempTableBlockCache.h"
 #include "storage/table.h"
 #include "storage/tableiterator.h"
 
@@ -52,7 +53,7 @@ public:
     bool insertTuple(TableTuple& tuple);
 
     size_t allocatedBlockCount() const {
-        return 0;
+        return m_blocks.size();
     }
 
     std::string tableType() const {
@@ -75,15 +76,14 @@ public:
         return m_numTuples;
     }
 
-    static const int BLOCKSIZE = 131072;
-
- protected:
+protected:
 
     LargeTempTable()
-        : Table(BLOCKSIZE)
+        : Table(LargeTempTableBlock::getBlocksize())
         , m_iter(this)
-        , m_data(new char[BLOCKSIZE])
+        , m_blockForWriting(nullptr)
         , m_currPosition(0)
+        , m_blocks()
         , m_numTuples(0)
     {
     }
@@ -91,13 +91,21 @@ public:
 private:
 
     void* dataBlock() {
-        return static_cast<void*>(m_data.get());
+        if (m_blockForWriting == nullptr) {
+            // Here we can instead call block cache to get a free
+            // block.
+            m_blockForWriting = new LargeTempTableBlock();
+            m_blocks.push_back(m_blockForWriting);
+        }
+        return m_blockForWriting->getData();
     }
 
     TableIterator m_iter;
 
-    boost::scoped_array<char> m_data;
+    LargeTempTableBlock* m_blockForWriting;
     size_t m_currPosition;
+    std::vector<LargeTempTableBlock*> m_blocks;
+
     int64_t m_numTuples; // redundant with base class?? xxx
 };
 

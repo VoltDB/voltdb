@@ -22,8 +22,9 @@
 #ifndef _VOLTDB_LARGETABLEITERATOR_H
 #define _VOLTDB_LARGETABLEITERATOR_H
 
+#include "common/executorcontext.hpp"
 #include "common/tabletuple.h"
-#include "storage/LargeTempTable.h"
+#include "common/LargeTempTableBlockCache.h"
 
 namespace voltdb {
 
@@ -34,12 +35,11 @@ class LargeTableIterator {
 public:
 
     LargeTableIterator(const LargeTableIterator& that)
-        : m_table(that.m_table)
-        , m_data(that.m_data)
-        , m_dataSize(that.m_dataSize)
+        : m_schema(that.m_schema)
+        , m_blocks(that.m_blocks)
+        , m_blockIterator(that.m_blockIterator)
         , m_currPosition(that.m_currPosition)
-        , m_numTuplesReturned(that.m_numTuplesReturned)
-        , m_storage(that.m_table->schema())
+        , m_storage(that.m_schema)
     {
         // xxx this is too expensive because the tuple storage gets
         // realloced... can use move ctor?
@@ -49,43 +49,46 @@ public:
     bool hasNext() const;
 
 protected:
-    LargeTableIterator(const LargeTempTable* table, char* data)
-        : m_table(table)
-        , m_data(data)
-        , m_dataSize(LargeTempTable::BLOCKSIZE)
+    LargeTableIterator(const TupleSchema *schema,
+                       const std::vector<LargeTempTableBlock*> *blocks)
+        : m_schema(schema)
+        , m_blocks(blocks)
+        , m_blockIterator(std::begin(*blocks))
         , m_currPosition(0)
-        , m_numTuplesReturned(0)
-        , m_storage(table->schema())
+        , m_storage(schema)
     {
     }
 
 private:
 
-    const LargeTempTable* m_table;
-    const char* m_data;
-    const size_t m_dataSize;
+    const TupleSchema* m_schema;
+    const std::vector<LargeTempTableBlock*> *m_blocks;
+    std::vector<LargeTempTableBlock*>::const_iterator m_blockIterator;
     size_t m_currPosition;
-    int64_t m_numTuplesReturned;
     StandAloneTupleStorage m_storage;
 
 };
 
 
 bool LargeTableIterator::next(TableTuple& out) {
-    if (m_numTuplesReturned >= m_table->numTuples()) {
+    if (m_blockIterator == std::end(*m_blocks)) {
         return false;
     }
 
-    ReferenceSerializeInputBE input(m_data + m_currPosition,
-                                    m_dataSize - m_currPosition);
+    char* data = (*m_blockIterator)->getData();
+    ReferenceSerializeInputBE input(data + m_currPosition,
+                                    LargeTempTableBlock::getBlocksize() - m_currPosition);
     out = m_storage.tuple();
 
     out.deserializeFrom(input, ExecutorContext::getTempStringPool());
 
-    ++m_numTuplesReturned;
-
     // xxx hack!
-    m_currPosition = input.getRawPointer() - m_data;
+    m_currPosition = input.getRawPointer() - data;
+
+    assert(m_currPosition <= (*m_blockIterator)->getUsedBytes());
+    if (m_currPosition == (*m_blockIterator)->getUsedBytes()) {
+        ++m_blockIterator;
+    }
 
     return true;
 }

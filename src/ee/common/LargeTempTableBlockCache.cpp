@@ -19,31 +19,30 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "common/LargeTempTableBlockCache.h"
-#include "storage/LargeTableIterator.h"
-#include "storage/LargeTempTable.h"
+#include "LargeTempTableBlockCache.h"
 
 namespace voltdb {
 
-bool LargeTempTable::insertTuple(TableTuple& tuple) {
-    ReferenceSerializeOutput output;
+    LargeTempTableBlockCache::LargeTempTableBlockCache()
+        : m_blocks()
+        , m_unpinnedBlocks()
+    {
+    }
 
-    // xxx Check to see if we can fit the tuple in the the current block...
-    size_t startPos = m_currPosition;
-    output.initializeWithPosition(dataBlock(), LargeTempTableBlock::getBlocksize(), m_currPosition);
-    tuple.serializeTo(output);
-    m_currPosition = output.position();
+    std::pair<int64_t, char*> LargeTempTableBlockCache::getEmptyBlock() {
+        int64_t id = getNextId();
+        char* data = NULL;
+        if (m_blocks.size() < MAX_CACHE_SIZE()) {
+            // allocate a new block.
+            m_blocks.emplace(std::make_pair(id, LargeTempTableBlock()));
+            data = m_blocks.find(id)->second.getData();
+        }
+        else {
+            assert(false);
+            // Write an existing unpinned block to disk
+        }
 
-    size_t usedBytes = m_currPosition - startPos;
-    m_blockForWriting->incrementUsedBytes(usedBytes);
+        return std::make_pair(id, data);
+    }
 
-    ++m_numTuples;
-
-    return true;
 }
-
-LargeTableIterator LargeTempTable::largeIterator() const {
-    return LargeTableIterator(schema(), &m_blocks);
-}
-
-} // namespace voltdb

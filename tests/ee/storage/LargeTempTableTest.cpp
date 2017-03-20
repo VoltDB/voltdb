@@ -153,7 +153,6 @@ TEST_F(LargeTempTableTest, Basic) {
     ltt->incrementRefcount();
 
     StandAloneTupleStorage tupleWrapper(schema);
-
     TableTuple tuple = tupleWrapper.tuple();
 
     std::vector<int> pkVals{66, 67, 68};
@@ -176,6 +175,33 @@ TEST_F(LargeTempTableTest, Basic) {
     }
 
     ltt->decrementRefcount();
+}
+
+TEST_F(LargeTempTableTest, MultiBlock) {
+
+    // Make the blocksize small to ensure we can full several blocks.
+
+    LargeTempTableBlock::setBlocksize(1024);
+    TupleSchema* schema = buildSchema(VALUE_TYPE_BIGINT,
+                                      VALUE_TYPE_DOUBLE,
+                                      std::make_pair(VALUE_TYPE_VARCHAR, 256));
+
+    std::vector<std::string> names{"pk", "val", "text"};
+
+    voltdb::LargeTempTable *ltt = TableFactory::buildLargeTempTable(
+        "ltmp",
+        schema,
+        names);
+    ltt->incrementRefcount();
+
+    StandAloneTupleStorage tupleWrapper(schema);
+    TableTuple tuple = tupleWrapper.tuple();
+
+    for (int i = 0; i < 30; ++i) {
+        std::string text(256, 'a' + i);
+        setTupleValues(&tuple, i, 0.5 * i, text);
+        ltt->insertTuple(tuple);
+    }
 }
 
 int main() {
