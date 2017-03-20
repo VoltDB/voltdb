@@ -58,7 +58,6 @@ import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.math.BigDecimal;
 import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.cert.X509Certificate;
@@ -518,7 +517,7 @@ public class TestJSONInterface extends TestCase {
             SnmpType snmpConfig = new SnmpType();
             snmpConfig.setTarget("localhost");
             deptype.setSnmp(snmpConfig);
-            String ndeptype = URLEncoder.encode(mapper.writeValueAsString(deptype), StandardCharsets.UTF_8.toString());
+            String ndeptype = mapper.writeValueAsString(deptype);
             params.put("deployment", ndeptype);
             String pdep = postUrlOverJSON(protocolPrefix + "localhost:8095/deployment/", null, null, null, 200, "application/json", params);
             assertTrue(pdep.contains("Deployment Updated"));
@@ -528,7 +527,7 @@ public class TestJSONInterface extends TestCase {
 
             snmpConfig.setCommunity("foobar");
             deptype.setSnmp(snmpConfig);
-            ndeptype = URLEncoder.encode(mapper.writeValueAsString(deptype), StandardCharsets.UTF_8.toString());
+            ndeptype = mapper.writeValueAsString(deptype);
             params.put("deployment", ndeptype);
             pdep = postUrlOverJSON(protocolPrefix + "localhost:8095/deployment/", null, null, null, 200, "application/json", params);
             assertTrue(pdep.contains("Deployment Updated"));
@@ -1609,7 +1608,7 @@ public class TestJSONInterface extends TestCase {
             String pdep = postUrlOverJSON(protocolPrefix + "localhost:8095/deployment/", null, null, null, 200, "application/json", null);
             assertTrue(pdep.contains("Failed"));
             Map<String,String> params = new HashMap<>();
-            params.put("deployment", URLEncoder.encode(jdep, "UTF-8"));
+            params.put("deployment", jdep);
             pdep = postUrlOverJSON(protocolPrefix + "localhost:8095/deployment/", null, null, null, 200, "application/json", params);
             assertTrue(pdep.contains("Deployment Updated"));
 
@@ -1630,7 +1629,7 @@ public class TestJSONInterface extends TestCase {
                 deptype.getHeartbeat().setTimeout(99);
             }
             String ndeptype = mapper.writeValueAsString(deptype);
-            params.put("deployment", URLEncoder.encode(ndeptype, "UTF-8"));
+            params.put("deployment", ndeptype);
             pdep = postUrlOverJSON(protocolPrefix + "localhost:8095/deployment/", null, null, null, 200, "application/json", params);
             System.out.println("POST result is: " + pdep);
             assertTrue(pdep.contains("Deployment Updated"));
@@ -1656,7 +1655,7 @@ public class TestJSONInterface extends TestCase {
             ss.setQuery(qv);
             deptype.setSystemsettings(ss);
             ndeptype = mapper.writeValueAsString(deptype);
-            params.put("deployment", URLEncoder.encode(ndeptype, "UTF-8"));
+            params.put("deployment", ndeptype);
             pdep = postUrlOverJSON(protocolPrefix + "localhost:8095/deployment/", null, null, null, 200, "application/json", params);
             System.out.println("POST result is: " + pdep);
             assertTrue(pdep.contains("Deployment Updated"));
@@ -1670,7 +1669,7 @@ public class TestJSONInterface extends TestCase {
             ss.setQuery(qv);
             deptype.setSystemsettings(ss);
             ndeptype = mapper.writeValueAsString(deptype);
-            params.put("deployment", URLEncoder.encode(ndeptype, "UTF-8"));
+            params.put("deployment", ndeptype);
             pdep = postUrlOverJSON(protocolPrefix + "localhost:8095/deployment/", null, null, null, 200, "application/json", params);
             System.out.println("POST result is: " + pdep);
             assertTrue(pdep.contains("Deployment Updated"));
@@ -1743,7 +1742,7 @@ public class TestJSONInterface extends TestCase {
             DeploymentType gotValue = mapper.readValue(jdep, DeploymentType.class);
             assertEquals("10", gotValue.getSystemsettings().getResourcemonitor().getMemorylimit().getSize());
 
-            memLimit.setSize("90%25");
+            memLimit.setSize("90%");
             ndeptype = mapper.writeValueAsString(deptype);
             params.put("deployment", ndeptype);
             pdep = postUrlOverJSON(protocolPrefix + "localhost:8095/deployment/", null, null, null, 200, "application/json", params);
@@ -2339,7 +2338,7 @@ public class TestJSONInterface extends TestCase {
                             deptype.getHeartbeat().setTimeout(timeout);
                         }
                         Map<String,String> params = new HashMap<>();
-                        params.put("deployment", URLEncoder.encode(mapper.writeValueAsString(deptype), "UTF-8"));
+                        params.put("deployment", mapper.writeValueAsString(deptype));
                         params.put("admin", "true");
                         String responseJSON = postUrlOverJSON(protocolPrefix + "localhost:8095/deployment/", m_username, m_password, "hashed", 200, "application/json", params);
                         if (!responseJSON.contains("Deployment Updated.")) {
