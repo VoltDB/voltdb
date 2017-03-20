@@ -86,7 +86,7 @@ voltdbroot = Opt('dir', 'voltdbroot', str, 2)
 hostcount = Opt('count', 'hostcount', int, 2)
 add = Opt('add', 'enableadd', None, 2)
 schema = Opt('schema', 'schema', str, 2)
-# procedures = Opt('procedures', '', str, 2)  # TODO need to verify CLASSPATH was updated - can't model on "legacycompile" since it lacks tests
+procedures = Opt('procedures', 'classpath', str, 2)
 
 # negative opt
 unknown = Opt('unknown', None, None, 0)
@@ -153,7 +153,8 @@ volt_opts = {'create': [admin,
              'init': [config,
                       voltdbroot,
                       force,
-                      schema],
+                      schema,
+                      procedures],
 
              'start': [admin,
                        client,
@@ -286,15 +287,18 @@ def compare_result(stdout, stderr, verb, opts, reportout, expectedOut=None, expe
         return True, description
 
     # match the opts
+    # ignore 'classpath' - it gets filtered out
     output_tokens = output_str.lstrip(verb).split()
     expected_tokens = []
     for k, v in opts.items():
-        if v:
+        if k == "classpath":
+            pass
+        elif v:
             expected_tokens.extend([k, v])
         else:
             expected_tokens.append(k)
     if set(output_tokens) != set(expected_tokens):
-        description = "Generate java command line:\n\t" + output_str + "\n" + "does not match expected options:\n" + " ".join(
+        description = "Generated java command line:\n\t" + output_str + "\n" + "does not match expected options:\n" + " ".join(
             expected_tokens) + "\nTest Failed!\n\n"
         reportout.write(description)
         return True, description

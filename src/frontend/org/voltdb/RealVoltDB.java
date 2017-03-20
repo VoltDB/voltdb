@@ -2170,10 +2170,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
      * @param config VoltDB configuration
      */
     private void stageSchemaFiles(Configuration config){
-        if (config.m_userSchema == null){
+        if ((config.m_userSchema == null) || (config.m_userSchema.equals(""))){
             return; // nothing to do
         }
         File stagedCatalogFH = new VoltFile(getStagedCatalogPath());
+        assert( !stagedCatalogFH.exists() || config.m_forceVoltdbCreate ); // managedPathsWithFiles() checks for the staged catalog
         final boolean standalone = true;
         final boolean isXCDR = false;
         VoltCompiler compiler = new VoltCompiler(standalone, isXCDR);
