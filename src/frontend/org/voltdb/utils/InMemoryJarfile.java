@@ -456,4 +456,13 @@ public class InMemoryJarfile extends TreeMap<String, byte[]> {
         copy.m_loader.initFrom(m_loader);
         return copy;
     }
+
+    public String debug() {
+        StringBuilder sb = new StringBuilder("InMemoryJar -- Key set: ");
+        for (Entry<String, byte[]> e: this.entrySet()) {
+            sb.append(e.getKey()).append(", ");
+        }
+
+        return sb.toString();
+    }
 }

@@ -170,6 +170,9 @@ public class VoltCompiler {
 
     private ClassLoader m_classLoader = ClassLoader.getSystemClassLoader();
 
+    // this needs to be reset in the main compile func
+    private final HashSet<Class<?>> m_cachedAddedClasses = new HashSet<>();
+
     /**
      * Represents output from a compile. This works similarly to Log4j; there
      * are different levels of feedback including info, warning, error, and
@@ -359,6 +362,9 @@ public class VoltCompiler {
     /** Passing true to constructor indicates the compiler is being run in standalone mode */
     public VoltCompiler(boolean standaloneCompiler) {
         this.standaloneCompiler = standaloneCompiler;
+
+        // reset the cache
+        m_cachedAddedClasses.clear();
     }
 
     /** Parameterless constructor is for embedded VoltCompiler use only. */
@@ -893,9 +899,6 @@ public class VoltCompiler {
             final List<VoltCompilerReader> ddlReaderList,
             final InMemoryJarfile jarOutput)
     {
-        // Compiler instance is reusable. Clear the cache.
-        cachedAddedClasses.clear();
-
         m_catalog = new Catalog();
         // Initialize the catalog for one cluster
         m_catalog.execute("add / clusters cluster");
@@ -946,6 +949,10 @@ public class VoltCompiler {
 
     public Database getCatalogDatabase() {
         return m_catalog.getClusters().get("cluster").getDatabases().get("database");
+    }
+
+    public static Database getCatalogDatabase(Catalog catalog) {
+        return catalog.getClusters().get("cluster").getDatabases().get("database");
     }
 
     private Database initCatalogDatabase() {
@@ -2014,10 +2021,6 @@ public class VoltCompiler {
         }
     }
 
-    // this needs to be reset in the main compile func
-    private static final HashSet<Class<?>> cachedAddedClasses = new HashSet<Class<?>>();
-
-
     public List<Class<?>> getInnerClasses(Class <?> c)
             throws VoltCompilerException {
         ImmutableList.Builder<Class<?>> builder = ImmutableList.builder();
@@ -2119,11 +2122,10 @@ public class VoltCompiler {
     public boolean addClassToJar(InMemoryJarfile jarOutput, final Class<?> cls)
             throws VoltCompiler.VoltCompilerException
     {
-        if (cachedAddedClasses.contains(cls)) {
+        if (m_cachedAddedClasses.contains(cls)) {
             return false;
-        } else {
-            cachedAddedClasses.add(cls);
         }
+        m_cachedAddedClasses.add(cls);
 
         for (final Class<?> nested : getInnerClasses(cls)) {
             addClassToJar(jarOutput, nested);
