@@ -118,7 +118,8 @@ public interface VoltDBInterface
             long currentTxnId,
             long currentTxnTimestamp,
             byte[] deploymentBytes,
-            byte[] deploymentHash);
+            byte[] deploymentHash,
+            boolean hasSchemaChange);
 
    /**
      * Tells if the VoltDB is running. m_isRunning needs to be set to true

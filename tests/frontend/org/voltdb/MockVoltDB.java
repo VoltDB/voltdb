@@ -460,7 +460,7 @@ public class MockVoltDB implements VoltDBInterface
     public Pair<CatalogContext, CatalogSpecificPlanner> catalogUpdate(String diffCommands,
             byte[] catalogBytes, byte[] catalogHash, int expectedCatalogVersion,
             long currentTxnId, long currentTxnTimestamp, byte[] deploymentBytes,
-            byte[] deploymentHash)
+            byte[] deploymentHash, boolean hasSchemaChange)
     {
         throw new UnsupportedOperationException("unimplemented");
     }
@@ -622,6 +622,7 @@ public class MockVoltDB implements VoltDBInterface
                 return false;
             }
 
+            @Override
             public boolean isDrActiveActiveAllowed() {
                 // TestExecutionSite (and probably others)
                 // use MockVoltDB without requiring unique
