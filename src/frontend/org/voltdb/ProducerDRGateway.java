@@ -187,11 +187,7 @@ public interface ProducerDRGateway {
      */
     public Map<Byte, DRProducerNodeStats> getNodeDRStats();
 
-    public void resumeReaders(byte clusterId);
+    public void resumeAllReadersAsync();
 
-    public void pauseReaders(byte clusterId);
-
-    public void resumeAllReaders();
-
-    public void pauseAllReaders();
+    public void pauseAllReadersAsync();
 }
