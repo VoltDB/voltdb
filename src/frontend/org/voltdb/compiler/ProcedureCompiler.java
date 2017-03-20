@@ -36,7 +36,6 @@ import org.voltdb.VoltNTProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.VoltTypeException;
-import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
@@ -72,7 +71,6 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
     static void compile(VoltCompiler compiler,
                         HSQLInterface hsql,
                         DatabaseEstimates estimates,
-                        Catalog catalog,
                         Database db,
                         ProcedureDescriptor procedureDescriptor,
                         InMemoryJarfile jarOutput)
@@ -84,10 +82,10 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
         assert(estimates != null);
 
         if (procedureDescriptor.m_singleStmt == null) {
-            compileJavaProcedure(compiler, hsql, estimates, catalog, db, procedureDescriptor, jarOutput);
+            compileJavaProcedure(compiler, hsql, estimates, db, procedureDescriptor, jarOutput);
         }
         else {
-            compileSingleStmtProcedure(compiler, hsql, estimates, catalog, db, procedureDescriptor);
+            compileSingleStmtProcedure(compiler, hsql, estimates, db, procedureDescriptor);
         }
     }
 
@@ -279,7 +277,6 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
     static void compileJavaProcedure(VoltCompiler compiler,
                                      HSQLInterface hsql,
                                      DatabaseEstimates estimates,
-                                     Catalog catalog,
                                      Database db,
                                      ProcedureDescriptor procedureDescriptor,
                                      InMemoryJarfile jarOutput)
@@ -418,7 +415,7 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
             StatementPartitioning partitioning =
                 info.singlePartition ? StatementPartitioning.forceSP() :
                                        StatementPartitioning.forceMP();
-            boolean cacheHit = StatementCompiler.compileFromSqlTextAndUpdateCatalog(compiler, hsql, catalog, db,
+            boolean cacheHit = StatementCompiler.compileFromSqlTextAndUpdateCatalog(compiler, hsql, db,
                     estimates, catalogStmt, stmt.getText(), stmt.getJoinOrder(),
                     detMode, partitioning);
 
@@ -737,7 +734,6 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
     static void compileSingleStmtProcedure(VoltCompiler compiler,
                                            HSQLInterface hsql,
                                            DatabaseEstimates estimates,
-                                           Catalog catalog,
                                            Database db,
                                            ProcedureDescriptor procedureDescriptor)
                                                    throws VoltCompiler.VoltCompilerException
@@ -796,7 +792,7 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
             info.singlePartition ? StatementPartitioning.forceSP() :
                                    StatementPartitioning.forceMP();
         // default to FASTER detmode because stmt procs can't feed read output into writes
-        StatementCompiler.compileFromSqlTextAndUpdateCatalog(compiler, hsql, catalog, db,
+        StatementCompiler.compileFromSqlTextAndUpdateCatalog(compiler, hsql, db,
                 estimates, catalogStmt, procedureDescriptor.m_singleStmt,
                 procedureDescriptor.m_joinOrder, DeterminismMode.FASTER, partitioning);
 

@@ -17,8 +17,6 @@
 
 package org.voltdb.planner;
 
-import java.math.BigDecimal;
-import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -198,11 +196,10 @@ public abstract class AbstractParsedStmt {
      * @param parsedStmt
      * @param sql
      * @param xmlSQL
-     * @param db
      * @param joinOrder
      */
     private static void parse(AbstractParsedStmt parsedStmt, String sql,
-            VoltXMLElement stmtTypeElement, Database db, String joinOrder) {
+            VoltXMLElement stmtTypeElement, String joinOrder) {
         // parse tables and parameters
         parsedStmt.parseTablesAndParams(stmtTypeElement);
 
@@ -229,7 +226,7 @@ public abstract class AbstractParsedStmt {
         NEXT_PARAMETER_ID = 0;
         AbstractParsedStmt retval = getParsedStmt(stmtTypeElement, paramValues, db);
 
-        parse(retval, sql, stmtTypeElement, db, joinOrder);
+        parse(retval, sql, stmtTypeElement, joinOrder);
         return retval;
     }
 
@@ -1560,7 +1557,7 @@ public abstract class AbstractParsedStmt {
         subquery.m_paramsById.putAll(m_paramsById);
         subquery.m_paramsByIndex = m_paramsByIndex;
 
-        AbstractParsedStmt.parse(subquery, m_sql, queryNode, m_db, m_joinOrder);
+        AbstractParsedStmt.parse(subquery, m_sql, queryNode, m_joinOrder);
         subquery.m_parentStmt = this;
         return subquery;
     }
@@ -1571,7 +1568,7 @@ public abstract class AbstractParsedStmt {
         subQuery.m_parentStmt = this;
         subQuery.m_paramsById.putAll(m_paramsById);
 
-        AbstractParsedStmt.parse(subQuery, m_sql, suqueryElmt, m_db, m_joinOrder);
+        AbstractParsedStmt.parse(subQuery, m_sql, suqueryElmt, m_joinOrder);
         updateContentDeterminismMessage(subQuery.calculateContentDeterminismMessage());
         return subQuery;
     }

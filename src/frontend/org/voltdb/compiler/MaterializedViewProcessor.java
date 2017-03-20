@@ -631,7 +631,6 @@ public class MaterializedViewProcessor {
             fallbackQueryStmt.setSqltext(query);
             StatementCompiler.compileStatementAndUpdateCatalog(m_compiler,
                               m_hsql,
-                              db.getCatalog(),
                               db,
                               estimates,
                               fallbackQueryStmt,
@@ -657,7 +656,6 @@ public class MaterializedViewProcessor {
             fallbackQueryStmt.setSqltext(query);
             StatementCompiler.compileStatementAndUpdateCatalog(m_compiler,
                               m_hsql,
-                              db.getCatalog(),
                               db,
                               estimates,
                               fallbackQueryStmt,
@@ -688,7 +686,6 @@ public class MaterializedViewProcessor {
         createQuery.setSqltext(query);
         StatementCompiler.compileStatementAndUpdateCatalog(m_compiler,
                           m_hsql,
-                          db.getCatalog(),
                           db,
                           estimates,
                           createQueryInfer,
@@ -701,7 +698,6 @@ public class MaterializedViewProcessor {
         mvHandlerInfo.getCreatequery().delete("createQueryInfer");
         StatementCompiler.compileStatementAndUpdateCatalog(m_compiler,
                           m_hsql,
-                          db.getCatalog(),
                           db,
                           estimates,
                           createQuery,
