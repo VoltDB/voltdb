@@ -31,8 +31,6 @@ import java.util.List;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
-import org.voltdb.catalog.Catalog;
-import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Statement;
@@ -53,7 +51,6 @@ import org.voltdb.utils.BuildDirectoryUtils;
  */
 public class PlannerTestAideDeCamp {
 
-    private final Catalog catalog;
     private final Procedure proc;
     private final HSQLInterface hsql;
     private final Database db;
@@ -69,12 +66,11 @@ public class PlannerTestAideDeCamp {
      */
     public PlannerTestAideDeCamp(URL ddlurl, String basename) throws Exception {
         assert(ddlurl != null);
-        String pth = ddlurl.getPath();
         String schemaPath = URLDecoder.decode(ddlurl.getPath(), "UTF-8");
         VoltCompiler compiler = new VoltCompiler(false);
         hsql = HSQLInterface.loadHsqldb();
         VoltCompiler.DdlProceduresToLoad no_procs = DdlProceduresToLoad.NO_DDL_PROCEDURES;
-        catalog = compiler.loadSchema(hsql, no_procs, schemaPath);
+        compiler.loadSchema(hsql, no_procs, schemaPath);
         db = compiler.getCatalogDatabase();
         proc = db.getProcedures().add(basename);
     }
@@ -146,8 +142,7 @@ public class PlannerTestAideDeCamp {
             partitioning = StatementPartitioning.forceMP();
         }
         String procName = catalogStmt.getParent().getTypeName();
-        Cluster catalogCluster = catalog.getClusters().get("cluster");
-        QueryPlanner planner = new QueryPlanner(sql, stmtLabel, procName, catalogCluster, db,
+        QueryPlanner planner = new QueryPlanner(sql, stmtLabel, procName, db,
                 partitioning, hsql, estimates, false, StatementCompiler.DEFAULT_MAX_JOIN_TABLES,
                 costModel, null, joinOrder, detMode);
 
