@@ -17,8 +17,6 @@
 
 package org.voltdb.plannodes;
 
-import org.voltdb.catalog.Cluster;
-import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.types.PlanNodeType;
@@ -37,8 +35,6 @@ public class NestLoopPlanNode extends AbstractJoinPlanNode {
 
     @Override
     public void computeCostEstimates(long childOutputTupleCountEstimate,
-                                     Cluster cluster,
-                                     Database db,
                                      DatabaseEstimates estimates,
                                      ScalarValueHints[] paramHints)
     {

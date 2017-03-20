@@ -26,7 +26,6 @@ import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.ParameterSet;
 import org.voltdb.VoltType;
-import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
@@ -52,7 +51,6 @@ public class QueryPlanner {
     String m_procName;
     HSQLInterface m_HSQL;
     DatabaseEstimates m_estimates;
-    Cluster m_cluster;
     Database m_db;
     String m_recentErrorMsg;
     StatementPartitioning m_partitioning;
@@ -84,7 +82,6 @@ public class QueryPlanner {
      * @param sql Literal SQL statement to parse
      * @param stmtName The name of the statement for logging/debugging
      * @param procName The name of the proc for logging/debugging
-     * @param catalogCluster Catalog info about the physical layout of the cluster.
      * @param catalogDb Catalog info about schema, metadata and procedures.
      * @param partitioning Describes the specified and inferred partition context.
      * @param HSQL HSQLInterface pointer used for parsing SQL into XML.
@@ -98,7 +95,6 @@ public class QueryPlanner {
     public QueryPlanner(String sql,
                         String stmtName,
                         String procName,
-                        Cluster catalogCluster,
                         Database catalogDb,
                         StatementPartitioning partitioning,
                         HSQLInterface HSQL,
@@ -113,10 +109,8 @@ public class QueryPlanner {
         assert(stmtName != null);
         assert(procName != null);
         assert(HSQL != null);
-        assert(catalogCluster != null);
         assert(catalogDb != null);
         assert(costModel != null);
-        assert(catalogDb.getCatalog() == catalogCluster.getCatalog());
         assert(detMode != null);
 
         m_sql = sql;
@@ -124,7 +118,6 @@ public class QueryPlanner {
         m_procName = procName;
         m_HSQL = HSQL;
         m_db = catalogDb;
-        m_cluster = catalogCluster;
         m_estimates = estimates;
         m_partitioning = partitioning;
         m_maxTablesPerJoin = maxTablesPerJoin;
@@ -132,7 +125,7 @@ public class QueryPlanner {
         m_paramHints = paramHints;
         m_joinOrder = joinOrder;
         m_detMode = detMode;
-        m_planSelector = new PlanSelector(m_cluster, m_db, m_estimates, m_stmtName,
+        m_planSelector = new PlanSelector(m_estimates, m_stmtName,
                 m_procName, m_sql, m_costModel, m_paramHints, m_detMode,
                 suppressDebugOutput);
         m_isUpsert = false;
@@ -429,7 +422,7 @@ public class QueryPlanner {
 
         // Init Assembler. Each plan assembler requires a new instance of the PlanSelector
         // to keep track of the best plan
-        PlanAssembler assembler = new PlanAssembler(m_cluster, m_db, m_partitioning,
+        PlanAssembler assembler = new PlanAssembler(m_db, m_partitioning,
                 (PlanSelector) m_planSelector.clone());
         // find the plan with minimal cost
         CompiledPlan bestPlan = assembler.getBestCostPlan(parsedStmt);
