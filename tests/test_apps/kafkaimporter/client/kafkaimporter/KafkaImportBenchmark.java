@@ -362,7 +362,7 @@ public class KafkaImportBenchmark {
             return false;
     }
 
-    public static void endTest(boolean testResult) {
+    public static void endTest(boolean testResult, Config config) {
         // Write stats to file if requested
         try {
             if ((config.statsfile != null) && (config.statsfile.length() != 0)) {
@@ -432,7 +432,7 @@ public class KafkaImportBenchmark {
         // minute to settle
         if (config.expected_rows == 0) {
             testResult = verifyZero();
-            endTest(testResult);
+            endTest(testResult, config);
         }
 
         // instance handles inserts to Kafka export table and its mirror DB table
@@ -515,6 +515,6 @@ public class KafkaImportBenchmark {
             testResult = MatchChecks.checkPounderResults(config.expected_rows, client);
         }
 
-        endTest(testResult);
+        endTest(testResult, config);
     }
 }

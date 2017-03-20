@@ -80,58 +80,6 @@ public class TestSqlInsertSuite extends RegressionSuite {
                 "VoltDB does not support multiple rows in the INSERT statement VALUES clause. Use separate INSERT statements.");
     }
 
-    public void testInsertWithExpressionSubquery() throws Exception
-    {
-        Client client = getClient();
-        // Insert a couple of rows into R2
-        validateTableOfLongs(client, "insert into r2 values (1, 2, 3, 4, 5, 6);", new long[][] {{1}});
-        validateTableOfLongs(client, "insert into r2 values (2, 3, 4, 5, 6, 7);", new long[][] {{1}});
-        // Insert a row into R1
-        validateTableOfLongs(client, "insert into r1 values (2, 3, 4, 5, 6, 7);", new long[][] {{1}});
-
-        validateTableOfLongs(client, "insert into r1 (ccc, bbb, aaa, zzz, yyy, xxx) " +
-                "select ccc, bbb, aaa, zzz, yyy, xxx from r2 " +
-                "where not exists (select ccc from r1 rr1 where rr1.ccc = r2.ccc);",
-                new long[][] {{1}});
-
-        long[][] expected = new long[][] {{1}, {2}};
-        validateTableOfLongs(client, "select ccc from r1 order by ccc", expected);
-
-        // clean-up R1
-        validateTableOfLongs(client, "delete from r1;", new long[][] {{2}});
-
-        validateTableOfLongs(client, "insert into r1 (ccc, bbb, aaa, zzz, yyy, xxx) " +
-                "select ccc, bbb, aaa, zzz, yyy, xxx from r2 " +
-                "where r2.ccc in (select ccc from r2 rr2 where rr2.ccc * 2 = rr2.bbb);",
-                new long[][] {{1}});
-        expected = new long[][] {{1}};
-        validateTableOfLongs(client, "select ccc from r1 order by ccc", expected);
-
-        // clean-up R1
-        validateTableOfLongs(client, "delete from r1;", new long[][] {{1}});
-        validateTableOfLongs(client, "insert into r1 (ccc, bbb, aaa, zzz, yyy, xxx) " +
-                "select (select max(aaa) from r2), 3, 3, 3, 3, 3 from r2;",
-                new long[][] {{2}});
-        expected = new long[][] {{4}, {4}};
-        validateTableOfLongs(client, "select ccc from r1 order by ccc", expected);
-
-        // clean-up R1
-        validateTableOfLongs(client, "delete from r1;", new long[][] {{2}});
-        validateTableOfLongs(client, "insert into r1 (ccc, bbb, aaa, zzz, yyy, xxx) " +
-                "values ((select max(aaa) from r2), 3, 3, 3, 3, 3);",
-                new long[][] {{1}});
-        expected = new long[][] {{4}};
-        validateTableOfLongs(client, "select ccc from r1 order by ccc", expected);
-
-        // clean-up R1
-        validateTableOfLongs(client, "delete from r1;", new long[][] {{1}});
-        String expectedMsg = "More than one row returned by a scalar/row subquery";
-        verifyStmtFails(client, "insert into r1 (ccc, bbb, aaa, zzz, yyy, xxx) " +
-                "values ((select ccc from r2), 3, 3, 3, 3, 3);",
-                expectedMsg);
-
-    }
-
     // See also tests for INSERT using DEFAULT NOW columns in TestFunctionsSuite.java
 
     //
@@ -156,24 +104,6 @@ public class TestSqlInsertSuite extends RegressionSuite {
                 "xxx bigint " + // default null
                 ");" +
                 "PARTITION TABLE P1 ON COLUMN ccc;" +
-                "" +
-                "CREATE TABLE R1 ( " +
-                "ccc bigint default 10 not null, " +
-                "bbb bigint default 11, " +
-                "aaa bigint default 12, " +
-                "zzz bigint not null, " +
-                "yyy bigint default 14, " +
-                "xxx bigint " + // default null
-                ");" +
-                "" +
-                "CREATE TABLE R2 ( " +
-                "ccc bigint default 10 not null, " +
-                "bbb bigint default 11, " +
-                "aaa bigint default 12, " +
-                "zzz bigint not null, " +
-                "yyy bigint default 14, " +
-                "xxx bigint " + // default null
-                ");" +
                 ""
                 ;
         try {

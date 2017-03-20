@@ -3309,7 +3309,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
 
                 // 1. update the export manager.
-                ExportManager.instance().updateCatalog(m_catalogContext, partitions);
+                ExportManager.instance().updateCatalog(m_catalogContext, diffCommands, partitions);
 
                 // 1.1 Update the elastic join throughput settings
                 if (m_elasticJoinService != null) m_elasticJoinService.updateConfig(m_catalogContext);
@@ -3963,19 +3963,17 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     private void prepareReplication() {
+        // Warning: This is called on the site thread if this host is rejoining
         try {
-            boolean okToStartDR = true;
             if (m_consumerDRGateway != null) {
-                if (m_config.m_startAction == StartAction.RECOVER) {
+                if (m_config.m_startAction != StartAction.CREATE) {
                     Pair<Byte, List<MeshMemberInfo>> expectedClusterMembers = m_producerDRGateway.getInitialConversations();
-                    okToStartDR = m_consumerDRGateway.isSyncSnapshotComplete(expectedClusterMembers.getFirst(),
+                    m_consumerDRGateway.setInitialConversationMembership(expectedClusterMembers.getFirst(),
                             expectedClusterMembers.getSecond());
                 }
-                if (okToStartDR) {
-                    m_consumerDRGateway.initialize(m_config.m_startAction != StartAction.CREATE);
-                }
+                m_consumerDRGateway.initialize(m_config.m_startAction != StartAction.CREATE);
             }
-            if (m_producerDRGateway != null && okToStartDR) {
+            if (m_producerDRGateway != null) {
                 m_producerDRGateway.startListening(m_catalogContext.cluster.getDrproducerenabled(),
                                                    VoltDB.getReplicationPort(m_catalogContext.cluster.getDrproducerport()),
                                                    VoltDB.getDefaultReplicationInterface());
