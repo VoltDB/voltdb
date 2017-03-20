@@ -140,7 +140,7 @@ public class ProcedureRunnerNT {
 
     protected CompletableFuture<ClientResponse> callProcedure(String procName, Object... params) {
         MyProcedureCallback cb = new MyProcedureCallback();
-        boolean success = m_procSet.m_ich.callProcedure(m_user, false, 1000 * 120, cb, procName, params);
+        boolean success = m_procSet.m_ich.callProcedure(m_user, false, 1000 * 120, cb, true, procName, params);
         assert(success);
         return cb.fut;
     }

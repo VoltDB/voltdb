@@ -1218,6 +1218,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                                               true,
                                                               1000 * 120,
                                                               cb,
+                                                              true, // priority NT
                                                               invocation.getProcName(),
                                                               itm.getParameters());
                 }
@@ -1471,7 +1472,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             return errorResponse(ccxn, task.clientHandle, ClientResponse.UNEXPECTED_FAILURE, errorMessage, null, false);
         }
 
-        return m_dispatcher.dispatch(task, handler, ccxn, user, null);
+        return m_dispatcher.dispatch(task, handler, ccxn, user, null, false);
     }
 
     public Procedure getProcedureFromName(String procName, CatalogContext catalogContext) {

@@ -87,59 +87,15 @@ public class InternalConnectionHandler {
             String procName,
             Object...args)
     {
-        Procedure catProc = InvocationDispatcher.getProcedureFromName(procName, getCatalogContext());
-        if (catProc == null) {
-            String fmt = "Cannot invoke procedure %s. Procedure not found.";
-            m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.ERROR, null, fmt, procName);
-            m_failedCount.incrementAndGet();
-            return false;
-        }
-
-        StoredProcedureInvocation task = new StoredProcedureInvocation();
-        task.setProcName(procName);
-        task.setParams(args);
-
-        try {
-            task = MiscUtils.roundTripForCL(task);
-        } catch (Exception e) {
-            String fmt = "Cannot invoke procedure %s. failed to create task.";
-            m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.ERROR, null, fmt, procName);
-            m_failedCount.incrementAndGet();
-            return false;
-        }
-
-        if (timeout != BatchTimeoutOverrideType.NO_TIMEOUT) {
-            task.setBatchTimeout(timeout);
-        }
-
-        int partition = -1;
-        try {
-            partition = InvocationDispatcher.getPartitionForProcedure(catProc, task);
-        } catch (Exception e) {
-            String fmt = "Can not invoke procedure %s. Partition not found.";
-            m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.ERROR, e, fmt, procName);
-            m_failedCount.incrementAndGet();
-            return false;
-        }
-
-        final InternalClientResponseAdapter adapter = m_adapters.get(partition);
-        InternalAdapterTaskAttributes kattrs = new InternalAdapterTaskAttributes(
-                DEFAULT_INTERNAL_ADAPTER_NAME, isAdmin, adapter.connectionId());
-
-        if (!adapter.createTransaction(kattrs, procName, catProc, cb, null, task, user, partition, null)) {
-            m_failedCount.incrementAndGet();
-            return false;
-        }
-        m_submitSuccessCount.incrementAndGet();
-        return true;
+        return callProcedure(user, isAdmin, timeout, cb, false, procName, args);
     }
 
-    public boolean callNTProcedureOnHost(
-            long hostId,
+    public boolean callProcedure(
             AuthUser user,
             boolean isAdmin,
             int timeout,
             ProcedureCallback cb,
+            boolean ntPriority,
             String procName,
             Object...args)
     {
@@ -182,7 +138,7 @@ public class InternalConnectionHandler {
         InternalAdapterTaskAttributes kattrs = new InternalAdapterTaskAttributes(
                 DEFAULT_INTERNAL_ADAPTER_NAME, isAdmin, adapter.connectionId());
 
-        if (!adapter.createTransaction(kattrs, procName, catProc, cb, null, task, user, partition, null)) {
+        if (!adapter.createTransaction(kattrs, procName, catProc, cb, null, task, user, partition, ntPriority, null)) {
             m_failedCount.incrementAndGet();
             return false;
         }
@@ -230,7 +186,7 @@ public class InternalConnectionHandler {
 
         final AuthUser user = getCatalogContext().authSystem.getImporterUser();
 
-        if (!adapter.createTransaction(kattrs, proc, catProc, procCallback, statsCollector, task, user, partition, backPressurePredicate)) {
+        if (!adapter.createTransaction(kattrs, proc, catProc, procCallback, statsCollector, task, user, partition, false, backPressurePredicate)) {
             m_failedCount.incrementAndGet();
             return false;
         }

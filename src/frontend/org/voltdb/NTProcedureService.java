@@ -27,8 +27,11 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.network.Connection;
@@ -53,11 +56,22 @@ public class NTProcedureService {
     final ConcurrentLinkedQueue<Runnable> m_pendingInvocations = new ConcurrentLinkedQueue<>();
     final Semaphore m_outstandingNTProcSemaphore = new Semaphore(10);
 
-    final static String NTPROC_THREADPOOL_NAMEPREFIX = "NTProcServiceThread-";
+    final static String NTPROC_THREADPOOL_NAMEPREFIX = "NTPServiceThread-";
+    final static String NTPROC_THREADPOOL_PRIORITY_SUFFIX = "Priority-";
 
-    private final ExecutorService m_executorService = Executors.newCachedThreadPool(
+    private final ExecutorService m_primaryExecutorService = new ThreadPoolExecutor(
+            1,
+            20,
+            60,
+            TimeUnit.SECONDS,
+            new LinkedBlockingQueue<Runnable>(),
             new ThreadFactoryBuilder()
                 .setNameFormat(NTPROC_THREADPOOL_NAMEPREFIX + "%d")
+                .build());
+
+    private final ExecutorService m_priorityExecutorService = Executors.newCachedThreadPool(
+            new ThreadFactoryBuilder()
+                .setNameFormat(NTPROC_THREADPOOL_NAMEPREFIX + NTPROC_THREADPOOL_PRIORITY_SUFFIX + "%d")
                 .build());
 
     long nextProcedureRunnerId = 0;
@@ -121,7 +135,8 @@ public class NTProcedureService {
                                                              m_procedureName,
                                                              m_procMethod,
                                                              m_paramTypes,
-                                                             m_executorService,
+                                                             // use priority to avoid deadlocks
+                                                             m_priorityExecutorService,
                                                              NTProcedureService.this,
                                                              m_mailbox,
                                                              m_statsCollector);
@@ -222,6 +237,7 @@ public class NTProcedureService {
     ClientResponseImpl callProcedureNT(final AuthUser user,
                                        final Connection ccxn,
                                        final long clientHandle,
+                                       final boolean ntPriority,
                                        final String procName,
                                        final ParameterSet paramListIn)
     {
@@ -259,7 +275,12 @@ public class NTProcedureService {
         };
 
         try {
-            m_executorService.submit(invocationRunnable);
+            if (ntPriority) {
+                m_priorityExecutorService.submit(invocationRunnable);
+            }
+            else {
+                m_primaryExecutorService.submit(invocationRunnable);
+            }
         }
         catch (RejectedExecutionException e) {
             handleNTProcEnd(runner);

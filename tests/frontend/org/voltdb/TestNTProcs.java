@@ -54,18 +54,38 @@ public class TestNTProcs extends TestCase {
         }
     }
 
+    public static class TrivialNTProcPriority extends VoltNTProcedure {
+        public long run() throws InterruptedException, ExecutionException {
+            assertTrue(Thread.currentThread().getName().startsWith(NTProcedureService.NTPROC_THREADPOOL_NAMEPREFIX));
+            assertTrue(Thread.currentThread().getName().contains(NTProcedureService.NTPROC_THREADPOOL_PRIORITY_SUFFIX));
+
+            System.out.println("Ran trivial priority proc!");
+            return -1;
+        }
+    }
+
     public static class NestedNTProc extends VoltNTProcedure {
         public long run() throws InterruptedException, ExecutionException {
             assertTrue(Thread.currentThread().getName().startsWith(NTProcedureService.NTPROC_THREADPOOL_NAMEPREFIX));
 
-            System.out.println("Did it!");
+            // call a real transactional proc
+            System.out.println("Calling transaction!");
             CompletableFuture<ClientResponse> pf = callProcedure("@AdHoc", "select * from blah");
-
             // NB: blocking on a response keeps the thread in the pool wasted.
             // don't do this in prod
             ClientResponseImpl cr = (ClientResponseImpl) pf.get();
-            System.out.println("Got response!");
+            System.out.println("Got response 1!");
             System.out.println(cr.toJSONString());
+
+            // call an NT proc (should run on priority exec service)
+            System.out.println("Calling nt proc!");
+            pf = callProcedure("TestNTProcs$TrivialNTProcPriority");
+            // NB: blocking on a response keeps the thread in the pool wasted.
+            // don't do this in prod
+            cr = (ClientResponseImpl) pf.get();
+            System.out.println("Got response 2!");
+            System.out.println(cr.toJSONString());
+
             return -1;
         }
     }
@@ -76,6 +96,7 @@ public class TestNTProcs extends TestCase {
             System.out.flush();
 
             assertTrue(Thread.currentThread().getName().startsWith(NTProcedureService.NTPROC_THREADPOOL_NAMEPREFIX));
+            assertTrue(Thread.currentThread().getName().contains(NTProcedureService.NTPROC_THREADPOOL_PRIORITY_SUFFIX));
 
             System.out.println("Got to nextStep!");
             return 0;
@@ -95,7 +116,7 @@ public class TestNTProcs extends TestCase {
             assertTrue(Thread.currentThread().getName().startsWith(NTProcedureService.NTPROC_THREADPOOL_NAMEPREFIX));
 
             System.out.println("Running on one!");
-            CompletableFuture<Map<Integer,ClientResponse>> pf = callAllNodeNTProcedure("TestNTProcs$TrivialNTProc");
+            CompletableFuture<Map<Integer,ClientResponse>> pf = callAllNodeNTProcedure("TestNTProcs$TrivialNTProcPriority");
             Map<Integer,ClientResponse> cr = pf.get();
             cr.entrySet().stream()
                 .forEach(e -> {
@@ -140,6 +161,7 @@ public class TestNTProcs extends TestCase {
             System.out.flush();
 
             assertTrue(Thread.currentThread().getName().startsWith(NTProcedureService.NTPROC_THREADPOOL_NAMEPREFIX));
+            assertTrue(Thread.currentThread().getName().contains(NTProcedureService.NTPROC_THREADPOOL_PRIORITY_SUFFIX));
 
             System.out.println("Did it NT2!");
             ClientResponseImpl cr = (ClientResponseImpl) response;
@@ -184,6 +206,7 @@ public class TestNTProcs extends TestCase {
             System.out.flush();
 
             assertTrue(Thread.currentThread().getName().startsWith(NTProcedureService.NTPROC_THREADPOOL_NAMEPREFIX));
+            assertTrue(Thread.currentThread().getName().contains(NTProcedureService.NTPROC_THREADPOOL_PRIORITY_SUFFIX));
 
             System.out.println("Did it NT2!");
             return "This is spinal tap!";
@@ -227,7 +250,7 @@ public class TestNTProcs extends TestCase {
                     r.getLong("TRANSACTIONAL")
                     })
             // aggregate (sum, max, max, sum, sum, identity)
-            .reduce(new long[] {0, 0, 0, 0, 0}, (a, b) ->
+            .reduce(new long[] {0, 0, 0, 0, 0, 0}, (a, b) ->
                 new long[] {
                         a[0] + b[0],
                         Math.max(a[1], b[1]),
@@ -253,6 +276,7 @@ public class TestNTProcs extends TestCase {
             "create table blah (pkey integer not null, strval varchar(200), PRIMARY KEY(pkey));\n" +
             "partition table blah on column pkey;\n" +
             "create procedure from class org.voltdb.TestNTProcs$TrivialNTProc;\n" +
+            "create procedure from class org.voltdb.TestNTProcs$TrivialNTProcPriority;\n" +
             "create procedure from class org.voltdb.TestNTProcs$NestedNTProc;\n" +
             "create procedure from class org.voltdb.TestNTProcs$AsyncNTProc;\n" +
             "create procedure from class org.voltdb.TestNTProcs$RunEverywhereNTProc;\n" +
@@ -354,10 +378,10 @@ public class TestNTProcs extends TestCase {
         // CHECK STATS
         VoltTable statsT = getStats(client, "PROCEDURE");
         assertTrue(VoltTableUtil.tableContainsString(statsT, "RunEverywhereNTProc", true));
-        assertTrue(VoltTableUtil.tableContainsString(statsT, "TrivialNTProc", true));
+        assertTrue(VoltTableUtil.tableContainsString(statsT, "TrivialNTProcPriority", true));
         Map<String, Long> stats = aggregateProcRow(client, RunEverywhereNTProc.class.getName());
         assertEquals(1, stats.get("INVOCATIONS").longValue());
-        stats = aggregateProcRow(client, TrivialNTProc.class.getName());
+        stats = aggregateProcRow(client, TrivialNTProcPriority.class.getName());
         assertEquals(1, stats.get("INVOCATIONS").longValue());
 
         localServer.shutdown();
@@ -388,10 +412,10 @@ public class TestNTProcs extends TestCase {
         // CHECK STATS
         VoltTable statsT = getStats(client, "PROCEDURE");
         assertTrue(VoltTableUtil.tableContainsString(statsT, "RunEverywhereNTProc", true));
-        assertTrue(VoltTableUtil.tableContainsString(statsT, "TrivialNTProc", true));
+        assertTrue(VoltTableUtil.tableContainsString(statsT, "TrivialNTProcPriority", true));
         Map<String, Long> stats = aggregateProcRow(client, RunEverywhereNTProc.class.getName());
         assertEquals(1, stats.get("INVOCATIONS").longValue());
-        stats = aggregateProcRow(client, TrivialNTProc.class.getName());
+        stats = aggregateProcRow(client, TrivialNTProcPriority.class.getName());
         assertEquals(3, stats.get("INVOCATIONS").longValue());
 
         client.close();

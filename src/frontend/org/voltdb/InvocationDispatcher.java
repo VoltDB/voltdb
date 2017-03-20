@@ -300,7 +300,8 @@ public final class InvocationDispatcher {
             InvocationClientHandler handler,
             Connection ccxn,
             AuthUser user,
-            OverrideCheck bypass)
+            OverrideCheck bypass,
+            boolean ntPriority)
     {
         final long nowNanos = System.nanoTime();
                 // Deserialize the client's request and map to a catalog stored procedure
@@ -372,7 +373,7 @@ public final class InvocationDispatcher {
 
         // handle non-transactional procedures (INCLUDING NT SYSPROCS)
         if ((catProc.getTransactional() == false) && (catProc.getHasjava() == true)) {
-            return dispatchNTProcedure(task, user, ccxn);
+            return dispatchNTProcedure(task, user, ccxn, ntPriority);
         }
 
         if (catProc.getSystemproc()) {
@@ -839,16 +840,18 @@ public final class InvocationDispatcher {
         return null;
     }
 
-    private final ClientResponseImpl dispatchNTProcedure(StoredProcedureInvocation task,
+    public final ClientResponseImpl dispatchNTProcedure(StoredProcedureInvocation task,
                                                          AuthUser user,
-                                                         Connection ccxn)
+                                                         Connection ccxn,
+                                                         boolean ntPriority)
     {
         ParameterSet paramSet = task.getParams();
         return m_NTProcedureService.callProcedureNT(user,
-                                                      ccxn,
-                                                      task.clientHandle,
-                                                      task.getProcName(),
-                                                      paramSet);
+                                                    ccxn,
+                                                    task.clientHandle,
+                                                    ntPriority,
+                                                    task.getProcName(),
+                                                    paramSet);
     }
 
     private final void dispatchAdHoc(StoredProcedureInvocation task, InvocationClientHandler handler,
@@ -1073,7 +1076,7 @@ public final class InvocationDispatcher {
         // shutdown save snapshot is available for Pro edition only
         if (!MiscUtils.isPro()) {
             task.setParams();
-            return dispatch(task, handler, ccxn, user, bypass);
+            return dispatch(task, handler, ccxn, user, bypass, false);
         }
 
         Object p0 = task.getParams().getParam(0);
@@ -1189,7 +1192,7 @@ public final class InvocationDispatcher {
                 }
                 consoleLog.info("Snapshot taken successfully");
                 task.setParams();
-                dispatch(task, alternateHandler, alternateAdapter, user, bypass);
+                dispatch(task, alternateHandler, alternateAdapter, user, bypass, false);
             }
         };
 
@@ -1348,7 +1351,7 @@ public final class InvocationDispatcher {
                         return;
                     }
                     m_catalogContext.set(VoltDB.instance().getCatalogContext());
-                    dispatch(task, alternateHandler, alternateAdapter, user, bypass);
+                    dispatch(task, alternateHandler, alternateAdapter, user, bypass, false);
                 }
             },
             CoreUtils.SAMETHREADEXECUTOR);
