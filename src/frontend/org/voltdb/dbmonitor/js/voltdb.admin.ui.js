@@ -2937,7 +2937,7 @@ function loadAdminPage() {
             var contents = '' +
                 '<table width="100%" cellpadding="0" cellspacing="0" class="configurTbl">' +
                 '<tr id="Tr1">' +
-                '    <td>Stream</td>' +
+                '    <td>Target</td>' +
                 '    <td width="15%">' +
                 '       <input id="txtStream" name="txtStream" type="text" size="38">' +
                 '       <label id="errorStream" for="txtStream" class="error" style="display: none;"></label>' +
@@ -3074,7 +3074,7 @@ function loadAdminPage() {
                 $("#txtType").val(config.type);
                 addExportProperties();
                 VoltDbAdminConfig.orgTypeValue = config.type;
-                $("#txtStream").val(config.stream);
+                $("#txtStream").val(config.target);
 
                 $("#chkStream").iCheck(config.enabled ? 'check' : 'uncheck');
                 $("#txtExportConnectorClass").val(config.exportconnectorclass);
@@ -3183,7 +3183,7 @@ function loadAdminPage() {
                             "value": encodeURIComponent($(newStreamProperties[i + 1]).val()),
                         });
                     }
-                    newConfig["stream"] = $("#txtStream").val();
+                    newConfig["target"] = $("#txtStream").val();
                     newConfig["type"] = $("#txtType").val().trim();
                     newConfig["enabled"] = $("#chkStream").is(':checked');
                     if ($("#txtType").val().trim().toUpperCase() == "CUSTOM") {
@@ -3200,7 +3200,7 @@ function loadAdminPage() {
                         adminConfigurations["export"].configuration.push(newConfig);
                     } else {
                         var updatedConfig = adminConfigurations["export"].configuration[editId * 1];
-                        updatedConfig.stream = newConfig.stream;
+                        updatedConfig.target = newConfig.target;
                         updatedConfig.type = newConfig.type;
                         updatedConfig.enabled = newConfig.enabled;
                         updatedConfig.property = newConfig.property;
@@ -5303,7 +5303,7 @@ function loadAdminPage() {
                 }
 
                 for (var i = 0; i < data.length; i++) {
-                    var stream = VoltDbAdminConfig.escapeHtml(data[i].stream);
+                    var stream = VoltDbAdminConfig.escapeHtml(data[i].target);
                     var type = data[i].type ? (" (" + VoltDbAdminConfig.escapeHtml(data[i].type) + ")") : "";
                     var enabled = data[i].enabled;
                     var streamProperty = data[i].property;
