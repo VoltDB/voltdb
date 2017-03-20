@@ -549,7 +549,6 @@ void DRTupleStream::endTransaction(int64_t uniqueId)
 
     if (m_eventTxn) { // We need to push the event buffer out.
         extendBufferChain(0);
-        pushPendingBlocks(); //TODO: extendBufferChain does pushPendingBlocks. So do we need this here again?
         m_eventTxn = false;
     }
     m_txnRowCount = 0;
@@ -623,8 +622,6 @@ void DRTupleStream::generateDREvent(DREventType type, int64_t lastCommittedSpHan
         commitTransactionCommon();
 
         extendBufferChain(0);
-
-        pushPendingBlocks(); //TODO: extendBufferChain does pushPendingBlocks. So do we need this here again?
         break;
     }
     case SWAP_TABLE : { // Similar to other events, except that
