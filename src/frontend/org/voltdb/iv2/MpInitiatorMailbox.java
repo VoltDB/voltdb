@@ -27,6 +27,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.VoltMessage;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
@@ -302,6 +303,9 @@ public class MpInitiatorMailbox extends InitiatorMailbox
             m_scheduler.handleMessageRepair(needsRepair, work);
         }
         else if (repairWork instanceof CompleteTransactionMessage) {
+            if (tmLog.isDebugEnabled()) {
+                tmLog.debug("[MpInitiatorMailbox.repairReplicasWithInternal] send to " + CoreUtils.hsIdCollectionToString(needsRepair) + " msg:" + repairWork);
+            }
             send(com.google_voltpatches.common.primitives.Longs.toArray(needsRepair), repairWork);
         }
         else {

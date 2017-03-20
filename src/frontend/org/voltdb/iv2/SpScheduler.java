@@ -1051,28 +1051,28 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                    );
         }
 
-        // The site has not seen any fragment of the transaction yet but has been marked
-        // as non-leader. Nothing to process.
-        if (!m_isLeader && txn == null && !message.requiresAck()) {
+        // The site has not seen any fragments of the transaction yet, but it has been marked as non-leader.
+        if (!m_isLeader && txn == null) {
             return;
         }
 
-        // The site may have seen fragment messages in a multiple-part transaction but it has been marked as non-leader.
-        // In this case, The transaction is restarted, triggered either from mis-routed fragment or via master change repair process.
-        // This message is used to clean up the site before transaction restart.
-        if (m_isLeader || message.isRestartCleanup()) {
+        // A transaction may be restarted from a mis-routed fragment or via master change repair process.
+        // The site may have see all the fragments of a transaction,
+        if (m_isLeader || message.isRestartCleanup() || message.isToLeader()) {
             msg = new CompleteTransactionMessage(m_mailbox.getHSId(), m_mailbox.getHSId(), message);
             // Set the spHandle so that on repair the new master will set the max seen spHandle
             // correctly
             advanceTxnEgo();
             msg.setSpHandle(getCurrentTxnId());
-
+            msg.setToLeader(false);
             if (m_sendToHSIds.length > 0 && !msg.isReadOnly()) {
                 m_mailbox.send(m_sendToHSIds, msg);
             }
         } else {
             if (tmLog.isDebugEnabled() && TxnEgo.getSequence(msg.getSpHandle())< TxnEgo.SEQUENCE_ZERO) {
-                tmLog.debug("INVALID SEQUENCE:" + msg + "\nTxn:" + (txn != null ? txn.getNotice() : "") + "\nisLeader:" + m_isLeader);
+                tmLog.debug("INVALID SEQUENCE: site " + CoreUtils.hsIdToString(m_mailbox.getHSId()) +
+                        " MSG:" + msg + "\nTxn:" + (txn != null ? txn.getNotice() : "") +
+                        "\nisLeader:" + m_isLeader);
             }
             setMaxSeenTxnId(msg.getSpHandle());
         }
@@ -1142,7 +1142,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         //
         // The SPI uses this response message to track if all replicas have
         // committed the transaction.
-        if (!m_isLeader) {
+        if (!m_isLeader && msg.getSPIHSId() != m_mailbox.getHSId()) {
             m_mailbox.send(msg.getSPIHSId(), msg);
         }
     }

@@ -30,7 +30,11 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
     boolean m_requiresAck;
     boolean m_rollbackForFault;
 
+    //transaction restart cleanup
     boolean m_restartCleanup;
+
+    //indicate if this message is sent to partition leader
+    boolean m_toLeader;
 
     int m_hash;
     int m_flags = 0;
@@ -81,6 +85,7 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
         setBit(REQUIRESACK, requiresAck);
         setBit(ISRESTART, isRestart);
         m_restartCleanup = false;
+        m_toLeader = false;
     }
 
     public CompleteTransactionMessage(long initiatorHSId, long coordinatorHSId, CompleteTransactionMessage msg)
@@ -115,11 +120,20 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
     public boolean isRestartCleanup() {
         return m_restartCleanup;
     }
+
+    public void setToLeader(boolean toLeader) {
+        m_toLeader = toLeader;
+    }
+
+    public boolean isToLeader() {
+        return m_toLeader;
+    }
+
     @Override
     public int getSerializedSize()
     {
         int msgsize = super.getSerializedSize();
-        msgsize += 4 + 4 + 1;
+        msgsize += 4 + 4 + 1 + 1;
         return msgsize;
     }
 
@@ -131,6 +145,7 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
         buf.putInt(m_hash);
         buf.putInt(m_flags);
         buf.put((byte)(m_restartCleanup ? 1 : 0));
+        buf.put((byte)(m_toLeader ? 1 : 0));
         assert(buf.capacity() == buf.position());
         buf.limit(buf.position());
     }
@@ -142,6 +157,7 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
         m_hash = buf.getInt();
         m_flags = buf.getInt();
         m_restartCleanup = (buf.get() == 1);
+        m_toLeader = (buf.get() == 1);
         assert(buf.capacity() == buf.position());
     }
 
@@ -169,6 +185,9 @@ public class CompleteTransactionMessage extends TransactionInfoBaseMessage
             sb.append("\n  THIS IS A TRANSACTION RESTART");
         }
 
+        if (isToLeader()) {
+            sb.append("\n  SEND TO LEADER");
+        }
         return sb.toString();
     }
 }

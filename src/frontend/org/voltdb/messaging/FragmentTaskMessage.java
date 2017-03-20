@@ -87,8 +87,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
             StringBuilder sb = new StringBuilder();
             sb.append(String.format("FRAGMENT PLAN HASH: %s\n", Encoder.hexEncode(m_planHash)));
             if (m_stmtName != null) {
-                sb.append("\n");
-                sb.append("  STATEMENT NAME: ");
+                sb.append("\n  STATEMENT NAME: ");
                 sb.append(getStmtName());
             }
             if (m_parameterSet != null) {
@@ -102,26 +101,22 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
                 sb.append("\n  ").append(pset.toString());
             }
             if (m_outputDepId != null) {
-                sb.append("\n");
-                sb.append("  OUTPUT_DEPENDENCY_ID ");
+                sb.append("\n  OUTPUT_DEPENDENCY_ID ");
                 sb.append(m_outputDepId);
             }
-            if ((m_inputDepIds != null) && (m_inputDepIds.size() > 0)) {
-                sb.append("\n");
-                sb.append("  INPUT_DEPENDENCY_IDS ");
+            if (m_inputDepIds != null && m_inputDepIds.size() > 0) {
+                sb.append("\n  INPUT_DEPENDENCY_IDS ");
                 for (long id : m_inputDepIds)
                     sb.append(id).append(", ");
                 sb.setLength(sb.lastIndexOf(", "));
             }
-            if ((m_fragmentPlan != null) && (m_fragmentPlan.length != 0)) {
-                sb.append("\n");
-                sb.append("  FRAGMENT_PLAN ");
-                sb.append(m_fragmentPlan);
+            if (m_fragmentPlan != null && m_fragmentPlan.length != 0) {
+                sb.append("\n  FRAGMENT_PLAN ");
+                sb.append(new String(m_fragmentPlan, Charsets.UTF_8));
             }
-            if ((m_stmtText != null) && (m_stmtText.length != 0)) {
-                sb.append("\n");
-                sb.append("  STATEMENT_TEXT ");
-                sb.append(m_stmtText);
+            if (m_stmtText != null && m_stmtText.length != 0) {
+                sb.append("\n  STATEMENT_TEXT ");
+                sb.append(new String(m_stmtText, Charsets.UTF_8));
             }
             return sb.toString();
         }
