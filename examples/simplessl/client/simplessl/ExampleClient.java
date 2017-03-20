@@ -24,7 +24,10 @@
 package simplessl;
 
 import java.io.IOException;
+import java.security.NoSuchAlgorithmException;
 import java.util.StringTokenizer;
+
+import javax.crypto.Cipher;
 
 import org.voltdb.CLIConfig;
 import org.voltdb.VoltTable;
@@ -64,8 +67,24 @@ public class ExampleClient
         }
     }
 
+    /** Used to warn the user if strong cryptography is not installed.
+     * @return Maximum allowed key length
+     */
+    public static int getMaxKeyLength() {
+        try {
+            return Cipher.getMaxAllowedKeyLength("AES/CBC/PKCS5Padding");
+        } catch (final NoSuchAlgorithmException e) {
+            throw new RuntimeException("AES/CBC/PKCS5Padding is not available, despite it being mandatory for Java implementations!", e);
+        }
+    }
+
     public static void main(String[] args)
     {
+        final int maxCryptoKeyLength = getMaxKeyLength();
+        if (maxCryptoKeyLength < Integer.MAX_VALUE){
+            System.err.println("WARNING: Cryptographic key length is limited to " + maxCryptoKeyLength + " bits. You probably don't have unlimited strength cryptography installed.");
+        }
+
         Parameters config = new Parameters();
         config.parse(Client.class.getName(), args);
 
