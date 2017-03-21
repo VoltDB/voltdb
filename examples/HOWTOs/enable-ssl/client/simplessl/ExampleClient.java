@@ -46,7 +46,6 @@ public class ExampleClient
         return firstName + " " + lastName;
     }
 
-
     /**
      * Uses included {@link CLIConfig} class to
      * declaratively state command line options with defaults
@@ -56,7 +55,7 @@ public class ExampleClient
         @Option(desc = "Comma separated list of the form server[:port] to connect to.")
         String servers = "localhost";
 
-        @Option(desc = "SSL configuration file.")
+        @Option(desc = "SSL properties file.")
         String sslFile = "";
 
         @Override
@@ -89,7 +88,6 @@ public class ExampleClient
         config.parse(Client.class.getName(), args);
 
         System.out.println("Connecting to VoltDB");
-        ClientResponse response;
         try {
             ClientConfig clientConfig = new ClientConfig();
             clientConfig.setTrustStoreConfigFromPropertyFile(config.sslFile);
@@ -102,20 +100,11 @@ public class ExampleClient
             }
 
             String person = generateName();
-            try {
-                response = client.callProcedure("@AdHoc", "INSERT INTO people VALUES '" + person + "';");
-                if (response.getStatus() != ClientResponse.SUCCESS){
-                    throw new RuntimeException("Could not insert " + person + " into the database", null);
-                }
-                System.out.println("Added " + person + " to the database");
-            } catch (ProcCallException e){
-                if (e.getMessage().contains("UNIQUE")){
-                    // we generated a name that's already in the database; ignore this error.
-                    System.out.println(person + " is already in the database");
-                } else {
-                    throw e;
-                }
+            ClientResponse response = client.callProcedure("@AdHoc", "INSERT INTO people VALUES '" + person + "';");
+            if (response.getStatus() != ClientResponse.SUCCESS){
+                throw new RuntimeException("Could not insert " + person + " into the database", null);
             }
+            System.out.println("Added " + person + " to the database");
 
             response = client.callProcedure("@AdHoc", "SELECT * FROM people LIMIT 10;");
             if (response.getStatus() != ClientResponse.SUCCESS){
@@ -128,6 +117,9 @@ public class ExampleClient
             while (results[0].advanceRow()){
                 System.out.println(results[0].get(nameIndex, VoltType.STRING));
             }
+            
+            client.drain();
+            client.close();
 
             System.out.println("Success!");
         }
@@ -135,6 +127,9 @@ public class ExampleClient
             throw new RuntimeException(e);
         }
         catch (ProcCallException e) {
+            throw new RuntimeException(e);
+        }
+        catch (InterruptedException e){
             throw new RuntimeException(e);
         }
     }

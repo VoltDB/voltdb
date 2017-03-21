@@ -2,7 +2,7 @@
 
 This example demonstrates how to configure and run VoltDB while using SSL to secure connections to the database.
 
-VoltDB servers using SSL must be provided with a private key and a certificate which establishes trust for that key. Clients, including 'sqlcmd', are provided a one or more certificates that establishes that the server can be trusted.
+VoltDB servers using SSL must be provided with a private key and a certificate which establishes trust for that key. Clients, including 'sqlcmd', are provided one or more certificates that establishes that the server can be trusted.
 
 This application is not designed for performance assessments. SSL support is present in the "Voter" and "VoltKV" examples, both of which provide benchmarking applications.
 
@@ -72,3 +72,24 @@ If you change the client Java code, you must recompile the jar by using `./run.s
 Customizing this Example
 ---------------------------
 To further customize the cluster, see the "deployment-examples" directory within the "examples" directory. There are README files and example deployment XML files for different clustering, authorization, export, logging and persistence settings.
+
+
+Adding SSL to an Existing Application
+-----------------------------
+If you already have a VoltDB application, enabling SSL is simple. 
+- Prepare your key store and trust store. More information can be found in the "Preparation" section of this document.
+- Add the following to your deployment.xml
+```xml
+    <ssl enabled="true" external="true">
+        <keystore   path="example.keystore"   password="example"/>
+        <truststore path="example.truststore" password="example"/>
+    </ssl>
+```
+- Add the `--ssl=SSL.properties ` argument to `sqlcmd` to your script which loads the DDL.
+- Add the following in your client:
+```java
+    clientConfig.setTrustStore(pathToTrustStore, trustStorePassword); // can also use setTrustStoreConfigFromPropertyFile();
+    clientConfig.enableSSL();
+```
+
+Please note that this will reduce performance due to additional overhead associated with SSL. The exact results will vary depending on the encryption protocol chosen and usage pattern, so be sure to run benchmarks.
