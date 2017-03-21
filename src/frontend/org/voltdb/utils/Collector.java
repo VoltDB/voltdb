@@ -77,12 +77,16 @@ public class Collector {
     private static String m_workingDir = null;
     private static Set<String> m_logPaths = new HashSet<String>();
     private static Properties m_systemStats = new Properties();
+    private static VoltFile m_voltdbRoot = null;
 
     public static String[] cmdFilenames = {"sardata", "dmesgdata", "syscheckdata"};
 
     static class CollectConfig extends CLIConfig {
         @Option(desc = "file name prefix for uniquely identifying collection")
         String prefix = "";
+
+        @Option(desc = "file name prefix for uniquely identifying collection")
+        String outputFile= "collect.zip";
 
         @Option(desc = "upload resulting collection to HOST via SFTP")
         String host = "";
@@ -108,6 +112,9 @@ public class Collector {
         @Option(desc = "the voltdbroot path")
         String voltdbroot = "";
 
+        @Option(desc = "the database directory")
+        String databaseDir = Constants.DBROOT;
+
         @Option
         boolean calledFromVEM = false;
 
@@ -127,8 +134,55 @@ public class Collector {
         @Override
         public void validate() {
             if (days < 0) exitWithMessageAndUsage("days must be >= 0");
-            if (voltdbroot == "") exitWithMessageAndUsage("voltdbroot cannot be null");
+            //if (voltdbroot == "") exitWithMessageAndUsage("voltdbroot cannot be null");
         }
+    }
+
+    private static void populateVoltDBCollectionPaths() {
+        String systemCheckFilePath = null;
+        if (m_config.voltdbroot.trim().isEmpty()) {
+            m_voltdbRoot = new VoltFile(m_config.databaseDir);
+            if (!Constants.DBROOT.equals(m_voltdbRoot.getName())) {
+                m_voltdbRoot = new VoltFile(m_voltdbRoot, Constants.DBROOT);
+            }
+            systemCheckFilePath = m_voltdbRoot.getParent() + File.separator + "systemcheck";
+            try {
+                systemCheckFilePath = m_voltdbRoot.getCanonicalFile().getParent()
+                        + File.separator + "systemcheck";
+            } catch (IOException ioExcp) {
+                System.err.println("Encountered exception evaluating path for voltdbroot. " + ioExcp.getMessage());
+                System.exit(-1);
+            }
+        } else {
+            m_voltdbRoot = new VoltFile(m_config.voltdbroot);
+            systemCheckFilePath = m_voltdbRoot.getAbsolutePath() + File.separator + "systemcheck";
+        }
+
+        if (!m_voltdbRoot.exists()) {
+            System.err.println(m_voltdbRoot.getParentFile().getAbsolutePath() + " does not contain a valid database "
+                    + "directory. Specify valid path to the database directory.");
+            System.exit(-1);
+        }
+        if (!m_voltdbRoot.isDirectory()) {
+            System.err.println(m_voltdbRoot.getParentFile().getAbsolutePath() + " is a not directory. Specify valid "
+                    + " database directory in --dir option.");
+            System.exit(-1);
+        }
+
+        if (!m_voltdbRoot.canRead() || !m_voltdbRoot.canExecute()) {
+            System.err.println(m_voltdbRoot.getParentFile().getAbsolutePath() + " does not have read/exceute permission for current user."
+                    + " database directory in --dir option.");
+            System.exit(-1);
+        }
+
+        m_config.voltdbroot = m_voltdbRoot.getAbsolutePath();
+
+        // files to collect from config dir
+        String configLogDirPath = m_voltdbRoot.getAbsolutePath() + File.separator + Constants.CONFIG_DIR + File.separator;
+        m_configInfoPath = configLogDirPath + "config.json";
+        m_catalogJarPath = configLogDirPath + "catalog.jar";
+        m_deploymentPath = configLogDirPath + "deployment.xml";
+        m_systemCheckPath =  m_voltdbRoot.getAbsolutePath() + File.separator + "systemcheck";;
     }
 
     public static void main(String[] args) {
@@ -138,13 +192,7 @@ public class Collector {
         m_config = new CollectConfig();
         m_config.parse(Collector.class.getName(), args);
 
-        File voltDbRoot = new File(m_config.voltdbroot);
-        if (!voltDbRoot.exists()) {
-            System.err.println("voltdbroot path '" + m_config.voltdbroot + "' does not exist.");
-            System.exit(-1);
-        }
-
-        locatePaths(m_config.voltdbroot);
+        populateVoltDBCollectionPaths();
 
         JSONObject jsonObject = parseJSONFile(m_configInfoPath);
         parseJSONObject(jsonObject);
@@ -225,15 +273,6 @@ public class Collector {
         else {
             generateCollection(collectionFilesList, m_config.copyToVEM);
         }
-    }
-
-    private static void locatePaths(String voltDbRootPath) {
-        String configLogDirPath = voltDbRootPath + File.separator + Constants.CONFIG_DIR + File.separator;
-
-        m_configInfoPath = configLogDirPath + "config.json";
-        m_catalogJarPath = configLogDirPath + "catalog.jar";
-        m_deploymentPath = configLogDirPath + "deployment.xml";
-        m_systemCheckPath = voltDbRootPath + File.separator + "systemcheck";
     }
 
     public static JSONObject parseJSONFile(String configInfoPath) {
