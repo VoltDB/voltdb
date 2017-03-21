@@ -117,7 +117,7 @@ public class ExampleClient
             while (results[0].advanceRow()){
                 System.out.println(results[0].get(nameIndex, VoltType.STRING));
             }
-            
+
             client.drain();
             client.close();
 
