@@ -49,6 +49,7 @@ class BuildContext:
                 self.COVERAGE = True
             if arg in ["PROFILE"]:
                 self.PROFILE = True
+
         # Exec build.local if available, a python script provided with this
         # BuildContext object as the update-able symbol BUILD.  These example
         # build.local lines force the use of clang instead of gcc/g++.
@@ -177,29 +178,26 @@ def formatList(list):
         indent += len(name) + 1
     return str
 
-def buildGeneratedTests(CTX, makefile):
+def buildGeneratedTests(CTX, makefile, all_gen_tests):
     makefile.write("########################################################################\n")
     makefile.write("#\n")
-    makefile.write("# Generating C++ Tests.\n")
+    makefile.write("# Generated C++ Tests.\n")
     makefile.write("#\n")
     makefile.write("########################################################################\n")
     makefile.write("GENERATED_DIR=${OBJDIR}/generated\n")
-    makefile.write('GENERATED_TIMESTAMP=$(GENERATED_DIR)/timestamp.txt\n')
     makefile.write("GENERATED_SRC=$(GENERATED_DIR)/src\n")
     makefile.write("GENERATED_OBJ=$(GENERATED_DIR)/obj\n")
     makefile.write("GENERATED_BIN=$(GENERATED_DIR)/bin\n")
     makefile.write("\n")
-    makefile.write("GENERATED_FILES=$(shell echo ${GENERATED_SRC}/*/*.cpp)\n")
+    makefile.write('GENERATED_FILES= \\\n')
+    for gtest in all_gen_tests:
+        makefile.write('\t${GENERATED_SRC}/%s/%s.cpp \\\n' % (gtest[0], gtest[1]))
+    makefile.write('\n')
     makefile.write("GENERATED_OBJS=$(subst $(GENERATED_SRC),$(GENERATED_OBJ),$(patsubst %.cpp,%.o,${GENERATED_FILES}))\n")
     makefile.write("GENERATED_TESTS=$(subst $(GENERATED_SRC),$(GENERATED_BIN),$(patsubst %.cpp,%,${GENERATED_FILES}))\n")
     makefile.write("\n")
-    makefile.write('${GENERATED_TESTS}: ${GENERATED_TIMESTAMP}\n')
-    makefile.write('\n')
-    makefile.write('${GENERATED_TIMESTAMP}:\n')
-    makefile.write('\t@mkdir -p $(shell dirname ${GENERATED_TIMESTAMP})\n')
-    makefile.write('\t@touch $(GENERATED_TIMESTAMP)\n')
-    makefile.write('\n');
-    makefile.write("${GENERATED_BIN}/%: ${GENERATED_OBJ}/%.o objects/harness.o objects/volt.a | build-third-party-tools\n")
+    makefile.write("${GENERATED_BIN}/%: ${GENERATED_OBJ}/%.o objects/harness.o objects/volt.a \\\n")
+    makefile.write("                                  | make-generated-dirs build-third-party-tools\n")
     makefile.write('\t@mkdir -p $(shell dirname "$@")\n')
     makefile.write("\t$(LINK.cpp) -o $@ $< objects/harness.o objects/volt.a $(LASTLDFLAGS)\n")
     makefile.write("\n")
@@ -207,10 +205,18 @@ def buildGeneratedTests(CTX, makefile):
     makefile.write('\t@mkdir -p $(shell dirname "$@")\n')
     makefile.write("\t$(CCACHE) $(COMPILE.cpp) -I$(ROOTDIR)/$(TEST_PREFIX) -MMD -MP -o $@ $<\n")
     makefile.write("\n")
+
     makefile.write("build-generated-tests: ${GENERATED_TESTS}\n")
     makefile.write("clean-generated-tests:\n")
-    makefile.write("\trm -rf ${GENERATED_DIR}\n")
-    
+    makefile.write("\trm -rf ${GENERATED_OBJ}/* ${GENERATED_BIN}/*\n")
+    makefile.write('\n')
+    makefile.write('run-generated-tests: ${GENERATED_TESTS}\n')
+    makefile.write('\tfor file in ${GENERATED_TESTS}; do echo :---- $$file ----:; $$file; done')
+    makefile.write('\n')
+    makefile.write('make-generated-dirs: ${GENERATED_DIR}\n')
+    makefile.write('\tmkdir -p ${GENERATED_OBJ} ${GENERATED_BIN}\n')
+    makefile.write('\n')
+
 def buildThirdPartyTools(CTX, makefile):
     makefile.write("########################################################################\n")
     makefile.write("#\n")
@@ -333,7 +339,7 @@ def buildThirdPartyTools(CTX, makefile):
     makefile.write('\t@echo Configuring The S2 Library for building.\n')
     makefile.write("\tif [ ! -f google-s2-geometry/Makefile ] ; then \\\n")
     makefile.write("\t    rm -rf google-s2-geometry; \\\n")
-    makefile.write('\t    mkdir google-s2-geometry; \\\n')
+    makefile.write('\t    mkdir -p google-s2-geometry; \\\n')
     makefile.write('\t    cd google-s2-geometry; \\\n')
     makefile.write('\t\tcmake -DCXX_VERSION_FLAG=\"-std=%s\" -DVOLTDB_THIRD_PARTY_CPP_DIR=\"${THIRD_PARTY_SRC}\" -DCMAKE_INSTALL_PREFIX=\"${INSTALL_DIR}\" -DCMAKE_BUILD_TYPE=\"${S2_BUILD_TYPE}\" \"${GOOGLE_S2_SRC}\"; \\\n' % CTX.CXX_VERSION_FLAG )
     makefile.write("\tfi\n")
@@ -387,6 +393,17 @@ def buildThirdPartyTools(CTX, makefile):
 
     return None
 
+def generatedEETestFiles(generated_dir):
+    if not os.path.exists(generated_dir):
+        os.system("tools/generate-ee-unit-tests.sh")
+    answer = []
+    for (dir, subdir, files) in os.walk(generated_dir):
+        ldir = os.path.normpath(dir).split(os.sep)[-1]
+        for file in files:
+            if file[-4:] == '.cpp':
+                answer += [(ldir, file[:-4])]
+    return answer
+
 def buildMakefile(CTX):
     global version
 
@@ -417,12 +434,7 @@ def buildMakefile(CTX):
     os.system("mkdir -p %s" % (OUTPUT_PREFIX + "/nativelibs"))
     os.system("mkdir -p %s" % (OUTPUT_PREFIX + "/objects"))
     os.system("mkdir -p %s" % (OUTPUT_PREFIX + "/static_objects"))
-    os.system("mkdir -p %s" % (OUTPUT_PREFIX + "/cpptests"))
     os.system("mkdir -p %s" % (OUTPUT_PREFIX + "/prod"))
-    os.system("mkdir -p %s" % (OUTPUT_PREFIX + "/generated"))
-    os.system("mkdir -p %s" % (OUTPUT_PREFIX + "/generated/src"))
-    os.system("mkdir -p %s" % (OUTPUT_PREFIX + "/generated/obj"))
-    os.system("mkdir -p %s" % (OUTPUT_PREFIX + "/generated/bin"))
     input_paths = []
     for dir in CTX.INPUT.keys():
         input = CTX.INPUT[dir].split()
@@ -433,11 +445,13 @@ def buildMakefile(CTX):
         input = CTX.THIRD_PARTY_INPUT[dir].split()
         third_party_input_paths += [THIRD_PARTY_INPUT_PREFIX + "/" + dir + "/" + x for x in input]
 
+    # All permanent tests
     tests = []
     for dir in CTX.TESTS.keys():
-        input = CTX.TESTS[dir].split()
-        tests += [TEST_PREFIX + "/" + dir + "/" + x for x in input]
-
+        test_names = CTX.TESTS[dir].split()
+        tests += [os.path.join(TEST_PREFIX, dir, test) for test in test_names]
+    # All generated tests.
+    all_gen_tests = generatedEETestFiles(os.path.join(OUTPUT_PREFIX, 'generated'))
     makefile = file(OUTPUT_PREFIX + "/makefile", 'w')
     makefile.write("BUILD=%s\n" % CTX.LEVEL.lower())
     makefile.write("CC = %s\n" % CTX.CC)
@@ -492,7 +506,6 @@ def buildMakefile(CTX):
         makefile.write("main:\n")
     else:
         makefile.write("main: nativelibs/libvoltdb-%s.$(JNIEXT)\n" % version)
-    makefile.write("# Suppress display of executed commands.\n")
 
     jni_objects = []
     static_objects = []
@@ -607,9 +620,9 @@ def buildMakefile(CTX):
     makefile.write('# Tests\n')
     makefile.write('#\n')
     makefile.write('########################################################################\n')
-    
+
     # build the generated tests.
-    buildGeneratedTests(CTX, makefile)
+    buildGeneratedTests(CTX, makefile, all_gen_tests)
     makefile.write("\n")
     makefile.write(".PHONY: test\n")
     makefile.write("test: ")
@@ -628,7 +641,7 @@ def buildMakefile(CTX):
         makefile.write("#\n")
         makefile.write("########################################################################\n")
         makefile.write("%s: $(ROOTDIR)/%s | build-third-party-tools \n" % (objectname, sourcename))
-        makefile.write("\t$(CCACHE) $(COMPILE.cpp) -I$(ROOTDIR)/${TEST_PREFIX) -MMD -MP -o $@ $(ROOTDIR)/%s\n" % sourcename)
+        makefile.write("\t$(CCACHE) $(COMPILE.cpp) -I$(ROOTDIR)/${TEST_PREFIX} -MMD -MP -o $@ $(ROOTDIR)/%s\n" % sourcename)
         makefile.write("-include %s\n" % replaceSuffix(objectname, ".d"))
         # link the test
         makefile.write("%s: objects/harness.o %s objects/volt.a  | build-third-party-tools \n" % (binname, objectname))
@@ -770,32 +783,44 @@ class ValgrindErrorState:
                  exp) \
                 + "\n".join(self.errorStrings))
 
-def makeValgrindFile(pidStr):
-    return "valgrind_ee_%s.xml" % pidStr
+def makeValgrindFile(testdir, pidStr):
+    return os.path.join(testdir, "valgrind_ee_%s.xml" % pidStr)
 
 def runTests(CTX):
     failedTests = []
+    successes = 0
+    failures = 0
 
     retval = os.system("make --directory=%s test -j4" % (CTX.OUTPUT_PREFIX))
     if retval != 0:
         return -1
-    TESTOBJECTS_DIR = os.environ['TEST_DIR']
     TEST_PREFIX = CTX.TEST_PREFIX.rstrip("/")
     OUTPUT_PREFIX = CTX.OUTPUT_PREFIX.rstrip("/")
-
+    GEN_TEST_PREFIX = os.path.join(OUTPUT_PREFIX, 'generated')
     tests = []
-    for dir in CTX.TESTS.keys():
-        input = CTX.TESTS[dir].split()
-        tests += [(dir, TEST_PREFIX + "/" + dir + "/" + x) for x in input]
-    successes = 0
-    failures = 0
+    # For each test we record:
+    #    The name of the binary directory, excluding the category and test names,
+    #    The Category name,
+    #    The test name,
+    TEST_PERMANENT = True  # Set to False for debugging
+    TEST_GENERATED = True  # Set to False for debugging.
+    if TEST_PERMANENT:
+        for dirname in CTX.TESTS.keys():
+            test_names = CTX.TESTS[dirname].split()
+            tests += [(os.path.join(OUTPUT_PREFIX, 'cpptests'),
+                       dirname,
+                       testname) for testname in test_names]
+    if TEST_GENERATED:
+        for dirname, testname in generatedEETestFiles(os.path.join(OUTPUT_PREFIX, 'generated')):
+            tests += [(os.path.join(OUTPUT_PREFIX, 'generated', 'bin'),
+                       dirname,
+                       testname)]
     noValgrindTests = [ "CompactionTest", "CopyOnWriteTest", "harness_test", "serializeio_test" ]
-    for dir, test in tests:
+    for bindirname, dirname, test in tests:
         # We expect valgrind failures in all tests in memleaktests
         # except for the test named no_losses.
-        expectNoMemLeaks = not (dir == "memleaktests") or not ( test == "no_losses" )
-        binname, objectname, sourcename = namesForTestCode(test)
-        targetpath = OUTPUT_PREFIX + "/" + binname
+        expectNoMemLeaks = not (dirname == "memleaktests") or not ( test == "no_losses" )
+        targetpath = os.path.join(bindirname, dirname, test)
         retval = 0
         if test.endswith("CopyOnWriteTest") and CTX.LEVEL == "MEMCHECK_NOFREELIST":
             continue
@@ -806,8 +831,11 @@ def runTests(CTX):
             for test in noValgrindTests:
                 if targetpath.find(test) != -1:
                     isValgrindTest = False;
+                    break
             if CTX.PLATFORM == "Linux" and isValgrindTest:
-                valgrindFile = makeValgrindFile("%p")
+                print('Executing valgrind test %s' % targetpath)
+                valgrindDir = os.path.join(bindirname, dirname)
+                valgrindFile = makeValgrindFile(valgrindDir, "%p")
                 process = Popen(executable="valgrind",
                                 args=["valgrind",
                                       "--leak-check=full",
@@ -820,7 +848,7 @@ def runTests(CTX):
                                       targetpath], stderr=PIPE, bufsize=-1)
                 out_err = process.stderr.readlines()
                 retval = process.wait()
-                fileName = makeValgrindFile("%d" % process.pid)
+                fileName = makeValgrindFile(valgrindDir, "%d" % process.pid)
                 errorState = ValgrindErrorState(expectNoMemLeaks, fileName)
                 # If there are as many errors as we expect,
                 # then delete the xml file.  Otherwise keep it.

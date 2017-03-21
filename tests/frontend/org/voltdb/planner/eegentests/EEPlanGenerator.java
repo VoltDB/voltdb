@@ -883,12 +883,12 @@ public class EEPlanGenerator extends PlannerTestCase {
     protected void processArgs(String args[]) {
         for (int idx = 0; idx < args.length; idx += 1) {
             String arg = args[idx];
-            if ("--srcDir".equals(arg)) {
+            if ("--generated-dir".equals(arg)) {
                 idx += 1;
                 if (idx < args.length) {
                     m_sourceDir = args[idx];
                 } else {
-                    throw new IllegalArgumentException("No argument for --sourceDir.");
+                    throw new IllegalArgumentException("No argument for --generated-dir.");
                 }
             }
         }
