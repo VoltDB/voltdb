@@ -267,7 +267,7 @@ public class UpdateClassesBenchmark {
             sumBlockTime += uacBlockTime(client, 1);
         }
 
-        if (jar != null) {
+        if (jar != null || delPattern != null) {
             client.callProcedure("@UpdateClasses", jar, delPattern);
             sumBlockTime += uacBlockTime(client, 1);
         }
@@ -366,7 +366,11 @@ public class UpdateClassesBenchmark {
             String delPattern = readClassDeletePattern(patDelPath);
 
             System.out.println("Invocation " + i + ":" + stmts);
-            UACTime uacTime = doUpdateClassesWork(client, stmts, null, delPattern, null);
+            // drop procedures, but do not count into time
+            UACTime uacTime = doUpdateClassesWork(client, stmts, null, null, null);
+
+            // time UpdateClasses only
+            uacTime = doUpdateClassesWork(client, null, null, delPattern, null);
             res.updateWithRow(uacTime);
         }
         return res;
@@ -384,7 +388,11 @@ public class UpdateClassesBenchmark {
             String delPattern = readClassDeletePattern(patDelPath);
 
             System.out.println("Invocation " + i + ":" + stmts);
-            UACTime uacTime = doUpdateClassesWork(client, stmts, null, delPattern, null);
+            // drop procedures, but do not count into time
+            UACTime uacTime = doUpdateClassesWork(client, stmts, null, null, null);
+
+            // time UpdateClasses only
+            uacTime = doUpdateClassesWork(client, null, null, delPattern, null);
             res.updateWithRow(uacTime);
         }
         return res;
