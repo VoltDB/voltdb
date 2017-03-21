@@ -25,8 +25,9 @@ import org.voltdb.importer.formatter.FormatException;
 import org.voltdb.importer.formatter.Formatter;
 
 import au.com.bytecode.opencsv_voltpatches.CSVParser;
+import java.nio.ByteBuffer;
 
-public class VoltCSVFormatter implements Formatter {
+public class VoltCSVFormatter implements Formatter<ByteBuffer> {
     final CSVParser m_parser;
 
     public VoltCSVFormatter (String formatName, Properties prop) {
@@ -69,13 +70,13 @@ public class VoltCSVFormatter implements Formatter {
     }
 
     @Override
-    public Object[] transform(byte payload[]) throws FormatException {
+    public Object[] transform(ByteBuffer payload) throws FormatException {
         String line = null;
         try {
             if (payload == null) {
                 return null;
             }
-            line = new String(payload);
+            line = new String(payload.array());
             Object list[] = m_parser.parseLine(line);
             if (list != null) {
                 for (int i = 0; i < list.length; i++) {

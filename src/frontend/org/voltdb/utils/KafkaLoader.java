@@ -41,7 +41,7 @@ import org.voltdb.importer.formatter.FormatException;
 import org.voltdb.importer.formatter.Formatter;
 
 import au.com.bytecode.opencsv_voltpatches.CSVParser;
-import java.nio.charset.StandardCharsets;
+import java.nio.ByteBuffer;
 import kafka.consumer.ConsumerConfig;
 import kafka.consumer.ConsumerIterator;
 import kafka.consumer.KafkaStream;
@@ -192,7 +192,7 @@ public class KafkaLoader {
         @Option(desc = "Enable SSL, Optionally provide configuration file.")
         String ssl = "";
 
-        Formatter m_formatter = null;
+        Formatter<ByteBuffer> m_formatter = null;
         /**
          * Validate command line options.
          */
@@ -329,9 +329,9 @@ public class KafkaLoader {
         private final KafkaStream m_stream;
         private final CSVDataLoader m_loader;
         private final CSVParser m_csvParser;
-        private final Formatter m_formatter;
+        private final Formatter<ByteBuffer> m_formatter;
 
-        public KafkaConsumer(KafkaStream a_stream, CSVDataLoader loader, Formatter formatter) {
+        public KafkaConsumer(KafkaStream a_stream, CSVDataLoader loader, Formatter<ByteBuffer> formatter) {
             m_stream = a_stream;
             m_loader = loader;
             m_csvParser = new CSVParser();
@@ -345,17 +345,19 @@ public class KafkaLoader {
                 MessageAndMetadata<byte[], byte[]> md = it.next();
                 byte msg[] = md.message();
                 long offset = md.offset();
-                String smsg = new String(msg);
+                ByteBuffer bmsg = ByteBuffer.wrap(msg);
+                String smsg = new String(bmsg.array());
                 try {
                     Object params[];
                     if (m_formatter != null) {
                         try {
-                            params = m_formatter.transform(smsg.getBytes(StandardCharsets.UTF_8));
+                            params = m_formatter.transform(bmsg);
                         } catch (FormatException fe) {
+                            m_log.warn("Failed to transform message: " + smsg);
                             continue;
                         }
                     } else {
-                        params = m_csvParser.parseLine(smsg);
+                        params = m_csvParser.parseLine(new String(bmsg.array()));
                     }
                     if (params == null) continue;
                     m_loader.insertRow(new RowWithMetaData(smsg, offset), params);
@@ -428,7 +430,7 @@ public class KafkaLoader {
                 Class[] ctorParmTypes = new Class[]{ String.class, Properties.class };
                 Constructor ctor = classz.getDeclaredConstructor(ctorParmTypes);
                 Object[] ctorParms = new Object[]{ format, p };
-                cfg.m_formatter = (Formatter ) ctor.newInstance(ctorParms);
+                cfg.m_formatter = (Formatter<ByteBuffer> ) ctor.newInstance(ctorParms);
             }
             KafkaLoader kloader = new KafkaLoader(cfg);
             kloader.processKafkaMessages();
