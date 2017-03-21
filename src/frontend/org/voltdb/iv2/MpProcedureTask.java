@@ -158,7 +158,7 @@ public class MpProcedureTask extends ProcedureTask
                     m_msg.isForReplay());
 
             restart.setTruncationHandle(m_msg.getTruncationHandle());
-            restart.setRestartCleanup(true);
+            restart.setToLeader(true);
 
             if (hostLog.isDebugEnabled()) {
                 hostLog.debug("[MpProcedureTask]send CompleteTransactionMessage to: " + CoreUtils.hsIdCollectionToString(m_initiatorHSIds) +

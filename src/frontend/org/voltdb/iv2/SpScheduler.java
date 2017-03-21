@@ -1058,7 +1058,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
         // A transaction may be restarted from a mis-routed fragment or via master change repair process.
         // The site may have see all the fragments of a transaction,
-        if (m_isLeader || message.isRestartCleanup() || message.isToLeader()) {
+        if (m_isLeader || message.isToLeader()) {
             msg = new CompleteTransactionMessage(m_mailbox.getHSId(), m_mailbox.getHSId(), message);
             // Set the spHandle so that on repair the new master will set the max seen spHandle
             // correctly
