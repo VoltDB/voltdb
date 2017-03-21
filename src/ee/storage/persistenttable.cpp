@@ -637,29 +637,21 @@ void PersistentTable::swapTable(PersistentTable* otherTable,
     swapTableIndexes(otherTable,
             compiled.m_theIndexes,
             compiled.m_otherIndexes);
-    assert(isDREnabled() == otherTable->isDREnabled());
+    assert(m_drEnabled == otherTable->m_drEnabled);
 
-    AbstractDRTupleStream* drStream = NULL;
-    size_t drMark = 0;
-    if (!isUndo && isDREnabled()) { // Also called as undo action. Generate DR event if it isn't undo.
-        ExecutorContext* ec = ExecutorContext::getExecutorContext();
-        drStream = getDRTupleStream(ec);
-        drMark = drStream->m_uso;
+    if (!isUndo && m_drEnabled) {
         ExecutorContext::getEngine()->swapDRActions(otherTable, this);
     }
 
     if (fallible) {
         assert(!isUndo);
-        DRTupleStreamUndoAction *drUndo = NULL;
         UndoQuantum *uq = ExecutorContext::currentUndoQuantum();
-        if (isDREnabled()) {
-            drUndo = new (*uq) DRTupleStreamUndoAction(drStream, drMark, 0);
+        if (uq) {
+            uq->registerUndoAction(
+                    new (*uq) PersistentTableUndoSwapTableAction(this, otherTable,
+                            theIndexNames,
+                            otherIndexNames));
         }
-        uq->registerUndoAction(
-                new (*uq) PersistentTableUndoSwapTableAction(this, otherTable,
-                        theIndexNames,
-                        otherIndexNames,
-                        drUndo));
     }
 
     // Switch arguments here to Account here for the actual table pointers

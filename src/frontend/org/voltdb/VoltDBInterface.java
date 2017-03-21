@@ -312,4 +312,5 @@ public interface VoltDBInterface
 
     public SnmpTrapSender getSnmpTrapSender();
 
+    public void swapTables(String oneTable, String otherTable);
 }
