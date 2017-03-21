@@ -704,7 +704,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 /*
                  * Authenticate the user.
                  */
-                boolean authenticated = arq.authenticate(hashScheme);
+                boolean authenticated = arq.authenticate(hashScheme, socket.socket().getRemoteSocketAddress().toString());
 
                 if (!authenticated) {
                     Exception faex = arq.getAuthenticationFailureException();
