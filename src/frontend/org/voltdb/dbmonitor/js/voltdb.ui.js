@@ -60,7 +60,6 @@ $(document).ready(function () {
     }
 
     //search text clean up required for mozilla
-    $("#filterDatabaseTable").val('');
     $("#filterStoredProc").val('');
 
     //Prevent scrolling of page.
@@ -261,17 +260,17 @@ $(document).ready(function () {
     });
 
     // Filters Database Tables
-    $('#filterDatabaseTable').keyup(function () {
-        var that = this;
-        $.each($('.dbTbl tbody tr'),
-        function (i, val) {
-            if ($(val).text().indexOf($(that).val().toLowerCase()) == -1) {
-                $('.dbTbl tbody tr').eq(i).hide();
-            } else {
-                $('.dbTbl tbody tr').eq(i).show();
-            }
-        });
-    });
+//    $('#filterDatabaseTable').keyup(function () {
+//        var that = this;
+//        $.each($('.dbTbl tbody tr'),
+//        function (i, val) {
+//            if ($(val).text().indexOf($(that).val().toLowerCase()) == -1) {
+//                $('.dbTbl tbody tr').eq(i).hide();
+//            } else {
+//                $('.dbTbl tbody tr').eq(i).show();
+//            }
+//        });
+//    });
 
     var refreshCss = function () {
         //Enable Schema specific css only for Schema Tab.
@@ -396,6 +395,7 @@ $(document).ready(function () {
             shortcut.remove("f5");
             shortcut.remove("f6");
         }
+        $("#overlay").hide();
     });
 
     //Attach the login popup to the page.
@@ -766,10 +766,10 @@ var loadPage = function (serverName, portid) {
     var defaultSearchTextProcedure = 'Search Stored Procedures';
     var defaultSearchTextTable = 'Search Database Tables';
 
-    var currentProcedureAction = VoltDbUI.ACTION_STATES.NONE;
-    var priorProcedureAction = VoltDbUI.ACTION_STATES.NONE;
-    var currentTableAction = VoltDbUI.ACTION_STATES.NONE;
-    var priorTableAction = VoltDbUI.ACTION_STATES.NONE;
+//    var currentProcedureAction = VoltDbUI.ACTION_STATES.NONE;
+//    var priorProcedureAction = VoltDbUI.ACTION_STATES.NONE;
+//    var currentTableAction = VoltDbUI.ACTION_STATES.NONE;
+//    var priorTableAction = VoltDbUI.ACTION_STATES.NONE;
     VoltDbUI.CurrentTab = getCurrentTab();
 
     RefreshServerUI();
@@ -1077,9 +1077,9 @@ var loadPage = function (serverName, portid) {
                 MonitorGraphUI.RefreshPartitionIdleTime(partitionDetail, getCurrentServer(), graphView, currentTab);
         });
 
-        showHideCmdlogDataAndCharts(VoltDbUI.isCommandLogEnabled, graphView, currentTab);
+       showHideCmdlogDataAndCharts(VoltDbUI.isCommandLogEnabled, graphView, currentTab);
 
-        voltDbRenderer.GetDrRoleInformation(function(drRoleDetail){
+       voltDbRenderer.GetDrRoleInformation(function(drRoleDetail){
             var role = drRoleDetail['DRROLE'][0][0];
             $("#drModeName").html(drRoleDetail['DRROLE'][0][0])
             if(role == "MASTER" || role == "XDCR"){
@@ -1094,7 +1094,7 @@ var loadPage = function (serverName, portid) {
 
         });
 
-        var populateDRGraphandTable = function(drRoleDetail, drDetails){
+       var populateDRGraphandTable = function(drRoleDetail, drDetails){
             var response = drDetails;
             var replicaLatency = [];
             var role = drRoleDetail['DRROLE'][0][0];
@@ -1121,7 +1121,7 @@ var loadPage = function (serverName, portid) {
             }
         }
 
-        var showDrGraphAndData = function(drRoleDetail, producerDbId){
+       var showDrGraphAndData = function(drRoleDetail, producerDbId){
             var combinedId = ""
             var isDisabled = false;
             for(var i = 0; i <= drRoleDetail['DRROLE'].length -1 ; i++){
@@ -1258,13 +1258,14 @@ var loadPage = function (serverName, portid) {
                                                 }
                                                 if(isDrGraphVisible || isMasterDataVisible || isReplicaDataVisible){
                                                     var curTab = VoltDbUI.getCookie("current-tab");
-                                                    if (curTab == NavigationTabs.DR){
+                                                    if (curTab == NavigationTabs.DR && !$("#navDR").hasClass('active') && VoltDbUI.isFirstDRLoad){
                                                         $("#overlay").show();
                                                         setTimeout(function () { $("#navDR > a").trigger("click"); }, 100);
                                                     }
 
                                                     $('#navDR').show();
                                                 }
+                                                VoltDbUI.isFirstDRLoad = false;
                                             } else {
                                                 hideDrInformation()
                                             }
@@ -1329,7 +1330,7 @@ var loadPage = function (serverName, portid) {
                                '<p></p></span></div>' +
                               '<div class="drRelationRight"><span class="iconDRDatabase"></span><div class="headText1 DRHeaderWrap">' +
                               '<a href="#" class="showhideIcon arrowAdjustDR">' +
-                              '<span class="DRHeaderName" id="dRHeaderName_' + i + '">Database ('+ drRoleDetail['DRROLE'][i][2] +')</span>' +
+                              '<span class="DRHeaderName" id="dRRemoteHeaderName_' + i + '">Database ('+ drRoleDetail['DRROLE'][i][2] +')</span>' +
                               '</a></div>  <div class="latencyDR latencyDR_' + combinedId + '"></div></div><div class="clear"></div></div>' +
                               '            <div class="clear"></div>' +
                               '        </div>'
@@ -1539,7 +1540,7 @@ var loadPage = function (serverName, portid) {
         }
 
 
-        var showHideDrGraph = function(status){
+       var showHideDrGraph = function(status){
             var chartList =  VoltDbUI.drChartList;
             if(chartList != undefined && chartList.length > 0){
                 for(var i = 0; i < chartList.length; i++){
@@ -1554,7 +1555,7 @@ var loadPage = function (serverName, portid) {
             }
         }
 
-        voltDbRenderer.GetDeploymentInformation(function (deploymentDetails) {
+       voltDbRenderer.GetDeploymentInformation(function (deploymentDetails) {
                 if (deploymentDetails != undefined) {
                     var clusterDetails = voltDbRenderer.getClusterDetail(getCurrentServer());
                     if (clusterDetails != undefined && clusterDetails.LICENSE != undefined) {
@@ -1571,11 +1572,11 @@ var loadPage = function (serverName, portid) {
                 }
         });
 
-        var max = function( array ){
-            return Math.max.apply( Math, array );
-        };
+       var max = function( array ){
+           return Math.max.apply( Math, array );
+       };
 
-        var hideDrInformation =  function(){
+       var hideDrInformation =  function(){
             $('#navDR').hide()
             $('#clusterId').hide();
             $('#clusterId').html("");
@@ -1583,274 +1584,112 @@ var loadPage = function (serverName, portid) {
             $("#divDrReplication").hide();
             $("#divDrWrapperAdmin").hide();
             showHideDrGraph(false);
+            VoltDbUI.isFirstDRLoad = false;
         }
 
-        var loadProcedureInformations = function (procedureMetadata) {
-            if ((procedureMetadata != "" && procedureMetadata != undefined)) {
-                voltDbRenderer.mapProcedureInformation(currentProcedureAction, priorProcedureAction, function (traverse, htmlData) {
-                    if (!voltDbRenderer.isProcedureSearch) {
-                        if ((currentProcedureAction == VoltDbUI.ACTION_STATES.REFRESH && currentProcedureAction != VoltDbUI.ACTION_STATES.NONE) || (currentProcedureAction != VoltDbUI.ACTION_STATES.REFRESH && currentProcedureAction == VoltDbUI.ACTION_STATES.NONE)) {
-                            lblTotalPages.innerHTML = voltDbRenderer.procedureDataSize < voltDbRenderer.maxVisibleRows ? " ".concat(1) : " ".concat(Math.ceil(voltDbRenderer.procedureDataSize / voltDbRenderer.maxVisibleRows));
-                        }
 
-                        if (htmlData.SystemInformation[0] != "") {
-                            if ((currentProcedureAction == VoltDbUI.ACTION_STATES.NONE || currentProcedureAction == VoltDbUI.ACTION_STATES.REFRESH) && priorProcedureAction == VoltDbUI.ACTION_STATES.NONE) //only during initial load
-                                lblPrevious.innerHTML = " ".concat(1, ' ');
+       var loadProcedureInformations = function (procedureMetadata) {
+            var response = procedureMetadata;
+            var htmlcontent = "";
 
-                            $('#storeProcedureBody').html(htmlData.SystemInformation);
-                        } else {
-                            lblPrevious.innerHTML = " ".concat(0, ' ');
-                            lblTotalPages.innerHTML = " ".concat(0);
-                            $('#storeProcedureBody').html("<tr><td colspan=6> No data to be displayed</td></tr>");
-                        }
-                    }
+            for (var key in response) {
+                htmlcontent = htmlcontent + "<tr>";
+                htmlcontent = htmlcontent + "<td>" + response[key].PROCEDURE + "</td>" +
+                    "<td>" + response[key].INVOCATIONS+ "</td>" +
+                    "<td>" + response[key].MIN_LATENCY + "</td>" +
+                    "<td>" + response[key].MAX_LATENCY + "</td>" +
+                    "<td>" + response[key].AVG_LATENCY + "</td>" +
+                    "<td>" + response[key].PERC_EXECUTION + "</td>";
+                htmlcontent = htmlcontent + "</tr>";
 
-                    if (currentProcedureAction == VoltDbUI.ACTION_STATES.SEARCH) {
-                        priorProcedureAction = currentProcedureAction;
-                    }
-
-                    currentProcedureAction = VoltDbUI.ACTION_STATES.REFRESH;
-                    VoltDbUI.CurrentProcedureDataProgress = VoltDbUI.DASHBOARD_PROGRESS_STATES.REFRESH_PROCEDUREDATA_NONE;
-
-                });
-
-            } else {
-                lblPrevious.innerHTML = " ".concat(0, ' ');
-                lblTotalPages.innerHTML = " ".concat(0);
-                $('#storeProcedureBody').html("<tr><td colspan=6> No data to be displayed</td></tr>");
-
-                if (currentProcedureAction == VoltDbUI.ACTION_STATES.SEARCH) {
-                    priorProcedureAction = currentProcedureAction;
-                }
-
-                currentProcedureAction = VoltDbUI.ACTION_STATES.REFRESH;
-                VoltDbUI.CurrentProcedureDataProgress = VoltDbUI.DASHBOARD_PROGRESS_STATES.REFRESH_PROCEDUREDATA_NONE;
             }
-        };
+            var leftScroll = $("#tblSP_wrapper").find(".tblScroll").scrollLeft();
+            if ($.fn.dataTable.isDataTable('#tblSP')) {
+                $("#tblSP").DataTable().destroy();
+            }
+
+            var content = "<table width='100%' border='0' cellspacing='0' id='tblSP' cellpadding='0' class='storeTbl drTbl no-footer dataTable' aria-describedby='tblSP_info' role='grid'>" +
+                "<thead><tr role='row'><th id='PROCEDURE' width='30%' data-name='none' class='' tabindex='0' aria-controls='tblSP' rowspan='1' colspan='1' aria-sort='ascending' aria-label='Stored Procedure: activate to sort column descending'>Stored Procedure</th>" +
+                "<th id='INVOCATIONS' width='10%' data-name='none' class='sorting' tabindex='0' aria-controls='tblSP' rowspan='1' colspan='1' >Invocations</th>" +
+                "<th id='MIN_LATENCY' width='15%' data-name='none' class='sorting' tabindex='0' aria-controls='tblSP' rowspan='1' colspan='1' >Min Latency (ms)</th>" +
+                "<th id='MAX_LATENCY' width='15%' data-name='none' class='sorting' tabindex='0' aria-controls='tblSP' rowspan='1' colspan='1' >Max Latency (ms)</th>" +
+                "<th id='AVG_LATENCY' width='15%' data-name='none' class='sorting' tabindex='0' aria-controls='tblSP' rowspan='1' colspan='1' >Avg Latency (ms)</th>" +
+                "<th id='PERC_EXECUTION' width='15%' data-name='none' class='sorting' tabindex='0' aria-controls='tblSP' rowspan='1' colspan='1' >% Time of Execution</th>" +
+                "</thead><tbody>";
+            $("#tblSP_wrapper").find(".sPContainer").html(content + htmlcontent + "</tbody></table>");
+            spTable = $("#tblSP").DataTable({
+                stateSave: true,
+                pageLength: 5,
+                "sPaginationType": "extStyleLF",
+                "bAutoWidth": false,
+                "language": {
+                    "zeroRecords": "No data to be displayed"
+                },
+                "fnDrawCallback": function () {
+                    if ($("#tblSP").find("tbody tr td").first().html() == "No data to be displayed") {
+                        $(this).parent().parent().find(".dataTables_paginate .navigationLabel .pageIndex").text("0");
+                    } else {
+                        $(this).parent().parent().find(".dataTables_paginate .navigationLabel .pageIndex").text(" " + this.fnPagingInfo().iPage + " ");
+                    }
+
+                    $(this).parent().parent().find(".dataTables_paginate .navigationLabel .totalPages").text(this.fnPagingInfo().iTotalPages);
+
+                    if ((screen.width == 1600) && (screen.height == 900)) {
+                        var length = $("#tblSP tr").length - 1;
+                        if (length >= 5) {
+                            $("#divSPSection").css("min-height", "280px");
+                        } else if (length == 4) {
+                            $("#divSPSection").css("min-height", "250px");
+                        } else if (length == 3) {
+                            $("#divSPSection").css("min-height", "230px");
+                        } else if (length == 2) {
+                            $("#divSPSection").css("min-height", "200px");
+                        } else if (length == 1 || length == 0) {
+                            $("#divSPSection").css("min-height", "170px");
+                        }
+                    } else if ((screen.width == 360) && (screen.height == 640)) {
+                        $("#divSPSection").css("min-height", "380px");
+                    } else if ((screen.width == 640) && (screen.height == 960)) {
+                        alert("iphone resolution mode");
+                        $("#divSPSection").css("min-height", "380px");
+                    } else if ($(window).width() == '751') {
+                        $("#divSPSection").css("min-height", "350px");
+                    }
+                },
+
+                "sDom": 'p<"tblScroll drScroll"t>',
+                "aoColumns": [
+                    null,
+                    { "bSearchable": false },
+                    { "bSearchable": false },
+                    { "bSearchable": false },
+                    { "bSearchable": false },
+                    { "bSearchable": false }
+                ]
+            });
+
+            $("#tblSP_wrapper").find(".tblScroll").scrollLeft(leftScroll);
+            $("#tblSP_wrapper").find(".paginationDefault").remove();
+
+            //Customizing DataTables to make it as existing pagination
+            $(".paginate_disabled_previous").html("Prev");
+            $(".paginate_enabled_next").html("Next");
+            $(".paginate_disabled_next").html("Next");
+            $(".paginate_enabled_previous").html("Prev");
+
+            $(".paginate_disabled_previous").attr("title", "Previous Page");
+            $(".paginate_enabled_next").attr("title", "Next Page");
+            $(".paginate_disabled_next").attr("title", "Next Page");
+            $(".paginate_enabled_previous").attr("title", "Previous Page");
+
+        $('#filterSP').on('keyup', function () {
+            spTable.search(this.value).draw();
+        });
+    };
 
         voltDbRenderer.GetProceduresInfo(loadProcedureInformations);
 
-        voltDbRenderer.getTablesInformation(function (tableMetadata) {
-            if (tableMetadata != "" && tableMetadata != undefined) {
-                voltDbRenderer.mapTableInformation(currentTableAction, priorTableAction, voltDbRenderer.isTableSearch, function (htmlData) {
-                    if (!voltDbRenderer.isTableSearch) {
-                        if ((currentTableAction == VoltDbUI.ACTION_STATES.REFRESH && currentTableAction != VoltDbUI.ACTION_STATES.NONE) || (currentTableAction != VoltDbUI.ACTION_STATES.REFRESH && currentTableAction == VoltDbUI.ACTION_STATES.NONE)) {
-                            setPaginationIndicesOfTables(voltDbRenderer.isTableSearch);
-                        }
-
-                        if (htmlData != "") {
-                            if (currentTableAction == VoltDbUI.ACTION_STATES.NONE && currentTableAction == VoltDbUI.ACTION_STATES.NONE){ //only during initial load
-                                setPaginationIndicesOfTables(voltDbRenderer.isTableSearch);
-                            }
-                            $('#tablesBody').html(htmlData);
-                        } else {
-                            setPaginationIndicesOfTables(voltDbRenderer.isTableSearch);
-                            $('#tablesBody').html("<tr><td colspan=6> No data to be displayed</td></tr>");
-                        }
-                    }
-
-                    if (currentTableAction == VoltDbUI.ACTION_STATES.SEARCH) {
-                        priorTableAction = currentTableAction;
-                    }
-                    currentTableAction = VoltDbUI.ACTION_STATES.REFRESH;
-                });
-            } else {
-                lblPreviousTable.innerHTML = " ".concat(0, ' ');
-                lblTotalPagesofTables.innerHTML = " ".concat(0, ' ');
-                $('#tablesBody').html("<tr><td colspan=6> No data to be displayed</td></tr>");
-            }
-        });
-
-        $("#previousProcedures").unbind("click");
-        $('#previousProcedures').on('click', function () {
-            if (voltDbRenderer.procedureTableIndex >= 0) {
-                currentProcedureAction = VoltDbUI.ACTION_STATES.PREVIOUS;
-                voltDbRenderer.mapProcedureInformation(currentProcedureAction, priorProcedureAction, function (currentAction, htmlData) {
-                    setPaginationIndicesOfProcedures(voltDbRenderer.isProcedureSearch);
-
-                    if (!voltDbRenderer.isProcedureSearch) {
-                        $('#storeProcedureBody').html(htmlData.SystemInformation);
-                    } else {
-                        $('#storeProcedureBody').html(htmlData);
-                    }
-                    priorProcedureAction = currentProcedureAction;
-                });
-                currentProcedureAction = VoltDbUI.ACTION_STATES.REFRESH;
-            }
-        });
-
-        $("#nextProcedures").unbind("click");
-        $('#nextProcedures').on('click', function () {
-            var isValidAction = false;
-
-            if (voltDbRenderer.isProcedureSearch) {
-                isValidAction = !((voltDbRenderer.procedureTableIndex + 1) * voltDbRenderer.maxVisibleRows >= voltDbRenderer.procedureSearchDataSize);
-            } else {
-                isValidAction = !((voltDbRenderer.procedureTableIndex + 1) * voltDbRenderer.maxVisibleRows >= voltDbRenderer.procedureDataSize);
-            }
-
-            if (isValidAction) {
-                currentProcedureAction = VoltDbUI.ACTION_STATES.NEXT;
-                voltDbRenderer.mapProcedureInformation(currentProcedureAction, priorProcedureAction, function (currentAction, htmlData) {
-                    setPaginationIndicesOfProcedures(voltDbRenderer.isProcedureSearch);
-                    if (!voltDbRenderer.isProcedureSearch) {
-                        $('#storeProcedureBody').html(htmlData.SystemInformation);
-                    } else {
-                        $('#storeProcedureBody').html(htmlData);
-                    }
-                    priorProcedureAction = currentAction;
-                });
-                currentProcedureAction = VoltDbUI.ACTION_STATES.REFRESH;
-            }
-        });
-
-        $("#previousTables").unbind("click");
-        $('#previousTables').on('click', function () {
-            if (voltDbRenderer.tableIndex >= 0) {
-                currentTableAction = VoltDbUI.ACTION_STATES.PREVIOUS;
-                voltDbRenderer.mapTableInformation(currentTableAction, priorTableAction, voltDbRenderer.isTableSearch, function (htmlData) {
-                    setPaginationIndicesOfTables(voltDbRenderer.isTableSearch);
-                    $('#tablesBody').html(htmlData);
-                    priorTableAction = currentTableAction;
-                    currentTableAction = VoltDbUI.ACTION_STATES.REFRESH;
-                });
-            }
-        });
-
-        $("#nextTables").unbind("click");
-        $('#nextTables').on('click', function () {
-            var isValidAction = false;
-            voltDbRenderer.isNextClicked = true;
-
-            if (voltDbRenderer.isTableSearch) {
-                isValidAction = !((voltDbRenderer.tableIndex + 1) * voltDbRenderer.maxVisibleRows >= voltDbRenderer.tableSearchDataSize);
-            } else {
-                isValidAction = !((voltDbRenderer.tableIndex + 1) * voltDbRenderer.maxVisibleRows >= voltDbRenderer.tableDataSize);
-            }
-
-            if (isValidAction) {
-                currentTableAction = VoltDbUI.ACTION_STATES.NEXT;
-                voltDbRenderer.mapTableInformation(currentTableAction, priorTableAction, voltDbRenderer.isTableSearch, function (htmlData) {
-                    setPaginationIndicesOfTables(voltDbRenderer.isTableSearch);
-
-                    if (!voltDbRenderer.isTableSearch && (htmlData != undefined && htmlData != "")) {
-                        $('#tablesBody').html(htmlData);
-                    } else if (htmlData != undefined && htmlData != "") {
-                        $('#tablesBody').html(htmlData);
-                    }
-                    priorTableAction = currentTableAction;
-                    currentTableAction = VoltDbUI.ACTION_STATES.REFRESH;
-                    voltDbRenderer.isNextClicked = false;
-                });
-            }
-
-        });
-
-        $("#filterStoredProc").unbind("click");
-        $('#filterStoredProc').on('click', function () {
-            if (this.value == defaultSearchTextProcedure)
-                this.value = '';
-        });
-
-        $("#filterStoredProc").unbind("keyup");
-        $('#filterStoredProc').on('keyup', function () {
-            if (this.value != '' && this.value != defaultSearchTextProcedure) {
-                voltDbRenderer.isProcedureSearch = true;
-                currentProcedureAction = VoltDbUI.ACTION_STATES.SEARCH;
-            } else {
-                voltDbRenderer.isProcedureSearch = false;
-                currentProcedureAction = VoltDbUI.ACTION_STATES.REFRESH;
-            }
-
-            if (voltDbRenderer.isProcedureSearch) {
-                voltDbRenderer.searchProcedures('', this.value, function (searchResult) {
-                    priorProcedureAction = currentProcedureAction;
-                    currentProcedureAction = VoltDbUI.ACTION_STATES.SEARCH;
-
-                    if (searchResult) {
-                        if (voltDbRenderer.isSortProcedures)
-                            voltDbRenderer.sortProceduresByColumns(true);
-
-                        voltDbRenderer.mapProcedureInformation(currentProcedureAction, priorProcedureAction, function (traverse, htmlSearchData) {
-                            if (htmlSearchData != "")
-                                $('#storeProcedureBody').html(htmlSearchData);
-                            else
-                                $('#storeProcedureBody').html("<tr><td colspan=6> No data to be displayed</td></tr>");
-
-                            //set pagination
-                            setPaginationIndicesOfProcedures(voltDbRenderer.isProcedureSearch, voltDbRenderer.procedureSearchDataSize);
-                        });
-                    } else {
-                        $('#storeProcedureBody').html("<tr><td colspan=6> No data to be displayed</td></tr>");
-                        setPaginationIndicesOfProcedures(voltDbRenderer.isProcedureSearch, voltDbRenderer.procedureSearchDataSize);
-                    }
-                    priorProcedureAction = VoltDbUI.ACTION_STATES.SEARCH;
-                });
-            } else {
-                voltDbRenderer.mapProcedureInformation(currentProcedureAction, priorProcedureAction, function (traverse, htmlData) {
-                    if (htmlData != ""){
-                        $('#storeProcedureBody').html(htmlData.SystemInformation);
-                    } else {
-                        $('#storeProcedureBody').html("<tr><td colspan=6> No data to be displayed</td></tr>");
-                    }
-
-                    setPaginationIndicesOfProcedures(voltDbRenderer.isProcedureSearch);
-                });
-
-            }
-        });
-
-        $("#filterDatabaseTable").unbind("keyup");
-        $('#filterDatabaseTable').on('keyup', function () {
-            if ($('#filterDatabaseTable')[0].value != '' && $('#filterDatabaseTable')[0].value != defaultSearchTextTable) {
-                voltDbRenderer.isTableSearch = true;
-                voltDbRenderer.isSearchTextCleaned = false;
-                currentTableAction = VoltDbUI.ACTION_STATES.SEARCH;
-            } else {
-                voltDbRenderer.isTableSearch = false;
-                voltDbRenderer.isSearchTextCleaned = true;
-                currentTableAction = VoltDbUI.ACTION_STATES.REFRESH;
-            }
-
-            if (voltDbRenderer.isTableSearch) {
-                voltDbRenderer.GetDataTablesInformation(function (connection) {
-                    voltDbRenderer.searchTables(connection, $('#filterDatabaseTable')[0].value, function (searchResult) {
-                        priorTableAction = currentTableAction;
-                        currentTableAction = VoltDbUI.ACTION_STATES.SEARCH;
-                        if (searchResult) {
-                            if (voltDbRenderer.isSortTables)
-                                voltDbRenderer.sortTablesByColumns(true);
-
-                            voltDbRenderer.mapTableInformation(currentTableAction, priorTableAction, voltDbRenderer.isTableSearch, function (htmlSearchData) {
-                                if (htmlSearchData != undefined) {
-                                    $('#tablesBody').html(htmlSearchData);
-                                }
-                                setPaginationIndicesOfTables(voltDbRenderer.isTableSearch, "search");
-                            });
-                        } else {
-                            $('#tablesBody').html("<tr><td colspan=6> No data to be displayed</td></tr>");
-                            setPaginationIndicesOfTables(voltDbRenderer.isTableSearch);
-                        }
-                        priorTableAction = VoltDbUI.ACTION_STATES.SEARCH;
-                    });
-                });
-            } else {
-                voltDbRenderer.mapTableInformation(currentTableAction, priorTableAction, voltDbRenderer.isTableSearch, function (htmlData) {
-                    if (htmlData != "") {
-                        $('#tablesBody').html(htmlData);
-                    } else {
-                        $('#tablesBody').html("<tr><td colspan=6> No data to be displayed</td></tr>");
-                    }
-                    setPaginationIndicesOfTables(voltDbRenderer.isTableSearch);
-                });
-            }
-        });
-
-        $("#filterDatabaseTable").unbind("click");
-        $('#filterDatabaseTable').on('click', function () {
-            if (this.value == defaultSearchTextTable)
-                this.value = '';
-        });
+        refreshDataTableSection(graphView, currentTab)
     };
 
     var replicationWarning = function (count) {
@@ -1869,6 +1708,8 @@ var loadPage = function (serverName, portid) {
     };
 
     var cmdLogTable = '';
+    var dtTable = '';
+    var spTable = '';
 
     var refreshCmdLogSection = function (graphView, currentTab) {
         voltDbRenderer.GetCommandLogInformation(function (cmdLogDetails) {
@@ -1974,6 +1815,109 @@ var loadPage = function (serverName, portid) {
 
         $('#filterServer').on('keyup', function () {
             cmdLogTable.search(this.value).draw();
+        });
+    };
+
+    var refreshDataTableSection = function (graphView, currentTab) {
+        voltDbRenderer.getTablesInformation(function (tableMetadata) {
+                voltDbRenderer.mapTableInformation(function (dtDetails) {
+                     var response = dtDetails;
+            var htmlcontent = "";
+
+            for (var key in response) {
+                htmlcontent = htmlcontent + "<tr>";
+                htmlcontent = htmlcontent + "<td>" + response[key].TABLE_NAME + "</td>" +
+                    "<td>" + response[key].TUPLE_COUNT+ "</td>" +
+                    "<td>" + response[key].MAX_ROWS + "</td>" +
+                    "<td>" + response[key].MIN_ROWS + "</td>" +
+                    "<td>" + response[key].AVG_ROWS + "</td>" +
+                    "<td>" + response[key].TABLE_TYPE + "</td>";
+                htmlcontent = htmlcontent + "</tr>";
+
+            }
+            var leftScroll = $("#tblDT_wrapper").find(".tblScroll").scrollLeft();
+            if ($.fn.dataTable.isDataTable('#tblDT')) {
+                $("#tblDT").DataTable().destroy();
+            }
+
+            var content = "<table width='100%' border='0' cellspacing='0' id='tblDT' cellpadding='0' class='storeTbl drTbl no-footer dataTable' aria-describedby='tblCmdLog_info' role='grid'>" +
+                "<thead><tr role='row'><th id='TABLE_NAME' width='30%' data-name='none' class='' tabindex='0' aria-controls='tblDT' rowspan='1' colspan='1' aria-sort='ascending' aria-label='Server: activate to sort column descending'>Table</th>" +
+                "<th id='TUPLE_COUNT' width='10%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDT' rowspan='1' colspan='1' >Row Count</th>" +
+                "<th id='MAX_ROWS' width='15%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDT' rowspan='1' colspan='1' >Max Rows (per partition)</th>" +
+                "<th id='MIN_ROWS' width='15%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDT' rowspan='1' colspan='1' >Min Rows (per partition)</th>" +
+                "<th id='AVG_ROWS' width='15%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDT' rowspan='1' colspan='1' >Avg Rows (per partition)</th>" +
+                "<th id='TABLE_TYPE' width='15%' data-name='none' class='sorting' tabindex='0' aria-controls='tblDT' rowspan='1' colspan='1' >Type</th>" +
+                "</thead><tbody>";
+            $("#tblDT_wrapper").find(".dTContainer").html(content + htmlcontent + "</tbody></table>");
+            dtTable = $("#tblDT").DataTable({
+                stateSave: true,
+                pageLength: 5,
+                "sPaginationType": "extStyleLF",
+                "bAutoWidth": false,
+                "language": {
+                    "zeroRecords": "No data to be displayed"
+                },
+                "fnDrawCallback": function () {
+                    if ($("#tblDT").find("tbody tr td").first().html() == "No data to be displayed") {
+                        $(this).parent().parent().find(".dataTables_paginate .navigationLabel .pageIndex").text("0");
+                    } else {
+                        $(this).parent().parent().find(".dataTables_paginate .navigationLabel .pageIndex").text(" " + this.fnPagingInfo().iPage + " ");
+                    }
+
+                    $(this).parent().parent().find(".dataTables_paginate .navigationLabel .totalPages").text(this.fnPagingInfo().iTotalPages);
+
+                    if ((screen.width == 1600) && (screen.height == 900)) {
+                        var length = $("#tblDT tr").length - 1;
+                        if (length >= 5) {
+                            $("#divDTSection").css("min-height", "280px");
+                        } else if (length == 4) {
+                            $("#divDTSection").css("min-height", "250px");
+                        } else if (length == 3) {
+                            $("#divDTSection").css("min-height", "230px");
+                        } else if (length == 2) {
+                            $("#divDTSection").css("min-height", "200px");
+                        } else if (length == 1 || length == 0) {
+                            $("#divDTSection").css("min-height", "170px");
+                        }
+                    } else if ((screen.width == 360) && (screen.height == 640)) {
+                        $("#divDTSection").css("min-height", "380px");
+                    } else if ((screen.width == 640) && (screen.height == 960)) {
+                        alert("iphone resolution mode");
+                        $("#divDTSection").css("min-height", "380px");
+                    } else if ($(window).width() == '751') {
+                        $("#divDTSection").css("min-height", "350px");
+                    }
+                },
+
+                "sDom": 'p<"tblScroll drScroll"t>',
+                "aoColumns": [
+                    null,
+                    { "bSearchable": false },
+                    { "bSearchable": false },
+                    { "bSearchable": false },
+                    { "bSearchable": false },
+                    { "bSearchable": false }
+                ]
+            });
+
+            $("#tblDT_wrapper").find(".tblScroll").scrollLeft(leftScroll);
+            $("#tblDT_wrapper").find(".paginationDefault").remove();
+
+            //Customizing DataTables to make it as existing pagination
+            $(".paginate_disabled_previous").html("Prev");
+            $(".paginate_enabled_next").html("Next");
+            $(".paginate_disabled_next").html("Next");
+            $(".paginate_enabled_previous").html("Prev");
+
+            $(".paginate_disabled_previous").attr("title", "Previous Page");
+            $(".paginate_enabled_next").attr("title", "Next Page");
+            $(".paginate_disabled_next").attr("title", "Next Page");
+            $(".paginate_enabled_previous").attr("title", "Previous Page");
+                });
+        });
+
+        $('#filterDT').on('keyup', function () {
+            dtTable.search(this.value).draw();
         });
     };
 
@@ -2206,114 +2150,6 @@ var loadPage = function (serverName, portid) {
         });
     };
 
-    var setPaginationIndicesOfProcedures = function (isProcedureSearch) {
-        if (isProcedureSearch) {
-            if (voltDbRenderer.procedureSearchDataSize > 0) {
-                if (currentProcedureAction == VoltDbUI.ACTION_STATES.NEXT && priorProcedureAction == VoltDbUI.ACTION_STATES.SEARCH) {
-                    lblPrevious.innerHTML = " ".concat(voltDbRenderer.procedureTableIndex + 1, ' ');
-                    lblTotalPages.innerHTML = voltDbRenderer.procedureSearchDataSize < voltDbRenderer.maxVisibleRows ? " ".concat(1) : " ".concat(Math.ceil(voltDbRenderer.procedureSearchDataSize / voltDbRenderer.maxVisibleRows));
-
-                } else if ((currentProcedureAction == VoltDbUI.ACTION_STATES.PREVIOUS && priorProcedureAction == VoltDbUI.ACTION_STATES.SEARCH)) {
-                    lblPrevious.innerHTML = " ".concat(voltDbRenderer.procedureTableIndex, ' ');
-                    lblTotalPages.innerHTML = voltDbRenderer.procedureSearchDataSize < voltDbRenderer.maxVisibleRows ? " ".concat(1) : " ".concat(Math.ceil(voltDbRenderer.procedureSearchDataSize / voltDbRenderer.maxVisibleRows));
-
-                } else if (currentProcedureAction == VoltDbUI.ACTION_STATES.NEXT && priorProcedureAction == VoltDbUI.ACTION_STATES.PREVIOUS) {
-                    lblPrevious.innerHTML = " ".concat(voltDbRenderer.procedureTableIndex + 1, ' ');
-                    lblTotalPages.innerHTML = voltDbRenderer.procedureSearchDataSize < voltDbRenderer.maxVisibleRows ? " ".concat(1) : " ".concat(Math.ceil(voltDbRenderer.procedureSearchDataSize / voltDbRenderer.maxVisibleRows));
-
-                } else if (currentProcedureAction == VoltDbUI.ACTION_STATES.NEXT && priorProcedureAction == VoltDbUI.ACTION_STATES.NEXT) {
-                    lblPrevious.innerHTML = " ".concat(voltDbRenderer.procedureTableIndex + 1, ' ');
-                    lblTotalPages.innerHTML = voltDbRenderer.procedureSearchDataSize < voltDbRenderer.maxVisibleRows ? " ".concat(1) : " ".concat(Math.ceil(voltDbRenderer.procedureSearchDataSize / voltDbRenderer.maxVisibleRows));
-
-                } else if (currentProcedureAction == VoltDbUI.ACTION_STATES.PREVIOUS && priorProcedureAction == VoltDbUI.ACTION_STATES.NEXT) {
-                    lblPrevious.innerHTML = " ".concat(voltDbRenderer.procedureTableIndex + 1, ' ');
-                    lblTotalPages.innerHTML = voltDbRenderer.procedureSearchDataSize < voltDbRenderer.maxVisibleRows ? " ".concat(1) : " ".concat(Math.ceil(voltDbRenderer.procedureSearchDataSize / voltDbRenderer.maxVisibleRows));
-
-                } else {
-                    lblPrevious.innerHTML = " ".concat(1, ' ');
-                    lblTotalPages.innerHTML = voltDbRenderer.procedureSearchDataSize < voltDbRenderer.maxVisibleRows ? " ".concat(1) : " ".concat(Math.ceil(voltDbRenderer.procedureSearchDataSize / voltDbRenderer.maxVisibleRows));
-
-                }
-            } else {
-                lblPrevious.innerHTML = " ".concat(0, ' ');
-                lblTotalPages.innerHTML = " ".concat(0);
-            }
-        } else {
-            if (voltDbRenderer.procedureDataSize > 0) {
-                if (currentProcedureAction == VoltDbUI.ACTION_STATES.NEXT) {
-                    lblPrevious.innerHTML = " ".concat(voltDbRenderer.procedureTableIndex + 1, ' ');
-
-                } else if (currentProcedureAction == VoltDbUI.ACTION_STATES.PREVIOUS) {
-                    lblPrevious.innerHTML = " ".concat(voltDbRenderer.procedureTableIndex + 1, ' ');
-
-                } else {
-                    lblPrevious.innerHTML = " ".concat(1, ' ');
-
-                }
-                lblTotalPages.innerHTML = voltDbRenderer.procedureDataSize < voltDbRenderer.maxVisibleRows ? " ".concat(1) : " ".concat(Math.ceil(voltDbRenderer.procedureDataSize / voltDbRenderer.maxVisibleRows));
-            } else {
-                lblPrevious.innerHTML = " ".concat(0, ' ');
-                lblTotalPages.innerHTML = " ".concat(0);
-            }
-        }
-    };
-
-    var setPaginationIndicesOfTables = function (isTableSearch) {
-        //set pagination
-        if (isTableSearch) {
-            if (voltDbRenderer.tableSearchDataSize > 0) {
-                if (currentTableAction == VoltDbUI.ACTION_STATES.NEXT &&
-                    (priorTableAction == VoltDbUI.ACTION_STATES.SEARCH || priorTableAction == VoltDbUI.ACTION_STATES.PREVIOUS || priorTableAction == VoltDbUI.ACTION_STATES.NEXT)) {
-                    lblPreviousTable.innerHTML = " ".concat(voltDbRenderer.tableIndex + 1, ' ');
-                    lblTotalPagesofTables.innerHTML = voltDbRenderer.tableSearchDataSize < voltDbRenderer.maxVisibleRows ? " ".concat(1) : " ".concat(Math.ceil(voltDbRenderer.tableSearchDataSize / voltDbRenderer.maxVisibleRows));
-
-                } else if ((currentTableAction == VoltDbUI.ACTION_STATES.PREVIOUS && priorTableAction == VoltDbUI.ACTION_STATES.SEARCH || priorTableAction == VoltDbUI.ACTION_STATES.PREVIOUS)) {
-                    lblPreviousTable.innerHTML = " ".concat(voltDbRenderer.tableIndex + 1, ' ');
-                    lblTotalPagesofTables.innerHTML = voltDbRenderer.tableSearchDataSize < voltDbRenderer.maxVisibleRows ? " ".concat(1) : " ".concat(Math.ceil(voltDbRenderer.tableSearchDataSize / voltDbRenderer.maxVisibleRows));
-
-                } else if (currentTableAction == VoltDbUI.ACTION_STATES.PREVIOUS && priorTableAction == VoltDbUI.ACTION_STATES.NEXT) {
-                    lblPreviousTable.innerHTML = " ".concat(voltDbRenderer.tableIndex + 1, ' ');
-                    lblTotalPagesofTables.innerHTML = voltDbRenderer.tableSearchDataSize < voltDbRenderer.maxVisibleRows ? " ".concat(1) : " ".concat(Math.ceil(voltDbRenderer.tableSearchDataSize / voltDbRenderer.maxVisibleRows));
-
-                } else if (currentTableAction == VoltDbUI.ACTION_STATES.REFRESH && (priorTableAction == VoltDbUI.ACTION_STATES.PREVIOUS || priorTableAction == VoltDbUI.ACTION_STATES.NEXT)) {
-                    lblTotalPagesofTables.innerHTML = voltDbRenderer.tableSearchDataSize < voltDbRenderer.maxVisibleRows ? " ".concat(1) : " ".concat(Math.ceil(voltDbRenderer.tableSearchDataSize / voltDbRenderer.maxVisibleRows));
-
-                } else {
-                    lblPreviousTable.innerHTML = " ".concat(1, ' ');
-                    lblTotalPagesofTables.innerHTML = voltDbRenderer.tableSearchDataSize < voltDbRenderer.maxVisibleRows ? " ".concat(1) : " ".concat(Math.ceil(voltDbRenderer.tableSearchDataSize / voltDbRenderer.maxVisibleRows));
-
-                }
-            } else {
-                lblPreviousTable.innerHTML = " ".concat(0, ' ');
-                lblTotalPagesofTables.innerHTML = " ".concat(0, ' ');
-
-            }
-        } else {
-            if (voltDbRenderer.tableDataSize > 0) {
-                if (currentTableAction == VoltDbUI.ACTION_STATES.NEXT) {
-                    lblPreviousTable.innerHTML = " ".concat(voltDbRenderer.tableIndex + 1, ' ');
-
-                } else if (currentTableAction == VoltDbUI.ACTION_STATES.PREVIOUS) {
-                    lblPreviousTable.innerHTML = " ".concat(voltDbRenderer.tableIndex + 1, ' ');
-
-                } else if ((currentTableAction == VoltDbUI.ACTION_STATES.REFRESH || currentTableAction == VoltDbUI.ACTION_STATES.NONE) &&
-                    (voltDbRenderer.isSearchTextCleaned || !(priorTableAction == VoltDbUI.ACTION_STATES.PREVIOUS || priorTableAction == VoltDbUI.ACTION_STATES.NEXT))) {
-                    lblPreviousTable.innerHTML = " ".concat(1, ' ');
-                    voltDbRenderer.isSearchTextCleaned = false;
-
-                } else if (voltDbRenderer.isTableSortClicked) {
-                    lblPreviousTable.innerHTML = " ".concat(1, ' ');
-
-                }
-                lblTotalPagesofTables.innerHTML = voltDbRenderer.tableDataSize < voltDbRenderer.maxVisibleRows ? " ".concat(1) : " ".concat(Math.ceil(voltDbRenderer.tableDataSize / voltDbRenderer.maxVisibleRows));
-            } else {
-                lblPreviousTable.innerHTML = " ".concat(0, ' ');
-                lblTotalPagesofTables.innerHTML = " ".concat(0, ' ');
-
-            }
-        }
-    };
-
     var saveThreshold = function () {
         var defaultThreshold = 70;
         var thresholdInput = $("#threshold");
@@ -2361,201 +2197,6 @@ var loadPage = function (serverName, portid) {
     $("#graphView").val(VoltDbUI.getFromLocalStorage("graph-view"));
     $("#drGraphView").val(VoltDbUI.getFromLocalStorage("dr-graph-view") != undefined ? VoltDbUI.getFromLocalStorage("dr-graph-view"): "Seconds");
     MonitorGraphUI.AddGraph(VoltDbUI.getFromLocalStorage("graph-view"), $('#chartServerCPU'), $('#chartServerRAM'), $('#chartClusterLatency'), $('#chartClusterTransactions'), $('#chartPartitionIdleTime'), $('#ChartDrReplicationRate'), $('#chartCommandLogging'));
-
-    $('#PROCEDURE,#INVOCATIONS,#MIN_LATENCY,#MAX_LATENCY,#AVG_LATENCY,#AVG_LATENCY,#PERC_EXECUTION').unbind('click');
-    $('#PROCEDURE,#INVOCATIONS,#MIN_LATENCY,#MAX_LATENCY,#AVG_LATENCY,#PERC_EXECUTION').on('click', function () {
-        voltDbRenderer.isProcedureSortClicked = true;
-        currentProcedureAction = VoltDbUI.ACTION_STATES.SORT;
-
-        if (this.id != 'PROCEDURE') {
-            $("#tblStoredProcedures").find('#PROCEDURE').attr('data-name', 'none');
-            $("#tblStoredProcedures").find('#PROCEDURE').removeAttr('class');
-        }
-
-        if (VoltDbUI.sortStatus == VoltDbUI.SORT_STATES.NONE || VoltDbUI.sortStatus == VoltDbUI.SORT_STATES.SORTED) {
-            if ($(this).data('name') == "none") {
-                $(this).data('name', 'ascending');
-                voltDbRenderer.sortOrder = "ascending";
-
-            } else if ($(this).data('name') == "ascending") {
-                voltDbRenderer.sortOrder = "descending";
-                $(this).data('name', 'descending');
-
-            } else if ($(this).data('name') == "descending") {
-                voltDbRenderer.sortOrder = "ascending";
-                $(this).data('name', 'ascending');
-
-            }
-
-            //apply css to display sort arrow image
-            if ($(this).hasClass("sorttable_sorted")) {
-                if (this.id == voltDbRenderer.sortColumn)
-                    $("#" + voltDbRenderer.sortColumn).data('name', 'descending');
-                else
-                    $("#" + voltDbRenderer.sortColumn).data('name', 'none');
-
-                $("#" + voltDbRenderer.sortColumn).removeClass("sorttable_sorted");
-                $("#" + voltDbRenderer.sortColumn).removeClass("sorttable_sorted_reverse");
-
-                $(this).removeClass("sorttable_sorted");
-                $(this).addClass("sorttable_sorted_reverse");
-
-            } else if ($(this).hasClass("sorttable_sorted_reverse")) {
-                if (this.id == voltDbRenderer.sortColumn)
-                    $("#" + voltDbRenderer.sortColumn).data('name', 'ascending');
-                else
-                    $("#" + voltDbRenderer.sortColumn).data('name', 'none');
-
-                $("#" + voltDbRenderer.sortColumn).removeClass("sorttable_sorted");
-                $("#" + voltDbRenderer.sortColumn).removeClass("sorttable_sorted_reverse");
-
-                $(this).removeClass("sorttable_sorted_reverse");
-                $(this).addClass("sorttable_sorted");
-
-            } else {
-                $(this).addClass("sorttable_sorted");
-                if ($("#" + voltDbRenderer.sortColumn) != undefined) {
-                    $("#" + voltDbRenderer.sortColumn).data('name', 'none');
-                    $("#" + voltDbRenderer.sortColumn).removeClass("sorttable_sorted");
-                    $("#" + voltDbRenderer.sortColumn).removeClass("sorttable_sorted_reverse");
-                }
-
-            }
-
-            voltDbRenderer.isSortProcedures = true;
-            voltDbRenderer.sortColumn = this.id;
-
-            if (voltDbRenderer.isProcedureSearch) {
-                VoltDbUI.sortStatus = VoltDbUI.SORT_STATES.SORTING;
-                voltDbRenderer.searchProcedures('', $('#filterStoredProc')[0].value, function (searchResult) {
-                    currentProcedureAction = VoltDbUI.ACTION_STATES.SORT;
-                    voltDbRenderer.formatSearchDataToJsonArray();
-                    if (voltDbRenderer.sortProceduresByColumns(false)) {
-                        voltDbRenderer.mapProcedureInformationSorting(currentProcedureAction, priorProcedureAction, function (htmlData) {
-                            if (htmlData != "")
-                                $('#storeProcedureBody').html(htmlData);
-                            else
-                                $('#storeProcedureBody').html("<tr><td colspan=6> No data to be displayed</td></tr>");
-
-                            //set pagination
-                            setPaginationIndicesOfProcedures(voltDbRenderer.isProcedureSearch);
-                            VoltDbUI.sortStatus = VoltDbUI.SORT_STATES.SORTED;
-
-                        });
-                    } else {
-                        VoltDbUI.sortStatus = VoltDbUI.SORT_STATES.NONE;
-                    }
-                    priorProcedureAction = VoltDbUI.ACTION_STATES.SEARCH;
-                });
-            } else {
-                VoltDbUI.sortStatus = VoltDbUI.SORT_STATES.SORTING;
-                voltDbRenderer.sortProceduresByColumns(false);
-                voltDbRenderer.mapProcedureInformationSorting(currentProcedureAction, priorProcedureAction, function (htmlData) {
-                    if (htmlData != "")
-                        $('#storeProcedureBody').html(htmlData);
-                    else
-                        $('#storeProcedureBody').html("<tr><td colspan=6> No data to be displayed</td></tr>");
-
-                    setPaginationIndicesOfProcedures(voltDbRenderer.isProcedureSearch);
-                    VoltDbUI.sortStatus = VoltDbUI.SORT_STATES.SORTED;
-                });
-            }
-        }
-        voltDbRenderer.isProcedureSortClicked = false;
-    });
-
-    $('#TABLE_NAME,#TUPLE_COUNT,#MAX_ROWS,#MIN_ROWS,#AVG_ROWS,#TABLE_TYPE').unbind('click');
-    $('#TABLE_NAME,#TUPLE_COUNT,#MAX_ROWS,#MIN_ROWS,#AVG_ROWS,#TABLE_TYPE').on('click', function () {
-        voltDbRenderer.isTableSortClicked = true;
-
-        if (this.id != 'TABLE_NAME') {
-            $("#tblDataTables").find('#TABLE_NAME').attr('data-name', 'none');
-            $("#tblDataTables").find('#TABLE_NAME').removeAttr('class');
-        }
-        if (VoltDbUI.tableSortStatus == VoltDbUI.SORT_STATES.NONE || VoltDbUI.tableSortStatus == VoltDbUI.SORT_STATES.SORTED) {
-            if ($(this).data('name') == "none") {
-                $(this).data('name', 'ascending');
-                voltDbRenderer.sortTableOrder = "ascending";
-
-            } else if ($(this).data('name') == "ascending") {
-                voltDbRenderer.sortTableOrder = "descending";
-                $(this).data('name', 'descending');
-
-            } else if ($(this).data('name') == "descending") {
-                voltDbRenderer.sortTableOrder = "ascending";
-                $(this).data('name', 'ascending');
-
-            }
-
-            //apply css to display sort arrow image
-            if ($(this).hasClass("sorttable_sorted")) {
-                if (this.id == voltDbRenderer.tableSortColumn) {
-                    $("#" + voltDbRenderer.tableSortColumn).data('name', 'descending');
-                } else
-                    $("#" + voltDbRenderer.tableSortColumn).data('name', 'none');
-
-                $("#" + voltDbRenderer.tableSortColumn).removeClass("sorttable_sorted");
-                $("#" + voltDbRenderer.tableSortColumn).removeClass("sorttable_sorted_reverse");
-
-                $(this).removeClass("sorttable_sorted");
-                $(this).addClass("sorttable_sorted_reverse");
-
-            } else if ($(this).hasClass("sorttable_sorted_reverse")) {
-                if (this.id == voltDbRenderer.tableSortColumn)
-                    $("#" + voltDbRenderer.tableSortColumn).data('name', 'ascending');
-                else
-                    $("#" + voltDbRenderer.tableSortColumn).data('name', 'none');
-
-                $("#" + voltDbRenderer.tableSortColumn).removeClass("sorttable_sorted");
-                $("#" + voltDbRenderer.tableSortColumn).removeClass("sorttable_sorted_reverse");
-
-                $(this).removeClass("sorttable_sorted_reverse");
-                $(this).addClass("sorttable_sorted");
-
-            } else {
-                $(this).addClass("sorttable_sorted");
-                if ($("#" + voltDbRenderer.tableSortColumn) != undefined) {
-                    $("#" + voltDbRenderer.tableSortColumn).data('name', 'none');
-                    $("#" + voltDbRenderer.tableSortColumn).removeClass("sorttable_sorted");
-                    $("#" + voltDbRenderer.tableSortColumn).removeClass("sorttable_sorted_reverse");
-                }
-
-            }
-
-            voltDbRenderer.isSortTables = true;
-            voltDbRenderer.tableSortColumn = this.id;
-
-            if (voltDbRenderer.isTableSearch) {
-                VoltDbUI.tableSortStatus = VoltDbUI.SORT_STATES.SORTING;
-                priorTableAction = currentTableAction;
-                currentTableAction = VoltDbUI.ACTION_STATES.SEARCH;
-                voltDbRenderer.sortTablesByColumns();
-                voltDbRenderer.mapTableInformation(currentTableAction, priorTableAction, voltDbRenderer.isTableSearch, function (htmlData) {
-                    if ((htmlData != undefined && htmlData != "")) {
-                        $('#tablesBody').html(htmlData);
-                    }
-                    //set pagination
-                    setPaginationIndicesOfTables(voltDbRenderer.isTableSearch);
-                    VoltDbUI.tableSortStatus = VoltDbUI.SORT_STATES.SORTED;
-                    voltDbRenderer.isTableSortClicked = false;
-
-                });
-                priorTableAction = VoltDbUI.ACTION_STATES.SEARCH;
-
-            } else {
-                VoltDbUI.tableSortStatus = VoltDbUI.SORT_STATES.SORTING;
-                voltDbRenderer.sortTablesByColumns();
-                voltDbRenderer.mapTableInformation(currentTableAction, priorTableAction, voltDbRenderer.isTableSearch, function (htmlData) {
-                    if ((htmlData != undefined && htmlData != "")) {
-                        $('#tablesBody').html(htmlData);
-                    }
-                    setPaginationIndicesOfTables(voltDbRenderer.isTableSearch);
-                    VoltDbUI.tableSortStatus = VoltDbUI.SORT_STATES.SORTED;
-                    voltDbRenderer.isTableSortClicked = false;
-                });
-            }
-        }
-    });
 
 
     $("#graphView").on("change", function () {
@@ -2819,15 +2460,24 @@ var showHideGraph = function (userpreferences) {
         $("#ChartDrReplicationRate").hide();
     }
 
-    if (userpreferences["StoredProcedures"] == false)
+    if (userpreferences["StoredProcedures"] == false){
         $("#tblStoredProcedures").hide();
-    else
+        $("#divSPSection").hide()
+    }
+    else{
         $("#tblStoredProcedures").show();
+        $("#divSPSection").show()
+    }
 
-    if (userpreferences["DatabaseTables"] == false)
+    if (userpreferences["DatabaseTables"] == false){
         $("#tblDataTables").hide();
-    else
+        $("#tblDT").hide();
+    }
+    else{
         $("#tblDataTables").show();
+        $("#tblDT").show();
+    }
+
 
     if (userpreferences["DatabaseTables"] == false && userpreferences["StoredProcedures"] == false)
         $("#firstpane").hide();
@@ -2875,6 +2525,12 @@ var showHideGraph = function (userpreferences) {
         }
     } else {
         $("#divCommandLog").hide();
+    }
+
+    if (userpreferences["DatabaseTables"] == true) {
+        $("#divDTSection").show();
+    } else {
+        $("#divDTSection").hide();
     }
 
     adjustGraphSpacing();
@@ -2937,21 +2593,7 @@ var adjustGraphSpacing = function () {
         this.drReplicationRole = "NONE";
         this.isDRInfoRequired = false;
         this.isCommandLogEnabled = false;
-        this.ACTION_STATES = {
-            NONE: -1,
-            NEXT: 0,
-            PREVIOUS: 1,
-            REFRESH: 2,
-            SEARCH: 3,
-            SORT: 4
-        };
-
-        this.SORT_STATES = {
-            NONE: 0,
-            SORTING: 1,
-            SORTED: 2
-        };
-
+        this.isFirstDRLoad = true;
         this.DASHBOARD_PROGRESS_STATES = {
             REFRESHMEMORY: 0,
             REFRESHMEMORY_NONE: 1,
@@ -2977,8 +2619,7 @@ var adjustGraphSpacing = function () {
         this.CurrentTransactionProgess = this.DASHBOARD_PROGRESS_STATES.REFRESHTRANSACTION_NONE;
         this.CurrentTableDataProgress = this.DASHBOARD_PROGRESS_STATES.REFRESH_TABLEDATA_NONE;
         this.CurrentProcedureDataProgress = this.DASHBOARD_PROGRESS_STATES.REFRESH_PROCEDUREDATA_NONE;
-        this.sortStatus = this.SORT_STATES.NONE;
-        this.tableSortStatus = this.SORT_STATES.NONE;
+
         this.isConnectionChecked = false;
         this.connectionTimeInterval = null;
         this.partitionGraphInterval = null;

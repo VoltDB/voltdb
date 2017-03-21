@@ -50,11 +50,11 @@
 
 package org.voltcore.network;
 
-import java.nio.channels.ReadableByteChannel;
-import java.nio.ByteBuffer;
-import org.voltcore.network.NIOReadStream;
-import junit.framework.TestCase;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.channels.ReadableByteChannel;
+
+import junit.framework.TestCase;
 
 public class TestNIOReadStream extends TestCase {
     MockReadableByteChannel channel;
@@ -163,6 +163,107 @@ public class TestNIOReadStream extends TestCase {
         stream.getBytes(single);
         assertEquals(79, single[0]);
         assertStreamIsEmpty();
+    }
+
+    public void testPeekBytes() throws Exception {
+        final int SIZE = 4096*10;
+        ByteBuffer netbb = ByteBuffer.allocate(SIZE);
+        final int BORDER = 32 * 1024;
+
+        // Write a block that spans multiple buffers
+        channel.nextRead = netbb.array();
+        netbb.putInt(2121);
+        netbb.putInt(5555);
+
+        netbb.position(BORDER - 2);
+        netbb.putInt(2121);
+        netbb.putInt(5555);
+
+        assertEquals(SIZE, stream.read(channel, SIZE, pool));
+        ByteBuffer intbb = ByteBuffer.allocate(Integer.BYTES);
+        intbb.limit(Integer.BYTES);
+
+        stream.peekBytes(intbb.array());
+        assertEquals(2121, intbb.getInt(0));
+
+        stream.peekBytes(intbb.array());
+        assertEquals(2121, intbb.getInt(0));
+
+        stream.getBytes(intbb.array());
+        assertEquals(2121, intbb.getInt(0));
+
+        stream.getBytes(intbb.array());
+        assertEquals(5555, intbb.getInt(0));
+
+        byte [] fillah = new byte[BORDER - 10];
+        stream.getBytes(fillah);
+
+        stream.peekBytes(intbb.array());
+        assertEquals(2121, intbb.getInt(0));
+
+        stream.peekBytes(intbb.array());
+        assertEquals(2121, intbb.getInt(0));
+
+        stream.getBytes(intbb.array());
+        assertEquals(2121, intbb.getInt(0));
+
+        stream.getBytes(intbb.array());
+        assertEquals(5555, intbb.getInt(0));
+    }
+
+    public void testGetSlice() throws Exception {
+        final int SIZE = 4096*10;
+        ByteBuffer netbb = ByteBuffer.allocate(SIZE);
+        final int BORDER = 32 * 1024;
+
+        // Write a block that spans multiple buffers
+        channel.nextRead = netbb.array();
+        netbb.putInt(2121);
+        netbb.putInt(5555);
+
+        netbb.position(BORDER - 2);
+        netbb.putInt(2121);
+        netbb.putInt(5555);
+
+        assertEquals(SIZE, stream.read(channel, SIZE, pool));
+
+        NIOReadStream.Slice slc = stream.getSlice(8);
+        assertEquals(8, slc.bb.writerIndex());
+        assertEquals(0, slc.bb.readerIndex());
+        assertEquals(2121, slc.bb.readInt());
+        assertEquals(5555, slc.bb.readInt());
+        assertEquals(8, slc.bb.readerIndex());
+
+        assertEquals(0, slc.discard());
+
+        int sliceSize = BORDER - 10;
+        slc = stream.getSlice(sliceSize);
+        assertEquals(sliceSize, slc.bb.writerIndex());
+        assertEquals(0, slc.bb.readerIndex());
+        slc.bb.readerIndex(sliceSize);
+        assertFalse(slc.bb.isReadable());
+
+        assertEquals(0, slc.discard());
+
+        slc = stream.getSlice(8);
+        assertEquals(8, slc.bb.writerIndex());
+        assertEquals(0, slc.bb.readerIndex());
+        assertEquals(2121, slc.bb.readInt());
+        assertEquals(5555, slc.bb.readInt());
+        assertEquals(8, slc.bb.readerIndex());
+
+        assertEquals(1, slc.discard());
+        assertEquals(0, slc.discard());
+
+        sliceSize = 8186;
+        slc = stream.getSlice(sliceSize);
+        assertEquals(sliceSize, slc.bb.writerIndex());
+        assertEquals(0, slc.bb.readerIndex());
+        slc.bb.readerIndex(sliceSize);
+        assertFalse(slc.bb.isReadable());
+
+        assertEquals(1, slc.discard());
+        assertEquals(0, slc.discard());
     }
 
     public void testMultipleReadsOneValue() throws IOException {

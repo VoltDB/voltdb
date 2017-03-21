@@ -90,8 +90,6 @@ public class TestClientPortChannel extends JUnit4LocalClusterTest {
             assertTrue(success);
 
             m_config.startUp();
-
-            Thread.currentThread().sleep(5000);
         } catch (IOException ex) {
             fail(ex.getMessage());
         } finally {
@@ -214,9 +212,18 @@ public class TestClientPortChannel extends JUnit4LocalClusterTest {
         //Just connect and disconnect
         PortConnector channel = new PortConnector("localhost", port);
         System.out.println("Testing Connect and Close");
+        int scnt = 0;
+        int fcnt = 0;
         for (int i = 0; i < 100; i++) {
-            channel.connect();
-            channel.close();
+            try {
+                channel.connect();
+                channel.close();
+                scnt++;
+            } catch (Exception ex) {
+                ex.printStackTrace();
+                fcnt++;
+            }
+            System.out.println("Success: " + scnt + " Failed: " + fcnt);
         }
 
         //Bad +ve length
@@ -671,7 +678,7 @@ public class TestClientPortChannel extends JUnit4LocalClusterTest {
         System.out.println("Response length is: " + len);
 
         ByteBuffer respbuf = ByteBuffer.allocate(len);
-        channel.read(respbuf, len - 4);
+        channel.read(respbuf, len);
         respbuf.flip();
         System.out.println("Version is: " + respbuf.get());
 

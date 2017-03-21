@@ -16,14 +16,11 @@
  */
 package org.voltdb.utils;
 
-import au.com.bytecode.opencsv_voltpatches.CSVParser;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Constructor;
-import java.nio.charset.StandardCharsets;
-
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -32,12 +29,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
-
-import kafka.consumer.ConsumerConfig;
-import kafka.consumer.ConsumerIterator;
-import kafka.consumer.KafkaStream;
-import kafka.javaapi.consumer.ConsumerConnector;
-import kafka.message.MessageAndMetadata;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.CLIConfig;
@@ -48,6 +39,14 @@ import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.importer.formatter.FormatException;
 import org.voltdb.importer.formatter.Formatter;
+
+import au.com.bytecode.opencsv_voltpatches.CSVParser;
+import java.nio.charset.StandardCharsets;
+import kafka.consumer.ConsumerConfig;
+import kafka.consumer.ConsumerIterator;
+import kafka.consumer.KafkaStream;
+import kafka.javaapi.consumer.ConsumerConnector;
+import kafka.message.MessageAndMetadata;
 
 /**
  * KafkaConsumer loads data from kafka into voltdb
@@ -100,10 +99,14 @@ public class KafkaLoader {
         final String[] serverlist = m_config.servers.split(",");
 
         // If we need to prompt the user for a VoltDB password, do so.
-        m_config.password = m_config.readPasswordIfNeeded(m_config.user, m_config.password, "Enter password: ");
+        m_config.password = CLIConfig.readPasswordIfNeeded(m_config.user, m_config.password, "Enter password: ");
 
         // Create connection
-        final ClientConfig c_config = new ClientConfig(m_config.user, m_config.password);
+        final ClientConfig c_config = new ClientConfig(m_config.user, m_config.password, null);
+        if (m_config.ssl != null && !m_config.ssl.trim().isEmpty()) {
+            c_config.setTrustStoreConfigFromPropertyFile(m_config.ssl);
+            c_config.enableSSL();
+        }
         c_config.setProcedureCallTimeout(0); // Set procedure all to infinite
 
         m_client = getClient(c_config, serverlist, m_config.port);
@@ -186,7 +189,10 @@ public class KafkaLoader {
         @Option(desc = "Use upsert instead of insert", hasArg = false)
         boolean update = false;
 
-        Formatter iformatter = null;
+        @Option(desc = "Enable SSL, Optionally provide configuration file.")
+        String ssl = "";
+
+        Formatter m_formatter = null;
         /**
          * Validate command line options.
          */
@@ -282,8 +288,8 @@ public class KafkaLoader {
             m_config = config;
             //Get group id which should be unique for table so as to keep offsets clean for multiple runs.
             String groupId = "voltdb-" + (m_config.useSuppliedProcedure ? m_config.procedure : m_config.table);
-            //TODO: Should get this from properties file or something as override?
             Properties props = new Properties();
+            // If configuration is provided for consumer pick up
             if (m_config.config.length() > 0) {
                 props.load(new FileInputStream(new File(m_config.config)));
                 //Get GroupId from property if present and use it.
@@ -374,7 +380,7 @@ public class KafkaLoader {
 
         // now launch all the threads for partitions.
         for (final KafkaStream stream : streams) {
-            KafkaConsumer bconsumer = new KafkaConsumer(stream, loader, m_config.iformatter);
+            KafkaConsumer bconsumer = new KafkaConsumer(stream, loader, m_config.m_formatter);
             executor.submit(bconsumer);
         }
 
@@ -422,7 +428,7 @@ public class KafkaLoader {
                 Class[] ctorParmTypes = new Class[]{ String.class, Properties.class };
                 Constructor ctor = classz.getDeclaredConstructor(ctorParmTypes);
                 Object[] ctorParms = new Object[]{ format, p };
-                cfg.iformatter = (Formatter ) ctor.newInstance(ctorParms);
+                cfg.m_formatter = (Formatter ) ctor.newInstance(ctorParms);
             }
             KafkaLoader kloader = new KafkaLoader(cfg);
             kloader.processKafkaMessages();

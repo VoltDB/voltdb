@@ -30,7 +30,6 @@ import java.util.Set;
 import org.json_voltpatches.JSONException;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
-import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Constraint;
@@ -52,7 +51,6 @@ import org.voltdb.planner.parseinfo.BranchNode;
 import org.voltdb.planner.parseinfo.JoinNode;
 import org.voltdb.planner.parseinfo.StmtSubqueryScan;
 import org.voltdb.planner.parseinfo.StmtTableScan;
-import org.voltdb.plannodes.IndexSortablePlanNode;
 import org.voltdb.plannodes.AbstractJoinPlanNode;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractReceivePlanNode;
@@ -61,6 +59,7 @@ import org.voltdb.plannodes.AggregatePlanNode;
 import org.voltdb.plannodes.DeletePlanNode;
 import org.voltdb.plannodes.HashAggregatePlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
+import org.voltdb.plannodes.IndexSortablePlanNode;
 import org.voltdb.plannodes.IndexUseForOrderBy;
 import org.voltdb.plannodes.InsertPlanNode;
 import org.voltdb.plannodes.LimitPlanNode;
@@ -112,8 +111,6 @@ public class PlanAssembler {
         }
     }
 
-    /** convenience pointer to the cluster object in the catalog */
-    private final Cluster m_catalogCluster;
     /** convenience pointer to the database object in the catalog */
     private final Database m_catalogDb;
 
@@ -151,16 +148,12 @@ public class PlanAssembler {
     private boolean m_bestAndOnlyPlanWasGenerated = false;
 
     /**
-     *
-     * @param catalogCluster
-     *            Catalog info about the physical layout of the cluster.
      * @param catalogDb
      *            Catalog info about schema, metadata and procedures.
      * @param partitioning
      *            Describes the specified and inferred partition context.
      */
-    PlanAssembler(Cluster catalogCluster, Database catalogDb, StatementPartitioning partitioning, PlanSelector planSelector) {
-        m_catalogCluster = catalogCluster;
+    PlanAssembler(Database catalogDb, StatementPartitioning partitioning, PlanSelector planSelector) {
         m_catalogDb = catalogDb;
         m_partitioning = partitioning;
         m_planSelector = planSelector;
@@ -492,6 +485,10 @@ public class PlanAssembler {
         // Get the best plans for the expression subqueries ( IN/EXISTS (SELECT...) )
         Set<AbstractExpression> subqueryExprs = parsedStmt.findSubquerySubexpressions();
         if ( ! subqueryExprs.isEmpty() ) {
+            if (parsedStmt instanceof ParsedSelectStmt == false) {
+                m_recentErrorMsg = "Subquery expressions are only supported in SELECT statements";
+                return null;
+            }
 
             // guards against IN/EXISTS/Scalar subqueries
             if ( ! m_partitioning.wasSpecifiedAsSingle() ) {
@@ -746,8 +743,7 @@ public class PlanAssembler {
             StatementPartitioning partitioning = (StatementPartitioning)m_partitioning.clone();
             PlanSelector planSelector = (PlanSelector) m_planSelector.clone();
             planSelector.m_planId = planId;
-            PlanAssembler assembler = new PlanAssembler(
-                    m_catalogCluster, m_catalogDb, partitioning, planSelector);
+            PlanAssembler assembler = new PlanAssembler(m_catalogDb, partitioning, planSelector);
             CompiledPlan bestChildPlan = assembler.getBestCostPlan(parsedChildStmt);
             partitioning = assembler.m_partitioning;
 
@@ -863,8 +859,7 @@ public class PlanAssembler {
         PlanSelector planSelector = (PlanSelector) m_planSelector.clone();
         planSelector.m_planId = planId;
         StatementPartitioning currentPartitioning = (StatementPartitioning)m_partitioning.clone();
-        PlanAssembler assembler = new PlanAssembler(
-                m_catalogCluster, m_catalogDb, currentPartitioning, planSelector);
+        PlanAssembler assembler = new PlanAssembler(m_catalogDb, currentPartitioning, planSelector);
         CompiledPlan compiledPlan = assembler.getBestCostPlan(subQuery);
         // make sure we got a winner
         if (compiledPlan == null) {

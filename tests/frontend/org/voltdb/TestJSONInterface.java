@@ -53,20 +53,14 @@
  */
 package org.voltdb;
 
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
 import java.io.UnsupportedEncodingException;
 import java.math.BigDecimal;
-import java.net.HttpURLConnection;
-import java.net.URI;
-import java.net.URL;
 import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.security.cert.X509Certificate;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -75,17 +69,30 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
+import javax.net.ssl.SSLContext;
+
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
 import org.apache.http.HttpVersion;
 import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.ResponseHandler;
 import org.apache.http.client.config.RequestConfig;
+import org.apache.http.client.methods.HttpDelete;
+import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
+import org.apache.http.client.methods.HttpPut;
+import org.apache.http.client.methods.HttpRequestBase;
+import org.apache.http.config.Registry;
+import org.apache.http.config.RegistryBuilder;
+import org.apache.http.conn.socket.ConnectionSocketFactory;
+import org.apache.http.conn.socket.PlainConnectionSocketFactory;
+import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
+import org.apache.http.conn.ssl.SSLContextBuilder;
 import org.apache.http.entity.ContentType;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClients;
+import org.apache.http.impl.client.HttpClientBuilder;
+import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.apache.http.util.EntityUtils;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.json_voltpatches.JSONArray;
@@ -107,6 +114,7 @@ import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.HeartbeatType;
 import org.voltdb.compiler.deploymentfile.ResourceMonitorType;
 import org.voltdb.compiler.deploymentfile.ResourceMonitorType.Memorylimit;
+import org.voltdb.compiler.deploymentfile.SnmpType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType.Query;
 import org.voltdb.compiler.deploymentfile.UsersType;
@@ -119,14 +127,25 @@ import org.voltdb.utils.Encoder;
 import org.voltdb.utils.MiscUtils;
 
 import junit.framework.TestCase;
-import org.voltdb.compiler.deploymentfile.SnmpType;
 
 public class TestJSONInterface extends TestCase {
     final static ContentType utf8ApplicationFormUrlEncoded =
             ContentType.create("application/x-www-form-urlencoded","UTF-8");
+    private static final String VALID_JSONP = "good_$123";
+    private static final String INVALID_JSONP;
+
+    static {
+        String pval = "jQuery111106314619798213243_1487039392105\"'></XSS/*-*/STYLE=xss:e/**/xpression(try{a=firstTime}catch(e){firstTime=1;alert(9096)})>";
+        try {
+            pval = URLEncoder.encode("jQuery111106314619798213243_1487039392105\"'></XSS/*-*/STYLE=xss:e/**/xpression(try{a=firstTime}catch(e){firstTime=1;alert(9096)})>", "UTF-8");
+        } catch (UnsupportedEncodingException e) {
+        }
+        INVALID_JSONP = pval;
+    }
 
     ServerThread server;
     Client client;
+    public final static String protocolPrefix = ClientConfig.ENABLE_SSL_FOR_TEST ? "https://" : "http://";
 
     static class Response {
 
@@ -142,6 +161,7 @@ public class TestJSONInterface extends TestCase {
 
     static String getHTTPVarString(Map<String, String> params) throws UnsupportedEncodingException {
         String s = "";
+        if (params == null) return s;
         for (Entry<String, String> e : params.entrySet()) {
             String encodedValue = URLEncoder.encode(e.getValue(), "UTF-8");
             s += "&" + e.getKey() + "=" + encodedValue;
@@ -154,34 +174,19 @@ public class TestJSONInterface extends TestCase {
         if (port == null) {
             port = VoltDB.DEFAULT_HTTP_PORT;
         }
-        return String.format("http://localhost:%d/%s", port, path);
+        return String.format(protocolPrefix + "localhost:%d/%s", port, path);
+    }
+
+    public static String callProcOverJSONRaw(Map params, final int expectedCode) throws Exception {
+        return httpUrlOverJSON("POST", protocolPrefix + "localhost:8095/api/1.0/", null, null, null, expectedCode, null, params);
+    }
+
+    public static String callProcOverJSONRaw(Map params, int httpPort, final int expectedCode) throws Exception {
+        return httpUrlOverJSON("POST", protocolPrefix + "localhost:" + httpPort + "/api/1.0/", null, null, null, expectedCode, null, params);
     }
 
     public static String callProcOverJSONRaw(String varString, final int expectedCode) throws Exception {
-        URI jsonAPIURI = URI.create("http://localhost:8095/api/1.0/");
-        try (CloseableHttpClient httpclient = HttpClients.createDefault()) {
-            HttpPost post = new HttpPost(jsonAPIURI);
-            // play nice by using HTTP 1.1 continue requests where the client sends the request headers first
-            // to the server to see if the server is willing to accept it. This allows us to test large requests
-            // without incurring server socket connection terminations
-            RequestConfig rc = RequestConfig.copy(RequestConfig.DEFAULT).setExpectContinueEnabled(true).build();
-            post.setProtocolVersion(HttpVersion.HTTP_1_1);
-            post.setConfig(rc);
-            post.setEntity(new StringEntity(varString, utf8ApplicationFormUrlEncoded));
-            ResponseHandler<String> rh = new ResponseHandler<String>() {
-                @Override
-                public String handleResponse(final HttpResponse response) throws ClientProtocolException, IOException {
-                    int status = response.getStatusLine().getStatusCode();
-                    assertEquals(expectedCode, status);
-                    if ((status >= 200 && status < 300) || status == 400) {
-                        HttpEntity entity = response.getEntity();
-                        return entity != null ? EntityUtils.toString(entity) : null;
-                    }
-                    return null;
-                }
-            };
-            return httpclient.execute(post,rh);
-        }
+        return httpUrlOverJSONExecute("POST", protocolPrefix + "localhost:8095/api/1.0/", null, null, null, expectedCode, null, varString);
     }
 
     public static String getUrlOverJSON(String url, String user, String password, String scheme, int expectedCode, String expectedCt) throws Exception {
@@ -200,91 +205,87 @@ public class TestJSONInterface extends TestCase {
         return httpUrlOverJSON("DELETE", url, user, password, scheme, expectedCode, expectedCt, null);
     }
 
-    private static String httpUrlOverJSON(String method, String url, String user, String password, String scheme, int expectedCode, String expectedCt, Map<String,String> params) throws Exception {
-        URL jsonAPIURL = new URL(url);
+    private static String httpUrlOverJSONExecute(String method, String url, String user, String password, String scheme, int expectedCode, String expectedCt, String varString) throws Exception {
+        SSLContext sslContext = new SSLContextBuilder().loadTrustMaterial(null, (X509Certificate[] arg0, String arg1) -> true).build();
+        SSLConnectionSocketFactory sf = new SSLConnectionSocketFactory(sslContext,
+          SSLConnectionSocketFactory.ALLOW_ALL_HOSTNAME_VERIFIER);
+        Registry<ConnectionSocketFactory> socketFactoryRegistry = RegistryBuilder.<ConnectionSocketFactory>create()
+                .register("http", PlainConnectionSocketFactory.getSocketFactory())
+                .register("https", sf)
+                .build();
 
-        HttpURLConnection conn = (HttpURLConnection) jsonAPIURL.openConnection();
-        conn.setRequestMethod(method);
-        conn.setDoOutput(true);
-        conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
-        if (user != null && password != null) {
-            if (scheme.equalsIgnoreCase("hashed")) {
-                MessageDigest md = MessageDigest.getInstance("SHA-1");
-                byte hashedPasswordBytes[] = md.digest(password.getBytes("UTF-8"));
-                String h = user + ":" + Encoder.hexEncode(hashedPasswordBytes);
-                conn.setRequestProperty("Authorization", "Hashed " + h);
-            } else if (scheme.equalsIgnoreCase("hashed256")) {
-                MessageDigest md = MessageDigest.getInstance("SHA-256");
-                byte hashedPasswordBytes[] = md.digest(password.getBytes("UTF-8"));
-                String h = user + ":" + Encoder.hexEncode(hashedPasswordBytes);
-                conn.setRequestProperty("Authorization", "Hashed " + h);
-            } else if (scheme.equalsIgnoreCase("basic")) {
-                conn.setRequestProperty("Authorization", "Basic " + new String(Base64.encodeToString(new String(user + ":" + password).getBytes(), false)));
+        // allows multi-threaded use
+        PoolingHttpClientConnectionManager connMgr = new PoolingHttpClientConnectionManager(socketFactoryRegistry);
+        HttpClientBuilder hb = HttpClientBuilder.create();
+        hb.setSslcontext(sslContext);
+        hb.setConnectionManager(connMgr);
+        try (CloseableHttpClient httpclient = hb.build()) {
+            HttpRequestBase request;
+            switch (method) {
+                case "POST":
+                    HttpPost post = new HttpPost(url);
+                    post.setEntity(new StringEntity(varString, utf8ApplicationFormUrlEncoded));
+                    request = post;
+                    break;
+                case "PUT":
+                    HttpPut put = new HttpPut(url);
+                    put.setEntity(new StringEntity(varString, utf8ApplicationFormUrlEncoded));
+                    request = put;
+                    break;
+                case "DELETE":
+                    HttpDelete delete = new HttpDelete(url);
+                    request = delete;
+                    break;
+                case "GET":
+                    request = new HttpGet(url + ((varString != null && varString.trim().length() > 0) ? ("?" + varString.trim()) : ""));
+                    break;
+                default:
+                    request = new HttpGet(url + ((varString != null && varString.trim().length() > 0) ? ("?" + varString.trim()) : ""));
+                    break;
             }
-        }
-        conn.connect();
-        byte andbyte[] = String.valueOf('&').getBytes();
-        if (params != null && params.size() > 0) {
-            OutputStream os = conn.getOutputStream();
-            for (String key : params.keySet()) {
-                os.write(key.getBytes());
-                if (params.get(key) != null) {
-                    String b = "=" + params.get(key);
-                    os.write(b.getBytes());
+            // play nice by using HTTP 1.1 continue requests where the client sends the request headers first
+            // to the server to see if the server is willing to accept it. This allows us to test large requests
+            // without incurring server socket connection terminations
+            RequestConfig rc = RequestConfig.copy(RequestConfig.DEFAULT).setExpectContinueEnabled(true).build();
+            request.setProtocolVersion(HttpVersion.HTTP_1_1);
+            request.setConfig(rc);
+            if (user != null && password != null) {
+                if (scheme.equalsIgnoreCase("hashed")) {
+                    MessageDigest md = MessageDigest.getInstance("SHA-1");
+                    byte hashedPasswordBytes[] = md.digest(password.getBytes("UTF-8"));
+                    String h = user + ":" + Encoder.hexEncode(hashedPasswordBytes);
+                    request.setHeader("Authorization", "Hashed " + h);
+                } else if (scheme.equalsIgnoreCase("hashed256")) {
+                    MessageDigest md = MessageDigest.getInstance("SHA-256");
+                    byte hashedPasswordBytes[] = md.digest(password.getBytes("UTF-8"));
+                    String h = user + ":" + Encoder.hexEncode(hashedPasswordBytes);
+                    request.setHeader("Authorization", "Hashed " + h);
+                } else if (scheme.equalsIgnoreCase("basic")) {
+                    request.setHeader("Authorization", "Basic " + new String(Base64.encodeToString(new String(user + ":" + password).getBytes(), false)));
                 }
-                os.write(andbyte);
             }
+            ResponseHandler<String> rh = new ResponseHandler<String>() {
+                @Override
+                public String handleResponse(final HttpResponse response) throws ClientProtocolException, IOException {
+                    int status = response.getStatusLine().getStatusCode();
+                    String ct = response.getHeaders("Content-Type")[0].getValue();
+                    if (expectedCt != null) {
+                        assertTrue(ct.contains(expectedCt));
+                    }
+                    assertEquals(expectedCode, status);
+                    if ((status >= 200 && status < 300) || status == 400) {
+                        HttpEntity entity = response.getEntity();
+                        return entity != null ? EntityUtils.toString(entity) : null;
+                    }
+                    return null;
+                }
+            };
+            return httpclient.execute(request,rh);
         }
+    }
 
-        BufferedReader in = null;
-        try {
-            if (conn.getInputStream() != null) {
-                in = new BufferedReader(
-                        new InputStreamReader(
-                                conn.getInputStream(), "UTF-8"));
-            }
-        } catch (IOException e) {
-            if (conn.getErrorStream() != null) {
-                in = new BufferedReader(
-                        new InputStreamReader(
-                                conn.getErrorStream(), "UTF-8"));
-            }
-        }
-        if (in == null) {
-            throw new Exception("Unable to read response from server");
-        }
-        String ct = conn.getContentType();
-        assertTrue(ct.contains(expectedCt));
-
-        StringBuilder decodedString = new StringBuilder();
-        String line;
-        try {
-            while ((line = in.readLine()) != null) {
-                decodedString.append(line);
-            }
-        } catch (Exception ex) {
-            ex.printStackTrace();
-        } finally {
-            in.close();
-            in = null;
-        }
-        // get result code
-        int responseCode = conn.getResponseCode();
-
-        String response = decodedString.toString();
-
-        assertEquals(expectedCode, responseCode);
-
-        try {
-            conn.getInputStream().close();
-            conn.disconnect();
-        } // ignore closing problems here
-        catch (Exception e) {
-        }
-        conn = null;
-
-        //System.err.println(response);
-        return response;
+    private static String httpUrlOverJSON(String method, String url, String user, String password, String scheme, int expectedCode, String expectedCt, Map<String,String> params) throws Exception {
+        return httpUrlOverJSONExecute(method, url, user, password, scheme, expectedCode, expectedCt, getHTTPVarString(params));
     }
 
     public static String getHashedPasswordForHTTPVar(String password, ClientAuthScheme scheme) {
@@ -317,14 +318,14 @@ public class TestJSONInterface extends TestCase {
     }
 
     public static String callProcOverJSON(String procName, ParameterSet pset, String username, String password, boolean preHash, boolean admin, int expectedCode, ClientAuthScheme scheme) throws Exception {
-        return callProcOverJSON(procName, pset, username, password, preHash, admin, expectedCode /* HTTP_OK */, scheme, -1);
+        return callProcOverJSON(procName, pset, 8095, username, password, preHash, admin, expectedCode /* HTTP_OK */, scheme, -1);
     }
 
-    public static String callProcOverJSON(String procName, ParameterSet pset, String username, String password, boolean preHash, boolean admin, int expectedCode, ClientAuthScheme scheme, int procCallTimeout) throws Exception {
+    public static String callProcOverJSON(String procName, ParameterSet pset, int httpPort, String username, String password, boolean preHash, boolean admin, int expectedCode, ClientAuthScheme scheme, int procCallTimeout) throws Exception {
         // Call insert
         String paramsInJSON = pset.toJSONString();
         //System.out.println(paramsInJSON);
-        HashMap<String, String> params = new HashMap<>();
+        Map<String, String> params = new HashMap<>();
         params.put("Procedure", procName);
         params.put("Parameters", paramsInJSON);
         if (procCallTimeout > 0) {
@@ -344,18 +345,11 @@ public class TestJSONInterface extends TestCase {
             params.put("admin", "true");
         }
 
-        String varString = getHTTPVarString(params);
-
-        varString = getHTTPVarString(params);
-
-        String ret = callProcOverJSONRaw(varString, expectedCode);
+        String ret = callProcOverJSONRaw(params, httpPort, expectedCode);
         if (preHash) {
             //If prehash make same call with SHA1 to check expected code.
             params.put("Hashedpassword", getHashedPasswordForHTTPVar(password, ClientAuthScheme.HASH_SHA1));
-            varString = getHTTPVarString(params);
-
-            varString = getHTTPVarString(params);
-            callProcOverJSONRaw(varString, expectedCode);
+            callProcOverJSONRaw(params, httpPort, expectedCode);
         }
         return ret;
     }
@@ -514,7 +508,7 @@ public class TestJSONInterface extends TestCase {
             server.waitForInitialization();
 
             //Get deployment
-            String jdep = getUrlOverJSON("http://localhost:8095/deployment", null, null, null, 200,  "application/json");
+            String jdep = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment", null, null, null, 200,  "application/json");
             Map<String,String> params = new HashMap<>();
 
             ObjectMapper mapper = new ObjectMapper();
@@ -523,21 +517,21 @@ public class TestJSONInterface extends TestCase {
             SnmpType snmpConfig = new SnmpType();
             snmpConfig.setTarget("localhost");
             deptype.setSnmp(snmpConfig);
-            String ndeptype = URLEncoder.encode(mapper.writeValueAsString(deptype), StandardCharsets.UTF_8.toString());
+            String ndeptype = mapper.writeValueAsString(deptype);
             params.put("deployment", ndeptype);
-            String pdep = postUrlOverJSON("http://localhost:8095/deployment/", null, null, null, 200, "application/json", params);
+            String pdep = postUrlOverJSON(protocolPrefix + "localhost:8095/deployment/", null, null, null, 200, "application/json", params);
             assertTrue(pdep.contains("Deployment Updated"));
-            jdep = getUrlOverJSON("http://localhost:8095/deployment", null, null, null, 200,  "application/json");
+            jdep = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment", null, null, null, 200,  "application/json");
             DeploymentType gotValue = mapper.readValue(jdep, DeploymentType.class);
             assertEquals("public", gotValue.getSnmp().getCommunity());
 
             snmpConfig.setCommunity("foobar");
             deptype.setSnmp(snmpConfig);
-            ndeptype = URLEncoder.encode(mapper.writeValueAsString(deptype), StandardCharsets.UTF_8.toString());
+            ndeptype = mapper.writeValueAsString(deptype);
             params.put("deployment", ndeptype);
-            pdep = postUrlOverJSON("http://localhost:8095/deployment/", null, null, null, 200, "application/json", params);
+            pdep = postUrlOverJSON(protocolPrefix + "localhost:8095/deployment/", null, null, null, 200, "application/json", params);
             assertTrue(pdep.contains("Deployment Updated"));
-            jdep = getUrlOverJSON("http://localhost:8095/deployment", null, null, null, 200,  "application/json");
+            jdep = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment", null, null, null, 200,  "application/json");
             gotValue = mapper.readValue(jdep, DeploymentType.class);
             assertEquals("foobar", gotValue.getSnmp().getCommunity());
 
@@ -1118,8 +1112,7 @@ public class TestJSONInterface extends TestCase {
             params.put("Parameters", paramsInJSON);
             params.put("User", u.name);
             params.put("Password", Encoder.hexEncode(new byte[]{1, 2, 3}));
-            String varString = getHTTPVarString(params);
-            response = callProcOverJSONRaw(varString, 200);
+            response = callProcOverJSONRaw(params, 200);
             r = responseFromJSON(response);
             assertEquals(ClientResponse.UNEXPECTED_FAILURE, r.status);
 
@@ -1131,8 +1124,7 @@ public class TestJSONInterface extends TestCase {
             params.put("Parameters", paramsInJSON);
             params.put("User", u.name);
             params.put("Password", "abcdefghiabcdefghiabcdefghiabcdefghi");
-            varString = getHTTPVarString(params);
-            response = callProcOverJSONRaw(varString, 200);
+            response = callProcOverJSONRaw(params, 200);
             r = responseFromJSON(response);
             assertEquals(ClientResponse.UNEXPECTED_FAILURE, r.status);
 
@@ -1344,7 +1336,7 @@ public class TestJSONInterface extends TestCase {
             }
 
             pset = ParameterSet.fromArrayNoCopy(100000);
-            String response = callProcOverJSON("TestJSONInterface$LongReadProc", pset, null, null, false, false, 200, ClientAuthScheme.HASH_SHA256, 1);
+            String response = callProcOverJSON("TestJSONInterface$LongReadProc", pset, 8095, null, null, false, false, 200, ClientAuthScheme.HASH_SHA256, 1);
             Response r = responseFromJSON(response);
             assertEquals(ClientResponse.GRACEFUL_FAILURE, r.status);
             assertTrue(r.statusString.contains("Transaction Interrupted"));
@@ -1567,10 +1559,10 @@ public class TestJSONInterface extends TestCase {
             server.waitForInitialization();
 
             //Get deployment
-            String jdep = getUrlOverJSON("http://localhost:8095/deployment", null, null, null, 200,  "application/json");
+            String jdep = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment", null, null, null, 200,  "application/json");
             assertTrue(jdep.contains("cluster"));
             //Download deployment
-            String xdep = getUrlOverJSON("http://localhost:8095/deployment/download", null, null, null, 200, "text/xml");
+            String xdep = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment/download", null, null, null, 200, "text/xml");
             assertTrue(xdep.contains("<deployment>"));
             assertTrue(xdep.contains("</deployment>"));
         } finally {
@@ -1610,19 +1602,19 @@ public class TestJSONInterface extends TestCase {
             server.waitForInitialization();
 
             //Get deployment
-            String jdep = getUrlOverJSON("http://localhost:8095/deployment", null, null, null, 200,  "application/json");
+            String jdep = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment", null, null, null, 200,  "application/json");
             assertTrue(jdep.contains("cluster"));
             //POST deployment with no content
-            String pdep = postUrlOverJSON("http://localhost:8095/deployment/", null, null, null, 200, "application/json", null);
+            String pdep = postUrlOverJSON(protocolPrefix + "localhost:8095/deployment/", null, null, null, 200, "application/json", null);
             assertTrue(pdep.contains("Failed"));
             Map<String,String> params = new HashMap<>();
-            params.put("deployment", URLEncoder.encode(jdep, "UTF-8"));
-            pdep = postUrlOverJSON("http://localhost:8095/deployment/", null, null, null, 200, "application/json", params);
+            params.put("deployment", jdep);
+            pdep = postUrlOverJSON(protocolPrefix + "localhost:8095/deployment/", null, null, null, 200, "application/json", params);
             assertTrue(pdep.contains("Deployment Updated"));
 
             //POST deployment in admin mode
             params.put("admin", "true");
-            pdep = postUrlOverJSON("http://localhost:8095/deployment/", null, null, null, 200, "application/json", params);
+            pdep = postUrlOverJSON(protocolPrefix + "localhost:8095/deployment/", null, null, null, 200, "application/json", params);
             assertTrue(pdep.contains("Deployment Updated"));
 
             ObjectMapper mapper = new ObjectMapper();
@@ -1637,11 +1629,11 @@ public class TestJSONInterface extends TestCase {
                 deptype.getHeartbeat().setTimeout(99);
             }
             String ndeptype = mapper.writeValueAsString(deptype);
-            params.put("deployment", URLEncoder.encode(ndeptype, "UTF-8"));
-            pdep = postUrlOverJSON("http://localhost:8095/deployment/", null, null, null, 200, "application/json", params);
+            params.put("deployment", ndeptype);
+            pdep = postUrlOverJSON(protocolPrefix + "localhost:8095/deployment/", null, null, null, 200, "application/json", params);
             System.out.println("POST result is: " + pdep);
             assertTrue(pdep.contains("Deployment Updated"));
-            jdep = getUrlOverJSON("http://localhost:8095/deployment", null, null, null, 200,  "application/json");
+            jdep = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment", null, null, null, 200,  "application/json");
             assertTrue(jdep.contains("cluster"));
             deptype = mapper.readValue(jdep, DeploymentType.class);
             int nto = deptype.getHeartbeat().getTimeout();
@@ -1663,11 +1655,11 @@ public class TestJSONInterface extends TestCase {
             ss.setQuery(qv);
             deptype.setSystemsettings(ss);
             ndeptype = mapper.writeValueAsString(deptype);
-            params.put("deployment", URLEncoder.encode(ndeptype, "UTF-8"));
-            pdep = postUrlOverJSON("http://localhost:8095/deployment/", null, null, null, 200, "application/json", params);
+            params.put("deployment", ndeptype);
+            pdep = postUrlOverJSON(protocolPrefix + "localhost:8095/deployment/", null, null, null, 200, "application/json", params);
             System.out.println("POST result is: " + pdep);
             assertTrue(pdep.contains("Deployment Updated"));
-            jdep = getUrlOverJSON("http://localhost:8095/deployment", null, null, null, 200,  "application/json");
+            jdep = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment", null, null, null, 200,  "application/json");
             assertTrue(jdep.contains("cluster"));
             deptype = mapper.readValue(jdep, DeploymentType.class);
             nto = deptype.getSystemsettings().getQuery().getTimeout();
@@ -1677,11 +1669,11 @@ public class TestJSONInterface extends TestCase {
             ss.setQuery(qv);
             deptype.setSystemsettings(ss);
             ndeptype = mapper.writeValueAsString(deptype);
-            params.put("deployment", URLEncoder.encode(ndeptype, "UTF-8"));
-            pdep = postUrlOverJSON("http://localhost:8095/deployment/", null, null, null, 200, "application/json", params);
+            params.put("deployment", ndeptype);
+            pdep = postUrlOverJSON(protocolPrefix + "localhost:8095/deployment/", null, null, null, 200, "application/json", params);
             System.out.println("POST result is: " + pdep);
             assertTrue(pdep.contains("Deployment Updated"));
-            jdep = getUrlOverJSON("http://localhost:8095/deployment", null, null, null, 200,  "application/json");
+            jdep = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment", null, null, null, 200,  "application/json");
             assertTrue(jdep.contains("cluster"));
             deptype = mapper.readValue(jdep, DeploymentType.class);
             nto = deptype.getSystemsettings().getQuery().getTimeout();
@@ -1724,7 +1716,7 @@ public class TestJSONInterface extends TestCase {
             server.waitForInitialization();
 
             //Get deployment
-            String jdep = getUrlOverJSON("http://localhost:8095/deployment", null, null, null, 200,  "application/json");
+            String jdep = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment", null, null, null, 200,  "application/json");
             Map<String,String> params = new HashMap<>();
 
             ObjectMapper mapper = new ObjectMapper();
@@ -1744,18 +1736,18 @@ public class TestJSONInterface extends TestCase {
             ss.setResourcemonitor(resourceMonitor);
             String ndeptype = mapper.writeValueAsString(deptype);
             params.put("deployment", ndeptype);
-            String pdep = postUrlOverJSON("http://localhost:8095/deployment/", null, null, null, 200, "application/json", params);
+            String pdep = postUrlOverJSON(protocolPrefix + "localhost:8095/deployment/", null, null, null, 200, "application/json", params);
             assertTrue(pdep.contains("Deployment Updated"));
-            jdep = getUrlOverJSON("http://localhost:8095/deployment", null, null, null, 200,  "application/json");
+            jdep = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment", null, null, null, 200,  "application/json");
             DeploymentType gotValue = mapper.readValue(jdep, DeploymentType.class);
             assertEquals("10", gotValue.getSystemsettings().getResourcemonitor().getMemorylimit().getSize());
 
-            memLimit.setSize("90%25");
+            memLimit.setSize("90%");
             ndeptype = mapper.writeValueAsString(deptype);
             params.put("deployment", ndeptype);
-            pdep = postUrlOverJSON("http://localhost:8095/deployment/", null, null, null, 200, "application/json", params);
+            pdep = postUrlOverJSON(protocolPrefix + "localhost:8095/deployment/", null, null, null, 200, "application/json", params);
             assertTrue(pdep.contains("Deployment Updated"));
-            jdep = getUrlOverJSON("http://localhost:8095/deployment", null, null, null, 200,  "application/json");
+            jdep = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment", null, null, null, 200,  "application/json");
             gotValue = mapper.readValue(jdep, DeploymentType.class);
             assertEquals("90%", gotValue.getSystemsettings().getResourcemonitor().getMemorylimit().getSize());
 
@@ -1763,8 +1755,8 @@ public class TestJSONInterface extends TestCase {
             memLimit.setSize("90.5%25");
             ndeptype = mapper.writeValueAsString(deptype);
             params.put("deployment", ndeptype);
-            pdep = postUrlOverJSON("http://localhost:8095/deployment/", null, null, null, 200, "application/json", params);
-            jdep = getUrlOverJSON("http://localhost:8095/deployment", null, null, null, 200,  "application/json");
+            pdep = postUrlOverJSON(protocolPrefix + "localhost:8095/deployment/", null, null, null, 200, "application/json", params);
+            jdep = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment", null, null, null, 200,  "application/json");
             gotValue = mapper.readValue(jdep, DeploymentType.class);
             // must be still the old value
             assertEquals("90%", gotValue.getSystemsettings().getResourcemonitor().getMemorylimit().getSize());
@@ -1818,27 +1810,27 @@ public class TestJSONInterface extends TestCase {
             //20E3AAE7FC23385295505A6B703FD1FBA66760D5 FD19534FBF9B75DF7CD046DE3EAF93DB77367CA7C1CC017FFA6CED2F14D32E7D
             //D033E22AE348AEB5660FC2140AEC35850C4DA997 8C6976E5B5410415BDE908BD4DEE15DFB167A9C873FC4BB8A81F6F2AB448A918
             //sha-256
-            String dep = getUrlOverJSON("http://localhost:8095/deployment/?User=" + "user3&" + "Hashedpassword=8C6976E5B5410415BDE908BD4DEE15DFB167A9C873FC4BB8A81F6F2AB448A918", null, null, null, 200, "application/json");
+            String dep = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment/?User=" + "user3&" + "Hashedpassword=8C6976E5B5410415BDE908BD4DEE15DFB167A9C873FC4BB8A81F6F2AB448A918", null, null, null, 200, "application/json");
             assertTrue(dep.contains("cluster"));
             //sha-1
-            dep = getUrlOverJSON("http://localhost:8095/deployment/?User=" + "user3&" + "Hashedpassword=D033E22AE348AEB5660FC2140AEC35850C4DA997", null, null, null, 200, "application/json");
+            dep = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment/?User=" + "user3&" + "Hashedpassword=D033E22AE348AEB5660FC2140AEC35850C4DA997", null, null, null, 200, "application/json");
             assertTrue(dep.contains("cluster"));
 
             //Get deployment bad user
-            dep = getUrlOverJSON("http://localhost:8095/deployment/?User=" + "user1&" + "Hashedpassword=d033e22ae348aeb5660fc2140aec35850c4da997", null, null, null, 200, "application/json");
+            dep = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment/?User=" + "user1&" + "Hashedpassword=d033e22ae348aeb5660fc2140aec35850c4da997", null, null, null, 200, "application/json");
             assertTrue(dep.contains("Permission denied"));
             //good user
-            dep = getUrlOverJSON("http://localhost:8095/deployment/?User=" + "user2&" + "Hashedpassword=d033e22ae348aeb5660fc2140aec35850c4da997", null, null, null, 200, "application/json");
+            dep = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment/?User=" + "user2&" + "Hashedpassword=d033e22ae348aeb5660fc2140aec35850c4da997", null, null, null, 200, "application/json");
             assertTrue(dep.contains("cluster"));
             //Download deployment bad user
-            dep = getUrlOverJSON("http://localhost:8095/deployment/download?User=" + "user1&" + "Hashedpassword=d033e22ae348aeb5660fc2140aec35850c4da997", null, null, null, 200, "application/json");
+            dep = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment/download?User=" + "user1&" + "Hashedpassword=d033e22ae348aeb5660fc2140aec35850c4da997", null, null, null, 200, "application/json");
             assertTrue(dep.contains("Permission denied"));
             //good user
-            dep = getUrlOverJSON("http://localhost:8095/deployment/download?User=" + "user2&" + "Hashedpassword=d033e22ae348aeb5660fc2140aec35850c4da997", null, null, null, 200, "text/xml");
+            dep = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment/download?User=" + "user2&" + "Hashedpassword=d033e22ae348aeb5660fc2140aec35850c4da997", null, null, null, 200, "text/xml");
             assertTrue(dep.contains("<deployment>"));
             assertTrue(dep.contains("</deployment>"));
             //get with jsonp
-            dep = getUrlOverJSON("http://localhost:8095/deployment/?User=" + "user2&" + "Hashedpassword=d033e22ae348aeb5660fc2140aec35850c4da997&jsonp=jackson5", null, null, null, 200, "application/json");
+            dep = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment/?User=" + "user2&" + "Hashedpassword=d033e22ae348aeb5660fc2140aec35850c4da997&jsonp=jackson5", null, null, null, 200, "application/json");
             assertTrue(dep.contains("cluster"));
             assertTrue(dep.contains("jackson5"));
             assertTrue(dep.matches("^jackson5(.*)"));
@@ -1887,23 +1879,23 @@ public class TestJSONInterface extends TestCase {
             server.waitForInitialization();
 
             //Get deployment bad user
-            String dep = getUrlOverJSON("http://localhost:8095/deployment/", "user1", "admin", "hashed", 200, "application/json");
+            String dep = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment/", "user1", "admin", "hashed", 200, "application/json");
             assertTrue(dep.contains("Permission denied"));
             //good user
-            dep = getUrlOverJSON("http://localhost:8095/deployment/", "user2", "admin", "hashed", 200, "application/json");
+            dep = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment/", "user2", "admin", "hashed", 200, "application/json");
             assertTrue(dep.contains("cluster"));
             //Download deployment bad user
-            dep = getUrlOverJSON("http://localhost:8095/deployment/download", "user1", "admin", "hashed", 200, "application/json");
+            dep = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment/download", "user1", "admin", "hashed", 200, "application/json");
             assertTrue(dep.contains("Permission denied"));
             //good user
-            dep = getUrlOverJSON("http://localhost:8095/deployment/download", "user2", "admin", "hashed", 200, "text/xml");
+            dep = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment/download", "user2", "admin", "hashed", 200, "text/xml");
             assertTrue(dep.contains("<deployment>"));
             assertTrue(dep.contains("</deployment>"));
-            dep = getUrlOverJSON("http://localhost:8095/deployment/download", "user2", "admin", "hashed256", 200, "text/xml");
+            dep = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment/download", "user2", "admin", "hashed256", 200, "text/xml");
             assertTrue(dep.contains("<deployment>"));
             assertTrue(dep.contains("</deployment>"));
             //Test back with sha1
-            dep = getUrlOverJSON("http://localhost:8095/deployment/download", "user2", "admin", "hashed", 200, "text/xml");
+            dep = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment/download", "user2", "admin", "hashed", 200, "text/xml");
             assertTrue(dep.contains("<deployment>"));
             assertTrue(dep.contains("</deployment>"));
 
@@ -1952,16 +1944,16 @@ public class TestJSONInterface extends TestCase {
             server.waitForInitialization();
 
             //Get deployment bad user
-            String dep = getUrlOverJSON("http://localhost:8095/deployment/", "user1", "admin", "basic", 200, "application/json");
+            String dep = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment/", "user1", "admin", "basic", 200, "application/json");
             assertTrue(dep.contains("Permission denied"));
             //good user
-            dep = getUrlOverJSON("http://localhost:8095/deployment/", "user2", "admin", "basic", 200, "application/json");
+            dep = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment/", "user2", "admin", "basic", 200, "application/json");
             assertTrue(dep.contains("cluster"));
             //Download deployment bad user
-            dep = getUrlOverJSON("http://localhost:8095/deployment/download", "user1", "admin", "basic", 200, "application/json");
+            dep = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment/download", "user1", "admin", "basic", 200, "application/json");
             assertTrue(dep.contains("Permission denied"));
             //good user
-            dep = getUrlOverJSON("http://localhost:8095/deployment/download", "user2", "admin", "basic", 200, "text/xml");
+            dep = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment/download", "user2", "admin", "basic", 200, "text/xml");
             assertTrue(dep.contains("<deployment>"));
             assertTrue(dep.contains("</deployment>"));
         } finally {
@@ -2002,9 +1994,9 @@ public class TestJSONInterface extends TestCase {
             server.waitForInitialization();
 
             //Get users
-            String json = getUrlOverJSON("http://localhost:8095/deployment/users/", null, null, null, 200,  "application/json");
-            assertEquals(json, "");
-            getUrlOverJSON("http://localhost:8095/deployment/users/foo", null, null, null, 404,  "application/json");
+            String json = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment/users/", null, null, null, 200,  "application/json");
+            assertEquals(json, "[]");
+            getUrlOverJSON(protocolPrefix + "localhost:8095/deployment/users/foo", null, null, null, 404,  "application/json");
 
             //Put users
             ObjectMapper mapper = new ObjectMapper();
@@ -2014,10 +2006,10 @@ public class TestJSONInterface extends TestCase {
             String map = mapper.writeValueAsString(user);
             Map<String,String> params = new HashMap<>();
             params.put("user", map);
-            putUrlOverJSON("http://localhost:8095/deployment/users/foo/", null, null, null, 201,  "application/json", params);
+            putUrlOverJSON(protocolPrefix + "localhost:8095/deployment/users/foo/", null, null, null, 201,  "application/json", params);
 
             //Get users
-            json = getUrlOverJSON("http://localhost:8095/deployment/users/", null, null, null, 200,  "application/json");
+            json = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment/users/", null, null, null, 200,  "application/json");
             JSONArray jarray = new JSONArray(json);
             assertEquals(jarray.length(), 1);
             JSONObject jobj = jarray.getJSONObject(0);
@@ -2028,21 +2020,21 @@ public class TestJSONInterface extends TestCase {
             user.setRoles("foo");
             map = mapper.writeValueAsString(user);
             params.put("user", map);
-            postUrlOverJSON("http://localhost:8095/deployment/users/foo/", null, null, null, 200,  "application/json", params);
+            postUrlOverJSON(protocolPrefix + "localhost:8095/deployment/users/foo/", null, null, null, 200,  "application/json", params);
 
             //Get users
-            json = getUrlOverJSON("http://localhost:8095/deployment/users/", null, null, null, 200,  "application/json");
+            json = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment/users/", null, null, null, 200,  "application/json");
             jarray = new JSONArray(json);
             assertEquals(jarray.length(), 1);
             jobj = jarray.getJSONObject(0);
             assertTrue(jobj.getString("roles").equals("foo"));
 
             //Delete users
-            deleteUrlOverJSON("http://localhost:8095/deployment/users/foo/", null, null, null, 204,  "application/json");
+            deleteUrlOverJSON(protocolPrefix + "localhost:8095/deployment/users/foo/", null, null, null, 204,  "application/json");
 
             //Get users
-            json = getUrlOverJSON("http://localhost:8095/deployment/users/", null, null, null, 200,  "application/json");
-            assertEquals(json, "");
+            json = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment/users/", null, null, null, 200,  "application/json");
+            assertEquals(json, "[]");
         } finally {
             if (server != null) {
                 server.shutdown();
@@ -2067,7 +2059,7 @@ public class TestJSONInterface extends TestCase {
             server.waitForInitialization();
 
             //Get exportTypes
-            String json = getUrlOverJSON("http://localhost:8095/deployment/export/type", null, null, null, 200,  "application/json");
+            String json = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment/export/type", null, null, null, 200,  "application/json");
             JSONObject jobj = new JSONObject(json);
             assertTrue(jobj.getString("types").contains("FILE"));
             assertTrue(jobj.getString("types").contains("JDBC"));
@@ -2112,7 +2104,7 @@ public class TestJSONInterface extends TestCase {
             server.waitForInitialization();
 
             //Get profile
-            String dep = getUrlOverJSON("http://localhost:8095/profile", null, null, null, 200, "application/json");
+            String dep = getUrlOverJSON(protocolPrefix + "localhost:8095/profile", null, null, null, 200, "application/json");
             assertTrue(dep.contains("\"user\""));
             assertTrue(dep.contains("\"permissions\""));
         } finally {
@@ -2196,6 +2188,120 @@ public class TestJSONInterface extends TestCase {
         }
     }
 
+    public void testJSONPSanitization() throws Exception {
+        try {
+            String simpleSchema
+                    = "CREATE TABLE foo (\n"
+                    + "    bar BIGINT NOT NULL,\n"
+                    + "    PRIMARY KEY (bar)\n"
+                    + ");";
+
+            File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
+            String schemaPath = schemaFile.getPath();
+            schemaPath = URLEncoder.encode(schemaPath, "UTF-8");
+
+            VoltProjectBuilder builder = new VoltProjectBuilder();
+            builder.addSchema(schemaPath);
+            builder.addPartitionInfo("foo", "bar");
+            builder.addStmtProcedure("Insert", "insert into foo values(?);");
+            builder.setHTTPDPort(8095);
+            boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
+            assertTrue(success);
+
+            VoltDB.Configuration config = new VoltDB.Configuration();
+            config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
+            config.m_pathToDeployment = builder.getPathToDeployment();
+            server = new ServerThread(config);
+            server.start();
+            server.waitForInitialization();
+
+            // Get deployment
+            String dep = checkJSONPHandling("GET", protocolPrefix + "localhost:8095/deployment", "application/json", null);
+            // Download deployment
+            checkJSONPHandling("GET", protocolPrefix + "localhost:8095/deployment/download", "text/xml", null);
+            // Post deployment
+            Map<String,String> params = new HashMap<>();
+            params.put("deployment", URLEncoder.encode(takeOutWrappingJSONP(dep), "UTF-8"));
+            checkJSONPHandling("POST", protocolPrefix + "localhost:8095/deployment/", "application/json", params);
+
+            // Get users
+            checkJSONPHandling("GET", protocolPrefix + "localhost:8095/deployment/users", "application/json", null);
+            // Put user
+            ObjectMapper mapper = new ObjectMapper();
+            UsersType.User user = new UsersType.User();
+            user.setName("foo");
+            user.setPassword("foo");
+            String map = mapper.writeValueAsString(user);
+            params = new HashMap<>();
+            params.put("user", map);
+            checkJSONPHandling("PUT", protocolPrefix + "localhost:8095/deployment/users/foo", "application/json", params);
+            // Post user
+            user.setRoles("foo");
+            map = mapper.writeValueAsString(user);
+            params.put("user", map);
+            checkJSONPHandling("POST", protocolPrefix + "localhost:8095/deployment/users/foo", "application/json", params);
+            // Delete user
+            checkJSONPHandling("DELETE", protocolPrefix + "localhost:8095/deployment/users/foo", "application/json", null);
+
+            // Get exportTypes
+            checkJSONPHandling("GET", protocolPrefix + "localhost:8095/deployment/export/type", "application/json", null);
+
+            // Get profile
+            checkJSONPHandling("GET", protocolPrefix + "localhost:8095/profile", "application/json", null);
+
+            // Get /api/1.0
+            String response = checkJSONPHandling("GET", protocolPrefix + "localhost:8095/api/1.0?Procedure=Insert&Parameters=[1]", "application/json", null);
+            assertTrue(responseFromJSON(takeOutWrappingJSONP(response)).status == ClientResponse.SUCCESS);
+
+            // Post /api/1.0
+            params = new HashMap<>();
+            params.put("Procedure", "Insert");
+            params.put("Parameters", "[2]");
+            response = checkJSONPHandling("POST", protocolPrefix + "localhost:8095/api/1.0/", "application/json", params);
+            assertTrue(responseFromJSON(takeOutWrappingJSONP(response)).status == ClientResponse.SUCCESS);
+        } finally {
+            if (server != null) {
+                server.shutdown();
+                server.join();
+            }
+            server = null;
+        }
+    }
+
+    private static String takeOutWrappingJSONP(String s) {
+        return s.substring(s.indexOf('(') + 1, s.lastIndexOf(')')).trim();
+    }
+
+    private static String checkJSONPHandling(String method, String baseUrl,
+                                    String expectedCt, Map<String, String> params) throws Exception {
+        String jsonpKeyString = baseUrl.contains("?") ? "&jsonp=" : "?jsonp=";
+        String urlWithValidJSONP = baseUrl + jsonpKeyString + VALID_JSONP;
+        String urlWithInvalidJSONP= baseUrl + jsonpKeyString + INVALID_JSONP;
+        String validJSONPResponse = null;
+        String invalidJSONPResponse = null;
+
+        switch (method) {
+            case "GET":
+                validJSONPResponse = getUrlOverJSON(urlWithValidJSONP, null, null, null, 200, expectedCt);
+                invalidJSONPResponse = getUrlOverJSON(urlWithInvalidJSONP, null, null, null, 400, "application/json");
+                break;
+            case "POST":
+                validJSONPResponse = postUrlOverJSON(urlWithValidJSONP, null, null, null, 200, expectedCt, params);
+                invalidJSONPResponse = postUrlOverJSON(urlWithInvalidJSONP, null, null, null, 400, "application/json", params);
+                break;
+            case "PUT":
+                validJSONPResponse = putUrlOverJSON(urlWithValidJSONP, null, null, null, 201, expectedCt, params);
+                invalidJSONPResponse = putUrlOverJSON(urlWithInvalidJSONP, null, null, null, 400, "application/json", params);
+                break;
+            case "DELETE":
+                validJSONPResponse = deleteUrlOverJSON(urlWithValidJSONP, null, null, null, 204, expectedCt);
+                invalidJSONPResponse = deleteUrlOverJSON(urlWithInvalidJSONP, null, null, null, 400, "application/json");
+                break;
+        }
+        assertTrue(invalidJSONPResponse != null && invalidJSONPResponse.contains("Invalid jsonp callback function name"));
+        return validJSONPResponse;
+    }
+
     private static class TestWorker implements Runnable {
 
         public static boolean s_success = true; // this is set by worker threads on failure only
@@ -2220,7 +2326,7 @@ public class TestJSONInterface extends TestCase {
                 if (m_id==0) { // do all deployment update from one thread to avoid version error on server side
                     for (int i=0; i<m_catUpdateCount; i++) {
                         // update deployment to force a catalog update and resetting connections
-                        String jdep = getUrlOverJSON("http://localhost:8095/deployment", m_username, m_password, "hashed", 200,  "application/json");
+                        String jdep = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment", m_username, m_password, "hashed", 200,  "application/json");
                         ObjectMapper mapper = new ObjectMapper();
                         DeploymentType deptype = mapper.readValue(jdep, DeploymentType.class);
                         int timeout = 100 + m_id;
@@ -2232,9 +2338,9 @@ public class TestJSONInterface extends TestCase {
                             deptype.getHeartbeat().setTimeout(timeout);
                         }
                         Map<String,String> params = new HashMap<>();
-                        params.put("deployment", URLEncoder.encode(mapper.writeValueAsString(deptype), "UTF-8"));
+                        params.put("deployment", mapper.writeValueAsString(deptype));
                         params.put("admin", "true");
-                        String responseJSON = postUrlOverJSON("http://localhost:8095/deployment/", m_username, m_password, "hashed", 200, "application/json", params);
+                        String responseJSON = postUrlOverJSON(protocolPrefix + "localhost:8095/deployment/", m_username, m_password, "hashed", 200, "application/json", params);
                         if (!responseJSON.contains("Deployment Updated.")) {
                             System.out.println("Failed to update deployment");
                             s_success = false;

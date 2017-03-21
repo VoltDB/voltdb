@@ -20,6 +20,7 @@ if sys.hexversion < 0x02050000:
     raise Exception("Python version 2.5 or greater is required.")
 import array
 import socket
+import base64, textwrap
 import struct
 import datetime
 import decimal
@@ -27,6 +28,14 @@ try:
     from hashlib import sha1 as sha
 except ImportError:
     from sha import sha
+
+try:
+    import ssl
+    ssl_available = True
+except ImportError, e:
+    ssl_available = False
+    ssl_exception = e
+
 
 decimal.getcontext().prec = 38
 
@@ -82,6 +91,7 @@ class ReadBuffer(object):
             values = struct.unpack_from(format, self._buf, self._off)
         except struct.error, e:
             print 'Exception unpacking %d bytes using format "%s": %s' % (size, format, str(e))
+            raise e
         self.shift(size)
         return values
 
@@ -129,25 +139,44 @@ class FastSerializer:
     # if these assumptions are not true. it is further assumed
     # that host order is little endian. See isNaN().
 
-    def __init__(self, host = None, port = 21212, username = "",
+    # default ssl configuration
+    if (ssl_available):
+        DEFAULT_SSL_CONFIG = {
+        'keyfile': None,
+        'certfile': None,
+        'cert_reqs': ssl.CERT_NONE,
+        'ca_certs': None,
+        'do_handshake_on_connect': True
+        }
+    else:
+        DEFAULT_SSL_CONFIG = {}
+
+    def __init__(self, host = None, port = 21212, usessl = False, username = "",
                  password = "", dump_file_path = None,
                  connect_timeout = 8,
                  procedure_timeout = None,
-                 default_timeout = None):
+                 default_timeout = None,
+                 ssl_config_file = None,
+                 ssl_config = DEFAULT_SSL_CONFIG):
         """
         :param host: host string for connection or None
         :param port: port for connection or None
+        :param usessl: switch for use ssl or not
         :param username: authentication user name for connection or None
         :param password: authentication password for connection or None
         :param dump_file_path: path to optional dump file or None
         :param connect_timeout: timeout (secs) or None for authentication (default=8)
         :param procedure_timeout: timeout (secs) or None for procedure calls (default=None)
         :param default_timeout: default timeout (secs) or None for all other operations (default=None)
+        :param ssl_config_file: config file that defines java keystore and truststore files
         """
         # connect a socket to host, port and get a file object
         self.wbuf = array.array('c')
         self.host = host
         self.port = port
+        self.usessl = usessl
+        self.ssl_config = ssl_config
+        self.ssl_config_file = ssl_config_file
         if not dump_file_path is None:
             self.dump_file = open(dump_file_path, "wb")
         else:
@@ -157,7 +186,15 @@ class FastSerializer:
 
         self.socket = None
         if self.host != None and self.port != None:
-            self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            ss = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            if (self.usessl):
+                if (ssl_available):
+                    self.socket = self.__wrap_socket(ss)
+                else:
+                    print "ERROR: To use SSL functionality please Install the Python ssl module."
+                    raise ssl_exception
+            else:
+                self.socket = ss
             self.socket.setblocking(1)
             self.socket.setsockopt(socket.SOL_TCP, socket.TCP_NODELAY, 1)
             self.socket.connect((self.host, self.port))
@@ -246,6 +283,78 @@ class FastSerializer:
         if self.socket:
             self.socket.settimeout(self.default_timeout)
 
+    def __wrap_socket(self, ss):
+        jks_config = {}
+        if self.ssl_config_file:
+            with open(self.ssl_config_file, 'r') as f:
+                lines = f.readlines()
+                for line in lines:
+                    k, v = line.strip().split('=')
+                    jks_config[k.lower()] = v
+
+        def write_pem(der_bytes, type, f):
+            f.write("-----BEGIN %s-----\n" % type)
+            f.write("\r\n".join(textwrap.wrap(base64.b64encode(der_bytes).decode('ascii'), 64)))
+            f.write("\n-----END %s-----\n" % type)
+
+        # extract key and certs
+        import jks
+        use_key_cert = False
+        if 'keystore' in jks_config and jks_config['keystore'] and \
+                'keystorepassword' in jks_config and jks_config['keystorepassword']:
+            ks = jks.KeyStore.load(jks_config['keystore'], jks_config['keystorepassword'])
+            keyfile = open(jks_config['keystore'] + '.key.pem', 'w')
+            certfile = open(jks_config['keystore'] + '.cert.pem', 'w')
+            for alias, pk in ks.private_keys.items():
+                # print("Private key: %s" % pk.alias)
+                if pk.algorithm_oid == jks.util.RSA_ENCRYPTION_OID:
+                    write_pem(pk.pkey, "RSA PRIVATE KEY", keyfile)
+                else:
+                    write_pem(pk.pkey_pkcs8, "PRIVATE KEY", keyfile)
+
+                for c in pk.cert_chain:
+                    write_pem(c[1], "CERTIFICATE", certfile)
+                use_key_cert = True
+            keyfile.close()
+            certfile.close()
+            if use_key_cert:
+                self.ssl_config['keyfile'] = keyfile.name
+                self.ssl_config['certfile'] = certfile.name
+
+        # extract ca certs
+        use_ca_cert = False
+        if 'truststore' in jks_config and jks_config['truststore'] and \
+                        'truststorepassword' in jks_config and jks_config['truststorepassword']:
+            ts = jks.KeyStore.load(jks_config['truststore'], jks_config['truststorepassword'])
+            cafile = open(jks_config['truststore'] + '.ca.cert.pem', 'w')
+            for alias, c in ts.certs.items():
+                # print("Certificate: %s" % c.alias)
+                write_pem(c.cert, "CERTIFICATE", cafile)
+                use_ca_cert = True
+            cafile.close()
+            if use_ca_cert:
+                self.ssl_config['ca_certs'] = cafile.name
+                self.ssl_config['cert_reqs'] = ssl.CERT_REQUIRED
+        elif 'cacerts' in jks_config and jks_config['cacerts']:
+            self.ssl_config['ca_certs'] = jks_config['cacerts']
+            self.ssl_config['cert_reqs'] = ssl.CERT_REQUIRED
+
+        # extract ssl_version
+        if 'ssl_version' in jks_config and jks_config['ssl_version']:
+            self.ssl_config['ca_certs'] = jks_config['ssl_version']
+        tlsv = None
+        try:
+            tlsv = ssl.PROTOCOL_TLSv1_2
+        except AttributeError, e:
+            print "WARNING: This version of python does not support TLSv1.2, upgrade to one that does"
+            tlsv = ssl.PROTOCOL_TLSv1
+
+        return ssl.wrap_socket(ss, self.ssl_config['keyfile'],
+                               self.ssl_config['certfile'], False,
+                               cert_reqs=self.ssl_config['cert_reqs'],
+                               ssl_version=tlsv,
+                               ca_certs=self.ssl_config['ca_certs'])
+
     def __compileStructs(self):
         # Compiled structs for each type
         self.byteType = lambda length : '%c%db' % (self.inputBOM, length)
@@ -293,7 +402,7 @@ class FastSerializer:
         try:
             self.bufferForRead()
         except IOError, e:
-            print "ERROR: Connection failed. Please check that the host and port are correct."
+            print "ERROR: Connection failed. Please check that the host, port and ssl settings are correct."
             raise e
         except socket.timeout:
             raise RuntimeError("Authentication timed out after %d seconds."

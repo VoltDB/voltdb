@@ -17,6 +17,7 @@
 
 package org.voltcore.logging;
 
+import java.io.File;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.util.concurrent.ExecutionException;
@@ -348,13 +349,14 @@ public class VoltLogger {
      * Static method to change the Log4j config globally. This fails
      * if you're not using Log4j for now.
      * @param xmlConfig The text of a Log4j config file.
+     * @param voltroot The VoltDB root path
      */
-    public static void configure(String xmlConfig) {
+    public static void configure(String xmlConfig, File voltroot) {
         try {
             Class<?> loggerClz = Class.forName("org.voltcore.logging.VoltLog4jLogger");
             assert(loggerClz != null);
-            Method configureMethod = loggerClz.getMethod("configure", String.class);
-            configureMethod.invoke(null, xmlConfig);
+            Method configureMethod = loggerClz.getMethod("configure", String.class, File.class);
+            configureMethod.invoke(null, xmlConfig, voltroot);
         } catch (Exception e) {}
     }
 

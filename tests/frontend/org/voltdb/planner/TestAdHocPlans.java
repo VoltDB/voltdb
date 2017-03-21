@@ -63,7 +63,7 @@ public class TestAdHocPlans extends AdHocQueryTester {
                 config.asClusterSettings().asSupplier(),
                 NodeSettings.create(config.asPathSettingsMap()));
         CatalogContext context = new CatalogContext(0, 0, catalog, dbSettings, bytes, null, new byte[] {}, 0, mock(HostMessenger.class));
-        m_pt = new PlannerTool(context.cluster, context.database, context.getCatalogHash());
+        m_pt = new PlannerTool(context.database, context.getCatalogHash());
     }
 
     @Test

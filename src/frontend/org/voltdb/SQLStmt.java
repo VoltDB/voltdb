@@ -64,6 +64,14 @@ public class SQLStmt {
 
     boolean inCatalog;
 
+    String stmtName = null;
+    protected void setStmtName(String name) {
+        stmtName = name;
+    }
+    protected String getStmtName() {
+        return stmtName;
+    }
+
     // used to clean up plans
     SiteProcedureConnection site;
 

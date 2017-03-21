@@ -90,7 +90,7 @@ public class SQLCommand
     private static List<String> RecallableSessionLines = new ArrayList<String>();
     private static boolean m_testFrontEndOnly;
     private static String m_testFrontEndResult;
-
+    private static String m_sslPropsFile;
 
     private static String patchErrorMessageWithFile(String batchFileName, String message) {
 
@@ -599,7 +599,6 @@ public class SQLCommand
     /**
      *
      * @param fileInfo  The FileInfo object describing the file command (or stdin)
-     * @param script    The line reader object to read from
      * @throws Exception
      */
     private static void executeScriptFromReader(FileInfo fileInfo, SQLCommandLineReader reader)
@@ -1035,6 +1034,7 @@ public class SQLCommand
         + "              [--user=user]\n"
         + "              [--password=password]\n"
         + "              [--kerberos=jaas_login_configuration_entry_key]\n"
+        + "              [--ssl or --ssl=ssl-configuration-file]\n"
         + "              [--query=query]\n"
         + "              [--output-format=(fixed|csv|tab)]\n"
         + "              [--output-skip-metadata]\n"
@@ -1274,6 +1274,8 @@ public class SQLCommand
         String kerberos = "";
         List<String> queries = null;
         String ddlFile = "";
+        String sslConfigFile = null;
+        boolean enableSSL = false;
 
         // Parse out parameters
         for (int i = 0; i < args.length; i++) {
@@ -1351,6 +1353,14 @@ public class SQLCommand
             else if (arg.equals("--output-skip-metadata")) {
                 m_outputShowMetadata = false;
             }
+            else if (arg.startsWith("--ssl=")) {
+                enableSSL = true;
+                sslConfigFile = extractArgInput(arg);
+            }
+            else if (arg.startsWith("--ssl")) {
+                enableSSL = true;
+                sslConfigFile = null;
+            }
             else if (arg.equals("--debug")) {
                 m_debug = true;
             }
@@ -1389,9 +1399,12 @@ public class SQLCommand
         }
 
         // Create connection
-        ClientConfig config = new ClientConfig(user, password);
+        ClientConfig config = new ClientConfig(user, password, null);
+        if (enableSSL && sslConfigFile != null && !sslConfigFile.trim().isEmpty()) {
+            config.setTrustStoreConfigFromPropertyFile(sslConfigFile);
+            config.enableSSL();
+        }
         config.setProcedureCallTimeout(0);  // Set procedure all to infinite timeout, see ENG-2670
-
         try {
             // if specified enable kerberos
             if (!kerberos.isEmpty()) {

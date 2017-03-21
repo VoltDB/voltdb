@@ -172,6 +172,30 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
                 ";\n" +
 
                 "CREATE TABLE BINARYTEST (ID INTEGER, bdata varbinary(256), PRIMARY KEY(ID));" +
+                // DDL for testing internet address functions
+                //
+                // INET4_TEST and INET6_TEST will have a bunch of rows, each
+                // with a presentation and binary version.  We will test
+                // that the translation from one equals the other and
+                // that the other equals the translation to the one.
+                "CREATE TABLE INET4_TEST ( " +
+                "    PRES         VARCHAR, " +
+                "    BIN          BIGINT " +
+                ");" +
+                "CREATE TABLE INET4_TEST_PPRES ( " +
+                "    PRES         VARCHAR NOT NULL, " +
+                "    BIN          BIGINT " +
+                ");" +
+                "PARTITION TABLE INET4_TEST_PPRES ON COLUMN PRES;" +
+                "CREATE TABLE INET6_TEST ( " +
+                "    PRES         VARCHAR, " +
+                "    BIN          VARBINARY " +
+                ");" +
+                "CREATE TABLE INET6_TEST_PPRES ( " +
+                "    PRES         VARCHAR NOT NULL, " +
+                "    BIN          VARBINARY " +
+                ");" +
+                "PARTITION TABLE INET6_TEST_PPRES ON COLUMN PRES;" +
                 "";
         try {
             project.addLiteralSchema(literalSchema);
@@ -2353,6 +2377,339 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             result = client.callProcedure("@AdHoc", String.format("select bin(%d) from R3 where big = %d", val, val)).getResults()[0];
             validateTableColumnOfScalarVarchar(result, new String[]{binString});
         }
+    }
+
+    private void validateIPv4Addr(Client client, String tableName, String presentation, Long binary)
+            throws IOException, NoConnectionsException, ProcCallException {
+        ClientResponse cr;
+        VoltTable vt;
+
+        cr = client.callProcedure("@AdHoc", "TRUNCATE TABLE " + tableName + ";");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure(tableName.toUpperCase() + ".INSERT", presentation, binary);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        //
+        // First, see if converting the binary matches the presentation.
+        //
+        cr = client.callProcedure("@AdHoc",
+                                  String.format("select inet_ntoa(cast(bin as bigint)) from %s;",
+                                                tableName));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        vt = cr.getResults()[0];
+        assertEquals(1, vt.getRowCount());
+        assertEquals(1, vt.getColumnCount());
+        assertTrue(vt.advanceRow());
+        if (presentation != null) {
+            assertEquals(presentation.toUpperCase(), vt.getString(0).toUpperCase());
+        } else {
+            assertNull(vt.getString(0));
+            assertTrue(vt.wasNull());
+        }
+
+        // Now, test if converting the presentation matches the binary.
+        cr = client.callProcedure("@AdHoc",
+                                  String.format("select inet_aton(pres) from %s;",
+                                                tableName));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        vt = cr.getResults()[0];
+        assertEquals(1, vt.getRowCount());
+        assertEquals(1, vt.getColumnCount());
+        assertTrue(vt.advanceRow());
+        if (binary != null) {
+            assertEquals(binary, Long.valueOf(vt.getLong(0)));
+        } else {
+            // Fetch the value.  It should be null.
+            vt.getLong(0);
+            assertTrue(vt.wasNull());
+        }
+
+        // Now test that the two are inverses one of the other.
+        cr = client.callProcedure("@AdHoc",
+                                  String.format("select inet_aton(inet_ntoa(cast(bin as bigint))) from %s;",
+                                                tableName));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        vt = cr.getResults()[0];
+        assertEquals(1, vt.getRowCount());
+        assertEquals(1, vt.getColumnCount());
+        assertTrue(vt.advanceRow());
+        if (binary != null) {
+            assertEquals(binary, Long.valueOf(vt.getLong(0)));
+        } else {
+            // Fetch the value, but we don't care about it.
+            // It should be NULL.
+            vt.getLong(0);
+            assert(vt.wasNull());
+        }
+
+        // Finally, test that the two are inverses the other of the one.
+        cr = client.callProcedure("@AdHoc",
+                                  String.format("select inet_ntoa(inet_aton(pres)) from %s;",
+                                                tableName));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        vt = cr.getResults()[0];
+        assertEquals(1, vt.getRowCount());
+        assertEquals(1, vt.getColumnCount());
+        assertTrue(vt.advanceRow());
+        if (presentation != null) {
+            assertEquals(presentation, vt.getString(0));
+        } else {
+            assertNull(vt.getString(0));
+            assertTrue(vt.wasNull());
+        }
+    }
+
+    private void invalidIPAddr(Client client,
+                                 String tableName,
+                                 String presentation) throws Exception {
+        ClientResponse cr;
+        VoltTable vt;
+
+        cr = client.callProcedure("@AdHoc", "TRUNCATE TABLE " + tableName + ";");
+        String ipVersion = tableName.startsWith("INET4_") ? "" : "6";
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        if (ipVersion.length() == 0) {
+            cr = client.callProcedure(tableName.toUpperCase() + ".INSERT", presentation, 0x0);
+        }
+        else {
+            byte[] zeros = new byte[16];
+            cr = client.callProcedure(tableName.toUpperCase() + ".INSERT", presentation, zeros);
+        }
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        Exception ex = null;
+        try {
+            String sql = String.format("select inet%s_aton(pres) from %s;", ipVersion, tableName);
+            client.callProcedure("@AdHoc", sql);
+            fail(String.format("Expected inet address %s to fail.", presentation));
+        }
+        catch (Exception e) {
+            ex = e;
+        }
+        finally {
+            assertNotNull(ex);
+            assertTrue("Expected a SQL ERROR here", ex.getMessage().contains("SQL ERROR"));
+        }
+    }
+
+    private void assertEqualByteArrays(byte[] bytes, byte[] actual) {
+        for (int idx = 0; idx < actual.length; idx += 1) {
+            assertEquals(String.format("Byte %d is different: %s != %s",
+                                       idx, bytes[idx], actual[idx]),
+                         bytes[idx], actual[idx]);
+        }
+    }
+
+    private void validateIPv6Addr(Client client, String tableName, String presentation, short[] addr)
+            throws IOException, NoConnectionsException, ProcCallException {
+        ClientResponse cr;
+        VoltTable vt;
+        String actual_str;
+        byte[] bytes = null;
+        if (addr != null) {
+            assertEquals(8, addr.length);
+            bytes = new byte[8 * 2];
+            // Make bytes be an IPv6 address in network byte order.
+            for (int idx = 0; idx < 8; idx += 1) {
+                // Network byte order is big endian
+                // We are just swapping by shorts.
+                bytes[2 * idx + 0] = (byte)((addr[idx] >> 8) & 0xFF);
+                bytes[2 * idx + 1] = (byte)((addr[idx] >> 0) & 0xFF);
+            }
+        }
+        String tableNameUpper = tableName.toUpperCase();
+        cr = client.callProcedure("@AdHoc", String.format("TRUNCATE TABLE %s;", tableNameUpper));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure(tableNameUpper + ".insert", presentation, bytes);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure(tableNameUpper + ".insert", presentation, bytes);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("@AdHoc", String.format("select inet6_aton(pres) from %s;", tableNameUpper));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        vt = cr.getResults()[0];
+        assertTrue(vt.advanceRow());
+        byte[] actual = vt.getVarbinary(0);
+        if (bytes != null) {
+            assertEquals(bytes.length, actual.length);
+            assertEqualByteArrays(bytes, actual);
+        }
+        else {
+            assertTrue(vt.wasNull());
+        }
+
+        cr = client.callProcedure("@AdHoc", String.format("select inet6_ntoa(bin) from %s;", tableNameUpper));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        vt = cr.getResults()[0];
+        assertTrue(vt.advanceRow());
+        actual_str = vt.getString(0);
+        if (presentation != null) {
+            assertEquals(presentation, actual_str);
+        }
+        else {
+            assertTrue(vt.wasNull());
+        }
+
+        cr = client.callProcedure("@AdHoc", String.format("select inet6_ntoa(inet6_aton(pres)) from %s;", tableNameUpper));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        vt = cr.getResults()[0];
+        assertTrue(vt.advanceRow());
+        actual_str = vt.getString(0);
+        if (presentation != null) {
+            assertEquals(presentation, actual_str);
+        }
+        else {
+            assertTrue(vt.wasNull());
+        }
+
+        cr = client.callProcedure("@AdHoc", String.format("select inet6_aton(inet6_ntoa(bin)) from %s;", tableNameUpper));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        vt = cr.getResults()[0];
+        assertTrue(vt.advanceRow());
+        actual = vt.getVarbinary(0);
+        if (bytes != null) {
+            assertEqualByteArrays(bytes, actual);
+        }
+        else {
+            assertTrue(vt.wasNull());
+        }
+    }
+
+    public void testInternetAddresses() throws Exception {
+        Client client = getClient();
+
+        validateIPv4Addr(client, "INET4_TEST", null, null);
+        validateIPv4Addr(client,
+                         "INET4_TEST",
+                         "127.0.0.1",
+                         0x7f000001L);
+        validateIPv4Addr(client,
+                         "INET4_TEST_PPRES",
+                         "127.0.0.1",
+                         0x7f000001L);
+        validateIPv4Addr(client,
+                         "INET4_TEST",
+                         "192.168.7.40",
+                         0xc0a80728L);
+        validateIPv4Addr(client,
+                         "INET4_TEST_PPRES",
+                         "192.168.7.40",
+                         0xc0a80728L);
+        validateIPv4Addr(client,
+                         "INET4_TEST",
+                         "1.1.1.1",
+                         0x01010101L);
+        validateIPv4Addr(client,
+                         "INET4_TEST",
+                         "1.1.1.1",
+                         0x01010101L);
+        validateIPv4Addr(client,
+                         "INET4_TEST",
+                         "1.2.3.4",
+                         0x01020304L);
+        validateIPv4Addr(client,
+                         "INET4_TEST_PPRES",
+                         "1.2.3.4",
+                         0x01020304L);
+        invalidIPAddr(client,
+                        "INET4_TEST",
+                        "01.02.03.04");
+        invalidIPAddr(client,
+                        "INET4_TEST",
+                        "arglebargle");
+        invalidIPAddr(client,
+                        "INET4_TEST",
+                        "192.168.7.6/24");
+
+        // Only test for nulls on INET6_TEST and not the
+        // partitioned table, since we can't insert a null
+        // in a partitioned column.
+        validateIPv6Addr(client, "INET6_TEST", null, null);
+        // The function inet_ntop does not put leading zeros
+        // in any of these numbers.  So "::0102:" would
+        // fail.
+        validateIPv6Addr(client,
+                         "INET6_TEST",
+                         "ab01:cd12:ef21:1ab:12cd:34ef:a01b:c23d",
+                         new short[] {
+                                 (short)0xab01,
+                                 (short)0xcd12,
+                                 (short)0xef21,
+                                 (short)0x01ab,
+                                 (short)0x12cd,
+                                 (short)0x34ef,
+                                 (short)0xa01b,
+                                 (short)0xc23d
+                         });
+        validateIPv6Addr(client,
+                         "INET6_TEST_PPRES",
+                         "ab01:cd12:ef21:1ab:12cd:34ef:a01b:c23d",
+                         new short[] {
+                                 (short)0xab01,
+                                 (short)0xcd12,
+                                 (short)0xef21,
+                                 (short)0x01ab,
+                                 (short)0x12cd,
+                                 (short)0x34ef,
+                                 (short)0xa01b,
+                                 (short)0xc23d
+                         });
+        validateIPv6Addr(client,
+                         "INET6_TEST",
+                         "::",
+                         new short[] {
+                                 (short)0x0000,
+                                 (short)0x0000,
+                                 (short)0x0000,
+                                 (short)0x0000,
+                                 (short)0x0000,
+                                 (short)0x0000,
+                                 (short)0x0000,
+                                 (short)0x0000
+                         });
+        validateIPv6Addr(client,
+                         "INET6_TEST_PPRES",
+                         "::",
+                         new short[] {
+                                 (short)0x0000,
+                                 (short)0x0000,
+                                 (short)0x0000,
+                                 (short)0x0000,
+                                 (short)0x0000,
+                                 (short)0x0000,
+                                 (short)0x0000,
+                                 (short)0x0000
+                         });
+        validateIPv6Addr(client,
+                         "INET6_TEST",
+                         "::1",
+                         new short[] {
+                                 (short)0x0000,
+                                 (short)0x0000,
+                                 (short)0x0000,
+                                 (short)0x0000,
+                                 (short)0x0000,
+                                 (short)0x0000,
+                                 (short)0x0000,
+                                 (short)0x0001
+                         });
+        validateIPv6Addr(client,
+                         "INET6_TEST_PPRES",
+                         "::1",
+                         new short[] {
+                                 (short)0x0000,
+                                 (short)0x0000,
+                                 (short)0x0000,
+                                 (short)0x0000,
+                                 (short)0x0000,
+                                 (short)0x0000,
+                                 (short)0x0000,
+                                 (short)0x0001
+                         });
+        invalidIPAddr(client,
+                        "INET6_TEST",
+                        ":::");
+        invalidIPAddr(client,
+                        "INET6_TEST",
+                        "arglebargle");
     }
 
     public void testDateadd() throws NoConnectionsException, IOException, ProcCallException {

@@ -61,8 +61,8 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         partitionIdleTime               { $("#chartPartitionIdleTime") }
         commandLogStatistics            { $("#chartCommandLogging") }
         databaseReplication             { $("#ChartDrReplicationRate") }
-        storedProcedures                { $("#tblStoredProcedures") }
-        dataTables                      { $("#tblDataTables") }
+        storedProcedures                { $("#divSPSection") }
+        dataTables                      { $("#tblDT") }
 
         serverCpuCheckbox               { $("#ServerCPU") }
         serverRamCheckbox               { $("#ServerRAM") }
@@ -75,10 +75,10 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         dataTablesCheckbox              { $("#DatabaseTables") }
 
         filterStoredProcedure           { $("#filterStoredProc") }
-        filterDatabaseTable             { $("#filterDatabaseTable") }
+        filterDatabaseTable             { $("#filterDT") }
 
-        databaseTableCurrentPage        { $("#lblPreviousTable") }
-        databaseTableTotalPage          { $("#lblTotalPagesofTables") }
+        databaseTableCurrentPage        { $("#tblDT_paginate > div > span.pageIndex") }
+        databaseTableTotalPage          { $("#tblDT_paginate > div > span.totalPages") }
 
         displayPreference               { $("#showMyPreference") }
         graphView                       { $('#graphView') }
@@ -170,8 +170,8 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         clusterwide                     { $("#chartPartitionIdleTime > div.legend > ul > li:nth-child(2)")}
         multipartition                  { $("#chartPartitionIdleTime > div.legend > ul > li:nth-child(3)")}
 
-        storedProceduresMsg             { $("#storeProcedureBody") }
-        databaseTableMsg                { $("#tablesBody") }
+        storedProceduresMsg             { $("#tblSP > tbody > tr > td") }
+        databaseTableMsg                { $("#tblDT > tbody > tr > td") }
 
         header                          { module Header }
         footer                          { module Footer }
@@ -955,7 +955,7 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
      *  to check ascending order, check the class "sorttable_sorted" displayed
      */
     def boolean tableInAscendingOrder() {
-        if ( ascending.displayed )
+        if ( ascendingDT.displayed )
             return true
         else
             return false
@@ -966,7 +966,7 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
      *  to check ascending order, check the class "sorttable_sorted" displayed
      */
     def boolean tableInDescendingOrder() {
-        if ( descending.displayed )
+        if ( descendingDT.displayed )
             return true
         else
             return false

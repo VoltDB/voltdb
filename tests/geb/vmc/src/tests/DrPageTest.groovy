@@ -97,6 +97,54 @@ class DrPageTest extends TestBase {
         }
     }
 
+    def divProducerId
+    def divRemoteId
+    def verifyClusterName(){
+        when:
+        println("Process only if DR is present..")
+        divId = $("#drCombinedId").jquery.text()
+        divProducerId = $("#drProducerId").jquery.text()
+        divRemoteId = $("#drRemoteId").jquery.text()
+        then:
+        if(isDrTabVisible && !page.isDrPendingPresent()) {
+            when:
+            waitFor(5){ dRHeaderName.isDisplayed() }
+            waitFor(5){ dRRemoteHeaderName.isDisplayed() }
+            then:
+            assert dRHeaderName.jquery.html() == "Database (" + divProducerId + ") "
+            assert dRRemoteHeaderName.jquery.html() == "Database (" + divRemoteId + ")"
+        } else {
+            println("DR is not available.")
+        }
+    }
+
+    def expandCollapseDrHeader(){
+        when:
+        println("Process only if DR is present")
+        divId = $("#drCombinedId").jquery.text()
+        then:
+        if(isDrTabVisible) {
+            when: "Check Dr Mode"
+            assert isDrHeaderExpandedOrCollapsed(divId) == true
+            dRHeaderName.click()
+            waitForTime(5)
+            assert isDrHeaderExpandedOrCollapsed(divId) == false
+            dRHeaderName.click()
+            waitForTime(5)
+            assert isDrHeaderExpandedOrCollapsed(divId) == true
+        } else {
+            println("DR is not available.")
+        }
+    }
+
+    def waitForTime(time){
+        try{
+            waitFor(time){ assert 1==0}
+        }catch(geb.waiting.WaitTimeoutException e){
+
+        }
+    }
+
     def verifyClusterRelation() {
         when:
         println("Process only if DR is present")
