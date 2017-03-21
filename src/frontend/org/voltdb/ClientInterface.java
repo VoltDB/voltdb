@@ -88,7 +88,6 @@ import org.voltdb.common.Constants;
 import org.voltdb.dtxn.InitiatorStats.InvocationInfo;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.Iv2Trace;
-import org.voltdb.iv2.MpInitiator;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2EndOfLogMessage;
@@ -1147,6 +1146,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         m_adminAcceptor = null;
         m_adminAcceptor = new ClientAcceptor(adminIntf, adminPort, messenger.getNetwork(), true, sslContext);
 
+        // Create the per-partition adapters before creating the mailbox. Once
+        // the mailbox is created, the master promotion notification may race
+        // with this.
+        m_internalConnectionHandler = new InternalConnectionHandler();
+        for (int pid : m_cartographer.getPartitions()) {
+            m_internalConnectionHandler.addAdapter(pid, createInternalAdapter(pid));
+        }
+
         m_mailbox = new LocalMailbox(messenger,  messenger.getHSIdForLocalSite(HostMessenger.CLIENT_INTERFACE_SITE_ID)) {
             LinkedBlockingQueue<VoltMessage> m_d = new LinkedBlockingQueue<VoltMessage>();
             @Override
@@ -1199,8 +1206,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 .siteId(m_siteId)
                 .build();
 
-        m_internalConnectionHandler = new InternalConnectionHandler();
-
         m_executeTaskAdpater = new SimpleClientResponseAdapter(ClientInterface.EXECUTE_TASK_CID, "ExecuteTaskAdapter", true);
         bindAdapter(m_executeTaskAdpater, null);
     }
@@ -1234,8 +1239,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 }
             }
 
-            // Create adapters here so that it works for both startup and elastic add.
-            m_internalConnectionHandler.addAdapter(partitionId, createInternalAdapter(partitionId));
+            // Create adapters here so that it works for elastic add.
+            if (!m_internalConnectionHandler.hasAdapter(partitionId)) {
+                m_internalConnectionHandler.addAdapter(partitionId, createInternalAdapter(partitionId));
+            }
         } catch (Exception e) {
             hostLog.warn("Error handling partition fail over at ClientInterface, continuing anyways", e);
         }

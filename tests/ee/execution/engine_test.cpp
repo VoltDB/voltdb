@@ -51,11 +51,6 @@
 
 #include "harness.h"
 
-#include "catalog/catalog.h"
-#include "catalog/cluster.h"
-#include "catalog/constraint.h"
-#include "catalog/database.h"
-#include "catalog/table.h"
 #include "common/tabletuple.h"
 #include "common/valuevector.h"
 #include "expressions/abstractexpression.h"
@@ -64,11 +59,10 @@
 #include "storage/persistenttable.h"
 #include "storage/tablefactory.h"
 #include "storage/tableiterator.h"
-#include "storage/temptable.h"
 #include "storage/tableutil.h"
 
-#include "test_utils/LoadTableFrom.hpp"
 #include "test_utils/plan_testing_baseclass.h"
+#include "test_utils/LoadTableFrom.hpp"
 
 #include <cstdlib>
 #include <ctime>

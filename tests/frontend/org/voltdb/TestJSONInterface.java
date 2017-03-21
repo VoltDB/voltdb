@@ -58,7 +58,6 @@ import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.math.BigDecimal;
 import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.cert.X509Certificate;
@@ -180,6 +179,10 @@ public class TestJSONInterface extends TestCase {
 
     public static String callProcOverJSONRaw(Map params, final int expectedCode) throws Exception {
         return httpUrlOverJSON("POST", protocolPrefix + "localhost:8095/api/1.0/", null, null, null, expectedCode, null, params);
+    }
+
+    public static String callProcOverJSONRaw(Map params, int httpPort, final int expectedCode) throws Exception {
+        return httpUrlOverJSON("POST", protocolPrefix + "localhost:" + httpPort + "/api/1.0/", null, null, null, expectedCode, null, params);
     }
 
     public static String callProcOverJSONRaw(String varString, final int expectedCode) throws Exception {
@@ -315,10 +318,10 @@ public class TestJSONInterface extends TestCase {
     }
 
     public static String callProcOverJSON(String procName, ParameterSet pset, String username, String password, boolean preHash, boolean admin, int expectedCode, ClientAuthScheme scheme) throws Exception {
-        return callProcOverJSON(procName, pset, username, password, preHash, admin, expectedCode /* HTTP_OK */, scheme, -1);
+        return callProcOverJSON(procName, pset, 8095, username, password, preHash, admin, expectedCode /* HTTP_OK */, scheme, -1);
     }
 
-    public static String callProcOverJSON(String procName, ParameterSet pset, String username, String password, boolean preHash, boolean admin, int expectedCode, ClientAuthScheme scheme, int procCallTimeout) throws Exception {
+    public static String callProcOverJSON(String procName, ParameterSet pset, int httpPort, String username, String password, boolean preHash, boolean admin, int expectedCode, ClientAuthScheme scheme, int procCallTimeout) throws Exception {
         // Call insert
         String paramsInJSON = pset.toJSONString();
         //System.out.println(paramsInJSON);
@@ -342,11 +345,11 @@ public class TestJSONInterface extends TestCase {
             params.put("admin", "true");
         }
 
-        String ret = callProcOverJSONRaw(params, expectedCode);
+        String ret = callProcOverJSONRaw(params, httpPort, expectedCode);
         if (preHash) {
             //If prehash make same call with SHA1 to check expected code.
             params.put("Hashedpassword", getHashedPasswordForHTTPVar(password, ClientAuthScheme.HASH_SHA1));
-            callProcOverJSONRaw(params, expectedCode);
+            callProcOverJSONRaw(params, httpPort, expectedCode);
         }
         return ret;
     }
@@ -514,7 +517,7 @@ public class TestJSONInterface extends TestCase {
             SnmpType snmpConfig = new SnmpType();
             snmpConfig.setTarget("localhost");
             deptype.setSnmp(snmpConfig);
-            String ndeptype = URLEncoder.encode(mapper.writeValueAsString(deptype), StandardCharsets.UTF_8.toString());
+            String ndeptype = mapper.writeValueAsString(deptype);
             params.put("deployment", ndeptype);
             String pdep = postUrlOverJSON(protocolPrefix + "localhost:8095/deployment/", null, null, null, 200, "application/json", params);
             assertTrue(pdep.contains("Deployment Updated"));
@@ -524,7 +527,7 @@ public class TestJSONInterface extends TestCase {
 
             snmpConfig.setCommunity("foobar");
             deptype.setSnmp(snmpConfig);
-            ndeptype = URLEncoder.encode(mapper.writeValueAsString(deptype), StandardCharsets.UTF_8.toString());
+            ndeptype = mapper.writeValueAsString(deptype);
             params.put("deployment", ndeptype);
             pdep = postUrlOverJSON(protocolPrefix + "localhost:8095/deployment/", null, null, null, 200, "application/json", params);
             assertTrue(pdep.contains("Deployment Updated"));
@@ -1333,7 +1336,7 @@ public class TestJSONInterface extends TestCase {
             }
 
             pset = ParameterSet.fromArrayNoCopy(100000);
-            String response = callProcOverJSON("TestJSONInterface$LongReadProc", pset, null, null, false, false, 200, ClientAuthScheme.HASH_SHA256, 1);
+            String response = callProcOverJSON("TestJSONInterface$LongReadProc", pset, 8095, null, null, false, false, 200, ClientAuthScheme.HASH_SHA256, 1);
             Response r = responseFromJSON(response);
             assertEquals(ClientResponse.GRACEFUL_FAILURE, r.status);
             assertTrue(r.statusString.contains("Transaction Interrupted"));
@@ -1605,7 +1608,7 @@ public class TestJSONInterface extends TestCase {
             String pdep = postUrlOverJSON(protocolPrefix + "localhost:8095/deployment/", null, null, null, 200, "application/json", null);
             assertTrue(pdep.contains("Failed"));
             Map<String,String> params = new HashMap<>();
-            params.put("deployment", URLEncoder.encode(jdep, "UTF-8"));
+            params.put("deployment", jdep);
             pdep = postUrlOverJSON(protocolPrefix + "localhost:8095/deployment/", null, null, null, 200, "application/json", params);
             assertTrue(pdep.contains("Deployment Updated"));
 
@@ -1626,7 +1629,7 @@ public class TestJSONInterface extends TestCase {
                 deptype.getHeartbeat().setTimeout(99);
             }
             String ndeptype = mapper.writeValueAsString(deptype);
-            params.put("deployment", URLEncoder.encode(ndeptype, "UTF-8"));
+            params.put("deployment", ndeptype);
             pdep = postUrlOverJSON(protocolPrefix + "localhost:8095/deployment/", null, null, null, 200, "application/json", params);
             System.out.println("POST result is: " + pdep);
             assertTrue(pdep.contains("Deployment Updated"));
@@ -1652,7 +1655,7 @@ public class TestJSONInterface extends TestCase {
             ss.setQuery(qv);
             deptype.setSystemsettings(ss);
             ndeptype = mapper.writeValueAsString(deptype);
-            params.put("deployment", URLEncoder.encode(ndeptype, "UTF-8"));
+            params.put("deployment", ndeptype);
             pdep = postUrlOverJSON(protocolPrefix + "localhost:8095/deployment/", null, null, null, 200, "application/json", params);
             System.out.println("POST result is: " + pdep);
             assertTrue(pdep.contains("Deployment Updated"));
@@ -1666,7 +1669,7 @@ public class TestJSONInterface extends TestCase {
             ss.setQuery(qv);
             deptype.setSystemsettings(ss);
             ndeptype = mapper.writeValueAsString(deptype);
-            params.put("deployment", URLEncoder.encode(ndeptype, "UTF-8"));
+            params.put("deployment", ndeptype);
             pdep = postUrlOverJSON(protocolPrefix + "localhost:8095/deployment/", null, null, null, 200, "application/json", params);
             System.out.println("POST result is: " + pdep);
             assertTrue(pdep.contains("Deployment Updated"));
@@ -1739,7 +1742,7 @@ public class TestJSONInterface extends TestCase {
             DeploymentType gotValue = mapper.readValue(jdep, DeploymentType.class);
             assertEquals("10", gotValue.getSystemsettings().getResourcemonitor().getMemorylimit().getSize());
 
-            memLimit.setSize("90%25");
+            memLimit.setSize("90%");
             ndeptype = mapper.writeValueAsString(deptype);
             params.put("deployment", ndeptype);
             pdep = postUrlOverJSON(protocolPrefix + "localhost:8095/deployment/", null, null, null, 200, "application/json", params);
@@ -2335,7 +2338,7 @@ public class TestJSONInterface extends TestCase {
                             deptype.getHeartbeat().setTimeout(timeout);
                         }
                         Map<String,String> params = new HashMap<>();
-                        params.put("deployment", URLEncoder.encode(mapper.writeValueAsString(deptype), "UTF-8"));
+                        params.put("deployment", mapper.writeValueAsString(deptype));
                         params.put("admin", "true");
                         String responseJSON = postUrlOverJSON(protocolPrefix + "localhost:8095/deployment/", m_username, m_password, "hashed", 200, "application/json", params);
                         if (!responseJSON.contains("Deployment Updated.")) {

@@ -22,7 +22,6 @@ import java.util.Collection;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
-import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
@@ -224,7 +223,7 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
     }
 
     @Override
-    public void computeCostEstimates(long childOutputTupleCountEstimate, Cluster cluster, Database db, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
+    public void computeCostEstimates(long childOutputTupleCountEstimate, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
 
         // Add the cost of the inlined index scan to the cost of processing the input tuples.
         // This isn't really a fair representation of what's going on, as the index is scanned once

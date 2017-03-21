@@ -22,7 +22,6 @@ import java.util.Set;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
-import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
@@ -94,7 +93,7 @@ public class MaterializedScanPlanNode extends AbstractPlanNode {
     }
 
     @Override
-    public void computeCostEstimates(long childOutputTupleCountEstimate, Cluster cluster, Database db, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
+    public void computeCostEstimates(long childOutputTupleCountEstimate, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
         // assume constant cost. Most of the cost of the SQL-IN will be measured by the NLIJ that is always paired with this element
         m_estimatedProcessedTupleCount = 1;
         m_estimatedOutputTupleCount = 1;

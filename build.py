@@ -476,6 +476,7 @@ if whichtests in ("${eetestsuite}", "common"):
     CTX.TESTS['common'] = """
      debuglog_test
      elastic_hashinator_test
+     PerFragmentStatsTest
      nvalue_test
      pool_test
      serializeio_test
