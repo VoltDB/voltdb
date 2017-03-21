@@ -66,6 +66,8 @@ import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.net.HostAndPort;
 
 public class Collector {
+    private final static String DEFAULT_COLLECT_FILENAME = "collect.zip";
+
     private static String m_configInfoPath = null;
     private static String m_catalogJarPath = null;
     private static String m_deploymentPath = null;
@@ -81,12 +83,13 @@ public class Collector {
 
     public static String[] cmdFilenames = {"sardata", "dmesgdata", "syscheckdata"};
 
+
     static class CollectConfig extends CLIConfig {
         @Option(desc = "file name prefix for uniquely identifying collection")
         String prefix = "";
 
         @Option(desc = "file name prefix for uniquely identifying collection")
-        String outputFile= "collect.zip";
+        String outputFileName = "";
 
         @Option(desc = "upload resulting collection to HOST via SFTP")
         String host = "";
@@ -112,8 +115,8 @@ public class Collector {
         @Option(desc = "the voltdbroot path")
         String voltdbroot = "";
 
-        @Option(desc = "the database directory")
-        String databaseDir = Constants.DBROOT;
+        @Option(desc = "overwrite output file if it exists")
+        boolean force= false;
 
         @Option
         boolean calledFromVEM = false;
@@ -134,30 +137,15 @@ public class Collector {
         @Override
         public void validate() {
             if (days < 0) exitWithMessageAndUsage("days must be >= 0");
-            //if (voltdbroot == "") exitWithMessageAndUsage("voltdbroot cannot be null");
+            if (voltdbroot.trim().isEmpty()) exitWithMessageAndUsage("Invalid database directory");
+            if (!outputFileName.trim().isEmpty() && !prefix.trim().isEmpty())
+                exitWithMessageAndUsage("For outputfile either --output or file --prefix is allowed."
+                        + "Can't specify both of them.");
         }
     }
 
     private static void populateVoltDBCollectionPaths() {
-        String systemCheckFilePath = null;
-        if (m_config.voltdbroot.trim().isEmpty()) {
-            m_voltdbRoot = new VoltFile(m_config.databaseDir);
-            if (!Constants.DBROOT.equals(m_voltdbRoot.getName())) {
-                m_voltdbRoot = new VoltFile(m_voltdbRoot, Constants.DBROOT);
-            }
-            systemCheckFilePath = m_voltdbRoot.getParent() + File.separator + "systemcheck";
-            try {
-                systemCheckFilePath = m_voltdbRoot.getCanonicalFile().getParent()
-                        + File.separator + "systemcheck";
-            } catch (IOException ioExcp) {
-                System.err.println("Encountered exception evaluating path for voltdbroot. " + ioExcp.getMessage());
-                System.exit(-1);
-            }
-        } else {
-            m_voltdbRoot = new VoltFile(m_config.voltdbroot);
-            systemCheckFilePath = m_voltdbRoot.getAbsolutePath() + File.separator + "systemcheck";
-        }
-
+        m_voltdbRoot = new VoltFile(m_config.voltdbroot);
         if (!m_voltdbRoot.exists()) {
             System.err.println(m_voltdbRoot.getParentFile().getAbsolutePath() + " does not contain a valid database "
                     + "directory. Specify valid path to the database directory.");
@@ -168,13 +156,11 @@ public class Collector {
                     + " database directory in --dir option.");
             System.exit(-1);
         }
-
         if (!m_voltdbRoot.canRead() || !m_voltdbRoot.canExecute()) {
             System.err.println(m_voltdbRoot.getParentFile().getAbsolutePath() + " does not have read/exceute permission for current user."
                     + " database directory in --dir option.");
             System.exit(-1);
         }
-
         m_config.voltdbroot = m_voltdbRoot.getAbsolutePath();
 
         // files to collect from config dir
@@ -182,7 +168,32 @@ public class Collector {
         m_configInfoPath = configLogDirPath + "config.json";
         m_catalogJarPath = configLogDirPath + "catalog.jar";
         m_deploymentPath = configLogDirPath + "deployment.xml";
-        m_systemCheckPath =  m_voltdbRoot.getAbsolutePath() + File.separator + "systemcheck";;
+        m_systemCheckPath =  m_voltdbRoot.getAbsolutePath() + File.separator + "systemcheck";
+
+        // At minimum, the initialized database will have deployment jar and catalog.jar file.
+        // Validate voltdbroot path is valid or not
+        File deploymentFile = new File(m_deploymentPath);
+        File catalogJarFile = new File(m_catalogJarPath);
+        File configInfoFile = new File(m_configInfoPath);
+        if (!deploymentFile.exists() || !catalogJarFile.exists() || !configInfoFile.exists()) {
+            System.err.println("ERROR: Invalid database directory " + m_voltdbRoot.getParentFile().getAbsolutePath()
+                    + ". Specify valid database directory using --dir option.");
+            System.exit(-1);
+        }
+
+        if (!m_config.prefix.isEmpty()) {
+            m_config.outputFileName = m_config.prefix + "_" + DEFAULT_COLLECT_FILENAME;
+        }
+        if (m_config.outputFileName.isEmpty()) {
+            m_config.outputFileName = DEFAULT_COLLECT_FILENAME;
+        }
+
+        File outputFile = new File(m_config.outputFileName);
+        if (outputFile.exists() && !m_config.force) {
+            System.err.println("ERROR: Output file " + outputFile.getAbsolutePath() + " already exists."
+                    + " Use --force to overwrite the existing file.");
+            System.exit(-1);
+        }
     }
 
     public static void main(String[] args) {
@@ -500,7 +511,8 @@ public class Collector {
             String folderBase = (m_config.prefix.isEmpty() ? "" : m_config.prefix + "_") +
                                 CoreUtils.getHostnameOrAddress() + "_voltlogs_" + timestamp;
             String folderPath = folderBase + File.separator;
-            String collectionFilePath = rootpath + File.separator + folderBase + ".zipfile";
+            //String collectionFilePath = rootpath + File.separator + folderBase + ".zipfile";
+            String collectionFilePath = m_config.outputFileName;
 
             FileOutputStream collectionStream = new FileOutputStream(collectionFilePath);
             ZipOutputStream zipStream = new ZipOutputStream(collectionStream);
