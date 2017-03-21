@@ -56,7 +56,7 @@ public:
 
     void initialize(const char *catalog_string) {
         PlanTestingBaseClass<EngineTestTopend>::initialize(catalog_string);
-        m_tableT = getPersistentTableAndId("T", &m_tableT_id);
+        m_tableT = getPersistentTableAndId("T", &m_tableT_id, NULL);
         ASSERT_TRUE(m_tableT);
     }
 

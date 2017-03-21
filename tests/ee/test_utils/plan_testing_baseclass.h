@@ -47,9 +47,13 @@
 #include <cstdlib>
 #include <sstream>
 #include <string.h>
+
+#include "catalog/cluster.h"
+#include "catalog/constraint.h"
+#include "catalog/table.h"
+
 #include "execution/VoltDBEngine.h"
 #include "storage/temptable.h"
-
 #include "test_utils/LoadTableFrom.hpp"
 #include "test_utils/plan_testing_config.h"
 
