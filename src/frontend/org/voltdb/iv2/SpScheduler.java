@@ -1362,7 +1362,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         if (existingDC != null) {
             // this is a collision and is bad
             existingDC.logWithCollidingDuplicateCounters(counter);
-            VoltDB.crashGlobalVoltDB("DUPLICATE COUNTER MISMATCH: two duplicate counter keys collided.", true, null);
+            if (!existingDC.collisionFromBalanceSPI(counter)) {
+                VoltDB.crashGlobalVoltDB("DUPLICATE COUNTER MISMATCH: two duplicate counter keys collided.", true, null);
+            }
         }
         else {
             m_duplicateCounters.put(dpKey, counter);
