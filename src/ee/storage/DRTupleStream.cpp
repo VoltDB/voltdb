@@ -399,7 +399,6 @@ size_t DRTupleStream::computeOffsets(DRRecordType &type,
 void DRTupleStream::beginTransaction(int64_t sequenceNumber, int64_t spHandle, int64_t uniqueId)
 {
     assert(!m_opened);
-    m_eventTxn = false;
 
     if (!m_currBlock) {
          extendBufferChain(m_defaultCapacity);
@@ -547,11 +546,6 @@ void DRTupleStream::endTransaction(int64_t uniqueId)
         extendBufferChain(0);
     }
 
-    if (m_eventTxn) { // We need to push the event buffer out.
-        extendBufferChain(0);
-        pushPendingBlocks(); //TODO: extendBufferChain does pushPendingBlocks. So do we need this here again?
-        m_eventTxn = false;
-    }
     m_txnRowCount = 0;
 }
 
@@ -623,13 +617,14 @@ void DRTupleStream::generateDREvent(DREventType type, int64_t lastCommittedSpHan
         commitTransactionCommon();
 
         extendBufferChain(0);
-
-        pushPendingBlocks(); //TODO: extendBufferChain does pushPendingBlocks. So do we need this here again?
         break;
     }
-    case SWAP_TABLE : { // Similar to other events, except that
-        // this happens within a begin and end transaction, so actions done there are not needed here.
-        m_eventTxn = true;
+    case SWAP_TABLE : {
+        // For DR events that get generated between a BEGIN_TXN and END_TXN,
+        // always call endTransaction() and then extendBufferChain() on dr
+        // streams in the release() of the corresponding UndoAction.
+        // Currently, only SWAP_TABLE does this, if there are others in the
+        // future, the above logic can be refactored into a function.
         writeEventData(type, payloads);
         break;
     }

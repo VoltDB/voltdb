@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 
+import org.voltcore.utils.Pair;
 import org.voltdb.ProducerDRGateway.MeshMemberInfo;
 
 // Interface through which the outside world can interact with the consumer side
@@ -34,6 +35,8 @@ public interface ConsumerDRGateway extends Promotable {
      * @param newConnectionSource The new connection source if changed, or null if not.
      */
     void updateCatalog(CatalogContext catalog, String newConnectionSource);
+
+    void swapTables(final Pair<String, Long> oneTable, final Pair<String, Long> otherTable);
 
     Map<Byte, DRRoleStats.State> getStates();
 
