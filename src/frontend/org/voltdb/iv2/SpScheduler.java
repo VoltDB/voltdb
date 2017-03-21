@@ -707,7 +707,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         // Avoid all the lookup below.
         // Also, don't update the truncation handle, since it won't have meaning for anyone.
         if (message.isReadOnly()) {
-            if (m_defaultConsistencyReadLevel == ReadLevel.FAST) {
+            if (m_defaultConsistencyReadLevel == ReadLevel.FAST || !m_isLeader) {
                 // the initiatorHSId is the ClientInterface mailbox.
                 m_mailbox.send(message.getInitiatorHSId(), message);
                 return;
@@ -715,7 +715,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
             if (m_defaultConsistencyReadLevel == ReadLevel.SAFE) {
                 // InvocationDispatcher routes SAFE reads to SPI only
-                //assert(m_isLeader || (!message.wasCreatedFromLeader() && isSpiBalanceRequested()));
+                assert(m_isLeader);
                 assert(m_bufferedReadLog != null);
                 m_bufferedReadLog.offer(m_mailbox, message, m_repairLogTruncationHandle);
                 return;
@@ -806,8 +806,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         FragmentTaskMessage msg = message;
         long newSpHandle;
 
-        //TODO: there will be a race condition here. FragmentTaskMessage could arrive right in the middle
-        // of @BalanceSPI and the site sees the first fragment as leader but the site is marked as non-leader.
         if (m_isLeader) {
             // Quick hack to make progress...we need to copy the FragmentTaskMessage
             // before we start mucking with its state (SPHANDLE).  We need to revisit

@@ -183,7 +183,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
                 // anyway. If the rejoin has transferred data but not left the rejoining
                 // state, it will respond REJOINING to new work which will break
                 // the MPI and/or be unexpected to external clients.
-                if (!m_initiatorMailbox.acceptPromotion()) {
+                if (!balanceSPI && !m_initiatorMailbox.acceptPromotion()) {
                     tmLog.error(m_whoami
                             + "rejoining site can not be promoted to leader. Terminating.");
                     VoltDB.crashLocalVoltDB("A rejoining site can not be promoted to leader.", false, null);
