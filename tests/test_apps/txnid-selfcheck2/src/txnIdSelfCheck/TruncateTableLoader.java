@@ -169,10 +169,11 @@ public class TruncateTableLoader extends BenchmarkThread {
         } catch (Exception e) {
             hardStop("getrowcount exception", e);
         }
-        if (rowCounts[0] != swapRowCount || rowCounts[1] != tableRowCount) {
+        int z = shouldRollback == 0 ? 0 : 1;
+        if (rowCounts[(z+0)&1] != swapRowCount || rowCounts[(z+1)&1] != tableRowCount) {
             String message = swapProcName+" on "+tableName+", "+swapTableName
                     + " failed to swap row counts correctly: went from " + tableRowCount
-                    + ", " + swapRowCount + " to " + rowCounts[0] + ", " + rowCounts[1];
+                    + ", " + swapRowCount + " to " + rowCounts[0] + ", " + rowCounts[1] + ", rollback: " + shouldRollback;
             hardStop("TruncateTableLoader: " + message);
         }
         return rowCounts;
@@ -343,18 +344,6 @@ public class TruncateTableLoader extends BenchmarkThread {
                         // on exception, log and end the thread, but don't kill the process
                         hardStop("TruncateTableLoader failed a TruncateTable or SwapTable ProcCallException call for table '"
                                 + tableName + "': " + e.getMessage());
-                    }
-                }
-                if (!TxnId2Utils.isConnectionTransactionCatalogOrServerUnavailableIssue(e.getClientResponse().getStatusString())) {
-                    long newRowCount = -1;
-                    try {
-                        newRowCount = TxnId2Utils.getRowCount(client, tableName);
-                    } catch (Exception e2) {
-                        hardStop("getrowcount exception", e2);
-                    }
-                    if (newRowCount != currentRowCount) {
-                        hardStop("TruncateTableLoader call to TruncateTable or SwapTable changed row count from " + currentRowCount
-                                + " to "+newRowCount+", despite rollback, for table '" + tableName + "': " + e.getMessage());
                     }
                 }
             }

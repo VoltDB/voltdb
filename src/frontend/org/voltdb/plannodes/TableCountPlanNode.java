@@ -17,7 +17,6 @@
 
 package org.voltdb.plannodes;
 
-import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
@@ -79,7 +78,7 @@ public class TableCountPlanNode extends AbstractScanPlanNode {
     }
 
     @Override
-    public void computeCostEstimates(long childOutputTupleCountEstimate, Cluster cluster, Database db, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
+    public void computeCostEstimates(long childOutputTupleCountEstimate, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
         m_estimatedProcessedTupleCount = 1;
         m_estimatedOutputTupleCount = 1;
     }

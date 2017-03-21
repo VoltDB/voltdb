@@ -28,7 +28,6 @@ import org.voltdb.PlannerStatsCollector.CacheUse;
 import org.voltdb.StatsAgent;
 import org.voltdb.StatsSelector;
 import org.voltdb.VoltDB;
-import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.common.Constants;
 import org.voltdb.planner.BoundPlan;
@@ -49,22 +48,20 @@ public class PlannerTool {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final VoltLogger compileLog = new VoltLogger("COMPILE");
 
-    private final Database m_database;
-    private final Cluster m_cluster;
+    private Database m_database;
+    private byte[] m_catalogHash;
+    private AdHocCompilerCache m_cache;
+
     private final HSQLInterface m_hsql;
-    private final byte[] m_catalogHash;
-    private final AdHocCompilerCache m_cache;
     private static PlannerStatsCollector m_plannerStats;
 
     private static final int AD_HOC_JOINED_TABLE_LIMIT = 5;
 
-    public PlannerTool(final Cluster cluster, final Database database, byte[] catalogHash)
+    public PlannerTool(final Database database, byte[] catalogHash)
     {
-        assert(cluster != null);
         assert(database != null);
 
         m_database = database;
-        m_cluster = cluster;
         m_catalogHash = catalogHash;
         m_cache = AdHocCompilerCache.getCacheForCatalogHash(catalogHash);
 
@@ -86,7 +83,6 @@ public class PlannerTool {
                 throw new RuntimeException("Error creating hsql: " + e.getMessage() + " in DDL statement: " + decoded_cmd);
             }
         }
-
         hostLog.debug("hsql loaded");
 
         // Create and register a singleton planner stats collector, if this is the first time.
@@ -104,6 +100,14 @@ public class PlannerTool {
         }
     }
 
+    public PlannerTool updateWhenNoSchemaChange(Database database, byte[] catalogHash) {
+        m_database = database;
+        m_catalogHash = catalogHash;
+
+        return this;
+    }
+
+
     public AdHocPlannedStatement planSqlForTest(String sqlIn) {
         StatementPartitioning infer = StatementPartitioning.inferPartitioning();
         return planSql(sqlIn, infer, false, null);
@@ -120,7 +124,7 @@ public class PlannerTool {
         TrivialCostModel costModel = new TrivialCostModel();
         DatabaseEstimates estimates = new DatabaseEstimates();
         QueryPlanner planner = new QueryPlanner(
-            sql, "PlannerTool", "PlannerToolProc", m_cluster, m_database,
+            sql, "PlannerTool", "PlannerToolProc", m_database,
             partitioning, m_hsql, estimates, !VoltCompiler.DEBUG_MODE,
             AD_HOC_JOINED_TABLE_LIMIT, costModel, null, null, DeterminismMode.FASTER);
 
@@ -196,7 +200,7 @@ public class PlannerTool {
             TrivialCostModel costModel = new TrivialCostModel();
             DatabaseEstimates estimates = new DatabaseEstimates();
             QueryPlanner planner = new QueryPlanner(
-                    sql, "PlannerTool", "PlannerToolProc", m_cluster, m_database,
+                    sql, "PlannerTool", "PlannerToolProc", m_database,
                     partitioning, m_hsql, estimates, !VoltCompiler.DEBUG_MODE,
                     AD_HOC_JOINED_TABLE_LIMIT, costModel, null, null, DeterminismMode.FASTER);
 

@@ -275,10 +275,10 @@ def agg_liveclients(table):
 
 def print_metrics(data):
     # get variables from data dictionary (separate entries from different sources)
-    incr_successes, incr_failures, outstanding, incr_retries = data["importer"]
+    incr_successes, incr_failures, outstanding, incr_retries = data.get("importer",(0,0,0,0))
     cpu = data["CPU"]
-    new_tuples, new_alloc = data["PersistentTable"]
-    streamrows, buffered = data["StreamedTable"]
+    new_tuples, new_alloc = data.get("PersistentTable",(0,0))
+    streamrows, buffered = data.get("StreamedTable",(0,0))
     invs, tps, exec_millis, c_svrs, mbin, mbout = data["PROCEDURE"]
     connections, outstanding_tx = data["LIVECLIENTS"]
 
@@ -321,7 +321,9 @@ while end_time > time.time():
     proc_tables = caller.call_stats("PROCEDURE")
     liveclients_tables = caller.call_stats("LIVECLIENTS")
 
-    data = imp_keeper.process(imp_tables[0])
+    data = dict()
+    imp_data = imp_keeper.process(imp_tables[0])
+    data.update(imp_data)
 
     table_data = table_keeper.process(table_tables[0])
     data.update(table_data)

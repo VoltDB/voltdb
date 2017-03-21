@@ -20,7 +20,7 @@ if sys.hexversion < 0x02050000:
     raise Exception("Python version 2.5 or greater is required.")
 import array
 import socket
-import ssl, base64, textwrap
+import base64, textwrap
 import struct
 import datetime
 import decimal
@@ -28,6 +28,14 @@ try:
     from hashlib import sha1 as sha
 except ImportError:
     from sha import sha
+
+try:
+    import ssl
+    ssl_available = True
+except ImportError, e:
+    ssl_available = False
+    ssl_exception = e
+
 
 decimal.getcontext().prec = 38
 
@@ -132,13 +140,16 @@ class FastSerializer:
     # that host order is little endian. See isNaN().
 
     # default ssl configuration
-    DEFAULT_SSL_CONFIG = {
+    if (ssl_available):
+        DEFAULT_SSL_CONFIG = {
         'keyfile': None,
         'certfile': None,
         'cert_reqs': ssl.CERT_NONE,
         'ca_certs': None,
         'do_handshake_on_connect': True
-    }
+        }
+    else:
+        DEFAULT_SSL_CONFIG = {}
 
     def __init__(self, host = None, port = 21212, usessl = False, username = "",
                  password = "", dump_file_path = None,
@@ -177,7 +188,11 @@ class FastSerializer:
         if self.host != None and self.port != None:
             ss = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             if (self.usessl):
-                self.socket = self.__wrap_socket(ss)
+                if (ssl_available):
+                    self.socket = self.__wrap_socket(ss)
+                else:
+                    print "ERROR: To use SSL functionality please Install the Python ssl module."
+                    raise ssl_exception
             else:
                 self.socket = ss
             self.socket.setblocking(1)

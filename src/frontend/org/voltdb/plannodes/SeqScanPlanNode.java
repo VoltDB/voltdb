@@ -19,8 +19,6 @@ package org.voltdb.plannodes;
 
 import java.util.List;
 
-import org.voltdb.catalog.Cluster;
-import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.DatabaseEstimates.TableEstimates;
@@ -75,7 +73,7 @@ public class SeqScanPlanNode extends AbstractScanPlanNode {
 
     private static final TableEstimates SUBQUERY_TABLE_ESTIMATES_HACK = new TableEstimates();
     @Override
-    public void computeCostEstimates(long childOutputTupleCountEstimate, Cluster cluster, Database db, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
+    public void computeCostEstimates(long childOutputTupleCountEstimate, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
         if (m_isSubQuery) {
             // Get estimates from the sub-query
             // @TODO For the sub-query the cost estimates will be calculated separately
