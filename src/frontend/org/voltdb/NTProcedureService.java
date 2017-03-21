@@ -21,10 +21,10 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Queue;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -32,7 +32,9 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.eclipse.jetty.util.ArrayQueue;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.network.Connection;
 import org.voltcore.utils.CoreUtils;
@@ -46,14 +48,34 @@ import com.google_voltpatches.common.util.concurrent.ThreadFactoryBuilder;
 
 public class NTProcedureService {
 
+    static class PendingInvocation {
+        AuthUser user;
+        Connection ccxn;
+        long clientHandle;
+        boolean ntPriority;
+        String procName;
+        ParameterSet paramListIn;
+
+        PendingInvocation(AuthUser user, Connection ccxn, long clientHandle,
+                          boolean ntPriority, String procName, ParameterSet paramListIn)
+        {
+            this.user = user;
+            this.ccxn = ccxn;
+            this.clientHandle = clientHandle;
+            this.ntPriority = ntPriority;
+            this.procName = procName;
+            this.paramListIn = paramListIn;
+        }
+    }
+
     // user procedures.
     ImmutableMap<String, ProcedureRunnerNTGenerator> m_procs = ImmutableMap.<String, ProcedureRunnerNTGenerator>builder().build();
     ImmutableMap<String, ProcedureRunnerNTGenerator> m_sysProcs = ImmutableMap.<String, ProcedureRunnerNTGenerator>builder().build();
-    ConcurrentHashMap<Long, ProcedureRunnerNT> m_outstanding = new ConcurrentHashMap<>();
+    Map<Long, ProcedureRunnerNT> m_outstanding = new ConcurrentHashMap<>();
     final InternalConnectionHandler m_ich;
     final Mailbox m_mailbox;
-
-    final ConcurrentLinkedQueue<Runnable> m_pendingInvocations = new ConcurrentLinkedQueue<>();
+    AtomicBoolean m_paused = new AtomicBoolean(false);
+    Queue<PendingInvocation> m_pendingInvocations = new ArrayQueue<>();
     final Semaphore m_outstandingNTProcSemaphore = new Semaphore(10);
 
     final static String NTPROC_THREADPOOL_NAMEPREFIX = "NTPServiceThread-";
@@ -151,11 +173,11 @@ public class NTProcedureService {
         m_ich = ich;
         m_mailbox = mailbox;
 
-        m_sysProcs = loadSystemProcedures();
+        m_sysProcs = loadSystemProcedures(null);
     }
 
     @SuppressWarnings("unchecked")
-    private ImmutableMap<String, ProcedureRunnerNTGenerator> loadSystemProcedures() {
+    private ImmutableMap<String, ProcedureRunnerNTGenerator> loadSystemProcedures(ProcedureRunnerNTGenerator uacPrntg) {
         ImmutableMap.Builder<String, ProcedureRunnerNTGenerator> builder =
                 ImmutableMap.<String, ProcedureRunnerNTGenerator>builder();
 
@@ -201,8 +223,12 @@ public class NTProcedureService {
         return builder.build();
     }
 
+    synchronized void preUpdate() {
+        m_paused.set(true);
+    }
+
     @SuppressWarnings("unchecked")
-    void update(CatalogContext catalogContext) {
+    synchronized void update(CatalogContext catalogContext) {
         CatalogMap<Procedure> procedures = catalogContext.database.getProcedures();
 
         Map<String, ProcedureRunnerNTGenerator> runnerGeneratorMap = new TreeMap<>();
@@ -232,15 +258,30 @@ public class NTProcedureService {
         }
 
         m_procs = ImmutableMap.<String, ProcedureRunnerNTGenerator>builder().putAll(runnerGeneratorMap).build();
+
+        loadSystemProcedures(m_sysProcs.get("@UpdateApplicationCatalog"));
+
+        m_paused.set(false);
+
+        // release all of the pending invocations
+        m_pendingInvocations
+            .forEach(pi -> callProcedureNT(pi.user, pi.ccxn, pi.clientHandle, pi.ntPriority, pi.procName, pi.paramListIn));
+        m_pendingInvocations.clear();
     }
 
-    ClientResponseImpl callProcedureNT(final AuthUser user,
+    synchronized ClientResponseImpl callProcedureNT(final AuthUser user,
                                        final Connection ccxn,
                                        final long clientHandle,
                                        final boolean ntPriority,
                                        final String procName,
                                        final ParameterSet paramListIn)
     {
+        if (m_paused.get()) {
+            PendingInvocation pi = new PendingInvocation(user, ccxn, clientHandle, ntPriority, procName, paramListIn);
+            m_pendingInvocations.add(pi);
+            return null;
+        }
+
         final ProcedureRunnerNTGenerator prntg;
         if (procName.startsWith("@")) {
             prntg = m_sysProcs.get(procName);

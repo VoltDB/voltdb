@@ -40,6 +40,8 @@ import org.voltdb.client.SyncCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.sysprocs.AdHoc_RO_MP;
+import org.voltdb.sysprocs.GC;
+import org.voltdb.sysprocs.UpdateApplicationCatalog;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltTableUtil;
 
@@ -528,6 +530,58 @@ public class TestNTProcs extends TestCase {
         ClientResponseImpl response = (ClientResponseImpl) client.callProcedure("@GC");
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
         System.out.println(response.getResults()[0].toFormattedString());
+
+        // CHECK STATS
+        VoltTable statsT = getStats(client, "PROCEDURE");
+        System.out.println("STATS: " + statsT.toFormattedString());
+
+        assertTrue(VoltTableUtil.tableContainsString(statsT, "GC", true));
+
+        System.out.println(statsT.toFormattedString());
+
+        Map<String, Long> stats = aggregateProcRow(client, GC.class.getName());
+        assertEquals(1, stats.get("INVOCATIONS").longValue());
+
+        localServer.shutdown();
+        localServer.join();
+    }
+
+    public void testUAC() throws Exception {
+        String pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");
+        String pathToDeployment = Configuration.getPathToCatalogForTest("adhocddl.xml");
+
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("--dont care");
+        builder.setUseDDLSchema(true);
+        boolean success = builder.compile(pathToCatalog, 2, 1, 0);
+        assertTrue("Schema compilation failed", success);
+        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
+
+        VoltDB.Configuration config = new VoltDB.Configuration();
+        config.m_pathToCatalog = pathToCatalog;
+        config.m_pathToDeployment = pathToDeployment;
+
+        ServerThread localServer = new ServerThread(config);
+
+        localServer.start();
+        localServer.waitForInitialization();
+
+        Client client = ClientFactory.createClient();
+        client.createConnection("localhost");
+
+        ClientResponseImpl response = (ClientResponseImpl) client.callProcedure("@AdHoc", "create table blah (pkey integer not null, strval varchar(200), PRIMARY KEY(pkey));");
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+
+        // CHECK STATS
+        VoltTable statsT = getStats(client, "PROCEDURE");
+        System.out.println("STATS: " + statsT.toFormattedString());
+
+        assertTrue(VoltTableUtil.tableContainsString(statsT, "UpdateApplicationCatalog", true));
+
+        System.out.println(statsT.toFormattedString());
+
+        Map<String, Long> stats = aggregateProcRow(client, UpdateApplicationCatalog.class.getName());
+        assertEquals(1, stats.get("INVOCATIONS").longValue());
 
         localServer.shutdown();
         localServer.join();

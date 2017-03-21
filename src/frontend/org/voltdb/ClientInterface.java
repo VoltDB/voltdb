@@ -1427,7 +1427,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      */
     public void notifyOfCatalogUpdate() {
         m_catalogContext.set(VoltDB.instance().getCatalogContext());
-        m_dispatcher.notifyOfCatalogUpdate();
         /*
          * Update snapshot daemon settings.
          *

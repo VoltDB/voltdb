@@ -256,10 +256,14 @@ public final class InvocationDispatcher {
         m_defaultConsistencyReadLevel = VoltDB.Configuration.getDefaultReadConsistencyLevel();
 
         m_NTProcedureService = new NTProcedureService(m_ich, m_mailbox);
-        notifyOfCatalogUpdate();
+        notifyNTProcedureServiceOfCatalogUpdate();
     }
 
-    void notifyOfCatalogUpdate() {
+    void notifyNTProcedureServiceOfPreCatalogUpdate() {
+        m_NTProcedureService.preUpdate();
+    }
+
+    void notifyNTProcedureServiceOfCatalogUpdate() {
         m_NTProcedureService.update(m_catalogContext.get());
     }
 

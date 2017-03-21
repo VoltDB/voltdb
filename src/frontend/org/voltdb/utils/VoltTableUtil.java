@@ -283,6 +283,12 @@ public class VoltTableUtil {
         VoltTableSpliterator(VoltTable table, int origin, int fence) {
             System.out.printf("New VTS %d -> %d in Table with %d rows\n", origin, fence, table.getRowCount());
             System.out.flush();
+
+            if (origin == fence) {
+                m_row = null;
+                return;
+            }
+
             assert(origin < fence);
             m_row = table.fetchRow(origin);
             m_fence = fence;
@@ -290,7 +296,7 @@ public class VoltTableUtil {
 
         @Override
         public boolean tryAdvance(Consumer<? super VoltTableRow> action) {
-            if (m_row.getActiveRowIndex() < m_fence) {
+            if ((m_row != null) && (m_row.getActiveRowIndex() < m_fence)) {
                  action.accept(m_row);
                  m_row = m_row.cloneRow();
                  m_row.advanceRow();
@@ -309,7 +315,8 @@ public class VoltTableUtil {
 
         @Override
         public long estimateSize() {
-            return m_fence - m_row.getActiveRowIndex();
+            if (m_row == null) return 0;
+            else return m_fence - m_row.getActiveRowIndex();
         }
 
         @Override

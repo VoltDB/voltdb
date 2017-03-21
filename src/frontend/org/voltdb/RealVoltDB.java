@@ -3336,9 +3336,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     m_adminListener.notifyOfCatalogUpdate();
                 }
 
+                m_clientInterface.getDispatcher().notifyNTProcedureServiceOfPreCatalogUpdate();
+
                 // 4. Flush StatisticsAgent old user PROCEDURE statistics.
                 // The stats agent will hold all other stats in memory.
                 getStatsAgent().notifyOfCatalogUpdate();
+
+                // 4.5. (added)
+                // Update the NT procedure service AFTER stats are cleared in the previous step
+                m_clientInterface.getDispatcher().notifyNTProcedureServiceOfCatalogUpdate();
 
                 // 5. MPIs don't run fragments. Update them here. Do
                 // this after flushing the stats -- this will re-register
