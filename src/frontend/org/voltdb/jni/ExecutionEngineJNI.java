@@ -194,13 +194,6 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
         m_psetBufferC = DBBPool.allocateDirect(size);
         m_psetBuffer = m_psetBufferC.b();
-        int errorCode = nativeSetBuffers(pointer, m_psetBuffer,
-                m_psetBuffer.capacity(),
-                perFragmentStatsBuffer, perFragmentStatsBuffer.capacity(),
-                m_firstDeserializer.buffer(), m_firstDeserializer.buffer().capacity(),
-                m_nextDeserializer.buffer(), m_nextDeserializer.buffer().capacity(),
-                m_exceptionBuffer, m_exceptionBuffer.capacity());
-        checkErrorCode(errorCode);
     }
 
     final void setupPerFragmentStatsBuffer(int size) {
@@ -223,6 +216,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             // The last request was a batch that was greater than max network buffer size,
             // so let's not hang on to all that memory
             setupPsetBuffer(MAX_PSETBUFFER_SIZE);
+            updateEEBufferPointers();
         }
         else {
             m_psetBuffer.clear();
