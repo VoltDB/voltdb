@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.io.Reader;
 import java.io.StringReader;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Properties;
 
@@ -109,11 +110,18 @@ public class VoltSuperCSVFormatter implements Formatter<ByteBuffer> {
 
     @Override
     public Object[] transform(ByteBuffer payload) throws FormatException {
-
         if (payload == null) {
             return null;
         }
-        String line = new String(payload.array());
+        return transform(payload, payload.position(), payload.limit());
+    }
+
+    @Override
+    public Object[] transform(ByteBuffer payload, int offset, int length) throws FormatException {
+        if (payload == null) {
+            return null;
+        }
+        String line = new String(payload.array(), offset, length, StandardCharsets.UTF_8);
         m_tokenizer.setSourceString(line);
         List<String> dataList;
         try {

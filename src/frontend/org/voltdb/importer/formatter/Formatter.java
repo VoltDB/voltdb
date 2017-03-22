@@ -29,4 +29,5 @@ public interface Formatter<T> {
      * @throws FormatException
      */
     public Object[] transform(T sourceData) throws FormatException;
+    public Object[] transform(T sourceData, int offset, int length) throws FormatException;
 }
