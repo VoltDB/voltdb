@@ -336,6 +336,9 @@ public class InitiatorMailbox implements Mailbox
         }
     }
 
+    // If @BalanceSPI comes in, set up new partition leader selection and
+    // mark this site as non-leader. All the transactions (sp and mp) which are sent to partition leader will be
+    // rerouted from this moment on until the transactions are correctly routed to new leader.
     private void handleSPIBalanceIfRequested(Iv2InitiateTaskMessage msg) {
 
         if (!"@BalanceSPI".equals(msg.getStoredProcedureName())) {
@@ -363,9 +366,8 @@ public class InitiatorMailbox implements Mailbox
         }
     }
 
-    // if the SPI migration has been requested, the site will be immediately treated as non-leader
-    // all the requests will be sent back to the sender if these requests are intended for leader
-    // These transactions will be restarted.
+    // After the SPI migration has been requested, all the sp requests will be sent back to the sender
+    // if these requests are intended for leader. Client interface will restart these transactions.
     private boolean checkMisroutedIv2IntiateTaskMessage(Iv2InitiateTaskMessage message) {
         if (m_scheduler.isLeader() || message.toReplica()) {
             return false;
@@ -378,9 +380,9 @@ public class InitiatorMailbox implements Mailbox
         return true;
     }
 
-    // if SPI migration has been requested, the site will be immediately treated as non-leader
-    // all the requests will be sent back to the sender if these requests are intended for leader
-    // These transactions will be restarted.
+    // After SPI migration has been requested, all the fragments which are sent to leader will be responded with
+    // restart transaction. MP writes will be restarted by re-adding it to transaction queue. MP reads will be restarted via
+    // client interface.
     private boolean checkMisroutedFragmentTaskMessage(FragmentTaskMessage message) {
         if (m_scheduler.isLeader() || message.toReplica()) {
             return false;
@@ -396,7 +398,7 @@ public class InitiatorMailbox implements Mailbox
         return true;
     }
 
-    // start the process of appointing a new leader for the partition
+    // update partition leader appointee on zookeeper.
     private void startSPIMigration(int partition, long newHSID) {
         LeaderCache leaderAppointee = new LeaderCache(m_messenger.getZK(), VoltZK.iv2appointees);
         try {

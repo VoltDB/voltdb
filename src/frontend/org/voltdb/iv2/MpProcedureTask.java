@@ -182,8 +182,9 @@ public class MpProcedureTask extends ProcedureTask
                     txn.setNeedsRollback(true);
                 }
                 completeInitiateTask(siteConnection);
-                // Set the source HSId (ugh) to ourselves so we track the message path correctly
                 response.m_sourceHSId = m_initiator.getHSId();
+
+                //ask client interface to restart read-only transactions.
                 response.setMisrouted(m_msg.getStoredProcedureInvocation());
                 m_initiator.deliver(response);
             } else {
