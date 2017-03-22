@@ -35,6 +35,7 @@ import org.voltdb.importer.formatter.FormatException;
 import org.voltdb.importer.formatter.Formatter;
 
 import com.google_voltpatches.common.base.Optional;
+import java.nio.ByteBuffer;
 
 /**
  * Importer implementation for pull socket importer. At runtime, there will
@@ -79,7 +80,7 @@ public class PullSocketImporter extends AbstractImporter {
 
         m_thread = Optional.of(Thread.currentThread());
         Optional<BufferedReader> reader = null;
-        Formatter formatter = m_config.getFormatterBuilder().create();
+        Formatter<ByteBuffer> formatter = m_config.getFormatterBuilder().create();
         while (!m_eos.get()) {
             try {
                 reader = attemptBufferedReader();
@@ -92,7 +93,7 @@ public class PullSocketImporter extends AbstractImporter {
                 String csv = null;
                 while ((csv=br.readLine()) != null) {
                      try{
-                        Object params[] = formatter.transform(csv.getBytes());
+                        Object params[] = formatter.transform(ByteBuffer.wrap(csv.getBytes()));
                         Invocation invocation = new Invocation(m_config.getProcedure(), params);
                         if (!callProcedure(invocation)) {
                             if (isDebugEnabled()) {
