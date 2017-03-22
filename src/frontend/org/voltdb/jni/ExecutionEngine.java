@@ -658,7 +658,6 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
                 }
             }
 
-            int bufferHint = Math.min(m_currentBatchIndex,1);
             FastDeserializer results = coreExecutePlanFragments(m_currentBatchIndex, numFragmentIds, planFragmentIds,
                     inputDepIds, parameterSets, isWriteFrag, writeCRC, txnId, spHandle, lastCommittedSpHandle,
                     uniqueId, undoQuantumToken, traceOn);

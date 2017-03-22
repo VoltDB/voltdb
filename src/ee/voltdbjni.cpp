@@ -580,8 +580,8 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExecu
     Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
     try {
         updateJNILogProxy(engine); //JNIEnv pointer can change between calls, must be updated
-        engine->resetReusedResultOutputBuffer(0, batch_index);
         engine->resetPerFragmentStatsOutputBuffer();
+        engine->resetReusedResultOutputBuffer(0, batch_index);
         static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
 
         // fragment info
