@@ -2,7 +2,7 @@
 
 VoltDB provides a number of examples to help people learn what is possible with VoltDB as well as how to use certain features. Some of these examples show specific patterns and individual features, while others are based on real-world applications. Many examples are simplified in the interest of making them better learning tools.
 
-All of the examples in the download kit are written in Java. There are some examples that have JDBC client code in addition to VoltDB native client code, notably `voter` and `voltkv`. For examples in additional languages, download a client kit for a specific language.  There is a list of client kits with examples on our [Developers](voltdb.com/developers) page.
+All of the examples in the download kit are written in Java. There are some examples that have JDBC client code in addition to VoltDB native client code, notably `voter` and `voltkv`. For examples in additional languages, download a client kit for a specific language.  There is a list of client kits with examples on our [Developers](https://www.voltdb.com/developers) page.
 
 These examples do not cover the complete set of VoltDB features or use cases; they are just a sample of what is possible with VoltDB. We do, however, expect to add additional examples and refinements over time. If you have feedback or suggestions related to examples, or any of the HOWTOs, send email to askanengineer@voltdb.com, we welcome your input.
 
@@ -67,12 +67,10 @@ This example is a simulation of a telephone based voting process where callers a
 
 Voter includes synchronous, asynchronous and JDBC versions of the client code.
 
-### windowing ###
-
+### windowing
 This example shows an application that takes in time-series data, runs analytic queries over several time-windows, and deletes older data as it either ages out or passes a rowcount threshold.
 
-### windowing-with-ddl ###
-
+### windowing-with-ddl
 A modified version of the windowing example that demonstrates the V5 feature that lets users define how to age out old tuples using a special row-count constraint on the table definition. This example has no Java stored procedures.
 
 
