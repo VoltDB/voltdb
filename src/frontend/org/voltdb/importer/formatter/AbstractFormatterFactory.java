@@ -17,7 +17,6 @@
 
 package org.voltdb.importer.formatter;
 
-import java.nio.ByteBuffer;
 import java.util.Properties;
 
 import org.osgi.framework.BundleActivator;
@@ -49,5 +48,5 @@ public abstract class AbstractFormatterFactory implements BundleActivator {
      * @param props - the properties used for the construction of formatter.
      * @return formatter instance created with the importer id
      */
-    public abstract Formatter<ByteBuffer> create(String  formatName, Properties props);
+    public abstract Formatter create(String formatName, Properties props);
 }

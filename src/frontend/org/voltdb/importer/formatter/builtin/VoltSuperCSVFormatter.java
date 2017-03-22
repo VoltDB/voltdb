@@ -32,7 +32,7 @@ import org.supercsv_voltpatches.tokenizer.Tokenizer;
 import org.voltdb.importer.formatter.FormatException;
 import org.voltdb.importer.formatter.Formatter;
 
-public class VoltSuperCSVFormatter implements Formatter<ByteBuffer> {
+public class VoltSuperCSVFormatter implements Formatter {
 
     /** String that can be used to indicate NULL value in CSV files */
     public static final String CSV_NULL = "\\N";
@@ -113,15 +113,7 @@ public class VoltSuperCSVFormatter implements Formatter<ByteBuffer> {
         if (payload == null) {
             return null;
         }
-        return transform(payload, payload.position(), payload.limit());
-    }
-
-    @Override
-    public Object[] transform(ByteBuffer payload, int offset, int length) throws FormatException {
-        if (payload == null) {
-            return null;
-        }
-        String line = new String(payload.array(), offset, length, StandardCharsets.UTF_8);
+        String line = new String(payload.array(), payload.arrayOffset(), payload.limit(), StandardCharsets.UTF_8);
         m_tokenizer.setSourceString(line);
         List<String> dataList;
         try {

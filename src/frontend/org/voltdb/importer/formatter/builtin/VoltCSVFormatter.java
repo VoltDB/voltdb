@@ -28,7 +28,7 @@ import au.com.bytecode.opencsv_voltpatches.CSVParser;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 
-public class VoltCSVFormatter implements Formatter<ByteBuffer> {
+public class VoltCSVFormatter implements Formatter {
     final CSVParser m_parser;
 
     public VoltCSVFormatter (String formatName, Properties prop) {
@@ -72,20 +72,12 @@ public class VoltCSVFormatter implements Formatter<ByteBuffer> {
 
     @Override
     public Object[] transform(ByteBuffer payload) throws FormatException {
-        if (payload == null) {
-            return null;
-        }
-        return transform(payload, payload.position(), payload.limit());
-    }
-
-    @Override
-    public Object[] transform(ByteBuffer payload, int offset, int length) throws FormatException {
         String line = null;
         try {
             if (payload == null) {
                 return null;
             }
-            line = new String(payload.array(), offset, length, StandardCharsets.UTF_8);
+            line = new String(payload.array(), payload.arrayOffset(), payload.limit(), StandardCharsets.UTF_8);
             Object list[] = m_parser.parseLine(line);
             if (list != null) {
                 for (int i = 0; i < list.length; i++) {

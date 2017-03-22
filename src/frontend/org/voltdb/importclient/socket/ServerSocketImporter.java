@@ -110,7 +110,7 @@ public class ServerSocketImporter extends AbstractImporter {
             try {
                 BufferedReader in = new BufferedReader(
                         new InputStreamReader(m_clientSocket.getInputStream()));
-                Formatter<ByteBuffer> formatter = m_config.getFormatterBuilder().create();
+                Formatter formatter = m_config.getFormatterBuilder().create();
                 Object params[] = null;
                 while (shouldRun()) {
                     String line = in.readLine();

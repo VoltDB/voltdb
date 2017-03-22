@@ -343,7 +343,7 @@ public class KafkaLoader {
         private final KafkaStream m_stream;
         private final CSVDataLoader m_loader;
         private final CSVParser m_csvParser;
-        private final Formatter<ByteBuffer> m_formatter;
+        private final Formatter m_formatter;
         private final KafkaConfig m_config;
 
         public KafkaConsumer(KafkaStream a_stream, CSVDataLoader loader, KafkaConfig config)
@@ -359,7 +359,7 @@ public class KafkaLoader {
                 Class[] ctorParmTypes = new Class[]{ String.class, Properties.class };
                 Constructor ctor = classz.getDeclaredConstructor(ctorParmTypes);
                 Object[] ctorParms = new Object[]{ format, m_config.m_formatterProperties };
-                m_formatter = (Formatter<ByteBuffer> ) ctor.newInstance(ctorParms);
+                m_formatter = (Formatter )ctor.newInstance(ctorParms);
             } else {
                 m_formatter = null;
             }
