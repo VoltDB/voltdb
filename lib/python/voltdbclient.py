@@ -24,11 +24,7 @@ import base64, textwrap
 import struct
 import datetime
 import decimal
-try:
-    from hashlib import sha1 as sha
-except ImportError:
-    from sha import sha
-
+import hashlib
 try:
     import ssl
     ssl_available = True
@@ -377,7 +373,9 @@ class FastSerializer:
         # authentication is turned off.
 
         #protocol version
-        self.writeByte(0)
+        self.writeByte(1)
+        #sha256
+        self.writeByte(1)
 
         # service requested
         self.writeString("database")
@@ -389,8 +387,8 @@ class FastSerializer:
             # no username, just output length of 0
             self.writeString("")
 
-        # password supplied, sha-1 hash it
-        m = sha()
+        # password supplied, sha-256 hash it
+        m = hashlib.sha256()
         m.update(password)
         pwHash = m.digest()
         self.wbuf.extend(pwHash)
