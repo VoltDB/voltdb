@@ -540,17 +540,13 @@ def buildMakefile(CTX):
     cleanobjs += ["prod/voltrun"]
 
     makefile.write("# voltdb execution engine that accepts work on a tcp socket (vs. jni)\n")
-    makefile.write("prod/voltdbipc: $(SRCDIR)/voltdbipc.cpp " + " objects/volt.a\n")
+    makefile.write("prod/voltdbipc: $(SRCDIR)/voltdbipc.cpp objects/volt.a\n")
     makefile.write("\t$(LINK.cpp) -o $@ $^ $(LASTLDFLAGS) $(LASTIPCLDFLAGS)\n")
     makefile.write("\n")
     cleanobjs += ["prod/voltdbipc"]
-
-    if CTX.LEVEL == "MEMCHECK":
-        makefile.write("prod/voltdbipc")
-    if CTX.LEVEL == "MEMCHECK_NOFREELIST":
-        makefile.write("prod/voltdbipc")
-    makefile.write("\n")
     makefile.write('\n')
+    makefile.write('\n')
+    
     makefile.write("objects/volt.a: %s\n" % formatList(jni_objects))
     makefile.write("\t$(AR) $(ARFLAGS) $@ $?\n")
     harness_source = TEST_PREFIX + "/harness.cpp"
@@ -624,13 +620,18 @@ def buildMakefile(CTX):
     # build the generated tests.
     buildGeneratedTests(CTX, makefile, all_gen_tests)
     makefile.write("\n")
+    
+    # A target for all the tests.  This is what buildtools.py eventually uses.
+    makefile.write("#\n# A target for all the tests.  This is what buildtools.py eventually uses.\n#\n") 
     makefile.write(".PHONY: test\n")
-    makefile.write("test: ")
+    makefile.write("test: \\\n")
     for test in tests:
         binname, objectname, sourcename = namesForTestCode(test)
-        makefile.write(binname + " \\\n        ")
-    makefile.write("${GENERATED_TESTS}\n")
-    makefile.write("\n\n")
+        makefile.write("\t" + binname + " \\\n        ")
+    makefile.write("\t\t${GENERATED_TESTS}")
+    if CTX.LEVEL == "MEMCHECK" or CTX.LEVEL == "MEMCHECK_NOFREELIST":
+        makefile.write("\\\n\tprod/voltdbipc\n")
+    makefile.write('\n')
     for test in tests:
         binname, objectname, sourcename = namesForTestCode(test)
 
@@ -866,7 +867,7 @@ def runTests(CTX):
         if retval == 0:
             successes += 1
         else:
-            failedTests += [binname]
+            failedTests += [os.path.join(dirname, binname)]
             failures += 1
     print "==============================================================================="
     print "TESTING COMPLETE (PASSED: %d, FAILED: %d)" % (successes, failures)
