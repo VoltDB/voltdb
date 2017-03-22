@@ -18,17 +18,19 @@ import sys, os, subprocess
 
 from voltcli import utility
 
-collect_help = ('Collect logs on the current node for problem analysis.')
+collect_help = ('Collect logs on the current node for problem analysis')
 
 dir_spec_help = ('root directory for the database. The default is the current working directory.')
-output_help = ('file name to store collect data in compressed format.')
+output_help = ('file name to store collect data in compressed format. The default is the collect.zip in the '
+               'current working directory.')
 
 
 @VOLT.Command(
     description = collect_help,
     options = (
         VOLT.StringOption (None, '--prefix', 'prefix',
-                           'file name prefix for uniquely identifying collection',
+                           'file name prefix for uniquely identifying collection. This has been deprecated, consider '
+                           'using --output option',
                            default = ''),
         VOLT.StringOption('-o', '--output', 'output', output_help, default=''),
         VOLT.StringOption (None, '--upload', 'host',
@@ -57,13 +59,13 @@ output_help = ('file name to store collect data in compressed format.')
         VOLT.BooleanOption('-f', '--force', 'force', 'Overwrite the existing file.', default = False)
     ),
     arguments = (
-        VOLT.PathArgument('voltdbroot', 'the voltdbroot path', absolute = True, optional=True, default=None)
+        VOLT.PathArgument('voltdbroot', 'the voltdbroot path. This has been deprecated, consider using --dir option', absolute = True, optional=True, default=None)
     )
 )
 
 def collect(runner):
     if int(runner.opts.days) == 0:
-        utility.abort(" \'0\' is invalid entry for option --days")
+        utility.abort(' \'0\' is invalid entry for option --days')
 
     process_voltdbroot_args(runner)
     process_outputfile_args(runner)
@@ -77,19 +79,19 @@ def collect(runner):
 
 def process_voltdbroot_args(runner) :
     if (runner.opts.directory_spec) and (runner.opts.voltdbroot):
-        utility.abort("To specify database root directory, use --dir option. Providing database root using command line "
-                      "argument and --dir option is not valid")
+        utility.abort('To specify database root directory, use --dir option. Providing database root using --dir option '
+                      'and command line argument is not valid.')
 
-    os.environ["PATH"] += os.pathsep + os.pathsep.join(s for s in sys.path if os.path.join("voltdb", "bin") in s)
+    os.environ['PATH'] += os.pathsep + os.pathsep.join(s for s in sys.path if os.path.join('voltdb', 'bin') in s)
     # If database directory is given, derive voltdbroot path to store results of systemcheck in voltdbroot directory
     if runner.opts.directory_spec:
         if os.path.isdir(runner.opts.directory_spec) and os.access(runner.opts.directory_spec, os.R_OK|os.W_OK|os.X_OK):
             voltdbrootDir = os.path.join(runner.opts.directory_spec + 'voltdbroot')
         else:
-            utility.abort("ERROR: specified database directory is not valid", runner.opts.directory_spec)
+            utility.abort('ERROR: specified database directory is not valid', runner.opts.directory_spec)
     elif runner.opts.voltdbroot:
-        utility.warning("Specifying voltdbroot directory using command argument is deprecated. Consider using --dir "
-                        "option to specify database directory.");
+        utility.warning('Specifying voltdbroot directory using command argument is deprecated. Consider using --dir '
+                        'option to specify database directory.');
         voltdbrootDir = runner.opts.voltdbroot
     else:
         voltdbrootDir = os.path.join(os.getcwd(), 'voltdbroot')
@@ -100,26 +102,29 @@ def process_voltdbroot_args(runner) :
 
 def performSystemCheck(runner, dirPath):
     if os.path.isdir(dirPath) and os.access(dirPath, os.R_OK|os.W_OK|os.X_OK):
-        checkFD = os.open(os.path.join(dirPath, "systemcheck"), os.O_WRONLY|os.O_CREAT|os.O_TRUNC)
+        checkFD = os.open(os.path.join(dirPath, 'systemcheck'), os.O_WRONLY|os.O_CREAT|os.O_TRUNC)
         checkOutput = os.fdopen(checkFD, 'w')
-        subprocess.call("voltdb check", stdout=checkOutput, shell=True)
+        subprocess.call('voltdb check', stdout=checkOutput, shell=True)
         checkOutput.close()
     else:
         if runner.opts.directory_spec:
-            utility.abort("Invalid database directory " + runner.opts.directory_spec +
-                          ". Specify valid database directory using --dir option")
+            utility.abort('Invalid database directory ' + runner.opts.directory_spec +
+                          '. Specify valid database directory using --dir option.')
         elif runner.opts.voltdbroot:
-            utility.abort("Invalid voltdbroot path " + runner.opts.voltdbroot +
-                          ". Specify valid database directory using --dir option")
+            utility.abort('Invalid voltdbroot path ' + runner.opts.voltdbroot +
+                          '. Specify valid database directory using --dir option.')
         else:
-            utility.abort("Invalid database directory " + os.getcwd() +
-                          ". Specify valid database directory using --dir option")
+            utility.abort('Invalid database directory ' + os.getcwd() +
+                          '. Specify valid database directory using --dir option.')
 
 def process_outputfile_args(runner):
     if runner.opts.output and runner.opts.prefix:
-        utility.abort("To specify output file name, use --output or --prefix option. Using both options is not valid")
+        utility.abort('To specify output file name, use --output option. Providing output file name using --output '
+                      'and --prefix option is not valid.')
 
     if runner.opts.output:
         runner.args.extend(['--outputFile='+runner.opts.output])
     elif runner.opts.prefix:
+        utility.warning('Specifying prefix for outputfile name is deprecated. Consider using --output option to specify'
+                        ' output file name.')
         runner.args.extend(['--prefix='+runner.opts.prefix])
