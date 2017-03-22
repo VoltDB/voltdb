@@ -28,6 +28,7 @@
 
 #include "common/TupleSchemaBuilder.h"
 #include "common/ValueFactory.hpp"
+#include "common/ValuePeeker.hpp"
 #include "common/tabletuple.h"
 #include "common/types.h"
 #include "storage/LargeTableIterator.h"
@@ -35,10 +36,6 @@
 #include "storage/tablefactory.h"
 
 using namespace voltdb;
-
-class LargeTempTableTest : public Test {
-
-};
 
 template<typename T>
 NValue nvalueFromNative(T val);
@@ -138,6 +135,32 @@ TupleSchema* buildSchema(Args... args) {
 }
 
 
+class LargeTempTableTest : public Test {
+protected:
+
+    void assertTupleValuesEqualHelper(TableTuple* tuple, int index) {
+        assert(tuple->getSchema()->columnCount() == index);
+    }
+
+    template<typename T, typename ...Args>
+    void assertTupleValuesEqualHelper(TableTuple* tuple, int index, T expected, Args... args) {
+        NValue actualNVal = tuple->getNValue(index);
+        NValue expectedNVal = nvalueFromNative(expected);
+
+        ASSERT_EQ(ValuePeeker::peekValueType(expectedNVal), ValuePeeker::peekValueType(actualNVal));
+        ASSERT_EQ(0, expectedNVal.compare(actualNVal));
+
+        assertTupleValuesEqualHelper(tuple, index + 1, args...);
+    }
+
+    template<typename... Args>
+    void assertTupleValuesEqual(TableTuple* tuple, Args... expectedVals) {
+        assertTupleValuesEqualHelper(tuple, 0, expectedVals...);
+    }
+};
+
+
+
 TEST_F(LargeTempTableTest, Basic) {
     TupleSchema* schema = buildSchema(VALUE_TYPE_BIGINT,
                                       VALUE_TYPE_DOUBLE,
@@ -168,9 +191,7 @@ TEST_F(LargeTempTableTest, Basic) {
     TableTuple iterTuple(ltt->schema());
     int i = 0;
     while (iter.next(iterTuple)) {
-        ASSERT_EQ(0, nvalueFromNative(pkVals[i]).compare(iterTuple.getNValue(0)));
-        ASSERT_EQ(0, nvalueFromNative(floatVals[i]).compare(iterTuple.getNValue(1)));
-        ASSERT_EQ(0, nvalueFromNative(textVals[i]).compare(iterTuple.getNValue(2)));
+        assertTupleValuesEqual(&iterTuple, pkVals[i], floatVals[i], textVals[i]);
         ++i;
     }
 
@@ -202,6 +223,17 @@ TEST_F(LargeTempTableTest, MultiBlock) {
         setTupleValues(&tuple, i, 0.5 * i, text);
         ltt->insertTuple(tuple);
     }
+
+    LargeTableIterator iter = ltt->largeIterator();
+    TableTuple iterTuple(ltt->schema());
+    int i = 0;
+    while (iter.next(iterTuple)) {
+        std::string text(256, 'a' + i);
+        assertTupleValuesEqual(&iterTuple, i, 0.5 * i, text);
+        ++i;
+    }
+
+    ltt->incrementRefcount();
 }
 
 int main() {

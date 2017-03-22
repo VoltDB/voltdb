@@ -28,13 +28,19 @@ namespace voltdb {
 bool LargeTempTable::insertTuple(TableTuple& tuple) {
     ReferenceSerializeOutput output;
 
-    // xxx Check to see if we can fit the tuple in the the current block...
-    size_t startPos = m_currPosition;
-    output.initializeWithPosition(dataBlock(), LargeTempTableBlock::getBlocksize(), m_currPosition);
-    tuple.serializeTo(output);
-    m_currPosition = output.position();
+    size_t neededBytes = tuple.serializationSize();
 
-    size_t usedBytes = m_currPosition - startPos;
+    if (m_blockForWriting == nullptr || neededBytes > m_blockForWriting->getRemainingBytes()) {
+        m_blockForWriting = new LargeTempTableBlock();
+        m_blocks.push_back(m_blockForWriting);
+        assert(neededBytes <= m_blockForWriting->getRemainingBytes());
+    }
+
+    size_t startPos = m_blockForWriting->getUsedBytes();
+    output.initializeWithPosition(m_blockForWriting->getData(), LargeTempTableBlock::getBlocksize(), startPos);
+    tuple.serializeTo(output);
+
+    size_t usedBytes = output.position() - startPos;
     m_blockForWriting->incrementUsedBytes(usedBytes);
 
     ++m_numTuples;

@@ -72,6 +72,10 @@ namespace voltdb {
             return m_usedBytes;
         }
 
+        size_t getRemainingBytes() const {
+            return getBlocksize() - getUsedBytes();
+        }
+
         // xxx make this protected
         static void setBlocksize(size_t newSize) {
             blocksizeRef() = newSize;

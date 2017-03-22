@@ -88,6 +88,7 @@ bool LargeTableIterator::next(TableTuple& out) {
     assert(m_currPosition <= (*m_blockIterator)->getUsedBytes());
     if (m_currPosition == (*m_blockIterator)->getUsedBytes()) {
         ++m_blockIterator;
+        m_currPosition = 0;
     }
 
     return true;

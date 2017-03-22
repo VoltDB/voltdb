@@ -82,7 +82,6 @@ protected:
         : Table(LargeTempTableBlock::getBlocksize())
         , m_iter(this)
         , m_blockForWriting(nullptr)
-        , m_currPosition(0)
         , m_blocks()
         , m_numTuples(0)
     {
@@ -90,20 +89,9 @@ protected:
 
 private:
 
-    void* dataBlock() {
-        if (m_blockForWriting == nullptr) {
-            // Here we can instead call block cache to get a free
-            // block.
-            m_blockForWriting = new LargeTempTableBlock();
-            m_blocks.push_back(m_blockForWriting);
-        }
-        return m_blockForWriting->getData();
-    }
-
     TableIterator m_iter;
 
     LargeTempTableBlock* m_blockForWriting;
-    size_t m_currPosition;
     std::vector<LargeTempTableBlock*> m_blocks;
 
     int64_t m_numTuples; // redundant with base class?? xxx
