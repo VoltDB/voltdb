@@ -305,6 +305,9 @@ public class ProcedureRunner {
         return m_cachedRNG;
     }
 
+    /**
+     * Wraps coreCall with statistics code.
+     */
     public ClientResponseImpl call(Object... paramListIn) {
         m_perCallStats = m_statsCollector.beginProcedure();
 
@@ -376,7 +379,7 @@ public class ProcedureRunner {
                 String msg = "PROCEDURE " + m_procedureName + " EXPECTS " + String.valueOf(m_paramTypes.length) +
                     " PARAMS, BUT RECEIVED " + String.valueOf(paramList.length);
                 m_statusCode = ClientResponse.GRACEFUL_FAILURE;
-                return getErrorResponse(m_statusCode, msg, null);
+                return getErrorResponse(m_statusCode, m_appStatusCode, m_appStatusString, msg, null);
             }
 
             for (int i = 0; i < m_paramTypes.length; i++) {
@@ -388,7 +391,7 @@ public class ProcedureRunner {
                     String msg = "PROCEDURE " + m_procedureName + " TYPE ERROR FOR PARAMETER " + i +
                             ": " + e.toString();
                     m_statusCode = ClientResponse.GRACEFUL_FAILURE;
-                    return getErrorResponse(m_statusCode, msg, null);
+                    return getErrorResponse(m_statusCode, m_appStatusCode, m_appStatusString, msg, null);
                 }
             }
 
@@ -441,7 +444,13 @@ public class ProcedureRunner {
                             throw (Error)ex;
                         }
                     }
-                    retval = getErrorResponse(ex);
+                    retval = getErrorResponse(m_procedureName,
+                                              m_isReadOnly,
+                                              m_txnState.getInvocation().getBatchTimeout(),
+                                              m_appStatusCode,
+                                              m_appStatusString,
+                                              getNonVoltDBBackendIfExists(),
+                                              ex);
                 }
             }
             // single statement only work
@@ -465,7 +474,13 @@ public class ProcedureRunner {
                     }
                 }
                 catch (SerializableException ex) {
-                    retval = getErrorResponse(ex);
+                    retval = getErrorResponse(m_procedureName,
+                                              m_isReadOnly,
+                                              m_txnState.getInvocation().getBatchTimeout(),
+                                              m_appStatusCode,
+                                              m_appStatusString,
+                                              getNonVoltDBBackendIfExists(),
+                                              ex);
                 }
             }
 
@@ -473,7 +488,7 @@ public class ProcedureRunner {
             if (results == null) {
                 results = new VoltTable[0];
             } else if (results.length > Short.MAX_VALUE) {
-                String statusString = "Stored procedure returns too much data. Exceeded  maximum number of VoltTables: " + Short.MAX_VALUE;
+                String statusString = "Stored procedure returns too much data. Exceeded maximum number of VoltTables: " + Short.MAX_VALUE;
                 retval = new ClientResponseImpl(
                         ClientResponse.GRACEFUL_FAILURE,
                         ClientResponse.GRACEFUL_FAILURE,
@@ -649,7 +664,7 @@ public class ProcedureRunner {
     }
 
     /*
-     * Cluster id is immutable and be persisted during the snapshot
+     * Cluster id is immutable and is persisted across snapshot/recover events
      */
     public int getClusterId() {
         return m_site.getCorrespondingClusterId();
@@ -1231,10 +1246,11 @@ public class ProcedureRunner {
 
    /**
     * Test whether or not the given stack frame is within a procedure invocation
+    * @param The name of the procedure
     * @param stel a stack trace element
     * @return true if it is, false it is not
     */
-   protected boolean isProcedureStackTraceElement(StackTraceElement stel) {
+   public static boolean isProcedureStackTraceElement(String procedureName, StackTraceElement stel) {
        int lastPeriodPos = stel.getClassName().lastIndexOf('.');
 
        if (lastPeriodPos == -1) {
@@ -1246,8 +1262,8 @@ public class ProcedureRunner {
        // Account for inner classes too. Inner classes names comprise of the parent
        // class path followed by a dollar sign
        String simpleName = stel.getClassName().substring(lastPeriodPos);
-       return simpleName.equals(m_procedureName)
-           || (simpleName.startsWith(m_procedureName) && simpleName.charAt(m_procedureName.length()) == '$');
+       return simpleName.equals(procedureName)
+           || (simpleName.startsWith(procedureName) && simpleName.charAt(procedureName.length()) == '$');
    }
 
    /**
@@ -1255,7 +1271,13 @@ public class ProcedureRunner {
     * @param e
     * @return A ClientResponse containing error information
     */
-   protected ClientResponseImpl getErrorResponse(Throwable eIn) {
+   public static ClientResponseImpl getErrorResponse(String procedureName,
+                                                     boolean readOnly,
+                                                     int individualTimeout,
+                                                     byte appStatus,
+                                                     String appStatusString,
+                                                     NonVoltDBBackend nonVoltDBBackend,
+                                                     Throwable eIn) {
        // use local var to avoid warnings about reassigning method argument
        Throwable e = eIn;
        boolean expected_failure = true;
@@ -1263,7 +1285,7 @@ public class ProcedureRunner {
        StackTraceElement[] stack = e.getStackTrace();
        ArrayList<StackTraceElement> matches = new ArrayList<StackTraceElement>();
        for (StackTraceElement ste : stack) {
-           if (isProcedureStackTraceElement(ste)) {
+           if (isProcedureStackTraceElement(procedureName, ste)) {
                matches.add(ste);
            }
        }
@@ -1291,7 +1313,7 @@ public class ProcedureRunner {
        }
        else if (e.getClass() == org.voltdb.ExpectedProcedureException.class) {
            String backendType = "HSQL";
-           if (getNonVoltDBBackendIfExists() instanceof PostgreSQLBackend) {
+           if (nonVoltDBBackend instanceof PostgreSQLBackend) {
                backendType = "PostgreSQL";
            }
            msg.append(backendType);
@@ -1319,9 +1341,8 @@ public class ProcedureRunner {
        // ensure the message is returned if we're not going to hit the verbose condition below
        if (expected_failure || hideStackTrace) {
            msg.append("  ").append(e.getMessage());
-           if (e instanceof org.voltdb.exceptions.InterruptException && m_isReadOnly) {
+           if (e instanceof org.voltdb.exceptions.InterruptException && readOnly) {
                int originalTimeout = VoltDB.instance().getConfig().getQueryTimeout();
-               int individualTimeout = m_txnState.getInvocation().getBatchTimeout();
                if (BatchTimeoutOverrideType.isUserSetTimeout(individualTimeout)) {
                    msg.append(" query-specific timeout period.");
                    msg.append(" The query-specific timeout is currently " +  individualTimeout/1000.0 + " seconds.");
@@ -1361,15 +1382,23 @@ public class ProcedureRunner {
        }
 
        return getErrorResponse(
-               status, msg.toString(),
+               status,
+               appStatus,
+               appStatusString,
+               msg.toString(),
                e instanceof SerializableException ? (SerializableException)e : null);
    }
 
-   protected ClientResponseImpl getErrorResponse(byte status, String msg, SerializableException e) {
+   protected static ClientResponseImpl getErrorResponse(byte status,
+                                                        byte appStatus,
+                                                        String appStatusString,
+                                                        String msg,
+                                                        SerializableException e)
+   {
        return new ClientResponseImpl(
                status,
-               m_appStatusCode,
-               m_appStatusString,
+               appStatus,
+               appStatusString,
                new VoltTable[0],
                "VOLTDB ERROR: " + msg);
    }
@@ -1385,11 +1414,11 @@ public class ProcedureRunner {
        if (result instanceof VoltTable[]) {
            VoltTable[] retval = (VoltTable[]) result;
            for (VoltTable table : retval) {
-            if (table == null) {
+               if (table == null) {
                    Exception e = new RuntimeException("VoltTable arrays with non-zero length cannot contain null values.");
                    throw new InvocationTargetException(e);
                }
-        }
+           }
 
            return retval;
        }

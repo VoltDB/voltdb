@@ -17,13 +17,9 @@
 
 package org.voltdb;
 
-import java.io.PrintWriter;
-import java.io.StringWriter;
-import java.io.Writer;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
@@ -40,33 +36,43 @@ import org.voltdb.AuthSystem.AuthUser;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
-import org.voltdb.exceptions.SerializableException;
-import org.voltdb.exceptions.SpecifiedException;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
+/**
+ * Support class non-transactional procedures that runs 1-1
+ * with an instance of VoltNTProcedure.
+ *
+ * Much like regular ProcedureRunner, this NT version lets you run
+ * the run method and manages the API of the user-supplied proc.
+ *
+ */
 public class ProcedureRunnerNT {
 
+    // this is priority service for follow up work
     protected final ExecutorService m_executorService;
-    protected final NTProcedureService m_procSet;
+    protected final NTProcedureService m_ntProcService;
+    // client interface mailbox
     protected final Mailbox m_mailbox;
+    // shared between all concurrent calls to the same procedure
     ProcedureStatsCollector m_statsCollector;
+    // generated for each call
     StatementStats.SingleCallStatsToken m_perCallStats = null;
 
+    // unique for each call
     protected final long m_id;
+    // gate to only allow one all-host call at a time
     protected final AtomicBoolean m_outstandingAllHostProc = new AtomicBoolean(false);
 
+    // regular call support stuff
     protected final AuthUser m_user;
     protected final Connection m_ccxn;
     protected final long m_clientHandle;
-
     protected final String m_procedureName;
     protected final VoltNTProcedure m_procedure;
     protected final Method m_procMethod;
     protected final Class<?>[] m_paramTypes;
-
     protected byte m_statusCode = ClientResponse.SUCCESS;
     protected String m_statusString = null;
-    // Status code that can be set by stored procedure upon invocation that will be returned with the response.
     protected byte m_appStatusCode = ClientResponse.UNINITIALIZED_APP_STATUS_CODE;
     protected String m_appStatusString = null;
 
@@ -92,11 +98,14 @@ public class ProcedureRunnerNT {
         m_procMethod = procMethod;
         m_paramTypes = paramTypes;
         m_executorService = executorService;
-        m_procSet = procSet;
+        m_ntProcService = procSet;
         m_mailbox = mailbox;
         m_statsCollector = statsCollector;
     }
 
+    /**
+     * Complete the future when we get a traditional ProcedureCallback.
+     */
     class MyProcedureCallback implements ProcedureCallback {
         final CompletableFuture<ClientResponse> fut = new CompletableFuture<>();
         @Override
@@ -117,6 +126,14 @@ public class ProcedureRunnerNT {
     Map<Integer,ClientResponse> m_allHostResponses;
     CompletableFuture<Map<Integer,ClientResponse>> m_allHostFut;
 
+    /**
+     * This is called when an all-host proc responds from a particular node.
+     * It completes the future when all of the
+     *
+     * It uses a dumb hack that the hostid is stored in the appStatusString.
+     * Since this is just for sysprocs, VoltDB devs making sysprocs should know
+     * that string app status doesn't work.
+     */
     public synchronized void allHostNTProcedureCallback(ClientResponse clientResponse) {
         int hostId = Integer.parseInt(clientResponse.getAppStatusString());
         boolean removed = m_outstandingAllHostProcedureHostIds.remove(hostId);
@@ -138,13 +155,21 @@ public class ProcedureRunnerNT {
         }
     }
 
+    /**
+     * Call a procedure (either txn or NT) and complete the returned future when done.
+     */
     protected CompletableFuture<ClientResponse> callProcedure(String procName, Object... params) {
         MyProcedureCallback cb = new MyProcedureCallback();
-        boolean success = m_procSet.m_ich.callProcedure(m_user, false, 1000 * 120, cb, true, procName, params);
+        boolean success = m_ntProcService.m_ich.callProcedure(m_user, false, 1000 * 120, cb, true, procName, params);
         assert(success);
         return cb.fut;
     }
 
+    /**
+     * Send an invocation directly to each host's CI mailbox.
+     * This ONLY works for NT procedures.
+     * Track responses and complete the returned future when they're all accounted for.
+     */
     protected CompletableFuture<Map<Integer,ClientResponse>> callAllNodeNTProcedure(String procName, Object... params) {
         // only one of these at a time
         if (m_outstandingAllHostProc.get()) {
@@ -183,6 +208,7 @@ public class ProcedureRunnerNT {
             m_outstandingAllHostProcedureHostIds = liveHostIds;
         }
 
+        // send the invocation to all live nodes
         liveHostIds.stream()
                 .map(hostId -> CoreUtils.getHSIdFromHostAndSite(hostId, HostMessenger.CLIENT_INTERFACE_SITE_ID))
                 .forEach(hsid -> {
@@ -192,6 +218,14 @@ public class ProcedureRunnerNT {
         return m_allHostFut;
     }
 
+    /**
+     * Synchronous call to NT procedure run(..) method.
+     *
+     * Wraps coreCall with statistics.
+     *
+     * @return ClientResponseImpl non-null if done and null if there is an
+     * async task still running.
+     */
     protected ClientResponseImpl call(Object... paramListIn) {
         m_perCallStats = m_statsCollector.beginProcedure();
 
@@ -225,6 +259,11 @@ public class ProcedureRunnerNT {
         return result;
     }
 
+    /**
+     * Core Synchronous call to NT procedure run(..) method.
+     * @return ClientResponseImpl non-null if done and null if there is an
+     * async task still running.
+     */
     private ClientResponseImpl coreCall(Object... paramListIn) {
         VoltTable[] results = null;
 
@@ -236,7 +275,7 @@ public class ProcedureRunnerNT {
                 String msg = "PROCEDURE " + m_procedureName + " EXPECTS " + String.valueOf(m_paramTypes.length) +
                     " PARAMS, BUT RECEIVED " + String.valueOf(paramList.length);
                 m_statusCode = ClientResponse.GRACEFUL_FAILURE;
-                return getErrorResponse(m_statusCode, msg, null);
+                return ProcedureRunner.getErrorResponse(m_statusCode, m_appStatusCode, m_appStatusString, msg, null);
             }
 
             for (int i = 0; i < m_paramTypes.length; i++) {
@@ -248,7 +287,7 @@ public class ProcedureRunnerNT {
                     String msg = "PROCEDURE " + m_procedureName + " TYPE ERROR FOR PARAMETER " + i +
                             ": " + e.toString();
                     m_statusCode = ClientResponse.GRACEFUL_FAILURE;
-                    return getErrorResponse(m_statusCode, msg, null);
+                    return ProcedureRunner.getErrorResponse(m_statusCode, m_appStatusCode, m_appStatusString, msg, null);
                 }
             }
 
@@ -307,7 +346,7 @@ public class ProcedureRunnerNT {
                             response.flattenToBuffer(buf).flip();
                             m_ccxn.writeStream().enqueue(buf);
 
-                            m_procSet.handleNTProcEnd(ProcedureRunnerNT.this);
+                            m_ntProcService.handleNTProcEnd(ProcedureRunnerNT.this);
                         }
                     });
 
@@ -329,19 +368,25 @@ public class ProcedureRunnerNT {
                 // the condition as best as it can (usually a crashLocalVoltDB).
                 throw (Error)ex;
             }
-            return getErrorResponse(ex);
+            return ProcedureRunner.getErrorResponse(m_procedureName,
+                                                    true,
+                                                    0,
+                                                    m_appStatusCode,
+                                                    m_appStatusString,
+                                                    null,
+                                                    ex);
         }
 
         return responseFromTableArray(results);
     }
 
-    public ClientResponseImpl responseFromTableArray(VoltTable[] results) {
+    ClientResponseImpl responseFromTableArray(VoltTable[] results) {
         // don't leave empty handed
         if (results == null) {
             results = new VoltTable[0];
         }
         else if (results.length > Short.MAX_VALUE) {
-            String statusString = "Stored procedure returns too much data. Exceeded  maximum number of VoltTables: " + Short.MAX_VALUE;
+            String statusString = "Stored procedure returns too much data. Exceeded maximum number of VoltTables: " + Short.MAX_VALUE;
             return new ClientResponseImpl(
                     ClientResponse.GRACEFUL_FAILURE,
                     ClientResponse.GRACEFUL_FAILURE,
@@ -359,131 +404,11 @@ public class ProcedureRunnerNT {
     }
 
     /**
-    *
-    * @param e
-    * @return A ClientResponse containing error information
-    */
-   protected ClientResponseImpl getErrorResponse(Throwable eIn) {
-       // use local var to avoid warnings about reassigning method argument
-       Throwable e = eIn;
-       boolean expected_failure = true;
-       boolean hideStackTrace = false;
-       StackTraceElement[] stack = e.getStackTrace();
-       ArrayList<StackTraceElement> matches = new ArrayList<StackTraceElement>();
-       for (StackTraceElement ste : stack) {
-           if (isProcedureStackTraceElement(ste)) {
-               matches.add(ste);
-           }
-       }
-
-       byte status = ClientResponse.UNEXPECTED_FAILURE;
-       StringBuilder msg = new StringBuilder();
-
-       if (e.getClass() == VoltAbortException.class) {
-           status = ClientResponse.USER_ABORT;
-           msg.append("USER ABORT\n");
-       }
-       else if (e.getClass() == org.voltdb.exceptions.ConstraintFailureException.class) {
-           status = ClientResponse.GRACEFUL_FAILURE;
-           msg.append("CONSTRAINT VIOLATION\n");
-       }
-       else if (e.getClass() == org.voltdb.exceptions.SQLException.class) {
-           status = ClientResponse.GRACEFUL_FAILURE;
-           msg.append("SQL ERROR\n");
-       }
-       // Interrupt exception will be thrown when the procedure is killed by a user
-       // or by a timeout in the middle of executing.
-       else if (e.getClass() == org.voltdb.exceptions.InterruptException.class) {
-           status = ClientResponse.GRACEFUL_FAILURE;
-           msg.append("Transaction Interrupted\n");
-       }
-       else if (e.getClass() == org.voltdb.ExpectedProcedureException.class) {
-           String backendType = "HSQL";
-           msg.append(backendType);
-           msg.append("-BACKEND ERROR\n");
-           if (e.getCause() != null) {
-               e = e.getCause();
-           }
-       }
-       else if (e.getClass() == org.voltdb.exceptions.TransactionRestartException.class) {
-           status = ClientResponse.TXN_RESTART;
-           msg.append("TRANSACTION RESTART\n");
-       }
-       // SpecifiedException means the dev wants control over status and message
-       else if (e.getClass() == SpecifiedException.class) {
-           SpecifiedException se = (SpecifiedException) e;
-           status = se.getStatus();
-           expected_failure = true;
-           hideStackTrace = true;
-       }
-       else {
-           msg.append("UNEXPECTED FAILURE:\n");
-           expected_failure = false;
-       }
-
-       // ensure the message is returned if we're not going to hit the verbose condition below
-       if (expected_failure || hideStackTrace) {
-           msg.append("  ").append(e.getMessage());
-       }
-
-       // Rarely hide the stack trace.
-       // Right now, just for SpecifiedException, which is usually from sysprocs where the error is totally
-       // known and not helpful to the user.
-       if (!hideStackTrace) {
-           // If the error is something we know can happen as part of normal operation,
-           // reduce the verbosity.
-           // Otherwise, generate more output for debuggability
-           if (expected_failure) {
-               for (StackTraceElement ste : matches) {
-                   msg.append("\n    at ");
-                   msg.append(ste.getClassName()).append(".").append(ste.getMethodName());
-                   msg.append("(").append(ste.getFileName()).append(":");
-                   msg.append(ste.getLineNumber()).append(")");
-               }
-           }
-           else {
-               Writer result = new StringWriter();
-               PrintWriter pw = new PrintWriter(result);
-               e.printStackTrace(pw);
-               msg.append("  ").append(result.toString());
-           }
-       }
-
-       return getErrorResponse(
-               status, msg.toString(),
-               e instanceof SerializableException ? (SerializableException)e : null);
-    }
-
-    protected ClientResponseImpl getErrorResponse(byte status, String msg, SerializableException e) {
-        return new ClientResponseImpl(
-                status,
-                m_appStatusCode,
-                m_appStatusString,
-                new VoltTable[0],
-                "VOLTDB ERROR: " + msg);
-    }
-
-    /**
-     * Test whether or not the given stack frame is within a procedure invocation
-     * @param stel a stack trace element
-     * @return true if it is, false it is not
+     * For all-host NT procs, use site failures to call callbacks for hosts
+     * that will obviously never respond.
+     *
+     * ICH and the other plumbing should handle regular, txn procs.
      */
-    protected boolean isProcedureStackTraceElement(StackTraceElement stel) {
-        int lastPeriodPos = stel.getClassName().lastIndexOf('.');
-
-        if (lastPeriodPos == -1) {
-            lastPeriodPos = 0;
-        } else {
-            ++lastPeriodPos;
-        }
-
-        // Account for inner classes too. Inner classes names comprise of the parent
-        // class path followed by a dollar sign
-        String simpleName = stel.getClassName().substring(lastPeriodPos);
-        return simpleName.equals(m_procedureName)
-            || (simpleName.startsWith(m_procedureName) && simpleName.charAt(m_procedureName.length()) == '$');
-    }
-
     public void processAnyCallbacksFromFailedHosts(Set<Integer> failedHosts) {
         synchronized(m_allHostCallbackLock) {
             failedHosts.stream()
@@ -501,5 +426,20 @@ public class ProcedureRunnerNT {
                     }
                 });
         }
+    }
+
+    /*
+     * Cluster id is immutable and is persisted across snapshot/recover events
+     */
+    public int getClusterId() {
+        return VoltDB.instance().getCatalogContext().cluster.getDrclusterid();
+    }
+
+    public void setAppStatusCode(byte statusCode) {
+        m_appStatusCode = statusCode;
+    }
+
+    public void setAppStatusString(String statusString) {
+        m_appStatusString = statusString;
     }
 }

@@ -21,11 +21,61 @@ import java.util.concurrent.CompletableFuture;
 
 import org.voltdb.client.ClientResponse;
 
+/**
+ * Base class for any user provided non-transactional procedures.
+ * To be a valid procedure, there muse exist a run(..) method that
+ * accepts compatible parameters and returns one of:
+ * long, VoltTable, VoltTable[], CompletableFuture<ClientResponse>
+ *
+ */
 public class VoltNTProcedure {
 
     ProcedureRunnerNT m_runner = null;
 
-    protected CompletableFuture<ClientResponse> callProcedure(String procName, Object... params) {
+    /**
+     * Calls a procedure (either transactional or not) and returns a CompletableFuture that can
+     * be returned from the procedure.
+     *
+     * To add a callback to the future, try:
+     * return callProcedure(procname, params).thenApply(javafunction);
+     *
+     * Where "javafunction" takes a ClientResponse and returns an acceptable procedure return type.
+     *
+     * @return
+     */
+    public CompletableFuture<ClientResponse> callProcedure(String procName, Object... params) {
         return m_runner.callProcedure(procName, params);
+    }
+
+    /**
+     * Get the ID of cluster that the client connects to.
+     * @return An ID that identifies the VoltDB cluster
+     */
+    public int getClusterId() {
+        return m_runner.getClusterId();
+    }
+
+    /**
+     * Set the status code that will be returned to the client. This is not the same as the status
+     * code returned by the server. If a procedure sets the status code and then rolls back or causes an error
+     * the status code will still be propagated back to the client so it is always necessary to check
+     * the server status code first.
+     *
+     * @param statusCode Byte-long application-specific status code.
+     */
+    public void setAppStatusCode(byte statusCode) {
+        m_runner.setAppStatusCode(statusCode);
+    }
+
+    /**
+     * Set the string that will be turned to the client. This is not the same as the status string
+     * returned by the server. If a procedure sets the status string and then rolls back or causes an error
+     * the status string will still be propagated back to the client so it is always necessary to check
+     * the server status code first.
+     *
+     * @param statusString Application specific status string.
+     */
+    public void setAppStatusString(String statusString) {
+        m_runner.setAppStatusString(statusString);
     }
 }
