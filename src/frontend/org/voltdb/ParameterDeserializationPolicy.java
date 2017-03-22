@@ -35,21 +35,22 @@ public class ParameterDeserializationPolicy extends InvocationValidationPolicy {
     public ClientResponseImpl shouldAccept(AuthUser user,
             StoredProcedureInvocation invocation,
             Procedure proc) {
-        if (proc.getSystemproc()) {
-            try {
-                invocation.getParams();
-            } catch (RuntimeException e) {
-                Writer result = new StringWriter();
-                PrintWriter pw = new PrintWriter(result);
-                e.printStackTrace(pw);
-                return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
-                        new VoltTable[0],
-                        "Exception while deserializing procedure params\n" +
-                                result.toString(),
-                        invocation.clientHandle);
-            }
+        if (! proc.getSystemproc()) {
+            return null;
         }
 
+        try {
+            invocation.getParams();
+        } catch (RuntimeException e) {
+            Writer result = new StringWriter();
+            PrintWriter pw = new PrintWriter(result);
+            e.printStackTrace(pw);
+            return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
+                    new VoltTable[0],
+                    "Exception while deserializing procedure params\n" +
+                            result.toString(),
+                            invocation.clientHandle);
+        }
         return null;
     }
 }

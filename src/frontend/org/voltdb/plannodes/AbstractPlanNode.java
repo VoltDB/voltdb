@@ -37,7 +37,6 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
-import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
@@ -374,8 +373,6 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
      * TODO(XIN): It takes at least 14% planner CPU. Optimize it.
      */
     public final void computeEstimatesRecursively(PlanStatistics stats,
-                                                  Cluster cluster,
-                                                  Database db,
                                                   DatabaseEstimates estimates,
                                                   ScalarValueHints[] paramHints)
     {
@@ -387,7 +384,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         // recursively compute and collect stats from children
         long childOutputTupleCountEstimate = 0;
         for (AbstractPlanNode child : m_children) {
-            child.computeEstimatesRecursively(stats, cluster, db, estimates, paramHints);
+            child.computeEstimatesRecursively(stats, estimates, paramHints);
             m_outputColumnHints.addAll(child.m_outputColumnHints);
             childOutputTupleCountEstimate += child.m_estimatedOutputTupleCount;
         }
@@ -396,11 +393,11 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         for (Entry<PlanNodeType, AbstractPlanNode> entry : m_inlineNodes.entrySet()) {
             AbstractPlanNode inlineNode = entry.getValue();
             if (inlineNode instanceof AbstractScanPlanNode) {
-                inlineNode.computeCostEstimates(0, cluster, db, estimates, paramHints);
+                inlineNode.computeCostEstimates(0, estimates, paramHints);
             }
         }
 
-        computeCostEstimates(childOutputTupleCountEstimate, cluster, db, estimates, paramHints);
+        computeCostEstimates(childOutputTupleCountEstimate, estimates, paramHints);
         stats.incrementStatistic(0, StatsField.TUPLES_READ, m_estimatedProcessedTupleCount);
     }
 
@@ -411,8 +408,6 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
      * {@see AbstractPlanNode#computeEstimatesRecursively(PlanStatistics, Cluster, Database, DatabaseEstimates, ScalarValueHints[])}.
      */
     protected void computeCostEstimates(long childOutputTupleCountEstimate,
-                                        Cluster cluster,
-                                        Database db,
                                         DatabaseEstimates estimates,
                                         ScalarValueHints[] paramHints)
     {

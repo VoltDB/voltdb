@@ -27,14 +27,16 @@ public abstract class AuthenticationRequest {
 
     /**
      * Perform the authentication request
+     * @param scheme is the type of Hash scheme
+     * @param fromAddress is the remote IP address of this authenticate request
      * @return true if authenticated, false if not
      * @throws {@link IllegalStateException} if this request was already made
      */
-    public boolean authenticate(ClientAuthScheme scheme) {
+    public boolean authenticate(ClientAuthScheme scheme, String fromAddress) {
         if (m_done) throw new IllegalStateException("this authentication request has a result");
         boolean authenticated = false;
         try {
-            authenticated = authenticateImpl(scheme);
+            authenticated = authenticateImpl(scheme, fromAddress);
         } catch (Exception ex) {
             m_authenticationFailure = ex;
         }
@@ -49,7 +51,7 @@ public abstract class AuthenticationRequest {
      * @return true if authenticated, false if not
      * @throws Exception raised by the provider (if any)
      */
-    protected abstract boolean authenticateImpl(ClientAuthScheme scheme) throws Exception;
+    protected abstract boolean authenticateImpl(ClientAuthScheme scheme, String fromAddress) throws Exception;
 
     /**
      * if the request is successful it returns the authenticated user name
@@ -68,4 +70,5 @@ public abstract class AuthenticationRequest {
         if (!m_done) throw new IllegalStateException("this authentication request has not been made yet");
         return m_authenticationFailure;
     }
+
 }

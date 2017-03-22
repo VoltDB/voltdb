@@ -220,9 +220,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     // Cluster settings reference and supplier
     final ClusterSettingsRef m_clusterSettings = new ClusterSettingsRef();
     private String m_buildString;
-    static final String m_defaultVersionString = "7.1";
+    static final String m_defaultVersionString = "7.1.1";
     // by default set the version to only be compatible with itself
-    static final String m_defaultHotfixableRegexPattern = "^\\Q7.1\\E\\z";
+    static final String m_defaultHotfixableRegexPattern = "^\\Q7.1.1\\E\\z";
     // these next two are non-static because they can be overrriden on the CLI for test
     private String m_versionString = m_defaultVersionString;
     private String m_hotfixableRegexPattern = m_defaultHotfixableRegexPattern;
@@ -3224,7 +3224,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             long currentTxnId,
             long currentTxnUniqueId,
             byte[] deploymentBytes,
-            byte[] deploymentHash)
+            byte[] deploymentHash,
+            boolean hasSchemaChange)
     {
         try {
             synchronized(m_catalogUpdateLock) {
@@ -3276,7 +3277,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                             diffCommands,
                             true,
                             deploymentBytes,
-                            m_messenger);
+                            m_messenger,
+                            hasSchemaChange);
                 final CatalogSpecificPlanner csp = new CatalogSpecificPlanner( m_asyncCompilerAgent, m_catalogContext);
                 m_txnIdToContextTracker.put(currentTxnId,
                         new ContextTracker(
