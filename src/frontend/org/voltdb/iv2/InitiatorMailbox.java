@@ -323,7 +323,7 @@ public class InitiatorMailbox implements Mailbox
             if (checkMisroutedIv2IntiateTaskMessage((Iv2InitiateTaskMessage)message)) {
                 return;
             }
-            handleSPIBalanceIfRequested((Iv2InitiateTaskMessage)message);
+            initiateSPIMigrationIfRequested((Iv2InitiateTaskMessage)message);
         } else if (message instanceof FragmentTaskMessage) {
             if (checkMisroutedFragmentTaskMessage((FragmentTaskMessage)message)) {
                 return;
@@ -339,7 +339,7 @@ public class InitiatorMailbox implements Mailbox
     // If @BalanceSPI comes in, set up new partition leader selection and
     // mark this site as non-leader. All the transactions (sp and mp) which are sent to partition leader will be
     // rerouted from this moment on until the transactions are correctly routed to new leader.
-    private void handleSPIBalanceIfRequested(Iv2InitiateTaskMessage msg) {
+    private void initiateSPIMigrationIfRequested(Iv2InitiateTaskMessage msg) {
 
         if (!"@BalanceSPI".equals(msg.getStoredProcedureName())) {
             return;
@@ -360,10 +360,22 @@ public class InitiatorMailbox implements Mailbox
             return;
         }
 
-        startSPIMigration(pid, newLeaderHSId);
-        if (tmLog.isDebugEnabled()) {
-            tmLog.debug(VoltZK.debugLeadersInfo(m_messenger.getZK()));
+        LeaderCache leaderAppointee = new LeaderCache(m_messenger.getZK(), VoltZK.iv2appointees);
+        try {
+            leaderAppointee.start(true);
+            leaderAppointee.put(pid, VoltZK.suffixHSIdsWithBalanceSPIRequest(newLeaderHSId));
+        } catch (InterruptedException | ExecutionException | KeeperException e) {
+            VoltDB.crashLocalVoltDB("fail to start SPI migration",true, e);
+        } finally {
+            try {
+                leaderAppointee.shutdown();
+            } catch (InterruptedException e) {
+            }
         }
+        m_scheduler.m_isLeader = false;
+        m_repairLog.setLeaderState(false);
+        tmLog.info("[InitiatorMailbox] starting Balance SPI for partition " + pid + " to " +
+                CoreUtils.hsIdToString(newLeaderHSId) + ". isLeader:" + m_scheduler.m_isLeader);
     }
 
     // After the SPI migration has been requested, all the sp requests will be sent back to the sender
@@ -396,26 +408,6 @@ public class InitiatorMailbox implements Mailbox
         Iv2Trace.logMisroutedFragmentTaskMessage(message, getHSId());
         deliver(response);
         return true;
-    }
-
-    // update partition leader appointee on zookeeper.
-    private void startSPIMigration(int partition, long newHSID) {
-        LeaderCache leaderAppointee = new LeaderCache(m_messenger.getZK(), VoltZK.iv2appointees);
-        try {
-            leaderAppointee.start(true);
-            leaderAppointee.put(partition, VoltZK.suffixHSIdsWithBalanceSPIRequest(newHSID));
-        } catch (InterruptedException | ExecutionException | KeeperException e) {
-            VoltDB.crashLocalVoltDB("fail to start SPI migration",true, e);
-        } finally {
-            try {
-                leaderAppointee.shutdown();
-            } catch (InterruptedException e) {
-            }
-        }
-        m_scheduler.m_isLeader = false;
-        m_repairLog.setLeaderState(false);
-        tmLog.info("[InitiatorMailbox] starting Balance SPI for partition " + partition + " to " +
-                CoreUtils.hsIdToString(newHSID) + ". isLeader:" + m_scheduler.m_isLeader);
     }
 
     @Override
