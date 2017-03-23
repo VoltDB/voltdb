@@ -601,12 +601,12 @@
                     '@SnapshotScan': { '1': ['DirectoryPath (varchar)', 'Returns Table[]'] },
                     '@SnapshotStatus': { '0': ['Returns Table[]'] },
                     '@Statistics': { '2': ['Statistic (StatisticsComponent)', 'Interval (bit)', 'Returns Table[]'] },
-                    '@StopNode':{'1': ['Returns Int']},
-                    '@SwapTables':{'1': ['SQL (varchar)','Returns Table[]']},
+                    '@StopNode':{'1': ['Host ID (Int)', 'Returns Int']},
+                    '@SwapTables':{'1': ['Table Name (varchar)', 'Table-Name (varchar)', 'Returns Int']},
                     '@SystemCatalog': { '1': ['SystemCatalog (CatalogComponent)', 'Returns Table[]'] },
                     '@SystemInformation': { '1': ['Selector (SysInfoSelector)', 'Returns Table[]'] },
                     '@UpdateApplicationCatalog': { '2': ['CatalogPath (varchar)', 'DeploymentConfigPath (varchar)', 'Returns Table[]'] },
-                    '@UpdateClasses': { '1': ['Jar-file (varchar)', 'Returns Table[]'] },
+                    '@UpdateClasses': { '1': ['Jar File (varchar)', 'Class Selector (varchar)' 'Returns Table[]'] },
                     '@UpdateLogging': { '1': ['Configuration (xml)', 'Returns Table[]'] },
                     '@ValidatePartitioning': { '2': ['HashinatorType (int)', 'Config (varbinary)', 'Returns Table[]'] }
                 };
