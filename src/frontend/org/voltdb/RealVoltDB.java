@@ -4398,9 +4398,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             if (tableA.getIsdred() && tableB.getIsdred()) {
                 long signatureHashA = Hashing.sha1().hashString(tableA.getSignature(), Charsets.UTF_8).asLong();
                 long signatureHashB = Hashing.sha1().hashString(tableB.getSignature(), Charsets.UTF_8).asLong();
-                m_consumerDRGateway.swapTables(
-                        Pair.of(oneTable.toUpperCase(), signatureHashA),
-                        Pair.of(otherTable.toUpperCase(), signatureHashB));
+                Set<Pair<String, Long>> swappedTables = new HashSet<>();
+                swappedTables.add(Pair.of(oneTable.toUpperCase(), signatureHashA));
+                swappedTables.add(Pair.of(otherTable.toUpperCase(), signatureHashB));
+                m_consumerDRGateway.swapTables(swappedTables);
             }
         }
     }
