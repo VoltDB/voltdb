@@ -34,7 +34,7 @@ public class ExampleFormatterFactory extends AbstractFormatterFactory {
      */
 
     @Override
-    public Formatter<String> create(String m_formatName, Properties m_formatProps) {
+    public Formatter create(String m_formatName, Properties m_formatProps) {
         ExampleFormatter formatter = new ExampleFormatter(m_formatName, m_formatProps);
         return formatter;
     }
