@@ -914,7 +914,7 @@ public class DDLCompiler {
             throw m_compiler.new VoltCompilerException(String.format(
                     "Invalid CREATE PROCEDURE statement: \"%s\", " +
                     "expected syntax: \"CREATE PROCEDURE [ALLOW <role> [, <role> ...] FROM CLASS <class-name>\" " +
-                    "or: \"CREATE PROCEDURE <name> [ALLOW <role> [, <role> ...] AS <single-select-or-dml-statement>\"" +
+                    "or: \"CREATE PROCEDURE <name> [ALLOW <role> [, <role> ...] AS <single-select-or-dml-statement>\"",
                     statement.substring(0,statement.length()-1))); // remove trailing semicolon
         }
 
