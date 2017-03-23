@@ -300,8 +300,7 @@ public class StandaloneExportGeneration implements Generation {
      * Returns true if the generatino was completely truncated away
      */
     @Override
-    public boolean truncateExportToTxnId(long txnId, long[] perPartitionTxnIds) {
-        return false;
+    public void truncateExportToTxnId(long txnId, long[] perPartitionTxnIds) {
     }
 
     @Override

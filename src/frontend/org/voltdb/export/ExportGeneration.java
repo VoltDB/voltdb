@@ -198,6 +198,7 @@ public class ExportGeneration implements Generation {
     }
 
     //This checks if the on disk generation is a catalog generation.
+    @Override
     public boolean isContinueingGeneration() {
         return m_isContinueingGeneration;
     }
@@ -245,6 +246,7 @@ public class ExportGeneration implements Generation {
      * start consuming the export data.
      *
      */
+    @Override
     public void kickOffLeaderElection(final HostMessenger messenger) {
         m_childUpdatingThread.submit(new Runnable() {
             @Override
@@ -606,6 +608,7 @@ public class ExportGeneration implements Generation {
         };
     }
 
+    @Override
     public long getQueuedExportBytes(int partitionId, String signature) {
         //assert(m_dataSourcesByPartition.containsKey(partitionId));
         //assert(m_dataSourcesByPartition.get(partitionId).containsKey(delegateId));
@@ -720,6 +723,7 @@ public class ExportGeneration implements Generation {
         }
     }
 
+    @Override
     public void pushExportBuffer(int partitionId, String signature, long uso, ByteBuffer buffer, boolean sync, boolean endOfStream) {
         //        System.out.println("In generation " + m_timestamp + " partition " + partitionId + " signature " + signature + (buffer == null ? " null buffer " : (" buffer length " + buffer.remaining())));
         //        for (Integer i : m_dataSourcesByPartition.keySet()) {
@@ -789,16 +793,15 @@ public class ExportGeneration implements Generation {
     }
 
     /*
-     * Returns true if the generatino was completely truncated away
+     * Sets truncation point for the export data sources in current generation
      */
-    public boolean truncateExportToTxnId(long txnId, long[] perPartitionTxnIds) {
+    @Override
+    public void truncateExportToTxnId(long txnId, long[] perPartitionTxnIds) {
         // create an easy partitionId:txnId lookup.
         HashMap<Integer, Long> partitionToTxnId = new HashMap<Integer, Long>();
         for (long tid : perPartitionTxnIds) {
             partitionToTxnId.put(TxnEgo.getPartitionId(tid), tid);
         }
-
-        List<ListenableFuture<?>> tasks = new ArrayList<ListenableFuture<?>>();
 
         // pre-iv2, the truncation point is the snapshot transaction id.
         // In iv2, truncation at the per-partition txn id recorded in the snapshot.
@@ -811,23 +814,14 @@ public class ExportGeneration implements Generation {
                             source.getPartitionId());
                 }
                 else {
-                    //If this was drained and closed we may not have truncation point and we dont want to reopen PBDs
+                    //If this was drained and closed we may not have truncation point and we don't want to
+                    // reopen PBDs for those data sources
                     if (!source.isClosed()) {
-                        tasks.add(source.truncateExportToTxnId(truncationPoint));
+                        source.truncateExportToTxnId(truncationPoint);
                     }
                 }
             }
         }
-
-        try {
-            Futures.allAsList(tasks).get();
-        } catch (Exception e) {
-            VoltDB.crashLocalVoltDB("Unexpected exception truncating export data during snapshot restore. " +
-                                    "You can back up export overflow data and start the " +
-                                    "DB without it to get past this error", true, e);
-        }
-
-        return m_drainedSources.get() == m_numSources;
     }
 
     public void sync(final boolean nofsync) {
@@ -848,6 +842,7 @@ public class ExportGeneration implements Generation {
         }
     }
 
+    @Override
     public void close(final HostMessenger messenger) {
         List<ListenableFuture<?>> tasks = new ArrayList<ListenableFuture<?>>();
         for (Map<String, ExportDataSource> sources : m_dataSourcesByPartition.values()) {
@@ -872,6 +867,7 @@ public class ExportGeneration implements Generation {
      * mastership role for the given partition id
      * @param partitionId
      */
+    @Override
     public void acceptMastershipTask( int partitionId) {
         Map<String, ExportDataSource> partitionDataSourceMap = m_dataSourcesByPartition.get(partitionId);
 

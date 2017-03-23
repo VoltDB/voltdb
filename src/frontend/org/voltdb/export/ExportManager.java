@@ -29,7 +29,6 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.voltcore.logging.Level;
@@ -138,15 +137,6 @@ public class ExportManager
 
     private int m_connCount = 0;
 
-    /*
-     * Issue a permit when a generation is drained so that when we are truncating if a generation
-     * is completely truncated we can wait for the on generation drained task to finish.
-     *
-     * This eliminates a race with CL replay where it may do catalog updates and such while truncation
-     * is still running on generation drained.
-     */
-    private final Semaphore m_onGenerationDrainedForTruncation = new Semaphore(0);
-
     public class GenerationDrainRunnable implements Runnable {
 
         private final ExportGeneration m_generation;
@@ -171,7 +161,7 @@ public class ExportManager
             //After all generations drained processors can not be null as above check should kick you out.
             ExportDataProcessor proc = m_processor.get();
             if (proc == null) {
-                VoltDB.crashLocalVoltDB("No export data processor found", true, null);
+                VoltDB.crashLocalVoltDB("No export data processor found, generation drained:" + m_generation, true, null);
             }
             proc.queueWork(new Runnable() {
                 @Override
@@ -182,8 +172,6 @@ public class ExportManager
                         exportLog.error("Error rolling to next export generation", e);
                     } catch (Exception e) {
                         exportLog.error("Error rolling to next export generation", e);
-                    } finally {
-                        m_onGenerationDrainedForTruncation.release();
                     }
                 }
 
@@ -215,7 +203,7 @@ public class ExportManager
                     //Pick next generation.
                     ExportGeneration nextGeneration = m_generations.firstEntry().getValue();
                     if (installNewProcessor) {
-                        exportLog.info("Creating connector " + m_loaderClass);
+                        exportLog.info("Creating connector for next generation" + m_loaderClass);
                         final Class<?> loaderClass = Class.forName(m_loaderClass);
                         newProcessor = (ExportDataProcessor) loaderClass.newInstance();
                         newProcessor.addLogger(exportLog);
@@ -270,6 +258,7 @@ public class ExportManager
             oldProcessor.shutdown();
         }
         try {
+            exportLog.info("Cleanup files for generation: " + drainedGeneration.m_timestamp);
             //We close and delete regardless
             drainedGeneration.closeAndDelete(m_messenger);
         } catch (IOException e) {
@@ -631,6 +620,7 @@ public class ExportManager
 
         updateProcessorConfig(connectors);
         if (m_processorConfig.isEmpty()) {
+            exportLog.info("No Export configuration exists no generation will be created.");
             m_lastNonEnabledGeneration = catalogContext.m_uniqueId;
             return;
         }
@@ -752,15 +742,8 @@ public class ExportManager
     public void truncateExportToTxnId(long snapshotTxnId, long[] perPartitionTxnIds) {
         exportLog.info("Truncating export data after txnId " + snapshotTxnId);
         for (ExportGeneration generation : m_generations.values()) {
-            //If the generation was completely drained, wait for the task to finish running
-            //by waiting for the permit that will be generated
-            if (generation.truncateExportToTxnId(snapshotTxnId, perPartitionTxnIds)) {
-                try {
-                    m_onGenerationDrainedForTruncation.acquire();
-                } catch (InterruptedException e) {
-                    VoltDB.crashLocalVoltDB("Interrupted truncating export data", true, e);
-                }
-            }
+            //This just registers the tuncation point for data sources.
+            generation.truncateExportToTxnId(snapshotTxnId, perPartitionTxnIds);
         }
     }
 
