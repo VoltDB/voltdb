@@ -109,14 +109,13 @@ public class ProcedureStatsCollector extends SiteStatsSource {
         m_isUAC = (m_procName != null) && (m_procName.startsWith(UpdateApplicationCatalog.class.getName()));
     }
 
-
-
     // This is not the *real* invocation count, but a fuzzy one we keep to sample 5% of
     // calls without modifying any state. We *only* modify state when a procedure completes.
     AtomicLong fuzzyInvocationCounter = new AtomicLong(0);
 
     /**
      * Called when a procedure begins executing. Caches the time the procedure starts.
+     * Note: This does not touch internal mutable state besides fuzzyInvocationCounter.
      */
     public final SingleCallStatsToken beginProcedure() {
         long invocations = fuzzyInvocationCounter.getAndIncrement();
@@ -132,6 +131,9 @@ public class ProcedureStatsCollector extends SiteStatsSource {
     /**
      * Called after a procedure is finished executing. Compares the start and end time and calculates
      * the statistics.
+     *
+     * Synchronized because it modifies internal state and (for NT procs) can be called from multiple
+     * threads. For transactional procs the lock should be uncontended.,
      */
     public final synchronized void endProcedure(boolean aborted, boolean failed, SingleCallStatsToken statsToken) {
         if (aborted) {

@@ -249,6 +249,14 @@ public final class StatementStats {
         return retval;
     }
 
+    /**
+     * This is a token the ProcedureRunner holds onto while it's running.
+     * It collects stats information during the procedure run without needing
+     * to touch the actual stats source.
+     * When the procedure is done (commit/abort/whatever), this token is given
+     * to the ProcedureStatsCollector in a single (thread-safe) call.
+     *
+     */
     public static final class SingleCallStatsToken {
         class PerStmtStats {
             final String stmtName;
@@ -268,6 +276,9 @@ public final class StatementStats {
             }
         }
 
+        /**
+         * Per-statment stats
+         */
         class MeasuredStmtStats {
             final long stmtDuration;
             final int stmtResultSize;
@@ -285,6 +296,7 @@ public final class StatementStats {
 
         final long startTimeNanos;
         final boolean samplingStatements;
+        // stays null until used
         List<PerStmtStats> stmtStats = null;
 
         int parameterSetSize = 0;
@@ -307,10 +319,6 @@ public final class StatementStats {
             parameterSetSize = size;
         }
 
-        public void setResultSize(int size) {
-            resultSize = size;
-        }
-
         public void setResultSize(VoltTable[] results) {
             resultSize = 0;
             if (results != null) {
@@ -320,6 +328,10 @@ public final class StatementStats {
             }
         }
 
+        /**
+         * Called when a statement completes.
+         * Adds a record to the parent stats token.
+         */
         public void recordStatementStats(String stmtName,
                                          boolean isCoordinatorTask,
                                          boolean failed,
