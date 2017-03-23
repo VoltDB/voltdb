@@ -791,10 +791,12 @@ def runTests(CTX):
     failedTests = []
     successes = 0
     failures = 0
+    # We only want to use valgrind for MEMCHECK or MEMCHECK_NOFREELIST builds.
+    usingValgrind = CTX.LEVEL == "MEMCHECK" or CTX.LEVEL == "MEMCHECK_NOFREELIST"
     #
     # Set executing to False to test this function without
-    # really running tests.  Set exretval to 0 to simulate all
-    # successes.  Set exretval to -1 to simulate all failuares.
+    # really running tests.  In this case, set exretval to 0 to simulate all
+    # successes.  Set exretval to -1 to simulate all failures.
     #
     executing = True
     exretval = 0
@@ -828,6 +830,7 @@ def runTests(CTX):
         # We expect valgrind failures in all tests in memleaktests
         # except for the test named no_losses.
         expectNoMemLeaks = not (dirname == "memleaktests") or not ( test == "no_losses" )
+        srcpath = os.path.join("test", "ee", dirname, test)
         targetpath = os.path.join(bindirname, dirname, test)
         retval = 0
         if test.endswith("CopyOnWriteTest") and CTX.LEVEL == "MEMCHECK_NOFREELIST":
@@ -835,11 +838,12 @@ def runTests(CTX):
         if os.path.exists(targetpath + ".py"):
             retval = os.system("/usr/bin/env python " + targetpath + ".py")
         else:
-            isValgrindTest = True;
-            for nvgtest in noValgrindTests:
-                if targetpath.find(nvgtest) != -1:
-                    isValgrindTest = False;
-                    break
+            isValgrindTest = usingValgrind
+            if usingValgrind:
+                for nvgtest in noValgrindTests:
+                    if targetpath.find(nvgtest) != -1:
+                        isValgrindTest = False;
+                        break
             if CTX.PLATFORM == "Linux" and isValgrindTest:
                 print('Executing valgrind test %s' % targetpath)
                 valgrindDir = os.path.join(bindirname, dirname)

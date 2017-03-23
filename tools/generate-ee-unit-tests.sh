@@ -1,6 +1,13 @@
 #!/bin/sh
-# This is just temporary.  Delete this before merging to master.
-# this command should go into the makefile somehow.
+# A script to generate all the generated EE unit tests.  This allows us to
+# avoid the churn which results from checking them into git.  We don't need
+# to manage licenses for the generated files, since they are only present at
+# build time.
+#
+# This seems like it should be temporary, and that the the command
+# should be in the ant file, or else embedded into buildtools.py.  But
+# it's convenient and useful for debugging to put it here, so that the
+# tests can easily be generated manually.
 
 BUILD=debug
 VERBOSE=
