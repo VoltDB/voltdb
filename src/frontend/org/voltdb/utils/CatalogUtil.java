@@ -67,12 +67,10 @@ import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONException;
 import org.mindrot.BCrypt;
-import org.xml.sax.SAXException;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
 import org.voltdb.HealthMonitor;
-import org.voltdb.RealVoltDB;
 import org.voltdb.SystemProcedureCatalog;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
@@ -142,6 +140,7 @@ import org.voltdb.settings.DbSettings;
 import org.voltdb.settings.NodeSettings;
 import org.voltdb.snmp.DummySnmpTrapSender;
 import org.voltdb.types.ConstraintType;
+import org.xml.sax.SAXException;
 
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -703,7 +702,7 @@ public abstract class CatalogUtil {
             setClusterInfo(catalog, deployment);
 
             //Set the snapshot schedule
-            setSnapshotInfo( catalog, deployment.getSnapshot());
+            setSnapshotInfo(catalog, deployment.getSnapshot());
 
             //Set enable security
             setSecurityEnabled(catalog, deployment.getSecurity());

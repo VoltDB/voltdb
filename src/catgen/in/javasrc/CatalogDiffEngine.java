@@ -1256,24 +1256,22 @@ public class CatalogDiffEngine {
         if (responseList == null) {
             m_supported = false;
             m_errors.append(errorMessage + "\n");
+            return;
         }
         // otherwise, it's possible if a specific table is empty
         // collect the error message(s) and decide if it can be done inside @UAC
-        else {
-            for (TablePopulationRequirements response : responseList) {
-                String objectName = response.getObjectName();
-                List<String> tableNames = response.getTableNames();
-                String nonEmptyErrorMessage = response.getErrorMessage();
-                assert (nonEmptyErrorMessage != null);
+        for (TablePopulationRequirements response : responseList) {
+            String objectName = response.getObjectName();
+            String nonEmptyErrorMessage = response.getErrorMessage();
+            assert (nonEmptyErrorMessage != null);
 
-                TablePopulationRequirements popreq = m_tablesThatMustBeEmpty.get(objectName);
-                if (popreq == null) {
-                    popreq = response;
-                    m_tablesThatMustBeEmpty.put(objectName, popreq);
-                } else {
-                    String newErrorMessage = popreq.getErrorMessage() + "\n " + response.getErrorMessage();
-                    popreq.setErrorMessage(newErrorMessage);
-                }
+            TablePopulationRequirements popreq = m_tablesThatMustBeEmpty.get(objectName);
+            if (popreq == null) {
+                popreq = response;
+                m_tablesThatMustBeEmpty.put(objectName, popreq);
+            } else {
+                String newErrorMessage = popreq.getErrorMessage() + "\n " + response.getErrorMessage();
+                popreq.setErrorMessage(newErrorMessage);
             }
         }
     }
@@ -1623,24 +1621,11 @@ public class CatalogDiffEngine {
      * This currently handles just the basics, but much of the plumbing is
      * in place to give a lot more detail, with a bit more work.
      */
-    public String getDescriptionOfChanges() {
+    public String getDescriptionOfChanges(boolean updatedClass) {
         StringBuilder sb = new StringBuilder();
 
         sb.append("Catalog Difference Report\n");
         sb.append("=========================\n");
-        if (supported()) {
-            sb.append("  This change can occur while the database is running.\n");
-            if (requiresSnapshotIsolation()) {
-                sb.append("  This change must occur when no snapshot is running.\n");
-                sb.append("  If a snapshot is in progress, the system will wait \n" +
-                          "  until the snapshot is complete to make the changes.\n");
-            }
-        }
-        else {
-            sb.append("  Making this change requires stopping and restarting the database.\n");
-        }
-        sb.append("\n");
-
         boolean wroteChanges = false;
 
         // DESCRIBE TABLE CHANGES
@@ -1657,13 +1642,13 @@ public class CatalogDiffEngine {
                 }
 
                 // check if export table
-                // this probably doesn't work due to the same kinds of problesm we have
+                // this probably doesn't work due to the same kinds of problems we have
                 // when identifying views. Tables just need a field that says if they
                 // are export tables or not... ugh. FIXME
                 for (Connector c : ((Database) table.getParent()).getConnectors()) {
                     for (ConnectorTableInfo cti : c.getTableinfo()) {
                         if (cti.getTable() == table) {
-                            return "Export Table " + type.getTypeName();
+                            return "Stream Table " + type.getTypeName();
                         }
                     }
                 }
@@ -1689,6 +1674,9 @@ public class CatalogDiffEngine {
 
         // DESCRIBE GROUP CHANGES
         wroteChanges |= basicMetaChangeDesc(sb, "GROUP CHANGES:", DiffClass.GROUP, null, null);
+
+        // DESCRIBE USER CHANGES
+        wroteChanges |= basicMetaChangeDesc(sb, "USER CHANGES:", DiffClass.USER, null, null);
 
         // DESCRIBE OTHER CHANGES
         CatalogChangeGroup group = m_changes.get(DiffClass.OTHER);
@@ -1717,7 +1705,11 @@ public class CatalogDiffEngine {
         }
 
         if (!wroteChanges) {
-            sb.append("  No changes detected.\n");
+            if (updatedClass) {
+                sb.append("  Changes have been made to user code (procedures, supporting classes, etc).\n");
+            } else {
+                sb.append("  No changes detected.\n");
+            }
         }
 
         // trim the last newline
