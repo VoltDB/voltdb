@@ -286,7 +286,7 @@ public class HTTPClientInterface {
 
             authResult = authenticate(request);
             if (!authResult.isAuthenticated()) {
-                ok(jsonp, authResult.m_message, response);
+                unauthorized(jsonp, authResult.m_message, response);
                 request.setHandled(true);
                 return;
             }
