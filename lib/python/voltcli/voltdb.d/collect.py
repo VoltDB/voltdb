@@ -32,18 +32,6 @@ output_help = ('file name to store collect data in compressed format. The defaul
                            'file name prefix for uniquely identifying collection. (Deprecated. Please use --output).',
                            default = ''),
         VOLT.StringOption('-o', '--output', 'output', output_help, default=''),
-        VOLT.StringOption (None, '--upload', 'host',
-                           'upload resulting collection to HOST via SFTP.',
-                           default = ''),
-        VOLT.StringOption (None, '--username', 'username',
-                           'user name for SFTP upload.',
-                           default = ''),
-        VOLT.StringOption (None, '--password', 'password',
-                           'password for SFTP upload.',
-                           default = ''),
-        VOLT.BooleanOption(None, '--no-prompt', 'noprompt',
-                           'automatically upload collection (without user prompt).',
-                           default = False),
         VOLT.BooleanOption(None, '--dry-run', 'dryrun',
                            'list the log files without collecting them.',
                            default = False),
@@ -53,8 +41,7 @@ output_help = ('file name to store collect data in compressed format. The defaul
         VOLT.IntegerOption(None, '--days', 'days',
                            'number of days of files to collect (files included are log, crash files), Current day value is 1.',
                            default = 7),
-
-        VOLT.StringOption('-D', '--dir', 'directory_spec', dir_spec_help, default=None),
+        VOLT.StringOption('-D', '--dir', 'directory_spec', dir_spec_help, default=''),
         VOLT.BooleanOption('-f', '--force', 'force', 'Overwrite the existing file.', default = False)
     ),
     arguments = (
@@ -69,10 +56,8 @@ def collect(runner):
     process_voltdbroot_args(runner)
     process_outputfile_args(runner)
 
-    runner.args.extend(['--host='+runner.opts.host, '--username='+runner.opts.username, '--password='+runner.opts.password,
-    '--noprompt='+str(runner.opts.noprompt), '--dryrun='+str(runner.opts.dryrun), '--skipheapdump='+str(runner.opts.skipheapdump),
-    '--days='+str(runner.opts.days), '--force='+str(runner.opts.force)])
-
+    runner.args.extend(['--dryrun=' + str(runner.opts.dryrun), '--skipheapdump=' + str(runner.opts.skipheapdump),
+                        '--days=' + str(runner.opts.days), '--force=' + str(runner.opts.force)])
     runner.java_execute('org.voltdb.utils.Collector', None, *runner.args)
 
 
@@ -84,7 +69,7 @@ def process_voltdbroot_args(runner) :
     # If database directory is given, derive voltdbroot path to store results of systemcheck in voltdbroot directory
     if runner.opts.directory_spec:
         if os.path.isdir(runner.opts.directory_spec) and os.access(runner.opts.directory_spec, os.R_OK|os.W_OK|os.X_OK):
-            voltdbrootDir = os.path.join(runner.opts.directory_spec + 'voltdbroot')
+            voltdbrootDir = os.path.join(runner.opts.directory_spec, 'voltdbroot')
         else:
             utility.abort('ERROR: specified database directory is not valid', runner.opts.directory_spec)
     elif runner.opts.voltdbroot:

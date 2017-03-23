@@ -139,17 +139,13 @@ public class TestCollector extends JUnit4LocalClusterTest {
             cliParams.add("--prefix=" + m_prefix);
             pathToOutputFile = System.getProperty("user.dir") + File.separator + m_prefix + "_" + Collector.DEFAULT_COLLECT_FILENAME;
         }
-        cliParams.add("--host=\"\"");
-        cliParams.add("--username=\"\"");
-        cliParams.add("--password=\"\"");
-        cliParams.add("--noprompt=true");
         cliParams.add("--dryrun=false");        // dryRun
         cliParams.add("--skipheapdump=" + String.valueOf(skipHeapDump));
         cliParams.add("--days=" + String.valueOf(days));
         cliParams.add("--libPathForTest=" + getWorkingDir(m_voltDbRootPath) + "/lib");
         cliParams.add("--force=" + String.valueOf(force));
         if (!m_outputFileName.isEmpty()) {
-            cliParams.add("--output=" + m_outputFileName);
+            cliParams.add("--outputFile=" + m_outputFileName);
             pathToOutputFile = m_outputFileName;
         }
 
