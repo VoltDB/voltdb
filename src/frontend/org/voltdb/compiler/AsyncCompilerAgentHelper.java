@@ -68,7 +68,7 @@ public class AsyncCompilerAgentHelper
             // or null if it still needs to be filled in.
             InMemoryJarfile newCatalogJar = null;
             InMemoryJarfile oldJar = context.getCatalogJar().deepCopy();
-
+            boolean updatedClass = false;
             String deploymentString = work.operationString;
             if ("@UpdateApplicationCatalog".equals(work.invocationName)) {
                 // Grab the current catalog bytes if @UAC had a null catalog from deployment-only update
@@ -87,8 +87,14 @@ public class AsyncCompilerAgentHelper
                     newCatalogJar = new InMemoryJarfile(work.operationBytes);
                 }
                 try {
-                    newCatalogJar = modifyCatalogClasses(context.catalog, oldJar, work.operationString,
+                    InMemoryJarfile modifiedJar = modifyCatalogClasses(context.catalog, oldJar, work.operationString,
                             newCatalogJar, work.drRole == DrRoleType.XDCR);
+                    if (modifiedJar == null) {
+                        newCatalogJar = oldJar;
+                    } else {
+                        newCatalogJar = modifiedJar;
+                        updatedClass = true;
+                    }
                 }
                 catch (ClassNotFoundException e) {
                     retval.errorMsg = "Unexpected error in @UpdateClasses modifying classes " +
@@ -225,6 +231,7 @@ public class AsyncCompilerAgentHelper
             }
 
             String commands = diff.commands();
+            compilerLog.info(diff.getDescriptionOfChanges(updatedClass));
 
             // since diff commands can be stupidly big, compress them here
             retval.encodedDiffCommands = Encoder.compressAndBase64Encode(commands);
@@ -271,6 +278,10 @@ public class AsyncCompilerAgentHelper
         return jarfile;
     }
 
+    /**
+     * @return NUll if no classes changed, otherwise return the update jar file.
+     * @throws ClassNotFoundException
+     */
     private InMemoryJarfile modifyCatalogClasses(Catalog catalog, InMemoryJarfile jarfile, String deletePatterns,
             InMemoryJarfile newJarfile, boolean isXDCR) throws ClassNotFoundException
     {
@@ -308,17 +319,19 @@ public class AsyncCompilerAgentHelper
                 jarfile.put(e.getKey(), e.getValue());
             }
         }
-        if (deletedClasses || foundClasses) {
-            compilerLog.info("Checking java classes available to stored procedures");
-            // TODO: check the jar classes on all nodes
-            Database db = VoltCompiler.getCatalogDatabase(catalog);
-            for (Procedure proc: db.getProcedures()) {
-                // single statement procedure does not need to check class loading
-                if (proc.getHasjava() == false) continue;
+        if (!deletedClasses && !foundClasses) {
+            return null;
+        }
 
-                if (! VoltCompilerUtils.containsClassName(jarfile, proc.getClassname())) {
-                    throw new ClassNotFoundException("Cannot load class for procedure " + proc.getClassname());
-                }
+        compilerLog.info("Checking java classes available to stored procedures");
+        // TODO: check the jar classes on all nodes
+        Database db = VoltCompiler.getCatalogDatabase(catalog);
+        for (Procedure proc: db.getProcedures()) {
+            // single statement procedure does not need to check class loading
+            if (proc.getHasjava() == false) continue;
+
+            if (! VoltCompilerUtils.containsClassName(jarfile, proc.getClassname())) {
+                throw new ClassNotFoundException("Cannot load class for procedure " + proc.getClassname());
             }
         }
         return jarfile;
