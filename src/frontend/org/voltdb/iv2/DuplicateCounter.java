@@ -26,7 +26,6 @@ import org.voltcore.utils.CoreUtils;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltTable;
-import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.CompleteTransactionResponseMessage;
 import org.voltdb.messaging.DummyTransactionResponseMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
@@ -98,22 +97,9 @@ public class DuplicateCounter
         String msg = String.format("DUPLICATE COUNTER COLLISION:\n"
                 + "REQUEST MESSAGE 1: %s\n"
                 + "REQUEST MESSAGE 2: %s\n",
-                m_openMessage.toString(),
-                other.m_openMessage.toString());
+                m_openMessage,
+                other.m_openMessage);
         tmLog.error(msg);
-    }
-
-    //Both former and current partition leader may send CompleteTransactionMessage
-    //over, which may introduce duplicate coiunter collision.
-    boolean collisionFromBalanceSPI(DuplicateCounter other) {
-        if (!(m_openMessage instanceof CompleteTransactionMessage) ||
-                !(other.m_openMessage instanceof CompleteTransactionMessage)) {
-            return false;
-        }
-
-        CompleteTransactionMessage msg1 = (CompleteTransactionMessage)m_openMessage;
-        CompleteTransactionMessage msg2 = (CompleteTransactionMessage)other.m_openMessage;
-        return (msg1.getCoordinatorHSId() == msg2.getCoordinatorHSId());
     }
 
     StoredProcedureInvocation getInvocation() {

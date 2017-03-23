@@ -1359,16 +1359,31 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
      */
     void safeAddToDuplicateCounterMap(DuplicateCounterKey dpKey, DuplicateCounter counter) {
         DuplicateCounter existingDC = m_duplicateCounters.get(dpKey);
-        if (existingDC != null) {
-            // this is a collision and is bad
-            existingDC.logWithCollidingDuplicateCounters(counter);
-            if (!existingDC.collisionFromBalanceSPI(counter)) {
-                VoltDB.crashGlobalVoltDB("DUPLICATE COUNTER MISMATCH: two duplicate counter keys collided.", true, null);
-            }
-        }
-        else {
+        if (existingDC == null) {
             m_duplicateCounters.put(dpKey, counter);
+            return;
         }
+        if (tmLog.isDebugEnabled()) {
+            tmLog.debug(String.format("Duplicate counters:\nMessage 1: %s\nMessage 2: %s\n",
+                    existingDC.m_openMessage, counter.m_openMessage));
+        }
+        if (!skipCollisionFromBalanceSPI(existingDC, counter)) {
+            existingDC.logWithCollidingDuplicateCounters(counter);
+            VoltDB.crashGlobalVoltDB("DUPLICATE COUNTER MISMATCH: two duplicate counter keys collided.", true, null);
+        }
+    }
+
+    //Both former and current partition leader may send CompleteTransactionMessage
+    //over, which may introduce duplicate counter collision.
+    boolean skipCollisionFromBalanceSPI(DuplicateCounter counter1, DuplicateCounter counter2) {
+        if (!(counter1.m_openMessage instanceof CompleteTransactionMessage) ||
+                !(counter2.m_openMessage instanceof CompleteTransactionMessage)) {
+            return false;
+        }
+
+        CompleteTransactionMessage msg1 = (CompleteTransactionMessage)(counter1.m_openMessage);
+        CompleteTransactionMessage msg2 = (CompleteTransactionMessage)(counter2.m_openMessage);
+        return (msg1.getCoordinatorHSId() != msg2.getCoordinatorHSId());
     }
 
     @Override
