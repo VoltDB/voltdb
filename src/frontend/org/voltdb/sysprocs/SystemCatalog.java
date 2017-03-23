@@ -43,7 +43,9 @@ public class SystemCatalog extends VoltSystemProcedure
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
     @Override
-    public void init() {}
+    public long[] getPlanFragmentIds() {
+        return new long[]{};
+    }
 
     @Override
     public DependencyPair executePlanFragment(Map<Integer, List<VoltTable>> dependencies,

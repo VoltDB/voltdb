@@ -2352,7 +2352,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                        changeResult.reasonsForEmptyTables,
                        changeResult.requiresSnapshotIsolation ? 1 : 0,
                        changeResult.worksWithElastic ? 1 : 0,
-                       changeResult.deploymentHash);
+                       changeResult.deploymentHash,
+                       changeResult.hasSchemaChange ? 1 : 0);
         task.clientHandle = changeResult.clientHandle;
         // DR stuff
         task.type = changeResult.invocationType;

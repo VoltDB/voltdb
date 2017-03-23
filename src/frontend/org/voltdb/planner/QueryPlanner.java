@@ -52,7 +52,7 @@ public class QueryPlanner {
     String m_procName;
     HSQLInterface m_HSQL;
     DatabaseEstimates m_estimates;
-    Cluster m_cluster;
+    Cluster m_cluster; // It's not used, that gets removed in ENG-12133
     Database m_db;
     String m_recentErrorMsg;
     StatementPartitioning m_partitioning;
@@ -84,7 +84,6 @@ public class QueryPlanner {
      * @param sql Literal SQL statement to parse
      * @param stmtName The name of the statement for logging/debugging
      * @param procName The name of the proc for logging/debugging
-     * @param catalogCluster Catalog info about the physical layout of the cluster.
      * @param catalogDb Catalog info about schema, metadata and procedures.
      * @param partitioning Describes the specified and inferred partition context.
      * @param HSQL HSQLInterface pointer used for parsing SQL into XML.
@@ -98,7 +97,6 @@ public class QueryPlanner {
     public QueryPlanner(String sql,
                         String stmtName,
                         String procName,
-                        Cluster catalogCluster,
                         Database catalogDb,
                         StatementPartitioning partitioning,
                         HSQLInterface HSQL,
@@ -114,10 +112,8 @@ public class QueryPlanner {
         assert(stmtName != null);
         assert(procName != null);
         assert(HSQL != null);
-        assert(catalogCluster != null);
         assert(catalogDb != null);
         assert(costModel != null);
-        assert(catalogDb.getCatalog() == catalogCluster.getCatalog());
         assert(detMode != null);
 
         m_sql = sql;
@@ -125,7 +121,6 @@ public class QueryPlanner {
         m_procName = procName;
         m_HSQL = HSQL;
         m_db = catalogDb;
-        m_cluster = catalogCluster;
         m_estimates = estimates;
         m_partitioning = partitioning;
         m_maxTablesPerJoin = maxTablesPerJoin;

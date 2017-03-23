@@ -60,11 +60,13 @@ public class Shutdown extends VoltSystemProcedure {
     };
 
     @Override
-    public void init() {
-        registerPlanFragment(SysProcFragmentId.PF_shutdownSync);
-        registerPlanFragment(SysProcFragmentId.PF_shutdownSyncDone);
-        registerPlanFragment(SysProcFragmentId.PF_shutdownCommand);
-        registerPlanFragment(SysProcFragmentId.PF_procedureDone);
+    public long[] getPlanFragmentIds() {
+        return new long[]{
+            SysProcFragmentId.PF_shutdownSync,
+            SysProcFragmentId.PF_shutdownSyncDone,
+            SysProcFragmentId.PF_shutdownCommand,
+            SysProcFragmentId.PF_procedureDone
+        };
     }
 
     @Override

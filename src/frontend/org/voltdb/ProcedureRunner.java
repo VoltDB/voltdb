@@ -119,7 +119,7 @@ public class ProcedureRunner {
     //
     protected final SiteProcedureConnection m_site;
     protected final SystemProcedureExecutionContext m_systemProcedureContext;
-    protected final CatalogSpecificPlanner m_csp;
+    protected CatalogSpecificPlanner m_csp;
 
     // per procedure state and catalog info
     //
@@ -164,27 +164,28 @@ public class ProcedureRunner {
                 }
             };
 
-    ProcedureRunner(VoltProcedure procedure,
+    ProcedureRunner(Language lang,
+                    VoltProcedure procedure,
                     SiteProcedureConnection site,
-                    SystemProcedureExecutionContext sysprocContext,
                     Procedure catProc,
                     CatalogSpecificPlanner csp) {
+        this(lang, procedure, site, null, catProc, csp);
+        // assert this constructor for non-system procedures
+        assert(procedure instanceof VoltSystemProcedure == false);
+    }
+
+    ProcedureRunner(Language lang,
+            VoltProcedure procedure,
+            SiteProcedureConnection site,
+            SystemProcedureExecutionContext sysprocContext,
+            Procedure catProc,
+            CatalogSpecificPlanner csp) {
+
         assert(m_inputCRC.getValue() == 0L);
-
-        String language = catProc.getLanguage();
-
-        if (language != null && !language.trim().isEmpty()) {
-            m_language = Language.valueOf(language.trim().toUpperCase());
-        } else if (procedure instanceof StmtProcedure){
-            m_language = null;
-        } else {
-            m_language = Language.JAVA;
-        }
-
-        if (procedure instanceof StmtProcedure) {
+        m_language = lang;
+        if (m_language == null) {
             m_procedureName = catProc.getTypeName().intern();
-        }
-        else {
+        } else {
             m_procedureName = m_language.accept(procedureNameRetriever, procedure);
         }
         m_procedure = procedure;
@@ -217,6 +218,17 @@ public class ProcedureRunner {
                 m_statsCollector);
 
         reflect();
+    }
+
+    public void reInitSysProc(CatalogContext catalogContext, CatalogSpecificPlanner csp) {
+        assert(m_procedure != null);
+        if (! m_isSysProc) {
+            return;
+        }
+        ((VoltSystemProcedure) m_procedure).initSysProc(m_site,
+                catalogContext.cluster);
+
+        m_csp = csp;
     }
 
     public Procedure getCatalogProcedure() {
@@ -911,10 +923,11 @@ public class ProcedureRunner {
 
 
     protected void reflect() {
+        Map<String, SQLStmt> stmtMap;
         // fill in the sql for single statement procs
-        if (m_catProc.getHasjava() == false) {
+        if (m_language == null) {
             try {
-                Map<String, SQLStmt> stmtMap = ProcedureCompiler.getValidSQLStmts(null, m_procedureName, m_procedure.getClass(), m_procedure, true);
+                stmtMap = ProcedureCompiler.getValidSQLStmts(null, m_procedureName, m_procedure.getClass(), m_procedure, true);
                 SQLStmt stmt = stmtMap.get(VoltDB.ANON_STMT_NAME);
                 assert(stmt != null);
                 Statement statement = m_catProc.getStatements().get(VoltDB.ANON_STMT_NAME);
@@ -951,19 +964,6 @@ public class ProcedureRunner {
                 // shouldn't throw anything outside of the compiler
                 e.printStackTrace();
             }
-        }
-        else {
-            // this is where, in the case of java procedures, m_method is set
-            m_paramTypes = m_language.accept(parametersTypeRetriever, this);
-
-            if (m_procMethod == null && m_language == Language.JAVA) {
-                throw new RuntimeException("No \"run\" method found in: " + m_procedure.getClass().getName());
-            }
-        }
-
-        // iterate through the fields and deal with sql statements
-        Map<String, SQLStmt> stmtMap = null;
-        if (m_catProc.getHasjava() == false) {
             try {
                 stmtMap = ProcedureCompiler.getValidSQLStmts(null, m_procedureName, m_procedure.getClass(), m_procedure, true);
             } catch (Exception e1) {
@@ -973,6 +973,14 @@ public class ProcedureRunner {
             }
         }
         else {
+            // this is where, in the case of java procedures, m_method is set
+            m_paramTypes = m_language.accept(parametersTypeRetriever, this);
+
+            if (m_procMethod == null && m_language == Language.JAVA) {
+                throw new RuntimeException("No \"run\" method found in: " + m_procedure.getClass().getName());
+            }
+
+            // iterate through the fields and deal with sql statements
             stmtMap = m_language.accept(sqlStatementsRetriever, this);
         }
 
