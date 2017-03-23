@@ -23,14 +23,26 @@
 
 package org.voltcore.utils;
 
-import junit.framework.TestCase;
-
 import org.junit.Test;
 import org.mockito.Mockito;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 
+import junit.framework.TestCase;
+
 public class TestRateLimitedLogger extends TestCase {
+
+    @Test
+    public void testEnumLevelOrder() {
+        assertTrue(Level.values().length == 8);
+        assertTrue(Level.ALL.ordinal() + 1 == Level.TRACE.ordinal());
+        assertTrue(Level.TRACE.ordinal() + 1 == Level.DEBUG.ordinal());
+        assertTrue(Level.DEBUG.ordinal() + 1 == Level.INFO.ordinal());
+        assertTrue(Level.INFO.ordinal() + 1 == Level.WARN.ordinal());
+        assertTrue(Level.WARN.ordinal() + 1 == Level.ERROR.ordinal());
+        assertTrue(Level.ERROR.ordinal() + 1 == Level.FATAL.ordinal());
+        assertTrue(Level.FATAL.ordinal() + 1 == Level.OFF.ordinal());
+    }
 
     @Test
     public void testRateLimit() {
