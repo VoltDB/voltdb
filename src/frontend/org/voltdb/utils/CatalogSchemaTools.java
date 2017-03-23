@@ -427,10 +427,9 @@ public abstract class CatalogSchemaTools {
      */
     public static void toSchema(StringBuilder sb, Procedure proc)
     {
-        // Groovy: hasJava (true), m_language ("GROOVY"), m_defaultproc (false)
-        // CRUD: hasJava (false), m_language (""), m_defaultproc (true)
-        // SQL: hasJava (false), m_language(""), m_defaultproc (false), m_statements.m_items."SQL"
-        // JAVA: hasJava (true, m_language ("JAVA"), m_defaultproc (false)
+        // CRUD: hasJava (false), m_defaultproc (true)
+        // SQL: hasJava (false), m_defaultproc (false), m_statements.m_items."SQL"
+        // JAVA: hasJava (true, m_defaultproc (false)
         if (proc.getDefaultproc()) {
             return;
         }
@@ -481,7 +480,7 @@ public abstract class CatalogSchemaTools {
                     spacer,
                     proc.getStatements().get("SQL").getSqltext().trim()));
         }
-        else if (proc.getLanguage().equals("JAVA")) {
+        else {
             // Java Class
             sb.append(String.format(
                     "CREATE PROCEDURE %s%s\n%sFROM CLASS %s",
@@ -489,16 +488,6 @@ public abstract class CatalogSchemaTools {
                     partitionClause.toString(),
                     spacer,
                     proc.getClassname()));
-        }
-        else {
-            // Groovy procedure
-            sb.append(String.format(
-                    "CREATE PROCEDURE %s%s%s\n%sAS ###%s### LANGUAGE GROOVY",
-                    proc.getClassname(),
-                    allowClause,
-                    partitionClause.toString(),
-                    spacer,
-                    annot.scriptImpl));
         }
 
         // The SQL statement variant may have terminated the CREATE PROCEDURE statement.
