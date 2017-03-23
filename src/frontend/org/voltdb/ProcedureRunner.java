@@ -406,7 +406,7 @@ public class ProcedureRunner {
                         }
                         try {
                             Object rawResult = m_procMethod.invoke(m_procedure, paramList);
-                            results = getResultsFromRawResults(rawResult);
+                            results = ParameterConverter.getResultsFromRawResults(rawResult);
                         }
                         catch (IllegalAccessException e) {
                             // If reflection fails, invoke the same error handling that other exceptions do
@@ -419,7 +419,7 @@ public class ProcedureRunner {
                         }
                         GroovyScriptProcedureDelegate proc = (GroovyScriptProcedureDelegate)m_procedure;
                         Object rawResult = proc.invoke(paramList);
-                        results = getResultsFromRawResults(rawResult);
+                        results = ParameterConverter.getResultsFromRawResults(rawResult);
                     }
                     log.trace("invoked");
                 }
@@ -444,9 +444,13 @@ public class ProcedureRunner {
                             throw (Error)ex;
                         }
                     }
+
+                    int batchTimeout = m_txnState == null ? 0 :
+                        m_txnState.getInvocation() == null ? 0 :
+                            m_txnState.getInvocation().getBatchTimeout();
                     retval = getErrorResponse(m_procedureName,
                                               m_isReadOnly,
-                                              m_txnState.getInvocation().getBatchTimeout(),
+                                              batchTimeout,
                                               m_appStatusCode,
                                               m_appStatusString,
                                               getNonVoltDBBackendIfExists(),
@@ -474,9 +478,12 @@ public class ProcedureRunner {
                     }
                 }
                 catch (SerializableException ex) {
+                    int batchTimeout = m_txnState == null ? 0 :
+                        m_txnState.getInvocation() == null ? 0 :
+                            m_txnState.getInvocation().getBatchTimeout();
                     retval = getErrorResponse(m_procedureName,
                                               m_isReadOnly,
-                                              m_txnState.getInvocation().getBatchTimeout(),
+                                              batchTimeout,
                                               m_appStatusCode,
                                               m_appStatusString,
                                               getNonVoltDBBackendIfExists(),
@@ -1403,36 +1410,6 @@ public class ProcedureRunner {
                "VOLTDB ERROR: " + msg);
    }
 
-   /**
-    * Given the results of a procedure, convert it into a sensible array of VoltTables.
-    * @throws InvocationTargetException
-    */
-   final private VoltTable[] getResultsFromRawResults(Object result) throws InvocationTargetException {
-       if (result == null) {
-           return new VoltTable[0];
-       }
-       if (result instanceof VoltTable[]) {
-           VoltTable[] retval = (VoltTable[]) result;
-           for (VoltTable table : retval) {
-               if (table == null) {
-                   Exception e = new RuntimeException("VoltTable arrays with non-zero length cannot contain null values.");
-                   throw new InvocationTargetException(e);
-               }
-           }
-
-           return retval;
-       }
-       if (result instanceof VoltTable) {
-           return new VoltTable[] { (VoltTable) result };
-       }
-       if (result instanceof Long) {
-           VoltTable t = new VoltTable(new VoltTable.ColumnInfo("", VoltType.BIGINT));
-           t.addRow(result);
-           return new VoltTable[] { t };
-       }
-       throw new RuntimeException("Procedure didn't return acceptable type.");
-   }
-
    VoltTable[] executeQueriesInIndividualBatches(List<QueuedSQL> batch, boolean finalTask) {
        assert(batch.size() > 0);
 
@@ -1761,13 +1738,13 @@ public class ProcedureRunner {
            for (i = 0; i < batchSize; i++) {
                QueuedSQL qs = batch.get(i);
                // No coordinator task for a single partition procedure.
-               boolean hasCoordinatorTask = false;
+               boolean isCoordinatorTask = false;
                // If all the fragments in this batch are executed successfully, succeededFragmentsCount == batchSize.
                // Otherwise, the fragment whose index equals succeededFragmentsCount is the one that failed.
                boolean failed = i == succeededFragmentsCount;
 
                m_perCallStats.recordStatementStats(qs.stmt.getStmtName(),
-                                                   hasCoordinatorTask,
+                                                   isCoordinatorTask,
                                                    failed,
                                                    executionTimes == null ? 0 : executionTimes[i],
                                                    results == null ? null : results[i],

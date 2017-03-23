@@ -24,6 +24,10 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 
+/**
+ * Run system garbage collection and return how long it took to run in nanos.
+ *
+ */
 public class GC extends VoltNTSystemProcedure {
     public VoltTable run() throws InterruptedException, ExecutionException {
         final long start = System.nanoTime();

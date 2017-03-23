@@ -256,13 +256,20 @@ public final class InvocationDispatcher {
         m_defaultConsistencyReadLevel = VoltDB.Configuration.getDefaultReadConsistencyLevel();
 
         m_NTProcedureService = new NTProcedureService(m_ich, m_mailbox);
+        // this kicks off the initial NT procedures being loaded
         notifyNTProcedureServiceOfCatalogUpdate();
     }
 
+    /**
+     * Tells NTProcedureService to pause before stats get smashed during UAC
+     */
     void notifyNTProcedureServiceOfPreCatalogUpdate() {
         m_NTProcedureService.preUpdate();
     }
 
+    /**
+     * Tells NTProcedureService to reload NT procedures
+     */
     void notifyNTProcedureServiceOfCatalogUpdate() {
         m_NTProcedureService.update(m_catalogContext.get());
     }
@@ -1922,10 +1929,16 @@ public final class InvocationDispatcher {
         return new ClientResponseImpl(ClientResponseImpl.SERVER_UNAVAILABLE, new VoltTable[0], msg, handle);
     }
 
+    /**
+     * Currently passes failure notices to NTProcedureService
+     */
     void handleFailedHosts(Set<Integer> failedHosts) {
         m_NTProcedureService.handleCallbacksForFailedHosts(failedHosts);
     }
 
+    /**
+     * Passes responses to NTProcedureService
+     */
     public void handleAllHostNTProcedureResponse(ClientResponseImpl clientResponseData) {
         long handle = clientResponseData.getClientHandle();
         ProcedureRunnerNT runner = m_NTProcedureService.m_outstanding.get(handle);

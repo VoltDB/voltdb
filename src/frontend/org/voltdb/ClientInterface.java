@@ -199,7 +199,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     private final Cartographer m_cartographer;
 
     //Dispatched stored procedure invocations
-    final InvocationDispatcher m_dispatcher;
+    private final InvocationDispatcher m_dispatcher;
 
     /*
      * This list of ACGs is iterated to retrieve initiator statistics in IV2.
@@ -1197,9 +1197,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 else if (message instanceof BinaryPayloadMessage) {
                     handlePartitionFailOver((BinaryPayloadMessage)message);
                 }
+                /*
+                 * InitiateTaskMessage only get delivered here for all-host NT proc calls.
+                 */
                 else if (message instanceof Iv2InitiateTaskMessage) {
-                    // todo
-
                     final Iv2InitiateTaskMessage itm = (Iv2InitiateTaskMessage) message;
                     final StoredProcedureInvocation invocation = itm.getStoredProcedureInvocation();
 
@@ -1211,6 +1212,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         public void clientCallback(ClientResponse clientResponse) throws Exception {
                             InitiateResponseMessage responseMessage = new InitiateResponseMessage(itm);
                             // use the app status string to store the host id (as a string)
+                            // ProcedureRunnerNT has a method that expects this hack
                             ((ClientResponseImpl) clientResponse).setAppStatusString(String.valueOf(hostId));
                             responseMessage.setResults((ClientResponseImpl) clientResponse);
                             responseMessage.setClientHandle(invocation.clientHandle);
@@ -1218,9 +1220,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             m_mailbox.send(itm.m_sourceHSId, responseMessage);
                         }
                     };
-
-                    System.out.printf("HostID %d got a request for an all-host NT proc\n", hostId);
-                    System.out.flush();
 
                     m_internalConnectionHandler.callProcedure(m_catalogContext.get().authSystem.getInternalAdminUser(),
                                                               true,

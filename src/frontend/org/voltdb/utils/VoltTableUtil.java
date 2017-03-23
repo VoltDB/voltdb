@@ -268,6 +268,9 @@ public class VoltTableUtil {
         return false;
     }
 
+    /**
+     * Get a VoltTableRow as an array of Objects of the right type
+     */
     public static Object[] tableRowAsObjects(VoltTableRow row) {
         Object[] result = new Object[row.getColumnCount()];
         for (int i = 0; i < row.getColumnCount(); i++) {
@@ -276,6 +279,9 @@ public class VoltTableUtil {
         return result;
     }
 
+    /**
+     * Support class for Java8-style streaming of table rows.
+     */
     private static class VoltTableSpliterator implements Spliterator<VoltTableRow> {
         VoltTableRow m_row;
         int m_fence;
@@ -326,7 +332,9 @@ public class VoltTableUtil {
 
     }
 
-    /** Not yet public API for VoltTable and Java 8 streams */
+    /**
+     * Not yet public API for VoltTable and Java 8 streams
+     */
     public static Stream<VoltTableRow> stream(VoltTable table) {
         return StreamSupport.stream(new VoltTableSpliterator(table, 0, table.getRowCount()), false);
     }
