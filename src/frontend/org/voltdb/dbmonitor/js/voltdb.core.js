@@ -587,23 +587,28 @@
                     '@Explain': { '1': ['SQL (varchar)', 'Returns Table[]'] },
                     '@ExplainProc': { '1': ['Stored Procedure Name (varchar)', 'Returns Table[]'] },
                     '@ExplainView': { '1': ['Materialized View Name (varchar)', 'Returns Table[]'] },
+                    '@GC': { '0': ['Returns bit'] },
+                    '@GetPartitionKeys': { '1': ['VoltType (varchar)', 'Returns Table[]'] },
                     '@Pause': { '0': ['Returns bit'] },
+                    '@Promote': { '0': ['Returns bit'] },
                     '@Quiesce': { '0': ['Returns bit'] },
+                    '@ResetDR': { '0': ['Returns bit'] },
                     '@Resume': { '0': ['Returns bit'] },
                     '@Shutdown': { '0': ['Returns bit'] },
                     '@SnapshotDelete': { '2': ['DirectoryPath (varchar)', 'UniqueId (varchar)', 'Returns Table[]'] },
                     '@SnapshotRestore': { '2': ['DirectoryPath (varchar)', 'UniqueId (varchar)', 'Returns Table[]'], '1': ['JSON (varchar)', 'Returns Table[]'] },
-                    '@SnapshotSave': { '3': ['DirectoryPath (varchar)', 'UniqueId (varchar)', 'Blocking (bit)', 'Returns Table[]'], '1': ['JSON (varchar)', 'Returns Table[]'] },
+                    '@SnapshotSave': { '0': ['Returns Table[]'], '3': ['DirectoryPath (varchar)', 'UniqueId (varchar)', 'Blocking (bit)', 'Returns Table[]'], '1': ['JSON (varchar)', 'Returns Table[]'] },
                     '@SnapshotScan': { '1': ['DirectoryPath (varchar)', 'Returns Table[]'] },
                     '@SnapshotStatus': { '0': ['Returns Table[]'] },
                     '@Statistics': { '2': ['Statistic (StatisticsComponent)', 'Interval (bit)', 'Returns Table[]'] },
+                    '@StopNode':{'1': ['Returns Int']},
+                    '@SwapTables':{'1': ['SQL (varchar)','Returns Table[]']},
                     '@SystemCatalog': { '1': ['SystemCatalog (CatalogComponent)', 'Returns Table[]'] },
                     '@SystemInformation': { '1': ['Selector (SysInfoSelector)', 'Returns Table[]'] },
                     '@UpdateApplicationCatalog': { '2': ['CatalogPath (varchar)', 'DeploymentConfigPath (varchar)', 'Returns Table[]'] },
+                    '@UpdateClasses': { '1': ['Jar-file (varchar)', 'Returns Table[]'] },
                     '@UpdateLogging': { '1': ['Configuration (xml)', 'Returns Table[]'] },
-                    '@Promote': { '0': ['Returns bit'] },
-                    '@ValidatePartitioning': { '2': ['HashinatorType (int)', 'Config (varbinary)', 'Returns Table[]'] },
-                    '@GetPartitionKeys': { '1': ['VoltType (varchar)', 'Returns Table[]'] }
+                    '@ValidatePartitioning': { '2': ['HashinatorType (int)', 'Config (varbinary)', 'Returns Table[]'] }
                 };
 
                 var childConnectionQueue = connection.getQueue();
