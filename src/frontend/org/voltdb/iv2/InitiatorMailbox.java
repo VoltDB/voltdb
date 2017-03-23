@@ -355,8 +355,8 @@ public class InitiatorMailbox implements Mailbox
         RealVoltDB db = (RealVoltDB)VoltDB.instance();
         int hostId = Integer.parseInt(params[2].toString());
         Long newLeaderHSId = db.getCartograhper().getHSIDForPartitionHost(hostId, pid);
-        if (newLeaderHSId == m_hsId) {
-            tmLog.warn(String.format("@BalanceSPI the partition leader is already on the host %d.", hostId));
+        if (newLeaderHSId == null || newLeaderHSId == m_hsId) {
+            tmLog.warn(String.format("@BalanceSPI the partition leader is already on the host %d or the host id is invalid.", hostId));
             return;
         }
 
@@ -375,7 +375,7 @@ public class InitiatorMailbox implements Mailbox
         m_scheduler.m_isLeader = false;
         m_repairLog.setLeaderState(false);
         tmLog.info("[InitiatorMailbox] starting Balance SPI for partition " + pid + " to " +
-                CoreUtils.hsIdToString(newLeaderHSId) + ". isLeader:" + m_scheduler.m_isLeader);
+                CoreUtils.hsIdToString(newLeaderHSId));
     }
 
     // After the SPI migration has been requested, all the sp requests will be sent back to the sender
