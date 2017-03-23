@@ -26,13 +26,11 @@ VoltDB = 'org.voltdb.VoltDB'
                           'Specifies the root directory for the database. The default is voltdbroot under the current working directory.',
                           default = None),
         VOLT.BooleanOption('-f', '--force', 'force',
-                           'Start a new, empty database even if the VoltDB managed directories contain files from a previous session that may be overwritten.'),
+                           'Initialize a new, empty database. Any previous session will be overwritten.'),
         VOLT.StringOption('-s', '--schema', 'schema',
-                           'Specifies a file containing the data definition (as SQL statements) to be loaded when starting the database.'
-                           ' voltdbroot/startup/bootstrap/existing/ddl.sql is used if it exists and no schema is specified, and overwritten with the new schema if provided.'),
+                           'Specifies a file containing the data definition (as SQL statements) to be loaded when starting the database.'),
         VOLT.StringOption('-p', '--procedures', 'procedures_jarfile',
-                           'Specifies a .jar file containing stored procedures to be loaded upon starting the database.'
-                           ' The default is voltdbroot/startup/bootstrap/existing/procedures.jar is used if it exists and no file is specified, and overwritten with the new file if provided.')
+                           'Specifies a .jar file containing stored procedures to be loaded upon starting the database.')
     ),
     description = 'Initializes a new, empty database.'
 )

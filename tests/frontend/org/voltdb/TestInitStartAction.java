@@ -42,7 +42,6 @@ import org.junit.ClassRule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 import org.voltdb.VoltDB.Configuration;
-import org.voltdb.VoltDB.CrashCalledException;
 import org.voltdb.VoltDB.SimulatedExitException;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.compiler.VoltCompiler;
@@ -245,7 +244,7 @@ final public class TestInitStartAction {
      * More comprehensive checks will be added during 'start', since 'init' has no way to verify that the entire cluster has the same schema.
      *
      * Note that SimulatedExitException is thrown by the command line parser with no descriptive details.
-     * CrashCalledException is from VoltDB.crashLocalVoltDB() and details are left behind when it's thrown.
+     * VoltDB.crashLocalVoltDB() throws an AssertionError with the message "Faux crash of VoltDB successful."
      */
 
     /** Verifies that the staged catalog matches what VoltCompiler emits given the supplied schema.
@@ -380,7 +379,7 @@ final public class TestInitStartAction {
         server.join();
 
         assertNotNull(serverException.get());
-        assertTrue(serverException.get() instanceof CrashCalledException);
+        assertTrue(serverException.get().getMessage().equals("Faux crash of VoltDB successful."));
         assertTrue(VoltDB.wasCrashCalled);
         assertTrue(VoltDB.crashMessage.contains("Could not compile specified schema"));
         assertEquals(true, schemaFile.delete());

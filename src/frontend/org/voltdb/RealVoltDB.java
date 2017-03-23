@@ -532,7 +532,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     public static String getStagedCatalogPath(String voltDbRoot){
-        return voltDbRoot + File.separator + Constants.CONFIG_DIR + File.separator + Constants.STAGED_CATALOG_FILE_NAME;
+        return voltDbRoot + File.separator + Constants.CONFIG_DIR + File.separator + CatalogUtil.STAGED_CATALOG_FILE_NAME;
     }
 
     private String managedPathEmptyCheck(String voltDbRoot, String path) {
@@ -2170,9 +2170,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
      * @param config VoltDB configuration
      */
     private void stageSchemaFiles(Configuration config){
-        if ((config.m_userSchema == null) || (config.m_userSchema.equals(""))){
+        if (config.m_userSchema == null){
             return; // nothing to do
         }
+        assert( config.m_userSchema.isFile() ); // this is validated during command line parsing and will be true unless disk faults
         File stagedCatalogFH = new VoltFile(getStagedCatalogPath());
         assert( !stagedCatalogFH.exists() || config.m_forceVoltdbCreate ); // managedPathsWithFiles() checks for the staged catalog
         final boolean standalone = true;

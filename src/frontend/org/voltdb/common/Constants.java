@@ -79,6 +79,4 @@ public class Constants
 
     public static final String DBROOT = "voltdbroot";
     public static final String CONFIG_DIR = "config";
-    public static final String CATALOG_FILE_NAME = "catalog.jar";
-    public static final String STAGED_CATALOG_FILE_NAME = "staged-catalog.jar";
 }

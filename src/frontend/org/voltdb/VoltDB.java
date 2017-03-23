@@ -772,7 +772,7 @@ public class VoltDB {
                     // catalog.jar contains DDL and proc classes with which the database was
                     // compiled. Check if catalog.jar exists as it is needed to fetch ddl (get
                     // schema) as well as procedures (get classes)
-                    File catalogFH = new VoltFile(configInfoDir, Constants.CATALOG_FILE_NAME);
+                    File catalogFH = new VoltFile(configInfoDir, CatalogUtil.CATALOG_FILE_NAME);
                     if (!catalogFH.exists()) {
                         try {
                             parentPath = m_voltdbRoot.getCanonicalFile().getParent();
@@ -1185,7 +1185,7 @@ public class VoltDB {
         wasCrashCalled = true;
         crashMessage = errMsg;
         if (ignoreCrash) {
-            throw new CrashCalledException();
+            throw new AssertionError("Faux crash of VoltDB successful.");
         }
         if (CoreUtils.isJunitTest()) {
             VoltLogger log = new VoltLogger("HOST");
@@ -1316,7 +1316,7 @@ public class VoltDB {
         wasCrashCalled = true;
         crashMessage = errMsg;
         if (ignoreCrash) {
-            throw new CrashCalledException();
+            throw new AssertionError("Faux crash of VoltDB successful.");
         }
         // end test code
 
@@ -1457,15 +1457,6 @@ public class VoltDB {
             throw new SimulatedExitException(status);
         }
         System.exit(status);
-    }
-
-    // extend AssertionError to ensure behavioral compatibility
-    public static class CrashCalledException extends AssertionError {
-        private static final long serialVersionUID = 1L;
-
-        public CrashCalledException(){
-            super("Faux crash of VoltDB successful.");
-        }
     }
 
     private static VoltDB.Configuration m_config = new VoltDB.Configuration();
