@@ -86,7 +86,7 @@ voltdbroot = Opt('dir', 'voltdbroot', str, 2)
 hostcount = Opt('count', 'hostcount', int, 2)
 add = Opt('add', 'enableadd', None, 2)
 schema = Opt('schema', 'schema', str, 2)
-procedures = Opt('procedures', 'classpath', str, 2)
+classes = Opt('classes', 'classpath', str, 2)
 
 # negative opt
 unknown = Opt('unknown', None, None, 0)
@@ -154,7 +154,7 @@ volt_opts = {'create': [admin,
                       voltdbroot,
                       force,
                       schema,
-                      procedures],
+                      classes],
 
              'start': [admin,
                        client,
