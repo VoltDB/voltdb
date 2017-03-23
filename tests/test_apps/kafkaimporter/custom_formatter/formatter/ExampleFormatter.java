@@ -69,8 +69,9 @@ public class ExampleFormatter implements Formatter {
 
         String percentErrors = m_prop.getProperty("errorrate", "1").trim();
         int badinject = 1;
+        String sourceData = null;
         try {
-            String sourceData = new String(payload.array(), payload.arrayOffset(), payload.limit(), StandardCharsets.UTF_8);
+            sourceData = new String(payload.array(), payload.arrayOffset(), payload.limit(), StandardCharsets.UTF_8);
             badinject = Integer.parseInt(percentErrors);
         } catch (NumberFormatException e1) {
             e1.printStackTrace();
