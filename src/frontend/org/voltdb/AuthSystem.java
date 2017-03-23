@@ -530,56 +530,6 @@ public class AuthSystem {
         return m_principalName == null ? null : new String(m_principalName, StandardCharsets.UTF_8);
     }
 
-    /**
-     * Check the username and password against the catalog. Return the appropriate permission
-     * set for that user if the information is correct and return null otherwise. If security is disabled
-     * an AuthUser object that grants all permissions is returned.
-     * @param username Name of the user to authenticate
-     * @param password SHA-1 single hashed version of the users clear text password
-     * @return The permission set for the user if authentication succeeds or null if authentication fails.
-     */
-    boolean authenticate(String username, byte[] password, ClientAuthScheme scheme) {
-        if (!m_enabled) {
-            return true;
-        }
-        final AuthUser user = m_users.get(username);
-        if (user == null) {
-            authLogger.l7dlog(Level.INFO, LogKeys.auth_AuthSystem_NoSuchUser.name(), new String[] {username}, null);
-            return false;
-        }
-
-        boolean matched = true;
-        if (user.m_sha1ShadowPassword != null || user.m_sha2ShadowPassword != null) {
-            MessageDigest md = null;
-            try {
-                md = MessageDigest.getInstance(ClientAuthScheme.getDigestScheme(scheme));
-            } catch (NoSuchAlgorithmException e) {
-                VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
-            }
-            byte passwordHash[] = md.digest(password);
-
-            /*
-             * A n00bs attempt at constant time comparison
-             */
-            for (int ii = 0; ii < passwordHash.length; ii++) {
-                if (passwordHash[ii] != user.m_sha1ShadowPassword[ii]){
-                    matched = false;
-                }
-            }
-        } else {
-            String pwToCheck = (scheme == ClientAuthScheme.HASH_SHA1 ? user.m_bcryptShadowPassword : user.m_bcryptSha2ShadowPassword);
-            matched = BCrypt.checkpw(Encoder.hexEncode(password), pwToCheck);
-        }
-
-        if (matched) {
-            logAuthSuccess(username);
-            return true;
-        } else {
-            authLogger.l7dlog(Level.INFO, LogKeys.auth_AuthSystem_AuthFailedPasswordMistmatch.name(), new String[] {username}, null);
-            return false;
-        }
-    }
-
     public InternalImporterUser getImporterUser() {
         return m_internalImporterUser;
     }
@@ -740,7 +690,7 @@ public class AuthSystem {
         }
 
         @Override
-        protected boolean authenticateImpl(ClientAuthScheme scheme) throws Exception {
+        protected boolean authenticateImpl(ClientAuthScheme scheme, String fromAddress) throws Exception {
             if (!m_enabled) {
                 m_authenticatedUser = m_user;
                 return true;
@@ -750,7 +700,7 @@ public class AuthSystem {
             }
             final AuthUser user = m_users.get(m_user);
             if (user == null) {
-                authLogger.l7dlog(Level.INFO, LogKeys.auth_AuthSystem_NoSuchUser.name(), new String[] {m_user}, null);
+                logAuthFails(LogKeys.auth_AuthSystem_NoSuchUser.name(), m_user, fromAddress);
                 return false;
             }
 
@@ -780,21 +730,30 @@ public class AuthSystem {
 
             if (matched) {
                 m_authenticatedUser = m_user;
-                logAuthSuccess(m_authenticatedUser);
+                logAuthSuccess(m_authenticatedUser, fromAddress);
                 return true;
-            } else {
-                authLogger.l7dlog(Level.INFO, LogKeys.auth_AuthSystem_AuthFailedPasswordMistmatch.name(), new String[] {m_user}, null);
-                return false;
             }
+
+            logAuthFails(LogKeys.auth_AuthSystem_AuthFailedPasswordMistmatch.name(), m_user, fromAddress);
+            return false;
         }
     }
 
-    private static void logAuthSuccess(String user) {
+    private static void logAuthSuccess(String user, String fromAddress) {
         //Make sure its logged per user
-        String format = "Authenticated user " + user + "%s";
-        RateLimitedLogger.tryLogForMessage(System.currentTimeMillis(), 60, TimeUnit.SECONDS,
-            authLogger, Level.INFO, format, ". This message is rate limited to once every 60 seconds.");
+        if (fromAddress == null) {
+            fromAddress = "NULL";
+        }
+        String authenticationLogMessage = String.format(
+                "Authenticated user %s from %s. This message is rate limited to once every 60 seconds.",
+                user, fromAddress);
 
+        RateLimitedLogger.tryLogForMessage(System.currentTimeMillis(), 60, TimeUnit.SECONDS,
+            authLogger, Level.INFO, authenticationLogMessage);
+    }
+
+    private static void logAuthFails(String key, String user, String fromAddress) {
+        authLogger.l7dlog(Level.INFO, key, new String[] {user, fromAddress}, null);
     }
 
     public class SpnegoPassthroughRequest extends AuthenticationRequest {
@@ -803,14 +762,14 @@ public class AuthSystem {
             m_authenticatedPrincipal = authenticatedPrincipal;
         }
         @Override
-        protected boolean authenticateImpl(ClientAuthScheme scheme) throws Exception {
+        protected boolean authenticateImpl(ClientAuthScheme scheme, String fromAddress) throws Exception {
             final AuthUser user = m_users.get(m_authenticatedPrincipal);
             if (user == null) {
-                authLogger.l7dlog(Level.INFO, LogKeys.auth_AuthSystem_NoSuchUser.name(), new String[] {m_authenticatedPrincipal}, null);
+                logAuthFails(LogKeys.auth_AuthSystem_NoSuchUser.name(), m_authenticatedPrincipal, fromAddress);
                 return false;
             }
             m_authenticatedUser = m_authenticatedPrincipal;
-            logAuthSuccess(m_authenticatedUser);
+            logAuthSuccess(m_authenticatedUser, fromAddress);
             return true;
         }
     }
@@ -821,7 +780,7 @@ public class AuthSystem {
             m_socket = socket;
         }
         @Override
-        protected boolean authenticateImpl(ClientAuthScheme scheme) throws Exception {
+        protected boolean authenticateImpl(ClientAuthScheme scheme, String fromAddress) throws Exception {
             if (!m_enabled) {
                 m_authenticatedUser = "_^_pinco_pallo_^_";
                 return true;
@@ -981,18 +940,16 @@ public class AuthSystem {
                 }
             });
 
-            if (authenticatedUser != null) {
-                final AuthUser user = m_users.get(authenticatedUser);
-                if (user == null) {
-                    authLogger.l7dlog(Level.INFO, LogKeys.auth_AuthSystem_NoSuchUser.name(), new String[] {authenticatedUser}, null);
-                    return false;
-                }
-                m_authenticatedUser = authenticatedUser;
-                logAuthSuccess(m_authenticatedUser);
-            } else {
+            if (authenticatedUser == null)
+                return false;
+
+            final AuthUser user = m_users.get(authenticatedUser);
+            if (user == null) {
+                logAuthFails(LogKeys.auth_AuthSystem_NoSuchUser.name(), authenticatedUser, fromAddress);
                 return false;
             }
-
+            m_authenticatedUser = authenticatedUser;
+            logAuthSuccess(m_authenticatedUser, fromAddress);
             return true;
         }
     }
