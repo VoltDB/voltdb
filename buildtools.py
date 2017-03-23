@@ -68,7 +68,7 @@ class BuildContext:
         if self.PLATFORM == 'Linux':
             if self.compilerName() == 'gcc':
                 return "linux-x86_64:gcc -fpic"
-        print "ERROR: Don't know what platform to use to configure openssl."
+        print("ERROR: Don't know what platform to use to configure openssl.")
         sys.exit(-1)
 
     def compilerName(self):
@@ -140,7 +140,7 @@ try:
     version = readFile("version.txt")
     version = version.strip()
 except:
-    print "ERROR: Unable to read version number from version.txt."
+    print("ERROR: Unable to read version number from version.txt.")
     sys.exit(-1)
 
 # Replace the extension of filename with the
@@ -627,10 +627,10 @@ def buildMakefile(CTX):
     makefile.write("test: \\\n")
     for test in tests:
         binname, objectname, sourcename = namesForTestCode(test)
-        makefile.write("\t" + binname + " \\\n        ")
-    makefile.write("\t\t${GENERATED_TESTS}")
+        makefile.write("        " + binname + " \\\n")
+    makefile.write("        ${GENERATED_TESTS}")
     if CTX.LEVEL == "MEMCHECK" or CTX.LEVEL == "MEMCHECK_NOFREELIST":
-        makefile.write("\\\n\tprod/voltdbipc\n")
+        makefile.write("\\\n        prod/voltdbipc\n")
     makefile.write('\n')
     for test in tests:
         binname, objectname, sourcename = namesForTestCode(test)
@@ -791,6 +791,13 @@ def runTests(CTX):
     failedTests = []
     successes = 0
     failures = 0
+    #
+    # Set executing to False to test this function without
+    # really running tests.  Set exretval to 0 to simulate all
+    # successes.  Set exretval to -1 to simulate all failuares.
+    #
+    executing = True
+    exretval = 0
 
     retval = os.system("make --directory=%s test -j4" % (CTX.OUTPUT_PREFIX))
     if retval != 0:
@@ -829,54 +836,67 @@ def runTests(CTX):
             retval = os.system("/usr/bin/env python " + targetpath + ".py")
         else:
             isValgrindTest = True;
-            for test in noValgrindTests:
-                if targetpath.find(test) != -1:
+            for nvgtest in noValgrindTests:
+                if targetpath.find(nvgtest) != -1:
                     isValgrindTest = False;
                     break
             if CTX.PLATFORM == "Linux" and isValgrindTest:
                 print('Executing valgrind test %s' % targetpath)
                 valgrindDir = os.path.join(bindirname, dirname)
                 valgrindFile = makeValgrindFile(valgrindDir, "%p")
-                process = Popen(executable="valgrind",
-                                args=["valgrind",
-                                      "--leak-check=full",
-                                      "--show-reachable=yes",
-                                      "--error-exitcode=-1",
-                                      "--suppressions=" + os.path.join(TEST_PREFIX,
-                                                                       "test_utils/vdbsuppressions.supp"),
-                                      "--xml=yes",
-                                      "--xml-file=" + valgrindFile,
-                                      targetpath], stderr=PIPE, bufsize=-1)
-                out_err = process.stderr.readlines()
-                retval = process.wait()
-                fileName = makeValgrindFile(valgrindDir, "%d" % process.pid)
-                errorState = ValgrindErrorState(expectNoMemLeaks, fileName)
+                if executing:
+                    process = Popen(executable="valgrind",
+                                    args=["valgrind",
+                                          "--leak-check=full",
+                                          "--show-reachable=yes",
+                                          "--error-exitcode=-1",
+                                          "--suppressions=" + os.path.join(TEST_PREFIX,
+                                                                           "test_utils/vdbsuppressions.supp"),
+                                          "--xml=yes",
+                                          "--xml-file=" + valgrindFile,
+                                          targetpath], stderr=PIPE, bufsize=-1)
+                    out_err = process.stderr.readlines()
+                    retval = process.wait()
+                    fileName = makeValgrindFile(valgrindDir, "%d" % process.pid)
+                    errorState = ValgrindErrorState(True, fileName)
+                else:
+                    fileName = None
+                    retval = exretval
+                    errorState = None
                 # If there are as many errors as we expect,
                 # then delete the xml file.  Otherwise keep it.
                 # It may be useful.
-                if ( not errorState.isExpectedState()):
-                    try:
-                        os.remove(fileName)
-                    except ex:
-                        pass
-                    print errorState.errorMessage()
-                    retval = -1
-                    sys.stdout.flush()
+                if errorState:
+                    if not errorState.isExpectedState():
+                        if fileName:
+                            try:
+                                os.remove(fileName)
+                            except ex:
+                                pass
+                        print(errorState.errorMessage())
+                        retval = -1
+                        sys.stdout.flush()
+                else:
+                    print('    Test %s was not run.' % os.path.join(dirname, test))
             else:
-                retval = os.system(targetpath)
+                print('Executing non-valgrind test %s' % targetpath)
+                if executing:
+                    retval = os.system(targetpath)
+                else:
+                    retval = exretval
         if retval == 0:
             successes += 1
         else:
-            failedTests += [os.path.join(dirname, binname)]
+            failedTests += [os.path.join(dirname, test)]
             failures += 1
-    print "==============================================================================="
-    print "TESTING COMPLETE (PASSED: %d, FAILED: %d)" % (successes, failures)
+    print("===============================================================================")
+    print("TESTING COMPLETE (PASSED: %d, FAILED: %d)" % (successes, failures))
     for test in failedTests:
-        print "TEST: " + test + " in DIRECTORY: " + CTX.OUTPUT_PREFIX + " FAILED"
+        print("TEST: " + test + " in DIRECTORY: " + CTX.OUTPUT_PREFIX + " FAILED")
     if failures == 0:
-        print "*** SUCCESS ***"
+        print("*** SUCCESS ***")
     else:
-        print "!!! FAILURE !!!"
-    print "==============================================================================="
+        print("!!! FAILURE !!!")
+    print("===============================================================================")
 
     return failures
