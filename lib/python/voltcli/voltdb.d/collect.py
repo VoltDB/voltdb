@@ -29,37 +29,36 @@ output_help = ('file name to store collect data in compressed format. The defaul
     description = collect_help,
     options = (
         VOLT.StringOption (None, '--prefix', 'prefix',
-                           'file name prefix for uniquely identifying collection. This has been deprecated, consider '
-                           'using --output option',
+                           'file name prefix for uniquely identifying collection. (Deprecated. Please use --output).',
                            default = ''),
         VOLT.StringOption('-o', '--output', 'output', output_help, default=''),
         VOLT.StringOption (None, '--upload', 'host',
-                           'upload resulting collection to HOST via SFTP',
+                           'upload resulting collection to HOST via SFTP.',
                            default = ''),
         VOLT.StringOption (None, '--username', 'username',
-                           'user name for SFTP upload',
+                           'user name for SFTP upload.',
                            default = ''),
         VOLT.StringOption (None, '--password', 'password',
-                           'password for SFTP upload',
+                           'password for SFTP upload.',
                            default = ''),
         VOLT.BooleanOption(None, '--no-prompt', 'noprompt',
-                           'automatically upload collection (without user prompt)',
+                           'automatically upload collection (without user prompt).',
                            default = False),
         VOLT.BooleanOption(None, '--dry-run', 'dryrun',
-                           'list the log files without collecting them',
+                           'list the log files without collecting them.',
                            default = False),
         VOLT.BooleanOption(None, '--skip-heap-dump', 'skipheapdump',
-                           'exclude heap dump file from collection',
+                           'exclude heap dump file from collection.',
                            default = True),
         VOLT.IntegerOption(None, '--days', 'days',
-                           'number of days of files to collect (files included are log, crash files), Current day value is 1',
+                           'number of days of files to collect (files included are log, crash files), Current day value is 1.',
                            default = 7),
 
         VOLT.StringOption('-D', '--dir', 'directory_spec', dir_spec_help, default=None),
         VOLT.BooleanOption('-f', '--force', 'force', 'Overwrite the existing file.', default = False)
     ),
     arguments = (
-        VOLT.PathArgument('voltdbroot', 'the voltdbroot path. This has been deprecated, consider using --dir option', absolute = True, optional=True, default=None)
+        VOLT.PathArgument('voltdbroot', 'the voltdbroot path. (Deprecated. Please use --dir).', absolute = True, optional=True, default=None)
     )
 )
 
@@ -79,8 +78,7 @@ def collect(runner):
 
 def process_voltdbroot_args(runner) :
     if (runner.opts.directory_spec) and (runner.opts.voltdbroot):
-        utility.abort('To specify database root directory, use --dir option. Providing database root using --dir option '
-                      'and command line argument is not valid.')
+        utility.abort('ERROR: Cannot specify both --dir and command line argument. Please use --dir option.')
 
     os.environ['PATH'] += os.pathsep + os.pathsep.join(s for s in sys.path if os.path.join('voltdb', 'bin') in s)
     # If database directory is given, derive voltdbroot path to store results of systemcheck in voltdbroot directory
@@ -96,7 +94,7 @@ def process_voltdbroot_args(runner) :
     else:
         voltdbrootDir = os.path.join(os.getcwd(), 'voltdbroot')
 
-    runner.args.extend(['--voltdbroot='+voltdbrootDir])
+    runner.args.extend(['--voltdbroot=' + voltdbrootDir])
     performSystemCheck(runner, voltdbrootDir)
 
 
@@ -119,12 +117,11 @@ def performSystemCheck(runner, dirPath):
 
 def process_outputfile_args(runner):
     if runner.opts.output and runner.opts.prefix:
-        utility.abort('To specify output file name, use --output option. Providing output file name using --output '
-                      'and --prefix option is not valid.')
+        utility.abort('"ERROR: Cannot specify both --output and --prefix. Please use --output option.')
 
     if runner.opts.output:
-        runner.args.extend(['--outputFile='+runner.opts.output])
+        runner.args.extend(['--outputFile=' + runner.opts.output])
     elif runner.opts.prefix:
         utility.warning('Specifying prefix for outputfile name is deprecated. Consider using --output option to specify'
                         ' output file name.')
-        runner.args.extend(['--prefix='+runner.opts.prefix])
+        runner.args.extend(['--prefix=' + runner.opts.prefix])

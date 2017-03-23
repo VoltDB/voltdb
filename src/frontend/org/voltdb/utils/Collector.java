@@ -174,7 +174,7 @@ public class Collector {
         File outputFile = new File(m_config.outputFileName);
         if (outputFile.exists() && !m_config.force) {
             System.err.println("ERROR: Output file " + outputFile.getAbsolutePath() + " already exists."
-                    + " Use --force to overwrite the existing collect file.");
+                    + " Use --force to overwrite an existing file.");
             VoltDB.exit(-1);
         }
     }
