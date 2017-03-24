@@ -334,6 +334,23 @@ public class TestSqlUpsertSuite extends RegressionSuite {
 
             vt = client.callProcedure("@AdHoc", query).getResults()[0];
             validateTableOfLongs(vt, new long[][] {{1,2,1}, {2,2,2}, {3,3,3}});
+
+            // insert
+            upsert = "UPSERT INTO " + tb + " (ID, WAGE, DEPT) " +
+                    "VALUES((SELECT MAX(ID) + 5 FROM R2), 0, 0);";
+            vt = client.callProcedure("@AdHoc", upsert).getResults()[0];
+            validateTableOfLongs(vt, new long[][] {{1}});
+            vt = client.callProcedure("@AdHoc", query).getResults()[0];
+            validateTableOfLongs(vt, new long[][] {{1,2,1}, {2,2,2}, {3,3,3}, {8, 0, 0} });
+
+            // update
+            upsert = "UPSERT INTO " + tb + " (ID, WAGE, DEPT) " +
+                    "VALUES((SELECT MAX(ID) + 5 FROM R2), 1, 1);";
+            vt = client.callProcedure("@AdHoc", upsert).getResults()[0];
+            validateTableOfLongs(vt, new long[][] {{1}});
+            vt = client.callProcedure("@AdHoc", query).getResults()[0];
+            validateTableOfLongs(vt, new long[][] {{1,2,1}, {2,2,2}, {3,3,3}, {8, 1, 1} });
+
         }
 
     }
