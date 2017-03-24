@@ -97,8 +97,8 @@ public class DuplicateCounter
         String msg = String.format("DUPLICATE COUNTER COLLISION:\n"
                 + "REQUEST MESSAGE 1: %s\n"
                 + "REQUEST MESSAGE 2: %s\n",
-                m_openMessage,
-                other.m_openMessage);
+                m_openMessage.toString(),
+                other.m_openMessage.toString());
         tmLog.error(msg);
     }
 
