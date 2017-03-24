@@ -51,8 +51,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltdb.CLIConfig;
 import org.voltdb.VoltDB;
 import org.voltdb.common.Constants;
-import org.voltdb.compiler.deploymentfile.DeploymentType;
-import org.voltdb.compiler.deploymentfile.PathsType;
+import org.voltdb.settings.NodeSettings;
 import org.voltdb.types.TimestampType;
 
 import com.google_voltpatches.common.base.Throwables;
@@ -511,16 +510,38 @@ public class Collector {
                 String exportOverflowPath = m_config.voltdbroot + File.separator + "export_overflow";
                 String commandLogPath = m_config.voltdbroot + File.separator + "command_log";
                 String commandLogSnapshotPath = m_config.voltdbroot + File.separator + "command_log_snapshot";
-                DeploymentType deployment = CatalogPasswordScrambler.getDeployment(new File(m_deploymentPath));
-                PathsType deploymentPaths = deployment.getPaths();
-                if (deploymentPaths != null) {
-                    PathsType.Droverflow drPath = deploymentPaths.getDroverflow();
-                    if (drPath != null)
-                        drOverflowPath = VoltDB.instance().getDROverflowPath(drPath);
-                    PathsType.Exportoverflow exportPath = deploymentPaths.getExportoverflow();
-                    if (exportPath != null)
-                        exportOverflowPath = VoltDB.instance().getExportOverflowPath(exportPath);
+
+                if (m_pathPropertiesPath != null && !m_pathPropertiesPath.trim().isEmpty()
+                        && (new File(m_pathPropertiesPath)).exists()) {
+                    Properties prop = new Properties();
+                    InputStream input = null;
+
+                    try {
+                        input = new FileInputStream(m_pathPropertiesPath);
+                        prop.load(input);
+                    } catch (IOException excp) {
+                        System.err.println(excp.getMessage());
+                    }
+                    if (!prop.isEmpty()) {
+                        String cmdLogPropPath = prop.getProperty(NodeSettings.CL_PATH_KEY, null);
+                        if (cmdLogPropPath != null && !cmdLogPropPath.trim().isEmpty()) {
+                            commandLogPath = cmdLogPropPath;
+                        }
+                        String cmdLogSnapshotPropPath = prop.getProperty(NodeSettings.CL_SNAPSHOT_PATH_KEY, null);
+                        if (cmdLogSnapshotPropPath != null && !cmdLogSnapshotPropPath.trim().isEmpty()) {
+                            commandLogSnapshotPath = cmdLogSnapshotPropPath;
+                        }
+                        String drOverflowPropPath = prop.getProperty(NodeSettings.DR_OVERFLOW_PATH_KEY, null);
+                        if (drOverflowPropPath != null && !drOverflowPropPath.trim().isEmpty()) {
+                            drOverflowPath = drOverflowPropPath;
+                        }
+                        String exportOverflowPropPath = prop.getProperty(NodeSettings.EXPORT_OVERFLOW_PATH_KEY, null);
+                        if (exportOverflowPropPath != null && !exportOverflowPropPath.trim().isEmpty()) {
+                            exportOverflowPath = exportOverflowPropPath;
+                        }
+                    }
                 }
+
                 String[] duDrOverflowCmd = {"bash", "-c", duCommand + " " + drOverflowPath};
                 cmd(zipStream, duDrOverflowCmd, folderPath + "system_logs" + File.separator, "dudroverflowdata");
 
