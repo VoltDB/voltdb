@@ -29,6 +29,7 @@ import java.util.List;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.SelectSubqueryExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.DeletePlanNode;
 import org.voltdb.plannodes.InsertPlanNode;
 import org.voltdb.plannodes.ReceivePlanNode;
@@ -282,6 +283,15 @@ public class TestPlansDML extends PlannerTestCase {
         dmlSQL = "UPDATE P1 SET C = (SELECT C FROM R2 WHERE A = 0) ;";
         checkDMLPlanNodeAndSubqueryExpression(dmlSQL, null);
 
+        dmlSQL = "UPDATE P1 set C = ? WHERE A = (SELECT MAX(R1.C) FROM R1 WHERE R1.A = P1.A);";
+        checkDMLPlanNodeAndSubqueryExpression(dmlSQL, ExpressionType.COMPARE_EQUAL);
+
+        dmlSQL = "UPDATE P1 set C = (SELECT C FROM R1 WHERE R1.C = P1.C LIMIT 1);";
+        checkDMLPlanNodeAndSubqueryExpression(dmlSQL, null);
+
+        dmlSQL = "UPSERT INTO R6 (A, C) SELECT A, C FROM R2 WHERE NOT EXISTS (SELECT 1 FROM R6 WHERE R6.A = R2.C) ORDER BY 1, 2;";
+        checkDMLPlanNodeAndSubqueryExpression(dmlSQL, ExpressionType.OPERATOR_NOT);
+
         dmlSQL = "DELETE FROM R1 WHERE C IN (SELECT A FROM R2);";
         checkDMLPlanNodeAndSubqueryExpression(dmlSQL, ExpressionType.OPERATOR_EXISTS);
 
@@ -338,16 +348,22 @@ public class TestPlansDML extends PlannerTestCase {
         }
 
         String dmlType = dmlSQL.substring(0, dmlSQL.indexOf(' ')).trim().toUpperCase();
+        if ("UPSERT".equalsIgnoreCase(dmlType)) {
+            // UPSERT is INSERT
+            dmlType = "INSERT";
+        }
         assertEquals(dmlType, dmlNode.getPlanNodeType().toString());
 
-        while(dmlNode.getPlanNodeType() != PlanNodeType.SEQSCAN && dmlNode.getPlanNodeType() != PlanNodeType.MATERIALIZE) {
+        PlanNodeType nodeType = dmlNode.getPlanNodeType();
+        while(nodeType != PlanNodeType.SEQSCAN && nodeType != PlanNodeType.MATERIALIZE && nodeType != PlanNodeType.INDEXSCAN) {
             dmlNode = dmlNode.getChild(0);
+            nodeType = dmlNode.getPlanNodeType();
         }
         assertNotNull(dmlNode);
 
         // Verify DML Predicate
         if (filterType != null) {
-            AbstractExpression predicate = ((SeqScanPlanNode) dmlNode).getPredicate();
+            AbstractExpression predicate = ((AbstractScanPlanNode) dmlNode).getPredicate();
             assertNotNull(predicate);
             assertEquals(filterType, predicate.getExpressionType());
             assertTrue(predicate.hasAnySubexpressionOfClass(SelectSubqueryExpression.class));

@@ -302,6 +302,42 @@ public class TestSqlUpsertSuite extends RegressionSuite {
                 errorMsg);
     }
 
+    public void testUpsertWithSubquery() throws IOException, ProcCallException {
+        Client client = getClient();
+        VoltTable vt = null;
+
+        vt = client.callProcedure("@AdHoc", String.format(
+                "Insert into %s values(%d, %d, %d)", "R2", 1, 1, 1)).getResults()[0];
+        vt = client.callProcedure("@AdHoc", String.format(
+                "Insert into %s values(%d, %d, %d)", "R2", 2, 2, 2)).getResults()[0];
+        vt = client.callProcedure("@AdHoc", String.format(
+                "Insert into %s values(%d, %d, %d)", "R2", 3, 3, 3)).getResults()[0];
+
+        String[] tables = {"R1"};
+
+        for (String tb : tables) {
+            String query = "select ID, wage, dept from " + tb + " order by ID, dept";
+            String upsert = "UPSERT INTO " + tb + " (ID, WAGE, DEPT) " +
+                    "SELECT ID, WAGE, DEPT FROM R2 WHERE NOT EXISTS (SELECT 1 FROM " + tb +
+                    " WHERE " + tb + ".DEPT = R2.DEPT) ORDER BY 1, 2, 3;";
+
+            // This row should stay as is - not in the result set of the UPSERT'S SELECT
+            vt = client.callProcedure("@AdHoc", String.format(
+                    "Insert into %s values(%d, %d, %d)", tb, 1, 2, 1)).getResults()[0];
+            // This row should be updated - in the TB and in the result set of the UPSERT'S SELECT
+            vt = client.callProcedure("@AdHoc", String.format(
+                    "Insert into %s values(%d, %d, %d)", tb, 3, 3, 1)).getResults()[0];
+            // The R2 (2,2,2) should be inserted to TB
+
+            vt = client.callProcedure("@AdHoc", upsert).getResults()[0];
+            validateTableOfLongs(vt, new long[][] {{2}});
+
+            vt = client.callProcedure("@AdHoc", query).getResults()[0];
+            validateTableOfLongs(vt, new long[][] {{1,2,1}, {2,2,2}, {3,3,3}});
+        }
+
+    }
+
     //
     // JUnit / RegressionSuite boilerplate
     //
@@ -389,12 +425,12 @@ public class TestSqlUpsertSuite extends RegressionSuite {
         assert(success);
         builder.addServerConfig(config);
 
-        //*/ Cluster
-        config = new LocalCluster("sqlupsert-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
-        success = config.compile(project);
-        assert(success);
-        builder.addServerConfig(config);
-        //*/
+//        //*/ Cluster
+//        config = new LocalCluster("sqlupsert-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
+//        success = config.compile(project);
+//        assert(success);
+//        builder.addServerConfig(config);
+//        //*/
 
         return builder;
     }
