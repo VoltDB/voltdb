@@ -1013,7 +1013,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             //If terminus is present we will recover from shutdown save so dont move.
             if (!durable && m_config.m_startAction.doesRecover() && determination.terminusNonce == null) {
                 if (m_nodeSettings.clean()) {
-                    String msg = "Archived previous snapshot directory to " + m_nodeSettings.getSnapshoth() + ".1";
+                    String msg = "Archiving old snapshots to " + m_nodeSettings.getSnapshoth() +
+                                 ".1 and starting an empty database." +
+                                 " Use voltadmin restore if you wish to restore an old database instance.";
                     consoleLog.info(msg);
                     hostLog.info(msg);
                 }
