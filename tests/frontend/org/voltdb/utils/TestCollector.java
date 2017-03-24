@@ -51,6 +51,9 @@ import org.json_voltpatches.JSONObject;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+
+import org.voltcore.utils.CoreUtils;
+
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltDB.SimulatedExitException;
 import org.voltdb.client.Client;
@@ -137,7 +140,9 @@ public class TestCollector extends JUnit4LocalClusterTest {
             cliParams.add("--prefix=\"\"");
         } else {
             cliParams.add("--prefix=" + m_prefix);
-            pathToOutputFile = System.getProperty("user.dir") + File.separator + m_prefix + "_" + Collector.DEFAULT_COLLECT_FILENAME;
+            pathToOutputFile = System.getProperty("user.dir") + File.separator + m_prefix
+                    + "_" + Collector.PREFIX_DEFAULT_COLLECT_FILE + "_"
+                    + CoreUtils.getHostnameOrAddress() + Collector.COLLECT_FILE_EXTENSION;
         }
         cliParams.add("--dryrun=false");        // dryRun
         cliParams.add("--skipheapdump=" + String.valueOf(skipHeapDump));
@@ -150,7 +155,8 @@ public class TestCollector extends JUnit4LocalClusterTest {
         }
 
         if (pathToOutputFile.trim().isEmpty()) {
-            pathToOutputFile = Collector.DEFAULT_COLLECT_FILENAME;
+            pathToOutputFile =  Collector.PREFIX_DEFAULT_COLLECT_FILE + "_"
+                    + CoreUtils.getHostnameOrAddress() + Collector.COLLECT_FILE_EXTENSION;
         }
 
         Collector.main(cliParams.toArray(new String[cliParams.size()]));

@@ -21,8 +21,8 @@ from voltcli import utility
 collect_help = ('Collect logs on the current node for problem analysis')
 
 dir_spec_help = ('root directory for the database. The default is the current working directory.')
-output_help = ('file name to store collect data in compressed format. The default is the collect.zip in the '
-               'current working directory.')
+output_help = ('file name to store collect data in compressed format. The default is the '
+               '\'voltdb_collect_<hostname or IP>.zip\' in the current working directory.')
 
 
 @VOLT.Command(

@@ -58,7 +58,8 @@ import com.google_voltpatches.common.base.Throwables;
 
 public class Collector {
     private final static String ZIP_ENTRY_FOLDER_BASE_SUFFIX =  "_volt_collect_logs_";
-    final static String DEFAULT_COLLECT_FILENAME = "collect.zip";
+    final static String PREFIX_DEFAULT_COLLECT_FILE = "voltdb_collect";
+    final static String COLLECT_FILE_EXTENSION = ".zip";
 
     private static String m_configInfoPath = null;
     private static String m_catalogJarPath = null;
@@ -150,10 +151,12 @@ public class Collector {
         }
 
         if (!m_config.prefix.isEmpty()) {
-            m_config.outputFile = m_config.prefix + "_" + DEFAULT_COLLECT_FILENAME;
+            m_config.outputFile = m_config.prefix + "_" +  PREFIX_DEFAULT_COLLECT_FILE + "_"
+                    + CoreUtils.getHostnameOrAddress() + COLLECT_FILE_EXTENSION;
         }
         if (m_config.outputFile.isEmpty()) {
-            m_config.outputFile = DEFAULT_COLLECT_FILENAME;
+            m_config.outputFile =  PREFIX_DEFAULT_COLLECT_FILE + "_" + CoreUtils.getHostnameOrAddress()
+                + COLLECT_FILE_EXTENSION;;
         }
 
         File outputFile = new File(m_config.outputFile);
