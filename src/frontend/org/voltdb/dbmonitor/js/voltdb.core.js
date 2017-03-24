@@ -606,7 +606,7 @@
                     '@SystemCatalog': { '1': ['SystemCatalog (CatalogComponent)', 'Returns Table[]'] },
                     '@SystemInformation': { '1': ['Selector (SysInfoSelector)', 'Returns Table[]'] },
                     '@UpdateApplicationCatalog': { '2': ['CatalogPath (varchar)', 'DeploymentConfigPath (varchar)', 'Returns Table[]'] },
-                    '@UpdateClasses': { '1': ['Jar File (varchar)', 'Class Selector (varchar)' 'Returns Table[]'] },
+                    '@UpdateClasses': { '1': ['Jar File (varchar)', 'Class Selector (varchar)', 'Returns Table[]'] },
                     '@UpdateLogging': { '1': ['Configuration (xml)', 'Returns Table[]'] },
                     '@ValidatePartitioning': { '2': ['HashinatorType (int)', 'Config (varbinary)', 'Returns Table[]'] }
                 };
