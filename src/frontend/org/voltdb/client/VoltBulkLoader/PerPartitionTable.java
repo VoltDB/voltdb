@@ -101,8 +101,8 @@ public class PerPartitionTable {
                 });
             }
             else {
-                m_batchRowList.get(0).m_loader.m_outstandingRowCount.addAndGet(-1 * m_batchRowList.size());
                 m_batchRowList.get(0).m_loader.m_loaderCompletedCnt.addAndGet(m_batchRowList.size());
+                m_batchRowList.get(0).m_loader.m_outstandingRowCount.addAndGet(-1 * m_batchRowList.size());
             }
         }
     }
@@ -207,8 +207,8 @@ public class PerPartitionTable {
             ProcedureCallback callback = new ProcedureCallback() {
                 @Override
                 public void clientCallback(ClientResponse response) throws Exception {
-                    row.m_loader.m_outstandingRowCount.decrementAndGet();
                     row.m_loader.m_loaderCompletedCnt.incrementAndGet();
+                    row.m_loader.m_outstandingRowCount.decrementAndGet();
 
                     //one insert at a time callback
                     if (response.getStatus() != ClientResponse.SUCCESS) {
