@@ -30,8 +30,9 @@ import json
     description="Show status of current cluster and remote cluster(s) it connects to",
     options=(
             VOLT.BooleanOption('-r', '--refresh', 'refresh', 'refresh the output continuously', default=False),
-            VOLT.IntegerOption('-i', '--interval', 'interval', 'refresh rate measured in second', default=2),
-            VOLT.BooleanOption('-j', '--json', 'json', 'print out JSON format instead of plain text', default=False)
+            VOLT.IntegerOption('-i', '--interval', 'interval', 'refresh interval measured in seconds', default=2),
+            VOLT.BooleanOption('-j', '--json', 'json', 'print out JSON format instead of plain text', default=False),
+            VOLT.BooleanOption('-d', '--dr', 'dr', 'display DR/XDCR related status', default=False)
     ),
     hideverb=False
 )
@@ -64,24 +65,25 @@ def doStatus(runner):
     else:
         printPlainSummary(clusterInfo)
 
-    # repeat the process to discover other cluster.
-    for clusterId, remoteCluster in clusterInfo.remoteclusters_by_id.items():
-        for remoteHost in remoteCluster.members:
-            hostname = remoteHost.split(':')[0]
-            try:
-                runner.__voltdb_connect__(hostname,
-                                         runner.opts.host.port,
-                                         runner.opts.username,
-                                         runner.opts.password,
-                                         runner.opts.ssl_config)
-                clusterInfo = getClusterInfo(runner)
-                if runner.opts.json:
-                    printJSONSummary(clusterInfo)
-                else:
-                    printPlainSummary(clusterInfo)
-                break
-            except Exception, e:
-                pass  # ignore it
+    if runner.opts.dr:
+        # repeat the process to discover remote cluster.
+        for clusterId, remoteCluster in clusterInfo.remoteclusters_by_id.items():
+            for remoteHost in remoteCluster.members:
+                hostname = remoteHost.split(':')[0]
+                try:
+                    runner.__voltdb_connect__(hostname,
+                                             runner.opts.host.port,
+                                             runner.opts.username,
+                                             runner.opts.password,
+                                             runner.opts.ssl_config)
+                    clusterInfo = getClusterInfo(runner)
+                    if runner.opts.json:
+                        printJSONSummary(clusterInfo)
+                    else:
+                        printPlainSummary(clusterInfo)
+                    break
+                except Exception, e:
+                    pass  # ignore it
 
 def getClusterInfo(runner):
     response = runner.call_proc('@SystemInformation',
@@ -98,17 +100,18 @@ def getClusterInfo(runner):
     clusterId = host.clusterid
     fullClusterSize = int(host.fullclustersize)
     version = host.version
+    uptime = host.uptime
 
     response = runner.call_proc('@SystemInformation',
                                 [VOLT.FastSerializer.VOLTTYPE_STRING],
                                 ['DEPLOYMENT'])
     for tuple in response.table(0).tuples():
-        if (tuple[0] == 'kfactor'):
+        if tuple[0] == 'kfactor':
             kfactor = tuple[1]
             break
 
 
-    cluster = Cluster(int(clusterId), version, int(kfactor), int(fullClusterSize))
+    cluster = Cluster(int(clusterId), version, int(kfactor), int(fullClusterSize), uptime)
     for hostId, hostInfo in hosts.hosts_by_id.items():
         cluster.add_member(hostId, hostInfo.hostname)
 
@@ -122,48 +125,53 @@ def getClusterInfo(runner):
             liveclients += 1
     cluster.update_live_clients(liveclients)
 
-    # Do we have any ongoing DR conversation?
-    response = checkstats.get_stats(runner, "DRROLE")
-    for tuple in response.table(0).tuples():
-        role = tuple[0]
-        status = tuple[1]
-        remote_cluster_id = tuple[2]
-        if (remote_cluster_id != -1):
-            cluster.add_remote_cluster(remote_cluster_id, status, role)
+    if runner.opts.dr:
+        # Do we have any ongoing DR conversation?
+        response = checkstats.get_stats(runner, "DRROLE")
+        for tuple in response.table(0).tuples():
+            role = tuple[0]
+            status = tuple[1]
+            remote_cluster_id = tuple[2]
+            if (remote_cluster_id != -1):
+                cluster.add_remote_cluster(remote_cluster_id, status, role)
 
-    response = checkstats.get_stats(runner, "DRPRODUCER")
-    for tuple in response.table(0).tuples():
-        host_name = tuple[2]
-        remote_cluster_id = tuple[4]
-        last_queued_drid = tuple[10]
-        last_queued_ts = tuple[12]
-        last_acked_ts = tuple[13]
-        if last_queued_drid == -1:
-            delay = 0
-        else:
-            delay = (last_queued_ts - last_acked_ts).microseconds / 1000
-        cluster.get_remote_cluster(remote_cluster_id).update_producer_latency(host_name, remote_cluster_id, delay)
+        response = checkstats.get_stats(runner, "DRPRODUCER")
+        for tuple in response.table(0).tuples():
+            host_name = tuple[2]
+            remote_cluster_id = tuple[4]
+            last_queued_drid = tuple[10]
+            last_queued_ts = tuple[12]
+            last_acked_ts = tuple[13]
+            if last_queued_drid == -1:
+                delay = 0
+            else:
+                delay = (last_queued_ts - last_acked_ts).microseconds / 1000
+            cluster.get_remote_cluster(remote_cluster_id).update_producer_latency(host_name, remote_cluster_id, delay)
 
-    # Find remote topology through drconsumer stats
-    response = checkstats.get_stats(runner, "DRCONSUMER")
-    for tuple in response.table(1).tuples():
-        remote_cluster_id = tuple[4]
-        covering_host = tuple[7]
-        last_applied_ts = tuple[9]
-        if covering_host != '':
-            cluster.get_remote_cluster(remote_cluster_id).add_remote_member(covering_host)
+        # Find remote topology through drconsumer stats
+        response = checkstats.get_stats(runner, "DRCONSUMER")
+        for tuple in response.table(1).tuples():
+            remote_cluster_id = tuple[4]
+            covering_host = tuple[7]
+            last_applied_ts = tuple[9]
+            if covering_host != '':
+                cluster.get_remote_cluster(remote_cluster_id).add_remote_member(covering_host)
 
     return cluster
 
 def printPlainSummary(cluster):
-    header1 = "Cluster %s, version %s, hostcount %d, kfactor %d" % (cluster.id, cluster.version, cluster.hostcount, cluster.kfactor)
+    header1 = "Cluster %s, version %s, hostcount %d, kfactor %d" % (cluster.id,
+                                                                    cluster.version,
+                                                                    cluster.hostcount,
+                                                                    cluster.kfactor)
 
     livehost = len(cluster.hosts_by_id)
     missing = cluster.hostcount - livehost
-    header2 = " %d live host%s, %d missing host%s, %d live client%s" \
-                     % (livehost, 's' if livehost > 2 else '',
-                        missing, 's' if missing > 2 else '',
-                        cluster.liveclients, 's' if cluster.liveclients > 2 else '')
+    header2 = " %d live host%s, %d missing host%s, %d live client%s, uptime %s" % (
+                livehost, 's' if livehost > 2 else '',
+                missing, 's' if missing > 2 else '',
+                cluster.liveclients, 's' if cluster.liveclients > 2 else '',
+                cluster.uptime)
 
     delimiter = '-' * header1.__len__()
 
@@ -228,6 +236,7 @@ def printJSONSummary(cluster):
         "livehost": livehost,
         "missing": missing,
         "liveclient": cluster.liveclients,
+        "uptime": cluster.uptime,
         "remoteClusters": remoteClusterInfos,
         "members": members
     }

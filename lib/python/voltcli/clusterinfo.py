@@ -16,14 +16,15 @@
 
 class Cluster(object):
 
-    def __init__(self, id, version, kfactor, hostcount):
+    def __init__(self, id, version, kfactor, hostcount, uptime):
         self.id = id
         self.version = version
         self.kfactor = kfactor
         self.hostcount = hostcount
         self.hosts_by_id = dict()
         self.remoteclusters_by_id = dict()
-        self.liveclients = 0;
+        self.uptime = uptime
+        self.liveclients = 0
 
     def update_live_clients(self, liveclients):
         self.liveclients = liveclients
