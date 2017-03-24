@@ -63,7 +63,7 @@ def collect(runner):
 
 def process_voltdbroot_args(runner) :
     if (runner.opts.directory_spec) and (runner.opts.voltdbroot):
-        utility.abort('ERROR: Cannot specify both --dir and command line argument. Please use --dir option.')
+        utility.abort('Cannot specify both --dir and command line argument. Please use --dir option.')
 
     os.environ['PATH'] += os.pathsep + os.pathsep.join(s for s in sys.path if os.path.join('voltdb', 'bin') in s)
     # If database directory is given, derive voltdbroot path to store results of systemcheck in voltdbroot directory
@@ -71,7 +71,7 @@ def process_voltdbroot_args(runner) :
         if os.path.isdir(runner.opts.directory_spec) and os.access(runner.opts.directory_spec, os.R_OK|os.W_OK|os.X_OK):
             voltdbrootDir = os.path.join(runner.opts.directory_spec, 'voltdbroot')
         else:
-            utility.abort('ERROR: specified database directory is not valid', runner.opts.directory_spec)
+            utility.abort('Specified database directory is not valid', runner.opts.directory_spec)
     elif runner.opts.voltdbroot:
         utility.warning('Specifying voltdbroot directory using command argument is deprecated. Consider using --dir '
                         'option to specify database directory.');
@@ -102,7 +102,7 @@ def performSystemCheck(runner, dirPath):
 
 def process_outputfile_args(runner):
     if runner.opts.output and runner.opts.prefix:
-        utility.abort('"ERROR: Cannot specify both --output and --prefix. Please use --output option.')
+        utility.abort('Cannot specify both --output and --prefix. Please use --output option.')
 
     if runner.opts.output:
         runner.args.extend(['--outputFile=' + runner.opts.output])
