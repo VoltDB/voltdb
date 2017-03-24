@@ -3289,4 +3289,157 @@ class DbMonitorTest extends TestBase {
 
         page.runQuery()
     }*/
+    def addProcedureAndCheck() {
+        String createQuery = page.getQueryToCreateTable().replace("\n", "")
+        String createStoredProcedure = page.getQueryToCreateStoredProcedure().replace("\n", "")
+        String deleteQuery = page.getQueryToDeleteTableOnly().replace("\n", "")
+        String dropProcedureQuery = page.getQueryToDropProcedureQuery().replace("\n", "")
+        String execProcedureQuery = page.getQueryToExecuteProcedureQuery().replace("\n", "")
+        String storedProcedureName = String.valueOf(page.getNameOfStoredProcedure()).replace("\n", "")
+        String resultingStoredProcedureName = ""
+        boolean createdStatus = false
+        boolean deletedStatus = false
+
+        when:
+        println(storedProcedureName)
+        then:
+        println(createStoredProcedure)
+        println(execProcedureQuery)
+        println(dropProcedureQuery)
+
+        when: 'sql query tab is clicked'
+        page.gotoSqlQuery()
+        then: 'at sql query'
+        at SqlQueryPage
+
+        when: 'set create table query in the box'
+        page.setQueryText(createQuery)
+        and: 'run the query'
+        page.runQuery()
+        then: 'refresh the page'
+        page.refreshquery.click()
+
+        when: 'set CREATE PROCEDURE query in the box'
+        page.setQueryText(createStoredProcedure)
+        and: 'run the query'
+        page.runQuery()
+        then: 'refresh the page'
+        page.refreshquery.click()
+
+        when: 'set EXEC PROCEDURE query in the box'
+        page.setQueryText(execProcedureQuery)
+        and: 'run the query'
+        page.runQuery()
+        then: 'refresh the page'
+        page.refreshquery.click()
+
+        when: 'Db Monitor tab is clicked'
+        page.gotoDbMonitor()
+        then: 'at DbMonitor Page'
+        at DbMonitorPage
+
+        when: 'click Display Preference button'
+        page.openDisplayPreference()
+        then: 'display title and save button of preferences'
+        page.preferencesTitleDisplayed()
+        page.savePreferencesBtnDisplayed()
+        page.popupCloseDisplayed()
+
+        when: 'Stored Procedure checkbox is displayed'
+        page.storedProceduresCheckbox.isDisplayed()
+        and: 'Add Stored Procedure'
+        page.storedProceduresCheckbox.click()
+        then: 'Save Preference'
+        page.savePreferencesBtn.click()
+        report 'savePreferencesBtn'
+        then: 'wait for filter in stored procedure and insert filter term'
+        try {
+          waitFor(waitTime) { page.filterStoredProcedure.isDisplayed() }
+          page.filterStoredProcedure.value(storedProcedureName)
+          report "1"
+        } catch (geb.waiting.WaitTimeoutException e) {
+          try {
+            $("#filterSP").isDisplayed()
+            $("#filterSP").value(storedProcedureName)
+            report "2"
+          } catch (geb.waiting.WaitTimeoutException exp) {
+          }
+        }
+
+        when: 'save the value of resultingStoredProcedureName'
+        try {
+          waitFor(waitTime) { $("#storeProcedureBody > tr > td:nth-child(1)").isDisplayed() }
+          resultingStoredProcedureName = $("#storeProcedureBody > tr > td:nth-child(1)").text()
+        } catch(geb.error.RequiredPageContentNotPresent e) {
+          waitFor(waitTime) { $("#tblSP > tbody > tr > td.sorting_1").isDisplayed() }
+          resultingStoredProcedureName = $("#tblSP > tbody > tr > td:nth-child(1)").text()
+        } catch(geb.waiting.WaitTimeoutException e) {
+          waitFor(waitTime) { $("#tblSP > tbody > tr > td.sorting_1").isDisplayed() }
+          resultingStoredProcedureName = $("#tblSP > tbody > tr > td:nth-child(1)").text()
+        }
+        then: 'set created status'
+        println("The resultingStoredProcedureName is " + resultingStoredProcedureName)
+        // if(resultingStoredProcedureName.equals(storedProcedureName)) {
+        //     createdStatus = true
+        // }
+        try {
+          waitFor(waitTime) { $("#tblSP > tbody > tr > td:nth-child(1)").isDisplayed() }
+          createdStatus = true
+        } catch (geb.waiting.WaitTimeoutException e) {
+        }
+        when: 'sql query tab is clicked'
+        page.gotoSqlQuery()
+        then: 'at sql query'
+        at SqlQueryPage
+
+        when: 'set create table query in the box'
+        page.setQueryText(dropProcedureQuery)
+        and: 'run the query'
+        page.runQuery()
+        report 'checking'
+        then: 'refresh the page'
+        page.refreshquery.click()
+
+        when: 'Db Monitor tab is clicked'
+        page.gotoDbMonitor()
+        then: 'at DbMonitor Page'
+        at DbMonitorPage
+        then: 'wait for filter in stored procedure  and insert filter term'
+        try {
+          waitFor(waitTime) { page.filterStoredProcedure.isDisplayed() }
+          page.filterStoredProcedure.value(storedProcedureName)
+          report "3"
+        } catch (geb.waiting.WaitTimeoutException e) {
+          try {
+            $("#filterSP").isDisplayed()
+            $("#filterSP").value(storedProcedureName)
+            report "4"
+          } catch (geb.waiting.WaitTimeoutException exp) {
+          }
+        }
+
+        when: 'check deleted status'
+        try {
+          waitFor(waitTime) { !$("#storeProcedureBody > tr > td:nth-child(1)").text().equals(storedProcedureName) }
+          waitFor(waitTime) { $("#storeProcedureBody > tr > td").isDisplayed() }
+          deletedStatus = true
+        } catch (geb.waiting.WaitTimeoutException e) {
+        }
+        try {
+          waitFor(waitTime) { !$("#tblSP > tbody > tr > td.sorting_1").text().equals(storedProcedureName) }
+          waitFor(waitTime) { $("#tblSP > tbody > tr > td").isDisplayed() }
+          deletedStatus = true
+        } catch (geb.waiting.WaitTimeoutException e) {
+        }
+        println(createdStatus)
+        println(deletedStatus)
+        then: 'display final result'
+        if (createdStatus == true && deletedStatus == true) {
+          println("addProcedureAndCheck - PASS")
+        }
+        else {
+          println("addProcedureAndCheck - FAIL")
+          assert false
+        }
+    }
 }

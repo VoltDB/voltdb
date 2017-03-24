@@ -19,7 +19,6 @@ package org.voltdb.importclient.kinesis;
 
 import java.math.BigInteger;
 import java.net.URI;
-import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
@@ -136,7 +135,7 @@ public class KinesisStreamImporter extends AbstractImporter {
     private class StreamConsumer implements IRecordProcessor {
 
         private String m_shardId;
-        private Formatter<String> m_formatter;
+        private Formatter m_formatter;
         Gap m_gapTracker = new Gap(Integer.getInteger("KINESIS_IMPORT_GAP_LEAD", 32768));
         private BigInteger m_lastFetchCommittedSequenceNumber = BigInteger.ZERO;
 
@@ -148,7 +147,7 @@ public class KinesisStreamImporter extends AbstractImporter {
         public void initialize(InitializationInput initInput) {
 
             m_shardId = initInput.getShardId();
-            m_formatter = (Formatter<String>) m_config.getFormatterBuilder().create();
+            m_formatter = m_config.getFormatterBuilder().create();
 
             String seq = initInput.getExtendedSequenceNumber().getSequenceNumber();
             if (NumberUtils.isDigits(seq)) {
@@ -185,10 +184,10 @@ public class KinesisStreamImporter extends AbstractImporter {
                     }
                 }
 
-                String data = null;
+                Object params[] = null;
                 try {
-                    data = new String(record.getData().array(), StandardCharsets.UTF_8);
-                    Invocation invocation = new Invocation(m_config.getProcedure(), m_formatter.transform(data));
+                    params = m_formatter.transform(record.getData());
+                    Invocation invocation = new Invocation(m_config.getProcedure(), params);
 
                     StreamProcedureCallback cb = new StreamProcedureCallback(m_gapTracker, offset, seqNum, m_cbcnt);
                     if (!callProcedure(invocation, cb)) {
@@ -196,7 +195,7 @@ public class KinesisStreamImporter extends AbstractImporter {
                         m_gapTracker.commit(offset, seqNum);
                     }
                 } catch (FormatException e) {
-                    rateLimitedLog(Level.ERROR, e, "Data error on shard %s, data: %s", m_shardId, data);
+                    rateLimitedLog(Level.ERROR, e, "Data error on shard %s, data: %s", m_shardId, Arrays.toString(params));
                     m_gapTracker.commit(offset, seqNum);
                 }
                 if (!shouldRun()) {

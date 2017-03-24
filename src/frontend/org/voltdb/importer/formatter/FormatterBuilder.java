@@ -43,7 +43,7 @@ public class FormatterBuilder<T> {
     /**
      * @return formatter instance created by its factory
      */
-    public Formatter<?> create(){
+    public Formatter create(){
         return m_formatterFcatory.create(m_formatterName, m_formatterProps);
     }
 
