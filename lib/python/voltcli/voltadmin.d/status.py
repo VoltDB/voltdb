@@ -34,7 +34,6 @@ import json
             VOLT.BooleanOption('-j', '--json', 'json', 'print out JSON format instead of plain text', default=False),
             VOLT.BooleanOption('-d', '--dr', 'dr', 'display DR/XDCR related status', default=False)
     ),
-    hideverb=False
 )
 
 def status(runner):
