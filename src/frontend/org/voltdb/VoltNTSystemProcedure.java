@@ -26,12 +26,12 @@ import org.voltdb.client.ClientResponse;
  * Sysproc variant of VoltNTProcedure adds the all-hosts method.
  *
  */
-public class VoltNTSystemProcedure extends VoltNTProcedure {
+public class VoltNTSystemProcedure extends VoltNonTransactionalProcedure {
 
     /**
      * Run a non-transactional (only) procedure on each live host.
      */
-    protected CompletableFuture<Map<Integer,ClientResponse>> callAllNodeNTProcedure(String procName, Object... params) {
+    protected CompletableFuture<Map<Integer,ClientResponse>> callNTProcedureOnAllHosts(String procName, Object... params) {
         return m_runner.callAllNodeNTProcedure(procName, params);
     }
 }

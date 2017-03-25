@@ -28,6 +28,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.jfree.util.Log;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.network.Connection;
@@ -68,7 +69,7 @@ public class ProcedureRunnerNT {
     protected final Connection m_ccxn;
     protected final long m_clientHandle;
     protected final String m_procedureName;
-    protected final VoltNTProcedure m_procedure;
+    protected final VoltNonTransactionalProcedure m_procedure;
     protected final Method m_procMethod;
     protected final Class<?>[] m_paramTypes;
     protected byte m_statusCode = ClientResponse.SUCCESS;
@@ -80,7 +81,7 @@ public class ProcedureRunnerNT {
                       AuthUser user,
                       Connection ccxn,
                       long clientHandle,
-                      VoltNTProcedure procedure,
+                      VoltNonTransactionalProcedure procedure,
                       String procName,
                       Method procMethod,
                       Class<?>[] paramTypes,
@@ -137,7 +138,13 @@ public class ProcedureRunnerNT {
     public synchronized void allHostNTProcedureCallback(ClientResponse clientResponse) {
         int hostId = Integer.parseInt(clientResponse.getAppStatusString());
         boolean removed = m_outstandingAllHostProcedureHostIds.remove(hostId);
-        assert(removed); // just while developing -- should handle this
+        // log this for now... I don't expect it to ever happen, but will be interesting to see...
+        if (!removed) {
+            Log.error(String.format(
+                      "ProcedureRunnerNT.allHostNTProcedureCallback for procedure %s received late or unexepected response from hostID %d.",
+                      m_procedureName, hostId));
+            return;
+        }
 
         final Map<Integer,ClientResponse> allHostResponses = m_allHostResponses;
 
@@ -317,7 +324,7 @@ public class ProcedureRunnerNT {
                             else {
                                 VoltTable[] results = null;
                                 try {
-                                    results = ParameterConverter.getResultsFromRawResults(rawResult);
+                                    results = ParameterConverter.getResultsFromRawResults(m_procedureName, rawResult);
                                     response = responseFromTableArray(results);
                                 } catch (Exception e) {
                                     // this is a bad place to be, but it's hard to know if it's crash bad...
@@ -352,7 +359,7 @@ public class ProcedureRunnerNT {
 
                     return null;
                 }
-                results = ParameterConverter.getResultsFromRawResults(rawResult);
+                results = ParameterConverter.getResultsFromRawResults(m_procedureName, rawResult);
             }
             catch (IllegalAccessException e) {
                 // If reflection fails, invoke the same error handling that other exceptions do

@@ -22,7 +22,6 @@ import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Array;
 import java.lang.reflect.InvocationTargetException;
 import java.math.BigDecimal;
-import java.math.BigInteger;
 import java.util.Date;
 import java.util.regex.Pattern;
 
@@ -551,7 +550,7 @@ public class ParameterConverter {
      * Given the results of a procedure, convert it into a sensible array of VoltTables.
      * @throws InvocationTargetException
      */
-    final static public VoltTable[] getResultsFromRawResults(Object result) throws InvocationTargetException {
+    final static public VoltTable[] getResultsFromRawResults(String procedureName, Object result) throws InvocationTargetException {
         if (result == null) {
             return new VoltTable[0];
         }
@@ -574,6 +573,7 @@ public class ParameterConverter {
             t.addRow(result);
             return new VoltTable[] { t };
         }
-        throw new RuntimeException("Procedure didn't return acceptable type.");
+        throw new RuntimeException(String.format("Procedure %s unsupported procedure return type %s.",
+                procedureName, result.getClass().getSimpleName()));
     }
 }

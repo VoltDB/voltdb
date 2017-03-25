@@ -333,6 +333,15 @@ public class ProcedureRunner {
         return result;
     }
 
+    /**
+     * @return Custom batch timeout value or 0 if there isn't one.
+     */
+    private int getBatchTimeout() {
+        return m_txnState == null ? 0 :
+            m_txnState.getInvocation() == null ? 0 :
+                m_txnState.getInvocation().getBatchTimeout();
+    }
+
     @SuppressWarnings("finally")
     private ClientResponseImpl coreCall(Object... paramListIn) {
         // verify per-txn state has been reset
@@ -395,8 +404,6 @@ public class ProcedureRunner {
                 }
             }
 
-            boolean error = false;
-            boolean abort = false;
             // run a regular java class
             if (m_hasJava) {
                 try {
@@ -406,7 +413,7 @@ public class ProcedureRunner {
                         }
                         try {
                             Object rawResult = m_procMethod.invoke(m_procedure, paramList);
-                            results = ParameterConverter.getResultsFromRawResults(rawResult);
+                            results = ParameterConverter.getResultsFromRawResults(m_procedureName, rawResult);
                         }
                         catch (IllegalAccessException e) {
                             // If reflection fails, invoke the same error handling that other exceptions do
@@ -419,19 +426,13 @@ public class ProcedureRunner {
                         }
                         GroovyScriptProcedureDelegate proc = (GroovyScriptProcedureDelegate)m_procedure;
                         Object rawResult = proc.invoke(paramList);
-                        results = ParameterConverter.getResultsFromRawResults(rawResult);
+                        results = ParameterConverter.getResultsFromRawResults(m_procedureName, rawResult);
                     }
                     log.trace("invoked");
                 }
                 catch (InvocationTargetException itex) {
                     //itex.printStackTrace();
                     Throwable ex = itex.getCause();
-                    if (ex instanceof VoltAbortException &&
-                            !(ex instanceof EEException)) {
-                        abort = true;
-                    } else {
-                        error = true;
-                    }
                     if (CoreUtils.isStoredProcThrowableFatalToServer(ex)) {
                         // If the stored procedure attempted to do something other than linklibraray or instantiate
                         // a missing object that results in an error, throw the error and let the server deal with
@@ -445,12 +446,9 @@ public class ProcedureRunner {
                         }
                     }
 
-                    int batchTimeout = m_txnState == null ? 0 :
-                        m_txnState.getInvocation() == null ? 0 :
-                            m_txnState.getInvocation().getBatchTimeout();
                     retval = getErrorResponse(m_procedureName,
                                               m_isReadOnly,
-                                              batchTimeout,
+                                              getBatchTimeout(),
                                               m_appStatusCode,
                                               m_appStatusString,
                                               getNonVoltDBBackendIfExists(),
@@ -478,12 +476,9 @@ public class ProcedureRunner {
                     }
                 }
                 catch (SerializableException ex) {
-                    int batchTimeout = m_txnState == null ? 0 :
-                        m_txnState.getInvocation() == null ? 0 :
-                            m_txnState.getInvocation().getBatchTimeout();
                     retval = getErrorResponse(m_procedureName,
                                               m_isReadOnly,
-                                              batchTimeout,
+                                              getBatchTimeout(),
                                               m_appStatusCode,
                                               m_appStatusString,
                                               getNonVoltDBBackendIfExists(),

@@ -28,7 +28,7 @@ import org.voltdb.client.ClientResponse;
  * long, VoltTable, VoltTable[], CompletableFuture<ClientResponse>
  *
  */
-public class VoltNTProcedure {
+public class VoltNonTransactionalProcedure {
 
     ProcedureRunnerNT m_runner = null;
 

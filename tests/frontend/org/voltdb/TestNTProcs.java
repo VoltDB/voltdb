@@ -24,10 +24,12 @@
 package org.voltdb;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import junit.framework.TestCase;
 
@@ -35,7 +37,9 @@ import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
+import org.voltdb.client.ProcedureCallback;
 import org.voltdb.client.SyncCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
@@ -47,16 +51,16 @@ import org.voltdb.utils.VoltTableUtil;
 
 public class TestNTProcs extends TestCase {
 
-    public static class TrivialNTProc extends VoltNTProcedure {
+    public static class TrivialNTProc extends VoltNonTransactionalProcedure {
         public long run() throws InterruptedException, ExecutionException {
             assertTrue(Thread.currentThread().getName().startsWith(NTProcedureService.NTPROC_THREADPOOL_NAMEPREFIX));
 
-            System.out.println("Ran trivial proc!");
+            //System.out.println("Ran trivial proc!");
             return -1;
         }
     }
 
-    public static class TrivialNTProcPriority extends VoltNTProcedure {
+    public static class TrivialNTProcPriority extends VoltNonTransactionalProcedure {
         public long run() throws InterruptedException, ExecutionException {
             assertTrue(Thread.currentThread().getName().startsWith(NTProcedureService.NTPROC_THREADPOOL_NAMEPREFIX));
             assertTrue(Thread.currentThread().getName().contains(NTProcedureService.NTPROC_THREADPOOL_PRIORITY_SUFFIX));
@@ -66,7 +70,7 @@ public class TestNTProcs extends TestCase {
         }
     }
 
-    public static class NestedNTProc extends VoltNTProcedure {
+    public static class NestedNTProc extends VoltNonTransactionalProcedure {
         public long run() throws InterruptedException, ExecutionException {
             assertTrue(Thread.currentThread().getName().startsWith(NTProcedureService.NTPROC_THREADPOOL_NAMEPREFIX));
 
@@ -92,7 +96,7 @@ public class TestNTProcs extends TestCase {
         }
     }
 
-    public static class AsyncNTProc extends VoltNTProcedure {
+    public static class AsyncNTProc extends VoltNonTransactionalProcedure {
         long nextStep(ClientResponse cr) {
             System.out.printf("AsyncNTProc.nextStep running in thread: %s\n", Thread.currentThread().getName());
             System.out.flush();
@@ -118,7 +122,7 @@ public class TestNTProcs extends TestCase {
             assertTrue(Thread.currentThread().getName().startsWith(NTProcedureService.NTPROC_THREADPOOL_NAMEPREFIX));
 
             System.out.println("Running on one!");
-            CompletableFuture<Map<Integer,ClientResponse>> pf = callAllNodeNTProcedure("TestNTProcs$TrivialNTProcPriority");
+            CompletableFuture<Map<Integer,ClientResponse>> pf = callNTProcedureOnAllHosts("TestNTProcs$TrivialNTProcPriority");
             Map<Integer,ClientResponse> cr = pf.get();
             cr.entrySet().stream()
                 .forEach(e -> {
@@ -143,7 +147,7 @@ public class TestNTProcs extends TestCase {
         }
     }
 
-    public static class DelayProcNT extends VoltNTProcedure {
+    public static class DelayProcNT extends VoltNonTransactionalProcedure {
         public long run(int millis) throws InterruptedException {
             assertTrue(Thread.currentThread().getName().startsWith(NTProcedureService.NTPROC_THREADPOOL_NAMEPREFIX));
 
@@ -156,7 +160,7 @@ public class TestNTProcs extends TestCase {
         }
     }
 
-    public static class NTProcWithFutures extends VoltNTProcedure {
+    public static class NTProcWithFutures extends VoltNonTransactionalProcedure {
 
         public Long secondPart(ClientResponse response) {
             System.out.printf("NTProcWithFutures.secondPart running in thread: %s\n", Thread.currentThread().getName());
@@ -186,8 +190,8 @@ public class TestNTProcs extends TestCase {
             System.out.println("Running on one!");
 
             // you can't have two of these outstanding so this is expected to fail
-            CompletableFuture<Map<Integer,ClientResponse>> pf1 = callAllNodeNTProcedure("TestNTProcs$DelayProc", 100);
-            callAllNodeNTProcedure("TestNTProcs$DelayProcNT", 100);
+            CompletableFuture<Map<Integer,ClientResponse>> pf1 = callNTProcedureOnAllHosts("TestNTProcs$DelayProc", 100);
+            callNTProcedureOnAllHosts("TestNTProcs$DelayProcNT", 100);
 
             Map<Integer,ClientResponse> cr = pf1.get();
             cr.entrySet().stream()
@@ -201,7 +205,7 @@ public class TestNTProcs extends TestCase {
 
     // This class returns CompletableFuture<String> from run(), which is both invalid, and hard to
     // check statically. Verify we at least get a runtime error.
-    public static class NTProcWithBadTypeFuture extends VoltNTProcedure {
+    public static class NTProcWithBadTypeFuture extends VoltNonTransactionalProcedure {
 
         public String secondPart(ClientResponse response) {
             System.out.printf("NTProcWithBadTypeFuture.secondPart running in thread: %s\n", Thread.currentThread().getName());
@@ -220,6 +224,80 @@ public class TestNTProcs extends TestCase {
             System.out.println("Did it NT1!");
             return callProcedure("TestNTProcs$DelayProc", 1).thenApply(this::secondPart);
         }
+    }
+
+
+
+
+
+    public static class NTProcThatSlams extends VoltNonTransactionalProcedure {
+
+        final static int COLLECT_BLOCK = 0;
+        final static int COLLECT_RETURN = 1;
+        final static int COLLECT_ASYNC = 2;
+
+        public ClientResponse secondPart(ClientResponse response) {
+            assertTrue(Thread.currentThread().getName().startsWith(NTProcedureService.NTPROC_THREADPOOL_NAMEPREFIX));
+            assertTrue(Thread.currentThread().getName().contains(NTProcedureService.NTPROC_THREADPOOL_PRIORITY_SUFFIX));
+
+            return response;
+        }
+
+        public CompletableFuture<ClientResponse> run(String whatToCall, byte[] serializedParams, int howToCollect, int timeToSleep) {
+            CompletableFuture<ClientResponse> cf = null;
+
+            // sleep for specified time
+            try { Thread.sleep(timeToSleep); } catch (InterruptedException e) {}
+
+            if (whatToCall == null) {
+                cf = new CompletableFuture<ClientResponse>();
+                cf.complete(new ClientResponseImpl(
+                        ClientResponse.SUCCESS,
+                        new VoltTable[0],
+                        null,
+                        0));
+                return cf;
+            }
+
+            // get parameter sets
+            Object[] params = new Object[0];
+            if ((serializedParams != null) && (serializedParams.length > 0)) {
+                ByteBuffer paramBuf = ByteBuffer.wrap(serializedParams);
+                ParameterSet pset = null;
+                try {
+                    pset = ParameterSet.fromByteBuffer(paramBuf);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                    fail();
+                }
+                params = pset.toArray();
+            }
+
+            cf = callProcedure(whatToCall, params);
+
+            switch (howToCollect) {
+            case COLLECT_BLOCK:
+                ClientResponse r = null;
+                try {
+                    r = cf.get();
+                } catch (InterruptedException | ExecutionException e) {
+                    e.printStackTrace();
+                    fail();
+                }
+                cf = new CompletableFuture<ClientResponse>();
+                cf.complete(r);
+                return cf;
+            case COLLECT_RETURN:
+                return cf;
+            case COLLECT_ASYNC:
+                return cf.thenApply(this::secondPart);
+            default:
+                fail();
+            }
+            fail();
+            return null;
+        }
+
     }
 
     // get the first stats table for any selector
@@ -287,6 +365,7 @@ public class TestNTProcs extends TestCase {
             "create procedure from class org.voltdb.TestNTProcs$DelayProcNT;\n" +
             "create procedure from class org.voltdb.TestNTProcs$RunEverywhereNTProcWithDelay;\n" +
             "create procedure from class org.voltdb.TestNTProcs$NTProcWithBadTypeFuture;\n" +
+            "create procedure from class org.voltdb.TestNTProcs$NTProcThatSlams;\n" +
             "partition table blah on column pkey;\n";
 
     private void compile() throws Exception {
@@ -513,6 +592,7 @@ public class TestNTProcs extends TestCase {
             response = (ClientResponseImpl) e.getClientResponse();
         }
         assertEquals(ClientResponse.GRACEFUL_FAILURE, response.getStatus());
+        assertTrue(response.getStatusString().contains("was not an acceptible VoltDB return type"));
         System.out.println("Client got failure response");
         System.out.println(response.toJSONString());
 
@@ -578,11 +658,82 @@ public class TestNTProcs extends TestCase {
 
         assertTrue(VoltTableUtil.tableContainsString(statsT, "UpdateApplicationCatalog", true));
 
-        System.out.println(statsT.toFormattedString());
-
         Map<String, Long> stats = aggregateProcRow(client, UpdateApplicationCatalog.class.getName());
         assertEquals(1, stats.get("INVOCATIONS").longValue());
 
+        localServer.shutdown();
+        localServer.join();
+    }
+
+    /*
+    final static int CALL_NOTHING = 0;
+    final static int CALL_ADHOC = 1;
+    final static int CALL_WRITE_PROC = 2;
+    final static int CALL_TRIVIALNT = 3;
+    final static int CALL_UAC = 4;
+    final static int CALL_STATS = 5;
+    */
+
+    public void testSlamNTProcs() throws Exception {
+        ServerThread localServer = start();
+
+        Client client = ClientFactory.createClient();
+        client.createConnection("localhost");
+
+        final Client firehoseClient = ClientFactory.createClient();
+        firehoseClient.createConnection("localhost");
+        final AtomicBoolean keepFirehosing = new AtomicBoolean(true);
+
+        final ProcedureCallback firehoseCallback = new ProcedureCallback() {
+            @Override
+            public void clientCallback(ClientResponse clientResponse) throws Exception {
+                if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
+                    ClientResponseImpl cri = (ClientResponseImpl) clientResponse;
+                    System.err.println(cri.toJSONString());
+                    System.err.flush();
+                    fail();
+                }
+            }
+        };
+
+        Thread firehoseThread = new Thread() {
+            @Override
+            public void run() {
+                while (keepFirehosing.get()) {
+                    try {
+                        firehoseClient.callProcedure(firehoseCallback,
+                                                     "TestNTProcs$NTProcThatSlams",
+                                                     "TestNTProcs$TrivialNTProc",
+                                                     new byte[0], // params
+                                                     NTProcThatSlams.COLLECT_ASYNC,
+                                                     20);
+                    } catch (IOException e) {
+                        // TODO Auto-generated catch block
+                        e.printStackTrace();
+                    }
+                }
+                try {
+                    firehoseClient.drain();
+                } catch (NoConnectionsException | InterruptedException e) {
+                    // TODO Auto-generated catch block
+                    e.printStackTrace();
+                }
+            }
+        };
+        firehoseThread.start();
+
+        Thread.sleep(5000);
+        keepFirehosing.set(false);
+        firehoseThread.join();
+
+        // CHECK STATS
+        VoltTable statsT = getStats(client, "PROCEDURE");
+        System.out.println("STATS: " + statsT.toFormattedString());
+
+        assertTrue(VoltTableUtil.tableContainsString(statsT, "NTProcThatSlams", true));
+
+        client.close();
+        firehoseClient.close();
         localServer.shutdown();
         localServer.join();
     }

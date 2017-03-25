@@ -145,7 +145,7 @@ public final class InvocationDispatcher {
 
     private final boolean m_isConfiguredForNonVoltDBBackend;
 
-    InternalConnectionHandler m_ich;
+    InternalConnectionHandler m_internalConnectionHandler;
 
     public final static class Builder {
 
@@ -250,12 +250,12 @@ public final class InvocationDispatcher {
 
         m_snapshotDaemon = checkNotNull(snapshotDaemon,"given snapshot daemon is null");
 
-        m_ich = ich;
+        m_internalConnectionHandler = ich;
 
         // try to get the global default setting for read consistency, but fall back to SAFE
         m_defaultConsistencyReadLevel = VoltDB.Configuration.getDefaultReadConsistencyLevel();
 
-        m_NTProcedureService = new NTProcedureService(m_ich, m_mailbox);
+        m_NTProcedureService = new NTProcedureService(m_internalConnectionHandler, m_mailbox);
         // this kicks off the initial NT procedures being loaded
         notifyNTProcedureServiceOfCatalogUpdate();
     }
@@ -383,7 +383,8 @@ public final class InvocationDispatcher {
         }
 
         // handle non-transactional procedures (INCLUDING NT SYSPROCS)
-        if ((catProc.getTransactional() == false) && (catProc.getHasjava() == true)) {
+        if (catProc.getTransactional() == false) {
+            assert(catProc.getHasjava());
             return dispatchNTProcedure(task, user, ccxn, ntPriority);
         }
 

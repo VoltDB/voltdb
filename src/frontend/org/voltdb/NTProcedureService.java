@@ -24,10 +24,10 @@ import java.util.Map.Entry;
 import java.util.Queue;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -112,7 +112,7 @@ public class NTProcedureService {
             20,
             60,
             TimeUnit.SECONDS,
-            new LinkedBlockingQueue<Runnable>(),
+            new ArrayBlockingQueue<Runnable>(10000),
             new ThreadFactoryBuilder()
                 .setNameFormat(NTPROC_THREADPOOL_NAMEPREFIX + "%d")
                 .build());
@@ -138,12 +138,12 @@ public class NTProcedureService {
     class ProcedureRunnerNTGenerator {
 
         protected final String m_procedureName;
-        protected final Class<? extends VoltNTProcedure> m_procClz;
+        protected final Class<? extends VoltNonTransactionalProcedure> m_procClz;
         protected final Method m_procMethod;
         protected final Class<?>[] m_paramTypes;
         protected final ProcedureStatsCollector m_statsCollector;
 
-        ProcedureRunnerNTGenerator(Class<? extends VoltNTProcedure> clz) {
+        ProcedureRunnerNTGenerator(Class<? extends VoltNonTransactionalProcedure> clz) {
             m_procClz = clz;
             m_procedureName = m_procClz.getSimpleName();
 
@@ -162,6 +162,7 @@ public class NTProcedureService {
                     }
                     procMethod = m;
                     paramTypes = m.getParameterTypes();
+                    break; // compiler has checked there's only one valid run() method
                 }
             }
 
@@ -188,10 +189,11 @@ public class NTProcedureService {
         ProcedureRunnerNT generateProcedureRunnerNT(AuthUser user, Connection ccxn, long clientHandle)
                 throws InstantiationException, IllegalAccessException
         {
-            // every single call gets a unique id
+            // every single call gets a unique id as a key for the outstanding procedure map
+            // in NTProcedureService
             long id = nextProcedureRunnerId++;
 
-            VoltNTProcedure procedure = null;
+            VoltNonTransactionalProcedure procedure = null;
             procedure = m_procClz.newInstance();
             ProcedureRunnerNT runner = new ProcedureRunnerNT(id,
                                                              user,
@@ -243,12 +245,12 @@ public class NTProcedureService {
             }
 
             final String className = sysProc.getClassname();
-            Class<? extends VoltNTProcedure> procClass = null;
+            Class<? extends VoltNonTransactionalProcedure> procClass = null;
 
             // this check is for sysprocs that don't have a procedure class
             if (className != null) {
                 try {
-                    procClass = (Class<? extends VoltNTProcedure>) Class.forName(className);
+                    procClass = (Class<? extends VoltNonTransactionalProcedure>) Class.forName(className);
                 }
                 catch (final ClassNotFoundException e) {
                     if (sysProc.commercial) {
@@ -298,9 +300,9 @@ public class NTProcedureService {
 
             // this code is mostly lifted from transactionally procedures
             String className = procedure.getClassname();
-            Class<? extends VoltNTProcedure> clz = null;
+            Class<? extends VoltNonTransactionalProcedure> clz = null;
             try {
-                clz = (Class<? extends VoltNTProcedure>) catalogContext.classForProcedure(className);
+                clz = (Class<? extends VoltNonTransactionalProcedure>) catalogContext.classForProcedure(className);
             } catch (ClassNotFoundException e) {
                 if (className.startsWith("org.voltdb.")) {
                     String msg = String.format(LoadedProcedureSet.ORGVOLTDB_PROCNAME_ERROR_FMT, className);
@@ -336,7 +338,7 @@ public class NTProcedureService {
     }
 
     /**
-     * Invoke an NT procedure asyncronously on one of the exec services.
+     * Invoke an NT procedure asynchronously on one of the exec services.
      * @returns ClientResponseImpl if something goes wrong.
      */
     synchronized ClientResponseImpl callProcedureNT(final AuthUser user,

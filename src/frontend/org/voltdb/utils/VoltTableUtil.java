@@ -258,7 +258,7 @@ public class VoltTableUtil {
                         value = value.toLowerCase();
                     }
                     if (value.contains(s)) {
-                            return true;
+                        return true;
                     }
                 }
             }
@@ -284,11 +284,10 @@ public class VoltTableUtil {
      */
     private static class VoltTableSpliterator implements Spliterator<VoltTableRow> {
         VoltTableRow m_row;
-        int m_fence;
+        final int m_fence;
 
         VoltTableSpliterator(VoltTable table, int origin, int fence) {
-            System.out.printf("New VTS %d -> %d in Table with %d rows\n", origin, fence, table.getRowCount());
-            System.out.flush();
+            m_fence = fence;
 
             if (origin == fence) {
                 m_row = null;
@@ -297,7 +296,6 @@ public class VoltTableUtil {
 
             assert(origin < fence);
             m_row = table.fetchRow(origin);
-            m_fence = fence;
         }
 
         @Override

@@ -31,8 +31,8 @@ import org.voltdb.ProcInfo;
 import org.voltdb.ProcInfoData;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltNonTransactionalProcedure;
 import org.voltdb.VoltProcedure;
-import org.voltdb.VoltNTProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.VoltTypeException;
@@ -364,7 +364,7 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
         }
 
         // if the procedure is non-transactional, then take this special path here
-        if (VoltNTProcedure.class.isAssignableFrom(procClass)) {
+        if (VoltNonTransactionalProcedure.class.isAssignableFrom(procClass)) {
             compileNTProcedure(compiler, procClass, procedure, jarOutput);
             return;
         }
@@ -578,9 +578,8 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
          // get the short name of the class (no package)
         String shortName = deriveShortProcedureName(procClass.getName());
 
-        VoltNTProcedure procInstance;
         try {
-            procInstance = (VoltNTProcedure)procClass.newInstance();
+            procClass.newInstance();
         } catch (InstantiationException e) {
             throw new RuntimeException("Error instantiating procedure \"%s\"" + procClass.getName(), e);
         } catch (IllegalAccessException e) {
@@ -622,7 +621,7 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
            (procMethod.getReturnType() != long.class) &&
            (procMethod.getReturnType() != Long.class)) {
 
-            String msg = "Procedure: " + shortName + " has run(...) method that doesn't return long, Long, VoltTable, VoltTable[] or Continuation.";
+            String msg = "Procedure: " + shortName + " has run(...) method that doesn't return long, Long, VoltTable, VoltTable[] or CompleteableFuture.";
             throw compiler.new VoltCompilerException(msg);
         }
 
