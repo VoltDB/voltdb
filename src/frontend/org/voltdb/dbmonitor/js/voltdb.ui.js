@@ -992,7 +992,9 @@ var loadPage = function (serverName, portid) {
         var getLicenseInformation = function (licenseInfo) {
             if (licenseInfo != undefined && licenseInfo != "") {
                 var licInfo = $.parseJSON(licenseInfo);
-                $("#addNewConfigLink").show();
+                if(!VoltDbAdminConfig.isExportLoading){
+                    $("#addNewConfigLink").show();
+                }
                 $(".licenseInfo").show();
                 $("#tdLicenseInfo").hide();
                 $("#tdLicenseInfo").css("display", "none");

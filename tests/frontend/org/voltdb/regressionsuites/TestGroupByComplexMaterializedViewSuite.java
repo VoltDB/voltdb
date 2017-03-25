@@ -1509,7 +1509,7 @@ public class TestGroupByComplexMaterializedViewSuite extends RegressionSuite {
 
         // With view size limits in place, it's actually not possible
         // to delete all the rows from the source table
-        if (!isValgrind()) {
+        if (!LocalCluster.isMemcheckDefined()) {
             // we are truncating here, but in the back end, we actually delete row-by-row,
             // hence this failure.
             verifyStmtFails(client, "truncate table r6", "exceeds the size");

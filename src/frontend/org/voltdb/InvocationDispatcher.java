@@ -439,10 +439,13 @@ public final class InvocationDispatcher {
                 dispatchSwapTables(task, handler, ccxn, user);
                 return null;
             }
-            // ExecuteTask is an internal procedure, not for public use.
             else if ("@ExecuteTask".equals(procName)) {
+                // ExecuteTask is an internal procedure, not for public use.
                 return unexpectedFailureResponse(
                         "@ExecuteTask is a reserved procedure only for VoltDB internal use", task.clientHandle);
+            }
+            else if ("@UpdateLogging".equals(procName)) {
+                task = appendAuditParams(task, ccxn, user);
             }
 
             // ERROR MESSAGE FOR PRO SYSPROC USE IN COMMUNITY
@@ -511,7 +514,6 @@ public final class InvocationDispatcher {
         }
         // If you're going to copy and paste something, CnP the pattern
         // up above.  -rtb.
-
 
         int partition = -1;
         try {
@@ -889,6 +891,24 @@ public final class InvocationDispatcher {
         Object[] userParams = null;
         dispatchAdHocCommon(task, handler, ccxn, ExplainMode.NONE, sql,
                 userParams, null, user);
+    }
+
+    private StoredProcedureInvocation appendAuditParams(StoredProcedureInvocation task,
+            Connection ccxn, AuthSystem.AuthUser user) {
+        String username = user.m_name;
+        if (username == null) {
+            username = "An anonymous user";
+        }
+        String remoteHost = ccxn.getRemoteSocketAddress().toString();
+        String xml = (String)task.getParams().toArray()[0];
+        StoredProcedureInvocation spi = new StoredProcedureInvocation();
+        spi.setProcName(task.getProcName());
+        spi.setParams(username, remoteHost, xml);
+        spi.setClientHandle(task.getClientHandle());
+        spi.setBatchTimeout(task.getBatchTimeout());
+        spi.type = task.getType();
+        spi.setAllPartition(task.getAllPartition());
+        return spi;
     }
 
    /**

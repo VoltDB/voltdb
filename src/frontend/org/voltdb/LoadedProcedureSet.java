@@ -27,10 +27,8 @@ import org.voltcore.logging.VoltLogger;
 import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Procedure;
-import org.voltdb.compiler.Language;
 import org.voltdb.compiler.PlannerTool;
 import org.voltdb.compiler.StatementCompiler;
-import org.voltdb.groovy.GroovyScriptProcedureDelegate;
 import org.voltdb.utils.LogKeys;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -46,18 +44,6 @@ public class LoadedProcedureSet {
             "in the catalog jarfile and will now exit.";
 
     private static final VoltLogger hostLog = new VoltLogger("HOST");
-
-    private static Language.CheckedExceptionVisitor<VoltProcedure, Class<?>, Exception> procedureInstantiator =
-            new Language.CheckedExceptionVisitor<VoltProcedure, Class<?>, Exception>() {
-                @Override
-                public VoltProcedure visitJava(Class<?> p) throws Exception {
-                    return (VoltProcedure)p.newInstance();
-                }
-                @Override
-                public VoltProcedure visitGroovy(Class<?> p) throws Exception {
-                    return new GroovyScriptProcedureDelegate(p);
-                }
-            };
 
     final SiteProcedureConnection m_site;
 
@@ -161,14 +147,8 @@ public class LoadedProcedureSet {
             }
 
             VoltProcedure procedure = null;
-            // default to Java
-            Language lang = Language.JAVA;
+
             if (proc.getHasjava()) {
-                try {
-                    lang = Language.valueOf(proc.getLanguage());
-                } catch (IllegalArgumentException e) {
-                    // default to Java for earlier compiled catalogs
-                }
 
                 final String className = proc.getClassname();
                 Class<?> procClass = null;
@@ -186,7 +166,7 @@ public class LoadedProcedureSet {
                     }
                 }
                 try {
-                    procedure = lang.accept(procedureInstantiator, procClass);
+                    procedure = (VoltProcedure) procClass.newInstance();
                 }
                 catch (final Exception e) {
                     // TODO: remove the extra meaningless parameter "0"
@@ -196,11 +176,10 @@ public class LoadedProcedureSet {
             }
             else {
                 procedure = new ProcedureRunner.StmtProcedure();
-                lang = null;
             }
 
             assert(procedure != null);
-            ProcedureRunner runner = new ProcedureRunner(lang, procedure, site, proc, csp);
+            ProcedureRunner runner = new ProcedureRunner(procedure, site, proc, csp);
             builder.put(proc.getTypeName().intern(), runner);
         }
         return builder.build();
@@ -261,7 +240,7 @@ public class LoadedProcedureSet {
                             new Object[] { site.getCorrespondingSiteId(), 0 }, e);
                 }
 
-                ProcedureRunner runner = new ProcedureRunner(Language.JAVA, procedure,
+                ProcedureRunner runner = new ProcedureRunner(procedure,
                         site, site.getSystemProcedureExecutionContext(),
                         proc, csp);
 
@@ -312,7 +291,7 @@ public class LoadedProcedureSet {
                 String sqlText = DefaultProcedureManager.sqlForDefaultProc(catProc);
                 Procedure newCatProc = StatementCompiler.compileDefaultProcedure(m_plannerTool, catProc, sqlText);
                 VoltProcedure voltProc = new ProcedureRunner.StmtProcedure();
-                pr = new ProcedureRunner(null, voltProc, m_site, newCatProc, m_csp);
+                pr = new ProcedureRunner(voltProc, m_site, newCatProc, m_csp);
                 // this will ensure any created fragment tasks know to load the plans
                 // for this plan-on-the-fly procedure
                 pr.setProcNameToLoadForFragmentTasks(catProc.getTypeName());
