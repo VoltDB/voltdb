@@ -19,6 +19,7 @@
 #define _EXECUTORCONTEXT_HPP_
 
 #include "Topend.h"
+#include "common/LargeTempTableBlockCache.h"
 #include "common/UndoQuantum.h"
 #include "common/valuevector.h"
 #include "common/subquerycontext.h"
@@ -380,6 +381,10 @@ class ExecutorContext {
      */
     void reportProgressToTopend(const TempTableLimits* limits);
 
+    LargeTempTableBlockCache* lttBlockCache() {
+        return &m_lttBlockCache;
+    }
+
   private:
     Topend *m_topend;
     Pool *m_tempStringPool;
@@ -408,6 +413,7 @@ class ExecutorContext {
     int64_t m_uniqueId;
     int64_t m_currentTxnTimestamp;
     int64_t m_currentDRTimestamp;
+    LargeTempTableBlockCache m_lttBlockCache;
   public:
     int64_t m_lastCommittedSpHandle;
     int64_t m_siteId;

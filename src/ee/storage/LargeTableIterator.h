@@ -36,7 +36,8 @@ public:
 
     LargeTableIterator(const LargeTableIterator& that)
         : m_schema(that.m_schema)
-        , m_blocks(that.m_blocks)
+        , m_currBlock(nullptr)
+        , m_blockIds(that.m_blockIds)
         , m_blockIterator(that.m_blockIterator)
         , m_currPosition(that.m_currPosition)
         , m_storage(that.m_schema)
@@ -50,20 +51,24 @@ public:
 
 protected:
     LargeTableIterator(const TupleSchema *schema,
-                       const std::vector<LargeTempTableBlock*> *blocks)
+                       const std::vector<int64_t> *blockIds)
         : m_schema(schema)
-        , m_blocks(blocks)
-        , m_blockIterator(std::begin(*blocks))
+        , m_currBlock(nullptr)
+        , m_blockIds(blockIds)
+        , m_blockIterator(std::begin(*blockIds))
         , m_currPosition(0)
         , m_storage(schema)
     {
+        LargeTempTableBlockCache* lttCache = ExecutorContext::getExecutorContext()->lttBlockCache();
+        m_currBlock = lttCache->fetchBlock(*m_blockIterator);
     }
 
 private:
 
     const TupleSchema* m_schema;
-    const std::vector<LargeTempTableBlock*> *m_blocks;
-    std::vector<LargeTempTableBlock*>::const_iterator m_blockIterator;
+    LargeTempTableBlock* m_currBlock;
+    const std::vector<int64_t> *m_blockIds;
+    std::vector<int64_t>::const_iterator m_blockIterator;
     size_t m_currPosition;
     StandAloneTupleStorage m_storage;
 
@@ -71,11 +76,11 @@ private:
 
 
 bool LargeTableIterator::next(TableTuple& out) {
-    if (m_blockIterator == std::end(*m_blocks)) {
+    if (m_blockIterator == std::end(*m_blockIds)) {
         return false;
     }
 
-    char* data = (*m_blockIterator)->getData();
+    char* data = m_currBlock->getData();
     ReferenceSerializeInputBE input(data + m_currPosition,
                                     LargeTempTableBlock::getBlocksize() - m_currPosition);
     out = m_storage.tuple();
@@ -85,10 +90,19 @@ bool LargeTableIterator::next(TableTuple& out) {
     // xxx hack!
     m_currPosition = input.getRawPointer() - data;
 
-    assert(m_currPosition <= (*m_blockIterator)->getUsedBytes());
-    if (m_currPosition == (*m_blockIterator)->getUsedBytes()) {
+    assert(m_currPosition <= m_currBlock->getUsedBytes());
+    if (m_currPosition == m_currBlock->getUsedBytes()) {
+        LargeTempTableBlockCache* lttCache = ExecutorContext::getExecutorContext()->lttBlockCache();
+
+        // unpin the current block
+        lttCache->unpinBlock(*m_blockIterator);
+
+        // Get the next block if one exists
         ++m_blockIterator;
-        m_currPosition = 0;
+        if (m_blockIterator != std::end(*m_blockIds)) {
+            m_currBlock = lttCache->fetchBlock(*m_blockIterator);
+            m_currPosition = 0;
+        }
     }
 
     return true;

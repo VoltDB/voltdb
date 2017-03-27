@@ -24,8 +24,10 @@
 
 #include <array>
 #include <deque>
+#include <list>
 #include <map>
 #include <utility>
+#include <vector>
 
 #include <boost/scoped_array.hpp>
 
@@ -40,24 +42,11 @@ namespace voltdb {
         LargeTempTableBlock()
             : m_data(new char[getBlocksize()])
             , m_usedBytes(0)
-            , m_refCount(0)
         {
         }
 
         static size_t getBlocksize() {
             return blocksizeRef();
-        }
-
-        void incrementRefCount() {
-            ++m_refCount;
-        }
-
-        void decrementRefCount() {
-            m_refCount--;
-        }
-
-        int getRefCount() const {
-            return m_refCount;
         }
 
         char* getData() {
@@ -76,6 +65,10 @@ namespace voltdb {
             return getBlocksize() - getUsedBytes();
         }
 
+        void makeEmpty() {
+            m_usedBytes = 0;
+        }
+
         // xxx make this protected
         static void setBlocksize(size_t newSize) {
             blocksizeRef() = newSize;
@@ -90,27 +83,23 @@ namespace voltdb {
 
         char* m_data;
         size_t m_usedBytes;
-        int m_refCount;
     };
 
     class LargeTempTableBlockCache {
     public:
         LargeTempTableBlockCache();
 
-        std::pair<int64_t, char*> getEmptyBlock();
+        std::pair<int64_t, LargeTempTableBlock*> getEmptyBlock();
 
         void unpinBlock(int64_t blockId);
 
-        char* fetchBlock(int64_t blockId);
+        LargeTempTableBlock* fetchBlock(int64_t blockId);
 
         void releaseBlock(int64_t blockId);
 
     private:
 
-        static int MAX_CACHE_SIZE() {
-            // 25 * 2MB is about 50MB.
-            return 25;
-        }
+        static const int NUM_CACHE_ENTRIES = 25;
 
         int64_t getNextId() {
             int64_t nextId = m_nextId;
@@ -118,8 +107,14 @@ namespace voltdb {
             return nextId;
         }
 
-        std::map<int64_t, LargeTempTableBlock> m_blocks;
-        std::deque<LargeTempTableBlock*> m_unpinnedBlocks;
+        std::array<LargeTempTableBlock, NUM_CACHE_ENTRIES> m_cache;
+
+        std::vector<LargeTempTableBlock*> m_emptyEntries;
+
+        std::map<int64_t, LargeTempTableBlock*> m_liveEntries;
+
+        std::list<int64_t> m_unpinnedEntries;
+
         int64_t m_nextId;
     };
 }

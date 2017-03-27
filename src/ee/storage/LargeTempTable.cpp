@@ -30,9 +30,18 @@ bool LargeTempTable::insertTuple(TableTuple& tuple) {
 
     size_t neededBytes = tuple.serializationSize();
 
+    // Do we need to request a tuple block?
     if (m_blockForWriting == nullptr || neededBytes > m_blockForWriting->getRemainingBytes()) {
-        m_blockForWriting = new LargeTempTableBlock();
-        m_blocks.push_back(m_blockForWriting);
+        LargeTempTableBlockCache* lttBlockCache = ExecutorContext::getExecutorContext()->lttBlockCache();
+
+        if (m_blockForWriting != nullptr) {
+            int64_t lastBlockId = m_blockIds.back();
+            lttBlockCache->unpinBlock(lastBlockId);
+        }
+
+        int64_t nextBlockId;
+        std::tie(nextBlockId, m_blockForWriting) = lttBlockCache->getEmptyBlock();
+        m_blockIds.push_back(nextBlockId);
         assert(neededBytes <= m_blockForWriting->getRemainingBytes());
     }
 
@@ -49,7 +58,7 @@ bool LargeTempTable::insertTuple(TableTuple& tuple) {
 }
 
 LargeTableIterator LargeTempTable::largeIterator() const {
-    return LargeTableIterator(schema(), &m_blocks);
+    return LargeTableIterator(schema(), &m_blockIds);
 }
 
 } // namespace voltdb

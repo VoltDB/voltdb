@@ -53,7 +53,7 @@ public:
     bool insertTuple(TableTuple& tuple);
 
     size_t allocatedBlockCount() const {
-        return m_blocks.size();
+        return m_blockIds.size();
     }
 
     std::string tableType() const {
@@ -82,7 +82,7 @@ protected:
         : Table(LargeTempTableBlock::getBlocksize())
         , m_iter(this)
         , m_blockForWriting(nullptr)
-        , m_blocks()
+        , m_blockIds()
         , m_numTuples(0)
     {
     }
@@ -92,7 +92,7 @@ private:
     TableIterator m_iter;
 
     LargeTempTableBlock* m_blockForWriting;
-    std::vector<LargeTempTableBlock*> m_blocks;
+    std::vector<int64_t> m_blockIds;
 
     int64_t m_numTuples; // redundant with base class?? xxx
 };

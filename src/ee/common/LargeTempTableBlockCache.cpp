@@ -24,25 +24,51 @@
 namespace voltdb {
 
     LargeTempTableBlockCache::LargeTempTableBlockCache()
-        : m_blocks()
-        , m_unpinnedBlocks()
+        : m_cache()
+        , m_emptyEntries(NUM_CACHE_ENTRIES)
+        , m_liveEntries()
+        , m_unpinnedEntries()
     {
+        // At initialization, all cache entries are empty.
+        auto cacheIt = m_cache.begin();
+        for (; cacheIt != m_cache.end(); ++cacheIt) {
+            m_emptyEntries.push_back(&(*cacheIt));
+        }
     }
 
-    std::pair<int64_t, char*> LargeTempTableBlockCache::getEmptyBlock() {
+    std::pair<int64_t, LargeTempTableBlock*> LargeTempTableBlockCache::getEmptyBlock() {
         int64_t id = getNextId();
-        char* data = NULL;
-        if (m_blocks.size() < MAX_CACHE_SIZE()) {
-            // allocate a new block.
-            m_blocks.emplace(std::make_pair(id, LargeTempTableBlock()));
-            data = m_blocks.find(id)->second.getData();
-        }
-        else {
-            assert(false);
-            // Write an existing unpinned block to disk
+
+        if (m_emptyEntries.size() > 0) {
+            LargeTempTableBlock *emptyBlock = m_emptyEntries.back();
+            m_emptyEntries.pop_back();
+            m_liveEntries[id] = emptyBlock;
+            return std::make_pair(id, emptyBlock);
         }
 
-        return std::make_pair(id, data);
+        assert(false);
     }
 
+    LargeTempTableBlock* LargeTempTableBlockCache::fetchBlock(int64_t blockId) {
+        assert(m_liveEntries.find(blockId) != std::end(m_liveEntries));
+
+        // If it's in the unpinned entries list, remove it
+        auto unpinnedIt = m_unpinnedEntries.begin();
+        for (; unpinnedIt != m_unpinnedEntries.end(); ++unpinnedIt) {
+            if (*unpinnedIt == blockId) {
+                m_unpinnedEntries.erase(unpinnedIt);
+                break;
+            }
+        }
+
+        return m_liveEntries[blockId];
+    }
+
+    void LargeTempTableBlockCache::unpinBlock(int64_t blockId) {
+        m_unpinnedEntries.push_front(blockId);
+    }
+
+    void LargeTempTableBlockCache::releaseBlock(int64_t blockId) {
+        assert(false);
+    }
 }
