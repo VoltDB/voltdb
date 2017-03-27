@@ -725,7 +725,9 @@ jQuery.extend({
                     console.log(e.message);
                 },
                  statusCode:{
-                    401: function(response){
+                    401: function(jqXHR, textStatus, errorThrown){
+                        var data = jqXHR.responseJSON;
+                        callback(data, (jqXHR.getResponseHeader("Host") != null ? jqXHR.getResponseHeader("Host").split(":")[0] : "-1"))
                         console.log('Failed to authenticate to the server via Kerberos. Please check the configuration of your client/browser')
                     }
                 }
