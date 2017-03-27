@@ -305,6 +305,25 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         for (AbstractPlanNode node : m_children) {
             node.getTablesAndIndexes(tablesRead, indexes);
         }
+        getTablesAndIndexesFromSubqueries(tablesRead, indexes);
+    }
+
+    /**
+     * Collect read tables read and index names used in the current node subquery expressions.
+     *
+     * @param tablesRead Set of table aliases read potentially added to at each recursive level.
+     * @param indexes Set of index names used in the plan tree
+     * Only the current node is of interest.
+     */
+    protected void getTablesAndIndexesFromSubqueries(Map<String, StmtTargetTableScan> tablesRead,
+            Collection<String> indexes) {
+        for(AbstractExpression expr : findAllSubquerySubexpressions()) {
+            assert(expr instanceof AbstractSubqueryExpression);
+            AbstractSubqueryExpression subquery = (AbstractSubqueryExpression) expr;
+            AbstractPlanNode subqueryNode = subquery.getSubqueryNode();
+            assert(subqueryNode != null);
+            subqueryNode.getTablesAndIndexes(tablesRead, indexes);
+        }
     }
 
     /**
