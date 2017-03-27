@@ -18,7 +18,7 @@
 package org.voltdb.client;
 
 /**
- * interface for callbacks that are invoked when an asynchronously invoked transaction receives a response.
+ * Interface for callbacks that are invoked when an asynchronously invoked transaction receives a response.
  * Extend this class and provide an implementation of {@link #clientCallback} to receive a response to a
  * stored procedure invocation on all partitions.
  */
