@@ -458,23 +458,26 @@ class VerbRunner(object):
         """
         self.voltdb_disconnect()
         try:
-            kwargs = {}
-            if username:
-                kwargs['username'] = username
-                if password:
-                    kwargs['password'] = password
-                else:
-                    """
-                    If a username was specified and a password was not, prompt the user for the pwd.
-                    """
-                    kwargs['password'] = getpass('Enter your password: ')
-            if ssl_config:
-                kwargs['usessl'] = True
-                kwargs['ssl_config_file'] = ssl_config
-
-            self.client = FastSerializer(host, port, **kwargs)
+            self.__voltdb_connect__(host, port, username, password, ssl_config)
         except Exception, e:
             utility.abort(e)
+
+    def __voltdb_connect__(self, host, port, username=None, password=None, ssl_config=None):
+        kwargs = {}
+        if username:
+            kwargs['username'] = username
+            if password:
+                kwargs['password'] = password
+            else:
+                """
+                If a username was specified and a password was not, prompt the user for the pwd.
+                """
+                kwargs['password'] = getpass('Enter your password: ')
+        if ssl_config:
+            kwargs['usessl'] = True
+            kwargs['ssl_config_file'] = ssl_config
+
+        self.client = FastSerializer(host, port, **kwargs)
 
     def voltdb_disconnect(self):
         """
