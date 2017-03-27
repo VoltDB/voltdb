@@ -587,8 +587,6 @@
                     '@Explain': { '1': ['SQL (varchar)', 'Returns Table[]'] },
                     '@ExplainProc': { '1': ['Stored Procedure Name (varchar)', 'Returns Table[]'] },
                     '@ExplainView': { '1': ['Materialized View Name (varchar)', 'Returns Table[]'] },
-                    '@GC': { '0': ['Returns bit'] },
-                    '@GetPartitionKeys': { '1': ['VoltType (varchar)', 'Returns Table[]'] },
                     '@Pause': { '0': ['Returns bit'] },
                     '@Promote': { '0': ['Returns bit'] },
                     '@Quiesce': { '0': ['Returns bit'] },
