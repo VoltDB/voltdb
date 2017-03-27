@@ -724,11 +724,14 @@ jQuery.extend({
                 error: function (e) {
                     console.log(e.message);
                 },
-                 statusCode:{
+                statusCode:{
                     401: function(jqXHR, textStatus, errorThrown){
                         var data = jqXHR.responseJSON;
                         callback(data, (jqXHR.getResponseHeader("Host") != null ? jqXHR.getResponseHeader("Host").split(":")[0] : "-1"))
-                        console.log('Failed to authenticate to the server via Kerberos. Please check the configuration of your client/browser')
+                        if (data.statusstring.includes("kerberos")){
+                            console.log('Failed to authenticate to the server via Kerberos. Please check the configuration of your client/browser')
+                        }
+
                     }
                 }
             });
@@ -754,8 +757,13 @@ jQuery.extend({
                     console.log(e.message);
                 },
                  statusCode:{
-                    401: function(response){
-                        console.log('Failed to authenticate to the server via Kerberos. Please check the configuration of your client/browser');
+                    401: function(jqXHR, textStatus, errorThrown){
+                        var data = jqXHR.responseJSON;
+                        callback(data, (jqXHR.getResponseHeader("Host") != null ? jqXHR.getResponseHeader("Host").split(":")[0] : "-1"))
+                        if (data.statusstring.includes("kerberos")){
+                            console.log('Failed to authenticate to the server via Kerberos. Please check the configuration of your client/browser')
+                        }
+
                     }
                 }
             });
@@ -774,9 +782,14 @@ jQuery.extend({
                 error: function (e) {
                     console.log(e.message);
                 },
-                 statusCode:{
-                    401: function(response){
-                        console.log('Failed to authenticate to the server via Kerberos. Please check the configuration of your client/browser');
+                statusCode:{
+                    401: function(jqXHR, textStatus, errorThrown){
+                        var data = jqXHR.responseJSON;
+                        callback(data, (jqXHR.getResponseHeader("Host") != null ? jqXHR.getResponseHeader("Host").split(":")[0] : "-1"))
+                        if (data.statusstring.includes("kerberos")){
+                            console.log('Failed to authenticate to the server via Kerberos. Please check the configuration of your client/browser')
+                        }
+
                     }
                 }
             });
