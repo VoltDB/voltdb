@@ -158,23 +158,26 @@ public class TruncateTableLoader extends BenchmarkThread {
         if (isStatusSuccess(clientResponse, shouldRollback, "swap", tableName)) {
             Benchmark.txnCount.incrementAndGet();
             nSwaps++;
-        }
 
-        // Confirm that the table-swap worked correctly, by checking the row counts
-        // nb. swap is not supported with DR yet, with XDCR this check is likeley to fail
-        // unless we take other action or change the test.
-        try {
-            rowCounts[0] = TxnId2Utils.getRowCount(client, tableName);
-            rowCounts[1] = TxnId2Utils.getRowCount(client, swapTableName);
-        } catch (Exception e) {
-            hardStop("getrowcount exception", e);
+            // Confirm that the table-swap worked correctly, by checking the row counts
+            // nb. swap is not supported with DR yet, with XDCR this check is likeley to fail
+            // unless we take other action or change the test.
+            try {
+                rowCounts[0] = TxnId2Utils.getRowCount(client, tableName);
+                rowCounts[1] = TxnId2Utils.getRowCount(client, swapTableName);
+            } catch (Exception e) {
+                hardStop("getrowcount exception", e);
+            }
+            int z = shouldRollback == 0 ? 0 : 1;
+            if (rowCounts[(z + 0) & 1] != swapRowCount || rowCounts[(z + 1) & 1] != tableRowCount) {
+                String message = swapProcName + " on " + tableName + ", " + swapTableName
+                        + " failed to swap row counts correctly: went from " + tableRowCount
+                        + ", " + swapRowCount + " to " + rowCounts[0] + ", " + rowCounts[1] + ", rollback: " + shouldRollback;
+                hardStop("TruncateTableLoader: " + message);
+            }
         }
-        int z = shouldRollback == 0 ? 0 : 1;
-        if (rowCounts[(z+0)&1] != swapRowCount || rowCounts[(z+1)&1] != tableRowCount) {
-            String message = swapProcName+" on "+tableName+", "+swapTableName
-                    + " failed to swap row counts correctly: went from " + tableRowCount
-                    + ", " + swapRowCount + " to " + rowCounts[0] + ", " + rowCounts[1] + ", rollback: " + shouldRollback;
-            hardStop("TruncateTableLoader: " + message);
+        else {
+            hardStop(clientResponse.toString());
         }
         return rowCounts;
     }
