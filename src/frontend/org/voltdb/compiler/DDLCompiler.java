@@ -69,7 +69,6 @@ import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AbstractSubqueryExpression;
 import org.voltdb.expressions.AggregateExpression;
 import org.voltdb.expressions.TupleValueExpression;
-import org.voltdb.groovy.GroovyCodeBlockCompiler;
 import org.voltdb.parser.HSQLLexer;
 import org.voltdb.parser.SQLLexer;
 import org.voltdb.parser.SQLParser;
@@ -565,7 +564,7 @@ public class DDLCompiler {
             }
 
             ProcedureDescriptor descriptor = m_compiler.new ProcedureDescriptor(
-                    new ArrayList<String>(), Language.JAVA, null, clazz);
+                    new ArrayList<String>(), null, clazz);
 
             // Parse the ALLOW and PARTITION clauses.
             // Populate descriptor roles and returned partition data as needed.
@@ -583,61 +582,10 @@ public class DDLCompiler {
 
         // matches  if it is CREATE PROCEDURE <proc-name> [ALLOW <role> ...] [PARTITION ON ...] AS
         // ### <code-block> ### LANGUAGE <language-name>
+        // We used to support Groovy in pre-5.x, but now we don't
         statementMatcher = SQLParser.matchCreateProcedureAsScript(statement);
         if (statementMatcher.matches()) {
-
-            // Dots are okay in script procedures because they are a class name
-            String className = checkIdentifierStart(statementMatcher.group(1), statement);
-            String codeBlock = statementMatcher.group(3);
-            String languageToken = statementMatcher.group(4);
-            if (languageToken == null) {
-                throw m_compiler.new VoltCompilerException("LANGUAGE clause is bad or missing.");
-            }
-            languageToken = languageToken.toUpperCase();
-
-            Language language;
-            try {
-                language = Language.valueOf(languageToken);
-            }
-            catch (IllegalArgumentException e) {
-                throw m_compiler.new VoltCompilerException(String.format(
-                        "Language \"%s\" is not a supported", languageToken));
-            }
-
-            Class<?> scriptClass = null;
-
-            if (language == Language.GROOVY) {
-                try {
-                    scriptClass = GroovyCodeBlockCompiler.instance().parseCodeBlock(codeBlock, className);
-                } catch (CodeBlockCompilerException ex) {
-                    throw m_compiler.new VoltCompilerException(String.format(
-                            "Procedure \"%s\" code block has syntax errors:\n%s",
-                            className, ex.getMessage()));
-                } catch (Exception ex) {
-                    throw m_compiler.new VoltCompilerException(ex);
-                }
-            } else {
-                // Not sure how to get here with exception handling above, but help yourself
-                // to a belt with those suspenders!
-                throw m_compiler.new VoltCompilerException(String.format(
-                        "Language \"%s\" is not a supported", language.name()));
-            }
-
-            ProcedureDescriptor descriptor = m_compiler.new ProcedureDescriptor(
-                    new ArrayList<String>(), language, codeBlock, scriptClass);
-
-            // Parse the ALLOW and PARTITION clauses.
-            // Populate descriptor roles and returned partition data as needed.
-            CreateProcedurePartitionData partitionData =
-                    parseCreateProcedureClauses(descriptor, statementMatcher.group(2));
-
-            // track the defined procedure
-            String procName = m_tracker.add(descriptor);
-
-            // add partitioning if specified
-            addProcedurePartitionInfo(procName, partitionData, statement);
-
-            return true;
+            throw m_compiler.new VoltCompilerException("VoltDB doesn't support inline proceudre creation..");
         }
 
         // matches if it is CREATE PROCEDURE <proc-name> [ALLOW <role> ...] [PARTITION ON ...] AS <select-or-dml-statement>
@@ -647,7 +595,7 @@ public class DDLCompiler {
             String sqlStatement = statementMatcher.group(3) + ";";
 
             ProcedureDescriptor descriptor = m_compiler.new ProcedureDescriptor(
-                    new ArrayList<String>(), clazz, sqlStatement, null, null, false, null, null, null);
+                    new ArrayList<String>(), clazz, sqlStatement, null, null, false, null);
 
             // Parse the ALLOW and PARTITION clauses.
             // Populate descriptor roles and returned partition data as needed.
@@ -966,8 +914,7 @@ public class DDLCompiler {
             throw m_compiler.new VoltCompilerException(String.format(
                     "Invalid CREATE PROCEDURE statement: \"%s\", " +
                     "expected syntax: \"CREATE PROCEDURE [ALLOW <role> [, <role> ...] FROM CLASS <class-name>\" " +
-                    "or: \"CREATE PROCEDURE <name> [ALLOW <role> [, <role> ...] AS <single-select-or-dml-statement>\" " +
-                    "or: \"CREATE PROCEDURE <proc-name> [ALLOW <role> ...] AS ### <code-block> ### LANGUAGE GROOVY\"",
+                    "or: \"CREATE PROCEDURE <name> [ALLOW <role> [, <role> ...] AS <single-select-or-dml-statement>\"",
                     statement.substring(0,statement.length()-1))); // remove trailing semicolon
         }
 

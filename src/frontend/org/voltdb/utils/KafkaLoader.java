@@ -41,6 +41,8 @@ import org.voltdb.importer.formatter.FormatException;
 import org.voltdb.importer.formatter.Formatter;
 
 import au.com.bytecode.opencsv_voltpatches.CSVParser;
+import java.lang.reflect.InvocationTargetException;
+import java.nio.ByteBuffer;
 import kafka.consumer.ConsumerConfig;
 import kafka.consumer.ConsumerIterator;
 import kafka.consumer.KafkaStream;
@@ -191,7 +193,8 @@ public class KafkaLoader {
         @Option(desc = "Enable SSL, Optionally provide configuration file.")
         String ssl = "";
 
-        Formatter<String> iformatter = null;
+        //Read properties from formatter option and do basic validation.
+        Properties m_formatterProperties = new Properties();
         /**
          * Validate command line options.
          */
@@ -287,14 +290,26 @@ public class KafkaLoader {
             m_config = config;
             //Get group id which should be unique for table so as to keep offsets clean for multiple runs.
             String groupId = "voltdb-" + (m_config.useSuppliedProcedure ? m_config.procedure : m_config.table);
-            //TODO: Should get this from properties file or something as override?
             Properties props = new Properties();
+            // If configuration is provided for consumer pick up
             if (m_config.config.length() > 0) {
                 props.load(new FileInputStream(new File(m_config.config)));
                 //Get GroupId from property if present and use it.
                 groupId = props.getProperty("group.id", groupId);
                 //Get zk connection from props file if present.
                 m_config.zookeeper = props.getProperty("zookeeper.connect", m_config.zookeeper);
+                if (!props.contains("zookeeper.session.timeout.ms"))
+                    props.put("zookeeper.session.timeout.ms", "400");
+                if (!props.contains("zookeeper.sync.time.ms"))
+                    props.put("zookeeper.sync.time.ms", "200");
+                if (!props.contains("auto.commit.interval.ms"))
+                    props.put("auto.commit.interval.ms", "1000");
+                if (!props.contains("auto.commit.enable"))
+                    props.put("auto.commit.enable", "true");
+                if (!props.contains("auto.offset.reset"))
+                    props.put("auto.offset.reset", "smallest");
+                if (!props.contains("rebalance.backoff.ms"))
+                    props.put("rebalance.backoff.ms", "10000");
             } else {
                 props.put("zookeeper.session.timeout.ms", "400");
                 props.put("zookeeper.sync.time.ms", "200");
@@ -328,13 +343,26 @@ public class KafkaLoader {
         private final KafkaStream m_stream;
         private final CSVDataLoader m_loader;
         private final CSVParser m_csvParser;
-        private final Formatter<String> m_formatter;
+        private final Formatter m_formatter;
+        private final KafkaConfig m_config;
 
-        public KafkaConsumer(KafkaStream a_stream, CSVDataLoader loader, Formatter<String> formatter) {
+        public KafkaConsumer(KafkaStream a_stream, CSVDataLoader loader, KafkaConfig config)
+                throws ClassNotFoundException, NoSuchMethodException, InstantiationException, IllegalAccessException, IllegalArgumentException, InvocationTargetException {
             m_stream = a_stream;
             m_loader = loader;
             m_csvParser = new CSVParser();
-            m_formatter = formatter;
+            m_config = config;
+            if (m_config.m_formatterProperties.size() > 0) {
+                String formatter = m_config.m_formatterProperties.getProperty("formatter");
+                String format = m_config.m_formatterProperties.getProperty("format", "csv");
+                Class classz = Class.forName(formatter);
+                Class[] ctorParmTypes = new Class[]{ String.class, Properties.class };
+                Constructor ctor = classz.getDeclaredConstructor(ctorParmTypes);
+                Object[] ctorParms = new Object[]{ format, m_config.m_formatterProperties };
+                m_formatter = (Formatter )ctor.newInstance(ctorParms);
+            } else {
+                m_formatter = null;
+            }
         }
 
         @Override
@@ -349,8 +377,9 @@ public class KafkaLoader {
                     Object params[];
                     if (m_formatter != null) {
                         try {
-                            params = m_formatter.transform(smsg);
+                            params = m_formatter.transform(ByteBuffer.wrap(smsg.getBytes()));
                         } catch (FormatException fe) {
+                            m_log.warn("Failed to transform message: " + smsg);
                             continue;
                         }
                     } else {
@@ -379,7 +408,7 @@ public class KafkaLoader {
 
         // now launch all the threads for partitions.
         for (final KafkaStream stream : streams) {
-            KafkaConsumer bconsumer = new KafkaConsumer(stream, loader, m_config.iformatter);
+            KafkaConsumer bconsumer = new KafkaConsumer(stream, loader, m_config);
             executor.submit(bconsumer);
         }
 
@@ -414,20 +443,13 @@ public class KafkaLoader {
         cfg.parse(KafkaLoader.class.getName(), args);
         try {
             if (cfg.formatter.length() > 0) {
-                Properties p = new Properties();
                 InputStream pfile = new FileInputStream(cfg.formatter);
-                p.load(pfile);
-                String formatter = p.getProperty("formatter");
+                cfg.m_formatterProperties.load(pfile);
+                String formatter = cfg.m_formatterProperties.getProperty("formatter");
                 if (formatter == null || formatter.trim().length() == 0) {
                     m_log.error("formatter class must be specified in formatter file as formatter=<class>: " + cfg.formatter);
                     System.exit(-1);
                 }
-                String format = p.getProperty("format", "csv");
-                Class classz = Class.forName(formatter);
-                Class[] ctorParmTypes = new Class[]{ String.class, Properties.class };
-                Constructor ctor = classz.getDeclaredConstructor(ctorParmTypes);
-                Object[] ctorParms = new Object[]{ format, p };
-                cfg.iformatter = (Formatter<String>) ctor.newInstance(ctorParms);
             }
             KafkaLoader kloader = new KafkaLoader(cfg);
             kloader.processKafkaMessages();

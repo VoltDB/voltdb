@@ -48,6 +48,8 @@ import com.google_voltpatches.common.base.Joiner;
 import com.google_voltpatches.common.collect.FluentIterable;
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 
 import junit.framework.TestCase;
 
@@ -106,7 +108,7 @@ public class TestVoltCSVFormatter extends TestCase {
         FormatterBuilder builder = new FormatterBuilder("csv", prop);
         builder.setFormatterFactory(o);
         Formatter formatter = builder.create();
-        Object[] results = formatter.transform("12,10.05,test");
+        Object[] results = formatter.transform(ByteBuffer.wrap("12,10.05,test".getBytes(StandardCharsets.UTF_8)));
         assertEquals(results.length, 3);
         assertEquals(results[0], "12");
         assertEquals(results[1], "10.05");
@@ -123,7 +125,7 @@ public class TestVoltCSVFormatter extends TestCase {
         builder.setFormatterFactory(o);
         Formatter formatter = builder.create();
 
-        Object[] results = formatter.transform("12\t10.05\ttest");
+        Object[] results = formatter.transform(ByteBuffer.wrap("12\t10.05\ttest".getBytes(StandardCharsets.UTF_8)));
         assertEquals(results.length, 3);
         assertEquals(results[0], "12");
         assertEquals(results[1], "10.05");
@@ -159,23 +161,6 @@ public class TestVoltCSVFormatter extends TestCase {
         assertNull(results);
     }
 
-    @Test
-    public void testNonStringTransform() throws Exception {
-        ServiceReference refs[] = m_bundle.getRegisteredServices();
-        ServiceReference<AbstractFormatterFactory> reference = refs[0];
-        AbstractFormatterFactory o = m_bundle.getBundleContext().getService(reference);
-        Properties prop = new Properties();
-        FormatterBuilder builder = new FormatterBuilder("csv", prop);
-        builder.setFormatterFactory(o);
-        Formatter formatter = builder.create();
-
-        try {
-            formatter.transform(12345);
-            fail();
-        } catch (ClassCastException e) {
-        }
-    }
-
     //char separator, char quotechar, char escape, boolean strictQuotes, boolean ignoreLeadingWhiteSpace
     @Test
     public void testQuoteChar() throws Exception {
@@ -188,7 +173,7 @@ public class TestVoltCSVFormatter extends TestCase {
         builder.setFormatterFactory(o);
         Formatter formatter = builder.create();
 
-        Object[] results = formatter.transform("12,'10.05,test'");
+        Object[] results = formatter.transform(ByteBuffer.wrap("12,'10.05,test'".getBytes(StandardCharsets.UTF_8)));
         assertEquals(results.length, 2);
         assertEquals(results[0], "12");
         assertEquals(results[1], "10.05,test");
@@ -205,7 +190,7 @@ public class TestVoltCSVFormatter extends TestCase {
         builder.setFormatterFactory(o);
         Formatter formatter = builder.create();
 
-        Object[] results = formatter.transform("12,\"10.05,|\"test|\"\"");
+        Object[] results = formatter.transform(ByteBuffer.wrap("12,\"10.05,|\"test|\"\"".getBytes(StandardCharsets.UTF_8)));
         assertEquals(results.length, 2);
         assertEquals(results[0], "12");
         assertEquals(results[1], "10.05,\"test\"");
@@ -222,7 +207,7 @@ public class TestVoltCSVFormatter extends TestCase {
         builder.setFormatterFactory(o);
         Formatter formatter = builder.create();
 
-        Object[] results = formatter.transform("\"12\",\"10.05\",\"es\"");
+        Object[] results = formatter.transform(ByteBuffer.wrap("\"12\",\"10.05\",\"es\"".getBytes(StandardCharsets.UTF_8)));
         assertEquals(results.length, 3);
         assertEquals(results[0], "12");
         assertEquals(results[1], "10.05");
@@ -240,7 +225,7 @@ public class TestVoltCSVFormatter extends TestCase {
         builder.setFormatterFactory(o);
         Formatter formatter = builder.create();
 
-        Object[] results = formatter.transform("12,10.05,  test");
+        Object[] results = formatter.transform(ByteBuffer.wrap("12,10.05,  test".getBytes(StandardCharsets.UTF_8)));
         assertEquals(results.length, 3);
         assertEquals(results[0], "12");
         assertEquals(results[1], "10.05");
@@ -258,7 +243,7 @@ public class TestVoltCSVFormatter extends TestCase {
         builder.setFormatterFactory(o);
         Formatter formatter = builder.create();
 
-        Object[] results = formatter.transform("12,10.05,  test");
+        Object[] results = formatter.transform(ByteBuffer.wrap("12,10.05,  test".getBytes(StandardCharsets.UTF_8)));
         assertEquals(results.length, 3);
         assertEquals(results[0], "12");
         assertEquals(results[1], "10.05");
@@ -277,7 +262,7 @@ public class TestVoltCSVFormatter extends TestCase {
         Formatter formatter = builder.create();
 
         try {
-            Object[] results = formatter.transform("12,10.05,  test");
+            Object[] results = formatter.transform(ByteBuffer.wrap("12,10.05,  test".getBytes(StandardCharsets.UTF_8)));
             fail();
         } catch (RuntimeException e) {
         }
@@ -294,7 +279,7 @@ public class TestVoltCSVFormatter extends TestCase {
         builder.setFormatterFactory(o);
         Formatter formatter = builder.create();
 
-        Object[] results = formatter.transform("12の10.05のtest");
+        Object[] results = formatter.transform(ByteBuffer.wrap("12の10.05のtest".getBytes(StandardCharsets.UTF_8)));
         assertEquals(results.length, 3);
         assertEquals(results[0], "12");
         assertEquals(results[1], "10.05");
@@ -314,7 +299,7 @@ public class TestVoltCSVFormatter extends TestCase {
         Formatter formatter = builder.create();
 
         try {
-            Object[] results = formatter.transform("12,,test");
+            Object[] results = formatter.transform(ByteBuffer.wrap("12,,test".getBytes(StandardCharsets.UTF_8)));
             fail();
         } catch (RuntimeException e) {
         }
@@ -332,7 +317,7 @@ public class TestVoltCSVFormatter extends TestCase {
         builder.setFormatterFactory(o);
         Formatter formatter = builder.create();
 
-        Object[] results = formatter.transform("12,,test");
+        Object[] results = formatter.transform(ByteBuffer.wrap("12,,test".getBytes(StandardCharsets.UTF_8)));
         assertEquals(results.length, 3);
         assertEquals(results[0], "12");
         assertEquals(results[1], null);
@@ -351,7 +336,7 @@ public class TestVoltCSVFormatter extends TestCase {
         builder.setFormatterFactory(o);
         Formatter formatter = builder.create();
 
-        Object[] results = formatter.transform("12,empty,test");
+        Object[] results = formatter.transform(ByteBuffer.wrap("12,empty,test".getBytes(StandardCharsets.UTF_8)));
         assertEquals(results.length, 3);
         assertEquals(results[0], "12");
         assertEquals(results[1], null);
