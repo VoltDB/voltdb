@@ -13,7 +13,6 @@ class BuildContext:
         self.JNILIBFLAGS = ""
         self.JNIBINFLAGS = ""
         self.SOFLAGS = ""
-        self.SOEXT = ""
         self.IGNORE_SYS_PREFIXES = ()
         self.INPUT_PREFIX = ""
         self.THIRD_PARTY_INPUT_PREFIX = ""
