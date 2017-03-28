@@ -1,6 +1,9 @@
 <?xml version="1.0" ?>
-<project default="default" name="VoltDB">
+<project default="default" name="VoltDB"  xmlns:jacoco="antlib:org.jacoco.ant">
 
+    <taskdef uri="antlib:org.jacoco.ant" resource="org/jacoco/ant/antlib.xml">
+        <classpath path="third_party/java/jars/jacocoant.jar"/>
+    </taskdef>
 <!-- GENERAL HELPER MACROS -->
 <macrodef name="envdefault">
     <attribute name="prop" />
@@ -26,6 +29,7 @@
             includes="@{includes}"
             encoding='UTF-8'
             debug='true'
+            debuglevel="lines,vars,source"
             includeAntRuntime='false'>
             <classpath refid="project.classpath" />
         </javac>
@@ -733,7 +737,7 @@ DISTRIBUTION
             <include name="src/frontend/org/voltdb/VoltProcedure.java" />
             <include name="src/frontend/org/voltdb/SQLStmt.java" />
             <include name="src/frontend/org/voltdb/VoltType.java" />
-            <include name="src/frontend/org/voltdb/InProcessVoltDBServer.java" />
+            <include name="src/frontend/org/voltdb/ProcInfo.java" />
             <include name="src/frontend/org/voltdb/importer/AbstractImporter.java" />
             <include name="src/frontend/org/voltdb/importer/AbstractImporterFactory.java" />
             <include name="src/frontend/org/voltdb/importer/ImporterConfig.java" />
@@ -1201,6 +1205,7 @@ JAR BUILDING
             <include name="org/jctools_voltpatches/**" />
         </fileset>
         <fileset dir="${build.test.dir}" defaultexcludes="yes" >
+            <include name="org/voltdb/ServerThread.class" />
             <include name="org/voltdb/benchmark/*" />
             <include name="org/voltdb/regressionsuites/Local*" />
             <include name="org/voltdb/regressionsuites/MultiConfigSuiteBuilder.class" />
@@ -1733,6 +1738,7 @@ TEST CASES
             </filterchain>
         </loadresource>
 
+      <jacoco:coverage destfile="jacoco.exec">
         <!-- run ant's junit runner -->
         <junit
             fork="yes"
@@ -1752,6 +1758,7 @@ TEST CASES
             <!-- <jvmarg value="-Xcheck:jni" /> -->
             <jvmarg value="-Xmx256m"/>
             <jvmarg value="-XX:+HeapDumpOnOutOfMemoryError"/>
+            <!-- <jvmarg value="-javaagent:/tmp/jacoco/jacocoagent.jar"/> -->
             <!-- removed in java 8 <jvmarg value="-XX:-UseSplitVerifier"/> -->
             <env key="VERIFY_CATALOG_DEBUG" value="${verifycatalogdebug}"/>
             <env key="VOLTDB_BUILD_DIR" value="${build.dir}"/>
@@ -1800,6 +1807,7 @@ TEST CASES
 
             <assertions><enable/></assertions>
         </junit>
+    </jacoco:coverage>
 
         <!-- per-test post processing script
              1. ensure a result xml file got written
