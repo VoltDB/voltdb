@@ -742,8 +742,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 System.exit(-1);
             }
 
-            // print the ascii art!
-            consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_StartupString.name(), null);
+            // print the ascii art! But not for init.
+            if (config.m_startAction != StartAction.INITIALIZE) {
+                consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_StartupString.name(), null);
+            }
 
             // load license API
             if (config.m_pathToLicense == null) {

@@ -475,10 +475,10 @@ public class ClientConfig {
      * Configure trust store
      *
      * @param propFN property file name containing trust store properties:
-     * <p><ul>
+     * <ul>
      * <li>{@code trustStore} trust store file specification
      * <li>{@code trustStorePassword} trust store password
-     * </ul><p>
+     * </ul>
      */
     public void setTrustStoreConfigFromPropertyFile(String propFN) {
         File propFD = new File(propFN != null && !propFN.trim().isEmpty() ? propFN : "");
