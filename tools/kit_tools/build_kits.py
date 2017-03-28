@@ -64,14 +64,6 @@ def makeReleaseDir(releaseDir):
 
 
 ################################################
-# SEE IF HAS ZIP TARGET
-###############################################
-def versionHasZipTarget():
-    with settings(warn_only=True):
-        with cd(os.path.join(builddir,'pro')):
-                return run("ant -p -f mmt.xml | grep dist.pro.zip")
-
-################################################
 # BUILD THE COMMUNITY VERSION
 ################################################
 
@@ -128,14 +120,12 @@ def buildRabbitMQExport(version):
         run("git status")
         run("git describe --dirty", warn_only=True)
         run("VOLTDIST=../pro/obj/pro/voltdb-ent-%s ant" % version)
-    # Repackage the pro tarball and zip file with the RabbitMQ connector Jar
+    # Repackage the pro tarball with the RabbitMQ connector Jar
     with cd("%s/pro/obj/pro" % builddir):
         run("pwd")
         run("gunzip voltdb-ent-%s.tar.gz" % version)
         run("tar uvf voltdb-ent-%s.tar voltdb-ent-%s/lib/extension/voltdb-rabbitmq.jar" % (version, version))
-        if versionHasZipTarget():
-            run("gzip voltdb-ent-%s.tar" % version)
-            run("zip -r voltdb-ent-%s.zip voltdb-ent-%s" % (version, version))
+        run("gzip voltdb-ent-%s.tar" % version)
 
 ################################################
 # MAKE AN ENTERPRISE TRIAL LICENSE
@@ -145,14 +135,6 @@ def buildRabbitMQExport(version):
 def makeTrialLicense(days=30, dr_and_xdcr="true", nodes=12):
     with cd(builddir + "/pro/tools"):
         run("./make_trial_licenses.pl -t %d -H %d -W %s" % (days, nodes, dr_and_xdcr ))
-
-################################################
-# MAKE AN ENTERPRISE ZIP FILE FOR SOME PARTNER UPLOAD SITES
-################################################
-
-def makeEnterpriseZip():
-    with cd(builddir + "/pro"):
-        run("VOLTCORE=../voltdb ant -f mmt.xml dist.pro.zip")
 
 ################################################
 # MAKE AN JAR FILES NEEDED TO PUSH TO MAVEN
@@ -188,10 +170,6 @@ def copyCommunityFilesToReleaseDir(releaseDir, version, operatingsys):
 def copyTrialLicenseToReleaseDir(releaseDir):
     get("%s/pro/trial_*.xml" % (builddir),
         "%s/license.xml" % (releaseDir))
-
-def copyEnterpriseZipToReleaseDir(releaseDir, version, operatingsys):
-    get("%s/pro/obj/pro/voltdb-ent-%s.zip" % (builddir, version),
-        "%s/voltdb-ent-%s.zip" % (releaseDir, version))
 
 def copyMavenJarsToReleaseDir(releaseDir, version):
     #The .jars and upload file must be in a directory called voltdb - it is the projectname
@@ -349,9 +327,6 @@ try:
         copyFilesToReleaseDir(releaseDir, versionCentos, "pro")
         makeTrialLicense()
         copyTrialLicenseToReleaseDir(releaseDir)
-        if versionHasZipTarget():
-            makeEnterpriseZip()
-            copyEnterpriseZipToReleaseDir(releaseDir, versionCentos, "LINUX")
         makeMavenJars()
         copyMavenJarsToReleaseDir(releaseDir, versionCentos)
 
