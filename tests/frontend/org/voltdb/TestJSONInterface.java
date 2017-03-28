@@ -2069,7 +2069,7 @@ public class TestJSONInterface extends TestCase {
             server.waitForInitialization();
 
             //Get exportTypes
-            String json = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment/export/type", null, null, null, 200,  "application/json");
+            String json = getUrlOverJSON(protocolPrefix + "localhost:8095/deployment/export/types", null, null, null, 200,  "application/json");
             JSONObject jobj = new JSONObject(json);
             assertTrue(jobj.getString("types").contains("FILE"));
             assertTrue(jobj.getString("types").contains("JDBC"));
@@ -2231,7 +2231,7 @@ public class TestJSONInterface extends TestCase {
                     "localhost:8095/deployment/download/invalid",
                     "localhost:8095/deployment/export",
                     "localhost:8095/deployment/export/invalid",
-                    "localhost:8095/deployment/export/type/invalid",
+                    "localhost:8095/deployment/export/types/invalid",
                     "localhost:8095/profile/invalid",
                     "localhost:8095/api",
                     "localhost:8095/api/1.0/invalid",
@@ -2304,7 +2304,7 @@ public class TestJSONInterface extends TestCase {
             checkJSONPHandling("DELETE", protocolPrefix + "localhost:8095/deployment/users/foo", "application/json", null);
 
             // Get exportTypes
-            checkJSONPHandling("GET", protocolPrefix + "localhost:8095/deployment/export/type", "application/json", null);
+            checkJSONPHandling("GET", protocolPrefix + "localhost:8095/deployment/export/types", "application/json", null);
 
             // Get profile
             checkJSONPHandling("GET", protocolPrefix + "localhost:8095/profile", "application/json", null);
