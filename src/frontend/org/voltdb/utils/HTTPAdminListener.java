@@ -539,7 +539,7 @@ public class HTTPAdminListener {
                     } else {
                         handleGetUsers(jsonp, target, baseRequest, request, response);
                     }
-                } else if (target.equals("/export/type/")) {
+                } else if (target.equals("/export/types/")) {
                     handleGetExportTypes(jsonp, response);
                 } else if (target.equals("/")) { // just deployment
                     if (request.getMethod().equalsIgnoreCase("POST")) {

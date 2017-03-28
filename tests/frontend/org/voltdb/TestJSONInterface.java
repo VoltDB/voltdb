@@ -2014,7 +2014,7 @@ public class TestJSONInterface extends TestCase {
             server.waitForInitialization();
 
             //Get exportTypes
-            String json = getUrlOverJSON("http://localhost:8095/deployment/export/type", null, null, null, 200,  "application/json");
+            String json = getUrlOverJSON("http://localhost:8095/deployment/export/types", null, null, null, 200,  "application/json");
             JSONObject jobj = new JSONObject(json);
             assertTrue(jobj.getString("types").contains("FILE"));
             assertTrue(jobj.getString("types").contains("JDBC"));
