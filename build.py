@@ -136,10 +136,6 @@ if CTX.PROFILE:
 CTX.SRC_INCLUDE_DIRS += ['src/ee' ]
 CTX.SYSTEM_DIRS = ['third_party/cpp']
 
-# don't worry about checking for changes in header files in the following
-#  directories
-CTX.IGNORE_SYS_PREFIXES = ['/usr/include', '/usr/lib', 'third_party']
-
 # where to find the source
 CTX.INPUT_PREFIX = "src/ee/"
 

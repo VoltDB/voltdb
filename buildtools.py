@@ -13,7 +13,6 @@ class BuildContext:
         self.JNILIBFLAGS = ""
         self.JNIBINFLAGS = ""
         self.SOFLAGS = ""
-        self.IGNORE_SYS_PREFIXES = ()
         self.INPUT_PREFIX = ""
         self.THIRD_PARTY_INPUT_PREFIX = ""
         self.OUTPUT_PREFIX = ""
@@ -369,7 +368,6 @@ def buildMakefile(CTX):
     THIRD_PARTY_INPUT_PREFIX = CTX.THIRD_PARTY_INPUT_PREFIX.rstrip("/")
     OUTPUT_PREFIX = CTX.OUTPUT_PREFIX.rstrip("/")
     TEST_PREFIX = CTX.TEST_PREFIX.rstrip("/")
-    IGNORE_SYS_PREFIXES = CTX.IGNORE_SYS_PREFIXES
     JNIEXT = CTX.JNIEXT.strip()
     NM = CTX.NM
     NMFLAGS = CTX.NMFLAGS
