@@ -6,7 +6,7 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.convert.ConverterRule;
 import org.apache.calcite.rel.logical.LogicalProject;
 import org.voltdb.calciteadapter.VoltDBConvention;
-import org.voltdb.calciteadapter.rel.VoltDBProject;
+import org.voltdb.calciteadapter.rel.VoltDBPartitionedTableScan;
 
 public class VoltDBPartitionedTableScanRule extends ConverterRule {
     static final VoltDBPartitionedTableScanRule INSTANCE = new VoltDBPartitionedTableScanRule();
@@ -18,7 +18,7 @@ public class VoltDBPartitionedTableScanRule extends ConverterRule {
 
     @Override
     public RelNode convert(RelNode rel) {
-      final VoltDBPartitionedTableScan scan = rel;
+      final VoltDBPartitionedTableScan scan = (VoltDBPartitionedTableScan)rel;
       return rel;
     }
 
