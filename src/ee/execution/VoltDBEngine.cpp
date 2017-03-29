@@ -248,7 +248,7 @@ VoltDBEngine::initialize(int32_t clusterIndex,
         SynchronizedThreadLock::init(sitesPerHost);
         if (createDrReplicatedStream) {
             mpEngineLocals = EngineLocals();
-            VOLT_DEBUG("Initializing mp partition with context %p", mpEngineLocal.context);
+            VOLT_DEBUG("Initializing mp partition with context %p", mpEngineLocals.context);
         }
     }
     pthread_mutex_unlock(&sharedEngineMutex);
@@ -1605,6 +1605,9 @@ void VoltDBEngine::initMaterializedViewsAndLimitDeletePlans(bool updateReplicate
     // walk tables
     BOOST_FOREACH (LabeledTable labeledTable, m_database->tables()) {
         auto catalogTable = labeledTable.second;
+        if (catalogTable->isreplicated() ^ updateReplicated) {
+            continue;
+        }
         Table *table = m_tables[catalogTable->relativeIndex()];
         PersistentTable *persistentTable = dynamic_cast<PersistentTable*>(table);
         if (persistentTable != NULL) {
