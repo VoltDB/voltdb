@@ -1,9 +1,10 @@
 <?xml version="1.0" ?>
-<project default="default" name="VoltDB"  xmlns:jacoco="antlib:org.jacoco.ant">
+<!-- <project default="default" name="VoltDB"  xmlns:jacoco="antlib:org.jacoco.ant"> -->
+<project default="default" name="VoltDB">
 
-    <taskdef uri="antlib:org.jacoco.ant" resource="org/jacoco/ant/antlib.xml">
-        <classpath path="third_party/java/jars/jacocoant.jar"/>
-    </taskdef>
+    <!--    <taskdef uri="antlib:org.jacoco.ant" resource="org/jacoco/ant/antlib.xml"> -->
+        <!--    <classpath path="third_party/java/jars/jacocoant.jar"/> -->
+        <!-- </taskdef> -->
 <!-- GENERAL HELPER MACROS -->
 <macrodef name="envdefault">
     <attribute name="prop" />
@@ -1738,7 +1739,7 @@ TEST CASES
             </filterchain>
         </loadresource>
 
-      <jacoco:coverage destfile="jacoco.exec">
+        <!-- <jacoco:coverage destfile="jacoco.exec"> -->
         <!-- run ant's junit runner -->
         <junit
             fork="yes"
@@ -1758,7 +1759,7 @@ TEST CASES
             <!-- <jvmarg value="-Xcheck:jni" /> -->
             <jvmarg value="-Xmx256m"/>
             <jvmarg value="-XX:+HeapDumpOnOutOfMemoryError"/>
-            <!-- <jvmarg value="-javaagent:/tmp/jacoco/jacocoagent.jar"/> -->
+            <jvmarg value="-javaagent:/tmp/jacoco/jacocoagent.jar"/>
             <!-- removed in java 8 <jvmarg value="-XX:-UseSplitVerifier"/> -->
             <env key="VERIFY_CATALOG_DEBUG" value="${verifycatalogdebug}"/>
             <env key="VOLTDB_BUILD_DIR" value="${build.dir}"/>
@@ -1807,7 +1808,7 @@ TEST CASES
 
             <assertions><enable/></assertions>
         </junit>
-    </jacoco:coverage>
+    <!-- </jacoco:coverage> -->
 
         <!-- per-test post processing script
              1. ensure a result xml file got written
