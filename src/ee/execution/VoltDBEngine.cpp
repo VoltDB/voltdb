@@ -247,6 +247,7 @@ VoltDBEngine::initialize(int32_t clusterIndex,
         VOLT_DEBUG("Initializing partition %d with context %p", m_partitionId, m_executorContext);
         SynchronizedThreadLock::init(sitesPerHost);
         if (createDrReplicatedStream) {
+            // The site thread that has the lowest siteId gets to create DR replicated stream
             mpEngineLocals = EngineLocals();
             VOLT_DEBUG("Initializing mp partition with context %p", mpEngineLocals.context);
         }

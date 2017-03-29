@@ -63,9 +63,7 @@ void SynchronizedThreadLock::waitForLastSiteFinished()
 {
     pthread_mutex_lock(&sharedEngineMutex);
     globalTxnEndCountdownLatch++;
-    while (globalTxnEndCountdownLatch != 0) {
-        pthread_cond_wait(&sharedEngineCondition, &sharedEngineMutex);
-    }
+    pthread_cond_wait(&sharedEngineCondition, &sharedEngineMutex);
     pthread_mutex_unlock(&sharedEngineMutex);
 }
 }

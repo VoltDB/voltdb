@@ -63,8 +63,7 @@ ThreadLocalPool::ThreadLocalPool() {
 }
 
 ThreadLocalPool::~ThreadLocalPool() {
-    PairTypePtr p =
-            static_cast<PairTypePtr>(pthread_getspecific(m_key));
+    PairTypePtr p = static_cast<PairTypePtr>(pthread_getspecific(m_key));
     assert(p != NULL);
     if (p != NULL) {
         if (p->first == 1) {
@@ -77,7 +76,7 @@ ThreadLocalPool::~ThreadLocalPool() {
         } else {
             pthread_setspecific( m_key, new PairType( p->first - 1, p->second));
         }
-            delete p;
+        delete p;
     }
 }
 
