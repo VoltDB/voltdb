@@ -173,8 +173,8 @@ public:
      * @exception std::runtime_error When failed to dump.
      */
     void dump(std::ostream& os) const throw(std::runtime_error){
-        os.write((char*)&b_, sizeof(b_));
-        os.write((char*)&M_[0], sizeof(M_[0]) * M_.size());
+        os.write((const char*)&b_, sizeof(b_));
+        os.write((const char*)&M_[0], sizeof(M_[0]) * M_.size());
         if(os.fail()){
             throw std::runtime_error("Failed to dump");
         }
