@@ -41,6 +41,8 @@ OPTION(VOLTDB_USE_PROFILING "Build for profiling analysis" OFF)
 IF (NOT DEFINED VOLTDB_BUILD_TYPE)
   MESSAGE (FATAL ERROR "VOLTDB_BUILD_TYPE is not defined.")
 ENDIF ()
+MESSAGE ("CMAKE_SOURCE_DIR: ${CMAKE_SOURCE_DIR}")
+MESSAGE ("CMAKE_BINARY_DIR: ${CMAKE_BINARY_DIR}")
 ########################################################################
 #
 # Names of folders in the tree
@@ -52,6 +54,7 @@ SET (VOLTDB_EE_SRC_DIR src/ee)
 SET (VOLTDB_THIRD_PARTY_CPP_DIR third_party/cpp)
 # This is where we install third party artifacts.
 SET (VOLTDB_THIRD_PARTY_INSTALL_DIR ${CMAKE_BINARY_DIR}/3pty-install)
+SET (VOLTDB_THIRD_PARTY_INCLUDE_DIR ${VOLTDB_THIRD_PARTY_INSTALL_DIR}/include)
 # This where we build most third party artifacts.  OpenSSL is different.
 SET (VOLTDB_THIRD_PARTY_OBJ_DIR ${CMAKE_BINARY_DIR}/3pty-obj)
 # We keep pcre2 in a tarball, since we don't actually make
@@ -62,7 +65,7 @@ SET (VOLTDB_TARBALLS ${CMAKE_SOURCE_DIR}/${VOLTDB_THIRD_PARTY_CPP_DIR}/tarballs)
 EXECUTE_PROCESS(COMMAND cat ${CMAKE_SOURCE_DIR}/version.txt OUTPUT_VARIABLE VOLTDB_VERSION)
 
 # Set the log level.
-SET (VOLT_LOG_LEVEL 500 "Log Level")
+SET (VOLT_LOG_LEVEL 500)
 
 ########################################################################
 #  calculate the compiler versions, and the options needed
@@ -89,44 +92,67 @@ SET (VOLT_LOG_LEVEL 500 "Log Level")
 # will build and run correctly.
 #
 ########################################################################
+MESSAGE ("SYSTEM VERSION: ${CMAKE_SYSTEM}")
+MESSAGE ("COMPILER VERSION: ${CMAKE_CXX_COMPILER_VERSION}")
+SET (VOLTDB_COMPILER_U17p04 "6.3.0")
+SET (VOLTDB_COMPILER_U16p10 "6.2.0")
+SET (VOLTDB_COMPILER_U16p04 "5.4.0")
+SET (VOLTDB_COMPILER_U15p10 "5.2.1")
+SET (VOLTDB_COMPILER_U15p04 "4.9.2")
+SET (VOLTDB_COMPILER_U14p04 "4.8.4")
+SET (VOLTDB_COMPILER_C7     "4.8.5")
+SET (VOLTDB_COMPILER_12p04  "4.6.3")
+SET (VOLTDB_COMPILER_C6     "4.4.7")
+SET (VOLTDB_COMPILER_OLDE   "4.4.0")
 IF (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   SET (VOLTDB_LINK_FLAGS "${VOLTDB_LINK_FLAGS} -rdynamic ")
   ADD_COMPILE_OPTIONS(-pthread -Wno-deprecated-declarations  -Wno-unknown-pragmas)
-  if ( CMAKE_CXX_COMPILER_VERSION VERSION_LESS "4.4.7" )
-    # < C6 compiler
-    MESSAGE (FATAL_ERROR "GCC Version ${CMAKE_CXX_COMPILER_VERSION} is too old to build VoltDB.  Try at least 4.4.7.")
-  ELSEIF ( NOT ("4.6.3" VERSION_GREATER CMAKE_CXX_COMPILER_VERSION ) )
-    # >= the C6 compiler, but < the U14.04 and C7 compilers.
-    # -std=c++0x
-    SET (CXX_VERSION_FLAG -std=c++0x)
-  ELSEIF ( NOT ("4.8.5" VERSION_GREATER CMAKE_CXX_COMPILER_VERSION ) )
-    # >= the U14.04 and C7 compilers, but LT  U15.04
+  # It turns out to be easier to go from a higher version to a lower
+  # version, since we can't easily test <= and >=.
+  IF ( CMAKE_CXX_COMPILER_VERSION VERSION_GREATER VOLTDB_COMPILER_U17p04 )
+    # COMPILER_VERSION > 6.3.0
+    MESSAGE ("GCC Version ${CMAKE_CXX_COMPILER_VERSION} is not verified for building VoltDB.")
+    MESSAGE ("We're using the options for 6.2.0, which is the newest one we've tried.  Good Luck.")
+    ADD_COMPILE_OPTIONS(-Wno-unused-local-typedefs )
+    SET (CXX_VERSION_FLAG -std=c++11)
+  ELSEIF (CMAKE_CXX_COMPILER_VERSION VERSION_GREATER VOLTDB_COMPILER_U16p10)
+    # 6.2.0 < COMPILER_VERSION and COMPILER_VERSION <= 6.3.0
+    MESSAGE("Using the Ubuntu 17.04 compiler settings for gcc ${CMAKE_CXX_COMPILER_VERSION}")
+    ADD_COMPILE_OPTIONS(-Wno-unused-local-typedefs )
+    SET (CXX_VERSION_FLAG -std=c++11)
+  ELSEIF ( CMAKE_CXX_COMPILER_VERSION VERSION_GREATER VOLTDB_COMPILER_U16p04 )
+    # 5.4.0 < COMPILER_VERSION and COMPILER_VERSION <= 6.2.0
+    MESSAGE("Using the Ubuntu 16.10 compiler settings for gcc ${CMAKE_CXX_COMPILER_VERSION}")
+    ADD_COMPILE_OPTIONS(-Wno-unused-local-typedefs )
+    SET (CXX_VERSION_FLAG -std=c++11)
+  ELSEIF ( CMAKE_CXX_COMPILER_VERSION VERSION_GREATER VOLTDB_COMPILER_U15p10 )
+    # 5.2.1 < COMPILER_VERSION and COMPILER_VERSION <= 5.4.0
+    MESSAGE("Using the Ubuntu 16.04 compiler settings for gcc ${CMAKE_CXX_COMPILER_VERSION}")
+    ADD_COMPILE_OPTIONS( -Wno-unused-local-typedefs )
+    SET (CXX_VERSION_FLAG -std=c++11)
+  ELSEIF ( CMAKE_CXX_COMPILER_VERSION VERSION_GREATER VOLTDB_COMPILER_U15p04  )
+    # 4.9.2 < COMPILER_VERSION and COMPILER_VERSION <= 5.2.1
+    MESSAGE("Using the Ubuntu 15.10 compiler settings for gcc ${CMAKE_CXX_COMPILER_VERSION}")
+    ADD_COMPILE_OPTIONS( -Wno-unused-local-typedefs )
+    SET (CXX_VERSION_FLAG -std=c++11)
+  ELSEIF ( CMAKE_CXX_COMPILER_VERSION VERSION_GREATER VOLTDB_COMPILER_U14p04 )
+    # 4.8.4 < COMPILER_VERSION and COMPILER_VERSION <= 4.9.2
+    # Note that U14.04 and C7 are different versions, but equivalent
+    # for our needs here.
+    # Nothing special added to the compile flags.
+    MESSAGE("Using the Ubuntu 15.04 compiler settings for gcc ${CMAKE_CXX_COMPILER_VERSION}")
     ADD_COMPILE_OPTIONS(-Wno-unused-but-set-variable -Wno-unused-local-typedefs -Wno-float-conversion -Wno-conversion)
     SET (CXX_VERSION_FLAG -std=c++11)
-  ELSEIF ( NOT ("4.9.2" VERSION_GREATER CMAKE_CXX_COMPILER_VERSION ) )
-    # >= C7 and U15.04 but < U15.10
-    ADD_COMPILE_OPTIONS(-Wno-unused-but-set-variable -Wno-unused-local-typedefs )
-    SET (CXX_VERSION_FLAG -std=c++11)
-  ELSEIF ( NOT ("5.2.1" VERSION_GREATER CMAKE_CXX_COMPILER_VERSION ) )
-    # >= U15.10 but < U16.04
-    ADD_COMPILE_OPTIONS(-Wno-unused-local-typedefs )
-    SET (CXX_VERSION_FLAG -std=c++11)
-  ELSEIF ( NOT ("5.4.0" VERSION_GREATER CMAKE_CXX_COMPILER_VERSION ) )
-    # >= U16.04 but < U16.10
-    ADD_COMPILE_OPTIONS(-Wno-unused-local-typedefs )
-    SET (CXX_VERSION_FLAG -std=c++11)
-  ELSEIF ( NOT ("6.2.0" VERSION_GREATER CMAKE_CXX_COMPILER_VERSION ) )
-    # >= U16.10 but < U17.04
-    ADD_COMPILE_OPTIONS(-Wno-unused-local-typedefs )
-    SET (CXX_VERSION_FLAG -std=c++11)
-  ELSE ()
-    if ( "6.3.0" < CMAKE_CXX_COMPILER_VERSION )
-      MESSAGE ("GCC Version ${CMAKE_CXX_COMPILER_VERSION} is not verified for building VoltDB.")
-      MESSAGE ("We're using the options for 6.3.0, which is the newest one we've tried.  Good Luck.")
-    ENDIF ()
-    ADD_COMPILE_OPTIONS(-Wno-unused-local-typedefs )
-    SET (CXX_VERSION_FLAG -std=c++11)
-  ENDIF ()
+  ELSEIF ( CMAKE_CXX_COMPILER_VERSION VERSION_GREATER VOLTDB_COMPILER_CXX0X)
+    # 4.6.0 < COMPILER_VERSION and COMPILER_VERSION <= 4.8.4
+    # Use -std=c++0x.  This is in GCC's experimental C++11 compiler
+    # support region.
+    MESSAGE("Using the Centos 6 settings for ${CMAKE_CXX_COMPILER_VERSION}")
+    ADD_COMPILE_OPTIONS(-Wno-unused-but-set-variable -Wno-unused-local-typedefs -Wno-float-conversion -Wno-conversion)
+    SET (CXX_VERSION_FLAG -std=c++0x)
+  ELSE()
+    message(FATAL_ERROR "GNU Compiler version ${CMAKE_CXX_COMPILER_VERSION} is too old to build VoltdB.  Try at least 4.4.7.")
+  ENDIF()
 ELSEIF (CMAKE_CXX_COMPILER_ID STREQUAL "CLANG")
   # All clang is C++11.
   SET (CXX_VERSION_FLAG -std=c++11)
@@ -155,9 +181,9 @@ SET (VOLTDB_OPENSSL_TARBALL ${VOLTDB_TARBALLS}/${VOLTDB_OPENSSL_NAME}.tgz)
 SET (VOLTDB_OPENSSL_PREFIX ${VOLTDB_THIRD_PARTY_OBJ_DIR}/openssl)
 ExternalProject_Add(libcrypto
   PREFIX ${VOLTDB_OPENSSL_PREFIX}
-  URL ${VOLTDB_TARBALLS}/openssl.tgz
+  URL ${VOLTDB_OPENSSL_TARBALL}
   SOURCE_DIR ${VOLTDB_OPENSSL_PREFIX}/${VOLTDB_OPENSSL_NAME}
-  BUILD_DIR ${VOLTDB_OPENSSL_PREFIX}/${VOLTDB_OPENSSL_NAME}
+  BINARY_DIR ${VOLTDB_OPENSSL_PREFIX}/${VOLTDB_OPENSSL_NAME}
   CONFIGURE_COMMAND ./config --prefix=${VOLTDB_THIRD_PARTY_INSTALL_DIR}
   BUILD_COMMAND make
   INSTALL_COMMAND make install)
@@ -168,21 +194,19 @@ ExternalProject_Add(libcrypto
 #
 ########################################################################
 SET (VOLTDB_LIBS2GEO ${VOLTDB_THIRD_PARTY_INSTALL_DIR}/lib/libs2geo.a)
-SET (VOLTDB_S2GEO_SRC   ${VOLTDB_THIRD_PARTY_CPP_DIR}/google-s2-geometry)
+SET (VOLTDB_S2GEO_SRC ${VOLTDB_THIRD_PARTY_CPP_DIR}/google-s2-geometry)
 SET (VOLTDB_S2GEO_OBJ ${VOLTDB_THIRD_PARTY_OBJ_DIR}/google-s2-geometry)
 SET (VOLTDB_S2GEO_CMAKE_CONFIG
   -DCXX_VERSION_FLAG=${CXX_VERSION_FLAG}
-  -DVOLTDB_THIRD_PARTY_CPP_DIR=${VOLTDB_THIRD_PARTY_CPP_DIR}
+  -DVOLTDB_THIRD_PARTY_CPP_DIR=${CMAKE_SOURCE_DIR}/${VOLTDB_THIRD_PARTY_CPP_DIR}
   -DCMAKE_INSTALL_PREFIX=${VOLTDB_THIRD_PARTY_INSTALL_DIR}
   -DCMAKE_BUILD_TYPE=${VOLTDB_BUILD_TYPE})
 SET (VOLTDB_S2GEO_PREFIX ${VOLTDB_THIRD_PARTY_OBJ_DIR})
-SET (VOLTDB_S2GEO_SRC ${VOLTDB_THIRD_PARTY_CPP_DIR}/google-s2-geometry)
-SET (VOLTDB_S2GEO_OBJ ${VOLTDB_THIRD_PARTY_OBJ_DIR}/google-s2-geometry)
 ExternalProject_Add(libs2geo
   PREFIX ${VOLTDB_S2GEO_PREFIX}
-  SOURCE_DIR ${VOLTDB_S2GEO_SRC}
+  SOURCE_DIR ${CMAKE_SOURCE_DIR}/${VOLTDB_S2GEO_SRC}
   CMAKE_ARGS ${VOLTDB_S2GEO_CMAKE_CONFIG}
-  BUILD_DIR ${VOLTDB_S2GEO_OBJ}
+  BINARY_DIR ${VOLTDB_S2GEO_OBJ}
   INSTALL_COMMAND make install)
 ########################################################################
 #
@@ -203,7 +227,7 @@ ExternalProject_Add(pcre2
   PREFIX ${VOLTDB_PCRE2_PREFIX}
   URL ${VOLTDB_PCRE2_TARBALL}
   SOURCE_DIR ${VOLTDB_PCRE2_SRC}
-  BUILD_DIR ${VOLTDB_PCRE2_OBJ}
+  BINARY_DIR ${VOLTDB_PCRE2_OBJ}
   CONFIGURE_COMMAND ${VOLTDB_PCRE2_SRC}/configure -disable-shared --prefix=${VOLTDB_THIRD_PARTY_INSTALL_DIR}
   BUILD_COMMAND make
   INSTALL_COMMAND make install)
@@ -230,6 +254,15 @@ ADD_COMPILE_OPTIONS(
   -DVOLT_LOG_LEVEL=${VOLT_LOG_LEVEL}
 )
 
+MESSAGE("SYSTEM NAME: ${CMAKE_SYSTEM_NAME}")
+IF ( ${CMAKE_SYSTEM_NAME} STREQUAL "Linux" )
+  ADD_COMPILE_OPTIONS(-Wno-attributes -Wcast-align -DLINUX -fpic)
+  SET (VOLTDB_NM_OPTIONS "-n --demangle")
+ELSEIF( ${CMAKE_SYSTEM_NAME} STREQUAL "Darwin" )
+  SET (VOLTDB_NM_OPTIONS "-n")
+ELSE()
+  MESSAGE(FATAL_ERROR "System nameed ${CMAKE_SYSTEM_NAME} is unknown")
+ENDIF()
 
 # Set coverage and profiling options
 IF ( ${VOLTDB_USE_COVERAGE} )
@@ -398,25 +431,30 @@ SET (VOLTDB_SRC
   ${VOLTDB_EE_SRC_DIR}/logging/LogManager.cpp
 )
 
-SET (THIRD_PARTY_SRC
-  ${VOLTDB_THIRD_PARTY_CPP_DIR}/${VOLTDB_THIRD_PARTY_CPP_DIR}/jsoncpp/jsoncpp.cpp
-  ${VOLTDB_THIRD_PARTY_CPP_DIR}/${VOLTDB_THIRD_PARTY_CPP_DIR}/crc/crc32c.cc
-  ${VOLTDB_THIRD_PARTY_CPP_DIR}/${VOLTDB_THIRD_PARTY_CPP_DIR}/crc/crc32ctables.cc
-  ${VOLTDB_THIRD_PARTY_CPP_DIR}/${VOLTDB_THIRD_PARTY_CPP_DIR}/murmur3/MurmurHash3.cpp
-  ${VOLTDB_THIRD_PARTY_CPP_DIR}/${VOLTDB_THIRD_PARTY_CPP_DIR}/sha1/sha1.cpp
+SET (VOLTDB_THIRD_PARTY_SRC
+  ${VOLTDB_THIRD_PARTY_CPP_DIR}/jsoncpp/jsoncpp.cpp
+  ${VOLTDB_THIRD_PARTY_CPP_DIR}/crc/crc32c.cc
+  ${VOLTDB_THIRD_PARTY_CPP_DIR}/crc/crc32ctables.cc
+  ${VOLTDB_THIRD_PARTY_CPP_DIR}/murmur3/MurmurHash3.cpp
+  ${VOLTDB_THIRD_PARTY_CPP_DIR}/sha1/sha1.cpp
 )
 
+MESSAGE("VOLTDB_SRC: ${VOLTDB_SRC}")
+MESSAGE("VOLTDB_THIRD_PARTY_SRC: ${VOLTDB_THIRD_PARTY_SRC}")
+
 ADD_LIBRARY(voltdbobjs OBJECT ${VOLTDB_SRC})
-ADD_LIBRARY(third_party_objs OBJECT ${THIRD_PARTY_SRC})
+ADD_LIBRARY(third_party_objs OBJECT ${VOLTDB_THIRD_PARTY_SRC})
 
-message("VOLTDB_EE_SRC_DIR: ${VOLTDB_EE_SRC_DIR}")
-message("VOLTDB_THIRD_PARTY_CPP_DIR: ${VOLTDB_THIRD_PARTY_CPP_DIR}")
-TARGET_INCLUDE_DIRECTORIES(voltdbobjs
-  ${CMAKE_SOURCE_DIR}/${VOLTDB_EE_SRC_DIR}
+MESSAGE("VOLTDB_EE_SRC_DIR: ${VOLTDB_EE_SRC_DIR}")
+MESSAGE("VOLTDB_THIRD_PARTY_CPP_DIR: ${VOLTDB_THIRD_PARTY_CPP_DIR}")
+TARGET_INCLUDE_DIRECTORIES(voltdbobjs PRIVATE
+  ${VOLTDB_EE_SRC_DIR}
+  ${VOLTDB_THIRD_PARTY_CPP_DIR}
+  ${VOLTDB_THIRD_PARTY_INCLUDE_DIR})
+TARGET_INCLUDE_DIRECTORIES(third_party_objs
+  SYSTEM PRIVATE
   ${CMAKE_SOURCE_DIR}/${VOLTDB_THIRD_PARTY_CPP_DIR})
-TARGET_INCLUDE_DIRECTORIES(third_party_objs SYSTEM ${VOLTDB_THIRD_PARTY_CPP_DIR})
 
-TARGET_COMPILE_OPTIONS(voltdbobjs ${VOLTDB_EE_OPTS})
-TARGET_COMPILE_OPTIONS(third_party_objs ${THIRD_PARTY_SRC})
-
-ADD_DEPENDENCIES(s2geo libcrypto)
+ADD_DEPENDENCIES(voltdbobjs libs2geo)
+TARGET_COMPILE_OPTIONS(voltdbobjs PUBLIC ${VOLTDB_EE_OPTS})
+TARGET_COMPILE_OPTIONS(third_party_objs PUBLIC ${THIRD_PARTY_SRC})

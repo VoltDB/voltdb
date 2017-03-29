@@ -93,7 +93,6 @@ if CTX.PROFILE:
 # GCC 4.4 up to but not including 4.7 use -std=c++0x
 # GCC 4.7 and later use -std=c++11
 # Clang uses -std=c++11
-# This should match the calculation in CMakeLists.txt
 if CTX.compilerName() == 'gcc':
     if (CTX.compilerMajorVersion() < 4) \
         or ((CTX.compilerMajorVersion() == 4) \
