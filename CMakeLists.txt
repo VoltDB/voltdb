@@ -116,7 +116,8 @@ SET (VOLTDB_COMPILER_12p04  "4.6.3")
 SET (VOLTDB_COMPILER_C6     "4.4.7")
 SET (VOLTDB_COMPILER_OLDE   "4.4.0")
 IF (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-  SET (VOLTDB_LINK_FLAGS "${VOLTDB_LINK_FLAGS} -rdynamic ")
+  SET (VOLTDB_LINK_FLAGS ${VOLTDB_LINK_FLAGS} -pthread)
+  SET (VOLTDB_IPC_LINK_FLAGS ${VOLTDB_LIB_LINK_FLAGS} -rdynamic)
   ADD_COMPILE_OPTIONS(-pthread -Wno-deprecated-declarations  -Wno-unknown-pragmas)
   # It turns out to be easier to go from a higher version to a lower
   # version, since we can't easily test <= and >=.
@@ -179,6 +180,45 @@ ENDIF ()
 
 ADD_COMPILE_OPTIONS(${CXX_VERSION_FLAG})
 
+MESSAGE("SYSTEM NAME: ${CMAKE_SYSTEM_NAME}")
+IF ( ${CMAKE_SYSTEM_NAME} STREQUAL "Linux" )
+  ADD_COMPILE_OPTIONS(-Wno-attributes -Wcast-align -DLINUX -fpic)
+  SET (VOLTDB_NM_OPTIONS "-n --demangle")
+  IF (${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU")
+    SET (VOLTDB_OPENSSL_TOKEN "linux-x86_64:gcc -fpic")
+  ELSE()
+    MESSAGE(FATAL_ERROR "Compiler family ${CMAKE_CXX_COMPILER_ID} is not supported when building VoltDB.")
+  ENDIF()
+ELSEIF( ${CMAKE_SYSTEM_NAME} STREQUAL "Darwin" )
+  SET (VOLTDB_NM_OPTIONS "-n")
+  SET (VOLTDB_OPENSSL_TOKEN "darwin64-x86_64-cc")
+ELSE()
+  MESSAGE(FATAL_ERROR "System nameed ${CMAKE_SYSTEM_NAME} is unknown")
+ENDIF()
+
+########################################################################
+#
+# Go and build the pcre2 library.
+# We have to untar it and configure it.  We will
+# do this at build time.
+#
+########################################################################
+SET (VOLTDB_PCRE2_PREFIX ${VOLTDB_THIRD_PARTY_OBJ_DIR}/pcre2)
+SET (VOLTDB_PCRE2_VERSION 10.10)
+SET (VOLTDB_PCRE2_NAME pcre2-${VOLTDB_PCRE2_VERSION})
+SET (VOLTDB_PCRE2_TARBALL ${VOLTDB_TARBALLS}/${VOLTDB_PCRE2_NAME}.tgz)
+SET (VOLTDB_PCRE2_SRC ${VOLTDB_PCRE2_PREFIX}/src/${VOLTDB_PCRE2_NAME})
+SET (VOLTDB_PCRE2_OBJ ${VOLTDB_PCRE2_PREFIX}/obj/${VOLTDB_PCRE2_NAME})
+
+ExternalProject_Add(pcre2
+  PREFIX ${VOLTDB_PCRE2_PREFIX}
+  URL ${VOLTDB_PCRE2_TARBALL}
+  SOURCE_DIR ${VOLTDB_PCRE2_SRC}
+  BINARY_DIR ${VOLTDB_PCRE2_OBJ}
+  CONFIGURE_COMMAND ${VOLTDB_PCRE2_SRC}/configure -disable-shared --with-pic --prefix=${VOLTDB_THIRD_PARTY_INSTALL_DIR}
+  BUILD_COMMAND make
+  INSTALL_COMMAND make install)
+
 ########################################################################
 #
 # Go and build the openssl library.  We only use this
@@ -190,14 +230,16 @@ SET (VOLTDB_OPENSSL_VERSION 1.0.2d)
 SET (VOLTDB_OPENSSL_NAME openssl-${VOLTDB_OPENSSL_VERSION})
 SET (VOLTDB_OPENSSL_TARBALL ${VOLTDB_TARBALLS}/${VOLTDB_OPENSSL_NAME}.tgz)
 SET (VOLTDB_OPENSSL_PREFIX ${VOLTDB_THIRD_PARTY_OBJ_DIR}/openssl)
+# Binary and source are the same for openssl.  There
+# are not obvious ways to do out-of-tree builds.
+SET (VOLTDB_OPENSSL_SRC ${VOLTDB_OPENSSL_PREFIX}/src/${VOLTDB_OPENSSL_NAME})
+SET (VOLTDB_OPENSSL_OBJ ${VOLTDB_OPENSSL_PREFIX}/src/${VOLTDB_OPENSSL_NAME})
 ExternalProject_Add(crypto
   PREFIX ${VOLTDB_OPENSSL_PREFIX}
   URL ${VOLTDB_OPENSSL_TARBALL}
-  # Binary and source are the same for openssl.  There
-  # are not obvious ways to do out-of-tree builds.
-  SOURCE_DIR ${VOLTDB_OPENSSL_PREFIX}/src/${VOLTDB_OPENSSL_NAME}
-  BINARY_DIR ${VOLTDB_OPENSSL_PREFIX}/src/${VOLTDB_OPENSSL_NAME}
-  CONFIGURE_COMMAND ./config --prefix=${VOLTDB_THIRD_PARTY_INSTALL_DIR}
+  SOURCE_DIR ${VOLTDB_OPENSSL_SRC}
+  BINARY_DIR ${VOLTDB_OPENSSL_OBJ}
+  CONFIGURE_COMMAND ./Configure --prefix=${VOLTDB_THIRD_PARTY_INSTALL_DIR} ${VOLTDB_OPENSSL_TOKEN}
   BUILD_COMMAND make
   INSTALL_COMMAND make install)
 
@@ -223,30 +265,6 @@ ExternalProject_Add(s2geo
   BINARY_DIR ${VOLTDB_S2GEO_OBJ})
 ########################################################################
 #
-# Go and build the pcre2 library.
-# We have to untar it and configure it.  We will
-# do this at build time.
-#
-########################################################################
-SET (VOLTDB_PCRE2_PREFIX ${VOLTDB_THIRD_PARTY_OBJ_DIR}/pcre2)
-SET (VOLTDB_PCRE2_VERSION 10.10)
-SET (VOLTDB_PCRE2_NAME pcre2-${VOLTDB_PCRE2_VERSION})
-SET (VOLTDB_PCRE2_TARBALL ${VOLTDB_TARBALLS}/${VOLTDB_PCRE2_NAME}.tar.bz2)
-SET (VOLTDB_PCRE2_SRC ${VOLTDB_PCRE2_PREFIX}/src/${PCRE2_NAME})
-SET (VOLTDB_PCRE2_OBJ ${VOLTDB_THIRD_PARTY_OBJ_DIR}/pcre2)
-
-SET (VOLTDB_LIBPCRE2 ${THIRD_PARTY_INSTALL}/lib/libpcre-8a)
-ExternalProject_Add(pcre2
-  PREFIX ${VOLTDB_PCRE2_PREFIX}
-  URL ${VOLTDB_PCRE2_TARBALL}
-  SOURCE_DIR ${VOLTDB_PCRE2_SRC}
-  BINARY_DIR ${VOLTDB_PCRE2_OBJ}
-  CONFIGURE_COMMAND ${VOLTDB_PCRE2_SRC}/configure -disable-shared --prefix=${VOLTDB_THIRD_PARTY_INSTALL_DIR}
-  BUILD_COMMAND make
-  INSTALL_COMMAND make install)
-
-########################################################################
-#
 # Go and build the VoltDB library and IPC command.
 #
 ########################################################################
@@ -267,16 +285,6 @@ ADD_COMPILE_OPTIONS(
   -DVOLT_LOG_LEVEL=${VOLT_LOG_LEVEL}
 )
 
-MESSAGE("SYSTEM NAME: ${CMAKE_SYSTEM_NAME}")
-IF ( ${CMAKE_SYSTEM_NAME} STREQUAL "Linux" )
-  ADD_COMPILE_OPTIONS(-Wno-attributes -Wcast-align -DLINUX -fpic)
-  SET (VOLTDB_NM_OPTIONS "-n --demangle")
-ELSEIF( ${CMAKE_SYSTEM_NAME} STREQUAL "Darwin" )
-  SET (VOLTDB_NM_OPTIONS "-n")
-ELSE()
-  MESSAGE(FATAL_ERROR "System nameed ${CMAKE_SYSTEM_NAME} is unknown")
-ENDIF()
-
 # Set coverage and profiling options
 IF ( ${VOLTDB_USE_COVERAGE} )
   SET (VOLTDB_LINK_FLAGS "${VOLTDB_LINK_FLAGS} -ftest-coverage -fprofile-arcs")
@@ -287,7 +295,6 @@ IF ( ${VOLTDB_USE_PROFILING} )
 ENDIF ()
 
 SET (VOLTDB_SRC
-  ${VOLTDB_EE_SRC_DIR}/voltdbjni.cpp
   ${VOLTDB_EE_SRC_DIR}/catalog/catalog.cpp
   ${VOLTDB_EE_SRC_DIR}/catalog/catalogtype.cpp
   ${VOLTDB_EE_SRC_DIR}/catalog/cluster.cpp
@@ -452,6 +459,9 @@ SET (VOLTDB_THIRD_PARTY_SRC
   ${VOLTDB_THIRD_PARTY_CPP_DIR}/sha1/sha1.cpp
 )
 
+SET (VOLTDB_JNI_SRC
+  ${VOLTDB_EE_SRC_DIR}/voltdbjni.cpp
+  )
 SET (VOLTDB_IPC_SRC
   ${VOLTDB_EE_SRC_DIR}/voltdbipc.cpp
 )
@@ -459,42 +469,79 @@ SET (VOLTDB_IPC_SRC
 # MESSAGE("VOLTDB_THIRD_PARTY_SRC: ${VOLTDB_THIRD_PARTY_SRC}")
 # MESSAGE("VOLTDB_IPC_SRC: ${VOLTDB_IPC_SRC}")
 ADD_LIBRARY(voltdbobjs OBJECT ${VOLTDB_SRC})
+ADD_LIBRARY(voltdbjniobjs OBJECT ${VOLTDB_JNI_SRC})
 ADD_LIBRARY(voltdbipcobjs OBJECT ${VOLTDB_IPC_SRC})
 ADD_LIBRARY(third_party_objs OBJECT ${VOLTDB_THIRD_PARTY_SRC})
 
-ADD_DEPENDENCIES(voltdbobjs s2geo crypto)
-ADD_DEPENDENCIES(voltdbipcobjs s2geo crypto)
+ADD_DEPENDENCIES(voltdbobjs s2geo crypto pcre2)
+ADD_DEPENDENCIES(voltdbipcobjs s2geo crypto pcre2)
+ADD_DEPENDENCIES(voltdbjniobjs s2geo crypto pcre2)
 
 MESSAGE("VOLTDB_EE_SRC_DIR: ${VOLTDB_EE_SRC_DIR}")
 MESSAGE("VOLTDB_THIRD_PARTY_CPP_DIR: ${VOLTDB_THIRD_PARTY_CPP_DIR}")
-TARGET_INCLUDE_DIRECTORIES(voltdbobjs PRIVATE
+MESSAGE("VOLTDB_THIRD_PARTY_INCLUDE_DIR: ${VOLTDB_THIRD_PARTY_INCLUDE_DIR}")
+MESSAGE("VOLTDB_THIRD_PARTY_INCLUDE_DIR: ${VOLTDB_THIRD_PARTY_INCLUDE_DIR}")
+TARGET_INCLUDE_DIRECTORIES(voltdbobjs
+  PUBLIC
   ${VOLTDB_EE_SRC_DIR}
   ${VOLTDB_THIRD_PARTY_CPP_DIR}
   ${VOLTDB_THIRD_PARTY_INCLUDE_DIR})
-TARGET_INCLUDE_DIRECTORIES(voltdbipcobjs PRIVATE
+TARGET_INCLUDE_DIRECTORIES(voltdbipcobjs
+  PUBLIC
+  ${VOLTDB_EE_SRC_DIR}
+  ${VOLTDB_THIRD_PARTY_CPP_DIR}
+  ${VOLTDB_THIRD_PARTY_INCLUDE_DIR})
+TARGET_INCLUDE_DIRECTORIES(voltdbjniobjs
+  PUBLIC
   ${VOLTDB_EE_SRC_DIR}
   ${VOLTDB_THIRD_PARTY_CPP_DIR}
   ${VOLTDB_THIRD_PARTY_INCLUDE_DIR})
 TARGET_INCLUDE_DIRECTORIES(third_party_objs
-  SYSTEM PRIVATE
-  ${CMAKE_SOURCE_DIR}/${VOLTDB_THIRD_PARTY_CPP_DIR})
+  PUBLIC
+  ${VOLTDB_THIRD_PARTY_CPP_DIR})
 
-TARGET_COMPILE_OPTIONS(voltdbobjs PUBLIC ${VOLTDB_EE_OPTS})
-TARGET_COMPILE_OPTIONS(voltdbipcobjs PUBLIC ${VOLTDB_EE_OPTS})
-TARGET_COMPILE_OPTIONS(third_party_objs PUBLIC ${THIRD_PARTY_SRC})
-
+########################################################################
+#
+# Adding the voltdb jni library.
+#
+########################################################################
 SET (VOLTDB_LIBNAME voltdb-${VOLTDB_VERSION})
 ADD_LIBRARY(${VOLTDB_LIBNAME}
+  SHARED
   $<TARGET_OBJECTS:voltdbobjs>
+  $<TARGET_OBJECTS:voltdbjniobjs>
   $<TARGET_OBJECTS:third_party_objs>
   )
-TARGET_LINK_LIBRARIES(${VOLTDB_LIBNAME} -ls2geo -lcrypto)
 
+TARGET_LINK_LIBRARIES(${VOLTDB_LIBNAME}
+  -L${VOLTDB_THIRD_PARTY_INSTALL_DIR}/lib
+  -lpcre2-8 -ls2geo -lcrypto
+  ${VOLTDB_LINK_FLAGS}
+  ${VOLTDB_LINK_FLAGS})
+
+########################################################################
+#
+# Adding the voltdbipc executable.
+#
+########################################################################
 SET (VOLTDB_IPCRUN_NAME voltdbipc)
 ADD_EXECUTABLE(${VOLTDB_IPCRUN_NAME}
   $<TARGET_OBJECTS:voltdbobjs>
+  $<TARGET_OBJECTS:third_party_objs>
   $<TARGET_OBJECTS:voltdbipcobjs>
-  $<TARGET_OBJECTS:third_party_objs>)
+)
+
+TARGET_LINK_LIBRARIES(${VOLTDB_IPCRUN_NAME}
+  -L${VOLTDB_THIRD_PARTY_INSTALL_DIR}/lib
+  -lpcre2-8 -ls2geo -lcrypto
+  ${VOLTDB_LINK_FLAGS}
+  -ldl)
 
 INSTALL(TARGETS ${VOLTDB_LIBNAME} ${VOLTDB_IPCRUN_NAME}
   DESTINATION ${CMAKE_SOURCE_DIR}/prod)
+
+########################################################################
+#
+# What about voltrun?  Do we use that anymore?  Where is it used?
+#
+########################################################################
