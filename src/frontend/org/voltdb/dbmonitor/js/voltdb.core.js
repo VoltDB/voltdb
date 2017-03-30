@@ -581,22 +581,25 @@
                     '@Explain': { '1': ['SQL (varchar)', 'Returns Table[]'] },
                     '@ExplainProc': { '1': ['Stored Procedure Name (varchar)', 'Returns Table[]'] },
                     '@Pause': { '0': ['Returns bit'] },
+                    '@Promote': { '0': ['Returns bit'] },
                     '@Quiesce': { '0': ['Returns bit'] },
+                    '@ResetDR': { '0': ['Returns bit'] },
                     '@Resume': { '0': ['Returns bit'] },
                     '@Shutdown': { '0': ['Returns bit'] },
                     '@SnapshotDelete': { '2': ['DirectoryPath (varchar)', 'UniqueId (varchar)', 'Returns Table[]'] },
                     '@SnapshotRestore': { '2': ['DirectoryPath (varchar)', 'UniqueId (varchar)', 'Returns Table[]'], '1': ['JSON (varchar)', 'Returns Table[]'] },
-                    '@SnapshotSave': { '3': ['DirectoryPath (varchar)', 'UniqueId (varchar)', 'Blocking (bit)', 'Returns Table[]'], '1': ['JSON (varchar)', 'Returns Table[]'] },
+                    '@SnapshotSave': { '0': ['Returns Table[]'], '3': ['DirectoryPath (varchar)', 'UniqueId (varchar)', 'Blocking (bit)', 'Returns Table[]'], '1': ['JSON (varchar)', 'Returns Table[]'] },
                     '@SnapshotScan': { '1': ['DirectoryPath (varchar)', 'Returns Table[]'] },
                     '@SnapshotStatus': { '0': ['Returns Table[]'] },
                     '@Statistics': { '2': ['Statistic (StatisticsComponent)', 'Interval (bit)', 'Returns Table[]'] },
+                    '@StopNode':{'1': ['Host ID (Int)', 'Returns Int']},
+                    '@SwapTables':{'1': ['Table Name (varchar)', 'Table-Name (varchar)', 'Returns Int']},
                     '@SystemCatalog': { '1': ['SystemCatalog (CatalogComponent)', 'Returns Table[]'] },
                     '@SystemInformation': { '1': ['Selector (SysInfoSelector)', 'Returns Table[]'] },
                     '@UpdateApplicationCatalog': { '2': ['CatalogPath (varchar)', 'DeploymentConfigPath (varchar)', 'Returns Table[]'] },
+                    '@UpdateClasses': { '1': ['Jar File (varchar)', 'Class Selector (varchar)', 'Returns Table[]'] },
                     '@UpdateLogging': { '1': ['Configuration (xml)', 'Returns Table[]'] },
-                    '@Promote': { '0': ['Returns bit'] },
-                    '@ValidatePartitioning': { '2': ['HashinatorType (int)', 'Config (varbinary)', 'Returns Table[]'] },
-                    '@GetPartitionKeys': { '1': ['VoltType (varchar)', 'Returns Table[]'] }
+                    '@ValidatePartitioning': { '2': ['HashinatorType (int)', 'Config (varbinary)', 'Returns Table[]'] }
                 };
 
                 var childConnectionQueue = connection.getQueue();
@@ -717,13 +720,49 @@ jQuery.extend({
                 error: function (e) {
                     console.log(e.message);
                 },
-                 statusCode:{
-                    401: function(response){
-                        console.log('Failed to authenticate to the server via Kerberos. Please check the configuration of your client/browser')
+                statusCode:{
+                    401: function(jqXHR, textStatus, errorThrown){
+                        var data = jqXHR.responseJSON;
+                        callback(data, (jqXHR.getResponseHeader("Host") != null ? jqXHR.getResponseHeader("Host").split(":")[0] : "-1"))
+                        if (data.statusstring.includes("kerberos")){
+                            console.log('Failed to authenticate to the server via Kerberos. Please check the configuration of your client/browser')
+                        }
+
                     }
                 }
             });
+        } else if(formData.indexOf('PrepareShutdown') > -1){
+            jQuery.ajax({
+                type: 'GET',
+                url: url,
+                data: formData,
+                dataType: 'text',
+                beforeSend: function (request) {
+                    if (authorization != null) {
+                        request.setRequestHeader("Authorization", authorization);
+                    }
+                },
+                success: function (data) {
+                    final_data = json_parse(data, function (key, value) {
+                                                return value;
+                                            });
+                    final_data.results[0].data[0][0] = final_data.results[0].data[0][0]['c'].join('')
+                    callback(final_data);
+                },
+                error: function (e) {
+                    console.log(e.message);
+                },
+                 statusCode:{
+                    401: function(jqXHR, textStatus, errorThrown){
+                        var data = jqXHR.responseJSON;
+                        callback(data, (jqXHR.getResponseHeader("Host") != null ? jqXHR.getResponseHeader("Host").split(":")[0] : "-1"))
+                        if (data.statusstring.includes("kerberos")){
+                            console.log('Failed to authenticate to the server via Kerberos. Please check the configuration of your client/browser')
+                        }
 
+                    }
+                }
+            });
         } else {
             jQuery.ajax({
                 type: 'GET',
@@ -739,9 +778,14 @@ jQuery.extend({
                 error: function (e) {
                     console.log(e.message);
                 },
-                 statusCode:{
-                    401: function(response){
-                        console.log('Failed to authenticate to the server via Kerberos. Please check the configuration of your client/browser');
+                statusCode:{
+                    401: function(jqXHR, textStatus, errorThrown){
+                        var data = jqXHR.responseJSON;
+                        callback(data, (jqXHR.getResponseHeader("Host") != null ? jqXHR.getResponseHeader("Host").split(":")[0] : "-1"))
+                        if (data.statusstring.includes("kerberos")){
+                            console.log('Failed to authenticate to the server via Kerberos. Please check the configuration of your client/browser')
+                        }
+
                     }
                 }
             });
