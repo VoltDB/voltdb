@@ -129,7 +129,7 @@ ExecutorContext::~ExecutorContext() {
 
 void ExecutorContext::assignThreadLocals(EngineLocals& mapping)
 {
-    VOLT_DEBUG("Switching context to partition %d on thread %lu", mapping.partitionId, pthread_self());
+    VOLT_DEBUG("Switching context to partition %d on thread %p", mapping.partitionId, pthread_self());
     pthread_setspecific(static_key, mapping.context);
     ThreadLocalPool::assignThreadLocals(mapping);
 }
