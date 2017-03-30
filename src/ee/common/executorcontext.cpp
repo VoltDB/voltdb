@@ -129,6 +129,7 @@ ExecutorContext::~ExecutorContext() {
 
 void ExecutorContext::assignThreadLocals(EngineLocals& mapping)
 {
+    VOLT_DEBUG("Switching context to partition %d on thread %lu", mapping.partitionId, pthread_self());
     pthread_setspecific(static_key, mapping.context);
     ThreadLocalPool::assignThreadLocals(mapping);
 }
@@ -136,7 +137,7 @@ void ExecutorContext::assignThreadLocals(EngineLocals& mapping)
 void ExecutorContext::bindToThread()
 {
     pthread_setspecific(static_key, this);
-    VOLT_DEBUG("Installing EC(%ld)", (long)this);
+    VOLT_DEBUG("Installing EC(%ld) for partition %d", (long)this, m_partitionId);
 }
 
 ExecutorContext* ExecutorContext::getExecutorContext() {

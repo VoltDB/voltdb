@@ -36,11 +36,13 @@ struct voltdb_pool_allocator_new_delete
     static char * malloc(const size_type bytes);
     static void free(char * const block);
 };
+
 typedef boost::pool<voltdb_pool_allocator_new_delete> PoolForObjectSize;
 typedef boost::shared_ptr<PoolForObjectSize> PoolForObjectSizePtr;
 typedef boost::unordered_map<std::size_t, PoolForObjectSizePtr> PoolsByObjectSize;
-typedef std::pair<int, PoolsByObjectSize* > PairType;
-typedef PairType* PairTypePtr;
+
+typedef std::pair<int, PoolsByObjectSize* > PoolPairType;
+typedef PoolPairType* PoolPairTypePtr;
 
 struct PoolLocals {
     PoolLocals();
@@ -58,7 +60,7 @@ struct PoolLocals {
         return *this;
     }
 
-    PairTypePtr poolData;
+    PoolPairTypePtr poolData;
     CompactingStringStorage* stringData;
     std::size_t* allocated;
 };
@@ -97,7 +99,7 @@ public:
 
     static void assignThreadLocals(PoolLocals& mapping);
 
-    static PairTypePtr getDataPoolPair();
+    static PoolPairTypePtr getDataPoolPair();
 
     /**
      * Allocate space from a page of objects of the requested size.

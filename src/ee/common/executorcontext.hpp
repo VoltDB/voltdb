@@ -426,16 +426,19 @@ class ExecutorContext {
     ProgressStats m_progressStats;
 };
 struct EngineLocals : public PoolLocals {
-    inline EngineLocals() : PoolLocals(), context(ExecutorContext::getExecutorContext()) {}
-    inline EngineLocals(const EngineLocals& src) : PoolLocals(src), context(src.context)
+    inline EngineLocals() : PoolLocals(), partitionId(-1), context(ExecutorContext::getExecutorContext()) {}
+    inline EngineLocals(int32_t pid) : PoolLocals(), partitionId(pid), context(ExecutorContext::getExecutorContext()) {}
+    inline EngineLocals(const EngineLocals& src) : PoolLocals(src), partitionId(src.partitionId), context(src.context)
     {}
 
     inline EngineLocals& operator = (EngineLocals const& rhs) {
         PoolLocals::operator = (rhs);
+        partitionId = rhs.partitionId;
         context = rhs.context;
         return *this;
     }
 
+    int32_t partitionId;
     ExecutorContext* context;
 };
 typedef std::map<int32_t, EngineLocals> SharedEngineLocalsType;

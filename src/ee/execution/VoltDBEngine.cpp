@@ -243,12 +243,12 @@ VoltDBEngine::initialize(int32_t clusterIndex,
     // Add the engine to the global list tracking replicated tables
     pthread_mutex_lock(&sharedEngineMutex);
     if (partitionId != 16383) {
-        enginesByPartitionId[partitionId] = EngineLocals();
+        enginesByPartitionId[partitionId] = EngineLocals(m_partitionId);
         VOLT_DEBUG("Initializing partition %d with context %p", m_partitionId, m_executorContext);
         SynchronizedThreadLock::init(sitesPerHost);
         if (createDrReplicatedStream) {
             // The site thread that has the lowest siteId gets to create DR replicated stream
-            mpEngineLocals = EngineLocals();
+            mpEngineLocals = EngineLocals(16383);
             VOLT_DEBUG("Initializing mp partition with context %p", mpEngineLocals.context);
         }
     }
@@ -657,7 +657,7 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const std::string &catal
         return true;
     }
     assert(m_catalog != NULL);
-    VOLT_DEBUG("Loading catalog...");
+    VOLT_DEBUG("Loading catalog on partition %d ...", m_partitionId);
 
 
     m_catalog->execute(catalogPayload);
@@ -677,7 +677,7 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const std::string &catal
     }
 
     if (SynchronizedThreadLock::countDownGlobalTxnStartCount()) {
-        VOLT_ERROR("loading replicated parts of catalog from partition %d", m_partitionId);
+        VOLT_DEBUG("loading replicated parts of catalog from partition %d", m_partitionId);
         EngineLocals* ourEngineLocals = &enginesByPartitionId[m_partitionId];
         VoltDBEngine* mpEngine = mpEngineLocals.context->getContextEngine();
         ExecutorContext::assignThreadLocals(mpEngineLocals);
@@ -704,6 +704,7 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const std::string &catal
         // block the site thread until the replicated tables have been applied in all partitions
         SynchronizedThreadLock::waitForLastSiteFinished();
     }
+    VOLT_DEBUG("loading partitioned parts of catalog from partition %d", m_partitionId);
 
     // load up all the tables, adding all tables
     if (processCatalogAdditions(timestamp, false) == false) {
@@ -720,10 +721,10 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const std::string &catal
 
     typedef std::pair<CatalogId, Table*> CatToTable;
     BOOST_FOREACH (CatToTable tablePair, m_tables) {
-        VOLT_ERROR("Partition %d loaded table %d at address %p", m_partitionId, tablePair.first, tablePair.second);
+        VOLT_DEBUG("Partition %d loaded table %d at address %p", m_partitionId, tablePair.first, tablePair.second);
     }
 
-    VOLT_DEBUG("Loaded catalog from partition...");
+    VOLT_DEBUG("Loaded catalog from partition %d ...", m_partitionId);
     return true;
 }
 
