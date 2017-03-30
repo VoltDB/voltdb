@@ -88,8 +88,6 @@
 <property name='deployment.parsergen.dir'    location='${src.gpl.dir}/org/voltdb/compiler/deploymentfile' />
 <property name='deployment.parsergen.pkg'    value='org.voltdb.compiler.deploymentfile' />
 <property name='deployment.parsergen.xsd'    value='org/voltdb/compiler/DeploymentFileSchema.xsd' />
-<property name='debian.package.dir'          value='obj/debian' />
-<property name='rpm.package.dir'             value='obj/rpms' />
 
 <!-- os.mac is set when build is running on Mac OSX -->
 <condition property="os.mac">
@@ -1012,7 +1010,7 @@ CLEANING
 <target name='clean'
     description="Remove all compiled and generated files."
     depends="cleantmp, clean_client, clean_deployment_gen,
-             clean_debian_package, clean_rpm_package, clean_bindoc, clean_other_gen">
+             clean_bindoc, clean_other_gen">
   <exec dir='examples/adperformance' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
   <exec dir='examples/bank-offers' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
   <exec dir='examples/callcenter' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
@@ -2708,64 +2706,6 @@ DBBPool.java preprocessing
 </target>
 
 
-<!--
-***********************
-DEBIAN PACKAGE CREATION
-***********************
--->
 
-<target name="debian_package"
-      depends="buildinfo"
-        description="Create Debian/Ubuntu package. Uses sudo, so it may prompt for a password.">
-    <exec executable="sudo" failonerror="true">
-        <arg value="python" />
-        <arg value="${base.dir}/tools/voltdb-install.py" />
-        <arg value="-D" />
-        <arg value="${raw.dist.dir}/voltdb-${dist.version}.tar.gz" />
-    </exec>
-</target>
-
-<!-- This debian package cleaning target is safe. It doesn't run as root. -->
-<target name="clean_debian_package"
-      depends=""
-        description="Remove all Debian/Ubuntu package build artifacts.">
-    <exec dir='.' executable='/bin/sh' failonerror='false'>
-        <arg line="-c 'rm -rfv ${debian.package.dir}'" />
-    </exec>
-</target>
-
-<!-- Use this if permissions are messed up by interrupted package building as root. -->
-<target name="force_clean_debian_package"
-      depends=""
-        description="Forceably remove all Debian/Ubuntu package build artifacts as root.">
-    <exec dir="." executable="sudo" failonerror="false">
-        <arg line="/bin/sh -c 'rm -rfv ${debian.package.dir}'" />
-    </exec>
-</target>
-
-<!--
-***********************
-RPM PACKAGE CREATION
-***********************
--->
-
-<target name="rpm_package"
-        depends="buildinfo"
-        description="Create RPM package">
-    <exec executable="python" failonerror="true">
-        <arg value="${base.dir}/tools/voltdb-install.py" />
-        <arg value="-R" />
-        <arg value="${raw.dist.dir}/voltdb-${dist.version}.tar.gz" />
-    </exec>
-</target>
-
-<!-- This cleaning target is safe. It doesn't run as root. -->
-<target name="clean_rpm_package"
-      depends=""
-        description="Remove all RPM build artifacts.">
-    <exec dir='.' executable='/bin/sh' failonerror='false'>
-        <arg line="-c 'rm -rfv ${rpm.package.dir}'" />
-    </exec>
-</target>
 <!-- END PROJECT -->
 </project>
