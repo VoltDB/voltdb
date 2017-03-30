@@ -77,6 +77,11 @@ static void globalInitOrCreateOncePerProcess() {
     setenv("TZ", "UTC", 0); // set timezone as "UTC" in EE level
 
     (void)pthread_key_create(&static_key, NULL);
+
+    assert(SITES_PER_HOST == -1);
+    SITES_PER_HOST = 0;
+    pthread_mutex_init(&sharedEngineMutex, NULL);
+    pthread_cond_init(&sharedEngineCondition, 0);
 }
 
 ExecutorContext::ExecutorContext(int64_t siteId,
