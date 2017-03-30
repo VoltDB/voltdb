@@ -274,7 +274,6 @@ parser.add_argument('pro_sha', nargs="?", default="master", help="pro repository
 parser.add_argument('rabbitmq_sha', nargs="?", default="master", help="rabbitmq repository commit, tag or branch" )
 parser.add_argument('-g','--gitloc', default="git@github.com:VoltDB", help="Repository location. For example: /home/github-mirror")
 parser.add_argument('--nomac', action='store_true', help="Don't build Mac OSX")
-parser.add_argument('--nopackages', action='store_true', help="Don't build .rpm and .deb packages")
 parser.add_argument('--nocommunity', action='store_true', help="Don't build community")
 args = parser.parse_args()
 
@@ -286,10 +285,9 @@ print args
 
 build_community = not args.nocommunity
 build_mac = not args.nomac
-build_packages = not args.nopackages
 
 #If anything is missing we're going to dump this in oneoffs dir.
-build_all = build_community and build_mac and build_packages
+build_all = build_community and build_mac
 if voltdbTreeish != proTreeish or not build_all:
     oneOff = True
 else:
@@ -362,57 +360,6 @@ except Exception as e:
     print "Could not build LINUX kit. Exception: " + str(e) + ", Type: " + str(type(e))
     build_errors=True
 
-if build_packages:
-    # build debian kit
-    try:
-        with settings(user=username,host_string=UbuntuSSHInfo[1],disable_known_hosts=True,key_filename=UbuntuSSHInfo[0]):
-            debbuilddir = "%s/deb_build/" % builddir
-            run("rm -rf " + debbuilddir)
-            run("mkdir -p " + debbuilddir)
-
-            with cd(debbuilddir):
-                put ("tools/voltdb-install.py",".")
-
-                if build_community:
-                    commbld = "voltdb-%s.tar.gz" % (versionCentos)
-                    put("%s/%s" % (releaseDir, commbld),".")
-                    run ("sudo python voltdb-install.py -D " + commbld)
-                    get("voltdb_%s-1_amd64.deb" % (versionCentos), releaseDir)
-
-                entbld = "voltdb-ent-%s.tar.gz" % (versionCentos)
-                put("%s/%s" % (releaseDir, entbld),".")
-                run ("sudo python voltdb-install.py -D " + entbld)
-                get("voltdb-ent_%s-1_amd64.deb" % (versionCentos), releaseDir)
-    except Exception as e:
-        print traceback.format_exc()
-        print "Could not build debian kit. Exception: " + str(e) + ", Type: " + str(type(e))
-        build_errors=True
-
-    try:
-        # build rpm kit
-        with settings(user=username,host_string=CentosSSHInfo[1],disable_known_hosts=True,key_filename=CentosSSHInfo[0]):
-            rpmbuilddir = "%s/rpm_build/" % builddir
-            run("rm -rf " + rpmbuilddir)
-            run("mkdir -p " + rpmbuilddir)
-
-            with cd(rpmbuilddir):
-                put ("tools/voltdb-install.py",".")
-
-                if build_community:
-                    commbld = "voltdb-%s.tar.gz" % (versionCentos)
-                    put("%s/%s" % (releaseDir, commbld),".")
-                    run ("python2.6 voltdb-install.py -R " + commbld)
-                    get("voltdb-%s-1.x86_64.rpm" % (versionCentos), releaseDir)
-
-                entbld = "voltdb-ent-%s.tar.gz" % (versionCentos)
-                put("%s/%s" % (releaseDir, entbld),".")
-                run ("python2.6 voltdb-install.py -R " + entbld)
-                get("voltdb-ent-%s-1.x86_64.rpm" % (versionCentos), releaseDir)
-
-    except Exception as e:
-        print traceback.format_exc()
-        print "Could not build rpm kit. Exception: " + str(e) + ", Type: " + str(type(e))
-        build_errors=True
 
 computeChecksums(releaseDir)
 
