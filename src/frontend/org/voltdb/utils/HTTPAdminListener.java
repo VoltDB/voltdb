@@ -381,7 +381,8 @@ public class HTTPAdminListener {
 
                 if (!target.equals("/")) {
                     response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, "Resource not found"));
-                    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                    response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+                    baseRequest.setHandled(true);
                     return;
                 }
                 if (jsonp != null) {
@@ -576,7 +577,6 @@ public class HTTPAdminListener {
                 }
                 baseRequest.setHandled(true);
             } catch (Exception ex) {
-                response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
                 logger.info("Not servicing url: " + baseRequest.getRequestURI() + " Details: "+ ex.getMessage(), ex);
             }
         }
@@ -1054,6 +1054,7 @@ public class HTTPAdminListener {
             ContextHandler deploymentRequestHandler = new ContextHandler("/deployment");
             m_deploymentHandler = new DeploymentRequestHandler();
             deploymentRequestHandler.setHandler(m_deploymentHandler);
+            deploymentRequestHandler.setAllowNullPathInfo(true);
 
             ///profile
             ContextHandler profileRequestHandler = new ContextHandler("/profile");
