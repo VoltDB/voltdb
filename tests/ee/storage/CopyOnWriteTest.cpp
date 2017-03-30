@@ -1986,7 +1986,7 @@ TEST_F(CopyOnWriteTest, SnapshotAndIndex) {
             checkIndex(testRange2.label("streamed"), &streamedIndex2, predicates2, true);
         }
 
-        itest++;
+        //itest++;
     }
 }
 
