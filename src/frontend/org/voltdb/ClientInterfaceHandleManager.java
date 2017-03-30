@@ -62,6 +62,7 @@ public class ClientInterfaceHandleManager
     final AdmissionControlGroup m_acg;
 
     private volatile boolean m_wantsTopologyUpdates = false;
+    private volatile boolean m_wantsProcUpdates = false;
 
     private HandleGenerator m_shortCircuitHG = new HandleGenerator(SHORT_CIRCUIT_PART_ID);
 
@@ -492,5 +493,13 @@ public class ClientInterfaceHandleManager
 
     public boolean wantsTopologyUpdates() {
         return m_wantsTopologyUpdates;
+    }
+
+    public void setWantsProcUpdates(boolean wantsProcUpdates) {
+        m_wantsProcUpdates = wantsProcUpdates;
+    }
+
+    public boolean wantsProcUpdates() {
+        return m_wantsProcUpdates;
     }
 }

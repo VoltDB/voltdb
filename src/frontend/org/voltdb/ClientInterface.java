@@ -117,6 +117,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
     //Same as in Distributer.java
     public static final long ASYNC_TOPO_HANDLE = Long.MAX_VALUE - 1;
+    public static final long ASYNC_PROC_HANDLE = Long.MAX_VALUE - 2;
 
     // reasons a connection can fail
     public static final byte AUTHENTICATION_FAILURE = Constants.AUTHENTICATION_FAILURE;
@@ -1383,6 +1384,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
          */
         if (VoltDB.instance().getMode() != OperationMode.INITIALIZING) {
             mayActivateSnapshotDaemon();
+
+            //add a notification to client right away
+            StoredProcedureInvocation spi = new StoredProcedureInvocation();
+            spi.setProcName("@SystemCatalog");
+            spi.setParams("PROCEDURES");
+            spi.setClientHandle(ASYNC_PROC_HANDLE);
+            notifyClients(m_currentProcValues,m_currentProcSupplier,
+                            m_procUpdatePredicate, spi, OpsSelector.SYSTEMCATALOG);
         }
     }
 
@@ -1471,25 +1480,63 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
     };
 
+    private final AtomicReference<DeferredSerialization> m_currentProcValues = new AtomicReference<>(null);
+    private final Supplier<DeferredSerialization> m_currentProcSupplier = new Supplier<DeferredSerialization>() {
+        @Override
+        public DeferredSerialization get() {
+            return m_currentProcValues.get();
+        }
+    };
+
     /*
      * A predicate to allow the client notifier to skip clients
      * that don't want a specific kind of update
      */
     private final Predicate<ClientInterfaceHandleManager> m_wantsTopologyUpdatesPredicate =
             new Predicate<ClientInterfaceHandleManager>() {
-                @Override
-                public boolean apply(ClientInterfaceHandleManager input) {
-                    return input.wantsTopologyUpdates();
-                }};
+        @Override
+        public boolean apply(ClientInterfaceHandleManager input) {
+            return input.wantsTopologyUpdates();
+        }
+    };
+
+    private final Predicate<ClientInterfaceHandleManager> m_procUpdatePredicate =
+            new Predicate<ClientInterfaceHandleManager>() {
+        @Override
+        public boolean apply(ClientInterfaceHandleManager input) {
+            return input.wantsProcUpdates();
+        }
+    };
+
 
     /*
-     * Submit a task to the stats agent to retrieve the topology. Supply a dummy
+     * Submit a task to the stats agent to retrieve the topology and procedures. Supply a dummy
      * client response adapter to fake a connection. The adapter converts the response
      * to a listenable future and we add a listener to pick up the resulting topology
      * and check if it has changed. If it has changed, queue a task to the notifier
      * to propagate the update to clients.
      */
     private void checkForTopologyChanges() {
+        StoredProcedureInvocation spi = new StoredProcedureInvocation();
+        spi.setProcName("@Statistics");
+        spi.setParams("TOPO", 0);
+        spi.setClientHandle(ASYNC_TOPO_HANDLE);
+        notifyClients(m_currentTopologyValues,m_currentTopologySupplier,
+                        m_wantsTopologyUpdatesPredicate, spi, OpsSelector.STATISTICS);
+
+        spi = new StoredProcedureInvocation();
+        spi.setProcName("@SystemCatalog");
+        spi.setParams("PROCEDURES");
+        spi.setClientHandle(ASYNC_PROC_HANDLE);
+        notifyClients(m_currentProcValues,m_currentProcSupplier,
+                        m_procUpdatePredicate, spi, OpsSelector.SYSTEMCATALOG);
+    }
+
+    private void notifyClients( AtomicReference<DeferredSerialization> values,
+                                Supplier<DeferredSerialization> supplier,
+                                Predicate<ClientInterfaceHandleManager> predicate,
+                                StoredProcedureInvocation spi,
+                                OpsSelector selector) {
         final Pair<SimpleClientResponseAdapter, ListenableFuture<ClientResponseImpl>> p =
                 SimpleClientResponseAdapter.getAsListenableFuture();
         final ListenableFuture<ClientResponseImpl> fut = p.getSecond();
@@ -1499,7 +1546,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 try {
                     final ClientResponseImpl r = fut.get();
                     if (r.getStatus() != ClientResponse.SUCCESS) {
-                        hostLog.warn("Received error response retrieving topology: " + r.getStatusString());
+                        hostLog.warn("Received error response retrieving stats info: " + r.getStatusString());
                         return;
                     }
 
@@ -1511,18 +1558,17 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
                     //Check for no change
                     ByteBuffer oldValue = null;
-                    DeferredSerialization ds = m_currentTopologyValues.get();
+                    DeferredSerialization ds = values.get();
                     if (ds != null) {
                         oldValue = ByteBuffer.allocate(ds.getSerializedSize());
                         ds.serialize(oldValue);
                         oldValue.flip();
+                        if (buf.equals(oldValue)) {
+                            return;
+                        }
                     }
 
-                    if (buf.equals(oldValue)) {
-                        return;
-                    }
-
-                    m_currentTopologyValues.set(new DeferredSerialization() {
+                    values.set(new DeferredSerialization() {
                         @Override
                         public void serialize(ByteBuffer outbuf) throws IOException {
                             outbuf.put(buf.duplicate());
@@ -1531,27 +1577,20 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         public void cancel() {}
 
                         @Override
-                        public int getSerializedSize() {
-                            return buf.remaining();
-                        }
+                        public int getSerializedSize() {return buf.remaining();}
                     });
                     if (oldValue != null) {
                         m_notifier.queueNotification(
                                 m_cihm.values(),
-                                m_currentTopologySupplier,
-                                m_wantsTopologyUpdatesPredicate);
+                                supplier,
+                                predicate);
                     }
-
                 } catch (Throwable t) {
-                    hostLog.error("Error checking for topology updates", Throwables.getRootCause(t));
+                    hostLog.error("Error checking for updates", Throwables.getRootCause(t));
                 }
             }
         }, CoreUtils.SAMETHREADEXECUTOR);
-        final StoredProcedureInvocation spi = new StoredProcedureInvocation();
-        spi.setProcName("@Statistics");
-        spi.setParams("TOPO", 0);
-        spi.setClientHandle(ASYNC_TOPO_HANDLE);
-        InvocationDispatcher.dispatchStatistics(OpsSelector.STATISTICS, spi, p.getFirst());
+        InvocationDispatcher.dispatchStatistics(selector, spi, p.getFirst());
     }
 
     private static final long CLIENT_HANGUP_TIMEOUT = Long.getLong("CLIENT_HANGUP_TIMEOUT", 30000);
