@@ -1,7 +1,7 @@
 <?xml version="1.0" ?>
-<!-- <project default="default" name="VoltDB"  xmlns:jacoco="antlib:org.jacoco.ant"> -->
-<project default="default" name="VoltDB">
+<project default="default" name="VoltDB" xmlns:if="ant:if">
 
+<!-- <project default="default" name="VoltDB"  xmlns:jacoco="antlib:org.jacoco.ant"> -->
     <!--    <taskdef uri="antlib:org.jacoco.ant" resource="org/jacoco/ant/antlib.xml"> -->
         <!--    <classpath path="third_party/java/jars/jacocoant.jar"/> -->
         <!-- </taskdef> -->
@@ -47,6 +47,12 @@
 <!-- allow env.VOLTBUILD to override "build" property -->
 <envdefault prop="build" var="VOLTBUILD" default="release" />
 <envdefault prop="jmemcheck" var="JMEMCHECK" default="memcheck" />
+<!-- <envdefault prop="use_jacoco" var="USE_JACOCO" default="false" /> -->
+
+<!-- enable code coverage for JUnit's -->
+<condition property="use_jacoco" value="true">
+    <isset property="env.USE_JACOCO"/>
+</condition>
 
 <!-- allow env.VOLTPRO to override "voltpro" property -->
 <condition property="voltpro" value="${env.VOLTPRO}">
@@ -1710,6 +1716,7 @@ TEST CASES
 ]]>
 </scriptdef>
 
+
 <!-- run junit for one suite -->
 <target name='junit_onesuite'>
     <!-- set defaults for junit vars if not already set -->
@@ -1759,7 +1766,7 @@ TEST CASES
             <!-- <jvmarg value="-Xcheck:jni" /> -->
             <jvmarg value="-Xmx256m"/>
             <jvmarg value="-XX:+HeapDumpOnOutOfMemoryError"/>
-            <jvmarg value="-javaagent:/tmp/jacoco/jacocoagent.jar"/>
+            <jvmarg if:set="use_jacoco" value="-javaagent:/tmp/jacoco/jacocoagent.jar"/>
             <!-- removed in java 8 <jvmarg value="-XX:-UseSplitVerifier"/> -->
             <env key="VERIFY_CATALOG_DEBUG" value="${verifycatalogdebug}"/>
             <env key="VOLTDB_BUILD_DIR" value="${build.dir}"/>
