@@ -88,8 +88,6 @@ ELSEIF (VOLTDB_BUILD_TYPE STREQUAL "RELEASE")
 ELSE()
   MESSAGE(FATAL_ERROR "BUILD TYPE ${VOLTDB_BUILD_TYPE} IS UNKNOWN.")
 ENDIF()
-MESSAGE ("CMAKE_SOURCE_DIR: ${CMAKE_SOURCE_DIR}")
-MESSAGE ("CMAKE_BINARY_DIR: ${CMAKE_BINARY_DIR}")
 ########################################################################
 #
 # Names of folders in the tree
@@ -140,8 +138,6 @@ SET (VOLT_LOG_LEVEL 500)
 # will build and run correctly.
 #
 ########################################################################
-MESSAGE ("SYSTEM VERSION: ${CMAKE_SYSTEM}")
-MESSAGE ("COMPILER VERSION: ${CMAKE_CXX_COMPILER_VERSION}")
 SET (VOLTDB_COMPILER_U17p04 "6.3.0")
 SET (VOLTDB_COMPILER_U16p10 "6.2.0")
 SET (VOLTDB_COMPILER_U16p04 "5.4.0")
@@ -217,7 +213,6 @@ ENDIF ()
 
 ADD_COMPILE_OPTIONS(${CXX_VERSION_FLAG})
 
-MESSAGE("SYSTEM NAME: ${CMAKE_SYSTEM_NAME}")
 IF ( ${CMAKE_SYSTEM_NAME} STREQUAL "Linux" )
   ADD_COMPILE_OPTIONS(-Wno-attributes -Wcast-align -DLINUX -fpic)
   SET (VOLTDB_NM_OPTIONS "-n --demangle")
@@ -502,9 +497,6 @@ SET (VOLTDB_JNI_SRC
 SET (VOLTDB_IPC_SRC
   ${VOLTDB_EE_SRC_DIR}/voltdbipc.cpp
 )
-# MESSAGE("VOLTDB_SRC: ${VOLTDB_SRC}")
-# MESSAGE("VOLTDB_THIRD_PARTY_SRC: ${VOLTDB_THIRD_PARTY_SRC}")
-# MESSAGE("VOLTDB_IPC_SRC: ${VOLTDB_IPC_SRC}")
 ADD_LIBRARY(voltdbobjs OBJECT ${VOLTDB_SRC})
 ADD_LIBRARY(voltdbjniobjs OBJECT ${VOLTDB_JNI_SRC})
 ADD_LIBRARY(voltdbipcobjs OBJECT ${VOLTDB_IPC_SRC})
@@ -514,10 +506,6 @@ ADD_DEPENDENCIES(voltdbobjs s2geo crypto pcre2)
 ADD_DEPENDENCIES(voltdbipcobjs s2geo crypto pcre2)
 ADD_DEPENDENCIES(voltdbjniobjs s2geo crypto pcre2)
 
-MESSAGE("VOLTDB_EE_SRC_DIR: ${VOLTDB_EE_SRC_DIR}")
-MESSAGE("VOLTDB_THIRD_PARTY_CPP_DIR: ${VOLTDB_THIRD_PARTY_CPP_DIR}")
-MESSAGE("VOLTDB_THIRD_PARTY_INCLUDE_DIR: ${VOLTDB_THIRD_PARTY_INCLUDE_DIR}")
-MESSAGE("VOLTDB_THIRD_PARTY_INCLUDE_DIR: ${VOLTDB_THIRD_PARTY_INCLUDE_DIR}")
 TARGET_INCLUDE_DIRECTORIES(voltdbobjs
   PUBLIC
   ${VOLTDB_EE_SRC_DIR}
@@ -553,7 +541,6 @@ ADD_LIBRARY(${VOLTDB_LIBNAME}
 TARGET_LINK_LIBRARIES(${VOLTDB_LIBNAME}
   -L${VOLTDB_THIRD_PARTY_INSTALL_DIR}/lib
   -lpcre2-8 -ls2geo -lcrypto
-  ${VOLTDB_LINK_FLAGS}
   ${VOLTDB_LINK_FLAGS})
 
 ########################################################################
@@ -569,9 +556,9 @@ ADD_EXECUTABLE(${VOLTDB_IPCRUN_NAME}
 )
 
 TARGET_LINK_LIBRARIES(${VOLTDB_IPCRUN_NAME}
+  ${VOLTDB_LINK_FLAGS}
   -L${VOLTDB_THIRD_PARTY_INSTALL_DIR}/lib
   -lpcre2-8 -ls2geo -lcrypto
-  ${VOLTDB_LINK_FLAGS}
   -ldl)
 
 INSTALL(TARGETS ${VOLTDB_LIB_NAME}
@@ -585,3 +572,126 @@ INSTALL(TARGETS ${VOLTDB_IPCRUN_NAME}
 # What about voltrun?  Do we use that anymore?  Where is it used?
 #
 ########################################################################
+
+########################################################################
+#
+# Testing
+#
+########################################################################
+set (VOLTDB_TEST_SRC tests/ee)
+set (VOLTDB_TEST_DIR ${CMAKE_BINARY_DIR}/tests)
+set (VOLTDB_TEST_OBJ ${VOLTDB_TEST_DIR}/obj)
+set (VOLTDB_TEST_INSTALL_DIR ${VOLTDB_TEST_DIR}/bin)
+SET (VOLTDB_TEST_PROGRAMS
+  harness_test
+  catalog/catalog_test
+  logging/logging_test
+  memleaktests/definite_losses
+  memleaktests/indirect_losses
+  memleaktests/no_losses
+  memleaktests/still_reachable_losses
+  memleaktests/possible_losses
+  memleaktests/rw_deleted
+  common/debuglog_test
+  common/elastic_hashinator_test
+  common/PerFragmentStatsTest
+  common/nvalue_test
+  common/pool_test
+  common/serializeio_test
+  common/tabletuple_test
+  common/ThreadLocalPoolTest
+  common/tupleschema_test
+  common/undolog_test
+  common/valuearray_test
+  common/uniqueid_test
+  execution/add_drop_table
+  execution/engine_test
+  execution/FragmentManagerTest
+  executors/OptimizedProjectorTest
+  executors/MergeReceiveExecutorTest
+  executors/TestGeneratedPlans
+  executors/TestWindowedRank
+  executors/TestWindowedCount
+  executors/TestWindowedMin
+  executors/TestWindowedMax
+  executors/TestWindowedSum
+  expressions/expression_test
+  expressions/function_test
+  indexes/index_key_test
+  indexes/index_scripted_test
+  indexes/index_test
+  indexes/CompactingHashIndexTest
+  indexes/CompactingTreeMultiIndexTest
+  indexes/CoveringCellIndexTest
+  storage/CompactionTest
+  storage/CopyOnWriteTest
+  storage/DRBinaryLog_test
+  storage/DRTupleStream_test
+  storage/ExportTupleStream_test
+  storage/PersistentTableMemStatsTest
+  storage/StreamedTable_test
+  storage/TempTableLimitsTest
+  storage/constraint_test
+  storage/filter_test
+  storage/persistent_table_log_test
+  storage/persistenttable_test
+  storage/serialize_test
+  storage/table_and_indexes_test
+  storage/table_test
+  storage/tabletuple_export_test
+  storage/tabletuplefilter_test
+  structures/CompactingMapTest
+  structures/CompactingMapIndexCountTest
+  structures/CompactingHashTest
+  structures/CompactingPoolTest
+  structures/CompactingMapBenchmark
+  plannodes/WindowFunctionPlanNodeTest
+  plannodes/PlanNodeFragmentTest
+)
+
+ADD_LIBRARY(voltdb_test_harness
+  OBJECT
+  ${VOLTDB_TEST_SRC}/harness)
+
+TARGET_INCLUDE_DIRECTORIES(voltdb_test_harness
+  PUBLIC
+  ${VOLTDB_EE_SRC_DIR}
+  ${VOLTDB_THIRD_PARTY_CPP_DIR}
+  ${VOLTDB_THIRD_PARTY_INCLUDE_DIR})
+
+SET (VOLTDB_TEST_DIR_LIST "")
+
+FOREACH(TEST_NAME ${VOLTDB_TEST_PROGRAMS})
+  STRING(REGEX REPLACE .*/ "" TEST ${TEST_NAME})
+  STRING(REGEX REPLACE /.* "" DIR ${TEST_NAME})
+  LIST(FIND VOLTDB_TEST_DIR_LIST ${DIR} FIND_IDX)
+  IF (${FIND_IDX} LESS 0)
+    LIST(APPEND VOLTDB_TEST_DIR_LIST ${DIR})
+  ENDIF()
+  LIST(APPEND VOLTDB_TEST_DIR_${DIR} ${TEST})
+ENDFOREACH()
+
+FOREACH (TEST_DIR ${VOLTDB_TEST_DIR_LIST})
+  FOREACH (TEST_NAME ${VOLTDB_TEST_DIR_${TEST_DIR}})
+    ADD_EXECUTABLE(${TEST_NAME}
+      $<TARGET_OBJECTS:voltdb_test_harness>
+      $<TARGET_OBJECTS:voltdbobjs>
+      $<TARGET_OBJECTS:third_party_objs>
+      ${VOLTDB_TEST_SRC}/${TEST_DIR}/${TEST_NAME}.cpp)
+    ADD_DEPENDENCIES(${TEST_NAME}
+      pcre2 crypto s2geo)
+    TARGET_INCLUDE_DIRECTORIES(${TEST_NAME}
+      PUBLIC
+      ${VOLTDB_EE_SRC_DIR}
+      ${VOLTDB_THIRD_PARTY_CPP_DIR}
+      ${VOLTDB_THIRD_PARTY_INCLUDE_DIR}
+      ${VOLTDB_TEST_SRC})
+    TARGET_LINK_LIBRARIES(${TEST_NAME}
+      ${VOLTDB_LINK_FLAGS}
+      -L${VOLTDB_THIRD_PARTY_INSTALL_DIR}/lib
+      -lpcre2-8 -ls2geo -lcrypto
+      -ldl)
+    INSTALL(TARGETS ${TEST_NAME}
+      DESTINATION ${VOLTDB_TEST_INSTALL_DIR}/${TEST_DIR})
+  ENDFOREACH()
+ENDFOREACH()
