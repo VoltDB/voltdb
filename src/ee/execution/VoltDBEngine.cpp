@@ -651,6 +651,7 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const std::string &catal
         m_executorContext->bindToThread();
     }
 
+    VOLT_ERROR("Loading catalog...%d", m_partitionId);
     if (m_partitionId == 16383) {
         // Don't allocate tables on the MP thread because the last SP thread will do that
         return true;
