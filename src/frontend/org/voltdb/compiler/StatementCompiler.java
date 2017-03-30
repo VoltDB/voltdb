@@ -308,7 +308,7 @@ public abstract class StatementCompiler {
             Statement catalogStmt, String sqlText, String joinOrder,
             DeterminismMode detMode, StatementPartitioning partitioning)
     throws VoltCompiler.VoltCompilerException {
-        return compileStatementAndUpdateCatalog(compiler, hsql, catalog, db, estimates, catalogStmt,
+        return compileStatementAndUpdateCatalog(compiler, hsql, db, estimates, catalogStmt,
                 null, // VoltXML
                 sqlText, joinOrder, detMode, partitioning);
     }

@@ -32,7 +32,6 @@ import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.compiler.VoltCompiler;
-import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.BuildDirectoryUtils;
 
 import junit.framework.TestCase;
@@ -54,24 +53,7 @@ public class TestCalcite extends TestCase {
     }
 
     private boolean compileDDL(String ddl, VoltCompiler compiler) {
-        final File schemaFile = VoltProjectBuilder.writeStringToTempFile(ddl);
-        final String schemaPath = schemaFile.getPath();
-
-        final String simpleProject =
-            "<?xml version=\"1.0\"?>\n" +
-            "<project>" +
-            "<database name='database'>" +
-            "<schemas>" +
-            "<schema path='" + schemaPath + "' />" +
-            "</schemas>" +
-            "<procedures/>" +
-            "</database>" +
-            "</project>";
-
-        final File projectFile = VoltProjectBuilder.writeStringToTempFile(simpleProject);
-        final String projectPath = projectFile.getPath();
-
-        return compiler.compileWithProjectXML(projectPath, testout_jar);
+        return compiler.compileDDLString(ddl, testout_jar);
     }
 
     private CatalogMap<Table> getCatalogTables(Catalog catalog) {
@@ -79,7 +61,7 @@ public class TestCalcite extends TestCase {
     }
 
     private SchemaPlus schemaPlusFromDDL(String ddl) {
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(true, false);
         boolean success = compileDDL(ddl, compiler);
 
         assertTrue(success);
@@ -94,7 +76,7 @@ public class TestCalcite extends TestCase {
     }
 
     private Catalog ddlToCatalog(String ddl) {
-        VoltCompiler compiler = new VoltCompiler();
+        VoltCompiler compiler = new VoltCompiler(true, false);
         boolean success = compileDDL(ddl, compiler);
 
         assertTrue(success);

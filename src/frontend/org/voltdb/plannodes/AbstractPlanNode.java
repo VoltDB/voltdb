@@ -1262,4 +1262,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         m_children.get(0).adjustDifferentiatorField(tve);
     }
 
+    public void setOutputSchema(NodeSchema schema) {
+        m_outputSchema = schema;
+    }
 }
