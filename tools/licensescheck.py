@@ -431,6 +431,7 @@ else:
 # assumes a single valid license in $repo/tools/approved_licenses/license.txt
 # "${voltpro}" is the build.xml property - can be seen as a literal if the
 # property is not set.
+(profixcount, proerrcount) = (0, 0)
 if not ascommithook:
     for arg in sys.argv[1:]:
         if parsing_options and arg[0:2] == "--":
@@ -445,24 +446,25 @@ if not ascommithook:
                 pathprefix = os.path.join("..", arg)
             proLicenses = [pathprefix + '/tools/approved_licenses/license.txt']
             proLicensesPy = [pathprefix + '/tools/approved_licenses/license_python.txt']
-            (fixcount, errcount) = (0, 0)
             (fixinc, errinc) = processAllFiles(pathprefix + "/src/", fix,
                 tuple([readFile(f) for f in proLicenses]),
                 tuple([readFile(f) for f in proLicensesPy]))
-            fixcount += fixinc
-            errcount += errinc
+            profixcount += fixinc
+            proerrcount += errinc
 
             (fixinc, errinc) = processAllFiles(pathprefix + "/tests/", fix,
                 tuple([readFile(f) for f in proLicenses]),
                 tuple([readFile(f) for f in proLicensesPy]))
-            fixcount += fixinc
-            errcount += errinc
+            profixcount += fixinc
+            proerrcount += errinc
 
-            if errcount == 0:
+            if proerrcount == 0:
                 print "SUCCESS. Found 0 license text errors, 0 files containing tabs or trailing whitespace."
             else:
-                print "FAILURE (%s). Found %d license text or whitespace errors." % (arg, errcount)
+                print "FAILURE (%s). Found %d license text or whitespace errors." % (arg, proerrcount)
 
 
-
-sys.exit(errcount)
+if (errcount + proerrcount) == 0:
+    sys.exit(0)
+else:
+    sys.exit(1)
