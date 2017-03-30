@@ -178,8 +178,6 @@ def copyFilesToReleaseDir(releaseDir, version, type=None):
 def copyCommunityFilesToReleaseDir(releaseDir, version, operatingsys):
     get("%s/voltdb/obj/release/voltdb-%s.tar.gz" % (builddir, version),
         "%s/voltdb-%s.tar.gz" % (releaseDir, version))
-    get("%s/voltdb/obj/release/voltdb-client-java-%s.tar.gz" % (builddir, version),
-        "%s/voltdb-client-java-%s.tar.gz" % (releaseDir, version))
 
     # add stripped symbols
     if operatingsys == "LINUX":
