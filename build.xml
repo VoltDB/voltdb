@@ -891,24 +891,6 @@ DISTRIBUTION
         </fileset>
     </chmod>
 
-    <!-- create an archive for distribution -->
-    <exec executable="mv" failonerror="true">
-        <arg value="${raw.dist.dir}/dist-client-java"/>
-        <arg value="${raw.dist.dir}/voltdb-client-java-${dist.version}"/>
-    </exec>
-    <exec executable="tar" failonerror="true">
-        <arg value="-cz"/>
-        <arg value="-C"/>
-        <arg value="${raw.dist.dir}"/>
-        <arg value="-f"/>
-        <arg value="${raw.dist.dir}/voltdb-client-java-${dist.version}.tar.gz"/>
-        <arg value="voltdb-client-java-${dist.version}"/>
-    </exec>
-    <!-- move it back to dist directory for downstream dependencies -->
-    <exec executable="mv" failonerror="true">
-        <arg value="${raw.dist.dir}/voltdb-client-java-${dist.version}"/>
-        <arg value="${raw.dist.dir}/dist-client-java"/>
-    </exec>
 </target>
 
 <target name="prep_libvoltdb">
