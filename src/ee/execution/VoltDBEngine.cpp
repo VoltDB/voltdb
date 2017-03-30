@@ -677,7 +677,7 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const std::string &catal
     }
 
     if (SynchronizedThreadLock::countDownGlobalTxnStartCount()) {
-        VOLT_ERROR("loading replicated parts of catalog from partition %d", m_partitionId);
+        VOLT_DEBUG("loading replicated parts of catalog from partition %d", m_partitionId);
         EngineLocals* ourEngineLocals = &enginesByPartitionId[m_partitionId];
         VoltDBEngine* mpEngine = mpEngineLocals.context->getContextEngine();
         ExecutorContext::assignThreadLocals(mpEngineLocals);
