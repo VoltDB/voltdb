@@ -1,3 +1,40 @@
+########################################################################
+#
+# A CMake build configuration for VoltDB.
+#
+# To use this, in the root of the voltdb hierarchy, run
+#   1.) mkdir obj/${BUILD_TYPE}
+#       where ${BUILD_TYPE} is memcheck, release or debug.
+#   2.) cd obj/${BUILD_TYPE}
+#   3.) cmake -DVOLTDB_BUILD_TYPE=${BUILD_TYPE}
+#   4.) make -j<N> -k install
+#       where, as usual, <N> is number telling make how much parallelism
+#       to use.  Values between 1 and 8 are typical.  Higher values
+#       may produce faster builds, or they may just gum things up.
+# If this succeeds, then the build artifacts will be placed in
+# obj/${BUILD}/prod/.
+#
+# The two artifacts are:
+#   1.) The jni library, which will be in
+#           nativelibs/libvoltdb-VERSION.so
+#       for Linux and
+#           nativelibs/libvoltdb-VERSION.dylib
+#       for Darwin.
+#   2.) The voltdbipcrun program, which is used for memory leak detection,
+#       and to debug this EE.  This will be found in prod/voltdbipcrun
+#       on both Linux and Darwin.
+#
+# Note that only GCC is supported on Linux, and only Clang is
+# supported on Darwin.
+#
+# This requires a gcc compiler version of at least 4.4.7, and a cmake
+# version of at least 2.8.12.  It's possible that older versions of
+# cmake will work, but 2.8.7, which is the released version for
+# Ubuntu 12.04, will be too old.  Recompiling a more recent cmake
+# version might very well make Ubuntu 12.04 a viable platform, but we
+# have not tested this.
+#
+########################################################################
 CMAKE_MINIMUM_REQUIRED (VERSION 2.8.12 FATAL_ERROR)
 PROJECT(VoltDB_EE)
 INCLUDE(ExternalProject)
@@ -537,8 +574,11 @@ TARGET_LINK_LIBRARIES(${VOLTDB_IPCRUN_NAME}
   ${VOLTDB_LINK_FLAGS}
   -ldl)
 
-INSTALL(TARGETS ${VOLTDB_LIBNAME} ${VOLTDB_IPCRUN_NAME}
-  DESTINATION ${CMAKE_SOURCE_DIR}/prod)
+INSTALL(TARGETS ${VOLTDB_LIB_NAME}
+  DESTINATION ${CMAKE_BINARY_DIR}/nativelibs)
+
+INSTALL(TARGETS ${VOLTDB_IPCRUN_NAME}
+  DESTINATION ${CMAKE_BINARY_DIR}/prod)
 
 ########################################################################
 #
