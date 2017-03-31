@@ -444,7 +444,7 @@ if whichtests == None:
 
 # input format similar to source, but the executable name is listed
 if whichtests ==  "${eetestsuite}":
-    CTX.TESTS['.'] = """
+    CTX.TESTS['harness_test'] = """
      harness_test
     """
 

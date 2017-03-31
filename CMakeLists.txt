@@ -49,6 +49,7 @@ INCLUDE(ExternalProject)
 #                           The default is 500.  This is cached, so it
 #                           needs to be specified to cmake each time it needs
 #                           to be changed.
+#          Some Local Variables when configuring tests.
 # 2. Object files generally go into these folders.
 #      ${CMAKE_BINARY_DIR}  Root of the output tree.  This is
 #                           generally obj/debug, obj/release or obj/memcheck.
@@ -81,6 +82,7 @@ ENDIF ()
 STRING(TOUPPER "${VOLTDB_BUILD_TYPE}" VOLTDB_BUILD_TYPE)
 IF ((VOLTDB_BUILD_TYPE STREQUAL "MEMCHECK") OR (VOLTDB_BUILD_TYPE STREQUAL "MEMCHECK_NOFREELIST"))
   ADD_COMPILE_OPTIONS(-DDEBUG -DMEMCHECK )
+  SET (VOLTDB_USE_VALGRIND --valgrind)
 ELSEIF (VOLTDB_BUILD_TYPE STREQUAL "DEBUG")
   ADD_COMPILE_OPTIONS(-g3 -DDEBUG)
 ELSEIF (VOLTDB_BUILD_TYPE STREQUAL "RELEASE")
@@ -95,6 +97,10 @@ ENDIF()
 ########################################################################
 # This is for our sources, relative to the source directory.
 SET (VOLTDB_EE_SRC_DIR src/ee)
+# This is for output names, relative to the binary directory.
+SET(VOLTDB_EE_OBJ_DIR obj/ee)
+SET(VOLTDB_EE_TEST_DIR tests/ee)
+
 # This is for third party sources, relative to the source directory.
 SET (VOLTDB_THIRD_PARTY_CPP_DIR third_party/cpp)
 # This is where we install third party artifacts.
@@ -538,6 +544,9 @@ ADD_LIBRARY(${VOLTDB_LIBNAME}
   $<TARGET_OBJECTS:third_party_objs>
   )
 
+SET_TARGET_PROPERTIES(${VOLTDB_LIBNAME}
+  PROPERTIES
+  OUTPUT_NAME ${VOLTDB_EE_OBJ_DIR}/${VOLTDB_LIBNAME})
 TARGET_LINK_LIBRARIES(${VOLTDB_LIBNAME}
   -L${VOLTDB_THIRD_PARTY_INSTALL_DIR}/lib
   -lpcre2-8 -ls2geo -lcrypto
@@ -555,13 +564,21 @@ ADD_EXECUTABLE(${VOLTDB_IPCRUN_NAME}
   $<TARGET_OBJECTS:voltdbipcobjs>
 )
 
+SET_TARGET_PROPERTIES(${VOLTDB_IPCRUN_NAME}
+  PROPERTIES
+  OUTPUT_NAME ${VOLTDB_EE_OBJ_DIR}/${VOLTDB_IPCRUN_NAME})
 TARGET_LINK_LIBRARIES(${VOLTDB_IPCRUN_NAME}
   ${VOLTDB_LINK_FLAGS}
   -L${VOLTDB_THIRD_PARTY_INSTALL_DIR}/lib
   -lpcre2-8 -ls2geo -lcrypto
   -ldl)
 
-INSTALL(TARGETS ${VOLTDB_LIB_NAME}
+########################################################################
+#
+# Where to install things, and what to install.
+#
+########################################################################
+INSTALL(TARGETS ${VOLTDB_LIBNAME}
   DESTINATION ${CMAKE_BINARY_DIR}/nativelibs)
 
 INSTALL(TARGETS ${VOLTDB_IPCRUN_NAME}
@@ -582,16 +599,22 @@ set (VOLTDB_TEST_SRC tests/ee)
 set (VOLTDB_TEST_DIR ${CMAKE_BINARY_DIR}/tests)
 set (VOLTDB_TEST_OBJ ${VOLTDB_TEST_DIR}/obj)
 set (VOLTDB_TEST_INSTALL_DIR ${VOLTDB_TEST_DIR}/bin)
+
+#
+# Here we have all the names of tests which are expected to pass.
+# They have the form directory/test_name.  The test names must all be globally
+# unique.  We test for this later on.
+# 
 SET (VOLTDB_TEST_PROGRAMS
-  harness_test
+  harness_test/harness_test
   catalog/catalog_test
   logging/logging_test
   memleaktests/definite_losses
   memleaktests/indirect_losses
-  memleaktests/no_losses
   memleaktests/still_reachable_losses
   memleaktests/possible_losses
   memleaktests/rw_deleted
+  memleaktests/no_losses
   common/debuglog_test
   common/elastic_hashinator_test
   common/PerFragmentStatsTest
@@ -659,16 +682,27 @@ TARGET_INCLUDE_DIRECTORIES(voltdb_test_harness
   ${VOLTDB_THIRD_PARTY_CPP_DIR}
   ${VOLTDB_THIRD_PARTY_INCLUDE_DIR})
 
+#
+# Calculate the list of directories and the list of
+# tests in each directory.  The test names must be be
+# unique, even ignoring directories.
+#
 SET (VOLTDB_TEST_DIR_LIST "")
+SET (VOLTDB_TEST_ALLTESTS "")
 
 FOREACH(TEST_NAME ${VOLTDB_TEST_PROGRAMS})
   STRING(REGEX REPLACE .*/ "" TEST ${TEST_NAME})
   STRING(REGEX REPLACE /.* "" DIR ${TEST_NAME})
+  LIST(FIND VOLTDB_TEST_ALLTESTS ${TEST} FIND_IDX)
+  IF (NOT ${FIND_IDX} LESS 0)
+    MESSAGE(FATAL_ERROR "Duplicate test name ${TEST_NAME}")
+  ENDIF()
   LIST(FIND VOLTDB_TEST_DIR_LIST ${DIR} FIND_IDX)
   IF (${FIND_IDX} LESS 0)
     LIST(APPEND VOLTDB_TEST_DIR_LIST ${DIR})
   ENDIF()
   LIST(APPEND VOLTDB_TEST_DIR_${DIR} ${TEST})
+  LIST(APPEND VOLTDB_TEST_ALLTESTS ${TEST})
 ENDFOREACH()
 
 FOREACH (TEST_DIR ${VOLTDB_TEST_DIR_LIST})
@@ -678,6 +712,9 @@ FOREACH (TEST_DIR ${VOLTDB_TEST_DIR_LIST})
       $<TARGET_OBJECTS:voltdbobjs>
       $<TARGET_OBJECTS:third_party_objs>
       ${VOLTDB_TEST_SRC}/${TEST_DIR}/${TEST_NAME}.cpp)
+    SET_TARGET_PROPERTIES(${TEST_NAME}
+      PROPERTIES
+      OUTPUT_NAME ${VOLTDB_EE_TEST_DIR}/${TEST_NAME})
     ADD_DEPENDENCIES(${TEST_NAME}
       pcre2 crypto s2geo)
     TARGET_INCLUDE_DIRECTORIES(${TEST_NAME}
@@ -695,3 +732,8 @@ FOREACH (TEST_DIR ${VOLTDB_TEST_DIR_LIST})
       DESTINATION ${VOLTDB_TEST_INSTALL_DIR}/${TEST_DIR})
   ENDFOREACH()
 ENDFOREACH()
+
+ADD_CUSTOM_TARGET(runalltests
+  DEPENDS ${VOLTDB_TEST_ALLTESTS} install
+  COMMAND ${CMAKE_SOURCE_DIR}/tools/runalltests.py ${VOLTDB_USE_VALGRIND} ${VOLTDB_TEST_PROGRAMS}
+  )
