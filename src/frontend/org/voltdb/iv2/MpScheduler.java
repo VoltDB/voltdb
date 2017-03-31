@@ -241,6 +241,7 @@ public class MpScheduler extends Scheduler
                     timestamp,
                     message.isReadOnly(),
                     true, // isSinglePartition
+                    null,
                     message.getStoredProcedureInvocation(),
                     message.getClientInterfaceHandle(),
                     message.getConnectionId(),
@@ -268,6 +269,7 @@ public class MpScheduler extends Scheduler
                     timestamp,
                     message.isReadOnly(),
                     message.isSinglePartition(),
+                    null,
                     message.getStoredProcedureInvocation(),
                     message.getClientInterfaceHandle(),
                     message.getConnectionId(),
@@ -287,6 +289,30 @@ public class MpScheduler extends Scheduler
 
             // if cannot figure out the involved partitions, run it as an MP txn
         }
+
+        // temp debugging for n-part transactions
+        /*String msg = String.format("Running MP/NP proc named %s", message.getStoredProcedureInvocation().getProcName());
+        System.out.println(msg);
+        System.out.flush();*/
+
+        int[] nPartitionIds = message.getNParitionIds();
+        if (nPartitionIds != null) {
+            HashMap<Integer, Long> involvedPartitionMasters = new HashMap<>();
+            for (int partitionId : nPartitionIds) {
+                involvedPartitionMasters.put(partitionId, m_partitionMasters.get(partitionId));
+            }
+
+            // temp debugging for n-part transactions
+            /*msg = String.format("Running NP proc on two partitions: %d and %d", nPartitionIds[0], nPartitionIds[1]);
+            msg += String.format(" - Invovled partition masters is %d", involvedPartitionMasters.size());
+            System.out.println(msg);
+            System.out.flush();*/
+
+            task = instantiateNpProcedureTask(m_mailbox, procedureName,
+                    m_pendingTasks, mp, involvedPartitionMasters,
+                    m_buddyHSIds.get(m_nextBuddy), false);
+        }
+
 
         if (task == null) {
             task = new MpProcedureTask(m_mailbox, procedureName,
@@ -354,6 +380,7 @@ public class MpScheduler extends Scheduler
                     message.getUniqueId(),
                     message.isReadOnly(),
                     message.isSinglePartition(),
+                    null,
                     message.getStoredProcedureInvocation(),
                     message.getClientInterfaceHandle(),
                     message.getConnectionId(),

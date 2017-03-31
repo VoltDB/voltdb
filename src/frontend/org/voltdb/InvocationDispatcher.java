@@ -482,9 +482,9 @@ public final class InvocationDispatcher {
         // If you're going to copy and paste something, CnP the pattern
         // up above.  -rtb.
 
-        int partition = -1;
+        int[] partitions = null;
         try {
-            partition = getPartitionForProcedure(catProc, task);
+            partitions = getPartitionsForProcedure(catProc, task);
         } catch (Exception e) {
             // unable to hash to a site, return an error
             return getMispartitionedErrorResponse(task, catProc, e);
@@ -494,7 +494,7 @@ public final class InvocationDispatcher {
                         catProc.getReadonly(),
                         catProc.getSinglepartition(),
                         catProc.getEverysite(),
-                        partition,
+                        partitions,
                         task.getSerializedSize(),
                         nowNanos);
         if (!success) {
@@ -970,7 +970,7 @@ public final class InvocationDispatcher {
                           catProc.getReadonly(),
                           catProc.getSinglepartition(),
                           catProc.getEverysite(),
-                          partition,
+                          new int[] { partition },
                           task.getSerializedSize(),
                           System.nanoTime());
         return null;
@@ -1518,7 +1518,7 @@ public final class InvocationDispatcher {
                 // initiate the transaction. These hard-coded values from catalog
                 // procedure are horrible, horrible, horrible.
                 createTransaction(changeResult.connectionId,
-                        task, false, false, false, 0, task.getSerializedSize(),
+                        task, false, false, false, null, task.getSerializedSize(),
                         System.nanoTime());
             }
 
@@ -1764,7 +1764,7 @@ public final class InvocationDispatcher {
             // initiate the transaction
             createTransaction(plannedStmtBatch.connectionId, task,
                     plannedStmtBatch.isReadOnly(), isSinglePartition, false,
-                    partition,
+                    new int[] { partition },
                     task.getSerializedSize(), System.nanoTime());
         }
     }
@@ -1776,7 +1776,7 @@ public final class InvocationDispatcher {
             final boolean isReadOnly,
             final boolean isSinglePartition,
             final boolean isEveryPartition,
-            final int partition,
+            final int[] partitions,
             final int messageSize,
             final long nowNanos)
     {
@@ -1788,7 +1788,7 @@ public final class InvocationDispatcher {
                 isReadOnly,
                 isSinglePartition,
                 isEveryPartition,
-                partition,
+                partitions,
                 messageSize,
                 nowNanos,
                 false);  // is for replay.
@@ -1803,12 +1803,12 @@ public final class InvocationDispatcher {
             final boolean isReadOnly,
             final boolean isSinglePartition,
             final boolean isEveryPartition,
-            final int partition,
+            final int[] partitions,
             final int messageSize,
             long nowNanos,
             final boolean isForReplay)
     {
-        assert(!isSinglePartition || (partition >= 0));
+        assert(!isSinglePartition || (partitions.length == 1));
         final ClientInterfaceHandleManager cihm = m_cihm.get(connectionId);
         if (cihm == null) {
             hostLog.rateLimitedLog(60, Level.WARN, null,
@@ -1830,12 +1830,12 @@ public final class InvocationDispatcher {
          */
         if (isSinglePartition && !isEveryPartition) {
             if (isReadOnly && (m_defaultConsistencyReadLevel == ReadLevel.FAST)) {
-                initiatorHSId = m_localReplicas.get().get(partition);
+                initiatorHSId = m_localReplicas.get().get(partitions[0]);
             }
             if (initiatorHSId != null) {
                 isShortCircuitRead = true;
             } else {
-                initiatorHSId = m_cartographer.getHSIdForSinglePartitionMaster(partition);
+                initiatorHSId = m_cartographer.getHSIdForSinglePartitionMaster(partitions[0]);
             }
         } else {
             // Multi-part transactions go to the multi-part coordinator
@@ -1848,7 +1848,7 @@ public final class InvocationDispatcher {
             }
         }
 
-        long handle = cihm.getHandle(isSinglePartition, partition, invocation.getClientHandle(),
+        long handle = cihm.getHandle(isSinglePartition, isSinglePartition ? partitions[0] : -1, invocation.getClientHandle(),
                 messageSize, nowNanos, invocation.getProcName(), initiatorHSId, isReadOnly, isShortCircuitRead);
 
         Iv2InitiateTaskMessage workRequest =
@@ -1859,6 +1859,7 @@ public final class InvocationDispatcher {
                     uniqueId,
                     isReadOnly,
                     isSinglePartition,
+                    (partitions == null) || (partitions.length < 2) ? null : partitions,
                     invocation,
                     handle,
                     connectionId,
@@ -1869,14 +1870,28 @@ public final class InvocationDispatcher {
         return true;
     }
 
-    final static int getPartitionForProcedure(Procedure procedure, StoredProcedureInvocation task) {
+    final static int[] getPartitionsForProcedure(Procedure procedure, StoredProcedureInvocation task) {
+
         final CatalogContext.ProcedurePartitionInfo ppi =
-                (CatalogContext.ProcedurePartitionInfo)procedure.getAttachment();
+                (CatalogContext.ProcedurePartitionInfo) procedure.getAttachment();
+
         if (procedure.getSinglepartition()) {
             // break out the Hashinator and calculate the appropriate partition
-            return getPartitionForProcedure( ppi.index, ppi.type, task);
-        } else {
-            return MpInitiator.MP_INIT_PID;
+            return new int[] { getPartitionForProcedureParameter( ppi.index, ppi.type, task) };
+        }
+        else if (procedure.getPartitioncolumn2() != null) {
+             // two-partition procedure
+            VoltType partitionParamType1 = VoltType.get((byte)procedure.getPartitioncolumn().getType());
+            VoltType partitionParamType2 = VoltType.get((byte)procedure.getPartitioncolumn2().getType());
+
+            int p1 = getPartitionForProcedureParameter(procedure.getPartitionparameter(), partitionParamType1, task);
+            int p2 = getPartitionForProcedureParameter(procedure.getPartitionparameter2(), partitionParamType2, task);
+
+            return new int[] { p1, p2 };
+        }
+        else {
+            // multi-partition procedure
+            return new int[] { MpInitiator.MP_INIT_PID };
         }
     }
 
@@ -1909,7 +1924,7 @@ public final class InvocationDispatcher {
      * Identify the partition for an execution site task.
      * @return The partition best set up to execute the procedure.
      */
-    final static int getPartitionForProcedure(int partitionIndex, VoltType partitionType, StoredProcedureInvocation task) {
+    final static int getPartitionForProcedureParameter(int partitionIndex, VoltType partitionType, StoredProcedureInvocation task) {
         Object invocationParameter = task.getParameterAtIndex(partitionIndex);
         return TheHashinator.getPartitionForParameter(partitionType, invocationParameter);
     }
