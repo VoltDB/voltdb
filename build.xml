@@ -44,7 +44,7 @@
 <envdefault prop="build" var="VOLTBUILD" default="release" />
 <envdefault prop="jmemcheck" var="JMEMCHECK" default="memcheck" />
 
-<!-- enable code coverage for JUnit's -->
+<!-- enable code coverage for JUnit's if USE_JACOCO in environment-->
 <condition property="use_jacoco" value="true">
     <isset property="env.USE_JACOCO"/>
 </condition>
