@@ -353,7 +353,9 @@ public class TestJSONInterface extends TestCase {
         }
 
         String ret = callProcOverJSONRaw(params, httpPort, expectedCode);
-        if (preHash) {
+        // Update application catalog sometimes changes the password.
+        // The second procedure call will fail in that case, so don't call it a second time.
+        if (preHash && !procName.equals("@UpdateApplicationCatalog")) {
             //If prehash make same call with SHA1 to check expected code.
             params.put("Hashedpassword", getHashedPasswordForHTTPVar(password, ClientAuthScheme.HASH_SHA1));
             callProcOverJSONRaw(params, httpPort, expectedCode);
@@ -1140,7 +1142,7 @@ public class TestJSONInterface extends TestCase {
                 return;
             }
 
-        // ENG-963 below here
+            // ENG-963 below here
             // do enough to get a new deployment file
             VoltProjectBuilder builder2 = new VoltProjectBuilder();
             builder2.addSchema(schemaPath);
