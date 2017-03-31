@@ -26,7 +26,7 @@
             includes="@{includes}"
             encoding='UTF-8'
             debug='true'
-            debuglevel="lines,vars,source"
+            debuglevel="lines"
             includeAntRuntime='false'>
             <classpath refid="project.classpath" />
         </javac>
