@@ -137,6 +137,15 @@ def makeTrialLicense(days=30, dr_and_xdcr="true", nodes=12):
         run("./make_trial_licenses.pl -t %d -H %d -W %s" % (days, nodes, dr_and_xdcr ))
 
 ################################################
+# MAKE A SHA256 checksum
+################################################
+
+def makeSHA256SUM(version, type):
+    with cd(builddir + "/pro/obj/pro"):
+        kitname="voltdb-" +  type + "-" + version
+        run("sha256sum -b %s.tar.gz > %s.SHA256SUM" % (kitname, kitname))
+
+################################################
 # MAKE AN JAR FILES NEEDED TO PUSH TO MAVEN
 ################################################
 
@@ -156,6 +165,8 @@ def copyFilesToReleaseDir(releaseDir, version, type=None):
         typeString=""
     get("%s/pro/obj/pro/voltdb%s-%s.tar.gz" % (builddir, typeString, version),
         "%s/voltdb%s-%s.tar.gz" % (releaseDir, typeString, version))
+    get("%s/pro/obj/pro/voltdb%s-%s.SHA256SUM" % (builddir, typeString, version),
+        "%s/voltdb%s-%s.SHA256SUM" % (releaseDir, typeString, version))
 
 def copyCommunityFilesToReleaseDir(releaseDir, version, operatingsys):
     get("%s/voltdb/obj/release/voltdb-%s.tar.gz" % (builddir, version),
@@ -188,28 +199,6 @@ def copyMavenJarsToReleaseDir(releaseDir, version):
         "%s/voltdbclient-%s-javadoc.jar" % (mavenProjectDir, version))
     get("%s/voltdb/obj/release/voltdbclient-%s-sources.jar" % (builddir, version),
         "%s/voltdbclient-%s-sources.jar" % (mavenProjectDir, version))
-
-################################################
-# COMPUTE CHECKSUMS
-################################################
-
-def computeChecksums(releaseDir):
-    md5cmd = "md5sum"
-    sha1cmd = "sha1sum"
-    if os.uname()[0] == "Darwin":
-        md5cmd = "md5 -r"
-        sha1cmd = "shasum -a 1"
-
-    with lcd(releaseDir):
-        local('echo "CRC checksums:" > checksums.txt')
-        local('echo "" >> checksums.txt')
-        local('cksum *.*z* >> checksums.txt')
-        local('echo "MD5 checksums:" >> checksums.txt')
-        local('echo "" >> checksums.txt')
-        local('%s *.*z* >> checksums.txt' % md5cmd)
-        local('echo "SHA1 checksums:" >> checksums.txt')
-        local('echo "" >> checksums.txt')
-        local('%s *.*z* >> checksums.txt' % sha1cmd)
 
 ################################################
 # CREATE CANDIDATE SYMLINKS
@@ -291,8 +280,8 @@ CentosSSHInfo = getSSHInfoForHost("volt15a")
 MacSSHInfo = getSSHInfoForHost("voltmini")
 UbuntuSSHInfo = getSSHInfoForHost("volt12d")
 
-# build kits on the mini
-if build_mac and build_community:
+# build community kit on the mini so that .so can be picked up for unified kit
+if build_mac or build_community:
     try:
         with settings(user=username,host_string=MacSSHInfo[1],disable_known_hosts=True,key_filename=MacSSHInfo[0]):
             versionMac = checkoutCode(voltdbTreeish, proTreeish, rbmqExportTreeish, args.gitloc)
@@ -321,9 +310,10 @@ try:
             copyCommunityFilesToReleaseDir(releaseDir, versionCentos, "LINUX")
         buildEnterprise()
         buildRabbitMQExport(versionCentos)
+        makeSHA256SUM(versionCentos,"ent")
         copyFilesToReleaseDir(releaseDir, versionCentos, "ent")
-
         packagePro(versionCentos)
+        makeSHA256SUM(versionCentos,"pro")
         copyFilesToReleaseDir(releaseDir, versionCentos, "pro")
         makeTrialLicense()
         copyTrialLicenseToReleaseDir(releaseDir)
@@ -334,9 +324,6 @@ except Exception as e:
     print traceback.format_exc()
     print "Could not build LINUX kit. Exception: " + str(e) + ", Type: " + str(type(e))
     build_errors=True
-
-
-computeChecksums(releaseDir)
 
 rmNativeLibs()      # cleanup imported native libs so not picked up unexpectedly by other builds
 
