@@ -80,7 +80,13 @@ IF (NOT DEFINED VOLTDB_BUILD_TYPE)
   MESSAGE (FATAL ERROR "VOLTDB_BUILD_TYPE is not defined.")
 ENDIF ()
 STRING(TOUPPER "${VOLTDB_BUILD_TYPE}" VOLTDB_BUILD_TYPE)
-IF ((VOLTDB_BUILD_TYPE STREQUAL "MEMCHECK") OR (VOLTDB_BUILD_TYPE STREQUAL "MEMCHECK_NOFREELIST"))
+IF ((${VOLTDB_BUILD_TYPE} STREQUAL "MEMCHECK") OR (${VOLTDB_BUILD_TYPE} STREQUAL "MEMCHECK_NOFREELIST"))
+  SET (IS_VALGRIND_BUILD TRUE)
+ELSE()
+  SET(IS_VALGRIND_BUILD FALSE)
+ENDIF()
+
+IF (IS_VALGRIND_BUILD)
   ADD_COMPILE_OPTIONS(-DDEBUG -DMEMCHECK )
   SET (VOLTDB_USE_VALGRIND --valgrind)
 ELSEIF (VOLTDB_BUILD_TYPE STREQUAL "DEBUG")
@@ -544,9 +550,6 @@ ADD_LIBRARY(${VOLTDB_LIBNAME}
   $<TARGET_OBJECTS:third_party_objs>
   )
 
-SET_TARGET_PROPERTIES(${VOLTDB_LIBNAME}
-  PROPERTIES
-  OUTPUT_NAME ${VOLTDB_EE_OBJ_DIR}/${VOLTDB_LIBNAME})
 TARGET_LINK_LIBRARIES(${VOLTDB_LIBNAME}
   -L${VOLTDB_THIRD_PARTY_INSTALL_DIR}/lib
   -lpcre2-8 -ls2geo -lcrypto
@@ -564,9 +567,6 @@ ADD_EXECUTABLE(${VOLTDB_IPCRUN_NAME}
   $<TARGET_OBJECTS:voltdbipcobjs>
 )
 
-SET_TARGET_PROPERTIES(${VOLTDB_IPCRUN_NAME}
-  PROPERTIES
-  OUTPUT_NAME ${VOLTDB_EE_OBJ_DIR}/${VOLTDB_IPCRUN_NAME})
 TARGET_LINK_LIBRARIES(${VOLTDB_IPCRUN_NAME}
   ${VOLTDB_LINK_FLAGS}
   -L${VOLTDB_THIRD_PARTY_INSTALL_DIR}/lib
@@ -589,17 +589,27 @@ INSTALL(TARGETS ${VOLTDB_IPCRUN_NAME}
 # What about voltrun?  Do we use that anymore?  Where is it used?
 #
 ########################################################################
-
+ADD_CUSTOM_TARGET(build
+  DEPENDS
+  ${VOLTDB_LIBNAME}
+  ${VOLTDB_IPCRUN_NAME})
 ########################################################################
 #
 # Testing
 #
 ########################################################################
-set (VOLTDB_TEST_SRC tests/ee)
-set (VOLTDB_TEST_DIR ${CMAKE_BINARY_DIR}/tests)
-set (VOLTDB_TEST_OBJ ${VOLTDB_TEST_DIR}/obj)
-set (VOLTDB_TEST_INSTALL_DIR ${VOLTDB_TEST_DIR}/bin)
-
+ENABLE_TESTING()
+SET (VOLTDB_TEST_SRC tests/ee)
+SET (VOLTDB_TEST_DIR ${CMAKE_BINARY_DIR}/tests)
+SET (VOLTDB_TEST_OBJ ${VOLTDB_TEST_DIR}/obj)
+SET (VOLTDB_TEST_INSTALL_DIR ${VOLTDB_TEST_DIR}/bin)
+#
+# All the tests in ${VOLTDB_FAILING_VALGRIND_DIRS} are
+# expected to fail under valgrind except for those
+# named in VOLTDB_PASSING_VALGRIND_TESTS.
+#
+SET (VOLTDB_FAILING_VALGRIND_DIRS memleaktests)
+SET (VOLTDB_PASSING_VALGRIND_TESTS no_losses)
 #
 # Here we have all the names of tests which are expected to pass.
 # They have the form directory/test_name.  The test names must all be globally
@@ -705,8 +715,45 @@ FOREACH(TEST_NAME ${VOLTDB_TEST_PROGRAMS})
   LIST(APPEND VOLTDB_TEST_ALLTESTS ${TEST})
 ENDFOREACH()
 
+FUNCTION(VALGRIND_FILE_NAME TARGET_DIR TARGET_NAME OUTPUT_VAR)
+  SET(${OUTPUT_VAR} valgrind_ee_${TARGET_DIR}_${TARGET_NAME}.xml PARENT_SCOPE)
+ENDFUNCTION()
+
+function(JOIN VALUES GLUE OUTPUT)
+  string (REPLACE ";" "${GLUE}" _TMP_STR "${VALUES}")
+  set (${OUTPUT} "${_TMP_STR}" PARENT_SCOPE)
+endfunction()
+
+FUNCTION(VALGRIND_COMMAND TARGET_DIR TARGET_NAME TEST_EXE_CMD OUTPUT_VAR)
+  SET(SUPPRESSIONS ${CMAKE_SOURCE_DIR}/${VOLTDB_EE_TEST_DIR}/test_utils/vdbsuppressions.supp)
+  IF (${IS_VALGRIND_BUILD})
+    VALGRIND_FILE_NAME(${TARGET_DIR} ${TARGET_NAME} VGFN)
+    SET(CMD_LIST
+      "valgrind"
+      "--leak-check=full"
+      "--show-leak-kinds=all"
+      "--errors-for-leak-kinds=all"
+      "--error-exitcode=1"
+      "--suppressions=${SUPPRESSIONS}"
+      "--xml=yes"
+      "--xml-file=${VGFN}"
+      ${TEST_EXE_CMD})
+    SET(${OUTPUT_VAR}
+      ${CMD_LIST}
+      PARENT_SCOPE)
+  ELSE()
+    SET(${OUTPUT_VAR} ${TEST_EXE_CMD} PARENT_SCOPE)
+  ENDIF()
+ENDFUNCTION()
+
+SET (VOLTDB_TEST_WORKING_DIR ${VOLTDB_TEST_DIR}/test_working_dir)
+ADD_CUSTOM_TARGET(build-tests
+  COMMAND ${CMAKE_COMMAND} -E make_directory ${VOLTDB_TEST_WORKING_DIR})
 FOREACH (TEST_DIR ${VOLTDB_TEST_DIR_LIST})
+  ADD_CUSTOM_TARGET(make_${TEST_DIR}
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${VOLTDB_EE_TEST_DIR}/${TEST_DIR})
   FOREACH (TEST_NAME ${VOLTDB_TEST_DIR_${TEST_DIR}})
+    SET(TEST_OUTPUT_NAME ${VOLTDB_EE_TEST_DIR}/${TEST_DIR}/${TEST_NAME})
     ADD_EXECUTABLE(${TEST_NAME}
       $<TARGET_OBJECTS:voltdb_test_harness>
       $<TARGET_OBJECTS:voltdbobjs>
@@ -714,9 +761,12 @@ FOREACH (TEST_DIR ${VOLTDB_TEST_DIR_LIST})
       ${VOLTDB_TEST_SRC}/${TEST_DIR}/${TEST_NAME}.cpp)
     SET_TARGET_PROPERTIES(${TEST_NAME}
       PROPERTIES
-      OUTPUT_NAME ${VOLTDB_EE_TEST_DIR}/${TEST_NAME})
+      OUTPUT_NAME ${TEST_OUTPUT_NAME}
+      EXCLUDE_FROM_ALL TRUE)
     ADD_DEPENDENCIES(${TEST_NAME}
-      pcre2 crypto s2geo)
+      pcre2 crypto s2geo
+      make_${TEST_DIR})
+    ADD_DEPENDENCIES(build-tests ${TEST_NAME})
     TARGET_INCLUDE_DIRECTORIES(${TEST_NAME}
       PUBLIC
       ${VOLTDB_EE_SRC_DIR}
@@ -728,8 +778,37 @@ FOREACH (TEST_DIR ${VOLTDB_TEST_DIR_LIST})
       -L${VOLTDB_THIRD_PARTY_INSTALL_DIR}/lib
       -lpcre2-8 -ls2geo -lcrypto
       -ldl)
-    INSTALL(TARGETS ${TEST_NAME}
-      DESTINATION ${VOLTDB_TEST_INSTALL_DIR}/${TEST_DIR})
+    SET(TARGET_EXE_CMD ${CMAKE_BINARY_DIR}/${TEST_OUTPUT_NAME})
+    VALGRIND_COMMAND(${TEST_DIR} ${TEST_NAME} ${TARGET_EXE_CMD} CTEST_EXE_CMD)
+    SET(CTEST_TEST_NAME ${TEST_DIR}-${TEST_NAME})
+    ADD_TEST(NAME ${CTEST_TEST_NAME}
+      WORKING_DIRECTORY ${VOLTDB_TEST_WORKING_DIR}
+      COMMAND ${CTEST_EXE_CMD})
+
+    #
+    # We expect all the memleak tests to fail, except for
+    # the test no_losses.  It's possible, but not obvious,
+    # how to do this with a regular expression property
+    # on the test, but this seems more straightforward.
+    #
+    SET(WILL_FAIL FALSE)
+    LIST(FIND VOLTDB_FAILING_VALGRIND_DIRS ${TEST_DIR} VG_DIR_FAIL)
+    LIST(FIND VOLTDB_PASSING_VALGRIND_TESTS ${TEST_NAME} VG_TEST_PASS)
+    IF (${IS_VALGRIND_BUILD} AND (NOT (${VG_DIR_FAIL} LESS 0)))
+      IF (${VG_TEST_PASS} LESS 0)
+        MESSAGE("${TEST_DIR}/${TEST_NAME} is expected to fail")
+        SET (WILL_FAIL TRUE)
+      ELSE()
+        MESSAGE("${TEST_DIR}/${TEST_NAME} is expected to succeed")
+      ENDIF()
+    ELSE()
+      MESSAGE("${TEST_DIR}/${TEST_NAME} is expected to succeed")
+    ENDIF()
+    SET_TESTS_PROPERTIES(${CTEST_TEST_NAME}
+      PROPERTIES
+      DEPENDS Configure-${CTEST_TEST_NAME}
+      WILL_FAIL ${WILL_FAIL}
+      LABELS ${TEST_DIR})
   ENDFOREACH()
 ENDFOREACH()
 
