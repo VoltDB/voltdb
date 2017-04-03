@@ -87,7 +87,7 @@ a.save-search,
 a.icon-search,
 ul.clusterStat, li.activeServerName,.timeOutCross,
 a.showServers, a.hideServers, .popup_close, .icon-document, .icon-tables, .icon-procedures, .pref-storedProc, .pref-tables, .pref-graph, .icon-server, #toggleMenu, .iconDeleteAddConfig, .drArrow, .icon-master, .icon-replica, .icon-command, .drIconHead {
-    background-image: url(images/voltdb-icon-sprite.png) !important;
+    background-image: url(../images/voltdb-icon-sprite.png) !important;
     background-repeat: no-repeat;
 }
 
@@ -714,27 +714,27 @@ ul.rightShowhideList {
 }
 
 .collapsed {
-   background: #fbfbfb url(images/voltdb-icon-sprite.png) 20px -535px no-repeat;
+   background: #fbfbfb url(../images/voltdb-icon-sprite.png) 20px -535px no-repeat;
 }
 .collapsedDR {
-    background:url(images/up_dr.png)7px 11px no-repeat;
+    background:url(../images/up_dr.png)7px 11px no-repeat;
 }
 
 .expanded {
-    background: #fbfbfb url(images/voltdb-icon-sprite.png) 20px -490px no-repeat;
+    background: #fbfbfb url(../images/voltdb-icon-sprite.png) 20px -490px no-repeat;
 }
 .expandedDR {
-    background:url(images/down_dr.png)7px 11px no-repeat;
+    background:url(../images/down_dr.png)7px 11px no-repeat;
     position:relative;
 
 }
 
 .leftShowhide .expanded {
-   background: #fbfbfb url(images/voltdb-icon-sprite.png) 0px -506px no-repeat;
+   background: #fbfbfb url(../images/voltdb-icon-sprite.png) 0px -506px no-repeat;
 }
 
 .leftShowhide .collapsed {
-   background: #fbfbfb url(images/voltdb-icon-sprite.png) 0px -550px no-repeat;
+   background: #fbfbfb url(../images/voltdb-icon-sprite.png) 0px -550px no-repeat;
 }
 
 .arrowAdjust {
@@ -1136,21 +1136,21 @@ a.setVal {
     }
 
 
-table.serversTbl tr td.active, table.serversListTbl tr td.active {background-image: url(images/servIcons.png) !important;
+table.serversTbl tr td.active, table.serversListTbl tr td.active {background-image: url(../images/servIcons.png) !important;
     background-repeat: no-repeat;}
 
-table.serversTbl tr td.joining{background-image: url(images/servIcons.png) !important;
+table.serversTbl tr td.joining{background-image: url(../images/servIcons.png) !important;
     background-repeat: no-repeat;}
 
-table.serversTbl tr td.pauseMonitoring {background-image: url(images/pauseMonitoring.png) !important;
+table.serversTbl tr td.pauseMonitoring {background-image: url(../images/pauseMonitoring.png) !important;
     background-repeat: no-repeat;}
 
-.alertIconServ{background-image: url(images/alertServ.png) !important;
+.alertIconServ{background-image: url(../images/alertServ.png) !important;
     background-repeat: no-repeat;}
 
 
 table.serversTbl tr td.pauseActiveMonitoring {
-    background-image: url(images/pauseMonitoring.png) !important;
+    background-image: url(../images/pauseMonitoring.png) !important;
     background-repeat: no-repeat;
     background-color: #f0f3f4;
 }
@@ -1499,13 +1499,13 @@ tt, code, kbd, samp {
 
 /*table sorting in dashboard*/
 table.storeTbl .sorttable_sorted_reverse {
-    background-image: url(images/asc.gif);
+    background-image: url(../images/asc.gif);
     background-repeat: no-repeat;
     background-position: right;
 }
 
 table.storeTbl .sorttable_sorted {
-    background-image: url(images/desc.gif);
+    background-image: url(../images/desc.gif);
     background-repeat: no-repeat;
     background-position: right;
 }
@@ -2011,7 +2011,7 @@ h3.ui-accordion-header {
 }
 
 h3.ui-accordion-header, h3.ui-accordion-header-active, .icon-query/* h1.icon-queryResult*/ {
-    background-image: url(images/voltdb-icon-sprite.png)!important;
+    background-image: url(../images/voltdb-icon-sprite.png)!important;
     background-repeat: no-repeat!important;
 }
 
@@ -2044,7 +2044,7 @@ h3.ui-state-active {
     padding-left:30px!important;
 }*/
 .icon-queryResult { float:left;
-    background-image: url(images/icon_query_result.jpg);
+    background-image: url(../images/icon_query_result.jpg);
     background-repeat: no-repeat; width:25px; height:25px; margin:0 5px 0 0;}
 /***********************************DR page*******************************/
 .containerMain1 { background:#fff; padding:10px;margin-bottom: 20px;border: 1px solid #ccc;}
@@ -2064,11 +2064,11 @@ h3.ui-state-active {
 .drRelation { float:left; }
 .drRelationLeft { float:left;  }
 .drRelationLeft span p { position:relative; top:-10px; font-size: 12px; text-align:center; }
-.arrowDouble { background-image: url(images/arrow_double.png); width:190px; height:20px;
+.arrowDouble { background-image: url(../images/arrow_double.png); width:190px; height:20px;
 display:block; position: relative; top:8px; margin:0 10px;  }
-.arrowSingle { background-image: url(images/arrow.png); width:190px; height:22px;
+.arrowSingle { background-image: url(../images/arrow.png); width:190px; height:22px;
 display:block; position: relative; top:8px; margin:0 10px;  }
-.arrowSingleLeft { background-image: url(images/left_arrow.png); width:190px; height:22px;
+.arrowSingleLeft { background-image: url(../images/left_arrow.png); width:190px; height:22px;
 display:block; position: relative; top:8px; margin:0 10px;  }
 .drRelationRight { float:left; }
 
@@ -2171,7 +2171,7 @@ border:1px solid #FFF;
 }
 
 .loading {
-    background: #fff url(images/loader.GIF) no-repeat center center;
+    background: #fff url(../images/loader.GIF) no-repeat center center;
     height: 75px;
     width: 75px;
     margin: 20% auto;
@@ -2179,14 +2179,14 @@ border:1px solid #FFF;
 }
 
 .loading-medium {
-    background: #fff url(images/loader-medium.GIF) no-repeat center center;
+    background: #fff url(../images/loader-medium.GIF) no-repeat center center;
     height: 30px;
     width: 30px;
     margin: 38% auto;
 }
 
 .loading-small {
-    background: #fff url(images/loader-small.GIF) no-repeat center center;
+    background: #fff url(../images/loader-small.GIF) no-repeat center center;
     height: 20px;
     width: 20px;
     position: absolute;
@@ -2217,7 +2217,7 @@ border:1px solid #FFF;
     }
 
 .errorIcon {
-    background: url(images/error.png) no-repeat 10px 12px;
+    background: url(../images/error.png) no-repeat 10px 12px;
     text-indent: 20px;
 }
 
@@ -2341,7 +2341,7 @@ ul.helpSchemaList {
 /*.labelCollapsed,*/
 /*.labelExpanded,*/
 a.restoreConfirmationDisable, .securityDelete, .exportDelete, .plusAdd,.deleteSmall {
-    background-image: url(images/admin-icons.png);
+    background-image: url(../images/admin-icons.png);
 }
 
 label.error {
@@ -2760,20 +2760,20 @@ ul.adminClusterList li a.shutdown {
     cursor: pointer;
     width: 16px;
     height: 16px;
-    background: url("images/help-arrow.png") no-repeat;
+    background: url("../images/help-arrow.png") no-repeat;
     margin-top: 2px;
 }
 
 .labelCollapsed {
     /*background-position: -468px -11px;*/
     padding-left: 22px;
-    background: url("images/up.png")0 1px no-repeat;
+    background: url("../images/up.png")0 1px no-repeat;
 }
 
 .labelExpanded {
     /*background-position: -468px -55px;*/
     padding-left: 22px;
-    background: url("images/down.png")0 1px no-repeat;
+    background: url("../images/down.png")0 1px no-repeat;
 }
 
 .adminTbl2 tr td:nth-child(1) {
@@ -3965,7 +3965,7 @@ fieldset { border:1px solid #ccc; padding:20px;}
 .input-group-addon, .input-group-btn, .input-group .form-control {
     display: table-cell;
 }
-.downImg { background: url(images/drop_down_arrow.png) no-repeat; width:16px; height:16px; display:block;}
+.downImg { background: url(../images/drop_down_arrow.png) no-repeat; width:16px; height:16px; display:block;}
 
 .drop-down-list li {
     padding: 6px 10px;
@@ -4005,13 +4005,13 @@ fieldset { border:1px solid #ccc; padding:20px;}
 
  .gutter.gutter-horizontal {
    cursor: col-resize;
-   background-image: url(images/vertical.png);
+   background-image: url(../images/vertical.png);
    background-color:#eee;
  }
 
  .gutter.gutter-vertical {
    cursor: row-resize;
-   background-image: url(images/horizontal.png);
+   background-image: url(../images/horizontal.png);
    background-color:#eee;
    margin-top:15px;
  }
@@ -4244,7 +4244,7 @@ ul#shutdownMsg li{ font-size:13px; line-height:20px; }
 
 
 @media (max-width: 699px) {
-    .arrowDRDatabase {background-image: url(images/arrow_small.png); width:60px; height:16px;
+    .arrowDRDatabase {background-image: url(../images/arrow_small.png); width:60px; height:16px;
     display:block; position: relative; top:8px; margin:0 10px; }
     .logHeight {height: 364px;}
 
@@ -4870,7 +4870,7 @@ ul#shutdownMsg li{ font-size:13px; line-height:20px; }
 @media (max-width: 564px) {
 
 .arrowSingle {
-    background-image:url("images/arrow_vertical_small_down.png");
+    background-image:url("../images/arrow_vertical_small_down.png");
     width: 16px;
     height: 60px;
     display: block;
@@ -4885,7 +4885,7 @@ ul#shutdownMsg li{ font-size:13px; line-height:20px; }
     }
 
   .arrowSingleLeft {
-    background-image: url("images/arrow_vertical_small_up.png");
+    background-image: url("../images/arrow_vertical_small_up.png");
     width: 16px;
     height: 60px;
     display: block;
@@ -4893,7 +4893,7 @@ ul#shutdownMsg li{ font-size:13px; line-height:20px; }
     }
 
     .arrowDouble {
-    background-image: url("images/arrow_vertical_small_double.png");
+    background-image: url("../images/arrow_vertical_small_double.png");
     width: 16px;
     height: 60px;
     display: block;
