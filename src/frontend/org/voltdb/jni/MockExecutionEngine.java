@@ -53,7 +53,7 @@ public class MockExecutionEngine extends ExecutionEngine {
             final long spHandle,
             final long lastCommittedSpHandle,
             final long uniqueId,
-            final long undoToken) throws EEException
+            final long undoToken, boolean traceOn) throws EEException
     {
         if (numFragmentIds != 1) {
             return null;

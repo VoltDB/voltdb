@@ -33,6 +33,8 @@ import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.rejoin.TaskLog;
 import org.voltdb.utils.LogKeys;
+import org.voltdb.utils.MiscUtils;
+import org.voltdb.utils.VoltTrace;
 
 /**
  * Implements the single partition procedure ProcedureTask.
@@ -55,6 +57,15 @@ public class SpProcedureTask extends ProcedureTask
        super(initiator, procName, new SpTransactionState(msg), queue);
     }
 
+    @Override
+    protected void durabilityTraceEnd() {
+        final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.SPI);
+        if (traceLog != null) {
+            traceLog.add(() -> VoltTrace.endAsync("durability",
+                                                  MiscUtils.hsIdTxnIdToString(m_initiator.getHSId(), getSpHandle())));
+        }
+    }
+
     /** Run is invoked by a run-loop to execute this transaction. */
     @Override
     public void run(SiteProcedureConnection siteConnection)
@@ -65,6 +76,13 @@ public class SpProcedureTask extends ProcedureTask
         if (HOST_DEBUG_ENABLED) {
             hostLog.debug("STARTING: " + this);
         }
+        final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.SPI);
+        if (traceLog != null) {
+            traceLog.add(() -> VoltTrace.beginDuration("runsptask",
+                                                       "txnId", TxnEgo.txnIdToString(getTxnId()),
+                                                       "partition", Integer.toString(siteConnection.getCorrespondingPartitionId())));
+        }
+
         if (!m_txnState.isReadOnly()) {
             m_txnState.setBeginUndoToken(siteConnection.getLatestUndoToken());
         }
@@ -99,6 +117,9 @@ public class SpProcedureTask extends ProcedureTask
         }
         if (HOST_DEBUG_ENABLED) {
             hostLog.debug("COMPLETE: " + this);
+        }
+        if (traceLog != null) {
+            traceLog.add(VoltTrace::endDuration);
         }
 
         logToDR(siteConnection.getDRGateway(), txnState, response);

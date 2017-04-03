@@ -98,6 +98,7 @@ import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListenableFutureTask;
+import org.voltdb.utils.VoltTrace;
 
 public final class InvocationDispatcher {
 
@@ -318,8 +319,20 @@ public final class InvocationDispatcher {
                 // Deserialize the client's request and map to a catalog stored procedure
         final CatalogContext catalogContext = m_catalogContext.get();
 
-        String procName = task.getProcName();
-        Procedure catProc = getProcedureFromName(procName, catalogContext);
+        final String procName = task.getProcName();
+        final String threadName = Thread.currentThread().getName(); // Thread name has to be materialized here
+        final StoredProcedureInvocation finalTask = task;
+        final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.CI);
+        if (traceLog != null) {
+            traceLog.add(() -> VoltTrace.meta("process_name", "name", CoreUtils.getHostnameOrAddress()))
+                    .add(() -> VoltTrace.meta("thread_name", "name", threadName))
+                    .add(() -> VoltTrace.meta("thread_sort_index", "sort_index", Integer.toString(1)))
+                    .add(() -> VoltTrace.beginAsync("recvtxn", finalTask.getClientHandle(),
+                                                    "name", procName,
+                                                    "clientHandle", Long.toString(finalTask.getClientHandle())));
+        }
+
+        Procedure catProc = getProcedureFromName(task.getProcName(), catalogContext);
 
         if (catProc == null) {
             String errorMessage = "Procedure " + procName + " was not found";
@@ -415,6 +428,9 @@ public final class InvocationDispatcher {
             }
             else if ("@SystemInformation".equals(procName)) {
                 return dispatchStatistics(OpsSelector.SYSTEMINFORMATION, task, ccxn);
+            }
+            else if ("@Trace".equals(procName)) {
+                return dispatchStatistics(OpsSelector.TRACE, task, ccxn);
             }
             else if ("@StopNode".equals(procName)) {
                 return dispatchStopNode(task);
@@ -1415,6 +1431,13 @@ public final class InvocationDispatcher {
     private final void dispatchAdHocCommon(StoredProcedureInvocation task,
             InvocationClientHandler handler, Connection ccxn, ExplainMode explainMode,
             String sql, Object[] userParams, Object[] userPartitionKey, AuthSystem.AuthUser user) {
+        final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.CI);
+        if (traceLog != null) {
+            traceLog.add(() -> VoltTrace.beginAsync("planadhoc", task.getClientHandle(),
+                                                    "clientHandle", Long.toString(task.getClientHandle()),
+                                                    "sql", sql));
+        }
+
         List<String> sqlStatements = SQLLexer.splitStatements(sql);
         String[] stmtsArray = sqlStatements.toArray(new String[sqlStatements.size()]);
 
@@ -1465,6 +1488,11 @@ public final class InvocationDispatcher {
                 if (result instanceof AdHocPlannedStmtBatch) {
                     final AdHocPlannedStmtBatch plannedStmtBatch = (AdHocPlannedStmtBatch) result;
                     ExplainMode explainMode = plannedStmtBatch.getExplainMode();
+
+                    final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.CI);
+                    if (traceLog != null) {
+                        traceLog.add(() -> VoltTrace.endAsync("planadhoc", plannedStmtBatch.clientHandle));
+                    }
 
                     // assume all stmts have the same catalog version
                     if ((plannedStmtBatch.getPlannedStatementCount() > 0) &&
@@ -1877,6 +1905,17 @@ public final class InvocationDispatcher {
                     handle,
                     connectionId,
                     isForReplay);
+
+        Long finalInitiatorHSId = initiatorHSId;
+        final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.CI);
+        if (traceLog != null) {
+            traceLog.add(() -> VoltTrace.instantAsync("inittxn",
+                                                      invocation.getClientHandle(),
+                                                      "clientHandle", Long.toString(invocation.getClientHandle()),
+                                                      "ciHandle", Long.toString(handle),
+                                                      "partition", Integer.toString(partition),
+                                                      "dest", CoreUtils.hsIdToString(finalInitiatorHSId)));
+        }
 
         Iv2Trace.logCreateTransaction(workRequest);
         m_mailbox.send(initiatorHSId, workRequest);

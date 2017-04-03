@@ -27,7 +27,8 @@ public enum OpsSelector {
     SNAPSHOTSCAN(SnapshotScanAgent.class, HostMessenger.SNAPSHOTDELETE_SITE_ID),
     STATISTICS(StatsAgent.class, HostMessenger.STATS_SITE_ID),
     SYSTEMCATALOG(SystemCatalogAgent.class, HostMessenger.SYSCATALOG_SITE_ID),
-    SYSTEMINFORMATION(SystemInformationAgent.class, HostMessenger.SYSINFO_SITE_ID);
+    SYSTEMINFORMATION(SystemInformationAgent.class, HostMessenger.SYSINFO_SITE_ID),
+    TRACE(TraceAgent.class, HostMessenger.TRACE_SITE_ID);
 
     // OpsAgent subclass providing the implementation for this OPS selector
     private final Class<? extends OpsAgent> m_agentClass;

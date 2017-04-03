@@ -52,7 +52,7 @@ public class DummyCommandLog implements CommandLog {
             int[] involvedPartitions,
             DurabilityListener l,
             TransactionTask handle) {
-        return Futures.immediateFuture(null);
+        return null;
     }
 
     @Override

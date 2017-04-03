@@ -66,6 +66,7 @@ import org.voltdb.utils.Encoder;
 import org.voltdb.utils.MiscUtils;
 
 import com.google_voltpatches.common.base.Charsets;
+import org.voltdb.utils.VoltTrace;
 
 public class ProcedureRunner {
 
@@ -1656,7 +1657,8 @@ public class ProcedureRunner {
                    m_txnState.txnId,
                    m_txnState.m_spHandle,
                    m_txnState.uniqueId,
-                   m_isReadOnly);
+                   m_isReadOnly,
+                   VoltTrace.log(VoltTrace.Category.EE) != null);
        } catch (Throwable ex) {
            if (! m_isReadOnly) {
                // roll back the current batch and re-throw the EE exception
