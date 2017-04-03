@@ -715,6 +715,7 @@ FOREACH(TEST_NAME ${VOLTDB_TEST_PROGRAMS})
   LIST(APPEND VOLTDB_TEST_ALLTESTS ${TEST})
 ENDFOREACH()
 
+SET (VOLTDB_TEST_WORKING_DIR ${VOLTDB_TEST_DIR}/test_working_dir)
 FUNCTION(VALGRIND_FILE_NAME TARGET_DIR TARGET_NAME OUTPUT_VAR)
   SET(${OUTPUT_VAR} valgrind_ee_${TARGET_DIR}_${TARGET_NAME}.xml PARENT_SCOPE)
 ENDFUNCTION()
@@ -729,6 +730,8 @@ FUNCTION(VALGRIND_COMMAND TARGET_DIR TARGET_NAME TEST_EXE_CMD OUTPUT_VAR)
   IF (${IS_VALGRIND_BUILD})
     VALGRIND_FILE_NAME(${TARGET_DIR} ${TARGET_NAME} VGFN)
     SET(CMD_LIST
+      ${CMAKE_SOURCE_DIR}/tools/runvalgrindtest.py
+      "/usr/bin/env"
       "valgrind"
       "--leak-check=full"
       "--show-leak-kinds=all"
@@ -746,13 +749,33 @@ FUNCTION(VALGRIND_COMMAND TARGET_DIR TARGET_NAME TEST_EXE_CMD OUTPUT_VAR)
   ENDIF()
 ENDFUNCTION()
 
-SET (VOLTDB_TEST_WORKING_DIR ${VOLTDB_TEST_DIR}/test_working_dir)
+#
+# Calculate if this is a python test.  If there is a python script
+# in the source foldter called TEST_DIR/TEST_NAME.py, then we
+# wrap the test command with that script by putting the command
+# in the script's argument list.
+#
+FUNCTION(PYTHON_COMMAND TEST_DIR TEST_NAME TEST_EXE_CMD OUTPUT_VAR)
+  FILE(GLOB PYTHON_SCRIPTS ${CMAKE_SOURCE_DIR}/${VOLTDB_TEST_SRC}/${TEST_DIR}/${TEST_NAME}.py)
+  LIST(LENGTH PYTHON_SCRIPTS IS_PYTHON)
+  IF (${IS_PYTHON} GREATER 0)
+    LIST(GET PYTHON_SCRIPTS 0 PYTHON_SCRIPT)
+    LIST(INSERT TEST_EXE_CMD 0 ${PYTHON_SCRIPT})
+  ENDIF()
+  SET(${OUTPUT_VAR} ${TEST_EXE_CMD} PARENT_SCOPE)
+ENDFUNCTION()
+
 ADD_CUSTOM_TARGET(build-tests
   COMMAND ${CMAKE_COMMAND} -E make_directory ${VOLTDB_TEST_WORKING_DIR})
 FOREACH (TEST_DIR ${VOLTDB_TEST_DIR_LIST})
   ADD_CUSTOM_TARGET(make_${TEST_DIR}
     COMMAND ${CMAKE_COMMAND} -E make_directory ${VOLTDB_EE_TEST_DIR}/${TEST_DIR})
   FOREACH (TEST_NAME ${VOLTDB_TEST_DIR_${TEST_DIR}})
+    #
+    # Define the test executable, and set the build-tests
+    # depends on the test.  Remember the necessary include
+    # directories and link libraries.
+    #
     SET(TEST_OUTPUT_NAME ${VOLTDB_EE_TEST_DIR}/${TEST_DIR}/${TEST_NAME})
     ADD_EXECUTABLE(${TEST_NAME}
       $<TARGET_OBJECTS:voltdb_test_harness>
@@ -778,13 +801,18 @@ FOREACH (TEST_DIR ${VOLTDB_TEST_DIR_LIST})
       -L${VOLTDB_THIRD_PARTY_INSTALL_DIR}/lib
       -lpcre2-8 -ls2geo -lcrypto
       -ldl)
+    #
+    # Calculate the actual test command.
+    #
     SET(TARGET_EXE_CMD ${CMAKE_BINARY_DIR}/${TEST_OUTPUT_NAME})
-    VALGRIND_COMMAND(${TEST_DIR} ${TEST_NAME} ${TARGET_EXE_CMD} CTEST_EXE_CMD)
+    # If we are running a valgrind test, then calculate the
+    # valgrind command.
+    VALGRIND_COMMAND(${TEST_DIR} ${TEST_NAME} ${TARGET_EXE_CMD} VALGRIND_EXE_CMD)
+    PYTHON_COMMAND(${TEST_DIR} ${TEST_NAME} "${VALGRIND_EXE_CMD}" CTEST_EXE_CMD)
     SET(CTEST_TEST_NAME ${TEST_DIR}-${TEST_NAME})
     ADD_TEST(NAME ${CTEST_TEST_NAME}
       WORKING_DIRECTORY ${VOLTDB_TEST_WORKING_DIR}
       COMMAND ${CTEST_EXE_CMD})
-
     #
     # We expect all the memleak tests to fail, except for
     # the test no_losses.  It's possible, but not obvious,
@@ -796,13 +824,10 @@ FOREACH (TEST_DIR ${VOLTDB_TEST_DIR_LIST})
     LIST(FIND VOLTDB_PASSING_VALGRIND_TESTS ${TEST_NAME} VG_TEST_PASS)
     IF (${IS_VALGRIND_BUILD} AND (NOT (${VG_DIR_FAIL} LESS 0)))
       IF (${VG_TEST_PASS} LESS 0)
-        MESSAGE("${TEST_DIR}/${TEST_NAME} is expected to fail")
         SET (WILL_FAIL TRUE)
       ELSE()
-        MESSAGE("${TEST_DIR}/${TEST_NAME} is expected to succeed")
       ENDIF()
     ELSE()
-      MESSAGE("${TEST_DIR}/${TEST_NAME} is expected to succeed")
     ENDIF()
     SET_TESTS_PROPERTIES(${CTEST_TEST_NAME}
       PROPERTIES
@@ -813,6 +838,6 @@ FOREACH (TEST_DIR ${VOLTDB_TEST_DIR_LIST})
 ENDFOREACH()
 
 ADD_CUSTOM_TARGET(runalltests
-  DEPENDS ${VOLTDB_TEST_ALLTESTS} install
-  COMMAND ${CMAKE_SOURCE_DIR}/tools/runalltests.py ${VOLTDB_USE_VALGRIND} ${VOLTDB_TEST_PROGRAMS}
+  DEPENDS build-tests
+  COMMAND ctest --output-on-fail -j 4
   )

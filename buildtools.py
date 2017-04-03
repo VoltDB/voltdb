@@ -216,7 +216,7 @@ def buildThirdPartyTools(CTX, makefile):
     makefile.write('PCRE2_SRC=${THIRD_PARTY_SRC}/${PCRE2_NAME}\n')
     makefile.write('PCRE2_OBJ=${OBJDIR}/${PCRE2_NAME}\n')
     makefile.write('PCRE2_INSTALL=${INSTALL_DIR}\n')
-    makefile.write('PCRE2_TARBALL=${TARBALLS_DIR}/${PCRE2_NAME}.tar.bz2\n')
+    makefile.write('PCRE2_TARBALL=${TARBALLS_DIR}/${PCRE2_NAME}.tgz\n')
 
     # define makefile target for debugging
     makefile.write("#\n# This target lets us print makefile variables, for debugging\n")
@@ -326,7 +326,7 @@ def buildThirdPartyTools(CTX, makefile):
     makefile.write('\tfi\n')
     makefile.write('unpack-pcre2:\n')
     makefile.write('\tif [ ! -d "$PCRE2_SRC" ] ; then \\\n')
-    makefile.write('\t  tar -x -j -f "${PCRE2_TARBALL}" -C "${THIRD_PARTY_SRC}" ; \\\n')
+    makefile.write('\t  tar -x -z -f "${PCRE2_TARBALL}" -C "${THIRD_PARTY_SRC}" ; \\\n')
     makefile.write('fi\n')
 
     # third party tools testing target
