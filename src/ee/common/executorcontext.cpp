@@ -94,6 +94,7 @@ ExecutorContext::ExecutorContext(int64_t siteId,
     m_engine(engine),
     m_txnId(0),
     m_spHandle(0),
+    m_traceOn(false),
     m_lastCommittedSpHandle(0),
     m_siteId(siteId),
     m_partitionId(partitionId),
@@ -145,12 +146,27 @@ UniqueTempTableResult ExecutorContext::executeExecutors(const std::vector<Abstra
     try {
         BOOST_FOREACH (AbstractExecutor *executor, executorList) {
             assert(executor);
+
+            if (isTraceOn()) {
+                char name[32];
+                snprintf(name, 32, "%s", planNodeToString(executor->getPlanNode()->getPlanNodeType()).c_str());
+                m_topend->traceLog(true, name, NULL);
+            }
+
             // Call the execute method to actually perform whatever action
             // it is that the node is supposed to do...
             if (!executor->execute(m_staticParams)) {
+                if (isTraceOn()) {
+                    m_topend->traceLog(false, NULL, NULL);
+                }
                 throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                     "Unspecified execution error detected");
             }
+
+            if (isTraceOn()) {
+                m_topend->traceLog(false, NULL, NULL);
+            }
+
             ++ctr;
         }
     } catch (const SerializableEEException &e) {
