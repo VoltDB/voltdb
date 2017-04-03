@@ -1391,7 +1391,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             spi.setParams("PROCEDURES");
             spi.setClientHandle(ASYNC_PROC_HANDLE);
             notifyClients(m_currentProcValues,m_currentProcSupplier,
-                            m_procUpdatePredicate, spi, OpsSelector.SYSTEMCATALOG);
+                           spi, OpsSelector.SYSTEMCATALOG);
         }
     }
 
@@ -1500,15 +1500,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
     };
 
-    private final Predicate<ClientInterfaceHandleManager> m_procUpdatePredicate =
-            new Predicate<ClientInterfaceHandleManager>() {
-        @Override
-        public boolean apply(ClientInterfaceHandleManager input) {
-            return input.wantsProcUpdates();
-        }
-    };
-
-
     /*
      * Submit a task to the stats agent to retrieve the topology and procedures. Supply a dummy
      * client response adapter to fake a connection. The adapter converts the response
@@ -1522,19 +1513,18 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         spi.setParams("TOPO", 0);
         spi.setClientHandle(ASYNC_TOPO_HANDLE);
         notifyClients(m_currentTopologyValues,m_currentTopologySupplier,
-                        m_wantsTopologyUpdatesPredicate, spi, OpsSelector.STATISTICS);
+                         spi, OpsSelector.STATISTICS);
 
         spi = new StoredProcedureInvocation();
         spi.setProcName("@SystemCatalog");
         spi.setParams("PROCEDURES");
         spi.setClientHandle(ASYNC_PROC_HANDLE);
         notifyClients(m_currentProcValues,m_currentProcSupplier,
-                        m_procUpdatePredicate, spi, OpsSelector.SYSTEMCATALOG);
+                        spi, OpsSelector.SYSTEMCATALOG);
     }
 
     private void notifyClients( AtomicReference<DeferredSerialization> values,
                                 Supplier<DeferredSerialization> supplier,
-                                Predicate<ClientInterfaceHandleManager> predicate,
                                 StoredProcedureInvocation spi,
                                 OpsSelector selector) {
         final Pair<SimpleClientResponseAdapter, ListenableFuture<ClientResponseImpl>> p =
@@ -1583,7 +1573,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         m_notifier.queueNotification(
                                 m_cihm.values(),
                                 supplier,
-                                predicate);
+                                m_wantsTopologyUpdatesPredicate);
                     }
                 } catch (Throwable t) {
                     hostLog.error("Error checking for updates", Throwables.getRootCause(t));

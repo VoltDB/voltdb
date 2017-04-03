@@ -644,7 +644,6 @@ public final class InvocationDispatcher {
 
             if ("TOPOLOGY".equals(param)) {
                 cihm.setWantsTopologyUpdates(true);
-                cihm.setWantsProcUpdates(true);
             } else {
                 err = "Parameter \"" + param + "\" is not recognized/supported"; break;
             }
