@@ -117,6 +117,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
     //Same as in Distributer.java
     public static final long ASYNC_TOPO_HANDLE = Long.MAX_VALUE - 1;
+    //Notify clients to update procedure info cache for client affinity
     public static final long ASYNC_PROC_HANDLE = Long.MAX_VALUE - 2;
 
     // reasons a connection can fail
