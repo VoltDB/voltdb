@@ -1733,8 +1733,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     data = zk.getData(VoltZK.start_action + "/" + child, false, null);
                 } catch (KeeperException excp) {
                     if (excp.code() == Code.NONODE) {
-                        hostLog.warn("Failed to validate the start action as node "
-                                + VoltZK.start_action + "/" + child + " got disconnected", excp);
+                        if (hostLog.isDebugEnabled())
+                            hostLog.warn("Failed to validate the start action as node "
+                                    + VoltZK.start_action + "/" + child + " got disconnected", excp);
                     } else {
                         hostLog.error("Failed to validate the start actions ", excp);
                     }
