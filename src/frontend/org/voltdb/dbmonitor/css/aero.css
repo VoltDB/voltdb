@@ -9,7 +9,7 @@
     padding: 0;
     width: 23px;
     height: 27px;
-    background: url(images/aero.png) no-repeat;
+    background: url(../images/aero.png) no-repeat;
     border: none;
     cursor: pointer;
 }
@@ -54,7 +54,7 @@
 @media (-o-min-device-pixel-ratio: 5/4), (-webkit-min-device-pixel-ratio: 1.25), (min-resolution: 120dpi) {
     .icheckbox_square-aero,
     .iradio_square-aero {
-        background-image: url(images/aero@2x.png);
+        background-image: url(../images/aero@2x.png);
         -webkit-background-size: 240px 24px;
         background-size: 240px 24px;
     }
