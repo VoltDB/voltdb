@@ -75,6 +75,7 @@ import org.apache.log4j.FileAppender;
 import org.apache.log4j.Logger;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
+import org.apache.zookeeper_voltpatches.KeeperException.Code;
 import org.apache.zookeeper_voltpatches.WatchedEvent;
 import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
@@ -1711,38 +1712,57 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     }
 
     private void validateStartAction() {
+        ZooKeeper zk = m_messenger.getZK();
+        boolean initCompleted = false;
+        List<String> children = null;
+
         try {
-            ZooKeeper zk = m_messenger.getZK();
-            boolean initCompleted = zk.exists(VoltZK.init_completed, false) != null;
-            List<String> children = zk.getChildren(VoltZK.start_action, new StartActionWatcher(), null);
-            if (!children.isEmpty()) {
-                for (String child : children) {
-                    byte[] data = zk.getData(VoltZK.start_action + "/" + child, false, null);
-                    if (data == null) {
-                        VoltDB.crashLocalVoltDB("Couldn't find " + VoltZK.start_action + "/" + child);
+            initCompleted = zk.exists(VoltZK.init_completed, false) != null;
+            children = zk.getChildren(VoltZK.start_action, new StartActionWatcher(), null);
+        } catch (KeeperException e) {
+            hostLog.error("Failed to validate the start actions", e);
+            return;
+        } catch (InterruptedException e) {
+            VoltDB.crashLocalVoltDB("Interrupted during start action validation:" + e.getMessage(), true, e);
+        }
+
+        if (children != null && !children.isEmpty()) {
+            for (String child : children) {
+                byte[] data = null;
+                try {
+                    data = zk.getData(VoltZK.start_action + "/" + child, false, null);
+                } catch (KeeperException excp) {
+                    if (excp.code() == Code.NONODE) {
+                        hostLog.warn("Failed to validate the start action due to node "
+                                + VoltZK.start_action + "/" + child + " disconnected", excp);
+                    } else {
+                        hostLog.error("Failed to validate the start actions ", excp);
                     }
-                    String startAction = new String(data);
-                    if ((startAction.equals(StartAction.JOIN.toString()) ||
-                            startAction.equals(StartAction.REJOIN.toString()) ||
-                            startAction.equals(StartAction.LIVE_REJOIN.toString())) &&
-                            !initCompleted) {
-                        int nodeId = VoltZK.getHostIDFromChildName(child);
-                        if (nodeId == m_messenger.getHostId()) {
-                            VoltDB.crashLocalVoltDB("This node was started with start action " + startAction + " during cluster creation. "
-                                    + "All nodes should be started with matching create or recover actions when bring up a cluster. "
-                                    + "Join and rejoin are for adding nodes to an already running cluster.");
-                        } else {
-                            hostLog.warn("Node " + nodeId + " tried to " + startAction + " cluster but it is not allowed during cluster creation. "
-                                    + "All nodes should be started with matching create or recover actions when bring up a cluster. "
-                                    + "Join and rejoin are for adding nodes to an already running cluster.");
-                        }
+                    return;
+                } catch (InterruptedException e) {
+                    VoltDB.crashLocalVoltDB("Interrupted during start action validation:" + e.getMessage(), true, e);
+                }
+
+                if (data == null) {
+                    VoltDB.crashLocalVoltDB("Couldn't find " + VoltZK.start_action + "/" + child);
+                }
+                String startAction = new String(data);
+                if ((startAction.equals(StartAction.JOIN.toString()) ||
+                        startAction.equals(StartAction.REJOIN.toString()) ||
+                        startAction.equals(StartAction.LIVE_REJOIN.toString())) &&
+                        !initCompleted) {
+                    int nodeId = VoltZK.getHostIDFromChildName(child);
+                    if (nodeId == m_messenger.getHostId()) {
+                        VoltDB.crashLocalVoltDB("This node was started with start action " + startAction + " during cluster creation. "
+                                + "All nodes should be started with matching create or recover actions when bring up a cluster. "
+                                + "Join and rejoin are for adding nodes to an already running cluster.");
+                    } else {
+                        hostLog.warn("Node " + nodeId + " tried to " + startAction + " cluster but it is not allowed during cluster creation. "
+                                + "All nodes should be started with matching create or recover actions when bring up a cluster. "
+                                + "Join and rejoin are for adding nodes to an already running cluster.");
                     }
                 }
             }
-        } catch (KeeperException e) {
-            hostLog.error("Failed to validate the start actions", e);
-        } catch (InterruptedException e) {
-            VoltDB.crashLocalVoltDB("Interrupted during start action validation:" + e.getMessage(), true, e);
         }
     }
 
