@@ -3188,6 +3188,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     @Override
     synchronized public void logUpdate(String xmlConfig, long currentTxnId, File voltroot)
     {
+        hostLog.info("Trying to update logging currentTxnId=" + currentTxnId + " lastLogUpdate_txnId=" + lastLogUpdate_txnId);
         // another site already did this work.
         if (currentTxnId == lastLogUpdate_txnId) {
             return;

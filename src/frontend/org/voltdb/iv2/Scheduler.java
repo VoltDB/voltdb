@@ -125,6 +125,7 @@ abstract public class Scheduler implements InitiatorMessageHandler
     final protected TxnEgo advanceTxnEgo()
     {
         m_txnEgo = m_txnEgo.makeNext();
+        hostLog.info("advance txnId to " + m_txnEgo.getTxnId());
         return m_txnEgo;
     }
 
