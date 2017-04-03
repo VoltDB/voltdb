@@ -77,6 +77,11 @@ static void globalInitOrCreateOncePerProcess() {
     setenv("TZ", "UTC", 0); // set timezone as "UTC" in EE level
 
     (void)pthread_key_create(&static_key, NULL);
+
+    assert(SITES_PER_HOST == -1);
+    SITES_PER_HOST = 0;
+    pthread_mutex_init(&sharedEngineMutex, NULL);
+    pthread_cond_init(&sharedEngineCondition, 0);
 }
 
 ExecutorContext::ExecutorContext(int64_t siteId,
@@ -124,7 +129,7 @@ ExecutorContext::~ExecutorContext() {
 
 void ExecutorContext::assignThreadLocals(EngineLocals& mapping)
 {
-    VOLT_DEBUG("Switching context to partition %d on thread %lu", mapping.partitionId, pthread_self());
+    VOLT_DEBUG("Switching context to partition %d on thread %p", mapping.partitionId, pthread_self());
     pthread_setspecific(static_key, mapping.context);
     ThreadLocalPool::assignThreadLocals(mapping);
 }

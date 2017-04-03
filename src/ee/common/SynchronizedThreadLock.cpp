@@ -19,6 +19,7 @@
 
 namespace voltdb {
 
+// Initialized when executor context is created.
 pthread_mutex_t sharedEngineMutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t sharedEngineCondition;
 std::atomic<int32_t> globalTxnStartCountdownLatch(0);

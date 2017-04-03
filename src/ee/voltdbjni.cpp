@@ -182,16 +182,6 @@ void setupSigHandler(void) {
 #endif
 }
 
-/*
- * Initializes the global ee objects with a lock for managing the map and a counter for sitesPerHost
- */
-SHAREDLIB_JNIEXPORT void JNICALL Java_org_voltdb_utils_PosixAdvise_nativeInitGlobals(JNIEnv *, jclass) {
-    assert(SITES_PER_HOST == -1);
-    SITES_PER_HOST = 0;
-    pthread_mutex_init(&sharedEngineMutex, NULL);
-    pthread_cond_init(&sharedEngineCondition, 0);
-}
-
 ////////////////////////////////////////////////////////////////////////////
 // Create / Destroy
 ////////////////////////////////////////////////////////////////////////////

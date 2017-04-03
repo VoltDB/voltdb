@@ -26,7 +26,6 @@ import java.io.InputStream;
 import java.util.UUID;
 
 import org.voltcore.logging.VoltLogger;
-import org.voltdb.utils.PosixAdvise;
 
 public class EELibraryLoader {
 
@@ -72,7 +71,6 @@ public class EELibraryLoader {
                         System.load(libFile.getAbsolutePath());
                     }
                     voltSharedLibraryLoaded = true;
-                    PosixAdvise.nativeInitGlobals();
                     hostLog.info("Successfully loaded native VoltDB library " + libname + ".");
                 } catch (Throwable e) {
                     if (hostLog.isDebugEnabled()) {
