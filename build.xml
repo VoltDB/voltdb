@@ -1605,12 +1605,12 @@ NATIVE EE STUFF
     </exec>
 </target>
 
-<target name='ee' depends="ee_buildmakefile, catalog, jnicompile, buildinfo"
+<target name='ee' depends="catalog, jnicompile, buildinfo"
     description="Build C++ JNI library and copy it to production folder.">
     <exec dir='.' executable='python' failonerror='true'>
         <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
         <env key="EESKIPBUILDMAKEFILE" value="true" />
-        <arg line="build.py --build-type=${build}" --install/>
+        <arg line="build.py --build-type=${build} --source-dir=${base.dir} --install"/>
     </exec>
     <antcall target="prep_libvoltdb"/>
 </target>

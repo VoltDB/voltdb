@@ -36,7 +36,7 @@ parser.add_argument('--profile',
                     help='Do profiling.')
 parser.add_argument('--configure',
                     action='store_true',
-                    help='Configure the build but don't do any building.')'
+                    help='Configure the build but do not do any building.')
 parser.add_argument('--coverage',
                     action='store_true',
                     help='Do coverage testing.')
