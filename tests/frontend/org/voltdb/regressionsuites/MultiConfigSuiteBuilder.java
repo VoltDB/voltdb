@@ -56,7 +56,7 @@ public class MultiConfigSuiteBuilder extends TestSuite {
      * @return A list of the names of each JUnit test method.
      */
     static List<String> getTestMethodNames(Class<? extends TestCase> testCls) {
-        ArrayList<String> retval = new ArrayList<String>();
+        ArrayList<String> retval = new ArrayList<>();
 
         for (Method m : testCls.getMethods()) {
             if (m.getReturnType() != void.class)
@@ -87,6 +87,10 @@ public class MultiConfigSuiteBuilder extends TestSuite {
      * @param config A Server Configuration to run this set of tests on.
      */
     public boolean addServerConfig(VoltServerConfig config) {
+        return addServerConfig(config, true);
+    }
+
+    public boolean addServerConfig(VoltServerConfig config, boolean reuseServer) {
 
         // near silent skip on k>0 and community edition
         if (!MiscUtils.isPro()) {
@@ -157,7 +161,7 @@ public class MultiConfigSuiteBuilder extends TestSuite {
             rs.setConfig(config);
             // The last test method for the current cluster configuration will need to
             // shutdown the cluster completely after finishing the test.
-            rs.m_completeShutdown = (i == methods.size() - 1);
+            rs.m_completeShutdown = ! reuseServer || (i == methods.size() - 1);
             super.addTest(rs);
         }
 

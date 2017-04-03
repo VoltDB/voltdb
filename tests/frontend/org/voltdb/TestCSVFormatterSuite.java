@@ -47,6 +47,7 @@ public class TestCSVFormatterSuite extends TestCSVFormatterSuiteBase {
     private VoltTable tryForResult(Client client, CountDownLatch latch) throws Exception {
         String query = "SELECT * FROM importCSVTable ORDER BY clm_integer;";
         VoltTable table;
+        Thread.sleep(500);
         // For the quickest victory, race to read the result,
         // hoping to lose that race to the writer.
         table = client.callProcedure("@AdHoc", query).getResults()[0];
@@ -201,7 +202,7 @@ public class TestCSVFormatterSuite extends TestCSVFormatterSuiteBase {
 
     static public MultiConfigSuiteBuilder buildEnv() throws Exception {
         final MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestCSVFormatterSuite.class);
-        Map<String, String> additionalEnv = new HashMap<String, String>();
+        Map<String, String> additionalEnv = new HashMap<>();
         //Specify bundle location
         String bundleLocation = System.getProperty("user.dir") + "/bundles";
         System.out.println("Bundle location is: " + bundleLocation);
