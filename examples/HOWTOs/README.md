@@ -6,6 +6,7 @@ In this directory, we're collecting short tutorials and other "How to" examples 
 Development:
 ------------
  * [Using Eclipse to develop, unit test, and debug VoltDB stored procedures and java clients](EclipseUnitTestDebug.md)
+ * [Configure Logging](ConfigureLogging.md)
 
 Administration
 --------------
