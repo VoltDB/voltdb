@@ -331,7 +331,7 @@ VoltDBEngine::~VoltDBEngine() {
     else {
         delete m_executorContext;
     }
-    VOLT_ERROR("finished deallocate for partition %d", m_partitionId);
+    VOLT_DEBUG("finished deallocate for partition %d", m_partitionId);
 }
 
 // ------------------------------------------------------------------
@@ -677,7 +677,7 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const std::string &catal
         m_executorContext->bindToThread();
     }
 
-    VOLT_ERROR("Loading catalog...%d", m_partitionId);
+    VOLT_DEBUG("Loading catalog...%d", m_partitionId);
     if (m_partitionId == 16383) {
         // Don't allocate tables on the MP thread because the last SP thread will do that
         return true;
@@ -747,7 +747,7 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const std::string &catal
 
     typedef std::pair<CatalogId, Table*> CatToTable;
     BOOST_FOREACH (CatToTable tablePair, m_tables) {
-        VOLT_DEBUG("Partition %d loaded table %d at address %p", m_partitionId, tablePair.first, tablePair.second);
+        VOLT_TRACE("Partition %d loaded table %d at address %p", m_partitionId, tablePair.first, tablePair.second);
     }
 
     VOLT_DEBUG("Loaded catalog from partition %d ...", m_partitionId);
