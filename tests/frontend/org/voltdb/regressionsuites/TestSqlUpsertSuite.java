@@ -351,6 +351,10 @@ public class TestSqlUpsertSuite extends RegressionSuite {
             vt = client.callProcedure("@AdHoc", query).getResults()[0];
             validateTableOfLongs(vt, new long[][] {{1,2,1}, {2,2,2}, {3,3,3}, {8, 1, 1} });
 
+            // Upsert with a non-scalar subquery expression
+            String expectedMsg = "More than one row returned by a scalar/row subquery";
+            verifyStmtFails(client, "UPSERT INTO " + tb + " (ID, WAGE, DEPT) " +
+                    "VALUES((SELECT ID FROM R2), 1, 1)", expectedMsg);
         }
 
     }
@@ -442,12 +446,12 @@ public class TestSqlUpsertSuite extends RegressionSuite {
         assert(success);
         builder.addServerConfig(config);
 
-//        //*/ Cluster
-//        config = new LocalCluster("sqlupsert-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
-//        success = config.compile(project);
-//        assert(success);
-//        builder.addServerConfig(config);
-//        //*/
+        //*/ Cluster
+        config = new LocalCluster("sqlupsert-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
+        success = config.compile(project);
+        assert(success);
+        builder.addServerConfig(config);
+        //*/
 
         return builder;
     }

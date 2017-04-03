@@ -335,6 +335,8 @@ public class TestPlansDML extends PlannerTestCase {
         // Distributed expression subquery with inferred partitioning
         failToCompile("DELETE FROM R1 WHERE C > ALL (SELECT A FROM P2);", PlanAssembler.IN_EXISTS_SCALAR_ERROR_MESSAGE);
 
+        // Column count mismatch between the UPDATE columns and the columns returned by the scalar subquery
+        failToCompile("UPDATE P1 set C = (SELECT (A,C) FROM R1 WHERE R1.C = P1.C LIMIT 1);", "row column count mismatch");
     }
 
     void checkDMLPlanNodeAndSubqueryExpression(String dmlSQL, ExpressionType filterType) {
