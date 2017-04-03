@@ -611,6 +611,8 @@ private:
     // handled.
     void insertTupleCommon(TableTuple& source, TableTuple& target, bool fallible, bool shouldDRStream = true);
 
+    void doInsertTupleCommon(TableTuple& source, TableTuple& target, bool fallible, bool shouldDRStream = true);
+
     void insertTupleForUndo(char* tuple);
 
     void updateTupleForUndo(char* targetTupleToUpdate,

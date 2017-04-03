@@ -112,7 +112,8 @@ ExecutorContext::ExecutorContext(int64_t siteId,
     m_hostname(hostname),
     m_hostId(hostId),
     m_drClusterId(drClusterId),
-    m_progressStats()
+    m_progressStats(),
+    m_runningRTContext(false)
 {
     (void)pthread_once(&static_keyOnce, globalInitOrCreateOncePerProcess);
     bindToThread();
@@ -125,6 +126,39 @@ ExecutorContext::~ExecutorContext() {
     VOLT_DEBUG("De-installing EC(%ld) for partition %d", (long)this, m_partitionId);
 
     pthread_setspecific(static_key, NULL);
+}
+
+/**
+ * Switch executor context when updating thread-specific MP related data structures.
+ *
+ * Call this function will change the executor context binded with current thread to the given EngineLocals,
+ * also change the associated thread-specific memory pools. The original thread locals are kept in a static
+ * variable, it's safe since updating replicated table
+ *
+ * Must be paired with restoreThreadLocals() to restore the original thread-specific variables.
+ *
+ */
+void ExecutorContext::switchThreadLocals(EngineLocals& mapping)
+{
+    VOLT_DEBUG("Switching context to partition %d on thread %p", mapping.partitionId, pthread_self());
+    savedEngineLocals = &enginesByPartitionId[getExecutorContext()->m_partitionId];
+    pthread_setspecific(static_key, mapping.context);
+    ThreadLocalPool::assignThreadLocals(mapping);
+    m_runningRTContext = true;
+}
+
+/*
+ * Restore a saved executor context.
+ *
+ * Must be paired with switchThreadLocals().
+ */
+void ExecutorContext::restoreThreadLocals()
+{
+    VOLT_DEBUG("Restore context to partition %d on thread %p", savedEngineLocals.partitionId, pthread_self());
+    pthread_setspecific(static_key, savedEngineLocals->context);
+    ThreadLocalPool::assignThreadLocals(*savedEngineLocals);
+    savedEngineLocals = NULL;
+    m_runningRTContext = false;
 }
 
 void ExecutorContext::assignThreadLocals(EngineLocals& mapping)
@@ -140,7 +174,8 @@ void ExecutorContext::bindToThread()
     VOLT_DEBUG("Installing EC(%ld) for partition %d", (long)this, m_partitionId);
 }
 
-ExecutorContext* ExecutorContext::getExecutorContext() {
+ExecutorContext* ExecutorContext::getExecutorContext()
+{
     (void)pthread_once(&static_keyOnce, globalInitOrCreateOncePerProcess);
     return static_cast<ExecutorContext*>(pthread_getspecific(static_key));
 }
@@ -165,55 +200,13 @@ UniqueTempTableResult ExecutorContext::executeExecutors(const std::vector<Abstra
     try {
         BOOST_FOREACH (AbstractExecutor *executor, executorList) {
             assert(executor);
-            PlanNodeType nextPlanNodeType = executor->getPlanNode()->getPlanNodeType();
-            if (nextPlanNodeType >= PLAN_NODE_TYPE_UPDATE && nextPlanNodeType <= PLAN_NODE_TYPE_DELETE) {
-                AbstractOperationPlanNode* node = dynamic_cast<AbstractOperationPlanNode*>(executor->getPlanNode());
-                assert(node);
-                Table* targetTable = node->getTargetTable();
-                PersistentTable *persistentTarget = dynamic_cast<PersistentTable*>(targetTable);
-                if (persistentTarget != NULL && persistentTarget->isReplicatedTable()) {
-                    if (mpEngineLocals.context == this) {
-                        mpExecutor = executor;
-                    }
-                    if (SynchronizedThreadLock::countDownGlobalTxnStartCount()) {
-                        if (!ourEngineLocals) {
-                            ourEngineLocals = &enginesByPartitionId[m_partitionId];
-                        }
-                        ExecutorContext::assignThreadLocals(mpEngineLocals);
-                        needsReleaseLock = true;
-                        // Call the execute method to actually perform whatever action
-                        // it is that the node is supposed to do...
-                        if (!mpExecutor->execute(m_staticParams)) {
-                            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                               "Unspecified execution error detected");
-                        }
-                        ++ctr;
-                        mpExecutor = NULL;
-                        needsReleaseLock = false;
-                        // Assign the correct pool back to this thread
-                        ExecutorContext::assignThreadLocals(*ourEngineLocals);
-                        SynchronizedThreadLock::signalLastSiteFinished();
-                    } else {
-                        SynchronizedThreadLock::waitForLastSiteFinished();
-                    }
-                } else {
-                    // Call the execute method to actually perform whatever action
-                    // it is that the node is supposed to do...
-                    if (!executor->execute(m_staticParams)) {
-                        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                            "Unspecified execution error detected");
-                    }
-                    ++ctr;
-                }
-            } else {
-                // Call the execute method to actually perform whatever action
-                // it is that the node is supposed to do...
-                if (!executor->execute(m_staticParams)) {
-                    throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                        "Unspecified execution error detected");
-                }
-                ++ctr;
+            // Call the execute method to actually perform whatever action
+            // it is that the node is supposed to do...
+            if (!executor->execute(m_staticParams)) {
+                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                    "Unspecified execution error detected");
             }
+            ++ctr;
         }
     } catch (const SerializableEEException &e) {
         if (needsReleaseLock) {

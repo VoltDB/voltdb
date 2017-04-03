@@ -804,7 +804,7 @@ void PersistentTable::insertPersistentTuple(TableTuple& source, bool fallible, b
     }
 }
 
-void PersistentTable::insertTupleCommon(TableTuple& source, TableTuple& target,
+void PersistentTable::doInsertTupleCommon(TableTuple& source, TableTuple& target,
                                         bool fallible, bool shouldDRStream) {
     if (fallible) {
         // not null checks at first
@@ -908,6 +908,27 @@ void PersistentTable::insertTupleCommon(TableTuple& source, TableTuple& target,
     // in which case, we want to clean up by calling
     // deleteTupleStorage, below)
     insertTupleIntoDeltaTable(source, fallible);
+}
+
+void PersistentTable::insertTupleCommon(TableTuple& source, TableTuple& target,
+                                        bool fallible, bool shouldDRStream) {
+    if (this->isReplicatedTable()) {
+        if (SynchronizedThreadLock::countDownGlobalTxnStartCount()) {
+            // Save current executor context, then change it to MP executor context (has lowest site id)
+            EngineLocals* ourEngineLocals = &enginesByPartitionId[ExecutorContext::getExecutorContext()->m_partitionId];
+            VoltDBEngine* mpEngine = mpEngineLocals.context->getContextEngine();
+            ExecutorContext::assignThreadLocals(mpEngineLocals);
+
+            doInsertTupleCommon(source, target, fallible, shouldDRStream);
+
+            ExecutorContext::assignThreadLocals(*ourEngineLocals);
+            SynchronizedThreadLock::signalLastSiteFinished();
+        } else {
+            SynchronizedThreadLock::waitForLastSiteFinished();
+        }
+    } else {
+        doInsertTupleCommon(source, target, fallible, shouldDRStream);
+    }
 
     BOOST_FOREACH (auto viewHandler, m_viewHandlers) {
         viewHandler->handleTupleInsert(this, fallible);

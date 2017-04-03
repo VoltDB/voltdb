@@ -1634,6 +1634,7 @@ void VoltDBEngine::initMaterializedViewsAndLimitDeletePlans(bool updateReplicate
     // walk tables
     BOOST_FOREACH (LabeledTable labeledTable, m_database->tables()) {
         auto catalogTable = labeledTable.second;
+        // When updateReplicated flag is set, only replicated table work allowed, and vice versa.
         if (catalogTable->isreplicated() ^ updateReplicated) {
             continue;
         }
