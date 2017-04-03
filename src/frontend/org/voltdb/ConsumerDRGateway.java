@@ -73,4 +73,6 @@ public interface ConsumerDRGateway extends Promotable {
     void pauseConsumerDispatcher(byte clusterId);
 
     void resumeConsumerDispatcher(byte clusterId);
+
+    void resetDrAppliedTracker(byte clusterId);
 }

@@ -54,7 +54,7 @@ public class ExecuteTask_SP extends VoltSystemProcedure {
      * @param partitionParam  key for routing stored procedure to correct site
      * @param taskId          type of the task to execute
      */
-    public void run(SystemProcedureExecutionContext ctx, byte[] partitionParam, byte taskId)
+    public void run(SystemProcedureExecutionContext ctx, byte[] partitionParam, byte taskId, byte clusterId)
     {
         TaskType taskType = TaskType.values()[taskId];
         switch (taskType) {
@@ -67,6 +67,9 @@ public class ExecuteTask_SP extends VoltSystemProcedure {
                 throw new VoltAbortException("DRConsumerDrIdTracker could not be converted to JSON");
             }
 
+            break;
+        case RESET_DR_APPLIED_TRACKER_SINGLE:
+            ctx.resetDrAppliedTracker(clusterId);
             break;
         default:
             throw new VoltAbortException("Unable to find the task associated with the given task id");

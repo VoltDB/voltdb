@@ -542,6 +542,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         @Override
         public void resetDrAppliedTracker() {
             m_maxSeenDrLogsBySrcPartition.clear();
+            if (drLog.isDebugEnabled()) {
+                drLog.debug("Cleared DR Applied tracker");
+            }
             m_lastLocalSpUniqueId = -1L;
             m_lastLocalMpUniqueId = -1L;
         }
@@ -549,6 +552,13 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         @Override
         public void resetDrAppliedTracker(byte clusterId) {
             m_maxSeenDrLogsBySrcPartition.remove((int) clusterId);
+            if (drLog.isDebugEnabled()) {
+                drLog.debug("Reset DR Applied tracker for " + clusterId);
+            }
+            if (m_maxSeenDrLogsBySrcPartition.isEmpty()) {
+                m_lastLocalSpUniqueId = -1L;
+                m_lastLocalMpUniqueId = -1L;
+            }
         }
 
         @Override
