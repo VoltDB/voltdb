@@ -40,6 +40,7 @@ import javax.xml.bind.annotation.XmlAttribute;
 import org.apache.http.entity.ContentType;
 import org.codehaus.jackson.JsonFactory;
 import org.codehaus.jackson.JsonGenerator;
+import org.codehaus.jackson.JsonParseException;
 import org.codehaus.jackson.annotate.JsonIgnore;
 import org.codehaus.jackson.annotate.JsonProperty;
 import org.codehaus.jackson.annotate.JsonPropertyOrder;
@@ -373,14 +374,23 @@ public class HTTPAdminListener {
                 authResult = authenticate(baseRequest);
                 if (!authResult.isAuthenticated()) {
                     response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, authResult.m_message));
-                } else {
-                    if (jsonp != null) {
-                        response.getWriter().write(jsonp + "(");
-                    }
-                    m_mapper.writeValue(response.getWriter(), new Profile(authResult.m_user, authResult.m_perms));
-                    if (jsonp != null) {
-                        response.getWriter().write(")");
-                    }
+                    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                    baseRequest.setHandled(true);
+                    return;
+                }
+
+                if (!target.equals("/")) {
+                    response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, "Resource not found"));
+                    response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+                    baseRequest.setHandled(true);
+                    return;
+                }
+                if (jsonp != null) {
+                    response.getWriter().write(jsonp + "(");
+                }
+                m_mapper.writeValue(response.getWriter(), new Profile(authResult.m_user, authResult.m_perms));
+                if (jsonp != null) {
+                    response.getWriter().write(")");
                 }
                 baseRequest.setHandled(true);
             } catch (Exception ex) {
@@ -507,18 +517,23 @@ public class HTTPAdminListener {
                 authResult = authenticate(baseRequest);
                 if (!authResult.isAuthenticated()) {
                     response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, authResult.m_message));
+                    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                     baseRequest.setHandled(true);
                     return;
                 }
                 //Authenticated but has no permissions.
                 if (!authResult.m_authUser.hasPermission(Permission.ADMIN)) {
                     response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, "Permission denied"));
+                    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                     baseRequest.setHandled(true);
                     return;
                 }
 
+                if (!target.endsWith("/")) { // the URI may or may not end with /
+                    target += "/";
+                }
                 //Authenticated and has ADMIN permission
-                if (baseRequest.getRequestURI().contains("/download")) {
+                if (target.equals("/download/")) {
                     //Deployment xml is text/xml
                     response.setContentType("text/xml;charset=utf-8");
                     DeploymentType dt = CatalogUtil.shallowClusterAndPathsClone(this.getDeployment());
@@ -526,7 +541,7 @@ public class HTTPAdminListener {
                     dt.getCluster().setHostcount(getCatalogContext().getClusterSettings().hostcount());
 
                     response.getWriter().write(CatalogUtil.getDeployment(dt, true));
-                } else if (baseRequest.getRequestURI().contains("/users")) {
+                } else if (target.startsWith("/users/")) { // username may be passed in after the / (not as a param)
                     if (request.getMethod().equalsIgnoreCase("POST")) {
                         handleUpdateUser(jsonp, target, baseRequest, request, response, authResult);
                     } else if (request.getMethod().equalsIgnoreCase("PUT")) {
@@ -536,11 +551,11 @@ public class HTTPAdminListener {
                     } else {
                         handleGetUsers(jsonp, target, baseRequest, request, response);
                     }
-                } else if (baseRequest.getRequestURI().contains("/export/type")) {
+                } else if (target.equals("/export/types/")) {
                     handleGetExportTypes(jsonp, response);
-                } else {
+                } else if (target.equals("/")) { // just deployment
                     if (request.getMethod().equalsIgnoreCase("POST")) {
-                        handleUpdateDeployment(jsonp, target, baseRequest, request, response, authResult);
+                        handleUpdateDeployment(jsonp, baseRequest, request, response, authResult);
                     } else {
                         //non POST
                         response.setCharacterEncoding("UTF-8");
@@ -556,15 +571,18 @@ public class HTTPAdminListener {
                             response.getWriter().write(")");
                         }
                     }
+                } else {
+                    response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, "Resource not found"));
+                    response.setStatus(HttpServletResponse.SC_NOT_FOUND);
                 }
                 baseRequest.setHandled(true);
             } catch (Exception ex) {
-              logger.info("Not servicing url: " + baseRequest.getRequestURI() + " Details: "+ ex.getMessage(), ex);
+                logger.info("Not servicing url: " + baseRequest.getRequestURI() + " Details: "+ ex.getMessage(), ex);
             }
         }
 
         //Update the deployment
-        public void handleUpdateDeployment(String jsonp, String target,
+        public void handleUpdateDeployment(String jsonp,
                            Request baseRequest,
                            HttpServletRequest request,
                            HttpServletResponse response, AuthenticationResult ar)
@@ -572,6 +590,7 @@ public class HTTPAdminListener {
             String deployment = request.getParameter("deployment");
             if (deployment == null || deployment.length() == 0) {
                 response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, "Failed to get deployment information."));
+                response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
                 return;
             }
             try {
@@ -604,8 +623,13 @@ public class HTTPAdminListener {
                     response.getWriter().print(HTTPClientInterface.asJsonp(jsonp, r.toJSONString()));
                 }
                 baseRequest.setHandled(true);
+            } catch(JsonParseException e) {
+                response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, "Unparsable JSON"));
+                baseRequest.setHandled(true);
             } catch (Exception ex) {
                 logger.error("Failed to update deployment from API", ex);
+                response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
                 response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, Throwables.getStackTraceAsString(ex)));
                 baseRequest.setHandled(true);
             }
@@ -872,7 +896,13 @@ public class HTTPAdminListener {
                 // http://www.ietf.org/rfc/rfc4627.txt dictates this mime type
                 response.setContentType(jsonContentType);
                 if (m_jsonEnabled) {
-                    httpClientInterface.process(baseRequest, response);
+                    if (target.equals("/")) {
+                        httpClientInterface.process(baseRequest, response);
+                    } else {
+                        response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+                        response.getWriter().println("Resource not found");
+                        baseRequest.setHandled(true);
+                    }
 
                     // used for perf testing of the http interface
                     /*String msg = "{\"status\":1,\"appstatus\":-128,\"statusstring\":null,\"appstatusstring\":null,\"exception\":null,\"results\":[{\"status\":-128,\"schema\":[{\"name\":\"SVAL1\",\"type\":9},{\"name\":\"SVAL2\",\"type\":9},{\"name\":\"SVAL3\",\"type\":9}],\"data\":[[\"FOO\",\"BAR\",\"BOO\"]]}]}";
@@ -1024,6 +1054,7 @@ public class HTTPAdminListener {
             ContextHandler deploymentRequestHandler = new ContextHandler("/deployment");
             m_deploymentHandler = new DeploymentRequestHandler();
             deploymentRequestHandler.setHandler(m_deploymentHandler);
+            deploymentRequestHandler.setAllowNullPathInfo(true);
 
             ///profile
             ContextHandler profileRequestHandler = new ContextHandler("/profile");

@@ -121,7 +121,6 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         avgLatency                      { $("#AVG_LATENCY") }
         timeOfExecution                 { $("#PERC_EXECUTION") }
 
-
         //DBmonitor part for server
         dbmonitorbutton                 { $("#navDbmonitor > a")}
         clusterserverbutton             { $("#btnPopServerList")}
@@ -160,7 +159,6 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         commandLogStatisticsMin         { $("#visualisationCommandLog > g > g > g.nv-x.nv-axis > g > g:nth-child(2) > text") }
         commandLogStatisticsMax         { $("#visualisationCommandLog > g > g > g.nv-x.nv-axis > g > g:nth-child(3) > text") }
 
-
         //database replication graph
         databaseReplicationMin          { $("#visualizationDrReplicationRate > g > g > g.nv-x.nv-axis > g > g:nth-child(2) > text") }
         databaseReplicationMax          { $("#visualizationDrReplicationRate > g > g > g.nv-x.nv-axis > g > g:nth-child(3) > text") }
@@ -176,13 +174,10 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         header                          { module Header }
         footer                          { module Footer }
 
-
         //DR Section
 
         showHideDrBlock {$("#showHideDrBlock")}
-
         drSection {$("#drSection")}
-
 
         //DR Master Columns
 
@@ -190,22 +185,14 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
 
         status {$("#status")}
 
-
-
-
         ascendingDT                 { $(class:"sorting_asc") }
         descendingDT                { $(class:"sorting_desc") }
-
-
 
         dbDrMode {$("#dbDrMode")}
 
         filterPartitionId {$("#filterPartitionId")}
 
         partitionIdRows{$("#tblDrMAster").find(class:"sorting_1")}
-
-
-
 
         //Dr Replica Section
 
@@ -229,7 +216,6 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         cmdSegmentsInUse {$("#cmdSegmentsInUse")}
         cmdFsyncInterval {$("#cmdFsyncInterval")}
 
-
         drMasterTitle {$("#drMasterTitle")}
         drReplicaTitle {$("#drReplicaTitle")}
         drCLPTitle {$("#drCLPTitle")}
@@ -237,9 +223,6 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         filterServer {$("#filterServer")}
 
         clpServerRows {$("#tblCmdLog").find(class:"sorting_1")}
-
-
-
 
         // UAT
         drTableModeTypeText         { $("#dbDrMode") }
@@ -524,13 +507,6 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         return drSection.displayed
     }
 
-
-
-
-
-
-
-
     def boolean isCmdLogSectionOpen() {
         return showHideCLPBlock.displayed
     }
@@ -538,8 +514,6 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
     def boolean isCLPAreaOpen() {
         return clpSection.displayed
     }
-
-
 
     /**
      * Opens the "Data" area (containing Stored Procedures and Database Tables
@@ -569,18 +543,15 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         return true
     }
 
-
     def boolean closeDrArea() {
         clickToNotDisplay(showHideDrBlock, drSection)
         return true
     }
 
-
     def boolean closeCLPArea() {
         clickToNotDisplay(showHideCLPBlock, clpSection)
         return true
     }
-
 
     /**
      *  Edits from here
@@ -827,6 +798,7 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         String date = string.substring(3, string.length()-9)
         return date
     }
+
     /*
      * click SQL Query to go to SqlQueryPage
      */
@@ -854,8 +826,8 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
     }
 
     /*
- * get query to delete a table
- */
+     * get query to delete a table
+     */
     def String getQueryToDeleteTableAndView() {
         BufferedReader br = new BufferedReader(new FileReader("src/resources/sqlQueryDbMonitor.txt"));
         String line;
@@ -892,6 +864,82 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
     }
 
     /*
+
+     */
+    def String getQueryToCreateStoredProcedure() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/sqlQueryDbMonitor.txt"));
+        String line;
+        String query = ""
+
+        while((line = br.readLine()) != "#createStoredProcedure") {
+        }
+
+        while ((line = br.readLine()) != "#executeStoredProcedure") {
+            // process the line.
+            query = query + line + "\n"
+        }
+
+        return query
+    }
+
+    /*
+
+     */
+    def String getQueryToExecuteProcedureQuery() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/sqlQueryDbMonitor.txt"));
+        String line;
+        String query = ""
+
+        while((line = br.readLine()) != "#executeStoredProcedure") {
+        }
+
+        while ((line = br.readLine()) != "#dropStoredProcedure") {
+            // process the line.
+            query = query + line + "\n"
+        }
+
+        return query
+    }
+
+    /*
+
+     */
+    def String getQueryToDropProcedureQuery() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/sqlQueryDbMonitor.txt"));
+        String line;
+        String query = ""
+
+        while((line = br.readLine()) != "#dropStoredProcedure") {
+        }
+
+        while ((line = br.readLine()) != "#procedureName") {
+            // process the line.
+            query = query + line + "\n"
+        }
+
+        return query
+    }
+
+    /*
+
+     */
+    def String getNameOfStoredProcedure() {
+        BufferedReader br = new BufferedReader(new FileReader("src/resources/sqlQueryDbMonitor.txt"));
+        String line;
+        String query = ""
+
+        while((line = br.readLine()) != "#procedureName") {
+        }
+
+        while ((line = br.readLine()) != null) {
+            // process the line.
+            query = query + line + "\n"
+        }
+
+        return query
+    }
+
+    /*
      * get tablename that is created and deleted
      */
     def String getTablename() {
@@ -908,10 +956,8 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
 
         query = br.readLine()
 
-
         return query
     }
-
 
     //server search
 
@@ -972,8 +1018,6 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
             return false
     }
 
-
-
     /*
      *  return true if table is in descending order
      *  to check descending order, check the class "sorting_desc" displayed
@@ -1020,13 +1064,6 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         status.click()
     }
 
-
-
-
-
-
-
-
     /*
      *  click the status column in DR Replica table
      */
@@ -1048,7 +1085,7 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         replicationRate5.click()
     }
 
-/*
+    /*
      *  click the cmdServer column in  Command log table
      */
     def boolean clickCmdServer() {
@@ -1083,17 +1120,12 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         cmdSegmentsInUse.click()
     }
 
-
     /*
-   *    click the FsyncInterval column in  Command log table
-   */
+     *    click the FsyncInterval column in  Command log table
+     */
     def boolean clickCmdFsyncInterval() {
         cmdFsyncInterval.click()
     }
-
-
-
-
 
     /*
      *  click the min rows column in database table
@@ -1269,5 +1301,4 @@ class DbMonitorPage extends VoltDBManagementCenterPage {
         else
             return true
     }
-
 }

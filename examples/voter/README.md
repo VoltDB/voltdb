@@ -36,9 +36,7 @@ The latency numbers reported by the default benchmark settings may be higher tha
 
 The "Voter" application is specifically designed for benchmarking to give you a good feel for the type of performance VoltDB is capable of on your hardware.
 
-For more on benchmarking and tips on application tuning, make sure you visit the VoltDB blog:
- - http://voltdb.com/search/node/benchmark
- - http://voltdb.com/search/node/tuning
+For more on benchmarking and tips on application tuning please see the VoltDB Performance Guide at https://docs.voltdb.com/PerfGuide/
 
 
 Quickstart

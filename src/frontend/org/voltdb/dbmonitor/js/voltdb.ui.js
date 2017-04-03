@@ -662,11 +662,11 @@ var loadPage = function (serverName, portid) {
     function showEnableDisableDownloadBtn(){
          if ((navigator.userAgent.indexOf('Safari') != -1 && navigator.userAgent.indexOf('Chrome') == -1) ||
          navigator.userAgent.indexOf('MSIE') > 0 || navigator.userAgent.indexOf('Trident/') > 0 ) {
-            $(".downloadCls").attr("src","css/resources/images/icon_download_disabled.png");
+            $(".downloadCls").attr("src","images/icon_download_disabled.png");
             $(".downloadCls").attr("title","Download file feature is not supported in this browser.")
             $(".downloadCls").css( 'cursor', 'default' );
          } else {
-            $(".downloadCls").attr("src","css/resources/images/downloadBtn.png");
+            $(".downloadCls").attr("src","images/downloadBtn.png");
             $(".downloadCls").attr("title","Download data as CSV")
             $(".downloadCls").css( 'cursor', 'pointer' );
          }
@@ -992,7 +992,9 @@ var loadPage = function (serverName, portid) {
         var getLicenseInformation = function (licenseInfo) {
             if (licenseInfo != undefined && licenseInfo != "") {
                 var licInfo = $.parseJSON(licenseInfo);
-                $("#addNewConfigLink").show();
+                if(!VoltDbAdminConfig.isExportLoading){
+                    $("#addNewConfigLink").show();
+                }
                 $(".licenseInfo").show();
                 $("#tdLicenseInfo").hide();
                 $("#tdLicenseInfo").css("display", "none");
@@ -1342,7 +1344,7 @@ var loadPage = function (serverName, portid) {
                               '                <div id="mainGraphBlock_' + combinedId + '">' +
                               '                    <div class="errorMsgLocalStorageFull" style="display:none">' +
                               '                        <div class="errorMsgLocalWrapper">' +
-                              '                            <img src="css/resources/images/alert.png" alt="Alert"/>' +
+                              '                            <img src="images/alert.png" alt="Alert"/>' +
                               '                        </div>' +
                               '                        <div class="textMsgLocalWrapper">' +
                               '                            <p>Local storage is full. Please delete some saved queries from SQL Query tab or minimize the retained time interval using the above sliding window.</p>' +
@@ -1354,7 +1356,7 @@ var loadPage = function (serverName, portid) {
                               '                            <div class="chartHeader">' +
                               '                                <h1>Database Replication (DR)' +
                               '                                    <a href="#" class="downloadBtnChart" ' +
-                              '                                     > <img class="downloadCls" src="css/resources/images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>' +
+                              '                                     > <img class="downloadCls" src="images/downloadBtn.png" alt="download" title="Download data as CSV"/></a>' +
                               '                                    <div class="clear"></div>' +
                               '                                </h1>' +
                               '                            </div>' +
