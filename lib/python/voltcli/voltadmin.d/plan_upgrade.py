@@ -132,7 +132,7 @@ def generateCommands(opts, hosts, kfactor):
     et.write(cluster_1_deploy)
 
     (et, drId) = updateDeployment(victim,
-                                 str(int(drId) + 1),
+                                 drId,
                                  getHostnameOrIp(survivor) + ':' + str(survivor.drport))
     cluster_2_deploy = "deployment2.xml"
     et.write(cluster_2_deploy)
@@ -316,27 +316,30 @@ def writeCommands(file, subject, command):
         file.write(command)
         file.write('\n\n')
 
-def updateDeployment(host, hintDrId, drSource):
+def updateDeployment(host, greatestRemoteClusterId, drSource):
+    if greatestRemoteClusterId is None or greatestRemoteClusterId > 127:
+        clusterId = 1  # start from 1
+    else:
+        clusterId = greatestRemoteClusterId + 1
+
     et = ElementTree.parse(host.deployment)
     dr = et.getroot().find('./dr')
     if dr is None:
-        dr = ET.Element('dr')
+        # append an empty DR tag and change it later
+        dr = ElementTree.Element('dr')
         et.getroot().append(dr)
-    if dr.attrib['id'] is None:
-        if hintDrId is None:
-            dr.attrib['id'] = '1'  # start from 1
-        else:
-            dr.attrib['id'] = hintDrId
-    else:
-        if hintDrId is not None:
-            dr.attrib['id'] = hintDrId  # override it
-    drId = dr.attrib['id']
+
+    # update DR tag
+    dr.attrib['id'] = str(clusterId)
     dr.attrib['role'] = 'xdcr'
+
+    # find DR connection source
     connection = dr.find('./connection')
     if connection is None:
-        connection = ET.Element('connection')
-        dr.append(connectionTag)
-        drSource = drSource + ',' + connectionTag.attrib['source']
+        connection = ElementTree.Element('connection')
+        dr.append(connection)
+
+    # update DR connection source
     connection.attrib['enabled'] = 'true'
     connection.attrib['source'] = drSource
-    return et, drId
+    return et, clusterId

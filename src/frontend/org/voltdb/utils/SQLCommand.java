@@ -590,6 +590,9 @@ public class SQLCommand
         try {
             executeScriptFromReader(fileInfo, reader);
         }
+        catch (SQLCmdEarlyExitException e) {
+            throw e;
+        }
         catch (Exception x) {
             stopOrContinue(x);
         }

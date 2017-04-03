@@ -64,14 +64,6 @@ def makeReleaseDir(releaseDir):
 
 
 ################################################
-# SEE IF HAS ZIP TARGET
-###############################################
-def versionHasZipTarget():
-    with settings(warn_only=True):
-        with cd(os.path.join(builddir,'pro')):
-                return run("ant -p -f mmt.xml | grep dist.pro.zip")
-
-################################################
 # BUILD THE COMMUNITY VERSION
 ################################################
 
@@ -128,14 +120,12 @@ def buildRabbitMQExport(version):
         run("git status")
         run("git describe --dirty", warn_only=True)
         run("VOLTDIST=../pro/obj/pro/voltdb-ent-%s ant" % version)
-    # Repackage the pro tarball and zip file with the RabbitMQ connector Jar
+    # Repackage the pro tarball with the RabbitMQ connector Jar
     with cd("%s/pro/obj/pro" % builddir):
         run("pwd")
         run("gunzip voltdb-ent-%s.tar.gz" % version)
         run("tar uvf voltdb-ent-%s.tar voltdb-ent-%s/lib/extension/voltdb-rabbitmq.jar" % (version, version))
-        if versionHasZipTarget():
-            run("gzip voltdb-ent-%s.tar" % version)
-            run("zip -r voltdb-ent-%s.zip voltdb-ent-%s" % (version, version))
+        run("gzip voltdb-ent-%s.tar" % version)
 
 ################################################
 # MAKE AN ENTERPRISE TRIAL LICENSE
@@ -145,14 +135,6 @@ def buildRabbitMQExport(version):
 def makeTrialLicense(days=30, dr_and_xdcr="true", nodes=12):
     with cd(builddir + "/pro/tools"):
         run("./make_trial_licenses.pl -t %d -H %d -W %s" % (days, nodes, dr_and_xdcr ))
-
-################################################
-# MAKE AN ENTERPRISE ZIP FILE FOR SOME PARTNER UPLOAD SITES
-################################################
-
-def makeEnterpriseZip():
-    with cd(builddir + "/pro"):
-        run("VOLTCORE=../voltdb ant -f mmt.xml dist.pro.zip")
 
 ################################################
 # MAKE AN JAR FILES NEEDED TO PUSH TO MAVEN
@@ -178,10 +160,6 @@ def copyFilesToReleaseDir(releaseDir, version, type=None):
 def copyCommunityFilesToReleaseDir(releaseDir, version, operatingsys):
     get("%s/voltdb/obj/release/voltdb-%s.tar.gz" % (builddir, version),
         "%s/voltdb-%s.tar.gz" % (releaseDir, version))
-    get("%s/voltdb/obj/release/voltdb-client-java-%s.tar.gz" % (builddir, version),
-        "%s/voltdb-client-java-%s.tar.gz" % (releaseDir, version))
-    get("%s/voltdb/obj/release/voltdb-tools-%s.tar.gz" % (builddir, version),
-        "%s/voltdb-tools-%s.tar.gz" % (releaseDir, version))
 
     # add stripped symbols
     if operatingsys == "LINUX":
@@ -192,10 +170,6 @@ def copyCommunityFilesToReleaseDir(releaseDir, version, operatingsys):
 def copyTrialLicenseToReleaseDir(releaseDir):
     get("%s/pro/trial_*.xml" % (builddir),
         "%s/license.xml" % (releaseDir))
-
-def copyEnterpriseZipToReleaseDir(releaseDir, version, operatingsys):
-    get("%s/pro/obj/pro/voltdb-ent-%s.zip" % (builddir, version),
-        "%s/voltdb-ent-%s.zip" % (releaseDir, version))
 
 def copyMavenJarsToReleaseDir(releaseDir, version):
     #The .jars and upload file must be in a directory called voltdb - it is the projectname
@@ -278,7 +252,6 @@ parser.add_argument('pro_sha', nargs="?", default="master", help="pro repository
 parser.add_argument('rabbitmq_sha', nargs="?", default="master", help="rabbitmq repository commit, tag or branch" )
 parser.add_argument('-g','--gitloc', default="git@github.com:VoltDB", help="Repository location. For example: /home/github-mirror")
 parser.add_argument('--nomac', action='store_true', help="Don't build Mac OSX")
-parser.add_argument('--nopackages', action='store_true', help="Don't build .rpm and .deb packages")
 parser.add_argument('--nocommunity', action='store_true', help="Don't build community")
 args = parser.parse_args()
 
@@ -290,10 +263,9 @@ print args
 
 build_community = not args.nocommunity
 build_mac = not args.nomac
-build_packages = not args.nopackages
 
 #If anything is missing we're going to dump this in oneoffs dir.
-build_all = build_community and build_mac and build_packages
+build_all = build_community and build_mac
 if voltdbTreeish != proTreeish or not build_all:
     oneOff = True
 else:
@@ -355,9 +327,6 @@ try:
         copyFilesToReleaseDir(releaseDir, versionCentos, "pro")
         makeTrialLicense()
         copyTrialLicenseToReleaseDir(releaseDir)
-        if versionHasZipTarget():
-            makeEnterpriseZip()
-            copyEnterpriseZipToReleaseDir(releaseDir, versionCentos, "LINUX")
         makeMavenJars()
         copyMavenJarsToReleaseDir(releaseDir, versionCentos)
 
@@ -366,57 +335,6 @@ except Exception as e:
     print "Could not build LINUX kit. Exception: " + str(e) + ", Type: " + str(type(e))
     build_errors=True
 
-if build_packages:
-    # build debian kit
-    try:
-        with settings(user=username,host_string=UbuntuSSHInfo[1],disable_known_hosts=True,key_filename=UbuntuSSHInfo[0]):
-            debbuilddir = "%s/deb_build/" % builddir
-            run("rm -rf " + debbuilddir)
-            run("mkdir -p " + debbuilddir)
-
-            with cd(debbuilddir):
-                put ("tools/voltdb-install.py",".")
-
-                if build_community:
-                    commbld = "voltdb-%s.tar.gz" % (versionCentos)
-                    put("%s/%s" % (releaseDir, commbld),".")
-                    run ("sudo python voltdb-install.py -D " + commbld)
-                    get("voltdb_%s-1_amd64.deb" % (versionCentos), releaseDir)
-
-                entbld = "voltdb-ent-%s.tar.gz" % (versionCentos)
-                put("%s/%s" % (releaseDir, entbld),".")
-                run ("sudo python voltdb-install.py -D " + entbld)
-                get("voltdb-ent_%s-1_amd64.deb" % (versionCentos), releaseDir)
-    except Exception as e:
-        print traceback.format_exc()
-        print "Could not build debian kit. Exception: " + str(e) + ", Type: " + str(type(e))
-        build_errors=True
-
-    try:
-        # build rpm kit
-        with settings(user=username,host_string=CentosSSHInfo[1],disable_known_hosts=True,key_filename=CentosSSHInfo[0]):
-            rpmbuilddir = "%s/rpm_build/" % builddir
-            run("rm -rf " + rpmbuilddir)
-            run("mkdir -p " + rpmbuilddir)
-
-            with cd(rpmbuilddir):
-                put ("tools/voltdb-install.py",".")
-
-                if build_community:
-                    commbld = "voltdb-%s.tar.gz" % (versionCentos)
-                    put("%s/%s" % (releaseDir, commbld),".")
-                    run ("python2.6 voltdb-install.py -R " + commbld)
-                    get("voltdb-%s-1.x86_64.rpm" % (versionCentos), releaseDir)
-
-                entbld = "voltdb-ent-%s.tar.gz" % (versionCentos)
-                put("%s/%s" % (releaseDir, entbld),".")
-                run ("python2.6 voltdb-install.py -R " + entbld)
-                get("voltdb-ent-%s-1.x86_64.rpm" % (versionCentos), releaseDir)
-
-    except Exception as e:
-        print traceback.format_exc()
-        print "Could not build rpm kit. Exception: " + str(e) + ", Type: " + str(type(e))
-        build_errors=True
 
 computeChecksums(releaseDir)
 
