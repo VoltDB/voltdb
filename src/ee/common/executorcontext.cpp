@@ -117,7 +117,7 @@ ExecutorContext::~ExecutorContext() {
     // currently does not own any of its pointers
 
     // ... or none, now that the one is going away.
-    VOLT_DEBUG("De-installing EC(%ld)", (long)this);
+    VOLT_DEBUG("De-installing EC(%ld) for partition %d", (long)this, m_partitionId);
 
     pthread_setspecific(static_key, NULL);
 }

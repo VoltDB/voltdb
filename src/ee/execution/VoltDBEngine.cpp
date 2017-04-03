@@ -281,30 +281,56 @@ VoltDBEngine::~VoltDBEngine() {
     typedef std::pair<int64_t, Table*> TID;
 
     if (m_partitionId != 16383) {
-        //
-        BOOST_FOREACH (LabeledTCD cd, m_catalogDelegates) {
-            delete cd.second;
+        // This lock is strictly defensive because sites are normally shutdown serially with a Join in between
+        pthread_mutex_lock(&sharedEngineMutex);
+        for (auto tcdIter = m_catalogDelegates.cbegin(); tcdIter != m_catalogDelegates.cend(); ) {
+            auto table = tcdIter->second->getPersistentTable();
+            if (!table || !table->isReplicatedTable()) {
+                delete tcdIter->second;
+                auto eraseThis = tcdIter;
+                tcdIter++;
+                m_catalogDelegates.erase(eraseThis);
+            }
+            else {
+                assert(m_drReplicatedStream);
+                BOOST_FOREACH (const SharedEngineLocalsType::value_type& enginePair, enginesByPartitionId) {
+                    if (enginePair.first == m_partitionId) {
+                        continue;
+                    }
+                    VoltDBEngine* currEngine = enginePair.second.context->getContextEngine();
+                    auto extTcdIter = currEngine->m_catalogDelegates.find(tcdIter->first);
+                    if (extTcdIter != currEngine->m_catalogDelegates.end()) {
+                        currEngine->m_catalogDelegates.erase(extTcdIter);
+                    }
+                }
+
+                auto eraseThis = tcdIter;
+                tcdIter++;
+                delete eraseThis->second;
+                m_catalogDelegates.erase(eraseThis);
+            }
+        }
+
+        BOOST_FOREACH (TID tid, m_snapshottingTables) {
+            tid.second->decrementRefcount();
+        }
+
+        delete m_executorContext;
+
+        delete m_drReplicatedStream;
+        delete m_drStream;
+
+        enginesByPartitionId.erase(m_partitionId);
+        bool allEnginesDestroyed = enginesByPartitionId.empty();
+        pthread_mutex_unlock(&sharedEngineMutex);
+
+        if (allEnginesDestroyed) {
+            pthread_mutex_destroy(&sharedEngineMutex);
         }
     }
-
-    BOOST_FOREACH (TID tid, m_snapshottingTables) {
-        tid.second->decrementRefcount();
+    else {
+        delete m_executorContext;
     }
-
-    delete m_executorContext;
-
-    delete m_drReplicatedStream;
-    delete m_drStream;
-
-    // Add the engine to the global list tracking replicated tables
-    pthread_mutex_lock(&sharedEngineMutex);
-    enginesByPartitionId.erase(m_partitionId);
-    bool allEnginesDestroyed = enginesByPartitionId.empty();
-    pthread_mutex_unlock(&sharedEngineMutex);
-    if (allEnginesDestroyed) {
-        pthread_mutex_destroy(&sharedEngineMutex);
-    }
-
     VOLT_ERROR("finished deallocate for partition %d", m_partitionId);
 }
 
