@@ -9,7 +9,6 @@ import org.apache.calcite.sql.parser.SqlParser;
 import org.apache.calcite.tools.FrameworkConfig;
 import org.apache.calcite.tools.Frameworks;
 import org.apache.calcite.tools.Planner;
-import org.apache.calcite.tools.Programs;
 import org.voltdb.calciteadapter.rel.VoltDBRel;
 import org.voltdb.calciteadapter.rules.VoltDBRules;
 import org.voltdb.catalog.Database;
@@ -36,7 +35,7 @@ public class CalcitePlanner {
         final FrameworkConfig config = Frameworks.newConfigBuilder()
                 .parserConfig(SqlParser.Config.DEFAULT)
                 .defaultSchema(schema)
-                .programs(Programs.ofRules(VoltDBRules.getRules()))
+                .programs(VoltDBRules.getProgram())
                 .build();
           return Frameworks.getPlanner(config);
 
@@ -113,6 +112,10 @@ public class CalcitePlanner {
 
         }
         catch (Throwable e) {
+            System.out.println("For some reason planning failed!  Here's how far you got:");
+            System.out.println(sb.toString());
+            System.out.println("\nAnd here's the error:");
+            System.out.println(e.getMessage());
             throw new PlanningErrorException(e.getMessage());
         }
 

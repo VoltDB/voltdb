@@ -1,40 +1,46 @@
 package org.voltdb.calciteadapter.rules;
 
-import java.util.ArrayList;
-import java.util.List;
-
-import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.rel.rules.CalcMergeRule;
 import org.apache.calcite.rel.rules.FilterCalcMergeRule;
 import org.apache.calcite.rel.rules.FilterToCalcRule;
 import org.apache.calcite.rel.rules.ProjectCalcMergeRule;
 import org.apache.calcite.rel.rules.ProjectToCalcRule;
+import org.apache.calcite.tools.Program;
+import org.apache.calcite.tools.Programs;
 
 public class VoltDBRules {
     //public static final ConverterRule PROJECT_RULE = new VoltDBProjectRule();
     //public static final RelOptRule PROJECT_SCAN_MERGE_RULE = new VoltDBProjectScanMergeRule();
 
-    public static List<RelOptRule> getRules() {
-        List<RelOptRule> rules = new ArrayList<>();
+    public static Program getProgram() {
 
-        rules.add(VoltDBCalcScanMergeRule.INSTANCE);
-        rules.add(VoltDBProjectRule.INSTANCE);
-        rules.add(VoltDBProjectRule.INSTANCE);
-        rules.add(VoltDBJoinRule.INSTANCE);
+        Program standardRules = Programs.ofRules(
+                CalcMergeRule.INSTANCE,
+                FilterCalcMergeRule.INSTANCE,
+                FilterToCalcRule.INSTANCE,
+                ProjectCalcMergeRule.INSTANCE,
+                ProjectToCalcRule.INSTANCE,//);
 
-        rules.add(VoltDBCalcJoinMergeRule.INSTANCE);
+        // Pull up the send nodes as high as possible
+        //Program pullUpSendProg = Programs.ofRules(
+                VoltDBSendPullUp.PROJECT,
+                VoltDBSendPullUp.CALC,
+                VoltDBSendPullUpJoin.INSTANCE,//);
+
+        //Program voltDBConversionRules = Programs.ofRules(
+                VoltDBCalcScanMergeRule.INSTANCE,
+                VoltDBProjectRule.INSTANCE,
+                VoltDBJoinRule.INSTANCE,
+                VoltDBCalcJoinMergeRule.INSTANCE);
+
+        Program metaProgram = Programs.sequence(
+                standardRules);//,
+        //pullUpSendProg,
+          //      voltDBConversionRules);
 
         // We don't actually handle this.
-        //rules.add(VoltDBProjectJoinMergeRule.INSTANCE);
+        //    VoltDBProjectJoinMergeRule.INSTANCE
 
-        rules.add(CalcMergeRule.INSTANCE);
-        rules.add(FilterCalcMergeRule.INSTANCE);
-        rules.add(FilterToCalcRule.INSTANCE);
-        rules.add(ProjectCalcMergeRule.INSTANCE);
-        rules.add(ProjectToCalcRule.INSTANCE);
-        rules.add(ProjectToCalcRule.INSTANCE);
-
-
-        return rules;
+        return metaProgram;
     }
 }

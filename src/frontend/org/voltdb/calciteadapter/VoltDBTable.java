@@ -3,6 +3,7 @@ package org.voltdb.calciteadapter;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptTable;
 import org.apache.calcite.plan.RelOptTable.ToRelContext;
 import org.apache.calcite.rel.RelCollation;
@@ -12,14 +13,13 @@ import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rel.type.RelDataTypeFactory.FieldInfoBuilder;
 import org.apache.calcite.schema.Schema;
+import org.apache.calcite.schema.Schema.TableType;
 import org.apache.calcite.schema.Statistic;
 import org.apache.calcite.schema.TranslatableTable;
-import org.apache.calcite.schema.Schema.TableType;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.util.ImmutableBitSet;
 import org.voltdb.VoltType;
-import org.voltdb.calciteadapter.rel.VoltDBPartitionedTableScan;
-import org.voltdb.calciteadapter.rel.VoltDBTableScan;
+import org.voltdb.calciteadapter.rel.VoltDBSend;
 import org.voltdb.calciteadapter.rel.VoltDBTableScan;
 import org.voltdb.catalog.Column;
 import org.voltdb.utils.CatalogUtil;
@@ -94,11 +94,20 @@ public class VoltDBTable implements TranslatableTable {
 
     @Override
     public RelNode toRel(ToRelContext context, RelOptTable relOptTable) {
-        if (getCatTable().getIsreplicated()) {
-            return new VoltDBTableScan(context.getCluster(), relOptTable, this);
+        RelOptCluster cluster = context.getCluster();
+        RelNode node = new VoltDBTableScan(cluster, relOptTable, this);
+        RelDataType rowType = node.getRowType();
+
+        if (! getCatTable().getIsreplicated()) {
+            node = new VoltDBSend(
+                    cluster,
+                    cluster.traitSet(),
+                    node,
+                    cluster.getRexBuilder().identityProjects(rowType),
+                    rowType);
         }
 
-        return new VoltDBPartitionedTableScan(context.getCluster(), relOptTable, this);
+        return node;
     }
 
     public org.voltdb.catalog.Table getCatTable() {

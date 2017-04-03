@@ -28,7 +28,7 @@ public class VoltDBTableScan extends TableScan implements VoltDBRel {
             VoltDBTable voltDBTable) {
           super(cluster, cluster.traitSetOf(VoltDBConvention.INSTANCE), table);
           this.m_voltDBTable = voltDBTable;
-          m_program = null;
+          m_program = RexProgram.createIdentity(voltDBTable.getRowType(cluster.getTypeFactory()));
     }
 
     protected VoltDBTableScan(RelOptCluster cluster, RelOptTable table,

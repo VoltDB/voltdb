@@ -32,6 +32,7 @@ import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.compiler.VoltCompiler;
+import org.voltdb.planner.CompiledPlan;
 import org.voltdb.utils.BuildDirectoryUtils;
 
 import junit.framework.TestCase;
@@ -104,15 +105,24 @@ public class TestCalcite extends TestCase {
                 + "f float not null, "
                 + "v varchar(32));"
                 + "create table t2 ("
-                + "pk integer primary key, vc varchar(256));";
+                + "pk integer primary key, vc varchar(256));\n\n"
+                + "create table partitioned ("
+                + "i integer primary key not null, "
+                + "si smallint, "
+                + "ti tinyint,"
+                + "bi bigint,"
+                + "f float not null, "
+                + "v varchar(32));\n"
+                + "partition table partitioned on column i;";
 
         Catalog cat = ddlToCatalog(ddl);
         Database db = cat.getClusters().get("cluster").getDatabases().get("database");
 //        CalcitePlanner.plan(db, "select f from test_calcite");
-//        CalcitePlanner.plan(db, "select * from test_calcite");
+        CalcitePlanner.plan(db, "select * from test_calcite");
 //        CalcitePlanner.plan(db, "select i from test_calcite where v = 'foo'");
 //        CalcitePlanner.plan(db, "select i from test_calcite where ti = 10");
-        CalcitePlanner.plan(db,
+
+        CompiledPlan plan = CalcitePlanner.plan(db,
                 "select t1.v, t2.v "
                 + "from "
                 + "  (select * from test_calcite where v = 'foo') as t1 "
@@ -121,6 +131,18 @@ public class TestCalcite extends TestCase {
                 + "on t1.i = t2.i "
                 //+ "where t1.i = 3;"
                 );
+
+        System.out.println(plan.explainedPlan);
+
+        plan = CalcitePlanner.plan(db, "select * from partitioned;");
+        System.out.println(plan.explainedPlan);
+
+        plan = CalcitePlanner.plan(db, "select * from partitioned as p1 inner join partitioned as p2 on p1.i = p2.i;");
+        System.out.println(plan.explainedPlan);
+
+        plan = CalcitePlanner.plan(db, "select * from test_calcite as p1 inner join test_calcite as p2 on p1.i = p2.i;");
+        System.out.println(plan.explainedPlan);
+
 //        parseValidateAndPlan(planner, "select * from test_calcite");
 //        parseValidateAndPlan(planner, "select f from test_calcite where ti = 3");
 //        parseValidateAndPlan(planner, "select f from test_calcite where ti = 3");
