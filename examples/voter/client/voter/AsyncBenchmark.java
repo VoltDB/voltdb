@@ -177,6 +177,7 @@ public class AsyncBenchmark {
     public AsyncBenchmark(VoterConfig config) {
         this.config = config;
 
+        clientConfig.setMaxTransactionsPerSecond(config.ratelimit);
         ClientConfig clientConfig = new ClientConfig(config.user, config.password, new StatusListener());
         if (!config.sslfile.trim().isEmpty()) {
             clientConfig.setTrustStoreConfigFromPropertyFile(config.sslfile);
