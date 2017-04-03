@@ -1152,7 +1152,11 @@ class Distributer {
              * affinity and known topology (hashinator initialized).
              */
             if (m_useClientAffinity && (m_hashinator != null)) {
-                final Procedure procedureInfo = m_procedureInfo.get().get(invocation.getProcName());
+                final ImmutableSortedMap<String, Procedure> procedures = m_procedureInfo.get();
+                Procedure procedureInfo = null;
+                if (procedures != null) {
+                    procedureInfo = procedures.get(invocation.getProcName());
+                }
                 Integer hashedPartition = -1;
 
                 if (procedureInfo != null) {
