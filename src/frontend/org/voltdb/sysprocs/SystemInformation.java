@@ -458,6 +458,7 @@ public class SystemInformation extends VoltSystemProcedure
         // root path
         vt.addRow(hostId, "VOLTDBROOT", VoltDB.instance().getVoltDBRootPath());
         vt.addRow(hostId, "FULLCLUSTERSIZE", Integer.toString(VoltDB.instance().getCatalogContext().getClusterSettings().hostcount()));
+        vt.addRow(hostId, "CLUSTERID", Integer.toString(VoltDB.instance().getCatalogContext().getCluster().getDrclusterid()));
         return vt;
     }
 

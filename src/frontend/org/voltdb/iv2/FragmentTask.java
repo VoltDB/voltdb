@@ -341,13 +341,23 @@ public class FragmentTask extends TransactionTask
                 // The single-partition stored procedure handler is in the ProcedureRunner.
                 if (currRunner != null) {
                     succeededFragmentsCount = currRunner.getExecutionEngine().extractPerFragmentStats(1, executionTimes);
-                    currRunner.getStatsCollector().finishStatement(m_fragmentMsg.getStmtName(frag),
-                                                                   m_fragmentMsg.isCoordinatorTask(),
-                                                                   m_fragmentMsg.isPerFragmentStatsRecording(),
-                                                                   succeededFragmentsCount == 0,
-                                                                   executionTimes == null ? 0 : executionTimes[0],
-                                                                   dependency,
-                                                                   params);
+
+                    long stmtDuration = 0;
+                    int stmtResultSize = 0;
+                    int stmtParameterSetSize = 0;
+                    if (m_fragmentMsg.isPerFragmentStatsRecording()) {
+                        stmtDuration = executionTimes == null ? 0 : executionTimes[0];
+                        stmtResultSize = dependency == null ? 0 : dependency.getSerializedSize();
+                        stmtParameterSetSize = params == null ? 0 : params.getSerializedSize();
+                    }
+
+                    currRunner.getStatsCollector().endFragment(m_fragmentMsg.getStmtName(frag),
+                                                               m_fragmentMsg.isCoordinatorTask(),
+                                                               succeededFragmentsCount == 0,
+                                                               m_fragmentMsg.isPerFragmentStatsRecording(),
+                                                               stmtDuration,
+                                                               stmtResultSize,
+                                                               stmtParameterSetSize);
                 }
             }
         }

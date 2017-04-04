@@ -176,8 +176,7 @@ public class SQLParser extends SQLPatternFactory
      *
      * CREATE PROCEDURE with inline implementation script, e.g. Groovy, statement regex
      * NB supports only unquoted table and column names
-     * The only supported language is GROOVY for now, but to avoid confusing with the
-     * other CREATE PROCEDURE ... AS variant match anything that has the block delimiters.
+     * This used to support GROOVY, but now will just offer a compile error.
      *
      * Capture groups:
      *  (1) Procedure name
