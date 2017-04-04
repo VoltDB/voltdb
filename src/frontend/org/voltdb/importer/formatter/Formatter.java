@@ -17,16 +17,18 @@
 
 package org.voltdb.importer.formatter;
 
+import java.nio.ByteBuffer;
+
 /**
  * Interface for the formatter, the transform method gets called after the formatter factory
  * creates the formatter.
  */
-public interface Formatter<T> {
+public interface Formatter {
     /**
      * Transforms data from one format to another.
      * @param sourceData - raw data from source
      * @return Array of data converted from sourceData
      * @throws FormatException
      */
-    public Object[] transform(T sourceData) throws FormatException;
+    public Object[] transform(ByteBuffer sourceData) throws FormatException;
 }

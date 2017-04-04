@@ -25,8 +25,10 @@ import org.voltdb.importer.formatter.FormatException;
 import org.voltdb.importer.formatter.Formatter;
 
 import au.com.bytecode.opencsv_voltpatches.CSVParser;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 
-public class VoltCSVFormatter implements Formatter<String> {
+public class VoltCSVFormatter implements Formatter {
     final CSVParser m_parser;
 
     public VoltCSVFormatter (String formatName, Properties prop) {
@@ -69,9 +71,14 @@ public class VoltCSVFormatter implements Formatter<String> {
     }
 
     @Override
-    public Object[] transform(String sourceData) throws FormatException {
+    public Object[] transform(ByteBuffer payload) throws FormatException {
+        String line = null;
         try {
-            Object list[] = m_parser.parseLine(sourceData);
+            if (payload == null) {
+                return null;
+            }
+            line = new String(payload.array(), payload.arrayOffset(), payload.limit(), StandardCharsets.UTF_8);
+            Object list[] = m_parser.parseLine(line);
             if (list != null) {
                 for (int i = 0; i < list.length; i++) {
                     if ("NULL".equals(list[i])
@@ -83,7 +90,7 @@ public class VoltCSVFormatter implements Formatter<String> {
             }
             return list;
         } catch (IOException e) {
-            throw new FormatException("failed to format " + sourceData, e);
+            throw new FormatException("failed to format " + line, e);
         }
     }
 }

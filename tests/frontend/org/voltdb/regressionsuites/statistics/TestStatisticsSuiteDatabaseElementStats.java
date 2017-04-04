@@ -29,6 +29,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import junit.framework.Test;
+
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
@@ -37,8 +39,6 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.regressionsuites.StatisticsTestSuiteBase;
 import org.voltdb.utils.MiscUtils;
-
-import junit.framework.Test;
 
 public class TestStatisticsSuiteDatabaseElementStats extends StatisticsTestSuiteBase {
 
@@ -180,7 +180,7 @@ public class TestStatisticsSuiteDatabaseElementStats extends StatisticsTestSuite
         System.out.println("\n\nTESTING PROCEDURE STATS\n\n\n");
         Client client  = getFullyConnectedClient();
 
-        ColumnInfo[] expectedSchema = new ColumnInfo[19];
+        ColumnInfo[] expectedSchema = new ColumnInfo[20];
         expectedSchema[0] = new ColumnInfo("TIMESTAMP", VoltType.BIGINT);
         expectedSchema[1] = new ColumnInfo("HOST_ID", VoltType.INTEGER);
         expectedSchema[2] = new ColumnInfo("HOSTNAME", VoltType.STRING);
@@ -200,6 +200,7 @@ public class TestStatisticsSuiteDatabaseElementStats extends StatisticsTestSuite
         expectedSchema[16] = new ColumnInfo("AVG_PARAMETER_SET_SIZE", VoltType.INTEGER);
         expectedSchema[17] = new ColumnInfo("ABORTS", VoltType.BIGINT);
         expectedSchema[18] = new ColumnInfo("FAILURES", VoltType.BIGINT);
+        expectedSchema[19] = new ColumnInfo("TRANSACTIONAL", VoltType.TINYINT);
         VoltTable expectedTable = new VoltTable(expectedSchema);
 
         VoltTable[] results = null;
