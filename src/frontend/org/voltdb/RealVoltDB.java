@@ -109,6 +109,7 @@ import org.voltdb.common.Constants;
 import org.voltdb.common.NodeState;
 import org.voltdb.compiler.AdHocCompilerCache;
 import org.voltdb.compiler.AsyncCompilerAgent;
+import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.deploymentfile.ClusterType;
 import org.voltdb.compiler.deploymentfile.ConsistencyType;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
@@ -526,6 +527,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         return m_nodeSettings.resolve(m_nodeSettings.getDROverflow()).getPath();
     }
 
+    private String getStagedCatalogPath(){
+        return getStagedCatalogPath(getVoltDBRootPath());
+    }
+
+    public static String getStagedCatalogPath(String voltDbRoot){
+        return voltDbRoot + File.separator + Constants.CONFIG_DIR + File.separator + CatalogUtil.STAGED_CATALOG_FILE_NAME;
+    }
+
     private String managedPathEmptyCheck(String voltDbRoot, String path) {
         VoltFile managedPath;
         if (new File(path).isAbsolute())
@@ -558,12 +567,17 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     private List<String> managedPathsWithFiles(Configuration config, DeploymentType deployment) {
         ImmutableList.Builder<String> nonEmptyPaths = ImmutableList.builder();
-        if (!config.m_isEnterprise) {
-            return nonEmptyPaths.build();
-        }
         PathsType paths = deployment.getPaths();
         String voltDbRoot = getVoltDBRootPath(paths.getVoltdbroot());
         String path;
+
+        if ((path = managedPathEmptyCheck(voltDbRoot, getStagedCatalogPath())) != null){
+            nonEmptyPaths.add(path);
+        }
+
+        if (!config.m_isEnterprise) {
+            return nonEmptyPaths.build();
+        }
         if ((path = managedPathEmptyCheck(voltDbRoot, getSnapshotPath(paths.getSnapshots()))) != null)
             nonEmptyPaths.add(path);
         if ((path = managedPathEmptyCheck(voltDbRoot, getExportOverflowPath(paths.getExportoverflow()))) != null)
@@ -835,7 +849,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     consoleLog.info(msg);
                     hostLog.info(msg);
                 }
-                stageDeploymemtFileForInitialize(config, readDepl.deployment);
+                stageDeploymentFileForInitialize(config, readDepl.deployment);
+                stageSchemaFiles(config);
                 stageInitializedMarker(config);
                 hostLog.info("Initialized VoltDB root directory " + config.m_voltdbRoot.getPath());
                 consoleLog.info("Initialized VoltDB root directory " + config.m_voltdbRoot.getPath());
@@ -2060,14 +2075,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
      * <p><ul>
      * <li>creates if necessary the voltdbroot directory
      * <li>fail if voltdbroot is already configured and populated with database artifacts
-     * <li>creates command log, dr, snaphot, and export directories
+     * <li>creates command log, DR, snapshot, and export directories
      * <li>creates the config directory under voltdbroot
      * <li>moves the deployment file under the config directory
      * </ul>
      * @param config
      * @param dt a {@link DeploymentType}
      */
-    private void stageDeploymemtFileForInitialize(Configuration config, DeploymentType dt) {
+    private void stageDeploymentFileForInitialize(Configuration config, DeploymentType dt) {
 
         String deprootFN = dt.getPaths().getVoltdbroot().getPath();
         File   deprootFH = new VoltFile(deprootFN);
@@ -2151,6 +2166,30 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
         // Save cluster settings properties derived from the deployment file
         ClusterSettings.create(CatalogUtil.asClusterSettingsMap(dt)).store();
+    }
+
+    /**
+     * Takes the schema and stored procedures files given at initialization and performs the following tasks:
+     * <p><ul>
+     * <li>creates if necessary the voltdbroot/starter/bootstrap/existing directory tree
+     * <li>fail if database artifacts already exist and --force was not supplied (this is unexpected due to earlier checks)
+     * <li>moves the specified files to the 'existing' directory
+     * </ul>
+     * @param config VoltDB configuration
+     */
+    private void stageSchemaFiles(Configuration config){
+        if (config.m_userSchema == null){
+            return; // nothing to do
+        }
+        assert( config.m_userSchema.isFile() ); // this is validated during command line parsing and will be true unless disk faults
+        File stagedCatalogFH = new VoltFile(getStagedCatalogPath());
+        assert( !stagedCatalogFH.exists() || config.m_forceVoltdbCreate ); // managedPathsWithFiles() checks for the staged catalog
+        final boolean standalone = true;
+        final boolean isXCDR = false;
+        VoltCompiler compiler = new VoltCompiler(standalone, isXCDR);
+        if (!compiler.compileFromDDL(stagedCatalogFH.getAbsolutePath(), config.m_userSchema.getAbsolutePath())){
+            VoltDB.crashLocalVoltDB("Could not compile specified schema " + config.m_userSchema, false, null);
+        }
     }
 
     private void stageInitializedMarker(Configuration config) {
