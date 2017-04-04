@@ -635,6 +635,10 @@ public class ExportManager
             return;
         }
 
+        if (!CatalogUtil.isStreamTableAffected(catalogContext.catalog, diffCommands)) {
+            exportLog.info("Skipped rolling generations as generation no stream tables changed.");
+            return;
+        }
         /**
          * This checks if the catalogUpdate was done in EE or not. If catalog update is skipped for @UpdateClasses and such
          * EE does not roll to new generation and thus we need to ignore creating new generation roll with the current generation.

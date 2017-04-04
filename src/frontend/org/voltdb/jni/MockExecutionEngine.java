@@ -129,7 +129,7 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public void coreUpdateCatalog(final long txnId, final String catalogDiffs) throws EEException {
+    public void coreUpdateCatalog(final long txnId, final boolean isStreamUpdate, final String catalogDiffs) throws EEException {
     }
 
     @Override

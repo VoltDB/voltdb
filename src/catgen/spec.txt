@@ -130,6 +130,7 @@ begin Table                                  "A table (relation) in the database
   string signature                           "Catalog version independent signature of the table consisting of name and schema"
   int tuplelimit                             "A maximum number of rows in a table"
   bool isDRed                                "Is this table DRed?"
+  bool isStream                              "Is this table a Stream?"
   Statement* tuplelimitDeleteStmt            "Delete statement to execute if tuple limit will be exceeded"
 end
 

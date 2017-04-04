@@ -1241,6 +1241,7 @@ public class VoltCompiler {
             tableref.setIsreplicated(false);
             tableref.setPartitioncolumn(null);
         }
+        tableref.setIsstream(true);
         org.voltdb.catalog.ConnectorTableInfo connTableInfo =
                 catconn.getTableinfo().getIgnoreCase(tableName);
 

@@ -1470,6 +1470,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             return true;
         }
 
+        CatalogMap<Table> tables = m_context.catalog.getClusters().get("cluster").getDatabases().get("database").getTables();
+        boolean isStreamChange = CatalogUtil.isStreamTableAffected(m_context.catalog, diffCmds);
+
         diffCmds = CatalogUtil.getDiffCommandsForEE(diffCmds);
         if (diffCmds.length() == 0) {
             // empty diff cmds for the EE to apply, so skip the JNI call
@@ -1478,13 +1481,10 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
 
         boolean DRCatalogChange = false;
-        CatalogMap<Table> tables = m_context.catalog.getClusters().get("cluster").getDatabases().get("database").getTables();
         for (Table t : tables) {
             if (t.getIsdred()) {
                 DRCatalogChange |= diffCmds.contains("tables#" + t.getTypeName());
-                if (DRCatalogChange) {
-                    break;
-                }
+                break;
             }
         }
         // if a snapshot is in process, wait for it to finish
@@ -1506,7 +1506,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         //Necessary to quiesce before updating the catalog
         //so export data for the old generation is pushed to Java.
         m_ee.quiesce(m_lastCommittedSpHandle);
-        m_ee.updateCatalog(m_context.m_uniqueId, diffCmds);
+        m_ee.updateCatalog(m_context.m_uniqueId, isStreamChange, diffCmds);
         if (DRCatalogChange) {
             final DRCatalogCommands catalogCommands = DRCatalogDiffEngine.serializeCatalogCommandsForDr(m_context.catalog, -1);
             generateDREvent( EventType.CATALOG_UPDATE, uniqueId, m_lastCommittedSpHandle,
