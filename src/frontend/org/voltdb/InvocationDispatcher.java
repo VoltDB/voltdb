@@ -383,8 +383,9 @@ public final class InvocationDispatcher {
         }
 
         // handle non-transactional procedures (INCLUDING NT SYSPROCS)
-        if (catProc.getTransactional() == false) {
-            assert(catProc.getHasjava());
+        // note that we also need to check for java for now as transactional flag is
+        // only 100% when we're talking Java
+        if ((catProc.getTransactional() == false) && catProc.getHasjava()) {
             return dispatchNTProcedure(task, user, ccxn, ntPriority);
         }
 
