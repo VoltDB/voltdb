@@ -2529,7 +2529,20 @@ public class TestPlansSubQueries extends PlannerTestCase {
      */
 
     public void testENG8280() throws Exception {
-        // failToCompile("select A from r1 as parent where C < 100 order by ( select D from r1 where r1.C = parent.C ) * 2;","mumble");
+        failToCompile("select A from r1 as parent where C < 100 order by ( select D from r1 where r1.C = parent.C ) * 2;",
+                      "ORDER BY clause with subquery expression is not allowed.");
+    }
+
+    public void testENG12116() throws Exception {
+        String SQL = "SELECT 0 FROM ( SELECT DISTINCT * FROM ENG12076_P1 AS T1, ENG12076_R1 ) TTT1;";
+        try {
+            List<AbstractPlanNode> rootNode = compileToFragments(SQL);
+            fail("Expected compilation failure here.");
+        } catch (Exception ex) {
+            assertTrue("Did not find expected message.",
+                       ex.getMessage().contains("mumble"));
+        }
+
     }
 
     /**

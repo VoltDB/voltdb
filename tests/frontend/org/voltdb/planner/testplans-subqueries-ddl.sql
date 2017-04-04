@@ -98,6 +98,20 @@ COUNT(*) heat
 FROM pgr
 GROUP BY s, hotspot_hm;
 
+--- ENG-12076
+-- Define tables and other DDL, for use with the SQL grammar generator
+CREATE TABLE ENG12076_P1 (
+  ID               INTEGER NOT NULL,
+  INT              INTEGER,
+  VCHAR_INLINE     VARCHAR(14)
+);
+PARTITION TABLE ENG12076_P1 ON COLUMN ID;
+
+CREATE TABLE ENG12076_R1 (
+  ID               INTEGER NOT NULL,
+  INT              INTEGER,
+  VCHAR_INLINE     VARCHAR(42 BYTES)
+);
 
 --- ENG-8264
 create table stores (

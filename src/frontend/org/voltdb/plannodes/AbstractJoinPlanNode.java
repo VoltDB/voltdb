@@ -226,6 +226,7 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode implements I
             }
             else {
                 index = tve.setColumnIndexUsingSchema(inner_schema);
+                index += outer_schema.size();
             }
 
             if (index == -1) {
@@ -234,6 +235,7 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode implements I
             }
 
             tve.setColumnIndex(index);
+            tve.setDifferentiator(index);
         }
 
         // We want the output columns to be ordered like [outer table columns][inner table columns],
