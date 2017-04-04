@@ -666,7 +666,7 @@ public class VoltDB {
                 } else if (arg.equalsIgnoreCase("schema")){
                     m_userSchema = new File(args[++i].trim());
                     if (!m_userSchema.isFile() || !m_userSchema.canRead()){
-                        System.err.println("FATAL: Supplied schema file " + m_userSchema + " is not a readable file.");
+                        System.err.println("FATAL: Supplied schema file " + m_userSchema + " is not a file or can't be read.");
                         referToDocAndExit();
                     }
                 } else {
