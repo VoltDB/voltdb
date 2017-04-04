@@ -17,6 +17,8 @@
 
 package org.voltdb;
 
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
+
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
@@ -44,8 +46,6 @@ import org.voltcore.utils.RateLimitedLogger;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
-
-import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
 /**
  * A very simple adapter for import handler that deserializes bytes into client responses.
@@ -124,6 +124,8 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
 
             if (response.getStatus() == ClientResponse.RESPONSE_UNKNOWN) {
                 //Handle failure of transaction due to node kill
+                // JHH: I feel like this needs more explanation. Are we
+                // just restarting the transaction here? Why? Safe?
                 createTransaction(
                         m_kattrs,
                         m_task.getProcName(),
@@ -132,6 +134,7 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
                         m_task,
                         m_user,
                         m_partition,
+                        false,
                         null);
             }
         }
@@ -164,6 +167,7 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
             final StoredProcedureInvocation task,
             final AuthSystem.AuthUser user,
             final int partition,
+            final boolean ntPriority,
             final Function<Integer, Boolean> backPressurePredicate) {
         if (!m_partitionExecutor.containsKey(partition)) {
             m_partitionExecutor.putIfAbsent(partition, CoreUtils.getSingleThreadExecutor("InternalHandlerExecutor - " + partition));
@@ -196,9 +200,10 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
                     task.setClientHandle(handle);
                     final InternalCallback cb = new InternalCallback(
                             kattrs, catProc, task, procName, partition, proccb, statsCollector, user, handle);
+
                     m_callbacks.put(handle, cb);
 
-                    ClientResponseImpl r = dispatcher.dispatch(task, kattrs, InternalClientResponseAdapter.this, user, null);
+                    ClientResponseImpl r = dispatcher.dispatch(task, kattrs, InternalClientResponseAdapter.this, user, null, ntPriority);
                     if (r != null) {
                         try {
                             cb.handleResponse(r);
@@ -275,7 +280,11 @@ public class InternalClientResponseAdapter implements Connection, WriteStream {
         } catch (IOException ex) {
             VoltDB.crashLocalVoltDB("enqueue() in InternalClientResponseAdapter throw an exception", true, ex);
         }
+
         final Callback callback = m_callbacks.get(resp.getClientHandle());
+        if (callback == null) {
+            throw new IllegalStateException("Callback was null?");
+        }
         if (!m_partitionExecutor.containsKey(callback.getPartitionId())) {
             m_logger.error("Invalid partition response recieved for sending internal client response.");
             return;

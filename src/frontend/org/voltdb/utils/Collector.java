@@ -38,8 +38,6 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipException;
 import java.util.zip.ZipOutputStream;
@@ -49,27 +47,26 @@ import org.apache.log4j.varia.NullAppender;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
-import org.json_voltpatches.JSONStringer;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.CLIConfig;
 import org.voltdb.VoltDB;
 import org.voltdb.common.Constants;
-import org.voltdb.compiler.deploymentfile.DeploymentType;
-import org.voltdb.compiler.deploymentfile.PathsType;
-import org.voltdb.processtools.SFTPSession;
-import org.voltdb.processtools.SFTPSession.SFTPException;
-import org.voltdb.processtools.SSHTools;
+import org.voltdb.settings.NodeSettings;
 import org.voltdb.types.TimestampType;
 
-import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.base.Throwables;
-import com.google_voltpatches.common.net.HostAndPort;
 
 public class Collector {
+    private final static String ZIP_ENTRY_FOLDER_BASE_SUFFIX =  "_volt_collect_logs_";
+    final static String PREFIX_DEFAULT_COLLECT_FILE = "voltdb_collect";
+    final static String COLLECT_FILE_EXTENSION = ".zip";
+
     private static String m_configInfoPath = null;
     private static String m_catalogJarPath = null;
     private static String m_deploymentPath = null;
     private static String m_systemCheckPath = null;
+    private static String m_pathPropertiesPath = null;
+    private static String m_clusterPropertiesPath = null;
     private static CollectConfig m_config;
 
     public static long m_currentTimeMillis = System.currentTimeMillis();
@@ -77,24 +74,20 @@ public class Collector {
     private static String m_workingDir = null;
     private static Set<String> m_logPaths = new HashSet<String>();
     private static Properties m_systemStats = new Properties();
+    private static VoltFile m_voltdbRoot = null;
+
+    private static String m_zipFolderBase = "";
+    static String getZipCollectFolderBase() { return m_zipFolderBase; }
 
     public static String[] cmdFilenames = {"sardata", "dmesgdata", "syscheckdata"};
+
 
     static class CollectConfig extends CLIConfig {
         @Option(desc = "file name prefix for uniquely identifying collection")
         String prefix = "";
 
-        @Option(desc = "upload resulting collection to HOST via SFTP")
-        String host = "";
-
-        @Option(desc = "user name for SFTP upload.")
-        String username = "";
-
-        @Option(desc = "password for SFTP upload")
-        String password = "";
-
-        @Option(desc = "automatically upload collection (without user prompt)")
-        boolean noprompt = false;
+        @Option(desc = "file name prefix for uniquely identifying collection")
+        String outputFile = "";
 
         @Option(desc = "list the log files without collecting them")
         boolean dryrun = false;
@@ -108,18 +101,8 @@ public class Collector {
         @Option(desc = "the voltdbroot path")
         String voltdbroot = "";
 
-        @Option
-        boolean calledFromVEM = false;
-
-        // generate resulting file in voltdbroot instead of current working dir and do not append timestamp in filename
-        // so the resulting file is easier to be located and copied to VEM
-        @Option
-        boolean copyToVEM=false;
-
-        // generate a list of information (server name, size, and path) of files rather than actually collect files
-        // used by files display panel in VEM UI
-        @Option(desc = "generate a list of information (server name, size, and path) of files rather than actually collect files")
-        boolean fileInfoOnly=false;
+        @Option(desc = "overwrite output file if it exists")
+        boolean force= false;
 
         @Option
         String libPathForTest = "";
@@ -127,7 +110,60 @@ public class Collector {
         @Override
         public void validate() {
             if (days < 0) exitWithMessageAndUsage("days must be >= 0");
-            if (voltdbroot == "") exitWithMessageAndUsage("voltdbroot cannot be null");
+            if (voltdbroot.trim().isEmpty()) exitWithMessageAndUsage("Invalid database directory");
+        }
+    }
+
+    private static void populateVoltDBCollectionPaths() {
+        m_voltdbRoot = new VoltFile(m_config.voltdbroot);
+        if (!m_voltdbRoot.exists()) {
+            System.err.println(m_voltdbRoot.getParentFile().getAbsolutePath() + " does not contain a valid database "
+                    + "directory. Specify valid path to the database directory.");
+            VoltDB.exit(-1);
+        }
+        if (!m_voltdbRoot.isDirectory()) {
+            System.err.println(m_voltdbRoot.getParentFile().getAbsolutePath() + " is a not directory. Specify valid "
+                    + " database directory in --dir option.");
+            VoltDB.exit(-1);
+        }
+        if (!m_voltdbRoot.canRead() || !m_voltdbRoot.canExecute()) {
+            System.err.println(m_voltdbRoot.getParentFile().getAbsolutePath() + " does not have read/exceute permission.");
+            VoltDB.exit(-1);
+        }
+        m_config.voltdbroot = m_voltdbRoot.getAbsolutePath();
+
+        // files to collect from config dir
+        String configLogDirPath = m_voltdbRoot.getAbsolutePath() + File.separator + Constants.CONFIG_DIR + File.separator;
+        m_configInfoPath = configLogDirPath + "config.json";
+        m_catalogJarPath = configLogDirPath + "catalog.jar";
+        m_deploymentPath = configLogDirPath + "deployment.xml";
+        m_pathPropertiesPath = configLogDirPath + "path.properties";
+        m_clusterPropertiesPath = configLogDirPath + "cluster.properties";
+        m_systemCheckPath =  m_voltdbRoot.getAbsolutePath() + File.separator + "systemcheck";
+
+        // Validate voltdbroot path is valid or not - check if deployment and config info json exists
+        File deploymentFile = new File(m_deploymentPath);
+        File configInfoFile = new File(m_configInfoPath);
+        if (!deploymentFile.exists() || !configInfoFile.exists()) {
+            System.err.println("ERROR: Invalid database directory " + m_voltdbRoot.getParentFile().getAbsolutePath()
+                    + ". Specify valid database directory using --dir option.");
+            VoltDB.exit(-1);
+        }
+
+        if (!m_config.prefix.isEmpty()) {
+            m_config.outputFile = m_config.prefix + "_" +  PREFIX_DEFAULT_COLLECT_FILE + "_"
+                    + CoreUtils.getHostnameOrAddress() + COLLECT_FILE_EXTENSION;
+        }
+        if (m_config.outputFile.isEmpty()) {
+            m_config.outputFile =  PREFIX_DEFAULT_COLLECT_FILE + "_" + CoreUtils.getHostnameOrAddress()
+                + COLLECT_FILE_EXTENSION;;
+        }
+
+        File outputFile = new File(m_config.outputFile);
+        if (outputFile.exists() && !m_config.force) {
+            System.err.println("ERROR: Output file " + outputFile.getAbsolutePath() + " already exists."
+                    + " Use --force to overwrite an existing file.");
+            VoltDB.exit(-1);
         }
     }
 
@@ -137,14 +173,14 @@ public class Collector {
 
         m_config = new CollectConfig();
         m_config.parse(Collector.class.getName(), args);
-
-        File voltDbRoot = new File(m_config.voltdbroot);
-        if (!voltDbRoot.exists()) {
-            System.err.println("voltdbroot path '" + m_config.voltdbroot + "' does not exist.");
-            System.exit(-1);
+        if (!m_config.outputFile.trim().isEmpty() && !m_config.prefix.trim().isEmpty()) {
+            System.err.println("For outputfile, specify either --output or --prefix. Can't specify "
+                    + "both of them.");
+            m_config.printUsage();
+            VoltDB.exit(-1);
         }
 
-        locatePaths(m_config.voltdbroot);
+        populateVoltDBCollectionPaths();
 
         JSONObject jsonObject = parseJSONFile(m_configInfoPath);
         parseJSONObject(jsonObject);
@@ -177,63 +213,9 @@ public class Collector {
             System.out.println("[dry-run] A tgz file containing above files would be generated in current dir");
             System.out.println("          Use --upload option to enable uploading via SFTP");
         }
-        else if (m_config.fileInfoOnly) {
-            String collectionFilesListPath = m_config.voltdbroot + File.separator + m_config.prefix;
-
-            byte jsonBytes[] = null;
-            try {
-                JSONStringer stringer = new JSONStringer();
-
-                stringer.object();
-                stringer.keySymbolValuePair("server", m_config.prefix);
-                stringer.key("files").array();
-                for (String path: collectionFilesList) {
-                    stringer.object();
-                    stringer.keySymbolValuePair("filename", path);
-                    if (Arrays.asList(cmdFilenames).contains(path.split(" ")[0])) {
-                        stringer.keySymbolValuePair("size", 0);
-                    }
-                    else {
-                        stringer.keySymbolValuePair("size", new File(path).length());
-                    }
-                    stringer.endObject();
-                }
-                stringer.endArray();
-                stringer.endObject();
-
-                JSONObject jsObj = new JSONObject(stringer.toString());
-                jsonBytes = jsObj.toString(4).getBytes(Charsets.UTF_8);
-            } catch (JSONException e) {
-                Throwables.propagate(e);
-            }
-
-            FileOutputStream fos = null;
-            try {
-                fos = new FileOutputStream(collectionFilesListPath);
-                fos.write(jsonBytes);
-                fos.getFD().sync();
-            } catch (IOException e) {
-                Throwables.propagate(e);
-            } finally {
-                try {
-                    fos.close();
-                } catch (IOException e) {
-                    Throwables.propagate(e);
-                }
-            }
-        }
         else {
-            generateCollection(collectionFilesList, m_config.copyToVEM);
+            generateCollection(collectionFilesList);
         }
-    }
-
-    private static void locatePaths(String voltDbRootPath) {
-        String configLogDirPath = voltDbRootPath + File.separator + Constants.CONFIG_DIR + File.separator;
-
-        m_configInfoPath = configLogDirPath + "config.json";
-        m_catalogJarPath = configLogDirPath + "catalog.jar";
-        m_deploymentPath = configLogDirPath + "deployment.xml";
-        m_systemCheckPath = voltDbRootPath + File.separator + "systemcheck";
     }
 
     public static JSONObject parseJSONFile(String configInfoPath) {
@@ -252,14 +234,14 @@ public class Collector {
             jsonObject = new JSONObject(builder.toString());
         } catch (FileNotFoundException e) {
             System.err.println("config log file '" + configInfoPath + "' could not be found.");
-            System.exit(-1);
+            VoltDB.exit(-1);
         } catch (IOException e) {
             System.err.println(e.getMessage());
-            System.exit(-1);
+            VoltDB.exit(-1);
         } catch (JSONException e) {
             System.err.println("Error with config file: " + configInfoPath);
             System.err.println(e.getLocalizedMessage());
-            System.exit(-1);
+            VoltDB.exit(-1);
         }
 
         return jsonObject;
@@ -333,6 +315,12 @@ public class Collector {
             }
             if (new File(m_configInfoPath).exists()) {
                 collectionFilesList.add(m_configInfoPath);
+            }
+            if (new File(m_pathPropertiesPath).exists()) {
+                collectionFilesList.add(m_pathPropertiesPath);
+            }
+            if (new File(m_clusterPropertiesPath).exists()) {
+                collectionFilesList.add(m_clusterPropertiesPath);
             }
 
             for (String path: m_logPaths) {
@@ -440,28 +428,16 @@ public class Collector {
         m_currentTimeMillis = System.currentTimeMillis();
     }
 
-    private static void generateCollection(Set<String> paths, boolean copyToVEM) {
+    private static void generateCollection(Set<String> paths) {
         try {
-            String timestamp = "";
-            String rootpath = "";
-
-            if (copyToVEM) {
-                rootpath = m_config.voltdbroot;
-            }
-            else {
-                TimestampType ts = new TimestampType(new java.util.Date());
-                timestamp = ts.toString().replace(' ', '-').replace(':', '-');
-
-                // get rid of microsecond part
-                timestamp = timestamp.substring(0, "YYYY-mm-DD-HH-MM-ss".length());
-
-                rootpath = System.getProperty("user.dir");
-            }
-
-            String folderBase = (m_config.prefix.isEmpty() ? "" : m_config.prefix + "_") +
-                                CoreUtils.getHostnameOrAddress() + "_voltlogs_" + timestamp;
-            String folderPath = folderBase + File.separator;
-            String collectionFilePath = rootpath + File.separator + folderBase + ".zipfile";
+            TimestampType ts = new TimestampType(new java.util.Date());
+            String timestamp = ts.toString().replace(' ', '-').replace(':', '-');
+            // get rid of microsecond part
+            timestamp = timestamp.substring(0, "YYYY-mm-DD-HH-MM-ss".length());
+            m_zipFolderBase = (m_config.prefix.isEmpty() ? "" : m_config.prefix + "_") +
+                    CoreUtils.getHostnameOrAddress() + ZIP_ENTRY_FOLDER_BASE_SUFFIX + timestamp;
+            String folderPath = m_zipFolderBase + File.separator;
+            String collectionFilePath = m_config.outputFile;
 
             FileOutputStream collectionStream = new FileOutputStream(collectionFilePath);
             ZipOutputStream zipStream = new ZipOutputStream(collectionStream);
@@ -491,7 +467,11 @@ public class Collector {
                         filename.startsWith("hs_err_pid") || path.startsWith("/var/log/")) {
                     entryPath = "system_logs" + File.separator + file.getName();
                 }
-                if (filename.equals("deployment.xml") || filename.equals("catalog.jar") || filename.equals("config.json")) {
+                if (filename.equals("deployment.xml")
+                        || filename.equals("catalog.jar")
+                        || filename.equals("config.json")
+                        || filename.equals("path.properties")
+                        || filename.equals("cluster.properties")) {
                     entryPath = "voltdb_files" + File.separator + file.getName();
                 }
                 if (filename.endsWith(".hprof")) {
@@ -533,16 +513,38 @@ public class Collector {
                 String exportOverflowPath = m_config.voltdbroot + File.separator + "export_overflow";
                 String commandLogPath = m_config.voltdbroot + File.separator + "command_log";
                 String commandLogSnapshotPath = m_config.voltdbroot + File.separator + "command_log_snapshot";
-                DeploymentType deployment = CatalogPasswordScrambler.getDeployment(new File(m_deploymentPath));
-                PathsType deploymentPaths = deployment.getPaths();
-                if (deploymentPaths != null) {
-                    PathsType.Droverflow drPath = deploymentPaths.getDroverflow();
-                    if (drPath != null)
-                        drOverflowPath = VoltDB.instance().getDROverflowPath(drPath);
-                    PathsType.Exportoverflow exportPath = deploymentPaths.getExportoverflow();
-                    if (exportPath != null)
-                        exportOverflowPath = VoltDB.instance().getExportOverflowPath(exportPath);
+
+                if (m_pathPropertiesPath != null && !m_pathPropertiesPath.trim().isEmpty()
+                        && (new File(m_pathPropertiesPath)).exists()) {
+                    Properties prop = new Properties();
+                    InputStream input = null;
+
+                    try {
+                        input = new FileInputStream(m_pathPropertiesPath);
+                        prop.load(input);
+                    } catch (IOException excp) {
+                        System.err.println(excp.getMessage());
+                    }
+                    if (!prop.isEmpty()) {
+                        String cmdLogPropPath = prop.getProperty(NodeSettings.CL_PATH_KEY, null);
+                        if (cmdLogPropPath != null && !cmdLogPropPath.trim().isEmpty()) {
+                            commandLogPath = cmdLogPropPath;
+                        }
+                        String cmdLogSnapshotPropPath = prop.getProperty(NodeSettings.CL_SNAPSHOT_PATH_KEY, null);
+                        if (cmdLogSnapshotPropPath != null && !cmdLogSnapshotPropPath.trim().isEmpty()) {
+                            commandLogSnapshotPath = cmdLogSnapshotPropPath;
+                        }
+                        String drOverflowPropPath = prop.getProperty(NodeSettings.DR_OVERFLOW_PATH_KEY, null);
+                        if (drOverflowPropPath != null && !drOverflowPropPath.trim().isEmpty()) {
+                            drOverflowPath = drOverflowPropPath;
+                        }
+                        String exportOverflowPropPath = prop.getProperty(NodeSettings.EXPORT_OVERFLOW_PATH_KEY, null);
+                        if (exportOverflowPropPath != null && !exportOverflowPropPath.trim().isEmpty()) {
+                            exportOverflowPath = exportOverflowPropPath;
+                        }
+                    }
                 }
+
                 String[] duDrOverflowCmd = {"bash", "-c", duCommand + " " + drOverflowPath};
                 cmd(zipStream, duDrOverflowCmd, folderPath + "system_logs" + File.separator, "dudroverflowdata");
 
@@ -565,86 +567,9 @@ public class Collector {
 
             long sizeInByte = new File(collectionFilePath).length();
             String sizeStringInKB = String.format("%5.2f", (double)sizeInByte / 1000);
-            if (!m_config.calledFromVEM) {
-                System.out.println("Collection file created at " + collectionFilePath + " size: " + sizeStringInKB + " KB");
-            }
-
-            boolean upload = false;
-            if (!m_config.host.isEmpty()) {
-                if (m_config.noprompt) {
-                    upload = true;
-                }
-                else {
-                    upload = getUserResponse("Upload via SFTP");
-                }
-            }
-
-            if (upload) {
-                if (org.voltdb.utils.MiscUtils.isPro()) {
-                    if (m_config.username.isEmpty() && !m_config.noprompt) {
-                        System.out.print("username: ");
-                        m_config.username = System.console().readLine();
-                    }
-                    if (m_config.password.isEmpty() && !m_config.noprompt) {
-                        System.out.print("password: ");
-                        m_config.password = new String(System.console().readPassword());
-                    }
-
-                    try {
-                        uploadToServer(collectionFilePath, m_config.host, m_config.username, m_config.password);
-
-                        System.out.println("Uploaded " + new File(collectionFilePath).getName() + " via SFTP");
-
-                        boolean delLocalCopy = false;
-                        if (m_config.noprompt) {
-                            delLocalCopy = true;
-                        }
-                        else {
-                            delLocalCopy = getUserResponse("Delete local copy " + collectionFilePath);
-                        }
-
-                        if (delLocalCopy) {
-                            try {
-                                new File(collectionFilePath).delete();
-                                if (!m_config.calledFromVEM) {
-                                    System.out.println("Local copy "  + collectionFilePath + " deleted");
-                                }
-                            } catch (SecurityException e) {
-                                System.err.println("Failed to delete local copy " + collectionFilePath + ". " + e.getMessage());
-                            }
-                        }
-                    } catch (Exception e) {
-                        System.err.println(e.getMessage());
-                    }
-                }
-                else {
-                    System.out.println("Uploading is only available in the Enterprise Edition");
-                }
-            }
+            System.out.println("\nCollection file created in " + collectionFilePath + "; file size: " + sizeStringInKB + " KB");
         } catch (Exception e) {
             System.err.println(e.getMessage());
-        }
-    }
-
-    private static boolean getUserResponse(String prompt) {
-        while (true) {
-            System.out.print(prompt + " [y/n]? ");
-            String response = System.console().readLine();
-
-            if (response.isEmpty()) {
-                continue;
-            }
-
-            switch (response.charAt(0)) {
-            case 'Y':
-            case 'y':
-                return true;
-            case 'N':
-            case 'n':
-                return false;
-            default:
-                break;
-            }
         }
     }
 
@@ -691,85 +616,4 @@ public class Collector {
         }
     }
 
-    public static boolean uploadToServer(String collectionFilePath, String host, String username, String password) throws Exception {
-        attemptConnect(host, username, password);
-
-        SSHTools ssh = new SSHTools(username, null);
-        SFTPSession sftp = null;
-
-        HostAndPort hostAndPort = HostAndPort.fromString(host);
-        if (hostAndPort.hasPort()) {
-            sftp = ssh.getSftpSession(username, password, null, hostAndPort.getHostText(), hostAndPort.getPort(), null);
-        }
-        else {
-            sftp = ssh.getSftpSession(username, password, null, host, null);
-        }
-
-        String rootpath = sftp.exec("pwd").trim();
-
-        HashMap<File, File> files = new HashMap<File, File>();
-        File src = new File(collectionFilePath);
-        File dest = new File(rootpath + File.separator + new File(collectionFilePath).getName());
-        files.put(src, dest);
-
-        try {
-            sftp.copyOverFiles(files);
-        } finally {
-            if (sftp != null) {
-                sftp.terminate();
-            }
-        }
-
-        return true;
-    }
-
-    public static void attemptConnect(String host, String username, String password) throws Exception {
-        SSHTools ssh = new SSHTools(username, null);
-        SFTPSession sftp = null;
-
-        try {
-            HostAndPort hostAndPort = HostAndPort.fromString(host);
-            if (hostAndPort.hasPort()) {
-                sftp = ssh.getSftpSession(username, password, null, hostAndPort.getHostText(), hostAndPort.getPort(), null);
-            }
-            else {
-                sftp = ssh.getSftpSession(username, password, null, host, null);
-            }
-        } catch (SFTPException e) {
-            String errorMsg = e.getCause().getMessage();
-
-            /*
-             * e.getCause() is JSchException and the java exception class name only appears in message
-             * hide java class name and extract error message
-             */
-            Pattern pattern = Pattern.compile("(java.*Exception: )(.*)");
-            Matcher matcher = pattern.matcher(errorMsg);
-
-            if (matcher.matches()) {
-                if (errorMsg.startsWith("java.net.UnknownHostException")) {
-                    throw new Exception("Unknown host: " + matcher.group(2));
-                }
-                else {
-                    throw new Exception(matcher.group(2));
-                }
-            }
-            else {
-                if (errorMsg.equals("Auth cancel") || errorMsg.equals("Auth fail")) {
-                    // "Auth cancel" appears when username doesn't exist or password is wrong
-                    throw new Exception("Authorization rejected");
-                }
-                else {
-                    throw new Exception(errorMsg.substring(0, 1).toUpperCase() + errorMsg.substring(1));
-                }
-            }
-        } catch (Exception e) {
-            String errorMsg = e.getMessage();
-
-            throw new Exception(errorMsg.substring(0, 1).toUpperCase() + errorMsg.substring(1));
-        } finally {
-            if (sftp != null) {
-                sftp.terminate();
-            }
-        }
-    }
 }

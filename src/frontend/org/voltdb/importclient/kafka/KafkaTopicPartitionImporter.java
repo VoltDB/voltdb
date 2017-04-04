@@ -22,7 +22,7 @@ import static java.util.Collections.singletonMap;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -376,7 +376,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
         long submitCount = 0;
         AtomicLong cbcnt = new AtomicLong(0);
         @SuppressWarnings("unchecked")
-        Formatter<String> formatter = (Formatter<String>) m_config.getFormatterBuilder().create();
+        Formatter formatter = m_config.getFormatterBuilder().create();
         try {
             //Start with the starting leader.
             resetLeader();
@@ -458,20 +458,21 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                         continue;
                     }
                     ByteBuffer payload = messageAndOffset.message().payload();
-                    String line = new String(payload.array(),payload.arrayOffset(),payload.limit(),StandardCharsets.UTF_8);
+                    Object params[] = null;
                     try {
                         m_gapTracker.submit(messageAndOffset.nextOffset());
-                        Invocation invocation = new Invocation(m_config.getProcedure(), formatter.transform(line));
+                        params = formatter.transform(payload);
+                        Invocation invocation = new Invocation(m_config.getProcedure(), params);
                         TopicPartitionInvocationCallback cb = new TopicPartitionInvocationCallback(
                                 messageAndOffset.nextOffset(), cbcnt, m_gapTracker, m_dead);
                          if (!noTransaction && !callProcedure(invocation, cb)) {
                               if (isDebugEnabled()) {
-                                 debug(null, "Failed to process Invocation possibly bad data: " + line);
+                                 debug(null, "Failed to process Invocation possibly bad data: " + Arrays.toString(params));
                               }
                               m_gapTracker.commit(messageAndOffset.nextOffset());
                          }
                      } catch (FormatException e) {
-                        rateLimitedLog(Level.WARN, e, "Failed to tranform data: %s" ,line);
+                        rateLimitedLog(Level.WARN, e, "Failed to tranform data: %s" , Arrays.toString(params));
                         m_gapTracker.commit(messageAndOffset.nextOffset());
                     }
                     submitCount++;

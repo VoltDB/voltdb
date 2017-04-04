@@ -67,14 +67,14 @@ public class VoltLog4jLogger implements CoreVoltLogger {
    /*
      * Encoding for various log settings that will fit in 3 bits
      */
-    public static final int all = 0;
-    public static final int trace = 1;
-    public static final int debug = 2;
-    public static final int info = 3;
-    public static final int warn = 4;
-    public static final int error = 5;
-    public static final int fatal = 6;
-    public static final int off = 7;
+    public static final long all = 0;
+    public static final long trace = 1;
+    public static final long debug = 2;
+    public static final long info = 3;
+    public static final long warn = 4;
+    public static final long error = 5;
+    public static final long fatal = 6;
+    public static final long off = 7;
 
     /** Underlying Log4j logger */
     final Logger m_logger;
