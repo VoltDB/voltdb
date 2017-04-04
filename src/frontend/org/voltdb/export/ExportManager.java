@@ -623,6 +623,7 @@ public class ExportManager
         return m_connCount;
     }
 
+    CatalogContext m_lastActiveCatalog = null;
     public synchronized void updateCatalog(CatalogContext catalogContext, String diffCommands, List<Integer> partitions)
     {
         final Cluster cluster = catalogContext.catalog.getClusters().get("cluster");
@@ -635,10 +636,11 @@ public class ExportManager
             return;
         }
 
-        if (!CatalogUtil.isStreamTableAffected(catalogContext.catalog, diffCommands)) {
+        if (m_lastActiveCatalog != null && !CatalogUtil.isStreamTableAffected(m_lastActiveCatalog.catalog, catalogContext.catalog, diffCommands)) {
             exportLog.info("Skipped rolling generations as generation no stream tables changed.");
             return;
         }
+
         /**
          * This checks if the catalogUpdate was done in EE or not. If catalog update is skipped for @UpdateClasses and such
          * EE does not roll to new generation and thus we need to ignore creating new generation roll with the current generation.
@@ -649,7 +651,7 @@ public class ExportManager
             return;
         }
         File exportOverflowDirectory = new File(VoltDB.instance().getExportOverflowPath());
-
+        m_lastActiveCatalog = catalogContext;
         ExportGeneration newGeneration;
         try {
             newGeneration = new ExportGeneration(catalogContext.m_uniqueId, exportOverflowDirectory, false);

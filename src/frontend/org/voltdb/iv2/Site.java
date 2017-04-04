@@ -106,6 +106,7 @@ import org.voltdb.utils.MinimumRatioMaintainer;
 
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.base.Preconditions;
+import org.voltdb.catalog.Catalog;
 
 import vanilla.java.affinity.impl.PosixJNAAffinity;
 
@@ -1460,6 +1461,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     public boolean updateCatalog(String diffCmds, CatalogContext context, CatalogSpecificPlanner csp,
             boolean requiresSnapshotIsolationboolean, boolean isMPI, long uniqueId, long spHandle)
     {
+        Catalog oldCatalog = m_context.catalog;
         m_context = context;
         m_ee.setBatchTimeout(m_context.cluster.getDeployment().get("deployment").
                 getSystemsettings().get("systemsettings").getQuerytimeout());
@@ -1471,7 +1473,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
 
         CatalogMap<Table> tables = m_context.catalog.getClusters().get("cluster").getDatabases().get("database").getTables();
-        boolean isStreamChange = CatalogUtil.isStreamTableAffected(m_context.catalog, diffCmds);
+        boolean isStreamChange = CatalogUtil.isStreamTableAffected(oldCatalog, m_context.catalog, diffCmds);
 
         diffCmds = CatalogUtil.getDiffCommandsForEE(diffCmds);
         if (diffCmds.length() == 0) {

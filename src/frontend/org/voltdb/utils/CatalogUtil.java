@@ -2688,12 +2688,14 @@ public abstract class CatalogUtil {
         return sb.toString();
     }
 
-    public static boolean isStreamTableAffected(Catalog catalog, String diffCmds) {
+    public static boolean isStreamTableAffected(Catalog oldCatalog, Catalog newCatalog, String diffCmds) {
         if (diffCmds == null || diffCmds.length() == 0) return false;
-        CatalogMap<Table> tables = catalog.getClusters().get("cluster").getDatabases().get("database").getTables();
+        CatalogMap<Table> newTables = newCatalog.getClusters().get("cluster").getDatabases().get("database").getTables();
+        CatalogMap<Table> oldTables = oldCatalog.getClusters().get("cluster").getDatabases().get("database").getTables();
 
         // e.g.
         // add /clusters#cluster/databases#database tables table1
+        // delete /clusters#cluster/databases#database tables table1
         // and table1 is an export table
         // same applies with delete.
 
@@ -2705,11 +2707,24 @@ public abstract class CatalogUtil {
             if (cmd == 'a' || cmd == 'd') { // add, del
                 CatalogCmd catCmd = Catalog.parseStmt(stmt);
                 if (catCmd.arg1.equals("tables")) {
-                    for (Table t : tables) {
-                        if (t.getIsstream()) {
-                            return true;
+                    if (cmd == 'a') {
+                        for (Table t : newTables) {
+                            if (t.getIsstream() && t.getTypeName().equals(catCmd.arg2)) {
+                                return true;
+                            }
+                        }
+                    } else {
+                        for (Table t : oldTables) {
+                            if (t.getIsstream() && t.getTypeName().equals(catCmd.arg2)) {
+                                return true;
+                            }
                         }
                     }
+                }
+            } else if (cmd == 's') {
+                CatalogCmd catCmd = Catalog.parseStmt(stmt);
+                if (catCmd.path.contains("connectors#")) {
+                    return true;
                 }
             }
         }

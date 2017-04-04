@@ -636,9 +636,16 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const std::string &catal
         m_executorContext->drReplicatedStream()->m_enabled = m_executorContext->drStream()->m_enabled;
         m_executorContext->drReplicatedStream()->m_flushInterval = m_executorContext->drStream()->m_flushInterval;
     }
-
-    // load up all the tables, adding all tables
-    if (processCatalogAdditions(timestamp) == false) {
+    // See if we have any stream
+    bool isStreamUpdate = false;
+    BOOST_FOREACH (LabeledTable labeledTable, m_database->tables()) {
+        auto catalogTable = labeledTable.second;
+        if (catalogTable->isStream()) {
+            isStreamUpdate = true;
+            break;
+        }
+    }
+    if (processCatalogAdditions(isStreamUpdate, timestamp) == false) {
         return false;
     }
 
@@ -780,7 +787,7 @@ static bool haveDifferentSchema(catalog::Table* t1, voltdb::PersistentTable* t2)
  * Use the txnId of the catalog update as the generation for export
  * data.
  */
-bool VoltDBEngine::processCatalogAdditions(int64_t timestamp) {
+bool VoltDBEngine::processCatalogAdditions(bool isStreamUpdate, int64_t timestamp) {
     // iterate over all of the tables in the new catalog
     BOOST_FOREACH (LabeledTable labeledTable, m_database->tables()) {
         // get the catalog's table object
@@ -851,6 +858,67 @@ bool VoltDBEngine::processCatalogAdditions(int64_t timestamp) {
             // add/modify/remove indexes that have changed
             //  in the catalog
             //////////////////////////////////////////////
+            /*
+             * Instruct the table that was not added but is being retained to flush
+             * Then tell it about the new export generation/catalog txnid
+             * which will cause it to notify the topend export data source
+             * that no more data is coming for the previous generation
+             */
+            auto streamedTable = tcd->getStreamedTable();
+            if (streamedTable) {
+                //Dont update and roll generation if this is just a non stream table update.
+                if (!isStreamUpdate) continue;
+
+                streamedTable->setSignatureAndGeneration(catalogTable->signature(), timestamp);
+                if (!tcd->exportEnabled()) {
+                    // Evaluate export enabled or not and cache it on the tcd.
+                    tcd->evaluateExport(*m_database, *catalogTable);
+                    // If enabled hook up streamer
+                    if (tcd->exportEnabled() && streamedTable->enableStream()) {
+                        //Reset generation after stream wrapper is created.
+                        streamedTable->setSignatureAndGeneration(catalogTable->signature(), timestamp);
+                        m_exportingTables[catalogTable->signature()] = streamedTable;
+                    }
+                }
+
+                // Deal with views
+                std::vector<catalog::MaterializedViewInfo*> survivingInfos;
+                std::vector<MaterializedViewTriggerForStreamInsert*> survivingViews;
+                std::vector<MaterializedViewTriggerForStreamInsert*> obsoleteViews;
+
+                const catalog::CatalogMap<catalog::MaterializedViewInfo> & views = catalogTable->views();
+
+                MaterializedViewTriggerForStreamInsert::segregateMaterializedViews(streamedTable->views(),
+                        views.begin(), views.end(),
+                        survivingInfos, survivingViews, obsoleteViews);
+
+                for (int ii = 0; ii < survivingInfos.size(); ++ii) {
+                    auto currInfo = survivingInfos[ii];
+                    auto currView = survivingViews[ii];
+                    PersistentTable* oldDestTable = currView->destTable();
+                    // Use the now-current definiton of the target table, to be updated later, if needed.
+                    auto targetDelegate = findInMapOrNull(oldDestTable->name(),
+                                                          m_delegatesByName);
+                    PersistentTable* destTable = oldDestTable; // fallback value if not (yet) redefined.
+                    if (targetDelegate) {
+                        auto newDestTable = targetDelegate->getPersistentTable();
+                        if (newDestTable) {
+                            destTable = newDestTable;
+                        }
+                    }
+                    // This is not a leak -- the view metadata is self-installing into the new table.
+                    // Also, it guards its destTable from accidental deletion with a refcount bump.
+                    MaterializedViewTriggerForStreamInsert::build(streamedTable, destTable, currInfo);
+                    obsoleteViews.push_back(currView);
+                }
+
+                BOOST_FOREACH (auto toDrop, obsoleteViews) {
+                    streamedTable->dropMaterializedView(toDrop);
+                }
+                // note, this is the end of the line for export tables for now,
+                // don't allow them to change schema yet
+                continue;
+            }
 
             PersistentTable *persistentTable = tcd->getPersistentTable();
             //////////////////////////////////////////
@@ -1043,8 +1111,6 @@ bool VoltDBEngine::updateCatalog(int64_t timestamp, bool isStreamUpdate, std::st
     }
 
     assert(m_catalog != NULL); // the engine must be initialized
-    std::cout << "Updating catalog with stream: " << isStreamUpdate << "\n";
-    std::cout.flush();
     VOLT_DEBUG("Updating catalog...");
 
     // apply the diff commands to the existing catalog
@@ -1067,7 +1133,7 @@ bool VoltDBEngine::updateCatalog(int64_t timestamp, bool isStreamUpdate, std::st
 
     processCatalogDeletes(timestamp);
 
-    if (processCatalogAdditions(timestamp) == false) {
+    if (processCatalogAdditions(isStreamUpdate, timestamp) == false) {
         VOLT_ERROR("Error processing catalog additions.");
         return false;
     }
