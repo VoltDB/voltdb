@@ -35,6 +35,14 @@ import com.google_voltpatches.common.collect.ImmutableMap;
 
 public class LoadedProcedureSet {
 
+    public static final String ORGVOLTDB_PROCNAME_ERROR_FMT =
+            "VoltDB does not support procedures with package names " +
+            "that are prefixed with \"org.voltdb\". Please use a different " +
+            "package name and retry. Procedure name was %s.";
+    public static final String UNABLETOLOAD_ERROR_FMT =
+            "VoltDB was unable to load a procedure (%s) it expected to be " +
+            "in the catalog jarfile and will now exit.";
+
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
     final SiteProcedureConnection m_site;
@@ -133,6 +141,11 @@ public class LoadedProcedureSet {
                 continue;
             }
 
+            // skip non-transactional procs. Those will be handled by LoadedNTProcedureSet
+            if (proc.getTransactional() == false) {
+                continue;
+            }
+
             VoltProcedure procedure = null;
 
             if (proc.getHasjava()) {
@@ -144,15 +157,12 @@ public class LoadedProcedureSet {
                 }
                 catch (final ClassNotFoundException e) {
                     if (className.startsWith("org.voltdb.")) {
-                        VoltDB.crashLocalVoltDB("VoltDB does not support procedures with package names " +
-                                                        "that are prefixed with \"org.voltdb\". Please use a different " +
-                                                        "package name and retry. Procedure name was " + className + ".",
-                                                        false, null);
+                        String msg = String.format(LoadedProcedureSet.ORGVOLTDB_PROCNAME_ERROR_FMT, className);
+                        VoltDB.crashLocalVoltDB(msg, false, null);
                     }
                     else {
-                        VoltDB.crashLocalVoltDB("VoltDB was unable to load a procedure (" +
-                                                 className + ") it expected to be in the " +
-                                                "catalog jarfile and will now exit.", false, null);
+                        String msg = String.format(LoadedProcedureSet.UNABLETOLOAD_ERROR_FMT, className);
+                        VoltDB.crashLocalVoltDB(msg, false, null);
                     }
                 }
                 try {
@@ -179,7 +189,8 @@ public class LoadedProcedureSet {
     private ImmutableMap<String, ProcedureRunner> loadSystemProcedures(
             CatalogContext catalogContext,
             SiteProcedureConnection site,
-            CatalogSpecificPlanner csp) {
+            CatalogSpecificPlanner csp)
+    {
         // clean up all the registered system plan fragments before reloading system procedures
         m_registeredSysProcPlanFragments.clear();
         ImmutableMap.Builder<String, ProcedureRunner> builder = ImmutableMap.<String, ProcedureRunner>builder();
@@ -188,6 +199,11 @@ public class LoadedProcedureSet {
         for (Entry<String, Config> entry : entrySet) {
             Config sysProc = entry.getValue();
             Procedure proc = sysProc.asCatalogProcedure();
+
+            // NT sysprocs handled by NTProcedureService
+            if (!sysProc.transactional) {
+                continue;
+            }
 
             VoltSystemProcedure procedure = null;
 

@@ -23,15 +23,20 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Spliterator;
 import java.util.TimeZone;
+import java.util.function.Consumer;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
 import org.voltcore.utils.Pair;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltTableRow;
 import org.voltdb.VoltType;
 import org.voltdb.common.Constants;
-import org.voltdb.types.GeographyValue;
 import org.voltdb.types.GeographyPointValue;
+import org.voltdb.types.GeographyValue;
 import org.voltdb.types.TimestampType;
 
 import au.com.bytecode.opencsv_voltpatches.CSVWriter;
@@ -232,5 +237,103 @@ public class VoltTableUtil {
                     vt.getColumnType(ii));
         }
         return columns;
+    }
+
+    /**
+     * Return true if any string field in the table contains param s.
+     */
+    public static boolean tableContainsString(VoltTable t, String s, boolean caseSenstive) {
+        if (t.getRowCount() == 0) return false;
+        if (!caseSenstive) {
+            s = s.toLowerCase();
+        }
+
+        VoltTableRow row = t.fetchRow(0);
+        do {
+            for (int i = 0; i < t.getColumnCount(); i++) {
+                if (t.getColumnType(i) == VoltType.STRING) {
+                    String value = row.getString(i);
+                    if (value == null) continue;
+                    if (!caseSenstive) {
+                        value = value.toLowerCase();
+                    }
+                    if (value.contains(s)) {
+                        return true;
+                    }
+                }
+            }
+
+        } while (row.advanceRow());
+
+        return false;
+    }
+
+    /**
+     * Get a VoltTableRow as an array of Objects of the right type
+     */
+    public static Object[] tableRowAsObjects(VoltTableRow row) {
+        Object[] result = new Object[row.getColumnCount()];
+        for (int i = 0; i < row.getColumnCount(); i++) {
+            result[i] = row.get(i, row.getColumnType(i));
+        }
+        return result;
+    }
+
+    /**
+     * Support class for Java8-style streaming of table rows.
+     */
+    private static class VoltTableSpliterator implements Spliterator<VoltTableRow> {
+        VoltTableRow m_row;
+        final int m_fence;
+
+        VoltTableSpliterator(VoltTable table, int origin, int fence) {
+            m_fence = fence;
+
+            if (origin == fence) {
+                m_row = null;
+                return;
+            }
+
+            assert(origin < fence);
+            m_row = table.fetchRow(origin);
+        }
+
+        @Override
+        public boolean tryAdvance(Consumer<? super VoltTableRow> action) {
+            if ((m_row != null) && (m_row.getActiveRowIndex() < m_fence)) {
+                 action.accept(m_row);
+                 m_row = m_row.cloneRow();
+                 m_row.advanceRow();
+                 return true;
+             }
+             else { // cannot advance
+                 return false;
+             }
+        }
+
+        @Override
+        public Spliterator<VoltTableRow> trySplit() {
+            // no splitting until we have thread safety
+            return null;
+        }
+
+        @Override
+        public long estimateSize() {
+            if (m_row == null) return 0;
+            else return m_fence - m_row.getActiveRowIndex();
+        }
+
+        @Override
+        public int characteristics() {
+            return ORDERED | SIZED | IMMUTABLE | SUBSIZED;
+        }
+
+    }
+
+    /**
+     * Not yet public API for VoltTable and Java 8 streams
+     */
+    public static Stream<VoltTableRow> stream(VoltTable table) {
+        return StreamSupport.stream(new VoltTableSpliterator(table, 0, table.getRowCount()), false);
     }
 }

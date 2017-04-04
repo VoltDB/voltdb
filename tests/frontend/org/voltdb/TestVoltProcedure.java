@@ -421,7 +421,7 @@ public class TestVoltProcedure extends TestCase {
         ClientResponse r = call(LargeNumberOfTablesProc.class);
         assertEquals(ClientResponse.GRACEFUL_FAILURE, r.getStatus());
         System.out.println(r.getStatusString());
-        assertTrue(r.getStatusString().contains("Exceeded  maximum number of VoltTables"));
+        assertTrue(r.getStatusString().contains("Exceeded maximum number of VoltTables"));
     }
 
     public void testNegativeWiderType() {
