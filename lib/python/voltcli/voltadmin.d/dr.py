@@ -14,8 +14,15 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
 
-def reset(runner):
-    status = runner.call_proc('@ResetDR', [VOLT.FastSerializer.VOLTTYPE_TINYINT, VOLT.FastSerializer.VOLTTYPE_TINYINT], [-1, 0]).table(0).tuple(0).column_integer(0)
+def reset_local(runner):
+    status = runner.call_proc('@ResetDR', [VOLT.FastSerializer.VOLTTYPE_TINYINT, VOLT.FastSerializer.VOLTTYPE_TINYINT], [runner.opts.clusterId, runner.opts.clusterId * 1]).table(0).tuple(0).column_integer(0)
+    if status == 0:
+        runner.info('Conversation log is reset.')
+    else:
+        runner.error('The cluster failed to reset conversation log with status: %d' % status)
+
+def reset_remote(runner):
+    status = runner.call_proc('@ResetDR', [VOLT.FastSerializer.VOLTTYPE_TINYINT, VOLT.FastSerializer.VOLTTYPE_TINYINT], [runner.opts.clusterId, runner.opts.clusterId * 1]).table(0).tuple(0).column_integer(0)
     if status == 0:
         runner.info('Conversation log is reset.')
     else:
@@ -24,7 +31,14 @@ def reset(runner):
 @VOLT.Multi_Command(
     bundles = VOLT.AdminBundle(),
     description = 'DR control command.',
-    modifiers = VOLT.Modifier('reset', reset, 'Clear queued DR buffers.')
+    options = (
+            VOLT.BooleanOption('-f', '--force', 'forcing', 'bypass precheck', default = False),
+            VOLT.BooleanOption('-c', '--cluster', 'clusterId', 'drCluster Id', default = -1),
+    ),
+    modifiers = (
+            VOLT.Modifier('resetlocal', reset_local, 'remove local cluster from its dr cluster mesh.'),
+            VOLT.Modifier('reset', reset_remote, 'reset one/all remote dr cluster(s).'),
+    )
 )
 
 def dr(runner):
