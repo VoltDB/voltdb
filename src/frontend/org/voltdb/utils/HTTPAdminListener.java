@@ -63,6 +63,7 @@ import org.eclipse.jetty.server.SslConnectionFactory;
 import org.eclipse.jetty.server.handler.AbstractHandler;
 import org.eclipse.jetty.server.handler.ContextHandler;
 import org.eclipse.jetty.server.handler.ContextHandlerCollection;
+import org.eclipse.jetty.server.handler.gzip.GzipHandler;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.eclipse.jetty.util.thread.QueuedThreadPool;
 import org.json_voltpatches.JSONArray;
@@ -1060,6 +1061,18 @@ public class HTTPAdminListener {
             ContextHandler profileRequestHandler = new ContextHandler("/profile");
             profileRequestHandler.setHandler(new UserProfileHandler());
 
+//            ContextHandler imageHandler = new ContextHandler("/images");
+//            GzipHandler imageGzipHandler = new GzipHandler();
+//            imageGzipHandler.setIncludedMimeTypes("image/gif", "image/png", "image/jpeg");
+//            imageHandler.setHandler(imageGzipHandler);
+
+
+//            ContextHandler cssHandler = new ContextHandler("/css");
+//            GzipHandler cssGzipHandler = new GzipHandler();
+//            cssGzipHandler.setIncludedMimeTypes("text/css", "application/x-javascript");
+//            cssHandler.setHandler(cssGzipHandler);
+
+
             ContextHandlerCollection handlers = new ContextHandlerCollection();
             handlers.setHandlers(new Handler[] {
                     apiRequestHandler,
@@ -1068,9 +1081,21 @@ public class HTTPAdminListener {
                     deploymentRequestHandler,
                     profileRequestHandler,
                     dbMonitorHandler
-            });
+                    //, compressResourcesHandler
+//                    , imageHandler
+//                    , cssHandler
+                    });
 
-            m_server.setHandler(handlers);
+            GzipHandler compressResourcesHandler = new GzipHandler();
+//            compressResourcesHandler.addIncludedPaths("/css");
+//            compressResourcesHandler.addIncludedPaths("/images");
+//            compressResourcesHandler.setMinGzipSize(1);
+//            compressResourcesHandler.setIncludedMimeTypes("image/gif", "image/png", "image/jpeg",
+//                    "text/css", "application/x-javascript");
+            compressResourcesHandler.setHandler(handlers);
+
+            m_server.setHandler(compressResourcesHandler);
+//         m_server.setHandler(handlers);
 
             httpClientInterface.setTimeout(timeout);
             m_jsonEnabled = jsonEnabled;
