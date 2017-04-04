@@ -28,7 +28,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.jfree.util.Log;
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.network.Connection;
@@ -48,6 +48,8 @@ import org.voltdb.messaging.Iv2InitiateTaskMessage;
  *
  */
 public class ProcedureRunnerNT {
+
+    private static final VoltLogger tmLog = new VoltLogger("TM");
 
     // this is priority service for follow up work
     protected final ExecutorService m_executorService;
@@ -140,7 +142,7 @@ public class ProcedureRunnerNT {
         boolean removed = m_outstandingAllHostProcedureHostIds.remove(hostId);
         // log this for now... I don't expect it to ever happen, but will be interesting to see...
         if (!removed) {
-            Log.error(String.format(
+            tmLog.error(String.format(
                       "ProcedureRunnerNT.allHostNTProcedureCallback for procedure %s received late or unexepected response from hostID %d.",
                       m_procedureName, hostId));
             return;
