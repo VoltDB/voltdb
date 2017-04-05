@@ -567,6 +567,14 @@ print("Compiler: %s %d.%d.%d" % (CTX.compilerName(), CTX.compilerMajorVersion(),
 print("OpenSSL: version %s, config %s\n" % (CTX.getOpenSSLVersion(), CTX.getOpenSSLToken()))
 
 ###############################################################################
+# Test Valgrind if we are asked.
+###############################################################################
+if CTX.TARGET == "TESTVALGRIND":
+    print('TARGET is %s.' % CTX.TARGET)
+    retval = testValgrind(CTX)
+    sys.exit(retval)
+
+###############################################################################
 # BUILD THE MAKEFILE
 ###############################################################################
 
@@ -612,6 +620,5 @@ if CTX.TARGET == "TEST":
     retval = runTests(CTX)
 elif CTX.TARGET == "VOLTDBIPC":
     retval = buildIPC(CTX)
-
 if retval != 0:
     sys.exit(-1)

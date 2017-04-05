@@ -40,11 +40,17 @@ class BuildContext:
         self.MINORVERSION = 0
         self.PATCHLEVEL   = 0
         self.S2GEO_LIBS = ""
-        for arg in [x.strip().upper() for x in args]:
+        for orig_arg in [x.strip() for x in args]:
+            arg = orig_arg.upper()
             if arg in ["DEBUG", "RELEASE", "MEMCHECK", "MEMCHECK_NOFREELIST"]:
                 self.LEVEL = arg
-            if arg in ["BUILD", "CLEAN", "TEST", "VOLTRUN", "VOLTDBIPC"]:
+            if arg in ["BUILD", "CLEAN", "TEST", "VOLTRUN", "VOLTDBIPC" ]:
                 self.TARGET = arg
+            m = re.search("--testvalgrind=(.*)$", orig_arg)
+            if m:
+                self.TARGET="TESTVALGRIND"
+                self.xmlFile = m.group(1)
+                print('Test XML File: %s' % self.xmlFile)
             if arg in ["COVERAGE"]:
                 self.COVERAGE = True
             if arg in ["PROFILE"]:
@@ -618,23 +624,6 @@ def buildIPC(CTX):
     retval = os.system("make --directory=%s prod/voltdbipc -j4" % (CTX.OUTPUT_PREFIX))
     return retval
 
-class MemLeakError:
-    def __init__(self, bytes, blocks, errType, line):
-        self.bytes = bytes
-        self.blocks = blocks
-        self.errType = errType
-        self.line = line
-    def message(self):
-        return self.errType + '\n    ' + self.line
-
-class ValgrindError:
-    def __init__(self, errorCount, contextCount, errType, line):
-        self.errorCount = errorCount
-        self.contextCount = contextCount
-        self.line = line
-    def message(self):
-        return self.line
-
 class ValgrindErrorState:
     def __init__(self, expectNoErrors, valgrindFile):
         self.expectErrors = not expectNoErrors
@@ -648,7 +637,7 @@ class ValgrindErrorState:
         root = tree.getroot()
         errs = root.findall(".//error")
         for err in errs:
-            foundErrors = True
+            self.foundErrors = True
             self.errorStrings += [self._toString(err)]
 
     def _toString(self, err):
@@ -725,6 +714,14 @@ class ValgrindErrorState:
 
 def makeValgrindFile(pidStr):
     return "valgrind_ee_%s.xml" % pidStr
+
+def testValgrind(CTX):
+    errorState = ValgrindErrorState(True, CTX.xmlFile)
+    print(errorState.errorMessage())
+    if not errorState.isExpectedState():
+        print('Valgrind test failed.')
+        return 1
+    return 0
 
 def runTests(CTX):
     failedTests = []

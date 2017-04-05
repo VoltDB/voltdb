@@ -236,6 +236,7 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode implements I
 
             tve.setColumnIndex(index);
             tve.setDifferentiator(index);
+            col.setDifferentiator(index);
         }
 
         // We want the output columns to be ordered like [outer table columns][inner table columns],
