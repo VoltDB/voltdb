@@ -2365,7 +2365,7 @@ TEST CASES
         <include name="version.txt"/>
       </fileset>
     </copy>
-    <exec dir='tests/sqlcoverage' executable='python2.6' failonerror="${sqlcoverage.failonerror}">
+    <exec dir='tests/sqlcoverage' executable='python2.7' failonerror="${sqlcoverage.failonerror}">
         <env key="TEST_DIR" value="${build.testobjects.dir}" />
         <env key="VOLTDB_BUILD_DIR" value="${build.dir}"/>
         <arg line='sql_coverage_test.py' />
