@@ -399,11 +399,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                 }
             }
             if (isWriteFrag[i]) {
-                m_psetBuffer.limit(m_psetBuffer.position());
-                m_psetBuffer.position(paramStart);
-                writeCRC.update(m_psetBuffer);
-                assert(m_psetBuffer.remaining() == 0);
-                m_psetBuffer.limit(m_psetBuffer.capacity());
+                writeCRC.updateFromPosition(paramStart, m_psetBuffer);
             }
         }
         // checkMaxFsSize();
@@ -435,11 +431,9 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             assert(fds != null);
             try {
                 // check if anything was changed
-                final boolean dirty = fds.readBoolean();
-                if (dirty)
-                    m_dirty = true;
+                m_dirty |= fds.readBoolean();
             } catch (final IOException ex) {
-                LOG.error("Failed to deserialze result table" + ex);
+                LOG.error("Failed to deserialize result table" + ex);
                 throw new EEException(ERRORCODE_WRONG_SERIALIZED_BYTES);
             }
 

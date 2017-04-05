@@ -550,9 +550,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             }
             dirtyBytes.flip();
             // check if anything was changed
-            final boolean dirty  = dirtyBytes.get() > 0;
-            if (dirty)
-                m_dirty = true;
+            m_dirty |= dirtyBytes.get() > 0;
 
             final ByteBuffer resultTablesLengthBytes = ByteBuffer.allocate(4);
             //resultTablesLengthBytes.order(ByteOrder.LITTLE_ENDIAN);
@@ -569,8 +567,9 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                 return resultTablesLengthBytes;
 
             final ByteBuffer resultTablesBuffer = ByteBuffer
-                    .allocate(resultTablesLength);
+                    .allocate(resultTablesLength+4);
             //resultTablesBuffer.order(ByteOrder.LITTLE_ENDIAN);
+            resultTablesBuffer.putInt(resultTablesLength);
             while (resultTablesBuffer.hasRemaining()) {
                 int read = m_socketChannel.read(resultTablesBuffer);
                 if (read == -1) {
@@ -949,8 +948,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                     fser.writeParameterSet(pset);
                 }
                 if (isWriteFrag[i]) {
-                    fser.setPosition(paramStart);
-                    writeCRC.update(fser.getBuffer());
+                    writeCRC.updateFromPosition(paramStart, fser.getContainerNoFlip().b());
                 }
             }
         } catch (final IOException exception) {

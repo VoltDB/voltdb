@@ -252,20 +252,20 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         /**
          * Reset the result buffer (use the nextResultBuffer by default)
          */
-        void resetReusedResultOutputBuffer(const size_t headerSize = 0, const int batchIndex = 1) {
+        void resetReusedResultOutputBuffer(const size_t startingPosition = 0, const int batchIndex = 1) {
             if (batchIndex == 0) {
                 m_resultOutput.initializeWithPosition(m_firstReusedResultBuffer,
                                                       m_firstReusedResultCapacity,
-                                                      headerSize);
+                                                      startingPosition);
             }
             else {
                 m_resultOutput.initializeWithPosition(m_nextReusedResultBuffer,
                                                       m_nextReusedResultCapacity,
-                                                      headerSize);
+                                                      startingPosition);
             }
             m_exceptionOutput.initializeWithPosition(m_exceptionBuffer,
                                                      m_exceptionBufferCapacity,
-                                                     headerSize);
+                                                     startingPosition);
             *reinterpret_cast<int32_t*>(m_exceptionBuffer) =
                     voltdb::VOLT_EE_EXCEPTION_TYPE_NONE;
 

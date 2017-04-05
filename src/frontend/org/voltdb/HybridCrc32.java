@@ -80,4 +80,11 @@ public class HybridCrc32 extends PureJavaCrc32C {
         }
     }
 
+    public void updateFromPosition(int off, ByteBuffer b) {
+        b.limit(b.position());
+        b.position(off);
+        update(b);
+        assert(b.remaining() == 0);
+        b.limit(b.capacity());
+    }
 }

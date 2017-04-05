@@ -792,7 +792,7 @@ void VoltDBIPC::executePlanFragments(struct ipc_command *cmd) {
     ReferenceSerializeInputBE serialize_in(offset, sz);
 
     // and reset to space for the results output
-    m_engine->resetReusedResultOutputBuffer(1); // 1 byte to add status code
+    m_engine->resetReusedResultOutputBuffer(1, 1); // 1 byte to add status code
     m_engine->resetPerFragmentStatsOutputBuffer(queryCommand->perFragmentTimingEnabled);
 
     try {
@@ -1580,7 +1580,7 @@ void VoltDBIPC::executeTask(struct ipc_command *cmd) {
         execute_task *task = (execute_task*)cmd;
         voltdb::TaskType taskId = static_cast<voltdb::TaskType>(ntohll(task->taskId));
         ReferenceSerializeInputBE input(task->task, MAX_MSG_SZ);
-        m_engine->resetReusedResultOutputBuffer(1);
+        m_engine->resetReusedResultOutputBuffer(1, 1);
         m_engine->executeTask(taskId, input);
         int32_t responseLength = m_engine->getResultsSize();
         char *resultsBuffer = m_engine->getReusedResultBuffer();
@@ -1594,7 +1594,7 @@ void VoltDBIPC::executeTask(struct ipc_command *cmd) {
 void VoltDBIPC::applyBinaryLog(struct ipc_command *cmd) {
     try {
         apply_binary_log *params = (apply_binary_log*)cmd;
-        m_engine->resetReusedResultOutputBuffer(1);
+        m_engine->resetReusedResultOutputBuffer(1, 1);
         int64_t rows = m_engine->applyBinaryLog(ntohll(params->txnId),
                                         ntohll(params->spHandle),
                                         ntohll(params->lastCommittedSpHandle),
