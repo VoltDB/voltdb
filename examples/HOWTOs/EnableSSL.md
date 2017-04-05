@@ -2,7 +2,7 @@
 
 This document demonstrates how to configure and run VoltDB while using SSL to secure connections between the database and clients using the VoltDB API.
 
-VoltDB servers using SSL must be provided with a private key and a certificate which establishes trust for that key. Clients, including 'sqlcmd', are provided one or more certificates that establishes that the server can be trusted.
+VoltDB servers using SSL must be provided with a private key and a certificate which establishes trust for that key. Clients, including 'sqlcmd', are provided one or more certificates that establish that the server can be trusted.
 
 Please note that enabling SSL introduces additional overhead. This can reduce the maximum throughput and increase the latency of each client’s connection to the database, which may affect your application.
 
