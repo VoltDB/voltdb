@@ -17,13 +17,17 @@
 
 from voltcli.hostinfo import Host
 from voltcli.hostinfo import Hosts
+from voltcli import utility
 from xml.etree import ElementTree
 from collections import defaultdict
-import os.path
+from urllib2 import Request, urlopen, URLError
+import base64
+import os
+import sys
 
 # TODO: change to actual release version when in-service upgrade is released
 RELEASE_MAJOR_VERSION = 7
-RELEASE_MINOR_VERSION = 0
+RELEASE_MINOR_VERSION = 2
 
 @VOLT.Command(
     bundles=VOLT.AdminBundle(),
@@ -48,6 +52,7 @@ def plan_upgrade(runner):
         os.makedirs(runner.opts.newRoot)
 
     # verify the version of new kit is above the feature release version (e.g. 7.3)
+    # this part should also running under NT proc
     try:
         versionF = open(os.path.join(runner.opts.newKit, 'version.txt'), 'r')
     except IOError:
@@ -91,17 +96,15 @@ def basicCheck(runner):
 
     host = hosts.hosts_by_id.itervalues().next();
     currentVersion = host.version
-    currentVoltDBRoot = host.voltdbroot
-    currentDeployment = host.deployment
-    xmlroot = ElementTree.parse(currentDeployment).getroot()
-    cluster = xmlroot.find("./cluster");
-    if cluster is None:
-        runner.abort("Couldn't find cluster tag in current deployment file")
-    kfactor_tag = cluster.get('kfactor')
-    if kfactor_tag is None:
-        kfactor = 0
-    else:
-        kfactor = int(kfactor_tag)
+
+    # get k-factor from @SystemInformation
+    response = runner.call_proc('@SystemInformation',
+            [VOLT.FastSerializer.VOLTTYPE_STRING],
+            ['DEPLOYMENT'])
+    for tuple in response.table(0).tuples():
+        if tuple[0] == 'kfactor':
+            kfactor = tuple[1]
+            break
 
     # sanity check, in case of nodes number or K-factor is less than required
     # K = 0, abort with error message
@@ -125,13 +128,15 @@ def generateCommands(opts, hosts, kfactor):
     # 0 generate deployment file
     step = 0
     files = {}
-    (et, drId) = updateDeployment(survivor,
+    (et, drId) = updateDeployment(opts,
+                                 survivor,
                                  None,
                                  getHostnameOrIp(victim) + ':' + str(victim.drport))
     cluster_1_deploy = "deployment1.xml"
     et.write(cluster_1_deploy)
 
-    (et, drId) = updateDeployment(victim,
+    (et, drId) = updateDeployment(opts,
+                                 victim,
                                  drId,
                                  getHostnameOrIp(survivor) + ':' + str(survivor.drport))
     cluster_2_deploy = "deployment2.xml"
@@ -258,8 +263,14 @@ def generateCommands(opts, hosts, kfactor):
             break
 
     # cleanup
+    upgradePlan = open("upgrade-plan.txt", 'w+')
     for key, file in files.items():
+        file.seek(0)
+        upgradePlan.write(file.read() + '\n')
         file.close()
+        os.remove(file.name)
+
+    upgradePlan.close()
     if opts.newNode is not None:
         newNodeF.close()
     print 'Upgrade plan generated successfully in current directory. You might modify those per-node commands to fit your own need.'
@@ -316,13 +327,25 @@ def writeCommands(file, subject, command):
         file.write(command)
         file.write('\n\n')
 
-def updateDeployment(host, greatestRemoteClusterId, drSource):
+def updateDeployment(opts, host, greatestRemoteClusterId, drSource):
     if greatestRemoteClusterId is None or greatestRemoteClusterId > 127:
         clusterId = 1  # start from 1
     else:
         clusterId = greatestRemoteClusterId + 1
 
-    et = ElementTree.parse(host.deployment)
+    # get deployment file through rest API
+    url = 'http://' + getHostnameOrIp(host) + ':' + str(host.httpport) + '/deployment/download/'
+    request = Request(url)
+    base64string = base64.b64encode('%s:%s' % (opts.username, opts.password))
+    request.add_header("Authorization", "Basic %s" % base64string)
+    try:
+        response = urlopen(request)
+    except URLError, e:
+        utility.error("Failed to get deployment file from %s " % (getHostnameOrIp(host)))
+        sys.exit(1)
+
+    xmlString = response.read()
+    et = ElementTree.ElementTree(ElementTree.fromstring(xmlString))
     dr = et.getroot().find('./dr')
     if dr is None:
         # append an empty DR tag and change it later
