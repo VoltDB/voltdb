@@ -2537,10 +2537,10 @@ public class TestPlansSubQueries extends PlannerTestCase {
         String SQL = "SELECT 0 FROM ( SELECT DISTINCT * FROM ENG12076_P1 AS T1, ENG12076_R1 ) TTT1;";
         try {
             List<AbstractPlanNode> rootNode = compileToFragments(SQL);
-            fail("Expected compilation failure here.");
+            // This just passes.
+            assertTrue(true);
         } catch (Exception ex) {
-            assertTrue("Did not find expected message.",
-                       ex.getMessage().contains("mumble"));
+            fail("Unexpected compilation failure.");
         }
 
     }
