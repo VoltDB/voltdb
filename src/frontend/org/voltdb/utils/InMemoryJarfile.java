@@ -39,6 +39,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.UUID;
 import java.util.jar.JarEntry;
 import java.util.jar.JarInputStream;
 import java.util.jar.JarOutputStream;
@@ -234,14 +235,8 @@ public class InMemoryJarfile extends TreeMap<String, byte[]> {
         return crc.getValue();
     }
 
-    public byte[] getSha1Hash() {
-
-        MessageDigest md = null;
-        try {
-            md = MessageDigest.getInstance("SHA-1");
-        } catch (NoSuchAlgorithmException e) {
-            VoltDB.crashLocalVoltDB("Bad JVM has no SHA-1 hash.", true, e);
-        }
+    private byte[] getChecksum(String checksumType) throws NoSuchAlgorithmException {
+        MessageDigest md = MessageDigest.getInstance(checksumType);
 
         for (Entry<String, byte[]> e : super.entrySet()) {
             if (e.getKey().equals("buildinfo.txt") || e.getKey().equals("catalog-report.html")) {
@@ -266,6 +261,24 @@ public class InMemoryJarfile extends TreeMap<String, byte[]> {
         }
 
         return md.digest();
+    }
+
+    public byte[] getSha1Hash() {
+        try {
+            return getChecksum("SHA-1");
+        } catch (NoSuchAlgorithmException e) {
+            VoltDB.crashLocalVoltDB("Bad JVM has no SHA-1 hash.", true, e);
+            throw new RuntimeException("crashLocalVoltDB didn't work - this should be impossible, but exception is required to make compiler happy");
+        }
+    }
+
+    public UUID getMD5Checksum() {
+        try {
+            return Digester.md5AsUUID(getChecksum("MD5"));
+        } catch (NoSuchAlgorithmException e) {
+            VoltDB.crashLocalVoltDB("Bad JVM has no MD5 hash.", true, e);
+            throw new RuntimeException("crashLocalVoltDB didn't work - this should be impossible, but exception is required to make compiler happy");
+        }
     }
 
     public byte[] put(String key, File value) throws IOException {

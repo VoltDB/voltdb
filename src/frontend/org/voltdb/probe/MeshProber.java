@@ -889,7 +889,7 @@ public class MeshProber implements JoinAcceptor {
         }
 
         public Builder startupCatalogHash(UUID startupCatalogHash) {
-            m_startupCatalogHash = checkNotNull(startupCatalogHash);
+            m_startupCatalogHash = startupCatalogHash;
             return this;
         }
 

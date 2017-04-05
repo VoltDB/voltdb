@@ -422,6 +422,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     private LatencyHistogramStats m_latencyHistogramStats;
 
+    private boolean m_durable;
+
     private File getConfigDirectory() {
         return getConfigDirectory(m_config);
     }
@@ -983,12 +985,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
             m_clusterSettings.set(clusterSettings, 1);
 
-            InMemoryJarfile stagedCatalogJar = null; // keep this around so it need not be loaded twice
             UUID startupCatalogHash = null;
             if (m_pathToStartupCatalog != null){
                 try {
-                    stagedCatalogJar = new InMemoryJarfile(m_pathToStartupCatalog);
-                    startupCatalogHash = Digester.md5AsUUID(stagedCatalogJar.getFullJarBytes());
+                    // TODO - any way to keep it around so it need not be loaded twice?
+                    startupCatalogHash = new InMemoryJarfile(m_pathToStartupCatalog).getMD5Checksum();
                 } catch (IOException e){
                     VoltDB.crashLocalVoltDB("Failed to load staged catalog from " + m_pathToStartupCatalog, false, e);
                 }
@@ -1006,26 +1007,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 }
                 hostLog.info(action);
                 consoleLog.info(action);
-            }
-
-            File stagedCatalogFile = new VoltFile(m_pathToStartupCatalog);
-            if (determination.startAction != StartAction.CREATE){
-                hostLog.info("Staged catalog is not required for " + determination.startAction + " and will be deleted.");
-                if (stagedCatalogFile.delete() == false){
-                    hostLog.warn("Failed to delete staged catalog.");
-                }
-            } else {
-                // Move the staged catalog so that it won't be found next time we "voltdb start"
-                // By putting it in the official catalog's location, we don't have to worry about deleting it.
-                File officialCatalogLocation = new VoltFile(config.m_voltdbRoot, Constants.CONFIG_DIR + CatalogUtil.CATALOG_FILE_NAME);
-                officialCatalogLocation.delete();
-                if (stagedCatalogFile.renameTo(officialCatalogLocation)){
-                    hostLog.info("Moved staged catalog to be the official catalog");
-                    config.m_pathToCatalog = officialCatalogLocation.getAbsolutePath();
-                    m_pathToStartupCatalog = officialCatalogLocation.getAbsolutePath();
-                } else {
-                    hostLog.warn("Unable to move staged catalog to official location");
-                }
             }
 
             m_config.m_startAction = determination.startAction;
@@ -1055,14 +1036,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             validateStartAction();
 
             // durable means commandlogging is enabled.
-            boolean durable = readDeploymentAndCreateStarterCatalogContext(config);
+            m_durable = readDeploymentAndCreateStarterCatalogContext(config);
             if (config.m_isEnterprise && m_config.m_startAction.doesRequireEmptyDirectories()
-                    && !config.m_forceVoltdbCreate && durable) {
+                    && !config.m_forceVoltdbCreate && m_durable) {
                 managedPathsEmptyCheck(config);
             }
             //If we are not durable and we are not rejoining we backup auto snapshots if present.
             //If terminus is present we will recover from shutdown save so dont move.
-            if (!durable && m_config.m_startAction.doesRecover() && determination.terminusNonce == null) {
+            if (!m_durable && m_config.m_startAction.doesRecover() && determination.terminusNonce == null) {
                 if (m_nodeSettings.clean()) {
                     String msg = "Archiving old snapshots to " + m_nodeSettings.getSnapshoth() +
                                  ".1 and starting an empty database." +
@@ -1246,7 +1227,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             }
 
             // do the many init tasks in the Inits class
-            Inits inits = new Inits(m_statusTracker, this, 1, durable);
+            Inits inits = new Inits(m_statusTracker, this, 1, m_durable);
             inits.doInitializationWork();
 
             // Need the catalog so that we know how many tables so we can guess at the necessary heap size
@@ -1372,7 +1353,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                             (ProducerDRGateway) ndrgwConstructor.newInstance(
                                     new VoltFile(VoltDB.instance().getDROverflowPath()),
                                     new VoltFile(VoltDB.instance().getSnapshotPath()),
-                                    (m_config.m_startAction.doesRecover() && (durable || determination.terminusNonce != null)),
+                                    (m_config.m_startAction.doesRecover() && (m_durable || determination.terminusNonce != null)),
                                     m_config.m_startAction.doesRejoin(),
                                     m_replicationActive.get(),
                                     m_configuredNumberOfPartitions,
@@ -3889,7 +3870,23 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         /*
          * Remove the terminus file if it is there, which is written on shutdown --save
          */
-        new File(m_nodeSettings.getVoltDBRoot(), VoltDB.TERMINUS_MARKER).delete();
+        final File terminusMarker = new File(m_nodeSettings.getVoltDBRoot(), VoltDB.TERMINUS_MARKER);
+        final boolean terminusExists = terminusMarker.exists();
+        if (terminusExists){
+            boolean success = terminusMarker.delete();
+            if (!success){
+                hostLog.warn("Could not delete terminus marker");
+            }
+        }
+        if (m_durable || terminusExists){
+            File stagedCatalog = new File(m_nodeSettings.getVoltDBRoot(), Constants.CONFIG_DIR + CatalogUtil.STAGED_CATALOG_FILE_NAME);
+            if (stagedCatalog.exists()){
+                boolean success = stagedCatalog.delete();
+                if (!success){
+                    hostLog.warn("Could not delete staged catalog");
+                }
+            }
+        }
 
         /*
          * Command log is already initialized if this is a rejoin or a join

@@ -323,7 +323,10 @@ public class HostCriteria {
             return false;
         if (m_nodeState != other.m_nodeState)
             return false;
-        if (m_startupCatalogHash != other.m_startupCatalogHash){
+        if ((m_startupCatalogHash == null) ^ (other.m_startupCatalogHash == null)){
+            return false;
+        }
+        if ((m_startupCatalogHash != null) && !m_startupCatalogHash.equals(other.m_startupCatalogHash)){
             return false;
         }
         return true;
