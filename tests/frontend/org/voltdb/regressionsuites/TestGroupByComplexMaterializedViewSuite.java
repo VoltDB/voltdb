@@ -1523,6 +1523,9 @@ public class TestGroupByComplexMaterializedViewSuite extends RegressionSuite {
             // there is one table block per row.
             validateTableOfScalarLongs(client, "truncate table R6;", new long[] {numSourceRows});
         }
+
+        // Delete the problem maker first, so that the automatic cleanup between tests won't fail.
+        client.callProcedure("R6.delete", 1);
     }
 
     //
