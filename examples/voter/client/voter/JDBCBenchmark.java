@@ -116,7 +116,7 @@ public class JDBCBenchmark {
         @Option(desc = "Number of concurrent threads synchronously calling procedures.")
         int threads = 40;
 
-		@Option(desc = "Enable SSL, Optionally provide configuration file.")
+        @Option(desc = "Enable SSL, Optionally provide configuration file.")
         String sslfile = "";
 
         @Override
