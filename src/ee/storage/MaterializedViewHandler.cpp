@@ -169,12 +169,13 @@ namespace voltdb {
     void MaterializedViewHandler::catchUpWithExistingData(bool fallible) {
         ExecutorContext* ec = ExecutorContext::getExecutorContext();
         UniqueTempTableResult viewContent = ec->getEngine()->executePlanFragment(m_createQueryExecutorVector.get());
-        TableIterator ti = viewContent->iterator();
+        TableIterator* ti = viewContent->makeIterator();
         TableTuple tuple(viewContent->schema());
-        while (ti.next(tuple)) {
+        while (ti->next(tuple)) {
             //* enable to debug */ std::cout << "DEBUG: inserting catchup tuple into " << m_destTable->name() << std::endl;
             m_destTable->insertPersistentTuple(tuple, fallible, true);
         }
+        delete ti;
 
         ec->cleanupAllExecutors();
         /* // enable to debug
@@ -194,11 +195,12 @@ namespace voltdb {
         // For the case where there is no grouping column, like SELECT COUNT(*) FROM T;
         // We directly return the only row in the view. See ENG-7872.
         if (m_groupByColumnCount == 0) {
-            TableIterator iterator = m_destTable->iterator();
-            iterator.next(m_existingTuple);
+            TableIterator* iterator = m_destTable->makeIterator();
+            iterator->next(m_existingTuple);
             // Please note that if there is no group by columns, the view shall always have one row.
             // This row will be initialized when the view is constructed. We have special code path for that. -yzhang
             assert( ! m_existingTuple.isNullTuple());
+            delete iterator;
             return true;
         }
 
@@ -266,9 +268,9 @@ namespace voltdb {
         ExecutorContext* ec = ExecutorContext::getExecutorContext();
         vector<AbstractExecutor*> executorList = m_createQueryExecutorVector->getExecutorList();
         UniqueTempTableResult delta = ec->executeExecutors(executorList);
-        TableIterator ti = delta->iterator();
+        TableIterator* ti = delta->makeIterator();
         TableTuple deltaTuple(delta->schema());
-        while (ti.next(deltaTuple)) {
+        while (ti->next(deltaTuple)) {
             bool found = findExistingTuple(deltaTuple);
             if (found) {
                 mergeTupleForInsert(deltaTuple);
@@ -281,6 +283,7 @@ namespace voltdb {
                 m_destTable->insertPersistentTuple(deltaTuple, fallible);
             }
         }
+        delete ti;
     }
 
     void MaterializedViewHandler::mergeTupleForDelete(const TableTuple &deltaTuple) {
@@ -366,11 +369,12 @@ namespace voltdb {
         // Then we get the executor vectors we need to run:
         vector<AbstractExecutor*> executorList = m_minMaxExecutorVectors[minMaxColumnIndex]->getExecutorList();
         UniqueTempTableResult resultTable = ec->executeExecutors(executorList);
-        TableIterator ti = resultTable->iterator();
+        TableIterator* ti = resultTable->makeIterator();
         TableTuple resultTuple(resultTable->schema());
-        if (ti.next(resultTuple)) {
+        if (ti->next(resultTuple)) {
             newValue = resultTuple.getNValue(0);
         }
+        delete ti;
         // Now put the original parameters back.
         for (int i=0; i<=m_groupByColumnCount; i++) {
             params[i] = backups[i];
@@ -384,12 +388,12 @@ namespace voltdb {
         ExecutorContext* ec = ExecutorContext::getExecutorContext();
         vector<AbstractExecutor*> executorList = m_createQueryExecutorVector->getExecutorList();
         UniqueTempTableResult delta = ec->executeExecutors(executorList);
-        TableIterator ti = delta->iterator();
+        TableIterator* ti = delta->makeIterator();
         TableTuple deltaTuple(delta->schema());
         // The min/max value may need to be re-calculated, so we should terminate the delta table mode early
         // in order to run other queries.
         delete dtContext;
-        while (ti.next(deltaTuple)) {
+        while (ti->next(deltaTuple)) {
             bool found = findExistingTuple(deltaTuple);
             if (! found) {
                 std::string name = m_destTable->name();
@@ -410,6 +414,7 @@ namespace voltdb {
                                                             m_updatableIndexList, fallible);
             }
         }
+        delete ti;
     }
 
 } // namespace voltdb

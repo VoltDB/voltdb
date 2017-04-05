@@ -48,6 +48,11 @@ public:
      */
     virtual void release() { }
 
+    /*
+     * Indicates this undo action needs to be coordinated across sites in the same host
+     */
+    virtual bool isReplicatedTable() { return m_tableSurgeon->getTable().isReplicatedTable(); }
+
 private:
     char* m_tuple;
     PersistentTableSurgeon *m_tableSurgeon;

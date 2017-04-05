@@ -38,6 +38,8 @@ class StreamedTableUndoAction : public voltdb::UndoAction {
     void release() {
     }
 
+    virtual bool isReplicatedTable() { return false; }
+
   private:
     StreamedTable *m_table;
     size_t m_mark;

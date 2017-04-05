@@ -19,24 +19,10 @@
 #include "common/FatalException.hpp"
 #include "common/SQLException.h"
 
-#include "structures/CompactingPool.h"
-
-#include <boost/shared_ptr.hpp>
-#include <boost/unordered_map.hpp>
-
 #include <iostream>
 #include <pthread.h>
 
 namespace voltdb {
-
-struct voltdb_pool_allocator_new_delete
-{
-    typedef std::size_t size_type;
-    typedef std::ptrdiff_t difference_type;
-
-    static char * malloc(const size_type bytes);
-    static void free(char * const block);
-};
 
 /**
  * Thread local key for storing thread specific memory pools
@@ -49,15 +35,6 @@ static pthread_key_t m_stringKey;
 static pthread_key_t m_keyAllocated;
 static pthread_once_t m_keyOnce = PTHREAD_ONCE_INIT;
 
-typedef boost::pool<voltdb_pool_allocator_new_delete> PoolForObjectSize;
-typedef boost::shared_ptr<PoolForObjectSize> PoolForObjectSizePtr;
-typedef boost::unordered_map<std::size_t, PoolForObjectSizePtr> PoolsByObjectSize;
-
-typedef std::pair<int, PoolsByObjectSize* > PairType;
-typedef PairType* PairTypePtr;
-
-typedef boost::unordered_map<int32_t, boost::shared_ptr<CompactingPool> > CompactingStringStorage;
-
 static void createThreadLocalKey() {
     (void)pthread_key_create( &m_key, NULL);
     (void)pthread_key_create( &m_stringKey, NULL);
@@ -69,20 +46,18 @@ ThreadLocalPool::ThreadLocalPool() {
     if (pthread_getspecific(m_key) == NULL) {
         pthread_setspecific( m_keyAllocated, static_cast<const void *>(new std::size_t(0)));
         pthread_setspecific( m_key, static_cast<const void *>(
-                new PairType(
+                new PoolPairType(
                         1, new PoolsByObjectSize())));
         pthread_setspecific(m_stringKey, static_cast<const void*>(new CompactingStringStorage()));
     } else {
-        PairTypePtr p =
-                static_cast<PairTypePtr>(pthread_getspecific(m_key));
-        pthread_setspecific( m_key, new PairType( p->first + 1, p->second));
-        delete p;
+        PoolPairTypePtr p =
+                static_cast<PoolPairTypePtr>(pthread_getspecific(m_key));
+        p->first++;
     }
 }
 
 ThreadLocalPool::~ThreadLocalPool() {
-    PairTypePtr p =
-            static_cast<PairTypePtr>(pthread_getspecific(m_key));
+    PoolPairTypePtr p = static_cast<PoolPairTypePtr>(pthread_getspecific(m_key));
     assert(p != NULL);
     if (p != NULL) {
         if (p->first == 1) {
@@ -92,11 +67,18 @@ ThreadLocalPool::~ThreadLocalPool() {
             pthread_setspecific(m_stringKey, NULL);
             delete static_cast<std::size_t*>(pthread_getspecific(m_keyAllocated));
             pthread_setspecific( m_keyAllocated, NULL);
+            delete p;
         } else {
-            pthread_setspecific( m_key, new PairType( p->first - 1, p->second));
+            p->first--;
         }
-        delete p;
     }
+}
+
+void ThreadLocalPool::assignThreadLocals(PoolLocals& mapping)
+{
+    pthread_setspecific(m_keyAllocated, static_cast<const void *>(mapping.allocated));
+    pthread_setspecific(m_key, static_cast<const void *>(mapping.poolData));
+    pthread_setspecific(m_stringKey, static_cast<const void*>(mapping.stringData));
 }
 
 static int32_t getAllocationSizeForObject(int length)
@@ -163,6 +145,11 @@ void ThreadLocalPool::freeRelocatable(Sized* data)
 { delete [] reinterpret_cast<char*>(data); }
 
 #else // not MEMCHECK
+
+PoolPairTypePtr ThreadLocalPool::getDataPoolPair()
+{
+    return static_cast< PoolPairTypePtr >(pthread_getspecific(m_key));
+}
 
 static CompactingStringStorage& getStringPoolMap()
 {
@@ -236,7 +223,7 @@ void ThreadLocalPool::freeRelocatable(Sized* sized)
 void* ThreadLocalPool::allocateExactSizedObject(std::size_t sz)
 {
     PoolsByObjectSize& pools =
-            *(static_cast< PairTypePtr >(pthread_getspecific(m_key))->second);
+            *(static_cast< PoolPairTypePtr >(pthread_getspecific(m_key))->second);
     PoolsByObjectSize::iterator iter = pools.find(sz);
     PoolForObjectSize* pool;
     if (iter == pools.end()) {
@@ -283,7 +270,7 @@ void* ThreadLocalPool::allocateExactSizedObject(std::size_t sz)
 void ThreadLocalPool::freeExactSizedObject(std::size_t sz, void* object)
 {
     PoolsByObjectSize& pools =
-            *(static_cast< PairTypePtr >(pthread_getspecific(m_key))->second);
+            *(static_cast< PoolPairTypePtr >(pthread_getspecific(m_key))->second);
     PoolsByObjectSize::iterator iter = pools.find(sz);
     if (iter == pools.end()) {
         throwFatalException(
@@ -322,4 +309,11 @@ void voltdb_pool_allocator_new_delete::free(char * const block) {
     (*static_cast< std::size_t* >(pthread_getspecific(m_keyAllocated))) -= *reinterpret_cast<std::size_t*>(block - sizeof(std::size_t));
     delete [](block - sizeof(std::size_t));
 }
+
+PoolLocals::PoolLocals() {
+    allocated = static_cast< std::size_t* >(pthread_getspecific(m_keyAllocated));
+    poolData = static_cast< PoolPairTypePtr >(pthread_getspecific(m_key));
+    stringData = static_cast<CompactingStringStorage*>(pthread_getspecific(m_stringKey));
+}
+
 }

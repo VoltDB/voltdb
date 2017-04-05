@@ -215,9 +215,6 @@ private:
     PersistentTable(PersistentTable const&);
     PersistentTable operator=(PersistentTable const&);
 
-    // default iterator
-    TableIterator m_iter;
-
     virtual void initializeWithColumns(TupleSchema* schema,
             std::vector<std::string> const& columnNames,
             bool ownsTupleSchema,
@@ -237,19 +234,18 @@ public:
     }
 
     // Return a table iterator by reference
-    TableIterator& iterator() {
-        m_iter.reset(m_data.begin());
-        return m_iter;
+    virtual TableIterator* makeIterator() {
+        return new TableIterator(this, m_data.begin());
+    }
+
+    virtual TableIterator* iteratorDeletingAsWeGo() {
+        TableIterator* newIter = makeIterator();
+        newIter->setTempTableDeleteAsGo(false);
+        return newIter;
     }
 
     JumpingTableIterator* makeJumpingIterator() {
         return new JumpingTableIterator(this, m_data.begin(), m_data.end());
-    }
-
-    TableIterator& iteratorDeletingAsWeGo() {
-        m_iter.reset(m_data.begin());
-        m_iter.setTempTableDeleteAsGo(false);
-        return m_iter;
     }
 
 

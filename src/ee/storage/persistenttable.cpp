@@ -57,6 +57,7 @@
 #include "PersistentTableUndoTruncateTableAction.h"
 #include "PersistentTableUndoSwapTableAction.h"
 #include "PersistentTableUndoUpdateAction.h"
+#include "DummyPersistentTableUndoAction.h"
 #include "TableCatalogDelegate.hpp"
 #include "tablefactory.h"
 #include "tableiterator.h"
@@ -115,7 +116,6 @@ private:
 
 PersistentTable::PersistentTable(int partitionColumn, char const* signature, bool isMaterialized, int tableAllocationTargetSize, int tupleLimit, bool drEnabled) :
     Table(tableAllocationTargetSize == 0 ? TABLE_BLOCKSIZE : tableAllocationTargetSize),
-    m_iter(this),
     m_allowNulls(),
     m_partitionColumn(partitionColumn),
     m_tupleLimit(tupleLimit),
@@ -136,9 +136,6 @@ PersistentTable::PersistentTable(int partitionColumn, char const* signature, boo
     m_deltaTable(NULL),
     m_deltaTableActive(false)
 {
-    // this happens here because m_data might not be initialized above
-    m_iter.reset(m_data.begin());
-
     for (int ii = 0; ii < TUPLE_BLOCK_NUM_BUCKETS; ii++) {
         m_blocksNotPendingSnapshotLoad.push_back(TBBucketPtr(new TBBucket()));
         m_blocksPendingSnapshotLoad.push_back(TBBucketPtr(new TBBucket()));
@@ -345,7 +342,8 @@ void PersistentTable::truncateTableUndo(TableCatalogDelegate* tcd,
     // reset base table pointer
     tcd->setTable(originalTable);
 
-    engine->rebuildTableCollections();
+    // TODO: Fix this to coordinate the undo for replicated tables by the last site.
+    engine->rebuildTableCollections(false);
 }
 
 // Decrement each view-based table's reference count.
@@ -520,7 +518,8 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
         emptyTable->swapPurgeExecutorVector(evPtr);
     }
 
-    engine->rebuildTableCollections();
+    // TODO: Fix this to coordinate the truncate for replicated tables by the last site.
+    engine->rebuildTableCollections(false);
 
     ExecutorContext* ec = ExecutorContext::getExecutorContext();
     AbstractDRTupleStream* drStream = getDRTupleStream(ec);
@@ -543,10 +542,28 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
                                 "active undo quantum, and presumably an active transaction that should be there",
                                 m_name.c_str());
         }
-        emptyTable->m_tuplesPinnedByUndo = emptyTable->m_tupleCount;
-        emptyTable->m_invisibleTuplesPendingDeleteCount = emptyTable->m_tupleCount;
-        // Create and register an undo action.
-        uq->registerUndoAction(new (*uq) PersistentTableUndoTruncateTableAction(tcd, this, emptyTable));
+        if (isReplicatedTable()) {
+            // For shared replicated table, in the same host site with lowest id
+            // will create the actual undo action, other sites register a dummy
+            // undo action as placeholder
+            BOOST_FOREACH (const SharedEngineLocalsType::value_type& enginePair, enginesByPartitionId) {
+                UndoQuantum* currUQ = enginePair.second.context->getCurrentUndoQuantum();
+                if (uq == currUQ) {
+                    emptyTable->m_tuplesPinnedByUndo = emptyTable->m_tupleCount;
+                    emptyTable->m_invisibleTuplesPendingDeleteCount = emptyTable->m_tupleCount;
+                    // Create and register an undo action.
+                    uq->registerUndoAction(new (*uq) PersistentTableUndoTruncateTableAction(tcd, this, emptyTable));
+                } else {
+                    // put a placeholder
+                    uq->registerUndoAction(new (*uq) DummyPersistentTableUndoAction(&m_surgeon));
+                }
+            }
+        } else {
+            emptyTable->m_tuplesPinnedByUndo = emptyTable->m_tupleCount;
+            emptyTable->m_invisibleTuplesPendingDeleteCount = emptyTable->m_tupleCount;
+            // Create and register an undo action.
+            uq->registerUndoAction(new (*uq) PersistentTableUndoTruncateTableAction(tcd, this, emptyTable));
+        }
     }
     else {
         if (fallible) {
@@ -648,7 +665,7 @@ void PersistentTable::swapTable(PersistentTable* otherTable,
     assert(hasNameIntegrity(name(), otherIndexNames));
     assert(hasNameIntegrity(otherTable->name(), theIndexNames));
 
-    ExecutorContext::getEngine()->rebuildTableCollections();
+    ExecutorContext::getEngine()->rebuildTableCollections(true);
 }
 
 void PersistentTable::swapTableState(PersistentTable* otherTable) {
@@ -851,12 +868,37 @@ void PersistentTable::insertTupleCommon(TableTuple& source, TableTuple& target,
          * Create and register an undo action.
          */
         UndoQuantum *uq = ExecutorContext::currentUndoQuantum();
-        if (uq) {
-            char* tupleData = uq->allocatePooledCopy(target.address(), target.tupleLength());
-            //* enable for debug */ std::cout << "DEBUG: inserting " << (void*)target.address()
-            //* enable for debug */           << " { " << target.debugNoHeader() << " } "
-            //* enable for debug */           << " copied to " << (void*)tupleData << std::endl;
-            uq->registerUndoAction(new (*uq) PersistentTableUndoInsertAction(tupleData, &m_surgeon));
+        if (isReplicatedTable()) {
+            // For shared replicated table, in the same host site with lowest id
+            // will create the actual undo action, other sites register a dummy
+            // undo action as a placeholder
+            BOOST_FOREACH (const SharedEngineLocalsType::value_type& enginePair, enginesByPartitionId) {
+                UndoQuantum* currUQ = enginePair.second.context->getCurrentUndoQuantum();
+                if (uq) {
+                    if (uq == currUQ) {
+                        // do the actual work
+                        char* tupleData = uq->allocatePooledCopy(target.address(), target.tupleLength());
+                       //* enable for debug */ std::cout << "DEBUG: inserting " << (void*)target.address()
+                       //* enable for debug */           << " { " << target.debugNoHeader() << " } "
+                       //* enable for debug */           << " copied to " << (void*)tupleData << std::endl;
+                       uq->registerUndoAction(new (*uq) PersistentTableUndoInsertAction(tupleData, &m_surgeon));
+                    } else {
+                        // put a placeholder
+                        uq->registerUndoAction(new (*uq) DummyPersistentTableUndoAction(&m_surgeon));
+                    }
+                } else {
+                    // If undoQuantum is null it should be null on every site.
+                    assert (!currUQ);
+                }
+            }
+        } else {
+            if (uq) {
+                char* tupleData = uq->allocatePooledCopy(target.address(), target.tupleLength());
+                //* enable for debug */ std::cout << "DEBUG: inserting " << (void*)target.address()
+                //* enable for debug */           << " { " << target.debugNoHeader() << " } "
+                //* enable for debug */           << " copied to " << (void*)tupleData << std::endl;
+                uq->registerUndoAction(new (*uq) PersistentTableUndoInsertAction(tupleData, &m_surgeon));
+            }
         }
     }
 
@@ -1051,14 +1093,38 @@ void PersistentTable::updateTupleWithSpecificIndexes(TableTuple& targetTupleToUp
     targetTupleToUpdate.copyForPersistentUpdate(sourceTupleWithNewValues, oldObjects, newObjects);
 
     if (uq) {
-        /*
-         * Create and register an undo action with copies of the "before" and "after" tuple storage
-         * and the "before" and "after" object pointers for non-inlined columns that changed.
-         */
-        char* newTupleData = uq->allocatePooledCopy(targetTupleToUpdate.address(), tupleLength);
-        uq->registerUndoAction(new (*uq) PersistentTableUndoUpdateAction(oldTupleData, newTupleData,
-                                                                         oldObjects, newObjects,
-                                                                         &m_surgeon, someIndexGotUpdated));
+        if (isReplicatedTable()) {
+            // For shared replicated table, in the same host site with lowest id
+            // will create the actual undo action, other sites register a dummy
+            // undo action as placeholder
+            BOOST_FOREACH (const SharedEngineLocalsType::value_type& enginePair, enginesByPartitionId) {
+                UndoQuantum *uq = ExecutorContext::currentUndoQuantum();
+                UndoQuantum* currUQ = enginePair.second.context->getCurrentUndoQuantum();
+                if (uq == currUQ) {
+                    // do the actual work
+                    /*
+                     * Create and register an undo action with copies of the "before" and "after" tuple storage
+                     * and the "before" and "after" object pointers for non-inlined columns that changed.
+                     */
+                    char* newTupleData = uq->allocatePooledCopy(targetTupleToUpdate.address(), tupleLength);
+                    uq->registerUndoAction(new (*uq) PersistentTableUndoUpdateAction(oldTupleData, newTupleData,
+                                                                                     oldObjects, newObjects,
+                                                                                     &m_surgeon, someIndexGotUpdated));
+                } else {
+                    // put a placeholder
+                    uq->registerUndoAction(new (*uq) DummyPersistentTableUndoAction(&m_surgeon));
+                }
+            }
+        } else {
+            /*
+             * Create and register an undo action with copies of the "before" and "after" tuple storage
+             * and the "before" and "after" object pointers for non-inlined columns that changed.
+             */
+            char* newTupleData = uq->allocatePooledCopy(targetTupleToUpdate.address(), tupleLength);
+            uq->registerUndoAction(new (*uq) PersistentTableUndoUpdateAction(oldTupleData, newTupleData,
+                                                                             oldObjects, newObjects,
+                                                                             &m_surgeon, someIndexGotUpdated));
+        }
     }
     else {
         // This is normally handled by the Undo Action's release (i.e. when there IS an Undo Action)
@@ -1189,11 +1255,31 @@ void PersistentTable::deleteTuple(TableTuple& target, bool fallible) {
     deleteFromAllIndexes(&target);
 
     if (createUndoAction) {
-        target.setPendingDeleteOnUndoReleaseTrue();
-        ++m_tuplesPinnedByUndo;
-        ++m_invisibleTuplesPendingDeleteCount;
-        // Create and register an undo action.
-        uq->registerUndoAction(new (*uq) PersistentTableUndoDeleteAction(target.address(), &m_surgeon), this);
+        if (isReplicatedTable()) {
+            // For shared replicated table, in the same host site with lowest id
+            // will create the actual undo action, other sites register a dummy
+            // undo action as placeholder
+            BOOST_FOREACH (const SharedEngineLocalsType::value_type& enginePair, enginesByPartitionId) {
+                UndoQuantum *uq = ExecutorContext::currentUndoQuantum();
+                UndoQuantum* currUQ = enginePair.second.context->getCurrentUndoQuantum();
+                if (uq == currUQ) {
+                    // do the actual work
+                    target.setPendingDeleteOnUndoReleaseTrue();
+                    ++m_tuplesPinnedByUndo;
+                    ++m_invisibleTuplesPendingDeleteCount;
+                   uq->registerUndoAction(new (*uq) PersistentTableUndoDeleteAction(target.address(), &m_surgeon), this);
+                } else {
+                    // put a placeholder
+                    uq->registerUndoAction(new (*uq) DummyPersistentTableUndoAction(&m_surgeon));
+                }
+            }
+        } else {
+            target.setPendingDeleteOnUndoReleaseTrue();
+            ++m_tuplesPinnedByUndo;
+            ++m_invisibleTuplesPendingDeleteCount;
+            // Create and register an undo action.
+            uq->registerUndoAction(new (*uq) PersistentTableUndoDeleteAction(target.address(), &m_surgeon), this);
+        }
     }
 
     // handle any materialized views, insert the tuple into delta table,
@@ -1926,13 +2012,13 @@ void PersistentTable::printBucketInfo() {
 }
 
 int64_t PersistentTable::validatePartitioning(TheHashinator* hashinator, int32_t partitionId) {
-    TableIterator iter = iterator();
+    TableIterator* iter = makeIterator();
 
     int64_t mispartitionedRows = 0;
 
-    while (iter.hasNext()) {
+    while (iter->hasNext()) {
         TableTuple tuple(schema());
-        iter.next(tuple);
+        iter->next(tuple);
         int32_t newPartitionId = hashinator->hashinate(tuple.getNValue(m_partitionColumn));
         if (newPartitionId != partitionId) {
             std::ostringstream buffer;
@@ -1958,6 +2044,7 @@ int64_t PersistentTable::validatePartitioning(TheHashinator* hashinator, int32_t
         LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_WARN,
                             buffer.str().c_str());
     }
+    delete iter;
     return mispartitionedRows;
 }
 
@@ -2068,8 +2155,8 @@ void PersistentTable::addIndex(TableIndex* index) {
 
     // fill the index with tuples... potentially the slow bit
     TableTuple tuple(m_schema);
-    TableIterator iter = iterator();
-    while (iter.next(tuple)) {
+    TableIterator* iter = makeIterator();
+    while (iter->next(tuple)) {
         index->addEntry(&tuple, NULL);
     }
 
@@ -2083,6 +2170,7 @@ void PersistentTable::addIndex(TableIndex* index) {
     m_smallestUniqueIndexCrc = 0;
     // Mark view handlers that need to be reconstructed as dirty.
     polluteViews();
+    delete iter;
 }
 
 void PersistentTable::removeIndex(TableIndex* index) {

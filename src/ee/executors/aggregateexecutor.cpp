@@ -795,16 +795,17 @@ bool AggregateHashExecutor::p_execute(const NValueArray& params)
 
     const TupleSchema * inputSchema = input_table->schema();
     assert(inputSchema);
-    TableIterator it = input_table->iteratorDeletingAsWeGo();
+    TableIterator* it = input_table->iteratorDeletingAsWeGo();
     ProgressMonitorProxy pmp(m_engine->getExecutorContext(), this);
 
     TableTuple nextTuple = AggregateHashExecutor::p_execute_init(params, &pmp, inputSchema, NULL);
 
     VOLT_TRACE("looping..");
-    while (it.next(nextTuple)) {
+    while (it->next(nextTuple)) {
         assert(m_postfilter.isUnderLimit()); // hash aggregation can not early return for limit
         AggregateHashExecutor::p_execute_tuple(nextTuple);
     }
+    delete it;
     AggregateHashExecutor::p_execute_finish();
 
     cleanupInputTempTable(input_table);
@@ -895,16 +896,17 @@ bool AggregateSerialExecutor::p_execute(const NValueArray& params)
     Table* input_table = m_abstractNode->getInputTable();
     assert(input_table);
     VOLT_TRACE("input table\n%s", input_table->debug().c_str());
-    TableIterator it = input_table->iteratorDeletingAsWeGo();
+    TableIterator* it = input_table->iteratorDeletingAsWeGo();
     TableTuple nextTuple(input_table->schema());
 
     ProgressMonitorProxy pmp(m_engine->getExecutorContext(), this);
     AggregateSerialExecutor::p_execute_init(params, &pmp, input_table->schema(), NULL);
 
-    while (m_postfilter.isUnderLimit() && it.next(nextTuple)) {
+    while (m_postfilter.isUnderLimit() && it->next(nextTuple)) {
         m_pmp->countdownProgress();
         AggregateSerialExecutor::p_execute_tuple(nextTuple);
     }
+    delete it;
     AggregateSerialExecutor::p_execute_finish();
     VOLT_TRACE("finalizing..");
 
@@ -1009,16 +1011,17 @@ bool AggregatePartialExecutor::p_execute(const NValueArray& params)
     Table* input_table = m_abstractNode->getInputTable(0);
     assert(input_table);
     VOLT_TRACE("input table\n%s", input_table->debug().c_str());
-    TableIterator it = input_table->iteratorDeletingAsWeGo();
+    TableIterator* it = input_table->iteratorDeletingAsWeGo();
     TableTuple nextTuple(input_table->schema());
 
     ProgressMonitorProxy pmp(m_engine->getExecutorContext(), this);
     AggregatePartialExecutor::p_execute_init(params, &pmp, input_table->schema(), NULL);
 
-    while (m_postfilter.isUnderLimit() && it.next(nextTuple)) {
+    while (m_postfilter.isUnderLimit() && it->next(nextTuple)) {
         m_pmp->countdownProgress();
         AggregatePartialExecutor::p_execute_tuple(nextTuple);
     }
+    delete it;
     AggregatePartialExecutor::p_execute_finish();
     VOLT_TRACE("finalizing..");
 

@@ -15,48 +15,44 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef PERSISTENTTABLEUNDODELETEACTION_H_
-#define PERSISTENTTABLEUNDODELETEACTION_H_
+#ifndef DUMMYPERSISTENTTABLEUNDOACTION_H_
+#define DUMMYPERSISTENTTABLEUNDOACTION_H_
 
 #include "common/UndoAction.h"
 #include "common/types.h"
-#include "storage/persistenttable.h"
 
 namespace voltdb {
 
 
-class PersistentTableUndoDeleteAction: public UndoAction {
+class DummyPersistentTableUndoAction: public voltdb::UndoAction {
 public:
-    inline PersistentTableUndoDeleteAction(char *deletedTuple, PersistentTableSurgeon *table)
-        : m_tuple(deletedTuple), m_table(table)
-    {}
+    inline DummyPersistentTableUndoAction(voltdb::PersistentTableSurgeon *tableSurgeon)
+        : m_tableSurgeon(tableSurgeon)
+    { }
 
-private:
-    virtual ~PersistentTableUndoDeleteAction() { }
+    virtual ~DummyPersistentTableUndoAction() { }
 
     /*
-     * Undo whatever this undo action was created to undo. In this case reinsert the tuple into the table.
+     * Undo whatever this undo action was created to undo
      */
     virtual void undo() {
-        m_table->insertTupleForUndo(m_tuple);
     }
 
     /*
-     * Release any resources held by the undo action. It will not need to be undone in the future.
-     * In this case free the strings associated with the tuple.
+     * Release any resources held by the undo action. It will not need
+     * to be undone in the future.
      */
-    virtual void release() { m_table->deleteTupleRelease(m_tuple); }
+    virtual void release() { }
 
     /*
      * Indicates this undo action needs to be coordinated across sites in the same host
      */
-    virtual bool isReplicatedTable() { return m_table->getTable().isReplicatedTable(); }
+    virtual bool isReplicatedTable() { return m_tableSurgeon->getTable().isReplicatedTable(); }
 
 private:
-    char *m_tuple;
-    PersistentTableSurgeon *m_table;
+    PersistentTableSurgeon *m_tableSurgeon;
 };
 
 }
 
-#endif /* PERSISTENTTABLEUNDODELETEACTION_H_ */
+#endif

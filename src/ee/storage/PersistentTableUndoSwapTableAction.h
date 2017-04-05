@@ -54,6 +54,11 @@ private:
      */
     virtual void release() { }
 
+    /*
+     * Indicates this undo action needs to be coordinated across sites in the same host
+     */
+    virtual bool isReplicatedTable() { return m_theTable->isReplicatedTable(); }
+
 private:
     PersistentTable * const m_theTable;
     PersistentTable * const m_otherTable;

@@ -56,6 +56,11 @@ public:
      */
     virtual void release() { NValue::freeObjectsFromTupleStorage(m_oldUninlineableColumns); }
 
+    /*
+     * Indicates this undo action needs to be coordinated across sites in the same host
+     */
+    virtual bool isReplicatedTable() { return m_tableSurgeon->getTable().isReplicatedTable(); }
+
     virtual ~PersistentTableUndoUpdateAction() { }
 
 private:

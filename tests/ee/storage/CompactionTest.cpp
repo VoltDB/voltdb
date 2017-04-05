@@ -73,7 +73,7 @@ public:
         m_tuplesDeletedInLastUndo = 0;
         m_engine = new voltdb::VoltDBEngine();
         int partitionCount = 1;
-        m_engine->initialize(1,1, 0, 0, "", 0, 1024, DEFAULT_TEMP_TABLE_MEMORY, false);
+        m_engine->initialize(1, 1, 0, partitionCount, 0, "", 0, 1024, DEFAULT_TEMP_TABLE_MEMORY, false);
         m_engine->updateHashinator(HASHINATOR_LEGACY, (char*)&partitionCount, NULL, 0);
 
         m_columnNames.push_back("1");
@@ -323,9 +323,9 @@ TEST_F(CompactionTest, BasicCompaction) {
     m_table->doForcedCompaction();
 
     stx::btree_set<int32_t> pkeysFoundAfterDelete;
-    TableIterator& iter = m_table->iterator();
+    TableIterator* iter = m_table->makeIterator();
     TableTuple tuple(m_table->schema());
-    while (iter.next(tuple)) {
+    while (iter->next(tuple)) {
         int32_t pkey = ValuePeeker::peekAsInteger(tuple.getNValue(0));
         key.setNValue(0, ValueFactory::getIntegerValue(pkey));
         for (int ii = 0; ii < 4; ii++) {
@@ -335,6 +335,7 @@ TEST_F(CompactionTest, BasicCompaction) {
         }
         pkeysFoundAfterDelete.insert(pkey);
     }
+    delete iter;
 
     std::vector<int32_t> diff;
     std::insert_iterator<std::vector<int32_t> > ii( diff, diff.begin());
@@ -467,9 +468,9 @@ TEST_F(CompactionTest, CompactionWithCopyOnWrite) {
         m_table->doForcedCompaction();
 
         stx::btree_set<int32_t> pkeysFoundAfterDelete;
-        TableIterator& iter = m_table->iterator();
+        TableIterator* iter = m_table->makeIterator();
         TableTuple tuple(m_table->schema());
-        while (iter.next(tuple)) {
+        while (iter->next(tuple)) {
             int32_t pkey = ValuePeeker::peekAsInteger(tuple.getNValue(0));
             key.setNValue(0, ValueFactory::getIntegerValue(pkey));
             for (int ii = 0; ii < 4; ii++) {
@@ -479,6 +480,7 @@ TEST_F(CompactionTest, CompactionWithCopyOnWrite) {
             }
             pkeysFoundAfterDelete.insert(pkey);
         }
+        delete iter;
 
         std::vector<int32_t> diff;
         std::insert_iterator<std::vector<int32_t> > ii( diff, diff.begin());

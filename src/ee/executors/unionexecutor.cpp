@@ -117,14 +117,15 @@ bool UnionSetOperator::processTuples()
     for (size_t ctr = 0, cnt = m_input_tablerefs.size(); ctr < cnt; ctr++) {
         Table* input_table = m_input_tablerefs[ctr].getTable();
         assert(input_table);
-        TableIterator iterator = input_table->iterator();
+        TableIterator* iterator = input_table->makeIterator();
         TableTuple tuple(input_table->schema());
-        while (iterator.next(tuple)) {
+        while (iterator->next(tuple)) {
             if (m_is_all || needToInsert(tuple, tuples)) {
                 // we got tuple to insert
                 m_output_table->insertTempTuple(tuple);
             }
         }
+        delete iterator;
     }
     return true;
 }
@@ -231,9 +232,9 @@ bool ExceptIntersectSetOperator::processTuples()
 
 void ExceptIntersectSetOperator::collectTuples(Table& input_table, TupleMap& tuple_map)
 {
-    TableIterator iterator = input_table.iterator();
+    TableIterator* iterator = input_table.makeIterator();
     TableTuple tuple(input_table.schema());
-    while (iterator.next(tuple)) {
+    while (iterator->next(tuple)) {
         TupleMap::iterator mapIt = tuple_map.find(tuple);
         if (mapIt == tuple_map.end()) {
             tuple_map.insert(std::make_pair(tuple, 1));
@@ -241,6 +242,7 @@ void ExceptIntersectSetOperator::collectTuples(Table& input_table, TupleMap& tup
             ++(mapIt->second);
         }
     }
+    delete iterator;
 }
 
 void ExceptIntersectSetOperator::exceptTupleMaps(TupleMap& map_a, TupleMap& map_b)

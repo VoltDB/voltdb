@@ -26,6 +26,7 @@
 #include "common/UniqueId.hpp"
 #include "execution/ExecutorVector.h"
 #include "execution/VoltDBEngine.h"
+#include "common/ThreadLocalPool.h"
 
 #include <vector>
 #include <stack>
@@ -43,6 +44,7 @@ const int64_t LONG_OP_THRESHOLD = 10000;
 class AbstractExecutor;
 class AbstractDRTupleStream;
 class VoltDBEngine;
+struct EngineLocals;
 
 class TempTable;
 
@@ -99,6 +101,8 @@ class ExecutorContext {
 
     // It is the thread-hopping VoltDBEngine's responsibility to re-establish the EC for each new thread it runs on.
     void bindToThread();
+
+    static void assignThreadLocals(EngineLocals& locals);
 
     // not always known at initial construction
     void setPartitionId(CatalogId partitionId) {
@@ -212,6 +216,10 @@ class ExecutorContext {
     /** DR timestamp field value for this transaction */
     int64_t currentDRTimestamp() {
         return m_currentDRTimestamp;
+    }
+
+    VoltDBEngine* getContextEngine() {
+        return m_engine;
     }
 
     /** Executor List for a given sub statement id */
@@ -417,7 +425,27 @@ class ExecutorContext {
     CatalogId m_drClusterId;
     ProgressStats m_progressStats;
 };
+struct EngineLocals : public PoolLocals {
+    inline EngineLocals() : PoolLocals(), partitionId(-1), context(ExecutorContext::getExecutorContext()) {}
+    inline EngineLocals(int32_t pid) : PoolLocals(), partitionId(pid), context(ExecutorContext::getExecutorContext()) {}
+    inline EngineLocals(const EngineLocals& src) : PoolLocals(src), partitionId(src.partitionId), context(src.context)
+    {}
 
+    inline EngineLocals& operator = (EngineLocals const& rhs) {
+        PoolLocals::operator = (rhs);
+        partitionId = rhs.partitionId;
+        context = rhs.context;
+        return *this;
+    }
+
+    int32_t partitionId;
+    ExecutorContext* context;
+};
+typedef std::map<int32_t, EngineLocals> SharedEngineLocalsType;
+
+extern SharedEngineLocalsType enginesByPartitionId;
+extern EngineLocals mpEngineLocals;
+extern AbstractExecutor * mpExecutor;
 }
 
 #endif

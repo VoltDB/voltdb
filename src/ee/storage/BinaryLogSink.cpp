@@ -151,8 +151,8 @@ bool isResolved(int32_t retval) {
 
 void setConflictOutcome(boost::shared_ptr<TempTable> metadataTable, bool acceptRemoteChange, bool convergent) {
     TableTuple tuple(metadataTable->schema());
-    TableIterator iter = metadataTable->iterator();
-    while (iter.next(tuple)) {
+    TableIterator* iter = metadataTable->makeIterator();
+    while (iter->next(tuple)) {
         tuple.setNValue(DR_ACTION_DECISION_COLUMN_INDEX,
                         ValueFactory::getTempStringValue(DRDecisionStr(acceptRemoteChange ? ACCEPT : REJECT)));
         tuple.setNValue(DR_DIVERGENCE_COLUMN_INDEX,
@@ -162,21 +162,23 @@ void setConflictOutcome(boost::shared_ptr<TempTable> metadataTable, bool acceptR
 
 void exportTuples(StreamedTable *exportTable, Table *metaTable, Table *tupleTable) {
     TableTuple tempMetaTuple(exportTable->schema());
-    TableIterator metaIter = metaTable->iterator();
+    TableIterator* metaIter = metaTable->makeIterator();
     if (!tupleTable) {
-        while (metaIter.next(tempMetaTuple)) {
+        while (metaIter->next(tempMetaTuple)) {
             exportTable->insertTuple(tempMetaTuple);
         }
     }
     else {
         TableTuple tempTupleTuple(tupleTable->schema());
-        TableIterator tupleIter = tupleTable->iterator();
-        while (metaIter.next(tempMetaTuple) && tupleIter.next(tempTupleTuple)) {
+        TableIterator* tupleIter = tupleTable->makeIterator();
+        while (metaIter->next(tempMetaTuple) && tupleIter->next(tempTupleTuple)) {
             tempMetaTuple.setNValue(DR_TUPLE_COLUMN_INDEX,
                                     ValueFactory::getTempStringValue(tempTupleTuple.toJsonString(tupleTable->getColumnNames())));
             exportTable->insertTuple(tempMetaTuple);
         }
+        delete tupleIter;
     }
+    delete metaIter;
 }
 
 typedef std::pair<boost::shared_ptr<TableTuple>, bool>  LabeledTableTuple;

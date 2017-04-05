@@ -62,6 +62,11 @@ private:
         m_emptyTable->truncateTableRelease(m_originalTable);
     }
 
+    /*
+     * Indicates this undo action needs to be coordinated across sites in the same host
+     */
+    virtual bool isReplicatedTable() { return m_originalTable->isReplicatedTable(); }
+
 private:
     TableCatalogDelegate* m_tcd;
     PersistentTable* m_originalTable;

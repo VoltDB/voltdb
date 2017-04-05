@@ -15,12 +15,15 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include "common/executorcontext.hpp"
+#include "common/SynchronizedThreadLock.h"
 
 #include "common/debuglog.h"
 #include "executors/abstractexecutor.h"
 #include "storage/AbstractDRTupleStream.h"
 #include "storage/DRTupleStream.h"
 #include "storage/DRTupleStreamUndoAction.h"
+#include "storage/persistenttable.h"
+#include "plannodes/insertnode.h"
 
 #include "boost/foreach.hpp"
 
@@ -34,6 +37,10 @@
 using namespace std;
 
 namespace voltdb {
+
+SharedEngineLocalsType enginesByPartitionId;
+EngineLocals mpEngineLocals;
+AbstractExecutor * mpExecutor = NULL;
 
 static pthread_key_t static_key;
 static pthread_once_t static_keyOnce = PTHREAD_ONCE_INIT;
@@ -70,6 +77,11 @@ static void globalInitOrCreateOncePerProcess() {
     setenv("TZ", "UTC", 0); // set timezone as "UTC" in EE level
 
     (void)pthread_key_create(&static_key, NULL);
+
+    assert(SITES_PER_HOST == -1);
+    SITES_PER_HOST = 0;
+    pthread_mutex_init(&sharedEngineMutex, NULL);
+    pthread_cond_init(&sharedEngineCondition, 0);
 }
 
 ExecutorContext::ExecutorContext(int64_t siteId,
@@ -110,15 +122,22 @@ ExecutorContext::~ExecutorContext() {
     // currently does not own any of its pointers
 
     // ... or none, now that the one is going away.
-    VOLT_DEBUG("De-installing EC(%ld)", (long)this);
+    VOLT_DEBUG("De-installing EC(%ld) for partition %d", (long)this, m_partitionId);
 
     pthread_setspecific(static_key, NULL);
+}
+
+void ExecutorContext::assignThreadLocals(EngineLocals& mapping)
+{
+    VOLT_DEBUG("Switching context to partition %d on thread %p", mapping.partitionId, pthread_self());
+    pthread_setspecific(static_key, mapping.context);
+    ThreadLocalPool::assignThreadLocals(mapping);
 }
 
 void ExecutorContext::bindToThread()
 {
     pthread_setspecific(static_key, this);
-    VOLT_DEBUG("Installing EC(%ld)", (long)this);
+    VOLT_DEBUG("Installing EC(%ld) for partition %d", (long)this, m_partitionId);
 }
 
 ExecutorContext* ExecutorContext::getExecutorContext() {
@@ -141,19 +160,68 @@ UniqueTempTableResult ExecutorContext::executeExecutors(const std::vector<Abstra
     // therefore dependency tracking is not needed here.
     size_t ttl = executorList.size();
     int ctr = 0;
-
+    EngineLocals* ourEngineLocals = NULL;
+    bool needsReleaseLock = false;
     try {
         BOOST_FOREACH (AbstractExecutor *executor, executorList) {
             assert(executor);
-            // Call the execute method to actually perform whatever action
-            // it is that the node is supposed to do...
-            if (!executor->execute(m_staticParams)) {
-                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                    "Unspecified execution error detected");
+            PlanNodeType nextPlanNodeType = executor->getPlanNode()->getPlanNodeType();
+            if (nextPlanNodeType >= PLAN_NODE_TYPE_UPDATE && nextPlanNodeType <= PLAN_NODE_TYPE_DELETE) {
+                AbstractOperationPlanNode* node = dynamic_cast<AbstractOperationPlanNode*>(executor->getPlanNode());
+                assert(node);
+                Table* targetTable = node->getTargetTable();
+                PersistentTable *persistentTarget = dynamic_cast<PersistentTable*>(targetTable);
+                if (persistentTarget != NULL && persistentTarget->isReplicatedTable()) {
+                    if (mpEngineLocals.context == this) {
+                        mpExecutor = executor;
+                    }
+                    if (SynchronizedThreadLock::countDownGlobalTxnStartCount()) {
+                        if (!ourEngineLocals) {
+                            ourEngineLocals = &enginesByPartitionId[m_partitionId];
+                        }
+                        ExecutorContext::assignThreadLocals(mpEngineLocals);
+                        needsReleaseLock = true;
+                        // Call the execute method to actually perform whatever action
+                        // it is that the node is supposed to do...
+                        if (!mpExecutor->execute(m_staticParams)) {
+                            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                               "Unspecified execution error detected");
+                        }
+                        ++ctr;
+                        mpExecutor = NULL;
+                        needsReleaseLock = false;
+                        // Assign the correct pool back to this thread
+                        ExecutorContext::assignThreadLocals(*ourEngineLocals);
+                        SynchronizedThreadLock::signalLastSiteFinished();
+                    } else {
+                        SynchronizedThreadLock::waitForLastSiteFinished();
+                    }
+                } else {
+                    // Call the execute method to actually perform whatever action
+                    // it is that the node is supposed to do...
+                    if (!executor->execute(m_staticParams)) {
+                        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                            "Unspecified execution error detected");
+                    }
+                    ++ctr;
+                }
+            } else {
+                // Call the execute method to actually perform whatever action
+                // it is that the node is supposed to do...
+                if (!executor->execute(m_staticParams)) {
+                    throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                        "Unspecified execution error detected");
+                }
+                ++ctr;
             }
-            ++ctr;
         }
     } catch (const SerializableEEException &e) {
+        if (needsReleaseLock) {
+            // Assign the correct pool back to this thread
+            ExecutorContext::assignThreadLocals(*ourEngineLocals);
+            SynchronizedThreadLock::signalLastSiteFinished();
+        }
+
         // Clean up any tempTables when the plan finishes abnormally.
         // This needs to be the caller's responsibility for normal returns because
         // the caller may want to first examine the final output table.

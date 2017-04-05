@@ -110,6 +110,7 @@
 #include "common/RecoveryProtoMessage.h"
 #include "common/LegacyHashinator.h"
 #include "common/ElasticHashinator.h"
+#include "common/ThreadLocalPool.h"
 #include "storage/DRTupleStream.h"
 #include "murmur3/MurmurHash3.h"
 #include "execution/VoltDBEngine.h"
@@ -262,6 +263,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeIniti
     jint clusterIndex,
     jlong siteId,
     jint partitionId,
+    jint sitesPerHost,
     jint hostId,
     jbyteArray hostname,
     jint drClusterId,
@@ -289,6 +291,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeIniti
         engine->initialize(clusterIndex,
                            siteId,
                            partitionId,
+                           sitesPerHost,
                            hostId,
                            hostString,
                            drClusterId,

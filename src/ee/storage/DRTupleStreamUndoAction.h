@@ -38,6 +38,8 @@ DRTupleStreamUndoAction(AbstractDRTupleStream *stream, size_t mark, size_t cost)
     void release() {
     }
 
+    virtual bool isReplicatedTable() { return false; }
+
 private:
     AbstractDRTupleStream *m_stream;
     size_t m_mark;
