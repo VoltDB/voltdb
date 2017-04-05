@@ -63,7 +63,7 @@ import org.eclipse.jetty.server.SslConnectionFactory;
 import org.eclipse.jetty.server.handler.AbstractHandler;
 import org.eclipse.jetty.server.handler.ContextHandler;
 import org.eclipse.jetty.server.handler.ContextHandlerCollection;
-import org.eclipse.jetty.server.handler.gzip.GzipHandler;
+import org.eclipse.jetty.server.handler.ResourceHandler;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.eclipse.jetty.util.thread.QueuedThreadPool;
 import org.json_voltpatches.JSONArray;
@@ -221,6 +221,13 @@ public class HTTPAdminListener {
                     baseRequest.setHandled(false);
                     return;
                 }
+
+                if (baseRequest.getRequestURI().contains("css")) {
+                    System.out.println("uri" + baseRequest.getRequestURI() + "target: " + target);
+                    baseRequest.setHandled(false);
+                    return;
+                }
+
                 //Send old /studio back to "/"
                 if (baseRequest.getRequestURI().contains("/studio")) {
                     response.sendRedirect("/");
@@ -275,6 +282,7 @@ public class HTTPAdminListener {
 
                     // set the headers
                     response.setContentType(mime);
+//                    response.setHeader("Cache-Control", "max-age=120");
                     response.setStatus(HttpServletResponse.SC_OK);
                     baseRequest.setHandled(true);
 
@@ -325,6 +333,39 @@ public class HTTPAdminListener {
             response.setStatus(HttpServletResponse.SC_OK);
             baseRequest.setHandled(true);
             response.getWriter().print(ddl);
+        }
+
+    }
+
+    class CacheStaticResourceHandler extends ResourceHandler {
+        public CacheStaticResourceHandler() {
+            super();
+            String path = VoltDB.class.getResource("dbmonitor/css").getFile();
+            System.out.println("DBmonitor path" + path);
+            setResourceBase(path);
+            setCacheControl("max-age=1200, public");
+            //setEtags(true);
+        }
+
+        @Override
+        public void handle(String target,
+                           Request baseRequest,
+                           HttpServletRequest request,
+                           HttpServletResponse response)
+                           throws IOException, ServletException {
+
+            super.handle(target, baseRequest, request, response);
+            //if (baseRequest.isHandled()) return;
+            //response.setHeader(HttpHeader.CACHE_CONTROL.toString(), "max-age=1200, public");
+
+            System.out.println("Request not handled " + getResourceBase());
+
+//            byte[] reportbytes = VoltDB.instance().getCatalogContext().getFileInJar("autogen-ddl.sql");
+//            String ddl = new String(reportbytes, Charsets.UTF_8);
+//            response.setContentType("text/plain;charset=utf-8");
+//            response.setStatus(HttpServletResponse.SC_OK);
+//            baseRequest.setHandled(true);
+//            response.getWriter().print(ddl);
         }
 
     }
@@ -1061,16 +1102,24 @@ public class HTTPAdminListener {
             ContextHandler profileRequestHandler = new ContextHandler("/profile");
             profileRequestHandler.setHandler(new UserProfileHandler());
 
-//            ContextHandler imageHandler = new ContextHandler("/images");
-//            GzipHandler imageGzipHandler = new GzipHandler();
-//            imageGzipHandler.setIncludedMimeTypes("image/gif", "image/png", "image/jpeg");
-//            imageHandler.setHandler(imageGzipHandler);
+//            dbMonitorHandler.setInitParameter("cacheControl", "max-age=1200, public");
+//            apiRequestHandler.setInitParameter("cacheControl", "max-age=1200, public");
+//            catalogRequestHandler.setInitParameter("cacheControl", "max-age=1200, public");
+//            ddlRequestHandler.setInitParameter("cacheControl", "max-age=1200, public");
+//            deploymentRequestHandler.setInitParameter("cacheControl", "max-age=1200, public");
+//            profileRequestHandler.setInitParameter("cacheControl", "max-age=1200, public");
 
-
-//            ContextHandler cssHandler = new ContextHandler("/css");
-//            GzipHandler cssGzipHandler = new GzipHandler();
-//            cssGzipHandler.setIncludedMimeTypes("text/css", "application/x-javascript");
-//            cssHandler.setHandler(cssGzipHandler);
+            ///css
+//            ContextHandler cssResourceHandler = new ContextHandler("/css");
+//            ResourceHandler cssResource = new CacheStaticResourceHandler();
+////            cssResource.setResourceBase("/");
+////            cssResource.setDirectoriesListed(true);
+//            cssResource.setEtags(true);
+////            cssResource.setCacheControl("max-age=3600, public");
+//            cssResourceHandler.setHandler(cssResource);
+            ContextHandler cssResourceHandler = new ContextHandler("/css");
+            ResourceHandler cssResource = new CacheStaticResourceHandler();
+//            cssResourceHandler.setHandler(cssResource);
 
 
             ContextHandlerCollection handlers = new ContextHandlerCollection();
@@ -1079,23 +1128,17 @@ public class HTTPAdminListener {
                     catalogRequestHandler,
                     ddlRequestHandler,
                     deploymentRequestHandler,
-                    profileRequestHandler,
-                    dbMonitorHandler
-                    //, compressResourcesHandler
-//                    , imageHandler
-//                    , cssHandler
+                    profileRequestHandler
+                    , dbMonitorHandler
+                    , cssResource
+//                    , cssResourceHandler
                     });
 
-            GzipHandler compressResourcesHandler = new GzipHandler();
-//            compressResourcesHandler.addIncludedPaths("/css");
-//            compressResourcesHandler.addIncludedPaths("/images");
-//            compressResourcesHandler.setMinGzipSize(1);
-//            compressResourcesHandler.setIncludedMimeTypes("image/gif", "image/png", "image/jpeg",
-//                    "text/css", "application/x-javascript");
-            compressResourcesHandler.setHandler(handlers);
+//            GzipHandler compressResourcesHandler = new GzipHandler();
+//            compressResourcesHandler.setHandler(handlers);
 
-            m_server.setHandler(compressResourcesHandler);
-//         m_server.setHandler(handlers);
+//            m_server.setHandler(compressResourcesHandler);
+            m_server.setHandler(handlers);
 
             httpClientInterface.setTimeout(timeout);
             m_jsonEnabled = jsonEnabled;
