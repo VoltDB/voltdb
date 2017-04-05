@@ -1945,6 +1945,7 @@ TEST CASES
         <!-- Fail the build if there were any problems.
              This runs all the tests before failing. -->
         <available file="${build.testoutput.dir}/JUNITHADFAILURES" property="junit.failures"/>
+        <fail if="junit.failures" unless="use_jacoco" message="JUnit had failures" />
     </sequential>
 </macrodef>
 
