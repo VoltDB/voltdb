@@ -29,6 +29,8 @@ import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Random;
 
+import junit.framework.TestCase;
+
 import org.json_voltpatches.JSONException;
 import org.voltdb.TableHelper.RandomTable;
 import org.voltdb.VoltTable.ColumnInfo;
@@ -37,8 +39,7 @@ import org.voltdb.types.GeographyValue;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.CompressionService;
-
-import junit.framework.TestCase;
+import org.voltdb.utils.VoltTableUtil;
 
 public class TestVoltTable extends TestCase {
     private VoltTable LONG_FIVE;
@@ -1433,6 +1434,25 @@ public class TestVoltTable extends TestCase {
             catch (Exception e) {
                 assertTrue((randIndex < 0) || (randIndex >= ROW_COUNT));
             }
+        }
+    }
+
+    public void testTableJava8Streams() {
+        Random rand = new Random(0);
+
+        for (int i = 0; i < 100; i++) {
+            int rowCount = rand.nextInt(2000);
+            TableHelper th = new TableHelper();
+            VoltTable t1 = th.getTotallyRandomTable("foo", true).table;
+            th.randomFill(t1, rowCount, 100);
+
+            assertEquals(rowCount, VoltTableUtil.stream(t1).count());
+
+            VoltTableUtil.stream(t1)
+                .map(r -> r.get(0, r.getColumnType(0)))
+                .map(x -> String.valueOf(x))
+                .map(s -> "Hello:" + s)
+                .forEach(s -> System.out.println(s));
         }
     }
 }

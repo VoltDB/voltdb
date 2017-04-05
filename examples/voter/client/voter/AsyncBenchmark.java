@@ -182,6 +182,7 @@ public class AsyncBenchmark {
             clientConfig.setTrustStoreConfigFromPropertyFile(config.sslfile);
             clientConfig.enableSSL();
         }
+        clientConfig.setMaxTransactionsPerSecond(config.ratelimit);
 
         if (config.topologyaware) {
             clientConfig.setTopologyChangeAware(true);
