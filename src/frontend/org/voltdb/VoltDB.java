@@ -706,6 +706,20 @@ public class VoltDB {
                 referToDocAndExit();
             }
 
+            final File stagedCatalogLocation = new VoltFile(RealVoltDB.getStagedCatalogPath(m_voltdbRoot.getAbsolutePath()));
+            if (stagedCatalogLocation.canRead()){
+                switch (m_startAction){
+                case PROBE:
+                    m_pathToCatalog = stagedCatalogLocation.getAbsolutePath();
+                    break;
+                case INITIALIZE:
+                    // check for startup artifacts will address existence of previous staged catalog
+                    break;
+                default:
+                    hostLog.warn("Staged catalog is present at " + stagedCatalogLocation.getAbsolutePath() + " but is being ignored by the " + m_startAction.toString() + " action.");
+                    break;
+                }
+            }
 
             // ENG-3035 Warn if 'recover' action has a catalog since we won't
             // be using it. Only cover the 'recover' action since 'start' sometimes

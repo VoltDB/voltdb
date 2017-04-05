@@ -49,6 +49,7 @@ public class HostCriteria {
     public final static String ADD_ALLOWED = "addAllowed";
     public final static String SAFE_MODE = "safeMode";
     public final static String TERMINUS_NONCE = "terminusNonce";
+    public final static String STARTUP_CATALOG_HASH = "startupCatalogHash";
 
     public final static UUID UNDEFINED = new UUID(0L,0L);
 
@@ -71,7 +72,8 @@ public class HostCriteria {
                 && jo.has(START_ACTION) && jo.getString(START_ACTION) != null && !jo.getString(START_ACTION).trim().isEmpty()
                 && jo.has(NODE_STATE) && jo.getString(NODE_STATE) != null && !jo.getString(NODE_STATE).trim().isEmpty()
                 && jo.has(HOST_COUNT) && jo.getInt(HOST_COUNT) > 0
-                && (jo.optString(TERMINUS_NONCE, null) == null || !jo.optString(TERMINUS_NONCE).trim().isEmpty());
+                && (jo.optString(TERMINUS_NONCE, null) == null || !jo.optString(TERMINUS_NONCE).trim().isEmpty())
+                && (jo.optString(STARTUP_CATALOG_HASH, null) == null || !jo.optString(STARTUP_CATALOG_HASH).trim().isEmpty());
         } catch (JSONException e) {
             return false;
         }
@@ -92,6 +94,7 @@ public class HostCriteria {
     protected final boolean m_addAllowed;
     protected final boolean m_safeMode;
     protected final String m_terminusNonce;
+    protected final UUID m_startupCatalogHash;
 
     public HostCriteria(JSONObject jo) {
         checkArgument(jo != null, "json object is null");
@@ -106,18 +109,21 @@ public class HostCriteria {
         m_addAllowed = jo.optBoolean(ADD_ALLOWED, false);
         m_safeMode = jo.optBoolean(SAFE_MODE, false);
         m_terminusNonce = jo.optString(TERMINUS_NONCE, null);
+        final String startupCatalogString = jo.optString(STARTUP_CATALOG_HASH, null);
+        m_startupCatalogHash = (startupCatalogString == null) ? null : UUID.fromString(startupCatalogString);
     }
 
     public HostCriteria(boolean paused, UUID configHash, UUID meshHash,
             boolean enterprise, StartAction startAction, boolean bare,
             int hostCount, NodeState nodeState, boolean addAllowed,
-            boolean safeMode, String terminusNonce) {
+            boolean safeMode, String terminusNonce, UUID startupCatalogHash) {
         checkArgument(configHash != null, "config hash is null");
         checkArgument(meshHash != null, "mesh hash is null");
         checkArgument(startAction != null, "start action is null");
         checkArgument(hostCount > 0, "host count %s is less then one", hostCount);
         checkArgument(terminusNonce == null || !terminusNonce.trim().isEmpty(),
                 "terminus should not be blank");
+        // startupCatalogHash may be null
 
         m_paused = paused;
         m_configHash = configHash;
@@ -130,6 +136,7 @@ public class HostCriteria {
         m_addAllowed = addAllowed;
         m_safeMode = safeMode;
         m_terminusNonce = terminusNonce;
+        m_startupCatalogHash = startupCatalogHash;
     }
 
     public boolean isPaused() {
@@ -179,6 +186,10 @@ public class HostCriteria {
         return m_terminusNonce;
     }
 
+    public UUID getStagedCatalogHash() {
+        return m_startupCatalogHash;
+    }
+
     public JSONObject appendTo(JSONObject jo) {
         checkArgument(jo != null, "json object is null");
         try {
@@ -193,8 +204,10 @@ public class HostCriteria {
             jo.put(ADD_ALLOWED, m_addAllowed);
             jo.put(SAFE_MODE, m_safeMode);
             jo.put(TERMINUS_NONCE, m_terminusNonce);
+            jo.put(STARTUP_CATALOG_HASH, m_startupCatalogHash);
         } catch (JSONException e) {
-            Throwables.propagate(e);
+            Throwables.throwIfUnchecked(e);
+            throw new RuntimeException(e);
         }
         return jo;
     }
@@ -235,6 +248,13 @@ public class HostCriteria {
             ilb.add("Servers have different startup snapshots nonces: "
                     + m_terminusNonce + " vs. " + o.m_terminusNonce);
         }
+        if ((m_startupCatalogHash == null) ^ (o.m_startupCatalogHash == null)){
+            ilb.add("Staged catalog is missing on at least one server. "
+                    + "If any server has a staged catalog, all must have identical staged catalogs.");
+        } else if ((m_startupCatalogHash != null) && !m_startupCatalogHash.equals(o.m_startupCatalogHash)){
+            ilb.add("Servers have different staged catalog hashes: "
+                    + m_startupCatalogHash + " vs. " + o.m_startupCatalogHash);
+        }
         return ilb.build();
     }
 
@@ -258,6 +278,8 @@ public class HostCriteria {
                 + ((m_startAction == null) ? 0 : m_startAction.hashCode());
         result = prime * result
                 + ((m_nodeState == null) ? 0 : m_nodeState.hashCode());
+        result = prime * result
+                + ((m_startupCatalogHash == null) ? 0 : m_startupCatalogHash.hashCode());
         return result;
     }
 
@@ -301,6 +323,9 @@ public class HostCriteria {
             return false;
         if (m_nodeState != other.m_nodeState)
             return false;
+        if (m_startupCatalogHash != other.m_startupCatalogHash){
+            return false;
+        }
         return true;
     }
 
@@ -311,6 +336,6 @@ public class HostCriteria {
                 + ", startAction=" + m_startAction + ", bare=" + m_bare
                 + ", hostCount=" + m_hostCount + ", nodeState=" + m_nodeState
                 + ", addAllowed=" + m_addAllowed + ", safeMode=" + m_safeMode
-                + ", terminusNonce=" + m_terminusNonce + "]";
+                + ", terminusNonce=" + m_terminusNonce + ", startupCatalogHash=" + m_startupCatalogHash + "]";
     }
 }

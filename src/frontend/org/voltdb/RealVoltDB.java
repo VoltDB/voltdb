@@ -57,6 +57,7 @@ import java.util.Random;
 import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
+import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -161,6 +162,7 @@ import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.Snapshot;
 import org.voltdb.utils.CLibrary;
 import org.voltdb.utils.CatalogUtil;
+import org.voltdb.utils.Digester;
 import org.voltdb.utils.CatalogUtil.CatalogAndIds;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.HTTPAdminListener;
@@ -822,7 +824,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             hostLog.info(sb.toString());
 
             // config UUID is part of the status tracker that is slated to be an
-            // Information source for an http admun endpoint
+            // Information source for an http admin endpoint
             m_statusTracker = new NodeStateTracker();
 
             if (config.m_startAction == StartAction.INITIALIZE) {
@@ -981,7 +983,18 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
             m_clusterSettings.set(clusterSettings, 1);
 
-            MeshProber.Determination determination = buildClusterMesh(readDepl);
+            InMemoryJarfile stagedCatalogJar = null; // keep this around so it need not be loaded twice
+            UUID startupCatalogHash = null;
+            if (m_pathToStartupCatalog != null){
+                try {
+                    stagedCatalogJar = new InMemoryJarfile(m_pathToStartupCatalog);
+                    startupCatalogHash = Digester.md5AsUUID(stagedCatalogJar.getFullJarBytes());
+                } catch (IOException e){
+                    VoltDB.crashLocalVoltDB("Failed to load staged catalog from " + m_pathToStartupCatalog, false, e);
+                }
+            }
+
+            MeshProber.Determination determination = buildClusterMesh(readDepl, startupCatalogHash);
             if (m_config.m_startAction == StartAction.PROBE) {
                 String action = "Starting a new database cluster";
                 if (determination.startAction.doesRejoin()) {
@@ -993,6 +1006,26 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 }
                 hostLog.info(action);
                 consoleLog.info(action);
+            }
+
+            File stagedCatalogFile = new VoltFile(m_pathToStartupCatalog);
+            if (determination.startAction != StartAction.CREATE){
+                hostLog.info("Staged catalog is not required for " + determination.startAction + " and will be deleted.");
+                if (stagedCatalogFile.delete() == false){
+                    hostLog.warn("Failed to delete staged catalog.");
+                }
+            } else {
+                // Move the staged catalog so that it won't be found next time we "voltdb start"
+                // By putting it in the official catalog's location, we don't have to worry about deleting it.
+                File officialCatalogLocation = new VoltFile(config.m_voltdbRoot, Constants.CONFIG_DIR + CatalogUtil.CATALOG_FILE_NAME);
+                officialCatalogLocation.delete();
+                if (stagedCatalogFile.renameTo(officialCatalogLocation)){
+                    hostLog.info("Moved staged catalog to be the official catalog");
+                    config.m_pathToCatalog = officialCatalogLocation.getAbsolutePath();
+                    m_pathToStartupCatalog = officialCatalogLocation.getAbsolutePath();
+                } else {
+                    hostLog.warn("Unable to move staged catalog to official location");
+                }
             }
 
             m_config.m_startAction = determination.startAction;
@@ -2747,7 +2780,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
      * rejoining, it will return when the node and agreement
      * site are synched to the existing cluster.
      */
-    MeshProber.Determination buildClusterMesh(ReadDeploymentResults readDepl) {
+    MeshProber.Determination buildClusterMesh(ReadDeploymentResults readDepl, UUID startupCatalogHash) {
         final boolean bareAtStartup  = m_config.m_forceVoltdbCreate
                 || pathsWithRecoverableArtifacts(readDepl.deployment).isEmpty();
         setBare(bareAtStartup);
@@ -2776,6 +2809,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 .safeMode(m_config.m_safeMode)
                 .terminusNonce(getTerminusNonce())
                 .missingHostCount(m_config.m_missingHostCount)
+                .startupCatalogHash(startupCatalogHash)
                 .build();
 
         HostAndPort hostAndPort = criteria.getLeader();
