@@ -137,11 +137,11 @@ public class RegressionSuite extends TestCase {
             }
             for (String tableName : tableNames) {
                 try {
-                    client.callProcedure("@AdHoc", "TRUNCATE TABLE " + tableName);
+                    client.callProcedure("@AdHoc", "DELETE FROM " + tableName);
                 }
                 catch (ProcCallException pce) {
-                    if (! pce.getMessage().contains("access rule violation")) {
-                        throw pce;
+                    if (! pce.getMessage().contains("Illegal to modify a materialized view.")) {
+                        fail("Hit an exception when cleaning up tables between tests: " + pce.getMessage());
                     }
                 }
             }
