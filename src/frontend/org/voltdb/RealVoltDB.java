@@ -576,10 +576,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         String voltDbRoot = getVoltDBRootPath(paths.getVoltdbroot());
         String path;
 
-        if ((path = managedPathEmptyCheck(voltDbRoot, getStagedCatalogPath())) != null){
-            nonEmptyPaths.add(path);
-        }
-
         if (!config.m_isEnterprise) {
             return nonEmptyPaths.build();
         }
@@ -2216,12 +2212,16 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             return; // nothing to do
         }
         assert( config.m_userSchema.isFile() ); // this is validated during command line parsing and will be true unless disk faults
-        File stagedCatalogFH = new VoltFile(getStagedCatalogPath());
-        assert( !stagedCatalogFH.exists() || config.m_forceVoltdbCreate ); // managedPathsWithFiles() checks for the staged catalog
+        File stagedCatalog = new VoltFile(getStagedCatalogPath());
+
+        // this check cannot be part of managedPathsWithFiles(), since "voltdb start" can get translated into "voltdb create" after probing the mesh.
+        if (!config.m_forceVoltdbCreate && stagedCatalog.exists() && stagedCatalog.canRead()){
+            VoltDB.crashLocalVoltDB("Staged catalog from \"init\" or a previous database is present, but \"voltdb init --force\" was not specified.");
+        }
         final boolean standalone = true;
         final boolean isXCDR = false;
         VoltCompiler compiler = new VoltCompiler(standalone, isXCDR);
-        if (!compiler.compileFromDDL(stagedCatalogFH.getAbsolutePath(), config.m_userSchema.getAbsolutePath())){
+        if (!compiler.compileFromDDL(stagedCatalog.getAbsolutePath(), config.m_userSchema.getAbsolutePath())){
             VoltDB.crashLocalVoltDB("Could not compile specified schema " + config.m_userSchema, false, null);
         }
     }
