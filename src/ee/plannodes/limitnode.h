@@ -65,7 +65,7 @@ public:
         , offset(0)
         , limitParamIdx(-1)
         , offsetParamIdx(-1)
-        , limitExpression(nullptr)
+        , limitExpression(NULL)
     {
     }
 

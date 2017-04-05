@@ -60,7 +60,7 @@ AbstractJoinPlanNode::AbstractJoinPlanNode()
     , m_wherePredicate()
     , m_joinType(JOIN_TYPE_INVALID)
     , m_outputSchemaPreAgg()
-    , m_tupleSchemaPreAgg(nullptr)
+    , m_tupleSchemaPreAgg(NULL)
 {
 }
 

@@ -73,7 +73,7 @@ public:
 protected:
     AbstractScanPlanNode()
         : m_target_table_name()
-        , m_tcd(nullptr)
+        , m_tcd(NULL)
         , m_predicate()
         , m_isSubQuery(false)
         , m_isEmptyScan(false)
