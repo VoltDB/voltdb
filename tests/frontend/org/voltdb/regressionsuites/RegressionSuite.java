@@ -126,17 +126,20 @@ public class RegressionSuite extends TestCase {
         else {
             Client client = getClient();
             VoltTable tableList = client.callProcedure("@SystemCatalog", "TABLES").getResults()[0];
-            ArrayList<String> tableNames = new ArrayList<String>(tableList.getRowCount());
+            ArrayList<String> tableNames = new ArrayList<>(tableList.getRowCount());
             int tableNameColIdx = tableList.getColumnIndex("TABLE_NAME");
             int tableTypeColIdx = tableList.getColumnIndex("TABLE_TYPE");
             while (tableList.advanceRow()) {
                 String tableType = tableList.getString(tableTypeColIdx);
-                if (tableType.equalsIgnoreCase("TABLE")) {
+                if (! tableType.equalsIgnoreCase("EXPORT")) {
                     tableNames.add(tableList.getString(tableNameColIdx));
                 }
             }
             for (String tableName : tableNames) {
-                client.callProcedure("@AdHoc", "TRUNCATE TABLE " + tableName);
+                try {
+                    client.callProcedure("@AdHoc", "TRUNCATE TABLE " + tableName);
+                }
+                catch (Exception ex) {}
             }
         }
         for (final Client c : m_clients) {
