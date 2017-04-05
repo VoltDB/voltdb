@@ -16,6 +16,7 @@ Administration
 
 ### Configuration
  * [Enable Authentication](EnableAuthentication.md)
+ * [Enable SSL](EnableSSL.md)
  * [Change Durability Settings](ChangeDurabilitySettings.md)
  * [Configure Logging](ConfigureLogging.md)
 
