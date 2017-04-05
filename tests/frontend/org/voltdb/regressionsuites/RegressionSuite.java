@@ -139,7 +139,11 @@ public class RegressionSuite extends TestCase {
                 try {
                     client.callProcedure("@AdHoc", "TRUNCATE TABLE " + tableName);
                 }
-                catch (Exception ex) {}
+                catch (ProcCallException pce) {
+                    if (! pce.getMessage().contains("access rule violation")) {
+                        throw pce;
+                    }
+                }
             }
         }
         for (final Client c : m_clients) {
