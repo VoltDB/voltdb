@@ -1502,7 +1502,7 @@ function loadAdminPage() {
 
     var searchSnapshots = function (e) {
         $('#btnRestore').removeClass('btn').addClass('restoreBtn');
-        $('#tblSearchList').html('<tr style="border:none"><td colspan="3" align="center"><img src="css/resources/images/loader-small.GIF"></td></tr>');
+        $('#tblSearchList').html('<tr style="border:none"><td colspan="3" align="center"><img src="images/loader-small.GIF"></td></tr>');
         voltDbRenderer.GetSnapshotList($('#txtSearchSnapshots').val(), function (snapshotList) {
             var result = '';
             var searchBox = '';
