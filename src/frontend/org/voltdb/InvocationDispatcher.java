@@ -34,7 +34,6 @@ import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -62,7 +61,6 @@ import org.voltdb.AuthSystem.AuthUser;
 import org.voltdb.ClientInterface.ExplainMode;
 import org.voltdb.Consistency.ReadLevel;
 import org.voltdb.SystemProcedureCatalog.Config;
-import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
@@ -100,6 +98,7 @@ import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListenableFutureTask;
+import org.voltdb.utils.VoltTrace;
 
 public final class InvocationDispatcher {
 
@@ -143,7 +142,11 @@ public final class InvocationDispatcher {
     // used to decide if we should shortcut reads
     private final Consistency.ReadLevel m_defaultConsistencyReadLevel;
 
+    private final NTProcedureService m_NTProcedureService;
+
     private final boolean m_isConfiguredForNonVoltDBBackend;
+
+    InternalConnectionHandler m_internalConnectionHandler;
 
     public final static class Builder {
 
@@ -155,6 +158,7 @@ public final class InvocationDispatcher {
         SnapshotDaemon m_snapshotDaemon;
         long m_plannerSiteId;
         long m_siteId;
+        InternalConnectionHandler m_ich;
 
         public Builder cartographer(Cartographer cartographer) {
             m_cartographer = checkNotNull(cartographer, "given cartographer is null");
@@ -196,6 +200,11 @@ public final class InvocationDispatcher {
             return this;
         }
 
+        public Builder internalConnectionHandler(InternalConnectionHandler ich) {
+            m_ich = checkNotNull(ich,"internal connection handler is null");;
+            return this;
+        }
+
         public InvocationDispatcher build() {
             return new InvocationDispatcher(
                     m_cartographer,
@@ -205,7 +214,8 @@ public final class InvocationDispatcher {
                     m_snapshotDaemon,
                     m_replicationRole,
                     m_plannerSiteId,
-                    m_siteId
+                    m_siteId,
+                    m_ich
                     );
         }
     }
@@ -222,7 +232,8 @@ public final class InvocationDispatcher {
             SnapshotDaemon snapshotDaemon,
             ReplicationRole replicationRole,
             long plannerSiteId,
-            long siteId)
+            long siteId,
+            InternalConnectionHandler ich)
     {
         m_siteId = siteId;
         m_plannerSiteId = plannerSiteId;
@@ -240,8 +251,28 @@ public final class InvocationDispatcher {
 
         m_snapshotDaemon = checkNotNull(snapshotDaemon,"given snapshot daemon is null");
 
+        m_internalConnectionHandler = ich;
+
         // try to get the global default setting for read consistency, but fall back to SAFE
         m_defaultConsistencyReadLevel = VoltDB.Configuration.getDefaultReadConsistencyLevel();
+
+        m_NTProcedureService = new NTProcedureService(m_internalConnectionHandler, m_mailbox);
+        // this kicks off the initial NT procedures being loaded
+        notifyNTProcedureServiceOfCatalogUpdate();
+    }
+
+    /**
+     * Tells NTProcedureService to pause before stats get smashed during UAC
+     */
+    void notifyNTProcedureServiceOfPreCatalogUpdate() {
+        m_NTProcedureService.preUpdate();
+    }
+
+    /**
+     * Tells NTProcedureService to reload NT procedures
+     */
+    void notifyNTProcedureServiceOfCatalogUpdate() {
+        m_NTProcedureService.update(m_catalogContext.get());
     }
 
     /*
@@ -281,14 +312,27 @@ public final class InvocationDispatcher {
             InvocationClientHandler handler,
             Connection ccxn,
             AuthUser user,
-            OverrideCheck bypass)
+            OverrideCheck bypass,
+            boolean ntPriority)
     {
         final long nowNanos = System.nanoTime();
                 // Deserialize the client's request and map to a catalog stored procedure
         final CatalogContext catalogContext = m_catalogContext.get();
 
-        String procName = task.getProcName();
-        Procedure catProc = getProcedureFromName(procName, catalogContext);
+        final String procName = task.getProcName();
+        final String threadName = Thread.currentThread().getName(); // Thread name has to be materialized here
+        final StoredProcedureInvocation finalTask = task;
+        final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.CI);
+        if (traceLog != null) {
+            traceLog.add(() -> VoltTrace.meta("process_name", "name", CoreUtils.getHostnameOrAddress()))
+                    .add(() -> VoltTrace.meta("thread_name", "name", threadName))
+                    .add(() -> VoltTrace.meta("thread_sort_index", "sort_index", Integer.toString(1)))
+                    .add(() -> VoltTrace.beginAsync("recvtxn", finalTask.getClientHandle(),
+                                                    "name", procName,
+                                                    "clientHandle", Long.toString(finalTask.getClientHandle())));
+        }
+
+        Procedure catProc = getProcedureFromName(task.getProcName(), catalogContext);
 
         if (catProc == null) {
             String errorMessage = "Procedure " + procName + " was not found";
@@ -351,6 +395,13 @@ public final class InvocationDispatcher {
             }
         }
 
+        // handle non-transactional procedures (INCLUDING NT SYSPROCS)
+        // note that we also need to check for java for now as transactional flag is
+        // only 100% when we're talking Java
+        if ((catProc.getTransactional() == false) && catProc.getHasjava()) {
+            return dispatchNTProcedure(task, user, ccxn, ntPriority);
+        }
+
         if (catProc.getSystemproc()) {
             // COMMUNITY SYSPROC SPECIAL HANDLING
 
@@ -378,9 +429,8 @@ public final class InvocationDispatcher {
             else if ("@SystemInformation".equals(procName)) {
                 return dispatchStatistics(OpsSelector.SYSTEMINFORMATION, task, ccxn);
             }
-            else if ("@GC".equals(procName)) {
-                dispatchSystemGC(handler, task);
-                return null;
+            else if ("@Trace".equals(procName)) {
+                return dispatchStatistics(OpsSelector.TRACE, task, ccxn);
             }
             else if ("@StopNode".equals(procName)) {
                 return dispatchStopNode(task);
@@ -672,40 +722,6 @@ public final class InvocationDispatcher {
         }
     }
 
-    //Run System.gc() in it's own thread because it will block
-    //until collection is complete and we don't want to do that from an application thread
-    //because the collector is partially concurrent and we can still make progress
-    private final ExecutorService m_systemGCThread =
-            CoreUtils.getCachedSingleThreadExecutor("System.gc() invocation thread", 1000);
-
-    private final void dispatchSystemGC(final InvocationClientHandler handler, final StoredProcedureInvocation task) {
-        m_systemGCThread.execute(new Runnable() {
-            @Override
-            public void run() {
-                final long start = System.nanoTime();
-                System.gc();
-                final long duration = System.nanoTime() - start;
-                VoltTable vt = new VoltTable(
-                        new ColumnInfo[] { new ColumnInfo("SYSTEM_GC_DURATION_NANOS", VoltType.BIGINT) });
-                vt.addRow(duration);
-                final ClientResponseImpl response = new ClientResponseImpl(
-                        ClientResponseImpl.SUCCESS,
-                        new VoltTable[] { vt },
-                        null,
-                        task.clientHandle);
-                ByteBuffer buf = ByteBuffer.allocate(response.getSerializedSize() + 4);
-                buf.putInt(buf.capacity() - 4);
-                response.flattenToBuffer(buf).flip();
-
-                ClientInterfaceHandleManager cihm = m_cihm.get(handler.connectionId());
-                if (cihm == null) {
-                    return;
-                }
-                cihm.connection.writeStream().enqueue(buf);
-            }
-        });
-    }
-
     private ClientResponseImpl dispatchStopNode(StoredProcedureInvocation task) {
         Object params[] = task.getParams().toArray();
         if (params.length != 1 || params[0] == null) {
@@ -853,6 +869,20 @@ public final class InvocationDispatcher {
         buf.flip();
         ccxn.writeStream().enqueue(buf);
         return null;
+    }
+
+    public final ClientResponseImpl dispatchNTProcedure(StoredProcedureInvocation task,
+                                                         AuthUser user,
+                                                         Connection ccxn,
+                                                         boolean ntPriority)
+    {
+        ParameterSet paramSet = task.getParams();
+        return m_NTProcedureService.callProcedureNT(user,
+                                                    ccxn,
+                                                    task.clientHandle,
+                                                    ntPriority,
+                                                    task.getProcName(),
+                                                    paramSet);
     }
 
     private final void dispatchAdHoc(StoredProcedureInvocation task, InvocationClientHandler handler,
@@ -1095,7 +1125,7 @@ public final class InvocationDispatcher {
         // shutdown save snapshot is available for Pro edition only
         if (!MiscUtils.isPro()) {
             task.setParams();
-            return dispatch(task, handler, ccxn, user, bypass);
+            return dispatch(task, handler, ccxn, user, bypass, false);
         }
 
         Object p0 = task.getParams().getParam(0);
@@ -1211,7 +1241,7 @@ public final class InvocationDispatcher {
                 }
                 consoleLog.info("Snapshot taken successfully");
                 task.setParams();
-                dispatch(task, alternateHandler, alternateAdapter, user, bypass);
+                dispatch(task, alternateHandler, alternateAdapter, user, bypass, false);
             }
         };
 
@@ -1370,7 +1400,7 @@ public final class InvocationDispatcher {
                         return;
                     }
                     m_catalogContext.set(VoltDB.instance().getCatalogContext());
-                    dispatch(task, alternateHandler, alternateAdapter, user, bypass);
+                    dispatch(task, alternateHandler, alternateAdapter, user, bypass, false);
                 }
             },
             CoreUtils.SAMETHREADEXECUTOR);
@@ -1401,6 +1431,13 @@ public final class InvocationDispatcher {
     private final void dispatchAdHocCommon(StoredProcedureInvocation task,
             InvocationClientHandler handler, Connection ccxn, ExplainMode explainMode,
             String sql, Object[] userParams, Object[] userPartitionKey, AuthSystem.AuthUser user) {
+        final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.CI);
+        if (traceLog != null) {
+            traceLog.add(() -> VoltTrace.beginAsync("planadhoc", task.getClientHandle(),
+                                                    "clientHandle", Long.toString(task.getClientHandle()),
+                                                    "sql", sql));
+        }
+
         List<String> sqlStatements = SQLLexer.splitStatements(sql);
         String[] stmtsArray = sqlStatements.toArray(new String[sqlStatements.size()]);
 
@@ -1451,6 +1488,11 @@ public final class InvocationDispatcher {
                 if (result instanceof AdHocPlannedStmtBatch) {
                     final AdHocPlannedStmtBatch plannedStmtBatch = (AdHocPlannedStmtBatch) result;
                     ExplainMode explainMode = plannedStmtBatch.getExplainMode();
+
+                    final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.CI);
+                    if (traceLog != null) {
+                        traceLog.add(() -> VoltTrace.endAsync("planadhoc", plannedStmtBatch.clientHandle));
+                    }
 
                     // assume all stmts have the same catalog version
                     if ((plannedStmtBatch.getPlannedStatementCount() > 0) &&
@@ -1864,6 +1906,17 @@ public final class InvocationDispatcher {
                     connectionId,
                     isForReplay);
 
+        Long finalInitiatorHSId = initiatorHSId;
+        final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.CI);
+        if (traceLog != null) {
+            traceLog.add(() -> VoltTrace.instantAsync("inittxn",
+                                                      invocation.getClientHandle(),
+                                                      "clientHandle", Long.toString(invocation.getClientHandle()),
+                                                      "ciHandle", Long.toString(handle),
+                                                      "partition", Integer.toString(partition),
+                                                      "dest", CoreUtils.hsIdToString(finalInitiatorHSId)));
+        }
+
         Iv2Trace.logCreateTransaction(workRequest);
         m_mailbox.send(initiatorHSId, workRequest);
         return true;
@@ -1935,5 +1988,26 @@ public final class InvocationDispatcher {
 
     private final static ClientResponseImpl serverUnavailableResponse(String msg, long handle) {
         return new ClientResponseImpl(ClientResponseImpl.SERVER_UNAVAILABLE, new VoltTable[0], msg, handle);
+    }
+
+    /**
+     * Currently passes failure notices to NTProcedureService
+     */
+    void handleFailedHosts(Set<Integer> failedHosts) {
+        m_NTProcedureService.handleCallbacksForFailedHosts(failedHosts);
+    }
+
+    /**
+     * Passes responses to NTProcedureService
+     */
+    public void handleAllHostNTProcedureResponse(ClientResponseImpl clientResponseData) {
+        long handle = clientResponseData.getClientHandle();
+        ProcedureRunnerNT runner = m_NTProcedureService.m_outstanding.get(handle);
+        runner.allHostNTProcedureCallback(clientResponseData);
+    }
+
+    /** test only */
+    long countNTWaitingProcs() {
+        return m_NTProcedureService.m_outstanding.size();
     }
 }

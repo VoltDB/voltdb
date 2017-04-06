@@ -91,7 +91,7 @@ public class Iv2TransactionCreator implements TransactionCreator
         };
 
         AuthUser admin = m_ci.getCatalogContext().authSystem.getInternalAdminUser();
-        return m_ci.getDispatcher().dispatch(invocation, handler, connection, admin, bypass);
+        return m_ci.getDispatcher().dispatch(invocation, handler, connection, admin, bypass, false);
     }
 
     @Override

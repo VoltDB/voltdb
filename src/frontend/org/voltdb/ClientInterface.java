@@ -83,6 +83,7 @@ import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.client.ClientAuthScheme;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ProcedureCallback;
 import org.voltdb.client.TLSHandshaker;
 import org.voltdb.common.Constants;
 import org.voltdb.dtxn.InitiatorStats.InvocationInfo;
@@ -95,6 +96,7 @@ import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.LocalMailbox;
 import org.voltdb.security.AuthenticationRequest;
 import org.voltdb.utils.MiscUtils;
+import org.voltdb.utils.VoltTrace;
 
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.base.Predicate;
@@ -117,6 +119,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
     //Same as in Distributer.java
     public static final long ASYNC_TOPO_HANDLE = Long.MAX_VALUE - 1;
+    //Notify clients to update procedure info cache for client affinity
+    public static final long ASYNC_PROC_HANDLE = Long.MAX_VALUE - 2;
 
     // reasons a connection can fail
     public static final byte AUTHENTICATION_FAILURE = Constants.AUTHENTICATION_FAILURE;
@@ -141,11 +145,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     public static final long DR_DISPATCHER_CID          = Long.MIN_VALUE + 7;
     public static final long RESTORE_SCHEMAS_CID        = Long.MIN_VALUE + 8;
     public static final long SHUTDONW_SAVE_CID          = Long.MIN_VALUE + 9;
+    public static final long NT_REMOTE_PROC_CID         = Long.MIN_VALUE + 10;
 
     // Leave CL_REPLAY_BASE_CID at the end, it uses this as a base and generates more cids
     // PerPartition cids
     private static long setBaseValue(int offset) { return offset << 14; }
-    public static final long CL_REPLAY_BASE_CID         = Long.MIN_VALUE + setBaseValue(1);
+    public static final long CL_REPLAY_BASE_CID                = Long.MIN_VALUE + setBaseValue(1);
     public static final long DR_REPLICATION_SNAPSHOT_BASE_CID  = Long.MIN_VALUE + setBaseValue(2);
     public static final long DR_REPLICATION_NORMAL_BASE_CID    = Long.MIN_VALUE + setBaseValue(3);
     public static final long DR_REPLICATION_MP_BASE_CID        = Long.MIN_VALUE + setBaseValue(4);
@@ -196,7 +201,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
     private final Cartographer m_cartographer;
 
-    //Dispatched strore procedure invocations
+    //Dispatched stored procedure invocations
     private final InvocationDispatcher m_dispatcher;
 
     /*
@@ -977,6 +982,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     delta,
                     clientResponse.getStatus());
 
+            final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.CI);
+            if (traceLog != null) {
+                traceLog.add(() -> VoltTrace.endAsync("recvtxn",
+                                                      clientData.m_clientHandle,
+                                                      "status", Byte.toString(clientResponse.getStatus()),
+                                                      "statusString", clientResponse.getStatusString()));
+            }
+
             clientResponse.setClientHandle(clientData.m_clientHandle);
             clientResponse.setClusterRoundtrip((int)TimeUnit.NANOSECONDS.toMillis(delta));
             clientResponse.setHash(null); // not part of wire protocol
@@ -1155,7 +1168,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
 
         m_mailbox = new LocalMailbox(messenger,  messenger.getHSIdForLocalSite(HostMessenger.CLIENT_INTERFACE_SITE_ID)) {
+            /** m_d only used in test */
             LinkedBlockingQueue<VoltMessage> m_d = new LinkedBlockingQueue<VoltMessage>();
+
             @Override
             public void deliver(final VoltMessage message) {
                 if (message instanceof InitiateResponseMessage) {
@@ -1163,6 +1178,17 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     // forward response; copy is annoying. want slice of response.
                     InitiateResponseMessage response = (InitiateResponseMessage)message;
                     StoredProcedureInvocation invocation = response.getInvocation();
+
+                    // handle all host NT procedure callbacks
+                    if (response.getClientConnectionId() == NT_REMOTE_PROC_CID) {
+                        //int hostId = VoltDB.instance().getHostMessenger().getHostId();
+                        //System.out.printf("HostID %d got a response from an all-host NT proc\n", hostId);
+                        //System.out.flush();
+
+                        m_dispatcher.handleAllHostNTProcedureResponse(response.getClientResponseData());
+                        return;
+                    }
+
                     Iv2Trace.logFinishTransaction(response, m_mailbox.getHSId());
                     ClientInterfaceHandleManager cihm = m_cihm.get(response.getClientConnectionId());
                     Procedure procedure = null;
@@ -1178,13 +1204,49 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         //Only the network can use the CIHM
                         cihm.connection.writeStream().fastEnqueue(new ClientResponseWork(response, cihm, procedure));
                     }
-                } else if (message instanceof BinaryPayloadMessage) {
+                }
+                else if (message instanceof BinaryPayloadMessage) {
                     handlePartitionFailOver((BinaryPayloadMessage)message);
-                } else {
+                }
+                /*
+                 * InitiateTaskMessage only get delivered here for all-host NT proc calls.
+                 */
+                else if (message instanceof Iv2InitiateTaskMessage) {
+                    final Iv2InitiateTaskMessage itm = (Iv2InitiateTaskMessage) message;
+                    final StoredProcedureInvocation invocation = itm.getStoredProcedureInvocation();
+
+                    // get hostid for this node
+                    final int hostId = CoreUtils.getHostIdFromHSId(m_mailbox.getHSId());
+
+                    final ProcedureCallback cb = new ProcedureCallback() {
+                        @Override
+                        public void clientCallback(ClientResponse clientResponse) throws Exception {
+                            InitiateResponseMessage responseMessage = new InitiateResponseMessage(itm);
+                            // use the app status string to store the host id (as a string)
+                            // ProcedureRunnerNT has a method that expects this hack
+                            ((ClientResponseImpl) clientResponse).setAppStatusString(String.valueOf(hostId));
+                            responseMessage.setResults((ClientResponseImpl) clientResponse);
+                            responseMessage.setClientHandle(invocation.clientHandle);
+                            responseMessage.setConnectionId(NT_REMOTE_PROC_CID);
+                            m_mailbox.send(itm.m_sourceHSId, responseMessage);
+                        }
+                    };
+
+                    m_internalConnectionHandler.callProcedure(m_catalogContext.get().authSystem.getInternalAdminUser(),
+                                                              true,
+                                                              1000 * 120,
+                                                              cb,
+                                                              true, // priority NT
+                                                              invocation.getProcName(),
+                                                              itm.getParameters());
+                }
+                else {
+                    // m_d is for test only
                     m_d.offer(message);
                 }
             }
 
+            /** This method only used in test */
             @Override
             public VoltMessage recv() {
                 return m_d.poll();
@@ -1195,6 +1257,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         m_zk = messenger.getZK();
         m_siteId = m_mailbox.getHSId();
 
+        m_executeTaskAdpater = new SimpleClientResponseAdapter(ClientInterface.EXECUTE_TASK_CID, "ExecuteTaskAdapter", true);
+        bindAdapter(m_executeTaskAdpater, null);
+
         m_dispatcher = InvocationDispatcher.builder()
                 .snapshotDaemon(m_snapshotDaemon)
                 .replicationRole(replicationRole)
@@ -1204,10 +1269,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 .clientInterfaceHandleManagerMap(m_cihm)
                 .plannerSiteId(m_plannerSiteId)
                 .siteId(m_siteId)
+                .internalConnectionHandler(m_internalConnectionHandler)
                 .build();
-
-        m_executeTaskAdpater = new SimpleClientResponseAdapter(ClientInterface.EXECUTE_TASK_CID, "ExecuteTaskAdapter", true);
-        bindAdapter(m_executeTaskAdpater, null);
     }
 
     private InternalClientResponseAdapter createInternalAdapter(int pid) {
@@ -1383,6 +1446,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
          */
         if (VoltDB.instance().getMode() != OperationMode.INITIALIZING) {
             mayActivateSnapshotDaemon();
+
+            //add a notification to client right away
+            StoredProcedureInvocation spi = new StoredProcedureInvocation();
+            spi.setProcName("@SystemCatalog");
+            spi.setParams("PROCEDURES");
+            spi.setClientHandle(ASYNC_PROC_HANDLE);
+            notifyClients(m_currentProcValues,m_currentProcSupplier,
+                           spi, OpsSelector.SYSTEMCATALOG);
         }
     }
 
@@ -1421,7 +1492,19 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             return errorResponse(ccxn, task.clientHandle, ClientResponse.UNEXPECTED_FAILURE, errorMessage, null, false);
         }
 
-        return m_dispatcher.dispatch(task, handler, ccxn, user, null);
+        final ClientResponseImpl errResp = m_dispatcher.dispatch(task, handler, ccxn, user, null, false);
+
+        if (errResp != null) {
+            final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.CI);
+            if (traceLog != null) {
+                traceLog.add(() -> VoltTrace.endAsync("recvtxn",
+                                                      task.getClientHandle(),
+                                                      "status", Byte.toString(errResp.getStatus()),
+                                                      "statusString", errResp.getStatusString()));
+            }
+        }
+
+        return errResp;
     }
 
     public Procedure getProcedureFromName(String procName, CatalogContext catalogContext) {
@@ -1471,25 +1554,53 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
     };
 
+    private final AtomicReference<DeferredSerialization> m_currentProcValues = new AtomicReference<>(null);
+    private final Supplier<DeferredSerialization> m_currentProcSupplier = new Supplier<DeferredSerialization>() {
+        @Override
+        public DeferredSerialization get() {
+            return m_currentProcValues.get();
+        }
+    };
+
     /*
      * A predicate to allow the client notifier to skip clients
      * that don't want a specific kind of update
      */
     private final Predicate<ClientInterfaceHandleManager> m_wantsTopologyUpdatesPredicate =
             new Predicate<ClientInterfaceHandleManager>() {
-                @Override
-                public boolean apply(ClientInterfaceHandleManager input) {
-                    return input.wantsTopologyUpdates();
-                }};
+        @Override
+        public boolean apply(ClientInterfaceHandleManager input) {
+            return input.wantsTopologyUpdates();
+        }
+    };
 
     /*
-     * Submit a task to the stats agent to retrieve the topology. Supply a dummy
+     * Submit a task to the stats agent to retrieve the topology and procedures. Supply a dummy
      * client response adapter to fake a connection. The adapter converts the response
      * to a listenable future and we add a listener to pick up the resulting topology
      * and check if it has changed. If it has changed, queue a task to the notifier
      * to propagate the update to clients.
      */
     private void checkForTopologyChanges() {
+        StoredProcedureInvocation spi = new StoredProcedureInvocation();
+        spi.setProcName("@Statistics");
+        spi.setParams("TOPO", 0);
+        spi.setClientHandle(ASYNC_TOPO_HANDLE);
+        notifyClients(m_currentTopologyValues,m_currentTopologySupplier,
+                         spi, OpsSelector.STATISTICS);
+
+        spi = new StoredProcedureInvocation();
+        spi.setProcName("@SystemCatalog");
+        spi.setParams("PROCEDURES");
+        spi.setClientHandle(ASYNC_PROC_HANDLE);
+        notifyClients(m_currentProcValues,m_currentProcSupplier,
+                        spi, OpsSelector.SYSTEMCATALOG);
+    }
+
+    private void notifyClients( AtomicReference<DeferredSerialization> values,
+                                Supplier<DeferredSerialization> supplier,
+                                StoredProcedureInvocation spi,
+                                OpsSelector selector) {
         final Pair<SimpleClientResponseAdapter, ListenableFuture<ClientResponseImpl>> p =
                 SimpleClientResponseAdapter.getAsListenableFuture();
         final ListenableFuture<ClientResponseImpl> fut = p.getSecond();
@@ -1499,7 +1610,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 try {
                     final ClientResponseImpl r = fut.get();
                     if (r.getStatus() != ClientResponse.SUCCESS) {
-                        hostLog.warn("Received error response retrieving topology: " + r.getStatusString());
+                        hostLog.warn("Received error response retrieving stats info: " + r.getStatusString());
                         return;
                     }
 
@@ -1511,18 +1622,17 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
                     //Check for no change
                     ByteBuffer oldValue = null;
-                    DeferredSerialization ds = m_currentTopologyValues.get();
+                    DeferredSerialization ds = values.get();
                     if (ds != null) {
                         oldValue = ByteBuffer.allocate(ds.getSerializedSize());
                         ds.serialize(oldValue);
                         oldValue.flip();
+                        if (buf.equals(oldValue)) {
+                            return;
+                        }
                     }
 
-                    if (buf.equals(oldValue)) {
-                        return;
-                    }
-
-                    m_currentTopologyValues.set(new DeferredSerialization() {
+                    values.set(new DeferredSerialization() {
                         @Override
                         public void serialize(ByteBuffer outbuf) throws IOException {
                             outbuf.put(buf.duplicate());
@@ -1531,27 +1641,20 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         public void cancel() {}
 
                         @Override
-                        public int getSerializedSize() {
-                            return buf.remaining();
-                        }
+                        public int getSerializedSize() {return buf.remaining();}
                     });
                     if (oldValue != null) {
                         m_notifier.queueNotification(
                                 m_cihm.values(),
-                                m_currentTopologySupplier,
+                                supplier,
                                 m_wantsTopologyUpdatesPredicate);
                     }
-
                 } catch (Throwable t) {
-                    hostLog.error("Error checking for topology updates", Throwables.getRootCause(t));
+                    hostLog.error("Error checking for updates", Throwables.getRootCause(t));
                 }
             }
         }, CoreUtils.SAMETHREADEXECUTOR);
-        final StoredProcedureInvocation spi = new StoredProcedureInvocation();
-        spi.setProcName("@Statistics");
-        spi.setParams("TOPO", 0);
-        spi.setClientHandle(ASYNC_TOPO_HANDLE);
-        InvocationDispatcher.dispatchStatistics(OpsSelector.STATISTICS, spi, p.getFirst());
+        InvocationDispatcher.dispatchStatistics(selector, spi, p.getFirst());
     }
 
     private static final long CLIENT_HANGUP_TIMEOUT = Long.getLong("CLIENT_HANGUP_TIMEOUT", 30000);
@@ -2008,5 +2111,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
     public AuthUser getInternalUser() {
         return m_catalogContext.get().authSystem.getInternalAdminUser();
+    }
+
+    void handleFailedHosts(Set<Integer> failedHosts) {
+        m_dispatcher.handleFailedHosts(failedHosts);
     }
 }

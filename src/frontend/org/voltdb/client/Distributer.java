@@ -74,6 +74,7 @@ import org.voltdb.common.Constants;
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableSet;
+import com.google_voltpatches.common.collect.ImmutableSortedMap;
 import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.collect.Sets;
 
@@ -90,6 +91,7 @@ class Distributer {
     static int RESUBSCRIPTION_DELAY_MS = Integer.getInteger("RESUBSCRIPTION_DELAY_MS", 10000);
     static final long PING_HANDLE = Long.MAX_VALUE;
     public static final Long ASYNC_TOPO_HANDLE = PING_HANDLE - 1;
+    public static final Long ASYNC_PROC_HANDLE = PING_HANDLE - 2;
     static final long USE_DEFAULT_CLIENT_TIMEOUT = 0;
     static long PARTITION_KEYS_INFO_REFRESH_FREQUENCY = Long.getLong("PARTITION_KEYS_INFO_REFRESH_FREQUENCY", 1000);
 
@@ -134,8 +136,8 @@ class Distributer {
     private final Map<Integer, NodeConnection> m_partitionMasters = new HashMap<>();
     private final Map<Integer, NodeConnection[]> m_partitionReplicas = new HashMap<>();
     private final Map<Integer, NodeConnection> m_hostIdToConnection = new HashMap<>();
-    private final Map<String, Procedure> m_procedureInfo = new HashMap<>();
-
+    private final AtomicReference<ImmutableSortedMap<String, Procedure>> m_procedureInfo =
+                                new AtomicReference<ImmutableSortedMap<String, Procedure>>();
     private final AtomicReference<ImmutableSet<Integer>> m_partitionKeys = new AtomicReference<ImmutableSet<Integer>>();
     private final AtomicLong m_lastPartitionKeyFetched = new AtomicLong(0);
     private final AtomicReference<ClientResponse> m_partitionUpdateStatus = new AtomicReference<ClientResponse>();
@@ -663,6 +665,14 @@ class Distributer {
                 }
 
                 return;
+            } else if (handle == ASYNC_PROC_HANDLE) {
+                ProcedureCallback cb = new ProcUpdateCallback();
+                try {
+                    cb.clientCallback(response);
+                } catch (Exception e) {
+                    uncaughtException(cb, response, e);
+                }
+                return;
             }
 
             //Race with expiration thread to be the first to remove the callback
@@ -1142,7 +1152,11 @@ class Distributer {
              * affinity and known topology (hashinator initialized).
              */
             if (m_useClientAffinity && (m_hashinator != null)) {
-                final Procedure procedureInfo = m_procedureInfo.get(invocation.getProcName());
+                final ImmutableSortedMap<String, Procedure> procedures = m_procedureInfo.get();
+                Procedure procedureInfo = null;
+                if (procedures != null) {
+                    procedureInfo = procedures.get(invocation.getProcName());
+                }
                 Integer hashedPartition = -1;
 
                 if (procedureInfo != null) {
@@ -1455,7 +1469,7 @@ class Distributer {
     }
 
     private void updateProcedurePartitioning(VoltTable vt) {
-        m_procedureInfo.clear();
+        Map<String, Procedure> procs = Maps.newHashMap();
         while (vt.advanceRow()) {
             try {
                 //Data embedded in JSON object in remarks column
@@ -1467,11 +1481,11 @@ class Distributer {
                     int partitionParameter = jsObj.getInt(Constants.JSON_PARTITION_PARAMETER);
                     int partitionParameterType =
                         jsObj.getInt(Constants.JSON_PARTITION_PARAMETER_TYPE);
-                    m_procedureInfo.put(procedureName,
+                    procs.put(procedureName,
                             new Procedure(false,readOnly, partitionParameter, partitionParameterType));
                 } else {
                     // Multi Part procedure JSON descriptors omit the partitionParameter
-                    m_procedureInfo.put(procedureName, new Procedure(true, readOnly, Procedure.PARAMETER_NONE,
+                    procs.put(procedureName, new Procedure(true, readOnly, Procedure.PARAMETER_NONE,
                                 Procedure.PARAMETER_NONE));
                 }
 
@@ -1479,6 +1493,8 @@ class Distributer {
                 e.printStackTrace();
             }
         }
+        ImmutableSortedMap<String, Procedure> oldProcs = m_procedureInfo.get();
+        m_procedureInfo.compareAndSet(oldProcs, ImmutableSortedMap.copyOf(procs));
     }
 
     private void updatePartitioning(VoltTable vt) {

@@ -116,7 +116,8 @@ public interface SiteProcedureConnection {
             long txnId,
             long spHandle,
             long uniqueId,
-            boolean readOnly) throws EEException;
+            boolean readOnly,
+            boolean traceOn) throws EEException;
 
     /**
      * Let the EE know which batch of sql is running so it can include this

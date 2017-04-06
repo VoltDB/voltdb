@@ -347,6 +347,7 @@ void VoltDBEngine::serializeTable(int32_t tableId, SerializeOutput& out) const {
  * @param uniqueId              The unique id, taken directly from the JNI call.
  * @param undoToken             The undo token, taken directly from
  *                              the JNI call
+ * @param traceOn               True to turn per-transaction tracing on.
  */
 int VoltDBEngine::executePlanFragments(int32_t numFragments,
                                        int64_t planfragmentIds[],
@@ -356,7 +357,9 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
                                        int64_t spHandle,
                                        int64_t lastCommittedSpHandle,
                                        int64_t uniqueId,
-                                       int64_t undoToken) {
+                                       int64_t undoToken,
+                                       bool traceOn)
+{
     // count failures
     int failures = 0;
 
@@ -367,7 +370,8 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
                                              txnId,
                                              spHandle,
                                              lastCommittedSpHandle,
-                                             uniqueId);
+                                             uniqueId,
+                                             traceOn);
 
     m_executorContext->checkTransactionForDR();
 
@@ -406,7 +410,8 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
         if (executePlanFragment(planfragmentIds[m_currentIndexInBatch],
                                 inputDependencyIds ? inputDependencyIds[m_currentIndexInBatch] : -1,
                                 m_currentIndexInBatch == 0,
-                                m_currentIndexInBatch == (numFragments - 1))) {
+                                m_currentIndexInBatch == (numFragments - 1),
+                                traceOn)) {
             ++failures;
         }
         if (perFragmentTimingEnabled) {
@@ -434,7 +439,9 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
 int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
                                       int64_t inputDependencyId,
                                       bool first,
-                                      bool last) {
+                                      bool last,
+                                      bool traceOn)
+{
     assert(planfragmentId != 0);
 
     m_currentInputDepId = static_cast<int32_t>(inputDependencyId);
@@ -1154,7 +1161,8 @@ VoltDBEngine::loadTable(int32_t tableId,
                                              txnId,
                                              spHandle,
                                              lastCommittedSpHandle,
-                                             uniqueId);
+                                             uniqueId,
+                                             false);
 
     Table* ret = getTableById(tableId);
     if (ret == NULL) {
@@ -1965,7 +1973,8 @@ int64_t VoltDBEngine::applyBinaryLog(int64_t txnId,
                                              txnId,
                                              spHandle,
                                              lastCommittedSpHandle,
-                                             uniqueId);
+                                             uniqueId,
+                                             false);
 
     int64_t rowCount = m_wrapper.apply(log, m_tablesBySignatureHash, &m_stringPool, this, remoteClusterId);
     return rowCount;

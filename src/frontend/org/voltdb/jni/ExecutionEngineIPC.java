@@ -954,7 +954,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             final long spHandle,
             final long lastCommittedSpHandle,
             final long uniqueId,
-            final long undoToken) throws EEException {
+            final long undoToken, boolean traceOn) throws EEException {
         sendPlanFragmentsInvocation(Commands.QueryPlanFragments,
                 numFragmentIds, planFragmentIds, inputDepIds, parameterSets, txnId,
                 spHandle, lastCommittedSpHandle, uniqueId, undoToken);
