@@ -135,16 +135,16 @@ public:
         m_engine.reset(new voltdb::VoltDBEngine(m_topend.get()));
 
         m_parameter_buffer.reset(new char[m_smallBufferSize]);
-	::memset(m_parameter_buffer.get(), 0, m_smallBufferSize);
+        ::memset(m_parameter_buffer.get(), 0, m_smallBufferSize);
 
         m_per_fragment_stats_buffer.reset(new char[m_smallBufferSize]);
-	::memset(m_per_fragment_stats_buffer.get(), 0, m_smallBufferSize);
+        ::memset(m_per_fragment_stats_buffer.get(), 0, m_smallBufferSize);
 
         m_result_buffer.reset(new char[m_resultBufferSize]);
-	::memset(m_result_buffer.get(), 0, m_resultBufferSize);
+        ::memset(m_result_buffer.get(), 0, m_resultBufferSize);
 
         m_exception_buffer.reset(new char[m_smallBufferSize]);
-	::memset(m_exception_buffer.get(), 0, m_smallBufferSize);
+        ::memset(m_exception_buffer.get(), 0, m_smallBufferSize);
 
         m_engine->setBuffers(m_parameter_buffer.get(), m_smallBufferSize,
                              m_per_fragment_stats_buffer.get(), m_smallBufferSize,

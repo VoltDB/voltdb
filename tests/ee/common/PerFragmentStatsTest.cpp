@@ -72,8 +72,8 @@ protected:
         ASSERT_EQ(valueA, voltdb::ValuePeeker::peekInteger(tuple.getNValue(0)));
         ASSERT_EQ(valueB, voltdb::ValuePeeker::peekDouble(tuple.getNValue(1)));
 
-	int32_t length = 0;
-	const char* data = voltdb::ValuePeeker::peekObject(tuple.getNValue(2), &length);
+        int32_t length = 0;
+        const char* data = voltdb::ValuePeeker::peekObject(tuple.getNValue(2), &length);
         ASSERT_EQ(0, strncmp(valueC, data, length));
     }
 
