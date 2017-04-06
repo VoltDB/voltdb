@@ -565,6 +565,9 @@ public class StatsAgent extends OpsAgent
         case DRROLE:
             stats = collectStats(StatsSelector.DRROLE, false);
             break;
+        case GC:
+            stats = collectStats(StatsSelector.GC, interval);
+            break;
         default:
             // Should have been successfully groomed in collectStatsImpl().  Log something
             // for our information but let the null check below return harmlessly
