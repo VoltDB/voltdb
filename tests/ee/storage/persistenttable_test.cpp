@@ -92,7 +92,8 @@ protected:
             0,  // txn id
             0,  // sp handle
             0,  // last committed sp handle
-            m_uniqueId);
+            m_uniqueId,
+            false);
         // DR timestamp discards the low 14 bits of the unique ID,
         // so we must increment by this amount to produce a new DR
         // timestamp next time around.

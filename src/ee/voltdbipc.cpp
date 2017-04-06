@@ -802,7 +802,8 @@ void VoltDBIPC::executePlanFragments(struct ipc_command *cmd) {
                                                 ntohll(queryCommand->spHandle),
                                                 ntohll(queryCommand->lastCommittedSpHandle),
                                                 ntohll(queryCommand->uniqueId),
-                                                ntohll(queryCommand->undoToken));
+                                                ntohll(queryCommand->undoToken),
+                                                false);
     }
     catch (const FatalException &e) {
         crashVoltDB(e);

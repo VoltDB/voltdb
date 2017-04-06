@@ -40,7 +40,9 @@ import org.voltdb.planner.ActivePlanRepository;
 import org.voltdb.rejoin.TaskLog;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.LogKeys;
+import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltTableUtil;
+import org.voltdb.utils.VoltTrace;
 
 public class FragmentTask extends TransactionTask
 {
@@ -89,11 +91,26 @@ public class FragmentTask extends TransactionTask
     }
 
     @Override
+    protected void durabilityTraceEnd() {
+        final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.SPI);
+        if (traceLog != null) {
+            traceLog.add(() -> VoltTrace.endAsync("durability",
+                                                  MiscUtils.hsIdTxnIdToString(m_initiator.getHSId(), m_fragmentMsg.getSpHandle())));
+        }
+    }
+
+    @Override
     public void run(SiteProcedureConnection siteConnection)
     {
         waitOnDurabilityBackpressureFuture();
         if (hostLog.isDebugEnabled()) {
             hostLog.debug("STARTING: " + this);
+        }
+        final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.SPSITE);
+        if (traceLog != null) {
+            traceLog.add(() -> VoltTrace.beginDuration("runfragmenttask",
+                                                       "txnId", TxnEgo.txnIdToString(getTxnId()),
+                                                       "partition", Integer.toString(siteConnection.getCorrespondingPartitionId())));
         }
 
         // if this has a procedure name from the initiation bundled,
@@ -132,6 +149,9 @@ public class FragmentTask extends TransactionTask
 
         if (hostLog.isDebugEnabled()) {
             hostLog.debug("COMPLETE: " + this);
+        }
+        if (traceLog != null) {
+            traceLog.add(VoltTrace::endDuration);
         }
     }
 
@@ -294,7 +314,8 @@ public class FragmentTask extends TransactionTask
                         m_txnState.txnId,
                         m_txnState.m_spHandle,
                         m_txnState.uniqueId,
-                        m_txnState.isReadOnly())[0];
+                        m_txnState.isReadOnly(),
+                        VoltTrace.log(VoltTrace.Category.EE) != null)[0];
 
                 if (hostLog.isTraceEnabled()) {
                     hostLog.l7dlog(Level.TRACE,

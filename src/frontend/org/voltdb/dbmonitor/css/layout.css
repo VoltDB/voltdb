@@ -321,9 +321,8 @@ html, body {
 
     .headLeft .logo {
         float: left;
-        width: 85px;
         padding: 8px 0 0 0;
-		margin-right:90px;
+		margin-right:35px;
     }
 
     .headLeft .menu {
@@ -4919,9 +4918,10 @@ ul#shutdownMsg li{ font-size:13px; line-height:20px; }
 
 @media (min-width: 700px) and (max-width: 800px) {
 
-    .headLeft .logo {width: 60px;}
+    .headLeft .logo {width: 60px; margin-right:85px;}
     .menuHome ul li a {padding-right:5px;}
     #nav ul li a { padding:28px 9px 0 9px;}
+
 
 }
 

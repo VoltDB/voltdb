@@ -45,6 +45,7 @@ import org.voltdb.sysprocs.SysProcFragmentId;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.VoltTableUtil;
+import org.voltdb.utils.VoltTrace;
 
 public class SysprocFragmentTask extends TransactionTask
 {
@@ -192,6 +193,14 @@ public class SysprocFragmentTask extends TransactionTask
             // equivalent to dep.depId:
             // final int outputDepId = m_fragmentMsg.getOutputDepId(frag);
 
+            final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.SPSITE);
+            if (traceLog != null) {
+                traceLog.add(() -> VoltTrace.beginDuration("runfragmenttask",
+                                                           "txnId", TxnEgo.txnIdToString(getTxnId()),
+                                                           "partition", Integer.toString(siteConnection.getCorrespondingPartitionId()),
+                                                           "fragmentId", String.valueOf(fragmentId)));
+            }
+
             ParameterSet params = m_fragmentMsg.getParameterSetForFragment(frag);
 
             try {
@@ -253,6 +262,10 @@ public class SysprocFragmentTask extends TransactionTask
                             new VoltTable(new ColumnInfo[] {new ColumnInfo("UNUSED", VoltType.INTEGER)}, 1));
                 }
                 break;
+            }
+
+            if (traceLog != null) {
+                traceLog.add(VoltTrace::endDuration);
             }
         }
         return currentFragResponse;
