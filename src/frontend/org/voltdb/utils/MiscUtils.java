@@ -41,13 +41,14 @@ import java.util.regex.Pattern;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
-import org.voltdb.ReplicationRole;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.deploymentfile.DrRoleType;
+import org.voltdb.iv2.TxnEgo;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.licensetool.LicenseException;
 
@@ -989,5 +990,23 @@ public class MiscUtils {
             assert this.value != null;
             return this.value;
         }
+    }
+
+    public static String hsIdTxnIdToString(long hsId, long txnId) {
+        final StringBuilder sb = new StringBuilder();
+        CoreUtils.hsIdToString(hsId, sb);
+        sb.append(" ");
+        TxnEgo.txnIdToString(txnId, sb);
+        return sb.toString();
+    }
+
+    public static String hsIdPairTxnIdToString(long srcHsId, long destHsId, long txnId) {
+        final StringBuilder sb = new StringBuilder(32);
+        CoreUtils.hsIdToString(srcHsId, sb);
+        sb.append("->");
+        CoreUtils.hsIdToString(destHsId, sb);
+        sb.append(" ");
+        TxnEgo.txnIdToString(txnId, sb);
+        return sb.toString();
     }
 }

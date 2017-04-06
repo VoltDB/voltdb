@@ -579,7 +579,8 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
             long txnId,
             long spHandle,
             long uniqueId,
-            boolean readOnly)
+            boolean readOnly,
+            boolean traceOn)
             throws EEException
     {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");

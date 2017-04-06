@@ -561,7 +561,8 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExecu
         jlong spHandle,
         jlong lastCommittedSpHandle,
         jlong uniqueId,
-        jlong undoToken)
+        jlong undoToken,
+        jboolean traceOn)
 {
     //VOLT_DEBUG("nativeExecutePlanFragments() start");
 
@@ -598,7 +599,8 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExecu
                                                     spHandle,
                                                     lastCommittedSpHandle,
                                                     uniqueId,
-                                                    undoToken);
+                                                    undoToken,
+                                                    traceOn == JNI_TRUE);
 
         if (failures > 0) {
             return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;

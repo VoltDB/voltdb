@@ -187,7 +187,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
                                  int64_t spHandle,
                                  int64_t lastCommittedSpHandle,
                                  int64_t uniqueId,
-                                 int64_t undoToken);
+                                 int64_t undoToken,
+                                 bool traceOn);
 
         /**
          * Execute a single, top-level plan fragment.  This method is
@@ -503,7 +504,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         int executePlanFragment(int64_t planfragmentId,
                                 int64_t inputDependencyId,
                                 bool first,
-                                bool last);
+                                bool last,
+                                bool traceOn);
 
         /**
          * Set up the vector of executors for a given fragment id.

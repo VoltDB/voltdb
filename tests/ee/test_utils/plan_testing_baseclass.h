@@ -247,7 +247,7 @@ public:
             // impressive.
             //
             try {
-                m_engine->executePlanFragments(1, &fragmentId, NULL, emptyParams, 1000, 1000, 1000, 1000, 1);
+                m_engine->executePlanFragments(1, &fragmentId, NULL, emptyParams, 1000, 1000, 1000, 1000, 1, false);
             } catch (voltdb::SerializableEEException &ex) {
                 throw;
             }
