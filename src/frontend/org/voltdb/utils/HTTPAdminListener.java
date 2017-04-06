@@ -19,11 +19,14 @@ package org.voltdb.utils;
 
 import java.io.BufferedInputStream;
 import java.io.ByteArrayInputStream;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.URL;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -64,6 +67,7 @@ import org.eclipse.jetty.server.handler.AbstractHandler;
 import org.eclipse.jetty.server.handler.ContextHandler;
 import org.eclipse.jetty.server.handler.ContextHandlerCollection;
 import org.eclipse.jetty.server.handler.ResourceHandler;
+import org.eclipse.jetty.server.handler.gzip.GzipHandler;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.eclipse.jetty.util.thread.QueuedThreadPool;
 import org.json_voltpatches.JSONArray;
@@ -97,6 +101,12 @@ public class HTTPAdminListener {
 
     private static final VoltLogger m_log = new VoltLogger("HOST");
     public static final String REALM = "VoltDBRealm";
+
+    private static final String RESOURCE_BASE = "dbmonitor";
+    private static final String CSS_TARGET = "css";
+    private static final String IMAGES_TARGET = "images";
+    private static final String JS_TARGET = "js";
+
     static final String jsonContentType = ContentType.APPLICATION_JSON.toString();
 
     Server m_server;
@@ -222,9 +232,11 @@ public class HTTPAdminListener {
                     return;
                 }
 
-                if (baseRequest.getRequestURI().contains("css")) {
-                    System.out.println("uri" + baseRequest.getRequestURI() + "target: " + target);
-                    baseRequest.setHandled(false);
+                if (baseRequest.getRequestURI().contains("css") ||
+                        baseRequest.getRequestURI().contains("images") ||
+                        baseRequest.getRequestURI().contains("js")) {
+//                    baseRequest.setHandled(false);
+                    System.out.println("uri" + baseRequest.getRequestURI() + " target: " + target);
                     return;
                 }
 
@@ -338,13 +350,19 @@ public class HTTPAdminListener {
     }
 
     class CacheStaticResourceHandler extends ResourceHandler {
-        public CacheStaticResourceHandler() {
+        /*
+         * resource handler to server static resource within dbmonitor,
+         * which is bundled in jar, with caching enabled         *
+         * @Param: target location within dbmonitor
+         *
+         */
+        public CacheStaticResourceHandler(final String target) {
             super();
-            String path = VoltDB.class.getResource("dbmonitor/css").getFile();
+            String path = VoltDB.class.getResource(RESOURCE_BASE + File.separator + target).toExternalForm();
             System.out.println("DBmonitor path" + path);
             setResourceBase(path);
-            setCacheControl("max-age=1200, public");
-            //setEtags(true);
+            setCacheControl("max-age=3600, public");
+            setEtags(true);
         }
 
         @Override
@@ -353,19 +371,11 @@ public class HTTPAdminListener {
                            HttpServletRequest request,
                            HttpServletResponse response)
                            throws IOException, ServletException {
-
             super.handle(target, baseRequest, request, response);
-            //if (baseRequest.isHandled()) return;
-            //response.setHeader(HttpHeader.CACHE_CONTROL.toString(), "max-age=1200, public");
-
-            System.out.println("Request not handled " + getResourceBase());
-
-//            byte[] reportbytes = VoltDB.instance().getCatalogContext().getFileInJar("autogen-ddl.sql");
-//            String ddl = new String(reportbytes, Charsets.UTF_8);
-//            response.setContentType("text/plain;charset=utf-8");
-//            response.setStatus(HttpServletResponse.SC_OK);
-//            baseRequest.setHandled(true);
-//            response.getWriter().print(ddl);
+            String resourceBase = getResourceBase();
+            Path path = Paths.get(resourceBase);
+            System.out.println("Request handled " + baseRequest.isHandled()
+                + " path " + path);
         }
 
     }
@@ -1102,24 +1112,17 @@ public class HTTPAdminListener {
             ContextHandler profileRequestHandler = new ContextHandler("/profile");
             profileRequestHandler.setHandler(new UserProfileHandler());
 
-//            dbMonitorHandler.setInitParameter("cacheControl", "max-age=1200, public");
-//            apiRequestHandler.setInitParameter("cacheControl", "max-age=1200, public");
-//            catalogRequestHandler.setInitParameter("cacheControl", "max-age=1200, public");
-//            ddlRequestHandler.setInitParameter("cacheControl", "max-age=1200, public");
-//            deploymentRequestHandler.setInitParameter("cacheControl", "max-age=1200, public");
-//            profileRequestHandler.setInitParameter("cacheControl", "max-age=1200, public");
-
-            ///css
-//            ContextHandler cssResourceHandler = new ContextHandler("/css");
-//            ResourceHandler cssResource = new CacheStaticResourceHandler();
-////            cssResource.setResourceBase("/");
-////            cssResource.setDirectoriesListed(true);
-//            cssResource.setEtags(true);
-////            cssResource.setCacheControl("max-age=3600, public");
-//            cssResourceHandler.setHandler(cssResource);
             ContextHandler cssResourceHandler = new ContextHandler("/css");
-            ResourceHandler cssResource = new CacheStaticResourceHandler();
-//            cssResourceHandler.setHandler(cssResource);
+            ResourceHandler cssResource = new CacheStaticResourceHandler(CSS_TARGET);
+            cssResourceHandler.setHandler(cssResource);
+
+            ContextHandler imageResourceHandler = new ContextHandler("/images");
+            ResourceHandler imagesResource = new CacheStaticResourceHandler(IMAGES_TARGET);
+            imageResourceHandler.setHandler(imagesResource);
+
+            ContextHandler jsResourceHandler = new ContextHandler("/js");
+            ResourceHandler jsResource = new CacheStaticResourceHandler(JS_TARGET);
+            jsResourceHandler.setHandler(jsResource);
 
 
             ContextHandlerCollection handlers = new ContextHandlerCollection();
@@ -1129,16 +1132,18 @@ public class HTTPAdminListener {
                     ddlRequestHandler,
                     deploymentRequestHandler,
                     profileRequestHandler
+//                    , cssResource
                     , dbMonitorHandler
-                    , cssResource
-//                    , cssResourceHandler
+                    , cssResourceHandler
+                    , imageResourceHandler
+                    , jsResourceHandler
                     });
 
-//            GzipHandler compressResourcesHandler = new GzipHandler();
-//            compressResourcesHandler.setHandler(handlers);
+            GzipHandler compressResourcesHandler = new GzipHandler();
+            compressResourcesHandler.setHandler(handlers);
 
-//            m_server.setHandler(compressResourcesHandler);
-            m_server.setHandler(handlers);
+            m_server.setHandler(compressResourcesHandler);
+//            m_server.setHandler(handlers);
 
             httpClientInterface.setTimeout(timeout);
             m_jsonEnabled = jsonEnabled;
