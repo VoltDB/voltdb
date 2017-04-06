@@ -83,6 +83,7 @@ TEST_F(PlanNodeUtilTest, getEmptyPlanNode) {
         try {
             std::unique_ptr<AbstractPlanNode> node(plannodeutil::getEmptyPlanNode(pnt));
             ASSERT_NE(PLAN_NODE_TYPE_INVALID, pnt);
+            ASSERT_NE(NULL, node.get());
         }
         catch (const voltdb::FatalException& fe) {
             ASSERT_EQ(PLAN_NODE_TYPE_INVALID, pnt);
