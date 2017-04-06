@@ -2533,18 +2533,6 @@ public class TestPlansSubQueries extends PlannerTestCase {
                       "ORDER BY clause with subquery expression is not allowed.");
     }
 
-    public void testENG12116() throws Exception {
-        String SQL = "SELECT 0 FROM ( SELECT DISTINCT * FROM ENG12076_P1 AS T1, ENG12076_R1 ) TTT1;";
-        try {
-            List<AbstractPlanNode> rootNode = compileToFragments(SQL);
-            // This just passes.
-            assertTrue(true);
-        } catch (Exception ex) {
-            fail("Unexpected compilation failure.");
-        }
-
-    }
-
     /**
      * Asserts that the plan doesn't use index scans.
      * (Except to ensure determinism).

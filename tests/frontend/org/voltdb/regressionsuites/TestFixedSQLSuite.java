@@ -695,6 +695,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
         subTestENG9533();
         subTestENG9796();
         subTestENG11256();
+        subTestENG12116();
     }
 
     private void subTestENG11256() throws Exception {
@@ -2705,6 +2706,17 @@ public class TestFixedSQLSuite extends RegressionSuite {
         truncateTables(client, new String[] {"p1", "r1", "r2"});
     }
 
+    private void subTestENG12116() throws Exception {
+        Client client = getClient();
+        String SQL = "SELECT SIN(0) FROM ( SELECT DISTINCT * FROM P1 AS O, R1 AS I ) AS TTT;";
+        client.callProcedure("p1.Insert", 10, "foo", 20,  40.0);
+        client.callProcedure("r1.Insert", 11, "bar", 20,  99.0);
+        VoltTable vt;
+        vt = client.callProcedure("@AdHoc", SQL).getResults()[0];
+        System.out.println(vt);
+        assertApproximateContentOfTable(new Object[][] {{ 0.0 }}, vt, 1.0e-7);
+    }
+
     //
     // JUnit / RegressionSuite boilerplate
     //
@@ -2754,12 +2766,12 @@ public class TestFixedSQLSuite extends RegressionSuite {
         builder.addServerConfig(config);
         // end of normally disabled section */
 
-        // CONFIG #2: HSQL
+        //* CONFIG #2: HSQL
         config = new LocalCluster("fixedsql-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
         success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);
-
+        // end of HSQDB config */
         return builder;
     }
 }
