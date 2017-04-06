@@ -470,6 +470,13 @@ public class CatalogDiffEngine {
                 }
                 // No special guard against dropping a table or view
                 // (although some procedures may fail to plan)
+                // Lets handle stream view to notify roll of generation.
+                if (tbl.getMvhandlerinfo().size() == 0 && tbl.getMaterializer() != null) {
+                    //If this is a view on stream lets roll generation.
+                    if (tbl.getMaterializer().m_isStream) {
+                        m_requiresNewExportGeneration = true;
+                    }
+                }
                 return null;
             }
 
