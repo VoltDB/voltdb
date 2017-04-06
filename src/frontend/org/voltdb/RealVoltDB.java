@@ -240,6 +240,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     private IOStats m_ioStats = null;
     private MemoryStats m_memoryStats = null;
     private CpuStats m_cpuStats = null;
+    private GcStats m_gcStats = null;
     private CommandLogStats m_commandLogStats = null;
     private DRRoleStats m_drRoleStats = null;
     private StatsManager m_statsManager = null;
@@ -1268,7 +1269,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             m_cpuStats = new CpuStats();
             getStatsAgent().registerStatsSource(StatsSelector.CPU,
                     0, m_cpuStats);
-
+            m_gcStats = new GcStats();
+            getStatsAgent().registerStatsSource(StatsSelector.GC,
+                    0, m_gcStats);
             // ENG-6321
             m_commandLogStats = new CommandLogStats(m_commandLog);
             getStatsAgent().registerStatsSource(StatsSelector.COMMANDLOG, 0, m_commandLogStats);
@@ -2073,7 +2076,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         EnterpriseMaintenance em = EnterpriseMaintenance.get();
         if (em != null) { em.setupMaintenaceTasks(); }
 
-        GCInspector.instance.start(m_periodicPriorityWorkThread);
+        GCInspector.instance.start(m_periodicPriorityWorkThread, m_gcStats);
     }
 
     private void startHealthMonitor() {

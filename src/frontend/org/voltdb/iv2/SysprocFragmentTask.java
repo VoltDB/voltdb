@@ -18,6 +18,7 @@
 package org.voltdb.iv2;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -52,8 +53,14 @@ public class SysprocFragmentTask extends TransactionTask
     final Mailbox m_initiator;
     final FragmentTaskMessage m_fragmentMsg;
     Map<Integer, List<VoltTable>> m_inputDeps;
-
     boolean m_respBufferable = true;
+    static final byte[] m_rawDummyResponse;
+
+    static {
+        VoltTable dummyResponse = new VoltTable(new ColumnInfo("STATUS", VoltType.TINYINT));
+        dummyResponse.setStatusCode(VoltTableUtil.NULL_DEPENDENCY_STATUS);
+        m_rawDummyResponse = dummyResponse.buildReusableDependenyResult();
+    }
 
     // This constructor is used during live rejoin log replay.
     SysprocFragmentTask(Mailbox mailbox,
@@ -96,11 +103,10 @@ public class SysprocFragmentTask extends TransactionTask
 
         // Set the dependencies even if this is a dummy response. This site could be the master
         // on elastic join, so the fragment response message is actually going to the MPI.
-        VoltTable depTable = new VoltTable(new VoltTable.ColumnInfo("STATUS", VoltType.TINYINT));
-        depTable.setStatusCode(VoltTableUtil.NULL_DEPENDENCY_STATUS);
         for (int frag = 0; frag < m_fragmentMsg.getFragmentCount(); frag++) {
             final int outputDepId = m_fragmentMsg.getOutputDepId(frag);
-            response.addDependency(outputDepId, depTable);
+            response.addDependency(new DependencyPair.BufferDependencyPair(outputDepId,
+                    m_rawDummyResponse, 0, m_rawDummyResponse.length));
         }
         response.setRespBufferable(m_respBufferable);
         m_initiator.deliver(response);
@@ -213,7 +219,7 @@ public class SysprocFragmentTask extends TransactionTask
                                                          params);
                 // @Shutdown returns null, handle it here
                 if (dep != null) {
-                    currentFragResponse.addDependency(dep.depId, dep.dependency);
+                    currentFragResponse.addDependency(dep);
                 }
             } catch (final EEException e) {
                 hostLog.l7dlog(Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(),
@@ -221,8 +227,9 @@ public class SysprocFragmentTask extends TransactionTask
                 currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
                 if (currentFragResponse.getTableCount() == 0) {
                     // Make sure the response has at least 1 result with a valid DependencyId
-                    currentFragResponse.addDependency(m_fragmentMsg.getOutputDepId(0),
-                            new VoltTable(new ColumnInfo[] {new ColumnInfo("UNUSED", VoltType.INTEGER)}, 1));
+                    currentFragResponse.addDependency(new
+                            DependencyPair.BufferDependencyPair(m_fragmentMsg.getOutputDepId(0),
+                                    m_rawDummyResult, 0, m_rawDummyResult.length));
                 }
                 break;
             } catch (final SQLException e) {
@@ -231,8 +238,9 @@ public class SysprocFragmentTask extends TransactionTask
                 currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
                 if (currentFragResponse.getTableCount() == 0) {
                     // Make sure the response has at least 1 result with a valid DependencyId
-                    currentFragResponse.addDependency(m_fragmentMsg.getOutputDepId(0),
-                            new VoltTable(new ColumnInfo[] {new ColumnInfo("UNUSED", VoltType.INTEGER)}, 1));
+                    currentFragResponse.addDependency(new
+                            DependencyPair.BufferDependencyPair(m_fragmentMsg.getOutputDepId(0),
+                                    m_rawDummyResult, 0, m_rawDummyResult.length));
                 }
                 break;
             }
@@ -248,8 +256,9 @@ public class SysprocFragmentTask extends TransactionTask
                         e);
                 if (currentFragResponse.getTableCount() == 0) {
                     // Make sure the response has at least 1 result with a valid DependencyId
-                    currentFragResponse.addDependency(m_fragmentMsg.getOutputDepId(0),
-                            new VoltTable(new ColumnInfo[] {new ColumnInfo("UNUSED", VoltType.INTEGER)}, 1));
+                    currentFragResponse.addDependency(new
+                            DependencyPair.BufferDependencyPair(m_fragmentMsg.getOutputDepId(0),
+                                    m_rawDummyResult, 0, m_rawDummyResult.length));
                 }
             }
             catch (final VoltAbortException e) {
@@ -258,8 +267,9 @@ public class SysprocFragmentTask extends TransactionTask
                         new SerializableException(CoreUtils.throwableToString(e)));
                 if (currentFragResponse.getTableCount() == 0) {
                     // Make sure the response has at least 1 result with a valid DependencyId
-                    currentFragResponse.addDependency(m_fragmentMsg.getOutputDepId(0),
-                            new VoltTable(new ColumnInfo[] {new ColumnInfo("UNUSED", VoltType.INTEGER)}, 1));
+                    currentFragResponse.addDependency(new
+                            DependencyPair.BufferDependencyPair(m_fragmentMsg.getOutputDepId(0),
+                                    m_rawDummyResult, 0, m_rawDummyResult.length));
                 }
                 break;
             }

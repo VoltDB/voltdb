@@ -139,6 +139,7 @@ public:
         m_exception_buffer.reset(new char[m_smallBufferSize]);
         m_engine->setBuffers(m_parameter_buffer.get(), m_smallBufferSize,
                              m_per_fragment_stats_buffer.get(), m_smallBufferSize,
+                             NULL, 0,
                              m_result_buffer.get(), m_resultBufferSize,
                              m_exception_buffer.get(), m_smallBufferSize);
         m_engine->resetReusedResultOutputBuffer();
