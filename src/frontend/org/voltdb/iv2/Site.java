@@ -106,7 +106,6 @@ import org.voltdb.utils.MinimumRatioMaintainer;
 
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.base.Preconditions;
-import org.voltdb.catalog.Catalog;
 
 import vanilla.java.affinity.impl.PosixJNAAffinity;
 
@@ -394,10 +393,10 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         @Override
         public boolean updateCatalog(String diffCmds, CatalogContext context,
                 CatalogSpecificPlanner csp, boolean requiresSnapshotIsolation,
-                long uniqueId, long spHandle)
+                long uniqueId, long spHandle, boolean requiresNewExportGeneration)
         {
             return Site.this.updateCatalog(diffCmds, context, csp, requiresSnapshotIsolation,
-                    false, uniqueId, spHandle);
+                    false, uniqueId, spHandle, requiresNewExportGeneration);
         }
 
         @Override
@@ -1459,9 +1458,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
      * Update the catalog.  If we're the MPI, don't bother with the EE.
      */
     public boolean updateCatalog(String diffCmds, CatalogContext context, CatalogSpecificPlanner csp,
-            boolean requiresSnapshotIsolationboolean, boolean isMPI, long uniqueId, long spHandle)
+            boolean requiresSnapshotIsolationboolean, boolean isMPI, long uniqueId, long spHandle, boolean requiresNewExportGeneration)
     {
-        Catalog oldCatalog = m_context.catalog;
         m_context = context;
         m_ee.setBatchTimeout(m_context.cluster.getDeployment().get("deployment").
                 getSystemsettings().get("systemsettings").getQuerytimeout());
@@ -1473,7 +1471,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
 
         CatalogMap<Table> tables = m_context.catalog.getClusters().get("cluster").getDatabases().get("database").getTables();
-        boolean isStreamChange = CatalogUtil.isStreamTableAffected(oldCatalog, m_context.catalog, diffCmds);
+        boolean isStreamChange = requiresNewExportGeneration;
 
         diffCmds = CatalogUtil.getDiffCommandsForEE(diffCmds);
         if (diffCmds.length() == 0) {

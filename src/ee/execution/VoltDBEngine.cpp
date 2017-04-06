@@ -1112,7 +1112,6 @@ bool VoltDBEngine::updateCatalog(int64_t timestamp, bool isStreamUpdate, std::st
 
     assert(m_catalog != NULL); // the engine must be initialized
     VOLT_DEBUG("Updating catalog...");
-
     // apply the diff commands to the existing catalog
     // throws SerializeEEExceptions on error.
     m_catalog->execute(catalogPayload);
