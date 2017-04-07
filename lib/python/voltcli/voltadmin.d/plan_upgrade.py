@@ -17,7 +17,7 @@
 
 from voltcli.hostinfo import Host
 from voltcli.hostinfo import Hosts
-from voltcli import utility
+from voltcli import checkstats
 from xml.etree import ElementTree
 from collections import defaultdict
 from urllib2 import Request, urlopen, URLError
@@ -41,7 +41,7 @@ RELEASE_MINOR_VERSION = 2
 )
 
 def plan_upgrade(runner):
-    hosts, kfactor = basicCheck(runner)
+    hosts, kfactor, largestClusterId = basicCheck(runner)
 
     # first check the existence of root path on all the existing nodes
     # runner.call_proc('@UpgradeCheck',[VOLT.FastSerializer.VOLTTYPE_STRING], [runner.opts.newKit, runner.opts.newRoot])
@@ -70,9 +70,10 @@ def plan_upgrade(runner):
 
     print 'Pre-upgrade check is passed.'
 
-    generateCommands(runner.opts,
+    generateCommands(runner,
                      hosts,
-                     kfactor)
+                     kfactor,
+                     largestClusterId)
 
 def basicCheck(runner):
     response = runner.call_proc('@SystemInformation',
@@ -115,33 +116,94 @@ def basicCheck(runner):
     if fullClusterSize == 1:
         runner.abort("Current cluster doesn't have enough node to perform in-service upgrade, at least two nodes are required")
 
-    return hosts, kfactor
+    response = checkstats.get_stats(runner, "DRROLE")
+    largestClusterId = -1
+    for tuple in response.table(0).tuples():
+        remote_cluster_id = tuple[2]
+        if remote_cluster_id > largestClusterId:
+            largestClusterId = remote_cluster_id
 
-def generateCommands(opts, hosts, kfactor):
-    halfNodes = len(hosts.hosts_by_id) / 2
-    (killSet, surviveSet) = pickNodeToKill(hosts, kfactor, halfNodes)
+    return hosts, kfactor, largestClusterId
 
-    # find a survivor node and a killSet node
-    survivor = surviveSet[0]
-    victim = killSet[0]
+def generateCommands(runner, hosts, kfactor, largestClusterId):
+    hostcount = len(hosts.hosts_by_id)
+    (killSet, surviveSet) = pickNodeToKill(hosts, kfactor, hostcount / 2)
 
     # 0 generate deployment file
     step = 0
-    files = {}
-    (et, drId) = updateDeployment(opts,
-                                 survivor,
-                                 None,
-                                 getHostnameOrIp(victim) + ':' + str(victim.drport))
-    cluster_1_deploy = "deployment1.xml"
-    et.write(cluster_1_deploy)
+    origin_cluster_deploy = "deployment_for_current_version.xml"
+    new_cluster_deploy = "deployment_for_new_version.xml"
+    files, newNodeF = generateDeploymentFile(runner, hosts, surviveSet, killSet,
+                                             largestClusterId, origin_cluster_deploy,
+                                             new_cluster_deploy, step)
 
-    (et, drId) = updateDeployment(opts,
-                                 victim,
-                                 drId,
-                                 getHostnameOrIp(survivor) + ':' + str(survivor.drport))
-    cluster_2_deploy = "deployment2.xml"
-    et.write(cluster_2_deploy)
-    # copy deployment file to individual node
+    # 1 kill half of the cluster
+    step += 1
+    generateStopNodeCommand(hosts, surviveSet, killSet, files, step)
+
+    # 2 for the new cluster, initialize the new root path
+    step += 1
+    generateInitNewClusterCommand(runner.opts, killSet, files, new_cluster_deploy, newNodeF, step)
+
+    # 3 start the new cluster
+    step += 1
+    leadersString = generateStartNewClusterCommand(runner.opts, killSet, hostcount, files, newNodeF, step)
+
+    # 4 load catalog into the new cluster
+    step += 1
+    writeCommands(files[getKey(killSet[0])], 'Step %d: load catalog' % step, '#note# load catalog into the new-version cluster')
+
+    # 5 only for upgrading stand-alone cluster, set up XDCR replication between two clusters
+    # update old cluster's deployment file
+    if largestClusterId == -1:
+        step += 1
+        generateTurnOnXDCRCommand(runner.opts, surviveSet, files, origin_cluster_deploy, step)
+
+    # 6 kill the original cluster
+    step += 1
+    generateShutdownOriginClusterCommand(surviveSet, files, step)
+
+    # 7 run DR RESET on one node of the new cluster.
+    # TODO: If there are other clusters connect to the original cluster before, run individual DR RESET.
+    step += 1
+    generateDRResetCommand(killSet, files, step)
+
+    # 8 initialize a new VoltDB root path on the nodes being shutdown ( may not need all of them)
+    step += 1
+    generateInitOldClusterCommmand(runner.opts, surviveSet, files, new_cluster_deploy, hostcount / 2, step)
+
+    # 9 rejoin the nodes being shutdown recently to the new cluster
+    step += 1
+    generateNodeRejoinCommand(runner.opts, surviveSet, leadersString, files, hostcount / 2, step)
+
+    cleanup(runner.opts, files, newNodeF)
+    print 'Upgrade plan generated successfully in current directory. You might modify those per-node commands to fit your own need.'
+
+def generateDeploymentFile(runner, hosts, surviveSet, killSet, largestClusterId, origin_cluster_deploy, new_cluster_deploy, step):
+    files = dict()
+
+    # get deployment file from the original cluster
+    xmlString = getCurrentDeploymentFile(runner, surviveSet[0])
+
+    if largestClusterId == -1:
+        # If this is a stand-alone cluster, generate a deployment file with a XDCR connection source
+        drId = createDeploymentForOriginalCluster(runner,
+                                                  xmlString,
+                                                  getHostnameOrIp(killSet[0]) + ':' + str(killSet[0].drport),
+                                                  origin_cluster_deploy)
+        createDeploymentForNewCluster(runner,
+                                      xmlString,
+                                      drId,
+                                      getHostnameOrIp(surviveSet[0]) + ':' + str(surviveSet[0].drport),
+                                      new_cluster_deploy)
+    else:
+        createDeploymentForNewCluster(runner,
+                                      xmlString,
+                                      largestClusterId,
+                                      None,
+                                      new_cluster_deploy)
+
+    # generate instructions to copy deployment file to individual node
     for hostId, hostInfo in hosts.hosts_by_id.items():
         file = open("upgradePlan-%s:%s-%s.txt" % (hostInfo.ipaddress, hostInfo.internalport, hostInfo.hostname), 'w+')
         writeHeader(file)
@@ -149,48 +211,45 @@ def generateCommands(opts, hosts, kfactor):
         if hostInfo in killSet:
             writeCommands(file,
                           'Step %d: copy deployment file' % step,
-                          '#note# copy %s to %s' % (cluster_2_deploy, opts.newRoot))
+                          '#note# copy %s to %s' % (new_cluster_deploy, runner.opts.newRoot))
         if hostInfo in surviveSet:
             writeCommands(file,
                           'Step %d: copy deployment file' % step,
-                          '#note# copy %s and %s to %s' % (cluster_1_deploy, cluster_2_deploy, opts.newRoot))
-    if opts.newNode is not None:
-        newNodeF = open("upgradePlan-%s.txt" % (opts.newNode), 'w+')
+                          '#note# copy %s and %s to %s' % (origin_cluster_deploy, new_cluster_deploy, runner.opts.newRoot))
+    newNodeF = None
+    if runner.opts.newNode is not None:
+        newNodeF = open("upgradePlan-%s.txt" % (runner.opts.newNode), 'w+')
         writeHeader(newNodeF)
         writeCommands(newNodeF,
                       'Step %d: copy deployment file' % step,
-                      '#note# copy %s to %s' % (cluster_2_deploy, opts.newRoot))
+                      '#note# copy %s to %s' % (new_cluster_deploy, runner.opts.newRoot))
+    return files, newNodeF
 
-    # 1 kill half of the cluster
-    step += 1
+def generateStopNodeCommand(hosts, surviveSet, killSet, files, step):
     for hostId, hostInfo in hosts.hosts_by_id.items():
         if hostInfo in killSet:
             writeCommands(files[getKey(hostInfo)],
                           'Step %d: stop node' % step,
-                          'voltadmin stop -H %s:%d %s:%d' % (survivor.hostname,
-                                                             survivor.adminport,
+                          'voltadmin stop -H %s:%d %s:%d' % (surviveSet[0].hostname,
+                                                             surviveSet[0].adminport,
                                                              getHostnameOrIp(hostInfo),
                                                              hostInfo.internalport))
 
-    # 2 for the new cluster, initialize the new root path
-    step += 1
+def generateInitNewClusterCommand(opts, killSet, files, new_cluster_deploy, newNodeF, step):
     for hostInfo in killSet:
         writeCommands(files[getKey(hostInfo)],
                       'Step %d: initialize new cluster' % step,
                       '%s init --dir=%s --config=%s' % (os.path.join(opts.newKit, 'bin/voltdb'),
                                                         opts.newRoot,
-                                                        os.path.join(opts.newRoot, cluster_2_deploy)))
+                                                        os.path.join(opts.newRoot, new_cluster_deploy)))
     if opts.newNode is not None:
-        if step == 1:
-            step += 1
         writeCommands(newNodeF,
                       'Step %d: initialize new cluster' % step,
                       '%s init --dir=%s --config=%s' % (os.path.join(opts.newKit, 'bin/voltdb'),
                                                         opts.newRoot,
-                                                        os.path.join(opts.newRoot, cluster_2_deploy)))
+                                                        os.path.join(opts.newRoot, new_cluster_deploy)))
 
-    # 3 start the new cluster
-    step += 1
+def generateStartNewClusterCommand(opts, killSet, hostcount, files, newNodeF, step):
     leadersString = []
     for hostInfo in killSet:
         leadersString.append(getHostnameOrIp(hostInfo) + ':' + str(hostInfo.internalport))
@@ -203,34 +262,38 @@ def generateCommands(opts, hosts, kfactor):
                       "%s start --dir=%s -H %s -c %d --missing=%d" % (os.path.join(opts.newKit, 'bin/voltdb'),
                                                                       opts.newRoot,
                                                                       ','.join(leadersString),
-                                                                      len(hosts.hosts_by_id),
-                                                                      halfNodes))
+                                                                      hostcount,
+                                                                      hostcount / 2))
+
+
     if opts.newNode is not None:
         writeCommands(newNodeF,
                       'Step %d: start new cluster' % step,
                       "%s start --dir=%s -H %s -c %d --missing=%d" % (os.path.join(opts.newKit, 'bin/voltdb'),
                                                                       opts.newRoot,
                                                                       ','.join(leadersString),
-                                                                      len(hosts.hosts_by_id),
-                                                                      halfNodes))
+                                                                      hostcount,
+                                                                      hostcount / 2))
+    return leadersString
 
-    # 4 set up XDCR replication between two clusters
-    # update old cluster's deployment file
-    step += 1
-    writeCommands(files[getKey(survivor)],
-                  'Step %d: turn XDCR on in the original cluster' % step,
-                  'voltadmin update -H %s:%d %s' % (survivor.hostname,
-                                                    survivor.adminport,
-                                                    os.path.join(opts.newRoot, cluster_1_deploy)))
+def generateTurnOnXDCRCommand(opts, surviveSet, files, origin_cluster_deploy, step):
+    writeCommands(files[getKey(surviveSet[0])],
+              'Step %d: turn XDCR on in the original cluster' % step,
+              'voltadmin update -H %s:%d %s' % (surviveSet[0].hostname,
+                                                surviveSet[0].adminport,
+                                                os.path.join(opts.newRoot, origin_cluster_deploy)))
 
-    # 6 call 'voltadmin shutdown --wait' on the original cluster
-    step += 1
-    writeCommands(files[getKey(survivor)],
-                  'Step %d: wait for XDCR stream to drain' % step,
-                  'voltadmin pause --wait -H %s:%d' % (survivor.hostname, survivor.adminport))
+def generateShutdownOriginClusterCommand(surviveSet, files, step):
+    writeCommands(files[getKey(surviveSet[0])],
+                  'Step %d: shutdown the original cluster' % step,
+                  'voltadmin shutdown -H %s:%d' % (surviveSet[0].hostname, surviveSet[0].adminport))
 
-    # 7 initialize a new VoltDB root path on the nodes being shutdown ( may not need all of them)
-    step += 1
+def generateDRResetCommand(killSet, files, step):
+    writeCommands(files[getKey(killSet[0])],
+              'Step %d: run dr reset command to stop generating binary logs for the origin cluster' % step,
+              'voltadmin dr reset -H %s:%d' % (killSet[0].hostname, killSet[0].adminport))
+
+def generateInitOldClusterCommmand(opts, surviveSet, files, new_cluster_deploy, halfNodes, step):
     initNodes = 0
     for hostInfo in surviveSet:
         initNodes += 1
@@ -238,18 +301,11 @@ def generateCommands(opts, hosts, kfactor):
                       'Step %d: initialize original cluster with new voltdb path' % step,
                       '%s init --dir=%s --config=%s' % (os.path.join(opts.newKit, 'bin/voltdb'),
                                                         opts.newRoot,
-                                                        os.path.join(opts.newRoot, cluster_2_deploy)))
+                                                        os.path.join(opts.newRoot, new_cluster_deploy)))
         if initNodes == halfNodes:
             break
 
-    # 8 kill the original cluster
-    step += 1
-    writeCommands(files[getKey(survivor)],
-                  'Step %d: shutdown the original cluster' % step,
-                  'voltadmin shutdown -H %s:%d' % (survivor.hostname, survivor.adminport))
-
-    # 9 rejoin the nodes being shutdown recently to the new cluster
-    step += 1
+def generateNodeRejoinCommand(opts, surviveSet, leadersString, files, halfNodes, step):
     rejoinNodes = 0
     for hostInfo in surviveSet:
         rejoinNodes += 1
@@ -262,7 +318,7 @@ def generateCommands(opts, hosts, kfactor):
         if rejoinNodes == halfNodes:
             break
 
-    # cleanup
+def cleanup(opts, files, newNodeF):
     upgradePlan = open("upgrade-plan.txt", 'w+')
     for key, file in files.items():
         file.seek(0)
@@ -270,10 +326,13 @@ def generateCommands(opts, hosts, kfactor):
         file.close()
         os.remove(file.name)
 
-    upgradePlan.close()
     if opts.newNode is not None:
+        newNodeF.seek(0)
+        upgradePlan.write(newNodeF.read() + '\n')
         newNodeF.close()
-    print 'Upgrade plan generated successfully in current directory. You might modify those per-node commands to fit your own need.'
+        os.remove(newNodeF.name)
+
+    upgradePlan.close()
 
 # Choose half of nodes (lower bound) in the cluster which can be killed without violating k-safety
 def pickNodeToKill(hosts, kfactor, expectation):
@@ -327,42 +386,86 @@ def writeCommands(file, subject, command):
         file.write(command)
         file.write('\n\n')
 
-def updateDeployment(opts, host, greatestRemoteClusterId, drSource):
-    if greatestRemoteClusterId is None or greatestRemoteClusterId > 127:
-        clusterId = 1  # start from 1
-    else:
-        clusterId = greatestRemoteClusterId + 1
-
+def getCurrentDeploymentFile(runner, host):
     # get deployment file through rest API
     url = 'http://' + getHostnameOrIp(host) + ':' + str(host.httpport) + '/deployment/download/'
     request = Request(url)
-    base64string = base64.b64encode('%s:%s' % (opts.username, opts.password))
+    base64string = base64.b64encode('%s:%s' % (runner.opts.username, runner.opts.password))
     request.add_header("Authorization", "Basic %s" % base64string)
     try:
         response = urlopen(request)
     except URLError, e:
-        utility.error("Failed to get deployment file from %s " % (getHostnameOrIp(host)))
-        sys.exit(1)
+        runner.abort("Failed to get deployment file from %s " % (getHostnameOrIp(host)))
 
-    xmlString = response.read()
+    return response.read()
+
+# Only stand-alone cluster needs it
+def createDeploymentForOriginalCluster(runner, xmlString, drSource, origin_cluster_deploy):
     et = ElementTree.ElementTree(ElementTree.fromstring(xmlString))
     dr = et.getroot().find('./dr')
     if dr is None:
-        # append an empty DR tag and change it later
-        dr = ElementTree.Element('dr')
-        et.getroot().append(dr)
+        runner.abort("This cluster doesn't have a DR tag in its deployment file, hence we can't generate in-service upgrade plan for it. \
+                    Please note add DR tag to your deployment file requires to shutdown and restart the database.")
 
-    # update DR tag
-    dr.attrib['id'] = str(clusterId)
-    dr.attrib['role'] = 'xdcr'
+    if 'id' not in dr.attrib:
+        clusterId = 0;  # by default clusterId is 0
+    else :
+        clusterId = int(dr.attrib['id']);
 
-    # find DR connection source
     connection = dr.find('./connection')
     if connection is None:
         connection = ElementTree.Element('connection')
         dr.append(connection)
 
-    # update DR connection source
+    if 'source' in connection.attrib:
+        connection.attrib['source'] += ',' + drSource
+    else:
+        connection.attrib['source'] = drSource
     connection.attrib['enabled'] = 'true'
-    connection.attrib['source'] = drSource
-    return et, clusterId
+
+    et.write(origin_cluster_deploy)
+    return clusterId;
+
+
+# Both stand-alone and multisite cluster need it
+def createDeploymentForNewCluster(runner, xmlString, largestClusterId, drSource, new_cluster_deploy):
+    et = ElementTree.ElementTree(ElementTree.fromstring(xmlString))
+
+    clusterId = largestClusterId + 1
+    # cluster id ranges from 0 to 127
+    if clusterId > 127:
+        clusterId = 0
+
+    # since we check the existence of DR tag when generating deployment file for origin cluster, it's safe to skip here
+    dr = et.getroot().find('./dr')
+    dr.attrib['id'] = str(clusterId)
+    connection = dr.find('./connection')
+
+    if connection is None:
+        connection = ElementTree.Element('connection')
+        dr.append(connection)
+
+    connection.attrib['enabled'] = 'true'
+    if drSource is not None:
+        # for stand-alone cluster
+        if 'source' in connection.attrib:
+            connection.attrib['source'] += ',' + drSource
+        else:
+            connection.attrib['source'] = drSource
+    else:
+        # for multisite cluster
+        if 'source' not in connection.attrib:
+            # Connect to a random covering host
+            response = checkstats.get_stats(runner, "DRCONSUMER")
+            for tuple in response.table(1).tuples():
+                covering_host = tuple[7]
+                if covering_host != '':
+                    connection.attrib['source'] = covering_host + ":" + host.drport  # assume it use the same DR port
+                    break;
+            if 'source' not in connection.attrib:
+                runner.abort("Failed to generate the deployment file, no remote host found")
+        else:
+            # Don't change the source if it exists
+            pass
+
+    et.write(new_cluster_deploy)
