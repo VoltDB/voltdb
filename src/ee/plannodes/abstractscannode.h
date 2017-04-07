@@ -71,7 +71,14 @@ public:
     bool isEmptyScan() const { return m_isEmptyScan; }
 
 protected:
-    AbstractScanPlanNode() { }
+    AbstractScanPlanNode()
+        : m_target_table_name()
+        , m_tcd(NULL)
+        , m_predicate()
+        , m_isSubQuery(false)
+        , m_isEmptyScan(false)
+    {
+    }
 
     void loadFromJSONObject(PlannerDomValue obj);
 
