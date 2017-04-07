@@ -50,8 +50,6 @@
 </condition>
 <property name="jacoco.agent" value="jacocoagent.jar" />
 <property name="jacoco.ant" value="jacocoant.jar" />
-<!-- <property name="jacoco.agent" value="${vendor.lib.dir}/jacocoagent.jar" /> -->
-<!-- <property name="jacoco.ant" value="${vendor.lib.dir}/jacocoant.jar" /> -->
 
 <!-- allow env.VOLTPRO to override "voltpro" property -->
 <condition property="voltpro" value="${env.VOLTPRO}">
