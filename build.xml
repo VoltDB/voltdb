@@ -26,8 +26,8 @@
             includes="@{includes}"
             encoding='UTF-8'
             debug='true'
-            debuglevel="lines"
             includeAntRuntime='false'>
+            <compilerarg if:set="use_jacoco" value="-g:lines"/>
             <classpath refid="project.classpath" />
         </javac>
     </sequential>
@@ -48,6 +48,10 @@
 <condition property="use_jacoco" value="true">
     <isset property="env.USE_JACOCO"/>
 </condition>
+<property name="jacoco.agent" value="jacocoagent.jar" />
+<property name="jacoco.ant" value="jacocoant.jar" />
+<!-- <property name="jacoco.agent" value="${vendor.lib.dir}/jacocoagent.jar" /> -->
+<!-- <property name="jacoco.ant" value="${vendor.lib.dir}/jacocoant.jar" /> -->
 
 <!-- allow env.VOLTPRO to override "voltpro" property -->
 <condition property="voltpro" value="${env.VOLTPRO}">
@@ -1689,7 +1693,7 @@ TEST CASES
             <!-- <jvmarg value="-Xcheck:jni" /> -->
             <jvmarg value="-Xmx256m"/>
             <jvmarg value="-XX:+HeapDumpOnOutOfMemoryError"/>
-            <jvmarg if:set="use_jacoco" value="-javaagent:third_party/java/jars/jacocoagent.jar"/>
+            <jvmarg if:set="use_jacoco" value="-javaagent:${vendor.lib.dir}/${jacoco.agent}"/>
             <!-- removed in java 8 <jvmarg value="-XX:-UseSplitVerifier"/> -->
             <env key="VERIFY_CATALOG_DEBUG" value="${verifycatalogdebug}"/>
             <env key="VOLTDB_BUILD_DIR" value="${build.dir}"/>
@@ -1994,7 +1998,7 @@ TEST CASES
 
 <!-- Resources for the JaCoCo task below. -->
 <taskdef uri="antlib:org.jacoco.ant" resource="org/jacoco/ant/antlib.xml">
-	<classpath path="third_party/java/jars/jacocoant.jar"/>
+    <classpath path="${vendor.lib.dir}/${jacoco.ant}"/>
 </taskdef>
 
 <target name="jacoco_report">
@@ -2021,7 +2025,7 @@ TEST CASES
             </sourcefiles>
         </structure>
 
-        <html destdir="report"/>
+        <html destdir="jacoco-report"/>
     </jacoco:report>
 </target>
 
