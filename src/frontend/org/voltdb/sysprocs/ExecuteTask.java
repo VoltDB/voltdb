@@ -183,9 +183,10 @@ public class ExecuteTask extends VoltSystemProcedure {
             default:
                 throw new VoltAbortException("Unable to find the task associated with the given task id");
             }
-            return new DependencyPair(DEP_executeTask, result);
+            return new DependencyPair.TableDependencyPair(DEP_executeTask, result);
         } else if (fragmentId == SysProcFragmentId.PF_executeTaskAggregate) {
-            return new DependencyPair(DEP_executeTaskAggregate, VoltTableUtil.unionTables(dependencies.get(DEP_executeTask)));
+            VoltTable unionTable = VoltTableUtil.unionTables(dependencies.get(DEP_executeTask));
+            return new DependencyPair.TableDependencyPair(DEP_executeTaskAggregate, unionTable);
         }
         assert false;
         return null;

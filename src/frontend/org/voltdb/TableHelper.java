@@ -17,6 +17,7 @@
 
 package org.voltdb;
 
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -1539,5 +1540,33 @@ public class TableHelper {
                 throw new RuntimeException("TableHelper.load failed.");
             }
         }
+    }
+
+    public static ByteBuffer getBackedBuffer(VoltTable table) {
+        // This is an unsafe version of VoltTable.getBuffer() because it does not instantiate a new ByteBuffer
+        table.m_buffer.position(0);
+        table.m_readOnly = true;
+        assert(table.m_buffer.remaining() == table.m_buffer.limit());
+        return table.m_buffer;
+    }
+
+    public static VoltTable[] convertBackedBufferToTables(ByteBuffer fullBacking, int batchSize) {
+        final VoltTable[] results = new VoltTable[batchSize];
+        for (int i = 0; i < batchSize; ++i) {
+            final int numdeps = fullBacking.getInt(); // number of dependencies for this frag
+            assert(numdeps == 1);
+            @SuppressWarnings("unused")
+            final
+            int depid = fullBacking.getInt(); // ignore the dependency id
+            final int tableSize = fullBacking.getInt();
+            // reasonableness check
+            assert(tableSize < 50000000);
+            final ByteBuffer tableBacking = fullBacking.slice();
+            fullBacking.position(fullBacking.position() + tableSize);
+            tableBacking.limit(tableSize);
+
+            results[i] = PrivateVoltTableFactory.createVoltTableFromBuffer(tableBacking, true);
+        }
+        return results;
     }
 }

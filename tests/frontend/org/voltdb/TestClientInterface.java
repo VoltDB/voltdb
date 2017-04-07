@@ -509,7 +509,10 @@ public class TestClientInterface {
         ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, m_cxn);
         assertNull(resp);
 
-        ByteBuffer b = responses.take();
+        DeferredSerialization ds = responsesDS.take();
+        ByteBuffer b = ByteBuffer.allocate(ds.getSerializedSize());
+        ds.serialize(b);
+
         resp = new ClientResponseImpl();
         b.position(4);
         resp.initFromBuffer(b);

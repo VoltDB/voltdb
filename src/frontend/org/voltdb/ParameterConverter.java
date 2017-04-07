@@ -561,12 +561,17 @@ public class ParameterConverter {
                     Exception e = new RuntimeException("VoltTable arrays with non-zero length cannot contain null values.");
                     throw new InvocationTargetException(e);
                 }
+                // Make sure this table does not use an ee cache buffer
+                table.convertToHeapBuffer();
             }
 
             return retval;
         }
         if (result instanceof VoltTable) {
-            return new VoltTable[] { (VoltTable) result };
+            VoltTable vt = (VoltTable) result;
+            // Make sure this table does not use an ee cache buffer
+            vt.convertToHeapBuffer();
+            return new VoltTable[] { vt };
         }
         if (result instanceof Long) {
             VoltTable t = new VoltTable(new VoltTable.ColumnInfo("", VoltType.BIGINT));

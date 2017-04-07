@@ -52,7 +52,12 @@ namespace voltdb {
 class OrderByPlanNode : public AbstractPlanNode
 {
 public:
-    OrderByPlanNode() { }
+    OrderByPlanNode()
+        : m_sortExpressions()
+        , m_sortDirections()
+    {
+    }
+
     ~OrderByPlanNode();
     PlanNodeType getPlanNodeType() const;
     std::string debugInfo(const std::string &spacer) const;
