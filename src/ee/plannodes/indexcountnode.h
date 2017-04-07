@@ -29,9 +29,16 @@ namespace voltdb {
 class IndexCountPlanNode : public AbstractScanPlanNode {
 public:
     IndexCountPlanNode()
-        : m_lookup_type(INDEX_LOOKUP_TYPE_EQ)
+        : m_target_index_name()
+        , m_searchkey_expressions()
+        , m_compare_not_distinct()
+        , m_endkey_expressions()
+        , m_lookup_type(INDEX_LOOKUP_TYPE_EQ)
         , m_end_type(INDEX_LOOKUP_TYPE_EQ)
-    { }
+        , m_skip_null_predicate()
+    {
+    }
+
     ~IndexCountPlanNode();
     PlanNodeType getPlanNodeType() const;
     std::string debugInfo(const std::string &spacer) const;

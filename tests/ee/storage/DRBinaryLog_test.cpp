@@ -322,7 +322,7 @@ public:
 
         UndoQuantum* uq = isReadOnly() ? NULL : m_undoLog.generateUndoQuantum(m_undoToken);
         engine->getExecutorContext()->setupForPlanFragments(uq, addPartitionId(txnId), addPartitionId(spHandle),
-                                                            addPartitionId(lastCommittedSpHandle), addPartitionId(uniqueId));
+                                                            addPartitionId(lastCommittedSpHandle), addPartitionId(uniqueId), false);
         engine->getExecutorContext()->checkTransactionForDR();
     }
 
@@ -1209,7 +1209,7 @@ TEST_F(DRBinaryLogTest, PartialTxnRollback) {
     // Simulate a second batch within the same txn
     UndoQuantum* uq = m_undoLog.generateUndoQuantum(m_undoToken + 1);
     m_engine->getExecutorContext()->setupForPlanFragments(uq, addPartitionId(99), addPartitionId(99),
-                                     addPartitionId(98), addPartitionId(70));
+                                                          addPartitionId(98), addPartitionId(70), false);
 
     insertTuple(m_table, prepareTempTuple(m_table, 24, 2321, "23455.5554", "and another", "this is starting to get even sillier", 2222));
 

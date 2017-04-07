@@ -66,7 +66,11 @@ class MaterializePlanNode : public ProjectionPlanNode {
     // Andy - 06/25/2008
     //
 public:
-    MaterializePlanNode() { }
+    MaterializePlanNode()
+        : m_batched(false)
+    {
+    }
+
     ~MaterializePlanNode();
     PlanNodeType getPlanNodeType() const;
     std::string debugInfo(const std::string &spacer) const;

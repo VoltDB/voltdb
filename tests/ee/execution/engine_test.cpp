@@ -541,7 +541,7 @@ TEST_F(ExecutionEngineTest, Execute_PlanFragmentInfo) {
     // Execute the plan.  You'd think this would be more
     // impressive.
     //
-    m_engine->executePlanFragments(1, &fragmentId, NULL, emptyParams, 1000, 1000, 1000, 1000, 1);
+    m_engine->executePlanFragments(1, &fragmentId, NULL, emptyParams, 1000, 1000, 1000, 1000, 1, false);
 
     // Fetch the results.  We have forced them to be written
     // to our own buffer in the local engine.  But we don't

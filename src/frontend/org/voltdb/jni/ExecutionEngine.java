@@ -30,6 +30,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.Pair;
+import org.voltdb.HybridCrc32;
 import org.voltdb.PlannerStatsCollector;
 import org.voltdb.PlannerStatsCollector.CacheUse;
 import org.voltdb.PrivateVoltTableFactory;
@@ -39,6 +40,8 @@ import org.voltdb.TableStreamType;
 import org.voltdb.TheHashinator.HashinatorConfig;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
+import org.voltdb.iv2.TxnEgo;
+import org.voltdb.utils.VoltTrace;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.planner.ActivePlanRepository;
@@ -140,6 +143,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
 
     String m_currentProcedureName = null;
     int m_currentBatchIndex = 0;
+    boolean m_usingFallbackBuffer = false;
     private long m_startTime;
     private long m_lastMsgTime;
     private long m_logDuration = INITIAL_LOG_DURATION;
@@ -159,6 +163,10 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     /** Has the database changed any state since the last reset of dirty status? */
     public boolean getDirtyStatus() {
         return m_dirty;
+    }
+
+    public boolean usingFallbackBuffer() {
+        return m_usingFallbackBuffer;
     }
 
     public void setBatchTimeout(int batchTimeout) {
@@ -385,6 +393,23 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         }
     }
 
+    public void traceLog(boolean isBegin, String name, String args)
+    {
+        if (isBegin) {
+            final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.EE);
+            if (traceLog != null) {
+                traceLog.add(() -> VoltTrace.beginDuration(name,
+                                                           "partition", Integer.toString(m_partitionId),
+                                                           "info", args));
+            }
+        } else {
+            final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.EE);
+            if (traceLog != null) {
+                traceLog.add(VoltTrace::endDuration);
+            }
+        }
+    }
+
     public long fragmentProgressUpdate(int indexFromFragmentTask,
             int planNodeTypeAsInt,
             long tuplesProcessed,
@@ -600,16 +625,20 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     }
 
     /** Run multiple plan fragments */
-    public VoltTable[] executePlanFragments(int numFragmentIds,
-                                            long[] planFragmentIds,
-                                            long[] inputDepIds,
-                                            Object[] parameterSets,
-                                            String[] sqlTexts,
-                                            long txnId,
-                                            long spHandle,
-                                            long lastCommittedSpHandle,
-                                            long uniqueId,
-                                            long undoQuantumToken) throws EEException
+    public FastDeserializer executePlanFragments(
+            int numFragmentIds,
+            long[] planFragmentIds,
+            long[] inputDepIds,
+            Object[] parameterSets,
+            boolean[] isWriteFrag,
+            HybridCrc32 writeCRC,
+            String[] sqlTexts,
+            long txnId,
+            long spHandle,
+            long lastCommittedSpHandle,
+            long uniqueId,
+            long undoQuantumToken,
+            boolean traceOn) throws EEException
     {
         try {
             // For now, re-transform undoQuantumToken to readOnly. Redundancy work in site.executePlanFragments()
@@ -620,8 +649,26 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             m_logDuration = INITIAL_LOG_DURATION;
             m_sqlTexts = sqlTexts;
 
-            VoltTable[] results = coreExecutePlanFragments(numFragmentIds, planFragmentIds, inputDepIds,
-                    parameterSets, txnId, spHandle, lastCommittedSpHandle, uniqueId, undoQuantumToken);
+            if (traceOn) {
+                final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.SPSITE);
+                if (traceLog != null) {
+                    traceLog.add(() -> VoltTrace.beginDuration("execplanfragment",
+                                                               "txnId", TxnEgo.txnIdToString(txnId),
+                                                               "partition", Integer.toString(m_partitionId)));
+                }
+            }
+
+            FastDeserializer results = coreExecutePlanFragments(m_currentBatchIndex, numFragmentIds, planFragmentIds,
+                    inputDepIds, parameterSets, isWriteFrag, writeCRC, txnId, spHandle, lastCommittedSpHandle,
+                    uniqueId, undoQuantumToken, traceOn);
+
+            if (traceOn) {
+                final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.SPSITE);
+                if (traceLog != null) {
+                    traceLog.add(VoltTrace::endDuration);
+                }
+            }
+
             m_plannerStats.updateEECacheStats(m_eeCacheSize, numFragmentIds - m_cacheMisses,
                     m_cacheMisses, m_partitionId);
             return results;
@@ -638,15 +685,20 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         }
     }
 
-    protected abstract VoltTable[] coreExecutePlanFragments(int numFragmentIds,
-                                                            long[] planFragmentIds,
-                                                            long[] inputDepIds,
-                                                            Object[] parameterSets,
-                                                            long txnId,
-                                                            long spHandle,
-                                                            long lastCommittedSpHandle,
-                                                            long uniqueId,
-                                                            long undoQuantumToken) throws EEException;
+    protected abstract FastDeserializer coreExecutePlanFragments(
+            int batchIndex,
+            int numFragmentIds,
+            long[] planFragmentIds,
+            long[] inputDepIds,
+            Object[] parameterSets,
+            boolean[] isWriteFrag,
+            HybridCrc32 writeCRC,
+            long txnId,
+            long spHandle,
+            long lastCommittedSpHandle,
+            long uniqueId,
+            long undoQuantumToken,
+            boolean traceOn) throws EEException;
 
     public abstract void setPerFragmentTimingEnabled(boolean enabled);
 
@@ -842,16 +894,18 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param parameter_buffer_size
      * @param per_fragment_stats_buffer
      * @param per_fragment_stats_buffer_size
-     * @param resultBuffer
-     * @param result_buffer_size
+     * @param firstResultBuffer
+     * @param first_result_buffer_size
+     * @param finalResultBuffer
+     * @param final_result_buffer_size
      * @param exceptionBuffer
      * @param exception_buffer_size
      * @return error code
      */
-    protected native int nativeSetBuffers(long pointer,
-                                          ByteBuffer parameter_buffer, int parameter_buffer_size,
+    protected native int nativeSetBuffers(long pointer, ByteBuffer parameter_buffer, int parameter_buffer_size,
                                           ByteBuffer per_fragment_stats_buffer, int per_fragment_stats_buffer_size,
-                                          ByteBuffer resultBuffer, int result_buffer_size,
+                                          ByteBuffer firstResultBuffer, int first_result_buffer_size,
+                                          ByteBuffer finalResultBuffer, int final_result_buffer_size,
                                           ByteBuffer exceptionBuffer, int exception_buffer_size);
 
     /**
@@ -898,6 +952,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      */
     protected native int nativeExecutePlanFragments(
             long pointer,
+            int batchIndex,
             int numFragments,
             long[] planFragmentIds,
             long[] inputDepIds,
@@ -905,7 +960,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             long spHandle,
             long lastCommittedSpHandle,
             long uniqueId,
-            long undoToken);
+            long undoToken,
+            boolean traceOn);
 
     /**
      * Serialize the result temporary table.

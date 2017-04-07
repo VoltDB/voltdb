@@ -25,6 +25,7 @@ package org.voltdb.jni;
 
 import static org.mockito.Matchers.contains;
 import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.verify;
 
 import java.util.Arrays;
 
@@ -49,7 +50,6 @@ import org.voltdb.catalog.Statement;
 import org.voltdb.planner.ActivePlanRepository;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
-import static org.mockito.Mockito.verify;
 
 public class TestFragmentProgressUpdate extends TestCase {
 
@@ -132,8 +132,10 @@ public class TestFragmentProgressUpdate extends TestCase {
                 new long[] { CatalogUtil.getUniqueIdForFragment(selectBottomFrag) },
                 null,
                 new ParameterSet[] { params },
+                new boolean[] { false },
+                null,
                 new String[] { selectStmt.getSqltext() },
-                3, 3, 2, 42, Long.MAX_VALUE);
+                3, 3, 2, 42, Long.MAX_VALUE, false);
         // Like many fully successful operations, a single row fetch counts as 2 logical row operations,
         // one for locating the row and one for retrieving it.
         assertEquals(1, m_ee.m_callsFromEE);
@@ -185,8 +187,10 @@ public class TestFragmentProgressUpdate extends TestCase {
                 new long[] { CatalogUtil.getUniqueIdForFragment(selectBottomFrag) },
                 null,
                 new ParameterSet[] { params },
+                new boolean[] { false },
+                null,
                 new String[] { selectStmt.getSqltext() },
-                3, 3, 2, 42, Long.MAX_VALUE);
+                3, 3, 2, 42, Long.MAX_VALUE, false);
 
         // Like many fully successful operations, a single row fetch counts as 2 logical row operations,
         // one for locating the row and one for retrieving it.
@@ -221,8 +225,10 @@ public class TestFragmentProgressUpdate extends TestCase {
                 new long[] { CatalogUtil.getUniqueIdForFragment(deleteBottomFrag) },
                 null,
                 new ParameterSet[] { params },
+                new boolean[] { false },
+                null,
                 new String[] { deleteStmt.getSqltext() },
-                3, 3, 2, 42, WRITE_TOKEN);
+                3, 3, 2, 42, WRITE_TOKEN, false);
 
         // populate plan cache
         ActivePlanRepository.clear();
@@ -236,8 +242,10 @@ public class TestFragmentProgressUpdate extends TestCase {
                 new long[] { CatalogUtil.getUniqueIdForFragment(selectBottomFrag) },
                 null,
                 new ParameterSet[] { params },
+                new boolean[] { false },
+                null,
                 new String[] { selectStmt.getSqltext() },
-                3, 3, 2, 42, Long.MAX_VALUE);
+                3, 3, 2, 42, Long.MAX_VALUE, false);
         assertTrue(m_ee.m_callsFromEE > 2);
         // here the m_lastTuplesAccessed is just the same as threshold, since we start a new fragment
         assertEquals(longOpthreshold, m_ee.m_lastTuplesAccessed);
@@ -291,8 +299,10 @@ public class TestFragmentProgressUpdate extends TestCase {
                 new long[] { CatalogUtil.getUniqueIdForFragment(selectBottomFrag) },
                 null,
                 new ParameterSet[] { params },
+                new boolean[] { false },
+                null,
                 new String[] { selectStmt.getSqltext() },
-                3, 3, 2, 42, READ_ONLY_TOKEN);
+                3, 3, 2, 42, READ_ONLY_TOKEN, false);
 
         // If want to see the stats, please uncomment the following line.
         // It is '8 393216 262144' on my machine.
@@ -429,6 +439,8 @@ public class TestFragmentProgressUpdate extends TestCase {
         long[] fragIds = new long[numFragsToExecute];
         ParameterSet[] paramSets = new ParameterSet[numFragsToExecute];
         String[] sqlTexts = new String[numFragsToExecute];
+        boolean[] writeFrags = new boolean[numFragsToExecute];
+        for (boolean writeFrag : writeFrags) { writeFrag = false; }
         createExecutionEngineInputs(stmtName, fragIds, paramSets, sqlTexts);
 
         // Replace the normal logger with a mocked one, so we can verify the message
@@ -468,9 +480,11 @@ public class TestFragmentProgressUpdate extends TestCase {
                     fragIds,
                     null,
                     paramSets,
+                    writeFrags,
+                    null,
                     sqlTexts,
                     3, 3, 2, 42,
-                    readOnly ? READ_ONLY_TOKEN : WRITE_TOKEN);
+                    readOnly ? READ_ONLY_TOKEN : WRITE_TOKEN, false);
             if (readOnly && timeout > 0) {
                 // only time out read queries
                 fail();
