@@ -33,7 +33,6 @@ import java.util.function.Supplier;
 
 import com.google_voltpatches.common.collect.EvictingQueue;
 import com.google_voltpatches.common.collect.ImmutableSet;
-import com.google_voltpatches.common.util.concurrent.Futures;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
@@ -146,7 +145,7 @@ public class VoltTrace implements Runnable {
 
             for (int i=0; i<m_argsArr.length; i+=2) {
                 if (i+1 == m_argsArr.length) break;
-                m_args.put(m_argsArr[i].toString(), m_argsArr[i+1].toString());
+                m_args.put(String.valueOf(m_argsArr[i]), String.valueOf(m_argsArr[i+1]));
             }
         }
 

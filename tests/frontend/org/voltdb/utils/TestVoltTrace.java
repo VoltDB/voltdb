@@ -222,7 +222,11 @@ public class TestVoltTrace {
         for (int i=0; i<count; i++) {
             String key = s_argKeys[m_random.nextInt(s_argKeys.length)];
             args[i*2] = key;
-            args[i*2+1] = key+"-val";
+            if (m_random.nextBoolean()) {
+                args[i * 2 + 1] = key + "-val";
+            } else {
+                args[i * 2 + 1] = null;
+            }
         }
 
         return args;
