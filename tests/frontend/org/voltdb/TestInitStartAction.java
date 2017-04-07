@@ -243,16 +243,12 @@ final public class TestInitStartAction {
 
 
     /*
-     * Tests:
+     * "voltdb init --schema --procedures" tests:
      * 1.  Positive test with valid schema that requires no procedures
      * 2a. Positive test with valid schema and procedures that are in CLASSPATH
      * 2b. Negative test with valid files but not "init --force"
      * 3.  Negative test with a bad schema
      * 4.  Negative test with procedures missing
-     *
-     * CAVEAT: Until ENG-11953 is complete, the files will be installed but not honored.
-     * The only verification performed during init are sanity checks.
-     * More comprehensive checks will be added during 'start', since 'init' has no way to verify that the entire cluster has the same schema.
      *
      * Note that SimulatedExitException is thrown by the command line parser with no descriptive details.
      * VoltDB.crashLocalVoltDB() throws an AssertionError with the message "Faux crash of VoltDB successful."
@@ -398,18 +394,22 @@ final public class TestInitStartAction {
 
     /** Tests that a cluster can start with each node using an identical staged catalog.
      * Since durability is off, the staged catalog will be kept around but not reflect any DDL changes.
-     * @throws Exception
+     * Restarting the database will reload the previous staged catalog.
      */
     @Test
     public void testStartWithStagedCatalogNoDurability() throws Exception {
         // TODO
     }
 
+    /** Tests that a cluster will not start if different nodes have different staged schemas.
+     */
     @Test
     public void testStartWithMismatchedStagedSchema() throws Exception {
         // TODO
     }
 
+    /** Tests that a cluster will not start if different nodes have different staged classes.
+     */
     @Test
     public void testStartWithMismatchedStagedClasses() throws Exception {
         // TODO
