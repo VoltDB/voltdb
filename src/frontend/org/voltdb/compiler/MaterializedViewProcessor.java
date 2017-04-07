@@ -44,7 +44,7 @@ import org.voltdb.catalog.Table;
 import org.voltdb.catalog.TableRef;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.expressions.AbstractExpression;
-import org.voltdb.expressions.AbstractExpression.MVUnsafeOperators;
+import org.voltdb.expressions.AbstractExpression.UnsafeDDLOperators;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.AbstractParsedStmt;
@@ -177,7 +177,7 @@ public class MaterializedViewProcessor {
             // remember it here.  We don't really know how
             // to transfer the message through the catalog, but
             // we can transmit the existence of the message.
-            boolean isSafeForNonemptyTables = (stmt.getUnsafeMVMessage() == null);
+            boolean isSafeForDDL = (stmt.getUnsafeMVMessage() == null);
             // Here the code path diverges for different kinds of views (single table view and joined table view)
             if (isMultiTableView) {
                 // Materialized view on joined tables
@@ -245,7 +245,7 @@ public class MaterializedViewProcessor {
                     // Set the expression type here to determine the behavior of the merge function.
                     destColumn.setAggregatetype(col.expression.getExpressionType().getValue());
                 }
-                mvHandlerInfo.setIssafewithnonemptysources(isSafeForNonemptyTables);
+                mvHandlerInfo.setIssafewithnonemptysources(isSafeForDDL);
             }
             else { // =======================================================================================
                 // Materialized view on single table
@@ -380,7 +380,7 @@ public class MaterializedViewProcessor {
                     destTable.setIsreplicated(false);
                     setGroupedTablePartitionColumn(matviewinfo, srcTable.getPartitioncolumn());
                 }
-                matviewinfo.setIssafewithnonemptysources(isSafeForNonemptyTables);
+                matviewinfo.setIssafewithnonemptysources(isSafeForDDL);
             } // end if single table view materialized view.
         }
     }
@@ -566,12 +566,12 @@ public class MaterializedViewProcessor {
         //
         // Check to see if the expression is safe for creating
         // views on nonempty tables.
-        MVUnsafeOperators unsafeOps = new MVUnsafeOperators();
+        UnsafeDDLOperators unsafeOps = new UnsafeDDLOperators();
         for (AbstractExpression expr : checkExpressions) {
-            expr.findNonemptyMVSafeOperations(unsafeOps);
+            expr.findUnsafeDDLOperations(unsafeOps);
         }
         if (unsafeOps.isUnsafe()) {
-            stmt.setUnsafeMVMessage(unsafeOps.toString());
+            stmt.setUnsafeDDLMessage(unsafeOps.toString());
         }
 
         if (stmt.hasSubquery()) {

@@ -1414,7 +1414,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
      * which can make an expression unsafe for use in creating
      * materialized views on non-empty tables.
      */
-    public static class MVUnsafeOperators {
+    public static class UnsafeDDLOperators {
         public final void add(String opName) {
             m_oplist.append(m_sep)
                     .append(opName);
@@ -1442,19 +1442,19 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
      * we get all the way through the search we are happy, and
      * return true.
      */
-    public void findNonemptyMVSafeOperations(MVUnsafeOperators ops) {
-        if ( ! m_type.isMVSafe()) {
+    public void findUnsafeDDLOperations(UnsafeDDLOperators ops) {
+        if ( ! m_type.isDDLSafe()) {
             ops.add(m_type.symbol());
         }
         if (m_left != null) {
-            m_left.findNonemptyMVSafeOperations(ops);
+            m_left.findUnsafeDDLOperations(ops);
         }
         if (m_right != null) {
-            m_right.findNonemptyMVSafeOperations(ops);
+            m_right.findUnsafeDDLOperations(ops);
         }
         if (m_args != null) {
             for (AbstractExpression arg : m_args) {
-                arg.findNonemptyMVSafeOperations(ops);
+                arg.findUnsafeDDLOperations(ops);
             }
         }
     }

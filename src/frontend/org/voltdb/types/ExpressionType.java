@@ -58,15 +58,15 @@ public enum ExpressionType {
         // left / right (both must be number. implicitly casted)
     OPERATOR_CONCAT                (OperatorExpression.class,  5, "||"),
         // left || right (both must be char/varchar)
-    OPERATOR_MOD                   (OperatorExpression.class,  6, "%"),
+    OPERATOR_MOD                   (OperatorExpression.class,  6, "%", true),
         // left % right (both must be integer)
     OPERATOR_CAST                  (OperatorExpression.class,  7, "<cast>"),
         // explicitly cast left as right (right is integer in ValueType enum)
-    OPERATOR_NOT                   (OperatorExpression.class,  8, "NOT"),
+    OPERATOR_NOT                   (OperatorExpression.class,  8, "NOT", true),
         // logical not
     OPERATOR_IS_NULL               (OperatorExpression.class,  9, "IS NULL", true),
     // unary null evaluation
-    OPERATOR_EXISTS                (OperatorExpression.class, 18, "EXISTS"),
+    OPERATOR_EXISTS                (OperatorExpression.class, 18, "EXISTS", true),
     // unary exists evaluation
 
     // ----------------------------
@@ -86,7 +86,7 @@ public enum ExpressionType {
         // greater than equal operator between left and right
     COMPARE_LIKE                 (ComparisonExpression.class, 16, "LIKE", true),
         // LIKE operator (left LIKE right). both children must be string.
-    COMPARE_IN                   (InComparisonExpression.class, 17, "IN"),
+    COMPARE_IN                   (InComparisonExpression.class, 17, "IN", true),
         // IN operator. left IN right. right must be VectorValue
     // value 18 is assigned to OPERATOR_EXISTS
     COMPARE_NOTDISTINCT          (ComparisonExpression.class, 19, "NOT DISTINCT", true),
@@ -116,8 +116,8 @@ public enum ExpressionType {
     AGGREGATE_SUM                 (AggregateExpression.class, 42, "SUM"),
     AGGREGATE_MIN                 (AggregateExpression.class, 43, "MIN", true),
     AGGREGATE_MAX                 (AggregateExpression.class, 44, "MAX", true),
-    AGGREGATE_AVG                 (AggregateExpression.class, 45, "AVG"),
-    AGGREGATE_APPROX_COUNT_DISTINCT(AggregateExpression.class, 46, "APPROX_COUNT_DISTINCT"),
+    AGGREGATE_AVG                 (AggregateExpression.class, 45, "AVG", true),
+    AGGREGATE_APPROX_COUNT_DISTINCT(AggregateExpression.class, 46, "APPROX_COUNT_DISTINCT", true),
     AGGREGATE_VALS_TO_HYPERLOGLOG (AggregateExpression.class, 47, "VALS_TO_HYPERLOGLOG"),
     AGGREGATE_HYPERLOGLOGS_TO_CARD(AggregateExpression.class, 48, "HYPERLOGLOGS_TO_CARD"),
     // ----------------------------
@@ -172,7 +172,8 @@ public enum ExpressionType {
     private final int m_value;
     private final String m_symbol;
     private final Class<? extends AbstractExpression> m_expressionClass;
-    private boolean m_isSafeForNonemptyViews;
+    // Does this expression type have the risk to fail a DDL.
+    private boolean m_isDDLSafe;
 
     ExpressionType(Class<? extends AbstractExpression> expressionClass,
                    int val, String symbol) {
@@ -180,11 +181,11 @@ public enum ExpressionType {
     }
 
     ExpressionType(Class<? extends AbstractExpression> expressionClass,
-                   int val, String symbol, boolean isMVSafe) {
+                   int val, String symbol, boolean isDDLSafe) {
         m_value = val;
         m_symbol = symbol;
         m_expressionClass = expressionClass;
-        m_isSafeForNonemptyViews = isMVSafe;
+        m_isDDLSafe = isDDLSafe;
     }
 
     public Class<? extends AbstractExpression> getExpressionClass() {
@@ -246,8 +247,8 @@ public enum ExpressionType {
      * Return true iff this expression type is safe for
      * creating materialized views on non-empty tables.
      */
-    public boolean isMVSafe() {
-        return m_isSafeForNonemptyViews;
+    public boolean isDDLSafe() {
+        return m_isDDLSafe;
     }
     /**
      * When generating an output schema for a projection node we need to
