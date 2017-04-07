@@ -32,6 +32,9 @@ public:
 
     inline JNITopend* updateJNIEnv(JNIEnv *env) { m_jniEnv = env; return this; }
     int loadNextDependency(int32_t dependencyId, Pool *stringPool, Table* destination);
+    void traceLog(bool isBegin,
+                  const char *name,
+                  const char *args);
     int64_t fragmentProgressUpdate(
                 int32_t batchIndex,
                 PlanNodeType planNodeType,
@@ -71,6 +74,7 @@ private:
     jobject m_javaExecutionEngine;
     jmethodID m_fallbackToEEAllocatedBufferMID;
     jmethodID m_nextDependencyMID;
+    jmethodID m_traceLogMID;
     jmethodID m_fragmentProgressUpdateMID;
     jmethodID m_planForFragmentIdMID;
     jmethodID m_crashVoltDBMID;

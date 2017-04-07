@@ -53,7 +53,7 @@
 #include "storage/temptable.h"
 
 
-static int64_t NUM_ROWS = 10000;
+static int64_t NUM_ROWS = 100;
 static int64_t NUM_COLS = 32;
 
 namespace voltdb {

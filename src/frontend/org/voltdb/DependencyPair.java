@@ -17,15 +17,85 @@
 
 package org.voltdb;
 
-public class DependencyPair {
+import java.nio.ByteBuffer;
+
+/*
+ * DependencyPairs represent a relationship between the steps of an MP System Procedure we are
+ * currently on and the Table result that is associated with that step. In some cases these dependencies
+ * are passed around between processes on the same host in which case they are actual Tables, but in
+ * other cases they are received over the network, in which case they are serialized into arrays.
+ * It is often convenient to leave them in whatever form they were created in and defer the conversion
+ * until it is actually necessary.
+ */
+public abstract class DependencyPair {
 
     public final int depId;
-    public final VoltTable dependency;
 
-    public DependencyPair(int depId, VoltTable dependency) {
-        assert(dependency != null);
-
+    public DependencyPair(int depId) {
         this.depId = depId;
-        this.dependency = dependency;
+    }
+
+    public abstract ByteBuffer getBufferDependency();
+
+    public abstract VoltTable getTableDependency();
+
+    /*
+     * Concrete class for a DependencyPair that is created from a VoltTable but may
+     * need to be serialized into a ByteArray.
+     */
+    public static class TableDependencyPair extends DependencyPair {
+        private final VoltTable dependencyTable;
+
+        public TableDependencyPair(int depId, VoltTable dependency) {
+            super(depId);
+            assert(dependency != null);
+
+            this.dependencyTable = dependency;
+        }
+
+        public ByteBuffer getBufferDependency() {
+            if (dependencyTable == null) {
+                return null;
+            }
+            return TableHelper.getBackedBuffer(dependencyTable);
+        }
+
+        public VoltTable getTableDependency() {
+            return dependencyTable;
+        }
+    }
+
+    /*
+     * Concrete class for a DependencyPair that is created from a ByteArray (typically
+     * from the network) that may need to be represented as a VoltTable.
+     */
+    public static class BufferDependencyPair extends DependencyPair {
+        private final byte[] dependencyByteArray;
+        private final int startPosition;
+        private final int totalLen;
+        private VoltTable dependencyTable = null;
+
+        public BufferDependencyPair(int depId, byte[] dependency, int startPosition, int totalLen) {
+            super(depId);
+            assert(dependency != null);
+            assert(dependency.length >= 4);
+            this.dependencyByteArray = dependency;
+            this.startPosition = startPosition;
+            this.totalLen = totalLen;
+        }
+
+
+        public ByteBuffer getBufferDependency() {
+            return ByteBuffer.wrap(dependencyByteArray, startPosition, totalLen);
+        }
+
+        public VoltTable getTableDependency() {
+            if (dependencyTable == null) {
+                dependencyTable = PrivateVoltTableFactory.createVoltTableFromByteArray(dependencyByteArray, startPosition, totalLen);
+            }
+            return dependencyTable;
+        }
     }
 }
+
+

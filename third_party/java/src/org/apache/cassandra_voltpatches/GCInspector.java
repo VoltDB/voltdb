@@ -32,6 +32,7 @@ import javax.management.MBeanServer;
 import javax.management.ObjectName;
 
 import org.voltcore.logging.VoltLogger;
+import org.voltdb.GcStats;
 
 import com.google_voltpatches.common.collect.ImmutableSet;
 
@@ -48,6 +49,7 @@ public class GCInspector
 
     final List<GarbageCollectorMXBean> beans = new ArrayList<GarbageCollectorMXBean>();
     final MemoryMXBean membean = ManagementFactory.getMemoryMXBean();
+    private GcStats m_voltGcStats = null;
 
     public GCInspector()
     {
@@ -67,11 +69,12 @@ public class GCInspector
         }
     }
 
-    public void start(ScheduledThreadPoolExecutor stpe)
+    public void start(ScheduledThreadPoolExecutor stpe, GcStats gcStats)
     {
         // don't bother starting a thread that will do nothing.
         if (beans.size() == 0)
             return;
+        m_voltGcStats = gcStats;
         Runnable t = new Runnable()
         {
             @Override
@@ -83,6 +86,10 @@ public class GCInspector
         stpe.scheduleAtFixedRate(t, INTERVAL_IN_MS, INTERVAL_IN_MS, TimeUnit.MILLISECONDS);
     }
 
+    private static final ImmutableSet<String> newGenGCs =
+            ImmutableSet.of(
+                    "ParNew",
+                    "G1 Young Generation");
     private static final ImmutableSet<String> oldGenGCs =
             ImmutableSet.of(
                     "ConcurrentMarkSweep",
@@ -128,14 +135,19 @@ public class GCInspector
             }
 
             // if we just finished a full collection and we're still using a lot of memory, log
+            if (newGenGCs.contains(gc.getName()))
+            {
+                m_voltGcStats.gcInspectorReport(true, (int)(count - previousCount), duration);
+            }
             if (oldGenGCs.contains(gc.getName()))
             {
+                m_voltGcStats.gcInspectorReport(false, (int)(count - previousCount), duration);
                 if (memoryUsed > .5 * memoryMax)
                 {
                     double usage = (double) memoryUsed / memoryMax;
 
                     String usageStr = String.format("%.2f", usage * 100);
-                    String memoryMaxStr = String.format("%.2f", (double) memoryMax / 1_048_576);  //2^20 Bytes 
+                    String memoryMaxStr = String.format("%.2f", (double) memoryMax / 1_048_576);  //2^20 Bytes
 
                     if (.5 <= usage && usage < .6)
                     {
@@ -146,21 +158,6 @@ public class GCInspector
                     }
                 }
             }
-        }
-    }
-
-    public static void main(String args[]) throws Exception {
-        ArrayList<byte[]> stuff = new ArrayList<byte[]>();
-        GCInspector.instance.start(new ScheduledThreadPoolExecutor(1));
-        int allocations = 3000;
-        for (int ii = 0; ii < allocations; ii++) {
-            for (int zz = 0; zz < 1024; zz++) {
-                stuff.add(new byte[1024]);
-            }
-        }
-        Random r = new Random();
-        while (true) {
-            stuff.set(r.nextInt(stuff.size()), new byte[1024]);
         }
     }
 }

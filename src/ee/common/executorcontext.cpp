@@ -88,12 +88,13 @@ ExecutorContext::ExecutorContext(int64_t siteId,
     m_undoQuantum(undoQuantum),
     m_staticParams(MAX_PARAM_COUNT),
     m_tuplesModifiedStack(),
-    m_executorsMap(),
+    m_executorsMap(NULL),
     m_drStream(drStream),
     m_drReplicatedStream(drReplicatedStream),
     m_engine(engine),
     m_txnId(0),
     m_spHandle(0),
+    m_traceOn(false),
     m_lastCommittedSpHandle(0),
     m_siteId(siteId),
     m_partitionId(partitionId),
@@ -145,12 +146,27 @@ UniqueTempTableResult ExecutorContext::executeExecutors(const std::vector<Abstra
     try {
         BOOST_FOREACH (AbstractExecutor *executor, executorList) {
             assert(executor);
+
+            if (isTraceOn()) {
+                char name[32];
+                snprintf(name, 32, "%s", planNodeToString(executor->getPlanNode()->getPlanNodeType()).c_str());
+                m_topend->traceLog(true, name, NULL);
+            }
+
             // Call the execute method to actually perform whatever action
             // it is that the node is supposed to do...
             if (!executor->execute(m_staticParams)) {
+                if (isTraceOn()) {
+                    m_topend->traceLog(false, NULL, NULL);
+                }
                 throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                     "Unspecified execution error detected");
             }
+
+            if (isTraceOn()) {
+                m_topend->traceLog(false, NULL, NULL);
+            }
+
             ++ctr;
         }
     } catch (const SerializableEEException &e) {
@@ -205,10 +221,14 @@ Table* ExecutorContext::getSubqueryOutputTable(int subqueryId) const
 
 void ExecutorContext::cleanupAllExecutors()
 {
-    typedef std::map<int, std::vector<AbstractExecutor*>* >::value_type MapEntry;
-    BOOST_FOREACH(MapEntry& entry, *m_executorsMap) {
-        int subqueryId = entry.first;
-        cleanupExecutorsForSubquery(subqueryId);
+    // If something failed before we could even instantiate the plan,
+    // there won't even be an executors map.
+    if (m_executorsMap != NULL) {
+        typedef std::map<int, std::vector<AbstractExecutor*>* >::value_type MapEntry;
+        BOOST_FOREACH(MapEntry& entry, *m_executorsMap) {
+            int subqueryId = entry.first;
+            cleanupExecutorsForSubquery(subqueryId);
+        }
     }
 
     // Clear any cached results from executed subqueries
@@ -265,14 +285,17 @@ void ExecutorContext::reportProgressToTopend(const TempTableLimits *limits) {
 }
 
 bool ExecutorContext::allOutputTempTablesAreEmpty() const {
-    typedef std::map<int, std::vector<AbstractExecutor*>* >::value_type MapEntry;
-    BOOST_FOREACH (MapEntry &entry, *m_executorsMap) {
-        BOOST_FOREACH(AbstractExecutor* executor, *(entry.second)) {
-            if (! executor->outputTempTableIsEmpty()) {
-                return false;
+    if (m_executorsMap != NULL) {
+        typedef std::map<int, std::vector<AbstractExecutor*>* >::value_type MapEntry;
+        BOOST_FOREACH (MapEntry &entry, *m_executorsMap) {
+            BOOST_FOREACH(AbstractExecutor* executor, *(entry.second)) {
+                if (! executor->outputTempTableIsEmpty()) {
+                    return false;
+                }
             }
         }
     }
+
     return true;
 }
 

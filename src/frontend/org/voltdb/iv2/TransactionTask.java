@@ -17,21 +17,34 @@
 
 package org.voltdb.iv2;
 
-import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltTable;
+import org.voltdb.VoltTable.ColumnInfo;
+import org.voltdb.VoltType;
 import org.voltdb.dtxn.TransactionState;
+import org.voltdb.messaging.Iv2InitiateTaskMessage;
+import org.voltdb.utils.VoltTrace;
+
+import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 
 public abstract class TransactionTask extends SiteTasker
 {
     protected static final VoltLogger execLog = new VoltLogger("EXEC");
     protected static final VoltLogger hostLog = new VoltLogger("HOST");
 
+    protected static final byte[] m_rawDummyResult;
+
+    static {
+        VoltTable dummyResult = new VoltTable(new ColumnInfo("UNUSED", VoltType.INTEGER));
+        m_rawDummyResult = dummyResult.buildReusableDependenyResult();
+    }
+
     final protected TransactionState m_txnState;
     final protected TransactionTaskQueue m_queue;
-    protected ListenableFuture<Object> m_durabilityBackpressureFuture = CoreUtils.COMPLETED_FUTURE;
+    protected ListenableFuture<Object> m_durabilityBackpressureFuture = null;
 
     public TransactionTask(TransactionState txnState, TransactionTaskQueue queue)
     {
@@ -52,12 +65,17 @@ public abstract class TransactionTask extends SiteTasker
      * returns immediately.
      */
     protected void waitOnDurabilityBackpressureFuture() {
-        try {
-            m_durabilityBackpressureFuture.get();
-        } catch (Throwable t) {
-            VoltDB.crashLocalVoltDB("Unexpected exception waiting for durability future", true, t);
+        if (m_durabilityBackpressureFuture != null) {
+            try {
+                m_durabilityBackpressureFuture.get();
+            } catch (Throwable t) {
+                VoltDB.crashLocalVoltDB("Unexpected exception waiting for durability future", true, t);
+            }
+            durabilityTraceEnd();
         }
     }
+
+    protected void durabilityTraceEnd() {}
 
     @Override
     abstract public void run(SiteProcedureConnection siteConnection);

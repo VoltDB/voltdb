@@ -240,6 +240,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     private IOStats m_ioStats = null;
     private MemoryStats m_memoryStats = null;
     private CpuStats m_cpuStats = null;
+    private GcStats m_gcStats = null;
     private CommandLogStats m_commandLogStats = null;
     private DRRoleStats m_drRoleStats = null;
     private StatsManager m_statsManager = null;
@@ -337,6 +338,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     private boolean m_isRunningWithOldVerb = true;
     private boolean m_isBare = false;
     private static final String SECONDARY_PICONETWORK_THREADS = "secondaryPicoNetworkThreads";
+
+    /** Last transaction ID at which the logging config updated.
+     * Also, use the intrinsic lock to safeguard access from multiple
+     * execution site threads */
+    private Long m_lastLogUpdateTxnId = 0L;
 
     /**
      * Startup snapshot nonce taken on shutdown --save
@@ -1263,7 +1269,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             m_cpuStats = new CpuStats();
             getStatsAgent().registerStatsSource(StatsSelector.CPU,
                     0, m_cpuStats);
-
+            m_gcStats = new GcStats();
+            getStatsAgent().registerStatsSource(StatsSelector.GC,
+                    0, m_gcStats);
             // ENG-6321
             m_commandLogStats = new CommandLogStats(m_commandLog);
             getStatsAgent().registerStatsSource(StatsSelector.COMMANDLOG, 0, m_commandLogStats);
@@ -2068,7 +2076,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         EnterpriseMaintenance em = EnterpriseMaintenance.get();
         if (em != null) { em.setupMaintenaceTasks(); }
 
-        GCInspector.instance.start(m_periodicPriorityWorkThread);
+        GCInspector.instance.start(m_periodicPriorityWorkThread, m_gcStats);
     }
 
     private void startHealthMonitor() {
@@ -3244,25 +3252,21 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         }
     }
 
-    /** Last transaction ID at which the logging config updated.
-     * Also, use the intrinsic lock to safeguard access from multiple
-     * execution site threads */
-    private static Long lastLogUpdate_txnId = 0L;
     @Override
     synchronized public void logUpdate(String xmlConfig, long currentTxnId, File voltroot)
     {
         // another site already did this work.
-        if (currentTxnId == lastLogUpdate_txnId) {
+        if (currentTxnId == m_lastLogUpdateTxnId) {
             return;
         }
-        else if (currentTxnId < lastLogUpdate_txnId) {
+        else if (currentTxnId < m_lastLogUpdateTxnId) {
             throw new RuntimeException(
-                    "Trying to update logging config at transaction " + lastLogUpdate_txnId
+                    "Trying to update logging config at transaction " + m_lastLogUpdateTxnId
                     + " with an older transaction: " + currentTxnId);
         }
         hostLog.info("Updating RealVoltDB logging config from txnid: " +
-                lastLogUpdate_txnId + " to " + currentTxnId);
-        lastLogUpdate_txnId = currentTxnId;
+                m_lastLogUpdateTxnId + " to " + currentTxnId);
+        m_lastLogUpdateTxnId = currentTxnId;
         VoltLogger.configure(xmlConfig, voltroot);
     }
 
