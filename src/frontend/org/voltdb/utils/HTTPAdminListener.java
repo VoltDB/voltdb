@@ -25,7 +25,6 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.URL;
-import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -102,12 +101,15 @@ public class HTTPAdminListener {
     private static final VoltLogger m_log = new VoltLogger("HOST");
     public static final String REALM = "VoltDBRealm";
 
+    // static resources
     private static final String RESOURCE_BASE = "dbmonitor";
     private static final String CSS_TARGET = "css";
     private static final String IMAGES_TARGET = "images";
     private static final String JS_TARGET = "js";
 
-    static final String jsonContentType = ContentType.APPLICATION_JSON.toString();
+    // content types
+    private static final String JSON_CONTENT_TYPE = ContentType.APPLICATION_JSON.toString();
+    private static final String HTML_CONTENT_TYPE = "text/html;charset=utf-8";
 
     Server m_server;
     HTTPClientInterface httpClientInterface = new HTTPClientInterface();
@@ -232,11 +234,10 @@ public class HTTPAdminListener {
                     return;
                 }
 
-                if (baseRequest.getRequestURI().contains("css") ||
-                        baseRequest.getRequestURI().contains("images") ||
-                        baseRequest.getRequestURI().contains("js")) {
-//                    baseRequest.setHandled(false);
-                    System.out.println("uri" + baseRequest.getRequestURI() + " target: " + target);
+                if (baseRequest.getRequestURI().contains(File.separator + CSS_TARGET) ||
+                        baseRequest.getRequestURI().contains(File.separator + IMAGES_TARGET) ||
+                        baseRequest.getRequestURI().contains(File.separator + JS_TARGET)) {
+                    // will be processed by individual resource handler
                     return;
                 }
 
@@ -266,7 +267,7 @@ public class HTTPAdminListener {
                 if (target.endsWith("/index.htm")) {
 
                     // set the headers
-                    response.setContentType("text/html;charset=utf-8");
+                    response.setContentType(HTML_CONTENT_TYPE);
                     response.setStatus(HttpServletResponse.SC_OK);
                     baseRequest.setHandled(true);
 
@@ -279,22 +280,23 @@ public class HTTPAdminListener {
                     }
                 }
                 else {
-                    // set the mime type in a giant hack
-                    String mime = "text/html;charset=utf-8";
-                    if (target.endsWith(".js"))
-                        mime = "application/x-javascript;charset=utf-8";
-                    if (target.endsWith(".css"))
-                        mime = "text/css;charset=utf-8";
-                    if (target.endsWith(".gif"))
-                        mime = "image/gif";
-                    if (target.endsWith(".png"))
-                        mime = "image/png";
-                    if ((target.endsWith(".jpg")) || (target.endsWith(".jpeg")))
-                        mime = "image/jpeg";
+                    // js, css, images handled by resource handler. files corresponding to it
+                    // should be placed in the specific location
+                    assert !target.endsWith(".js") : " Javascript should in the resource path "
+                        + RESOURCE_BASE + File.separator + JS_TARGET;
+                    assert !target.endsWith(".css") : " Stylesheet should in the resource path "
+                        + RESOURCE_BASE + File.separator + CSS_TARGET;
+                    assert !target.endsWith(".gif") : target + " should in the resource path "
+                        + RESOURCE_BASE + File.separator + IMAGES_TARGET;
+                    assert !target.endsWith(".png") : target + " should in the resource path "
+                        + RESOURCE_BASE + File.separator + IMAGES_TARGET;
+                    assert !target.endsWith(".jpg") : target + " should in the resource path "
+                        + RESOURCE_BASE + File.separator + IMAGES_TARGET;
+                    assert !target.endsWith(".jpeg") : target + "image should in the resource path "
+                        + RESOURCE_BASE + File.separator + IMAGES_TARGET;
 
                     // set the headers
-                    response.setContentType(mime);
-//                    response.setHeader("Cache-Control", "max-age=120");
+                    response.setContentType(HTML_CONTENT_TYPE);
                     response.setStatus(HttpServletResponse.SC_OK);
                     baseRequest.setHandled(true);
 
@@ -349,20 +351,25 @@ public class HTTPAdminListener {
 
     }
 
+    /*
+     * Utility handler class to enable caching of static resources.
+     * The static resources are package in jar file
+     */
     class CacheStaticResourceHandler extends ResourceHandler {
-        /*
-         * resource handler to server static resource within dbmonitor,
-         * which is bundled in jar, with caching enabled         *
-         * @Param: target location within dbmonitor
-         *
-         */
+        // target Directory location for folder w.r.t. resource base folder - dbmonitor
         public CacheStaticResourceHandler(final String target) {
             super();
-            String path = VoltDB.class.getResource(RESOURCE_BASE + File.separator + target).toExternalForm();
-            System.out.println("DBmonitor path" + path);
+            final String path = VoltDB.class.getResource(RESOURCE_BASE + File.separator + target).toExternalForm();
+            m_log.debug("Resource base path: " + path);
             setResourceBase(path);
-            setCacheControl("max-age=3600, public");
+            setCacheControl("max-age=600, private");
             setEtags(true);
+        }
+
+        @SuppressWarnings("unused")
+        private CacheStaticResourceHandler() {
+            super();
+            assert false : "Target location for static resource is needed to initialize the resource handler";
         }
 
         @Override
@@ -372,10 +379,9 @@ public class HTTPAdminListener {
                            HttpServletResponse response)
                            throws IOException, ServletException {
             super.handle(target, baseRequest, request, response);
-            String resourceBase = getResourceBase();
-            Path path = Paths.get(resourceBase);
-            System.out.println("Request handled " + baseRequest.isHandled()
-                + " path " + path);
+            if (!baseRequest.isHandled()) {
+                m_log.debug("Failed to process static resource: " + Paths.get(getResourceBase()));
+            }
         }
 
     }
@@ -418,7 +424,7 @@ public class HTTPAdminListener {
             String jsonp = request.getParameter(HTTPClientInterface.JSONP);
             AuthenticationResult authResult = null;
             try {
-                response.setContentType(jsonContentType);
+                response.setContentType(JSON_CONTENT_TYPE);
                 if (!HTTPClientInterface.validateJSONP(jsonp, baseRequest, response)) {
                     return;
                 }
@@ -559,7 +565,7 @@ public class HTTPAdminListener {
             String jsonp = request.getParameter(HTTPClientInterface.JSONP);
             AuthenticationResult authResult = null;
             try {
-                response.setContentType(jsonContentType);
+                response.setContentType(JSON_CONTENT_TYPE);
                 if (!HTTPClientInterface.validateJSONP(jsonp, baseRequest, response)) {
                     return;
                 }
@@ -946,7 +952,7 @@ public class HTTPAdminListener {
             if (baseRequest.isHandled()) return;
             try {
                 // http://www.ietf.org/rfc/rfc4627.txt dictates this mime type
-                response.setContentType(jsonContentType);
+                response.setContentType(JSON_CONTENT_TYPE);
                 if (m_jsonEnabled) {
                     if (target.equals("/")) {
                         httpClientInterface.process(baseRequest, response);
@@ -980,7 +986,7 @@ public class HTTPAdminListener {
         try {
             String report = ReportMaker.liveReport();
 
-            response.setContentType("text/html;charset=utf-8");
+            response.setContentType(HTML_CONTENT_TYPE);
             response.setStatus(HttpServletResponse.SC_OK);
             baseRequest.setHandled(true);
 
@@ -1131,19 +1137,21 @@ public class HTTPAdminListener {
                     catalogRequestHandler,
                     ddlRequestHandler,
                     deploymentRequestHandler,
-                    profileRequestHandler
-//                    , cssResource
-                    , dbMonitorHandler
-                    , cssResourceHandler
-                    , imageResourceHandler
-                    , jsResourceHandler
+                    profileRequestHandler,
+                    dbMonitorHandler,
+                    cssResourceHandler,
+                    imageResourceHandler,
+                    jsResourceHandler
                     });
 
             GzipHandler compressResourcesHandler = new GzipHandler();
             compressResourcesHandler.setHandler(handlers);
 
+            compressResourcesHandler.addExcludedMimeTypes(JSON_CONTENT_TYPE);
+            compressResourcesHandler.setIncludedMimeTypes("application/x-javascript", "text/css" ,
+                    "image/gif", "image/png", "image/jpeg", HTML_CONTENT_TYPE);
+
             m_server.setHandler(compressResourcesHandler);
-//            m_server.setHandler(handlers);
 
             httpClientInterface.setTimeout(timeout);
             m_jsonEnabled = jsonEnabled;
