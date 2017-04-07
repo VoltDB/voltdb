@@ -229,7 +229,7 @@ public class MeshProber implements JoinAcceptor {
                 hostCountSupplier.get(), coordinators.size());
         checkArgument(terminusNonce == null || !terminusNonce.trim().isEmpty(),
                 "terminus should not be blank");
-        // stagedConfigHash can be null - that means there's no staged config.
+        // stagedConfigHash can be null - that means there isn't a staged catalog
 
         this.m_coordinators = ImmutableSortedSet.copyOf(coordinators);
         this.m_versionChecker = versionChecker;

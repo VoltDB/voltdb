@@ -44,14 +44,25 @@ import org.junit.rules.TemporaryFolder;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltDB.SimulatedExitException;
 import org.voltdb.catalog.Catalog;
+import org.voltdb.client.Client;
+import org.voltdb.client.ClientConfig;
+import org.voltdb.client.ClientFactory;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.InMemoryJarfile;
+import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.base.Joiner;
 
+/** Tests starting the server with NewCLI (init + start).
+ * Covers the staged catalog approach (init --schema --classes) as well.
+ * There's a counterpart in Pro called "TestStagedCatalogsWithDurability"
+ * that addresses interations with features that aren't in Community.
+ */
 final public class TestInitStartAction {
 
     static File rootDH;
@@ -383,5 +394,24 @@ final public class TestInitStartAction {
         assertTrue(VoltDB.wasCrashCalled);
         assertTrue(VoltDB.crashMessage.contains("Could not compile specified schema"));
         assertEquals(true, schemaFile.delete());
+    }
+
+    /** Tests that a cluster can start with each node using an identical staged catalog.
+     * Since durability is off, the staged catalog will be kept around but not reflect any DDL changes.
+     * @throws Exception
+     */
+    @Test
+    public void testStartWithStagedCatalogNoDurability() throws Exception {
+        // TODO
+    }
+
+    @Test
+    public void testStartWithMismatchedStagedSchema() throws Exception {
+        // TODO
+    }
+
+    @Test
+    public void testStartWithMismatchedStagedClasses() throws Exception {
+        // TODO
     }
 }

@@ -715,7 +715,7 @@ public class VoltDB {
                     m_pathToCatalog = stagedCatalogLocation.getAbsolutePath();
                     break;
                 case INITIALIZE:
-                    // check for startup artifacts will address existence of previous staged catalog
+                    // existence of previous staged catalog will be addressed later
                     break;
                 default:
                     hostLog.warn("Staged catalog is present at " + stagedCatalogLocation.getAbsolutePath() + " but is being ignored by the " + m_startAction.toString() + " action.");
