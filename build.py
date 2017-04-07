@@ -554,8 +554,9 @@ if whichtests in ("${eetestsuite}", "structures"):
 
 if whichtests in ("${eetestsuite}", "plannodes"):
     CTX.TESTS['plannodes'] = """
-     WindowFunctionPlanNodeTest
      PlanNodeFragmentTest
+     PlanNodeUtilTest
+     WindowFunctionPlanNodeTest
     """
 
 ###############################################################################

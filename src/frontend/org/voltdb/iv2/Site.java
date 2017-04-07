@@ -46,6 +46,7 @@ import org.voltdb.DRLogSegmentId;
 import org.voltdb.DependencyPair;
 import org.voltdb.ExtensibleSnapshotDigestData;
 import org.voltdb.HsqlBackend;
+import org.voltdb.HybridCrc32;
 import org.voltdb.IndexStats;
 import org.voltdb.LoadedProcedureSet;
 import org.voltdb.MemoryStats;
@@ -93,6 +94,7 @@ import org.voltdb.jni.ExecutionEngineIPC;
 import org.voltdb.jni.ExecutionEngineJNI;
 import org.voltdb.jni.MockExecutionEngine;
 import org.voltdb.messaging.CompleteTransactionMessage;
+import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.rejoin.TaskLog;
@@ -104,10 +106,10 @@ import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MinimumRatioMaintainer;
 
+import vanilla.java.affinity.impl.PosixJNAAffinity;
+
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.base.Preconditions;
-
-import vanilla.java.affinity.impl.PosixJNAAffinity;
 
 public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
 {
@@ -1174,6 +1176,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     @Override
     public TupleStreamStateInfo getDRTupleStreamStateInfo()
     {
+        // Set the psetBuffer buffer capacity and clear the buffer
+        m_ee.getParamBufferForExecuteTask(0);
         ByteBuffer resultBuffer = ByteBuffer.wrap(m_ee.executeTask(TaskType.GET_DR_TUPLESTREAM_STATE, ByteBuffer.allocate(0)));
         long partitionSequenceNumber = resultBuffer.getLong();
         long partitionSpUniqueId = resultBuffer.getLong();
@@ -1425,28 +1429,40 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     @Override
-    public VoltTable[] executePlanFragments(int numFragmentIds,
-                                            long[] planFragmentIds,
-                                            long[] inputDepIds,
-                                            Object[] parameterSets,
-                                            String[] sqlTexts,
-                                            long txnId,
-                                            long spHandle,
-                                            long uniqueId,
-                                            boolean readOnly)
-            throws EEException
+    public FastDeserializer executePlanFragments(
+            int numFragmentIds,
+            long[] planFragmentIds,
+            long[] inputDepIds,
+            Object[] parameterSets,
+            boolean[] isWriteFrag,
+            HybridCrc32 writeCRC,
+            String[] sqlTexts,
+            long txnId,
+            long spHandle,
+            long uniqueId,
+            boolean readOnly,
+            boolean traceOn)
+                    throws EEException
     {
         return m_ee.executePlanFragments(
                 numFragmentIds,
                 planFragmentIds,
                 inputDepIds,
                 parameterSets,
+                isWriteFrag,
+                writeCRC,
                 sqlTexts,
                 txnId,
                 spHandle,
                 m_lastCommittedSpHandle,
                 uniqueId,
-                readOnly ? Long.MAX_VALUE : getNextUndoTokenBroken());
+                readOnly ? Long.MAX_VALUE : getNextUndoTokenBroken(),
+                traceOn);
+    }
+
+    @Override
+    public boolean usingFallbackBuffer() {
+        return m_ee.usingFallbackBuffer();
     }
 
     @Override

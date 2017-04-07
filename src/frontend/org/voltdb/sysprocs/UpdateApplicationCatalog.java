@@ -254,7 +254,7 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
 
             // Don't actually care about the returned table, just need to send something
             // back to the MPI scoreboard
-            DependencyPair success = new DependencyPair(DEP_updateCatalogSync,
+            DependencyPair success = new DependencyPair.TableDependencyPair(DEP_updateCatalogSync,
                     new VoltTable(new ColumnInfo[] { new ColumnInfo("UNUSED", VoltType.BIGINT) } ));
 
             if ( ! context.isLowestSiteId()) {
@@ -329,7 +329,7 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
             // back to the MPI scoreboard
             log.info("Site " + CoreUtils.hsIdToString(m_site.getCorrespondingSiteId()) +
                     " acknowledged data and catalog prechecks.");
-            return new DependencyPair(DEP_updateCatalogSyncAggregate,
+            return new DependencyPair.TableDependencyPair(DEP_updateCatalogSyncAggregate,
                     new VoltTable(new ColumnInfo[] { new ColumnInfo("UNUSED", VoltType.BIGINT) } ));
         }
         else if (fragmentId == SysProcFragmentId.PF_updateCatalog) {
@@ -402,11 +402,11 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
 
             VoltTable result = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);
             result.addRow(VoltSystemProcedure.STATUS_OK);
-            return new DependencyPair(DEP_updateCatalog, result);
+            return new DependencyPair.TableDependencyPair(DEP_updateCatalog, result);
         }
         else if (fragmentId == SysProcFragmentId.PF_updateCatalogAggregate) {
             VoltTable result = VoltTableUtil.unionTables(dependencies.get(DEP_updateCatalog));
-            return new DependencyPair(DEP_updateCatalogAggregate, result);
+            return new DependencyPair.TableDependencyPair(DEP_updateCatalogAggregate, result);
         }
         else {
             VoltDB.crashLocalVoltDB(

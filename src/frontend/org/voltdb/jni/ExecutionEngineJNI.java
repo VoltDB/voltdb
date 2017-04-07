@@ -25,6 +25,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
+import org.voltdb.HybridCrc32;
 import org.voltdb.ParameterSet;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.StatsSelector;
@@ -85,8 +86,9 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
     /** Create a ByteBuffer (in a container) for serializing arguments to C++. Use a direct
     ByteBuffer as it will be passed directly to the C++ code. */
-    private BBContainer psetBufferC = null;
-    private ByteBuffer psetBuffer = null;
+    private static final int MAX_PSETBUFFER_SIZE = 50 * 1024 * 1024; // 50MB
+    private BBContainer m_psetBufferC = null;
+    private ByteBuffer m_psetBuffer = null;
 
     /** Create a ByteBuffer (in a container) for the C++ side to share time measurements and
         the success / fail status for fragments in a batch. */
@@ -103,18 +105,24 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      * that rely on being able to serialize large results sets will get the same amount of storage
      * when using the IPC backend.
      **/
-    private final BBContainer deserializerBufferOrigin = org.voltcore.utils.DBBPool.allocateDirect(1024 * 1024 * 10);
-    private FastDeserializer deserializer =
-        new FastDeserializer(deserializerBufferOrigin.b());
+    private final BBContainer m_firstDeserializerBufferOrigin = org.voltcore.utils.DBBPool.allocateDirect(1024 * 1024 * 10);
+    private FastDeserializer m_firstDeserializer =
+            new FastDeserializer(m_firstDeserializerBufferOrigin.b());
+    private final BBContainer m_nextDeserializerBufferOrigin = org.voltcore.utils.DBBPool.allocateDirect(1024 * 1024 * 10);
+    private FastDeserializer m_nextDeserializer =
+            new FastDeserializer(m_nextDeserializerBufferOrigin.b());
+
+    private final BBContainer m_emptyDeserializerBuffer = org.voltcore.utils.DBBPool.allocateDirect(0);
+    private FastDeserializer m_emptyDeserializer = new FastDeserializer(m_emptyDeserializerBuffer.b());
 
     /*
      * For large result sets the EE will allocate new memory for the results
      * and invoke a callback to set the allocated memory here.
      */
-    private ByteBuffer fallbackBuffer = null;
+    private ByteBuffer m_fallbackBuffer = null;
 
-    private final BBContainer exceptionBufferOrigin = org.voltcore.utils.DBBPool.allocateDirect(1024 * 1024 * 5);
-    private ByteBuffer exceptionBuffer = exceptionBufferOrigin.b();
+    private final BBContainer m_exceptionBufferOrigin = org.voltcore.utils.DBBPool.allocateDirect(1024 * 1024 * 5);
+    private ByteBuffer m_exceptionBuffer = m_exceptionBufferOrigin.b();
 
     /**
      * initialize the native Engine object.
@@ -170,21 +178,22 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
     final void updateEEBufferPointers() {
         int errorCode = nativeSetBuffers(pointer,
-                psetBuffer, psetBuffer.capacity(),
+                m_psetBuffer, m_psetBuffer.capacity(),
                 perFragmentStatsBuffer, perFragmentStatsBuffer.capacity(),
-                deserializer.buffer(), deserializer.buffer().capacity(),
-                exceptionBuffer, exceptionBuffer.capacity());
+                m_firstDeserializer.buffer(), m_firstDeserializer.buffer().capacity(),
+                m_nextDeserializer.buffer(), m_nextDeserializer.buffer().capacity(),
+                m_exceptionBuffer, m_exceptionBuffer.capacity());
         checkErrorCode(errorCode);
     }
 
     final void setupPsetBuffer(int size) {
-        if (psetBuffer != null) {
-            psetBufferC.discard();
-            psetBuffer = null;
+        if (m_psetBuffer != null) {
+            m_psetBufferC.discard();
+            m_psetBuffer = null;
         }
 
-        psetBufferC = DBBPool.allocateDirect(size);
-        psetBuffer = psetBufferC.b();
+        m_psetBufferC = DBBPool.allocateDirect(size);
+        m_psetBuffer = m_psetBufferC.b();
     }
 
     final void setupPerFragmentStatsBuffer(int size) {
@@ -198,13 +207,19 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     }
 
     final void clearPsetAndEnsureCapacity(int size) {
-        assert(psetBuffer != null);
-        if (size > psetBuffer.capacity()) {
+        assert(m_psetBuffer != null);
+        if (size > m_psetBuffer.capacity()) {
             setupPsetBuffer(size);
             updateEEBufferPointers();
         }
+        else if (m_psetBuffer.capacity() > MAX_PSETBUFFER_SIZE && size < MAX_PSETBUFFER_SIZE) {
+            // The last request was a batch that was greater than max network buffer size,
+            // so let's not hang on to all that memory
+            setupPsetBuffer(MAX_PSETBUFFER_SIZE);
+            updateEEBufferPointers();
+        }
         else {
-            psetBuffer.clear();
+            m_psetBuffer.clear();
         }
     }
 
@@ -227,15 +242,15 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     /** Utility method to throw a Runtime exception based on the error code and serialized exception **/
     @Override
     final protected void throwExceptionForError(final int errorCode) throws RuntimeException {
-        exceptionBuffer.clear();
-        final int exceptionLength = exceptionBuffer.getInt();
+        m_exceptionBuffer.clear();
+        final int exceptionLength = m_exceptionBuffer.getInt();
 
         if (exceptionLength == 0) {
             throw new EEException(errorCode);
         } else {
-            exceptionBuffer.position(0);
-            exceptionBuffer.limit(4 + exceptionLength);
-            throw SerializableException.deserializeFromBuffer(exceptionBuffer);
+            m_exceptionBuffer.position(0);
+            m_exceptionBuffer.limit(4 + exceptionLength);
+            throw SerializableException.deserializeFromBuffer(m_exceptionBuffer);
         }
     }
 
@@ -253,12 +268,16 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             pointer = 0L;
             checkErrorCode(errorCode);
         }
-        deserializer = null;
-        deserializerBufferOrigin.discard();
-        exceptionBuffer = null;
-        exceptionBufferOrigin.discard();
-        psetBufferC.discard();
-        psetBuffer = null;
+        m_firstDeserializer = null;
+        m_firstDeserializerBufferOrigin.discard();
+        m_nextDeserializer = null;
+        m_nextDeserializerBufferOrigin.discard();
+        m_exceptionBuffer = null;
+        m_exceptionBufferOrigin.discard();
+        m_emptyDeserializer = null;
+        m_emptyDeserializerBuffer.discard();
+        m_psetBufferC.discard();
+        m_psetBuffer = null;
         perFragmentStatsBufferC.discard();
         perFragmentStatsBuffer = null;
         LOG.trace("Released Execution Engine.");
@@ -319,23 +338,28 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
     /**
      * @param undoToken Token identifying undo quantum for generated undo info
+     * @param traceOn
      */
     @Override
-    protected VoltTable[] coreExecutePlanFragments(
+    protected FastDeserializer coreExecutePlanFragments(
+            final int batchIndex,
             final int numFragmentIds,
             final long[] planFragmentIds,
             final long[] inputDepIds,
             final Object[] parameterSets,
+            boolean[] isWriteFrag,
+            HybridCrc32 writeCRC,
             final long txnId,
             final long spHandle,
             final long lastCommittedSpHandle,
             long uniqueId,
-            final long undoToken) throws EEException
+            final long undoToken,
+            final boolean traceOn) throws EEException
     {
         // plan frag zero is invalid
         assert((numFragmentIds == 0) || (planFragmentIds[0] != 0));
 
-        if (numFragmentIds == 0) return new VoltTable[0];
+        if (numFragmentIds == 0) return m_emptyDeserializer;
         final int batchSize = numFragmentIds;
         if (HOST_TRACE_ENABLED) {
             for (int i = 0; i < batchSize; ++i) {
@@ -356,14 +380,16 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
         clearPsetAndEnsureCapacity(allPsetSize);
         for (int i = 0; i < batchSize; ++i) {
-            if (parameterSets[i] instanceof ByteBuffer) {
-                ByteBuffer buf = (ByteBuffer) parameterSets[i];
-                psetBuffer.put(buf);
+            int paramStart = m_psetBuffer.position();
+            Object param = parameterSets[i];
+            if (param instanceof ByteBuffer) {
+                ByteBuffer buf = (ByteBuffer) param;
+                m_psetBuffer.put(buf);
             }
             else {
-                ParameterSet pset = (ParameterSet) parameterSets[i];
+                ParameterSet pset = (ParameterSet) param;
                 try {
-                    pset.flattenToBuffer(psetBuffer);
+                    pset.flattenToBuffer(m_psetBuffer);
                 }
                 catch (final IOException exception) {
                     throw new RuntimeException("Error serializing parameters for SQL batch element: " +
@@ -372,16 +398,22 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                                                pset.toJSONString(), exception);
                 }
             }
+            if (isWriteFrag[i]) {
+                writeCRC.updateFromPosition(paramStart, m_psetBuffer);
+            }
         }
         // checkMaxFsSize();
         clearPerFragmentStatsAndEnsureCapacity(batchSize);
 
         // Execute the plan, passing a raw pointer to the byte buffers for input and output
         //Clear is destructive, do it before the native call
-        deserializer.clear();
+        FastDeserializer targetDeserializer = (batchIndex == 0) ? m_firstDeserializer : m_nextDeserializer;
+        targetDeserializer.clear();
+
         final int errorCode =
             nativeExecutePlanFragments(
                     pointer,
+                    batchIndex,
                     numFragmentIds,
                     planFragmentIds,
                     inputDepIds,
@@ -389,45 +421,25 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                     spHandle,
                     lastCommittedSpHandle,
                     uniqueId,
-                    undoToken);
+                    undoToken,
+                    traceOn);
 
         try {
             checkErrorCode(errorCode);
-            FastDeserializer fds = fallbackBuffer == null ? deserializer : new FastDeserializer(fallbackBuffer);
-            // get a copy of the result buffers and make the tables
-            // use the copy
+            m_usingFallbackBuffer = m_fallbackBuffer != null;
+            FastDeserializer fds = m_usingFallbackBuffer ? new FastDeserializer(m_fallbackBuffer) : targetDeserializer;
+            assert(fds != null);
             try {
-                // read the complete size of the buffer used
-                final int totalSize = fds.readInt();
                 // check if anything was changed
-                final boolean dirty = fds.readBoolean();
-                if (dirty)
-                    m_dirty = true;
-                // get a copy of the buffer
-                final ByteBuffer fullBacking = fds.readBuffer(totalSize);
-                final VoltTable[] results = new VoltTable[batchSize];
-                for (int i = 0; i < batchSize; ++i) {
-                    final int numdeps = fullBacking.getInt(); // number of dependencies for this frag
-                    assert(numdeps == 1);
-                    @SuppressWarnings("unused")
-                    final
-                    int depid = fullBacking.getInt(); // ignore the dependency id
-                    final int tableSize = fullBacking.getInt();
-                    // reasonableness check
-                    assert(tableSize < 50000000);
-                    final ByteBuffer tableBacking = fullBacking.slice();
-                    fullBacking.position(fullBacking.position() + tableSize);
-                    tableBacking.limit(tableSize);
-
-                    results[i] = PrivateVoltTableFactory.createVoltTableFromBuffer(tableBacking, true);
-                }
-                return results;
+                m_dirty |= fds.readBoolean();
             } catch (final IOException ex) {
-                LOG.error("Failed to deserialze result table" + ex);
+                LOG.error("Failed to deserialize result table" + ex);
                 throw new EEException(ERRORCODE_WRONG_SERIALIZED_BYTES);
             }
+
+            return fds;
         } finally {
-            fallbackBuffer = null;
+            m_fallbackBuffer = null;
         }
     }
 
@@ -437,12 +449,12 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             LOG.trace("Retrieving VoltTable:" + tableId);
         }
         //Clear is destructive, do it before the native call
-        deserializer.clear();
-        final int errorCode = nativeSerializeTable(pointer, tableId, deserializer.buffer(),
-                deserializer.buffer().capacity());
+        m_nextDeserializer.clear();
+        final int errorCode = nativeSerializeTable(pointer, tableId, m_nextDeserializer.buffer(),
+                m_nextDeserializer.buffer().capacity());
         checkErrorCode(errorCode);
 
-        return PrivateVoltTableFactory.createVoltTableFromSharedBuffer(deserializer.buffer());
+        return PrivateVoltTableFactory.createVoltTableFromSharedBuffer(m_nextDeserializer.buffer());
     }
 
     @Override
@@ -463,19 +475,19 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         }
 
         //Clear is destructive, do it before the native call
-        deserializer.clear();
+        m_nextDeserializer.clear();
         final int errorCode = nativeLoadTable(pointer, tableId, serialized_table,
                                               txnId, spHandle, lastCommittedSpHandle, uniqueId,
                                               returnUniqueViolations, shouldDRStream, undoToken);
         checkErrorCode(errorCode);
 
         try {
-            int length = deserializer.readInt();
+            int length = m_nextDeserializer.readInt();
             if (length == 0) return null;
             if (length < 0) VoltDB.crashLocalVoltDB("Length shouldn't be < 0", true, null);
 
             byte uniqueViolations[] = new byte[length];
-            deserializer.readFully(uniqueViolations);
+            m_nextDeserializer.readFully(uniqueViolations);
 
             return uniqueViolations;
         } catch (final IOException ex) {
@@ -516,21 +528,19 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             final Long now)
     {
         //Clear is destructive, do it before the native call
-        deserializer.clear();
+        m_nextDeserializer.clear();
         final int numResults = nativeGetStats(pointer, selector.ordinal(), locators, interval, now);
         if (numResults == -1) {
             throwExceptionForError(ERRORCODE_ERROR);
         }
 
         try {
-            deserializer.readInt();//Ignore the length of the result tables
-
-            ByteBuffer buf = fallbackBuffer == null ? deserializer.buffer() : fallbackBuffer;
+            m_nextDeserializer.readInt();//Ignore the length of the result tables
             final VoltTable results[] = new VoltTable[numResults];
             for (int ii = 0; ii < numResults; ii++) {
-                int len = buf.getInt();
+                int len = m_nextDeserializer.readInt();
                 byte[] bufCopy = new byte[len];
-                buf.get(bufCopy);
+                m_nextDeserializer.readFully(bufCopy, 0, len);
                 results[ii] = PrivateVoltTableFactory.createVoltTableFromBuffer(ByteBuffer.wrap(bufCopy), true);
             }
             return results;
@@ -579,7 +589,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                                                       TableStreamType streamType,
                                                       List<BBContainer> outputBuffers) {
         //Clear is destructive, do it before the native call
-        deserializer.clear();
+        m_nextDeserializer.clear();
         byte[] bytes = outputBuffers != null
                             ? SnapshotUtil.OutputBuffersToBytes(outputBuffers)
                             : null;
@@ -588,14 +598,14 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                                                         streamType.ordinal(),
                                                         bytes);
         int[] positions = null;
-        assert(deserializer != null);
+        assert(m_nextDeserializer != null);
         int count;
         try {
-            count = deserializer.readInt();
+            count = m_nextDeserializer.readInt();
             if (count > 0) {
                 positions = new int[count];
                 for (int i = 0; i < count; i++) {
-                    positions[i] = deserializer.readInt();
+                    positions[i] = m_nextDeserializer.readInt();
                 }
                 return Pair.of(remaining, positions);
             }
@@ -616,7 +626,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             long ackTxnId, long seqNo, int partitionId, String tableSignature)
     {
         //Clear is destructive, do it before the native call
-        deserializer.clear();
+        m_nextDeserializer.clear();
         long retval = nativeExportAction(pointer,
                                          syncAction, ackTxnId, seqNo, getStringBytes(tableSignature));
         if (retval < 0) {
@@ -651,7 +661,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         // serialize the param set
         clearPsetAndEnsureCapacity(parameterSet.getSerializedSize());
         try {
-            parameterSet.flattenToBuffer(psetBuffer);
+            parameterSet.flattenToBuffer(m_psetBuffer);
         } catch (final IOException exception) {
             throw new RuntimeException(exception); // can't happen
         }
@@ -668,7 +678,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             // serialize the param set
             clearPsetAndEnsureCapacity(parameterSet.getSerializedSize());
             try {
-                parameterSet.flattenToBuffer(psetBuffer);
+                parameterSet.flattenToBuffer(m_psetBuffer);
             } catch (final IOException exception) {
                 throw new RuntimeException(exception); // can't happen
             }
@@ -699,20 +709,21 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      */
     public void fallbackToEEAllocatedBuffer(ByteBuffer buffer) {
         assert(buffer != null);
-        assert(fallbackBuffer == null);
-        fallbackBuffer = buffer;
+        assert(m_fallbackBuffer == null);
+        m_fallbackBuffer = buffer;
     }
 
     @Override
     public byte[] executeTask(TaskType taskType, ByteBuffer task) throws EEException {
         try {
-            psetBuffer.putLong(0, taskType.taskId);
+            assert(m_psetBuffer.limit() >= 8);
+            m_psetBuffer.putLong(0, taskType.taskId);
 
             //Clear is destructive, do it before the native call
-            deserializer.clear();
+            m_nextDeserializer.clear();
             final int errorCode = nativeExecuteTask(pointer);
             checkErrorCode(errorCode);
-            return (byte[])deserializer.readArray(byte.class);
+            return (byte[])m_nextDeserializer.readArray(byte.class);
         } catch (IOException e) {
             Throwables.propagate(e);
         }
@@ -722,7 +733,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     @Override
     public ByteBuffer getParamBufferForExecuteTask(int requiredCapacity) {
         clearPsetAndEnsureCapacity(8 + requiredCapacity);
-        psetBuffer.position(8);
-        return psetBuffer;
+        m_psetBuffer.position(8);
+        return m_psetBuffer;
     }
 }

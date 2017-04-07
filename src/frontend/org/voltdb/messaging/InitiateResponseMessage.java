@@ -60,6 +60,28 @@ public class InitiateResponseMessage extends VoltMessage {
         m_subject = Subject.DEFAULT.getId();
     }
 
+    public static InitiateResponseMessage messageForNTProcResponse(long clientInterfaceHandle,
+                                                                   long connectionId,
+                                                                   ClientResponseImpl response)
+    {
+        InitiateResponseMessage irm = new InitiateResponseMessage();
+        irm.m_txnId = -2;
+        irm.m_spHandle = -2;
+        irm.m_initiatorHSId = -2;
+        irm.m_coordinatorHSId = -1;
+        irm.m_clientInterfaceHandle = clientInterfaceHandle;
+        irm.m_connectionId = connectionId;
+        irm.m_commit = true;
+        irm.m_recovering = false;
+        irm.m_readOnly = false;
+        irm.m_response = response;
+        irm.m_mispartitioned = false;
+        irm.m_invocation = null;
+        irm.m_currentHashinatorConfig = null;
+        irm.m_subject = Subject.DEFAULT.getId();
+        return irm;
+    }
+
     /**
      * IV2 constructor
      */
@@ -143,6 +165,10 @@ public class InitiateResponseMessage extends VoltMessage {
 
     public void setRecovering(boolean recovering) {
         m_recovering = recovering;
+    }
+
+    public void setConnectionId(long connectionId) {
+        m_connectionId = connectionId;
     }
 
     public boolean isMispartitioned() {

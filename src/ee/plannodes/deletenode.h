@@ -55,7 +55,11 @@ namespace voltdb {
  */
 class DeletePlanNode : public AbstractOperationPlanNode {
 public:
-    DeletePlanNode() : m_truncate(false) { }
+    DeletePlanNode()
+        : m_truncate(false)
+    {
+    }
+
     PlanNodeType getPlanNodeType() const;
     bool getTruncate() const { return m_truncate; }
 

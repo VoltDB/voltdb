@@ -32,6 +32,7 @@ import org.voltdb.DRConsumerDrIdTracker;
 import org.voltdb.DRIdempotencyResult;
 import org.voltdb.DependencyPair;
 import org.voltdb.HsqlBackend;
+import org.voltdb.HybridCrc32;
 import org.voltdb.LoadedProcedureSet;
 import org.voltdb.NonVoltDBBackend;
 import org.voltdb.ParameterSet;
@@ -58,6 +59,7 @@ import org.voltdb.dtxn.UndoAction;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.settings.ClusterSettings;
 import org.voltdb.settings.NodeSettings;
+import org.voltdb.messaging.FastDeserializer;
 
 /**
  * An implementation of Site which provides only the functionality
@@ -570,19 +572,27 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     }
 
     @Override
-    public VoltTable[] executePlanFragments(
+    public FastDeserializer executePlanFragments(
             int numFragmentIds,
             long[] planFragmentIds,
             long[] inputDepIds,
             Object[] parameterSets,
+            boolean[] isWriteFrag,
+            HybridCrc32 writeCRC,
             String[] sqlTexts,
             long txnId,
             long spHandle,
             long uniqueId,
-            boolean readOnly)
+            boolean readOnly,
+            boolean traceOn)
             throws EEException
     {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+    }
+
+    @Override
+    public boolean usingFallbackBuffer() {
+        return false;
     }
 
     @Override

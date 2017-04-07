@@ -93,7 +93,7 @@ public class UpdateSettings extends VoltSystemProcedure {
 
         if (fragmentId == SysProcFragmentId.PF_updateSettingsBarrier) {
 
-            DependencyPair success = new DependencyPair(DEP_updateSettingsBarrier,
+            DependencyPair success = new DependencyPair.TableDependencyPair(DEP_updateSettingsBarrier,
                     new VoltTable(new ColumnInfo[] { new ColumnInfo("UNUSED", VoltType.BIGINT) } ));
             if (log.isInfoEnabled()) {
                 log.info("Site " + CoreUtils.hsIdToString(m_site.getCorrespondingSiteId()) +
@@ -117,7 +117,7 @@ public class UpdateSettings extends VoltSystemProcedure {
                 throw new SettingsException(msg, e);
             }
             log.info("Saved new cluster settings state");
-            return new DependencyPair(DEP_updateSettingsBarrierAggregate,
+            return new DependencyPair.TableDependencyPair(DEP_updateSettingsBarrierAggregate,
                     getVersionResponse(stat.getVersion()));
 
         } else if (fragmentId == SysProcFragmentId.PF_updateSettings) {
@@ -134,12 +134,12 @@ public class UpdateSettings extends VoltSystemProcedure {
 
             VoltTable result = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);
             result.addRow(VoltSystemProcedure.STATUS_OK);
-            return new DependencyPair(DEP_updateSettings, result);
+            return new DependencyPair.TableDependencyPair(DEP_updateSettings, result);
 
         } else if (fragmentId == SysProcFragmentId.PF_updateSettingsAggregate) {
 
             VoltTable result = VoltTableUtil.unionTables(dependencies.get(DEP_updateSettings));
-            return new DependencyPair(DEP_updateSettingsAggregate, result);
+            return new DependencyPair.TableDependencyPair(DEP_updateSettingsAggregate, result);
 
         } else {
             VoltDB.crashLocalVoltDB(
