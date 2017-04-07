@@ -785,6 +785,10 @@ void PersistentTable::insertPersistentTuple(TableTuple& source, bool fallible, b
         deleteTupleStorage(target); // also frees object columns
         throw;
     }
+    catch (SQLException& e) {
+        deleteTupleStorage(target); // also frees object columns
+        throw;
+    }
 }
 
 void PersistentTable::insertTupleCommon(TableTuple& source, TableTuple& target,
