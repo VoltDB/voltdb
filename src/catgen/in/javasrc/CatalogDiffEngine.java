@@ -585,12 +585,20 @@ public class CatalogDiffEngine {
         // of certain unique indexes that might fail if created
         else if (suspect instanceof Index) {
             Index index = (Index) suspect;
-            if (!index.m_unique) {
-                return null;
-            }
 
             // it's cool to remove unique indexes
             if (changeType == ChangeType.DELETION) {
+                return null;
+            }
+            
+            if (! index.getIssafewithnonemptysources()) {
+                return "Unable to create index " + index.getTypeName() +
+                       " because the index definition uses operations" +
+                       " that cannot always be applied if table " +
+                       index.getParent().getTypeName() + " is not empty.\n";
+            }
+            
+            if (! index.getUnique()) {
                 return null;
             }
 
@@ -656,17 +664,24 @@ public class CatalogDiffEngine {
         // handle adding an index - presumably unique
         if (suspect instanceof Index) {
             Index idx = (Index) suspect;
-            assert(idx.getUnique());
-
             String indexName = idx.getTypeName();
             retval = new TablePopulationRequirements(indexName);
             String tableName = idx.getParent().getTypeName();
             retval.addTableName(tableName);
-            retval.setErrorMessage(
-                    String.format(
-                            "Unable to add unique index %s because table %s is not empty.",
-                            indexName,
-                            tableName));
+            
+            if (! idx.getIssafewithnonemptysources()) {
+                retval.setErrorMessage("Unable to create index " + indexName +
+                                       " because the index definition uses operations" +
+                                       " that cannot always be applied if table " + tableName +
+                                       " is not empty.\n");
+            }
+            else if (idx.getUnique()) {
+                retval.setErrorMessage(
+                        String.format(
+                                "Unable to add unique index %s because table %s is not empty.",
+                                indexName,
+                                tableName));
+            }
             return retval;
         }
 
