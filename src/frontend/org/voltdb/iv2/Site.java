@@ -1500,7 +1500,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         for (Table t : tables) {
             if (t.getIsdred()) {
                 DRCatalogChange |= diffCmds.contains("tables#" + t.getTypeName());
-                break;
+                if (DRCatalogChange) {
+                    break;
+                }
             }
         }
         // if a snapshot is in process, wait for it to finish

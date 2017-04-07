@@ -2691,42 +2691,4 @@ public abstract class CatalogUtil {
         return sb.toString();
     }
 
-//    public static boolean isStreamTableAffected(Catalog newCatalog, String diffCmds) {
-//        if (diffCmds == null || diffCmds.length() == 0) return false;
-//        CatalogMap<Table> newTables = newCatalog.getClusters().get("cluster").getDatabases().get("database").getTables();
-//
-//        // e.g.
-//        // add /clusters#cluster/databases#database tables table1
-//        // delete /clusters#cluster/databases#database tables table1
-//        // and table1 is an export table
-//        // same applies with delete.
-//
-//        String[] cmds = diffCmds.split("\n");
-//        for (int i = 0; i < cmds.length; i++) {
-//            String stmt = cmds[i];
-//
-//            char cmd = Catalog.parseStmtCmd(stmt);
-//            //All deletes are treated as stream update
-//            if (cmd == 'd') return true;
-//            if (cmd == 'a' || cmd == 'd') { // add
-//                CatalogCmd catCmd = Catalog.parseStmt(stmt);
-//                if (catCmd.arg1.equals("tables")) {
-//                    if (cmd == 'a') {
-//                        for (Table t : newTables) {
-//                            if (t.getIsstream() && t.getTypeName().equals(catCmd.arg2)) {
-//                                return true;
-//                            }
-//                        }
-//                    }
-//                }
-//            } else if (cmd == 's') {
-//                CatalogCmd catCmd = Catalog.parseStmt(stmt);
-//                if (catCmd.path.contains("connectors#")) {
-//                    return true;
-//                }
-//            }
-//        }
-//        return false;
-//    }
-
 }

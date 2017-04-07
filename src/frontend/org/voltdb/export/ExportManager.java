@@ -623,7 +623,6 @@ public class ExportManager
         return m_connCount;
     }
 
-    CatalogContext m_lastActiveCatalog = null;
     public synchronized void updateCatalog(CatalogContext catalogContext, String diffCommands, boolean requiresNewExportGeneration, List<Integer> partitions)
     {
         final Cluster cluster = catalogContext.catalog.getClusters().get("cluster");
@@ -637,7 +636,7 @@ public class ExportManager
         }
 
         if (!requiresNewExportGeneration) {
-            exportLog.info("Skipped rolling generations as generation no stream tables changed.");
+            exportLog.info("Skipped rolling generations as no stream related changes happened during this update.");
             return;
         }
 
