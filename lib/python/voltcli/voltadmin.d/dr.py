@@ -15,14 +15,14 @@
 # along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
 
 def reset_local(runner):
-    status = runner.call_proc('@ResetDR', [VOLT.FastSerializer.VOLTTYPE_TINYINT, VOLT.FastSerializer.VOLTTYPE_TINYINT], [runner.opts.clusterId, runner.opts.clusterId * 1]).table(0).tuple(0).column_integer(0)
+    status = runner.call_proc('@ResetDR', [VOLT.FastSerializer.VOLTTYPE_TINYINT, VOLT.FastSerializer.VOLTTYPE_TINYINT], [runner.opts.clusterId, runner.opts.forcing * 1]).table(0).tuple(0).column_integer(0)
     if status == 0:
         runner.info('Conversation log is reset.')
     else:
         runner.error('The cluster failed to reset conversation log with status: %d' % status)
 
 def reset_remote(runner):
-    status = runner.call_proc('@ResetDR', [VOLT.FastSerializer.VOLTTYPE_TINYINT, VOLT.FastSerializer.VOLTTYPE_TINYINT], [runner.opts.clusterId, runner.opts.clusterId * 1]).table(0).tuple(0).column_integer(0)
+    status = runner.call_proc('@ResetDR', [VOLT.FastSerializer.VOLTTYPE_TINYINT, VOLT.FastSerializer.VOLTTYPE_TINYINT], [runner.opts.clusterId, runner.opts.forcing * 1]).table(0).tuple(0).column_integer(0)
     if status == 0:
         runner.info('Conversation log is reset.')
     else:
@@ -33,7 +33,7 @@ def reset_remote(runner):
     description = 'DR control command.',
     options = (
             VOLT.BooleanOption('-f', '--force', 'forcing', 'bypass precheck', default = False),
-            VOLT.BooleanOption('-c', '--cluster', 'clusterId', 'drCluster Id', default = -1),
+            VOLT.BooleanOption('-c', '--cluster', 'clusterId', 'dr cluster Id', default = -1),
     ),
     modifiers = (
             VOLT.Modifier('resetlocal', reset_local, 'remove local cluster from its dr cluster mesh.'),
