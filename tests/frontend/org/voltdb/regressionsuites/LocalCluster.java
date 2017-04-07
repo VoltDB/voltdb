@@ -263,6 +263,20 @@ public class LocalCluster extends VoltServerConfig {
     }
 
     public LocalCluster(String jarFileName,
+            int siteCount,
+            int hostCount,
+            int kfactor,
+            int clusterId,
+            BackendTarget target,
+            FailureState failureState,
+            boolean debug,
+            boolean isRejoinTest,
+            Map<String, String> env){
+        this(null, jarFileName, siteCount, hostCount, kfactor, clusterId, target, failureState, debug, isRejoinTest, env);
+    }
+
+    public LocalCluster(String schemaToStage,
+                        String catalogJarFileName,
                         int siteCount,
                         int hostCount,
                         int kfactor,
@@ -273,7 +287,19 @@ public class LocalCluster extends VoltServerConfig {
                         boolean isRejoinTest,
                         Map<String, String> env)
     {
-        assert jarFileName != null : "jar file name is null";
+        if (schemaToStage == null){
+            assert catalogJarFileName != null : "Catalog jar file name is null";
+            templateCmdLine.setNewCli(isNewCli);
+        } else {
+            assert catalogJarFileName == null : "Cannot specify a pre-compiled catalog when using staged catalogs. You should put any stored procedures into the CLASSPATH.";
+            templateCmdLine.setNewCli(true);
+            try {
+                templateCmdLine.m_userSchema = VoltProjectBuilder.createFileForSchema(schemaToStage);
+                System.err.println("Staged schema as \"" + templateCmdLine.m_userSchema + "\"");
+            } catch (IOException e){
+                throw new RuntimeException(e);
+            }
+        }
         assert siteCount > 0 : "site count is less than 0";
         assert hostCount > 0 : "host count is less than 0";
 
@@ -300,8 +326,13 @@ public class LocalCluster extends VoltServerConfig {
         m_callingClassName = traces[i].getClassName().substring(dot + 1);
         m_callingMethodName = traces[i].getMethodName();
 
-        log.info("Instantiating LocalCluster for " + jarFileName + " with class.method: " +
-                m_callingClassName + "." + m_callingMethodName);
+        if (catalogJarFileName == null){
+            log.info("Instantiating LocalCluster with class.method: " +
+                    m_callingClassName + "." + m_callingMethodName);
+        } else {
+            log.info("Instantiating LocalCluster for " + catalogJarFileName + " with class.method: " +
+                    m_callingClassName + "." + m_callingMethodName);
+        }
         log.info("ClusterId: " + clusterId + " Sites: " + siteCount + " Hosts: " + hostCount + " ReplicationFactor: " + kfactor);
 
         m_cluster.ensureCapacity(hostCount);
@@ -314,7 +345,6 @@ public class LocalCluster extends VoltServerConfig {
         }
         templateCmdLine.hostCount(hostCount);
         templateCmdLine.setMissingHostCount(m_missingHostCount);
-        templateCmdLine.setNewCli(isNewCli);
         setEnableSSL(isEnableSSL);
         if (kfactor > 0 && !MiscUtils.isPro()) {
             m_kfactor = 0;
@@ -324,7 +354,7 @@ public class LocalCluster extends VoltServerConfig {
         }
         m_clusterId = clusterId;
         m_debug = debug;
-        m_jarFileName = jarFileName;
+        m_jarFileName = catalogJarFileName;
         m_failureState = m_kfactor < 1 ? FailureState.ALL_RUNNING : failureState;
         m_pipes = new ArrayList<>();
         m_cmdLines = new ArrayList<>();
@@ -343,8 +373,16 @@ public class LocalCluster extends VoltServerConfig {
             buildDir = System.getProperty("user.dir") + "/obj/release";
         }
 
-        String classPath = System.getProperty("java.class.path") + ":" +
-                buildDir + File.separator + m_jarFileName + ":" + buildDir + File.separator + "prod";
+        String classPath = System.getProperty("java.class.path");
+        if (m_jarFileName != null){
+            classPath += ":" + buildDir + File.separator + m_jarFileName;
+        }
+        classPath += ":" + buildDir + File.separator + "prod";
+        if (m_jarFileName != null){
+            // Remove the stored procedures from the classpath.  Out-of-process nodes will
+            // only be able to find procedures and dependent classes in the catalog, as intended
+            classPath = classPath.replace(buildDir + File.separator + "testprocs:", "");
+        }
 
         // set the java lib path to the one for this process - Add obj/release/nativelibs
         String javaLibraryPath = System.getProperty("java.library.path");
@@ -354,10 +392,6 @@ public class LocalCluster extends VoltServerConfig {
         else {
             javaLibraryPath += ":" + buildDir + "/nativelibs";
         }
-
-        // Remove the stored procedures from the classpath.  Out-of-process nodes will
-        // only be able to find procedures and dependent classes in the catalog, as intended
-        classPath = classPath.replace(buildDir + File.separator + "testprocs:", "");
 
         // First try 'ant' syntax and then 'eclipse' syntax...
         String log4j = System.getProperty("log4j.configuration");
@@ -377,7 +411,7 @@ public class LocalCluster extends VoltServerConfig {
             addTestOptions(true).
             leader("").
             target(m_target).
-            startCommand(isNewCli ? "probe" : "create").
+            startCommand(isNewCli() ? "probe" : "create").
             jarFileName(VoltDB.Configuration.getPathToCatalogForTest(m_jarFileName)).
             buildDir(buildDir).
             classPath(classPath).
@@ -387,7 +421,6 @@ public class LocalCluster extends VoltServerConfig {
         if (javaLibraryPath!=null) {
             templateCmdLine.javaLibraryPath(javaLibraryPath);
         }
-        this.templateCmdLine.setNewCli(isNewCli);
         this.templateCmdLine.m_noLoadLibVOLTDB = m_target == BackendTarget.HSQLDB_BACKEND;
         // "tag" this command line so it's clear which test started it
         this.templateCmdLine.m_tag = m_callingClassName + ":" + m_callingMethodName;
@@ -2036,6 +2069,47 @@ public class LocalCluster extends VoltServerConfig {
         return lc;
     }
 
+    /** Creates a cluster on the local machine using NewCLI, staging the specified schema and procedures.
+     * This does not support DR use cases, because the tests that use it don't either.
+     * Catalog compilation is taken care of by VoltDB itself - no need to do so explicitly.
+     * @param schemaDDL
+     * @param proceduresJar
+     * @param siteCount
+     * @param hostCount
+     * @param kfactor
+     * @return a running VoltDB cluster
+     * @throws IOException
+     */
+    public static LocalCluster createLocalClusterViaStagedCatalog(String schemaDDL, String proceduresJar, int siteCount, int hostCount, int kfactor) throws IOException {
+
+        final int clusterID = 0;
+        LocalCluster lc = new LocalCluster(
+                schemaDDL,
+                null,
+                siteCount,
+                hostCount,
+                kfactor,
+                clusterID,
+                BackendTarget.NATIVE_EE_JNI,
+                FailureState.ALL_RUNNING, false, false, null);
+
+        assert(proceduresJar == null) : "TODO: add ability to insert a procedures JAR into the classpath";
+        assert(!lc.m_compiled);
+
+        System.out.println("Starting local cluster.");
+        lc.setHasLocalServer(false);
+        lc.overrideAnyRequestForValgrind();
+
+        boolean clearLocalDataDirectories = true;
+        lc.startUp(clearLocalDataDirectories);
+
+        for (int i = 0; i < hostCount; i++) {
+            System.out.printf("Local cluster node[%d] ports: internal=%d, admin=%d, client=%d\n",
+                              i, lc.internalPort(i), lc.adminPort(i), lc.port(i));
+        }
+        return lc;
+    }
+
     public Client createClient(ClientConfig config) throws IOException {
         Client client = ClientFactory.createClient(config);
         for (String address : getListenerAddresses()) {
@@ -2046,5 +2120,21 @@ public class LocalCluster extends VoltServerConfig {
 
     public void setDeplayBetweenNodeStartup(long deplayBetweenNodeStartup) {
         m_deplayBetweenNodeStartupMS = deplayBetweenNodeStartup;
+    }
+
+    /** Counts how many nodes contain a given file in their voltDbRoots
+     * @param relativePathFromVoltDBRoot
+     * @return number of nodes who have that file
+     */
+    public int countNodesWithFile(String relativePathFromVoltDBRoot){
+        int total = 0;
+        for (Map.Entry<String, String> entry : m_hostRoots.entrySet()){
+            File testFile = new VoltFile(entry.getValue() + relativePathFromVoltDBRoot);
+            assert( testFile.isFile() ) : testFile.getAbsolutePath() + " is not a file";
+            if (testFile.canRead() && (testFile.length() > 0)){
+                total++;
+            }
+        }
+        return total;
     }
 }

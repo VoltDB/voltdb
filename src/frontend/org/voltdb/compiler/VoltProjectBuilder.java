@@ -472,16 +472,23 @@ public class VoltProjectBuilder {
         addSchema(schemaURL.getPath());
     }
 
-    /**
-     * This is test code written by Ryan, even though it was
-     * committed by John.
+    /** Creates a temporary file for the supplied schema text.
+     * The file is not left open, and will be deleted upon process exit.
      */
-    public void addLiteralSchema(String ddlText) throws IOException {
-        File temp = File.createTempFile("literalschema", "sql");
+    public static File createFileForSchema(String ddlText) throws IOException {
+        File temp = File.createTempFile("literalschema", ".sql");
         temp.deleteOnExit();
         FileWriter out = new FileWriter(temp);
         out.write(ddlText);
         out.close();
+        return temp;
+    }
+
+    /**
+     * Adds the supplied schema by creating a temp file for it.
+     */
+    public void addLiteralSchema(String ddlText) throws IOException {
+        File temp = createFileForSchema(ddlText);
         addSchema(URLEncoder.encode(temp.getAbsolutePath(), "UTF-8"));
     }
 
