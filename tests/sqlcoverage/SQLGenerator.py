@@ -864,7 +864,7 @@ class ConstantGenerator(BaseGenerator):
                 i = u"NULL"
             elif isinstance(i, basestring):
                 # Points and polygon values do not want extra single-quotes around them
-                if i.startswith('pointFromText(') or i.startswith('polygonFromText('):
+                if i.startswith('PointFromText(') or i.startswith('PolygonFromText('):
                     i = u"%s" % (i)
                 # Varchar values do want single-quotes around them
                 else:
