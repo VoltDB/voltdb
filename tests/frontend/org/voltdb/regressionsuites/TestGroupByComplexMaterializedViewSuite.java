@@ -840,6 +840,8 @@ public class TestGroupByComplexMaterializedViewSuite extends RegressionSuite {
             assertTrue(exc.toString().contains("The size 2050 of the value"));
             assertTrue(exc.toString().contains("exceeds the size of the VARCHAR(2048 BYTES) column"));
         }
+        // Delete the problem maker first, so that the automatic cleanup between tests won't fail.
+        client.callProcedure("R6.delete", 1);
     }
 
     private void mvUpdateR4() throws IOException, ProcCallException {
@@ -1525,6 +1527,9 @@ public class TestGroupByComplexMaterializedViewSuite extends RegressionSuite {
                     new long[] {numSourceRows});
 
         }
+
+        // Delete the problem maker first, so that the automatic cleanup between tests won't fail.
+        client.callProcedure("R6.delete", 1);
     }
 
     //

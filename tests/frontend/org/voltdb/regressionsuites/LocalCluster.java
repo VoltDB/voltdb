@@ -482,7 +482,7 @@ public class LocalCluster extends VoltServerConfig {
     @Override
     public void startUp(boolean clearLocalDataDirectories) {
         //if cleardirectory is true we dont skip init.
-        startUp(clearLocalDataDirectories, (clearLocalDataDirectories ? false : true));
+        startUp(clearLocalDataDirectories, ! clearLocalDataDirectories);
     }
 
     public void setForceVoltdbCreate(boolean newVoltdb) {
@@ -705,12 +705,10 @@ public class LocalCluster extends VoltServerConfig {
     }
 
     public void startUp(boolean clearLocalDataDirectories, boolean skipInit) {
-        VoltServerConfig.addInstance(this);
-
-        assert (!m_running);
         if (m_running) {
             return;
         }
+        VoltServerConfig.addInstance(this);
 
         // needs to be called before any call to pick a filename
         VoltDB.setDefaultTimezone();
