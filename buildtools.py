@@ -636,8 +636,8 @@ class ValgrindError:
         return self.line
 
 class ValgrindErrorState:
-    def __init__(self, expectNoErrors, valgrindFile):
-        self.expectErrors = not expectNoErrors
+    def __init__(self, expectErrorsIn, valgrindFile):
+        self.expectErrors = expectErrorsIn
         self.foundErrors    = False
         self.valgrindFile = valgrindFile
         self.errorStrings = []
@@ -648,7 +648,7 @@ class ValgrindErrorState:
         root = tree.getroot()
         errs = root.findall(".//error")
         for err in errs:
-            foundErrors = True
+            self.foundErrors = True
             self.errorStrings += [self._toString(err)]
 
     def _toString(self, err):
@@ -746,7 +746,7 @@ def runTests(CTX):
     for dir, test in tests:
         # We expect valgrind failures in all tests in memleaktests
         # except for the test named no_losses.
-        expectNoMemLeaks = not (dir == "memleaktests") or not ( test == "no_losses" )
+        expectMemLeaks = (dir == "memleaktests") and not (test.endswith("no_losses"))
         binname, objectname, sourcename = namesForTestCode(test)
         targetpath = OUTPUT_PREFIX + "/" + binname
         retval = 0
@@ -774,7 +774,7 @@ def runTests(CTX):
                 out_err = process.stderr.readlines()
                 retval = process.wait()
                 fileName = makeValgrindFile("%d" % process.pid)
-                errorState = ValgrindErrorState(expectNoMemLeaks, fileName)
+                errorState = ValgrindErrorState(expectMemLeaks, fileName)
                 # If there are as many errors as we expect,
                 # then delete the xml file.  Otherwise keep it.
                 # It may be useful.

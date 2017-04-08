@@ -58,9 +58,18 @@ using namespace std;
 namespace voltdb {
 
 AbstractPlanNode::AbstractPlanNode()
-    : m_planNodeId(-1),
-      m_isInline(false),
-      m_validOutputColumnCount(0) { }
+    : m_planNodeId(-1)
+    , m_children()
+    , m_childIds()
+    , m_executor()
+    , m_inlineNodes()
+    , m_isInline(false)
+    , m_outputTable()
+    , m_inputTables()
+    , m_validOutputColumnCount(0)
+    , m_outputSchema()
+{
+}
 
 AbstractPlanNode::~AbstractPlanNode()
 {

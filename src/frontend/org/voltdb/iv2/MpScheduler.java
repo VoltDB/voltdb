@@ -32,6 +32,7 @@ import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.CommandLog;
@@ -52,6 +53,7 @@ import org.voltdb.utils.MiscUtils;
 
 import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.collect.Sets;
+import org.voltdb.utils.VoltTrace;
 
 public class MpScheduler extends Scheduler
 {
@@ -225,6 +227,17 @@ public class MpScheduler extends Scheduler
         TxnEgo ego = advanceTxnEgo();
         mpTxnId = ego.getTxnId();
 
+        final String threadName = Thread.currentThread().getName(); // Thread name has to be materialized here
+        final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.MPI);
+        if (traceLog != null) {
+            traceLog.add(() -> VoltTrace.meta("process_name", "name", CoreUtils.getHostnameOrAddress()))
+                    .add(() -> VoltTrace.meta("thread_name", "name", threadName))
+                    .add(() -> VoltTrace.meta("thread_sort_index", "sort_index", Integer.toString(100)))
+                    .add(() -> VoltTrace.beginAsync("initmp", mpTxnId,
+                                                    "txnId", TxnEgo.txnIdToString(mpTxnId),
+                                                    "ciHandle", Long.toString(message.getClientInterfaceHandle())));
+        }
+
         // Don't have an SP HANDLE at the MPI, so fill in the unused value
         Iv2Trace.logIv2InitiateTaskMessage(message, m_mailbox.getHSId(), mpTxnId, Long.MIN_VALUE);
 
@@ -393,6 +406,11 @@ public class MpScheduler extends Scheduler
     // see all of these messages and control their transmission.
     public void handleInitiateResponseMessage(InitiateResponseMessage message)
     {
+        final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.MPI);
+        if (traceLog != null) {
+            traceLog.add(() -> VoltTrace.endAsync("initmp", message.getTxnId()));
+        }
+
         DuplicateCounter counter = m_duplicateCounters.get(message.getTxnId());
         if (counter != null) {
             int result = counter.offer(message);

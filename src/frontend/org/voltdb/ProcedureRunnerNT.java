@@ -19,7 +19,6 @@ package org.voltdb;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
@@ -37,6 +36,7 @@ import org.voltdb.AuthSystem.AuthUser;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
+import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
 /**
@@ -69,6 +69,7 @@ public class ProcedureRunnerNT {
     // regular call support stuff
     protected final AuthUser m_user;
     protected final Connection m_ccxn;
+    protected final long m_ciHandle;
     protected final long m_clientHandle;
     protected final String m_procedureName;
     protected final VoltNonTransactionalProcedure m_procedure;
@@ -82,6 +83,7 @@ public class ProcedureRunnerNT {
     ProcedureRunnerNT(long id,
                       AuthUser user,
                       Connection ccxn,
+                      long ciHandle,
                       long clientHandle,
                       VoltNonTransactionalProcedure procedure,
                       String procName,
@@ -95,6 +97,7 @@ public class ProcedureRunnerNT {
         m_id = id;
         m_user = user;
         m_ccxn = ccxn;
+        m_ciHandle = ciHandle;
         m_clientHandle = clientHandle;
         m_procedure = procedure;
         m_procedureName = procName;
@@ -193,16 +196,16 @@ public class ProcedureRunnerNT {
 
         final Iv2InitiateTaskMessage workRequest =
                 new Iv2InitiateTaskMessage(m_mailbox.getHSId(),
-                        m_mailbox.getHSId(),
-                        Iv2InitiateTaskMessage.UNUSED_TRUNC_HANDLE,
-                        m_id,
-                        m_id,
-                        true,
-                        false,
-                        invocation,
-                        m_id,
-                        ClientInterface.NT_REMOTE_PROC_CID,
-                        false);
+                                           m_mailbox.getHSId(),
+                                           Iv2InitiateTaskMessage.UNUSED_TRUNC_HANDLE,
+                                           m_id,
+                                           m_id,
+                                           true,
+                                           false,
+                                           invocation,
+                                           m_id,
+                                           ClientInterface.NT_REMOTE_PROC_CID,
+                                           false);
 
         m_allHostFut = new CompletableFuture<>();
         m_allHostResponses = new HashMap<>();
@@ -232,10 +235,10 @@ public class ProcedureRunnerNT {
      *
      * Wraps coreCall with statistics.
      *
-     * @return ClientResponseImpl non-null if done and null if there is an
+     * @return True if done and null if there is an
      * async task still running.
      */
-    protected ClientResponseImpl call(Object... paramListIn) {
+    protected boolean call(Object... paramListIn) {
         m_perCallStats = m_statsCollector.beginProcedure();
 
         // if we're keeping track, calculate parameter size
@@ -244,28 +247,37 @@ public class ProcedureRunnerNT {
             m_perCallStats.setParameterSize(params.getSerializedSize());
         }
 
-        ClientResponseImpl result = coreCall(paramListIn);
+        ClientResponseImpl response = coreCall(paramListIn);
 
-        // if the whole call is done (no async bits)
-        if (result != null) {
-            // if we're keeping track, calculate result size
-            if (m_perCallStats.samplingProcedure()) {
-                m_perCallStats.setResultSize(result.getResults());
-            }
-            m_statsCollector.endProcedure(result.getStatus() == ClientResponse.USER_ABORT,
-                                          (result.getStatus() != ClientResponse.USER_ABORT) &&
-                                          (result.getStatus() != ClientResponse.SUCCESS),
-                                          m_perCallStats);
-
-            // send the response to caller
-            result.setClientHandle(m_clientHandle);
-            ByteBuffer buf = ByteBuffer.allocate(result.getSerializedSize() + 4);
-            buf.putInt(buf.capacity() - 4);
-            result.flattenToBuffer(buf).flip();
-            m_ccxn.writeStream().enqueue(buf);
+        // null response means this procedure isn't over and has some async component
+        if (response == null) {
+            return false;
         }
 
-        return result;
+        // if the whole call is done (no async bits)
+
+        // if we're keeping track, calculate result size
+        if (m_perCallStats.samplingProcedure()) {
+            m_perCallStats.setResultSize(response.getResults());
+        }
+        m_statsCollector.endProcedure(response.getStatus() == ClientResponse.USER_ABORT,
+                                      (response.getStatus() != ClientResponse.USER_ABORT) &&
+                                      (response.getStatus() != ClientResponse.SUCCESS),
+                                      m_perCallStats);
+
+        // send the response to caller
+        // must be done as IRM to CI mailbox for backpressure accounting
+        response.setClientHandle(m_clientHandle);
+        InitiateResponseMessage irm = InitiateResponseMessage.messageForNTProcResponse(m_ciHandle,
+                                                                                       m_ccxn.connectionId(),
+                                                                                       response);
+        m_mailbox.deliver(irm);
+
+        // remove record of this procedure in NTPS
+        // only done if procedure is really done
+        m_ntProcService.handleNTProcEnd(this);
+
+        return true;
     }
 
     /**
@@ -349,11 +361,12 @@ public class ProcedureRunnerNT {
                                                           m_perCallStats);
 
                             // send the response to the caller
+                            // must be done as IRM to CI mailbox for backpressure accounting
                             response.setClientHandle(m_clientHandle);
-                            ByteBuffer buf = ByteBuffer.allocate(response.getSerializedSize() + 4);
-                            buf.putInt(buf.capacity() - 4);
-                            response.flattenToBuffer(buf).flip();
-                            m_ccxn.writeStream().enqueue(buf);
+                            InitiateResponseMessage irm = InitiateResponseMessage.messageForNTProcResponse(m_ciHandle,
+                                                                                                           m_ccxn.connectionId(),
+                                                                                                           response);
+                            m_mailbox.deliver(irm);
 
                             m_ntProcService.handleNTProcEnd(ProcedureRunnerNT.this);
                         }

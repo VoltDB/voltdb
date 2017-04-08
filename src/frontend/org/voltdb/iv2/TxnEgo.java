@@ -164,6 +164,10 @@ final public class TxnEgo {
         return "(" + (TxnEgo.getSequence(txnId) - TxnEgo.SEQUENCE_ZERO) + ":" +
             TxnEgo.getPartitionId(txnId) + ")";
     }
+    public static void txnIdToString(long txnId, StringBuilder sb)
+    {
+        sb.append("(").append(TxnEgo.getSequence(txnId) - TxnEgo.SEQUENCE_ZERO).append(":").append(TxnEgo.getPartitionId(txnId)).append(")");
+    }
 
     public static String txnIdCollectionToString(Collection<Long> ids) {
         List<String> idstrings = new ArrayList<String>();

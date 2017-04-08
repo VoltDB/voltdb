@@ -33,7 +33,6 @@ import java.util.Map.Entry;
 import java.util.Random;
 import java.util.concurrent.ExecutionException;
 
-import org.apache.hadoop_voltpatches.util.PureJavaCrc32C;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.CatalogContext.ProcedurePartitionInfo;
@@ -58,6 +57,7 @@ import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.Site;
 import org.voltdb.iv2.UniqueIdGenerator;
 import org.voltdb.jni.ExecutionEngine;
+import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.planner.ActivePlanRepository;
 import org.voltdb.sysprocs.AdHocBase;
@@ -66,6 +66,7 @@ import org.voltdb.utils.Encoder;
 import org.voltdb.utils.MiscUtils;
 
 import com.google_voltpatches.common.base.Charsets;
+import org.voltdb.utils.VoltTrace;
 
 public class ProcedureRunner {
 
@@ -83,7 +84,6 @@ public class ProcedureRunner {
         SQLStmt stmt;
         ParameterSet params;
         Expectation expectation = null;
-        ByteBuffer serialization = null;
     }
     protected final ArrayList<QueuedSQL> m_batch = new ArrayList<QueuedSQL>(100);
     // cached fake SQLStmt array for single statement non-java procs
@@ -140,7 +140,7 @@ public class ProcedureRunner {
     protected final static int AGG_DEPID = 1;
 
     // current hash of sql and params
-    protected final PureJavaCrc32C m_inputCRC = new PureJavaCrc32C();
+    protected final HybridCrc32 m_inputCRC = new HybridCrc32();
 
     // running procedure info
     //  - track the current call to voltExecuteSQL for logging progress
@@ -440,11 +440,13 @@ public class ProcedureRunner {
                                 m_cachedSingleStmt.stmt,
                                 m_cachedSingleStmt.params,
                                 m_cachedSingleStmt.stmt.statementParamTypes);
+                        table.convertToHeapBuffer();
                         results = new VoltTable[] { table };
                     }
                     else {
                         m_batch.add(m_cachedSingleStmt);
                         results = voltExecuteSQL(true);
+                        results = convertTablesToHeapBuffers(results);
                     }
                 }
                 catch (SerializableException ex) {
@@ -647,19 +649,6 @@ public class ProcedureRunner {
     private void updateCRC(QueuedSQL queuedSQL) {
         if (!queuedSQL.stmt.isReadOnly) {
             m_inputCRC.update(queuedSQL.stmt.sqlCRC);
-            try {
-                ByteBuffer buf = ByteBuffer.allocate(queuedSQL.params.getSerializedSize());
-                queuedSQL.params.flattenToBuffer(buf);
-                buf.flip();
-                m_inputCRC.update(buf.array());
-                queuedSQL.serialization = buf;
-            } catch (IOException e) {
-                log.error("Unable to compute CRC of parameters to " +
-                        "a SQL statement in procedure: " + m_procedureName, e);
-                // don't crash
-                // presumably, this will fail deterministically at all replicas
-                // just log the error and hope people report it
-            }
         }
     }
 
@@ -852,7 +841,7 @@ public class ProcedureRunner {
             }
         }
         else if (m_isSinglePartition) {
-            results = fastPath(batch);
+            results = fastPath(batch, isFinalSQL);
         }
         else {
             results = slowPath(batch, isFinalSQL);
@@ -1349,6 +1338,14 @@ public class ProcedureRunner {
                "VOLTDB ERROR: " + msg);
    }
 
+   final private VoltTable[] convertTablesToHeapBuffers(VoltTable[] results) {
+       for (VoltTable table : results) {
+           // Make sure this table does not use an ee cache buffer
+           table.convertToHeapBuffer();
+       }
+       return results;
+   }
+
    VoltTable[] executeQueriesInIndividualBatches(List<QueuedSQL> batch, boolean finalTask) {
        assert(batch.size() > 0);
 
@@ -1552,14 +1549,8 @@ public class ProcedureRunner {
            // Build the set of params for the frags
            ByteBuffer paramBuf = null;
            try {
-               if (queuedSQL.serialization != null) {
-                   paramBuf = ByteBuffer.allocate(queuedSQL.serialization.capacity());
-                   paramBuf.put(queuedSQL.serialization);
-               }
-               else {
-                   paramBuf = ByteBuffer.allocate(queuedSQL.params.getSerializedSize());
-                   queuedSQL.params.flattenToBuffer(paramBuf);
-               }
+               paramBuf = ByteBuffer.allocate(queuedSQL.params.getSerializedSize());
+               queuedSQL.params.flattenToBuffer(paramBuf);
            } catch (IOException e) {
                throw new RuntimeException("Error serializing parameters for SQL statement: " +
                                           queuedSQL.stmt.getText() + " with params: " +
@@ -1621,25 +1612,22 @@ public class ProcedureRunner {
    }
 
    // Batch up pre-planned fragments, but handle ad hoc independently.
-   private VoltTable[] fastPath(List<QueuedSQL> batch) {
+   private VoltTable[] fastPath(List<QueuedSQL> batch, final boolean finalTask) {
        final int batchSize = batch.size();
        Object[] params = new Object[batchSize];
        long[] fragmentIds = new long[batchSize];
        String[] sqlTexts = new String[batchSize];
        int succeededFragmentsCount = 0;
+       boolean[] isWriteFrag = new boolean[batchSize];
 
        int i = 0;
        for (final QueuedSQL qs : batch) {
            assert(qs.stmt.collector == null);
            fragmentIds[i] = qs.stmt.aggregator.id;
            // use the pre-serialized params if it exists
-           if (qs.serialization != null) {
-               params[i] = qs.serialization;
-           }
-           else {
-               params[i] = qs.params;
-           }
+           params[i] = qs.params;
            sqlTexts[i] = qs.stmt.getText();
+           isWriteFrag[i] = !qs.stmt.isReadOnly;
            i++;
        }
 
@@ -1647,16 +1635,36 @@ public class ProcedureRunner {
        // Before executing the fragments, tell the EE if this batch should be timed.
        getExecutionEngine().setPerFragmentTimingEnabled(m_perCallStats.samplingStmts());
        try {
-           results = m_site.executePlanFragments(
+           FastDeserializer fragResult = m_site.executePlanFragments(
                    batchSize,
                    fragmentIds,
                    null,
                    params,
+                   isWriteFrag,
+                   m_inputCRC,
                    sqlTexts,
                    m_txnState.txnId,
                    m_txnState.m_spHandle,
                    m_txnState.uniqueId,
-                   m_isReadOnly);
+                   m_isReadOnly,
+                   VoltTrace.log(VoltTrace.Category.EE) != null);
+           final int totalSize;
+           try {
+               // read the complete size of the buffer used
+               totalSize = fragResult.readInt();
+           } catch (final IOException ex) {
+               log.error("Failed to deserialze result table" + ex);
+               throw new EEException(ExecutionEngine.ERRORCODE_WRONG_SERIALIZED_BYTES);
+           }
+           final ByteBuffer rawDataBuff;
+           if ((m_batchIndex == 0 && !m_site.usingFallbackBuffer()) || finalTask) {
+               // If this is the first or final batch, skip the copy of the underlying byte array
+               rawDataBuff = fragResult.buffer();
+           }
+           else {
+               rawDataBuff = fragResult.readBuffer(totalSize);
+           }
+           results = TableHelper.convertBackedBufferToTables(rawDataBuff, batchSize);
        } catch (Throwable ex) {
            if (! m_isReadOnly) {
                // roll back the current batch and re-throw the EE exception
