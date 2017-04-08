@@ -44,8 +44,7 @@
 <envdefault prop="build" var="VOLTBUILD" default="release" />
 
 <property name='base.dir'                    location='.' />
-<property name='build.root.dir'              location='obj' />
-<property name='build.dir'                   location='${build.root.dir}.${build}' />
+<property name='build.dir'                   location='obj/${build}' />
 <property name='build.prod.dir'              location='${build.dir}/prod' />
 <property name='build.client.dir'            location='${build.dir}/clientobj' />
 <property name='build.clientsrc.dir'         location='${build.dir}/clientsrc' />
