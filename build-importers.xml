@@ -2,7 +2,8 @@
 <project name="socketstream"      basedir="." default="socketstream">
 <property name='base.dir'         location='.' />
 <property name='bundles.dir'      location='./bundles' />
-<property name='build.dir'        location='obj/${build}' />
+<property name='build.root.dir'   location='obj' />
+<property name='build.dir'        location='${build.root.dir}/${build}' />
 <property name='build.prod.dir'   location='${build.dir}/prod' />
 
     <target name="buildbundles" depends="socketstream, pullsocketimporter, log4jsocketimporter, kafkastream, voltcsvformatter,kinesisstream"/>

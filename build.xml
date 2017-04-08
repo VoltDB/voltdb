@@ -13,25 +13,6 @@
     </sequential>
 </macrodef>
 
-<macrodef name="invoke-javac">
-    <attribute name="srcdir"/>
-    <attribute name="destdir" default="${build.prod.dir}"/>
-    <attribute name="excludes" default=""/>
-    <attribute name="includes" default=""/>
-    <sequential>
-        <javac
-            srcdir="@{srcdir}"
-            destdir="@{destdir}"
-            excludes="@{excludes}"
-            includes="@{includes}"
-            encoding='UTF-8'
-            debug='true'
-            includeAntRuntime='false'>
-            <classpath refid="project.classpath" />
-        </javac>
-    </sequential>
-</macrodef>
-
 <!-- PATHS AND PROPERTIES -->
 
 <tstamp/>
@@ -40,6 +21,7 @@
 <property environment="env"/>
 
 <!-- allow env.VOLTBUILD to override "build" property -->
+<envdefault prop="build.root.dir" var="VOLTBUILD_ROOT" default="obj" />
 <envdefault prop="build" var="VOLTBUILD" default="release" />
 <envdefault prop="jmemcheck" var="JMEMCHECK" default="memcheck" />
 
@@ -56,7 +38,7 @@
 <import file="${voltpro}/build.xml" optional="true"/>
 
 <property name='base.dir'                    location='.' />
-<property name='build.dir'                   location='obj/${build}' />
+<property name='build.dir'                   location='${build.root.dir}/${build}' />
 <property name='build.prod.dir'              location='${build.dir}/prod' />
 <property name='build.prod.dbmonitor.dir.js' location='${build.prod.dir}/org/voltdb/dbmonitor/js' />
 <property name='build.test.dir'              location='${build.dir}/test' />
@@ -90,6 +72,7 @@
 <property name='deployment.parsergen.xsd'    value='org/voltdb/compiler/DeploymentFileSchema.xsd' />
 <property name='debian.package.dir'          value='obj/debian' />
 <property name='rpm.package.dir'             value='obj/rpms' />
+<property name='cmake.generator'             value='Unix Makefiles' />
 
 <!-- os.mac is set when build is running on Mac OSX -->
 <condition property="os.mac">
@@ -745,6 +728,7 @@ DISTRIBUTION
 
     <!-- populate selected client javadoc documentation -->
     <ant antfile="build-client.xml" target="javadoc" inheritAll="false">
+        <property name='build.root.dir' value='${build.root.dir}' />
         <property name="build" value="${build}"/>
     </ant>
 </target>
@@ -1266,7 +1250,8 @@ JAR BUILDING
 </target>
 <target name="importbundles" depends="compile, buildinfo">
     <ant antfile="build-importers.xml" target="buildbundles" inheritAll="false">
-        <property name="build" value="${build}"/>
+      <property name="build" value="${build}"/>
+      <property name="build.root.dir" value="${build.root.dir}" />
     </ant>
 </target>
 
@@ -1327,12 +1312,32 @@ JAVA COMPILATION
 ***************************************
 -->
 
+<macrodef name="invoke-javac">
+    <attribute name="srcdir"/>
+    <attribute name="destdir" default="${build.prod.dir}"/>
+    <attribute name="excludes" default=""/>
+    <attribute name="includes" default=""/>
+    <sequential>
+        <javac
+            srcdir="@{srcdir}"
+            destdir="@{destdir}"
+            excludes="@{excludes}"
+            includes="@{includes}"
+            encoding='UTF-8'
+            debug='true'
+            includeAntRuntime='false'>
+            <classpath refid="project.classpath" />
+        </javac>
+    </sequential>
+</macrodef>
+
 <target name="compile" depends="catalog, dbbpool_gen, deployment_gen, compile_core, compile_pro"
         description="Compile all Java source and test classes"/>
 
 <target name="compile_client">
     <ant antfile="build-client.xml" target="compile" inheritAll="false">
-        <property name="build" value="${build}"/>
+      <property name="build" value="${build}"/>
+      <property name='build.root.dir' value='${build.root.dir}' />
     </ant>
 </target>
 
@@ -1583,7 +1588,7 @@ NATIVE EE STUFF
         <env key="TEST_DIR" value="${build.testobjects.dir}" />
         <env key="EETESTSUITE" value="${eetestsuite}"/>
         <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
-        <arg line="build.py ${build} test" />
+        <arg line="build.py --build-directory=${build.root.dir} --source-directory=${basedir} --build-type=${build} --test" />
     </exec>
 </target>
 
@@ -1593,7 +1598,7 @@ NATIVE EE STUFF
         <env key="TEST_DIR" value="${build.testobjects.dir}" />
         <env key="EETESTSUITE" value="${eetestsuite}"/>
         <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
-        <arg line="build.py ${build} build" />
+        <arg line="build.py --build-directory=${build.root.dir} --source-directory=${basedir} --build-type=${build} --build-tests" />
     </exec>
 </target>
 
@@ -1601,7 +1606,7 @@ NATIVE EE STUFF
     description="Build the IPC client.">
     <exec dir='.' executable='python' failonerror='true'>
         <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
-        <arg line="build.py ${build} voltdbipc" />
+        <arg line="build.py --build-directory=${build.root.dir} --source-directory=${basedir} --build-type=${build} --install" />
     </exec>
 </target>
 
@@ -1610,7 +1615,7 @@ NATIVE EE STUFF
     <exec dir='.' executable='python' failonerror='true'>
         <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
         <env key="EESKIPBUILDMAKEFILE" value="true" />
-        <arg line="build.py ${build}" />
+        <arg line="build.py --build-directory=${build.root.dir} --source-directory=${basedir} --build-type=${build} --install" />
     </exec>
     <antcall target="prep_libvoltdb"/>
 </target>
@@ -1620,7 +1625,7 @@ NATIVE EE STUFF
     <exec dir='.' executable='python' failonerror='true'>
         <env key="EEONLYBUILDMAKEFILE" value="true"/>
         <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
-        <arg line="build.py ${build}" />
+        <arg line="build.py --build-directory=${build.root.dir} --source-directory=${basedir} --build-type=${build} --configure" />
     </exec>
 </target>
 
@@ -1628,7 +1633,7 @@ NATIVE EE STUFF
     description="Build C++ JNI library and copy it to production folder.">
     <exec dir='.' executable='python' failonerror='true'>
         <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
-        <arg line="build.py ${build}" />
+        <arg line="build.py --build-directory=${build.root.dir} --source-directory=${basedir} --build-type=${build} --install" />
     </exec>
     <antcall target="prep_libvoltdb"/>
 </target>
@@ -1637,18 +1642,17 @@ NATIVE EE STUFF
     description="Build C++ JNI lib dl-ing perf tools and copy it to production folder.">
     <exec dir='.' executable='python' failonerror='true'>
         <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
-        <arg line="build.py ${build} profile" />
+        <arg line="build.py --build-directory=${build.root.dir} --source-directory=${basedir} --build-type=${build} ----profile --install" />
     </exec>
 </target>
 
-<target name='execplanfrag' depends="ee"
-        description="Create test program that loads catalog and tables and executes a plan fragment.">
+<target name='ee_coverage' depends="catalog, jnicompile"
+    description="Build C++ JNI lib dl-ing perf tools and copy it to production folder.">
     <exec dir='.' executable='python' failonerror='true'>
         <env key="VOLT_LOG_LEVEL" value="${VOLT_LOG_LEVEL}"/>
-        <arg line="build.py EXECPLANFRAG ${build}" />
+        <arg line="build.py --build-directory=${build.root.dir} --source-directory=${basedir} --build-type=${build} ----profile --install" />
     </exec>
 </target>
-
 
 <!--
 ***************************************

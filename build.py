@@ -13,10 +13,18 @@ parser.add_argument('--clean-build',
                     dest='cleanbuild',
                     action='store_true',
                     help='Do a completely clean build by deleting the obj directory first.')
-parser.add_argument('--source-dir',
+parser.add_argument('--source-directory',
                     dest='sourcedir',
                     required=True,
-                    help='Root of Voltdb source tree.')
+                    help='Root of VoltDB source tree.')
+parser.add_argument('--build-directory',
+                    dest='buildDirRoot',
+                    help='''
+                    Root of the VoltDB build tree.  The default is $SRCDIR/obj,
+                    where $SRCDIR is the source directory.  All build artifacts will
+                    be in the directory $BUILDDIR/$BUILDTYPE, where $BUILDDIR is
+                    this value and $BUILDTYPE is the build type, debug, release or
+                    memcheck''')
 parser.add_argument('--runalltests',
                     action='store_true',
                     help='Build and run the EE unit tests.  Use valgrind for memcheck or memcheck_nofreelist.')
@@ -34,25 +42,29 @@ parser.add_argument('--build-ipc',
 parser.add_argument('--profile',
                     action='store_true',
                     help='Do profiling.')
-parser.add_argument('--configure',
-                    action='store_true',
-                    help='Configure the build but do not do any building.')
 parser.add_argument('--coverage',
                     action='store_true',
                     help='Do coverage testing.')
 parser.add_argument('--debug',
                     action='store_true',
                     help='Print commands for debugging.')
+parser.add_argument('--configure',
+                    action='store_true',
+                    help='Run CMake.')
 parser.add_argument('--install',
                     action='store_true',
                     help='Install the binaries')
 parser.add_argument('--generator',
-                    default='Unix Makefiles',
+                    default='makefiles',
                     help='Tool used to do builds.')
+parser.add_argument('--eclipse',
+                    action='store_true',
+                    help='Generate an Eclipse project in the build area.')
 
 config=parser.parse_args()
-prefix=os.path.join('obj', config.buildtype)
-
+if not config.buildDirRoot:
+    config.buildDirRoot = 'obj'
+config.builddir = os.path.join(config.buildDirRoot, config.buildtype)
 def deleteDiretory(prefix, config):
     if config.debug:
         print("Deleting directory %s" % prefix)
@@ -65,6 +77,18 @@ def makeDirectory(prefix, config):
     else:
         subprocess.call('mkdir -p %s' % prefix, shell = True)
 
+def generatorString(config):
+    if config.generator == 'makefiles':
+        generator='Unix Makefiles'
+    elif config.generator == 'ninja':
+        generator='Ninja'
+    else:
+        print('Unknown generator \'%s\'' % config.generator)
+        sys.exit(100)
+    if config.eclipse:
+        generator='Eclipse CDT4 - ' + generator
+    return '-G \'%s\'' % generator
+
 def cmakeCommandString(config):
     profile = "OFF"
     coverage = "OFF"
@@ -72,17 +96,26 @@ def cmakeCommandString(config):
         coverage = "ON"
     if config.profile:
         profile = 'ON'
-    return 'cmake -DVOLTDB_BUILD_TYPE=%s -G \'%s\' -DVOLTDB_USE_COVERAGE=%s -DVOLTDB_USE_PROFILING=%s %s' \
-            % (config.buildtype, config.generator, coverage, profile, config.sourcedir)
+    return 'cmake -DVOLTDB_BUILD_TYPE=%s %s -DVOLTDB_USE_COVERAGE=%s -DVOLTDB_USE_PROFILING=%s %s' \
+            % (config.buildtype, generatorString(config), coverage, profile, config.sourcedir)
 def makeCommandString(config):
-    target='build'
+    target=''
     if config.buildtests:
         target += ' build-tests'
     if config.buildipc:
         target += ' voltdbipc'
     if config.runalltests:
         target += ' runalltests'
-    return ("make -j %s" % target)
+    if config.install:
+        target += ' install'
+    if len(target) > 0:
+        if config.generator == 'makefiles':
+            make_cmd = 'make -j -k'
+        elif config.generator == 'ninja':
+            make_cmd = 'ninja'
+            return ("%s %s" % (make_cmd, target))
+    else:
+        return ""
 
 def runCommand(commandStr, config):
     if config.debug:
@@ -94,23 +127,26 @@ def runCommand(commandStr, config):
 # be a directory.  If this is a clean build we
 # delete the existing directory.
 #
-if os.path.exists(prefix):
-    if not os.path.isdir(prefix):
-        print('build.py: \'%s\' exists but is not a directory.' % prefix)
+if os.path.exists(config.builddir):
+    if not os.path.isdir(config.builddir):
+        print('build.py: \'%s\' exists but is not a directory.' % config.builddir)
         sys.exit(100)
     if config.cleanbuild:
-        deleteDiretory(prefix, config)
+        deleteDiretory(config.builddir, config)
 
-if not os.path.exists(prefix):
-    makeDirectory(prefix, config)
+if not os.path.exists(config.builddir):
+    makeDirectory(config.builddir, config)
 
 if config.debug:
-    print('Changing to directory %s' % prefix)
+    print('Changing to directory %s' % config.builddir)
 else:
-    os.chdir(prefix)
+    os.chdir(config.builddir)
 #
 # If we have not already configured, we want to reconfigure.
 #
 if not os.path.exists('CMakeCache.txt'):
     runCommand(cmakeCommandString(config), config)
-runCommand(makeCommandString(config), config)
+makeCommand=makeCommandString(config)
+if makeCommand:
+    runCommand(makeCommand, config)
+
