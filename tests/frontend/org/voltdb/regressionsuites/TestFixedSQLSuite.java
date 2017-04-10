@@ -56,7 +56,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
 
     static final int VARCHAR_VARBINARY_THRESHOLD = 100;
 
-    public void testSmallFixedTests() throws IOException, ProcCallException
+    public void notestSmallFixedTests() throws IOException, ProcCallException
     {
         subTestInsertNullPartitionString();
         subTestAndExpressionComparingSameTableColumns();
@@ -654,6 +654,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
 
     public void testFixedTickets() throws Exception
     {
+        /*
         subTestTicketEng2250_IsNull();
         subTestTicketEng1850_WhereOrderBy();
         subTestTicketEng1850_WhereOrderBy2();
@@ -695,6 +696,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
         subTestENG9533();
         subTestENG9796();
         subTestENG11256();
+        */
         subTestENG12116();
     }
 
@@ -836,7 +838,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
         truncateTables(client, tables);
     }
 
-    //public void testTicket205() throws IOException, ProcCallException
+    //public void notestTicket205() throws IOException, ProcCallException
     //{
     //    String[] tables = {"P1", "R1", "P2", "R2"};
     //    Client client = getClient();
@@ -1595,7 +1597,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
         truncateTable(client, "P3");
     }
 
-    public void testVarchar() throws IOException, ProcCallException {
+    public void notestVarchar() throws IOException, ProcCallException {
         subTestVarcharByBytes();
         subTestVarcharByCharacter();
         subTestInlineVarcharAggregation();
@@ -2069,7 +2071,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
         }
     }
 
-    public void testInWithString() throws IOException, ProcCallException, InterruptedException {
+    public void notestInWithString() throws IOException, ProcCallException, InterruptedException {
         subTestInWithIntParams();
         subTestInWithStringParams();
         subTestInWithStringParamsAdHoc();
@@ -2708,13 +2710,28 @@ public class TestFixedSQLSuite extends RegressionSuite {
 
     private void subTestENG12116() throws Exception {
         Client client = getClient();
-        String SQL = "SELECT SIN(0) FROM ( SELECT DISTINCT * FROM P1 AS O, R1 AS I ) AS TTT;";
+        // This is essentially the case which was failing
+        // in ENG-12116.  Note that the select statement's
+        // expressions don't depend on the derived table it
+        // selects from.
+        String SQL = "SELECT SIN(0) FROM ( SELECT DISTINCT * FROM P1 AS O, R1 AS I) AS TTT;";
         client.callProcedure("p1.Insert", 10, "foo", 20,  40.0);
-        client.callProcedure("r1.Insert", 11, "bar", 20,  99.0);
+        client.callProcedure("r1.Insert", 11, "bar", 30,  99.0);
         VoltTable vt;
         vt = client.callProcedure("@AdHoc", SQL).getResults()[0];
-        System.out.println(vt);
         assertApproximateContentOfTable(new Object[][] {{ 0.0 }}, vt, 1.0e-7);
+        SQL = "SELECT * FROM ( SELECT DISTINCT * FROM P1 AS O, R1 AS I WHERE O.ID+1 = I.ID) AS TTT;";
+        client.callProcedure("p1.Insert", 20, "goo", 21,  41.0);
+        client.callProcedure("r1.Insert", 22, "gar", 31,  99.9);
+        vt = client.callProcedure("@AdHoc", SQL).getResults()[0];
+        // See if we are actually getting the columns
+        // right in the plan.  Before ENG-12116 was fixed we would
+        // sometimes choose the wrong columns in a subquery
+        // with select distinct when the column names were
+        // identical, as is the case here.  With this test
+        // we can see that the indexes are correct, since the
+        // values are different.
+        assertContentOfTable(new Object[][] {{ 10, "foo", 20, 40.0, 11, "bar", 30, 99.0 }}, vt);
     }
 
     //
