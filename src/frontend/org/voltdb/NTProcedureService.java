@@ -40,6 +40,7 @@ import org.voltdb.AuthSystem.AuthUser;
 import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Procedure;
+import org.voltdb.messaging.InitiateResponseMessage;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.util.concurrent.ThreadFactoryBuilder;
@@ -63,6 +64,7 @@ public class NTProcedureService {
      * list using this simple class.
      */
     static class PendingInvocation {
+        final long ciHandle;
         final AuthUser user;
         final Connection ccxn;
         final long clientHandle;
@@ -70,9 +72,10 @@ public class NTProcedureService {
         final String procName;
         final ParameterSet paramListIn;
 
-        PendingInvocation(AuthUser user, Connection ccxn, long clientHandle,
+        PendingInvocation(long ciHandle, AuthUser user, Connection ccxn, long clientHandle,
                           boolean ntPriority, String procName, ParameterSet paramListIn)
         {
+            this.ciHandle = ciHandle;
             this.user = user;
             this.ccxn = ccxn;
             this.clientHandle = clientHandle;
@@ -186,7 +189,7 @@ public class NTProcedureService {
          * From the generator, create an actual procedure runner to be used
          * for a single invocation of an NT procedure run.
          */
-        ProcedureRunnerNT generateProcedureRunnerNT(AuthUser user, Connection ccxn, long clientHandle)
+        ProcedureRunnerNT generateProcedureRunnerNT(AuthUser user, Connection ccxn, long ciHandle, long clientHandle)
                 throws InstantiationException, IllegalAccessException
         {
             // every single call gets a unique id as a key for the outstanding procedure map
@@ -198,6 +201,7 @@ public class NTProcedureService {
             ProcedureRunnerNT runner = new ProcedureRunnerNT(id,
                                                              user,
                                                              ccxn,
+                                                             ciHandle,
                                                              clientHandle,
                                                              procedure,
                                                              m_procedureName,
@@ -333,7 +337,7 @@ public class NTProcedureService {
 
         // release all of the pending invocations into the real queue
         m_pendingInvocations
-            .forEach(pi -> callProcedureNT(pi.user, pi.ccxn, pi.clientHandle, pi.ntPriority, pi.procName, pi.paramListIn));
+            .forEach(pi -> callProcedureNT(pi.ciHandle, pi.user, pi.ccxn, pi.clientHandle, pi.ntPriority, pi.procName, pi.paramListIn));
         m_pendingInvocations.clear();
     }
 
@@ -341,20 +345,21 @@ public class NTProcedureService {
      * Invoke an NT procedure asynchronously on one of the exec services.
      * @returns ClientResponseImpl if something goes wrong.
      */
-    synchronized ClientResponseImpl callProcedureNT(final AuthUser user,
-                                                    final Connection ccxn,
-                                                    final long clientHandle,
-                                                    final boolean ntPriority,
-                                                    final String procName,
-                                                    final ParameterSet paramListIn)
+    synchronized void callProcedureNT(final long ciHandle,
+                                      final AuthUser user,
+                                      final Connection ccxn,
+                                      final long clientHandle,
+                                      final boolean ntPriority,
+                                      final String procName,
+                                      final ParameterSet paramListIn)
     {
         // If paused, stuff a record of the invocation into a queue that gets
         // drained when un-paused. We're counting on regular upstream backpressure
         // to prevent this from getting too out of hand.
         if (m_paused) {
-            PendingInvocation pi = new PendingInvocation(user, ccxn, clientHandle, ntPriority, procName, paramListIn);
+            PendingInvocation pi = new PendingInvocation(ciHandle, user, ccxn, clientHandle, ntPriority, procName, paramListIn);
             m_pendingInvocations.add(pi);
-            return null;
+            return;
         }
 
         final ProcedureRunnerNTGenerator prntg;
@@ -367,13 +372,19 @@ public class NTProcedureService {
 
         ProcedureRunnerNT tempRunner = null;
         try {
-            tempRunner = prntg.generateProcedureRunnerNT(user, ccxn, clientHandle);
+            tempRunner = prntg.generateProcedureRunnerNT(user, ccxn, ciHandle, clientHandle);
         } catch (InstantiationException | IllegalAccessException e1) {
             // I don't expect to hit this, but it's here...
-            return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
-                    new VoltTable[0],
-                    "Could not create running context for " + procName + ".",
-                    clientHandle);
+            // must be done as IRM to CI mailbox for backpressure accounting
+            ClientResponseImpl response = new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
+                                                                 new VoltTable[0],
+                                                                 "Could not create running context for " + procName + ".",
+                                                                 clientHandle);
+            InitiateResponseMessage irm = InitiateResponseMessage.messageForNTProcResponse(ciHandle,
+                                                                                           ccxn.connectionId(),
+                                                                                           response);
+            m_mailbox.deliver(irm);
+            return;
         }
         final ProcedureRunnerNT runner = tempRunner;
         m_outstanding.put(runner.m_id, runner);
@@ -381,15 +392,7 @@ public class NTProcedureService {
         Runnable invocationRunnable = new Runnable() {
             @Override
             public void run() {
-                ClientResponseImpl response = runner.call(paramListIn.toArray());
-
-                // the procedure returns null if it isn't over, but will
-                // end when a subsequent async task completes.
-                if (response == null) {
-                    return;
-                }
-
-                handleNTProcEnd(runner);
+                runner.call(paramListIn.toArray());
             }
         };
 
@@ -409,13 +412,17 @@ public class NTProcedureService {
             handleNTProcEnd(runner);
 
             // I really don't expect this to happen... but it's here.
-            return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
-                    new VoltTable[0],
-                    "Could not submit NT procedure " + procName + " to exec service for .",
-                    clientHandle);
+            // must be done as IRM to CI mailbox for backpressure accounting
+            ClientResponseImpl response = new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
+                                                                 new VoltTable[0],
+                                                                 "Could not submit NT procedure " + procName + " to exec service for .",
+                                                                 clientHandle);
+            InitiateResponseMessage irm = InitiateResponseMessage.messageForNTProcResponse(ciHandle,
+                                                                                           ccxn.connectionId(),
+                                                                                           response);
+            m_mailbox.deliver(irm);
+            return;
         }
-
-        return null;
     }
 
     /**

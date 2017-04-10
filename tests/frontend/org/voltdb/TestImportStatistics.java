@@ -524,7 +524,7 @@ public class TestImportStatistics extends RegressionSuite {
     static public junit.framework.Test suite() throws Exception
     {
         LocalCluster config;
-        Map<String, String> additionalEnv = new HashMap<String, String>();
+        Map<String, String> additionalEnv = new HashMap<>();
         //Specify bundle location
         String bundleLocation = System.getProperty("user.dir") + "/bundles";
         System.out.println("Bundle location is: " + bundleLocation);
@@ -567,7 +567,7 @@ public class TestImportStatistics extends RegressionSuite {
         config.setHasLocalServer(false);
         boolean compile = config.compile(project);
         assertTrue(compile);
-        builder.addServerConfig(config);
+        builder.addServerConfig(config, false);
 
         return builder;
     }

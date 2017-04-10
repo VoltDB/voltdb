@@ -337,7 +337,7 @@ public class TestUpdateDeployment extends RegressionSuite {
     {
         System.out.println("\n\n-----\n testUpdateBadExport \n-----\n\n");
         System.setProperty(ExportDataProcessor.EXPORT_TO_TYPE, "org.voltdb.export.ExportTestClient");
-        Map<String, String> additionalEnv = new HashMap<String, String>();
+        Map<String, String> additionalEnv = new HashMap<>();
         additionalEnv.put(ExportDataProcessor.EXPORT_TO_TYPE, "org.voltdb.export.ExportTestClient");
         LocalCluster config = new LocalCluster("catalogupdate-bad-export.jar", SITES_PER_HOST, HOSTS, K,
                 BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, false, additionalEnv);
@@ -452,7 +452,7 @@ public class TestUpdateDeployment extends RegressionSuite {
         MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-base.xml"));
 
         // add this config to the set of tests to run
-        builder.addServerConfig(config);
+        builder.addServerConfig(config, false);
 
         /////////////////////////////////////////////////////////////
         // DELTA CATALOGS FOR TESTING

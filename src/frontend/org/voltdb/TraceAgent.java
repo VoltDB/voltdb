@@ -23,6 +23,7 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.utils.VoltTrace;
 
 import java.io.File;
+import java.util.Collection;
 
 public class TraceAgent extends OpsAgent {
     public TraceAgent()
@@ -62,7 +63,7 @@ public class TraceAgent extends OpsAgent {
     private String parseParamsForSystemInformation(ParameterSet params, JSONObject obj) throws Exception
     {
         // Default with no args is OVERVIEW
-        String subselector = "off";
+        String subselector = "status";
         if (params.toArray().length < 1) {
             return "Incorrect number of arguments to @Trace (expects as least 1, received " +
                    params.toArray().length + ")";
@@ -74,10 +75,9 @@ public class TraceAgent extends OpsAgent {
                        first;
             }
             subselector = (String)first;
-            if (!(subselector.equalsIgnoreCase("on") ||
-                  subselector.equalsIgnoreCase("off") ||
-                  subselector.equalsIgnoreCase("enable") ||
+            if (!(subselector.equalsIgnoreCase("enable") ||
                   subselector.equalsIgnoreCase("disable") ||
+                  subselector.equalsIgnoreCase("status") ||
                   subselector.equalsIgnoreCase("dump"))) {
                 return "Invalid @Trace selector " + subselector;
             }
@@ -103,21 +103,24 @@ public class TraceAgent extends OpsAgent {
         }
 
         final String subselector = obj.getString("subselector");
-        if (subselector.equalsIgnoreCase("on")) {
-            VoltTrace.start(new File(VoltDB.instance().getVoltDBRootPath(), "trace_logs").getAbsolutePath());
-        } else if (subselector.equalsIgnoreCase("off")) {
-            VoltTrace.closeAllAndShutdown(false, 0);
-        } else if (subselector.equalsIgnoreCase("dump")) {
-            final String filePath = VoltTrace.dump();
+        if (subselector.equalsIgnoreCase("dump")) {
+            final String filePath = VoltTrace.dump(new File(VoltDB.instance().getVoltDBRootPath(), "trace_logs").getAbsolutePath());
             if (filePath != null) {
                 results[0].addRow(filePath);
             } else {
-                results[0].addRow("A trace file write request is already in progress");
+                results[0].addRow("A trace file write request is already in progress or there is no category enabled");
             }
         } else if (subselector.equalsIgnoreCase("enable")) {
             VoltTrace.enableCategories(VoltTrace.Category.valueOf(obj.getString("categories").toUpperCase()));
         } else if (subselector.equalsIgnoreCase("disable")) {
             VoltTrace.disableCategories(VoltTrace.Category.valueOf(obj.getString("categories").toUpperCase()));
+        } else if (subselector.equalsIgnoreCase("status")) {
+            final Collection<VoltTrace.Category> enabledCategories = VoltTrace.enabledCategories();
+            if (enabledCategories.isEmpty()) {
+                results[0].addRow("off");
+            } else {
+                results[0].addRow(enabledCategories.toString());
+            }
         }
 
         sendOpsResponse(results, obj);

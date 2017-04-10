@@ -71,7 +71,10 @@ protected:
     void validateRow(voltdb::TableTuple &tuple, int32_t valueA, double valueB, const char* valueC) {
         ASSERT_EQ(valueA, voltdb::ValuePeeker::peekInteger(tuple.getNValue(0)));
         ASSERT_EQ(valueB, voltdb::ValuePeeker::peekDouble(tuple.getNValue(1)));
-        ASSERT_EQ(0, strcmp(valueC, voltdb::ValuePeeker::peekObjectValue(tuple.getNValue(2))));
+
+        int32_t length = 0;
+        const char* data = voltdb::ValuePeeker::peekObject(tuple.getNValue(2), &length);
+        ASSERT_EQ(0, strncmp(valueC, data, length));
     }
 
     void validatePerFragmentStatsBuffer(int32_t expectedSucceededFragmentsCount, int32_t batchSize) {

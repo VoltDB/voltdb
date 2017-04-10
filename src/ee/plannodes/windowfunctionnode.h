@@ -27,7 +27,15 @@ public:
                                const std::string &label,
                                const OwningExpressionVector & exprs) const;
     WindowFunctionPlanNode()
-        : AbstractPlanNode() {}
+        : AbstractPlanNode()
+        , m_aggregates()
+        , m_aggregateOutputColumns()
+        , m_aggregateInputExpressions()
+        , m_partitionByExpressions()
+        , m_orderByExpressions()
+    {
+    }
+
     virtual ~WindowFunctionPlanNode();
 
     PlanNodeType getPlanNodeType() const;

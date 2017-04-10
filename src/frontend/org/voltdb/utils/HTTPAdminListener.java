@@ -19,11 +19,13 @@ package org.voltdb.utils;
 
 import java.io.BufferedInputStream;
 import java.io.ByteArrayInputStream;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.URL;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -63,6 +65,8 @@ import org.eclipse.jetty.server.SslConnectionFactory;
 import org.eclipse.jetty.server.handler.AbstractHandler;
 import org.eclipse.jetty.server.handler.ContextHandler;
 import org.eclipse.jetty.server.handler.ContextHandlerCollection;
+import org.eclipse.jetty.server.handler.ResourceHandler;
+import org.eclipse.jetty.server.handler.gzip.GzipHandler;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.eclipse.jetty.util.thread.QueuedThreadPool;
 import org.json_voltpatches.JSONArray;
@@ -96,7 +100,16 @@ public class HTTPAdminListener {
 
     private static final VoltLogger m_log = new VoltLogger("HOST");
     public static final String REALM = "VoltDBRealm";
-    static final String jsonContentType = ContentType.APPLICATION_JSON.toString();
+
+    // static resources
+    private static final String RESOURCE_BASE = "dbmonitor";
+    private static final String CSS_TARGET = "css";
+    private static final String IMAGES_TARGET = "images";
+    private static final String JS_TARGET = "js";
+
+    // content types
+    private static final String JSON_CONTENT_TYPE = ContentType.APPLICATION_JSON.toString();
+    private static final String HTML_CONTENT_TYPE = "text/html;charset=utf-8";
 
     Server m_server;
     HTTPClientInterface httpClientInterface = new HTTPClientInterface();
@@ -220,6 +233,14 @@ public class HTTPAdminListener {
                     baseRequest.setHandled(false);
                     return;
                 }
+
+                if (baseRequest.getRequestURI().contains(File.separator + CSS_TARGET) ||
+                        baseRequest.getRequestURI().contains(File.separator + IMAGES_TARGET) ||
+                        baseRequest.getRequestURI().contains(File.separator + JS_TARGET)) {
+                    // will be processed by individual resource handler
+                    return;
+                }
+
                 //Send old /studio back to "/"
                 if (baseRequest.getRequestURI().contains("/studio")) {
                     response.sendRedirect("/");
@@ -246,7 +267,7 @@ public class HTTPAdminListener {
                 if (target.endsWith("/index.htm")) {
 
                     // set the headers
-                    response.setContentType("text/html;charset=utf-8");
+                    response.setContentType(HTML_CONTENT_TYPE);
                     response.setStatus(HttpServletResponse.SC_OK);
                     baseRequest.setHandled(true);
 
@@ -259,21 +280,23 @@ public class HTTPAdminListener {
                     }
                 }
                 else {
-                    // set the mime type in a giant hack
-                    String mime = "text/html;charset=utf-8";
-                    if (target.endsWith(".js"))
-                        mime = "application/x-javascript;charset=utf-8";
-                    if (target.endsWith(".css"))
-                        mime = "text/css;charset=utf-8";
-                    if (target.endsWith(".gif"))
-                        mime = "image/gif";
-                    if (target.endsWith(".png"))
-                        mime = "image/png";
-                    if ((target.endsWith(".jpg")) || (target.endsWith(".jpeg")))
-                        mime = "image/jpeg";
+                    // js, css, images handled by resource handler. files corresponding to it
+                    // should be placed in the specific location
+                    assert !target.endsWith(".js") : " Javascript should in the resource path "
+                        + RESOURCE_BASE + File.separator + JS_TARGET;
+                    assert !target.endsWith(".css") : " Stylesheet should in the resource path "
+                        + RESOURCE_BASE + File.separator + CSS_TARGET;
+                    assert !target.endsWith(".gif") : target + " should in the resource path "
+                        + RESOURCE_BASE + File.separator + IMAGES_TARGET;
+                    assert !target.endsWith(".png") : target + " should in the resource path "
+                        + RESOURCE_BASE + File.separator + IMAGES_TARGET;
+                    assert !target.endsWith(".jpg") : target + " should in the resource path "
+                        + RESOURCE_BASE + File.separator + IMAGES_TARGET;
+                    assert !target.endsWith(".jpeg") : target + "image should in the resource path "
+                        + RESOURCE_BASE + File.separator + IMAGES_TARGET;
 
                     // set the headers
-                    response.setContentType(mime);
+                    response.setContentType(HTML_CONTENT_TYPE);
                     response.setStatus(HttpServletResponse.SC_OK);
                     baseRequest.setHandled(true);
 
@@ -328,6 +351,46 @@ public class HTTPAdminListener {
 
     }
 
+    /*
+     * Utility handler class to enable caching of static resources.
+     * The static resources are package in jar file
+     */
+    class CacheStaticResourceHandler extends ResourceHandler {
+        // target Directory location for folder w.r.t. resource base folder - dbmonitor
+        public CacheStaticResourceHandler(final String target, int maxAge) {
+            super();
+            final String path = VoltDB.class.getResource(RESOURCE_BASE + File.separator + target).toExternalForm();
+            if (m_log.isDebugEnabled()) {
+                m_log.debug("Resource base path: " + path);
+            }
+            setResourceBase(path);
+            // set etags along with cache age so that the http client's requests for fetching the
+            // static resource is rate limited. Without cache age, client will requesting for
+            // static more than needed
+            setCacheControl("max-age=" + maxAge +", private");
+            setEtags(true);
+        }
+
+        @SuppressWarnings("unused")
+        private CacheStaticResourceHandler() {
+            super();
+            assert false : "Target location for static resource is needed to initialize the resource handler";
+        }
+
+        @Override
+        public void handle(String target,
+                           Request baseRequest,
+                           HttpServletRequest request,
+                           HttpServletResponse response)
+                           throws IOException, ServletException {
+            super.handle(target, baseRequest, request, response);
+            if (!baseRequest.isHandled() && m_log.isDebugEnabled()) {
+                m_log.debug("Failed to process static resource: " + Paths.get(getResourceBase()));
+            }
+        }
+
+    }
+
     //This is a wrapper to generate JSON for profile of authenticated user.
     private final class Profile {
         private final String user;
@@ -366,7 +429,7 @@ public class HTTPAdminListener {
             String jsonp = request.getParameter(HTTPClientInterface.JSONP);
             AuthenticationResult authResult = null;
             try {
-                response.setContentType(jsonContentType);
+                response.setContentType(JSON_CONTENT_TYPE);
                 if (!HTTPClientInterface.validateJSONP(jsonp, baseRequest, response)) {
                     return;
                 }
@@ -507,7 +570,7 @@ public class HTTPAdminListener {
             String jsonp = request.getParameter(HTTPClientInterface.JSONP);
             AuthenticationResult authResult = null;
             try {
-                response.setContentType(jsonContentType);
+                response.setContentType(JSON_CONTENT_TYPE);
                 if (!HTTPClientInterface.validateJSONP(jsonp, baseRequest, response)) {
                     return;
                 }
@@ -894,7 +957,7 @@ public class HTTPAdminListener {
             if (baseRequest.isHandled()) return;
             try {
                 // http://www.ietf.org/rfc/rfc4627.txt dictates this mime type
-                response.setContentType(jsonContentType);
+                response.setContentType(JSON_CONTENT_TYPE);
                 if (m_jsonEnabled) {
                     if (target.equals("/")) {
                         httpClientInterface.process(baseRequest, response);
@@ -928,7 +991,7 @@ public class HTTPAdminListener {
         try {
             String report = ReportMaker.liveReport();
 
-            response.setContentType("text/html;charset=utf-8");
+            response.setContentType(HTML_CONTENT_TYPE);
             response.setStatus(HttpServletResponse.SC_OK);
             baseRequest.setHandled(true);
 
@@ -974,6 +1037,7 @@ public class HTTPAdminListener {
             ) throws Exception {
         int poolsize = Integer.getInteger("HTTP_POOL_SIZE", 50);
         int timeout = Integer.getInteger("HTTP_REQUEST_TIMEOUT_SECONDS", 15);
+        int cacheMaxAge = Integer.getInteger("HTTP_STATIC_CACHE_MAXAGE", 24*60*60); // 24 hours
 
         String resolvedIntf = intf == null ? "" : intf.trim().isEmpty() ? ""
                 : HostAndPort.fromHost(intf).withDefaultPort(port).toString();
@@ -1060,6 +1124,19 @@ public class HTTPAdminListener {
             ContextHandler profileRequestHandler = new ContextHandler("/profile");
             profileRequestHandler.setHandler(new UserProfileHandler());
 
+            ContextHandler cssResourceHandler = new ContextHandler("/css");
+            ResourceHandler cssResource = new CacheStaticResourceHandler(CSS_TARGET, cacheMaxAge);
+            cssResourceHandler.setHandler(cssResource);
+
+            ContextHandler imageResourceHandler = new ContextHandler("/images");
+            ResourceHandler imagesResource = new CacheStaticResourceHandler(IMAGES_TARGET, cacheMaxAge);
+            imageResourceHandler.setHandler(imagesResource);
+
+            ContextHandler jsResourceHandler = new ContextHandler("/js");
+            ResourceHandler jsResource = new CacheStaticResourceHandler(JS_TARGET, cacheMaxAge);
+            jsResourceHandler.setHandler(jsResource);
+
+
             ContextHandlerCollection handlers = new ContextHandlerCollection();
             handlers.setHandlers(new Handler[] {
                     apiRequestHandler,
@@ -1067,10 +1144,20 @@ public class HTTPAdminListener {
                     ddlRequestHandler,
                     deploymentRequestHandler,
                     profileRequestHandler,
-                    dbMonitorHandler
-            });
+                    dbMonitorHandler,
+                    cssResourceHandler,
+                    imageResourceHandler,
+                    jsResourceHandler
+                    });
 
-            m_server.setHandler(handlers);
+            GzipHandler compressResourcesHandler = new GzipHandler();
+            compressResourcesHandler.setHandler(handlers);
+
+            compressResourcesHandler.addExcludedMimeTypes(JSON_CONTENT_TYPE);
+            compressResourcesHandler.setIncludedMimeTypes("application/x-javascript", "text/css" ,
+                    "image/gif", "image/png", "image/jpeg", HTML_CONTENT_TYPE);
+
+            m_server.setHandler(compressResourcesHandler);
 
             httpClientInterface.setTimeout(timeout);
             m_jsonEnabled = jsonEnabled;

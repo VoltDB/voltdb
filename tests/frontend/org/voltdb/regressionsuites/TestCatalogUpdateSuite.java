@@ -1061,7 +1061,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-base.xml"));
 
         // add this config to the set of tests to run
-        builder.addServerConfig(config);
+        builder.addServerConfig(config, false);
 
         /////////////////////////////////////////////////////////////
         // DELTA CATALOGS FOR TESTING

@@ -235,7 +235,9 @@ public class MpScheduler extends Scheduler
                     .add(() -> VoltTrace.meta("thread_sort_index", "sort_index", Integer.toString(100)))
                     .add(() -> VoltTrace.beginAsync("initmp", mpTxnId,
                                                     "txnId", TxnEgo.txnIdToString(mpTxnId),
-                                                    "ciHandle", Long.toString(message.getClientInterfaceHandle())));
+                                                    "ciHandle", message.getClientInterfaceHandle(),
+                                                    "name", procedureName,
+                                                    "read", message.isReadOnly()));
         }
 
         // Don't have an SP HANDLE at the MPI, so fill in the unused value

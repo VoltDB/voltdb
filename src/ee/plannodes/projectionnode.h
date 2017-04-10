@@ -55,7 +55,14 @@ namespace voltdb {
 class ProjectionPlanNode : public AbstractPlanNode
 {
 public:
-    ProjectionPlanNode() { }
+    ProjectionPlanNode()
+        : m_outputColumnNames()
+        , m_outputColumnTypes()
+        , m_outputColumnSizes()
+        , m_outputColumnExpressions()
+    {
+    }
+
     ~ProjectionPlanNode();
 
     PlanNodeType getPlanNodeType() const;

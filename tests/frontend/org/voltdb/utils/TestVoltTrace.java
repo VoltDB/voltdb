@@ -29,6 +29,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.LinkedList;
@@ -36,6 +37,7 @@ import java.util.List;
 import java.util.Random;
 import java.util.zip.GZIPInputStream;
 
+import com.google_voltpatches.common.collect.Sets;
 import org.codehaus.jackson.map.ObjectMapper;
 
 import org.junit.After;
@@ -56,12 +58,11 @@ public class TestVoltTrace {
         m_tempDir = VoltFile.createTempFile(FILE_NAME_PREFIX, null);
         assertTrue(m_tempDir.delete());
         assertTrue(m_tempDir.mkdir());
-        VoltTrace.start(m_tempDir.getAbsolutePath());
     }
 
     @After
     public void tearDown() throws Exception {
-        VoltTrace.closeAllAndShutdown(false, 0);
+        VoltTrace.closeAllAndShutdown(null, 0);
         VoltFile.recursivelyDelete(m_tempDir);
         m_tempDir = null;
     }
@@ -88,7 +89,7 @@ public class TestVoltTrace {
     }
 
     @Test
-    public void testCategoryToggle() {
+    public void testCategoryToggle() throws IOException {
         // Nothing is enabled by default
         for (VoltTrace.Category category : VoltTrace.Category.values()) {
             assertNull(VoltTrace.log(category));
@@ -96,6 +97,8 @@ public class TestVoltTrace {
 
         // Enable two categories
         VoltTrace.enableCategories(VoltTrace.Category.CI, VoltTrace.Category.SPI);
+        assertEquals(Sets.newHashSet(VoltTrace.Category.CI, VoltTrace.Category.SPI),
+                     VoltTrace.enabledCategories());
         for (VoltTrace.Category category : VoltTrace.Category.values()) {
             if (category == VoltTrace.Category.CI || category == VoltTrace.Category.SPI) {
                 assertNotNull(VoltTrace.log(category));
@@ -106,6 +109,7 @@ public class TestVoltTrace {
 
         // Disable one of them
         VoltTrace.disableCategories(VoltTrace.Category.CI);
+        assertEquals(Collections.singleton(VoltTrace.Category.SPI), VoltTrace.enabledCategories());
         for (VoltTrace.Category category : VoltTrace.Category.values()) {
             if (category == VoltTrace.Category.SPI) {
                 assertNotNull(VoltTrace.log(category));
@@ -113,6 +117,11 @@ public class TestVoltTrace {
                 assertNull(VoltTrace.log(category));
             }
         }
+
+        // Disable all and make sure the tracer is gone
+        VoltTrace.disableCategories(VoltTrace.Category.values());
+        assertTrue(VoltTrace.enabledCategories().isEmpty());
+        assertNull(VoltTrace.dump(m_tempDir.getAbsolutePath()));
     }
 
     @Test
@@ -120,7 +129,7 @@ public class TestVoltTrace {
         VoltTrace.enableCategories(VoltTrace.Category.values());
         final SenderRunnable sender = new SenderRunnable();
         sender.run();
-        final String path = VoltTrace.closeAllAndShutdown(true, 0);
+        final String path = VoltTrace.closeAllAndShutdown(m_tempDir.getAbsolutePath(), 0);
 
         verifyFileContents(sender.getSentList(), path);
     }
@@ -138,7 +147,7 @@ public class TestVoltTrace {
         final SenderRunnable sender = new SenderRunnable(VoltTrace.QUEUE_SIZE);
         sender.run();
 
-        verifyFileContents(sender.getSentList(), VoltTrace.closeAllAndShutdown(true, 0));
+        verifyFileContents(sender.getSentList(), VoltTrace.closeAllAndShutdown(m_tempDir.getAbsolutePath(), 0));
     }
 
     private ArrayList<VoltTrace.TraceEventType> m_allEventTypes = new ArrayList<>(EnumSet.allOf(VoltTrace.TraceEventType.class));
@@ -222,7 +231,11 @@ public class TestVoltTrace {
         for (int i=0; i<count; i++) {
             String key = s_argKeys[m_random.nextInt(s_argKeys.length)];
             args[i*2] = key;
-            args[i*2+1] = key+"-val";
+            if (m_random.nextBoolean()) {
+                args[i * 2 + 1] = key + "-val";
+            } else {
+                args[i * 2 + 1] = null;
+            }
         }
 
         return args;

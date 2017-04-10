@@ -1000,13 +1000,15 @@ public class MiscUtils {
         return sb.toString();
     }
 
-    public static String hsIdPairTxnIdToString(long srcHsId, long destHsId, long txnId) {
+    public static String hsIdPairTxnIdToString(final long srcHsId, final long destHsId,
+                                               final long txnId, final long uniqID) {
         final StringBuilder sb = new StringBuilder(32);
         CoreUtils.hsIdToString(srcHsId, sb);
         sb.append("->");
         CoreUtils.hsIdToString(destHsId, sb);
         sb.append(" ");
         TxnEgo.txnIdToString(txnId, sb);
+        sb.append(" ").append(uniqID);
         return sb.toString();
     }
 }
