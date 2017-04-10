@@ -27,11 +27,12 @@ import cgi
 import codecs
 import cPickle
 import decimal
-import datetime
 import os
 import traceback
+from datetime import datetime
 from distutils.util import strtobool
 from optparse import OptionParser
+from time import mktime
 from voltdbclient import VoltColumn, VoltTable, FastSerializer
 
 __quiet = True
@@ -75,7 +76,7 @@ def generate_table_str(res, key):
 
 def generate_modified_query(cmpdb, sql, modified_sql):
     result = ''
-    mod_sql = modified_sql.get(sql, None)
+    mod_sql = modified_sql.get(sql.rstrip(';'), None)
     if mod_sql:
         result = '<p>Modified SQL query, as sent to ' + str(cmpdb) + ':</p><h2>' + str(mod_sql) + '</h2>'
     return result
@@ -181,7 +182,24 @@ def print_section(name, mismatches, output_dir, cmpdb, modified_sql):
 
     return result
 
-def is_different(x, cntonly):
+def time_diff_close_enough(time1, time2, within_minutes):
+    """Test whether two datetimes (TIMESTAMP's) are:
+    1. within a specified number of minutes of each other; and
+    2. within a specified number (the same number) of minutes of right now.
+    If both are true, then they are deemed to be "close enough", on the
+    assumption that they were each set to NOW() or CURRENT_TIMESTAMP(), and
+    the difference is because VoltDB and its comparison database (HSQL or
+    PostgreSQL) called that function at slightly different times.
+    """
+    time_diff_in_minutes = (time1 - time2).total_seconds() / 60
+    if abs(time_diff_in_minutes) > within_minutes:
+        return False
+    time_diff_in_minutes = (time2 - datetime.now()).total_seconds() / 60
+    if abs(time_diff_in_minutes) > within_minutes:
+        return False
+    return True
+
+def is_different(x, cntonly, within_minutes):
     """Notes the attributes that are different. Since the whole table will be
     printed out as a single string.
     the first line is column count,
@@ -260,6 +278,9 @@ def is_different(x, cntonly):
         for jj in xrange(nColumns):
             if jniTuples[ii][jj] == cmpTuples[ii][jj]:
                 continue
+            if (within_minutes and jniColumns[jj].type == FastSerializer.VOLTTYPE_TIMESTAMP and
+                    time_diff_close_enough(jniTuples[ii][jj], cmpTuples[ii][jj], within_minutes)):
+                continue
             if (jniColumns[jj].type == FastSerializer.VOLTTYPE_FLOAT and
                     cmpColumns[jj].type == FastSerializer.VOLTTYPE_DECIMAL):
                 if decimal.Decimal(str(jniTuples[ii][jj])) == cmpTuples[ii][jj]:
@@ -294,8 +315,8 @@ contain the SQL statements which caused different responses on both backends.
 
 def generate_html_reports(suite, seed, statements_path, cmpdb_path, jni_path,
                           output_dir, report_invalid, report_all, extra_stats='',
-                          cmpdb='HSqlDB', modified_sql_path=None, max_mismatches=0,
-                          cntonly=False):
+                          cmpdb='HSqlDB', modified_sql_path=None,
+                          max_mismatches=0, within_minutes=0, cntonly=False):
     if output_dir != None and not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
@@ -349,7 +370,7 @@ def generate_html_reports(suite, seed, statements_path, cmpdb_path, jni_path,
 
             if notFound:
                 crashed.append(statement)
-            elif is_different(statement, cntonly):
+            elif is_different(statement, cntonly, within_minutes):
                 mismatches.append(statement)
             if ('NullPointerException' in str(jni)):
                 voltdb_npes.append(statement)
@@ -384,7 +405,7 @@ def generate_html_reports(suite, seed, statements_path, cmpdb_path, jni_path,
             raise IOError("Unable to read modified SQL file: %s\n  %s" % (modified_sql_path, str(e)))
 
     topLines = getTopSummaryLines(cmpdb, False)
-    currentTime = datetime.datetime.now().strftime("%A, %B %d, %I:%M:%S %p")
+    currentTime = datetime.now().strftime("%A, %B %d, %I:%M:%S %p")
     keyStats = createSummaryInHTML(count, failures, len(mismatches), len(voltdb_npes),
                                    len(cmpdb_npes), extra_stats, seed, max_mismatches)
     report = """
