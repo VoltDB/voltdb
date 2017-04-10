@@ -695,6 +695,31 @@ public class TestFixedSQLSuite extends RegressionSuite {
         subTestENG9533();
         subTestENG9796();
         subTestENG11256();
+        subTestENG12105();
+    }
+
+    private void subTestENG12105() throws Exception {
+        Client client = getClient();
+
+        validateTableOfLongs(client,
+                "insert into eng_12105 values (0, "
+                + "null, 12, 13, 14, "
+                + "15.0, 16.00, "
+                + "'foo', 'foo_inline_max', 'foo_inline', "
+                + "'2016-01-01 00:00:00.000000', "
+                + "x'deadbeef');", new long[][] {{1}});
+
+        validateTableOfLongs(client,
+                "SELECT ALL TINY "
+                + "FROM ENG_12105 T1 "
+                + "INNER JOIN "
+                + "(SELECT DISTINCT VARBIN C2 "
+                + "  FROM ENG_12105 "
+                + "  GROUP BY C2 , SMALL , C2 LIMIT 2 ) T2 "
+                + "ON TINY IS NULL "
+                + "GROUP BY TINY "
+                + "LIMIT 8372 "
+                + "OFFSET 0;", new long[][] {{-128}});
     }
 
     private void subTestENG11256() throws Exception {
