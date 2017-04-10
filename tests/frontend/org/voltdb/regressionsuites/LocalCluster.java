@@ -2084,7 +2084,17 @@ public class LocalCluster extends VoltServerConfig {
      * @return a running VoltDB cluster
      * @throws IOException
      */
-    public static LocalCluster createLocalClusterViaStagedCatalog(String schemaDDL, String proceduresJar, int siteCount, int hostCount, int kfactor) throws IOException {
+    public static LocalCluster createLocalClusterViaStagedCatalog(
+            String schemaDDL,
+            String proceduresJar,
+            int siteCount,
+            int hostCount,
+            int kfactor,
+            VoltProjectBuilder projectBuilder) throws IOException {
+
+        if (projectBuilder == null){
+            projectBuilder = new VoltProjectBuilder();
+        }
 
         final int clusterID = 0;
         LocalCluster lc = new LocalCluster(
@@ -2103,7 +2113,7 @@ public class LocalCluster extends VoltServerConfig {
         System.out.println("Starting local cluster.");
         lc.setHasLocalServer(false);
         lc.overrideAnyRequestForValgrind();
-        lc.compileDeploymentOnly(new VoltProjectBuilder());
+        lc.compileDeploymentOnly(projectBuilder);
 
         boolean clearLocalDataDirectories = false;
         boolean skipInit = false;
@@ -2146,7 +2156,7 @@ public class LocalCluster extends VoltServerConfig {
         int total = 0;
         for (Map.Entry<String, String> entry : m_hostRoots.entrySet()){
             File testFile = new VoltFile(entry.getValue() + pathWithinVoltDBRoot);
-            assert( testFile.isFile() ) : testFile.getAbsolutePath() + " is not a file";
+            assert( !testFile.exists() || testFile.isFile() ) : testFile.getAbsolutePath() + " is not a file";
             if (testFile.canRead() && (testFile.length() > 0)){
                 total++;
             }

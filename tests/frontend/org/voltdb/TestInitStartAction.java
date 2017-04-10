@@ -148,7 +148,6 @@ final public class TestInitStartAction {
     /** Tests starting an empty database with the NewCLI commands "init" and "start",
      * plus a few error cases.
      */
-    /*
     @Test
     public void testInitStartAction() throws Exception {
 
@@ -244,7 +243,6 @@ final public class TestInitStartAction {
         EnumSet<StartAction> legacyOnes = EnumSet.complementOf(EnumSet.of(StartAction.INITIALIZE,StartAction.PROBE, StartAction.GET));
         assertTrue(legacyOnes.stream().allMatch(StartAction::isLegacy));
     }
-    */
 
     /*
      * "voltdb init --schema --procedures" tests:
@@ -262,7 +260,6 @@ final public class TestInitStartAction {
      * @param schema Schema used to generate the staged catalog
      * @throws Exception upon test failure or error (unable to write temp file for example)
      */
-    /*
     private void validateStagedCatalog(String schema) throws Exception {
         // setup reference point for the supplied schema
         File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema);
@@ -289,12 +286,10 @@ final public class TestInitStartAction {
         assertEquals(true, referenceFile.delete());
         assertEquals(true, schemaFile.delete());
     }
-    */
 
     /** Test that a valid schema with no procedures can be used to stage a matching catalog.
      * @throws Exception upon failure or error
      */
-    /*
     @Test
     public void testInitWithSchemaValidNoProcedures() throws Exception {
 
@@ -314,13 +309,11 @@ final public class TestInitStartAction {
         validateStagedCatalog(schema);
         assertEquals(true, schemaFile.delete());
     }
-    */
 
     /** Test that a valid schema with procedures can be used to stage a matching catalog,
      * but running a second time without 'init --force' fails due to existing artifacts.
      * @throws Exception upon failure or error
      */
-    /*
     @Test
     public void testInitWithSchemaValidWithProcedures() throws Exception {
 
@@ -353,12 +346,10 @@ final public class TestInitStartAction {
         }
         assertEquals(true, schemaFile.delete());
     }
-    */
 
     /** Test that a valid schema with no procedures can be used to stage a matching catalog.
      * @throws Exception upon failure or error
      */
-    /*
     @Test
     public void testInitWithSchemaInvalidJunkSchema() throws Exception {
 
@@ -373,12 +364,10 @@ final public class TestInitStartAction {
 
         assertEquals(true, schemaFile.delete());
     }
-    */
 
     /** Test that a valid schema with no procedures can be used to stage a matching catalog.
      * @throws Exception upon failure or error
      */
-    /*
     @Test
     public void testInitWithSchemaInvalidMissingClass() throws Exception {
 
@@ -404,7 +393,6 @@ final public class TestInitStartAction {
         assertTrue(VoltDB.crashMessage.contains("Could not compile specified schema"));
         assertEquals(true, schemaFile.delete());
     }
-    */
 
     /** Tests that a cluster can start with each node using an identical staged catalog.
      * Since durability is off, the staged catalog will be kept around but not reflect any DDL changes.
@@ -419,8 +407,8 @@ final public class TestInitStartAction {
                 "PARTITION TABLE books ON COLUMN cash;";
         final int siteCount = 1;
         final int hostCount = 3;
-        final int kfactor = MiscUtils.isPro() ? 1 : 0;
-        LocalCluster cluster = LocalCluster.createLocalClusterViaStagedCatalog(schema, null, siteCount, hostCount, kfactor);
+        final int kfactor = 0;
+        LocalCluster cluster = LocalCluster.createLocalClusterViaStagedCatalog(schema, null, siteCount, hostCount, kfactor, null);
 
         // Staged catalog will persist because durability is off, and being able to recover the schema is beneficial.
         int nodesWithStagedCatalog = cluster.countNodesWithFile(Constants.CONFIG_DIR + File.separator + CatalogUtil.STAGED_CATALOG_FILE_NAME);

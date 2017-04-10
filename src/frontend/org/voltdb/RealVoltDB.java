@@ -3883,10 +3883,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             }
         }
         if (m_durable || terminusExists){
-            File stagedCatalog = new File(m_nodeSettings.getVoltDBRoot(), Constants.CONFIG_DIR + CatalogUtil.STAGED_CATALOG_FILE_NAME);
+            File stagedCatalog = new VoltFile(RealVoltDB.getStagedCatalogPath(m_nodeSettings.getVoltDBRoot().getAbsolutePath()));
             if (stagedCatalog.exists()){
                 boolean success = stagedCatalog.delete();
-                if (!success){
+                if (success){
+                    hostLog.info("Deleted staged catalog because durability is present.");
+                } else {
                     hostLog.warn("Could not delete staged catalog");
                 }
             }
