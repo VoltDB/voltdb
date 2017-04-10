@@ -43,33 +43,6 @@ RELEASE_MINOR_VERSION = 2
 def plan_upgrade(runner):
     hosts, kfactor, largestClusterId = basicCheck(runner)
 
-    # first check the existence of root path on all the existing nodes
-    # runner.call_proc('@UpgradeCheck',[VOLT.FastSerializer.VOLTTYPE_STRING], [runner.opts.newKit, runner.opts.newRoot])
-
-    # FIXME: now just assume both newKit and newRoot exist, create newRoot if necessary.
-    # In the future we need call a non transactional sysproc to check it.
-    if not os.path.exists(runner.opts.newRoot):
-        os.makedirs(runner.opts.newRoot)
-
-    # verify the version of new kit is above the feature release version (e.g. 7.3)
-    # this part should also running under NT proc
-    try:
-        versionF = open(os.path.join(runner.opts.newKit, 'version.txt'), 'r')
-    except IOError:
-        runner.abort("Couldn't find version information in new VoltDB kit.")
-
-    version = versionF.read().split(".");
-    if len(version) < 2:
-        runner.abort("Invalid version information in new VoltDB kit.")
-    majorVersion = version[0];
-    minorVersion = version[1];
-    if (int(majorVersion) < RELEASE_MAJOR_VERSION or
-        int(majorVersion) == RELEASE_MAJOR_VERSION and int(minorVersion) < RELEASE_MINOR_VERSION):
-        runner.abort("The version of new VoltDB kit is too low. In-service upgrade is supported from V%d.%d"
-                     % (RELEASE_MAJOR_VERSION, RELEASE_MINOR_VERSION));
-
-    print 'Pre-upgrade check is passed.'
-
     generateCommands(runner,
                      hosts,
                      kfactor,
@@ -122,6 +95,19 @@ def basicCheck(runner):
         remote_cluster_id = tuple[2]
         if remote_cluster_id > largestClusterId:
             largestClusterId = remote_cluster_id
+
+    # Check the existence of voltdb root path and new kit on all the existing nodes
+    response = runner.call_proc('@CheckUpgradePlan',
+                                [VOLT.FastSerializer.VOLTTYPE_STRING],
+                                [runner.opts.newKit, runner.opts.newRoot])
+    for tuple in response.table(0).tuples():
+        if tuple != 'Success':
+            error += tuple + "\n"
+
+    if error is not None:
+        runner.abort(error)
+
+    print 'Pre-upgrade check is passed.'
 
     return hosts, kfactor, largestClusterId
 
