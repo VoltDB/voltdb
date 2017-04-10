@@ -1539,8 +1539,8 @@ public class TestCatalogDiffs extends TestCase {
                 + "\nCREATE VIEW V_A (C1 , NUM_A) AS SELECT C1, COUNT(*) FROM A GROUP BY C1;");
         assertTrue("Failed to compile schema", builder.compile(testDir + File.separator + "exp6.jar"));
         Catalog catUpdatedWithStreamView = catalogForJar(testDir + File.separator + "exp6.jar");
-        verifyDiff(catOriginal, catUpdatedWithStreamView, null, null, true, false); // create view on stream and roll
-        verifyDiff(catUpdatedWithStreamView, catOriginal, null, null, true, false); // drop view on stream and roll
+        verifyDiff(catOriginal, catUpdatedWithStreamView, null, null, false, false); // create view on stream and roll
+        verifyDiff(catUpdatedWithStreamView, catOriginal, null, null, false, false); // drop view on stream and roll
 
     }
 

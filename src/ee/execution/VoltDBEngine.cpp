@@ -643,16 +643,8 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const std::string &catal
         m_executorContext->drReplicatedStream()->m_enabled = m_executorContext->drStream()->m_enabled;
         m_executorContext->drReplicatedStream()->m_flushInterval = m_executorContext->drStream()->m_flushInterval;
     }
-    // See if we have any stream
-    bool isStreamUpdate = false;
-    BOOST_FOREACH (LabeledTable labeledTable, m_database->tables()) {
-        auto catalogTable = labeledTable.second;
-        if (catalogTable->isStream()) {
-            isStreamUpdate = true;
-            break;
-        }
-    }
-    if (processCatalogAdditions(isStreamUpdate, timestamp) == false) {
+    //When loading catalog we do isStreamUpdate to false as stream tables will get created and thus roll will happen.
+    if (processCatalogAdditions(false, timestamp) == false) {
         return false;
     }
 
@@ -874,17 +866,17 @@ bool VoltDBEngine::processCatalogAdditions(bool isStreamUpdate, int64_t timestam
             auto streamedTable = tcd->getStreamedTable();
             if (streamedTable) {
                 //Dont update and roll generation if this is just a non stream table update.
-                if (!isStreamUpdate) continue;
-
-                streamedTable->setSignatureAndGeneration(catalogTable->signature(), timestamp);
-                if (!tcd->exportEnabled()) {
-                    // Evaluate export enabled or not and cache it on the tcd.
-                    tcd->evaluateExport(*m_database, *catalogTable);
-                    // If enabled hook up streamer
-                    if (tcd->exportEnabled() && streamedTable->enableStream()) {
-                        //Reset generation after stream wrapper is created.
-                        streamedTable->setSignatureAndGeneration(catalogTable->signature(), timestamp);
-                        m_exportingTables[catalogTable->signature()] = streamedTable;
+                if (isStreamUpdate) {
+                    streamedTable->setSignatureAndGeneration(catalogTable->signature(), timestamp);
+                    if (!tcd->exportEnabled()) {
+                        // Evaluate export enabled or not and cache it on the tcd.
+                        tcd->evaluateExport(*m_database, *catalogTable);
+                        // If enabled hook up streamer
+                        if (tcd->exportEnabled() && streamedTable->enableStream()) {
+                            //Reset generation after stream wrapper is created.
+                            streamedTable->setSignatureAndGeneration(catalogTable->signature(), timestamp);
+                            m_exportingTables[catalogTable->signature()] = streamedTable;
+                        }
                     }
                 }
 
