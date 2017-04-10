@@ -1119,6 +1119,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 m_configuredReplicationFactor = topo.getReplicationFactor();
                 m_cartographer = new Cartographer(m_messenger, m_configuredReplicationFactor,
                         m_catalogContext.cluster.getNetworkpartition());
+                m_cartographer.setHostCount(m_config.m_hostCount);
                 m_partitionZeroLeader = new Supplier<Boolean>() {
                     @Override
                     public Boolean get() {
@@ -3612,6 +3613,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 initializeDRProducer();
                 createDRConsumerIfNeeded();
                 prepareReplication();
+            }
+            if (m_rejoining) {
+                m_clientInterface.callBalanceSPI(m_myHostId);
             }
         }
         startHealthMonitor();

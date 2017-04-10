@@ -20,6 +20,7 @@ package org.voltdb.iv2;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -48,6 +49,7 @@ import org.voltdb.AbstractTopology;
 import org.voltdb.MailboxNodeContent;
 import org.voltdb.StatsSource;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.VoltZK;
@@ -56,6 +58,8 @@ import org.voltdb.iv2.LeaderCache.LeaderCallBackInfo;
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.collect.ArrayListMultimap;
 import com.google_voltpatches.common.collect.ImmutableMap;
+import com.google_voltpatches.common.collect.Lists;
+import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.collect.Multimap;
 import com.google_voltpatches.common.collect.Multimaps;
 import com.google_voltpatches.common.collect.Sets;
@@ -81,7 +85,7 @@ public class Cartographer extends StatsSource
 
     private final int m_configuredReplicationFactor;
     private final boolean m_partitionDetectionEnabled;
-
+    private int m_hostCount = 0;
     private final ExecutorService m_es
             = CoreUtils.getCachedSingleThreadExecutor("Cartographer", 15000);
 
@@ -192,6 +196,70 @@ public class Cartographer extends StatsSource
         @Override
         public void remove() {
             i.remove();
+        }
+    }
+
+    /**
+     * HostLeaderInfo is used to calculate the partition candidates for migration
+     */
+    private static class HostLeaderInfo implements Comparable<HostLeaderInfo> {
+        int m_hostId;
+        Set<Integer> m_partitions = Sets.newHashSet();
+
+        public HostLeaderInfo(int hostId) {
+            m_hostId = hostId;
+        }
+
+        @Override
+        public int compareTo(HostLeaderInfo other){
+            return (m_partitions.size() - other.m_partitions.size());
+        }
+
+        @Override
+        public int hashCode() {
+            return m_hostId;
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (obj instanceof HostLeaderInfo) {
+                HostLeaderInfo info = (HostLeaderInfo)obj;
+                return m_hostId == info.m_hostId;
+            }
+            return false;
+        }
+
+        public void addPartition(int partition) {
+            m_partitions.add(partition);
+        }
+
+        /**
+         * get partition candidates for migration on a host
+         * @param partitions  the partitions on the new host. These partitions are replica but will assume leadership after
+         *                    spi migration
+         * @param optimalLeadersOnHost  The optimal number of partition leaders
+         * @param candidateCount  the number of partition candidates requested
+         * @return  The partitions on this host to be migrated.
+         */
+        public Set<Integer> getPartitionsForMigration(Set<Integer> partitions, int optimalLeadersOnHost, int candidateCount) {
+
+            Set<Integer> candidates = Sets.newHashSet();
+            int count = m_partitions.size();
+            for (Integer partition : m_partitions) {
+                if (partitions.contains(partition) && count > optimalLeadersOnHost && candidates.size() < candidateCount) {
+                    candidates.add(partition);
+                    count--;
+                }
+            }
+            return candidates;
+        }
+
+        @Override
+        public String toString() {
+            StringBuilder builder = new StringBuilder();
+            builder.append("Host:" + m_hostId);
+            builder.append(", Partitions:" + m_partitions);
+            return builder.toString();
         }
     }
 
@@ -657,5 +725,112 @@ public class Cartographer extends StatsSource
             }
         }
         return true;
+    }
+
+    public void setHostCount(int hostCount) {
+        m_hostCount = hostCount;
+    }
+
+    /**
+     * Calculate the partitions whose leaders will be migrated to the new host.
+     * @param newHostId  newly rejoined host id
+     * @return The IDs of partitions. Their leaders will be moved to the new host
+     */
+    public Map<Integer, Integer> calculatePartitionsForMigration(int newHostId) {
+
+        assert(m_hostCount > 0);
+        Map<Integer, Integer> partitions = Maps.newHashMap();
+
+        //partitions on the new host
+        Set<Integer> partitionsOnNewHost = new HashSet<Integer>();
+        partitionsOnNewHost.addAll(getHostToPartitionMap().get(newHostId));
+
+        if (hostLog.isDebugEnabled()) {
+            hostLog.debug("[calculateSPIMigrationPartitions] partitions " + partitionsOnNewHost + " on host " + newHostId);
+        }
+
+        //current partition leaders by host
+        Map<Integer, HostLeaderInfo> leadersByHostMap = Maps.newHashMap();
+        HashMap<Integer, Long> cacheCopy = new HashMap<Integer, Long>(m_iv2Masters.pointInTimeCache());
+        for (Map.Entry<Integer, Long> entry : cacheCopy.entrySet()) {
+            int leaderHostId = (int)(CoreUtils.getHostIdFromHSId(entry.getValue()));
+            HostLeaderInfo leaderInfo = leadersByHostMap.get(leaderHostId);
+            if (leaderInfo == null) {
+                leaderInfo = new HostLeaderInfo(leaderHostId);
+                leadersByHostMap.put(leaderHostId, leaderInfo);
+            }
+            leaderInfo.addPartition(entry.getKey());
+        }
+
+        List<HostLeaderInfo> leaders = Lists.newLinkedList();
+        leaders.addAll(leadersByHostMap.values());
+        Collections.sort(leaders);
+        double countTemp = (double)(getPartitionCount()) / m_hostCount;
+        int maxCount = (int)Math.ceil(countTemp);
+        for (HostLeaderInfo info : leaders) {
+            int remaining = maxCount - partitions.size();
+            if (remaining == 0) {
+                break;
+            }
+            Set<Integer> candidates = info.getPartitionsForMigration(partitionsOnNewHost, maxCount, remaining);
+            if (hostLog.isDebugEnabled()) {
+                hostLog.debug("[calculateSPIMigrationPartitions] host info: " + info + " candidates:" + candidates);
+            }
+            for (Integer candidate : candidates) {
+                partitions.put(candidate, newHostId);
+            }
+        }
+
+        if (hostLog.isDebugEnabled()) {
+            hostLog.debug("[calculateSPIMigrationPartitions] partition leaders " + partitions + " to be moved to host " + newHostId);
+        }
+        return partitions;
+    }
+
+    //Wait for the spi migration to be processed
+    public boolean waitForPromotionAccepted(int hostId, int partition) {
+
+        final long maxSleep = 2 * 60 * 1000;
+        long sleep = 100;
+        while (true) {
+            Long hsid = m_iv2Masters.pointInTimeCache().get(partition);
+            if (hsid != null && hostId == CoreUtils.getHostIdFromHSId(hostId)) {
+                return true;
+            }
+            try {
+                Thread.sleep(sleep);
+            } catch (Exception ignored) {
+            }
+            if (sleep > maxSleep) {
+                break;
+            }
+            sleep = Math.min(sleep + sleep, maxSleep);
+        }
+        return false;
+    }
+
+    //Utility method to peek the topology
+    public static VoltTable peekTopology(Cartographer cart) {
+        ColumnInfo[] column = new ColumnInfo[3];
+        column[0] = new ColumnInfo("Partition", VoltType.BIGINT);
+        column[1] = new ColumnInfo("Sites", VoltType.STRING);
+        column[2] = new ColumnInfo("Leader", VoltType.STRING);
+        VoltTable t = new VoltTable(column);
+
+        Iterator<Object> i = cart.getStatsRowKeyIterator(false);
+        while (i.hasNext()) {
+            Object rowKey = i.next();
+            long leader;
+            List<Long> sites = new ArrayList<Long>();
+            if (rowKey.equals(MpInitiator.MP_INIT_PID)) {
+                leader = cart.getHSIdForMultiPartitionInitiator();
+                sites.add(leader);
+            } else {
+                leader = cart.m_iv2Masters.pointInTimeCache().get(rowKey);
+                sites.addAll(cart.getReplicasForPartition((Integer)rowKey));
+            }
+            t.addRow(rowKey, CoreUtils.hsIdCollectionToString(sites), CoreUtils.hsIdToString(leader));
+        }
+        return t;
     }
 }

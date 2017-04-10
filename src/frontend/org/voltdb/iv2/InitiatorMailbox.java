@@ -18,7 +18,6 @@
 package org.voltdb.iv2;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -104,8 +103,9 @@ public class InitiatorMailbox implements Mailbox
     synchronized public RepairAlgo constructRepairAlgo(Supplier<List<Long>> survivors, String whoami, boolean isBalanceSPI) {
         RepairAlgo ra = new SpPromoteAlgo( survivors.get(), this, whoami, m_partitionId, isBalanceSPI);
         if (hostLog.isDebugEnabled()) {
+
             hostLog.debug("[InitiatorMailbox:constructRepairAlgo] whoami: " + whoami + ", partitionId: " +
-                    m_partitionId + ", survivors: " + Arrays.toString(survivors.get().toArray()));
+                    m_partitionId + ", survivors: " + CoreUtils.hsIdCollectionToString(survivors.get()));
         }
         setRepairAlgoInternal(ra);
         return ra;

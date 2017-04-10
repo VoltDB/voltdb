@@ -102,6 +102,7 @@ import com.google_voltpatches.common.base.Predicate;
 import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableSet;
+import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.collect.Sets;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 
@@ -2048,5 +2049,82 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
     public AuthUser getInternalUser() {
         return m_catalogContext.get().authSystem.getInternalAdminUser();
+    }
+
+    /**
+     * migration spi after rejoining
+     * @param hostId new host id
+     */
+    public void callBalanceSPI(int hostId) {
+
+        Map<Integer, Integer> partitions = m_cartographer.calculatePartitionsForMigration(hostId);
+        VoltTable partitionKeys = TheHashinator.getPartitionKeys(VoltType.INTEGER);
+
+        if (hostLog.isDebugEnabled()) {
+            hostLog.debug("\n" + Cartographer.peekTopology(m_cartographer).toFormattedString());
+            hostLog.debug("\n" + partitionKeys.toFormattedString());
+            partitionKeys.resetRowPosition();
+        }
+
+        Map<Integer, Integer> keyMap = Maps.newHashMap();
+        while (partitionKeys.advanceRow()) {
+            keyMap.put((int)(partitionKeys.getLong(0)), ((int)partitionKeys.getLong(1)));
+        }
+        for (Map.Entry<Integer, Integer> entry: partitions.entrySet()) {
+            int partition = entry.getKey();
+            int hid = entry.getValue();
+            try {
+                ClientResponse resp = migrateSPI(keyMap.get(partition), partition, hid);
+                if (resp.getStatus() != ClientResponse.SUCCESS) {
+                    hostLog.error(String.format("Fail to move partition master for partition %d to host %d. %s", partition, hid, resp.getStatusString()));
+                }
+                if (m_cartographer.waitForPromotionAccepted(hostId, partition)) {
+                    hostLog.info(String.format("Partition master for partition %d has been moved to host %d.", partition, hid));
+                } else {
+                   hostLog.error(String.format("Fail to move partition master for partition %d to host %d.", partition, hid));
+                }
+
+            } catch (IOException | InterruptedException e) {
+                hostLog.error(String.format("Fail to move partition master for partition %d to host %d, %s", partition, hid, e.getMessage()));
+            }
+        }
+    }
+
+    /**
+     * Call @BalanceSPI to move SPI
+     * @param partitionKey  The partition key
+     * @param partition  The partition id
+     * @param newHostId  The new host
+     * @return
+     * @throws IOException
+     * @throws InterruptedException
+     */
+    private ClientResponse migrateSPI(int partitionKey, int partition, int newHostId) throws IOException, InterruptedException {
+        if (hostLog.isDebugEnabled()) {
+            hostLog.debug(String.format("[callSPIMigration] partition key %d, partition id %d, host id %d", partitionKey, partition, newHostId));
+        }
+        SimpleClientResponseAdapter.SyncCallback cb = new SimpleClientResponseAdapter.SyncCallback();
+        final String procedureName = "@BalanceSPI";
+        Config procedureConfig = SystemProcedureCatalog.listing.get(procedureName);
+        Procedure proc = procedureConfig.asCatalogProcedure();
+        StoredProcedureInvocation spi = new StoredProcedureInvocation();
+        spi.setProcName(procedureName);
+        spi.setParams(partitionKey, partition, newHostId);
+        spi.setClientHandle(m_executeTaskAdpater.registerCallback(cb));
+        if (spi.getSerializedParams() == null) {
+            spi = MiscUtils.roundTripForCL(spi);
+        }
+        synchronized (m_executeTaskAdpater) {
+            createTransaction(m_executeTaskAdpater.connectionId(),
+                              spi,
+                              proc.getReadonly(),
+                              proc.getSinglepartition(),
+                              proc.getEverysite(),
+                              partition,
+                              spi.getSerializedSize(),
+                              System.nanoTime());
+        }
+        final long timeoutMS = 2 * 60 * 1000;
+        return cb.getResponse(timeoutMS);
     }
 }
