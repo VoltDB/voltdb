@@ -592,6 +592,12 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                                     Long.MIN_VALUE, Long.MIN_VALUE, i);
                     clusterSources.put(i, tracker);
                 }
+                DRConsumerDrIdTracker tracker =
+                        DRConsumerDrIdTracker.createPartitionTracker(
+                                DRLogSegmentId.makeEmptyDRId(producerClusterId),
+                                Long.MIN_VALUE, Long.MIN_VALUE, MpInitiator.MP_INIT_PID);
+                clusterSources.put(MpInitiator.MP_INIT_PID, tracker);
+
                 m_maxSeenDrLogsBySrcPartition.put(producerClusterId, clusterSources);
             }
         }
