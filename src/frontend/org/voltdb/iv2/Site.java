@@ -1487,7 +1487,6 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
 
         CatalogMap<Table> tables = m_context.catalog.getClusters().get("cluster").getDatabases().get("database").getTables();
-        boolean isStreamChange = requiresNewExportGeneration;
 
         diffCmds = CatalogUtil.getDiffCommandsForEE(diffCmds);
         if (diffCmds.length() == 0) {
@@ -1524,7 +1523,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         //Necessary to quiesce before updating the catalog
         //so export data for the old generation is pushed to Java.
         m_ee.quiesce(m_lastCommittedSpHandle);
-        m_ee.updateCatalog(m_context.m_uniqueId, isStreamChange, diffCmds);
+        m_ee.updateCatalog(m_context.m_uniqueId, requiresNewExportGeneration, diffCmds);
         if (DRCatalogChange) {
             final DRCatalogCommands catalogCommands = DRCatalogDiffEngine.serializeCatalogCommandsForDr(m_context.catalog, -1);
             generateDREvent( EventType.CATALOG_UPDATE, uniqueId, m_lastCommittedSpHandle,
