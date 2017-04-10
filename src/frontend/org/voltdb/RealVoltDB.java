@@ -2180,10 +2180,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
         // log message unconditionally indicating that the provided host-count and admin-mode settings in
         // deployment, if any, will be ignored
-        consoleLog.info("When using the INIT command, some deployment file settings (hostcount, voltdbroot path, "
-                + "and admin-mode) are ignored");
-        hostLog.info("When using the INIT command, some deployment file settings (hostcount, voltdbroot path, "
-                + "and admin-mode) are ignored");
+        consoleLog.info("When using the INIT command, some deployment file settings (hostcount and voltdbroot path) "
+                + "are ignored");
+        hostLog.info("When using the INIT command, some deployment file settings (hostcount and voltdbroot path) are "
+                + "ignored");
 
         File depFH = getConfigLogDeployment(config);
         try (FileWriter fw = new FileWriter(depFH)) {

@@ -43,8 +43,8 @@ UPSERT INTO @dmltable               SELECT @insertcols FROM @fromtables ORDER BY
 UPSERT INTO @dmltable (@insertcols) SELECT @insertcols FROM @fromtables ORDER BY @idcol
 
 -- ... using SELECT *
-UPSERT INTO @dmltable               SELECT @star       FROM @fromtables ORDER BY @idcol
-UPSERT INTO @dmltable (@insertcols) SELECT @star       FROM @fromtables ORDER BY @idcol
+UPSERT INTO @dmltable               SELECT *           FROM @fromtables ORDER BY @idcol
+UPSERT INTO @dmltable (@insertcols) SELECT *           FROM @fromtables ORDER BY @idcol
 -- Confirm the values that were "upserted"
 SELECT @star FROM @dmltable
 
