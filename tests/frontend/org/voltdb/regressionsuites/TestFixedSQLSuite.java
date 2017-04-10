@@ -56,7 +56,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
 
     static final int VARCHAR_VARBINARY_THRESHOLD = 100;
 
-    public void notestSmallFixedTests() throws IOException, ProcCallException
+    public void testSmallFixedTests() throws IOException, ProcCallException
     {
         subTestInsertNullPartitionString();
         subTestAndExpressionComparingSameTableColumns();
@@ -654,7 +654,6 @@ public class TestFixedSQLSuite extends RegressionSuite {
 
     public void testFixedTickets() throws Exception
     {
-        /*
         subTestTicketEng2250_IsNull();
         subTestTicketEng1850_WhereOrderBy();
         subTestTicketEng1850_WhereOrderBy2();
@@ -696,7 +695,6 @@ public class TestFixedSQLSuite extends RegressionSuite {
         subTestENG9533();
         subTestENG9796();
         subTestENG11256();
-        */
         subTestENG12116();
     }
 
@@ -838,7 +836,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
         truncateTables(client, tables);
     }
 
-    //public void notestTicket205() throws IOException, ProcCallException
+    //public void testTicket205() throws IOException, ProcCallException
     //{
     //    String[] tables = {"P1", "R1", "P2", "R2"};
     //    Client client = getClient();
@@ -1597,7 +1595,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
         truncateTable(client, "P3");
     }
 
-    public void notestVarchar() throws IOException, ProcCallException {
+    public void testVarchar() throws IOException, ProcCallException {
         subTestVarcharByBytes();
         subTestVarcharByCharacter();
         subTestInlineVarcharAggregation();
@@ -2071,7 +2069,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
         }
     }
 
-    public void notestInWithString() throws IOException, ProcCallException, InterruptedException {
+    public void testInWithString() throws IOException, ProcCallException, InterruptedException {
         subTestInWithIntParams();
         subTestInWithStringParams();
         subTestInWithStringParamsAdHoc();
