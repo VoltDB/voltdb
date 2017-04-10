@@ -89,7 +89,7 @@ public enum ExpressionType {
     COMPARE_IN                   (InComparisonExpression.class, 17, "IN", true),
         // IN operator. left IN right. right must be VectorValue
     // value 18 is assigned to OPERATOR_EXISTS
-    COMPARE_NOTDISTINCT          (ComparisonExpression.class, 19, "NOT DISTINCT", true),
+    COMPARE_NOTDISTINCT          (ComparisonExpression.class, 19, "IS NOT DISTINCT FROM", true),
         // Not distinct operator between left and right
 
     // ----------------------------
@@ -173,7 +173,7 @@ public enum ExpressionType {
     private final String m_symbol;
     private final Class<? extends AbstractExpression> m_expressionClass;
     // Does this expression type have the risk to fail a DDL.
-    private boolean m_isDDLSafe;
+    private boolean m_isSafeForDDL;
 
     ExpressionType(Class<? extends AbstractExpression> expressionClass,
                    int val, String symbol) {
@@ -181,11 +181,11 @@ public enum ExpressionType {
     }
 
     ExpressionType(Class<? extends AbstractExpression> expressionClass,
-                   int val, String symbol, boolean isDDLSafe) {
+                   int val, String symbol, boolean isSafeForDDL) {
         m_value = val;
         m_symbol = symbol;
         m_expressionClass = expressionClass;
-        m_isDDLSafe = isDDLSafe;
+        m_isSafeForDDL = isSafeForDDL;
     }
 
     public Class<? extends AbstractExpression> getExpressionClass() {
@@ -247,8 +247,8 @@ public enum ExpressionType {
      * Return true iff this expression type is safe for
      * creating materialized views on non-empty tables.
      */
-    public boolean isDDLSafe() {
-        return m_isDDLSafe;
+    public boolean isSafeForDDL() {
+        return m_isSafeForDDL;
     }
     /**
      * When generating an output schema for a projection node we need to

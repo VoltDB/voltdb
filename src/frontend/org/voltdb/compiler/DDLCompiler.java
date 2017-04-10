@@ -66,7 +66,7 @@ import org.voltdb.compiler.VoltCompiler.ProcedureDescriptor;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.compilereport.TableAnnotation;
 import org.voltdb.expressions.AbstractExpression;
-import org.voltdb.expressions.AbstractExpression.UnsafeDDLOperators;
+import org.voltdb.expressions.AbstractExpression.UnsafeOperatorsForDDL;
 import org.voltdb.expressions.AbstractSubqueryExpression;
 import org.voltdb.expressions.AggregateExpression;
 import org.voltdb.expressions.TupleValueExpression;
@@ -1996,7 +1996,7 @@ public class DDLCompiler {
             }
         }
 
-        UnsafeDDLOperators unsafeOps = new UnsafeDDLOperators();
+        UnsafeOperatorsForDDL unsafeOps = new UnsafeOperatorsForDDL();
         if (exprs == null) {
             for (int i = 0; i < colNames.length; i++) {
                 VoltType colType = VoltType.get((byte)columns[i].getType());
@@ -2057,7 +2057,7 @@ public class DDLCompiler {
                         }
                     }
                 }
-                expression.findUnsafeDDLOperations(unsafeOps);
+                expression.findUnsafeOperatorsForDDL(unsafeOps);
             }
         }
 

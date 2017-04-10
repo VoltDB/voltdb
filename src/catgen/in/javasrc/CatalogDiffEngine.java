@@ -586,18 +586,18 @@ public class CatalogDiffEngine {
         else if (suspect instanceof Index) {
             Index index = (Index) suspect;
 
-            // it's cool to remove unique indexes
+            // it's cool to remove indexes
             if (changeType == ChangeType.DELETION) {
                 return null;
             }
-            
+
             if (! index.getIssafewithnonemptysources()) {
                 return "Unable to create index " + index.getTypeName() +
-                       " because the index definition uses operations" +
-                       " that cannot always be applied if table " +
-                       index.getParent().getTypeName() + " is not empty.\n";
+                       " while the table contains data." +
+                       " The index definition uses operations that cannot be applied " +
+                       "if table " + index.getParent().getTypeName() + " is not empty.";
             }
-            
+
             if (! index.getUnique()) {
                 return null;
             }
@@ -668,12 +668,12 @@ public class CatalogDiffEngine {
             retval = new TablePopulationRequirements(indexName);
             String tableName = idx.getParent().getTypeName();
             retval.addTableName(tableName);
-            
+
             if (! idx.getIssafewithnonemptysources()) {
                 retval.setErrorMessage("Unable to create index " + indexName +
-                                       " because the index definition uses operations" +
-                                       " that cannot always be applied if table " + tableName +
-                                       " is not empty.\n");
+                                       " while the table contains data." +
+                                       " The index definition uses operations that cannot be applied " +
+                                       "if table " + tableName + " is not empty.");
             }
             else if (idx.getUnique()) {
                 retval.setErrorMessage(

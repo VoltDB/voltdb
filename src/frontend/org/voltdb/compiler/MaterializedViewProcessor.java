@@ -44,7 +44,7 @@ import org.voltdb.catalog.Table;
 import org.voltdb.catalog.TableRef;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.expressions.AbstractExpression;
-import org.voltdb.expressions.AbstractExpression.UnsafeDDLOperators;
+import org.voltdb.expressions.AbstractExpression.UnsafeOperatorsForDDL;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.AbstractParsedStmt;
@@ -516,6 +516,8 @@ public class MaterializedViewProcessor {
             throw m_compiler.new VoltCompilerException(msg.toString());
         }
 
+        UnsafeOperatorsForDDL unsafeOps = new UnsafeOperatorsForDDL();
+
         // Finally, the display columns must have aggregate
         // calls.  But these are not any aggregate calls. They
         // must be count(), min(), max() or sum().
@@ -538,6 +540,8 @@ public class MaterializedViewProcessor {
             if (outcol.expression.getLeft() != null) {
                 checkExpressions.add(outcol.expression.getLeft());
             }
+            // Check if the aggregation is safe for non-empty view source table.
+            outcol.expression.findUnsafeOperatorsForDDL(unsafeOps);
             assert(outcol.expression.getRight() == null);
             assert(outcol.expression.getArgs() == null || outcol.expression.getArgs().size() == 0);
         }
@@ -566,9 +570,8 @@ public class MaterializedViewProcessor {
         //
         // Check to see if the expression is safe for creating
         // views on nonempty tables.
-        UnsafeDDLOperators unsafeOps = new UnsafeDDLOperators();
         for (AbstractExpression expr : checkExpressions) {
-            expr.findUnsafeDDLOperations(unsafeOps);
+            expr.findUnsafeOperatorsForDDL(unsafeOps);
         }
         if (unsafeOps.isUnsafe()) {
             stmt.setUnsafeDDLMessage(unsafeOps.toString());

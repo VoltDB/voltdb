@@ -39,7 +39,9 @@
  * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
  * License for the specific language governing permissions and limitations under
  * the License.
- */package org.voltdb.regressionsuites;
+ */
+
+package org.voltdb.regressionsuites;
 
 import java.io.IOException;
 
@@ -117,6 +119,7 @@ public class TestMaterializedViewNonemptyTablesSuite extends RegressionSuite {
         testUnsafeOperation(client, "MIN(b / b)");
         testUnsafeOperation(client, "MIN(MOD(b, b))");
         testUnsafeOperation(client, "MIN(cast(b as integer))");
+        testUnsafeOperation(client, "SUM(a)");
 
         // Unsafe Boolean Operations
         testUnsafeBoolOperation(client, "bs like 'abc'");
@@ -137,12 +140,6 @@ public class TestMaterializedViewNonemptyTablesSuite extends RegressionSuite {
         testSafeOperation(client, "MIN(100)");
         testSafeOperation(client, "MAX(b)");
         testSafeOperation(client, "MIN(b)");
-        /*
-        //
-        // Scalar Functions.
-        //
-        testSafeOperation("MIN()");
-        // */
     }
 
     // Note: This is here only to test the actual behavior with
@@ -188,6 +185,7 @@ public class TestMaterializedViewNonemptyTablesSuite extends RegressionSuite {
         "beta",
         "empty"
     };
+
     /**
      * Test to see if we can create a view.  The view name is
      * necessary because we drop the view after creation.
@@ -207,7 +205,7 @@ public class TestMaterializedViewNonemptyTablesSuite extends RegressionSuite {
                                 String expectedDiagnostic)
             throws IOException, NoConnectionsException, ProcCallException {
         ClientResponse cr = null;
-        assertTrue("sql string should start with \"create view \"",
+        assertTrue("SQL string should start with \"create view \"",
                    sql.startsWith("create view "));
         int pos = sql.indexOf(" ", 12);
         String viewName = sql.substring(12, pos);
@@ -231,7 +229,6 @@ public class TestMaterializedViewNonemptyTablesSuite extends RegressionSuite {
 
         // Try the view creation again.  This may or may
         // not succeed.
-        boolean success = true;
         boolean expectedSuccess = (expectedDiagnostic == null);
         try {
             cr = client.callProcedure("@AdHoc", sql);
@@ -240,7 +237,6 @@ public class TestMaterializedViewNonemptyTablesSuite extends RegressionSuite {
             }
         } catch (ProcCallException ex) {
             cr = ex.getClientResponse();
-            success = false;
             if ( expectedSuccess ) {
                 fail(String.format("Unexpected SQL compilation failure:\n%s",
                                    cr.getStatusString()));
@@ -355,7 +351,6 @@ public class TestMaterializedViewNonemptyTablesSuite extends RegressionSuite {
         project.setUseDDLSchema(true);
         project.addSchema(TestMaterializedViewNonemptyTablesSuite.class.getResource("testmvnonemptytables-ddl.sql"));
 
-
         // JNI
         config = new LocalCluster("testMaterializedViewNonemptyTables-onesite.jar", 1, 1, 0,
                 BackendTarget.NATIVE_EE_JNI);
@@ -363,12 +358,6 @@ public class TestMaterializedViewNonemptyTablesSuite extends RegressionSuite {
         assertTrue(t1);
         builder.addServerConfig(config);
 
-        // CLUSTER (Is this necessary?)
-        config = new LocalCluster("testMateralizedViewNonemptyTables-cluster.jar", 1, 3, 0,
-               BackendTarget.NATIVE_EE_JNI);
-        boolean t2 = config.compile(project);
-        assertTrue(t2);
-        builder.addServerConfig(config);
         return builder;
     }
 }
