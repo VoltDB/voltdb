@@ -843,6 +843,22 @@ public class VoltProjectBuilder {
                        ppdEnabled, snapshotPath, ppdPrefix);
     }
 
+    private void validateVoltDbRoot(String voltRootPath){
+        java.io.File voltRootFile = new java.io.File(voltRootPath);
+        if (!voltRootFile.isDirectory()) {
+            throw new RuntimeException("voltdbroot \"" + voltRootPath + "\" for test exists but is not a directory");
+        }
+        if (!voltRootFile.canRead()) {
+            throw new RuntimeException("voltdbroot \"" + voltRootPath + "\" for test exists but is not readable");
+        }
+        if (!voltRootFile.canWrite()) {
+            throw new RuntimeException("voltdbroot \"" + voltRootPath + "\" for test exists but is not writable");
+        }
+        if (!voltRootFile.canExecute()) {
+            throw new RuntimeException("voltdbroot \"" + voltRootPath + "\" for test exists but is not writable");
+        }
+    }
+
     public boolean compile(final VoltCompiler compiler,
                            final String jarPath,
                            final String voltRoot,
@@ -866,18 +882,7 @@ public class VoltProjectBuilder {
                         throw new RuntimeException("Unable to create voltdbroot \"" + voltRootPath + "\" for test");
                     }
                 }
-                if (!voltRootFile.isDirectory()) {
-                    throw new RuntimeException("voltdbroot \"" + voltRootPath + "\" for test exists but is not a directory");
-                }
-                if (!voltRootFile.canRead()) {
-                    throw new RuntimeException("voltdbroot \"" + voltRootPath + "\" for test exists but is not readable");
-                }
-                if (!voltRootFile.canWrite()) {
-                    throw new RuntimeException("voltdbroot \"" + voltRootPath + "\" for test exists but is not writable");
-                }
-                if (!voltRootFile.canExecute()) {
-                    throw new RuntimeException("voltdbroot \"" + voltRootPath + "\" for test exists but is not writable");
-                }
+                validateVoltDbRoot(voltRootPath);
                 deploymentVoltRoot = voltRootPath;
             }
         }
@@ -911,25 +916,53 @@ public class VoltProjectBuilder {
             }
         }
         if (deployment != null) {
-            try {
-                m_pathToDeployment = writeDeploymentFile(deploymentVoltRoot, deployment);
-            } catch (Exception e) {
-                System.out.println("Failed to create deployment file in testcase.");
-                e.printStackTrace();
-                System.out.println("hostcount: " + deployment.hostCount);
-                System.out.println("sitesPerHost: " + deployment.sitesPerHost);
-                System.out.println("clusterId: " + deployment.clusterId);
-                System.out.println("replication: " + deployment.replication);
-                System.out.println("voltRoot: " + deploymentVoltRoot);
-                System.out.println("ppdEnabled: " + ppdEnabled);
-                System.out.println("snapshotPath: " + snapshotPath);
-                System.out.println("ppdPrefix: " + ppdPrefix);
-                // sufficient to escape and fail test cases?
-                throw new RuntimeException(e);
-            }
+            compileDeploymentOnly(deploymentVoltRoot, deployment);
         }
 
         return success;
+    }
+
+    /** Generate a deployment file based on the options passed and set in this object.
+     * @pre This VoltProjectBuilder has all its options set, except those passed as arguments to this method.
+     * @param voltDbRoot
+     * @param hostCount
+     * @param sitesPerHost
+     * @param replication
+     * @param clusterId
+     * @return path to deployment file that was written
+     */
+    public String compileDeploymentOnly(String voltDbRoot,
+                                        int hostCount,
+                                        int sitesPerHost,
+                                        int replication,
+                                        int clusterId)
+    {
+        DeploymentInfo deployment = new DeploymentInfo(hostCount, sitesPerHost, replication, clusterId);
+        return compileDeploymentOnly(voltDbRoot, deployment);
+    }
+
+    private String compileDeploymentOnly(String voltDbRoot, DeploymentInfo deployment)
+    {
+        if ((voltDbRoot != null) && !voltDbRoot.trim().isEmpty()){
+            validateVoltDbRoot(voltDbRoot);
+        }
+        try {
+            m_pathToDeployment = writeDeploymentFile(voltDbRoot, deployment);
+        } catch (Exception e) {
+            System.out.println("Failed to create deployment file in testcase.");
+            e.printStackTrace();
+            System.out.println("hostcount: " + deployment.hostCount);
+            System.out.println("sitesPerHost: " + deployment.sitesPerHost);
+            System.out.println("clusterId: " + deployment.clusterId);
+            System.out.println("replication: " + deployment.replication);
+            System.out.println("voltRoot: " + voltDbRoot);
+            System.out.println("ppdEnabled: " + m_ppdEnabled);
+            System.out.println("snapshotPath: " + m_snapshotPath);
+            System.out.println("ppdPrefix: " + m_ppdPrefix);
+            // sufficient to escape and fail test cases?
+            throw new RuntimeException(e);
+        }
+        return m_pathToDeployment;
     }
 
     /**
@@ -1018,9 +1051,11 @@ public class VoltProjectBuilder {
         // <paths>
         PathsType paths = factory.createPathsType();
         deployment.setPaths(paths);
-        Voltdbroot voltdbroot = factory.createPathsTypeVoltdbroot();
-        paths.setVoltdbroot(voltdbroot);
-        voltdbroot.setPath(voltRoot);
+        if ((voltRoot != null) && !voltRoot.trim().isEmpty()){
+            Voltdbroot voltdbroot = factory.createPathsTypeVoltdbroot();
+            paths.setVoltdbroot(voltdbroot);
+            voltdbroot.setPath(voltRoot);
+        }
 
         if (m_snapshotPath != null) {
             PathsType.Snapshots snapshotPathElement = factory.createPathsTypeSnapshots();

@@ -289,13 +289,13 @@ public class LocalCluster extends VoltServerConfig {
     {
         if (schemaToStage == null){
             assert catalogJarFileName != null : "Catalog jar file name is null";
-            templateCmdLine.setNewCli(isNewCli);
+            setNewCli(isNewCli);
         } else {
             assert catalogJarFileName == null : "Cannot specify a pre-compiled catalog when using staged catalogs. You should put any stored procedures into the CLASSPATH.";
-            templateCmdLine.setNewCli(true);
+            setNewCli(true);
             try {
                 templateCmdLine.m_userSchema = VoltProjectBuilder.createFileForSchema(schemaToStage);
-                System.err.println("Staged schema as \"" + templateCmdLine.m_userSchema + "\"");
+                log.info("LocalCluster staged schema as \"" + templateCmdLine.m_userSchema + "\"");
             } catch (IOException e){
                 throw new RuntimeException(e);
             }
@@ -327,8 +327,13 @@ public class LocalCluster extends VoltServerConfig {
         m_callingMethodName = traces[i].getMethodName();
 
         if (catalogJarFileName == null){
-            log.info("Instantiating LocalCluster with class.method: " +
-                    m_callingClassName + "." + m_callingMethodName);
+            if (schemaToStage == null){
+                log.info("Instantiating empty LocalCluster with class.method: " +
+                        m_callingClassName + "." + m_callingMethodName);
+            } else {
+                log.info("Instantiating LocalCluster with schema and class.method: " +
+                        m_callingClassName + "." + m_callingMethodName);
+            }
         } else {
             log.info("Instantiating LocalCluster for " + catalogJarFileName + " with class.method: " +
                     m_callingClassName + "." + m_callingMethodName);
@@ -2099,15 +2104,26 @@ public class LocalCluster extends VoltServerConfig {
         System.out.println("Starting local cluster.");
         lc.setHasLocalServer(false);
         lc.overrideAnyRequestForValgrind();
+        lc.compileDeploymentOnly(new VoltProjectBuilder());
 
-        boolean clearLocalDataDirectories = true;
-        lc.startUp(clearLocalDataDirectories);
+        boolean clearLocalDataDirectories = false;
+        boolean skipInit = false;
+        lc.startUp(clearLocalDataDirectories, skipInit);
 
         for (int i = 0; i < hostCount; i++) {
             System.out.printf("Local cluster node[%d] ports: internal=%d, admin=%d, client=%d\n",
                               i, lc.internalPort(i), lc.adminPort(i), lc.port(i));
         }
+
         return lc;
+    }
+
+    public void compileDeploymentOnly(VoltProjectBuilder voltProjectBuilder) {
+        // NOTE: voltDbRoot must be set prior to calling this method if you care about it.
+        // When this method was written no users cared about the deployment's voltdbroot path,
+        // since staged catalog tests use multi-node clusters with node specific voltdbroots.
+        templateCmdLine.pathToDeployment(voltProjectBuilder.compileDeploymentOnly(m_voltdbroot, m_hostCount, m_siteCount, m_kfactor, m_clusterId));
+        m_compiled = true;
     }
 
     public Client createClient(ClientConfig config) throws IOException {
@@ -2127,9 +2143,10 @@ public class LocalCluster extends VoltServerConfig {
      * @return number of nodes who have that file
      */
     public int countNodesWithFile(String relativePathFromVoltDBRoot){
+        final String pathWithinVoltDBRoot = File.separator + "voltdbroot" + File.separator + relativePathFromVoltDBRoot;
         int total = 0;
         for (Map.Entry<String, String> entry : m_hostRoots.entrySet()){
-            File testFile = new VoltFile(entry.getValue() + relativePathFromVoltDBRoot);
+            File testFile = new VoltFile(entry.getValue() + pathWithinVoltDBRoot);
             assert( testFile.isFile() ) : testFile.getAbsolutePath() + " is not a file";
             if (testFile.canRead() && (testFile.length() > 0)){
                 total++;

@@ -185,7 +185,7 @@ public abstract class CatalogUtil {
     public static final String ROW_LENGTH_LIMIT = "row.length.limit";
     public static final int EXPORT_INTERNAL_FIELD_Length = 41; // 8 * 5 + 1;
 
-    public final static String[] CATALOG_DEFAULT_ARTIFCATS = {
+    public final static String[] CATALOG_DEFAULT_ARTIFACTS = {
             VoltCompiler.AUTOGEN_DDL_FILE_NAME,
             CATALOG_BUILDINFO_FILENAME,
             CATALOG_REPORT_FILENAME,
@@ -329,7 +329,7 @@ public abstract class CatalogUtil {
      */
     public static InMemoryJarfile getCatalogJarWithoutDefaultArtifacts(final InMemoryJarfile jarfile) {
         InMemoryJarfile cloneJar = jarfile.deepCopy();
-        for (String entry : CATALOG_DEFAULT_ARTIFCATS) {
+        for (String entry : CATALOG_DEFAULT_ARTIFACTS) {
             cloneJar.remove(entry);
         }
         return cloneJar;

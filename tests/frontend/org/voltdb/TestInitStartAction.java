@@ -414,12 +414,12 @@ final public class TestInitStartAction {
     public void testStartWithStagedCatalogNoDurability() throws Exception {
 
         final String schema =
-                "create table books (cash integer default 23 not null, title varchar(3) default 'foo', PRIMARY KEY(cash));" +
+                "create table books (cash integer default 23 not null, title varchar(3) default 'foo', PRIMARY KEY(cash));\n" +
                 "create procedure Foo as select * from books;\n" +
                 "PARTITION TABLE books ON COLUMN cash;";
         final int siteCount = 1;
         final int hostCount = 3;
-        final int kfactor = 2;
+        final int kfactor = MiscUtils.isPro() ? 1 : 0;
         LocalCluster cluster = LocalCluster.createLocalClusterViaStagedCatalog(schema, null, siteCount, hostCount, kfactor);
 
         // Staged catalog will persist because durability is off, and being able to recover the schema is beneficial.
