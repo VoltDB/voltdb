@@ -86,6 +86,9 @@ public class RegressionSuite extends TestCase {
     private final ArrayList<Client> m_clients = new ArrayList<>();
     private final ArrayList<SocketChannel> m_clientChannels = new ArrayList<>();
     protected final String m_methodName;
+    // If the current RegressionSuite instance is the last one in the current VoltServerConfig,
+    // shutdown the cluster completely after finishing the test.
+    protected boolean m_completeShutdown;
 
     /**
      * Trivial constructor that passes parameter on to superclass.
@@ -96,6 +99,7 @@ public class RegressionSuite extends TestCase {
         m_methodName = name;
 
         VoltServerConfig.setInstanceSet(new HashSet<>());
+        m_completeShutdown = false;
     }
 
     /**
@@ -116,7 +120,32 @@ public class RegressionSuite extends TestCase {
      */
     @Override
     public void tearDown() throws Exception {
-        m_config.shutDown();
+        if (m_completeShutdown) {
+            m_config.shutDown();
+        }
+        else {
+            Client client = getClient();
+            VoltTable tableList = client.callProcedure("@SystemCatalog", "TABLES").getResults()[0];
+            ArrayList<String> tableNames = new ArrayList<>(tableList.getRowCount());
+            int tableNameColIdx = tableList.getColumnIndex("TABLE_NAME");
+            int tableTypeColIdx = tableList.getColumnIndex("TABLE_TYPE");
+            while (tableList.advanceRow()) {
+                String tableType = tableList.getString(tableTypeColIdx);
+                if (! tableType.equalsIgnoreCase("EXPORT")) {
+                    tableNames.add(tableList.getString(tableNameColIdx));
+                }
+            }
+            for (String tableName : tableNames) {
+                try {
+                    client.callProcedure("@AdHoc", "DELETE FROM " + tableName);
+                }
+                catch (ProcCallException pce) {
+                    if (! pce.getMessage().contains("Illegal to modify a materialized view.")) {
+                        fail("Hit an exception when cleaning up tables between tests: " + pce.getMessage());
+                    }
+                }
+            }
+        }
         for (final Client c : m_clients) {
             c.close();
         }
