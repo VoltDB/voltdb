@@ -398,11 +398,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         m_shouldContinue = false;
     }
 
-    void shutdown()
-    {
-        if (m_non_voltdb_backend != null) {
-            m_non_voltdb_backend.shutdownInstance();
-        }
+    void shutdown() {
     }
 
     //

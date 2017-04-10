@@ -26,22 +26,22 @@ package org.voltdb.regressionsuites;
 import java.io.IOException;
 import java.util.ArrayList;
 
-import junit.framework.Test;
-
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientAuthScheme;
-import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.compiler.VoltProjectBuilder.RoleInfo;
+import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder.ProcedureInfo;
+import org.voltdb.compiler.VoltProjectBuilder.RoleInfo;
 import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb_testprocs.regressionsuites.securityprocs.DoNothing1;
 import org.voltdb_testprocs.regressionsuites.securityprocs.DoNothing2;
 import org.voltdb_testprocs.regressionsuites.securityprocs.DoNothing3;
+
+import junit.framework.Test;
 
 public class TestSecuritySuite extends RegressionSuite {
 
@@ -424,7 +424,7 @@ public class TestSecuritySuite extends RegressionSuite {
         TPCCProjectBuilder project = new TPCCProjectBuilder();
         project.addDefaultSchema();
         project.addDefaultPartitioning();
-        ArrayList<ProcedureInfo> procedures = new ArrayList<ProcedureInfo>();
+        ArrayList<ProcedureInfo> procedures = new ArrayList<>();
         procedures.add(new ProcedureInfo(new String[0], PROCEDURES[0]));
         procedures.add(new ProcedureInfo(new String[] {"group1"}, PROCEDURES[1]));
         procedures.add(new ProcedureInfo(new String[] {"group1", "group2"}, PROCEDURES[2]));
@@ -473,7 +473,7 @@ public class TestSecuritySuite extends RegressionSuite {
         if (!config.compile(project)) fail();
 
         // add this config to the set of tests to run
-        builder.addServerConfig(config);
+        builder.addServerConfig(config, false);
 
         // Not testing a cluster and assuming security shouldn't be affected by this
 

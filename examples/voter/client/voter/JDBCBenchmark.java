@@ -40,6 +40,7 @@ import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.Timer;
+import java.util.Properties;
 import java.util.TimerTask;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -114,6 +115,9 @@ public class JDBCBenchmark {
 
         @Option(desc = "Number of concurrent threads synchronously calling procedures.")
         int threads = 40;
+
+        @Option(desc = "Enable SSL, Optionally provide configuration file.")
+        String sslfile = "";
 
         @Override
         public void validate() {
@@ -191,7 +195,15 @@ public class JDBCBenchmark {
         // Prepare the JDBC URL for the VoltDB driver
         String url = "jdbc:voltdb://" + config.servers;
 
-        client = DriverManager.getConnection(url, "", "");
+        if (config.sslfile.length() > 0) {
+            Properties connectionProps = new Properties();
+            connectionProps.put("ssl", "true");
+            connectionProps.put("truststorepassword", "password");
+            connectionProps.put("truststore", config.sslfile);
+            client = DriverManager.getConnection(url, connectionProps);
+        }
+        else
+            client = DriverManager.getConnection(url, "", "");
 
         periodicStatsContext = ((IVoltDBConnection) client)
                 .createStatsContext();
