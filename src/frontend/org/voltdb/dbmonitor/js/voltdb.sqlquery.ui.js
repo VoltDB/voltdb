@@ -802,21 +802,6 @@ $(document).ready(function () {
                 SQLQueryRender.queryNameList.push(tabName == undefined ? 'Query' + tab_counter : tabName)
             }
 
-            function handlePaste (e) {
-                var clipboardData, pastedData;
-                // Stop data actually being pasted into div
-                e.stopPropagation();
-                e.preventDefault();
-
-                // Get pasted data via clipboard API
-                clipboardData = e.originalEvent.clipboardData || window.clipboardData;
-                pastedData = clipboardData.getData('Text');
-                var tabCounter = e.target.id.split("-")[1];
-                $("#querybox-" + tabCounter).html(pastedData);
-            }
-
-            $('#querybox-'+tab_counter).bind('paste', handlePaste);
-
             tab_counter++
             this.showHideNewTab()
             SQLQueryRender.enableDisableCrossTab()
