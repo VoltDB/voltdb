@@ -357,12 +357,17 @@ public class HTTPAdminListener {
      */
     class CacheStaticResourceHandler extends ResourceHandler {
         // target Directory location for folder w.r.t. resource base folder - dbmonitor
-        public CacheStaticResourceHandler(final String target) {
+        public CacheStaticResourceHandler(final String target, int maxAge) {
             super();
             final String path = VoltDB.class.getResource(RESOURCE_BASE + File.separator + target).toExternalForm();
-            m_log.debug("Resource base path: " + path);
+            if (m_log.isDebugEnabled()) {
+                m_log.debug("Resource base path: " + path);
+            }
             setResourceBase(path);
-            setCacheControl("max-age=600, private");
+            // set etags along with cache age so that the http client's requests for fetching the
+            // static resource is rate limited. Without cache age, client will requesting for
+            // static more than needed
+            setCacheControl("max-age=" + maxAge +", private");
             setEtags(true);
         }
 
@@ -379,7 +384,7 @@ public class HTTPAdminListener {
                            HttpServletResponse response)
                            throws IOException, ServletException {
             super.handle(target, baseRequest, request, response);
-            if (!baseRequest.isHandled()) {
+            if (!baseRequest.isHandled() && m_log.isDebugEnabled()) {
                 m_log.debug("Failed to process static resource: " + Paths.get(getResourceBase()));
             }
         }
@@ -1032,6 +1037,7 @@ public class HTTPAdminListener {
             ) throws Exception {
         int poolsize = Integer.getInteger("HTTP_POOL_SIZE", 50);
         int timeout = Integer.getInteger("HTTP_REQUEST_TIMEOUT_SECONDS", 15);
+        int cacheMaxAge = Integer.getInteger("HTTP_STATIC_CACHE_MAXAGE", 24*60*60); // 24 hours
 
         String resolvedIntf = intf == null ? "" : intf.trim().isEmpty() ? ""
                 : HostAndPort.fromHost(intf).withDefaultPort(port).toString();
@@ -1119,15 +1125,15 @@ public class HTTPAdminListener {
             profileRequestHandler.setHandler(new UserProfileHandler());
 
             ContextHandler cssResourceHandler = new ContextHandler("/css");
-            ResourceHandler cssResource = new CacheStaticResourceHandler(CSS_TARGET);
+            ResourceHandler cssResource = new CacheStaticResourceHandler(CSS_TARGET, cacheMaxAge);
             cssResourceHandler.setHandler(cssResource);
 
             ContextHandler imageResourceHandler = new ContextHandler("/images");
-            ResourceHandler imagesResource = new CacheStaticResourceHandler(IMAGES_TARGET);
+            ResourceHandler imagesResource = new CacheStaticResourceHandler(IMAGES_TARGET, cacheMaxAge);
             imageResourceHandler.setHandler(imagesResource);
 
             ContextHandler jsResourceHandler = new ContextHandler("/js");
-            ResourceHandler jsResource = new CacheStaticResourceHandler(JS_TARGET);
+            ResourceHandler jsResource = new CacheStaticResourceHandler(JS_TARGET, cacheMaxAge);
             jsResourceHandler.setHandler(jsResource);
 
 
