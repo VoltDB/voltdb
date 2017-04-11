@@ -535,26 +535,27 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
 
     public boolean commitOffset() {
         final short version = 1;
-        final long safe = m_gapTracker.commit(-1L);
+        long safe = m_gapTracker.commit(-1L);
         if (safe > m_lastCommittedOffset) {
             long now = System.currentTimeMillis();
             OffsetCommitResponse offsetCommitResponse = null;
             try {
                 BlockingChannel channel = null;
                 int retries = 3;
+                long pausedOffset = m_pauseOffset.get();
+                if (pausedOffset != -1) {
+                    info(null, "Using paused offset to commit: " + pausedOffset);
+                }
                 while (channel == null && --retries >= 0) {
                     if ((channel = m_offsetManager.get()) == null) {
                         getOffsetCoordinator();
                         rateLimitedLog(Level.ERROR, null, "Commit Offset Failed to get offset coordinator for " + m_topicAndPartition);
                         continue;
                     }
-                    long o = (m_pauseOffset.get() != -1 ? m_pauseOffset.get() : safe);
-                    if (m_pauseOffset.get() != -1) {
-                        info(null, "Using paused offset to commit: " + m_pauseOffset.get());
-                    }
+                    safe = (pausedOffset != -1 ? pausedOffset : safe);
                     OffsetCommitRequest offsetCommitRequest = new OffsetCommitRequest(
                             m_config.getGroupId(),
-                            singletonMap(m_topicAndPartition, new OffsetAndMetadata(o, "commit", now)),
+                            singletonMap(m_topicAndPartition, new OffsetAndMetadata(safe, "commit", now)),
                             nextCorrelationId(),
                             KafkaStreamImporterConfig.CLIENT_ID,
                             version
@@ -571,10 +572,6 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
                 }
                 if (retries < 0 || offsetCommitResponse == null) {
                     return false;
-                }
-                //If we have a paused offset reset it in case we get new paused offset while we are still not dead.
-                if (m_pauseOffset.get() != -1) {
-                    m_pauseOffset.set(-1);
                 }
             } catch (Exception e) {
                 rateLimitedLog(Level.ERROR, e, "Failed to commit Offset for " + m_topicAndPartition);
