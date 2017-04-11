@@ -129,6 +129,8 @@ public class CatalogDiffEngine {
     // true if table changes require the catalog change runs
     // while no snapshot is running
     private boolean m_requiresSnapshotIsolation = false;
+    // true if export needs new generation.
+    private boolean m_requiresNewExportGeneration = false;
 
     private final SortedMap<String, TablePopulationRequirements> m_tablesThatMustBeEmpty = new TreeMap<>();
 
@@ -214,6 +216,13 @@ public class CatalogDiffEngine {
      */
     public boolean requiresSnapshotIsolation() {
         return m_requiresSnapshotIsolation;
+    }
+
+    /**
+     * @return true if changes require export generation to be updated.
+     */
+    public boolean requiresNewExportGeneration() {
+        return m_requiresNewExportGeneration;
     }
 
     public String[][] tablesThatMustBeEmpty() {
@@ -417,23 +426,6 @@ public class CatalogDiffEngine {
     }
 
     /**
-     * If it is not a new table make sure that the soon to be exported
-     * table is empty or has no tuple allocated memory associated with it
-     *
-     * @param tName table name
-     */
-    private void trackExportOfAlreadyExistingTables(String tName) {
-        if (tName == null || tName.trim().isEmpty()) return;
-        if (!m_newTablesForExport.contains(tName)) {
-            String errorMessage = String.format(
-                    "Unable to change table %s to an export table because the table is not empty",
-                    tName
-                    );
-            m_tablesThatMustBeEmpty.put(tName, new TablePopulationRequirements(tName, tName, errorMessage));
-        }
-    }
-
-    /**
      * Check if an addition or deletion can be safely completed
      * in any database state.
      *
@@ -472,6 +464,10 @@ public class CatalogDiffEngine {
 
         else if (suspect instanceof Table) {
             if (ChangeType.DELETION == changeType) {
+                Table tbl = (Table)suspect;
+                if (CatalogUtil.isTableExportOnly((Database)tbl.getParent(), tbl)) {
+                    m_requiresNewExportGeneration = true;
+                }
                 // No special guard against dropping a table or view
                 // (although some procedures may fail to plan)
                 return null;
@@ -485,6 +481,7 @@ public class CatalogDiffEngine {
             if (CatalogUtil.isTableExportOnly((Database)tbl.getParent(), tbl)) {
                 // Remember that it's a new export table.
                 m_newTablesForExport.add(tbl.getTypeName());
+                m_requiresNewExportGeneration = true;
             }
 
             String viewName = null;
@@ -519,22 +516,17 @@ public class CatalogDiffEngine {
         }
 
         else if (suspect instanceof Connector) {
-            if (ChangeType.ADDITION == changeType) {
-                for (ConnectorTableInfo cti: ((Connector)suspect).getTableinfo()) {
-                    trackExportOfAlreadyExistingTables(cti.getTable().getTypeName());
-                }
-            }
+            m_requiresNewExportGeneration = true;
             return null;
         }
 
         else if (suspect instanceof ConnectorTableInfo) {
-            if (ChangeType.ADDITION == changeType) {
-                trackExportOfAlreadyExistingTables(((ConnectorTableInfo)suspect).getTable().getTypeName());
-            }
+            m_requiresNewExportGeneration = true;
             return null;
         }
 
         else if (suspect instanceof ConnectorProperty) {
+            m_requiresNewExportGeneration = true;
             return null;
         }
 
@@ -1062,6 +1054,7 @@ public class CatalogDiffEngine {
             }
             // allow export connector property changes
             if (parent instanceof Connector && suspect instanceof ConnectorProperty) {
+                m_requiresNewExportGeneration = true;
                 return null;
             }
 

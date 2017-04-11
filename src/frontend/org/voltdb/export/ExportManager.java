@@ -623,7 +623,7 @@ public class ExportManager
         return m_connCount;
     }
 
-    public synchronized void updateCatalog(CatalogContext catalogContext, String diffCommands, List<Integer> partitions)
+    public synchronized void updateCatalog(CatalogContext catalogContext, String diffCommands, boolean requiresNewExportGeneration, List<Integer> partitions)
     {
         final Cluster cluster = catalogContext.catalog.getClusters().get("cluster");
         final Database db = cluster.getDatabases().get("database");
@@ -632,6 +632,11 @@ public class ExportManager
         updateProcessorConfig(connectors);
         if (m_processorConfig.isEmpty()) {
             m_lastNonEnabledGeneration = catalogContext.m_uniqueId;
+            return;
+        }
+
+        if (!requiresNewExportGeneration) {
+            exportLog.info("Skipped rolling generations as no stream related changes happened during this update.");
             return;
         }
 
@@ -645,7 +650,6 @@ public class ExportManager
             return;
         }
         File exportOverflowDirectory = new File(VoltDB.instance().getExportOverflowPath());
-
         ExportGeneration newGeneration;
         try {
             newGeneration = new ExportGeneration(catalogContext.m_uniqueId, exportOverflowDirectory, false);

@@ -20,6 +20,8 @@ import java.io.File;
 import java.io.IOException;
 import java.text.DecimalFormat;
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -33,7 +35,6 @@ import java.util.function.Supplier;
 
 import com.google_voltpatches.common.collect.EvictingQueue;
 import com.google_voltpatches.common.collect.ImmutableSet;
-import com.google_voltpatches.common.util.concurrent.Futures;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
@@ -146,7 +147,7 @@ public class VoltTrace implements Runnable {
 
             for (int i=0; i<m_argsArr.length; i+=2) {
                 if (i+1 == m_argsArr.length) break;
-                m_args.put(m_argsArr[i].toString(), m_argsArr[i+1].toString());
+                m_args.put(String.valueOf(m_argsArr[i]), String.valueOf(m_argsArr[i+1]));
             }
         }
 
@@ -346,7 +347,6 @@ public class VoltTrace implements Runnable {
     static final int QUEUE_SIZE = Integer.getInteger("VOLTTRACE_QUEUE_SIZE", 4096);
     private static volatile VoltTrace s_tracer;
 
-    private final String m_voltroot;
     // Events from trace producers are put into this queue.
     // TraceFileWriter takes events from this queue and writes them to files.
     private EvictingQueue<TraceEventBatch> m_traceEvents = EvictingQueue.create(QUEUE_SIZE);
@@ -358,10 +358,6 @@ public class VoltTrace implements Runnable {
 
     private volatile Set<Category> m_enabledCategories = ImmutableSet.of();
     private final LinkedTransferQueue<Runnable> m_work = new LinkedTransferQueue<>();
-
-    protected VoltTrace(String voltroot) {
-        m_voltroot = voltroot;
-    }
 
     private boolean isCategoryEnabled(Category cat) {
         return m_enabledCategories.contains(cat);
@@ -388,12 +384,12 @@ public class VoltTrace implements Runnable {
 
     /**
      * Write the events in the queue to file.
-     * @param path    The directory to write the file to.
+     * @param logDir The directory to write the file to.
      * @return The file path if successfully written, or null if the there is
      * already a write in progress.
      */
-    private String write() throws IOException, ExecutionException, InterruptedException {
-        final File file = new File(m_voltroot, "trace_" + System.currentTimeMillis() + ".json.gz");
+    private String write(String logDir) throws IOException, ExecutionException, InterruptedException {
+        final File file = new File(logDir, "trace_" + System.currentTimeMillis() + ".json.gz");
         if (file.exists()) {
             throw new IOException("Trace file " + file.getAbsolutePath() + " already exists");
         }
@@ -509,17 +505,17 @@ public class VoltTrace implements Runnable {
 
     /**
      * Close all open files and wait for shutdown.
-     * @param dump             Dump all queued events
+     * @param logDir           The directory to write the trace events to, null to skip writing to file.
      * @param timeOutMillis    Timeout in milliseconds. Negative to not wait
      * @return The path to the trace file if written, or null if a write is already in progress.
      */
-    public static String closeAllAndShutdown(boolean dump, long timeOutMillis) {
+    public static String closeAllAndShutdown(String logDir, long timeOutMillis) throws IOException {
         String path = null;
         final VoltTrace tracer = s_tracer;
 
         if (tracer != null) {
-            if (dump) {
-                path = dump();
+            if (logDir != null) {
+                path = dump(logDir);
             }
 
             s_tracer = null;
@@ -539,22 +535,13 @@ public class VoltTrace implements Runnable {
     }
 
     /**
-     * Creates and starts a new tracer. If one already exists, this is a no-op.
+     * Creates and starts a new tracer. If one already exists, this is a
+     * no-op. Synchronized to prevent multiple threads enabling it at the same
+     * time.
      */
-    public static void start(String voltroot) throws IOException {
+    private static synchronized void start() throws IOException {
         if (s_tracer == null) {
-            final File dir = new File(voltroot);
-            if (!dir.getParentFile().canWrite() || !dir.getParentFile().canExecute()) {
-                throw new IOException("Trace log parent directory " + dir.getParentFile().getAbsolutePath() +
-                                      " is not writable");
-            }
-            if (!dir.exists()) {
-                if (!dir.mkdir()) {
-                    throw new IOException("Failed to create trace log directory " + dir.getAbsolutePath());
-                }
-            }
-
-            final VoltTrace tracer = new VoltTrace(voltroot);
+            final VoltTrace tracer = new VoltTrace();
             final Thread thread = new Thread(tracer);
             thread.setDaemon(true);
             thread.start();
@@ -566,13 +553,24 @@ public class VoltTrace implements Runnable {
      * Write all trace events in the queue to file.
      * @return The file path if written successfully, or null if a write is already in progress.
      */
-    public static String dump() {
+    public static String dump(String logDir) throws IOException {
         String path = null;
         final VoltTrace tracer = s_tracer;
 
         if (tracer != null) {
+            final File dir = new File(logDir);
+            if (!dir.getParentFile().canWrite() || !dir.getParentFile().canExecute()) {
+                throw new IOException("Trace log parent directory " + dir.getParentFile().getAbsolutePath() +
+                                      " is not writable");
+            }
+            if (!dir.exists()) {
+                if (!dir.mkdir()) {
+                    throw new IOException("Failed to create trace log directory " + dir.getAbsolutePath());
+                }
+            }
+
             try {
-                path = tracer.write();
+                path = tracer.write(logDir);
             } catch (Exception e) {
                 s_logger.info("Unable to write trace file: " + e.getMessage(), e);
             }
@@ -581,12 +579,19 @@ public class VoltTrace implements Runnable {
         return path;
     }
 
-    public static void enableCategories(Category... categories) {
-        final VoltTrace tracer = VoltTrace.s_tracer;
-
-        if (tracer == null) {
-            return;
+    /**
+     * Enable the given categories. If the tracer is not running at the moment,
+     * create a new one.
+     * @param categories The categories to enable. If some of them are enabled
+     * already, skip those.
+     * @throws IOException
+     */
+    public static void enableCategories(Category... categories) throws IOException {
+        if (s_tracer == null) {
+            start();
         }
+        final VoltTrace tracer = s_tracer;
+        assert tracer != null;
 
         final ImmutableSet.Builder<Category> builder = ImmutableSet.builder();
         builder.addAll(tracer.m_enabledCategories);
@@ -594,8 +599,14 @@ public class VoltTrace implements Runnable {
         tracer.m_enabledCategories = builder.build();
     }
 
+    /**
+     * Disable the given categories. If the tracer has no enabled category after
+     * this call, shutdown the tracer.
+     * @param categories The categories to disable. If some of them are disabled
+     * already, skip those.
+     */
     public static void disableCategories(Category... categories) {
-        final VoltTrace tracer = VoltTrace.s_tracer;
+        final VoltTrace tracer = s_tracer;
 
         if (tracer == null) {
             return;
@@ -608,6 +619,28 @@ public class VoltTrace implements Runnable {
                 builder.add(enabledCategory);
             }
         }
-        tracer.m_enabledCategories = builder.build();
+        final ImmutableSet<Category> enabledCategories = builder.build();
+
+        if (enabledCategories.isEmpty()) {
+            // All categories disabled, shutdown tracer
+            try {
+                closeAllAndShutdown(null, 0);
+            } catch (IOException e) {}
+        } else {
+            tracer.m_enabledCategories = enabledCategories;
+        }
+    }
+
+    /**
+     * @return The categories currently enabled, or null if none.
+     */
+    public static Collection<Category> enabledCategories() {
+        final VoltTrace tracer = s_tracer;
+
+        if (tracer == null) {
+            return Collections.emptyList();
+        }
+
+        return tracer.m_enabledCategories;
     }
 }
