@@ -244,6 +244,9 @@ void ExecutorContext::cleanupExecutorsForSubquery(const std::vector<AbstractExec
 
 void ExecutorContext::cleanupExecutorsForSubquery(int subqueryId) const
 {
+    std::cout << "cleanupExecutorsForSubquery: subquery id == "
+        << subqueryId
+        << std::endl;
     const std::vector<AbstractExecutor*>& executorList = getExecutors(subqueryId);
     cleanupExecutorsForSubquery(executorList);
 }

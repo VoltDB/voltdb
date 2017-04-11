@@ -223,6 +223,9 @@ class ExecutorContext {
     /** Executor List for a given sub statement id */
     const std::vector<AbstractExecutor*>& getExecutors(int subqueryId) const
     {
+        if (!(m_executorsMap->find(subqueryId) != m_executorsMap->end())) {
+            PRINT_STACK_TRACE();
+        }
         assert(m_executorsMap->find(subqueryId) != m_executorsMap->end());
         return *m_executorsMap->find(subqueryId)->second;
     }

@@ -795,6 +795,23 @@ public class EEPlanTestGenerator extends PlannerTestCase {
         generateTests("executors", "TestWindowedRank", rankDB);
     }
 
+    public void testENG12188() throws Exception {
+        TableConfig TConfig = new TableConfig("AAA",
+                                                new String[] {"A", "B", "C"},
+                                                new int[][] {{1, 2, 3}});
+        DBConfig eng12188Db = new DBConfig(getClass(),
+                                   EEPlanTestGenerator.class.getResource(DDL_FILENAME),
+                                   getCatalogString(),
+                                   TConfig);
+        String sqlStmt;
+        sqlStmt = "SELECT COUNT((SELECT TOP 1 5 FROM AAA AS T3 )) OVER (PARTITION BY A ) FROM AAA;";
+
+        eng12188Db.addTest(new TestConfig("test_ENG12188",
+                                  sqlStmt,
+                                  new int[][] {{  1 }}));
+        generateTests("executors", "TestENG12188", eng12188Db);
+     }
+
     @Override
     protected void tearDown() throws Exception {
         super.tearDown();
