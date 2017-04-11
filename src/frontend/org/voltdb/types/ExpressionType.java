@@ -58,7 +58,7 @@ public enum ExpressionType {
         // left / right (both must be number. implicitly casted)
     OPERATOR_CONCAT                (OperatorExpression.class,  5, "||"),
         // left || right (both must be char/varchar)
-    OPERATOR_MOD                   (OperatorExpression.class,  6, "%", true),
+    OPERATOR_MOD                   (OperatorExpression.class,  6, "%"),
         // left % right (both must be integer)
     OPERATOR_CAST                  (OperatorExpression.class,  7, "<cast>"),
         // explicitly cast left as right (right is integer in ValueType enum)
@@ -116,7 +116,7 @@ public enum ExpressionType {
     AGGREGATE_SUM                 (AggregateExpression.class, 42, "SUM"),
     AGGREGATE_MIN                 (AggregateExpression.class, 43, "MIN", true),
     AGGREGATE_MAX                 (AggregateExpression.class, 44, "MAX", true),
-    AGGREGATE_AVG                 (AggregateExpression.class, 45, "AVG", true),
+    AGGREGATE_AVG                 (AggregateExpression.class, 45, "AVG"),
     AGGREGATE_APPROX_COUNT_DISTINCT(AggregateExpression.class, 46, "APPROX_COUNT_DISTINCT", true),
     AGGREGATE_VALS_TO_HYPERLOGLOG (AggregateExpression.class, 47, "VALS_TO_HYPERLOGLOG"),
     AGGREGATE_HYPERLOGLOGS_TO_CARD(AggregateExpression.class, 48, "HYPERLOGLOGS_TO_CARD"),
