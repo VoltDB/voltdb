@@ -428,9 +428,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     private LatencyHistogramStats m_latencyHistogramStats;
 
-    // durable means command logging is enabled.
-    private boolean m_durable;
-
     private File getConfigDirectory() {
         return getConfigDirectory(m_config);
     }
@@ -994,7 +991,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     // TODO - any way to keep it around so it need not be loaded twice?
                     startupCatalogHash = new InMemoryJarfile(m_pathToStartupCatalog).getMD5Checksum();
                 } catch (IOException e){
-                    VoltDB.crashLocalVoltDB("Failed to load staged catalog from " + m_pathToStartupCatalog, false, e);
+                    VoltDB.crashLocalVoltDB("Failed to load schema and classes from staging location " + m_pathToStartupCatalog, false, e);
                 }
             }
 
@@ -1038,14 +1035,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             VoltZK.createStartActionNode(m_messenger.getZK(), m_messenger.getHostId(), m_config.m_startAction);
             validateStartAction();
 
-            m_durable = readDeploymentAndCreateStarterCatalogContext(config);
+            // durable means commandlogging is enabled.
+            boolean durable = readDeploymentAndCreateStarterCatalogContext(config);
             if (config.m_isEnterprise && m_config.m_startAction.doesRequireEmptyDirectories()
-                    && !config.m_forceVoltdbCreate && m_durable) {
+                    && !config.m_forceVoltdbCreate && durable) {
                 managedPathsEmptyCheck(config);
             }
             //If we are not durable and we are not rejoining we backup auto snapshots if present.
             //If terminus is present we will recover from shutdown save so dont move.
-            if (!m_durable && m_config.m_startAction.doesRecover() && determination.terminusNonce == null) {
+            if (!durable && m_config.m_startAction.doesRecover() && determination.terminusNonce == null) {
                 if (m_nodeSettings.clean()) {
                     String msg = "Archiving old snapshots to " + m_nodeSettings.getSnapshoth() +
                                  ".1 and starting an empty database." +
@@ -1229,7 +1227,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             }
 
             // do the many init tasks in the Inits class
-            Inits inits = new Inits(m_statusTracker, this, 1, m_durable);
+            Inits inits = new Inits(m_statusTracker, this, 1, durable);
             inits.doInitializationWork();
 
             // Need the catalog so that we know how many tables so we can guess at the necessary heap size
@@ -1357,7 +1355,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                             (ProducerDRGateway) ndrgwConstructor.newInstance(
                                     new VoltFile(VoltDB.instance().getDROverflowPath()),
                                     new VoltFile(VoltDB.instance().getSnapshotPath()),
-                                    (m_config.m_startAction.doesRecover() && (m_durable || determination.terminusNonce != null)),
+                                    (m_config.m_startAction.doesRecover() && (durable || determination.terminusNonce != null)),
                                     m_config.m_startAction.doesRejoin(),
                                     m_replicationActive.get(),
                                     m_configuredNumberOfPartitions,
@@ -2220,16 +2218,16 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
             return; // nothing to do
         }
         assert( config.m_userSchema.isFile() ); // this is validated during command line parsing and will be true unless disk faults
-        File stagedCatalog = new VoltFile(getStagedCatalogPath());
+        File stagedCatalogFH = new VoltFile(getStagedCatalogPath());
 
         // this check cannot be part of managedPathsWithFiles(), since "voltdb start" can get translated into "voltdb create" after probing the mesh.
-        if (!config.m_forceVoltdbCreate && stagedCatalog.exists() && stagedCatalog.canRead()){
-            VoltDB.crashLocalVoltDB("Staged catalog from \"init\" or a previous database is present, but \"voltdb init --force\" was not specified.");
+        if (!config.m_forceVoltdbCreate && stagedCatalogFH.exists() && stagedCatalogFH.canRead()){
+            VoltDB.crashLocalVoltDB("A previous database \"init\" staged a schema and/or classes. You must init with --force to overwrite them.");
         }
         final boolean standalone = true;
         final boolean isXCDR = false;
         VoltCompiler compiler = new VoltCompiler(standalone, isXCDR);
-        if (!compiler.compileFromDDL(stagedCatalog.getAbsolutePath(), config.m_userSchema.getAbsolutePath())){
+        if (!compiler.compileFromDDL(stagedCatalogFH.getAbsolutePath(), config.m_userSchema.getAbsolutePath())){
             VoltDB.crashLocalVoltDB("Could not compile specified schema " + config.m_userSchema, false, null);
         }
     }
@@ -3882,17 +3880,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 hostLog.warn("Could not delete terminus marker");
             }
         }
-        if (m_durable || terminusExists){
-            File stagedCatalog = new VoltFile(RealVoltDB.getStagedCatalogPath(m_nodeSettings.getVoltDBRoot().getAbsolutePath()));
-            if (stagedCatalog.exists()){
-                boolean success = stagedCatalog.delete();
-                if (success){
-                    hostLog.info("Deleted staged catalog because durability is present.");
-                } else {
-                    hostLog.warn("Could not delete staged catalog");
-                }
-            }
-        }
 
         /*
          * Command log is already initialized if this is a rejoin or a join
@@ -3927,6 +3914,18 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
          */
         if (m_leaderAppointer != null) {
             m_leaderAppointer.onReplayCompletion();
+        }
+
+        if ((m_commandLog != null) && (m_commandLog.isEnabled()) || terminusExists){
+            File stagedCatalog = new VoltFile(RealVoltDB.getStagedCatalogPath(m_nodeSettings.getVoltDBRoot().getAbsolutePath()));
+            if (stagedCatalog.exists()){
+                boolean success = stagedCatalog.delete();
+                if (success){
+                    hostLog.info("Deleted staged schema and classes because durability is present.");
+                } else {
+                    hostLog.warn("Could not delete staged schema and classes. They will be ignored during command log or terminus snapshot recovery.");
+                }
+            }
         }
 
         if (m_startMode != null) {

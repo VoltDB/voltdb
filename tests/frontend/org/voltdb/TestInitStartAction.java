@@ -394,41 +394,12 @@ final public class TestInitStartAction {
         assertEquals(true, schemaFile.delete());
     }
 
-    /** Tests that a cluster can start with each node using an identical staged catalog.
-     * Since durability is off, the staged catalog will be kept around but not reflect any DDL changes.
-     * Restarting the database will reload the previous staged catalog.
+    /** Tests that a server can be started with the staged schema and classes from another server.
+     * @throws Exception
      */
     @Test
-    public void testStartWithStagedCatalogNoDurability() throws Exception {
-
-        final String schema =
-                "create table books (cash integer default 23 not null, title varchar(3) default 'foo', PRIMARY KEY(cash));\n" +
-                "create procedure Foo as select * from books;\n" +
-                "PARTITION TABLE books ON COLUMN cash;";
-        final int siteCount = 1;
-        final int hostCount = 3;
-        final int kfactor = 0;
-        LocalCluster cluster = LocalCluster.createLocalClusterViaStagedCatalog(schema, null, siteCount, hostCount, kfactor, null);
-
-        // Staged catalog will persist because durability is off, and being able to recover the schema is beneficial.
-        int nodesWithStagedCatalog = cluster.countNodesWithFile(Constants.CONFIG_DIR + File.separator + CatalogUtil.STAGED_CATALOG_FILE_NAME);
-        assertEquals(nodesWithStagedCatalog, hostCount);
-        cluster.shutDown();
-        nodesWithStagedCatalog = cluster.countNodesWithFile(Constants.CONFIG_DIR + File.separator + CatalogUtil.STAGED_CATALOG_FILE_NAME);
-        assertEquals(nodesWithStagedCatalog, hostCount);
-    }
-
-    /** Tests that a cluster will not start if different nodes have different staged schemas.
-     */
-    @Test
-    public void testStartWithMismatchedStagedSchema() throws Exception {
-        // TODO
-    }
-
-    /** Tests that a cluster will not start if different nodes have different staged classes.
-     */
-    @Test
-    public void testStartWithMismatchedStagedClasses() throws Exception {
-        // TODO
+    public void testStagingClassesFromVoltDBGet() throws Exception {
+        // TODO: do I need an end-to-end use case test in JUnit, or is it sufficient that each piece is tested?
+        // This is, however, the right test for making sure in-process LocalCluster works with staged catalogs.
     }
 }

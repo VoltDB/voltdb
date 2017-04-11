@@ -165,6 +165,8 @@ public class LocalCluster extends VoltServerConfig {
         templateCmdLine.startCommand("create");
     };
 
+    private boolean m_usesStagedCatalog;
+
     private boolean isEnableSSL = Boolean.valueOf(System.getenv("ENABLE_SSL") == null ? Boolean.toString(Boolean.getBoolean("ENABLE_SSL")) : System.getenv("ENABLE_SSL"));
     public boolean isEnableSSL() { return isEnableSSL; };
     public void setEnableSSL(boolean flag) {
@@ -293,6 +295,7 @@ public class LocalCluster extends VoltServerConfig {
         } else {
             assert catalogJarFileName == null : "Cannot specify a pre-compiled catalog when using staged catalogs. You should put any stored procedures into the CLASSPATH.";
             setNewCli(true);
+            m_usesStagedCatalog = true;
             try {
                 templateCmdLine.m_userSchema = VoltProjectBuilder.createFileForSchema(schemaToStage);
                 log.info("LocalCluster staged schema as \"" + templateCmdLine.m_userSchema + "\"");
@@ -2114,16 +2117,6 @@ public class LocalCluster extends VoltServerConfig {
         lc.setHasLocalServer(false);
         lc.overrideAnyRequestForValgrind();
         lc.compileDeploymentOnly(projectBuilder);
-
-        boolean clearLocalDataDirectories = false;
-        boolean skipInit = false;
-        lc.startUp(clearLocalDataDirectories, skipInit);
-
-        for (int i = 0; i < hostCount; i++) {
-            System.out.printf("Local cluster node[%d] ports: internal=%d, admin=%d, client=%d\n",
-                              i, lc.internalPort(i), lc.adminPort(i), lc.port(i));
-        }
-
         return lc;
     }
 
