@@ -232,9 +232,9 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // -------------------------------------------------
         bool loadCatalog(int64_t timestamp, std::string const& catalogPayload);
 
-        bool updateCatalog(int64_t timestamp, std::string const& catalogPayload);
+        bool updateCatalog(int64_t timestamp, bool isStreamUpdate, std::string const& catalogPayload);
 
-        bool processCatalogAdditions(int64_t timestamp);
+        bool processCatalogAdditions(bool isStreamUpdate, int64_t timestamp);
 
         /**
         * Load table data into a persistent table specified by the tableId parameter.

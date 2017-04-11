@@ -643,9 +643,8 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const std::string &catal
         m_executorContext->drReplicatedStream()->m_enabled = m_executorContext->drStream()->m_enabled;
         m_executorContext->drReplicatedStream()->m_flushInterval = m_executorContext->drStream()->m_flushInterval;
     }
-
-    // load up all the tables, adding all tables
-    if (processCatalogAdditions(timestamp) == false) {
+    //When loading catalog we do isStreamUpdate to false as stream tables will get created and thus roll will happen.
+    if (processCatalogAdditions(false, timestamp) == false) {
         return false;
     }
 
@@ -787,7 +786,7 @@ static bool haveDifferentSchema(catalog::Table* t1, voltdb::PersistentTable* t2)
  * Use the txnId of the catalog update as the generation for export
  * data.
  */
-bool VoltDBEngine::processCatalogAdditions(int64_t timestamp) {
+bool VoltDBEngine::processCatalogAdditions(bool isStreamUpdate, int64_t timestamp) {
     // iterate over all of the tables in the new catalog
     BOOST_FOREACH (LabeledTable labeledTable, m_database->tables()) {
         // get the catalog's table object
@@ -853,12 +852,11 @@ bool VoltDBEngine::processCatalogAdditions(int64_t timestamp) {
         else {
 
             //////////////////////////////////////////////
-            // update the export info for existing tables
+            // update the export info for existing tables can not be done now so ignore streamed table.
             //
             // add/modify/remove indexes that have changed
             //  in the catalog
             //////////////////////////////////////////////
-
             /*
              * Instruct the table that was not added but is being retained to flush
              * Then tell it about the new export generation/catalog txnid
@@ -867,15 +865,18 @@ bool VoltDBEngine::processCatalogAdditions(int64_t timestamp) {
              */
             auto streamedTable = tcd->getStreamedTable();
             if (streamedTable) {
-                streamedTable->setSignatureAndGeneration(catalogTable->signature(), timestamp);
-                if (!tcd->exportEnabled()) {
-                    // Evaluate export enabled or not and cache it on the tcd.
-                    tcd->evaluateExport(*m_database, *catalogTable);
-                    // If enabled hook up streamer
-                    if (tcd->exportEnabled() && streamedTable->enableStream()) {
-                        //Reset generation after stream wrapper is created.
-                        streamedTable->setSignatureAndGeneration(catalogTable->signature(), timestamp);
-                        m_exportingTables[catalogTable->signature()] = streamedTable;
+                //Dont update and roll generation if this is just a non stream table update.
+                if (isStreamUpdate) {
+                    streamedTable->setSignatureAndGeneration(catalogTable->signature(), timestamp);
+                    if (!tcd->exportEnabled()) {
+                        // Evaluate export enabled or not and cache it on the tcd.
+                        tcd->evaluateExport(*m_database, *catalogTable);
+                        // If enabled hook up streamer
+                        if (tcd->exportEnabled() && streamedTable->enableStream()) {
+                            //Reset generation after stream wrapper is created.
+                            streamedTable->setSignatureAndGeneration(catalogTable->signature(), timestamp);
+                            m_exportingTables[catalogTable->signature()] = streamedTable;
+                        }
                     }
                 }
 
@@ -1102,16 +1103,14 @@ bool VoltDBEngine::processCatalogAdditions(int64_t timestamp) {
  * current and the desired catalog. Execute those commands and create,
  * delete or modify the corresponding exectution engine objects.
  */
-bool VoltDBEngine::updateCatalog(int64_t timestamp, std::string const& catalogPayload) {
+bool VoltDBEngine::updateCatalog(int64_t timestamp, bool isStreamUpdate, std::string const& catalogPayload) {
     // clean up execution plans when the tables underneath might change
     if (m_plans) {
         m_plans->clear();
     }
 
     assert(m_catalog != NULL); // the engine must be initialized
-
     VOLT_DEBUG("Updating catalog...");
-
     // apply the diff commands to the existing catalog
     // throws SerializeEEExceptions on error.
     m_catalog->execute(catalogPayload);
@@ -1132,7 +1131,7 @@ bool VoltDBEngine::updateCatalog(int64_t timestamp, std::string const& catalogPa
 
     processCatalogDeletes(timestamp);
 
-    if (processCatalogAdditions(timestamp) == false) {
+    if (processCatalogAdditions(isStreamUpdate, timestamp) == false) {
         VOLT_ERROR("Error processing catalog additions.");
         return false;
     }
