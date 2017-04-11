@@ -46,10 +46,6 @@ volt_verbs = {'create': 1,
               'start': 2,
              }
 
-# voltdb get and others use positional arguments so their
-# tests can't use the same pattern as "voltdb start|init|..."
-volt_irregular_verbs = { "get": 2,}
-
 volt_verbs_mapping = {'create': 'create',
                       'recover': 'recover',
                       'rejoin': 'live rejoin',
@@ -238,19 +234,23 @@ option_name_re = re.compile(option_name)
 option_ignore = ['version', 'help', 'verbose', 'background', 'ignore', 'blocking']
 
 # model data for the irregular (voltdb get) family
+# voltdb get and others use positional arguments so their
+# tests can't use the same pattern as "voltdb start|init|..."
+volt_irregular_verbs = { "get": 2,}
 get = Opt("get", "get", str, 2)
 irr_classes = Opt("classes", "classes", str, 2)
 voltdbrootdir = Opt("--dir somedir", "getvoltdbroot somedir", str, 2)
 otheroot = Opt("otheroot", "getvoltdbroot otheroot", str, 2)
 defaultroot = Opt("", "getvoltdbroot voltdbroot",  str, 2)
-noverb = Opt("", "no verb: put some help text here", str, 2)
-noobj = Opt("", "no obj: put some help text here", str, 2)
-noout = Opt("", "file \"\"", str, 2)
+# noverb = Opt("", "no verb: put some help text here", str, 2)
+# noobj = Opt("", "no obj: put some help text here", str, 2)
+# noparms = Opt("", "no parms", str, 2)
+# noout = Opt("", "file \"\"", str, 2)
 somefile = "somefile"
 out = Opt("--output "+somefile, "file"+" "+somefile, str, 2)
 verbs = [ get, ]
 objects = [ deployment, schema, irr_classes ]  # required
-options = [ voltdbrootdir, out, ]
+options = [ voltdbrootdir, out, "none", ]
 
 class TestsContainer(unittest.TestCase):
     longMessage = True
@@ -416,22 +416,26 @@ def test_irregular_verbs(reportout = None):
     for v in volt_irregular_verbs:
         for obj in objects:
             for pos in options:
-
-                # for o in sub_options:
-
-                expected_opts = [volt_verbs_mapping[v], obj.javaname, pos.javaname]
-
-                clean_args = []
-                for a in [obj.pyname, pos.pyname]:
-                    if len(a) > 0:
-                        for b in str(a).split():
-                            clean_args.append(b)
+                if pos == "none":
+                    expected_opts = [volt_verbs_mapping[v], obj.javaname,]
+                else:
+                    expected_opts = [volt_verbs_mapping[v], obj.javaname, pos.javaname]
+                    clean_args = []
+                    for a in [obj.pyname, pos.pyname]:
+                        if len(a) > 0:
+                            for b in str(a).split():
+                                clean_args.append(b)
                 stdout, stderr = run_voltcli(v, clean_args, reportout)
 
                 javaout = sanitize(stdout)
                 haddiffs, description = compare_irregular(javaout, expected_opts, reportout)
 
-                setattr(TestsContainer, 'test: {0}'.format(v+ " " + " ".join([ obj.pyname, pos.pyname, ])), make_test_function(haddiffs, description))
+                if pos == "none":
+                    setattr(TestsContainer, 'test: {0}'.format(v+ " " + " ".join([ obj.pyname, ])),
+                            make_test_function(haddiffs, description))
+                else:
+                    setattr(TestsContainer, 'test: {0}'.format(v+ " " + " ".join([ obj.pyname, pos.pyname, ])),
+                            make_test_function(haddiffs, description))
 
 def compare_irregular(actual, expected, reportout):
     """
