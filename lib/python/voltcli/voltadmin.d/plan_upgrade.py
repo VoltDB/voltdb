@@ -229,15 +229,15 @@ def generateInitNewClusterCommand(opts, killSet, files, new_cluster_deploy, newN
     for hostInfo in killSet:
         writeCommands(files[getKey(hostInfo)],
                       'Step %d: initialize new cluster' % step,
-                      '%s init --dir=%s --config=%s' % (os.path.join(opts.newKit, 'bin/voltdb'),
-                                                        opts.newRoot,
-                                                        os.path.join(opts.newRoot, new_cluster_deploy)))
+                      '%s init --dir=%s --config=%s --force' % (os.path.join(opts.newKit, 'bin/voltdb'),
+                                                                opts.newRoot,
+                                                                os.path.join(opts.newRoot, new_cluster_deploy)))
     if opts.newNode is not None:
         writeCommands(newNodeF,
                       'Step %d: initialize new cluster' % step,
-                      '%s init --dir=%s --config=%s' % (os.path.join(opts.newKit, 'bin/voltdb'),
-                                                        opts.newRoot,
-                                                        os.path.join(opts.newRoot, new_cluster_deploy)))
+                      '%s init --dir=%s --config=%s --force' % (os.path.join(opts.newKit, 'bin/voltdb'),
+                                                                opts.newRoot,
+                                                                os.path.join(opts.newRoot, new_cluster_deploy)))
 
 def generateStartNewClusterCommand(opts, killSet, hostcount, files, newNodeF, step):
     leadersString = []
@@ -431,7 +431,7 @@ def createDeploymentForNewCluster(runner, xmlString, largestClusterId, drSource,
     if clusterId > 127:
         clusterId = 0
 
-    # since we check the existence of DR tag when generating deployment file for origin cluster, it's safe to skip here
+    # since we check the existence of DR tag when generating deployment file for origin cluster, it's safe to skip it here
     dr = et.getroot().find('./dr')
     dr.attrib['id'] = str(clusterId)
     connection = dr.find('./connection')
