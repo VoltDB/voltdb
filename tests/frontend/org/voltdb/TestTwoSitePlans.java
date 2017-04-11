@@ -42,6 +42,7 @@ import org.voltdb.catalog.Statement;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.jni.ExecutionEngineJNI;
+import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.planner.ActivePlanRepository;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
@@ -191,35 +192,43 @@ public class TestTwoSitePlans extends TestCase {
 
         // insert some data
         ParameterSet params = ParameterSet.fromArrayNoCopy(1L, 1L, 1L);
-
-        VoltTable[] results = ee2.executePlanFragments(
+        FastDeserializer fragResult2 = ee2.executePlanFragments(
                 1,
                 new long[] { CatalogUtil.getUniqueIdForFragment(insertFrag) },
                 null,
                 new ParameterSet[] { params },
+                new boolean[] { false },
+                null,
                 new String[] { selectStmt.getSqltext() },
                 1,
                 1,
                 0,
                 42,
-                Long.MAX_VALUE);
-        assert(results.length == 1);
+                Long.MAX_VALUE, false);
+        // ignore totalsize field in message
+        fragResult2.readInt();
+        VoltTable[] results = TableHelper.convertBackedBufferToTables(fragResult2.buffer(), 1);
         assert(results[0].asScalarLong() == 1L);
 
         params = ParameterSet.fromArrayNoCopy(2L, 2L, 2L);
 
-        results = ee1.executePlanFragments(
+        FastDeserializer fragResult1 = ee1.executePlanFragments(
                 1,
                 new long[] { CatalogUtil.getUniqueIdForFragment(insertFrag) },
                 null,
                 new ParameterSet[] { params },
+                new boolean[] { false },
+                null,
                 new String[] { insertStmt.getSqltext() },
                 2,
                 2,
                 1,
                 42,
-                Long.MAX_VALUE);
-        assert(results.length == 1);
+                Long.MAX_VALUE, false);
+        // ignore totalsize field in message
+        fragResult1.readInt();
+        results = TableHelper.convertBackedBufferToTables(fragResult1.buffer(), 1);
+        assert (fragResult1.buffer() != fragResult2.buffer());
         assert(results[0].asScalarLong() == 1L);
     }
 
@@ -227,28 +236,42 @@ public class TestTwoSitePlans extends TestCase {
         ParameterSet params = ParameterSet.emptyParameterSet();
 
         int outDepId = 1 | DtxnConstants.MULTIPARTITION_DEPENDENCY;
-        VoltTable dependency1 = ee1.executePlanFragments(
+        FastDeserializer fragResult1 = ee1.executePlanFragments(
                 1,
                 new long[] { CatalogUtil.getUniqueIdForFragment(selectBottomFrag) },
                 null,
                 new ParameterSet[] { params },
+                new boolean[] { false },
+                null,
                 new String[] { selectStmt.getSqltext() },
-                3, 3, 2, 42, Long.MAX_VALUE)[0];
+                3, 3, 2, 42, Long.MAX_VALUE, false);
+        VoltTable dependency1 = null;
         try {
+            // ignore totalsize field in message
+            fragResult1.readInt();
+
+            dependency1 = TableHelper.convertBackedBufferToTables(fragResult1.buffer(), 1)[0];
             System.out.println(dependency1.toString());
         } catch (Exception e) {
             e.printStackTrace();
         }
         assertTrue(dependency1 != null);
 
-        VoltTable dependency2 = ee2.executePlanFragments(
+        FastDeserializer fragResult2 = ee2.executePlanFragments(
                 1,
                 new long[] { CatalogUtil.getUniqueIdForFragment(selectBottomFrag) },
                 null,
                 new ParameterSet[] { params },
+                new boolean[] { false },
+                null,
                 new String[] { selectStmt.getSqltext() },
-                3, 3, 2, 42, Long.MAX_VALUE)[0];
+                3, 3, 2, 42, Long.MAX_VALUE, false);
+        VoltTable dependency2 = null;
         try {
+            // ignore totalsize field in message
+            fragResult2.readInt();
+
+            dependency2 = TableHelper.convertBackedBufferToTables(fragResult2.buffer(), 1)[0];
             System.out.println(dependency2.toString());
         } catch (Exception e) {
             e.printStackTrace();
@@ -258,14 +281,23 @@ public class TestTwoSitePlans extends TestCase {
         ee1.stashDependency(outDepId, dependency1);
         ee1.stashDependency(outDepId, dependency2);
 
-        dependency1 = ee1.executePlanFragments(
+        FastDeserializer fragResult3 = ee1.executePlanFragments(
                 1,
                 new long[] { CatalogUtil.getUniqueIdForFragment(selectTopFrag) },
                 new long[] { outDepId },
                 new ParameterSet[] { params },
+                new boolean[] { false },
+                null,
                 new String[] { selectStmt.getSqltext() },
-                3, 3, 2, 42, Long.MAX_VALUE)[0];
+                3, 3, 2, 42, Long.MAX_VALUE, false);
+
+        // The underlying buffers are being reused
+        assert(fragResult1.buffer() == fragResult3.buffer());
         try {
+            // ignore totalsize field in message
+            fragResult3.readInt();
+
+            dependency1 = TableHelper.convertBackedBufferToTables(fragResult3.buffer(), 1)[0];
             System.out.println("Final Result");
             System.out.println(dependency1.toString());
         } catch (Exception e) {

@@ -17,6 +17,9 @@
 
 package org.voltdb;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * Record statistics for each statement in the stored procedure.
  */
@@ -246,6 +249,120 @@ public final class StatementStats {
         return retval;
     }
 
+    /**
+     * This is a token the ProcedureRunner holds onto while it's running.
+     * It collects stats information during the procedure run without needing
+     * to touch the actual stats source.
+     * When the procedure is done (commit/abort/whatever), this token is given
+     * to the ProcedureStatsCollector in a single (thread-safe) call.
+     *
+     */
+    public static final class SingleCallStatsToken {
+        class PerStmtStats {
+            final String stmtName;
+            final boolean isCoordinatorTask;
+            final boolean stmtFailed;
+            final MeasuredStmtStats measurements;
+
+            PerStmtStats(String stmtName,
+                    boolean isCoordinatorTask,
+                    boolean failed,
+                    MeasuredStmtStats measurements)
+            {
+                this.stmtName = stmtName;
+                this.isCoordinatorTask = isCoordinatorTask;
+                this.stmtFailed = failed;
+                this.measurements = measurements;
+            }
+        }
+
+        /**
+         * Per-statment stats
+         */
+        class MeasuredStmtStats {
+            final long stmtDuration;
+            final int stmtResultSize;
+            final int stmtParameterSetSize;
+
+            MeasuredStmtStats(long duration,
+                              int resultSize,
+                              int paramSetSize)
+            {
+                this.stmtDuration = duration;
+                this.stmtResultSize = resultSize;
+                this.stmtParameterSetSize = paramSetSize;
+            }
+        }
+
+        final long startTimeNanos;
+        final boolean samplingStatements;
+        // stays null until used
+        List<PerStmtStats> stmtStats = null;
+
+        int parameterSetSize = 0;
+        int resultSize = 0;
+
+        public SingleCallStatsToken(long startTimeNanos, boolean samplingStatements) {
+            this.startTimeNanos = startTimeNanos;
+            this.samplingStatements = samplingStatements;
+        }
+
+        public boolean samplingProcedure() {
+            return startTimeNanos != 0;
+        }
+
+        public boolean samplingStmts() {
+            return samplingStatements;
+        }
+
+        public void setParameterSize(int size) {
+            parameterSetSize = size;
+        }
+
+        public void setResultSize(VoltTable[] results) {
+            resultSize = 0;
+            if (results != null) {
+                for (VoltTable result : results ) {
+                    resultSize += result.getSerializedSize();
+                }
+            }
+        }
+
+        /**
+         * Called when a statement completes.
+         * Adds a record to the parent stats token.
+         */
+        public void recordStatementStats(String stmtName,
+                                         boolean isCoordinatorTask,
+                                         boolean failed,
+                                         long duration,
+                                         VoltTable result,
+                                         ParameterSet parameterSet)
+        {
+            if (stmtStats == null) {
+                stmtStats = new ArrayList<>();
+            }
+
+            MeasuredStmtStats measuredStmtStats = null;
+            if (samplingStatements) {
+                int stmtResultSize = 0;
+                if (result != null) {
+                    stmtResultSize = result.getSerializedSize();
+                }
+                int stmtParamSize = 0;
+                if (parameterSet != null) {
+                    stmtParamSize += parameterSet.getSerializedSize();
+                }
+                measuredStmtStats = new MeasuredStmtStats(duration, stmtResultSize, stmtParamSize);
+            }
+
+            stmtStats.add(new PerStmtStats(stmtName,
+                                           isCoordinatorTask,
+                                           failed,
+                                           measuredStmtStats));
+        }
+    }
+
     static final class StatsData {
         /**
          * Number of times this procedure has been invoked.
@@ -276,12 +393,6 @@ public final class StatementStats {
          */
         long m_maxExecutionTime = Long.MIN_VALUE;
         long m_incrMaxExecutionTime = Long.MIN_VALUE;
-
-        /**
-         * Time the procedure was last started
-         * (Not used by per-fragment stats)
-         */
-        long m_currentStartTime = -1;
 
         /**
          * Count of the number of aborts (user initiated or DB initiated)

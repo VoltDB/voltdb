@@ -216,7 +216,7 @@ class PointValueGenerator:
                                   PointValueGenerator.DIGITS_BEYOND_DECIMAL_POINT)
                 latitude  = round(self.__latmin  + (self.__latdiff  * random.random()),
                                   PointValueGenerator.DIGITS_BEYOND_DECIMAL_POINT)
-                yield "pointFromText('POINT ("+str(longitude)+" "+str(latitude)+")')"
+                yield "PointFromText('POINT ("+str(longitude)+" "+str(latitude)+")')"
 
 
 class PolygonValueGenerator:
@@ -322,7 +322,7 @@ class PolygonValueGenerator:
             if self.__nullpct and (random.randint(0, 100) < self.__nullpct):
                 yield None
             else:
-                polygon = "polygonFromText('POLYGON (" + self.generate_loop(self.__longmin, self.__longmax,
+                polygon = "PolygonFromText('POLYGON (" + self.generate_loop(self.__longmin, self.__longmax,
                                                                             self.__latmin, self.__latmax)
                 num_holes = self.__num_holes
                 if num_holes < 0:
@@ -508,7 +508,7 @@ class BaseGenerator:
 
     # List of column names for Geo types, i.e., point and polygon (GEOGRAPHY_POINT and GEOGRAPHY),
     # which may need to be wrapped in AsText(...)
-    __GEO_COLUMN_NAMES    = ['PT1', 'PT2', 'PT3', 'POLY1', 'POLY2', 'POLY3']
+    __GEO_COLUMN_NAMES    = ['POINT', 'PT1', 'PT2', 'PT3', 'POLYGON', 'POLY1', 'POLY2', 'POLY3']
     # List of possible prefixes for those column names, i.e., either a table name alias with '.',
     # or nothing at all; the empty one (no table name prefix) must be last
     __GEO_COLUMN_PREFIXES = ['A.', 'B.', 'LHS.', '']
@@ -864,7 +864,7 @@ class ConstantGenerator(BaseGenerator):
                 i = u"NULL"
             elif isinstance(i, basestring):
                 # Points and polygon values do not want extra single-quotes around them
-                if i.startswith('pointFromText(') or i.startswith('polygonFromText('):
+                if i.startswith('PointFromText(') or i.startswith('PolygonFromText('):
                     i = u"%s" % (i)
                 # Varchar values do want single-quotes around them
                 else:

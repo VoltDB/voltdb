@@ -51,9 +51,11 @@
 
 namespace voltdb {
 
-MergeReceivePlanNode::MergeReceivePlanNode() :
-    AbstractReceivePlanNode(), m_outputSchemaPreAgg()
-{ }
+MergeReceivePlanNode::MergeReceivePlanNode()
+    : AbstractReceivePlanNode()
+    , m_outputSchemaPreAgg()
+{
+}
 
 MergeReceivePlanNode::~MergeReceivePlanNode()
 {

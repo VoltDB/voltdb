@@ -42,6 +42,10 @@ class Topend {
     virtual int loadNextDependency(
         int32_t dependencyId, voltdb::Pool *pool, Table* destination) = 0;
 
+    virtual void traceLog(bool isBegin,
+                          const char *name,
+                          const char *args) {};
+
     // Update the topend on query progress and give the topend a chance to tell the
     // query to stop.
     // Return 0 if the Topend wants the EE to stop processing the current fragment

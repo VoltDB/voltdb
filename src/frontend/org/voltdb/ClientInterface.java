@@ -83,6 +83,7 @@ import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.client.ClientAuthScheme;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ProcedureCallback;
 import org.voltdb.client.TLSHandshaker;
 import org.voltdb.common.Constants;
 import org.voltdb.dtxn.InitiatorStats.InvocationInfo;
@@ -96,6 +97,7 @@ import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.LocalMailbox;
 import org.voltdb.security.AuthenticationRequest;
 import org.voltdb.utils.MiscUtils;
+import org.voltdb.utils.VoltTrace;
 
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.base.Predicate;
@@ -149,11 +151,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     public static final long DR_DISPATCHER_CID          = Long.MIN_VALUE + 7;
     public static final long RESTORE_SCHEMAS_CID        = Long.MIN_VALUE + 8;
     public static final long SHUTDONW_SAVE_CID          = Long.MIN_VALUE + 9;
+    public static final long NT_REMOTE_PROC_CID         = Long.MIN_VALUE + 10;
 
     // Leave CL_REPLAY_BASE_CID at the end, it uses this as a base and generates more cids
     // PerPartition cids
     private static long setBaseValue(int offset) { return offset << 14; }
-    public static final long CL_REPLAY_BASE_CID         = Long.MIN_VALUE + setBaseValue(1);
+    public static final long CL_REPLAY_BASE_CID                = Long.MIN_VALUE + setBaseValue(1);
     public static final long DR_REPLICATION_SNAPSHOT_BASE_CID  = Long.MIN_VALUE + setBaseValue(2);
     public static final long DR_REPLICATION_NORMAL_BASE_CID    = Long.MIN_VALUE + setBaseValue(3);
     public static final long DR_REPLICATION_MP_BASE_CID        = Long.MIN_VALUE + setBaseValue(4);
@@ -206,7 +209,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
     private final Cartographer m_cartographer;
 
-    //Dispatched strore procedure invocations
+    //Dispatched stored procedure invocations
     private final InvocationDispatcher m_dispatcher;
 
     /*
@@ -987,6 +990,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     delta,
                     clientResponse.getStatus());
 
+            final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.CI);
+            if (traceLog != null) {
+                traceLog.add(() -> VoltTrace.endAsync("recvtxn",
+                                                      clientData.m_clientHandle,
+                                                      "status", Byte.toString(clientResponse.getStatus()),
+                                                      "statusString", clientResponse.getStatusString()));
+            }
+
             clientResponse.setClientHandle(clientData.m_clientHandle);
             clientResponse.setClusterRoundtrip((int)TimeUnit.NANOSECONDS.toMillis(delta));
             clientResponse.setHash(null); // not part of wire protocol
@@ -1165,7 +1176,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
 
         m_mailbox = new LocalMailbox(messenger,  messenger.getHSIdForLocalSite(HostMessenger.CLIENT_INTERFACE_SITE_ID)) {
+            /** m_d only used in test */
             LinkedBlockingQueue<VoltMessage> m_d = new LinkedBlockingQueue<VoltMessage>();
+
             @Override
             public void deliver(final VoltMessage message) {
                 if (message instanceof InitiateResponseMessage) {
@@ -1173,6 +1186,18 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     // forward response; copy is annoying. want slice of response.
                     InitiateResponseMessage response = (InitiateResponseMessage)message;
                     StoredProcedureInvocation invocation = response.getInvocation();
+
+                    // handle all host NT procedure callbacks
+                    if (response.getClientConnectionId() == NT_REMOTE_PROC_CID) {
+                        //int hostId = VoltDB.instance().getHostMessenger().getHostId();
+                        //System.out.printf("HostID %d got a response from an all-host NT proc\n", hostId);
+                        //System.out.flush();
+
+                        m_dispatcher.handleAllHostNTProcedureResponse(response.getClientResponseData());
+                        return;
+                    }
+
+                    Iv2Trace.logFinishTransaction(response, m_mailbox.getHSId());
                     ClientInterfaceHandleManager cihm = m_cihm.get(response.getClientConnectionId());
                     Procedure procedure = null;
 
@@ -1188,13 +1213,49 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         cihm.connection.writeStream().fastEnqueue(new ClientResponseWork(response, cihm, procedure));
                         Iv2Trace.logFinishTransaction(response, m_mailbox.getHSId());
                     }
-                } else if (message instanceof BinaryPayloadMessage) {
+                }
+                else if (message instanceof BinaryPayloadMessage) {
                     handlePartitionFailOver((BinaryPayloadMessage)message);
-                } else {
+                }
+                /*
+                 * InitiateTaskMessage only get delivered here for all-host NT proc calls.
+                 */
+                else if (message instanceof Iv2InitiateTaskMessage) {
+                    final Iv2InitiateTaskMessage itm = (Iv2InitiateTaskMessage) message;
+                    final StoredProcedureInvocation invocation = itm.getStoredProcedureInvocation();
+
+                    // get hostid for this node
+                    final int hostId = CoreUtils.getHostIdFromHSId(m_mailbox.getHSId());
+
+                    final ProcedureCallback cb = new ProcedureCallback() {
+                        @Override
+                        public void clientCallback(ClientResponse clientResponse) throws Exception {
+                            InitiateResponseMessage responseMessage = new InitiateResponseMessage(itm);
+                            // use the app status string to store the host id (as a string)
+                            // ProcedureRunnerNT has a method that expects this hack
+                            ((ClientResponseImpl) clientResponse).setAppStatusString(String.valueOf(hostId));
+                            responseMessage.setResults((ClientResponseImpl) clientResponse);
+                            responseMessage.setClientHandle(invocation.clientHandle);
+                            responseMessage.setConnectionId(NT_REMOTE_PROC_CID);
+                            m_mailbox.send(itm.m_sourceHSId, responseMessage);
+                        }
+                    };
+
+                    m_internalConnectionHandler.callProcedure(m_catalogContext.get().authSystem.getInternalAdminUser(),
+                                                              true,
+                                                              1000 * 120,
+                                                              cb,
+                                                              true, // priority NT
+                                                              invocation.getProcName(),
+                                                              itm.getParameters());
+                }
+                else {
+                    // m_d is for test only
                     m_d.offer(message);
                 }
             }
 
+            /** This method only used in test */
             @Override
             public VoltMessage recv() {
                 return m_d.poll();
@@ -1205,6 +1266,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         m_zk = messenger.getZK();
         m_siteId = m_mailbox.getHSId();
 
+        m_executeTaskAdpater = new SimpleClientResponseAdapter(ClientInterface.EXECUTE_TASK_CID, "ExecuteTaskAdapter", true);
+        bindAdapter(m_executeTaskAdpater, null);
+
         m_dispatcher = InvocationDispatcher.builder()
                 .snapshotDaemon(m_snapshotDaemon)
                 .replicationRole(replicationRole)
@@ -1214,10 +1278,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 .clientInterfaceHandleManagerMap(m_cihm)
                 .plannerSiteId(m_plannerSiteId)
                 .siteId(m_siteId)
+                .internalConnectionHandler(m_internalConnectionHandler)
                 .build();
-
-        m_executeTaskAdpater = new SimpleClientResponseAdapter(ClientInterface.EXECUTE_TASK_CID, "ExecuteTaskAdapter", true);
-        bindAdapter(m_executeTaskAdpater, null);
     }
 
     private InternalClientResponseAdapter createInternalAdapter(int pid) {
@@ -1442,7 +1504,19 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             return errorResponse(ccxn, task.clientHandle, ClientResponse.UNEXPECTED_FAILURE, errorMessage, null, false);
         }
 
-        return m_dispatcher.dispatch(task, handler, ccxn, user, null);
+        final ClientResponseImpl errResp = m_dispatcher.dispatch(task, handler, ccxn, user, null, false);
+
+        if (errResp != null) {
+            final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.CI);
+            if (traceLog != null) {
+                traceLog.add(() -> VoltTrace.endAsync("recvtxn",
+                                                      task.getClientHandle(),
+                                                      "status", Byte.toString(errResp.getStatus()),
+                                                      "statusString", errResp.getStatusString()));
+            }
+        }
+
+        return errResp;
     }
 
     public Procedure getProcedureFromName(String procName, CatalogContext catalogContext) {
@@ -2126,5 +2200,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
         final long timeoutMS = 2 * 60 * 1000;
         return cb.getResponse(timeoutMS);
+    }
+
+    void handleFailedHosts(Set<Integer> failedHosts) {
+        m_dispatcher.handleFailedHosts(failedHosts);
     }
 }

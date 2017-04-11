@@ -23,6 +23,7 @@ import java.lang.reflect.Modifier;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.concurrent.CompletableFuture;
 
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.voltcore.logging.VoltLogger;
@@ -30,6 +31,7 @@ import org.voltdb.ProcInfo;
 import org.voltdb.ProcInfoData;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltNonTransactionalProcedure;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -161,7 +163,6 @@ public abstract class ProcedureCompiler {
         return shortName;
     }
 
-
     static void compileJavaProcedure(VoltCompiler compiler,
                                      HSQLInterface hsql,
                                      DatabaseEstimates estimates,
@@ -243,6 +244,14 @@ public abstract class ProcedureCompiler {
                 throw compiler.new VoltCompilerException(msg);
             }
         }
+
+        // if the procedure is non-transactional, then take this special path here
+        if (VoltNonTransactionalProcedure.class.isAssignableFrom(procClass)) {
+            compileNTProcedure(compiler, procClass, procedure, jarOutput);
+            return;
+        }
+        // if still here, that means the procedure is transactional
+        procedure.setTransactional(true);
 
         // track if there are any writer statements and/or sequential scans and/or an overlooked common partitioning parameter
         boolean procHasWriteStmts = false;
@@ -546,6 +555,140 @@ public abstract class ProcedureCompiler {
         compiler.addClassToJar(jarOutput, ancestor);
     }
 
+    private static void compileNTProcedure(VoltCompiler compiler,
+                                           Class<?> procClass,
+                                           Procedure procedure,
+                                           InMemoryJarfile jarOutput)
+                                                   throws VoltCompilerException
+    {
+         // get the short name of the class (no package)
+        String shortName = deriveShortProcedureName(procClass.getName());
+
+        try {
+            procClass.newInstance();
+        } catch (InstantiationException e) {
+            throw new RuntimeException("Error instantiating procedure \"%s\"" + procClass.getName(), e);
+        } catch (IllegalAccessException e) {
+            throw new RuntimeException("Error instantiating procedure \"%s\"" + procClass.getName(), e);
+        }
+
+        // find the run() method and get the params
+        Method procMethod = null;
+        Method[] methods = procClass.getDeclaredMethods();
+        for (final Method m : methods) {
+            String name = m.getName();
+            if (name.equals("run")) {
+                assert (m.getDeclaringClass() == procClass);
+
+                // if not null, then we've got more than one run method
+                if (procMethod != null) {
+                    String msg = "Procedure: " + shortName + " has multiple public run(...) methods. ";
+                    msg += "Only a single run(...) method is supported.";
+                    throw compiler.new VoltCompilerException(msg);
+                }
+
+                if (Modifier.isPublic(m.getModifiers())) {
+                    // found it!
+                    procMethod = m;
+                }
+                else {
+                    compiler.addWarn("Procedure: " + shortName + " has non-public run(...) method.");
+                }
+            }
+        }
+        if (procMethod == null) {
+            String msg = "Procedure: " + shortName + " has no run(...) method.";
+            throw compiler.new VoltCompilerException(msg);
+        }
+        // check the return type of the run method
+        if ((procMethod.getReturnType() != CompletableFuture.class) &&
+           (procMethod.getReturnType() != VoltTable[].class) &&
+           (procMethod.getReturnType() != VoltTable.class) &&
+           (procMethod.getReturnType() != long.class) &&
+           (procMethod.getReturnType() != Long.class)) {
+
+            String msg = "Procedure: " + shortName + " has run(...) method that doesn't return long, Long, VoltTable, VoltTable[] or CompleteableFuture.";
+            throw compiler.new VoltCompilerException(msg);
+        }
+
+        // set procedure parameter types
+        CatalogMap<ProcParameter> params = procedure.getParameters();
+        Class<?>[] paramTypes = procMethod.getParameterTypes();
+        setCatalogProcedureParameterTypes(compiler, shortName, params, paramTypes);
+
+        // actually make sure the catalog records this is a different kind of procedure
+        procedure.setTransactional(false);
+
+        // put the compiled code for this procedure into the jarfile
+        // need to find the outermost ancestor class for the procedure in the event
+        // that it's actually an inner (or inner inner...) class.
+        // addClassToJar recursively adds all the children, which should include this
+        // class
+        Class<?> ancestor = procClass;
+        while (ancestor.getEnclosingClass() != null) {
+            ancestor = ancestor.getEnclosingClass();
+        }
+        compiler.addClassToJar(jarOutput, ancestor);
+    }
+
+    private static void setCatalogProcedureParameterTypes(VoltCompiler compiler,
+                                                   String shortName,
+                                                   CatalogMap<ProcParameter> params,
+                                                   Class<?>[] paramTypes)
+                                                           throws VoltCompilerException
+    {
+        for (int i = 0; i < paramTypes.length; i++) {
+            Class<?> cls = paramTypes[i];
+            ProcParameter param = params.add(String.valueOf(i));
+            param.setIndex(i);
+
+            // handle the case where the param is an array
+            if (cls.isArray()) {
+                param.setIsarray(true);
+                cls = cls.getComponentType();
+            }
+            else
+                param.setIsarray(false);
+
+            // boxed types are not supported parameters at this time
+            if ((cls == Long.class) || (cls == Integer.class) || (cls == Short.class) ||
+                (cls == Byte.class) || (cls == Double.class) ||
+                (cls == Character.class) || (cls == Boolean.class))
+            {
+                String msg = "Procedure: " + shortName + " has a parameter with a boxed type: ";
+                msg += cls.getSimpleName();
+                msg += ". Replace this parameter with the corresponding primitive type and the procedure may compile.";
+                throw compiler.new VoltCompilerException(msg);
+            } else if ((cls == Float.class) || (cls == float.class)) {
+                String msg = "Procedure: " + shortName + " has a parameter with type: ";
+                msg += cls.getSimpleName();
+                msg += ". Replace this parameter type with double and the procedure may compile.";
+                throw compiler.new VoltCompilerException(msg);
+
+            }
+
+            VoltType type;
+            try {
+                type = VoltType.typeFromClass(cls);
+            }
+            catch (VoltTypeException e) {
+                // handle the case where the type is invalid
+                String msg = "Procedure: " + shortName + " has a parameter with invalid type: ";
+                msg += cls.getSimpleName();
+                throw compiler.new VoltCompilerException(msg);
+            }
+            catch (RuntimeException e) {
+                String msg = "Procedure: " + shortName + " unexpectedly failed a check on a parameter of type: ";
+                msg += cls.getSimpleName();
+                msg += " with error: ";
+                msg += e.toString();
+                throw compiler.new VoltCompilerException(msg);
+            }
+
+            param.setType(type.getValue());
+        }
+    }
+
     private static void checkForDeterminismWarnings(VoltCompiler compiler, String shortName, final Procedure procedure,
                                          boolean procHasWriteStmts) {
         for (Statement catalogStmt : procedure.getStatements()) {
@@ -608,6 +751,7 @@ public abstract class ProcedureCompiler {
         procedure.setSystemproc(false);
         procedure.setDefaultproc(procedureDescriptor.m_builtInStmt);
         procedure.setHasjava(false);
+        procedure.setTransactional(true);
 
         // get the annotation
         // first try to get one that has been passed from the compiler

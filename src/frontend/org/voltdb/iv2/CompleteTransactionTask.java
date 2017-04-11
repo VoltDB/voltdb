@@ -29,6 +29,7 @@ import org.voltdb.messaging.CompleteTransactionResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.rejoin.TaskLog;
+import org.voltdb.utils.VoltTrace;
 
 public class CompleteTransactionTask extends TransactionTask
 {
@@ -48,9 +49,14 @@ public class CompleteTransactionTask extends TransactionTask
     @Override
     public void run(SiteProcedureConnection siteConnection)
     {
-        if (hostLog.isDebugEnabled()) {
-            hostLog.debug("[CompleteTransactionTask]STARTING: " + this);
+        hostLog.debug("STARTING: " + this);
+        final VoltTrace.TraceEventBatch traceLog = VoltTrace.log(VoltTrace.Category.SPSITE);
+        if (traceLog != null) {
+            traceLog.add(() -> VoltTrace.beginDuration("execcompletetxn",
+                                                       "txnId", TxnEgo.txnIdToString(getTxnId()),
+                                                       "partition", Integer.toString(siteConnection.getCorrespondingPartitionId())));
         }
+
         if (!m_txnState.isReadOnly()) {
             // the truncation point token SHOULD be part of m_txn. However, the
             // legacy interaces don't work this way and IV2 hasn't changed this
@@ -66,9 +72,7 @@ public class CompleteTransactionTask extends TransactionTask
 
             // Log invocation to DR
             logToDR(siteConnection.getDRGateway());
-            if (hostLog.isDebugEnabled()) {
-                hostLog.debug("[CompleteTransactionTask]COMPLETE: " + this);
-            }
+            hostLog.debug("COMPLETE: " + this);
         }
         else
         {
@@ -77,9 +81,11 @@ public class CompleteTransactionTask extends TransactionTask
             // flush the queue; we want the TransactionTaskQueue to stay blocked on this TXN ID
             // for the restarted fragments.
             m_txnState.setBeginUndoToken(Site.kInvalidUndoToken);
-            if (hostLog.isDebugEnabled()) {
-                hostLog.debug("[CompleteTransactionTask]RESTART: " + this);
-            }
+            hostLog.debug("RESTART: " + this);
+        }
+
+        if (traceLog != null) {
+            traceLog.add(VoltTrace::endDuration);
         }
 
         final CompleteTransactionResponseMessage resp = new CompleteTransactionResponseMessage(m_completeMsg);
@@ -189,4 +195,5 @@ public class CompleteTransactionTask extends TransactionTask
         sb.append("  MSG: ").append(m_completeMsg.toString());
         return sb.toString();
     }
+
 }
