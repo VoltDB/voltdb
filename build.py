@@ -504,7 +504,6 @@ if whichtests in ("${eetestsuite}", "executors"):
     TestWindowedMin
     TestWindowedMax
     TestWindowedSum
-    TestENG12188
     """
 
 if whichtests in ("${eetestsuite}", "expressions"):

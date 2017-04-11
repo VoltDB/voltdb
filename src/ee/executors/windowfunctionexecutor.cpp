@@ -509,7 +509,7 @@ inline void WindowFunctionExecutor::initAggInstances()
     }
 }
 
-void WindowFunctionExecutor::lookaheadOneRowForAggs(const TableTuple &tuple, TableWindow &tableWindow) {
+inline void WindowFunctionExecutor::lookaheadOneRowForAggs(const TableTuple &tuple, TableWindow &tableWindow) {
     WindowAggregate **aggs = m_aggregateRow->getAggregates();
     for (int ii = 0; ii < m_aggTypes.size(); ii++) {
         if (aggs[ii]->m_needsLookahead) {
