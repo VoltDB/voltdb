@@ -194,6 +194,9 @@ public abstract class CatalogUtil {
     };
 
     private static boolean m_exportEnabled = false;
+    public static final String CATALOG_FILE_NAME = "catalog.jar";
+
+    public static final String STAGED_CATALOG_FILE_NAME = "staged-catalog.jar";
 
     private static JAXBContext m_jc;
     private static Schema m_schema;
@@ -2687,9 +2690,5 @@ public abstract class CatalogUtil {
         }
         return sb.toString();
     }
-
-    public static final String CATALOG_FILE_NAME = "catalog.jar";
-
-    public static final String STAGED_CATALOG_FILE_NAME = "staged-catalog.jar";
 
 }
