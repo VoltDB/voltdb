@@ -96,16 +96,16 @@ def basicCheck(runner):
         if remote_cluster_id > largestClusterId:
             largestClusterId = remote_cluster_id
 
-    # Check the existence of voltdb root path and new kit on all the existing nodes
-    response = runner.call_proc('@CheckUpgradePlan',
-                                [VOLT.FastSerializer.VOLTTYPE_STRING],
-                                [runner.opts.newKit, runner.opts.newRoot])
-    for tuple in response.table(0).tuples():
-        if tuple != 'Success':
-            error += tuple + "\n"
-
-    if error is not None:
-        runner.abort(error)
+#     # Check the existence of voltdb root path and new kit on all the existing nodes
+#     response = runner.call_proc('@CheckUpgradePlan',
+#                                 [VOLT.FastSerializer.VOLTTYPE_STRING],
+#                                 [runner.opts.newKit, runner.opts.newRoot])
+#     for tuple in response.table(0).tuples():
+#         if tuple != 'Success':
+#             error += tuple + "\n"
+#
+#     if error is not None:
+#         runner.abort(error)
 
     print 'Pre-upgrade check is passed.'
 
@@ -145,20 +145,24 @@ def generateCommands(runner, hosts, kfactor, largestClusterId):
         step += 1
         generateTurnOnXDCRCommand(runner.opts, surviveSet, files, origin_cluster_deploy, step)
 
-    # 6 kill the original cluster
+     # 6 call 'voltadmin shutdown --wait' on the original cluster
+    step += 1
+    generatePauseCommand(surviveSet, files, step)
+
+    # 7 kill the original cluster
     step += 1
     generateShutdownOriginClusterCommand(surviveSet, files, step)
 
-    # 7 run DR RESET on one node of the new cluster.
+    # 8 run DR RESET on one node of the new cluster.
     # TODO: If there are other clusters connect to the original cluster before, run individual DR RESET.
     step += 1
     generateDRResetCommand(killSet, files, step)
 
-    # 8 initialize a new VoltDB root path on the nodes being shutdown ( may not need all of them)
+    # 9 initialize a new VoltDB root path on the nodes being shutdown ( may not need all of them)
     step += 1
     generateInitOldClusterCommmand(runner.opts, surviveSet, files, new_cluster_deploy, hostcount / 2, step)
 
-    # 9 rejoin the nodes being shutdown recently to the new cluster
+    # 10 rejoin the nodes being shutdown recently to the new cluster
     step += 1
     generateNodeRejoinCommand(runner.opts, surviveSet, leadersString, files, hostcount / 2, step)
 
@@ -268,6 +272,11 @@ def generateTurnOnXDCRCommand(opts, surviveSet, files, origin_cluster_deploy, st
               'voltadmin update -H %s:%d %s' % (surviveSet[0].hostname,
                                                 surviveSet[0].adminport,
                                                 os.path.join(opts.newRoot, origin_cluster_deploy)))
+
+def generatePauseCommand(surviveSet, files, step):
+   writeCommands(files[getKey(surviveSet[0])],
+                  'Step %d: wait for XDCR stream to drain' % step,
+                  'voltadmin pause --wait -H %s:%d' % (surviveSet[0].hostname, surviveSet[0].adminport))
 
 def generateShutdownOriginClusterCommand(surviveSet, files, step):
     writeCommands(files[getKey(surviveSet[0])],
