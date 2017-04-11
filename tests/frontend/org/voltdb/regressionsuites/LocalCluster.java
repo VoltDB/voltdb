@@ -109,6 +109,10 @@ public class LocalCluster extends VoltServerConfig {
     int m_replicationPort = -1;
 
     Map<String, String> m_hostRoots = new HashMap<>();
+    public Map<String, String> getHostRoots(){
+        return m_hostRoots;
+    }
+
     // Dedicated paths in the filesystem to be used as a root for each process
     ArrayList<File> m_subRoots = new ArrayList<>();
     public ArrayList<File> getSubRoots() {

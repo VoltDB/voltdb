@@ -80,14 +80,14 @@ final public class TestStagedCatalogStart {
         assertEquals(1, response.getResults()[0].getRowCount());
 
         // Staged catalog will persist because durability is off, and being able to recover the schema is beneficial.
-        int nodesWithStagedCatalog = cluster.countNodesWithFile(Constants.CONFIG_DIR + File.separator + CatalogUtil.STAGED_CATALOG_FILE_NAME);
+        int nodesWithStagedCatalog = cluster.countNodesWithFile(CatalogUtil.STAGED_CATALOG_RELATIVE_PATH);
         assertEquals(hostCount, nodesWithStagedCatalog);
         cluster.shutDown();
 
         System.out.println("Delete staged catalog from node 0; cluster must not let us restart.");
         final File root0StagedCatalog = new File(RealVoltDB.getStagedCatalogPath(cluster.getServerSpecificRoot("0")));
         assertTrue(root0StagedCatalog.delete());
-        nodesWithStagedCatalog = cluster.countNodesWithFile(Constants.CONFIG_DIR + File.separator + CatalogUtil.STAGED_CATALOG_FILE_NAME);
+        nodesWithStagedCatalog = cluster.countNodesWithFile(CatalogUtil.STAGED_CATALOG_RELATIVE_PATH);
         assertEquals(hostCount - 1, nodesWithStagedCatalog);
 
         // Make sure cluster can't be restarted with a missing staged catalog
@@ -106,7 +106,7 @@ final public class TestStagedCatalogStart {
         if (!compiler.compileFromDDL(root0StagedCatalog.getAbsolutePath(), VoltProjectBuilder.createFileForSchema(differentSchema).getAbsolutePath())){
             fail();
         }
-        nodesWithStagedCatalog = cluster.countNodesWithFile(Constants.CONFIG_DIR + File.separator + CatalogUtil.STAGED_CATALOG_FILE_NAME);
+        nodesWithStagedCatalog = cluster.countNodesWithFile(CatalogUtil.STAGED_CATALOG_RELATIVE_PATH);
         assertEquals(nodesWithStagedCatalog, hostCount);
         clearLocalDataDirectories = false;
         skipInit = true;
@@ -114,5 +114,7 @@ final public class TestStagedCatalogStart {
         // FIXME how to verify the error message is as expected? It is, but test doesn't know it is.
 
         // TODO: test that different stored procedure code results in startup failure
+        // The challenge here will be loading two separate copies of the same stored procedure.
+        // Need to set up some infrastructure for this.
     }
 }
