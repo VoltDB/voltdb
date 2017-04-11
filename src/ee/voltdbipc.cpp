@@ -792,7 +792,8 @@ void VoltDBIPC::executePlanFragments(struct ipc_command *cmd) {
     ReferenceSerializeInputBE serialize_in(offset, sz);
 
     // and reset to space for the results output
-    m_engine->resetReusedResultOutputBuffer(1, 1); // 1 byte to add status code
+    m_engine->resetReusedResultOutputBuffer(1); // 1 byte to add status code
+    m_reusedResultBuffer[0] = kErrorCode_Success;
     m_engine->resetPerFragmentStatsOutputBuffer(queryCommand->perFragmentTimingEnabled);
 
     try {
@@ -817,9 +818,8 @@ void VoltDBIPC::executePlanFragments(struct ipc_command *cmd) {
     if (errors == 0) {
         // write the results array back across the wire
         const int32_t size = m_engine->getResultsSize();
-        char *resultBuffer = m_engine->getReusedResultBuffer();
-        resultBuffer[0] = kErrorCode_Success;
-        writeOrDie(m_fd, (unsigned char*)resultBuffer, size);
+        const unsigned char *resultBuffer = m_engine->getResultsBuffer();
+        writeOrDie(m_fd, resultBuffer, size);
     } else {
         sendException(kErrorCode_Error);
     }
