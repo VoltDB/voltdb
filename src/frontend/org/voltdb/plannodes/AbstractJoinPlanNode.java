@@ -222,7 +222,7 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode implements I
             // These will all be TVEs.
             assert(col.getExpression() instanceof TupleValueExpression);
             TupleValueExpression tve = (TupleValueExpression)col.getExpression();
-            int index = i;
+            int index;
             if (i < outerSize) {
                 index = tve.setColumnIndexUsingSchema(outer_schema);
             }
@@ -238,7 +238,6 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode implements I
 
             tve.setColumnIndex(index);
             tve.setDifferentiator(index);
-            // col.setDifferentiator(index);
         }
 
         // We want the output columns to be ordered like [outer table columns][inner table columns],
