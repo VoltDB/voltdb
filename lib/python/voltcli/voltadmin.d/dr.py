@@ -36,7 +36,7 @@ def reset_remote(runner):
             VOLT.BooleanOption('-c', '--cluster', 'clusterId', 'dr cluster Id', default = -1),
     ),
     modifiers = (
-            VOLT.Modifier('resetlocal', reset_local, 'remove local cluster from its dr cluster mesh.'),
+            VOLT.Modifier('resetlocal', reset_local, 'remove local cluster from dr cluster mesh.'),
             VOLT.Modifier('reset', reset_remote, 'reset one/all remote dr cluster(s).'),
     )
 )
